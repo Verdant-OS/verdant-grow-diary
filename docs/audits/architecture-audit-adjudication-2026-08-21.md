@@ -387,16 +387,39 @@ code, and this document does not claim that.**
 
 ### 6.2 The `vercel.json` question is now measured, not ambiguous
 
-`established fact`, four live probes, 2026-08-21:
+`established fact`, live probes 2026-08-21, **redirect following explicitly disabled** and the
+exact command recorded so the result is reproducible rather than asserted:
 
-| Path        | `vercel.json` declares | Measured                    |
-| ----------- | ---------------------- | --------------------------- |
-| `/features` | 301 → `/welcome`       | **HTTP 200, no `Location`** |
-| `/demo`     | 301 → `/welcome`       | **HTTP 200, no `Location`** |
-| `/strains`  | 301 → `/cultivars`     | **HTTP 200, no `Location`** |
-| `/refunds`  | 301 → `/refund`        | **HTTP 200, no `Location`** |
+```bash
+curl -sS -o /dev/null --max-redirs 0 --max-time 25 \
+  -w "%{http_code}|%{redirect_url}|%{num_redirects}" "https://verdantgrowdiary.com<path>"
+```
 
-Not one redirect fired. This independently reproduces #1051's finding.
+All **eight** redirect entries `vercel.json` declares — the earlier revision probed only four:
+
+| Path                | `vercel.json` declares   | Measured                                    |
+| ------------------- | ------------------------ | ------------------------------------------- |
+| `/features`         | 301 → `/welcome`         | **HTTP 200**, `Location` empty, 0 redirects |
+| `/demo`             | 301 → `/welcome`         | **HTTP 200**, `Location` empty, 0 redirects |
+| `/strains`          | 301 → `/cultivars`       | **HTTP 200**, `Location` empty, 0 redirects |
+| `/strains/:slug`    | 301 → `/cultivars/:slug` | **HTTP 200**, `Location` empty, 0 redirects |
+| `/refunds`          | 301 → `/refund`          | **HTTP 200**, `Location` empty, 0 redirects |
+| `/refund-policy`    | 301 → `/refund`          | **HTTP 200**, `Location` empty, 0 redirects |
+| `/terms-of-service` | 301 → `/terms`           | **HTTP 200**, `Location` empty, 0 redirects |
+| `/privacy-policy`   | 301 → `/privacy`         | **HTTP 200**, `Location` empty, 0 redirects |
+
+**Positive control — added after review, and it is the part that makes the negative
+trustworthy.** A reviewer noted that a client silently following redirects would report the
+destination's 200 with no `Location`, making an inert config indistinguishable from a working
+one. Two controls rule that out:
+
+| Control                             | Result                                                  | What it shows                                                                                                    |
+| ----------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `https://www.verdantgrowdiary.com/` | **HTTP 302**, `Location: https://verdantgrowdiary.com/` | The probe **does** observe a redirect when one exists — the apex redirect is not a `vercel.json` entry and fires |
+| `/__nonexistent__`                  | HTTP 200, no `Location`                                 | An undeclared path is indistinguishable from the eight declared ones, as expected if the config is inert         |
+
+`num_redirects=0` on every row confirms nothing was followed. Not one declared redirect fired.
+This independently reproduces #1051's finding.
 
 Note the corroborating repository evidence: `src/routes/` contains real route modules named
 `features.tsx`, `demo.tsx`, `strains.index.tsx`, `strains.$slug.tsx`, `refunds.tsx`,

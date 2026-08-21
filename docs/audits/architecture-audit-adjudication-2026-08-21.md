@@ -341,7 +341,9 @@ unscanned. §6.1's later subsection records that as **`NOT_MEASURED`**, and an e
 this summary silently narrowed the list to two, which would have let the publisher investigation
 exclude it prematurely.
 
-Distinguishing all three needs the publisher's build log, which is owner-gated; **nothing here
+Distinguishing all three needs the publisher's build log, which is owner-gated — though a **named
+instance of the second** landed on the base branch after this was written and can be tested without
+that log (see the #1090 subsection below); **nothing here
 shows wrong content shipped, only that the stamp has not been tied back to a committed tree** —
 "has not been", not "cannot be", because the third explanation is precisely the case where it
 could yet be.
@@ -355,6 +357,65 @@ actually scanned.
 
 This supersedes the `CURRENT_STATE` Production-commit row (`f09febc354a4`, `dirty: false`,
 2026-08-20).
+
+#### A candidate mechanism landed on the base branch after this section was written
+
+`#1090` merged into `verdant-grow-diary` as `9133a4c45` on 2026-08-21 at 20:10Z — after the four
+rows above were measured — and it names a mechanism for exactly this drift. It is recorded here
+because a document whose headline finding is an unexplained mismatch must not stay silent once
+the base branch supplies a candidate explanation. It is a **candidate**, not a closure, and the
+labels below are the load-bearing part.
+
+**`established fact`, verified in this repository rather than taken from that PR's description:**
+
+- `supabase` is a `TREE_HASH_ROOTS` entry, and `tree-hash.mjs`'s `EXCLUDED_PREFIXES` covers only
+  `supabase/.temp/`, `supabase/.branches/` and `src/generated/`. So
+  `supabase/functions/mcp/index.ts` — the committed MCP edge bundle — **is inside the hashed
+  roots**.
+- `vite.config.ts` at `ea31fbdfb` — the base this document was measured against — wired the
+  plugin behind one guard: `plugins: [process.platform !== "win32" && mcpPlugin()]`. The guard
+  excludes **only** Windows, so the plugin ran on any non-Windows builder. That the publisher is
+  one is `inference`, not measured here — #1090's title asserts Linux. `9133a4c45` removes the
+  wiring.
+
+**`source claim`, from #1090 and NOT verified here:** that the plugin esbuild-regenerates the
+committed bundle on `configResolved` / `buildStart`, and that Lovable's output is not
+byte-identical to the committed file. The plugin ships inside `@lovable.dev/mcp-js` and this
+session has no `node_modules`, so neither its hook timing nor its output bytes could be checked.
+
+**`inference`, conditional on both of those source claims holding:** every Lovable build rewrote
+a hashed root before the stamper ran, which produces both observed symptoms at once — a dirty
+working tree (`dirty: true`) and hashed roots that differ from the stamped commit's tree. That is
+a concrete instance of the second explanation listed above — "a publish pipeline that mutates
+hashed files … before prebuild" — with a named file instead of a hypothesis. It is **not a fourth
+class** of explanation, and does not narrow the list of three.
+
+**This narrows the bound in an uncomfortable direction, which is why it belongs here.** The bound
+itself stands: whether any shipped byte differs is still `NOT_MEASURED`. Its _reassurance_ does
+not. That reassurance rests on examples that never ship — a test file, a `scripts/` helper, a
+migration. `supabase/functions/mcp/index.ts` is none of those. It is an edge-function source, and
+publishing ships "the frontend and edge functions only" (`CLAUDE.md`, repository traps). So if
+this mechanism is the cause, the drifting path is one
+that **does** ship. Nothing here measures the deployed function's bytes; the point is that the
+comforting examples do not cover the named candidate.
+
+**Three things keep it open.** #1090 places the "production stamp / dirty / `__orphan__`
+diagnosis" outside its own scope. Nothing in it explains `ref: "__orphan__"`. And the two
+unverified source claims above are precisely what the inference rests on.
+
+**The falsifiable follow-up needs no owner access.** #1090 is merged but not necessarily
+published. Once a build produced _after_ it reaches production, re-fetch `/version.json` and
+recompute that commit's tree with `computeTreeHash()`. If this mechanism was the cause, the
+mismatch and `dirty: true` should stop; if they persist, the candidate is refuted and the
+publisher's build log is again the only route. Either outcome is a measurement, which beats the
+standing `BLOCKED`.
+
+**The test was attempted and is not yet available.** `/version.json` re-fetched 2026-08-21 at
+20:35Z still serves `ea31fbdfb934`, `buildTime 2026-08-21T15:53:46.096Z`, `dirty: true`,
+`ref: "__orphan__"`, `treeHash 831bd3b4f230…` — the same pre-#1090 build already tabled above, not
+a new one. #1090 merged at 20:10Z and **has not been published**, so this reading neither supports
+nor refutes the candidate. Recorded with its timestamp so the next reader knows the check was made
+rather than skipped, and re-runs it rather than re-deriving it.
 
 #### The tree hash was resolved locally — this is measured, not `BLOCKED`
 
@@ -835,19 +896,19 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 
 ## 8. Known unknowns, and what stays blocked
 
-| Question                                                                           | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Applied-migration ledger vs. the 272 committed files                               | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Does production deliver the security headers `vercel.json` declares?               | **Catch-all block measured (§6.2); the path-specific blocks are `NOT_MEASURED`.** Of the five headers in `/(.*)`, 3 arrive; `x-frame-options` and `permissions-policy` absent, no CSP substitutes; HSTS present with a different value — so that block is **not being applied as declared**. The `/unsubscribe` and `/assets/(.*)` blocks were never probed. Where the three delivered headers _do_ originate is `NOT_MEASURED`                                                                                                                                                   |
-| Does the served SHA exist in the repository?                                       | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1)                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Does the tree hash production **stamped** match the tree of the commit it stamped? | **`FAIL` — measured.** Recomputed `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Why did the build **workspace's** hashed roots differ from that commit's tree?     | `BLOCKED` — needs the publisher's build log; owner-only. Note the question: §6.1 establishes workspace drift only. Whether any **shipped byte** differs is `NOT_MEASURED`                                                                                                                                                                                                                                                                                                                                                                                                         |
-| What _is_ production commit `4b1c4867e685`?                                        | **`PASS` — resolved.** "Completed Verdant audit", `lovable-dev[bot]`, merge of `28c01a017` + `a684da59b`, `2026-08-21T09:44:40Z`, via the GitHub commit endpoint (§6.1). Do not re-run this lookup                                                                                                                                                                                                                                                                                                                                                                                |
-| Are all **five** declared npm consumers still real?                                | `NOT_MEASURED` — TOOL-01's prerequisite is an inventory across all five, **not** the preview project alone, and the gate requires every declared consumer while `package-lock.json` remains. **Do not state a residual count:** the preview checklist and `vercel.json` describe the _same_ deployment (§6.4), so map contracts to deployments before counting what any retirement clears. §6.2 removes no consumer's justification: production ≠ preview. The preview checklist also describes the pre-SSR client-only build, so it may be stale — verify, do not assume retired |
-| Runtime AI Doctor behaviour under the twenty adversarial cases                     | `NOT_MEASURED` — AI-02 not run                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| False-positive rate for any SPC rule                                               | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| GA4 / GSC authenticated baselines                                                  | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Indexation                                                                         | `NOT_MEASURED` — unchanged                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Question                                                                           | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Applied-migration ledger vs. the 272 committed files                               | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Does production deliver the security headers `vercel.json` declares?               | **Catch-all block measured (§6.2); the path-specific blocks are `NOT_MEASURED`.** Of the five headers in `/(.*)`, 3 arrive; `x-frame-options` and `permissions-policy` absent, no CSP substitutes; HSTS present with a different value — so that block is **not being applied as declared**. The `/unsubscribe` and `/assets/(.*)` blocks were never probed. Where the three delivered headers _do_ originate is `NOT_MEASURED`                                                                                                                                                                                                                                                                                         |
+| Does the served SHA exist in the repository?                                       | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Does the tree hash production **stamped** match the tree of the commit it stamped? | **`FAIL` — measured.** Recomputed `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Why did the build **workspace's** hashed roots differ from that commit's tree?     | `BLOCKED` — but **narrower than owner-only since #1090** (`9133a4c45`) merged into the base branch naming a candidate: a Vite plugin regenerating `supabase/functions/mcp/index.ts`, a hashed root, on every non-Windows build. Verified in-repo that the file is inside `TREE_HASH_ROOTS` and that the wiring existed at `ea31fbdfb`; the plugin's behaviour is an unverified `source claim` (§6.1). Falsifiable without the build log: re-measure once a post-#1090 build is published. Note the question: §6.1 establishes workspace drift only. Whether any **shipped byte** differs is `NOT_MEASURED` — and the named candidate **is** a shipped edge-function source, so the never-ships examples do not cover it |
+| What _is_ production commit `4b1c4867e685`?                                        | **`PASS` — resolved.** "Completed Verdant audit", `lovable-dev[bot]`, merge of `28c01a017` + `a684da59b`, `2026-08-21T09:44:40Z`, via the GitHub commit endpoint (§6.1). Do not re-run this lookup                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Are all **five** declared npm consumers still real?                                | `NOT_MEASURED` — TOOL-01's prerequisite is an inventory across all five, **not** the preview project alone, and the gate requires every declared consumer while `package-lock.json` remains. **Do not state a residual count:** the preview checklist and `vercel.json` describe the _same_ deployment (§6.4), so map contracts to deployments before counting what any retirement clears. §6.2 removes no consumer's justification: production ≠ preview. The preview checklist also describes the pre-SSR client-only build, so it may be stale — verify, do not assume retired                                                                                                                                       |
+| Runtime AI Doctor behaviour under the twenty adversarial cases                     | `NOT_MEASURED` — AI-02 not run                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| False-positive rate for any SPC rule                                               | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| GA4 / GSC authenticated baselines                                                  | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Indexation                                                                         | `NOT_MEASURED` — unchanged                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ---
 
@@ -930,7 +991,9 @@ unknowns:
 
 blocked:
   - why the build workspace's hashed roots differed from the stamped commit's tree.
-    Owner: whoever holds the publisher's build log. Unblocked by that log. Lead recorded:
+    Owner: whoever holds the publisher's build log. Unblocked by that log — or, without it,
+    by re-measuring once a post-#1090 build is published, which would confirm or refute the
+    candidate mechanism #1090 names (§6.1). Lead recorded:
     x-deployment-id ecbb2146eba6 on live responses
   - GA4 / GSC authenticated baselines — unchanged, blockers 2 and 3 in CURRENT_STATE
 
@@ -967,7 +1030,8 @@ files_touched:
    `4b1c4867e685` by SHA, recompute its tree with `scripts/lib/tree-hash.mjs`, and confirm it
    yields `1f0eb7b4e6cd…` against the live stamp's `8773f6b2c0ed…`. **Do not re-run the
    "does the SHA exist" check** — that question is closed (§6.1), and finding the SHA in another
-   ref would not touch the surviving finding. The open half is the publisher's build log.
+   ref would not touch the surviving finding. The open half was the publisher's build log; since
+   #1090 merged there is also a candidate mechanism to test against a post-#1090 publish (§6.1).
 3. ~~Challenge §6.3's counting method.~~ **Already raised and acted on** — Codex made exactly
    this challenge in review of this document, and §6.3 is rewritten accordingly: the finding
    is now "11 files use the installed schema validator", carrying no coverage claim in either

@@ -157,6 +157,16 @@ function buildOps(supabase, userId, fixtureNames) {
       if (error || !Array.isArray(data)) throw new Error("diary_entry_ids_lookup_error");
       return data.map((row) => row.id);
     },
+    async listDeletedDiaryEntryIds(growId) {
+      const { data, error } = await supabase
+        .from("diary_entry_audit_log")
+        .select("diary_entry_id")
+        .eq("user_id", userId)
+        .eq("action", "delete")
+        .eq("previous_snapshot->>grow_id", growId);
+      if (error || !Array.isArray(data)) throw new Error("diary_tombstone_ids_lookup_error");
+      return [...new Set(data.map((row) => row.diary_entry_id))];
+    },
     async countDiaryEntryAudits(diaryEntryIds) {
       if (!Array.isArray(diaryEntryIds) || diaryEntryIds.length === 0) return 0;
       const res = await supabase

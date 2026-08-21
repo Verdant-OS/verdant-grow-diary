@@ -179,10 +179,15 @@ function sameIds(left, right) {
 
 async function readDiaryAuditScope(ops, growId) {
   const diaryEntryIds = exactStrings(await ops.listDiaryEntryIds(growId), "diary_ids_invalid");
-  const auditRows = diaryEntryIds.length
-    ? exactRetainedCount(await ops.countDiaryEntryAudits(diaryEntryIds))
+  const tombstonedDiaryEntryIds = exactStrings(
+    await ops.listDeletedDiaryEntryIds(growId),
+    "diary_tombstone_ids_invalid",
+  );
+  const auditEntryIds = [...new Set([...diaryEntryIds, ...tombstonedDiaryEntryIds])];
+  const auditRows = auditEntryIds.length
+    ? exactRetainedCount(await ops.countDiaryEntryAudits(auditEntryIds))
     : 0;
-  return { diaryEntryIds, auditRows };
+  return { diaryEntryIds, auditEntryIds, auditRows };
 }
 
 async function readQuickLogScope(ops, growId) {
@@ -237,6 +242,7 @@ export async function discoverFixture(ops, names = FIXTURE_NAMES) {
     photoPaths,
     alertIds,
     diaryEntryIds: diaryAuditScope.diaryEntryIds,
+    diaryAuditEntryIds: diaryAuditScope.auditEntryIds,
     quickLogIds: quickLogScope.quickLogIds,
     quickLogIdempotencyKeys: quickLogScope.idempotencyKeys,
     quickLogAuditEventIds: quickLogScope.auditEventIds,
@@ -345,6 +351,7 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
     const verifiedDiary = await readDiaryAuditScope(ops, growId);
     if (
       !sameIds(discovery.diaryEntryIds, verifiedDiary.diaryEntryIds) ||
+      !sameIds(discovery.diaryAuditEntryIds, verifiedDiary.auditEntryIds) ||
       verifiedDiary.auditRows !== c.diary_entry_audit
     ) {
       return result("failed", "diary_audit_baseline_verification_failed", counts, retained);
@@ -397,21 +404,19 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
     return result("failed", "diary_entries_delete_failed", counts, retained);
   }
   try {
-    if ((await ops.listDiaryEntryIds(growId)).length > 0) {
-      return result("failed", "diary_entries_rows_survived_delete", counts, retained);
-    }
-  } catch {
-    return result("failed", "diary_entries_verify_failed", counts, retained);
-  }
-  try {
-    const postDeleteAuditRows = discovery.diaryEntryIds.length
-      ? exactRetainedCount(await ops.countDiaryEntryAudits(discovery.diaryEntryIds))
-      : 0;
+    const postDeleteDiary = await readDiaryAuditScope(ops, growId);
+    const expectedAuditEntryIds = [
+      ...new Set([...discovery.diaryAuditEntryIds, ...discovery.diaryEntryIds]),
+    ];
     const expectedAuditRows = c.diary_entry_audit + counts.diary_entries_deleted;
-    if (postDeleteAuditRows !== expectedAuditRows) {
+    if (
+      postDeleteDiary.diaryEntryIds.length > 0 ||
+      !sameIds(expectedAuditEntryIds, postDeleteDiary.auditEntryIds) ||
+      postDeleteDiary.auditRows !== expectedAuditRows
+    ) {
       return result("failed", "diary_audit_post_delete_verification_failed", counts, retained);
     }
-    retained.diary_entry_audit_rows = postDeleteAuditRows;
+    retained.diary_entry_audit_rows = postDeleteDiary.auditRows;
   } catch {
     return result("failed", "diary_audit_post_delete_verification_failed", counts, retained);
   }

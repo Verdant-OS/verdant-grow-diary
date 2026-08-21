@@ -38,6 +38,7 @@ interface FakeState {
   tents: string[];
   plants: string[];
   diaryEntryIds: string[];
+  tombstonedDiaryEntryIds: string[];
   diaryAuditScopeIds: string[];
   diaryEntryAuditRows: number;
   actionQueue: number;
@@ -83,6 +84,9 @@ function makeOps(state: FakeState) {
     },
     async listDiaryEntryIds() {
       return [...state.diaryEntryIds];
+    },
+    async listDeletedDiaryEntryIds() {
+      return [...state.tombstonedDiaryEntryIds];
     },
     async countDiaryEntries() {
       return state.diaryEntryIds.length;
@@ -133,8 +137,12 @@ function makeOps(state: FakeState) {
       return state.growTargets;
     },
     deleteDiaryEntries: del("diary_entries", () => {
+      const deletedIds = [...state.diaryEntryIds];
       const n = state.diaryEntryIds.length;
       state.diaryEntryIds = [];
+      state.tombstonedDiaryEntryIds = [
+        ...new Set([...state.tombstonedDiaryEntryIds, ...deletedIds]),
+      ];
       state.diaryEntryAuditRows += n;
       return n;
     }),
@@ -182,6 +190,7 @@ function seededState(): FakeState {
     tents: ["tent-1"],
     plants: ["plant-1"],
     diaryEntryIds: ["diary-1"],
+    tombstonedDiaryEntryIds: [],
     diaryAuditScopeIds: ["diary-1"],
     diaryEntryAuditRows: 1,
     actionQueue: 0,
@@ -509,6 +518,36 @@ describe("delete ordering (child before parent)", () => {
     expect(JSON.stringify(thrown)).not.toContain("SECRET");
   });
 
+  it("fails closed before deletion when diary tombstone discovery is missing, malformed, or mutates", async () => {
+    const missingState = seededState();
+    const missingOps = makeOps(missingState);
+    const missingDiscovery = await discoverFixture(missingOps);
+    missingOps.listDeletedDiaryEntryIds = undefined as never;
+    const missing = await executeTeardown(missingOps, missingDiscovery, { dryRun: false });
+    expect(missing.status).toBe("failed");
+    expect(missing.reason).toBe("diary_audit_baseline_verification_failed");
+    expect(missingOps.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+
+    const malformedState = seededState();
+    const malformedOps = makeOps(malformedState);
+    const malformedDiscovery = await discoverFixture(malformedOps);
+    malformedOps.listDeletedDiaryEntryIds = async () => [""];
+    const malformed = await executeTeardown(malformedOps, malformedDiscovery, { dryRun: false });
+    expect(malformed.status).toBe("failed");
+    expect(malformed.reason).toBe("diary_audit_baseline_verification_failed");
+    expect(malformedOps.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+
+    const changedState = seededState();
+    const changedOps = makeOps(changedState);
+    const changedDiscovery = await discoverFixture(changedOps);
+    changedState.tombstonedDiaryEntryIds = ["different-diary"];
+    changedState.diaryAuditScopeIds = ["diary-1", "different-diary"];
+    const changed = await executeTeardown(changedOps, changedDiscovery, { dryRun: false });
+    expect(changed.status).toBe("failed");
+    expect(changed.reason).toBe("diary_audit_baseline_verification_failed");
+    expect(changedOps.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+  });
+
   it.each([undefined, Number.NaN, -1, 1.5, 1])(
     "fails closed after diary deletion for an invalid or mismatched trigger count: %s",
     async (postCount) => {
@@ -549,6 +588,25 @@ describe("delete ordering (child before parent)", () => {
       "delete:diary_entries",
     ]);
     expect(JSON.stringify(result)).not.toContain("SECRET");
+  });
+
+  it("fails closed after diary deletion when tombstone discovery does not include the deleted live ID", async () => {
+    const state = seededState();
+    const ops = makeOps(state);
+    const discovery = await discoverFixture(ops);
+    let tombstoneReads = 0;
+    ops.listDeletedDiaryEntryIds = async () => {
+      tombstoneReads += 1;
+      return [];
+    };
+    const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("diary_audit_post_delete_verification_failed");
+    expect(tombstoneReads).toBe(2);
+    expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([
+      "delete:diary_entries",
+    ]);
   });
 
   it("still removes the parent hierarchy when no protected fixture history exists", async () => {
@@ -777,7 +835,11 @@ describe("idempotency", () => {
     expect(second.status).toBe("completed_with_retained_history");
     expect(second.counts.total_deleted).toBe(0);
     expect(second.retainedHistory.quick_log_rows).toBe(2);
-    expect(second.retainedHistory.diary_entry_audit_rows).toBe(0);
+    expect(second.retainedHistory.diary_entry_audit_rows).toBe(2);
+    expect(second.retainedHistory.total_retained).toBe(first.retainedHistory.total_retained);
+    const repeatedDry = await executeTeardown(ops, await discoverFixture(ops), { dryRun: true });
+    expect(repeatedDry.retainedHistory.diary_entry_audit_rows).toBe(2);
+    expect(repeatedDry.retainedHistory.total_retained).toBe(first.retainedHistory.total_retained);
   });
 
   it("executor return counts carry a correct total_deleted (not just the receipt)", async () => {
@@ -1064,6 +1126,9 @@ describe("static hygiene", () => {
     expect(CLI_SRC).toContain('.in("grow_event_id", quickLogIds)');
     expect(CLI_SRC).toContain('.in("idempotency_key", idempotencyKeys)');
     expect(CLI_SRC).toContain('.in("diary_entry_id", diaryEntryIds)');
+    expect(CLI_SRC).toContain('.eq("action", "delete")');
+    expect(CLI_SRC).toContain('.eq("previous_snapshot->>grow_id", growId)');
+    expect(CLI_SRC).toContain('.select("diary_entry_id")');
     expect(CLEANUP_SRC).toContain("discovery.quickLogIds");
     expect(CLEANUP_SRC).toContain("discovery.diaryEntryIds");
   });

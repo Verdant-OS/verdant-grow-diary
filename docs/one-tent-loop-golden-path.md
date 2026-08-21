@@ -313,7 +313,10 @@ relationships (grow → tent/plant → scoped children). It:
 - counts existing diary-entry audit rows by exact discovered diary IDs; dry-run
   predicts one immutable delete-audit row per planned diary deletion, and
   execute requires the post-delete count to equal baseline plus rows actually
-  deleted before any later child or parent deletion;
+  deleted before any later child or parent deletion; repeated cleanup recovers
+  tombstoned diary IDs through owner + delete action + exact snapshot grow ID,
+  selects no snapshots, and preserves the same retained count after live diary
+  rows are gone;
 - retains append-only Action Queue/events, AI Doctor, and AI-credit history;
   when retained Action Queue history can point to the fixture alert, it also
   retains and counts that source alert and its append-only alert events so the

@@ -1,31 +1,50 @@
 /**
  * Read-only display tests for SensorSourceLineageLine. Verifies that
- * source + vendor lineage renders cleanly and that non-live sources are
- * never rendered as "Live", even when a vendor is supplied.
+ * Source is always a canonical label, provenance/vendor stays separate,
+ * and non-live sources are never rendered as "Live".
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import SensorSourceLineageLine from "@/components/SensorSourceLineageLine";
 
 describe("SensorSourceLineageLine", () => {
-  it("renders MQTT · EcoWitt when both source and vendor present", () => {
+  it("renders canonical Source + vendor provenance for mqtt · EcoWitt", () => {
     render(<SensorSourceLineageLine source="mqtt" vendor="ecowitt" />);
     const root = screen.getByTestId("sensor-source-lineage");
-    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("MQTT");
+    // mqtt is not a canonical source — Source is Invalid reading, vendor is lineage.
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe(
+      "Invalid reading",
+    );
     expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("EcoWitt");
-    expect(root.getAttribute("data-non-live")).toBe("false");
+    expect(root.getAttribute("data-source")).toBe("invalid");
+    expect(root.getAttribute("data-non-live")).toBe("true");
+    expect(root.textContent).not.toMatch(/\bLive\b/i);
   });
 
-  it("renders Webhook · Home Assistant", () => {
+  it("renders canonical Source + Home Assistant vendor lineage", () => {
     render(<SensorSourceLineageLine source="webhook" vendor="home_assistant" />);
-    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("Webhook");
-    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("Home Assistant");
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe(
+      "Invalid reading",
+    );
+    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe(
+      "Home Assistant",
+    );
+    expect(screen.getByTestId("sensor-source-lineage").textContent).not.toMatch(/\bLive\b/i);
   });
 
-  it("renders source only when vendor is absent", () => {
+  it("surfaces display-canon provenance when vendor is absent", () => {
     render(<SensorSourceLineageLine source="mqtt" />);
-    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("MQTT");
-    expect(screen.queryByTestId("sensor-source-lineage-vendor")).toBeNull();
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe(
+      "Invalid reading",
+    );
+    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("MQTT");
+  });
+
+  it("shows Live sensor for pi_bridge with Pi bridge provenance", () => {
+    render(<SensorSourceLineageLine source="pi_bridge" />);
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("Live sensor");
+    expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("Pi bridge");
+    expect(screen.getByTestId("sensor-source-lineage").getAttribute("data-source")).toBe("live");
   });
 
   it.each(["manual", "csv", "demo", "stale", "invalid", "import"] as const)(
@@ -34,14 +53,14 @@ describe("SensorSourceLineageLine", () => {
       render(<SensorSourceLineageLine source={src} vendor="ecowitt" />);
       const root = screen.getByTestId("sensor-source-lineage");
       expect(root.getAttribute("data-non-live")).toBe("true");
-      expect(root.textContent).not.toContain("Live");
+      expect(root.textContent).not.toMatch(/\bLive\b/i);
     },
   );
 
-  it("vendor lineage advertises 'never used for auth' as a title hint", () => {
+  it("vendor lineage advertises it is never used as Source", () => {
     render(<SensorSourceLineageLine source="mqtt" vendor="ecowitt" />);
     const vendorEl = screen.getByTestId("sensor-source-lineage-vendor");
-    expect(vendorEl.getAttribute("title")?.toLowerCase()).toContain("never used for auth");
+    expect(vendorEl.getAttribute("title")?.toLowerCase()).toContain("never used as source");
   });
 
   it("preserves an unknown vendor string verbatim as lineage", () => {

@@ -654,6 +654,26 @@ vestigial. That does not follow, because **production and preview are different 
 **npm**, not Bun. If that project is live, dropping `package-lock.json` breaks preview installs.
 §6.2 therefore removes **nothing** here until the preview project's status is established.
 
+**And the preview project is not the whole prerequisite** — corrected again after review, because
+an earlier revision called it "the" precondition and that would have been a dangerous thing for
+an owner to act on. `config/dependency-lockfile-transition.json` declares **five** consumers, and
+the gate requires **every** declared one to keep its reviewed markers while `package-lock.json`
+remains:
+
+| Declared consumer                                | What it is                     |
+| ------------------------------------------------ | ------------------------------ |
+| `vercel.json`                                    | host config (3 markers)        |
+| `.github/workflows/seo-monitoring.yml`           | a live CI workflow (1 marker)  |
+| `README.md`                                      | contributor instructions (3)   |
+| `.claude/skills/run-verdant-grow-diary/SKILL.md` | the agent run guide (1 marker) |
+| `docs/preview-deployment-verification.md`        | the preview checklist (3)      |
+
+So retiring the preview project would resolve **one of five**. An owner who read the earlier
+wording, found the preview project retired, and dropped the compatibility lock would break the
+remaining four — including a workflow that actually runs. **TOOL-01's prerequisite is an
+inventory and migration decision across all five**, not a single question. The preview project is
+merely the one this document happened to surface.
+
 > Those two commands are described rather than quoted, which is not fussiness — it is a measured
 > property of the gate, learned by tripping it. `check-bun-lockfile-policy.mjs` scans **every
 > file the repository enumerates, documentation included**, against `NPM_INSTALL_PATTERN`
@@ -754,19 +774,19 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 
 ## 8. Known unknowns, and what stays blocked
 
-| Question                                                                           | Status                                                                                                                                                                                                                                                                 |
-| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Applied-migration ledger vs. the 272 committed files                               | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                                                                                                                                                  |
-| Does production deliver the security headers `vercel.json` declares?               | **Measured (§6.2).** 3 of 5 arrive; `x-frame-options` and `permissions-policy` absent, no CSP substitutes; HSTS present with a different value — so that file is **not being applied as declared**. Where the three delivered headers _do_ originate is `NOT_MEASURED` |
-| Does the served SHA exist in the repository?                                       | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1)                                                                                                                        |
-| Does the tree hash production **stamped** match the tree of the commit it stamped? | **`FAIL` — measured.** Recomputed `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                                                                                                                                      |
-| Why did the build **workspace's** hashed roots differ from that commit's tree?     | `BLOCKED` — needs the publisher's build log; owner-only. Note the question: §6.1 establishes workspace drift only. Whether any **shipped byte** differs is `NOT_MEASURED`                                                                                              |
-| What _is_ production commit `4b1c4867e685`?                                        | **`PASS` — resolved.** "Completed Verdant audit", `lovable-dev[bot]`, merge of `28c01a017` + `a684da59b`, `2026-08-21T09:44:40Z`, via the GitHub commit endpoint (§6.1). Do not re-run this lookup                                                                     |
-| Is the preview Vercel project `verdant-command-center-preview` live?               | `NOT_MEASURED` — **the** precondition for TOOL-01, not a side quest. §6.2 removes no npm consumer's justification: production ≠ preview. Its checklist also describes the pre-SSR client-only build, so the checklist may be stale too — verify, do not assume retired |
-| Runtime AI Doctor behaviour under the twenty adversarial cases                     | `NOT_MEASURED` — AI-02 not run                                                                                                                                                                                                                                         |
-| False-positive rate for any SPC rule                                               | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                                                                                                                                           |
-| GA4 / GSC authenticated baselines                                                  | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                                                                                                                                                |
-| Indexation                                                                         | `NOT_MEASURED` — unchanged                                                                                                                                                                                                                                             |
+| Question                                                                           | Status                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Applied-migration ledger vs. the 272 committed files                               | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                                                                                                                                                                                                                                                                                                  |
+| Does production deliver the security headers `vercel.json` declares?               | **Measured (§6.2).** 3 of 5 arrive; `x-frame-options` and `permissions-policy` absent, no CSP substitutes; HSTS present with a different value — so that file is **not being applied as declared**. Where the three delivered headers _do_ originate is `NOT_MEASURED`                                                                                                                                                 |
+| Does the served SHA exist in the repository?                                       | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1)                                                                                                                                                                                                                                                                        |
+| Does the tree hash production **stamped** match the tree of the commit it stamped? | **`FAIL` — measured.** Recomputed `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                                                                                                                                                                                                                                                                                      |
+| Why did the build **workspace's** hashed roots differ from that commit's tree?     | `BLOCKED` — needs the publisher's build log; owner-only. Note the question: §6.1 establishes workspace drift only. Whether any **shipped byte** differs is `NOT_MEASURED`                                                                                                                                                                                                                                              |
+| What _is_ production commit `4b1c4867e685`?                                        | **`PASS` — resolved.** "Completed Verdant audit", `lovable-dev[bot]`, merge of `28c01a017` + `a684da59b`, `2026-08-21T09:44:40Z`, via the GitHub commit endpoint (§6.1). Do not re-run this lookup                                                                                                                                                                                                                     |
+| Are all **five** declared npm consumers still real?                                | `NOT_MEASURED` — TOOL-01's prerequisite is an inventory across all five, **not** the preview project alone; retiring that one resolves 1 of 5, and the gate requires every declared consumer while `package-lock.json` remains. §6.2 removes no consumer's justification: production ≠ preview. The preview checklist also describes the pre-SSR client-only build, so it may be stale — verify, do not assume retired |
+| Runtime AI Doctor behaviour under the twenty adversarial cases                     | `NOT_MEASURED` — AI-02 not run                                                                                                                                                                                                                                                                                                                                                                                         |
+| False-positive rate for any SPC rule                                               | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                                                                                                                                                                                                                                                                                           |
+| GA4 / GSC authenticated baselines                                                  | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                                                                                                                                                                                                                                                                                                |
+| Indexation                                                                         | `NOT_MEASURED` — unchanged                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ---
 
@@ -838,7 +858,8 @@ not_done:
 
 unknowns:
   - where the 3 delivered security headers originate (NOT_MEASURED; needs edge/origin config)
-  - whether the preview Vercel project verdant-command-center-preview is still live
+  - whether each of the five declared npm consumers is still real (the preview Vercel
+    project is one of five, not the whole question)
   - whether NON_CANONICAL_SOURCE_ALIASES is enforced at every ingest call site, or only
     declared — this document verified the constant, not its call sites
   - whether client rendering fills /features and /terms-of-service after hydration

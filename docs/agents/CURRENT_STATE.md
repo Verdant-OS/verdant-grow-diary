@@ -1433,10 +1433,15 @@ Two findings other agents should not rediscover:
   `inference`. Where the delivered headers originate is `NOT_MEASURED`.
 - **The Bun/npm lockfile transition is dated.** `reviewBy` is 2026-08-25 and
   `check-bun-lockfile-policy.mjs` compares strictly greater, so the gate first
-  fails **2026-08-26 UTC**. Its precondition is establishing whether the
-  preview Vercel project `verdant-command-center-preview` is still live —
-  production and preview are different deployments, and an earlier reading that
-  conflated them was reversed.
+  fails **2026-08-26 UTC**. Its prerequisite is an **inventory across all five
+  declared npm consumers** in `config/dependency-lockfile-transition.json` —
+  `vercel.json`, the SEO-monitoring workflow, `README.md`, the agent run skill,
+  and the preview-deployment checklist. The gate requires every declared
+  consumer while `package-lock.json` remains, so retiring the preview Vercel
+  project resolves one of five, not the question. Do **not** drop the
+  compatibility lock on the strength of the preview project alone — one of the
+  remaining four is a workflow that actually runs. An earlier reading that
+  treated production and preview as the same deployment was reversed.
 
 Owner-gated, unchanged by this slice: the publisher's build log (the only thing
 that explains why a build workspace's hashed roots differed from the commit it

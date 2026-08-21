@@ -24,6 +24,8 @@ vi.mock("@/integrations/supabase/client", () => ({
 import { LocalDataHealthPanel } from "@/components/LocalDataHealthPanel";
 import {
   clearLocalStorageForTest,
+  ensureLocalStorageForTest,
+  getLocalStorageMethodOwnerForTest,
   getLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
@@ -59,7 +61,10 @@ async function schemaRow(name: string): Promise<HTMLElement> {
 }
 
 beforeEach(() => clearLocalStorageForTest());
-afterEach(() => cleanup());
+afterEach(() => {
+  vi.restoreAllMocks();
+  cleanup();
+});
 
 describe("LocalDataHealthPanel — scoped Quick Log last-target keys", () => {
   it("lists one row per account present on the device", async () => {
@@ -359,6 +364,46 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(getLocalStorageItemForTest(key)).toBe(RECORD);
     expect(screen.queryByText(/Backup saved/)).toBeNull();
+  });
+
+  it("does not retain a backup for a key skipped by the final pre-delete comparison", async () => {
+    const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    const backupStoreKey = "verdant.diagnostics.local-backups.v1";
+    setLocalStorageItemForTest(key, "{}");
+    render(<LocalDataHealthPanel />);
+    await schemaRow("Quick Log last target");
+
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    await screen.findByRole("dialog");
+
+    // Simulate another tab repairing this key after the first confirm-time
+    // validation, while the pre-clear backup is being persisted. The final
+    // comparison must preserve the healthy bytes, and the stale bytes must
+    // not remain available through Restore.
+    const storage = ensureLocalStorageForTest();
+    const methodOwner = getLocalStorageMethodOwnerForTest(storage, "setItem");
+    const originalSetItem = methodOwner.setItem;
+    let replacedDuringBackup = false;
+    vi.spyOn(methodOwner, "setItem").mockImplementation(function (
+      this: Storage,
+      storageKey: string,
+      value: string,
+    ) {
+      originalSetItem.call(this, storageKey, value);
+      if (!replacedDuringBackup && storageKey === backupStoreKey) {
+        replacedDuringBackup = true;
+        originalSetItem.call(this, key, RECORD);
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Confirm — clear/i }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(replacedDuringBackup).toBe(true);
+    expect(getLocalStorageItemForTest(key)).toBe(RECORD);
+    expect(screen.getByText(/Skipped 1 key/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
+    expect(JSON.parse(getLocalStorageItemForTest(backupStoreKey) ?? "[]")).toEqual([]);
   });
 
   it("whitelists scoped field metadata and omits an unversioned v value", async () => {

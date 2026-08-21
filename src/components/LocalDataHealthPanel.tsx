@@ -567,7 +567,7 @@ export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelPro
 
       // Snapshot BEFORE mutation so every clear is reversible, using the
       // exact reviewed bytes rather than re-reading a potentially newer value.
-      const snapshot = createBackupSnapshot(candidates, "fix-issues");
+      const provisionalSnapshot = createBackupSnapshot(candidates, "fix-issues");
       const cleared: string[] = [];
       const errors: string[] = [];
       for (const candidate of candidates) {
@@ -587,6 +587,13 @@ export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelPro
           );
         }
       }
+      // The durable pre-clear snapshot starts with every candidate so a
+      // successful removal is always reversible. Final comparison can still
+      // reject a candidate after that snapshot is written (for example, a
+      // cross-tab repair during the write), so make only keys that were
+      // actually removed restorable. Otherwise Restore could overwrite the
+      // newer bytes that the comparison correctly preserved.
+      const snapshot = finalizeBackupSnapshot(provisionalSnapshot, cleared);
       const parts: string[] = [];
       if (snapshot && cleared.length > 0)
         parts.push(
@@ -1395,6 +1402,24 @@ function createBackupSnapshot(entries: BackupEntry[], reason: string): BackupSna
   const next = [snapshot, ...readBackupStore()].slice(0, BACKUP_MAX);
   writeBackupStore(next);
   return snapshot;
+}
+
+function finalizeBackupSnapshot(
+  snapshot: BackupSnapshot | null,
+  clearedKeys: readonly string[],
+): BackupSnapshot | null {
+  if (!snapshot) return null;
+  const cleared = new Set(clearedKeys);
+  let finalized: BackupSnapshot | null = null;
+  const next = readBackupStore().flatMap((stored) => {
+    if (stored.id !== snapshot.id) return [stored];
+    const entries = stored.entries.filter((entry) => cleared.has(entry.key));
+    if (entries.length === 0) return [];
+    finalized = { ...stored, entries };
+    return [finalized];
+  });
+  writeBackupStore(next);
+  return finalized;
 }
 
 function restoreBackup(id: string): { restored: string[]; errors: string[] } {

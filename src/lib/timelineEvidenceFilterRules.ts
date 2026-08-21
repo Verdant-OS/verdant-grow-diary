@@ -72,7 +72,7 @@ export function deriveTimelineRowSensorSource(
   options: { now?: number; staleMs?: number } = {},
 ): TimelineSensorSourceKind | null {
   const details = (row?.details ?? {}) as Record<string, unknown>;
-  const raw = details.sensor_snapshot ?? details.sensor;
+  const raw = details.sensor_snapshot ?? details.sensor ?? details.manual_sensor_snapshot;
   if (!raw || typeof raw !== "object") return null;
   const snap = raw as { source?: unknown; ts?: unknown };
   const rawSource = typeof snap.source === "string" ? snap.source : null;

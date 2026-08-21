@@ -23,7 +23,7 @@
  *    zero-count or full cleanup.
  *
  * Output: human-readable lines + exactly one ONE_TENT_TEARDOWN_JSON=
- * receipt line (schema_version "2", deterministic, no IDs/tokens/
+ * receipt line (schema_version "3", deterministic, no IDs/tokens/
  * emails/paths/raw provider errors).
  *
  * Exit codes: 0 completed (incl. dry-run) · 2 blocked · 1 failed/error.
@@ -148,6 +148,24 @@ function buildOps(supabase, userId, fixtureNames) {
         .eq("grow_id", growId);
       return exactCount(res, "diary_entries_count");
     },
+    async listDiaryEntryIds(growId) {
+      const { data, error } = await supabase
+        .from("diary_entries")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("grow_id", growId);
+      if (error || !Array.isArray(data)) throw new Error("diary_entry_ids_lookup_error");
+      return data.map((row) => row.id);
+    },
+    async countDiaryEntryAudits(diaryEntryIds) {
+      if (!Array.isArray(diaryEntryIds) || diaryEntryIds.length === 0) return 0;
+      const res = await supabase
+        .from("diary_entry_audit_log")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .in("diary_entry_id", diaryEntryIds);
+      return exactCount(res, "diary_entry_audit_count");
+    },
     async countActionQueue(growId) {
       const res = await supabase
         .from("action_queue")
@@ -206,13 +224,53 @@ function buildOps(supabase, userId, fixtureNames) {
         .in("alert_id", alertIds);
       return exactCount(res, "alert_events_count");
     },
-    async countQuickLogs(growId) {
-      const res = await supabase
+    async listQuickLogIds(growId) {
+      const { data, error } = await supabase
         .from("grow_events")
-        .select("id", { count: "exact", head: true })
+        .select("id")
         .eq("user_id", userId)
         .eq("grow_id", growId);
-      return exactCount(res, "quick_logs_count");
+      if (error || !Array.isArray(data)) throw new Error("quick_log_ids_lookup_error");
+      return data.map((row) => row.id);
+    },
+    async countEnvironmentEvents(quickLogIds) {
+      if (!Array.isArray(quickLogIds) || quickLogIds.length === 0) return 0;
+      const res = await supabase
+        .from("environment_events")
+        .select("event_id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .in("event_id", quickLogIds);
+      return exactCount(res, "environment_events_count");
+    },
+    async listQuickLogIdempotencyKeys(quickLogIds) {
+      if (!Array.isArray(quickLogIds) || quickLogIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("quicklog_idempotency")
+        .select("idempotency_key")
+        .eq("user_id", userId)
+        .in("grow_event_id", quickLogIds);
+      if (error || !Array.isArray(data)) throw new Error("quicklog_idempotency_lookup_error");
+      return data.map((row) => row.idempotency_key);
+    },
+    async listQuickLogAuditIdsByEvent(quickLogIds) {
+      if (!Array.isArray(quickLogIds) || quickLogIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("quicklog_audit_events")
+        .select("id")
+        .eq("user_id", userId)
+        .in("grow_event_id", quickLogIds);
+      if (error || !Array.isArray(data)) throw new Error("quicklog_audit_event_lookup_error");
+      return data.map((row) => row.id);
+    },
+    async listQuickLogAuditIdsByKey(idempotencyKeys) {
+      if (!Array.isArray(idempotencyKeys) || idempotencyKeys.length === 0) return [];
+      const { data, error } = await supabase
+        .from("quicklog_audit_events")
+        .select("id")
+        .eq("user_id", userId)
+        .in("idempotency_key", idempotencyKeys);
+      if (error || !Array.isArray(data)) throw new Error("quicklog_audit_key_lookup_error");
+      return data.map((row) => row.id);
     },
     async countSensorRows(tentIds) {
       const res = await supabase
@@ -265,15 +323,6 @@ function buildOps(supabase, userId, fixtureNames) {
         .eq("grow_id", growId)
         .select("id");
       return deletedCount(res, "alerts_delete");
-    },
-    async deleteQuickLogs(growId) {
-      const res = await supabase
-        .from("grow_events")
-        .delete()
-        .eq("user_id", userId)
-        .eq("grow_id", growId)
-        .select("id");
-      return deletedCount(res, "quick_logs_delete");
     },
     async deleteSensorRows(tentIds) {
       const res = await supabase
@@ -418,6 +467,15 @@ async function main() {
   );
   human.push(`Source alert rows retained: ${receipt.retained_history.alert_rows}`);
   human.push(`Source alert event rows retained: ${receipt.retained_history.alert_event_rows}`);
+  human.push(`Protected Quick Log rows retained: ${receipt.retained_history.quick_log_rows}`);
+  human.push(
+    `Quick Log support rows retained: ${
+      receipt.retained_history.environment_event_rows +
+      receipt.retained_history.quicklog_idempotency_rows +
+      receipt.retained_history.quicklog_audit_event_rows
+    }`,
+  );
+  human.push(`Diary audit rows retained: ${receipt.retained_history.diary_entry_audit_rows}`);
   human.push(`History rows retained: ${receipt.retained_history.total_retained}`);
   emit(receipt, human, result.status === "failed" ? 1 : 0);
 }

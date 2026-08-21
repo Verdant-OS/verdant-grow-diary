@@ -190,7 +190,7 @@ exactly **one** compact JSON line with a stable prefix:
 ```text
 ONE_TENT_PREFLIGHT_JSON={"schema_version":"1",...}
 ONE_TENT_BROWSER_PROOF_JSON={"schema_version":"4",...}
-ONE_TENT_TEARDOWN_JSON={"schema_version":"2",...}
+ONE_TENT_TEARDOWN_JSON={"schema_version":"3",...}
 ```
 
 Receipt rules (all three, with the schema versions above):
@@ -304,8 +304,16 @@ relationships (grow → tent/plant → scoped children). It:
 - uses the managed user's own authenticated client (anon key + Bearer
   token), never service_role, so RLS remains part of the safety
   boundary;
-- removes owner-deletable diary photos, diary entries, Quick Logs, sensor
-  readings, grow targets, and unreferenced alerts in dependency order;
+- removes owner-deletable diary photos, diary entries, sensor readings, grow
+  targets, and unreferenced alerts in dependency order;
+- never directly deletes protected `grow_events`: it retains and re-verifies
+  the exact owner + fixture-grow Quick Log IDs, their exact environment rows,
+  idempotency keys, and the deduplicated audit-row union reachable from exact
+  event IDs or exact keys, then retains the parent hierarchy;
+- counts existing diary-entry audit rows by exact discovered diary IDs; dry-run
+  predicts one immutable delete-audit row per planned diary deletion, and
+  execute requires the post-delete count to equal baseline plus rows actually
+  deleted before any later child or parent deletion;
 - retains append-only Action Queue/events, AI Doctor, and AI-credit history;
   when retained Action Queue history can point to the fixture alert, it also
   retains and counts that source alert and its append-only alert events so the
@@ -318,9 +326,10 @@ relationships (grow → tent/plant → scoped children). It:
 - never deletes unrelated data: no partial-name matching, every query
   is scoped by `user_id` plus fixture `grow_id`/`tent_id`.
 
-**Known limit (honest):** `sensor_readings` and other protected history may
-not have owner DELETE permission. Cleanup records surviving counts as retained
-history and keeps parent rows instead of erasing or obscuring that evidence.
+**Known limit (honest):** `grow_events` are deliberately not owner-deletable,
+and `sensor_readings` or other protected history may also lack owner DELETE
+permission. Cleanup records those rows as retained history and keeps parent
+rows instead of erasing or obscuring that evidence.
 
 Preserve failed-run fixtures until debugging is complete — the
 Playwright spec never auto-tears-down after a BLOCKED or FAILED proof.

@@ -1,7 +1,7 @@
 /**
  * Pure owner-scoped cleanup planner for the authenticated One-Tent proof.
- * Active, user-visible fixture rows are removed when owner RLS permits it,
- * except source alerts required by retained Action Queue provenance.
+ * Owner-deletable active fixture rows are removed when RLS permits it, except
+ * protected Quick Log spines and source alerts required by retained history.
  * Protected history is retained and reported, together with the parent
  * hierarchy and source evidence needed to keep that history usable.
  */
@@ -32,7 +32,6 @@ export const TEARDOWN_STAGES = [
   { key: "photo_objects", countKey: "photo_objects_deleted", table: "diary-photos" },
   { key: "diary_entries", countKey: "diary_entries_deleted", table: "diary_entries" },
   { key: "alerts", countKey: "alerts_deleted", table: "alerts" },
-  { key: "quick_logs", countKey: "quick_logs_deleted", table: "grow_events" },
   { key: "sensor_rows", countKey: "sensor_rows_deleted", table: "sensor_readings" },
   { key: "grow_targets", countKey: "grow_targets_deleted", table: "grow_targets" },
   { key: "plants", countKey: "plants_deleted", table: "plants" },
@@ -61,6 +60,11 @@ const ZERO_RETAINED = Object.freeze({
   action_queue_event_rows: 0,
   alert_rows: 0,
   alert_event_rows: 0,
+  quick_log_rows: 0,
+  environment_event_rows: 0,
+  quicklog_idempotency_rows: 0,
+  quicklog_audit_event_rows: 0,
+  diary_entry_audit_rows: 0,
   ai_doctor_session_rows: 0,
   ai_credit_accounting_rows: 0,
   plants: 0,
@@ -126,7 +130,7 @@ export function buildTeardownReceipt({
     { ...zeroRetainedHistory(), ...retainedHistory },
   );
   return {
-    schema_version: "2",
+    schema_version: "3",
     status,
     reason: reason === null ? null : safeCode(reason, "cleanup_failed"),
     owner_verified: ownerVerified,
@@ -144,15 +148,19 @@ async function optionalCount(ops, method, ...args) {
   return typeof ops[method] === "function" ? Number(await ops[method](...args)) : 0;
 }
 
-function exactAlertIds(value) {
+function exactStrings(value, reason) {
   if (
     !Array.isArray(value) ||
     value.some((id) => typeof id !== "string" || id.length === 0) ||
     new Set(value).size !== value.length
   ) {
-    throw new Error("alert_ids_invalid");
+    throw new Error(reason);
   }
   return [...value];
+}
+
+function exactAlertIds(value) {
+  return exactStrings(value, "alert_ids_invalid");
 }
 
 function exactRetainedCount(value) {
@@ -163,9 +171,47 @@ function exactRetainedCount(value) {
 }
 
 function sameIds(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
   if (left.length !== right.length) return false;
   const expected = new Set(left);
   return right.every((id) => expected.has(id));
+}
+
+async function readDiaryAuditScope(ops, growId) {
+  const diaryEntryIds = exactStrings(await ops.listDiaryEntryIds(growId), "diary_ids_invalid");
+  const auditRows = diaryEntryIds.length
+    ? exactRetainedCount(await ops.countDiaryEntryAudits(diaryEntryIds))
+    : 0;
+  return { diaryEntryIds, auditRows };
+}
+
+async function readQuickLogScope(ops, growId) {
+  const quickLogIds = exactStrings(await ops.listQuickLogIds(growId), "quick_log_ids_invalid");
+  const environmentEventRows = quickLogIds.length
+    ? exactRetainedCount(await ops.countEnvironmentEvents(quickLogIds))
+    : 0;
+  const idempotencyKeys = quickLogIds.length
+    ? exactStrings(
+        await ops.listQuickLogIdempotencyKeys(quickLogIds),
+        "quicklog_idempotency_keys_invalid",
+      )
+    : [];
+  const auditIdsByEvent = quickLogIds.length
+    ? exactStrings(await ops.listQuickLogAuditIdsByEvent(quickLogIds), "quicklog_audit_ids_invalid")
+    : [];
+  const auditIdsByKey = idempotencyKeys.length
+    ? exactStrings(
+        await ops.listQuickLogAuditIdsByKey(idempotencyKeys),
+        "quicklog_audit_ids_invalid",
+      )
+    : [];
+  const auditEventIds = [...new Set([...auditIdsByEvent, ...auditIdsByKey])];
+  return {
+    quickLogIds,
+    environmentEventRows,
+    idempotencyKeys,
+    auditEventIds,
+  };
 }
 
 export async function discoverFixture(ops, names = FIXTURE_NAMES) {
@@ -180,6 +226,8 @@ export async function discoverFixture(ops, names = FIXTURE_NAMES) {
   const alertEventRows = alertIds.length
     ? exactRetainedCount(await ops.countAlertEvents(alertIds))
     : 0;
+  const diaryAuditScope = await readDiaryAuditScope(ops, grow.id);
+  const quickLogScope = await readQuickLogScope(ops, grow.id);
   return {
     found: true,
     names,
@@ -188,9 +236,14 @@ export async function discoverFixture(ops, names = FIXTURE_NAMES) {
     plantIds,
     photoPaths,
     alertIds,
+    diaryEntryIds: diaryAuditScope.diaryEntryIds,
+    quickLogIds: quickLogScope.quickLogIds,
+    quickLogIdempotencyKeys: quickLogScope.idempotencyKeys,
+    quickLogAuditEventIds: quickLogScope.auditEventIds,
     counts: {
       photo_objects: photoPaths.length,
-      diary_entries: await optionalCount(ops, "countDiaryEntries", grow.id),
+      diary_entries: diaryAuditScope.diaryEntryIds.length,
+      diary_entry_audit: diaryAuditScope.auditRows,
       follow_ups: await optionalCount(ops, "countFollowUps", grow.id),
       action_queue: await optionalCount(ops, "countActionQueue", grow.id),
       action_queue_events: await optionalCount(ops, "countActionQueueEvents", grow.id),
@@ -198,7 +251,10 @@ export async function discoverFixture(ops, names = FIXTURE_NAMES) {
       ai_credit_accounting: await optionalCount(ops, "countAiCreditAccounting", grow.id),
       alerts: alertIds.length,
       alert_events: alertEventRows,
-      quick_logs: await optionalCount(ops, "countQuickLogs", grow.id),
+      quick_logs: quickLogScope.quickLogIds.length,
+      environment_events: quickLogScope.environmentEventRows,
+      quicklog_idempotency: quickLogScope.idempotencyKeys.length,
+      quicklog_audit_events: quickLogScope.auditEventIds.length,
       sensor_rows: tentIds.length ? await optionalCount(ops, "countSensorRows", tentIds) : 0,
       grow_targets: await optionalCount(ops, "countGrowTargets", grow.id),
       plants: plantIds.length,
@@ -228,6 +284,10 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
   retained.action_queue_event_rows = c.action_queue_events ?? 0;
   retained.ai_doctor_session_rows = c.ai_doctor_sessions ?? 0;
   retained.ai_credit_accounting_rows = c.ai_credit_accounting ?? 0;
+  retained.quick_log_rows = c.quick_logs ?? 0;
+  retained.environment_event_rows = c.environment_events ?? 0;
+  retained.quicklog_idempotency_rows = c.quicklog_idempotency ?? 0;
+  retained.quicklog_audit_event_rows = c.quicklog_audit_events ?? 0;
   const retainFixtureAlerts =
     retained.action_queue_rows > 0 || retained.action_queue_event_rows > 0;
 
@@ -235,11 +295,12 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
     counts.photo_objects_deleted = c.photo_objects ?? 0;
     if (c.diary_entries > 0) counts.diary_entries_deleted = c.diary_entries;
     else counts.follow_ups_deleted = c.follow_ups ?? 0;
+    retained.diary_entry_audit_rows = (c.diary_entry_audit ?? 0) + counts.diary_entries_deleted;
     if (retainFixtureAlerts) {
       retained.alert_rows = c.alerts ?? 0;
       retained.alert_event_rows = c.alert_events ?? 0;
     } else counts.alerts_deleted = c.alerts ?? 0;
-    counts.quick_logs_deleted = c.quick_logs ?? 0;
+    counts.quick_logs_deleted = 0;
     counts.sensor_rows_deleted = c.sensor_rows ?? 0;
     counts.grow_targets_deleted = c.grow_targets ?? 0;
     const retainedChildHistory =
@@ -247,6 +308,11 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
       retained.action_queue_event_rows +
       retained.alert_rows +
       retained.alert_event_rows +
+      retained.quick_log_rows +
+      retained.environment_event_rows +
+      retained.quicklog_idempotency_rows +
+      retained.quicklog_audit_event_rows +
+      retained.diary_entry_audit_rows +
       retained.ai_doctor_session_rows +
       retained.ai_credit_accounting_rows;
     if (retainedChildHistory === 0) {
@@ -262,10 +328,31 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
   }
 
   const { growId, tentIds, photoPaths } = discovery;
-  const diaryStage =
-    typeof ops.deleteDiaryEntries === "function"
-      ? ["diary_entries", () => ops.deleteDiaryEntries(growId), () => ops.countDiaryEntries(growId)]
-      : ["follow_ups", () => ops.deleteFollowUps(growId), () => ops.countFollowUps(growId)];
+  try {
+    const verifiedQuickLogs = await readQuickLogScope(ops, growId);
+    if (
+      !sameIds(discovery.quickLogIds, verifiedQuickLogs.quickLogIds) ||
+      verifiedQuickLogs.environmentEventRows !== c.environment_events ||
+      !sameIds(discovery.quickLogIdempotencyKeys, verifiedQuickLogs.idempotencyKeys) ||
+      !sameIds(discovery.quickLogAuditEventIds, verifiedQuickLogs.auditEventIds)
+    ) {
+      return result("failed", "quick_log_retention_verification_failed", counts, retained);
+    }
+  } catch {
+    return result("failed", "quick_log_retention_verification_failed", counts, retained);
+  }
+  try {
+    const verifiedDiary = await readDiaryAuditScope(ops, growId);
+    if (
+      !sameIds(discovery.diaryEntryIds, verifiedDiary.diaryEntryIds) ||
+      verifiedDiary.auditRows !== c.diary_entry_audit
+    ) {
+      return result("failed", "diary_audit_baseline_verification_failed", counts, retained);
+    }
+    retained.diary_entry_audit_rows = verifiedDiary.auditRows;
+  } catch {
+    return result("failed", "diary_audit_baseline_verification_failed", counts, retained);
+  }
   if (retainFixtureAlerts) {
     try {
       const verifiedAlertIds = exactAlertIds(await ops.listAlertIds(growId));
@@ -289,20 +376,45 @@ export async function executeTeardown(ops, discovery, { dryRun }) {
     }
   }
   const activeStages = [
-    [
-      "photo_objects",
-      () =>
-        photoPaths.length && typeof ops.deleteDiaryPhotos === "function"
-          ? ops.deleteDiaryPhotos(photoPaths)
-          : 0,
-      async () => 0,
-    ],
-    diaryStage,
     ...(retainFixtureAlerts
       ? []
       : [["alerts", () => ops.deleteAlerts(growId), () => ops.countAlerts(growId)]]),
-    ["quick_logs", () => ops.deleteQuickLogs(growId), () => ops.countQuickLogs(growId)],
   ];
+
+  try {
+    counts.photo_objects_deleted = Number(
+      photoPaths.length && typeof ops.deleteDiaryPhotos === "function"
+        ? await ops.deleteDiaryPhotos(photoPaths)
+        : 0,
+    );
+  } catch {
+    return result("failed", "photo_objects_delete_failed", counts, retained);
+  }
+
+  try {
+    counts.diary_entries_deleted = exactRetainedCount(await ops.deleteDiaryEntries(growId));
+  } catch {
+    return result("failed", "diary_entries_delete_failed", counts, retained);
+  }
+  try {
+    if ((await ops.listDiaryEntryIds(growId)).length > 0) {
+      return result("failed", "diary_entries_rows_survived_delete", counts, retained);
+    }
+  } catch {
+    return result("failed", "diary_entries_verify_failed", counts, retained);
+  }
+  try {
+    const postDeleteAuditRows = discovery.diaryEntryIds.length
+      ? exactRetainedCount(await ops.countDiaryEntryAudits(discovery.diaryEntryIds))
+      : 0;
+    const expectedAuditRows = c.diary_entry_audit + counts.diary_entries_deleted;
+    if (postDeleteAuditRows !== expectedAuditRows) {
+      return result("failed", "diary_audit_post_delete_verification_failed", counts, retained);
+    }
+    retained.diary_entry_audit_rows = postDeleteAuditRows;
+  } catch {
+    return result("failed", "diary_audit_post_delete_verification_failed", counts, retained);
+  }
 
   for (const [key, remove, survivors] of activeStages) {
     try {

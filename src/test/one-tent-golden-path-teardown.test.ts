@@ -37,13 +37,19 @@ interface FakeState {
   growName: string;
   tents: string[];
   plants: string[];
-  followUps: number;
+  diaryEntryIds: string[];
+  diaryAuditScopeIds: string[];
+  diaryEntryAuditRows: number;
   actionQueue: number;
   actionQueueEvents: number;
   alertIds: string[];
   alertEvents: number;
   alerts: number;
-  quickLogs: number;
+  quickLogIds: string[];
+  environmentEvents: number;
+  quicklogIdempotencyKeys: string[];
+  quicklogAuditIdsByEvent: string[];
+  quicklogAuditIdsByKey: string[];
   sensorRows: number;
   growTargets: number;
   /** Stage keys whose delete should throw. */
@@ -75,8 +81,15 @@ function makeOps(state: FakeState) {
     async listPlantIds() {
       return [...state.plants];
     },
-    async countFollowUps() {
-      return state.followUps;
+    async listDiaryEntryIds() {
+      return [...state.diaryEntryIds];
+    },
+    async countDiaryEntries() {
+      return state.diaryEntryIds.length;
+    },
+    async countDiaryEntryAudits(diaryEntryIds: string[]) {
+      expect(diaryEntryIds).toEqual(state.diaryAuditScopeIds);
+      return state.diaryEntryAuditRows;
     },
     async countActionQueue() {
       return state.actionQueue;
@@ -94,8 +107,24 @@ function makeOps(state: FakeState) {
     async countAlerts() {
       return state.alerts;
     },
-    async countQuickLogs() {
-      return state.quickLogs;
+    async listQuickLogIds() {
+      return [...state.quickLogIds];
+    },
+    async countEnvironmentEvents(quickLogIds: string[]) {
+      expect(quickLogIds).toEqual(state.quickLogIds);
+      return state.environmentEvents;
+    },
+    async listQuickLogIdempotencyKeys(quickLogIds: string[]) {
+      expect(quickLogIds).toEqual(state.quickLogIds);
+      return [...state.quicklogIdempotencyKeys];
+    },
+    async listQuickLogAuditIdsByEvent(quickLogIds: string[]) {
+      expect(quickLogIds).toEqual(state.quickLogIds);
+      return [...state.quicklogAuditIdsByEvent];
+    },
+    async listQuickLogAuditIdsByKey(keys: string[]) {
+      expect(keys).toEqual(state.quicklogIdempotencyKeys);
+      return [...state.quicklogAuditIdsByKey];
     },
     async countSensorRows() {
       return state.sensorRows;
@@ -103,9 +132,10 @@ function makeOps(state: FakeState) {
     async countGrowTargets() {
       return state.growTargets;
     },
-    deleteFollowUps: del("follow_ups", () => {
-      const n = state.followUps;
-      state.followUps = 0;
+    deleteDiaryEntries: del("diary_entries", () => {
+      const n = state.diaryEntryIds.length;
+      state.diaryEntryIds = [];
+      state.diaryEntryAuditRows += n;
       return n;
     }),
     deleteAlerts: del("alerts", () => {
@@ -113,11 +143,6 @@ function makeOps(state: FakeState) {
       state.alerts = 0;
       state.alertIds = [];
       state.alertEvents = 0;
-      return n;
-    }),
-    deleteQuickLogs: del("quick_logs", () => {
-      const n = state.quickLogs;
-      state.quickLogs = 0;
       return n;
     }),
     deleteSensorRows: del("sensor_rows", () => {
@@ -156,13 +181,19 @@ function seededState(): FakeState {
     growName: FIXTURE_NAMES.grow,
     tents: ["tent-1"],
     plants: ["plant-1"],
-    followUps: 1,
+    diaryEntryIds: ["diary-1"],
+    diaryAuditScopeIds: ["diary-1"],
+    diaryEntryAuditRows: 1,
     actionQueue: 0,
     actionQueueEvents: 0,
     alertIds: ["alert-1"],
     alertEvents: 2,
     alerts: 1,
-    quickLogs: 1,
+    quickLogIds: ["event-parent", "event-environment"],
+    environmentEvents: 1,
+    quicklogIdempotencyKeys: ["fixture-key"],
+    quicklogAuditIdsByEvent: ["audit-shared"],
+    quicklogAuditIdsByKey: ["audit-started", "audit-shared"],
     sensorRows: 0, // sensor delete is RLS-blocked in prod; 0 keeps happy path pure
     growTargets: 1,
   };
@@ -336,17 +367,207 @@ describe("fixture scope protection", () => {
 // ---------------------------------------------------------------------------
 
 describe("delete ordering (child before parent)", () => {
-  it("full happy path deletes in reverse dependency order", async () => {
+  it("removes owner-deletable rows but retains the protected Quick Log spine and parents", async () => {
     const state = seededState();
     const ops = makeOps(state);
     const discovery = await discoverFixture(ops);
     const result = await executeTeardown(ops, discovery, { dryRun: false });
-    expect(result.status).toBe("completed_active_rows_removed");
+    expect(result.status).toBe("completed_with_retained_history");
     const deletes = ops.calls.filter((c) => c.startsWith("delete:"));
-    expect(deletes).toEqual([
-      "delete:follow_ups",
+    expect(deletes).toEqual(["delete:diary_entries", "delete:alerts", "delete:grow_targets"]);
+    expect(result.counts.quick_logs_deleted).toBe(0);
+    expect(result.retainedHistory.quick_log_rows).toBe(2);
+    expect(result.retainedHistory.environment_event_rows).toBe(1);
+    expect(result.retainedHistory.quicklog_idempotency_rows).toBe(1);
+    // audit-shared is reached by both exact event ID and exact key but counted once.
+    expect(result.retainedHistory.quicklog_audit_event_rows).toBe(2);
+    expect(result.retainedHistory.diary_entry_audit_rows).toBe(2);
+    expect(result.retainedHistory.total_retained).toBe(11);
+  });
+
+  it("dry-run and execute report the same protected Quick Log topology and predicted diary audit", async () => {
+    const dryState = seededState();
+    const runState = seededState();
+    const dry = await executeTeardown(makeOps(dryState), await discoverFixture(makeOps(dryState)), {
+      dryRun: true,
+    });
+    const runOps = makeOps(runState);
+    const run = await executeTeardown(runOps, await discoverFixture(runOps), { dryRun: false });
+
+    for (const key of [
+      "quick_log_rows",
+      "environment_event_rows",
+      "quicklog_idempotency_rows",
+      "quicklog_audit_event_rows",
+      "diary_entry_audit_rows",
+      "total_retained",
+    ] as const) {
+      expect(dry.retainedHistory[key]).toBe(run.retainedHistory[key]);
+    }
+    expect(dry.counts.quick_logs_deleted).toBe(0);
+    expect(run.counts.quick_logs_deleted).toBe(0);
+    expect(runOps.calls).not.toContain("delete:quick_logs");
+  });
+
+  it.each([undefined, Number.NaN, -1, 1.5])(
+    "fails closed before deletion for an invalid environment-event count: %s",
+    async (invalidCount) => {
+      const state = seededState();
+      const ops = makeOps(state);
+      const discovery = await discoverFixture(ops);
+      ops.countEnvironmentEvents = async () => invalidCount as number;
+      const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+      expect(result.status).toBe("failed");
+      expect(result.reason).toBe("quick_log_retention_verification_failed");
+      expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+    },
+  );
+
+  it("fails closed before deletion when Quick Log verification throws", async () => {
+    const state = seededState();
+    const ops = makeOps(state);
+    const discovery = await discoverFixture(ops);
+    ops.listQuickLogIds = async () => {
+      throw new Error("provider SECRET and fixture IDs");
+    };
+    const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("quick_log_retention_verification_failed");
+    expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+    expect(JSON.stringify(result)).not.toContain("SECRET");
+  });
+
+  it("fails closed when a retained Quick Log ID changes at the same count", async () => {
+    const state = seededState();
+    const ops = makeOps(state);
+    const discovery = await discoverFixture(ops);
+    state.quickLogIds = ["different-event", "event-environment"];
+    const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("quick_log_retention_verification_failed");
+    expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+  });
+
+  it("fails closed for invalid idempotency keys or a changed deduped audit union", async () => {
+    const invalidState = seededState();
+    const invalidOps = makeOps(invalidState);
+    const invalidDiscovery = await discoverFixture(invalidOps);
+    invalidState.quicklogIdempotencyKeys = [""];
+    const invalid = await executeTeardown(invalidOps, invalidDiscovery, { dryRun: false });
+    expect(invalid.status).toBe("failed");
+    expect(invalid.reason).toBe("quick_log_retention_verification_failed");
+    expect(invalidOps.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+
+    const changedState = seededState();
+    const changedOps = makeOps(changedState);
+    const changedDiscovery = await discoverFixture(changedOps);
+    changedState.quicklogAuditIdsByKey.push("new-audit-row");
+    const changed = await executeTeardown(changedOps, changedDiscovery, { dryRun: false });
+    expect(changed.status).toBe("failed");
+    expect(changed.reason).toBe("quick_log_retention_verification_failed");
+    expect(changedOps.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+  });
+
+  it.each([undefined, Number.NaN, -1, 1.5])(
+    "fails closed before deletion for an invalid diary-audit baseline: %s",
+    async (invalidCount) => {
+      const state = seededState();
+      const ops = makeOps(state);
+      const discovery = await discoverFixture(ops);
+      ops.countDiaryEntryAudits = async () => invalidCount as number;
+      const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+      expect(result.status).toBe("failed");
+      expect(result.reason).toBe("diary_audit_baseline_verification_failed");
+      expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+    },
+  );
+
+  it("fails closed before deletion when the diary audit baseline changes or throws", async () => {
+    const changedState = seededState();
+    const changedOps = makeOps(changedState);
+    const changedDiscovery = await discoverFixture(changedOps);
+    changedState.diaryEntryAuditRows += 1;
+    const changed = await executeTeardown(changedOps, changedDiscovery, { dryRun: false });
+    expect(changed.status).toBe("failed");
+    expect(changed.reason).toBe("diary_audit_baseline_verification_failed");
+    expect(changedOps.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+
+    const thrownState = seededState();
+    const thrownOps = makeOps(thrownState);
+    const thrownDiscovery = await discoverFixture(thrownOps);
+    thrownOps.countDiaryEntryAudits = async () => {
+      throw new Error("raw SECRET failure");
+    };
+    const thrown = await executeTeardown(thrownOps, thrownDiscovery, { dryRun: false });
+    expect(thrown.status).toBe("failed");
+    expect(thrown.reason).toBe("diary_audit_baseline_verification_failed");
+    expect(thrownOps.calls.filter((call) => call.startsWith("delete:"))).toEqual([]);
+    expect(JSON.stringify(thrown)).not.toContain("SECRET");
+  });
+
+  it.each([undefined, Number.NaN, -1, 1.5, 1])(
+    "fails closed after diary deletion for an invalid or mismatched trigger count: %s",
+    async (postCount) => {
+      const state = seededState();
+      const ops = makeOps(state);
+      const discovery = await discoverFixture(ops);
+      let verificationCalls = 0;
+      ops.countDiaryEntryAudits = async () => {
+        verificationCalls += 1;
+        return (verificationCalls === 1 ? 1 : postCount) as number;
+      };
+      const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+      expect(result.status).toBe("failed");
+      expect(result.reason).toBe("diary_audit_post_delete_verification_failed");
+      expect(verificationCalls).toBe(2);
+      expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([
+        "delete:diary_entries",
+      ]);
+    },
+  );
+
+  it("sanitizes a thrown post-delete diary audit verification before later deletes", async () => {
+    const state = seededState();
+    const ops = makeOps(state);
+    const discovery = await discoverFixture(ops);
+    let verificationCalls = 0;
+    ops.countDiaryEntryAudits = async () => {
+      verificationCalls += 1;
+      if (verificationCalls === 2) throw new Error("SECRET post-trigger failure");
+      return 1;
+    };
+    const result = await executeTeardown(ops, discovery, { dryRun: false });
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toBe("diary_audit_post_delete_verification_failed");
+    expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([
+      "delete:diary_entries",
+    ]);
+    expect(JSON.stringify(result)).not.toContain("SECRET");
+  });
+
+  it("still removes the parent hierarchy when no protected fixture history exists", async () => {
+    const state = seededState();
+    state.diaryEntryIds = [];
+    state.diaryAuditScopeIds = [];
+    state.diaryEntryAuditRows = 0;
+    state.quickLogIds = [];
+    state.environmentEvents = 0;
+    state.quicklogIdempotencyKeys = [];
+    state.quicklogAuditIdsByEvent = [];
+    state.quicklogAuditIdsByKey = [];
+    const ops = makeOps(state);
+    const result = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
+
+    expect(result.status).toBe("completed_active_rows_removed");
+    expect(ops.calls.filter((call) => call.startsWith("delete:"))).toEqual([
+      "delete:diary_entries",
       "delete:alerts",
-      "delete:quick_logs",
       "delete:grow_targets",
       "delete:plants",
       "delete:tents",
@@ -369,7 +590,7 @@ describe("delete ordering (child before parent)", () => {
     expect(result.retainedHistory.alert_rows).toBe(1);
     expect(result.retainedHistory.alert_event_rows).toBe(2);
     expect(result.retainedHistory.grows).toBe(1);
-    expect(result.retainedHistory.total_retained).toBe(7);
+    expect(result.retainedHistory.total_retained).toBe(15);
     expect(state.actionQueue).toBe(1);
     expect(state.alerts).toBe(1);
   });
@@ -386,7 +607,7 @@ describe("delete ordering (child before parent)", () => {
     expect(result.retainedHistory.alert_event_rows).toBe(2);
     expect(result.retainedHistory.action_queue_rows).toBe(1);
     expect(result.retainedHistory.grows).toBe(1);
-    expect(result.retainedHistory.total_retained).toBe(7);
+    expect(result.retainedHistory.total_retained).toBe(15);
     expect(ops.calls).not.toContain("delete:alerts");
   });
 
@@ -470,7 +691,7 @@ describe("delete ordering (child before parent)", () => {
 
     expect(result.status).toBe("failed");
     expect(result.reason).toBe("alerts_rows_survived_delete");
-    expect(ops.calls).not.toContain("delete:quick_logs");
+    expect(ops.calls).not.toContain("delete:grow_events");
     expect(ops.calls).not.toContain("delete:grows");
   });
 
@@ -479,7 +700,7 @@ describe("delete ordering (child before parent)", () => {
     const ops = makeOps(state);
     const result = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
 
-    expect(result.status).toBe("completed_active_rows_removed");
+    expect(result.status).toBe("completed_with_retained_history");
     expect(result.retainedHistory.alert_event_rows).toBe(0);
     expect(state.alertEvents).toBe(0);
   });
@@ -494,7 +715,7 @@ describe("delete ordering (child before parent)", () => {
     expect(result.reason).toBe("alerts_delete_failed");
     // Nothing after the failed stage was attempted.
     const deletes = ops.calls.filter((c) => c.startsWith("delete:"));
-    expect(deletes).toEqual(["delete:follow_ups", "delete:alerts"]);
+    expect(deletes).toEqual(["delete:diary_entries", "delete:alerts"]);
     // The raw provider error never leaks.
     expect(JSON.stringify(result)).not.toContain("SECRET");
   });
@@ -547,30 +768,33 @@ describe("idempotency", () => {
     expect(ops.calls.filter((c) => c.startsWith("delete:"))).toEqual([]);
   });
 
-  it("repeated teardown is safe (second run is a zero-count success)", async () => {
+  it("repeated teardown safely retains the same protected history without new deletes", async () => {
     const state = seededState();
     const ops = makeOps(state);
     const first = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
-    expect(first.status).toBe("completed_active_rows_removed");
+    expect(first.status).toBe("completed_with_retained_history");
     const second = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
-    expect(second.status).toBe("fixture_not_found");
+    expect(second.status).toBe("completed_with_retained_history");
     expect(second.counts.total_deleted).toBe(0);
+    expect(second.retainedHistory.quick_log_rows).toBe(2);
+    expect(second.retainedHistory.diary_entry_audit_rows).toBe(0);
   });
 
   it("executor return counts carry a correct total_deleted (not just the receipt)", async () => {
     const state = seededState();
     const ops = makeOps(state);
     const result = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
-    expect(result.status).toBe("completed_active_rows_removed");
-    // 1 follow-up + 1 alert + 1 quick log + 0 sensor + 1 target
-    // + 1 plant + 1 tent + 1 grow = 7. No audit row is called deleted.
-    expect(result.counts.total_deleted).toBe(7);
+    expect(result.status).toBe("completed_with_retained_history");
+    // 1 diary entry + 1 alert + 1 target. Protected Quick Log rows and
+    // parent hierarchy are retained, and no audit row is called deleted.
+    expect(result.counts.total_deleted).toBe(3);
     const dry = await executeTeardown(
       makeOps(seededState()),
       await discoverFixture(makeOps(seededState())),
       { dryRun: true },
     );
-    expect(dry.counts.total_deleted).toBe(7);
+    expect(dry.counts.total_deleted).toBe(3);
+    expect(dry.retainedHistory.total_retained).toBe(result.retainedHistory.total_retained);
   });
 
   it("executor fails closed on an ownership/marker violation (does not rely on the CLI check)", async () => {
@@ -593,7 +817,9 @@ describe("idempotency", () => {
     expect(result.status).toBe("dry_run");
     expect(result.reason).toBe("dry_run_plan_only");
     expect(result.counts.sensor_rows_deleted).toBe(2);
-    expect(result.counts.grows_deleted).toBe(1);
+    expect(result.counts.grows_deleted).toBe(0);
+    expect(result.retainedHistory.quick_log_rows).toBe(2);
+    expect(result.retainedHistory.diary_entry_audit_rows).toBe(2);
     expect(ops.calls.filter((c) => c.startsWith("delete:"))).toEqual([]);
     // State untouched.
     expect(state.growExists).toBe(true);
@@ -659,7 +885,7 @@ describe("teardown receipt", () => {
       follow_ups_deleted: 1,
       action_queue_deleted: 2,
       alerts_deleted: 1,
-      quick_logs_deleted: 3,
+      quick_logs_deleted: 0,
       grows_deleted: 1,
     };
     const receipt = buildTeardownReceipt({
@@ -673,6 +899,11 @@ describe("teardown receipt", () => {
         action_queue_event_rows: 1,
         alert_rows: 1,
         alert_event_rows: 2,
+        quick_log_rows: 2,
+        environment_event_rows: 1,
+        quicklog_idempotency_rows: 1,
+        quicklog_audit_event_rows: 2,
+        diary_entry_audit_rows: 2,
         ai_doctor_session_rows: 1,
         ai_credit_accounting_rows: 0,
         plants: 1,
@@ -680,8 +911,8 @@ describe("teardown receipt", () => {
         grows: 1,
       },
     });
-    expect(receipt.counts.total_deleted).toBe(8);
-    expect(receipt.retained_history.total_retained).toBe(12);
+    expect(receipt.counts.total_deleted).toBe(5);
+    expect(receipt.retained_history.total_retained).toBe(20);
   });
 
   it("receipt contains no IDs, tokens, emails, or paths", () => {
@@ -692,12 +923,21 @@ describe("teardown receipt", () => {
         ownerVerified: true,
         targetProjectVerified: true,
         counts: zeroCounts(),
+        retainedHistory: {
+          quick_log_rows: 2,
+          quicklog_idempotency_rows: 1,
+          quicklog_audit_event_rows: 2,
+          diary_entry_audit_rows: 2,
+        },
       }),
     );
     expect(line).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     expect(line).not.toMatch(/@/);
     expect(line).not.toMatch(/\/home\/|\/tmp\/|[A-Z]:\\/);
     expect(line).not.toMatch(/Bearer|token|cookie/i);
+    expect(line).not.toContain("event-parent");
+    expect(line).not.toContain("fixture-key");
+    expect(line).not.toContain("diary-1");
   });
 
   it("deterministic inputs yield deterministic receipt JSON with stable key order", () => {
@@ -713,6 +953,7 @@ describe("teardown receipt", () => {
       );
     expect(build()).toBe(build());
     const parsed = JSON.parse(build().slice(ONE_TENT_TEARDOWN_JSON_PREFIX.length));
+    expect(parsed.schema_version).toBe("3");
     expect(Object.keys(parsed)).toEqual([
       "schema_version",
       "status",
@@ -742,6 +983,11 @@ describe("teardown receipt", () => {
       "action_queue_event_rows",
       "alert_rows",
       "alert_event_rows",
+      "quick_log_rows",
+      "environment_event_rows",
+      "quicklog_idempotency_rows",
+      "quicklog_audit_event_rows",
+      "diary_entry_audit_rows",
       "ai_doctor_session_rows",
       "ai_credit_accounting_rows",
       "plants",
@@ -794,6 +1040,32 @@ describe("static hygiene", () => {
     expect(CLI_SRC).toContain('.in("alert_id", alertIds)');
     expect(CLI_SRC).toContain("listAlertIds");
     expect(CLEANUP_SRC).toContain("discovery.alertIds");
+  });
+
+  it("honors the deployed grow_events revoke and never attempts direct Quick Log deletion", () => {
+    const revoke = readFileSync(
+      join(ROOT, "supabase/migrations/20260722062644_8cdef271-abf0-4d82-9eca-970a91b6c547.sql"),
+      "utf8",
+    );
+    expect(revoke).toMatch(
+      /REVOKE INSERT, UPDATE, DELETE ON public\.grow_events\s+FROM anon, authenticated, PUBLIC/,
+    );
+    expect(CLI_SRC).not.toMatch(/\.from\("grow_events"\)[\s\S]{0,120}?\.delete\(\)/);
+    expect(CLEANUP_SRC).not.toContain("ops.deleteQuickLogs");
+  });
+
+  it("scopes protected Quick Log and diary audit accounting to exact owner IDs and keys", () => {
+    expect(CLI_SRC).toContain('.from("grow_events")');
+    expect(CLI_SRC).toContain('.from("environment_events")');
+    expect(CLI_SRC).toContain('.from("quicklog_idempotency")');
+    expect(CLI_SRC).toContain('.from("quicklog_audit_events")');
+    expect(CLI_SRC).toContain('.from("diary_entry_audit_log")');
+    expect(CLI_SRC).toContain('.in("event_id", quickLogIds)');
+    expect(CLI_SRC).toContain('.in("grow_event_id", quickLogIds)');
+    expect(CLI_SRC).toContain('.in("idempotency_key", idempotencyKeys)');
+    expect(CLI_SRC).toContain('.in("diary_entry_id", diaryEntryIds)');
+    expect(CLEANUP_SRC).toContain("discovery.quickLogIds");
+    expect(CLEANUP_SRC).toContain("discovery.diaryEntryIds");
   });
 
   it("no product code imports teardown tooling", () => {

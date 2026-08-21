@@ -1404,12 +1404,25 @@ the pairing existed only in the handoff.
 | Measurements pinned at   | `28c01a017`                                                                                                      |
 
 **Read the deliverable's own withdrawal record before citing it.** Review
-produced six substantive corrections — four claims withdrawn outright, one
-conclusion reversed, and one retraction that was itself wrong and withdrawn in
-turn. The document keeps every one visible rather than patching silently, and
-names two recurring failure modes behind them (propagation-after-change;
-inference presented as conclusion). Its labelled bounds are the load-bearing
-part, not its headlines.
+produced seven substantive corrections — four claims withdrawn outright, one
+conclusion reversed, one retraction that was itself wrong and withdrawn in turn,
+and one relapse into an already-withdrawn inference, caught and re-measured. The
+document keeps every one visible rather than patching silently, and names three
+recurring failure modes behind them: inference presented as conclusion,
+propagation after change, and bounded reads presented as complete. Its labelled
+bounds are the load-bearing part, not its headlines.
+
+**The provenance finding is now measured across three publishes**, not one.
+Recomputing each published commit's tree with `scripts/lib/tree-hash.mjs` and
+comparing against what the build stamped: `4b1c4867e685`, `39935889fe02` (#1080)
+and `5a13d0b47cb7` (#1089) all mismatch, all `dirty: true`. The middle and last
+differ only in `docs/agents/CURRENT_STATE.md` — outside `TREE_HASH_ROOTS` — and
+recompute identically, which is the mechanism behaving correctly. **Do not
+"confirm" any of this against a `git rev-parse` tree id:** `treeHash` is
+Verdant's SHA-256 over the allowlisted roots, and the two never match even on
+healthy builds. The bound is unchanged — the hashed roots include inputs that
+never ship, so this establishes build-workspace drift at stamp time, and whether
+any shipped byte differs stays `NOT_MEASURED`.
 
 Two findings other agents should not rediscover:
 

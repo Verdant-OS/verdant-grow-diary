@@ -276,15 +276,35 @@ stamper uses:
 > use that comparison: it ran the stamper's own module over the commit's extracted tree, which
 > is the only comparison that means anything. Do not re-derive this with `git rev-parse`.
 >
-> _The specific reading is superseded; the finding is not._ Production republished several times
-> on 2026-08-21 and now serves `39935889fe02` (#1080), so the `4b1c4867e685` / `8773f6b2c0ed`
-> pair above is a snapshot of one publish, not current state — treat it as perishable, exactly
-> as `CURRENT_STATE.md` instructs for every live row. But that later, independent measurement
-> records `dirty: true`, `ref: "__orphan__"`, provenance explicitly **not** `PASS`, and cause
-> `NOT_MEASURED`. So the provenance gap is **not** a one-off artifact of the publish this
-> section happened to catch: a second observer found the same class of gap on a different commit
-> hours later. That corroborates the finding while leaving its bound untouched — whether any
-> shipped byte differs is still `NOT_MEASURED`.
+> _The specific reading is superseded, and the finding is now measured on two further publishes
+> rather than inferred._ An earlier revision of this paragraph called the later `dirty: true` /
+> `ref: "__orphan__"` flags corroboration. **That was a relapse into the withdrawn claim at the
+> top of this section** — those flags can be produced by changes outside the hashed roots, which
+> is exactly why "`dirty` implies drift" was withdrawn. Flags are not a hash comparison.
+> Recomputed instead, with `computeTreeHash()`:
+>
+> | Published commit       | Stamped by the build | Recomputed from the commit | Match |
+> | ---------------------- | -------------------- | -------------------------- | ----- |
+> | `4b1c4867e685`         | `8773f6b2c0ed…`      | `1f0eb7b4e6cd…` (5,840)    | no    |
+> | `39935889fe02` (#1080) | `1fe0606c134a…`      | `8e117dc65711…` (5,850)    | no    |
+> | `5a13d0b47cb7` (#1089) | `1fe0606c134a…`      | `8e117dc65711…` (5,850)    | no    |
+>
+> The third row was fetched live from `/version.json` during this check — production republished
+> again while this PR was in review, at `2026-08-21T15:39:34Z`. The first two rows' stamps come
+> from this document's own earlier fetch and from `CURRENT_STATE.md` respectively.
+>
+> **Two details make this stronger than a repeated coincidence.** `39935889fe02` and
+> `5a13d0b47cb7` differ in exactly one file — `docs/agents/CURRENT_STATE.md` — which is outside
+> `TREE_HASH_ROOTS`, and they recompute to the _same_ hash. That is the mechanism behaving
+> correctly, and it independently re-validates this document's own canary. Production also
+> stamped the _same_ `1fe0606c134a…` for both, which is equally consistent. So the stamp is
+> stable and the recomputation is stable; they simply are not each other.
+>
+> Three publishes, two distinct committed trees, three mismatches, all `dirty: true`. The
+> provenance gap is therefore **not** an artifact of the single publish this section first
+> caught. **The bound is unchanged and deliberately not widened:** the hashed roots include
+> inputs that never ship, so this still establishes drift in the build workspace at stamp time,
+> and whether any shipped byte differs remains **`NOT_MEASURED`**.
 
 **Production stamped commit `4b1c4867e685` from a build workspace whose hashed roots did not
 match that commit's tree.** State it that way and no more strongly — corrected after review.
@@ -785,9 +805,14 @@ date: 2026-08-21
 slice_owner: Claude
 independent_reviewer: Codex — performed, not merely nominated. Codex reviewed successive
   heads of PR #1087 and its findings drove four outright withdrawals, one reversed
-  conclusion, one partly-refuted claim, and one CI failure this document itself caused.
-  Every review thread is replied to and resolved. Grok is NOT the reviewer of record; an
-  earlier revision of this section recommended Grok, which contradicted the PR.
+  conclusion, one retraction that was itself wrong and withdrawn in turn (§6.2, the
+  route-alias wiring), one relapse into an already-withdrawn inference (§6.1, dirty
+  flags read as corroboration), and one CI failure this document itself caused. An
+  earlier revision of this line said "one partly-refuted claim" — that was the
+  superseded adjudication, and reporting it here would have handed the recipient a
+  conclusion the document had already reversed. Every review thread is replied to and
+  resolved. Grok is NOT the reviewer of record; an earlier revision of this section
+  recommended Grok, which contradicted the PR.
 
 completed:
   - 21 stack determinations re-derived from source at 28c01a017; 21 held

@@ -325,9 +325,10 @@ also **`NO_MATCH`**. Final bound:
 the bound is now interpretable rather than a bare count, and it bears on one of the two
 surviving explanations: the resolver's "the build may predate the scan window" is **weak for
 this build**, whose own stamp reports `commitTime` `2026-08-21T09:44:40Z` — inside the scanned
-17 days by a wide margin. `uncertainty`: that timestamp is self-reported by a build whose SHA is
-absent from the repository, so it cannot be independently checked, and a matching commit could
-sit on one of the 169 unscanned branches rather than the deploy branch.
+17 days by a wide margin. That timestamp is **independently confirmed** — the GitHub commit
+endpoint reports the same `2026-08-21T09:44:40Z` for `4b1c4867e685` (see §6.1). What the scans
+could never have found is now known: the commit is a Lovable merge **off** the deploy branch, so
+recomputing over `origin/verdant-grow-diary` was searching the wrong ref, at any depth.
 
 The canary validates the _algorithm_; it never validated the _coverage_, which is precisely what
 the reviewer said twice.
@@ -357,11 +358,10 @@ actually supports.
 Per the resolver's own text the surviving explanations are a build predating the search, or
 content that never matched any commit — "editor-modified snapshot, or a publish pipeline that
 mutates hashed files such as `bun.lock` before prebuild". `dirty: true` points at the second.
-The first is weakened for a build whose own stamp reports `commitTime` `2026-08-21T09:44:40Z`,
-71 seconds before its `buildTime`: a commit that recent, on this branch, would sit at the tip,
-well inside the scanned ancestry. That is `inference`, not fact — the stamped `commitTime` is
-self-reported by a build whose SHA is not in the repository, so it cannot be checked
-independently.
+The first is ruled out, not merely weakened. The stamped `commitTime` `2026-08-21T09:44:40Z` is
+**confirmed by the GitHub commit endpoint** (§6.1), and the commit was retrieved by SHA — so the
+build did not predate anything. The scans missed it because it is a Lovable merge that is **not
+on the deploy branch**, which no scan depth over `origin/verdant-grow-diary` could have fixed.
 
 **What is owner-gated is now a single, specific question:** why the published tree differs from
 the tree of the commit it stamps. That rests on the direct hash comparison above, not on the two
@@ -548,19 +548,20 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 
 ## 8. Known unknowns, and what stays blocked
 
-| Question                                                             | Status                                                                                                                                          |
-| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                           |
-| Does production deliver the security headers `vercel.json` declares? | `NOT_MEASURED` — first check for OPS-02                                                                                                         |
-| Does the served SHA exist in the repository?                         | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1) |
-| Does production's tree hash match its **own stamped commit**?        | **`FAIL` — measured.** `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                          |
-| Why does the published tree differ from that commit's tree?          | `BLOCKED` — needs the publisher's build log; owner-only                                                                                         |
-| What _is_ production commit `4b1c4867e685`, and why is it dirty?     | `BLOCKED` — narrowed, but still needs the publisher's view; owner-only                                                                          |
-| Are all five npm consumers still real after §6.2?                    | `NOT_MEASURED` — cheapest TOOL-01 progress                                                                                                      |
-| Runtime AI Doctor behaviour under the twenty adversarial cases       | `NOT_MEASURED` — AI-02 not run                                                                                                                  |
-| False-positive rate for any SPC rule                                 | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                    |
-| GA4 / GSC authenticated baselines                                    | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                         |
-| Indexation                                                           | `NOT_MEASURED` — unchanged                                                                                                                      |
+| Question                                                             | Status                                                                                                                                                                                             |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                                                                              |
+| Does production deliver the security headers `vercel.json` declares? | `NOT_MEASURED` — first check for OPS-02                                                                                                                                                            |
+| Does the served SHA exist in the repository?                         | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1)                                                    |
+| Does production's tree hash match its **own stamped commit**?        | **`FAIL` — measured.** `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                                                                             |
+| Why does the published tree differ from that commit's tree?          | `BLOCKED` — needs the publisher's build log; owner-only                                                                                                                                            |
+| What _is_ production commit `4b1c4867e685`?                          | **`PASS` — resolved.** "Completed Verdant audit", `lovable-dev[bot]`, merge of `28c01a017` + `a684da59b`, `2026-08-21T09:44:40Z`, via the GitHub commit endpoint (§6.1). Do not re-run this lookup |
+| Why does the published tree differ from that commit's tree?          | `BLOCKED` — needs the publisher's build log; owner-only                                                                                                                                            |
+| Are all five npm consumers still real after §6.2?                    | `NOT_MEASURED` — cheapest TOOL-01 progress                                                                                                                                                         |
+| Runtime AI Doctor behaviour under the twenty adversarial cases       | `NOT_MEASURED` — AI-02 not run                                                                                                                                                                     |
+| False-positive rate for any SPC rule                                 | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                                                                       |
+| GA4 / GSC authenticated baselines                                    | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                                                                            |
+| Indexation                                                           | `NOT_MEASURED` — unchanged                                                                                                                                                                         |
 
 ---
 
@@ -595,10 +596,11 @@ Lead — peer, no rank). The adversarial questions worth putting to this documen
 
 1. Re-run the four live probes in §6.2 from a different network. Is HTTP 200 with no
    `Location` reproducible, or was one observation a cache artifact?
-2. Re-run the provenance resolver against the production `treeHash` at a later tip, and re-check
-   `4b1c4867e685`. If it appears in a ref this session did not have,
-   §6.1's first observation collapses — but the `dirty: true` + `commitSource: "git"`
-   observation stands independently and still needs an explanation.
+2. **Reproduce the own-commit hash comparison**, which is the surviving finding: fetch
+   `4b1c4867e685` by SHA, recompute its tree with `scripts/lib/tree-hash.mjs`, and confirm it
+   yields `1f0eb7b4e6cd…` against the live stamp's `8773f6b2c0ed…`. **Do not re-run the
+   "does the SHA exist" check** — that question is closed (§6.1), and finding the SHA in another
+   ref would not touch the surviving finding. The open half is the publisher's build log.
 3. ~~Challenge §6.3's counting method.~~ **Already raised and acted on** — Codex made exactly
    this challenge in review of this document, and §6.3 is rewritten accordingly: the finding
    is now "11 files use the installed schema validator", carrying no coverage claim in either

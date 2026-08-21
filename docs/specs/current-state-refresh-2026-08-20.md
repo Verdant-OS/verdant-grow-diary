@@ -4,6 +4,13 @@
 **Author:** Claude (Knowledge Library and Product Specification Architect)
 **Base measured:** `9ae3bb88af7508332914228b0495d79e45a42bdb` — `origin/verdant-grow-diary`,
 fetched this session. All measurements below were taken at that ref.
+
+> **Moved during authoring.** The deploy tip advanced to `5640d774` while this
+> specification was being written — #1041 (Tranche B+ slice D7) merged, touching `src/`
+> only and no governance file. The D7 row in §5.2 is corrected to `MERGED`; every other
+> measurement still holds at the ref above. The staleness this document describes is
+> ongoing, not a one-time snapshot, which is the point.
+
 **Applies to:** `docs/agents/CURRENT_STATE.md` (exempt from Sentinel parity; no version bump).
 
 ---
@@ -155,7 +162,7 @@ as an approved plan of slices still to ship. Measured:
 | B1 | planned | **MERGED** — #1040 `9141be8` |
 | B3a | planned | **MERGED** — #1042 `9b64456` |
 | D5 | planned | **OPEN** — #1043 |
-| D7 | planned | **OPEN** — #1041 |
+| D7 | planned | **MERGED** — #1041 `5640d77`, landed after this spec was measured |
 | B2 | "waits for A5" | **B2a MERGED** — #1049 `f09febc`; B2b still deferred to A5 |
 | B4 | "waits for A2" | **B4a MERGED** — #1047 `cff3efd`; B4b still deferred to A2 |
 | B5 | "waits for A3" | no merge found — unchanged |

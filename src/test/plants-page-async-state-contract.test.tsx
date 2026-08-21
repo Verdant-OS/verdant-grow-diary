@@ -235,6 +235,24 @@ describe("Plants page async-state contract", () => {
     expect(stalePrimary.refetch).toHaveBeenCalledTimes(1);
   });
 
+  it("shows an honest retry state when a cached-empty primary refresh fails", () => {
+    const staleEmptyPrimary = {
+      ...successfulQuery([]),
+      isError: true,
+    };
+    mocks.queries.active = successfulQuery([]);
+    mocks.queries.archivedByGrow.set("grow-a", staleEmptyPrimary);
+
+    renderPlants();
+
+    expect(screen.getByTestId("plants-limited-data")).toBeInTheDocument();
+    expect(screen.getByTestId("plants-primary-refresh-error")).toHaveTextContent(
+      "Plant list refresh unavailable",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry plant list refresh" }));
+    expect(staleEmptyPrimary.refetch).toHaveBeenCalledTimes(1);
+  });
+
   it("retries only the selected failed supplemental query", () => {
     const failedTents = { ...mocks.makeQuery(undefined), isError: true };
     mocks.queries.tents = failedTents;

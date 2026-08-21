@@ -121,6 +121,7 @@ vi.mock("@/components/CreateTentDialog", () => ({
 }));
 
 import CreatePlantDialog from "@/components/CreatePlantDialog";
+import { clearGrowDataMeta, getGrowDataMeta } from "@/hooks/useGrowData";
 
 const elementPrototype = Element.prototype as Element & {
   hasPointerCapture?: () => boolean;
@@ -134,10 +135,36 @@ elementPrototype.releasePointerCapture ??= () => {};
 elementPrototype.scrollIntoView ??= () => {};
 
 const G1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const G2 = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const T1 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const T2 = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const T_ORPHAN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const T_GONE = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+const USER_ID = "11111111-1111-4111-8111-111111111111";
+const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";
+const CREATED_ROW = {
+  candidate_label: null,
+  candidate_number: null,
+  created_at: "2026-08-21T17:45:00.000Z",
+  grow_id: G1,
+  health: "healthy",
+  id: "99999999-9999-4999-8999-999999999999",
+  is_archived: false,
+  last_note: null,
+  medium: null,
+  name: "Visible Plant",
+  pheno_hunt_id: null,
+  photo_url: null,
+  plant_type: "unknown",
+  pot_size: null,
+  schema_version: 1,
+  stage: "seedling",
+  started_at: "2026-08-21T17:45:00.000Z",
+  strain: null,
+  tent_id: T1,
+  updated_at: "2026-08-21T17:45:00.000Z",
+  user_id: USER_ID,
+} as const;
 
 function renderDialog(props: {
   defaultGrowId?: string;
@@ -159,7 +186,7 @@ beforeEach(() => {
   successToastMock.mockReset();
   funnelEventMock.mockReset();
   singleMock.mockReset();
-  singleMock.mockResolvedValue({ data: { id: "plant-1", name: "P" }, error: null });
+  singleMock.mockResolvedValue({ data: CREATED_ROW, error: null });
   selectMock.mockClear();
   growsState.grows = [{ id: G1, name: "Spring" }];
   growsState.activeGrowId = G1;
@@ -315,6 +342,7 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(payload.grow_id).toBe(G1);
     expect(payload.tent_id).toBe(T1);
     expect(payload.name).toBe("Happy Plant");
+    expect(selectMock).toHaveBeenCalledWith("*");
   });
 
   it("refreshes the exact legacy and owner-scoped plant caches before create handoff", async () => {
@@ -394,9 +422,107 @@ describe("CreatePlantDialog RTL binding", () => {
     resolveGrowPlantsRefresh();
     await waitFor(() => expect(client.getQueryData(ownerGrowPlantsKey)).toEqual(["owner-after"]));
     await waitFor(() => expect(screen.queryByTestId("create-plant-form")).not.toBeInTheDocument());
-    expect(onCreated).toHaveBeenCalledWith({ id: "plant-1", name: "P" });
+    expect(onCreated).toHaveBeenCalledWith(CREATED_ROW);
     unsubscribeLegacy();
     unsubscribeOwnerGrow();
+  });
+
+  it("keeps a server-confirmed first plant visible when both active cache refreshes fail", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const legacyPlantsKey = ["plants"] as const;
+    const activeGrowPlantsKey = ["grow", "plants", "all", G1, "owner", USER_ID] as const;
+    const archivedGrowPlantsKey = [
+      "grow",
+      "plants",
+      "all",
+      G1,
+      "with-archived",
+      "owner",
+      USER_ID,
+    ] as const;
+    const matchingTentPlantsKey = ["grow", "plants", T1, G1, "owner", USER_ID] as const;
+    const otherTentPlantsKey = ["grow", "plants", T2, G1, "owner", USER_ID] as const;
+    const otherGrowPlantsKey = ["grow", "plants", "all", G2, "owner", USER_ID] as const;
+    const otherOwnerPlantsKey = ["grow", "plants", "all", G1, "owner", OTHER_USER_ID] as const;
+
+    for (const key of [
+      legacyPlantsKey,
+      activeGrowPlantsKey,
+      archivedGrowPlantsKey,
+      matchingTentPlantsKey,
+      otherTentPlantsKey,
+      otherGrowPlantsKey,
+      otherOwnerPlantsKey,
+    ]) {
+      client.setQueryData(key, []);
+    }
+
+    const failedRefresh = vi.fn(async () => {
+      // Model the real grow query boundary replacing source metadata with a
+      // refresh error after the confirmed row has already been cached.
+      clearGrowDataMeta();
+      throw new Error("plant refresh unavailable");
+    });
+    const observers = [legacyPlantsKey, activeGrowPlantsKey, archivedGrowPlantsKey].map(
+      (queryKey) =>
+        new QueryObserver(client, {
+          queryKey,
+          queryFn: failedRefresh,
+          staleTime: Number.POSITIVE_INFINITY,
+          retry: false,
+        }),
+    );
+    const unsubscribers = observers.map((observer) => observer.subscribe(() => {}));
+    const onCreated = vi.fn();
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), CREATED_ROW.name);
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED_ROW));
+    expect(failedRefresh).toHaveBeenCalledTimes(3);
+    expect(client.getQueryState(archivedGrowPlantsKey)?.status).toBe("error");
+
+    expect(client.getQueryData(legacyPlantsKey)).toEqual([CREATED_ROW]);
+    const expectedMappedPlant = {
+      id: CREATED_ROW.id,
+      name: CREATED_ROW.name,
+      strain: "",
+      tentId: T1,
+      stage: "seedling",
+      startedAt: CREATED_ROW.started_at,
+      health: "healthy",
+      photo: "",
+      lastNote: "",
+      growId: G1,
+      isArchived: false,
+      medium: null,
+      potSize: null,
+      plantType: "unknown",
+    };
+    expect(client.getQueryData(activeGrowPlantsKey)).toEqual([expectedMappedPlant]);
+    expect(client.getQueryData(archivedGrowPlantsKey)).toEqual([expectedMappedPlant]);
+    expect(client.getQueryData(matchingTentPlantsKey)).toEqual([expectedMappedPlant]);
+    expect(client.getQueryData(otherTentPlantsKey)).toEqual([]);
+    expect(client.getQueryData(otherGrowPlantsKey)).toEqual([]);
+    expect(client.getQueryData(otherOwnerPlantsKey)).toEqual([]);
+    const refreshFailureMeta = getGrowDataMeta(["grow", "plants", "all", G1], USER_ID);
+    expect(refreshFailureMeta.dataSource).toBe("unavailable");
+    expect(refreshFailureMeta.sourceReason).not.toBe("supabase:rows");
+
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
   });
 
   it("allows dismissal during refresh without a delayed create handoff", async () => {

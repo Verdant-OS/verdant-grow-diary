@@ -70,10 +70,7 @@ import {
   type PlantsSupplementalQueryKey,
 } from "@/lib/plantsPageAsyncStateRules";
 import { isOneTentActivationIntent } from "@/lib/connectedOneTentActivationRules";
-import {
-  readFastAddParam,
-  fastAddPickerBannerCopy,
-} from "@/lib/fastAddActionRules";
+import { readFastAddParam, fastAddPickerBannerCopy } from "@/lib/fastAddActionRules";
 import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,
@@ -551,7 +548,7 @@ export default function Plants() {
         testId="plants-data-source-disclosure"
       />
 
-      {plantsAsyncState.kind === "limited" && allPlants.length > 0 && (
+      {plantsAsyncState.kind === "limited" && (
         <section
           role="status"
           data-testid="plants-limited-data"

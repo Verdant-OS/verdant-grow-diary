@@ -28,6 +28,11 @@ import { Link } from "@/lib/react-router-compat";
 import CreateTentDialog, { type CreatedTent } from "@/components/CreateTentDialog";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
+  confirmCreatedPlantRow,
+  primeConfirmedPlantCaches,
+} from "@/lib/confirmedPlantCacheService";
+import { recordConfirmedGrowPlantMeta } from "@/hooks/useGrowData";
+import {
   buildCreateGrowBindingView,
   canWriteCreateGrowId,
   evaluateSuppliedTentBinding,
@@ -384,7 +389,7 @@ export default function CreatePlantDialog({
     const { data, error } = await supabase
       .from("plants")
       .insert(validation.value as never)
-      .select("id, name")
+      .select("*")
       .single();
     if (error) {
       if (mountedRef.current) setBusy(false);
@@ -394,10 +399,29 @@ export default function CreatePlantDialog({
     // The insert is now durable. Record that fact before any cache refresh can
     // stall or the grower can leave; navigation remains refresh-gated below.
     trackFunnelEvent("plant_created");
-    // The insert is durable before these reads, but the grower-facing plant
-    // lists can still be showing the pre-create cache. Keep the dialog and its
-    // handoff pending until both legacy Quick Log and owner-scoped grow views
-    // have settled their refresh, matching the guided Start Your Room path.
+    const confirmed = confirmCreatedPlantRow(data, {
+      ownerId: user.id,
+      growId: targetGrowId,
+      tentId: validation.value.tent_id ?? null,
+    });
+    if (!confirmed) {
+      if (mountedRef.current) {
+        setBusy(false);
+        setOpen(false);
+      }
+      toast.error(
+        "Plant was saved, but Verdant could not confirm its details. Refresh before adding another.",
+      );
+      return;
+    }
+    await primeConfirmedPlantCaches(qc, user.id, confirmed, {
+      onGrowCacheConfirmed: (key) => {
+        recordConfirmedGrowPlantMeta(user.id, key);
+      },
+    });
+    // The insert is durable before these reads. Keep the dialog and its handoff
+    // pending until both legacy Quick Log and owner-scoped grow views have
+    // attempted authoritative reconciliation, matching Start Your Room.
     await Promise.allSettled([
       qc.invalidateQueries({ queryKey: ["plants"] }),
       qc.invalidateQueries({ queryKey: ["grow", "plants"] }),

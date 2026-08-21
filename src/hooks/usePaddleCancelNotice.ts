@@ -1,12 +1,12 @@
 /**
  * usePaddleCancelNotice — presentation-only.
  *
- * Fetches bounded newest-first RECURRING subscription windows for live and
- * sandbox (skipping `lifetime_%` pseudo-subscription IDs), selects an entitling
- * live row before a sandbox fallback, and derives the cancel-notice presentation
- * via `derivePaddleCancelNotice`. Never mutates rows, never re-implements access
- * rules, and never gates capabilities — the entitlement hook / access rules
- * remain the source of truth for what a user can do.
+ * Fetches bounded newest-first subscription windows for live and sandbox,
+ * selects the same canonical Founder/recurring winner as entitlements (live
+ * first, sandbox fallback only when expected), and derives the cancel-notice
+ * presentation via `derivePaddleCancelNotice`. Never mutates rows, never
+ * re-implements access rules, and never gates capabilities — the entitlement
+ * hook / access rules remain the source of truth for what a user can do.
  *
  * RLS on public.subscriptions is select-own; passing user_id is redundant
  * but harmless. The hook returns HIDDEN while loading, when the live read
@@ -50,7 +50,7 @@ export function usePaddleCancelNotice(): PaddleCancelNotice {
     }
     const expectedEnvironment: LovableBillingEnvironment = getPaddleEnvironment();
     (async () => {
-      const recurringRows = (environment: LovableBillingEnvironment) =>
+      const subscriptionRows = (environment: LovableBillingEnvironment) =>
         supabase
           .from("subscriptions")
           .select(
@@ -58,7 +58,6 @@ export function usePaddleCancelNotice(): PaddleCancelNotice {
           )
           .eq("user_id", user.id)
           .eq("environment", environment)
-          .not("paddle_subscription_id", "like", "lifetime_%")
           .order("created_at", { ascending: false })
           .order("paddle_subscription_id", { ascending: false })
           .limit(SUBSCRIPTION_ROW_SCAN_LIMIT);
@@ -66,10 +65,11 @@ export function usePaddleCancelNotice(): PaddleCancelNotice {
       // Live subscription rows remain canonical production evidence even
       // while new checkout is intentionally sandbox-only. Read the same
       // bounded environment windows as the entitlement hook, then apply its
-      // live-first, any-entitling-row precedence before deriving copy.
+      // Founder-first per-environment picker and live-first environment
+      // precedence before deriving copy.
       const [liveResult, sandboxResult] = await Promise.all([
-        recurringRows("live"),
-        recurringRows("sandbox"),
+        subscriptionRows("live"),
+        subscriptionRows("sandbox"),
       ]);
       if (cancelled) return;
       if (liveResult.error) {
@@ -95,15 +95,15 @@ export function usePaddleCancelNotice(): PaddleCancelNotice {
       }
 
       const sandboxRows = (sandboxResult.data ?? []) as PaddleCancelSubscriptionRow[];
-      const sandboxRow = pickEntitlingLovableRow(
-        sandboxRows,
-        "sandbox",
-        now,
-      ) as PaddleCancelSubscriptionRow | null;
-      const sandboxRowEntitles =
-        sandboxRow != null && lovableRowEntitles(sandboxRow, "sandbox", now);
-      const selectedRow =
-        sandboxRowEntitles || expectedEnvironment === "sandbox" ? sandboxRow : liveRow;
+      const sandboxRow =
+        expectedEnvironment === "sandbox"
+          ? (pickEntitlingLovableRow(
+              sandboxRows,
+              "sandbox",
+              now,
+            ) as PaddleCancelSubscriptionRow | null)
+          : null;
+      const selectedRow = expectedEnvironment === "sandbox" ? sandboxRow : liveRow;
 
       setNotice(derivePaddleCancelNotice(selectedRow));
     })();

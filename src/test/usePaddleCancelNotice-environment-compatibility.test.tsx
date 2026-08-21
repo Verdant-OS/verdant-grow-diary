@@ -19,6 +19,7 @@ const testState = vi.hoisted(() => ({
   errors: {} as Partial<Record<"live" | "sandbox", unknown>>,
   queriedEnvironments: [] as string[],
   capturedLimits: [] as number[],
+  lifetimeExclusionCount: 0,
   paddleEnvironment: "sandbox" as "live" | "sandbox",
 }));
 
@@ -41,6 +42,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => {
       let environment: string | null = null;
+      let excludesLifetimeRows = false;
       const descendingKeys: string[] = [];
       const chain: Record<string, unknown> = {};
       chain.select = () => chain;
@@ -48,7 +50,17 @@ vi.mock("@/integrations/supabase/client", () => ({
         if (column === "environment") environment = value;
         return chain;
       };
-      chain.not = () => chain;
+      chain.not = (column: string, operator: string, pattern: string) => {
+        if (
+          column === "paddle_subscription_id" &&
+          operator === "like" &&
+          pattern === "lifetime_%"
+        ) {
+          excludesLifetimeRows = true;
+          testState.lifetimeExclusionCount += 1;
+        }
+        return chain;
+      };
       chain.order = (column: string, options?: { ascending?: boolean }) => {
         if (options?.ascending === false) descendingKeys.push(column);
         return chain;
@@ -71,6 +83,11 @@ vi.mock("@/integrations/supabase/client", () => ({
         let rows = testState.rows.filter(
           (row) => readEnvironment == null || row.environment === readEnvironment,
         );
+        if (excludesLifetimeRows) {
+          rows = rows.filter(
+            (row) => !String(row.paddle_subscription_id ?? "").startsWith("lifetime_"),
+          );
+        }
         if (descendingKeys.length > 0) {
           rows = [...rows].sort((a, b) => {
             for (const key of descendingKeys) {
@@ -89,7 +106,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 function recurringRow(
   environment: "live" | "sandbox",
-  currentPeriodEnd: string,
+  currentPeriodEnd: string | null,
   overrides: Record<string, unknown> = {},
 ) {
   return {
@@ -111,6 +128,18 @@ function recurringRow(
   };
 }
 
+function founderRow(environment: "live" | "sandbox", overrides: Record<string, unknown> = {}) {
+  return recurringRow(environment, null, {
+    paddle_subscription_id: `lifetime_${environment}`,
+    product_id: "founder_lifetime",
+    price_id: "founder_lifetime",
+    cancel_at_period_end: false,
+    scheduled_change_action: null,
+    scheduled_change_at: null,
+    ...overrides,
+  });
+}
+
 async function renderNotice() {
   const { result } = renderHook(() => usePaddleCancelNotice());
   await waitFor(() => expect(testState.queriedEnvironments.length).toBeGreaterThan(0));
@@ -122,6 +151,7 @@ beforeEach(() => {
   testState.errors = {};
   testState.queriedEnvironments = [];
   testState.capturedLimits = [];
+  testState.lifetimeExclusionCount = 0;
   testState.paddleEnvironment = "sandbox";
 });
 
@@ -190,5 +220,79 @@ describe("usePaddleCancelNotice environment compatibility", () => {
 
     await waitFor(() => expect(testState.queriedEnvironments).toEqual(["live", "sandbox"]));
     expect(result.current.visible).toBe(false);
+  });
+
+  it.each([
+    {
+      name: "live Founder suppresses a lower-precedence sandbox recurring cancellation",
+      rows: [founderRow("live"), recurringRow("sandbox", SANDBOX_END)],
+      errors: {},
+      expectedEnvironment: "sandbox" as const,
+      expectedVisible: false,
+      expectedEnd: null,
+    },
+    {
+      name: "live Founder remains authoritative when the sandbox read fails",
+      rows: [founderRow("live"), recurringRow("sandbox", SANDBOX_END)],
+      errors: { sandbox: { message: "temporary sandbox read failure" } },
+      expectedEnvironment: "sandbox" as const,
+      expectedVisible: false,
+      expectedEnd: null,
+    },
+    {
+      name: "live recurring cancellation beats a sandbox Founder row",
+      rows: [recurringRow("live", LIVE_END), founderRow("sandbox")],
+      errors: {},
+      expectedEnvironment: "sandbox" as const,
+      expectedVisible: true,
+      expectedEnd: LIVE_END,
+    },
+    {
+      name: "sandbox Founder fallback suppresses recurring cancellation copy",
+      rows: [founderRow("sandbox")],
+      errors: {},
+      expectedEnvironment: "sandbox" as const,
+      expectedVisible: false,
+      expectedEnd: null,
+    },
+    {
+      name: "sandbox recurring cancellation is ignored when sandbox is not expected",
+      rows: [recurringRow("sandbox", SANDBOX_END)],
+      errors: {},
+      expectedEnvironment: "live" as const,
+      expectedVisible: false,
+      expectedEnd: null,
+    },
+    {
+      name: "live read failure stays hidden despite sandbox recurring evidence",
+      rows: [recurringRow("sandbox", SANDBOX_END)],
+      errors: { live: { message: "temporary live read failure" } },
+      expectedEnvironment: "sandbox" as const,
+      expectedVisible: false,
+      expectedEnd: null,
+    },
+    {
+      name: "sandbox read failure stays hidden without proven live entitlement",
+      rows: [] as Array<Record<string, unknown>>,
+      errors: { sandbox: { message: "temporary sandbox read failure" } },
+      expectedEnvironment: "sandbox" as const,
+      expectedVisible: false,
+      expectedEnd: null,
+    },
+  ])("$name", async ({ rows, errors, expectedEnvironment, expectedVisible, expectedEnd }) => {
+    testState.rows = rows;
+    testState.errors = errors;
+    testState.paddleEnvironment = expectedEnvironment;
+
+    const result = await renderNotice();
+
+    await waitFor(() => expect(testState.queriedEnvironments).toEqual(["live", "sandbox"]));
+    if (expectedVisible) {
+      await waitFor(() => expect(result.current.visible).toBe(true));
+    } else {
+      expect(result.current.visible).toBe(false);
+    }
+    expect(result.current.accessUntilIso).toBe(expectedEnd);
+    expect(testState.lifetimeExclusionCount).toBe(0);
   });
 });

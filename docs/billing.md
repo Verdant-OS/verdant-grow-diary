@@ -46,9 +46,12 @@ are not live yet.
 ## Configuration
 
 The **canonical** client env var is `VITE_PAYMENTS_CLIENT_TOKEN` (Lovable
-built-in Paddle integration). Its prefix (`test_` → sandbox, `live_` → live)
-is the single source of truth for the client environment. On loopback hosts
-a `live_` token fails closed and the checkout button renders as unavailable.
+built-in Paddle integration). The tracked development and production builds
+both use a sandbox-class (`test_`) token. The client authorizes checkout only
+when that exact class is present. A `live_`, missing, or malformed token fails
+closed as unavailable on every hostname; a production hostname never enables
+live checkout by itself. Classify tokens by prefix only and never print or
+copy their values into logs, tickets, or review comments.
 
 Legacy BYO client env vars (`VITE_PADDLE_ENVIRONMENT`,
 `VITE_PADDLE_CLIENT_TOKEN`, `VITE_PADDLE_PRICE_*`) are `@deprecated` and only
@@ -133,9 +136,35 @@ specifically reports that the new overload is absent. See
 for the mandatory pause, residual expand-stage exposure, verification evidence,
 and rollback order.
 
-## What is still required before live payments
+## Coordinated production-to-sandbox settings transition
 
-Before flipping to live Paddle:
+The source policy and tracked production token are sandbox-only. Making the
+deployed stack match that policy is a coordinated operator change, not a
+client-token-only flip:
+
+1. Confirm the sandbox secret and price-ID **names** are present without
+   printing their values.
+2. Pin `PAYMENTS_ENVIRONMENT=sandbox` and legacy `PADDLE_ENVIRONMENT=sandbox`.
+3. Confirm `PAYMENTS_SANDBOX_WEBHOOK_SECRET`, `PADDLE_SANDBOX_API_KEY`, and all
+   sandbox catalog price IDs belong to the same Paddle sandbox account.
+4. Publish the build that contains both the sandbox-class production client
+   token and the exact-sandbox runtime gate.
+5. Run `docs/paddle-sandbox-smoke.md` against the published app. If any layer
+   disagrees, disable checkout or roll back to the prior reviewed release;
+   never solve a mismatch by enabling live checkout ad hoc.
+
+This repository change does not mutate Lovable/Paddle/Supabase settings.
+
+## What is still required before live payments can be proposed
+
+Live checkout is intentionally unsupported by current source. A future change
+requires explicit owner authorization and one coordinated, independently
+reviewed transition covering client code and copy, a live-class production
+token, server environment selectors, live API/webhook secrets, live price IDs,
+notification destinations, tests, smoke evidence, monitoring, and rollback.
+No individual token or settings flip authorizes live checkout.
+
+Before proposing that transition:
 
 - [ ] Complete Paddle live verification (merchant of record onboarding).
 - [ ] Confirm acceptable use policy fit for Verdant (software-only).
@@ -148,5 +177,6 @@ Before flipping to live Paddle:
 - [ ] Sandbox smoke green per `docs/paddle-sandbox-smoke.md` (Pro Monthly,
       Pro Annual, Founder Lifetime, duplicate-delivery idempotency,
       cancel-and-resubscribe).
-- [ ] Set `PAYMENTS_ENVIRONMENT=live` and install live `VITE_PAYMENTS_CLIENT_TOKEN` + live webhook secret + live API key + live price IDs as one reviewed
-      change.
+- [ ] Prepare the code, configuration, secrets, price IDs, notification
+      destinations, public copy, tests, and rollback as one reviewed change;
+      apply none of them independently.

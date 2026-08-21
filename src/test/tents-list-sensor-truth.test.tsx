@@ -27,6 +27,7 @@ import {
   buildTentSnapshotView,
   type BuildTentSnapshotInput,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 
 // ---- Page render fixtures (hoisted: vi.mock factories run before imports) --
@@ -702,6 +703,72 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     expect(H.hookState.manualHookCalls).toBe(1);
     expect(H.hookState.legacyManualHookCalls).toBe(0);
     expect(H.hookState.lastManualTentIds).toEqual([H.TENT_ID]);
+  });
+
+  it("preserves a manual snapshot at the exact allowed future-skew boundary", () => {
+    vi.useFakeTimers();
+    const now = Date.parse("2026-08-21T12:00:00.000Z");
+    vi.setSystemTime(now);
+    const capturedAt = new Date(now + LIVE_CURRENT_STATE_STALE_MS).toISOString();
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualCards = [H.manualCard({ capturedAt })];
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveAttribute(
+      "data-status",
+      "ok",
+    );
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-rh`)).toHaveAttribute(
+      "data-status",
+      "ok",
+    );
+    expect(view.container.querySelectorAll('[data-status="invalid"]')).toHaveLength(0);
+  });
+
+  it("shows beyond-boundary future manual readings as Invalid with no healthy chips", () => {
+    vi.useFakeTimers();
+    const now = Date.parse("2026-08-21T12:00:00.000Z");
+    vi.setSystemTime(now);
+    const capturedAt = new Date(now + LIVE_CURRENT_STATE_STALE_MS + 1).toISOString();
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualCards = [
+      H.manualCard({
+        capturedAt,
+        readings: [
+          { field: "air_temp_c", value: 22, unit: "°C", derived: false },
+          { field: "humidity_pct", value: 55, unit: "%", derived: false },
+          { field: "vpd_kpa", value: 1.08, unit: "kPa", derived: false },
+        ],
+      }),
+    ];
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent(
+      "Invalid",
+    );
+    expect(screen.getByTestId(`tents-list-sensor-last-updated-${H.TENT_ID}`)).toHaveAttribute(
+      "data-captured-at",
+      capturedAt,
+    );
+    const metrics = ["temp", "rh", "vpd"].map((key) =>
+      screen.getByTestId(`tents-list-metric-${H.TENT_ID}-${key}`),
+    );
+    expect(metrics.every((item) => item.getAttribute("data-status") === "invalid")).toBe(true);
+    expect(view.container.querySelectorAll('[data-status="ok"]')).toHaveLength(0);
+    expect(screen.queryByTestId("tents-list-vpd-stage-missing-badge")).toBeNull();
   });
 
   it("never flashes Manual while cached-empty sensors refresh before fresh rows arrive", () => {

@@ -43,6 +43,7 @@ export default function TentEnvironmentSnapshotStrip({
     sensorStatus,
     manualCards,
     manualStatus,
+    now,
   });
 
   if (selection.kind === "sensor_loading") {

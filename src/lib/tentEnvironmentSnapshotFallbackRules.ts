@@ -3,6 +3,7 @@ import type {
   ManualSnapshotCardSeverity,
   ManualSnapshotTimelineCard,
 } from "@/lib/manualSensorSnapshotViewModel";
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 
 export type TentEnvironmentReadStatus = "loading" | "error" | "refresh_error" | "success";
 export type TentEnvironmentManualReadStatus = TentEnvironmentReadStatus | "refreshing";
@@ -12,6 +13,7 @@ export interface SelectTentEnvironmentSnapshotFallbackInput {
   sensorStatus: TentEnvironmentReadStatus;
   manualCards?: readonly ManualSnapshotTimelineCard[] | null;
   manualStatus: TentEnvironmentManualReadStatus;
+  now: number;
 }
 
 export type TentEnvironmentSnapshotSelection =
@@ -51,8 +53,11 @@ function manualQuality(severity: ManualSnapshotCardSeverity): "ok" | "degraded" 
   return "ok";
 }
 
-function manualCardRows(card: ManualSnapshotTimelineCard): BuildTentSnapshotInput[] {
-  const quality = manualQuality(card.severity);
+function manualCardRows(card: ManualSnapshotTimelineCard, now: number): BuildTentSnapshotInput[] {
+  const capturedAtMs = Date.parse(card.capturedAt);
+  const beyondAllowedFutureSkew =
+    Number.isFinite(capturedAtMs) && capturedAtMs - now > LIVE_CURRENT_STATE_STALE_MS;
+  const quality = beyondAllowedFutureSkew ? "invalid" : manualQuality(card.severity);
   const rows: BuildTentSnapshotInput[] = [];
 
   for (const reading of card.readings) {
@@ -103,7 +108,7 @@ export function selectTentEnvironmentSnapshotFallback(
   const card = newestManualCard(manualCards);
   if (input.manualStatus === "refreshing" && !card) return { kind: "manual_loading" };
   if (!card) return { kind: "empty" };
-  const rows = manualCardRows(card);
+  const rows = manualCardRows(card, input.now);
   const refreshWarning = input.manualStatus === "refresh_error";
   const refreshing = input.manualStatus === "refreshing";
   if (rows.length === 0) {

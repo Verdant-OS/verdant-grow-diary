@@ -436,6 +436,46 @@ function aliasDocument(
   };
 }
 
+/**
+ * An INDEXABLE audience variant that concedes its ranking URL to another route.
+ *
+ * Distinct from `aliasDocument` above, and the difference is the whole point:
+ * `aliasDocument` builds a legacy redirect stub (`/strains/*`) that inherits the
+ * target's title, description and JSON-LD wholesale and is marked
+ * `noindex, follow`. This helper keeps the variant's OWN copy and leaves it
+ * affirmatively indexable — only the canonical identity moves.
+ *
+ * Do not "simplify" this into `aliasDocument`. Pairing `noindex` with a
+ * cross-canonical sends crawlers two contradictory instructions about the same
+ * URL, and the variant would also lose the audience-specific title and
+ * description that justify its existence.
+ *
+ * `metadata.url` is the single source for `<link rel="canonical">`, `og:url`,
+ * and the WebPage JSON-LD `@id`, so pointing it at the canonical target keeps
+ * all three in agreement — which is exactly what the postbuild
+ * canonical/og-parity and JSON-LD `@id` validators assert.
+ */
+function crossCanonicalDocument(
+  path: string,
+  canonicalPath: string,
+  metadata: Omit<StaticSocialRouteMetadata, "url" | "image"> & {
+    readonly image?: string;
+  },
+): StaticPublicAliasDocument {
+  const url = `${VERDANT_SITE_ORIGIN}${canonicalPath}`;
+  return {
+    path,
+    fileName: routeFileName(path),
+    canonicalPath,
+    metadata: {
+      ...metadata,
+      url,
+      image: metadata.image ?? DEFAULT_OG_IMAGE,
+      jsonLd: metadata.jsonLd ?? [buildStaticWebPageJsonLd({ ...metadata, url })],
+    },
+  };
+}
+
 const GUIDE_HUB = publicDocument("/guides", {
   title: "Grower Guides: Diary, Lighting & Sensor Truth | Verdant",
   description:
@@ -572,17 +612,26 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       "Alphabetized reference of cannabis breeding, cultivation, and phenotype terms — searchable and category-filterable for serious growers.",
     imageAlt: "Verdant cultivation glossary",
   }),
-  publicDocument("/breeder-beta", {
-    title: "Verdant Breeder Beta | Verdant Grow Diary",
-    description:
-      "Controlled beta for breeders and pheno hunters. See how Verdant records lab evidence, pathogen screening, sensory rubrics, and pheno decisions — while the breeder always decides which plants advance.",
-    imageAlt: "Verdant Breeder Beta",
-  }),
+  // /creator-beta is declared FIRST so it is the primary in the manifest's
+  // duplicate-canonical report; /breeder-beta below points at it.
   publicDocument("/creator-beta", {
     title: "Verdant Creator & Breeder Beta | Verdant Grow Diary",
     description:
       "Controlled beta for serious growers, breeders, and grower-educators. See how Verdant turns plant logs, photos, sensor snapshots, phenotype notes, and lab evidence into one clear plant history.",
     imageAlt: "Verdant Creator & Breeder Beta",
+  }),
+  // Owner adjudication 2026-08-20: /breeder-beta keeps its breeder-oriented
+  // title and description and stays indexable, but concedes its ranking URL to
+  // /creator-beta. Both routes render the same <BetaLanding> component —
+  // measured 233 of ~237 shared unique visible tokens, identical h1 and every
+  // h2 — so two self-canonical URLs would compete on the same queries.
+  // It is intentionally absent from public/sitemap.xml: never advertise a URL
+  // whose canonical points somewhere else. See scripts/public-route-parity.config.mjs.
+  crossCanonicalDocument("/breeder-beta", "/creator-beta", {
+    title: "Verdant Breeder Beta | Verdant Grow Diary",
+    description:
+      "Controlled beta for breeders and pheno hunters. See how Verdant records lab evidence, pathogen screening, sensory rubrics, and pheno decisions — while the breeder always decides which plants advance.",
+    imageAlt: "Verdant Breeder Beta",
   }),
   publicDocument("/pheno-comparison", {
     title: "Pheno Comparison Preview — Verdant Grow Diary",

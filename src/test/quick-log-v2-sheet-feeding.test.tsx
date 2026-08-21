@@ -300,6 +300,22 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     expect(payload.note).toBe("Runoff was clear; leaf posture held.");
   });
 
+  it("carries a selected plant response into the feeding note and payload", async () => {
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-response", reused: false });
+    renderSheet("plant:plant-1");
+
+    fireEvent.click(screen.getByTestId("qlv2-response-chip-better"));
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("Response check: Better.");
+
+    clickFeed();
+    expect(screen.getByLabelText("Feeding note (optional)")).toHaveValue("Response check: Better.");
+    fillRequiredFeedingFields();
+    clickSave();
+
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    expect(writeFeedingMock.mock.calls[0][0].note).toBe("Response check: Better.");
+  });
+
   it("requires an honest applied volume and never guesses one", async () => {
     renderSheet("plant:plant-1");
     clickFeed();

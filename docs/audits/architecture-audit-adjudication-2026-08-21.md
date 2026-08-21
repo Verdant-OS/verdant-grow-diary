@@ -138,14 +138,14 @@ Every row measured at `28c01a0`. `established fact` unless labelled otherwise.
 
 ### 4.2 Rows the audit under- or over-stated
 
-| Audit row                 | Audit verdict                                                          | Adjudicated verdict                                                                                                                          | Why                                                                      |
-| ------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Head SHA                  | `5aff994b5d21…`                                                        | **Stale by one commit** — deploy tip is `28c01a0` (#1078, `fix(billing): keep production checkout sandbox-only`)                             | The branch advanced between audit and adjudication                       |
-| `vercel.json` authority   | `PARTIAL / AMBIGUOUS`, "does not prove production is currently broken" | **Measured — `vercel.json` does not govern production**                                                                                      | §6.2                                                                     |
-| Zod boundary coverage     | `PARTIAL PASS`, "universal coverage is not proven"                     | **Quantified: 11 of ~1,700 `src` files and 2 of 34 edge functions import Zod**                                                               | §6.3 — this is a much sharper gap than "not proven"                      |
-| pnpm                      | "Reject for V0"                                                        | **Already structurally forbidden** — `pnpm-lock.yaml` is in `FORBIDDEN_LOCKFILES` in `scripts/check-bun-lockfile-policy.mjs`, enforced in CI | Not a preference; a gate                                                 |
-| TOOL-01 (Bun/npm closure) | `P2`, "only after the V0 and production truth gates are stable"        | **Dated `P1`**                                                                                                                               | §6.4 — the transition has a fail-closed `reviewBy` of **2026-08-25**     |
-| `hono` "not present"      | listed among absent infra                                              | **Precisely:** not a direct dependency, but pinned as a transitive security override (`hono: 4.12.34`, `@hono/node-server: 2.0.10`)          | h3/Nitro pulls it; the override is a supply-chain floor, not an adoption |
+| Audit row                 | Audit verdict                                                          | Adjudicated verdict                                                                                                                          | Why                                                                              |
+| ------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Head SHA                  | `5aff994b5d21…`                                                        | **Stale by one commit** — deploy tip is `28c01a0` (#1078, `fix(billing): keep production checkout sandbox-only`)                             | The branch advanced between audit and adjudication                               |
+| `vercel.json` authority   | `PARTIAL / AMBIGUOUS`, "does not prove production is currently broken" | **Measured — `vercel.json` does not govern production**                                                                                      | §6.2                                                                             |
+| Zod boundary coverage     | `PARTIAL PASS`, "universal coverage is not proven"                     | **Upheld.** 11 `src` files and 2 of 34 edge functions import Zod, but importer counts do not measure boundary coverage                       | §6.3 — the audit's hedge was right; an earlier revision of this document was not |
+| pnpm                      | "Reject for V0"                                                        | **Already structurally forbidden** — `pnpm-lock.yaml` is in `FORBIDDEN_LOCKFILES` in `scripts/check-bun-lockfile-policy.mjs`, enforced in CI | Not a preference; a gate                                                         |
+| TOOL-01 (Bun/npm closure) | `P2`, "only after the V0 and production truth gates are stable"        | **Dated `P1`**                                                                                                                               | §6.4 — `reviewBy` **2026-08-25**, gate first fails **2026-08-26** UTC            |
+| `hono` "not present"      | listed among absent infra                                              | **Precisely:** not a direct dependency, but pinned as a transitive security override (`hono: 4.12.34`, `@hono/node-server: 2.0.10`)          | h3/Nitro pulls it; the override is a supply-chain floor, not an adoption         |
 
 ### 4.3 A refinement, not a correction, to #1051
 
@@ -248,16 +248,38 @@ were ever honoured by a host serving this app, and its security `headers` block 
 **not** delivering those headers. Whether the security headers arrive by another mechanism is
 `NOT_MEASURED` and should be OPS-02's first check.
 
-### 6.3 Runtime boundary validation is far thinner than "partial"
+### 6.3 Zod's reach is narrow — but that is a prompt to inventory, not a measured gap
 
 `established fact`: **11** files under `src/` and **2** of 34 edge functions import Zod.
+Zod is already installed (`^3.24.2` — **Zod 3**, not Zod 4; a v4 upgrade is its own migration
+and is not implied here).
 
-The audit called this `PARTIAL PASS`. Measured, it is a genuine architectural gap and the
-single best-evidenced item on the whole roadmap. BOUNDARY-01 should be re-prioritised
-accordingly, and it needs no new dependency — Zod is already installed (`^3.24.2`, **Zod 3**,
-not Zod 4; a v4 upgrade is its own migration and is not implied here).
+**Corrected after review, and the correction matters more than the finding.** An earlier
+revision of this section called that a "genuine architectural gap and the single
+best-evidenced item on the whole roadmap", and §7 raised BOUNDARY-01 to P0-adjacent on the
+strength of it. Both overstated what the number can support, and did so in contradiction of
+this document's own §11, which already warned that counting importers is a proxy for boundary
+coverage rather than a measure of it. Stating a caveat in one section and ignoring it in
+another is not a hedge; it is an error.
 
-### 6.4 The Bun/npm transition has a fail-closed deadline four days out
+Two reasons the count cannot carry that weight:
+
+- **Most `src` files are not ingress boundaries.** A denominator over the whole tree measures
+  nothing. (The earlier revision also gave that denominator as "~1,700", lifted from a prose
+  comment in `tsconfig.json` rather than counted. Measured at `28c01a017`, `src/` holds
+  **4,948** files — 4,932 `.ts`/`.tsx`, of which 2,063 are non-test. The ratio is dropped
+  rather than corrected, because the framing was wrong, not the arithmetic.)
+- **A boundary validated by a hand-written parser is validated.** Not importing Zod is not
+  evidence of an unvalidated input.
+
+What the number honestly supports: **no claim about coverage in either direction.** It is a
+reason to run BOUNDARY-01's inventory — enumerate the actual ingress points (manual entry,
+CSV/XLSX import, EcoWitt/MQTT/webhook/bridge payloads, AI request and tool-call response,
+billing webhooks, action transitions, local persistence, URL state) and record each one's
+current validator. **That inventory is the measurement.** Until it exists, whether Verdant
+has a boundary-validation gap is `NOT_MEASURED`.
+
+### 6.4 The Bun/npm transition has a fail-closed deadline days away
 
 `established fact`: `config/dependency-lockfile-transition.json` carries
 `"reviewBy": "2026-08-25"`, and `scripts/check-bun-lockfile-policy.mjs` states it _"fails
@@ -272,8 +294,14 @@ The five declared npm consumers are `vercel.json`, `.github/workflows/seo-monito
 `README.md`, `.claude/skills/run-verdant-grow-diary/SKILL.md`, and
 `docs/preview-deployment-verification.md`.
 
-Two consequences the audit missed. First, TOOL-01 is not a post-V0 P2 — the gate fires on
-**2026-08-25** regardless of V0 stabilisation, and the only two outcomes are retiring the
+**Two dates, not one — corrected after review.** `check-bun-lockfile-policy.mjs:371` compares
+`if (currentDate > transition.reviewBy)`, strictly greater. So the review deadline is
+**2026-08-25**, the check still **passes on** that date, and it **first fails on 2026-08-26**
+UTC. An earlier revision of this section collapsed the two into "the gate fires 2026-08-25",
+which is wrong by a day on the number the reprioritisation rests on.
+
+Two consequences the audit missed. First, TOOL-01 is not a post-V0 P2 — the gate goes
+fail-closed regardless of V0 stabilisation, and the only two outcomes are retiring the
 compatibility lock or extending `reviewBy` with a recorded reason. Second, **§6.2 removes one
 of the five consumers' justification**: `vercel.json`'s npm `installCommand` / `buildCommand`
 are cited as a reason to keep `package-lock.json`, but if Vercel does not govern production
@@ -309,8 +337,8 @@ The audit's sequence is sound in shape — architecture truth → production tru
 | **ARCH-01**         | Claude, P0                  | **UNBLOCKED** — #1051 merged as `5c60bcd9`. Reduces to the ADR in §7.1, appended to the merged map     | §3.1                            |
 | **ARCH-02**         | Grok, executable manifest   | **Actionable now** — build the manifest to pin the merged _`docs/codebase-map.md`_, not a new document | Avoids a third architecture doc |
 | **OPS-01 / OPS-02** | P0, after CURRENT_STATE PRs | **Raise — a live provenance gap exists now**                                                           | §6.1                            |
-| **BOUNDARY-01**     | P1                          | **Raise to P0-adjacent**                                                                               | §6.3: 11 of ~1,700 files        |
-| **TOOL-01**         | P2, post-V0                 | **P1, dated 2026-08-25**                                                                               | §6.4                            |
+| **BOUNDARY-01**     | P1                          | **Stays P1** — its first task is the ingress inventory, which is what would make any gap measurable    | §6.3 (corrected after review)   |
+| **TOOL-01**         | P2, post-V0                 | **P1** — review due 2026-08-25; gate first fails 2026-08-26 UTC                                        | §6.4                            |
 | Everything else     | —                           | **Unchanged**                                                                                          | The audit's ordering holds      |
 
 ### 7.1 What ARCH-01 should become now that #1051 has landed
@@ -392,10 +420,12 @@ Lead — peer, no rank). The adversarial questions worth putting to this documen
 2. Re-fetch and re-check `4b1c4867e685`. If it appears in a ref this session did not have,
    §6.1's first observation collapses — but the `dirty: true` + `commitSource: "git"`
    observation stands independently and still needs an explanation.
-3. Challenge §6.3's counting method. Files _importing_ Zod is a proxy for boundary coverage,
-   not a measure of it — a boundary validated by a hand-rolled parser is validated. The
-   honest form of the finding is "11 files use the installed schema validator", and the real
-   inventory is BOUNDARY-01's job.
+3. ~~Challenge §6.3's counting method.~~ **Already raised and acted on** — Codex made exactly
+   this challenge in review of this document, and §6.3 is rewritten accordingly: the finding
+   is now "11 files use the installed schema validator", carrying no coverage claim in either
+   direction, and BOUNDARY-01 stays P1 with the ingress inventory as its first task. Left in
+   place rather than deleted, because a caveat this document stated and then contradicted two
+   sections earlier is worth keeping visible.
 4. Confirm `NON_CANONICAL_SOURCE_ALIASES` is actually _enforced_ at every ingest path, not
    merely declared. This document verified the constant, not its call sites.
 
@@ -406,7 +436,8 @@ route §6.1 to whoever holds the publisher's view.
 ---
 
 **One calibrated verdict:** the audit's engineering judgement is sound and its stack
-determinations survive independent re-derivation intact — but its first two assignments are
-blocked by an open PR it had already noticed, and the most urgent thing it found is not on
-its roadmap at all: production is serving a dirty build from a commit this repository does
+determinations survive independent re-derivation intact. Its first two assignments were
+blocked by an open PR it had already noticed — **#1051, now merged as `5c60bcd9`, so ARCH-01
+and ARCH-02 are live work rather than blocked.** What remains unresolved is the thing that was
+never on its roadmap: production is serving a dirty build from a commit this repository does
 not contain.

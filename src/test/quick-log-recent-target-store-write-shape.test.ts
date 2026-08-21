@@ -30,6 +30,7 @@ import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { RECENT_TARGET_STORAGE_KEY_PREFIX } from "@/lib/quickLogRecentTargetSuggestion";
 import {
   clearLocalStorageForTest,
+  ensureLocalStorageForTest,
   getLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 
@@ -43,6 +44,24 @@ const VALID = {
   tentId: "t1",
   savedAt: "2026-08-19T12:00:00.000Z",
 };
+
+/**
+ * Every key currently in storage. Asserting on this rather than on our own
+ * key is what makes the signed-out case a real fence: a regression that wrote
+ * under an anonymous, blank, or global key would leave OUR key null and pass
+ * a single-key check while still putting a plant id on the device — which is
+ * the exact defect slice D5 existed to remove (the retired unscoped v1 key
+ * ran before the signed-in check).
+ */
+function allStorageKeys(): string[] {
+  const store = ensureLocalStorageForTest();
+  const keys: string[] = [];
+  for (let i = 0; i < store.length; i += 1) {
+    const key = store.key(i);
+    if (key !== null) keys.push(key);
+  }
+  return keys.sort();
+}
 
 function storedRecord(): Record<string, unknown> | null {
   const raw = getLocalStorageItemForTest(KEY);
@@ -109,18 +128,25 @@ describe("rememberRecentQuickLogTarget — the stored shape is closed", () => {
     rememberRecentQuickLogTarget(VALID, null);
     rememberRecentQuickLogTarget(VALID, undefined);
     rememberRecentQuickLogTarget(VALID, "   ");
+
+    // The WHOLE store must be empty, not merely our key. Checking only KEY
+    // would pass while all three calls wrote under an anonymous, blank, or
+    // global key — a regression that stores a plant id on a shared device
+    // without an account to scope it to.
+    expect(allStorageKeys()).toEqual([]);
+
     // Positive control: the same payload DOES write under a real account, so
-    // "nothing stored" here cannot be an artifact of the helper.
-    expect(getLocalStorageItemForTest(KEY)).toBeNull();
+    // "nothing stored" above cannot be an artifact of the helper.
     rememberRecentQuickLogTarget(VALID, USER);
+    expect(allStorageKeys()).toEqual([KEY]);
     expect(getLocalStorageItemForTest(KEY)).not.toBeNull();
   });
 
   it("scopes the write to the account that made it", () => {
     rememberRecentQuickLogTarget(VALID, "someone-else");
+    // Exactly one key, and it is the other account's — so the write neither
+    // leaked into this account's slot nor spilled into an extra key.
+    expect(allStorageKeys()).toEqual([`${RECENT_TARGET_STORAGE_KEY_PREFIX}someone-else`]);
     expect(getLocalStorageItemForTest(KEY)).toBeNull();
-    expect(
-      getLocalStorageItemForTest(`${RECENT_TARGET_STORAGE_KEY_PREFIX}someone-else`),
-    ).not.toBeNull();
   });
 });

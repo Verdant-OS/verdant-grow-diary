@@ -227,17 +227,49 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
      # it. See "the group id is not $!" below for the two ways guessing fails.
      local pgidfile; pgidfile="$(mktemp)"
      local publish='ps -o pgid= -p $$ | tr -d " " >"$1"; shift; exec "$@"'
-     setsid sh -c "$publish" _ "$pgidfile" "$@" &
+     # `--wait` is REQUIRED, and for TWO reasons, not one.
+     #
+     # setsid(1) forks whenever it is already a process-group leader, which is
+     # exactly what a backgrounded job is under job control. The intermediary
+     # then exits immediately while the real worker runs on, and $! names a
+     # process that is already gone. That breaks this function twice over:
+     # the handshake below finds no pgid and starts no watchdog, and — the
+     # worse half — `wait "$child"` at the bottom reaps the INTERMEDIARY and
+     # returns its status, which is always 0. A failing apt would be reported
+     # as success. Measured with job control on: the intermediary is gone a
+     # quarter-second in, and a command exiting 7 is reported as 0.
+     #
+     # `--wait` keeps the intermediary alive for the worker's lifetime, so $!
+     # is a true proxy for both purposes. Needs util-linux >= 2.24;
+     # ubuntu-latest ships 2.39.
+     #
+     # It has one cost, recorded rather than discovered later: a signal-killed
+     # worker comes back as the RAW signal number (15) instead of the shell's
+     # 128+signal (143), and setsid prints `setsid: child N did not exit
+     # normally` to stderr. The timeout status is therefore taken from the
+     # watchdog's own marker below rather than inferred from $?, so it does not
+     # depend on whether setsid happened to fork.
+     setsid --wait sh -c "$publish" _ "$pgidfile" "$@" &
      local child=$!
 
-     # Handshake: block until the group id is published, or the child is gone.
+     # Handshake: block until the group id is published, bounded by a cap.
      # No fixed sleep, and no assumption about when setsid(2) takes effect.
-     while [ ! -s "$pgidfile" ]; do
+     # The cap is a backstop — with `--wait` the loop already ends when the
+     # worker does — so a worker that somehow never publishes costs 5 seconds
+     # rather than the whole job. Publication is the first thing the child
+     # does, before exec, so it precedes any real work.
+     local waited=0
+     while [ ! -s "$pgidfile" ] && [ "$waited" -lt 100 ]; do
        kill -0 "$child" 2>/dev/null || break
        sleep 0.05
+       waited=$((waited + 1))
      done
      local pgid; pgid="$(cat "$pgidfile" 2>/dev/null)"; rm -f "$pgidfile"
      if [ -z "$pgid" ]; then wait "$child"; return $?; fi   # finished already
+
+     # The watchdog records that IT escalated. Reading the timeout off $?
+     # cannot work: 15 is both "TERM killed it" and "the command exited 15".
+     local timedout; timedout="$(mktemp)"; rm -f "$timedout"
 
      # Liveness is probed with pgrep, and signals are sent with sudo. Both
      # matter, and neither is optional — see "the apt is not ours to signal"
@@ -259,6 +291,7 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
          group_alive || exit 0                       # finished; no timeout
          sleep 1; waited=$((waited + 1))
        done
+       : > "$timedout"                               # we are escalating
        signal_group TERM
        graced=0
        while [ "$graced" -lt 30 ]; do
@@ -288,6 +321,10 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
 
      wait "$child"; local rc=$?
      wait "$watchdog" 2>/dev/null    # NOT `kill` — see below
+     # 124 is timeout(1)'s convention for "the deadline fired", and it is the
+     # only status here that does not depend on setsid's forking or on which
+     # signal landed.
+     if [ -e "$timedout" ]; then rm -f "$timedout"; return 124; fi
      return "$rc"
    }
    ```

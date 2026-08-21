@@ -439,10 +439,27 @@ the test commands.
 
 ### Phase 2 — Conditional on Phase 0 `(separate approval)`
 
-If Phase 0 returns `FAIL`, `with-deps` stays `true` and Phase 1's retry logic is the
-permanent mitigation. Nothing below applies.
+**Gating on a per-browser receipt, since there is no longer a single verdict.**
+Phase 0 now records `probe_results` keyed per browser, so "Phase 0 returned `PASS`"
+is not a statement that can be made any more — and the documented example is
+deliberately the mixed case, Chromium passing while WebKit fails. An earlier draft of
+this section still spoke in a single verdict and therefore contradicted the resolution
+table below, leaving the mixed case unauthorised in one place and handled in another.
+Resolved explicitly:
 
-If Phase 0 returns `PASS`, a later slice flips the composite action's `with-deps`
+| `probe_results`                 | Phase 2          | Effect                                                                                                                                      |
+| ------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **No browser passes**           | Does not proceed | `with-deps` stays `true`; Phase 1's retry logic is the permanent mitigation, and nothing below applies                                      |
+| **At least one browser passes** | Proceeds         | The default flips to `auto`, and `auto` gates **per browser** — a passing browser drops the apt install, a failing or unprobed one keeps it |
+| **Every browser passes**        | Proceeds         | Same mechanism; simply no browser left on the slow branch                                                                                   |
+
+**Any-browser-passes is the gate, not all-browsers-pass**, and the reason is that the
+resolution below is already per-browser: a WebKit `FAIL` costs WebKit its payoff and
+nothing else, so blocking Chromium's payoff on it would forfeit a measured saving to
+buy no safety at all. The safety comes from `auto` resolving over the browsers a step
+actually requests, not from withholding the phase.
+
+When Phase 2 proceeds, a later slice flips the composite action's `with-deps`
 **default** from `true` to **`auto`** — a one-line change in one file, versus 19 edits
 across two seam styles today. That reduction is the payoff of the convergence in
 Phase 1. Until that slice is approved and merged, Phase 1 installs deps exactly as

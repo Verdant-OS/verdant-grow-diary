@@ -1503,6 +1503,94 @@ differed stays `NOT_MEASURED`.
 
 ---
 
+## One-Tent goal — blocked on external gates, not code work (recorded 2026-08-21)
+
+Recorded by Claude 2026-08-21 ~22:00 UTC. Every row was measured this turn unless
+labelled otherwise. **No agent performed any of the external transitions named
+below**, and none is authorized by this entry.
+
+### The four gates
+
+| Gate                                | State                                                                                                                        |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| #1091 ready-state / reviewer action | **Owner-only.** Draft at `74e1ad4`; review automation cannot engage until the transition happens. Not performed by any agent |
+| Public attestation                  | **INVALID.** Canonical `faea6e9c59ad`, production `ea31fbdfb934` `dirty: true` — see below                                   |
+| Disposable authenticated proof      | **Must remain UNDISPATCHED** while attestation is invalid                                                                    |
+| #1076                               | **HELD.** Open, not draft, `requested_reviewers: cheekhimself` (verified 2026-08-21)                                         |
+
+### #1091 — 35/35 required is true; "clean head" is not
+
+`established fact`, measured 2026-08-21 ~21:50 UTC against head `74e1ad4`
+(branch `codex/one-tent-polish-ea31`, **behind the deploy tip by 1**):
+
+**All 35 ruleset-required contexts are green** — enumerated, not assumed: the 32
+`Full test suite (shard n/32)` jobs, `Lint, typecheck, test, build`,
+`Preflight — edge shared-lib mirror in sync`, and `test:legal-seo`. The ruleset is
+genuinely satisfied.
+
+**A non-required check is red on that same head, and it is not a test failure.**
+`Quick Log Playwright smoke` concluded `failure` (job `96919203284`, run
+`32529735698`). Its own step outputs:
+
+- `FIXTURE_STEP_OUTCOME: failure`
+- `SMOKE_STEP_OUTCOME: skipped` — the smoke never executed
+- `REPORT_JSON_PRESENT: false`, `SMOKE_COUNTS_AVAILABLE: false` — no report produced
+
+It ran **authenticated against the live Lovable host** (`E2E_FIXTURE_MODE: true`)
+with three fixture variables empty: expected grow name, second plant name, and
+account hint. In the **same run**, `Authenticated One-Tent branch proof` concluded
+`skipped`. `Browser census (authenticated)` was still `in_progress` at read time.
+
+**Root cause is `NOT_MEASURED`**, and the distinction matters before anyone
+resequences work around it: a failed _fixture/config_ step is not the same finding
+as a failed assertion, and only the second would implicate product code. Nobody
+should conclude either way from the summary line.
+
+**Why this is recorded rather than acted on.** `codex/one-tent-polish-ea31` is
+Codex's owned slice; adopting it would violate the collision fences in this file.
+This entry is a handoff, not a claim on the work. But **"35/35 green" is the
+summary that hides this**, so a ready-state transition taken on that summary alone
+would carry an unexamined red into review.
+
+### Attestation — re-measured, unchanged
+
+`established fact`, measured 2026-08-21 **21:58:32 UTC**:
+
+| Axis                 | Value                                                                         |
+| -------------------- | ----------------------------------------------------------------------------- |
+| Canonical deploy tip | `faea6e9c59ad` (#1087)                                                        |
+| Production serves    | `ea31fbdfb934`, `buildTime 2026-08-21T15:53:46.096Z`, `treeHash 831bd3b4f230` |
+| Provenance flags     | `dirty: true`, `ref: "__orphan__"`                                            |
+| Ancestry             | live **is** an ancestor of the tip                                            |
+| Publish lag          | **2** first-parent commits                                                    |
+
+This re-confirms the Branch-topology row's 21:05 UTC reading rather than
+superseding it — same tip, same served commit, same lag, taken 53 minutes later.
+Do not treat that as durability: this row moved three times inside the preceding
+hour. Re-measure before citing.
+
+### `20260813030000` — "unapplied" carries two meanings, and one is dangerous
+
+**This is the entry most likely to be misread, so state which sense is meant every
+time.**
+
+- **The GitHub apply lane never succeeded** — the apply-signup workflow still shows
+  only its failed PREFLIGHT. True.
+- **The production objects are live.** Per the measurement already recorded in the
+  signup-attribution section above (2026-08-21 ~15:23 UTC, Lovable `query_database`
+  against the production project): the table, all four helper functions, the
+  readiness RPC, and a `handle_new_user` carrying the `RAISE LOG` guard from
+  `20260821150000` all exist. Ledger name-rows for `20260813030000` are present via
+  the founder backfill.
+
+**The hard stop is unchanged and this entry does not soften it: do NOT GitHub-APPLY
+`20260813030000_signup_acquisition_forward_repair.sql`.** That file re-issues an
+**unguarded** `handle_new_user` and would overwrite the live guard — a production
+incident. A reader who takes a bare "remains unapplied" as licence to apply it has
+inverted the finding.
+
+---
+
 ## Agents currently assigned
 
 | Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |

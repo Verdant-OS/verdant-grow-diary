@@ -3,7 +3,9 @@
 Rerun this whenever the billing surface changes — checkout, webhook, entitlement
 gates, price IDs, env config. Mirrors the release-gate items in
 `docs/paddle-paid-launch-runbook.md` §Release gate. Everything below is
-**sandbox-only**; no real charges, no live secrets required.
+**sandbox-only** on preview and production hosts; no real charges, no live
+secrets required. This verifies the current product policy, not a rehearsal
+that silently authorizes live checkout.
 
 Canonical lane since 2026-07-16: `payments-webhook` → `public.subscriptions`.
 The BYO `paddle-webhook` / `billing_subscriptions` path is audit-only and
@@ -11,10 +13,16 @@ should stay empty in this flow.
 
 ## Pre-flight
 
-- [ ] `VITE_PAYMENTS_CLIENT_TOKEN` starts with `test_` (check the preview
-      network tab or the payments dashboard).
-- [ ] `/pricing` renders with the **amber test-mode banner** at the top
-      ("All payments made in the preview are in test mode").
+- [ ] The published build's `VITE_PAYMENTS_CLIENT_TOKEN` is classified as
+      sandbox-class (`test_`) without printing or copying the token value.
+- [ ] `PAYMENTS_ENVIRONMENT` and legacy `PADDLE_ENVIRONMENT` are both
+      classified as `sandbox`; sandbox API key, webhook secret, and price-ID
+      names are present and belong to the same Paddle environment.
+- [ ] `/pricing` renders with the **amber sandbox test-mode banner** at the top
+      and explicitly says no real charges are made.
+- [ ] A deliberately supplied live-class client token resolves to unavailable
+      on loopback, preview, and production hostnames before Paddle.js or the
+      price resolver is called.
 - [ ] Pro Monthly, Pro Annual, and Founder Lifetime CTAs are enabled (not
       the "checkout unavailable" fallback).
 - [ ] Founder counter on the pricing card shows a non-zero remaining count.

@@ -7,6 +7,8 @@ import {
   classifyEcowittTentSnapshotV0Source,
   ECOWITT_TENT_SNAPSHOT_V0_NO_LIVE_DATA,
   evaluateEcowittTentSnapshotV0Metric,
+  isConstitutionSensorTruthSource,
+  isForbiddenSensorTruthSourceToken,
   isStuckZeroOrHundredPct,
   mapEcowittTentSnapshotV0MetricKey,
 } from "@/lib/ecowittTentSnapshotV0Rules";
@@ -30,13 +32,16 @@ function row(
     raw_payload: unknown;
   }> = {},
 ) {
+  const capturedAt = overrides.captured_at ?? FRESH_AT;
   return {
     tent_id: TENT,
     source: overrides.source ?? "live",
-    captured_at: overrides.captured_at ?? FRESH_AT,
+    captured_at: capturedAt,
     metric: overrides.metric ?? "temperature_c",
     value: overrides.value ?? 24,
-    raw_payload: overrides.raw_payload ?? { vendor: "ecowitt", dateutc: FRESH_AT },
+    raw_payload:
+      overrides.raw_payload ??
+      ({ vendor: "ecowitt", dateutc: capturedAt } as Record<string, unknown>),
   };
 }
 
@@ -96,13 +101,54 @@ describe("ecowittTentSnapshotV0Rules — Sensor Truth tagging", () => {
     ).toBe("invalid");
   });
 
-  it("never promotes unknown vendor/transport to live via freshness", () => {
+  it.each([
+    "ecowitt",
+    "ha",
+    "homeassistant",
+    "home_assistant",
+    "mqtt",
+    "esp32",
+    "webhook",
+  ] as const)("never promotes transport/vendor source=%s to live via freshness", (source) => {
     expect(
       classifyEcowittTentSnapshotV0Source({
-        row: row({ source: "webhook", captured_at: FRESH_AT }),
+        row: row({ source, captured_at: FRESH_AT }),
         now: NOW,
       }),
     ).toBe("invalid");
+    expect(isForbiddenSensorTruthSourceToken(source)).toBe(true);
+  });
+
+  it("ages live from packet dateutc even when captured_at is fresher", () => {
+    expect(
+      classifyEcowittTentSnapshotV0Source({
+        row: row({
+          source: "live",
+          captured_at: FRESH_AT,
+          raw_payload: { vendor: "ecowitt", dateutc: STALE_AT },
+        }),
+        now: NOW,
+      }),
+    ).toBe("stale");
+  });
+
+  it("never displays forbidden tokens as Sensor Truth badge labels", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [
+        row({ source: "ecowitt", metric: "temperature_c", value: 24 }),
+        row({ source: "mqtt", metric: "humidity_pct", value: 55 }),
+        row({ source: "webhook", metric: "soil_moisture_pct", value: 40 }),
+      ],
+      { tentId: TENT, now: NOW },
+    );
+    const forbidden = ["ecowitt", "ha", "mqtt", "esp32", "webhook", "homeassistant"];
+    for (const m of vm.metrics) {
+      expect(m.truthSource === "none" || isConstitutionSensorTruthSource(m.truthSource)).toBe(true);
+      for (const token of forbidden) {
+        expect(m.badgeLabel.toLowerCase()).not.toContain(token);
+      }
+    }
+    expect(vm.overallBadgeLabel.toLowerCase()).not.toMatch(/ecowitt|mqtt|webhook|esp32|\bha\b/);
   });
 
   it("marks stuck RH 0/100 invalid", () => {
@@ -220,13 +266,16 @@ describe("ecowittLatestSnapshotFilter — vendor ecowitt never resolves to live"
   it.each([
     ["live", "live"],
     ["ecowitt", "invalid"],
+    ["ha", "invalid"],
+    ["mqtt", "invalid"],
+    ["esp32", "invalid"],
+    ["webhook", "invalid"],
     ["manual", "manual"],
     ["csv", "csv"],
     ["demo", "demo"],
     ["stale", "stale"],
     ["invalid", "invalid"],
     [null, "invalid"],
-    ["webhook", "invalid"],
   ] as const)("resolves persisted source %s to %s", (source, expected) => {
     const candidates = selectEcowittCandidates(
       [

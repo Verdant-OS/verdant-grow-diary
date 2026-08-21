@@ -6,11 +6,16 @@
  *
  * Hard constraints:
  *  - Pure. No I/O, no React, no timers, no device control.
- *  - Vendor string `ecowitt` is never a Sensor Truth source and never live.
+ *  - Transport may be EcoWitt; Sensor Truth tags are never transport/vendor
+ *    strings. Never store, display, or promote `ecowitt`, `ha`,
+ *    `homeassistant`, `mqtt`, `esp32`, or `webhook` as the truth source.
+ *  - Age uses packet `dateutc` when present (else captured_at / ts).
  *  - Freshness alone never promotes vendor/unknown to live.
  *  - Demo / testbench never live. Stuck RH/soil 0 or 100 → invalid.
  *  - Quiet bridge → no_live_data (presenter shows "No live data").
- *  - Does not remap FIELD_MAP; uses existing repo metric keys only.
+ *  - Does not remap FIELD_MAP or schema; uses existing repo metric keys only.
+ *  - Parked label helpers that still vendor-promote (e.g. sensorSourceLabelRules)
+ *    are left alone — V0 does not call them.
  */
 
 import { SENSOR_SNAPSHOT_STALE_THRESHOLD_MS } from "@/constants/sensorTiming";
@@ -32,6 +37,32 @@ export const ECOWITT_TENT_SNAPSHOT_V0_METRICS: readonly EcowittTentSnapshotV0Met
 export const ECOWITT_TENT_SNAPSHOT_V0_NO_LIVE_DATA = "No live data" as const;
 
 export const ECOWITT_TENT_SNAPSHOT_V0_FRESH_MS = SENSOR_SNAPSHOT_STALE_THRESHOLD_MS;
+
+/** Constitution tags only — the only values V0 may store or show as Sensor Truth. */
+export const CONSTITUTION_SENSOR_TRUTH_SOURCES = [
+  "live",
+  "manual",
+  "csv",
+  "demo",
+  "stale",
+  "invalid",
+] as const satisfies readonly EcowittTentSnapshotV0TruthSource[];
+
+/**
+ * Transport / vendor / bridge tokens that must never be Sensor Truth.
+ * Matching is exact on the normalized `source` string (not substring), so
+ * lineage in raw_payload.vendor stays usable for EcoWitt recognition without
+ * becoming a trust label.
+ */
+export const FORBIDDEN_SENSOR_TRUTH_SOURCE_TOKENS = [
+  "ecowitt",
+  "ha",
+  "homeassistant",
+  "home_assistant",
+  "mqtt",
+  "esp32",
+  "webhook",
+] as const;
 
 /** Night window for "drifted last night" (UTC hours, inclusive start / exclusive end). */
 export const ECOWITT_TENT_SNAPSHOT_V0_NIGHT_UTC_START_HOUR = 0;
@@ -90,17 +121,89 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Parse EcoWitt-style dateutc / ISO timestamps to epoch ms.
+ * Matches existing ingest convention: space-separated UTC → treat as Z.
+ */
+export function parseEcowittTentSnapshotV0DateUtcMs(raw: unknown): number | null {
+  if (typeof raw !== "string" || raw.trim().length === 0) return null;
+  const s = raw.trim();
+  const iso = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(s)
+    ? s.replace(" ", "T") + (s.endsWith("Z") ? "" : "Z")
+    : s;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function readDateUtcFromPayload(raw: unknown): number | null {
+  if (!isRecord(raw)) return null;
+  const direct = parseEcowittTentSnapshotV0DateUtcMs(raw.dateutc);
+  if (direct !== null) return direct;
+  const metadata = isRecord(raw.metadata) ? raw.metadata : null;
+  if (metadata) {
+    const nested = parseEcowittTentSnapshotV0DateUtcMs(metadata.dateutc);
+    if (nested !== null) return nested;
+  }
+  return null;
+}
+
+/**
+ * Packet observation time: prefer raw_payload.dateutc (gateway clock), then
+ * captured_at / ts / created_at. Never invents "now".
+ */
 function observedAtMs(row: EcowittTentSnapshotV0RowLike): number | null {
+  const fromDateutc = readDateUtcFromPayload(row.raw_payload);
+  if (fromDateutc !== null) return fromDateutc;
   for (const candidate of [row.captured_at, row.ts, row.created_at]) {
-    if (typeof candidate !== "string" || candidate.trim().length === 0) continue;
-    const ms = Date.parse(candidate);
-    if (Number.isFinite(ms)) return ms;
+    const ms = parseEcowittTentSnapshotV0DateUtcMs(candidate);
+    if (ms !== null) return ms;
   }
   return null;
 }
 
 function normalizedSource(source: unknown): string {
   return typeof source === "string" ? source.trim().toLowerCase() : "";
+}
+
+export function isConstitutionSensorTruthSource(
+  value: unknown,
+): value is EcowittTentSnapshotV0TruthSource {
+  return (
+    typeof value === "string" &&
+    (CONSTITUTION_SENSOR_TRUTH_SOURCES as readonly string[]).includes(value)
+  );
+}
+
+export function isForbiddenSensorTruthSourceToken(source: unknown): boolean {
+  const src = normalizedSource(source);
+  if (!src) return false;
+  return (FORBIDDEN_SENSOR_TRUTH_SOURCE_TOKENS as readonly string[]).includes(src);
+}
+
+/** User-facing badge copy — constitution tags only; never vendor/transport. */
+export function constitutionSensorTruthBadgeLabel(
+  truth: EcowittTentSnapshotV0TruthSource | "none",
+): string {
+  switch (truth) {
+    case "live":
+      return "Live";
+    case "manual":
+      return "Manual";
+    case "csv":
+      return "CSV";
+    case "demo":
+      return "Demo";
+    case "stale":
+      return "Stale";
+    case "invalid":
+      return "Invalid";
+    case "none":
+      return "No live data";
+  }
 }
 
 /** True when RH or soil moisture is stuck at the impossible healthy extremes. */
@@ -159,9 +262,11 @@ export function evaluateEcowittTentSnapshotV0Metric(
  * Order (fail closed):
  *  1. Testbench / demo provenance → demo (never live)
  *  2. Canonical manual / csv / demo / stale / invalid pass through
- *  3. Vendor string `ecowitt` (and other non-canonical) → invalid
- *  4. Canonical `live` + age ≤ 15m → live; else stale
- *  5. Missing/unparseable timestamp on live path → invalid
+ *  3. Forbidden transport/vendor tokens (ecowitt, ha, mqtt, esp32, webhook, …)
+ *     → invalid — freshness cannot rescue them
+ *  4. Any other non-canonical token → invalid
+ *  5. Canonical `live` + dateutc/captured age ≤ 15m → live; else stale
+ *  6. Missing/unparseable timestamp on live path → invalid
  */
 export function classifyEcowittTentSnapshotV0Source(
   input: ClassifyEcowittTentSnapshotV0SourceInput,
@@ -177,8 +282,8 @@ export function classifyEcowittTentSnapshotV0Source(
     return src;
   }
 
-  // Vendor / transport / unknown tokens are never Sensor Truth sources.
-  if (src !== "live") {
+  // Transport/vendor tokens are never Sensor Truth — even when the packet is fresh.
+  if (isForbiddenSensorTruthSourceToken(src) || src !== "live") {
     return "invalid";
   }
 

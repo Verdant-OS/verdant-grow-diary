@@ -9,6 +9,7 @@
 import {
   classifyEcowittTentSnapshotV0BridgeQuiet,
   classifyEcowittTentSnapshotV0Source,
+  constitutionSensorTruthBadgeLabel,
   ECOWITT_TENT_SNAPSHOT_V0_METRICS,
   ECOWITT_TENT_SNAPSHOT_V0_NO_LIVE_DATA,
   evaluateEcowittTentSnapshotV0Metric,
@@ -93,16 +94,6 @@ const METRIC_UNIT: Record<EcowittTentSnapshotV0MetricKey, string> = {
   soil: "%",
 };
 
-const BADGE_LABEL: Record<EcowittTentSnapshotV0TruthSource | "none", string> = {
-  live: "Live",
-  manual: "Manual",
-  csv: "CSV",
-  demo: "Demo",
-  stale: "Stale",
-  invalid: "Invalid",
-  none: "No live data",
-};
-
 /** Known EcoWitt FIELD_MAP keys V0 intentionally does not surface. */
 export const ECOWITT_TENT_SNAPSHOT_V0_UNUSED_FIELD_NAMES = [
   "co2",
@@ -119,7 +110,7 @@ function emptyMetric(key: EcowittTentSnapshotV0MetricKey): EcowittTentSnapshotV0
     unit: METRIC_UNIT[key],
     capturedAt: null,
     truthSource: "none",
-    badgeLabel: BADGE_LABEL.none,
+    badgeLabel: constitutionSensorTruthBadgeLabel("none"),
     valid: false,
     reason: null,
     sparkline: [],
@@ -354,7 +345,7 @@ export function buildEcowittTentSnapshotV0ViewModel(
       value: displayValue,
       capturedAt: entry.capturedAt,
       truthSource: entry.truth,
-      badgeLabel: BADGE_LABEL[entry.truth],
+      badgeLabel: constitutionSensorTruthBadgeLabel(entry.truth),
       valid: entry.evaluation.valid,
       reason: entry.evaluation.reason,
       sparkline: spark.points,
@@ -377,7 +368,7 @@ export function buildEcowittTentSnapshotV0ViewModel(
     bridgeQuiet: showQuietMessage,
     quietMessage: showQuietMessage ? ECOWITT_TENT_SNAPSHOT_V0_NO_LIVE_DATA : null,
     overallTruthSource: overall,
-    overallBadgeLabel: BADGE_LABEL[overall],
+    overallBadgeLabel: constitutionSensorTruthBadgeLabel(overall),
     latestCapturedAt,
     metrics,
     nightDrift: buildNightDrift(tentScoped, options.stage, windowStartMs),

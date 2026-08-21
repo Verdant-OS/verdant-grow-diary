@@ -3,7 +3,7 @@
 Exhaustive inventories that back the orientation section in [`/CLAUDE.md`](../CLAUDE.md).
 They live here rather than in `CLAUDE.md` so they do not load into every agent session.
 
-**Measured 2026-08-20 at deploy tip `77d8eec` (#1044)**, by direct inspection of the
+**Measured 2026-08-21 at base tip `f25f9ed` (#1020)**, by direct inspection of the
 working tree. Everything below is `established fact` about repository structure. Nothing
 here is a claim about production, deployment, indexing, or which migrations are applied —
 those axes belong to [`docs/agents/CURRENT_STATE.md`](agents/CURRENT_STATE.md) and keep
@@ -21,7 +21,7 @@ Routes are file-based under `src/routes/`, compiled into the generated
 
 ```text
 src/routes/__root.tsx                  document, SEO/JSON-LD, provider stack
-├── 56 public routes                   src/routes/*.tsx
+├── 53 public routes                   src/routes/*.tsx
 ├── _app.tsx                           authenticated layout → <AppShell><Outlet/></AppShell>
 │   ├── 52 authenticated routes        src/routes/_app/*.tsx
 │   └── _operator.tsx                  → <RequireOperatorRole/>
@@ -350,7 +350,7 @@ has no remote opt-in flag by design.
 supabase/
 ├── config.toml
 ├── seed.sql
-├── migrations/           270 .sql
+├── migrations/           272 .sql
 ├── functions/            34 edge functions + _shared/
 ├── contract-migrations/  2 (applied outside the normal chain)
 └── tests/                9 pgTAP-style .sql
@@ -360,7 +360,7 @@ supabase/
 flavours:
 
 - **157 Lovable auto-exports** — UUID slug, e.g. `20260721182752_4fc51714-bc29-…sql`
-- **113 hand-authored** — snake_case description, e.g.
+- **115 hand-authored** — snake_case description, e.g.
   `20260815054529_restrict_pgmq_email_wrappers_to_service_role.sql`
 
 Both conventions coexist in the production ledger, and Lovable records its migrations under a

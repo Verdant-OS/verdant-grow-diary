@@ -45,7 +45,7 @@ Applies to every deliverable, without exception:
 # Codebase orientation
 
 Everything below is `established fact`, measured from the repository at deploy tip
-`77d8eec` (#1044) on 2026-08-20. It describes **structure, tooling, and conventions** only.
+`f25f9ed` (#1020) on 2026-08-21. It describes **structure, tooling, and conventions** only.
 It makes no claim about production, GA4/GSC, or which migrations are applied — those axes
 belong to `docs/agents/CURRENT_STATE.md` and keep their `BLOCKED` / `NOT_MEASURED` labels
 there.
@@ -80,29 +80,29 @@ tanstackStart, viteReact, tailwindcss, tsconfigPaths and the `@` alias; do not r
 
 | Path                                                       | Size           | Contents                                                                          |
 | ---------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| `src/`                                                     | 4,884 ts/tsx   | The application (see below)                                                       |
-| `supabase/migrations/`                                     | 270 `.sql`     | Append-only migration history — **immutable once merged**                         |
+| `src/`                                                     | 4,921 ts/tsx   | The application (see below)                                                       |
+| `supabase/migrations/`                                     | 272 `.sql`     | Append-only migration history — **immutable once merged**                         |
 | `supabase/functions/`                                      | 34 + `_shared` | Deno edge functions                                                               |
 | `scripts/`                                                 | 236 entries    | Gates, harnesses, probes, release tooling (`.mjs` and `.ts`)                      |
 | `.github/workflows/`                                       | 86             | CI; `ci.yml` supplies every ruleset-required check                                |
-| `e2e/`                                                     | 58 specs       | Playwright                                                                        |
-| `docs/`                                                    | 392 files      | Governance, specs, runbooks, knowledge library, SEO                               |
-| `config/`                                                  | 9              | Pinned JSON contracts (required checks, replay compat, allowlists)                |
+| `e2e/`                                                     | 59 specs       | Playwright                                                                        |
+| `docs/`                                                    | 397 files      | Governance, specs, runbooks, knowledge library, SEO                               |
+| `config/`                                                  | 10             | Pinned JSON contracts (required checks, replay compat, allowlists)                |
 | `fixtures/`, `spikes/`, `plugins/`, `tools/`, `templates/` | —              | Sample payloads, sandboxed spikes, the Grow OS agent plugin, hardware testbenches |
 
 ## `src/` layout
 
-| Directory                    | Files | Role                                                                                                                                     |
-| ---------------------------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/`                   | 1,103 | Business logic. 994 flat at root + 17 domain subdirs (`ai/`, `genetics/`, `mcp/`, `cost/`, `entitlements/`, `quick-log/`, `sensors/`, …) |
-| `src/test/`                  | 2,824 | **Nearly all tests live here**, not beside their source                                                                                  |
-| `src/components/`            |   489 | Feature components, flat PascalCase; `ui/` holds 49 shadcn primitives                                                                    |
-| `src/routes/`                |   147 | TanStack file-route tree                                                                                                                 |
-| `src/pages/`                 |   139 | Page components that route files render                                                                                                  |
-| `src/hooks/`                 |   126 | React Query + Supabase access hooks                                                                                                      |
-| `src/constants/`             |    50 | Frozen domain tables **and pinned user-facing copy**                                                                                     |
-| `src/integrations/`          |     8 | Supabase browser/server clients, auth middleware, generated `types.ts`                                                                   |
-| `src/store/`, `src/context/` |     3 | React context providers (`auth`, `grows`, pheno sampling)                                                                                |
+| Directory                    | Files | Role                                                                                                                                       |
+| ---------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/lib/`                   | 1,111 | Business logic. 1,002 flat at root + 17 domain subdirs (`ai/`, `genetics/`, `mcp/`, `cost/`, `entitlements/`, `quick-log/`, `sensors/`, …) |
+| `src/test/`                  | 2,849 | **Nearly all tests live here**, not beside their source                                                                                    |
+| `src/components/`            |   492 | Feature components, flat PascalCase; `ui/` holds 49 shadcn primitives                                                                      |
+| `src/routes/`                |   147 | TanStack file-route tree                                                                                                                   |
+| `src/pages/`                 |   139 | Page components that route files render                                                                                                    |
+| `src/hooks/`                 |   126 | React Query + Supabase access hooks                                                                                                        |
+| `src/constants/`             |    50 | Frozen domain tables **and pinned user-facing copy**                                                                                       |
+| `src/integrations/`          |     8 | Supabase browser/server clients, auth middleware, generated `types.ts`                                                                     |
+| `src/store/`, `src/context/` |     3 | React context providers (`auth`, `grows`, pheno sampling)                                                                                  |
 
 ## Layering, as actually practised
 
@@ -111,8 +111,8 @@ root:
 
 | Suffix          | Count | Contract                                                                  |
 | --------------- | ----: | ------------------------------------------------------------------------- |
-| `*Rules.ts`     |   471 | Pure. No React, no Supabase, no fetch, no clock — `now: Date` is injected |
-| `*ViewModel.ts` |   166 | Pure presentation shaping. Zero import React; zero import Supabase        |
+| `*Rules.ts`     |   474 | Pure. No React, no Supabase, no fetch, no clock — `now: Date` is injected |
+| `*ViewModel.ts` |   167 | Pure presentation shaping. Zero import React; zero import Supabase        |
 | `*Service.ts`   |    26 | The I/O layer — 25 of 26 import the Supabase client                       |
 | `*Advisor.ts`   |     0 | Named in the constitution's table; **no such files exist**                |
 
@@ -153,7 +153,7 @@ User-facing copy is **data**, not JSX: it is pinned in `src/constants/*Copy.ts` 
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 API (`useNavigate`,
 `useLocation`, `useParams`, `Link`, `Outlet`, `Navigate`) on top of TanStack Router.
 
-**679 files import from it. Zero files under `src/components/` or `src/pages/` import
+**682 files import from it. Zero files under `src/components/` or `src/pages/` import
 `@tanstack/react-router` directly.** Vitest aliases the shim to a real MemoryRouter
 (`src/test/helpers/reactRouterCompat.vitest.tsx`) so component tests get working navigation.
 
@@ -187,7 +187,7 @@ Environment and install gotchas are owned by
 
 ## Testing conventions
 
-- Tests are **centralised**: 2,780 of 2,803 `src/**/*.{test,spec}.{ts,tsx}` files sit in
+- Tests are **centralised**: 2,802 of 2,828 `src/**/*.{test,spec}.{ts,tsx}` files sit in
   `src/test/`, named kebab-case by feature (`action-detail-linked-alert.test.tsx`). Only 26
   are co-located. Follow the centralised pattern unless the file you are editing already
   has a neighbour test.

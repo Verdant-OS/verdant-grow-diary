@@ -5,6 +5,7 @@ import { readFileSync, statSync } from "node:fs";
 const PREFIX = "ONE_TENT_BROWSER_PROOF_JSON=";
 const EXPECTED_STAGES = [
   "auth_restored",
+  "deployment_sha_verified",
   "hierarchy_created_via_ui",
   "grow_resolved",
   "tent_resolved",
@@ -13,6 +14,8 @@ const EXPECTED_STAGES = [
   "plant_persisted_after_refresh",
   "photo_and_manual_evidence_persisted",
   "quick_log_persisted",
+  "quick_log_manual_tent_snapshot_verified",
+  "operator_sensor_evidence_seeded",
   "timeline_visible",
   "manual_provenance_visible",
   "sensor_snapshot_verified",
@@ -32,13 +35,17 @@ const RECEIPT_KEYS = [
   "seed_status",
   "stages",
   "duplicate_fences",
+  "cleanup",
   "safety",
 ];
+const CLEANUP_KEYS = ["status", "active_rows_removed", "retained_history"];
 const SAFETY_KEYS = [
   "fabricated_login_used",
   "paid_ai_request_observed",
   "device_control_request_observed",
   "service_role_in_browser_observed",
+  "action_queue_approval_request_observed",
+  "paddle_checkout_request_observed",
 ];
 const MAX_LOG_BYTES = 10 * 1024 * 1024;
 
@@ -67,10 +74,16 @@ function isExactObject(value, keys) {
 
 function hasExactReceiptShape(receipt) {
   if (!isExactObject(receipt, RECEIPT_KEYS)) return false;
-  if (receipt?.schema_version !== "3") return false;
+  if (receipt?.schema_version !== "4") return false;
   if (receipt?.proof !== "one-tent-loop-authenticated-ui") return false;
   if (!["pass", "blocked", "fail"].includes(receipt?.status)) return false;
-  if (receipt?.blocker_reason !== null && typeof receipt?.blocker_reason !== "string") return false;
+  if (
+    receipt?.blocker_reason !== null &&
+    (typeof receipt?.blocker_reason !== "string" ||
+      !/^[a-z][a-z0-9_]{0,79}$/.test(receipt.blocker_reason))
+  ) {
+    return false;
+  }
   if (
     !["storage_session", "storage_plus_cookies", "cookies_only", "none"].includes(
       receipt?.restore_strategy,
@@ -98,6 +111,20 @@ function hasExactReceiptShape(receipt) {
   ) {
     return false;
   }
+  if (!isExactObject(receipt?.cleanup, CLEANUP_KEYS)) return false;
+  if (
+    ![
+      "not_run",
+      "completed_active_rows_removed",
+      "completed_with_retained_history",
+      "fixture_not_found",
+      "failed",
+    ].includes(receipt.cleanup.status) ||
+    typeof receipt.cleanup.active_rows_removed !== "boolean" ||
+    typeof receipt.cleanup.retained_history !== "boolean"
+  ) {
+    return false;
+  }
   if (!isExactObject(receipt?.safety, SAFETY_KEYS)) return false;
   if (receipt.safety.fabricated_login_used !== false) return false;
   return SAFETY_KEYS.slice(1).every((key) => typeof receipt.safety[key] === "boolean");
@@ -114,6 +141,16 @@ function verifyReceipt(receipt) {
   }
   if (!EXPECTED_STAGES.every((stage) => receipt.stages[stage] === "pass")) return false;
   if (!EXPECTED_FENCES.every((fence) => receipt.duplicate_fences[fence] === 1)) return false;
+  if (
+    !["completed_active_rows_removed", "completed_with_retained_history"].includes(
+      receipt.cleanup.status,
+    ) ||
+    receipt.cleanup.active_rows_removed !== true ||
+    receipt.cleanup.retained_history !==
+      (receipt.cleanup.status === "completed_with_retained_history")
+  ) {
+    return false;
+  }
   return SAFETY_KEYS.every((key) => receipt.safety[key] === false);
 }
 
@@ -127,6 +164,7 @@ function sanitizedFailureReason(receipt) {
   }
 
   if (reason === "password_auth_request_observed") return reason;
+  if (reason === "cleanup_failed" && receipt.cleanup.status === "failed") return reason;
   if (reason === "paid_ai_request_observed" && receipt.safety.paid_ai_request_observed) {
     return reason;
   }
@@ -139,6 +177,18 @@ function sanitizedFailureReason(receipt) {
   if (
     reason === "service_role_in_browser_observed" &&
     receipt.safety.service_role_in_browser_observed
+  ) {
+    return reason;
+  }
+  if (
+    reason === "action_queue_approval_request_observed" &&
+    receipt.safety.action_queue_approval_request_observed
+  ) {
+    return reason;
+  }
+  if (
+    reason === "paddle_checkout_request_observed" &&
+    receipt.safety.paddle_checkout_request_observed
   ) {
     return reason;
   }
@@ -165,9 +215,10 @@ try {
 } catch {
   fail("invalid_receipt_json");
 }
+if (hasExactReceiptShape(receipt)) {
+  console.log(`${PREFIX}${JSON.stringify(receipt)}`);
+}
 if (playwrightExit !== 0) {
   fail(`playwright_failed:${sanitizedFailureReason(receipt) ?? "unclassified"}`);
 }
 if (!verifyReceipt(receipt)) fail("receipt_not_complete_pass");
-
-console.log("one_tent_browser_proof=verified_pass");

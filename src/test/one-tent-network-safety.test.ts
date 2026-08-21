@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyOneTentForbiddenNetworkRequest,
+  hasOneTentServiceRoleCredential,
   isOneTentAiDoctorReviewEndpoint,
 } from "../../e2e/helpers/oneTentNetworkSafety";
 
@@ -27,6 +28,23 @@ describe("authenticated One-Tent forbidden network classifier", () => {
     "mqtt://broker.example.test/tent/commands",
   ])("classifies device-control endpoint %s", (url) => {
     expect(classifyOneTentForbiddenNetworkRequest(url)).toBe("device_control");
+  });
+
+  it.each([
+    "https://example.supabase.co/rest/v1/rpc/action_queue_transition",
+    "https://example.supabase.co/functions/v1/action-queue-approve",
+  ])("classifies Action Queue approval endpoint %s", (url) => {
+    expect(classifyOneTentForbiddenNetworkRequest(url)).toBe("action_queue_approval");
+  });
+
+  it.each([
+    "https://api.paddle.com/transactions",
+    "https://sandbox-api.paddle.com/transactions",
+    "https://buy.paddle.com/checkout/abc",
+    "https://cdn.paddle.com/paddle/v2/paddle.js",
+    "https://example.supabase.co/functions/v1/paddle-checkout",
+  ])("classifies Paddle checkout-capable endpoint %s", (url) => {
+    expect(classifyOneTentForbiddenNetworkRequest(url)).toBe("paddle_checkout");
   });
 
   it.each([
@@ -72,5 +90,18 @@ describe("authenticated One-Tent forbidden network classifier", () => {
         "abcdefghijklmnopqrstu",
       ),
     ).toBe(false);
+  });
+
+  it("detects service-role browser credentials without echoing their values", () => {
+    expect(
+      hasOneTentServiceRoleCredential({
+        authorization: "Bearer eyJhbGciOiJub25lIn0.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.",
+      }),
+    ).toBe(true);
+    expect(hasOneTentServiceRoleCredential({ apikey: "service_role" })).toBe(true);
+    expect(hasOneTentServiceRoleCredential({ authorization: "Bearer public-anon-token" })).toBe(
+      false,
+    );
+    expect(hasOneTentServiceRoleCredential({})).toBe(false);
   });
 });

@@ -19,11 +19,11 @@
  *  - DEFAULTS TO DRY-RUN. Destructive mode requires BOTH:
  *      --execute --confirm-fixture-teardown
  *    Conflicting or unknown flags block. No force/override flag exists.
- *  - Idempotent: already-clean environment reports completed with
- *    zero counts.
+ *  - Already-clean state reports fixture_not_found; it never claims a
+ *    zero-count or full cleanup.
  *
  * Output: human-readable lines + exactly one ONE_TENT_TEARDOWN_JSON=
- * receipt line (schema_version "1", deterministic, no IDs/tokens/
+ * receipt line (schema_version "2", deterministic, no IDs/tokens/
  * emails/paths/raw provider errors).
  *
  * Exit codes: 0 completed (incl. dry-run) · 2 blocked · 1 failed/error.
@@ -34,11 +34,12 @@ import { resolveExactSupabaseProjectOrigin } from "./managed-session-materialize
 import { evaluateManagedSession, readManagedSessionEnv } from "./one-tent-preflight-core.mjs";
 import {
   ACTION_FOLLOWUP_EVENT_TYPE,
-  FIXTURE_NAMES,
+  buildFixtureNames,
   buildTeardownReceipt,
   discoverFixture,
   executeTeardown,
   parseTeardownArgs,
+  parseOneTentFixtureMarker,
   renderTeardownReceipt,
   zeroCounts,
 } from "./one-tent-golden-path-fixture-cleanup.mjs";
@@ -64,7 +65,7 @@ function blocked(reason, targetProjectVerified = false) {
 }
 
 /** Thin authenticated adapter. Every query is user-scoped AND RLS-scoped. */
-function buildOps(supabase, userId) {
+function buildOps(supabase, userId, fixtureNames) {
   const deletedCount = (res, label) => {
     if (res.error) throw new Error(`${label}_error`);
     return Array.isArray(res.data) ? res.data.length : 0;
@@ -98,7 +99,7 @@ function buildOps(supabase, userId) {
         .select("id")
         .eq("user_id", userId)
         .eq("grow_id", growId)
-        .eq("name", FIXTURE_NAMES.tent);
+        .eq("name", fixtureNames.tent);
       if (error) throw new Error("tent_lookup_error");
       return (data ?? []).map((r) => r.id);
     },
@@ -108,7 +109,7 @@ function buildOps(supabase, userId) {
         .select("id")
         .eq("user_id", userId)
         .eq("grow_id", growId)
-        .eq("name", FIXTURE_NAMES.plant);
+        .eq("name", fixtureNames.plant);
       if (error) throw new Error("plant_lookup_error");
       return (data ?? []).map((r) => r.id);
     },
@@ -121,6 +122,31 @@ function buildOps(supabase, userId) {
         .contains("details", { event_type: ACTION_FOLLOWUP_EVENT_TYPE });
       return exactCount(res, "follow_ups_count");
     },
+    async listDiaryPhotoPaths(growId) {
+      const { data, error } = await supabase
+        .from("diary_entries")
+        .select("photo_url")
+        .eq("user_id", userId)
+        .eq("grow_id", growId)
+        .not("photo_url", "is", null);
+      if (error) throw new Error("diary_photo_lookup_error");
+      const ownerPrefix = `${userId}/${growId}/`;
+      return [
+        ...new Set(
+          (data ?? [])
+            .map((row) => row.photo_url)
+            .filter((path) => typeof path === "string" && path.startsWith(ownerPrefix)),
+        ),
+      ];
+    },
+    async countDiaryEntries(growId) {
+      const res = await supabase
+        .from("diary_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("grow_id", growId);
+      return exactCount(res, "diary_entries_count");
+    },
     async countActionQueue(growId) {
       const res = await supabase
         .from("action_queue")
@@ -128,6 +154,30 @@ function buildOps(supabase, userId) {
         .eq("user_id", userId)
         .eq("grow_id", growId);
       return exactCount(res, "action_queue_count");
+    },
+    async countActionQueueEvents(growId) {
+      const res = await supabase
+        .from("action_queue_events")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("grow_id", growId);
+      return exactCount(res, "action_queue_events_count");
+    },
+    async countAiDoctorSessions(growId) {
+      const res = await supabase
+        .from("ai_doctor_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("grow_id", growId);
+      return exactCount(res, "ai_doctor_sessions_count");
+    },
+    async countAiCreditAccounting(growId) {
+      const res = await supabase
+        .from("ai_credit_spends")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("grow_id", growId);
+      return exactCount(res, "ai_credit_accounting_count");
     },
     async countAlerts(growId) {
       const res = await supabase
@@ -171,6 +221,23 @@ function buildOps(supabase, userId) {
         .select("id");
       return deletedCount(res, "follow_ups_delete");
     },
+    async deleteDiaryPhotos(paths) {
+      const { data, error } = await supabase.storage.from("diary-photos").remove(paths);
+      if (error) throw new Error("diary_photos_delete_error");
+      if (!Array.isArray(data) || data.length !== paths.length) {
+        throw new Error("diary_photos_delete_incomplete");
+      }
+      return data.length;
+    },
+    async deleteDiaryEntries(growId) {
+      const res = await supabase
+        .from("diary_entries")
+        .delete()
+        .eq("user_id", userId)
+        .eq("grow_id", growId)
+        .select("id");
+      return deletedCount(res, "diary_entries_delete");
+    },
     async deleteAlerts(growId) {
       const res = await supabase
         .from("alerts")
@@ -213,7 +280,7 @@ function buildOps(supabase, userId) {
         .delete()
         .eq("user_id", userId)
         .eq("grow_id", growId)
-        .eq("name", FIXTURE_NAMES.plant)
+        .eq("name", fixtureNames.plant)
         .select("id");
       return deletedCount(res, "plants_delete");
     },
@@ -223,7 +290,7 @@ function buildOps(supabase, userId) {
         .delete()
         .eq("user_id", userId)
         .eq("grow_id", growId)
-        .eq("name", FIXTURE_NAMES.tent)
+        .eq("name", fixtureNames.tent)
         .select("id");
       return deletedCount(res, "tents_delete");
     },
@@ -233,7 +300,7 @@ function buildOps(supabase, userId) {
         .delete()
         .eq("user_id", userId)
         .eq("id", growId)
-        .eq("name", FIXTURE_NAMES.grow)
+        .eq("name", fixtureNames.grow)
         .select("id");
       return deletedCount(res, "grow_delete");
     },
@@ -264,13 +331,21 @@ async function main() {
   const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!anonKey) blocked("missing_supabase_config", true);
 
+  let fixtureNames;
+  try {
+    const fixtureMarker = parseOneTentFixtureMarker(process.env.E2E_ONE_TENT_FIXTURE_MARKER);
+    fixtureNames = buildFixtureNames(fixtureMarker);
+  } catch {
+    blocked("fixture_marker_invalid", true);
+  }
+
   const supabase = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: `Bearer ${preflight.session.access_token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const ops = buildOps(supabase, preflight.session.user.id);
+  const ops = buildOps(supabase, preflight.session.user.id, fixtureNames);
 
-  const discovery = await discoverFixture(ops);
+  const discovery = await discoverFixture(ops, fixtureNames);
   if (discovery.ownershipViolation) {
     emit(
       buildTeardownReceipt({
@@ -297,14 +372,19 @@ async function main() {
     ownerVerified: true,
     targetProjectVerified: true,
     counts: result.counts,
+    retainedHistory: result.retainedHistory,
   });
 
   const human = [];
-  if (result.status === "completed" && dryRun) {
+  if (result.status === "dry_run") {
     human.push("One-Tent golden-path teardown: DRY-RUN COMPLETED");
     human.push("No rows were deleted. Counts below are the deletion plan.");
-  } else if (result.status === "completed") {
-    human.push("One-Tent golden-path teardown: COMPLETED");
+  } else if (result.status === "completed_with_retained_history") {
+    human.push("One-Tent golden-path teardown: COMPLETED WITH RETAINED HISTORY");
+  } else if (result.status === "completed_active_rows_removed") {
+    human.push("One-Tent golden-path teardown: ACTIVE ROWS REMOVED");
+  } else if (result.status === "fixture_not_found") {
+    human.push("One-Tent golden-path teardown: EXACT FIXTURE NOT FOUND");
   } else {
     human.push("One-Tent golden-path teardown: FAILED");
     human.push(`Reason: ${result.reason}`);
@@ -314,6 +394,7 @@ async function main() {
   human.push(
     `Fixture rows ${dryRun ? "planned for removal" : "removed"}: ${receipt.counts.total_deleted}`,
   );
+  human.push(`History rows retained: ${receipt.retained_history.total_retained}`);
   emit(receipt, human, result.status === "failed" ? 1 : 0);
 }
 

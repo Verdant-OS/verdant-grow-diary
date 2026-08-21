@@ -43,11 +43,44 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).not.toContain("__dirname");
   });
 
+  it("bounds both seed and teardown child processes", () => {
+    expect(SPEC).toContain("const ONE_TENT_CHILD_TIMEOUT_MS = 60_000");
+    expect(SPEC).toContain("const ONE_TENT_CHILD_MAX_BUFFER_BYTES = 64 * 1024");
+
+    const seedStart = SPEC.indexOf(
+      "execFileSync(process.execPath",
+      SPEC.indexOf('"operator_sensor_evidence_seeded"'),
+    );
+    const seedEnd = SPEC.indexOf("expect(seedOutput)", seedStart);
+    const teardownStart = SPEC.indexOf(
+      "execFileSync(",
+      SPEC.indexOf("process.env.LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS"),
+    );
+    const teardownEnd = SPEC.indexOf("const lines = out", teardownStart);
+    const seedCall = SPEC.slice(seedStart, seedEnd);
+    const teardownCall = SPEC.slice(teardownStart, teardownEnd);
+
+    for (const call of [seedCall, teardownCall]) {
+      expect(call).toContain("timeout: ONE_TENT_CHILD_TIMEOUT_MS");
+      expect(call).toContain('killSignal: "SIGKILL"');
+      expect(call).toContain("maxBuffer: ONE_TENT_CHILD_MAX_BUFFER_BYTES");
+    }
+  });
+
   it("shares a validated per-run fixture marker between the UI walk and evidence helper", () => {
     expect(SPEC).toContain("process.env.E2E_ONE_TENT_FIXTURE_MARKER");
     expect(SEED).toContain("process.env.E2E_ONE_TENT_FIXTURE_MARKER");
     expect(SPEC).toContain("GOLDEN-PATH-FIXTURE-RUN-");
     expect(SEED).toContain("GOLDEN-PATH-FIXTURE-RUN-");
+    expect(SPEC).toContain("-ATTEMPT-");
+    expect(SEED).toContain("-ATTEMPT-");
+  });
+
+  it("proves the served public build is the exact expected deployment SHA", () => {
+    expect(SPEC).toContain("process.env.E2E_EXPECTED_SHA");
+    expect(SPEC).toContain("/version.json");
+    expect(SPEC).toContain('await stage("deployment_sha_verified"');
+    expect(SPEC).toContain("expect(version.commit).toBe(expectedSha)");
   });
 
   it("creates Grow, Tent, and Plant through the connected generic dialogs", () => {
@@ -197,6 +230,39 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(SPEC).toContain("seedStatus: evidenceSeedStatus");
   });
 
+  it("proves Quick Log manual Tent truth before operator sensor evidence is seeded", () => {
+    const quickLogSave = SPEC.indexOf('await stage("quick_log_persisted"');
+    const zeroSensorFence = SPEC.indexOf("expect(preSeedSensorRows).toHaveLength(0)");
+    const manualTentStage = SPEC.indexOf('await stage("quick_log_manual_tent_snapshot_verified"');
+    const tentsVisit = SPEC.indexOf("page.goto(`/tents?growId=${fixtureGrowId}`)", manualTentStage);
+    const operatorSeed = SPEC.indexOf('await stage("operator_sensor_evidence_seeded"');
+    const seedExecution = SPEC.indexOf("execFileSync(process.execPath", operatorSeed);
+    const timeline = SPEC.indexOf('await stage("timeline_visible"');
+
+    expect(quickLogSave).toBeGreaterThan(0);
+    expect(zeroSensorFence).toBeGreaterThan(quickLogSave);
+    expect(manualTentStage).toBeGreaterThan(zeroSensorFence);
+    expect(tentsVisit).toBeGreaterThan(manualTentStage);
+    expect(operatorSeed).toBeGreaterThan(tentsVisit);
+    expect(seedExecution).toBeGreaterThan(operatorSeed);
+    expect(timeline).toBeGreaterThan(seedExecution);
+
+    for (const token of [
+      "tents-list-sensor-source-${fixtureTentId}",
+      "tents-list-metric-${fixtureTentId}-temp",
+      "tents-list-metric-${fixtureTentId}-rh",
+      "tents-list-metric-${fixtureTentId}-vpd",
+      '"Manual"',
+      "/82(?:\\.0)?\\s*°?F/i",
+      "/48(?:\\.0)?\\s*%/",
+      '"—"',
+    ]) {
+      expect(SPEC).toContain(token);
+    }
+    expect(SPEC).toContain("No sensor data yet");
+    expect(SPEC).toContain("expect(tentCard).not.toContainText(/Live/i)");
+  });
+
   it("requires AI Doctor to expose actual evidence, uncertainty, and missing context", () => {
     expect(SPEC).toContain("DETERMINISTIC_AI_DOCTOR_RESPONSE.evidence");
     expect(SPEC).toContain("DETERMINISTIC_AI_DOCTOR_RESPONSE.missing_information");
@@ -251,10 +317,11 @@ describe("authenticated One-Tent proof covers the production objective", () => {
     expect(sensorStage).toContain("/bg-primary/");
   });
 
-  it("aborts forbidden paid-model and device requests through one classifier", () => {
+  it("aborts all paid-model, device, service-role, approval, and checkout requests", () => {
     expect(SPEC).toContain("classifyOneTentForbiddenNetworkRequest");
     expect(SPEC).toContain('page.route("**/*"');
     expect(SPEC).toContain("onForbiddenNetwork");
+    expect(SPEC).toContain("hasOneTentServiceRoleCredential");
     expect(SPEC).toContain('route.abort("blockedbyclient")');
     expect(SPEC).not.toMatch(/page\.route\(\/openai/);
 
@@ -356,16 +423,23 @@ describe("authenticated One-Tent proof covers the production objective", () => {
 
   it("proves Paddle remains visibly sandboxed without opening checkout", () => {
     expect(SPEC).toContain("paddle_sandbox_verified");
+    expect(SPEC).toContain("payments-test-mode-banner");
+    expect(SPEC).toContain('data-payment-env", "sandbox"');
+    expect(SPEC).toContain("No real charges");
     expect(SPEC).toContain("pricing-checkout-trust");
     expect(SPEC).toContain('data-checkout-state", "sandbox"');
+    expect(SPEC).not.toMatch(/pricing-(?:founder|pro)-(?:lifetime|monthly|annual)-cta"\)\.click/);
   });
 
   it("receipt cannot report PASS without every new objective stage", () => {
     for (const stage of [
       "hierarchy_created_via_ui",
+      "deployment_sha_verified",
       "plant_persisted_after_refresh",
       "quick_log_context_verified",
       "photo_and_manual_evidence_persisted",
+      "quick_log_manual_tent_snapshot_verified",
+      "operator_sensor_evidence_seeded",
       "sensor_snapshot_verified",
       "approval_boundary_verified",
       "paddle_sandbox_verified",

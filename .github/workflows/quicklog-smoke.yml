@@ -50,6 +50,17 @@ name: Quick Log Playwright smoke
 on:
   workflow_dispatch:
     inputs:
+      run_mode:
+        description: "Choose the ordinary Quick Log smoke or the guarded authenticated One-Tent proof."
+        required: true
+        default: "quicklog_smoke"
+        type: choice
+        options: ["quicklog_smoke", "one_tent_proof"]
+      expected_sha:
+        description: "Proof mode only: lowercase 40-hex commit deployed publicly and selected by the guarded proof branch."
+        required: false
+        default: ""
+        type: string
       playwright_retries:
         description: "Playwright retry count per test (default 1 in CI). Increase to 2 or 3 for deeper flake triage."
         required: false
@@ -95,34 +106,172 @@ on:
       - ".github/workflows/quicklog-smoke.yml"
 
 jobs:
-  # Temporary, branch-pinned proof lane. This intentionally uses the existing
-  # end-user E2E credentials against local branch code. It has no elevated
-  # credentials, paid-model calls, control capability, or teardown mutation.
-  # Each dispatch gets an isolated, validated fixture marker so retained
-  # evidence from a failed attempt is never deleted or reused.
+  # Temporary, branch-pinned proof lane. This intentionally uses local immutable
+  # harness code and existing end-user E2E credentials against the fixed, publicly
+  # attested deployment. It has no elevated credentials, paid-model calls, or
+  # control capability. A successful proof
+  # owner-cleans active fixture rows and reports protected retained history.
+  # Each first-attempt dispatch gets an isolated, validated fixture marker.
   one-tent-authenticated-proof:
     name: Authenticated One-Tent branch proof
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/one-tent-authenticated-proof-current'
+    if: github.event_name == 'workflow_dispatch' && inputs.run_mode == 'one_tent_proof'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    concurrency:
+      group: one-tent-authenticated-proof
+      cancel-in-progress: false
     permissions:
       contents: read
     env:
-      E2E_BASE_URL: ""
+      E2E_BASE_URL: "https://verdantgrowdiary.com"
       PLAYWRIGHT_RETRIES: "0"
       LOVABLE_E2E_TARGET_PROJECT_REF: knkwiiywfkbqznbxwqfh
-      LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS: "false"
-      E2E_ONE_TENT_FIXTURE_MARKER: "[GOLDEN-PATH-FIXTURE-RUN-${{ github.run_id }}]"
+      LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS: "true"
+      E2E_EXPECTED_SHA: "${{ inputs.expected_sha }}"
+      E2E_ONE_TENT_FIXTURE_MARKER: "[GOLDEN-PATH-FIXTURE-RUN-${{ github.run_id }}-ATTEMPT-${{ github.run_attempt }}]"
 
     steps:
-      - name: Checkout exact branch commit
+      - name: Verify immutable dispatch identity
+        env:
+          EXPECTED_SHA: "${{ inputs.expected_sha }}"
+          GITHUB_CONTEXT_SHA: "${{ github.sha }}"
+          GITHUB_ACTOR: "${{ github.actor }}"
+          GITHUB_TRIGGERING_ACTOR: "${{ github.triggering_actor }}"
+          GITHUB_RUN_ATTEMPT: "${{ github.run_attempt }}"
+          GITHUB_REF: "${{ github.ref }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [ "$EXPECTED_SHA" = "$GITHUB_CONTEXT_SHA" ]
+          [ "$GITHUB_ACTOR" = "cheekhimself" ]
+          [ "$GITHUB_TRIGGERING_ACTOR" = "cheekhimself" ]
+          [ "$GITHUB_RUN_ATTEMPT" = "1" ]
+          [ "$GITHUB_REF" = "refs/heads/codex/one-tent-authenticated-proof-current" ]
+
+      - name: Checkout exact expected commit
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+
+      - name: Verify checked-out deployment identity
+        env:
+          EXPECTED_SHA: "${{ inputs.expected_sha }}"
+          GITHUB_CONTEXT_SHA: "${{ github.sha }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "$(git rev-parse HEAD)" = "$EXPECTED_SHA" ]
+          [ "$EXPECTED_SHA" = "$GITHUB_CONTEXT_SHA" ]
+
+      - name: Verify public deployment identity
+        env:
+          EXPECTED_SHA: "${{ inputs.expected_sha }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https = require("node:https");
+
+          const PUBLIC_VERSION_URL = "https://verdantgrowdiary.com/version.json";
+          const PUBLIC_VERSION_TIMEOUT_MS = 5_000;
+          const PUBLIC_VERSION_MAX_BYTES = 4_096;
+          const expectedSha = process.env.EXPECTED_SHA ?? "";
+
+          async function attestPublicVersion() {
+            const response = await new Promise((resolve, reject) => {
+              const request = https.get(
+                PUBLIC_VERSION_URL,
+                {
+                  headers: {
+                    accept: "application/json",
+                    "accept-encoding": "identity",
+                  },
+                  signal: AbortSignal.timeout(PUBLIC_VERSION_TIMEOUT_MS),
+                  timeout: PUBLIC_VERSION_TIMEOUT_MS,
+                },
+                resolve,
+              );
+              request.on("timeout", () => request.destroy(new Error("request_timeout")));
+              request.on("error", () => reject(new Error("request_failed")));
+            });
+
+            if (response.statusCode >= 300 && response.statusCode < 400) {
+              response.destroy();
+              throw new Error("redirect_rejected");
+            }
+            if (response.statusCode !== 200) {
+              response.destroy();
+              throw new Error("unexpected_status");
+            }
+            const contentType = String(response.headers["content-type"] ?? "").toLowerCase();
+            if (!/^application\/json(?:;|$)/u.test(contentType)) {
+              response.destroy();
+              throw new Error("invalid_content_type");
+            }
+            const contentEncoding = String(response.headers["content-encoding"] ?? "identity");
+            if (contentEncoding !== "identity") {
+              response.destroy();
+              throw new Error("unexpected_content_encoding");
+            }
+            const declaredLength = response.headers["content-length"];
+            if (
+              Array.isArray(declaredLength) ||
+              (declaredLength !== undefined &&
+                (!/^\d+$/u.test(declaredLength) || Number(declaredLength) > PUBLIC_VERSION_MAX_BYTES))
+            ) {
+              response.destroy();
+              throw new Error("invalid_content_length");
+            }
+
+            const body = await new Promise((resolve, reject) => {
+              const chunks = [];
+              let bytes = 0;
+              response.setTimeout(PUBLIC_VERSION_TIMEOUT_MS, () =>
+                response.destroy(new Error("response_timeout")),
+              );
+              response.on("data", (chunk) => {
+                bytes += chunk.length;
+                if (bytes > PUBLIC_VERSION_MAX_BYTES) {
+                  response.destroy(new Error("body_too_large"));
+                  return;
+                }
+                chunks.push(chunk);
+              });
+              response.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+              response.on("error", () => reject(new Error("response_failed")));
+            });
+
+            let parsed;
+            try {
+              parsed = JSON.parse(body);
+            } catch {
+              throw new Error("invalid_json");
+            }
+            if (
+              parsed === null ||
+              Array.isArray(parsed) ||
+              typeof parsed !== "object" ||
+              typeof parsed.commit !== "string" ||
+              parsed.commit !== expectedSha
+            ) {
+              throw new Error("public_commit_mismatch");
+            }
+          }
+
+          attestPublicVersion()
+            .then(() => console.log("public_version_attestation=verified"))
+            .catch(() => {
+              console.error("public_version_attestation=failed");
+              process.exitCode = 1;
+            });
+          NODE
 
       - name: Verify exact Supabase target origin
         shell: bash
         run: |
           set -euo pipefail
-          [ "$GITHUB_REF" = "refs/heads/codex/one-tent-authenticated-proof-current" ]
           [ -f .env ] || { echo "Tracked public app configuration is missing" >&2; exit 1; }
           node --env-file=.env scripts/e2e/verify-one-tent-supabase-target.mjs
 
@@ -172,19 +321,21 @@ jobs:
             --log e2e/results/one-tent-authenticated-proof.log \
             --playwright-exit "$playwright_exit"
 
-      - name: Remove generated authentication state
+      - name: Remove generated authentication state and proof artifacts
         if: always()
         shell: bash
         run: |
-          rm -f \
+          rm -f -- \
             e2e/.auth/managed-session.env \
             e2e/.auth/user.json \
             e2e/.auth/session-storage.json \
-            e2e/results/one-tent-authenticated-proof.log
+            e2e/results/one-tent-authenticated-proof.log \
+            e2e/results/playwright-report.json
+          rm -rf -- test-results playwright-report
 
   quicklog-smoke:
     name: Quick Log Playwright smoke
-    if: github.ref != 'refs/heads/codex/one-tent-authenticated-proof-current'
+    if: github.event_name != 'workflow_dispatch' || inputs.run_mode == 'quicklog_smoke'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 

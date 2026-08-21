@@ -52,7 +52,7 @@ const ENV = {
 const EVIDENCE_ONLY_FLAG = "--evidence-only";
 
 const DEFAULT_FIXTURE_MARKER = "[GOLDEN-PATH-FIXTURE]";
-const RUN_FIXTURE_MARKER = /^\[GOLDEN-PATH-FIXTURE-RUN-[0-9]+\]$/;
+const RUN_FIXTURE_MARKER = /^\[GOLDEN-PATH-FIXTURE-RUN-[0-9]+-ATTEMPT-1\]$/;
 const declaredFixtureMarker = process.env.E2E_ONE_TENT_FIXTURE_MARKER?.trim();
 if (
   declaredFixtureMarker &&

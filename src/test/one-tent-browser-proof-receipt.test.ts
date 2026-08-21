@@ -19,8 +19,14 @@ function allPassStages(): Partial<Record<OneTentProofStage, StageOutcome>> {
   return out;
 }
 
+const retainedCleanup = {
+  status: "completed_with_retained_history" as const,
+  active_rows_removed: true,
+  retained_history: true,
+};
+
 describe("blocked receipt", () => {
-  const receipt = buildBlockedOneTentBrowserProofReceipt("managed session unavailable");
+  const receipt = buildBlockedOneTentBrowserProofReceipt("managed_session_unavailable");
 
   it("status blocked, seed blocked, every stage blocked or not_run", () => {
     expect(receipt.status).toBe("blocked");
@@ -31,7 +37,7 @@ describe("blocked receipt", () => {
   });
 
   it("carries the blocker reason and null duplicate fences", () => {
-    expect(receipt.blocker_reason).toBe("managed session unavailable");
+    expect(receipt.blocker_reason).toBe("managed_session_unavailable");
     expect(receipt.duplicate_fences).toEqual({
       quick_log_count: null,
       alert_count: null,
@@ -44,7 +50,7 @@ describe("blocked receipt", () => {
     expect(line.startsWith(ONE_TENT_BROWSER_PROOF_JSON_PREFIX)).toBe(true);
     expect(line).not.toContain("\n");
     const parsed = JSON.parse(line.slice(ONE_TENT_BROWSER_PROOF_JSON_PREFIX.length));
-    expect(parsed.schema_version).toBe("3");
+    expect(parsed.schema_version).toBe("4");
     expect(parsed.proof).toBe("one-tent-loop-authenticated-ui");
   });
 
@@ -72,6 +78,7 @@ describe("pass receipt", () => {
       alert_count: 1,
       action_queue_count: 1,
     },
+    cleanup: retainedCleanup,
   });
 
   it("status pass, all stages pass, duplicate counts 1", () => {
@@ -88,12 +95,20 @@ describe("pass receipt", () => {
     expect(receipt.stages).not.toHaveProperty("auto_diary_follow_up");
   });
 
+  it("composites the honest retained-history cleanup outcome without row details", () => {
+    expect(receipt.cleanup).toEqual(retainedCleanup);
+    expect(receipt).not.toHaveProperty("ids");
+    expect(receipt).not.toHaveProperty("marker");
+  });
+
   it("safety booleans default false and fabricated_login_used is unrepresentable as true", () => {
     expect(receipt.safety).toEqual({
       fabricated_login_used: false,
       paid_ai_request_observed: false,
       device_control_request_observed: false,
       service_role_in_browser_observed: false,
+      action_queue_approval_request_observed: false,
+      paddle_checkout_request_observed: false,
     });
   });
 });
@@ -141,6 +156,20 @@ describe("safety violations force fail", () => {
     expect(r.status).toBe("fail");
     expect(r.blocker_reason).toBe("password_auth_request_observed");
   });
+
+  it.each(["action_queue_approval_request_observed", "paddle_checkout_request_observed"] as const)(
+    "%s forbids a pass receipt",
+    (flag) => {
+      const r = buildOneTentBrowserProofReceipt({
+        restoreStrategy: "storage_session",
+        seedStatus: "completed",
+        stages: allPassStages(),
+        safety: { [flag]: true },
+      });
+      expect(r.status).toBe("fail");
+      expect(r.safety[flag]).toBe(true);
+    },
+  );
 });
 
 describe("determinism + hygiene", () => {
@@ -166,17 +195,35 @@ describe("determinism + hygiene", () => {
     expect(line).not.toMatch(/\/home\/|\/tmp\/|[A-Z]:\\/);
   });
 
+  it.each([
+    "https://attacker.invalid/?token=secret",
+    "C:\\Users\\runner\\proof.log",
+    "[GOLDEN-PATH-FIXTURE-RUN-123-ATTEMPT-1]",
+    "2026-08-21T12:34:56Z",
+    "raw failure: credential=secret",
+  ])("normalizes unsafe blocker detail instead of serializing %s", (unsafeReason) => {
+    const line = renderOneTentBrowserProofReceipt(
+      buildBlockedOneTentBrowserProofReceipt(unsafeReason),
+    );
+    expect(line).not.toContain(unsafeReason);
+    expect(JSON.parse(line.slice(ONE_TENT_BROWSER_PROOF_JSON_PREFIX.length)).blocker_reason).toBe(
+      "proof_blocked",
+    );
+  });
+
   it("stage key order is the documented contract order", () => {
     const receipt = buildBlockedOneTentBrowserProofReceipt("x");
     expect(Object.keys(receipt.stages)).toEqual([...ONE_TENT_PROOF_STAGES]);
     expect(ONE_TENT_PROOF_STAGES.slice(0, 7)).toEqual([
       "auth_restored",
+      "deployment_sha_verified",
       "hierarchy_created_via_ui",
       "grow_resolved",
       "tent_resolved",
       "plant_resolved",
       "quick_log_context_verified",
-      "plant_persisted_after_refresh",
     ]);
+    expect(ONE_TENT_PROOF_STAGES).toContain("quick_log_manual_tent_snapshot_verified");
+    expect(ONE_TENT_PROOF_STAGES).toContain("operator_sensor_evidence_seeded");
   });
 });

@@ -1,72 +1,35 @@
 /**
- * One-Tent golden-path fixture cleanup — pure planner + executor.
- *
- * Removes ONLY rows that belong to the golden-path fixture of the
- * currently managed user. Identity of the fixture is:
- *
- *     authenticated user_id
- *     AND exact deterministic fixture name INCLUDING the exact marker
- *     AND exact fixture relationships (grow → tent/plant → children)
- *
- * Never broad partial-name matching. Never another user's rows. Never
- * rows without the exact marker. Never service_role — the executor is
- * handed an authenticated-user adapter, so RLS remains part of the
- * safety boundary.
- *
- * DELETE / VERIFY ORDER (child before parent — audited against actual
- * FKs in supabase/migrations; grow_events / sensor_readings /
- * plants.tent_id are soft references that do NOT cascade, hence
- * explicit stages):
- *
- *   1. diary_entries follow-up markers (details.event_type=action_followup)
- *   2. alerts                       (cascades alert_events)
- *   3. grow_events quick logs
- *   4. sensor_readings              (see KNOWN LIMIT below)
- *   5. grow_targets
- *   6. plants
- *   7. tents
- *   8. the fixture grow itself      (cascades action_queue + events)
- *   9. verify action_queue rows are gone; report their discovered count
- *
- * KNOWN LIMIT (documented, honest): sensor_readings currently has NO
- * owner-scoped DELETE policy and no cascading FK, so an authenticated
- * teardown cannot remove the seeded manual snapshot. When fixture
- * sensor rows survive the delete attempt the run stops BEFORE deleting
- * parents (grow_targets/plants/tents/grow) and reports status=failed
- * with reason sensor_rows_delete_blocked_by_rls. Adding that DELETE
- * policy is a future migration — out of scope for test tooling, which
- * must not change RLS.
- *
- * Failure rule: any stage that errors, or that leaves surviving rows,
- * stops the run before any parent stage. No retry. No broadened scope.
- *
- * Idempotency: no fixture grow found ⇒ status=completed with all-zero
- * counts. Repeated runs are safe.
- *
- * This module is pure: no process.env, no I/O, no Supabase import. The
- * CLI (teardown-one-tent-golden-path.mjs) injects a thin adapter.
+ * Pure owner-scoped cleanup planner for the authenticated One-Tent proof.
+ * Active, user-visible fixture rows are removed when owner RLS permits it.
+ * Append-only or owner-undeletable history is retained and reported, and
+ * parent hierarchy rows are retained when deleting them could erase it.
  */
 
-/**
- * Deterministic fixture identity — must stay in lockstep with
- * scripts/e2e/seed-one-tent-golden-path.mjs and
- * src/test/fixtures/oneTentGoldenPathFixture.ts. Locked by
- * src/test/one-tent-golden-path-teardown.test.ts.
- */
 export const GOLDEN_MARKER = "[GOLDEN-PATH-FIXTURE]";
-export const FIXTURE_NAMES = {
-  grow: `One-Tent Golden Run ${GOLDEN_MARKER}`,
-  tent: `Flower Tent A ${GOLDEN_MARKER}`,
-  plant: `Golden Plant 1 ${GOLDEN_MARKER}`,
-};
-export const ACTION_FOLLOWUP_EVENT_TYPE = "action_followup";
+const RUN_MARKER = /^\[GOLDEN-PATH-FIXTURE-RUN-[0-9]+-ATTEMPT-1\]$/;
 
+export function parseOneTentFixtureMarker(raw) {
+  const marker = typeof raw === "string" ? raw.trim() : "";
+  if (marker === GOLDEN_MARKER || RUN_MARKER.test(marker)) return marker;
+  throw new Error("fixture_marker_invalid");
+}
+
+export function buildFixtureNames(rawMarker) {
+  const marker = parseOneTentFixtureMarker(rawMarker);
+  return {
+    grow: `One-Tent Golden Run ${marker}`,
+    tent: `Flower Tent A ${marker}`,
+    plant: `Golden Plant 1 ${marker}`,
+  };
+}
+
+export const FIXTURE_NAMES = buildFixtureNames(GOLDEN_MARKER);
+export const ACTION_FOLLOWUP_EVENT_TYPE = "action_followup";
 export const ONE_TENT_TEARDOWN_JSON_PREFIX = "ONE_TENT_TEARDOWN_JSON=";
 
-/** Stable report descriptors. Execution order is defined in executeTeardown. */
 export const TEARDOWN_STAGES = [
-  { key: "follow_ups", countKey: "follow_ups_deleted", table: "diary_entries" },
-  { key: "action_queue", countKey: "action_queue_deleted", table: "action_queue" },
+  { key: "photo_objects", countKey: "photo_objects_deleted", table: "diary-photos" },
+  { key: "diary_entries", countKey: "diary_entries_deleted", table: "diary_entries" },
   { key: "alerts", countKey: "alerts_deleted", table: "alerts" },
   { key: "quick_logs", countKey: "quick_logs_deleted", table: "grow_events" },
   { key: "sensor_rows", countKey: "sensor_rows_deleted", table: "sensor_readings" },
@@ -77,6 +40,8 @@ export const TEARDOWN_STAGES = [
 ];
 
 const ZERO_COUNTS = Object.freeze({
+  photo_objects_deleted: 0,
+  diary_entries_deleted: 0,
   follow_ups_deleted: 0,
   action_queue_deleted: 0,
   alerts_deleted: 0,
@@ -89,39 +54,61 @@ const ZERO_COUNTS = Object.freeze({
   total_deleted: 0,
 });
 
+const ZERO_RETAINED = Object.freeze({
+  sensor_rows: 0,
+  action_queue_rows: 0,
+  action_queue_event_rows: 0,
+  ai_doctor_session_rows: 0,
+  ai_credit_accounting_rows: 0,
+  plants: 0,
+  tents: 0,
+  grows: 0,
+  total_retained: 0,
+});
+
 export function zeroCounts() {
   return { ...ZERO_COUNTS };
 }
 
-// ---------------------------------------------------------------------------
-// CLI argument contract — dry-run by default; destruction needs BOTH flags.
-// ---------------------------------------------------------------------------
+export function zeroRetainedHistory() {
+  return { ...ZERO_RETAINED };
+}
 
 export function parseTeardownArgs(argv) {
   const known = new Set(["--dry-run", "--execute", "--confirm-fixture-teardown"]);
   const flags = new Set();
   for (const arg of argv) {
-    if (!known.has(arg)) {
-      return { mode: "blocked", reason: "unknown_flag" };
-    }
+    if (!known.has(arg)) return { mode: "blocked", reason: "unknown_flag" };
     flags.add(arg);
   }
   const dryRun = flags.has("--dry-run");
   const execute = flags.has("--execute");
   const confirm = flags.has("--confirm-fixture-teardown");
-  if (dryRun && (execute || confirm)) {
-    return { mode: "blocked", reason: "conflicting_flags" };
-  }
+  if (dryRun && (execute || confirm)) return { mode: "blocked", reason: "conflicting_flags" };
   if (execute && confirm) return { mode: "execute" };
   if (execute) return { mode: "blocked", reason: "missing_confirm_flag" };
   if (confirm) return { mode: "blocked", reason: "missing_execute_flag" };
-  // Default (no flags) and explicit --dry-run are the same safe mode.
   return { mode: "dry_run" };
 }
 
-// ---------------------------------------------------------------------------
-// Receipt — versioned, deterministic, secret-free.
-// ---------------------------------------------------------------------------
+function totalCounts(counts) {
+  return Object.entries(counts)
+    .filter(([key]) => key.endsWith("_deleted") && key !== "total_deleted")
+    .reduce((sum, [, count]) => sum + Number(count ?? 0), 0);
+}
+
+function withTotals(counts, retainedHistory = zeroRetainedHistory()) {
+  counts.total_deleted = totalCounts(counts);
+  retainedHistory.total_retained = Object.entries(retainedHistory)
+    .filter(([key]) => key !== "total_retained")
+    .reduce((sum, [, count]) => sum + Number(count ?? 0), 0);
+  return { counts, retainedHistory };
+}
+
+const SAFE_CODE = /^[a-z][a-z0-9_]{0,79}$/;
+function safeCode(value, fallback) {
+  return typeof value === "string" && SAFE_CODE.test(value) ? value : fallback;
+}
 
 export function buildTeardownReceipt({
   status,
@@ -129,35 +116,20 @@ export function buildTeardownReceipt({
   ownerVerified = false,
   targetProjectVerified = false,
   counts = zeroCounts(),
+  retainedHistory = zeroRetainedHistory(),
 }) {
-  const total =
-    counts.follow_ups_deleted +
-    counts.action_queue_deleted +
-    counts.alerts_deleted +
-    counts.quick_logs_deleted +
-    counts.sensor_rows_deleted +
-    counts.grow_targets_deleted +
-    counts.plants_deleted +
-    counts.tents_deleted +
-    counts.grows_deleted;
+  const normalized = withTotals(
+    { ...zeroCounts(), ...counts },
+    { ...zeroRetainedHistory(), ...retainedHistory },
+  );
   return {
-    schema_version: "1",
+    schema_version: "2",
     status,
-    reason,
+    reason: reason === null ? null : safeCode(reason, "cleanup_failed"),
     owner_verified: ownerVerified,
     target_project_verified: targetProjectVerified,
-    counts: {
-      follow_ups_deleted: counts.follow_ups_deleted,
-      action_queue_deleted: counts.action_queue_deleted,
-      alerts_deleted: counts.alerts_deleted,
-      quick_logs_deleted: counts.quick_logs_deleted,
-      sensor_rows_deleted: counts.sensor_rows_deleted,
-      grow_targets_deleted: counts.grow_targets_deleted,
-      plants_deleted: counts.plants_deleted,
-      tents_deleted: counts.tents_deleted,
-      grows_deleted: counts.grows_deleted,
-      total_deleted: total,
-    },
+    counts: normalized.counts,
+    retained_history: normalized.retainedHistory,
   };
 }
 
@@ -165,190 +137,178 @@ export function renderTeardownReceipt(receipt) {
   return `${ONE_TENT_TEARDOWN_JSON_PREFIX}${JSON.stringify(receipt)}`;
 }
 
-// ---------------------------------------------------------------------------
-// Discovery — resolve the EXACT fixture rows before any delete.
-// ---------------------------------------------------------------------------
+async function optionalCount(ops, method, ...args) {
+  return typeof ops[method] === "function" ? Number(await ops[method](...args)) : 0;
+}
 
-/**
- * @param ops injected adapter — every method MUST already scope by the
- *   authenticated user (and RLS enforces it again server-side):
- *     findGrowByExactName(name) -> { id, name } | null
- *     listTentIds(growId) -> string[]
- *     listPlantIds(growId) -> string[]
- *     countFollowUps(growId) -> number
- *     countActionQueue(growId) -> number
- *     countAlerts(growId) -> number
- *     countQuickLogs(growId) -> number
- *     countSensorRows(tentIds) -> number
- *     countGrowTargets(growId) -> number
- *     deleteFollowUps(growId) -> number      (rows actually deleted)
- *     deleteAlerts(growId) -> number
- *     deleteQuickLogs(growId) -> number
- *     deleteSensorRows(tentIds) -> number
- *     deleteGrowTargets(growId) -> number
- *     deletePlants(growId) -> number
- *     deleteTents(growId) -> number
- *     deleteGrow(growId) -> number
- */
-export async function discoverFixture(ops) {
-  const grow = await ops.findGrowByExactName(FIXTURE_NAMES.grow);
-  if (!grow) {
-    return { found: false };
-  }
-  // Marker verification is exact-equality by construction, but assert it
-  // anyway — a future adapter regression must not widen the blast radius.
-  if (grow.name !== FIXTURE_NAMES.grow || !grow.name.includes(GOLDEN_MARKER)) {
-    return { found: false, ownershipViolation: true };
-  }
+export async function discoverFixture(ops, names = FIXTURE_NAMES) {
+  const grow = await ops.findGrowByExactName(names.grow);
+  if (!grow) return { found: false, names };
+  if (grow.name !== names.grow) return { found: false, ownershipViolation: true, names };
   const tentIds = await ops.listTentIds(grow.id);
   const plantIds = await ops.listPlantIds(grow.id);
-  const plan = {
+  const photoPaths =
+    typeof ops.listDiaryPhotoPaths === "function" ? await ops.listDiaryPhotoPaths(grow.id) : [];
+  return {
     found: true,
+    names,
     growId: grow.id,
     tentIds,
     plantIds,
+    photoPaths,
     counts: {
-      follow_ups: await ops.countFollowUps(grow.id),
-      action_queue: await ops.countActionQueue(grow.id),
-      alerts: await ops.countAlerts(grow.id),
-      quick_logs: await ops.countQuickLogs(grow.id),
-      sensor_rows: tentIds.length ? await ops.countSensorRows(tentIds) : 0,
-      grow_targets: await ops.countGrowTargets(grow.id),
+      photo_objects: photoPaths.length,
+      diary_entries: await optionalCount(ops, "countDiaryEntries", grow.id),
+      follow_ups: await optionalCount(ops, "countFollowUps", grow.id),
+      action_queue: await optionalCount(ops, "countActionQueue", grow.id),
+      action_queue_events: await optionalCount(ops, "countActionQueueEvents", grow.id),
+      ai_doctor_sessions: await optionalCount(ops, "countAiDoctorSessions", grow.id),
+      ai_credit_accounting: await optionalCount(ops, "countAiCreditAccounting", grow.id),
+      alerts: await optionalCount(ops, "countAlerts", grow.id),
+      quick_logs: await optionalCount(ops, "countQuickLogs", grow.id),
+      sensor_rows: tentIds.length ? await optionalCount(ops, "countSensorRows", tentIds) : 0,
+      grow_targets: await optionalCount(ops, "countGrowTargets", grow.id),
       plants: plantIds.length,
       tents: tentIds.length,
       grows: 1,
     },
   };
-  return plan;
 }
 
-// ---------------------------------------------------------------------------
-// Execution — child before parent; stop at the first failed stage.
-// ---------------------------------------------------------------------------
-
-function withTotal(counts) {
-  counts.total_deleted =
-    counts.follow_ups_deleted +
-    counts.action_queue_deleted +
-    counts.alerts_deleted +
-    counts.quick_logs_deleted +
-    counts.sensor_rows_deleted +
-    counts.grow_targets_deleted +
-    counts.plants_deleted +
-    counts.tents_deleted +
-    counts.grows_deleted;
-  return counts;
+function result(status, reason, counts, retainedHistory = zeroRetainedHistory()) {
+  const normalized = withTotals(counts, retainedHistory);
+  return { status, reason, ...normalized };
 }
 
 export async function executeTeardown(ops, discovery, { dryRun }) {
   if (discovery.ownershipViolation) {
-    // A grow came back that failed exact-marker verification. The pure
-    // executor must fail closed itself — not rely on the CLI's check.
-    return {
-      status: "failed",
-      reason: "fixture_marker_verification_failed",
-      counts: zeroCounts(),
-    };
+    return result("failed", "fixture_marker_verification_failed", zeroCounts());
   }
   if (!discovery.found) {
-    // Idempotent: already clean is success, not failure.
-    return {
-      status: "completed",
-      reason: dryRun ? "dry_run" : null,
-      counts: zeroCounts(),
-    };
+    return result("fixture_not_found", "exact_fixture_not_found", zeroCounts());
   }
 
   const counts = zeroCounts();
-  const setCount = (key, n) => {
-    counts[`${key}_deleted`] = n;
-  };
+  const retained = zeroRetainedHistory();
+  const c = discovery.counts;
+  retained.action_queue_rows = c.action_queue ?? 0;
+  retained.action_queue_event_rows = c.action_queue_events ?? 0;
+  retained.ai_doctor_session_rows = c.ai_doctor_sessions ?? 0;
+  retained.ai_credit_accounting_rows = c.ai_credit_accounting ?? 0;
 
   if (dryRun) {
-    counts.follow_ups_deleted = discovery.counts.follow_ups;
-    counts.action_queue_deleted = discovery.counts.action_queue;
-    counts.alerts_deleted = discovery.counts.alerts;
-    counts.quick_logs_deleted = discovery.counts.quick_logs;
-    counts.sensor_rows_deleted = discovery.counts.sensor_rows;
-    counts.grow_targets_deleted = discovery.counts.grow_targets;
-    counts.plants_deleted = discovery.counts.plants;
-    counts.tents_deleted = discovery.counts.tents;
-    counts.grows_deleted = discovery.counts.grows;
-    // NO ops.delete* call is EVER made on this path.
-    return { status: "completed", reason: "dry_run", counts: withTotal(counts) };
+    counts.photo_objects_deleted = c.photo_objects ?? 0;
+    if (c.diary_entries > 0) counts.diary_entries_deleted = c.diary_entries;
+    else counts.follow_ups_deleted = c.follow_ups ?? 0;
+    counts.alerts_deleted = c.alerts ?? 0;
+    counts.quick_logs_deleted = c.quick_logs ?? 0;
+    counts.sensor_rows_deleted = c.sensor_rows ?? 0;
+    counts.grow_targets_deleted = c.grow_targets ?? 0;
+    const retainedChildHistory =
+      retained.action_queue_rows +
+      retained.action_queue_event_rows +
+      retained.ai_doctor_session_rows +
+      retained.ai_credit_accounting_rows;
+    if (retainedChildHistory === 0) {
+      counts.plants_deleted = c.plants;
+      counts.tents_deleted = c.tents;
+      counts.grows_deleted = c.grows;
+    } else {
+      retained.plants = c.plants;
+      retained.tents = c.tents;
+      retained.grows = c.grows;
+    }
+    return result("dry_run", "dry_run_plan_only", counts, retained);
   }
 
-  const { growId, tentIds } = discovery;
-
-  const stages = [
-    ["follow_ups", () => ops.deleteFollowUps(growId), () => ops.countFollowUps(growId)],
+  const { growId, tentIds, photoPaths } = discovery;
+  const diaryStage =
+    typeof ops.deleteDiaryEntries === "function"
+      ? ["diary_entries", () => ops.deleteDiaryEntries(growId), () => ops.countDiaryEntries(growId)]
+      : ["follow_ups", () => ops.deleteFollowUps(growId), () => ops.countFollowUps(growId)];
+  const activeStages = [
+    [
+      "photo_objects",
+      () =>
+        photoPaths.length && typeof ops.deleteDiaryPhotos === "function"
+          ? ops.deleteDiaryPhotos(photoPaths)
+          : 0,
+      async () => 0,
+    ],
+    diaryStage,
     ["alerts", () => ops.deleteAlerts(growId), () => ops.countAlerts(growId)],
     ["quick_logs", () => ops.deleteQuickLogs(growId), () => ops.countQuickLogs(growId)],
-    [
-      "sensor_rows",
-      () => (tentIds.length ? ops.deleteSensorRows(tentIds) : 0),
-      () => (tentIds.length ? ops.countSensorRows(tentIds) : 0),
-    ],
-    ["grow_targets", () => ops.deleteGrowTargets(growId), () => ops.countGrowTargets(growId)],
+  ];
+
+  for (const [key, remove, survivors] of activeStages) {
+    try {
+      const deleted = Number(await remove());
+      counts[`${key}_deleted`] = Number.isFinite(deleted) ? deleted : 0;
+    } catch {
+      return result("failed", `${key}_delete_failed`, counts, retained);
+    }
+    try {
+      if ((await survivors()) > 0) {
+        return result("failed", `${key}_rows_survived_delete`, counts, retained);
+      }
+    } catch {
+      return result("failed", `${key}_verify_failed`, counts, retained);
+    }
+  }
+
+  if (tentIds.length && c.sensor_rows > 0) {
+    try {
+      counts.sensor_rows_deleted = Number(await ops.deleteSensorRows(tentIds)) || 0;
+    } catch {
+      counts.sensor_rows_deleted = 0;
+    }
+    try {
+      retained.sensor_rows = Number(await ops.countSensorRows(tentIds)) || 0;
+    } catch {
+      return result("failed", "sensor_rows_verify_failed", counts, retained);
+    }
+  }
+
+  try {
+    counts.grow_targets_deleted = Number(await ops.deleteGrowTargets(growId)) || 0;
+    if ((await ops.countGrowTargets(growId)) > 0) {
+      return result("failed", "grow_targets_rows_survived_delete", counts, retained);
+    }
+  } catch {
+    return result("failed", "grow_targets_delete_failed", counts, retained);
+  }
+
+  const retainedChildHistory = Object.entries(retained)
+    .filter(([key]) => !["plants", "tents", "grows", "total_retained"].includes(key))
+    .reduce((sum, [, count]) => sum + count, 0);
+  if (retainedChildHistory > 0) {
+    retained.plants = c.plants;
+    retained.tents = c.tents;
+    retained.grows = c.grows;
+    return result(
+      "completed_with_retained_history",
+      "owner_cleanup_completed_with_retained_history",
+      counts,
+      retained,
+    );
+  }
+
+  const parentStages = [
     ["plants", () => ops.deletePlants(growId), async () => (await ops.listPlantIds(growId)).length],
     ["tents", () => ops.deleteTents(growId), async () => (await ops.listTentIds(growId)).length],
     [
       "grows",
       () => ops.deleteGrow(growId),
-      async () => ((await ops.findGrowByExactName(FIXTURE_NAMES.grow)) ? 1 : 0),
+      async () => ((await ops.findGrowByExactName(discovery.names.grow)) ? 1 : 0),
     ],
   ];
-
-  for (const [key, del, survivors] of stages) {
-    let deleted;
+  for (const [key, remove, survivors] of parentStages) {
     try {
-      deleted = await del();
+      counts[`${key}_deleted`] = Number(await remove()) || 0;
+      if ((await survivors()) > 0) return result("failed", `${key}_rows_survived_delete`, counts);
     } catch {
-      // Sanitized code only — the raw provider error may echo values.
-      return {
-        status: "failed",
-        reason: `${key}_delete_failed`,
-        counts: withTotal(counts),
-      };
-    }
-    setCount(key, typeof deleted === "number" ? deleted : 0);
-    let remaining;
-    try {
-      remaining = await survivors();
-    } catch {
-      return { status: "failed", reason: `${key}_verify_failed`, counts: withTotal(counts) };
-    }
-    if (remaining > 0) {
-      // Surviving children (e.g. sensor_readings without an owner DELETE
-      // policy) — STOP before parent stages so nothing gets obscured.
-      const reason =
-        key === "sensor_rows" ? "sensor_rows_delete_blocked_by_rls" : `${key}_rows_survived_delete`;
-      return { status: "failed", reason, counts: withTotal(counts) };
+      return result("failed", `${key}_delete_failed`, counts);
     }
   }
-
-  // Authenticated clients cannot delete Action Queue rows directly because
-  // their audit history is immutable. The fixture grow owns these rows with
-  // ON DELETE CASCADE, so verify the database removed them only after the
-  // exact-marker grow was deleted.
-  let remainingActions;
-  try {
-    remainingActions = await ops.countActionQueue(growId);
-  } catch {
-    return {
-      status: "failed",
-      reason: "action_queue_cascade_verify_failed",
-      counts: withTotal(counts),
-    };
-  }
-  if (remainingActions > 0) {
-    return {
-      status: "failed",
-      reason: "action_queue_rows_survived_grow_delete",
-      counts: withTotal(counts),
-    };
-  }
-  counts.action_queue_deleted = discovery.counts.action_queue;
-
-  return { status: "completed", reason: null, counts: withTotal(counts) };
+  return result("completed_active_rows_removed", "owner_cleanup_completed", counts);
 }

@@ -59,6 +59,7 @@ import {
 import { DETERMINISTIC_AI_DOCTOR_RESPONSE } from "./helpers/oneTentAiDoctorResponse";
 import {
   classifyOneTentForbiddenNetworkRequest,
+  hasOneTentServiceRoleCredential,
   isOneTentAiDoctorReviewEndpoint,
   type OneTentForbiddenNetworkKind,
 } from "./helpers/oneTentNetworkSafety";
@@ -66,7 +67,8 @@ import {
 const QUICK_LOG_NOTE = "Observed mild leaf-edge curl after a warm afternoon.";
 const QUICK_LOG_CONTEXT_DRAFT = "Context check only — close without saving.";
 const DEFAULT_FIXTURE_MARKER = "[GOLDEN-PATH-FIXTURE]";
-const RUN_FIXTURE_MARKER = /^\[GOLDEN-PATH-FIXTURE-RUN-[0-9]+\]$/;
+const RUN_FIXTURE_MARKER = /^\[GOLDEN-PATH-FIXTURE-RUN-[0-9]+-ATTEMPT-1\]$/;
+const EXPECTED_SHA = process.env.E2E_EXPECTED_SHA?.trim() ?? "";
 const TARGET_PROJECT_REF = process.env.LOVABLE_E2E_TARGET_PROJECT_REF?.trim() ?? "";
 const declaredFixtureMarker = process.env.E2E_ONE_TENT_FIXTURE_MARKER?.trim();
 if (
@@ -86,6 +88,8 @@ const SEED_SCRIPT = fileURLToPath(
 const TEARDOWN_SCRIPT = fileURLToPath(
   new URL("../scripts/e2e/teardown-one-tent-golden-path.mjs", import.meta.url),
 );
+const ONE_TENT_CHILD_TIMEOUT_MS = 60_000;
+const ONE_TENT_CHILD_MAX_BUFFER_BYTES = 64 * 1024;
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z2S8AAAAASUVORK5CYII=",
   "base64",
@@ -142,6 +146,11 @@ async function installOneTentNetworkBoundary(
 ) {
   await page.route("**/*", async (route: Route) => {
     const url = route.request().url();
+    if (hasOneTentServiceRoleCredential(route.request().headers())) {
+      onForbiddenNetwork("service_role");
+      await route.abort("blockedbyclient");
+      return;
+    }
     if (isOneTentAiDoctorReviewEndpoint(url, TARGET_PROJECT_REF)) {
       let requestBody: unknown = null;
       try {
@@ -242,10 +251,18 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
     let sawPaidModel = false;
     let sawDeviceControl = false;
     let sawServiceRole = false;
+    let sawActionQueueApproval = false;
+    let sawPaddleCheckout = false;
     let aiDoctorRequestEnvelope: unknown = null;
     let evidenceSeedStatus: OneTentProofStagedResult["seedStatus"] = "not_started";
     let proofReceiptStatus: "pass" | "blocked" | "fail" = "fail";
     let proofBlockerReason: string | null = null;
+    let proofError: unknown = null;
+    let cleanup: OneTentProofStagedResult["cleanup"] = {
+      status: "not_run",
+      active_rows_removed: false,
+      retained_history: false,
+    };
 
     async function stage<T>(name: OneTentProofStage, fn: () => Promise<T>): Promise<T> {
       try {
@@ -262,31 +279,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
     page.on("request", (req) => {
       const url = req.url();
       if (/\/auth\/v1\/token\?grant_type=password/.test(url)) sawPasswordAuth = true;
-      const headers = req.headers();
-      // A service_role credential never contains the literal string in its
-      // encoded form: legacy keys are JWTs (role claim is base64url-encoded)
-      // and new-format secret keys use the sb_secret_ prefix. Check both
-      // the authorization and apikey headers, decoding JWT role claims.
-      for (const headerName of ["authorization", "apikey"]) {
-        const value = String(headers[headerName] ?? "");
-        if (!value) continue;
-        if (/sb_secret_/i.test(value) || /service_role/i.test(value)) {
-          sawServiceRole = true;
-          continue;
-        }
-        const token = value.replace(/^Bearer\s+/i, "");
-        const segments = token.split(".");
-        if (segments.length === 3) {
-          try {
-            const payload = JSON.parse(Buffer.from(segments[1], "base64url").toString("utf8")) as {
-              role?: string;
-            };
-            if (payload.role === "service_role") sawServiceRole = true;
-          } catch {
-            /* not a JWT — nothing to decode */
-          }
-        }
-      }
+      if (hasOneTentServiceRoleCredential(req.headers())) sawServiceRole = true;
     });
 
     try {
@@ -300,10 +293,22 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
           (kind) => {
             if (kind === "paid_ai") sawPaidModel = true;
             if (kind === "device_control") sawDeviceControl = true;
+            if (kind === "service_role") sawServiceRole = true;
+            if (kind === "action_queue_approval") sawActionQueueApproval = true;
+            if (kind === "paddle_checkout") sawPaddleCheckout = true;
           },
         );
         await restoreManagedSession(page, ready, env.sessionJson ?? "");
         await expect(page).not.toHaveURL(/\/auth(\?|$)/);
+      });
+
+      await stage("deployment_sha_verified", async () => {
+        const expectedSha = EXPECTED_SHA;
+        expect(expectedSha).toMatch(/^[0-9a-f]{40}$/);
+        const response = await page.request.get("/version.json", { failOnStatusCode: false });
+        expect(response.ok()).toBe(true);
+        const version = (await response.json()) as { commit?: unknown };
+        expect(version.commit).toBe(expectedSha);
       });
 
       // Stage 2 — Create the hierarchy through the connected generic dialogs.
@@ -487,22 +492,7 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         expect(persistedPlant?.id).toBe(fixturePlantId);
       });
 
-      // The evidence-only seed may add grow targets and manual sensor rows,
-      // but fails closed if the browser-created hierarchy is missing or
-      // misbound. It cannot rescue a broken creation handoff.
       await stage("photo_and_manual_evidence_persisted", async () => {
-        try {
-          const seedOutput = execFileSync(process.execPath, [SEED_SCRIPT, "--evidence-only"], {
-            encoding: "utf8",
-            env: process.env,
-          });
-          expect(seedOutput).toContain("One-Tent Golden Path seed: OK");
-          evidenceSeedStatus = "completed";
-        } catch (error) {
-          evidenceSeedStatus = "failed";
-          throw error;
-        }
-
         const createdPlantCard = page.getByTestId("plant-card").filter({ hasText: PLANT_NAME });
         await expect(createdPlantCard).toHaveCount(1);
         await createdPlantCard.click();
@@ -570,10 +560,60 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         expect(error).toBeNull();
         expect(quickLogRows).toHaveLength(1);
         fences.quick_log_count = quickLogRows?.length ?? 0;
+
+        const { data: preSeedSensorRows, error: preSeedSensorError } = await authedDb
+          .from("sensor_readings")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("tent_id", fixtureTentId);
+        expect(preSeedSensorError).toBeNull();
+        expect(preSeedSensorRows).toHaveLength(0);
+      });
+
+      await stage("quick_log_manual_tent_snapshot_verified", async () => {
+        await page.goto(`/tents?growId=${fixtureGrowId}`);
+        const tentCard = page.getByTestId(`tents-card-${fixtureTentId}`);
+        await expect(tentCard).toBeVisible();
+        await expect(page.getByTestId(`tents-list-sensor-source-${fixtureTentId}`)).toContainText(
+          "Manual",
+        );
+        await expect(page.getByTestId(`tents-list-metric-${fixtureTentId}-temp`)).toContainText(
+          /82(?:\.0)?\s*°?F/i,
+        );
+        await expect(page.getByTestId(`tents-list-metric-${fixtureTentId}-rh`)).toContainText(
+          /48(?:\.0)?\s*%/,
+        );
+        await expect(page.getByTestId(`tents-list-metric-${fixtureTentId}-vpd`)).toContainText("—");
+        await expect(page.getByTestId(`tents-list-metric-${fixtureTentId}-vpd`)).toHaveAttribute(
+          "data-status",
+          "unknown",
+        );
+        await expect(tentCard).not.toContainText(/Live/i);
+        await expect(tentCard).not.toContainText("No sensor data yet");
+      });
+
+      // Only after Quick Log's manual Tent snapshot is proven may the
+      // operator helper add target-driven sensor evidence for later stages.
+      await stage("operator_sensor_evidence_seeded", async () => {
+        try {
+          const seedOutput = execFileSync(process.execPath, [SEED_SCRIPT, "--evidence-only"], {
+            encoding: "utf8",
+            env: process.env,
+            timeout: ONE_TENT_CHILD_TIMEOUT_MS,
+            killSignal: "SIGKILL",
+            maxBuffer: ONE_TENT_CHILD_MAX_BUFFER_BYTES,
+          });
+          expect(seedOutput).toContain("One-Tent Golden Path seed: OK");
+          evidenceSeedStatus = "completed";
+        } catch (error) {
+          evidenceSeedStatus = "failed";
+          throw error;
+        }
       });
 
       // Timeline: exact plant log, photo, and manual snapshot all survive refresh.
       await stage("timeline_visible", async () => {
+        await page.goto(`/plants/${fixturePlantId}`);
         await page.getByRole("link", { name: /^open logs$/i }).click();
         let timelineEntry = page.getByTestId("timeline-entry").filter({ hasText: QUICK_LOG_NOTE });
         await expect(timelineEntry).toHaveCount(1);
@@ -871,9 +911,16 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       // function is already blocked above to avoid its telemetry write.
       await stage("paddle_sandbox_verified", async () => {
         await page.goto("/pricing");
+        const testModeBanner = page.getByTestId("payments-test-mode-banner");
+        await expect(testModeBanner).toHaveAttribute("data-payment-env", "sandbox");
+        await expect(testModeBanner).toContainText(/Paddle sandbox/i);
+        await expect(testModeBanner).toContainText(/test mode/i);
+        await expect(testModeBanner).toContainText(/No real charges/i);
         const checkoutTrust = page.getByTestId("pricing-checkout-trust");
         await expect(checkoutTrust).toHaveAttribute("data-checkout-state", "sandbox");
-        await expect(checkoutTrust).toContainText(/sandbox|test/i);
+        await expect(checkoutTrust).toContainText(/Paddle sandbox/i);
+        await expect(checkoutTrust).toContainText(/Test only/i);
+        await expect(checkoutTrust).toContainText(/No real charges/i);
       });
 
       // Network safety
@@ -881,6 +928,8 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
       expect(sawPaidModel).toBe(false);
       expect(sawDeviceControl).toBe(false);
       expect(sawServiceRole).toBe(false);
+      expect(sawActionQueueApproval).toBe(false);
+      expect(sawPaddleCheckout).toBe(false);
 
       // Honest receipt annotation
       testInfo.annotations.push({
@@ -888,65 +937,103 @@ test.describe("One-Tent Loop — authenticated UI golden path", () => {
         description:
           "Pending approval suggestion verified; approval control observed but not clicked; no device command sent.",
       });
-    } finally {
-      // Exactly one machine-readable proof line, pass or fail. Any tripped
-      // safety fence forces the receipt out of "pass" (the builder enforces
-      // this), so a safety violation can never print PASS or trigger the
-      // optional post-pass teardown.
-      const safetyViolationReason = sawPasswordAuth
-        ? "password_auth_request_observed"
-        : sawPaidModel
-          ? "paid_ai_request_observed"
-          : sawDeviceControl
-            ? "device_control_request_observed"
-            : sawServiceRole
-              ? "service_role_in_browser_observed"
-              : null;
-      const receipt = buildOneTentBrowserProofReceipt({
-        restoreStrategy: ready.restoreStrategy,
-        // Record the evidence seed at its real boundary. A later photo, Quick
-        // Log, or UI assertion failure must not rewrite a completed seed as
-        // "not_started" in the evidence receipt.
-        seedStatus: evidenceSeedStatus,
-        blockerReason: proofBlockerReason,
-        safetyViolationReason,
-        stages: stageOutcomes,
-        duplicateFences: fences,
-        safety: {
-          paid_ai_request_observed: sawPaidModel,
-          device_control_request_observed: sawDeviceControl,
-          service_role_in_browser_observed: sawServiceRole,
-        },
-      });
-      console.log(`Authenticated One-Tent Loop Playwright Proof: ${receipt.status.toUpperCase()}`);
-      console.log(renderOneTentBrowserProofReceipt(receipt));
-      proofReceiptStatus = receipt.status;
+    } catch (error) {
+      proofError = error;
     }
 
-    // Optional cleanup — deliberately OUTSIDE the finally (throwing there
-    // would swallow the original test error): this line is only reached
-    // when the walk threw nothing, and the receipt-status gate keeps it
-    // to fully passing proofs. Never after BLOCKED or FAIL; never silent.
+    const safetyViolationReason = sawPasswordAuth
+      ? "password_auth_request_observed"
+      : sawPaidModel
+        ? "paid_ai_request_observed"
+        : sawDeviceControl
+          ? "device_control_request_observed"
+          : sawServiceRole
+            ? "service_role_in_browser_observed"
+            : sawActionQueueApproval
+              ? "action_queue_approval_request_observed"
+              : sawPaddleCheckout
+                ? "paddle_checkout_request_observed"
+                : null;
+    proofReceiptStatus =
+      proofError === null &&
+      safetyViolationReason === null &&
+      evidenceSeedStatus === "completed" &&
+      Object.values(stageOutcomes).length > 0 &&
+      Object.values(stageOutcomes).every((outcome) => outcome === "pass")
+        ? "pass"
+        : "fail";
+
+    // Cleanup runs only after the complete safe walk. Its child output is
+    // parsed but never echoed: the single browser receipt below is the only
+    // retained artifact and composites the sanitized cleanup outcome.
     if (
       proofReceiptStatus === "pass" &&
       process.env.LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS === "true"
     ) {
-      // Repo-rooted path: the worker's cwd is wherever playwright was
-      // invoked from, so a cwd-relative script path would ENOENT.
       try {
         const out = execFileSync(
           process.execPath,
           [TEARDOWN_SCRIPT, "--execute", "--confirm-fixture-teardown"],
-          { encoding: "utf8" },
+          {
+            encoding: "utf8",
+            timeout: ONE_TENT_CHILD_TIMEOUT_MS,
+            killSignal: "SIGKILL",
+            maxBuffer: ONE_TENT_CHILD_MAX_BUFFER_BYTES,
+          },
         );
-        console.log(out);
-      } catch (err) {
-        // Surface the child's ONE_TENT_TEARDOWN_JSON receipt before
-        // failing — a hidden teardown failure is worse than a loud one.
-        const failed = err as { stdout?: string };
-        if (failed.stdout) console.log(String(failed.stdout));
-        throw err;
+        const lines = out
+          .split(/\r?\n/u)
+          .filter((line) => line.startsWith("ONE_TENT_TEARDOWN_JSON="));
+        expect(lines).toHaveLength(1);
+        const teardown = JSON.parse(lines[0].slice("ONE_TENT_TEARDOWN_JSON=".length)) as {
+          status?: unknown;
+          counts?: { total_deleted?: unknown };
+          retained_history?: { total_retained?: unknown };
+        };
+        expect(["completed_active_rows_removed", "completed_with_retained_history"]).toContain(
+          teardown.status,
+        );
+        expect(Number(teardown.counts?.total_deleted)).toBeGreaterThan(0);
+        cleanup = {
+          status: teardown.status as
+            "completed_active_rows_removed" | "completed_with_retained_history",
+          active_rows_removed: true,
+          retained_history: teardown.status === "completed_with_retained_history",
+        };
+        if (cleanup.retained_history) {
+          expect(Number(teardown.retained_history?.total_retained)).toBeGreaterThan(0);
+        }
+      } catch {
+        cleanup = {
+          status: "failed",
+          active_rows_removed: false,
+          retained_history: false,
+        };
+        proofBlockerReason = "cleanup_failed";
+        proofError = new Error("cleanup_failed");
       }
+    }
+
+    const receipt = buildOneTentBrowserProofReceipt({
+      restoreStrategy: ready.restoreStrategy,
+      seedStatus: evidenceSeedStatus,
+      blockerReason: proofBlockerReason,
+      safetyViolationReason,
+      stages: stageOutcomes,
+      duplicateFences: fences,
+      cleanup,
+      safety: {
+        paid_ai_request_observed: sawPaidModel,
+        device_control_request_observed: sawDeviceControl,
+        service_role_in_browser_observed: sawServiceRole,
+        action_queue_approval_request_observed: sawActionQueueApproval,
+        paddle_checkout_request_observed: sawPaddleCheckout,
+      },
+    });
+    console.log(`Authenticated One-Tent Loop Playwright Proof: ${receipt.status.toUpperCase()}`);
+    console.log(renderOneTentBrowserProofReceipt(receipt));
+    if (proofError !== null || receipt.status !== "pass") {
+      throw new Error(receipt.blocker_reason ?? "proof_failed");
     }
   });
 });

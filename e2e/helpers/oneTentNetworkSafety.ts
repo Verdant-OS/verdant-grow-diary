@@ -1,4 +1,5 @@
-export type OneTentForbiddenNetworkKind = "paid_ai" | "device_control";
+export type OneTentForbiddenNetworkKind =
+  "paid_ai" | "device_control" | "service_role" | "action_queue_approval" | "paddle_checkout";
 
 const PAID_AI_DOMAINS = ["openai.com", "anthropic.com", "mistral.ai", "groq.com"] as const;
 const PAID_AI_EDGE_FUNCTION_PATHS = new Set([
@@ -8,6 +9,9 @@ const PAID_AI_EDGE_FUNCTION_PATHS = new Set([
 ]);
 const DEVICE_CONTROL_PATH =
   /(?:^|\/)(?:device[-_]?commands?|device[-_]?control|control[-_]?device|actuator(?:[-_]?commands?)?|mqtt|relays?)(?:\/|$)/i;
+const ACTION_QUEUE_APPROVAL_PATH =
+  /(?:^|\/)(?:action[-_]?queue[-_]?approve|action_queue_transition)(?:\/|$)/i;
+const PADDLE_PATH = /(?:^|\/)(?:paddle[-_]?checkout|paddle[-_]?webhook)(?:\/|$)/i;
 
 function isDomainOrSubdomain(hostname: string, domain: string): boolean {
   return hostname === domain || hostname.endsWith(`.${domain}`);
@@ -28,6 +32,28 @@ export function isOneTentAiDoctorReviewEndpoint(rawUrl: string, targetProjectRef
   } catch {
     return false;
   }
+}
+
+function jwtRole(value: string): string | null {
+  const token = value.replace(/^Bearer\s+/i, "").trim();
+  if (token === "service_role" || /^sb_secret_/i.test(token)) return "service_role";
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+  try {
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const parsed = JSON.parse(atob(padded)) as { role?: unknown };
+    return typeof parsed.role === "string" ? parsed.role : null;
+  } catch {
+    return null;
+  }
+}
+
+export function hasOneTentServiceRoleCredential(headers: Record<string, string>): boolean {
+  return Object.entries(headers).some(
+    ([name, value]) =>
+      ["authorization", "apikey"].includes(name.toLowerCase()) && jwtRole(value) === "service_role",
+  );
 }
 
 /**
@@ -57,6 +83,16 @@ export function classifyOneTentForbiddenNetworkRequest(
 
   if (["mqtt:", "mqtts:"].includes(url.protocol) || DEVICE_CONTROL_PATH.test(url.pathname)) {
     return "device_control";
+  }
+
+  if (ACTION_QUEUE_APPROVAL_PATH.test(url.pathname)) return "action_queue_approval";
+
+  if (
+    isDomainOrSubdomain(hostname, "paddle.com") ||
+    isDomainOrSubdomain(hostname, "paddlecdn.com") ||
+    PADDLE_PATH.test(url.pathname)
+  ) {
+    return "paddle_checkout";
   }
 
   return null;

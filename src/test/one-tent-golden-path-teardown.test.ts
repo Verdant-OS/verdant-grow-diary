@@ -15,10 +15,12 @@ import {
   FIXTURE_NAMES,
   GOLDEN_MARKER,
   ONE_TENT_TEARDOWN_JSON_PREFIX,
+  buildFixtureNames,
   buildTeardownReceipt,
   discoverFixture,
   executeTeardown,
   parseTeardownArgs,
+  parseOneTentFixtureMarker,
   renderTeardownReceipt,
   zeroCounts,
 } from "../../scripts/e2e/one-tent-golden-path-fixture-cleanup.mjs";
@@ -140,7 +142,7 @@ function seededState(): FakeState {
     tents: ["tent-1"],
     plants: ["plant-1"],
     followUps: 1,
-    actionQueue: 1,
+    actionQueue: 0,
     alerts: 1,
     quickLogs: 1,
     sensorRows: 0, // sensor delete is RLS-blocked in prod; 0 keeps happy path pure
@@ -208,6 +210,24 @@ describe("teardown identity prerequisites", () => {
 // ---------------------------------------------------------------------------
 
 describe("fixture scope protection", () => {
+  it("accepts only the static marker or a run-and-attempt-scoped dynamic marker", () => {
+    const marker = "[GOLDEN-PATH-FIXTURE-RUN-123456-ATTEMPT-1]";
+    expect(parseOneTentFixtureMarker(marker)).toBe(marker);
+    expect(buildFixtureNames(marker)).toEqual({
+      grow: `One-Tent Golden Run ${marker}`,
+      tent: `Flower Tent A ${marker}`,
+      plant: `Golden Plant 1 ${marker}`,
+    });
+    for (const invalid of [
+      "[GOLDEN-PATH-FIXTURE-RUN-123456]",
+      "[GOLDEN-PATH-FIXTURE-RUN-123456-ATTEMPT-2] trailing",
+      "[GOLDEN-PATH-FIXTURE-RUN-x-ATTEMPT-1]",
+      "",
+    ]) {
+      expect(() => parseOneTentFixtureMarker(invalid)).toThrow("fixture_marker_invalid");
+    }
+  });
+
   it("fixture names embed the exact marker", () => {
     expect(FIXTURE_NAMES.grow).toBe(`One-Tent Golden Run ${GOLDEN_MARKER}`);
     expect(FIXTURE_NAMES.tent).toBe(`Flower Tent A ${GOLDEN_MARKER}`);
@@ -263,10 +283,10 @@ describe("fixture scope protection", () => {
     // Tents/plants additionally require the EXACT fixture marker name —
     // grow_id linkage alone would put user rows re-pointed at the fixture
     // grow inside the blast radius.
-    expect(cliSrc).toMatch(/\.eq\("name", FIXTURE_NAMES\.tent\)/);
-    expect(cliSrc).toMatch(/\.eq\("name", FIXTURE_NAMES\.plant\)/);
-    expect((cliSrc.match(/\.eq\("name", FIXTURE_NAMES\.tent\)/g) ?? []).length).toBe(2);
-    expect((cliSrc.match(/\.eq\("name", FIXTURE_NAMES\.plant\)/g) ?? []).length).toBe(2);
+    expect(cliSrc).toMatch(/\.eq\("name", fixtureNames\.tent\)/);
+    expect(cliSrc).toMatch(/\.eq\("name", fixtureNames\.plant\)/);
+    expect((cliSrc.match(/\.eq\("name", fixtureNames\.tent\)/g) ?? []).length).toBe(2);
+    expect((cliSrc.match(/\.eq\("name", fixtureNames\.plant\)/g) ?? []).length).toBe(2);
     // The survivors gate must fail CLOSED on a missing count.
     expect(cliSrc).toMatch(/typeof res\.count !== "number"\) throw/);
     // Follow-ups additionally require the marker event_type.
@@ -287,13 +307,12 @@ describe("delete ordering (child before parent)", () => {
     const ops = makeOps(state);
     const discovery = await discoverFixture(ops);
     const result = await executeTeardown(ops, discovery, { dryRun: false });
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("completed_active_rows_removed");
     const deletes = ops.calls.filter((c) => c.startsWith("delete:"));
     expect(deletes).toEqual([
       "delete:follow_ups",
       "delete:alerts",
       "delete:quick_logs",
-      "delete:sensor_rows",
       "delete:grow_targets",
       "delete:plants",
       "delete:tents",
@@ -301,17 +320,19 @@ describe("delete ordering (child before parent)", () => {
     ]);
   });
 
-  it("action_queue rows are removed only by the final exact-grow cascade", async () => {
+  it("retains append-only Action Queue history and its parent hierarchy honestly", async () => {
     const state = seededState();
+    state.actionQueue = 1;
     const ops = makeOps(state);
     const discovery = await discoverFixture(ops);
     const result = await executeTeardown(ops, discovery, { dryRun: false });
     const deletes = ops.calls.filter((c) => c.startsWith("delete:"));
+    expect(result.status).toBe("completed_with_retained_history");
     expect(deletes).not.toContain("delete:action_queue");
-    expect(deletes.indexOf("delete:alerts")).toBeLessThan(deletes.indexOf("delete:plants"));
-    expect(deletes.indexOf("delete:plants")).toBeLessThan(deletes.indexOf("delete:grows"));
-    expect(result.counts.action_queue_deleted).toBe(1);
-    expect(state.actionQueue).toBe(0);
+    expect(deletes).not.toContain("delete:grows");
+    expect(result.retainedHistory.action_queue_rows).toBe(1);
+    expect(result.retainedHistory.grows).toBe(1);
+    expect(state.actionQueue).toBe(1);
   });
 
   it("failed child deletion prevents parent deletion and reports sanitized reason", async () => {
@@ -329,32 +350,34 @@ describe("delete ordering (child before parent)", () => {
     expect(JSON.stringify(result)).not.toContain("SECRET");
   });
 
-  it("RLS-surviving sensor rows stop the run before parents (documented sensor_readings limit)", async () => {
+  it("reports RLS-retained sensor history without claiming cleanup failure or full cleanup", async () => {
     const state = seededState();
     state.sensorRows = 1;
     state.survivors = new Set(["sensor_rows"]);
     const ops = makeOps(state);
     const discovery = await discoverFixture(ops);
     const result = await executeTeardown(ops, discovery, { dryRun: false });
-    expect(result.status).toBe("failed");
-    expect(result.reason).toBe("sensor_rows_delete_blocked_by_rls");
+    expect(result.status).toBe("completed_with_retained_history");
+    expect(result.reason).toBe("owner_cleanup_completed_with_retained_history");
+    expect(result.retainedHistory.sensor_rows).toBe(1);
     const deletes = ops.calls.filter((c) => c.startsWith("delete:"));
-    expect(deletes).not.toContain("delete:grow_targets");
+    expect(deletes).toContain("delete:grow_targets");
     expect(deletes).not.toContain("delete:plants");
     expect(deletes).not.toContain("delete:tents");
     expect(deletes).not.toContain("delete:grows");
   });
 
-  it("fails closed if action_queue rows survive the grow cascade", async () => {
+  it("never attempts a cascade that would erase append-only Action Queue history", async () => {
     const state = seededState();
+    state.actionQueue = 1;
     state.survivors = new Set(["action_queue"]);
     const ops = makeOps(state);
     const discovery = await discoverFixture(ops);
     const result = await executeTeardown(ops, discovery, { dryRun: false });
 
-    expect(result.status).toBe("failed");
-    expect(result.reason).toBe("action_queue_rows_survived_grow_delete");
-    expect(result.counts.action_queue_deleted).toBe(0);
+    expect(result.status).toBe("completed_with_retained_history");
+    expect(ops.calls).not.toContain("delete:grows");
+    expect(result.retainedHistory.action_queue_rows).toBe(1);
   });
 });
 
@@ -363,13 +386,14 @@ describe("delete ordering (child before parent)", () => {
 // ---------------------------------------------------------------------------
 
 describe("idempotency", () => {
-  it("missing fixture rows produce a successful zero-count result", async () => {
+  it("missing fixture rows produce an honest not-found result, never a zero/full-clean claim", async () => {
     const state = seededState();
     state.growExists = false;
     const ops = makeOps(state);
     const discovery = await discoverFixture(ops);
     const result = await executeTeardown(ops, discovery, { dryRun: false });
-    expect(result.status).toBe("completed");
+    expect(result.status).toBe("fixture_not_found");
+    expect(result.reason).toBe("exact_fixture_not_found");
     expect(result.counts).toEqual(zeroCounts());
     expect(ops.calls.filter((c) => c.startsWith("delete:"))).toEqual([]);
   });
@@ -378,9 +402,9 @@ describe("idempotency", () => {
     const state = seededState();
     const ops = makeOps(state);
     const first = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
-    expect(first.status).toBe("completed");
+    expect(first.status).toBe("completed_active_rows_removed");
     const second = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
-    expect(second.status).toBe("completed");
+    expect(second.status).toBe("fixture_not_found");
     expect(second.counts.total_deleted).toBe(0);
   });
 
@@ -388,16 +412,16 @@ describe("idempotency", () => {
     const state = seededState();
     const ops = makeOps(state);
     const result = await executeTeardown(ops, await discoverFixture(ops), { dryRun: false });
-    expect(result.status).toBe("completed");
-    // 1 follow-up + 1 AQ + 1 alert + 1 quick log + 0 sensor + 1 target
-    // + 1 plant + 1 tent + 1 grow = 8
-    expect(result.counts.total_deleted).toBe(8);
+    expect(result.status).toBe("completed_active_rows_removed");
+    // 1 follow-up + 1 alert + 1 quick log + 0 sensor + 1 target
+    // + 1 plant + 1 tent + 1 grow = 7. No audit row is called deleted.
+    expect(result.counts.total_deleted).toBe(7);
     const dry = await executeTeardown(
       makeOps(seededState()),
       await discoverFixture(makeOps(seededState())),
       { dryRun: true },
     );
-    expect(dry.counts.total_deleted).toBe(8);
+    expect(dry.counts.total_deleted).toBe(7);
   });
 
   it("executor fails closed on an ownership/marker violation (does not rely on the CLI check)", async () => {
@@ -417,8 +441,8 @@ describe("idempotency", () => {
     const ops = makeOps(state);
     const discovery = await discoverFixture(ops);
     const result = await executeTeardown(ops, discovery, { dryRun: true });
-    expect(result.status).toBe("completed");
-    expect(result.reason).toBe("dry_run");
+    expect(result.status).toBe("dry_run");
+    expect(result.reason).toBe("dry_run_plan_only");
     expect(result.counts.sensor_rows_deleted).toBe(2);
     expect(result.counts.grows_deleted).toBe(1);
     expect(ops.calls.filter((c) => c.startsWith("delete:"))).toEqual([]);
@@ -490,12 +514,23 @@ describe("teardown receipt", () => {
       grows_deleted: 1,
     };
     const receipt = buildTeardownReceipt({
-      status: "completed",
+      status: "completed_with_retained_history",
       ownerVerified: true,
       targetProjectVerified: true,
       counts,
+      retainedHistory: {
+        sensor_rows: 3,
+        action_queue_rows: 1,
+        action_queue_event_rows: 1,
+        ai_doctor_session_rows: 1,
+        ai_credit_accounting_rows: 0,
+        plants: 1,
+        tents: 1,
+        grows: 1,
+      },
     });
     expect(receipt.counts.total_deleted).toBe(8);
+    expect(receipt.retained_history.total_retained).toBe(9);
   });
 
   it("receipt contains no IDs, tokens, emails, or paths", () => {
@@ -534,8 +569,11 @@ describe("teardown receipt", () => {
       "owner_verified",
       "target_project_verified",
       "counts",
+      "retained_history",
     ]);
     expect(Object.keys(parsed.counts)).toEqual([
+      "photo_objects_deleted",
+      "diary_entries_deleted",
       "follow_ups_deleted",
       "action_queue_deleted",
       "alerts_deleted",
@@ -576,6 +614,14 @@ describe("static hygiene", () => {
     for (const src of [CLEANUP_SRC, CLI_SRC]) {
       expect(src).not.toMatch(/\bsetInterval\s*\(|\bsetTimeout\s*\(|node-cron|cron\.schedule/);
     }
+  });
+
+  it("owner cleanup includes diary photos and all active fixture diary rows", () => {
+    expect(CLI_SRC).toContain('.storage.from("diary-photos").remove');
+    expect(CLI_SRC).toContain('.from("diary_entries")');
+    expect(CLI_SRC).toContain('.eq("grow_id", growId)');
+    expect(CLEANUP_SRC).toContain("completed_with_retained_history");
+    expect(CLEANUP_SRC).not.toContain("status=completed with all-zero");
   });
 
   it("no product code imports teardown tooling", () => {

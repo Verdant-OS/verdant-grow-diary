@@ -43,18 +43,31 @@ Council Chair **recommends**. It does **not** release.
 
 ## 2. Place in the operating order
 
-Default sequence ([`AGENTS.md`](../../AGENTS.md) / [`HANDOFF_PROTOCOL.md`](./HANDOFF_PROTOCOL.md)):
+Default preferred path ([`AGENTS.md`](../../AGENTS.md) / [`HANDOFF_PROTOCOL.md`](./HANDOFF_PROTOCOL.md)):
 
 ```text
-Research (Grok)
-  → Architecture (Claude)
-    → Build (Codex)
+Research (often Grok)
+  → Architecture (often Claude)
+    → Build (often Codex)
       → Security Review (stop-ship on FAIL)
         → QA Audit (Gemini)
           → Council (one recommendation)
             → Cheek approval          ← terminal human gate
               → merge / hold / close / reassign / ship-verify
 ```
+
+**Peers (Cheek, 2026-08-20, refined):** Codex, Claude, and Grok have equal authority —
+none outranks the others. Explicit task ownership controls who acts. Labels above are
+**default strengths / preferred path**, not exclusivity. Any peer may research,
+architect, implement, audit, test, or independently review when they own (or review)
+the slice.
+
+**One owner + independent reviewer:** every assigned slice names one owner and a
+different peer as independent reviewer. Owner cannot review their own work.
+
+Standing collision fences in `CURRENT_STATE.md` still bind (Tranche A remaining edit
+points = Codex until reassigned; Tranche B+ = Claude until reassigned; no competing
+Timeline / Alerts / Action Queue rewrite).
 
 Scoped work may use a **subset** of roles. Parallel implementation of the same
 slice is a protocol failure — Cheek should reject “two agents both shipping X.”
@@ -366,9 +379,9 @@ House style matches other repo docs (e.g. `docs/specs/daily-walk-closed-learning
 ```mermaid
 flowchart TB
   subgraph pipeline["Multi-agent operating order"]
-    Grok["Grok - Research"]
-    Claude["Claude - Architecture / specs"]
-    Codex["Codex - Build smallest slice"]
+    Grok["Grok - Product intelligence / audit / implement"]
+    Claude["Claude - Specs (peer when owning)"]
+    Codex["Codex - Often build (not exclusive)"]
     Security["Security - Trust boundaries"]
     Gemini["Gemini - QA / release risk"]
     Council["Council Chair - One recommendation"]

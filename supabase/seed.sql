@@ -173,14 +173,15 @@ END $$;
 
 -- Action Queue transitions are RPC-only and their event history is
 -- append-only. The blanket production-parity grant above would otherwise
--- reopen direct lifecycle UPDATE/DELETE after the forward repair migration.
+-- reopen anon reads/inserts and direct lifecycle writes after the table-ACL
+-- forward repair migration.
 DO $$
 BEGIN
   IF to_regclass('public.action_queue') IS NOT NULL
      AND to_regclass('public.action_queue_events') IS NOT NULL THEN
-    REVOKE UPDATE, DELETE ON TABLE public.action_queue
-      FROM PUBLIC, anon, authenticated;
-    REVOKE UPDATE, DELETE ON TABLE public.action_queue_events
+    REVOKE ALL PRIVILEGES ON TABLE
+      public.action_queue,
+      public.action_queue_events
       FROM PUBLIC, anon, authenticated;
     GRANT SELECT, INSERT ON TABLE
       public.action_queue,

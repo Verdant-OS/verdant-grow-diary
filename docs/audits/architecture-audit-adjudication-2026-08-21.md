@@ -423,12 +423,37 @@ This independently reproduces #1051's finding.
 
 Note the corroborating repository evidence: `src/routes/` contains real route modules named
 `features.tsx`, `demo.tsx`, `strains.index.tsx`, `strains.$slug.tsx`, `refunds.tsx`,
-`refund-policy.tsx`, `privacy-policy.tsx` and `terms-of-service.tsx` — the application
-compensates _in-app_ for redirects the host never performs.
+`refund-policy.tsx`, `privacy-policy.tsx` and `terms-of-service.tsx`, so every declared
+destination is a real route rather than a dead path.
 
-`inference, high confidence`: `vercel.json`'s `redirects`, `rewrites`, `headers` and
-`projectSettings` are inert in production. The file's catch-all rewrite `/((?!assets/).*)` → `/`
-is an SPA fallback that would defeat SSR entirely **if** a host serving this app ever honoured it.
+**The `rewrites` entry needed its own measurement, and now has one.** Raised in review, and
+correct on both counts: a host-side catch-all rewrite to `/` would _also_ return HTTP 200 with no
+`Location` and `num_redirects=0`, so the redirect probe cannot see it — and the presence of route
+modules proves nothing either, because a host rewrite happens before any route is reached.
+Response **content** settles what status codes cannot:
+
+| Path                | Bytes  | `<title>`                                                   |
+| ------------------- | ------ | ----------------------------------------------------------- |
+| `/`                 | 51,657 | `Grow Diary & Grow Room Tracking App \| Verdant Grow Diary` |
+| `/pricing`          | 85,056 | `Pricing — Free, Pro & Craft \| Verdant Grow Diary`         |
+| `/features`         | 7,676  | `Verdant Grow Diary`                                        |
+| `/terms-of-service` | 7,732  | `Verdant Grow Diary`                                        |
+
+`/pricing` serves a different document from `/` — different length, different title, different
+`<h1>`. **Were the catch-all `/((?!assets/).*)` → `/` being applied, every row here would be
+`/`'s document.** None is. So `rewrites` is inert too, measured rather than inferred.
+
+That leaves: `redirects` **measured** inert, `rewrites` **measured** inert, `headers`
+**measured** not-applied-as-declared (below). `projectSettings` stays `inference` — nothing
+probed from outside the host can observe it.
+
+**One claim of mine did not survive this probe, and it is recorded rather than quietly
+dropped.** An earlier revision said the application "compensates _in-app_ for redirects the host
+never performs." For `/pricing` that holds. For `/features` and `/terms-of-service` it does not:
+each returns ~7.7 KB carrying the generic site title, **zero `<h1>`**, `robots: index, follow`,
+and provider chrome but no page content. Whether client-side rendering fills them after
+hydration is **`NOT_MEASURED`** — these probes execute no JavaScript. Recorded as a bounded
+observation, not a verdict, and deliberately not folded into the roadmap.
 
 #### Security headers — measured, and the earlier claim was wrong in both directions
 
@@ -542,11 +567,23 @@ which is wrong by a day on the number the reprioritisation rests on.
 
 Two consequences the audit missed. First, TOOL-01 is not a post-V0 P2 — the gate goes
 fail-closed regardless of V0 stabilisation, and the only two outcomes are retiring the
-compatibility lock or extending `reviewBy` with a recorded reason. Second, **§6.2 removes one
-of the five consumers' justification**: `vercel.json`'s npm `installCommand` / `buildCommand`
-are cited as a reason to keep `package-lock.json`, but if Vercel does not govern production
-that entry may be vestigial. That is the cheapest available progress on TOOL-01 and it should
-be checked before the deadline.
+compatibility lock or extending `reviewBy` with a recorded reason.
+
+Second — **corrected after review, and the correction reverses what this section concluded.** An
+earlier revision said §6.2 "removes one of the five consumers' justification", reasoning that if
+Vercel does not govern production then `vercel.json`'s npm `installCommand` / `buildCommand` are
+vestigial. That does not follow, because **production and preview are different deployments.**
+`docs/preview-deployment-verification.md` documents a preview-only Vercel project,
+`verdant-command-center-preview`, and requires its Install and Build commands to be
+`npm install` and `npm run build`. If that project is live, dropping `package-lock.json` breaks
+preview installs. §6.2 therefore removes **nothing** here until the preview project's status is
+established.
+
+Note also what that checklist describes: a **client-only Vite build**, output directory `dist`,
+SPA rewrite to `/index.html`. That is the pre-SSR architecture — this repo is TanStack Start SSR
+with no `index.html` at all (§4). So the checklist may itself be stale. That is a reason to
+**verify** the preview project's real state, not a licence to assume it is already retired.
+Either answer is progress on TOOL-01 before the deadline; assuming one is not.
 
 ### 6.5 A stale comment in `vite.config.ts` overstates an SEO regression
 
@@ -635,7 +672,7 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 | Does the tree hash production **stamped** match the tree of the commit it stamped? | **`FAIL` — measured.** Recomputed `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                                                                                                                                      |
 | Why did the build **workspace's** hashed roots differ from that commit's tree?     | `BLOCKED` — needs the publisher's build log; owner-only. Note the question: §6.1 establishes workspace drift only. Whether any **shipped byte** differs is `NOT_MEASURED`                                                                                              |
 | What _is_ production commit `4b1c4867e685`?                                        | **`PASS` — resolved.** "Completed Verdant audit", `lovable-dev[bot]`, merge of `28c01a017` + `a684da59b`, `2026-08-21T09:44:40Z`, via the GitHub commit endpoint (§6.1). Do not re-run this lookup                                                                     |
-| Are all five npm consumers still real after §6.2?                                  | `NOT_MEASURED` — cheapest TOOL-01 progress                                                                                                                                                                                                                             |
+| Is the preview Vercel project `verdant-command-center-preview` live?               | `NOT_MEASURED` — **the** precondition for TOOL-01, not a side quest. §6.2 removes no npm consumer's justification: production ≠ preview. Its checklist also describes the pre-SSR client-only build, so the checklist may be stale too — verify, do not assume retired |
 | Runtime AI Doctor behaviour under the twenty adversarial cases                     | `NOT_MEASURED` — AI-02 not run                                                                                                                                                                                                                                         |
 | False-positive rate for any SPC rule                                               | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                                                                                                                                           |
 | GA4 / GSC authenticated baselines                                                  | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                                                                                                                                                |

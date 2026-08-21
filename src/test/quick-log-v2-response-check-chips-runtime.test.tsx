@@ -453,4 +453,21 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
     await waitFor(() => expect(noteTextarea().value).toBe("after watering"));
     expect(noteTextarea().value).not.toContain("Response check:");
   });
+
+  it("strips a chip line the grower re-worded to a different status", () => {
+    renderSheet("plant:plant-1");
+    fireEvent.click(chip("better"));
+    // The grower edits the generated word itself. Provenance still says Better.
+    fireEvent.change(noteTextarea(), {
+      target: { value: "Response check: Worse.\nRunoff clear." },
+    });
+
+    fireEvent.click(screen.getByLabelText("Target"));
+    fireEvent.click(screen.getByRole("option", { name: /Tent/ }));
+
+    return waitFor(() => {
+      expect(noteTextarea().value).toBe("Runoff clear.");
+      expect(noteTextarea().value).not.toContain("Response check:");
+    });
+  });
 });

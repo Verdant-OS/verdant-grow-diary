@@ -538,9 +538,11 @@ export default function QuickLogV2Sheet({
 
     // PROVENANCE. `readResponseCheckStatus` matches anywhere in the note, so a
     // grower who writes "Previous response check: better after watering" reads
-    // as having a marker. Only ever undo what a CHIP wrote: remember the status
-    // the chip last authored, and strip only while the note still reads as that
-    // exact status. Prose the grower typed is never touched.
+    // as having a marker. Only ever undo what a CHIP wrote: remember that a
+    // chip owns the head slot, then strip any canonical response marker still
+    // occupying that slot. The grower may re-word Better/Same/Worse without
+    // transferring that plant response to a new target. Noncanonical prose is
+    // never touched.
     const authored = chipAuthoredStatusRef.current;
     // provenance does not follow a new plant
     chipAuthoredStatusRef.current = null;

@@ -18,12 +18,7 @@ import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 
 /** Constitution Sensor Truth source labels for V0. */
 export type EcowittTentSnapshotV0TruthSource =
-  | "live"
-  | "manual"
-  | "csv"
-  | "demo"
-  | "stale"
-  | "invalid";
+  "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 /** V0 metric keys — match existing snapshot vocabulary (temp/rh/soil). */
 export type EcowittTentSnapshotV0MetricKey = "temp" | "rh" | "soil";
@@ -142,7 +137,10 @@ export function evaluateEcowittTentSnapshotV0Metric(
     case "rh":
     case "soil": {
       if (value < 0 || value > 100) {
-        return { valid: false, reason: `${key === "rh" ? "Humidity" : "Soil moisture"} outside 0–100%.` };
+        return {
+          valid: false,
+          reason: `${key === "rh" ? "Humidity" : "Soil moisture"} outside 0–100%.`,
+        };
       }
       if (isStuckZeroOrHundredPct(value)) {
         return {

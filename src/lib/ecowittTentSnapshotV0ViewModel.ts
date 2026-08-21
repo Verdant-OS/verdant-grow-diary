@@ -194,7 +194,10 @@ function buildSparkline(
   key: EcowittTentSnapshotV0MetricKey,
   windowStartMs: number,
   now: Date,
-): { points: EcowittTentSnapshotV0SparkPoint[]; state: EcowittTentSnapshotV0MetricView["sparklineState"] } {
+): {
+  points: EcowittTentSnapshotV0SparkPoint[];
+  state: EcowittTentSnapshotV0MetricView["sparklineState"];
+} {
   const points: EcowittTentSnapshotV0SparkPoint[] = [];
   let sawDemo = false;
   let sawStaleOnly = true;
@@ -264,10 +267,7 @@ function buildNightDrift(
 
     nightSampleCount += 1;
     const classification = classifyInSpec(key, value, stage, false);
-    if (
-      classification === "below_target" ||
-      classification === "above_target"
-    ) {
+    if (classification === "below_target" || classification === "above_target") {
       outOfSpecCount += 1;
     }
   }

@@ -3,11 +3,12 @@
 Exhaustive inventories that back the orientation section in [`/CLAUDE.md`](../CLAUDE.md).
 They live here rather than in `CLAUDE.md` so they do not load into every agent session.
 
-**Measured 2026-08-21 at base tip `f25f9ed` (#1020)**, by direct inspection of the
-working tree. Everything below is `established fact` about repository structure. Nothing
-here is a claim about production, deployment, indexing, or which migrations are applied —
-those axes belong to [`docs/agents/CURRENT_STATE.md`](agents/CURRENT_STATE.md) and keep
-their `BLOCKED` / `NOT_MEASURED` labels there.
+**Measured 2026-08-21 at `f25f9ed` (#1020)**; current deploy tip is `28c01a01` (#1078).
+Counts were not re-taken at the later tip. By direct inspection of the working tree.
+Everything below is `established fact` about repository structure. Nothing here is a
+claim about production, deployment, indexing, or which migrations are applied — those
+axes belong to [`docs/agents/CURRENT_STATE.md`](agents/CURRENT_STATE.md) and keep their
+`BLOCKED` / `NOT_MEASURED` labels there.
 
 This file is **not** one of the twelve versioned governance files. It carries no
 `Sentinel-Version` and editing it does not trigger the parity gate.

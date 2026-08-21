@@ -47,8 +47,9 @@ Applies to every deliverable, without exception:
 
 # Codebase orientation
 
-Everything below is `established fact`, measured from the repository at deploy tip
-`f25f9ed` (#1020) on 2026-08-21. It describes **structure, tooling, and conventions** only.
+Everything below is `established fact`, measured at `f25f9ed` (#1020) on 2026-08-21;
+current deploy tip is `28c01a01` (#1078). Counts were not re-taken at the later tip. It
+describes **structure, tooling, and conventions** only.
 It makes no claim about production, GA4/GSC, or which migrations are applied — those axes
 belong to `docs/agents/CURRENT_STATE.md` and keep their `BLOCKED` / `NOT_MEASURED` labels
 there.
@@ -120,12 +121,12 @@ from `vercel.json`.
 `AGENTS.md` states the intended layering. What the tree contains, measured at `src/lib/`
 root:
 
-| Suffix          | Count | Contract                                                                           |
-| --------------- | ----: | ---------------------------------------------------------------------------------- |
-| `*Rules.ts`     |   474 | _Intended:_ pure — no React, no Supabase, no fetch, no clock; `now: Date` injected |
-| `*ViewModel.ts` |   167 | Pure presentation shaping. Zero import React; zero import Supabase                 |
-| `*Service.ts`   |    26 | The I/O layer — 25 of 26 import the Supabase client                                |
-| `*Advisor.ts`   |     0 | Named in the constitution's table; **no such files exist**                         |
+| Suffix          | Count | Contract                                                                                                                                              |
+| --------------- | ----: | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `*Rules.ts`     |   474 | _Intended:_ pure — no React, no Supabase, no fetch, no clock; `now: Date` injected                                                                    |
+| `*ViewModel.ts` |   167 | Pure presentation shaping. Zero import React; zero import Supabase                                                                                    |
+| `*Service.ts`   |    26 | The I/O layer — 25 of 26 import the Supabase client                                                                                                   |
+| `*Advisor.ts`   |     0 | Named in the constitution's table; none at the `src/lib/*Advisor.ts` glob (a nested `genetics/breedingActionAdvisor.ts` exists and is not this layer) |
 
 Put new business logic in a `*Rules.ts`, new presentation shaping in a `*ViewModel.ts`, new
 I/O in a `*Service.ts` or a hook. Components and pages stay presenters.

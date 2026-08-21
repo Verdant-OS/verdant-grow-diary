@@ -50,6 +50,17 @@ name: Quick Log Playwright smoke
 on:
   workflow_dispatch:
     inputs:
+      run_mode:
+        description: "Choose the ordinary Quick Log smoke or the guarded authenticated One-Tent proof."
+        required: true
+        default: "quicklog_smoke"
+        type: choice
+        options: ["quicklog_smoke", "one_tent_proof"]
+      expected_sha:
+        description: "Proof mode only: lowercase 40-hex commit deployed publicly and selected by the guarded proof branch."
+        required: false
+        default: ""
+        type: string
       playwright_retries:
         description: "Playwright retry count per test (default 1 in CI). Increase to 2 or 3 for deeper flake triage."
         required: false
@@ -95,8 +106,363 @@ on:
       - ".github/workflows/quicklog-smoke.yml"
 
 jobs:
+  # Temporary, branch-pinned proof lane. This intentionally uses local immutable
+  # harness code and existing end-user E2E credentials against the fixed, publicly
+  # attested deployment. It has no elevated credentials, paid-model calls, or
+  # control capability. A successful proof
+  # owner-cleans active fixture rows and reports protected retained history.
+  # Each first-attempt dispatch gets an isolated, validated fixture marker.
+  one-tent-authenticated-proof:
+    name: Authenticated One-Tent branch proof
+    if: github.event_name == 'workflow_dispatch' && inputs.run_mode == 'one_tent_proof'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: one-tent-authenticated-proof
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      E2E_BASE_URL: "https://verdantgrowdiary.com"
+      PLAYWRIGHT_RETRIES: "0"
+      LOVABLE_E2E_TARGET_PROJECT_REF: knkwiiywfkbqznbxwqfh
+      LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS: "true"
+      E2E_EXPECTED_SHA: "${{ inputs.expected_sha }}"
+      E2E_ONE_TENT_FIXTURE_MARKER: "[GOLDEN-PATH-FIXTURE-RUN-${{ github.run_id }}-ATTEMPT-${{ github.run_attempt }}]"
+
+    steps:
+      - name: Verify immutable dispatch identity
+        env:
+          EXPECTED_SHA: "${{ inputs.expected_sha }}"
+          GITHUB_CONTEXT_SHA: "${{ github.sha }}"
+          GITHUB_ACTOR: "${{ github.actor }}"
+          GITHUB_TRIGGERING_ACTOR: "${{ github.triggering_actor }}"
+          GITHUB_RUN_ATTEMPT: "${{ github.run_attempt }}"
+          GITHUB_REF: "${{ github.ref }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [ "$EXPECTED_SHA" = "$GITHUB_CONTEXT_SHA" ]
+          [ "$GITHUB_ACTOR" = "cheekhimself" ]
+          [ "$GITHUB_TRIGGERING_ACTOR" = "cheekhimself" ]
+          [ "$GITHUB_RUN_ATTEMPT" = "1" ]
+          [ "$GITHUB_REF" = "refs/heads/verdant-grow-diary" ]
+
+      - name: Checkout exact expected commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+
+      - name: Verify checked-out deployment identity
+        env:
+          EXPECTED_SHA: "${{ inputs.expected_sha }}"
+          GITHUB_CONTEXT_SHA: "${{ github.sha }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "$(git rev-parse HEAD)" = "$EXPECTED_SHA" ]
+          [ "$EXPECTED_SHA" = "$GITHUB_CONTEXT_SHA" ]
+
+      - name: Compute checked-out public tree identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -z "$(git status --porcelain)" ]
+          node <<'NODE'
+          const { appendFileSync } = require("node:fs");
+
+          async function computeExpectedTreeIdentity() {
+            const { computeTreeHash } = await import("./scripts/lib/tree-hash.mjs");
+            const { treeHash } = await computeTreeHash(process.cwd());
+            if (!/^[0-9a-f]{64}$/u.test(treeHash)) {
+              throw new Error("checked_out_tree_hash_invalid");
+            }
+            appendFileSync(
+              process.env.GITHUB_ENV,
+              `E2E_EXPECTED_TREE_HASH=${treeHash}\n`,
+              "utf8",
+            );
+          }
+
+          computeExpectedTreeIdentity().catch(() => {
+            console.error("checked_out_tree_identity=failed");
+            process.exitCode = 1;
+          });
+          NODE
+          [ -z "$(git status --porcelain)" ]
+
+      - name: Verify public deployment identity
+        env:
+          EXPECTED_SHA: "${{ inputs.expected_sha }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const https = require("node:https");
+          const { readFileSync, statSync } = require("node:fs");
+
+          const PUBLIC_ORIGIN = "https://verdantgrowdiary.com";
+          const PUBLIC_VERSION_URL = "https://verdantgrowdiary.com/version.json";
+          const PUBLIC_VERSION_TIMEOUT_MS = 5_000;
+          const PUBLIC_VERSION_MAX_BYTES = 4_096;
+          const PUBLIC_HTML_MAX_BYTES = 131_072;
+          const PUBLIC_JAVASCRIPT_MAX_BYTES = 8_388_608;
+          const PRODUCTION_ENV_MAX_BYTES = 65_536;
+          const expectedSha = process.env.EXPECTED_SHA ?? "";
+
+          function readBoundedProductionEnv() {
+            const metadata = statSync(".env.production");
+            if (!metadata.isFile() || metadata.size > PRODUCTION_ENV_MAX_BYTES) {
+              throw new Error("canonical_paddle_env_invalid");
+            }
+            return readFileSync(".env.production", "utf8");
+          }
+
+          function fetchBoundedPublicAsset(
+            url,
+            kind,
+            maxBytes,
+            consumeResponse,
+            evaluateMetadata,
+          ) {
+            const parsedUrl = new URL(url);
+            if (
+              parsedUrl.origin !== PUBLIC_ORIGIN ||
+              parsedUrl.protocol !== "https:" ||
+              parsedUrl.username ||
+              parsedUrl.password
+            ) {
+              return Promise.reject(new Error("public_asset_origin_invalid"));
+            }
+            return new Promise((resolve, reject) => {
+              const request = https.get(
+                parsedUrl,
+                {
+                  headers: {
+                    accept: kind === "html" ? "text/html" : "application/javascript",
+                    "accept-encoding": "identity",
+                  },
+                  signal: AbortSignal.timeout(PUBLIC_VERSION_TIMEOUT_MS),
+                  timeout: PUBLIC_VERSION_TIMEOUT_MS,
+                },
+                (response) => {
+                  try {
+                    consumeResponse({
+                      response,
+                      evaluateMetadata,
+                      maxBytes,
+                      kind,
+                      timeoutMs: PUBLIC_VERSION_TIMEOUT_MS,
+                    }).then(resolve, reject);
+                  } catch {
+                    response.destroy();
+                    reject(new Error("public_asset_response_setup_failed"));
+                  }
+                },
+              );
+              request.on("timeout", () => request.destroy(new Error("request_timeout")));
+              request.on("error", () => reject(new Error("request_failed")));
+            });
+          }
+
+          async function attestPublicVersion() {
+            const {
+              consumeBoundedPublicAssetResponse,
+              evaluateBoundedPublicAssetResponseMetadata,
+              evaluatePublicDeploymentIdentity,
+              evaluatePublicPaddleBundle,
+              resolveCanonicalPaddleSandboxToken,
+              resolvePublicMainModuleAsset,
+            } = await import("./scripts/e2e/managed-session-materialize-core.mjs");
+            const response = await new Promise((resolve, reject) => {
+              const request = https.get(
+                PUBLIC_VERSION_URL,
+                {
+                  headers: {
+                    accept: "application/json",
+                    "accept-encoding": "identity",
+                  },
+                  signal: AbortSignal.timeout(PUBLIC_VERSION_TIMEOUT_MS),
+                  timeout: PUBLIC_VERSION_TIMEOUT_MS,
+                },
+                resolve,
+              );
+              request.on("timeout", () => request.destroy(new Error("request_timeout")));
+              request.on("error", () => reject(new Error("request_failed")));
+            });
+
+            if (response.statusCode >= 300 && response.statusCode < 400) {
+              response.destroy();
+              throw new Error("redirect_rejected");
+            }
+            if (response.statusCode !== 200) {
+              response.destroy();
+              throw new Error("unexpected_status");
+            }
+            const contentType = String(response.headers["content-type"] ?? "").toLowerCase();
+            if (!/^application\/json(?:;|$)/u.test(contentType)) {
+              response.destroy();
+              throw new Error("invalid_content_type");
+            }
+            const contentEncoding = String(response.headers["content-encoding"] ?? "identity");
+            if (contentEncoding !== "identity") {
+              response.destroy();
+              throw new Error("unexpected_content_encoding");
+            }
+            const declaredLength = response.headers["content-length"];
+            if (
+              Array.isArray(declaredLength) ||
+              (declaredLength !== undefined &&
+                (!/^\d+$/u.test(declaredLength) || Number(declaredLength) > PUBLIC_VERSION_MAX_BYTES))
+            ) {
+              response.destroy();
+              throw new Error("invalid_content_length");
+            }
+
+            const body = await new Promise((resolve, reject) => {
+              const chunks = [];
+              let bytes = 0;
+              response.setTimeout(PUBLIC_VERSION_TIMEOUT_MS, () =>
+                response.destroy(new Error("response_timeout")),
+              );
+              response.on("data", (chunk) => {
+                bytes += chunk.length;
+                if (bytes > PUBLIC_VERSION_MAX_BYTES) {
+                  response.destroy(new Error("body_too_large"));
+                  return;
+                }
+                chunks.push(chunk);
+              });
+              response.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+              response.on("error", () => reject(new Error("response_failed")));
+            });
+
+            let parsed;
+            try {
+              parsed = JSON.parse(body);
+            } catch {
+              throw new Error("invalid_json");
+            }
+            const identity = evaluatePublicDeploymentIdentity({
+              version: parsed,
+              expectedSha,
+              expectedTreeHash: process.env.E2E_EXPECTED_TREE_HASH,
+            });
+            if (!identity.ok) {
+              throw new Error(identity.reason);
+            }
+
+            const canonicalToken = resolveCanonicalPaddleSandboxToken(
+              readBoundedProductionEnv(),
+            );
+            if (!canonicalToken.ok) {
+              throw new Error(canonicalToken.reason);
+            }
+            const html = await fetchBoundedPublicAsset(
+              `${PUBLIC_ORIGIN}/`,
+              "html",
+              PUBLIC_HTML_MAX_BYTES,
+              consumeBoundedPublicAssetResponse,
+              evaluateBoundedPublicAssetResponseMetadata,
+            );
+            const mainAsset = resolvePublicMainModuleAsset({ html, publicOrigin: PUBLIC_ORIGIN });
+            if (!mainAsset.ok) {
+              throw new Error(mainAsset.reason);
+            }
+            const bundle = await fetchBoundedPublicAsset(
+              mainAsset.url,
+              "javascript",
+              PUBLIC_JAVASCRIPT_MAX_BYTES,
+              consumeBoundedPublicAssetResponse,
+              evaluateBoundedPublicAssetResponseMetadata,
+            );
+            const paddle = evaluatePublicPaddleBundle({
+              canonicalToken: canonicalToken.token,
+              bundle,
+            });
+            if (!paddle.ok) {
+              throw new Error(paddle.reason);
+            }
+          }
+
+          attestPublicVersion()
+            .then(() => console.log("public_version_attestation=verified"))
+            .catch(() => {
+              console.error("public_version_attestation=failed");
+              process.exitCode = 1;
+            });
+          NODE
+
+      - name: Verify exact Supabase target origin
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -f .env ] || { echo "Tracked public app configuration is missing" >&2; exit 1; }
+          node --env-file=.env scripts/e2e/verify-one-tent-supabase-target.mjs
+
+      - name: Verify E2E credentials are configured
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "$E2E_TEST_EMAIL" ] || { echo "Missing secrets.E2E_TEST_EMAIL" >&2; exit 1; }
+          [ -n "$E2E_TEST_PASSWORD" ] || { echo "Missing secrets.E2E_TEST_PASSWORD" >&2; exit 1; }
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install chromium
+
+      - name: Materialize authenticated managed session
+        env:
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+        run: bun --env-file=.env run scripts/e2e/materialize-managed-session.mjs
+
+      - name: Run and verify authenticated One-Tent proof
+        env:
+          # Non-secret sentinel keeps Playwright tracing disabled for a run
+          # whose managed session carries bearer tokens. The real email and
+          # password are scoped only to the two first-party steps above.
+          E2E_TEST_EMAIL: "managed-session-trace-off"
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun --env-file=.env --env-file=e2e/.auth/managed-session.env run e2e:one-tent:preflight
+          mkdir -p e2e/results
+          set +e
+          bun --env-file=.env --env-file=e2e/.auth/managed-session.env run e2e:one-tent:ui > e2e/results/one-tent-authenticated-proof.log 2>&1
+          playwright_exit="$?"
+          set -e
+          node scripts/e2e/verify-one-tent-browser-proof-log.mjs \
+            --log e2e/results/one-tent-authenticated-proof.log \
+            --playwright-exit "$playwright_exit"
+
+      - name: Remove generated authentication state and proof artifacts
+        if: always()
+        shell: bash
+        run: |
+          rm -f -- \
+            e2e/.auth/managed-session.env \
+            e2e/.auth/user.json \
+            e2e/.auth/session-storage.json \
+            e2e/results/one-tent-authenticated-proof.log \
+            e2e/results/playwright-report.json
+          rm -rf -- test-results playwright-report
+
   quicklog-smoke:
     name: Quick Log Playwright smoke
+    if: github.event_name != 'workflow_dispatch' || inputs.run_mode == 'quicklog_smoke'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 

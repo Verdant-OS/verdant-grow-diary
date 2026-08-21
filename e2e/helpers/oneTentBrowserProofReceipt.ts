@@ -20,47 +20,105 @@
 
 export const ONE_TENT_BROWSER_PROOF_JSON_PREFIX = "ONE_TENT_BROWSER_PROOF_JSON=";
 
+export interface OneTentProofRuntimeContract {
+  viewport: { width: 390; height: 844 };
+  proofTimeoutMs: number;
+  childProcess: {
+    timeoutMs: number;
+    killSignal: "SIGKILL";
+    maxBufferBytes: number;
+  };
+}
+
+/**
+ * Resolved runtime values shared by the real Playwright walk and pure tests.
+ * Source scans may prove only that the spec wires this object into Playwright;
+ * they are not substitutes for validating these executable values.
+ */
+export function assertOneTentProofRuntimeContract(
+  contract: OneTentProofRuntimeContract,
+): OneTentProofRuntimeContract {
+  if (
+    contract.viewport.width !== 390 ||
+    contract.viewport.height !== 844 ||
+    contract.proofTimeoutMs !== 15 * 60_000 ||
+    contract.childProcess.timeoutMs !== 60_000 ||
+    contract.childProcess.killSignal !== "SIGKILL" ||
+    contract.childProcess.maxBufferBytes !== 64 * 1024
+  ) {
+    throw new Error("one_tent_proof_runtime_contract_invalid");
+  }
+  return contract;
+}
+
+export const ONE_TENT_PROOF_RUNTIME_CONTRACT = assertOneTentProofRuntimeContract({
+  viewport: { width: 390, height: 844 },
+  proofTimeoutMs: 15 * 60_000,
+  childProcess: {
+    timeoutMs: 60_000,
+    killSignal: "SIGKILL",
+    maxBufferBytes: 64 * 1024,
+  },
+});
+
 export type StageOutcome = "pass" | "blocked" | "fail" | "not_run";
 
 /** Ordered stage keys — order is part of the receipt contract. */
 export const ONE_TENT_PROOF_STAGES = [
   "auth_restored",
+  "deployment_sha_verified",
+  "hierarchy_created_via_ui",
   "grow_resolved",
   "tent_resolved",
   "plant_resolved",
+  "quick_log_context_verified",
+  "plant_persisted_after_refresh",
+  "photo_and_manual_evidence_persisted",
   "quick_log_persisted",
+  "quick_log_manual_tent_snapshot_verified",
+  "operator_sensor_evidence_seeded",
   "timeline_visible",
   "manual_provenance_visible",
+  "sensor_snapshot_verified",
   "ai_doctor_boundary_verified",
   "alert_verified",
   "action_queue_suggestion_verified",
-  "grower_decision_verified",
-  "follow_up_marker_verified",
+  "approval_boundary_verified",
+  "paddle_sandbox_verified",
 ] as const;
 
 export type OneTentProofStage = (typeof ONE_TENT_PROOF_STAGES)[number];
 
 export interface OneTentBrowserProofReceipt {
-  schema_version: "1";
+  schema_version: "4";
   proof: "one-tent-loop-authenticated-ui";
   status: "pass" | "blocked" | "fail";
   blocker_reason: string | null;
   restore_strategy: "storage_session" | "storage_plus_cookies" | "cookies_only" | "none";
   seed_status: "not_started" | "blocked" | "completed" | "failed";
-  stages: Record<OneTentProofStage, StageOutcome> & {
-    auto_diary_follow_up: "intentionally_unsupported" | "not_run";
-  };
+  stages: Record<OneTentProofStage, StageOutcome>;
   duplicate_fences: {
     quick_log_count: number | null;
     alert_count: number | null;
     action_queue_count: number | null;
-    follow_up_marker_count: number | null;
+  };
+  cleanup: {
+    status:
+      | "not_run"
+      | "completed_active_rows_removed"
+      | "completed_with_retained_history"
+      | "fixture_not_found"
+      | "failed";
+    active_rows_removed: boolean;
+    retained_history: boolean;
   };
   safety: {
     fabricated_login_used: false;
     paid_ai_request_observed: boolean;
     device_control_request_observed: boolean;
     service_role_in_browser_observed: boolean;
+    action_queue_approval_request_observed: boolean;
+    paddle_checkout_request_observed: boolean;
   };
 }
 
@@ -82,6 +140,9 @@ export interface OneTentProofStagedResult {
    */
   stages?: Partial<Record<OneTentProofStage, StageOutcome>>;
   duplicateFences?: Partial<OneTentBrowserProofReceipt["duplicate_fences"]>;
+  /** True for the deployed workflow; false for explicitly manual runs. */
+  cleanupRequired: boolean;
+  cleanup?: OneTentBrowserProofReceipt["cleanup"];
   safety?: Partial<Omit<OneTentBrowserProofReceipt["safety"], "fabricated_login_used">>;
 }
 
@@ -93,6 +154,12 @@ function deriveStatus(
   if (outcomes.some((o) => o === "fail")) return "fail";
   if (outcomes.every((o) => o === "pass")) return "pass";
   return "blocked";
+}
+
+const SAFE_REASON_CODE = /^[a-z][a-z0-9_]{0,79}$/;
+
+function sanitizeReasonCode(reason: string | null | undefined, fallback: string): string {
+  return typeof reason === "string" && SAFE_REASON_CODE.test(reason) ? reason : fallback;
 }
 
 /**
@@ -131,8 +198,18 @@ export function buildOneTentBrowserProofReceipt(
     Boolean(staged.safetyViolationReason) ||
     safetyFlags.paid_ai_request_observed === true ||
     safetyFlags.device_control_request_observed === true ||
-    safetyFlags.service_role_in_browser_observed === true;
+    safetyFlags.service_role_in_browser_observed === true ||
+    safetyFlags.action_queue_approval_request_observed === true ||
+    safetyFlags.paddle_checkout_request_observed === true;
   if (safetyViolated && status === "pass") status = "fail";
+  const cleanupStatus = staged.cleanup?.status ?? "not_run";
+  const cleanupCompleted = [
+    "completed_active_rows_removed",
+    "completed_with_retained_history",
+  ].includes(cleanupStatus);
+  const cleanupAcceptable =
+    cleanupCompleted || (!staged.cleanupRequired && cleanupStatus === "not_run");
+  if (!cleanupAcceptable && status === "pass") status = "fail";
 
   // A blocked proof must not report any stage as pass or fail.
   if (status === "blocked") {
@@ -147,41 +224,58 @@ export function buildOneTentBrowserProofReceipt(
   const safety = staged.safety ?? {};
 
   return {
-    schema_version: "1",
+    schema_version: "4",
     proof: "one-tent-loop-authenticated-ui",
     status,
     blocker_reason:
-      status === "pass" ? null : (staged.safetyViolationReason ?? staged.blockerReason ?? null),
+      status === "pass"
+        ? null
+        : sanitizeReasonCode(
+            staged.safetyViolationReason ?? staged.blockerReason,
+            status === "blocked" ? "proof_blocked" : "proof_failed",
+          ),
     restore_strategy: staged.restoreStrategy,
     seed_status: staged.seedStatus,
     stages: {
       auth_restored: rawStages.auth_restored,
+      deployment_sha_verified: rawStages.deployment_sha_verified,
+      hierarchy_created_via_ui: rawStages.hierarchy_created_via_ui,
       grow_resolved: rawStages.grow_resolved,
       tent_resolved: rawStages.tent_resolved,
       plant_resolved: rawStages.plant_resolved,
+      quick_log_context_verified: rawStages.quick_log_context_verified,
+      plant_persisted_after_refresh: rawStages.plant_persisted_after_refresh,
+      photo_and_manual_evidence_persisted: rawStages.photo_and_manual_evidence_persisted,
       quick_log_persisted: rawStages.quick_log_persisted,
+      quick_log_manual_tent_snapshot_verified: rawStages.quick_log_manual_tent_snapshot_verified,
+      operator_sensor_evidence_seeded: rawStages.operator_sensor_evidence_seeded,
       timeline_visible: rawStages.timeline_visible,
       manual_provenance_visible: rawStages.manual_provenance_visible,
+      sensor_snapshot_verified: rawStages.sensor_snapshot_verified,
       ai_doctor_boundary_verified: rawStages.ai_doctor_boundary_verified,
       alert_verified: rawStages.alert_verified,
       action_queue_suggestion_verified: rawStages.action_queue_suggestion_verified,
-      grower_decision_verified: rawStages.grower_decision_verified,
-      follow_up_marker_verified: rawStages.follow_up_marker_verified,
-      // Honest: the app has no auto-diary handoff; a passing proof
-      // records that explicitly instead of pretending coverage.
-      auto_diary_follow_up: status === "pass" ? "intentionally_unsupported" : "not_run",
+      approval_boundary_verified: rawStages.approval_boundary_verified,
+      paddle_sandbox_verified: rawStages.paddle_sandbox_verified,
     },
     duplicate_fences: {
       quick_log_count: fences.quick_log_count ?? null,
       alert_count: fences.alert_count ?? null,
       action_queue_count: fences.action_queue_count ?? null,
-      follow_up_marker_count: fences.follow_up_marker_count ?? null,
+    },
+    cleanup: staged.cleanup ?? {
+      status: "not_run",
+      active_rows_removed: false,
+      retained_history: false,
     },
     safety: {
       fabricated_login_used: false,
       paid_ai_request_observed: safety.paid_ai_request_observed ?? false,
       device_control_request_observed: safety.device_control_request_observed ?? false,
       service_role_in_browser_observed: safety.service_role_in_browser_observed ?? false,
+      action_queue_approval_request_observed:
+        safety.action_queue_approval_request_observed ?? false,
+      paddle_checkout_request_observed: safety.paddle_checkout_request_observed ?? false,
     },
   };
 }
@@ -200,6 +294,7 @@ export function buildBlockedOneTentBrowserProofReceipt(
   return buildOneTentBrowserProofReceipt({
     restoreStrategy,
     seedStatus,
+    cleanupRequired: false,
     blockerReason,
     stages,
   });

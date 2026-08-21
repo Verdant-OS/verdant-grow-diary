@@ -112,6 +112,7 @@ import {
 } from "@/lib/quickLogSaveGuardRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
+import { useRecentQuickLogTargetOffer } from "@/hooks/useRecentQuickLogTargetOffer";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   fahrenheitToCelsius,
@@ -395,6 +396,37 @@ export default function QuickLogV2Sheet({
   const hasFetchError = Boolean(plantsQ.isError || tentsQ.isError);
   const hasNoTargets = !isLoadingContext && !hasFetchError && options.length === 0;
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
+
+  // Slice D5 coverage — the desktop global entry.
+  //
+  // `QuickLogV2Fab` is `hidden md:inline-flex`, so on desktop this sheet IS the
+  // Dashboard Quick Log button; mobile's universal + routes to the legacy
+  // dialog instead. The sheet already RECORDED the target after every
+  // plant-scoped save and never read it back, so the approved S5 reduction
+  // ("exactly 1 explicit choice") held only on mobile.
+  //
+  // Withheld while the target list is blocked: a suggestion the Select cannot
+  // yet honour is an action that does nothing. `defaultTargetKey` is the
+  // launcher's scope — a sheet opened against a named target never offers.
+  const recentTargetOffer = useRecentQuickLogTargetOffer({
+    open,
+    userId: user?.id ?? null,
+    enabled: !contextBlocked && !form.selectedKey,
+    visiblePlants: plants as Parameters<typeof useRecentQuickLogTargetOffer>[0]["visiblePlants"],
+    visibleGrows: grows as Parameters<typeof useRecentQuickLogTargetOffer>[0]["visibleGrows"],
+    visibleTents: tents as Parameters<typeof useRecentQuickLogTargetOffer>[0]["visibleTents"],
+  });
+  // The V2 Select can only honour a key it actually lists. `resolveQuickLogV2Target`
+  // returns `ok: false` for anything else, so an unlisted plant would be an
+  // offer that produces an unusable selection — the same shape as offering a
+  // target the write path refuses.
+  const offerableRecentPlantKey =
+    recentTargetOffer.suggestion &&
+    options.some((o) => o.type === "plant" && o.id === recentTargetOffer.suggestion?.plantId)
+      ? `plant:${recentTargetOffer.suggestion.plantId}`
+      : null;
+  const showRecentTargetOffer =
+    !defaultTargetKey && !form.selectedKey && offerableRecentPlantKey !== null;
 
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
@@ -1371,6 +1403,62 @@ export default function QuickLogV2Sheet({
                   Add a tent
                 </a>
               </div>
+            </div>
+          )}
+
+          {showRecentTargetOffer && recentTargetOffer.suggestion && (
+            <div
+              data-testid="qlv2-recent-target-suggestion"
+              className="rounded-lg border border-border/60 bg-secondary/20 p-2.5 text-[12px] flex flex-wrap items-center gap-2"
+            >
+              <span className="text-muted-foreground">
+                Continue with {recentTargetOffer.suggestion.plantName}?
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                data-testid="qlv2-recent-target-accept"
+                onClick={() => {
+                  if (contextBlocked || wateringSubmissionLocked) return;
+                  // Freshness and scope are revalidated AT ACCEPTANCE. The sheet
+                  // can sit open across the 14-day boundary, and another tab can
+                  // replace the record; a value captured at render would let an
+                  // expired or replaced target through on a later click.
+                  const current = recentTargetOffer.revalidate();
+                  if (!current) {
+                    recentTargetOffer.retire();
+                    return;
+                  }
+                  // The click belongs to the plant named on this button. If
+                  // storage moved from A to B before its event arrived, redraw B
+                  // and require a new click — never reinterpret consent for A as
+                  // consent for B.
+                  if (current.plantId !== recentTargetOffer.suggestion?.plantId) return;
+                  // And it must still be a key this Select lists.
+                  if (!options.some((o) => o.type === "plant" && o.id === current.plantId)) {
+                    recentTargetOffer.retire();
+                    return;
+                  }
+                  if (videoValidationInFlightRef.current) resetVideoSelection();
+                  // Exactly the selection the Select performs, nothing more.
+                  setField("selectedKey", `plant:${current.plantId}`);
+                  setLocalError(null);
+                  setSaveStatus("");
+                  recentTargetOffer.retire();
+                }}
+              >
+                Continue
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                data-testid="qlv2-recent-target-dismiss"
+                onClick={() => recentTargetOffer.retire()}
+              >
+                Choose another
+              </Button>
             </div>
           )}
 

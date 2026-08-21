@@ -10,7 +10,6 @@
 // entry uses `import` and loads cleanly. Do not switch back to the
 // bare package specifier — Node will resolve `main` again.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config/dist/index.js";
-import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 
 // NOTE (TanStack migration): the legacy `staticSocialRouteDocuments` Vite
 // plugin (removed with the SPA shell) emitted 74 per-route HTML documents plus
@@ -22,13 +21,17 @@ import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 // SEO artifact pipeline is a separate, owner-approved slice — see the turn
 // report. Do not re-emit static route HTML into dist/client: those files would
 // shadow the real SSR routes on Cloudflare asset serving.
+//
+// MCP edge bundle: do NOT wire the Lovable MCP Vite codegen plugin here.
+// On Linux/Lovable/CI it esbuild-bundles `src/lib/mcp` into
+// `supabase/functions/mcp/index.ts` on configResolved/buildStart. That output
+// is not byte-identical to the committed hashed-root file, so every
+// vite dev/build rewrote a TREE_HASH_ROOTS path. The committed bundle stays
+// hand-synced; regenerate only via an explicit owner-approved path.
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
-  },
-  vite: {
-    plugins: [process.platform !== "win32" && mcpPlugin()].filter(Boolean),
   },
 });

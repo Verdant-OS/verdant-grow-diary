@@ -41,14 +41,39 @@ with `access: public | auth | operator | internal | redirect` and an optional
 
 | Group                    | Files                                                                                                                                                                                                                                                                                      |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Entry / auth             | `index.tsx` (apex, session-aware via `RootEntry`), `auth.tsx`, `login.tsx`, `signup.tsx`, `register.tsx`, `reset-password.tsx`, `welcome.tsx`                                                                                                                                              |
-| Marketing                | `features.tsx`, `pricing.tsx`, `founder.tsx`, `upgrade.tsx`, `demo.tsx`, `contact.tsx`, `feedback.tsx`, `hardware-integrations.tsx`, `how-ai-doctor-works.tsx`                                                                                                                             |
-| Commerce                 | `billing.$plan.tsx`, `checkout.success.tsx`, `checkout.cancel.tsx`                                                                                                                                                                                                                         |
-| Content / SEO            | `guides.index.tsx`, `guides.$slug.tsx`, `guides.grow-stage-care-guide.tsx`, `cultivars.index.tsx`, `cultivars.$slug.tsx`, `strains.index.tsx`, `strains.$slug.tsx`, `glossary.tsx`, `customer.guide.oreoz-vs-gelonade-comparison.tsx`, `docs.mcp-api.tsx`                                  |
+| Entry / auth             | `index.tsx` (apex, session-aware via `RootEntry`), `auth.tsx`, `reset-password.tsx`, `welcome.tsx`                                                                                                                                                                                         |
+| Marketing                | `pricing.tsx`, `founder.tsx`, `contact.tsx`, `feedback.tsx`, `hardware-integrations.tsx`, `how-ai-doctor-works.tsx`                                                                                                                                                                        |
+| Commerce                 | `checkout.success.tsx`, `checkout.cancel.tsx`                                                                                                                                                                                                                                              |
+| Content / SEO            | `guides.index.tsx`, `guides.$slug.tsx`, `guides.grow-stage-care-guide.tsx`, `cultivars.index.tsx`, `cultivars.$slug.tsx`, `glossary.tsx`, `customer.guide.oreoz-vs-gelonade-comparison.tsx`, `docs.mcp-api.tsx`                                                                            |
 | Credential-free tools    | `quick-log.tsx`, `tools.vpd-calculator.tsx`, `tools.blueprint-targets.tsx`, `pheno-comparison.tsx`, `pheno-expression-showcase.tsx`, `pheno-hunts.$id.compare.tsx`, `pheno-hunts.$id.showcase.tsx`, `ai-doctor-readiness-check.tsx`, `sensors.csv-preview.tsx`, `partners.csv-preview.tsx` |
 | Beta / internal previews | `breeder-beta.tsx`, `creator-beta.tsx`, `internal.demo-proof-walkthrough.tsx`, `internal.pheno-hunt-demo.tsx`, `internal.contextual-pheno-comparison-demo.tsx`                                                                                                                             |
-| Legal                    | `terms.tsx`, `terms-of-service.tsx`, `privacy.tsx`, `privacy-policy.tsx`, `refund.tsx`, `refunds.tsx`, `refund-policy.tsx`, `unsubscribe.tsx`                                                                                                                                              |
+| Legal                    | `terms.tsx`, `privacy.tsx`, `refund.tsx`, `unsubscribe.tsx`                                                                                                                                                                                                                                |
 | OAuth                    | `[.]lovable.oauth.consent.tsx`                                                                                                                                                                                                                                                             |
+
+### Root-level redirect aliases (13)
+
+These render redirect components and are `access: "redirect"` in `appRouteManifest.ts`. They
+are **not** pages — the surface lives at the target, so editing or testing them as pages is
+wasted work. Listed separately from the page groups above for that reason.
+
+| Alias               | Redirects to                                                              |
+| ------------------- | ------------------------------------------------------------------------- |
+| `/login`            | `/auth`                                                                   |
+| `/signup`           | `/auth`                                                                   |
+| `/register`         | `/auth`                                                                   |
+| `/features`         | `/welcome`                                                                |
+| `/demo`             | `/welcome`                                                                |
+| `/upgrade`          | `/pricing` with allowlisted plan, acquisition, return intent              |
+| `/billing/:plan`    | `/pricing?plan=<canonical>` (legacy entry; `/pricing` owns live checkout) |
+| `/strains`          | `/cultivars`                                                              |
+| `/strains/:slug`    | `/cultivars/:slug`                                                        |
+| `/terms-of-service` | `/terms`                                                                  |
+| `/privacy-policy`   | `/privacy`                                                                |
+| `/refunds`          | `/refund`                                                                 |
+| `/refund-policy`    | `/refund`                                                                 |
+
+Together with the five `_app` aliases below, `appRouteManifest.ts` classifies **18** paths as
+`access: "redirect"`.
 
 Several legal/marketing duplicates exist as routes **and** as redirect entries in
 `vercel.json` (`/strains → /cultivars`, `/features → /welcome`, `/terms-of-service → /terms`,
@@ -158,16 +183,16 @@ any executable-device marker flips a row to `blocked`.
 
 ## 3. Edge functions (`supabase/functions/`, 34 + `_shared`)
 
-| Domain                                    | Functions                                                                                                                                                              |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AI                                        | `ai-coach`, `ai-doctor-review`, `ai-cultivar-qa`, `create-breeding-suggestions`                                                                                        |
-| Entitlement checks (server-authoritative) | `premium-export-entitlement`, `live-sensor-entitlement`, `environment-summary-report-entitlement`, `founder-slots-remaining`                                           |
-| Payments                                  | `paddle-webhook`, `payments-webhook`, `paddle-portal-session`, `get-paddle-price`, `checkout-status`, `operator-credits-audit`                                         |
-| Sensors / ingest                          | `ecowitt-ingest`, `ecowitt-real-ingest`, `pi-ingest-readings`, `sensor-ingest-webhook`, `mint-bridge-token`, `revoke-bridge-token`, `operator-ggs-real-payload-commit` |
-| Email                                     | `send-transactional-email`, `preview-transactional-email`, `process-email-queue`, `handle-email-suppression`, `handle-email-unsubscribe`, `auth-email-hook`            |
-| Ops / metrics                             | `edge-metrics-latest`, `edge-metrics-alert-check`, `rls-selftest`                                                                                                      |
-| Account / growth                          | `delete-account`, `redeem-referral`, `save-founder-prefs`                                                                                                              |
-| Integrations                              | `mcp` (generated bundle — never hand-edit)                                                                                                                             |
+| Domain                                    | Functions                                                                                                                                                                                                      |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AI                                        | `ai-coach`, `ai-doctor-review`, `ai-cultivar-qa`, `create-breeding-suggestions`                                                                                                                                |
+| Entitlement checks (server-authoritative) | `premium-export-entitlement`, `live-sensor-entitlement`, `environment-summary-report-entitlement` — exactly these three                                                                                        |
+| Payments                                  | `paddle-webhook`, `payments-webhook`, `paddle-portal-session`, `get-paddle-price`, `checkout-status`, `operator-credits-audit`, `founder-slots-remaining` (public slot counter — **never** grants entitlement) |
+| Sensors / ingest                          | `ecowitt-ingest`, `ecowitt-real-ingest`, `pi-ingest-readings`, `sensor-ingest-webhook`, `mint-bridge-token`, `revoke-bridge-token`, `operator-ggs-real-payload-commit`                                         |
+| Email                                     | `send-transactional-email`, `preview-transactional-email`, `process-email-queue`, `handle-email-suppression`, `handle-email-unsubscribe`, `auth-email-hook`                                                    |
+| Ops / metrics                             | `edge-metrics-latest`, `edge-metrics-alert-check`, `rls-selftest`                                                                                                                                              |
+| Account / growth                          | `delete-account`, `redeem-referral`, `save-founder-prefs`                                                                                                                                                      |
+| Integrations                              | `mcp` (generated bundle — never hand-edit)                                                                                                                                                                     |
 
 Called from the app with `supabase.functions.invoke(...)`, roughly 17 call sites, mostly in
 hooks. Client-side entitlement reads are presentation-only; the `*-entitlement` functions are
@@ -427,7 +452,7 @@ Recorded as `established fact` about the tree, not as defects anyone has been as
   Queue sections remain accurate and useful.
 - **Two `*Rules.ts` modules import Supabase**, breaking the purity contract:
   `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`.
-- **39 of 488 components and 34 of 138 pages import `@/integrations/supabase/client`
+- **39 of 492 components and 34 of 139 pages import `@/integrations/supabase/client`
   directly** rather than going through a hook.
 - **`src/lib/*Advisor.ts` has zero files**, though the architecture table once named it as a
   layer. The nearest names are `manualSensorSnapshotAdvisorRules.ts` and

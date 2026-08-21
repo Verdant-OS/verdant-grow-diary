@@ -60,8 +60,8 @@ wasted work. Listed separately from the page groups above for that reason.
 | Alias               | Redirects to                                                              |
 | ------------------- | ------------------------------------------------------------------------- |
 | `/login`            | `/auth`                                                                   |
-| `/signup`           | `/auth`                                                                   |
-| `/register`         | `/auth`                                                                   |
+| `/signup`           | `/auth?mode=signup`                                                       |
+| `/register`         | `/auth?mode=signup`                                                       |
 | `/features`         | `/welcome`                                                                |
 | `/demo`             | `/welcome`                                                                |
 | `/upgrade`          | `/pricing` with allowlisted plan, acquisition, return intent              |
@@ -75,6 +75,11 @@ wasted work. Listed separately from the page groups above for that reason.
 
 Together with the five `_app` aliases below, `appRouteManifest.ts` classifies **18** paths as
 `access: "redirect"`.
+
+`/signup` and `/register` are **not** equivalent to `/login`: both carry `?mode=signup`, which is
+what puts `/auth` into its signup state. Dropping the query silently turns a signup link into a
+sign-in link. Take alias targets from the route file (`src/routes/<alias>.tsx`), not from this
+table's shape — the manifest records that a path redirects, not where.
 
 Several legal/marketing duplicates exist as routes **and** as redirect entries in
 `vercel.json` (`/strains → /cultivars`, `/features → /welcome`, `/terms-of-service → /terms`,

@@ -321,6 +321,10 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
      # The watchdog records that IT escalated. Reading the timeout off $?
      # cannot work: 15 is both "TERM killed it" and "the command exited 15".
      local timedout; timedout="$(mktemp)"; rm -f "$timedout"
+     # And records separately whether the escalation actually WORKED. These are
+     # different facts with different consequences: a deadline that fired and
+     # cleaned up is retryable; a group that survived KILL is not.
+     local unkilled; unkilled="$(mktemp)"; rm -f "$unkilled"
 
      # Liveness is probed with pgrep, and signals are sent with sudo. Both
      # matter, and neither is optional — see "the apt is not ours to signal"
@@ -371,16 +375,27 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
        # ends up held by the apt this was built to stop.
        if group_alive; then
          echo "::error::timeout could not kill group $pgid; apt may still hold this runner"
+         : > "$unkilled"                             # fatal: do NOT retry into this
        fi
      ) &
      local watchdog=$!
 
      wait "$child"; local rc=$?
      wait "$watchdog" 2>/dev/null    # NOT `kill` — see below
+
      # 124 is timeout(1)'s convention for "the deadline fired", and it is the
      # only status here that does not depend on setsid's forking or on which
-     # signal landed.
-     if [ -e "$timedout" ]; then rm -f "$timedout"; return 124; fi
+     # signal landed. But 124 means "bounded AND cleaned up", which the caller
+     # is entitled to retry — so a group that survived the KILL must not borrow
+     # it. Retrying into a root-owned apt that still holds the dpkg lock stacks
+     # stalled attempts instead of recovering from one, and the ::error:: above
+     # is a report, not a control signal: nothing reads it.
+     local fired="" survived=""
+     [ -e "$timedout" ] && fired=1
+     [ -e "$unkilled" ] && survived=1
+     rm -f "$timedout" "$unkilled"
+     if [ -n "$survived" ]; then return 125; fi    # the bound itself failed
+     if [ -n "$fired" ]; then return 124; fi       # bounded, group is gone
      return "$rc"
    }
    ```
@@ -470,7 +485,16 @@ asserting no `apt` process survives a killed attempt.
    `Acquire::Retries "3";` and `Acquire::http::Timeout "20";` in
    `/etc/apt/apt.conf.d/`, so apt itself gives up and retries rather than hanging.
 3. **Bounded retry** — up to 3 attempts, so the ~50%-per-attempt clearance rate
-   compounds to roughly 1-in-8 residual failure instead of 1-in-2.
+   compounds to roughly 1-in-8 residual failure instead of 1-in-2. **The loop must
+   stop immediately on status 125**, which `attempt()` returns when the bound
+   itself failed — the group was never published, or it survived the `KILL`.
+   Only 124 means "bounded and cleaned up", and only 124 is retryable. Retrying
+   after 125 launches a second install while a surviving root-owned `apt` may
+   still hold the dpkg lock, so three attempts stack three stalls instead of
+   compounding three independent ~50% chances; the arithmetic above assumes
+   independence that a held lock destroys. The `::error::` the watchdog prints
+   in that case is a report, not a control signal — nothing reads it, which is
+   exactly why the status has to carry the fact.
 4. **One composite action** at `.github/actions/install-playwright-browsers/`, so all
    19 call sites — across both seams (§3.2) — converge and the next fix is a one-file
    change.
@@ -573,7 +597,8 @@ Inputs (mirroring `require-ci-secret`'s documentation density):
 | `attempt-timeout-minutes` | no       | `3`        | Per-attempt cap, enforced by the process-group timeout in §4 Option C — **not** by `timeout-minutes`, which composite steps do not support                                                                                                                                                                                                                                      |
 
 Behavior: write the apt resilience config; loop up to `attempts`, each bounded by
-`attempt-timeout-minutes`; on total failure, `::error::` with the attempt count and
+`attempt-timeout-minutes`, **stopping early on status 125** (the bound itself
+failed — see item 3; 124 is the retryable one); on total failure, `::error::` with the attempt count and
 elapsed time, naming an apt/mirror fault **only when an apt signature or phase marker
 positively identifies it** per §4 Option C item 5 — never from a timeout alone — and a
 generic install failure otherwise; append a short markdown

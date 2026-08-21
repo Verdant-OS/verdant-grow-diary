@@ -474,13 +474,42 @@ That leaves: `redirects` **measured** inert, `rewrites` **measured** inert, `hea
 **measured** not-applied-as-declared (below). `projectSettings` stays `inference` — nothing
 probed from outside the host can observe it.
 
-**One claim of mine did not survive this probe, and it is recorded rather than quietly
-dropped.** An earlier revision said the application "compensates _in-app_ for redirects the host
-never performs." For `/pricing` that holds. For `/features` and `/terms-of-service` it does not:
-each returns ~7.7 KB carrying the generic site title, **zero `<h1>`**, `robots: index, follow`,
-and provider chrome but no page content. Whether client-side rendering fills them after
-hydration is **`NOT_MEASURED`** — these probes execute no JavaScript. Recorded as a bounded
-observation, not a verdict, and deliberately not folded into the roadmap.
+**A retraction here was itself wrong, and is withdrawn in turn.** The sequence is worth keeping
+whole, because the error is more instructive than either endpoint.
+
+The original claim was that the application "compensates _in-app_ for redirects the host never
+performs." The content probe above then showed `/features` and `/terms-of-service` returning
+~7.7 KB with the generic site title, **zero `<h1>`**, `robots: index, follow`, and provider
+chrome but no page content — so an earlier revision concluded that for those two routes the
+application "does not" compensate.
+
+**That conclusion does not follow from that observation, and source contradicts it.** Measured at
+the pinned SHA:
+
+| Route file                        | Mounts                                |
+| --------------------------------- | ------------------------------------- |
+| `src/routes/features.tsx`         | `<RouteAliasRedirect to="/welcome"/>` |
+| `src/routes/terms-of-service.tsx` | `<RouteAliasRedirect to="/terms"/>`   |
+
+Both are pinned by `src/test/route-alias-preservation.test.tsx`, in a table that also covers
+`/demo`, `/ai-doctor`, `/strains`, `/refunds`, `/refund-policy` and `/privacy-policy`. The
+application **is** wired to compensate, client-side, exactly as the original claim said.
+
+The empty SSR document is not evidence against that — it is what a client-side redirect shim
+_should_ server-render, since a component whose whole job is to navigate has no content to
+render. So the probe measured SSR output and an earlier revision read it as absence of wiring.
+
+State it as two separate facts, which is what the evidence supports:
+
+- **SSR output for those two routes is empty** — `established fact`, measured.
+- **Client-side alias wiring exists and is test-pinned** — `established fact`, measured at source.
+- **Whether hydrated navigation actually runs in production** — **`NOT_MEASURED`**. These probes
+  execute no JavaScript.
+
+The self-contradiction is the tell, and it is the second of its exact shape in this section: an
+earlier revision asserted "does not" and then labelled the same question `NOT_MEASURED` two
+sentences later. A sentence that concludes where its own status label says nothing is known
+should never survive a re-read.
 
 #### Security headers — measured, and the earlier claim was wrong in both directions
 
@@ -806,8 +835,11 @@ next_slice:
     docs/codebase-map.md. ARCH-01/ARCH-02 are unblocked; everything else here is bounded.
 
 files_touched:
-  - docs/audits/architecture-audit-adjudication-2026-08-21.md (this document; the only
-    file PR #1087 changes)
+  - docs/audits/architecture-audit-adjudication-2026-08-21.md — this document
+  - docs/agents/CURRENT_STATE.md — the owner/reviewer pairing record. Added after
+    review noted HANDOFF_PROTOCOL.md:25 requires it in BOTH the handoff block and
+    CURRENT_STATE. That file is exempt from the twelve-file Sentinel-Version bump
+    (verified: parity check reports 0 governance files changed)
   - docs/codebase-map.md — two corrections pushed to #1051's branch under this
     assignment, NOT via #1087: the payments-token class inversion and the
     functions.invoke call-site count. Listed because this slice produced them; they

@@ -17,7 +17,6 @@ import {
   parseManagedCookies as parseTs,
   evaluateManagedSession as evalTs,
 } from "../../e2e/helpers/lovableManagedSupabaseSession";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - JS mirror imported for parity assertions
 import {
   parseManagedCookies as parseJs,
@@ -29,6 +28,20 @@ import {
   extractSessionFromStorageSnapshot,
   buildManagedSessionEnv,
 } from "../../scripts/e2e/managed-session-materialize-core.mjs";
+import * as materializeCore from "../../scripts/e2e/managed-session-materialize-core.mjs";
+
+function resolveExactSupabaseProjectOrigin(input: {
+  supabaseUrl: string;
+  targetProjectRef: string;
+}): string | null {
+  const resolver = (
+    materializeCore as typeof materializeCore & {
+      resolveExactSupabaseProjectOrigin?: (value: typeof input) => string | null;
+    }
+  ).resolveExactSupabaseProjectOrigin;
+  expect(resolver).toBeTypeOf("function");
+  return resolver?.(input) ?? null;
+}
 
 // A real Playwright storageState cookie: session cookie => expires -1.
 const PLAYWRIGHT_STORAGE_STATE_COOKIE = {
@@ -173,6 +186,58 @@ describe("TS and JS parity implementations agree on the new formats", () => {
 });
 
 describe("materialize-core pure helpers", () => {
+  it.each([
+    "https://knkwiiywfkbqznbxwqfh.supabase.co",
+    "https://knkwiiywfkbqznbxwqfh.supabase.co/",
+    "https://knkwiiywfkbqznbxwqfh.supabase.co:443/",
+  ])("accepts only the exact canonical HTTPS Supabase origin: %s", (supabaseUrl) => {
+    expect(
+      resolveExactSupabaseProjectOrigin({
+        supabaseUrl,
+        targetProjectRef: "knkwiiywfkbqznbxwqfh",
+      }),
+    ).toBe("https://knkwiiywfkbqznbxwqfh.supabase.co");
+  });
+
+  it.each([
+    "http://knkwiiywfkbqznbxwqfh.supabase.co",
+    "https://knkwiiywfkbqznbxwqfh.supabase.co:444",
+    "https://knkwiiywfkbqznbxwqfh.supabase.co.attacker.invalid",
+    "https://knkwiiywfkbqznbxwqfh.attacker.invalid",
+    "https://user@knkwiiywfkbqznbxwqfh.supabase.co",
+    "https://:pass@knkwiiywfkbqznbxwqfh.supabase.co",
+    "https://knkwiiywfkbqznbxwqfh.supabase.co/rest/v1",
+    "https://knkwiiywfkbqznbxwqfh.supabase.co/?redirect=attacker",
+    "https://knkwiiywfkbqznbxwqfh.supabase.co/#fragment",
+    "not a url",
+  ])("rejects a noncanonical or lookalike target before authentication: %s", (supabaseUrl) => {
+    expect(
+      resolveExactSupabaseProjectOrigin({
+        supabaseUrl,
+        targetProjectRef: "knkwiiywfkbqznbxwqfh",
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects missing or malformed project refs", () => {
+    const supabaseUrl = "https://knkwiiywfkbqznbxwqfh.supabase.co";
+    for (const targetProjectRef of ["", "knkwiiywfkbqznbxwqfh.attacker.invalid", "../knk"]) {
+      expect(resolveExactSupabaseProjectOrigin({ supabaseUrl, targetProjectRef })).toBeNull();
+    }
+    expect(
+      resolveExactSupabaseProjectOrigin({
+        supabaseUrl: "https://a.supabase.co",
+        targetProjectRef: "a",
+      }),
+    ).toBeNull();
+    expect(
+      resolveExactSupabaseProjectOrigin({
+        supabaseUrl: "https://abcdefghijklmnopqrstu.supabase.co",
+        targetProjectRef: "abcdefghijklmnopqrstu",
+      }),
+    ).toBeNull();
+  });
+
   it("derives the supabase-js v2 storage key from the URL host", () => {
     expect(
       deriveSupabaseStorageKey({ supabaseUrl: "https://knkwiiywfkbqznbxwqfh.supabase.co" }),

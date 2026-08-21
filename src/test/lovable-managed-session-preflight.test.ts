@@ -20,8 +20,10 @@ const validSession = JSON.stringify({
 const ready: ManagedSessionEnvSnapshot = {
   authStatus: "injected",
   sessionJson: validSession,
-  storageKey: "sb-project-auth-token",
+  storageKey: "sb-abcdefghijklmnopqrst-auth-token",
   cookiesJson: "[]",
+  supabaseUrl: "https://abcdefghijklmnopqrst.supabase.co",
+  targetProjectRef: "abcdefghijklmnopqrst",
 };
 
 describe("evaluateManagedSession", () => {
@@ -70,7 +72,7 @@ describe("evaluateManagedSession", () => {
     expect(r.status).toBe("ready");
     if (r.status === "ready") {
       expect(r.session.user.id).toBe("user-abc");
-      expect(r.storageKey).toBe("sb-project-auth-token");
+      expect(r.storageKey).toBe("sb-abcdefghijklmnopqrst-auth-token");
       expect(Array.isArray(r.cookies)).toBe(true);
     }
   });

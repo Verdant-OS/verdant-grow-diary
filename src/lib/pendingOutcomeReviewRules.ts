@@ -19,6 +19,8 @@ export interface CompletedActionRowLike {
   completed_at?: string | null;
   approved_at?: string | null;
   plant_id?: string | null;
+  tent_id?: string | null;
+  grow_id?: string | null;
   suggested_change?: string | null;
 }
 
@@ -37,6 +39,10 @@ export interface PendingOutcomeReview {
   approved_at: string | null;
   /** Exact plant scope when set; null for tent/grow-level actions. */
   plant_id: string | null;
+  /** Exact tent scope when set; null for plant/grow-level actions without tent. */
+  tent_id: string | null;
+  /** Grow scope when set on the action row. */
+  grow_id: string | null;
   suggested_change: string | null;
   hours_since_completed: number;
 }
@@ -97,6 +103,8 @@ export function findPendingOutcomeReviews(
       completed_at: a.completed_at as string,
       approved_at: nonEmptyString(a.approved_at),
       plant_id: nonEmptyString(a.plant_id),
+      tent_id: nonEmptyString(a.tent_id),
+      grow_id: nonEmptyString(a.grow_id),
       suggested_change: nonEmptyString(a.suggested_change),
       hours_since_completed: Math.floor(ageMs / (60 * 60 * 1000)),
     });

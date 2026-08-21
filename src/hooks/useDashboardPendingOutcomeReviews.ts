@@ -24,7 +24,7 @@ export type PendingOutcomeReviewsState =
   | { status: "unavailable" };
 
 const COMPLETED_ACTION_COLUMNS =
-  "id,status,completed_at,approved_at,plant_id,suggested_change,grow_id";
+  "id,status,completed_at,approved_at,plant_id,tent_id,suggested_change,grow_id";
 const OUTCOME_DIARY_COLUMNS = "id,details";
 
 export function useDashboardPendingOutcomeReviews(

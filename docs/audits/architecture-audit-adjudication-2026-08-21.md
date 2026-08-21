@@ -23,9 +23,16 @@ or governance file, and it carries no `Sentinel-Version` (it is not one of the t
 > - the edge-function caller row, which said "mostly in hooks" when hooks are a minority
 >   (6 of 15 production files).
 >
-> **All measurements below stay pinned to `28c01a017` and are not restated at the new tip.**
+> **All _repository_ measurements below stay pinned to `28c01a017` and are not restated at the
+> new tip** — file counts, layer inventories, route and edge-function tallies, config contents.
 > A measurement is a record of what was true at a named commit; re-pointing it at a newer SHA
 > without re-running it would be exactly the drift this document was written to catch.
+>
+> **Two classes of measurement here are deliberately not pinned to that commit**, and are dated
+> individually where they appear: **live production probes** (§6.2's HTTP measurements) and the
+> **provenance comparisons** in §6.1, which recompute the trees of `4b1c4867e685`,
+> `39935889fe02`, `5a13d0b47cb7` and `ea31fbdfb934` — none of which is `28c01a017`. Do not read
+> this header as attributing those to the pinned tree.
 >
 > ### Numeric re-verification sweep
 >
@@ -113,8 +120,11 @@ corrects the stale stack facts in `AGENTS.md`, `GEMINI.md`, `SKILL.md` and `CURR
 
 Its stated corrections are **the same four** the supplied audit reaches independently:
 the app is TanStack Start SSR and not an SPA; `src/lib/*Advisor.ts` is an empty layer in the
-architecture table; `tsconfig.app.json` no longer exists; and `vercel.json` does not govern
-production.
+architecture table; `tsconfig.app.json` no longer exists; and `vercel.json`'s runtime directives
+are not applied as declared in production. **That last one is stated here as they stated it; this
+document narrows it** — §6.2 measures `redirects`, the rewrite and the catch-all header block
+only, and leaves whole-file authority `NOT_MEASURED`. Do not cite the categorical version from
+this paragraph.
 
 The supplied audit _names_ "Claude/codebase architecture documentation" in its own
 §4.2 immediate-collision freeze — and then assigns ARCH-01 to Claude anyway. That is the

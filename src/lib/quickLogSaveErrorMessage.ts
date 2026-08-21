@@ -116,20 +116,20 @@ export function quickLogSaveRecoveryAction(reason: string | null | undefined): s
     case "unsupported_action":
       return "Refresh the app to pick up the latest version, then log this as a note or watering.";
     case "invalid_idempotency_key":
-      return "Save again — a fresh save reference is generated automatically.";
+      return "Close and reopen the log form, then save again — that creates a fresh save reference.";
     case "not_authenticated":
       return "Sign in again, then retry. Your input stays on this screen.";
     case "not_authorized":
       return "Sign out and back in. If it persists, the account lacks access to this workspace.";
     case "rpc_unavailable":
-      return "Refresh the app and retry. If it persists, the database is behind the app version — check the Quick Log diagnostics screen.";
+      return "Refresh the app and retry. If it persists, the database is behind the app version — an operator can confirm it on the Quick Log diagnostics screen.";
     case "network_error":
       return "Check your connection and retry. Your input stays on this screen.";
     case "photo_saving_not_enabled":
       return "Save the entry without the photo for now.";
     case "save_failed":
     default:
-      return "Try again. If it keeps failing, the Quick Log diagnostics screen shows what the server rejected.";
+      return "Try again. If it keeps failing, an operator can see what the server rejected on the Quick Log diagnostics screen.";
   }
 }
 

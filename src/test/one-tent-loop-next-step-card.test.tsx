@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { ONE_TENT_LOOP_DISABLED_COPY } from "@/lib/oneTentLoopNavigationRules";
 
 function renderCard(ui: React.ReactElement) {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
@@ -17,11 +18,19 @@ describe("OneTentLoopNextStepCard", () => {
   });
 
   it("renders the safe CTA label and a link when ids are present", () => {
-    renderCard(<OneTentLoopNextStepCard current="tent" ids={{ tentId: "t1" }} />);
+    renderCard(<OneTentLoopNextStepCard current="tent" ids={{ plantId: "p1" }} />);
     const cta = screen.getByTestId("one-tent-loop-next-step-card-cta");
     expect(cta).toHaveTextContent("Open plant");
     const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
-    expect(anchor?.getAttribute("href")).toBe("/tents/t1");
+    expect(anchor?.getAttribute("href")).toBe("/plants/p1");
+  });
+
+  it("renders a disabled tent → plant handoff when only the current tent is known", () => {
+    renderCard(<OneTentLoopNextStepCard current="tent" ids={{ tentId: "t1" }} />);
+    expect(screen.getByTestId("one-tent-loop-next-step-card-disabled")).toHaveTextContent(
+      ONE_TENT_LOOP_DISABLED_COPY,
+    );
+    expect(screen.queryByTestId("one-tent-loop-next-step-card-cta")).toBeNull();
   });
 
   it("uses approval-required wording when on the action-queue step CTA", () => {

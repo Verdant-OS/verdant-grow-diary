@@ -73,7 +73,7 @@ export function consumeCheckoutReturnTo(opts?: { storage?: StorageLike | null })
   try {
     storage.removeItem(CHECKOUT_RETURN_TO_STORAGE_KEY);
   } catch {
-    /* ignore */
+    return null;
   }
   return sanitizeCheckoutReturnTo(raw);
 }

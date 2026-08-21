@@ -30,6 +30,7 @@ import {
 
 const ACCOUNT_A = "11111111-2222-3333-4444-555555555555";
 const ACCOUNT_B = "99999999-8888-7777-6666-555555555555";
+const NOW_MS = Date.parse("2026-08-20T00:00:00.000Z");
 const RECORD = JSON.stringify({
   plantId: "p1",
   growId: "g1",
@@ -166,6 +167,8 @@ describe("LocalDataHealthPanel — a malformed scoped record is never reported h
     // does not — nothing will ever read this value again.
     expect(screen.queryByText(/A future migration will handle it automatically/)).toBeNull();
     expect(screen.getByText(/does not match the shape this build expects/)).toBeInTheDocument();
+    expect(screen.getByText(/can never be used again/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Review & clear/i })).toBeEnabled();
   });
 });
 
@@ -176,21 +179,15 @@ describe("LocalDataHealthPanel — a future timestamp is a fault, expiry is not"
   // therefore reported Pass while the suggestion silently never appeared:
   // a clean bill of health over an invisible failure.
   //
-  // Offsets are relative to the real clock and deliberately coarse. Fake
-  // timers were tried first and deadlock this panel: it runs its checks
-  // asynchronously, so freezing the clock hangs RTL's `waitFor` and every
-  // case times out at 5s. The rule's EXACT boundary — reject at `savedAt`
-  // one millisecond past now, accept at equality — is pinned where it can be
-  // tested honestly, in `quick-log-recent-target-suggestion.test.ts` against
-  // an injected clock. These cases prove the panel agrees with that rule in
-  // kind, which is the part that was missing.
+  // Pin every offset to one injected instant. This keeps the panel's boundary
+  // deterministic without freezing RTL's own async clock.
   const DAY_MS = 24 * 60 * 60 * 1000;
   const stampedAt = (offsetMs: number) =>
     JSON.stringify({
       plantId: "p1",
       growId: "g1",
       tentId: "t1",
-      savedAt: new Date(Date.now() + offsetMs).toISOString(),
+      savedAt: new Date(NOW_MS + offsetMs).toISOString(),
     });
 
   it("warns on a record stamped in the future, and says what to do about it", async () => {
@@ -198,20 +195,38 @@ describe("LocalDataHealthPanel — a future timestamp is a fault, expiry is not"
       `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`,
       stampedAt(5 * DAY_MS),
     );
-    render(<LocalDataHealthPanel />);
+    render(<LocalDataHealthPanel now={() => NOW_MS} />);
 
     const row = await schemaRow("Quick Log last target");
     expect(within(row).getByText("Warn")).toBeInTheDocument();
-    expect(row).toHaveTextContent("the stored timestamp is in the future");
-    // A cause with no action is only half a diagnostic.
-    expect(row).toHaveTextContent("clear this entry to restore it now");
+    expect(row).toHaveTextContent("savedAt is in the future");
+    expect(row).toHaveTextContent("temporarily");
+    expect(row).toHaveTextContent("stored target remains intact");
+    expect(row).not.toHaveTextContent("the stored value has no effect");
+
+    expect(
+      screen.getByText(
+        "Check this device's date and time. Once the clock reaches the saved time, Quick Log can consider this target again; current grow, tent, and plant checks still apply. The stored target is intact, so no clearing is needed.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/can never be used again/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Review & clear/i })).toBeNull();
+    expect(screen.getByRole("button", { name: "Fix issues" })).toBeDisabled();
+  });
+
+  it("passes a record stamped exactly at the injected current time", async () => {
+    setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, stampedAt(0));
+    render(<LocalDataHealthPanel now={() => NOW_MS} />);
+
+    const row = await schemaRow("Quick Log last target");
+    expect(within(row).getByText("Pass")).toBeInTheDocument();
   });
 
   it("passes a record stamped moments ago — the positive control", async () => {
     // Differs from the case above in the SIGN of the offset and nothing else,
     // so a Warn there cannot be an artifact of the fixture.
     setLocalStorageItemForTest(`verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`, stampedAt(-60_000));
-    render(<LocalDataHealthPanel />);
+    render(<LocalDataHealthPanel now={() => NOW_MS} />);
 
     const row = await schemaRow("Quick Log last target");
     expect(within(row).getByText("Pass")).toBeInTheDocument();
@@ -227,7 +242,7 @@ describe("LocalDataHealthPanel — a future timestamp is a fault, expiry is not"
       `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`,
       stampedAt(-30 * DAY_MS),
     );
-    render(<LocalDataHealthPanel />);
+    render(<LocalDataHealthPanel now={() => NOW_MS} />);
 
     const row = await schemaRow("Quick Log last target");
     expect(within(row).getByText("Pass")).toBeInTheDocument();
@@ -238,7 +253,7 @@ describe("LocalDataHealthPanel — a future timestamp is a fault, expiry is not"
       `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`,
       stampedAt(5 * DAY_MS),
     );
-    const { container } = render(<LocalDataHealthPanel />);
+    const { container } = render(<LocalDataHealthPanel now={() => NOW_MS} />);
 
     await schemaRow("Quick Log last target");
     expect(container.textContent ?? "").not.toContain(ACCOUNT_A);
@@ -276,6 +291,37 @@ describe("LocalDataHealthPanel — the account uuid survives no fallback path", 
     expect(within(dialog).queryByText(/No validation issue detected/)).toBeNull();
     expect(dialog).toHaveTextContent("Unusable shape");
     expect(dialog).toHaveTextContent("missing a usable plantId/savedAt pair");
+  });
+
+  it("shows a changed future record as a non-clearable clock mismatch in the drawer", async () => {
+    const key = `verdant.quickLog.lastTarget.v2.${ACCOUNT_A}`;
+    setLocalStorageItemForTest(key, "{}");
+    render(<LocalDataHealthPanel now={() => NOW_MS} />);
+    await schemaRow("Quick Log last target");
+
+    // The value can change in another tab after the checklist was built. The
+    // drawer must classify the current bytes rather than carry the old clear
+    // recommendation forward.
+    setLocalStorageItemForTest(
+      key,
+      JSON.stringify({
+        plantId: "p1",
+        growId: "g1",
+        tentId: "t1",
+        savedAt: "2026-08-20T00:00:00.001Z",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Review & clear/i }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(dialog).toHaveTextContent("Clock mismatch");
+    expect(dialog).not.toHaveTextContent("Unusable shape");
+    expect(dialog).toHaveTextContent("temporarily withholds this remembered target");
+    expect(dialog).toHaveTextContent(
+      "Check this device's date and time. If it is correct, wait for the current time to catch up. Keep this local record; no data needs to be cleared.",
+    );
+    expect(screen.getByRole("button", { name: "Nothing to clear" })).toBeDisabled();
+    expect(getLocalStorageItemForTest(key)).not.toBeNull();
   });
 
   it("whitelists scoped field metadata and omits an unversioned v value", async () => {

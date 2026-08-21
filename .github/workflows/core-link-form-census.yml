@@ -20,7 +20,6 @@ on:
   schedule:
     - cron: "35 8 * * *"
   workflow_dispatch:
-
 permissions:
   contents: read
 
@@ -31,7 +30,7 @@ concurrency:
 jobs:
   focused-rules:
     name: Census rules and accessibility regressions
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -46,11 +45,10 @@ jobs:
           src/test/core-link-form-census-rules.test.ts
           src/test/pheno-keepers-page.test.tsx
           --reporter=dot
-
   browser-census:
     name: Browser census (${{ matrix.lane }})
     needs: focused-rules
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 40
     strategy:
       fail-fast: false

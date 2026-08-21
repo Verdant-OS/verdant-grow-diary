@@ -15,11 +15,10 @@ on:
       - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
       - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
   workflow_dispatch:
-
 jobs:
   forwarding-tests:
     name: Python forwarding + static safety + typecheck
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     # No repository secrets required. Safe for forked PRs. No real
     # forwarding occurs; Python tests mock the requests module.

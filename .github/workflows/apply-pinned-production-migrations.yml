@@ -27,7 +27,7 @@ concurrency:
 jobs:
   validate:
     name: Validate the production dispatch
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 5
     env:
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
@@ -68,7 +68,7 @@ jobs:
   apply:
     name: Preflight, apply once, and verify
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     environment: verdant-production
     env:

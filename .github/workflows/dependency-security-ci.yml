@@ -17,7 +17,7 @@ permissions:
 jobs:
   security:
     name: Lockfile policy, dependency audit, typecheck, build, tests
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 25
     steps:
       - name: Checkout
@@ -64,7 +64,6 @@ jobs:
           src/test/dependency-security-phase-a-contract.test.ts
           src/test/vite-dev-server-binding.test.ts
           --reporter=dot
-
       - name: Typecheck
         run: bun run typecheck
 

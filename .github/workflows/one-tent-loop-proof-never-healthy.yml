@@ -32,7 +32,6 @@ on:
       - "bun.lock"
       - "bun.lockb"
   workflow_dispatch:
-
 concurrency:
   group: one-tent-loop-proof-never-healthy-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -40,7 +39,7 @@ concurrency:
 jobs:
   one-tent-loop-proof-never-healthy:
     name: One-Tent Loop Proof never-healthy E2E (mocked)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
 
     steps:
@@ -122,7 +121,6 @@ jobs:
             test-results/**/*.log
           retention-days: 7
           if-no-files-found: ignore
-
 
       - name: Upload sanitized proof artifact
         if: ${{ always() }}

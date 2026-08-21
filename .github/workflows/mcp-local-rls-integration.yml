@@ -47,7 +47,7 @@ on:
 jobs:
   mcp-local-rls:
     name: MCP RLS harness (local Supabase)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 25
     # OPT-IN lane (mirrors security-db-local.yml): the harness needs a local
     # Supabase container the shared runners cannot always provide. The

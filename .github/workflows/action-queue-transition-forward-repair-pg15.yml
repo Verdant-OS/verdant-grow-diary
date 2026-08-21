@@ -36,14 +36,13 @@ on:
       - verdant-grow-diary
     paths: *action_queue_transition_repair_paths
   merge_group:
-
 permissions:
   contents: read
 
 jobs:
   pg15_runtime:
     name: PostgreSQL 15 runtime contract
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 10
     services:
       postgres:

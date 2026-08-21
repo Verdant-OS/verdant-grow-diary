@@ -97,7 +97,7 @@ on:
 jobs:
   quicklog-smoke:
     name: Quick Log Playwright smoke
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 20
 
     # Job scope: read code, post a sticky PR comment linking to Playwright
@@ -936,6 +936,7 @@ jobs:
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
+
       # Moved: Upload Playwright HTML report + Link in Job Summary now run
       # earlier (right before "Summarize Playwright flakes") so the HTML report
       # link is the FIRST section written to $GITHUB_STEP_SUMMARY and is
@@ -943,7 +944,6 @@ jobs:
       # is append-only, so ordering is controlled purely by step execution order.
       # Downstream steps that reference steps.upload_playwright_report.outputs.artifact-url
       # still resolve because those steps run after the moved position.
-
       - name: Detect Playwright trace files
         id: trace_files
         if: always() && steps.e2e_config.outputs.should_run == 'true'

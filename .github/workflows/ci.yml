@@ -13,7 +13,6 @@ on:
   pull_request:
     branches: [main, verdant-grow-diary]
   merge_group:
-
 jobs:
   # Preflight: verify the edge shared-lib mirror
   # (`supabase/functions/_shared/lib` + `.sync-manifest.json`) is in sync
@@ -24,7 +23,7 @@ jobs:
   # mirror drifts, install/lint/typecheck/tests/build never start.
   edge-shared-sync-preflight:
     name: Preflight — edge shared-lib mirror in sync
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 5
     permissions:
       contents: read
@@ -100,7 +99,7 @@ jobs:
   test:
     name: Lint, typecheck, test, build
     needs: edge-shared-sync-preflight
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
 
     # This job runs lint/typecheck/static scans + scanner guardrails + build.
     # The monolithic full Vitest suite lives in `full-suite` below. 45 minutes
@@ -583,7 +582,7 @@ jobs:
   # Playwright artifacts (report/results/screenshots) upload only on failure.
   legal-seo:
     name: test:legal-seo
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     permissions:
       contents: read
@@ -654,7 +653,7 @@ jobs:
   # See docs/testing/ci-full-suite-shards.md.
   full-suite:
     name: Full test suite (shard ${{ matrix.shard }}/32)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     # Matrix shard N covers vitest partitions (8N-7)..(8N) of 256 (eight
     # sequential 1/256 processes). Heavy shards (e.g. 6/32, 8/32) still
     # approached the old 45m ceiling on ubuntu-latest (#697 cancelled at
@@ -666,41 +665,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard:
-          [
-            1,
-            2,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            11,
-            12,
-            13,
-            14,
-            15,
-            16,
-            17,
-            18,
-            19,
-            20,
-            21,
-            22,
-            23,
-            24,
-            25,
-            26,
-            27,
-            28,
-            29,
-            30,
-            31,
-            32,
-          ]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

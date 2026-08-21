@@ -15,7 +15,6 @@ on:
   pull_request:
     branches: [main, verdant-grow-diary]
   workflow_dispatch:
-
 permissions:
   contents: read
   pull-requests: write # post/update the preview-status comment
@@ -32,7 +31,7 @@ jobs:
   # is out of sync, so the expensive build stage never starts.
   preflight:
     name: Preflight — edge shared-lib mirror
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -68,7 +67,7 @@ jobs:
   build:
     name: Production build (preview-bound)
     needs: preflight
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -133,7 +132,7 @@ jobs:
     name: Publish preview status to PR
     needs: [preflight, build]
     if: always() && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 3
     steps:
       - name: Post preview-status comment

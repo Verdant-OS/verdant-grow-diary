@@ -21,7 +21,6 @@ on:
   push:
   pull_request:
   workflow_dispatch:
-
 concurrency:
   # One run per ref; a newer push supersedes an in-flight run on the same
   # branch. Both protected release branches are excluded from cancellation so
@@ -35,7 +34,7 @@ permissions:
 jobs:
   typecheck-and-build:
     name: tsgo --noEmit + vite build
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 20
     steps:
       - name: Checkout

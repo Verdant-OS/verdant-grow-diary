@@ -29,7 +29,7 @@ on:
 jobs:
   pheno-journey:
     name: pheno-journey (${{ inputs.phase }})
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 20
     env:
       E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}

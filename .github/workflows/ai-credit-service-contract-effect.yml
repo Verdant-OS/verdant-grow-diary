@@ -24,7 +24,7 @@ env:
 jobs:
   verify:
     name: Verify AI-credit service contract remains effective
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     if: github.ref == 'refs/heads/verdant-grow-diary'
     environment: verdant-production
     timeout-minutes: 20
@@ -66,7 +66,6 @@ jobs:
             ["Without this protected read path, current function bodies and
             privileges cannot be compared with the money-path contract. A
             migration tracker row alone is not effect evidence."]
-
       - name: Inspect migration history and current service contract
         id: verify_effect
         if: always()

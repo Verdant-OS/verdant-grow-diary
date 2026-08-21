@@ -9,7 +9,6 @@ on:
       - ".github/workflows/supabase-migrations-sync-check.yml"
       - "docs/contributing-supabase-migrations.md"
   workflow_dispatch:
-
 concurrency:
   group: supabase-migrations-sync-${{ github.ref }}
   cancel-in-progress: true
@@ -17,7 +16,7 @@ concurrency:
 jobs:
   verify-migrations-complete:
     name: Verify migrations superset of integration branch
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     env:
       SUPABASE_MIGRATIONS_INTEGRATION_BRANCH: dev
     steps:

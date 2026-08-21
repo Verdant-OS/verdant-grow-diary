@@ -74,7 +74,7 @@ env:
 jobs:
   verify:
     name: Verify money migrations applied in production
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     # Trusted-ref gate. workflow_dispatch accepts a --ref, and this job checks
     # out that ref and runs ITS copy of the checker with SUPABASE_DB_URL
     # in the environment. Without this, dispatching from a modified branch runs
@@ -134,7 +134,6 @@ jobs:
             ["Without this secret the billing-critical migrations cannot be
             checked against production, and a green run would falsely imply
             they are applied. This is a hard failure by design."]
-
       # Reuses the existing 485-line checker verbatim. No second detector and
       # no second source of truth: REQUIRED_MONEY_MIGRATIONS stays the only
       # place the money-critical set is defined.

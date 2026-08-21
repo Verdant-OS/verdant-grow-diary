@@ -80,7 +80,7 @@ concurrency:
 jobs:
   irrigation-rls-runtime:
     name: Irrigation runtime trust boundary (local Supabase)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 25
 
     steps:
@@ -168,7 +168,7 @@ jobs:
 
   irrigation-overflow:
     name: Irrigation overflow (real Verdant CSS)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     env:
       CI: "true"
@@ -200,7 +200,6 @@ jobs:
         run: >-
           bunx playwright test e2e/irrigation-overflow.spec.ts
           --project=chromium-mocked --reporter=list,html
-
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

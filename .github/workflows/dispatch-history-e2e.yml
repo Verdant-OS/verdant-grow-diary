@@ -70,7 +70,6 @@ on:
       - "bun.lock"
       - "bun.lockb"
   workflow_dispatch:
-
 # Read-only token: the job only checks out code and uploads artifacts.
 permissions:
   contents: read
@@ -78,7 +77,7 @@ permissions:
 jobs:
   dispatch-history-e2e:
     name: Dispatch history Playwright (mocked / non-destructive)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
 
     steps:

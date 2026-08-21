@@ -30,7 +30,7 @@ on:
 jobs:
   irrigation-overflow-smoke:
     name: Irrigation overflow smoke (mocked / non-destructive)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
 
     steps:

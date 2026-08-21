@@ -34,7 +34,7 @@ on:
 jobs:
   gamification-staging-smoke:
     name: Gamification RLS + award_nugs smoke (staging)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     steps:
       - name: Checkout

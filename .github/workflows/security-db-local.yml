@@ -25,7 +25,7 @@ on:
 jobs:
   test-security-db-local:
     name: test:security-db-local
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 25
     # Not a required check, so a red run never blocks the merge queue.
     # Deliberately NOT continue-on-error: that flag rewrote a failing job

@@ -48,7 +48,7 @@ on:
 jobs:
   ai-doctor-freshness-e2e:
     name: AI Doctor freshness gate e2e (mocked / non-destructive)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
 
     steps:

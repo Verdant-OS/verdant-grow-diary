@@ -61,7 +61,7 @@ concurrency:
 jobs:
   prefix-diff-offline:
     name: Offline money-migration manifest + SARIF validation
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 10
     permissions:
       contents: read
@@ -130,7 +130,7 @@ jobs:
     needs: prefix-diff-offline
     if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
     environment: verdant-sandbox
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 10
     permissions:
       contents: read
@@ -226,7 +226,7 @@ jobs:
     needs: prefix-diff-offline
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}
     environment: verdant-production
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 10
     permissions:
       contents: read

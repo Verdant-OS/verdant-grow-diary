@@ -16,7 +16,6 @@ on:
   push:
     branches: [main, verdant-grow-diary]
   workflow_dispatch:
-
 permissions:
   contents: write # required to push the tag back to the repo
 
@@ -30,7 +29,7 @@ concurrency:
 jobs:
   tag:
     name: Create release tag
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

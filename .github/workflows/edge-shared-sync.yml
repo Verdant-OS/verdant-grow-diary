@@ -2,16 +2,16 @@ name: edge-shared-sync
 
 on:
   pull_request:
-    # Run on every PR — do not path-filter. A PR that only touches
-    # unrelated files can still regress edge-function imports (e.g. a
-    # merge of stale mirror state), so the gate must always run.
+  # Run on every PR — do not path-filter. A PR that only touches
+  # unrelated files can still regress edge-function imports (e.g. a
+  # merge of stale mirror state), so the gate must always run.
   push:
     branches: [main, verdant-grow-diary]
 
 jobs:
   verify:
     name: Verify _shared/lib mirror is in sync
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     permissions:
       contents: read
       issues: write # notify-edge-shared-drift.mjs opens/updates a tracking issue

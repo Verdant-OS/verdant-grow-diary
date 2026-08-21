@@ -15,14 +15,13 @@ on:
       - "src/test/cursor-sdk-production-isolation-fence.test.ts"
       - "docs/specs/cursor-sdk-local-orchestration-spike.md"
   workflow_dispatch:
-
 permissions:
   contents: read
 
 jobs:
   spike-static:
     name: Nested static proofs and production isolation
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     steps:
       - name: Checkout

@@ -41,7 +41,6 @@ on:
       - "docs/one-tent-loop-rc-smoke-test.md"
       - "docs/v0-release-checkpoint.md"
   workflow_dispatch:
-
 # Cancel older runs for the same PR or branch so only the latest commit
 # consumes a runner.
 concurrency:
@@ -51,7 +50,7 @@ concurrency:
 jobs:
   demo-proof-readonly:
     name: Demo Proof Walkthrough readonly E2E (mocked)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
 
     steps:

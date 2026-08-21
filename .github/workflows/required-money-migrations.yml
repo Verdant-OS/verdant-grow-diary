@@ -42,7 +42,7 @@ permissions:
 jobs:
   unit-tests-migration-version:
     name: Unit tests — migrationVersion + applied-check logic
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -84,7 +84,7 @@ jobs:
   assert-required-money-migrations:
     name: Assert required credit-spend + referral migrations present
     needs: unit-tests-migration-version
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Assert filename allowlist
@@ -97,7 +97,7 @@ jobs:
     needs: assert-required-money-migrations
     if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
     environment: verdant-sandbox
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     env:
       DATABASE_URL: ""
       PGDATABASE: ""
@@ -174,7 +174,7 @@ jobs:
     # Production verification is always a protected, manual run from the trusted base branch.
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}
     environment: verdant-production
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     env:
       DATABASE_URL: ""
       PGDATABASE: ""

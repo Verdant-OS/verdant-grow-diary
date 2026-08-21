@@ -42,7 +42,7 @@ jobs:
   # remote database credential.
   manifest-and-files:
     name: Core schema manifest and migration files
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -61,7 +61,7 @@ jobs:
     name: Verify pinned Verdant sandbox schema
     needs: manifest-and-files
     if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     environment: verdant-sandbox
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -112,7 +112,7 @@ jobs:
     name: Verify pinned Verdant production schema
     needs: manifest-and-files
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'production' }}
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     environment: verdant-production
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

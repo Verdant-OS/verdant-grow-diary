@@ -44,7 +44,7 @@ jobs:
   # Both real jobs `needs: changes` and skip themselves when false.
   changes:
     name: detect irrigation-scoped changes
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 2
     permissions:
       contents: read
@@ -212,7 +212,7 @@ jobs:
     if: >-
       (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
       && needs.changes.outputs.dry_run != 'true'
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -244,7 +244,7 @@ jobs:
     if: >-
       (needs.changes.outputs.irrigation == 'true' || github.event_name == 'workflow_dispatch')
       && needs.changes.outputs.dry_run != 'true'
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

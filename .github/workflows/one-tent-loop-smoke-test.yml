@@ -10,11 +10,10 @@ on:
       - "src/test/ggs-sentinel-*.test.ts"
       - "src/test/ggs-sentinel-*.test.tsx"
   workflow_dispatch:
-
 jobs:
   one-tent-loop-smoke:
     name: One-Tent Loop smoke audit
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 20
     steps:
       - name: Checkout

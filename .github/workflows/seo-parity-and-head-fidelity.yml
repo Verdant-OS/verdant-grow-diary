@@ -17,7 +17,7 @@ concurrency:
 jobs:
   seo-parity-and-head-fidelity:
     name: sitemap parity + head fidelity
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -56,10 +56,10 @@ jobs:
       - name: Postbuild SEO artifact generation contract
         run: bun run test:postbuild-seo-artifacts
 
+
       # Full production build; the postbuild hook runs
       # validate-static-route-head-fidelity.mjs and writes the
       # per-route diff report used below.
-
       - name: Build (runs postbuild head-fidelity validator)
         run: bun run build
 

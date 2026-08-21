@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-20.1**
+**Sentinel-Version: 2026-09-01.2**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -63,7 +63,7 @@ Use small, scoped changes. Avoid broad rewrites.
 
 ## Multi-Agent Coordination
 
-This repo is worked on by more than one AI agent (Codex, Claude Code, Lovable) at once, sometimes on the same feature independently, without either side knowing.
+This repo is worked on by more than one AI agent (Codex, Claude Code, Grok, Lovable) at once, sometimes on the same feature independently, without either side knowing.
 
 - Before starting substantial new work, check recent merged PRs and open PRs (`gh pr list --state all`, `git log`) for the same or an overlapping feature area. Do not build a second implementation of something that already shipped or is already in review elsewhere.
 - If you discover another agent already has open, unmerged work in your target area, stop and report the collision rather than silently building a competing version.
@@ -569,16 +569,28 @@ assigned role and read its file.
 - Security reviewer must read `docs/agents/roles/security.md`.
 - Council Chair must read `docs/agents/roles/council-chair.md`.
 
-Do not adopt another agent's responsibilities unless Cheek explicitly reassigns them.
+Do not adopt another agent's **owned** slice unless Cheek explicitly reassigns it or
+`CURRENT_STATE.md` marks that work done and unassigned.
 
-Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The default sequence is:
+Codex, Claude, and Grok are **peers**: none outranks the others (Cheek, 2026-08-20,
+refined). Explicit task ownership controls who researches, architects, implements,
+audits, tests, or independently reviews. Default strengths differ; they are preference,
+not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind (for
+example remaining Tranche A edit points for Codex, Tranche B+ product code for Claude,
+and no competing Timeline / Alerts / Action Queue rewrite).
+
+Every assigned slice names **one owner** and a **different peer** as **independent
+reviewer**. The owner cannot review their own work. **No code ships without peer
+review** — an owned slice without a named independent reviewer is incomplete.
+
+Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The preferred sequence is:
 
 ```text
 Research -> Architecture -> Build -> Security Review -> QA Audit -> Council -> Cheek approval
 ```
 
-The current task may require only a scoped subset of those roles. Do not create parallel
-implementations of the same slice.
+That sequence is a preferred path, not rank. The current task may require only a scoped
+subset of those stages. Do not create parallel implementations of the same slice.
 
 The only action permitted before the gate below is read-only acquisition of
 `AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the

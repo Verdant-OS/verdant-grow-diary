@@ -10,7 +10,10 @@ SPA, and the architecture table's `src/lib/*Advisor.ts` layer has **zero** files
 (replaced with the real `src/lib/*Service.ts` I/O layer, 26 files). Also fixes
 `.claude/skills/run-verdant-grow-diary/SKILL.md`, which documented
 `tsc -p tsconfig.app.json` — that file no longer exists. `Sentinel-Version`
-bumped to 2026-08-20.1 across all twelve governance files. Docs-only; no code,
+bumped to 2026-09-01.2 across all twelve governance files — this branch merged
+base twice while open, the second time colliding with #1060's peer-elevation bump to
+2026-09-01.1, so #1060's governance content is carried forward intact and re-bumped
+above it. Docs-only; no code,
 schema, migration, RLS, or edge-function change. **No production, GA4, GSC,
 sitemap, or applied-migration axis was re-measured in this edit** — every
 `BLOCKED` / `NOT_MEASURED` label below stands as written by the prior editors,
@@ -641,9 +644,13 @@ Owner-posted `CONFLICT_RECONCILIATION` comments on four then-open DIRTY PRs.
 No rebases, merges, or closes happened in that comment pass. [#933](https://github.com/Verdant-OS/verdant-grow-diary/pull/933)
 was already closed as superseded. This is an ownership/serialisation
 signal (`docs/agents/merge-queue.md`: empty queue + high `DIRTY` count), not
-queue latency. Branch-name authorship is not a role assignment: Grok remains
-Unassigned in the agents table below. The comments handed a recommended rebase
-path to whoever next owned each branch.
+queue latency. Branch-name authorship is not a role assignment. At the time
+those comments were posted, the agents table still framed Grok as research-
+delivery on `ONE_TENT_LOOP_OPERATING_ORDER`; as of 2026-08-20 (refined) Grok is
+**Product Intelligence, Adversarial Audit, and Implementation Lead** — peer with
+Claude/Codex, no role rank (see Agents table and
+`docs/agents/grok-peer-elevation-map-2026-08-20.md`). The comments handed a
+recommended rebase path to whoever next owned each branch.
 
 **Outcomes since recording (verified 2026-08-15 with `gh pr view`):**
 #710 merged 2026-08-14 as `1a3a70d1b`. #936 closed 2026-08-13 without merge;
@@ -767,8 +774,10 @@ the Convex or Postgres spikes below. Owner-only gates remain `BLOCKED`:
 Lovable-apply of `20260813030000_signup_acquisition_forward_repair.sql`,
 and a managed `e2e:one-tent:ui` session. Slice 5 recorded the honest
 `missing_session_json` receipt rather than fabricating a walk. Colliding
-PRs **#828**, **#817**, **#696** stay open and parked — do not start a
-competing Timeline / Alerts / Action Queue UI rewrite. Baseline and
+PRs **#828**, **#817**, and **#696** all closed unmerged on 2026-08-15 within a
+54-minute window (verified 2026-08-21 by direct PR read). The fence they carried
+stands on its own: do not start a competing Timeline / Alerts / Action Queue UI
+rewrite. Baseline and
 post-change receipts: `docs/one-tent-loop-operating-order-baseline.md`.
 Persist-path spec: `docs/specs/one-tent-loop-quicklog-single-write-path.md`.
 
@@ -806,12 +815,28 @@ navigation implementation. Approved design:
 context carry), **D5** (visible user-namespaced "Continue with <plant>?"
 suggestion — silent remembered defaults stay banned), **D7** (plant-scoped
 Better/Same/Worse row in the V2 sheet), and ratifies the design's §11 copy.
-Slice plan: each approved item ships as its own PR — B0a measurement harness
-(test-only, first merge gate), B1 target-precedence rules, D5 slice, D7
-slice, B3a recovery + ratified copy; B2/B3b wait for A5, B4's rules edit
-waits for A2, B5 waits for A3, B0b waits for the owner-gated authenticated
-session/CI path. No schema, no migrations, no new routes, no new Quick Log
-write paths, no production telemetry.
+Slice plan: each approved item ships as its own PR. **Status measured
+2026-08-21 at deploy tip `6cf3ffda` — Tranche B+ is substantially
+delivered, not pending:**
+
+| Slice                                      | Status                                    |
+| ------------------------------------------ | ----------------------------------------- |
+| B0a measurement harness (first merge gate) | **MERGED** — #1039 `de8ebad`              |
+| B1 target-precedence rules                 | **MERGED** — #1040 `9141be8`              |
+| B3a recovery + ratified copy               | **MERGED** — #1042 `9b64456`              |
+| B2a shared save-key policy                 | **MERGED** — #1049 `f09febc`              |
+| B4a `/doctor` loop card                    | **MERGED** — #1047 `cff3efd`              |
+| D7 plant-scoped Better/Same/Worse          | **MERGED** — #1041 `5640d77`              |
+| D5 "Continue with <plant>?"                | **OPEN** — #1043                          |
+| B2b                                        | still deferred to **A5** (unopened)       |
+| B4b                                        | still deferred to **A2** (unopened)       |
+| B5                                         | waits for **A3** (unopened)               |
+| B0b                                        | owner-gated authenticated session/CI path |
+
+Note the new dependency this created: B2b and B4b now block on Tranche A
+slices that have never been opened, so Tranche A is no longer only its own
+tranche — it gates the completion of Tranche B+. No schema, no migrations,
+no new routes, no new Quick Log write paths, no production telemetry.
 
 **Named isolated spike (approved 2026-08-13, not SEO):**
 `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE`. Cheek approved a spec-first,
@@ -1158,11 +1183,11 @@ schema change and does not authorize production writes.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                            |
-| Claude            | `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                                                                                                                                                                                                                                                                                            |
-| Grok              | `ONE_TENT_LOOP_OPERATING_ORDER` — repo slices delivered (0 baseline, 2 handoff ids, 3 PlantQuickLog persist-path, 4 smoke-audit alignment). Slices 1 and 5 remain owner-`BLOCKED` (signup apply + managed e2e session); Slice 5 receipt is `missing_session_json` with `fabricated_login_used: false`. Isolated `VERDANT_CURSOR_SDK_LOCAL_ORCHESTRATION_SPIKE` next gates on deploy (#985): live Cursor SDK proof still `BLOCKED` without a local `CURSOR_API_KEY`. Also recorded the 2026-08-15 Lovable Knowledge rewrite and this CURRENT_STATE merge. Not Unassigned. Reuse of the dispatcher is not approved. Does not pause Convex/Postgres spikes. Production Convex remains HOLD |
-| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                            |
+| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                                                                                                                                                                                  |
+| Claude            | **One-Tent Loop Tranche B+ — architect and implementer (Cheek, 2026-08-19). Substantially delivered as of 2026-08-21:** B0a (#1039), B1 (#1040), B3a (#1042), B2a (#1049), B4a (#1047) and D7 (#1041) merged; D5 (#1043) open; B2b/B4b/B5 blocked on unopened Tranche A slices A5/A2/A3. Also delivered #1062, the routed `CURRENT_STATE` refresh specification (`docs/specs/current-state-refresh-2026-08-20.md`). `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                              |
+| Grok              | **Product Intelligence, Adversarial Audit, and Implementation Lead** (Cheek 2026-08-20, refined). Equally empowered to research, audit the live app, implement assigned slices, test, and independently review. Peer with Claude and Codex — **none outranks the others**; explicit task ownership controls. SEO/market/backlink strength retained (not a fence). Map: `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Does **not** take Tranche A remaining edit points (Codex) or Tranche B+ product code (Claude) unless done and unassigned. Prior delivered work unchanged: `ONE_TENT_LOOP_OPERATING_ORDER` repo slices 0/2/3/4; Slices 1 and 5 owner-`BLOCKED`; Cursor SDK spike gates on #985 / `CURSOR_API_KEY`. Reuse of the dispatcher not approved. Convex/Postgres spikes not paused. Production Convex HOLD. Not Unassigned |
+| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                                                                                                                                                                                  |

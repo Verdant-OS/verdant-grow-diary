@@ -13,7 +13,7 @@ import {
   buildPlantQuickLogPrefill,
   type PlantQuickLogPrefill,
 } from "@/lib/plantQuickLogPrefillRules";
-import { timelinePath } from "@/lib/routes";
+import { actionsPath, alertsPath, timelinePath } from "@/lib/routes";
 
 export type OneTentLoopStep =
   | "grow"
@@ -142,6 +142,12 @@ export function resolveOneTentLoopNextStep(
   };
 
   const { growId, tentId, plantId, alertId, actionId } = ids;
+  // Normalization only: blank becomes null for a bare index path. Consuming
+  // pages still validate the requested grow against their authenticated rows.
+  const normalizedGrowId =
+    typeof growId === "string" && growId.trim().length > 0 ? growId.trim() : null;
+  const normalizedTentId =
+    typeof tentId === "string" && tentId.trim().length > 0 ? tentId.trim() : null;
 
   switch (current) {
     case "grow":
@@ -151,8 +157,9 @@ export function resolveOneTentLoopNextStep(
       if (tentId) return enable(base, `/tents/${tentId}`);
       return base;
     case "tent":
+      // CTA is "Open plant" — must route to an actual plant, never self-link
+      // back to Tent Detail. Without a selected plant, stay disabled.
       if (plantId) return enable(base, `/plants/${plantId}`);
-      if (tentId) return enable(base, `/tents/${tentId}`);
       return base;
     case "plant":
       {
@@ -179,20 +186,26 @@ export function resolveOneTentLoopNextStep(
       // an arbitrary query value into a sensor query.
       return enable(base, buildSensorsTentRouteHref(tentId));
     case "sensor-snapshot":
+      if (normalizedGrowId && normalizedTentId) {
+        return enable(
+          base,
+          `/doctor?growId=${encodeURIComponent(normalizedGrowId)}&tentId=${encodeURIComponent(normalizedTentId)}`,
+        );
+      }
       return enable(base, "/doctor");
     case "ai-doctor":
       // When a specific alertId is available, deep-link to that alert.
       // Otherwise fall back to the alerts index AND relabel the CTA so
       // the operator knows they are reviewing alerts, not opening one.
       if (alertId) return enable(base, `/alerts/${alertId}`);
-      return { ...enable(base, "/alerts"), ctaLabel: "Review alerts" };
+      return { ...enable(base, alertsPath(normalizedGrowId)), ctaLabel: "Review alerts" };
     case "alert":
       // CTA is "Add to Action Queue" — must route to the Action Queue
       // surface (/actions), not back to alerts. Action Queue items
       // remain approval-required; this CTA does NOT create or approve
       // anything automatically — it only navigates the operator there.
       if (actionId) return enable(base, `/actions/${actionId}`);
-      return enable(base, "/actions");
+      return enable(base, actionsPath(normalizedGrowId));
     case "action-queue":
       if (actionId) return enable(base, `/actions/${actionId}`);
       return enable(base, "/actions");

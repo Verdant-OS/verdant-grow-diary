@@ -20,8 +20,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: candidate-number-maintenance-migrations
+  group: verdant-production-migration-writer
   cancel-in-progress: false
+  queue: max
 
 jobs:
   validate:

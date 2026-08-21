@@ -1,12 +1,15 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { rootCertificates } from "node:tls";
 import { pathToFileURL } from "node:url";
 import { load as loadYaml } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
+import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSupabaseTls.mjs";
 
 const RUNNER_PATH = resolve("scripts/apply-signup-acquisition-forward-repair.mjs");
 const WORKFLOW_PATH = resolve(".github/workflows/apply-signup-acquisition-forward-repair.yml");
+const RUNBOOK_PATH = resolve("docs/signup-attribution-outage-operator-runbook.md");
 const MIGRATION_PATH = resolve(
   "supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql",
 );
@@ -29,6 +32,30 @@ const EXPECTED_RUN_ID = "99887766";
 const EXPECTED_RUN_ATTEMPT = "1";
 const DATABASE_SECRET = "signup-repair-database-secret";
 const DATABASE_URL = `postgres://postgres:${DATABASE_SECRET}@db.${PRODUCTION_PROJECT_REF}.supabase.co:5432/postgres?sslmode=require`;
+const RAW_CA_SECRET_SENTINEL = "raw-ca-secret-must-not-reach-psql";
+const SOLO_FOUNDER_ACKNOWLEDGEMENT = "I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN";
+const SOLO_FOUNDER_AUTHORIZATION_ENV = Object.freeze({
+  SOLO_FOUNDER_DELIVERY_MODE: "solo_founder_self_review_v1",
+  SOLO_FOUNDER_VERIFIED_USER_ID: "72639960",
+  SOLO_FOUNDER_VERIFIED_LOGIN: "cheekhimself",
+  SOLO_FOUNDER_VERIFIED_ENVIRONMENT: "verdant-production-solo-founder",
+  SOLO_FOUNDER_ACKNOWLEDGEMENT_VERIFIED: "true",
+  SOLO_FOUNDER_ENVIRONMENT_CONTRACT_VERIFIED: "true",
+  SOLO_FOUNDER_ENVIRONMENT_APPROVAL_VERIFIED: "true",
+  SOLO_FOUNDER_MINIMUM_REVIEW_SECONDS: "900",
+  SOLO_FOUNDER_MAXIMUM_REVIEW_SECONDS: "86400",
+});
+const SOLO_FOUNDER_AUTHORIZATION_RECEIPT = Object.freeze({
+  delivery_mode: "solo_founder_self_review_v1",
+  founder_github_user_id: 72639960,
+  founder_github_login: "cheekhimself",
+  production_environment: "verdant-production-solo-founder",
+  solo_founder_acknowledgement_verified: true,
+  environment_contract_verified: true,
+  environment_approval_verified: true,
+  minimum_review_seconds: 900,
+  maximum_review_seconds: 86400,
+});
 
 const EXPECTED_SOURCES = [
   "blueprint_targets",
@@ -198,6 +225,22 @@ function preflightStdout({
   })}\n`;
 }
 
+const temporaryRoots: string[] = [];
+
+function productionTlsEnv() {
+  const root = mkdtempSync(join(tmpdir(), "verdant-signup-repair-tls-test-"));
+  temporaryRoots.push(root);
+  const caPath = join(root, PRODUCTION_SUPABASE_CA_FILENAME);
+  const testCa = rootCertificates[0];
+  if (!testCa) throw new Error("Node did not provide a test root certificate.");
+  writeFileSync(caPath, testCa, { mode: 0o600 });
+  return {
+    RUNNER_TEMP: root,
+    SUPABASE_DB_CA_CERT_PATH: caPath,
+    SUPABASE_DB_CA_CERT_B64: RAW_CA_SECRET_SENTINEL,
+  };
+}
+
 function baseEnv(extra: Record<string, string> = {}) {
   return {
     OPERATION: "APPLY",
@@ -216,7 +259,10 @@ function baseEnv(extra: Record<string, string> = {}) {
     GITHUB_RUN_ATTEMPT: EXPECTED_RUN_ATTEMPT,
     GITHUB_EVENT_NAME: "workflow_dispatch",
     GITHUB_REF_NAME: "verdant-grow-diary",
+    SOLO_FOUNDER_ACKNOWLEDGEMENT,
+    ...SOLO_FOUNDER_AUTHORIZATION_ENV,
     PATH: process.env.PATH ?? "",
+    ...productionTlsEnv(),
     ...extra,
   };
 }
@@ -230,8 +276,6 @@ async function loadRunner() {
     );
   }
 }
-
-const temporaryRoots: string[] = [];
 
 function temporaryEvidenceEnv() {
   const root = mkdtempSync(join(tmpdir(), "verdant-signup-repair-test-"));
@@ -284,6 +328,11 @@ describe("signup-acquisition forward-repair migration pin", () => {
 
     expect(sql).toContain(migration.text);
     expect(sql).toContain("set transaction isolation level read committed;");
+    expect(sql).toContain("set local search_path = pg_catalog, public, pg_temp;");
+    expect(sql.indexOf("set local search_path = pg_catalog, public, pg_temp;")).toBeLessThan(
+      sql.indexOf("lock table supabase_migrations.schema_migrations"),
+    );
+    expect(sql).not.toContain("set local search_path = public, pg_catalog;");
     expect(sql).toContain("lock table supabase_migrations.schema_migrations");
     expect(sql).toContain("lock table auth.users in share row exclusive mode;");
     expect(sql).toContain("lock table public.profiles in share row exclusive mode;");
@@ -731,7 +780,8 @@ describe("signup-acquisition forward-repair read-only preflight", () => {
     const sql = runner.PREFLIGHT_SQL;
 
     expect(sql).toMatch(/set\s+transaction\s+read\s+only/i);
-    expect(sql).toMatch(/set local search_path = public, pg_catalog;/i);
+    expect(sql).toMatch(/set local search_path = pg_catalog, public, pg_temp;/i);
+    expect(sql).not.toMatch(/set local search_path = public, pg_catalog/i);
     expect(sql).toContain("supabase_migrations.schema_migrations");
     expect(sql).toContain("signup_acquisition_attributions");
     expect(sql).toContain("signup_acquisition_forward_repair");
@@ -828,6 +878,7 @@ describe("signup-acquisition forward-repair execution", () => {
       run_id: EXPECTED_RUN_ID,
       run_attempt: Number(EXPECTED_RUN_ATTEMPT),
       receipt_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
     expect(JSON.parse(readFileSync(evidence.preflightReceiptPath, "utf8"))).toEqual({
       schema_version: 1,
@@ -848,7 +899,32 @@ describe("signup-acquisition forward-repair execution", () => {
       migration_name: "signup_acquisition_forward_repair",
       migration_sha256: EXPECTED_SHA256,
       state_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+      ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
+  });
+
+  it("suppresses psql command tags so the read-only JSON result stays machine-readable", async () => {
+    const runner = await loadRunner();
+    let observedArgs: string[] = [];
+    const spawnImpl = (_command: string, args: string[]) => {
+      observedArgs = args;
+      return {
+        status: 0,
+        stdout: args.includes("-q")
+          ? preflightStdout({ exact: 1, schema: LIVE_SCHEMA })
+          : `SET\nSET\nSET\nSET\n${preflightStdout({ exact: 1, schema: LIVE_SCHEMA })}`,
+        stderr: "",
+      };
+    };
+
+    expect(
+      runner.runSignupAcquisitionForwardRepair({
+        env: baseEnv({ OPERATION: "PREFLIGHT", CONFIRM_APPLY: "" }),
+        spawnImpl,
+        logger: { log: () => {}, error: () => {} },
+      }),
+    ).toBe(runner.EXIT.OK);
+    expect(observedArgs).toEqual(runner.buildReadOnlyPsqlArgs());
   });
 
   it("runs PREFLIGHT as read-only verification when the repair is already applied", async () => {
@@ -909,6 +985,94 @@ describe("signup-acquisition forward-repair execution", () => {
       ).toBe(runner.EXIT.INPUT_REJECTED);
     }
     expect(calls).toBe(0);
+  });
+
+  it("rejects every missing or altered solo-founder authorization value before psql", async () => {
+    const runner = await loadRunner();
+    const protectedValues = {
+      GITHUB_RUN_ATTEMPT: EXPECTED_RUN_ATTEMPT,
+      SOLO_FOUNDER_ACKNOWLEDGEMENT,
+      ...SOLO_FOUNDER_AUTHORIZATION_ENV,
+    };
+    const cases = Object.entries(protectedValues).flatMap(([key, value]) => [
+      { key, value: undefined },
+      { key, value: value === "true" ? "false" : `${value}-altered` },
+    ]);
+
+    for (const { key, value } of cases) {
+      const evidence = temporaryEvidenceEnv();
+      const logs: string[] = [];
+      let calls = 0;
+      const env = baseEnv({
+        REPORT_PATH: evidence.reportPath,
+        AUDIT_PATH: evidence.auditPath,
+        PREFLIGHT_RECEIPT_PATH: evidence.preflightReceiptPath,
+        SUPABASE_DB_URL: `postgres://attacker:${DATABASE_SECRET}@attacker.invalid/db`,
+      });
+      if (value === undefined) delete (env as Record<string, string | undefined>)[key];
+      else (env as Record<string, string | undefined>)[key] = value;
+      const exitCode = runner.runSignupAcquisitionForwardRepair({
+        env,
+        spawnImpl: () => {
+          calls += 1;
+          return { status: 0, stdout: preflightStdout(), stderr: "" };
+        },
+        logger: {
+          log: (line: string) => logs.push(line),
+          error: (line: string) => logs.push(line),
+        },
+      });
+
+      expect(exitCode, key).toBe(runner.EXIT.INPUT_REJECTED);
+      expect(calls, key).toBe(0);
+      const surfaces = [
+        logs.join("\n"),
+        readFileSync(evidence.reportPath, "utf8"),
+        readFileSync(evidence.auditPath, "utf8"),
+      ].join("\n");
+      expect(surfaces, key).toContain("solo_founder_authorization_rejected");
+      expect(surfaces, key).not.toContain(DATABASE_SECRET);
+      expect(surfaces, key).not.toContain("attacker.invalid");
+      expect(existsSync(evidence.preflightReceiptPath), key).toBe(false);
+    }
+  });
+
+  it('rejects GITHUB_RUN_ATTEMPT="2" with fixed authorization evidence before psql', async () => {
+    const runner = await loadRunner();
+    const evidence = temporaryEvidenceEnv();
+    const logs: string[] = [];
+    let calls = 0;
+
+    const exitCode = runner.runSignupAcquisitionForwardRepair({
+      env: baseEnv({
+        GITHUB_RUN_ATTEMPT: "2",
+        REPORT_PATH: evidence.reportPath,
+        AUDIT_PATH: evidence.auditPath,
+        PREFLIGHT_RECEIPT_PATH: evidence.preflightReceiptPath,
+      }),
+      spawnImpl: () => {
+        calls += 1;
+        return { status: 0, stdout: preflightStdout(), stderr: "" };
+      },
+      logger: {
+        log: (line: string) => logs.push(line),
+        error: (line: string) => logs.push(line),
+      },
+    });
+
+    expect(exitCode).toBe(runner.EXIT.INPUT_REJECTED);
+    expect(calls).toBe(0);
+    expect(logs).toEqual(["solo_founder_authorization_rejected"]);
+    expect(readFileSync(evidence.reportPath, "utf8")).toContain(
+      "Reason code: solo_founder_authorization_rejected",
+    );
+    expect(JSON.parse(readFileSync(evidence.auditPath, "utf8"))).toMatchObject({
+      schema_version: 1,
+      tool: "apply-signup-acquisition-forward-repair",
+      outcome: "authorization_rejected",
+      reason_code: "solo_founder_authorization_rejected",
+    });
+    expect(existsSync(evidence.preflightReceiptPath)).toBe(false);
   });
 
   it("rejects APPLY before database access when the deploy branch advanced during review", async () => {
@@ -1001,6 +1165,37 @@ describe("signup-acquisition forward-repair execution", () => {
     expect(calls).toBe(0);
   });
 
+  it("names only the dedicated solo-founder environment in missing-secret guidance", async () => {
+    const runner = await loadRunner();
+    const evidence = temporaryEvidenceEnv();
+    let calls = 0;
+
+    expect(
+      runner.runSignupAcquisitionForwardRepair({
+        env: baseEnv({
+          SUPABASE_DB_URL: "",
+          REPORT_PATH: evidence.reportPath,
+          AUDIT_PATH: evidence.auditPath,
+          PREFLIGHT_RECEIPT_PATH: evidence.preflightReceiptPath,
+        }),
+        spawnImpl: () => {
+          calls += 1;
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        logger: { log: () => {}, error: () => {} },
+      }),
+    ).toBe(runner.EXIT.NO_DATABASE_URL);
+
+    const report = readFileSync(evidence.reportPath, "utf8");
+    expect(report).toContain(
+      "The verdant-production-solo-founder environment did not provide SUPABASE_DB_URL.",
+    );
+    expect(report).not.toContain(
+      "The verdant-production environment did not provide SUPABASE_DB_URL.",
+    );
+    expect(calls).toBe(0);
+  });
+
   it("runs preflight, exact migration plus ledger in one transaction, then postflight", async () => {
     const runner = await loadRunner();
     const evidence = temporaryEvidenceEnv();
@@ -1053,6 +1248,7 @@ describe("signup-acquisition forward-repair execution", () => {
       migration_version: "20260813030000",
       expected_head_sha: EXPECTED_HEAD_SHA,
       observed_head_sha: EXPECTED_HEAD_SHA,
+      ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
     const evidenceText = `${readFileSync(evidence.reportPath, "utf8")}\n${readFileSync(evidence.auditPath, "utf8")}`;
     expect(evidenceText).not.toContain(DATABASE_SECRET);
@@ -1226,46 +1422,85 @@ describe("signup-acquisition forward-repair execution", () => {
     ).toBe(runner.EXIT.POSTFLIGHT_CONTRACT_FAILED);
   });
 
-  it("passes psql only an identity-bound allowlisted environment", async () => {
-    const runner = await loadRunner();
-    let childEnv: Record<string, string> | undefined;
-    const spawnImpl = (
-      _command: string,
-      _args: string[],
-      options: { env: Record<string, string> },
-    ) => {
-      childEnv = options.env;
-      return {
-        status: 0,
-        stdout: preflightStdout({ exact: 1, schema: LIVE_SCHEMA }),
-        stderr: "",
+  it.each(["PREFLIGHT", "APPLY"] as const)(
+    "forces authenticated TLS and an allowlisted psql environment for %s",
+    async (operation) => {
+      const runner = await loadRunner();
+      let childEnv: Record<string, string> | undefined;
+      const spawnImpl = (
+        _command: string,
+        _args: string[],
+        options: { env: Record<string, string> },
+      ) => {
+        childEnv = options.env;
+        return {
+          status: 0,
+          stdout: preflightStdout({ exact: 1, schema: LIVE_SCHEMA }),
+          stderr: "",
+        };
       };
-    };
 
-    expect(
-      runner.runSignupAcquisitionForwardRepair({
-        env: baseEnv({
-          PREFLIGHT_RECEIPT_DIGEST: EXPECTED_LIVE_RECEIPT_DIGEST,
-          DATABASE_URL: "postgres://wrong-target",
-          PGHOST: "wrong-host",
-          SUPABASE_SERVICE_ROLE_KEY: "service-role-token-leak",
-          BRIDGE_TOKEN: "bridge-token-leak",
+      const tls = productionTlsEnv();
+      expect(
+        runner.runSignupAcquisitionForwardRepair({
+          env: baseEnv({
+            ...tls,
+            OPERATION: operation,
+            CONFIRM_APPLY: operation === "APPLY" ? APPLY_CONFIRMATION : "",
+            PREFLIGHT_RECEIPT_DIGEST: EXPECTED_LIVE_RECEIPT_DIGEST,
+            DATABASE_URL: "postgres://wrong-target",
+            PGHOST: "wrong-host",
+            SUPABASE_SERVICE_ROLE_KEY: "service-role-token-leak",
+            BRIDGE_TOKEN: "bridge-token-leak",
+          }),
+          spawnImpl,
+          logger: { log: () => {}, error: () => {} },
         }),
-        spawnImpl,
+      ).toBe(runner.EXIT.OK);
+      expect(childEnv).toMatchObject({
+        PGHOST: `db.${PRODUCTION_PROJECT_REF}.supabase.co`,
+        PGUSER: "postgres",
+        PGDATABASE: "postgres",
+        PGSSLMODE: "verify-full",
+        PGSSLROOTCERT: tls.SUPABASE_DB_CA_CERT_PATH,
+        PGGSSENCMODE: "disable",
+      });
+      expect(childEnv).not.toHaveProperty("DATABASE_URL");
+      expect(childEnv).not.toHaveProperty("SUPABASE_DB_URL");
+      expect(childEnv).not.toHaveProperty("SUPABASE_SERVICE_ROLE_KEY");
+      expect(childEnv).not.toHaveProperty("BRIDGE_TOKEN");
+      expect(childEnv).not.toHaveProperty("SUPABASE_DB_CA_CERT_B64");
+    },
+  );
+
+  it("rejects missing, displaced, or malformed production CA material before psql", async () => {
+    const runner = await loadRunner();
+    const malformedTls = productionTlsEnv();
+    writeFileSync(malformedTls.SUPABASE_DB_CA_CERT_PATH, "not a certificate", { mode: 0o600 });
+    const displacedTls = productionTlsEnv();
+    const scenarios = [
+      { RUNNER_TEMP: "", SUPABASE_DB_CA_CERT_PATH: "" },
+      {
+        ...displacedTls,
+        SUPABASE_DB_CA_CERT_PATH: join(displacedTls.RUNNER_TEMP, "attacker-root.crt"),
+      },
+      malformedTls,
+    ];
+
+    for (const tls of scenarios) {
+      let calls = 0;
+      const exitCode = runner.runSignupAcquisitionForwardRepair({
+        env: baseEnv(tls),
+        spawnImpl: () => {
+          calls += 1;
+          return { status: 0, stdout: preflightStdout(), stderr: "" };
+        },
         logger: { log: () => {}, error: () => {} },
-      }),
-    ).toBe(runner.EXIT.OK);
-    expect(childEnv).toMatchObject({
-      PGHOST: `db.${PRODUCTION_PROJECT_REF}.supabase.co`,
-      PGUSER: "postgres",
-      PGDATABASE: "postgres",
-      PGSSLMODE: "require",
-      PGGSSENCMODE: "disable",
-    });
-    expect(childEnv).not.toHaveProperty("DATABASE_URL");
-    expect(childEnv).not.toHaveProperty("SUPABASE_DB_URL");
-    expect(childEnv).not.toHaveProperty("SUPABASE_SERVICE_ROLE_KEY");
-    expect(childEnv).not.toHaveProperty("BRIDGE_TOKEN");
+      });
+
+      expect(exitCode).toBe(runner.EXIT.TLS_TRUST_REJECTED);
+      expect(calls).toBe(0);
+    }
   });
 });
 
@@ -1291,13 +1526,31 @@ describe("signup-acquisition forward-repair protected workflow", () => {
             type: "string",
             default: "",
           }),
+          expected_preflight_run_attempt: expect.objectContaining({
+            required: false,
+            type: "string",
+            default: "",
+          }),
+          expected_preflight_artifact_sha256: expect.objectContaining({
+            required: false,
+            type: "string",
+            default: "",
+          }),
+          solo_founder_acknowledgement: expect.objectContaining({
+            required: true,
+            type: "string",
+          }),
         },
       },
     });
+    expect(workflow.on.workflow_dispatch.inputs.solo_founder_acknowledgement).not.toHaveProperty(
+      "default",
+    );
     expect(workflow.permissions).toEqual({ contents: "read", actions: "read" });
     expect(workflow.concurrency).toEqual({
-      group: "signup-acquisition-forward-repair",
+      group: "verdant-production-migration-writer",
       "cancel-in-progress": false,
+      queue: "max",
     });
 
     const validate = workflow.jobs.validate;
@@ -1312,10 +1565,21 @@ describe("signup-acquisition forward-repair protected workflow", () => {
     expect(validateCommands).toContain('"APPLY"');
     expect(validateCommands).toContain('"PREFLIGHT"');
     expect(validateCommands).toContain("PREFLIGHT_RUN_ID");
+    expect(validateCommands).toContain("EXPECTED_PREFLIGHT_RUN_ATTEMPT");
+    expect(validateCommands).toContain("EXPECTED_PREFLIGHT_ARTIFACT_SHA256");
+    expect(validateCommands).toContain(SOLO_FOUNDER_ACKNOWLEDGEMENT);
+    expect(validateCommands).toContain("GITHUB_ACTOR_ID");
+    expect(validateCommands).toContain("GITHUB_ACTOR");
+    expect(validateCommands).toContain("GITHUB_TRIGGERING_ACTOR");
+    expect(validateCommands).toContain("GITHUB_RUN_ATTEMPT");
+    expect(validateCommands).toContain("72639960");
+    expect(validateCommands).toContain("cheekhimself");
+    expect(validateCommands).toMatch(/PREFLIGHT[\s\S]*PREFLIGHT_RUN_ID[\s\S]*-n/);
+    expect(validateCommands).toMatch(/APPLY[\s\S]*PREFLIGHT_RUN_ID/);
 
     const apply = workflow.jobs.apply;
     expect(apply.needs).toBe("validate");
-    expect(apply.environment).toBe("verdant-production");
+    expect(apply.environment).toBe("verdant-production-solo-founder");
     expect(apply.env).toMatchObject({
       OPERATION: "${{ inputs.operation }}",
       TARGET_ENV: "production",
@@ -1323,7 +1587,16 @@ describe("signup-acquisition forward-repair protected workflow", () => {
       CONFIRM_PROJECT_REF: "${{ inputs.confirm_project_ref }}",
       CONFIRM_APPLY: "${{ inputs.confirm_apply }}",
       PREFLIGHT_RUN_ID: "${{ inputs.preflight_run_id }}",
+      EXPECTED_PREFLIGHT_RUN_ATTEMPT: "${{ inputs.expected_preflight_run_attempt }}",
+      EXPECTED_PREFLIGHT_ARTIFACT_SHA256: "${{ inputs.expected_preflight_artifact_sha256 }}",
+      SOLO_FOUNDER_ACKNOWLEDGEMENT: "${{ inputs.solo_founder_acknowledgement }}",
     });
+    const auditDirectoryIndex = apply.steps.findIndex((step: any) =>
+      String(step.name ?? "").includes("Prepare sanitized audit directory"),
+    );
+    const authorizationIndex = apply.steps.findIndex((step: any) =>
+      String(step.name ?? "").includes("solo-founder production authorization"),
+    );
     const headResolutionIndex = apply.steps.findIndex((step: any) =>
       String(step.name ?? "").includes("current deploy branch head"),
     );
@@ -1340,11 +1613,33 @@ describe("signup-acquisition forward-repair protected workflow", () => {
     const provenanceIndex = apply.steps.findIndex((step: any) =>
       String(step.name ?? "").includes("authenticated PREFLIGHT artifact"),
     );
+    expect(authorizationIndex).toBe(auditDirectoryIndex + 1);
+    const authorizationStep = apply.steps[authorizationIndex];
+    expect(authorizationStep.run).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"',
+    );
+    expect(authorizationStep.run).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals"',
+    );
+    expect(authorizationStep.run).toContain(
+      'gh api "repos/${GITHUB_REPOSITORY}/environments/verdant-production-solo-founder"',
+    );
+    expect(authorizationStep.run).toContain("deployment-branch-policies?per_page=100");
+    expect(authorizationStep.run.match(/\bgh api\b/g) ?? []).toHaveLength(4);
+    expect(authorizationStep.run.match(/--jq/g) ?? []).toHaveLength(4);
+    expect(authorizationStep.run).toContain(
+      "node scripts/verify-solo-founder-production-authorization.mjs",
+    );
+    expect(authorizationStep.run).toContain('"outcome":"authorization_rejected"');
+    expect(authorizationStep.run).toContain('"reason_code":"solo_founder_authorization_rejected"');
     expect(provenanceIndex).toBeGreaterThan(-1);
     expect(apply.steps[provenanceIndex].run).toContain("$AUDIT_PATH");
     expect(apply.steps[provenanceIndex].run).toContain('"outcome":"artifact_rejected"');
     expect(apply.steps[provenanceIndex].run).toContain('"reason_code":"artifact_rejected"');
     expect(apply.steps[provenanceIndex].run).not.toContain('"reason_code":"receipt_missing"');
+    expect(authorizationIndex).toBeLessThan(provenanceIndex);
+    expect(authorizationIndex).toBeLessThan(secretGuardIndex);
+    expect(authorizationIndex).toBeLessThan(postgresInstallIndex);
     expect(provenanceIndex).toBeLessThan(headResolutionIndex);
     expect(secretGuardIndex).toBeLessThan(headResolutionIndex);
     expect(postgresInstallIndex).toBeLessThan(headResolutionIndex);
@@ -1380,12 +1675,100 @@ describe("signup-acquisition forward-repair protected workflow", () => {
     expect(receiptUpload.with.name).toContain("${{ github.run_id }}");
     expect(receiptUpload.with.name).toContain("${{ github.run_attempt }}");
     expect(receiptUpload.with.path).toContain("preflight-receipt.json");
-    const upload = apply.steps.find(
-      (step: any) =>
-        String(step.uses ?? "").startsWith("actions/upload-artifact@") &&
-        String(step.name ?? "").includes("sanitized evidence"),
+  });
+
+  it("fails a successful delivery closed when its immutable evidence upload fails", () => {
+    const parsed = loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const apply = parsed.jobs.apply;
+    const successUpload = apply.steps.find(
+      (step: Record<string, string>) =>
+        step.name === "Upload sanitized evidence after successful delivery",
     );
-    expect(upload.if).toBe("always()");
-    expect(upload.with["if-no-files-found"]).toBe("error");
+
+    expect(successUpload).toBeDefined();
+    expect(successUpload.if).toBe("success()");
+    expect(successUpload).not.toHaveProperty("continue-on-error");
+    expect(successUpload.uses).toBe(
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    );
+    expect(successUpload.with.name).toBe(
+      "signup-acquisition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+    );
+    expect(successUpload.with.path).toContain("audit/signup-acquisition-forward-repair/report.md");
+    expect(successUpload.with.path).toContain("audit/signup-acquisition-forward-repair/audit.json");
+    expect(successUpload.with["if-no-files-found"]).toBe("error");
+    expect(successUpload.with["retention-days"]).toBe(30);
+  });
+
+  it("keeps failed or cancelled evidence publication best-effort without masking the failure", () => {
+    const parsed = loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const apply = parsed.jobs.apply;
+    const summary = apply.steps.find(
+      (step: Record<string, string>) => step.name === "Publish sanitized summary",
+    );
+    const failureUpload = apply.steps.find(
+      (step: Record<string, string>) =>
+        step.name === "Upload sanitized evidence after failed or cancelled delivery",
+    );
+    const cleanupIndex = apply.steps.findIndex(
+      (step: Record<string, string>) => step.name === "Remove Supabase production CA",
+    );
+    const failureUploadIndex = apply.steps.indexOf(failureUpload);
+
+    expect(summary.if).toContain("always()");
+    expect(summary["continue-on-error"]).toBe(true);
+    expect(failureUpload).toBeDefined();
+    expect(failureUpload.if).toBe("failure() || cancelled()");
+    expect(failureUpload["continue-on-error"]).toBe(true);
+    expect(failureUpload.uses).toBe(
+      "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    );
+    expect(failureUpload.with.name).toBe(
+      "signup-acquisition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}",
+    );
+    expect(failureUpload.with.path).toContain("audit/signup-acquisition-forward-repair/report.md");
+    expect(failureUpload.with.path).toContain("audit/signup-acquisition-forward-repair/audit.json");
+    expect(failureUpload.with["if-no-files-found"]).toBe("error");
+    expect(failureUpload.with["retention-days"]).toBe(30);
+    expect(failureUploadIndex).toBeLessThan(cleanupIndex);
+    expect(apply.steps[cleanupIndex].if).toBe("always()");
+  });
+
+  it("documents the exact solo-founder ceremony without authorizing browser/account E2E", () => {
+    const runbook = readFileSync(RUNBOOK_PATH, "utf8");
+
+    for (const required of [
+      "verdant-production-solo-founder",
+      "cheekhimself",
+      "72639960",
+      "Prevent self-review OFF",
+      "administrator bypass OFF",
+      "verdant-grow-diary",
+      SOLO_FOUNDER_ACKNOWLEDGEMENT,
+      "15 minutes",
+      "24 hours",
+      "expected_preflight_run_attempt",
+      "expected_preflight_artifact_sha256",
+      "signup-acquisition-forward-repair-preflight-run-<RUN_ID>-attempt-1",
+      "fresh dispatch",
+      "This proves founder identity, intent, provenance, and elapsed time; it is not independent human review.",
+    ]) {
+      expect(runbook).toContain(required);
+    }
+    expect(runbook).toMatch(/founder self-review/i);
+    expect(runbook).toMatch(/never use[^\n]*signup-acquisition-forward-repair-evidence/i);
+    expect(runbook).toMatch(/exactly one required reviewer/i);
+    expect(runbook).toContain(
+      "The runner fails closed in this order:\n\n1. exact solo-founder authorization evidence and protected workflow attempt `1`;",
+    );
+    expect(runbook).toMatch(
+      /Before the apply transaction commits, correct the enumerated blocker, then use a fresh\s+`workflow_dispatch` at attempt `1`; no persistent write is assumed\./,
+    );
+    expect(runbook).toMatch(/fresh (?:Verdant )?account or browser E2E[^\n]*(?:separate|outside)/i);
+    expect(runbook).not.toContain("reviewer (who is not the dispatcher)");
+    expect(runbook).not.toContain("prevent-self-review enabled");
+    expect(runbook).not.toContain(
+      "Before the apply transaction commits, rerun after correcting the enumerated blocker",
+    );
   });
 });

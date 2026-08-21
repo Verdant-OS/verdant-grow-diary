@@ -12,23 +12,25 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export const PLANT_LOG_DAYS_WINDOW = 60;
+
+export async function fetchPlantLogDays(plantId: string): Promise<Array<string | null>> {
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase.from("diary_entries").select("entry_at").eq("plant_id", plantId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).limit(PLANT_LOG_DAYS_WINDOW);
+  });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.entry_at);
+}
 
 export function usePlantLogDays(plantId: string | null | undefined) {
   return useQuery<Array<string | null>>({
     queryKey: ["diary_entries", "plant_log_days", plantId ?? null],
     enabled: !!plantId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("diary_entries")
-        .select("entry_at")
-        .eq("plant_id", plantId as string)
-        .is("retracted_at", null)
-        .order("entry_at", { ascending: false })
-        .limit(PLANT_LOG_DAYS_WINDOW);
-      if (error) throw error;
-      return (data ?? []).map((r) => (r as { entry_at: string | null }).entry_at);
-    },
+    queryFn: () => fetchPlantLogDays(plantId as string),
   });
 }

@@ -30,6 +30,8 @@ describe("useDashboardScopedData hook — read-only scoped fetches", () => {
     expect(HOOK).toMatch(
       /from\(\s*["']diary_entries["']\s*\)[\s\S]*?\.eq\(\s*["']grow_id["']\s*,\s*growId\s*\)[\s\S]*?\.order\(\s*["']entry_at["']\s*,\s*\{\s*ascending:\s*false\s*\}\s*\)[\s\S]*?\.limit\(\s*5\s*\)/,
     );
+    expect(HOOK).toContain("selectWithRetractionCompat");
+    expect(HOOK).toMatch(/\.is\(\s*["']retracted_at["']\s*,\s*null\s*\)/);
   });
 
   it("fetches latest 5 action_queue_events by grow_id, newest-first", () => {

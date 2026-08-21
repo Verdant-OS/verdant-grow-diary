@@ -30,29 +30,61 @@ import {
 } from "@/components/ui/drawer";
 import { supabase } from "@/integrations/supabase/client";
 import { PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY } from "@/lib/publicQuickLogStarterRules";
+import {
+  parseRecentTargetRecord,
+  RECENT_TARGET_STORAGE_KEY_PREFIX,
+} from "@/lib/quickLogRecentTargetSuggestion";
 
 type CheckStatus = "pass" | "warn" | "fail" | "skip";
+
+interface LocalSchemaValidationIssue {
+  kind: "shape-mismatch" | "clock-mismatch";
+  detail: string;
+}
 
 interface CheckResult {
   name: string;
   status: CheckStatus;
   detail: string;
   meta?: string;
+  /**
+   * Overrides the canned remediation copy. The two defaults ("invalid JSON"
+   * and "schema version mismatch") would both misdescribe a value that parses
+   * and carries no version but has the wrong shape.
+   */
+  remediationAction?: string;
+  /** False when the warning is advisory and clearing would discard usable data. */
+  clearRecommended?: boolean;
 }
 
-const LOCAL_SCHEMAS: Array<{
+interface LocalSchema {
   key: string;
   label: string;
   expectedVersion?: number;
   optional: boolean;
-}> = [
+  /**
+   * Optional allowlist for field names that are safe to render as metadata.
+   * Discovered account-scoped records can contain arbitrary grower-controlled
+   * keys, so their drawer must never preview every property name.
+   */
+  previewFields?: readonly string[];
+  /**
+   * Optional semantic check for schemas with no `v` field. Valid JSON is not the
+   * same as a usable record: `{}` parses fine and is still rejected by the
+   * feature that reads it, so without this the panel would report a value as
+   * healthy while the feature silently ignores it. Returns null when the record
+   * is usable, or a classified reason to show the grower.
+   */
+  validate?: (raw: string) => LocalSchemaValidationIssue | null;
+}
+
+const LOCAL_SCHEMAS: LocalSchema[] = [
   {
     key: PUBLIC_QUICK_LOG_STARTER_DRAFT_KEY,
     label: "Public Quick Log starter draft",
     expectedVersion: 1,
     optional: true,
   },
-  { key: "verdant.quickLog.lastTarget.v1", label: "Quick Log last target", optional: true },
   {
     key: "verdant.quickLogHandoff.notNow.v1",
     label: "Quick Log handoff dismissal",
@@ -69,6 +101,110 @@ const LOCAL_SCHEMAS: Array<{
     optional: true,
   },
 ];
+
+const SCOPED_LAST_TARGET_LABEL = "Quick Log last target";
+const SCOPED_LAST_TARGET_PREVIEW_FIELDS = ["plantId", "growId", "tentId", "savedAt"] as const;
+
+/**
+ * The Quick Log last-target memory is account-scoped
+ * (`verdant.quickLog.lastTarget.v2.<userId>`), so it cannot appear in the
+ * static list above — the account id is part of the key. Enumerate whatever
+ * this device actually holds instead. On a shared browser that surfaces one
+ * row per account, which is the point: a grower can see and clear another
+ * account's leftover target. The retired unscoped `…lastTarget.v1` key is
+ * deliberately absent; nothing writes it any more.
+ *
+ * Only key names are read here. Values stay unread until `checkLocalSchema`
+ * inspects them, and are never printed. The account segment is never shown
+ * either — see `redactStorageKey`.
+ */
+function discoverScopedSchemas(now: number = Date.now()): typeof LOCAL_SCHEMAS {
+  const s = safeStorage();
+  if (!s) return [];
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < s.length; i += 1) {
+      const key = s.key(i);
+      if (key && key.startsWith(RECENT_TARGET_STORAGE_KEY_PREFIX)) keys.push(key);
+    }
+  } catch {
+    return [];
+  }
+  // Stable order with an explicit tie-breaker so repeat runs read identically.
+  keys.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return keys.map((key, index) => ({
+    key,
+    label:
+      keys.length === 1
+        ? SCOPED_LAST_TARGET_LABEL
+        : `${SCOPED_LAST_TARGET_LABEL} (account ${index + 1} of ${keys.length} on this device)`,
+    optional: true,
+    previewFields: SCOPED_LAST_TARGET_PREVIEW_FIELDS,
+    validate: (raw: string) => {
+      const record = parseRecentTargetRecord(raw);
+      if (!record) {
+        return {
+          kind: "shape-mismatch",
+          detail: "the stored record is missing a usable plantId/savedAt pair",
+        };
+      }
+      if (!Number.isFinite(now)) {
+        return {
+          kind: "clock-mismatch",
+          detail: "the current time is unavailable, so savedAt cannot be verified",
+        };
+      }
+      // Match the remembered-target suggestion rule exactly: equality is
+      // usable, but a timestamp later than the current clock is not evidence
+      // of a recent save and must fail closed. Expired records remain valid.
+      if (Date.parse(record.savedAt) > now) {
+        return {
+          kind: "clock-mismatch",
+          detail: "savedAt is in the future relative to this device's current time",
+        };
+      }
+      return null;
+    },
+  }));
+}
+
+/** Label for a key no descriptor could be found for. Never a raw key. */
+function fallbackSchemaLabel(key: string): string {
+  return key.startsWith(RECENT_TARGET_STORAGE_KEY_PREFIX)
+    ? SCOPED_LAST_TARGET_LABEL
+    : redactStorageKey(key);
+}
+
+/**
+ * Storage keys are shown to the grower, and the account-scoped last-target key
+ * carries a raw account uuid in its name. Elide that segment everywhere a key
+ * is rendered — check rows, the remediation checklist, the review drawer and
+ * the backup list alike. The real key stays in the data so clearing and
+ * restoring still target the right entry; only the display is redacted.
+ */
+function redactStorageKey(key: string): string {
+  return key.startsWith(RECENT_TARGET_STORAGE_KEY_PREFIX)
+    ? `${RECENT_TARGET_STORAGE_KEY_PREFIX}<account>`
+    : key;
+}
+
+const INVALID_JSON_DETAIL =
+  "Stored value is not valid JSON. The parser error is withheld because it can quote the stored value.";
+
+type StoredJsonResult = { ok: true; value: unknown } | { ok: false };
+
+/**
+ * JSON parser boundary for anything rendered by local-data diagnostics.
+ * V8 parser messages can quote the beginning of the stored value, so the
+ * exception itself must never leave this function.
+ */
+function parseStoredJson(raw: string): StoredJsonResult {
+  try {
+    return { ok: true, value: JSON.parse(raw) };
+  } catch {
+    return { ok: false };
+  }
+}
 
 function safeStorage(): Storage | null {
   try {
@@ -132,19 +268,21 @@ function checkLocalSchema(schema: (typeof LOCAL_SCHEMAS)[number]): CheckResult {
     };
   }
   const sizeBytes = new Blob([raw]).size;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
+  const parseResult = parseStoredJson(raw);
+  if (!parseResult.ok) {
     return {
       name: schema.label,
       status: "fail",
-      detail: `Present but not valid JSON (${sizeBytes} bytes). Clearing the key in DevTools will remove the corrupt value. Error: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
+      // Never echo the parser exception. V8's SyntaxError message quotes an
+      // excerpt of the offending input, so printing it would put the stored
+      // value on screen — the exact thing this panel promises it never does.
+      // The position is useless to a grower anyway; "it is corrupt, clear it"
+      // is the whole actionable content.
+      detail: `${INVALID_JSON_DETAIL} Size: ${sizeBytes} bytes. Clearing the key will remove the corrupt value.`,
       meta: schema.key,
     };
   }
+  const parsed = parseResult.value;
   if (schema.expectedVersion !== undefined) {
     const v =
       parsed && typeof parsed === "object" && "v" in parsed
@@ -160,6 +298,22 @@ function checkLocalSchema(schema: (typeof LOCAL_SCHEMAS)[number]): CheckResult {
         meta: schema.key,
       };
     }
+  }
+  const validationIssue = schema.validate?.(raw) ?? null;
+  if (validationIssue) {
+    const isClockMismatch = validationIssue.kind === "clock-mismatch";
+    return {
+      name: schema.label,
+      status: "warn",
+      detail: isClockMismatch
+        ? `Present and valid JSON (${sizeBytes} bytes), but ${validationIssue.detail}. Quick Log temporarily withholds this remembered target; the stored target remains intact.`
+        : `Present and valid JSON (${sizeBytes} bytes), but ${validationIssue.detail}. Whatever reads this key ignores it, so the stored value has no effect.`,
+      meta: schema.key,
+      remediationAction: isClockMismatch
+        ? "Check this device's date and time. Once the clock reaches the saved time, Quick Log can consider this target again; current grow, tent, and plant checks still apply. The stored target is intact, so no clearing is needed."
+        : "This stored value parses as JSON but does not match the shape this build expects, so the feature that reads it ignores it entirely. Nothing is broken — clearing it just removes a value that can never be used again. Server data is unaffected.",
+      clearRecommended: !isClockMismatch,
+    };
   }
   return {
     name: schema.label,
@@ -296,7 +450,21 @@ function StatusBadge({ status }: { status: CheckStatus }) {
 
 const LOCAL_SCHEMA_KEYS = new Set(LOCAL_SCHEMAS.map((s) => s.key));
 
-export function LocalDataHealthPanel() {
+/**
+ * A key is clearable from this panel only if it is one of ours. Account-scoped
+ * last-target keys qualify by prefix, since their full names are not known
+ * ahead of time.
+ */
+function isLocalSchemaKey(key: string): boolean {
+  return LOCAL_SCHEMA_KEYS.has(key) || key.startsWith(RECENT_TARGET_STORAGE_KEY_PREFIX);
+}
+
+interface LocalDataHealthPanelProps {
+  /** Injectable clock for deterministic scoped-record freshness checks. */
+  now?: () => number;
+}
+
+export function LocalDataHealthPanel({ now = Date.now }: LocalDataHealthPanelProps = {}) {
   const [checks, setChecks] = useState<CheckResult[]>([]);
   const [running, setRunning] = useState(false);
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
@@ -307,9 +475,10 @@ export function LocalDataHealthPanel() {
   const run = useCallback(async () => {
     setRunning(true);
     try {
+      const currentTime = now();
       const local: CheckResult[] = [
         checkStorageAvailability(),
-        ...LOCAL_SCHEMAS.map(checkLocalSchema),
+        ...[...LOCAL_SCHEMAS, ...discoverScopedSchemas(currentTime)].map(checkLocalSchema),
       ];
       let diary: CheckResult[] = [];
       try {
@@ -328,7 +497,7 @@ export function LocalDataHealthPanel() {
     } finally {
       setRunning(false);
     }
-  }, []);
+  }, [now]);
 
   useEffect(() => {
     void run();
@@ -344,7 +513,10 @@ export function LocalDataHealthPanel() {
       checks
         .filter(
           (c) =>
-            (c.status === "fail" || c.status === "warn") && c.meta && LOCAL_SCHEMA_KEYS.has(c.meta),
+            (c.status === "fail" || c.status === "warn") &&
+            c.meta &&
+            isLocalSchemaKey(c.meta) &&
+            c.clearRecommended !== false,
         )
         .map((c) => c.meta as string),
     ),
@@ -376,7 +548,9 @@ export function LocalDataHealthPanel() {
           s.removeItem(key);
           cleared.push(key);
         } catch (err) {
-          errors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
+          errors.push(
+            `${redactStorageKey(key)}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       }
       const parts: string[] = [];
@@ -499,7 +673,7 @@ export function LocalDataHealthPanel() {
                 <p className="text-xs text-muted-foreground mt-1 break-words">{c.detail}</p>
                 {c.meta && (
                   <p className="text-[11px] text-muted-foreground/80 mt-0.5 font-mono break-all">
-                    key: {c.meta}
+                    key: {redactStorageKey(c.meta)}
                   </p>
                 )}
               </li>
@@ -525,6 +699,7 @@ export function LocalDataHealthPanel() {
         onCancel={() => setDrawerKeys(null)}
         onConfirm={(keys) => void handleConfirmClear(keys)}
         running={running}
+        now={now}
       />
     </>
   );
@@ -545,7 +720,15 @@ function buildRemediation(check: CheckResult): RemediationStep | null {
   if (check.status !== "fail" && check.status !== "warn") return null;
 
   // Local schema keys — safe to clear from this device.
-  if (check.meta && LOCAL_SCHEMA_KEYS.has(check.meta)) {
+  if (check.meta && isLocalSchemaKey(check.meta)) {
+    if (check.remediationAction) {
+      return {
+        severity: check.status === "fail" ? "fail" : "warn",
+        title: check.name,
+        action: check.remediationAction,
+        fixableKey: check.clearRecommended === false ? undefined : check.meta,
+      };
+    }
     if (check.status === "fail") {
       return {
         severity: "fail",
@@ -666,7 +849,7 @@ function RemediationChecklist({ checks, onReviewKey, running }: RemediationCheck
                       Review & clear…
                     </Button>
                     <span className="text-[11px] text-muted-foreground font-mono break-all">
-                      {s.fixableKey}
+                      {redactStorageKey(s.fixableKey)}
                     </span>
                   </div>
                 )}
@@ -714,8 +897,16 @@ interface RemediationEntry {
   expectedVersion?: number;
   present: boolean;
   sizeBytes: number;
-  category: "invalid-json" | "version-mismatch" | "read-error" | "missing-required" | "unknown";
+  category:
+    | "invalid-json"
+    | "version-mismatch"
+    | "shape-mismatch"
+    | "clock-mismatch"
+    | "read-error"
+    | "missing-required"
+    | "unknown";
   errorMessage: string;
+  clearRecommended?: boolean;
   foundVersion?: unknown;
   // Redacted safe metadata (never raw values):
   topLevelFieldPreview?: Array<{ name: string; displayed: string }>;
@@ -727,9 +918,14 @@ interface RemediationEntry {
   };
 }
 
-function buildRemediationEntry(key: string): RemediationEntry {
-  const schema = LOCAL_SCHEMAS.find((s) => s.key === key);
-  const label = schema?.label ?? key;
+function buildRemediationEntry(key: string, now: number): RemediationEntry {
+  const schema =
+    LOCAL_SCHEMAS.find((s) => s.key === key) ??
+    discoverScopedSchemas(now).find((s) => s.key === key);
+  // Rediscovery can miss: the key may have been removed between the run and
+  // this drawer (another tab, DevTools), or storage may have become
+  // unavailable. The fallback must still never print an account uuid.
+  const label = schema?.label ?? fallbackSchemaLabel(key);
   const expectedVersion = schema?.expectedVersion;
 
   const s = safeStorage();
@@ -790,10 +986,8 @@ function buildRemediationEntry(key: string): RemediationEntry {
     else charClassSummary.nonAscii += 1;
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
+  const parseResult = parseStoredJson(raw);
+  if (!parseResult.ok) {
     return {
       key,
       label,
@@ -801,10 +995,14 @@ function buildRemediationEntry(key: string): RemediationEntry {
       present: true,
       sizeBytes,
       category: "invalid-json",
-      errorMessage: err instanceof Error ? err.message : String(err),
+      // Same reason as `checkLocalSchema`: the parser exception can quote the
+      // stored value. The redacted field preview and char-class summary below
+      // are how this drawer describes a value without printing it.
+      errorMessage: INVALID_JSON_DETAIL,
       charClassSummary,
     };
   }
+  const parsed = parseResult.value;
 
   // Parseable JSON — build a redacted top-level field preview. We show
   // field NAMES only, plus the `v` version integer (which is metadata,
@@ -814,8 +1012,13 @@ function buildRemediationEntry(key: string): RemediationEntry {
   let foundVersion: unknown;
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     const obj = parsed as Record<string, unknown>;
-    if ("v" in obj) foundVersion = obj.v;
-    topLevelFieldPreview = Object.keys(obj).map((name) => {
+    // Only versioned schemas may surface `v` as metadata. For an unversioned
+    // scoped record it is arbitrary grower-controlled content, not a version.
+    if (expectedVersion !== undefined && "v" in obj) foundVersion = obj.v;
+    const previewFieldNames = schema?.previewFields
+      ? schema.previewFields.filter((name) => Object.prototype.hasOwnProperty.call(obj, name))
+      : Object.keys(obj);
+    topLevelFieldPreview = previewFieldNames.map((name) => {
       if (name === "v") {
         return { name, displayed: `v${JSON.stringify(obj.v)}` };
       }
@@ -853,6 +1056,29 @@ function buildRemediationEntry(key: string): RemediationEntry {
     };
   }
 
+  // The same validator the checks list ran. Without this the drawer opened
+  // BECAUSE of a shape problem and then reported "no validation issue
+  // detected" — contradicting the row the grower just clicked.
+  const validationIssue = schema?.validate?.(raw) ?? null;
+  if (validationIssue) {
+    const isClockMismatch = validationIssue.kind === "clock-mismatch";
+    return {
+      key,
+      label,
+      expectedVersion,
+      present: true,
+      sizeBytes,
+      category: validationIssue.kind,
+      errorMessage: isClockMismatch
+        ? `${validationIssue.detail}. Quick Log temporarily withholds this remembered target; it can become usable when the current time catches up.`
+        : `Parses as JSON, but ${validationIssue.detail}. Whatever reads this key ignores it.`,
+      clearRecommended: !isClockMismatch,
+      foundVersion,
+      topLevelFieldPreview,
+      charClassSummary,
+    };
+  }
+
   return {
     key,
     label,
@@ -873,6 +1099,10 @@ function categoryLabel(cat: RemediationEntry["category"]): string {
       return "Corrupted (invalid JSON)";
     case "version-mismatch":
       return "Outdated schema version";
+    case "shape-mismatch":
+      return "Unusable shape";
+    case "clock-mismatch":
+      return "Clock mismatch";
     case "read-error":
       return "Read error";
     case "missing-required":
@@ -887,22 +1117,29 @@ interface RemediationDrawerProps {
   onCancel: () => void;
   onConfirm: (keys: string[]) => void;
   running: boolean;
+  now: () => number;
 }
 
-function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDrawerProps) {
+function RemediationDrawer({ keys, onCancel, onConfirm, running, now }: RemediationDrawerProps) {
   const open = keys !== null && keys.length > 0;
-  const entries = useMemo(() => (keys ?? []).map(buildRemediationEntry), [keys]);
-  const clearableKeys = entries.filter((e) => e.present).map((e) => e.key);
+  const entries = useMemo(() => {
+    const currentTime = now();
+    return (keys ?? []).map((key) => buildRemediationEntry(key, currentTime));
+  }, [keys, now]);
+  const clearableKeys = entries
+    .filter((e) => e.present && e.clearRecommended !== false)
+    .map((e) => e.key);
 
   return (
     <Drawer open={open} onOpenChange={(next) => (!next ? onCancel() : undefined)}>
       <DrawerContent className="max-h-[90vh]">
         <DrawerHeader>
-          <DrawerTitle>Review corrupted local data</DrawerTitle>
+          <DrawerTitle>Review local data</DrawerTitle>
           <DrawerDescription>
-            The following browser-local drafts will be removed from this device on confirm. Server
-            data (grows, plants, diary entries) is not touched. Stored values are redacted below —
-            only schema metadata (field names, sizes, versions) is shown.
+            Review the following browser-local records. Only entries with removal recommended below
+            will be cleared on confirm. Server data (grows, plants, diary entries) is not touched.
+            Stored values are redacted below — only schema metadata (field names, sizes, versions)
+            is shown.
           </DrawerDescription>
         </DrawerHeader>
 
@@ -918,7 +1155,9 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDr
                     variant={
                       e.category === "invalid-json" || e.category === "read-error"
                         ? "destructive"
-                        : e.category === "version-mismatch" || e.category === "missing-required"
+                        : e.category === "version-mismatch" ||
+                            e.category === "missing-required" ||
+                            e.category === "clock-mismatch"
                           ? "secondary"
                           : "outline"
                     }
@@ -928,7 +1167,7 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDr
                 </div>
 
                 <div className="text-[11px] font-mono break-all text-muted-foreground">
-                  key: {e.key}
+                  key: {redactStorageKey(e.key)}
                 </div>
 
                 <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs">
@@ -951,7 +1190,9 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDr
                 </dl>
 
                 <div>
-                  <p className="text-xs font-medium">Validation error</p>
+                  <p className="text-xs font-medium">
+                    {e.category === "clock-mismatch" ? "Clock status" : "Validation error"}
+                  </p>
                   <p className="text-xs text-muted-foreground break-words">{e.errorMessage}</p>
                 </div>
 
@@ -982,9 +1223,11 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDr
 
                 <div className="rounded border border-border/60 bg-muted/40 p-2 text-xs">
                   <span className="font-medium">Proposed action:</span>{" "}
-                  {e.present
-                    ? `Remove the localStorage entry at "${e.key}" on this device. Any unsaved work in that draft will be lost. Server data is unaffected.`
-                    : "No action needed — key is not present on this device."}
+                  {e.category === "clock-mismatch"
+                    ? "Check this device's date and time. If it is correct, wait for the current time to catch up. Keep this local record; no data needs to be cleared."
+                    : e.present
+                      ? `Remove the localStorage entry at "${redactStorageKey(e.key)}" on this device. Any unsaved work in that draft will be lost. Server data is unaffected.`
+                      : "No action needed — key is not present on this device."}
                 </div>
               </div>
             ))
@@ -1006,7 +1249,9 @@ function RemediationDrawer({ keys, onCancel, onConfirm, running }: RemediationDr
               onClick={() => onConfirm(clearableKeys)}
               disabled={running || clearableKeys.length === 0}
             >
-              Confirm — clear {clearableKeys.length} key{clearableKeys.length === 1 ? "" : "s"}
+              {clearableKeys.length === 0
+                ? "Nothing to clear"
+                : `Confirm — clear ${clearableKeys.length} key${clearableKeys.length === 1 ? "" : "s"}`}
             </Button>
           </div>
         </DrawerFooter>
@@ -1118,7 +1363,9 @@ function restoreBackup(id: string): { restored: string[]; errors: string[] } {
       }
       restored.push(entry.key);
     } catch (err) {
-      errors.push(`${entry.key}: ${err instanceof Error ? err.message : String(err)}`);
+      errors.push(
+        `${redactStorageKey(entry.key)}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   return { restored, errors };
@@ -1203,7 +1450,7 @@ function BackupsPanel({ backups, onRestore, onDelete, running }: BackupsPanelPro
                         key={e.key}
                         className="text-[11px] text-muted-foreground font-mono break-all"
                       >
-                        {e.value === null ? "∅" : `${e.sizeBytes}B`} · {e.key}
+                        {e.value === null ? "∅" : `${e.sizeBytes}B`} · {redactStorageKey(e.key)}
                       </li>
                     ))}
                   </ul>

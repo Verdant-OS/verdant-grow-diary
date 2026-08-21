@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import {
   buildManualSensorSnapshot,
@@ -60,6 +61,16 @@ import {
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
+import {
+  buildQuickLogPhotoIdentity,
+  buildQuickLogSaveSignature,
+  resolveQuickLogSaveKey,
+  type QuickLogSaveKeyState,
+} from "@/lib/quickLogSaveKeyPolicy";
+import {
+  classifyQuickLogThrownSaveError,
+  describeQuickLogSaveFailure,
+} from "@/lib/quickLogSaveErrorMessage";
 
 interface Props {
   open: boolean;
@@ -107,7 +118,10 @@ export default function PlantQuickLog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { save } = useQuickLogV2Save();
-  const [saveKey, setSaveKey] = useState<string | null>(null);
+  // One idempotency key per LOGICAL submission (D-B2). Held in a ref, not
+  // state: it is never rendered, and a stale render must never hand the
+  // server a key that does not match the payload being sent.
+  const saveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
   const responseSectionRef = useRef<HTMLElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
@@ -129,11 +143,11 @@ export default function PlantQuickLog({
   // to record a status. Land the tired grower on the Better/Same/Worse
   // section (scroll + focus). Focus only — never pre-selects a chip.
   useEffect(() => {
-    if (open) {
-      setSaveKey((current) => current ?? newQuickLogSaveKey());
-      return;
-    }
-    setSaveKey(null);
+    // Closing ends the logical submission, so the next open starts a new one.
+    // Opening mints nothing: the key is resolved lazily at save time from the
+    // payload signature, which guarantees it is STORED alongside the payload
+    // it was issued for.
+    if (!open) saveKeyRef.current = null;
   }, [open]);
 
   useEffect(() => {
@@ -199,6 +213,11 @@ export default function PlantQuickLog({
   }
 
   function resetForm() {
+    // Resetting ends the logical submission, so the key must not survive it.
+    // The success path calls resetForm() and then onOpenChange(false); clearing
+    // here means rotation does not depend on a parent actually honoring that
+    // close, which is the only other thing that clears the key.
+    saveKeyRef.current = null;
     setPhotoFile(null);
     setPhotoPreview(null);
     setNote("");
@@ -281,11 +300,32 @@ export default function PlantQuickLog({
           });
         if (upErr) {
           console.error("PlantQuickLog photo upload failed", upErr);
-          setError("Could not save this log. Check connection and try again.");
+          setError(
+            "Could not upload the photo, so nothing was saved. Check your connection and try again, or remove the photo and save the log without it.",
+          );
           return;
         }
         uploadedPath = path;
       }
+
+      // Reuse the key on a pure retry, rotate it on an edited one (D-B2).
+      // The signature signs the grower's photo CHOICE, never `uploadedPath`:
+      // that path embeds Date.now() and so differs on every attempt, and
+      // signing it would rotate the key on each retry — the exact duplicate
+      // write this policy exists to prevent.
+      const resolvedSaveKey = resolveQuickLogSaveKey({
+        current: saveKeyRef.current,
+        signature: buildQuickLogSaveSignature({
+          plantId,
+          growId,
+          tentId: tentId ?? null,
+          note: timelineNote,
+          sensors: sensorsForPayload,
+          photo: buildQuickLogPhotoIdentity(photoFile),
+        }),
+        mint: newQuickLogSaveKey,
+      });
+      saveKeyRef.current = resolvedSaveKey.state;
 
       const built = buildPlantQuickLogV2SavePayload({
         plantId,
@@ -295,7 +335,7 @@ export default function PlantQuickLog({
         note: timelineNote,
         sensors: sensorsForPayload,
         photoUrl: uploadedPath,
-        idempotencyKey: saveKey ?? newQuickLogSaveKey(),
+        idempotencyKey: resolvedSaveKey.state.key,
       });
       if (!built.ok) {
         if (uploadedPath) {
@@ -317,7 +357,8 @@ export default function PlantQuickLog({
             .remove([uploadedPath])
             .catch(() => {});
         }
-        setError("Could not save this log. Check connection and try again.");
+        const failure = describeQuickLogSaveFailure(result.reason);
+        setError(`${failure.message} ${failure.recovery}`);
         return;
       }
 
@@ -332,6 +373,23 @@ export default function PlantQuickLog({
       }
 
       toast.success("Log saved to timeline.");
+      // D5: this is a confirmed plant-scoped save, so it is the most recent
+      // target. Without this the remembered record goes stale here and an
+      // unscoped Quick Log would offer an OLDER plant — a suggestion that is
+      // valid but wrong, which is worse than offering nothing. Best-effort by
+      // construction: the helper swallows storage failures so a speed
+      // preference can never turn a confirmed save into a failure.
+      if (growId) {
+        rememberRecentQuickLogTarget(
+          {
+            plantId,
+            growId,
+            tentId: tentId ?? null,
+            savedAt: new Date().toISOString(),
+          },
+          user?.id ?? null,
+        );
+      }
       applyQuickLogV2Refresh(queryClient, {
         targetType: "plant",
         targetId: plantId,
@@ -353,7 +411,8 @@ export default function PlantQuickLog({
           .remove([uploadedPath])
           .catch(() => {});
       }
-      setError("Could not save this log. Check connection and try again.");
+      const failure = describeQuickLogSaveFailure(classifyQuickLogThrownSaveError(err));
+      setError(`${failure.message} ${failure.recovery}`);
     } finally {
       setBusy(false);
     }

@@ -171,6 +171,25 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Action Queue transitions are RPC-only and their event history is
+-- append-only. The blanket production-parity grant above would otherwise
+-- reopen anon reads/inserts and direct lifecycle writes after the table-ACL
+-- forward repair migration.
+DO $$
+BEGIN
+  IF to_regclass('public.action_queue') IS NOT NULL
+     AND to_regclass('public.action_queue_events') IS NOT NULL THEN
+    REVOKE ALL PRIVILEGES ON TABLE
+      public.action_queue,
+      public.action_queue_events
+      FROM PUBLIC, anon, authenticated;
+    GRANT SELECT, INSERT ON TABLE
+      public.action_queue,
+      public.action_queue_events
+    TO authenticated;
+  END IF;
+END $$;
+
 -- Irrigation event history is browser-read-only. The canonical write path is
 -- quicklog_save_event / quicklog_save_manual; direct client DML was revoked by
 -- the production migration. Reapply that deny boundary after the blanket local

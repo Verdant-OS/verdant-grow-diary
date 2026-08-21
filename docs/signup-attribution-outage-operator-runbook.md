@@ -568,67 +568,94 @@ version/name ledger identity.
 
 ### Protected two-dispatch sequence
 
-> **OPERATIONAL STATUS: BLOCKED.** Do not dispatch PREFLIGHT until the
-> `verdant-production` environment has (1) an eligible required reviewer, (2)
-> prevent-self-review enabled, and (3) the corrected environment-scoped
-> `SUPABASE_DB_URL`. Never dispatch APPLY until that read-only PREFLIGHT also confirms the
-> migration-ledger compatibility contract described below. The repository pins Verdant's
-> established ledger contract, but this change has not independently measured production's
-> current schema/table owners or ACLs. GitHub's run and artifact APIs authenticate provenance;
-> they do not prove that a human reviewed the database state.
+> **OPERATIONAL STATUS: BLOCKED until the dedicated environment is configured.** Create
+> `verdant-production-solo-founder` explicitly; never rely on GitHub to auto-create an
+> unprotected environment. Configure exactly one required reviewer: GitHub User
+> `cheekhimself` (user ID `72639960`). Set **Prevent self-review OFF** and
+> **administrator bypass OFF**. Configure a custom deployment branch policy containing only
+> the exact branch `verdant-grow-diary`. Add the environment-scoped `SUPABASE_DB_URL` and
+> `SUPABASE_DB_CA_CERT_B64` secrets. Leave the existing `verdant-production` environment and
+> every other production writer unchanged.
+
+The founder dispatches and approves each protected run as a founder self-review. The workflow
+authenticates the current run, that one approval, the dedicated environment contract, and the
+exact branch policy through read-only GitHub APIs before it can access a database secret.
+This proves founder identity, intent, provenance, and elapsed time; it is not independent human review.
+Administrator bypass is not an alternative approval path.
 
 1. Merge the delivery workflow to `verdant-grow-diary`. A pull-request or feature-branch
    run is intentionally refused.
 2. Read the current full 40-character commit from `verdant-grow-diary`. It must remain the
-   reviewed commit for both stages. If the branch moves, start again from a new PREFLIGHT.
+   reviewed commit for both stages. Every protected run must be a fresh attempt-1 dispatch;
+   never rerun a rejected workflow. If the branch moves, start again from a new PREFLIGHT.
 3. Open **Actions → Apply signup-acquisition forward repair → Run workflow** and select
    `verdant-grow-diary`.
 4. Run the read-only stage first:
 
-   | Input                 | PREFLIGHT value                                      |
-   | --------------------- | ---------------------------------------------------- |
-   | `operation`           | `PREFLIGHT`                                          |
-   | `expected_head_sha`   | the current 40-character `verdant-grow-diary` commit |
-   | `confirm_project_ref` | `knkwiiywfkbqznbxwqfh`                               |
-   | `confirm_apply`       | leave blank                                          |
-   | `preflight_run_id`    | leave blank                                          |
+   | Input                                | PREFLIGHT value                                           |
+   | ------------------------------------ | --------------------------------------------------------- |
+   | `operation`                          | `PREFLIGHT`                                               |
+   | `expected_head_sha`                  | the current 40-character `verdant-grow-diary` commit      |
+   | `confirm_project_ref`                | `knkwiiywfkbqznbxwqfh`                                    |
+   | `confirm_apply`                      | leave blank                                               |
+   | `preflight_run_id`                   | leave blank                                               |
+   | `expected_preflight_run_attempt`     | leave blank                                               |
+   | `expected_preflight_artifact_sha256` | leave blank                                               |
+   | `solo_founder_acknowledgement`       | `I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN` |
 
-5. After the eligible `verdant-production` reviewer (who is not the dispatcher) approves,
-   inspect the sanitized Markdown summary and run-scoped evidence artifact. PREFLIGHT makes one
+5. Approve the `verdant-production-solo-founder` gate as `cheekhimself`, then inspect the
+   sanitized Markdown summary and run-scoped evidence artifact. PREFLIGHT makes one
    transaction-enforced read-only query and never submits `--file`. Continue only when its
-   outcome is `SAFE_TO_APPLY`. If it reports `already_applied_verified`, stop; if it reports
-   any BLOCKED outcome, resolve that condition and run a new PREFLIGHT.
-6. Record the successful PREFLIGHT's numeric GitHub Actions run ID. Do not copy or type a
-   digest. The workflow uploads a single-file immutable receipt artifact named for that exact
-   run and attempt; APPLY authenticates and parses it itself. Start a **new** workflow dispatch:
+   outcome is `SAFE_TO_APPLY`. If it reports `already_applied_verified`, stop. Any BLOCKED or
+   ambiguous outcome requires a fresh dispatch, not a rerun.
+6. Record the successful PREFLIGHT's numeric run ID and exact prior run attempt (`1`). From the
+   run's artifacts API response, select exactly one non-expired artifact named
+   `signup-acquisition-forward-repair-preflight-run-<RUN_ID>-attempt-1`, replacing `<RUN_ID>`
+   with that numeric run ID, and record its lowercase `.digest` value without the `sha256:`
+   prefix. Never use the similarly named `signup-acquisition-forward-repair-evidence` artifact:
+   it contains sanitized operator evidence, not the immutable receipt authenticated by APPLY.
+   Wait at least **15 minutes** after the authenticated PREFLIGHT completes before deciding to
+   dispatch APPLY. The receipt expires after **24 hours**; an older receipt requires a fresh
+   PREFLIGHT.
+7. Start a fresh APPLY dispatch at attempt 1 and approve its dedicated environment gate:
 
-   | Input                 | APPLY value                                      |
-   | --------------------- | ------------------------------------------------ |
-   | `operation`           | `APPLY`                                          |
-   | `expected_head_sha`   | the same commit bound into the PREFLIGHT receipt |
-   | `confirm_project_ref` | `knkwiiywfkbqznbxwqfh`                           |
-   | `confirm_apply`       | `APPLY SIGNUP ACQUISITION FORWARD REPAIR`        |
-   | `preflight_run_id`    | successful SAFE_TO_APPLY run ID from step 6      |
+   | Input                                | APPLY value                                               |
+   | ------------------------------------ | --------------------------------------------------------- |
+   | `operation`                          | `APPLY`                                                   |
+   | `expected_head_sha`                  | the same commit bound into the PREFLIGHT receipt          |
+   | `confirm_project_ref`                | `knkwiiywfkbqznbxwqfh`                                    |
+   | `confirm_apply`                      | `APPLY SIGNUP ACQUISITION FORWARD REPAIR`                 |
+   | `preflight_run_id`                   | exact successful SAFE_TO_APPLY run ID                     |
+   | `expected_preflight_run_attempt`     | exact prior run attempt `1`                               |
+   | `expected_preflight_artifact_sha256` | receipt artifact's exact lowercase API digest             |
+   | `solo_founder_acknowledgement`       | `I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN` |
 
-7. APPLY validates that the supplied ID belongs to a different, completed-success
-   `workflow_dispatch` run of this exact active workflow, repository, branch, and commit. It
-   accepts exactly one unexpired, API-digest-matched, run/attempt-scoped artifact containing
-   only `preflight-receipt.json`; the dependency-free Node verifier validates the ZIP directory,
-   member type/name, compression method, declared and actual size, and CRC before parsing. The
-   signed archive download receives no GitHub credential and is byte- and
-   decompression-bounded. APPLY then installs its local Postgres client and
-   re-resolves `refs/heads/verdant-grow-diary` at the last step before the runner. If the branch
+8. APPLY validates that all three supplied provenance values belong to a different,
+   completed-success `workflow_dispatch` run of this exact active workflow, repository,
+   branch, and commit. It accepts exactly one unexpired, API-digest-matched,
+   run/attempt-scoped artifact containing only `preflight-receipt.json`; the dependency-free
+   Node verifier validates the ZIP directory, member type/name, compression method, declared
+   and actual size, and CRC before parsing. The signed archive download receives no GitHub
+   credential and is byte- and decompression-bounded. Both stages require the protected
+   database URL and CA, decode the CA to the fixed runner-temp path with owner-only permissions,
+   and validate it with OpenSSL before installing the local Postgres client. APPLY then re-resolves
+   `refs/heads/verdant-grow-diary` at the last step before the runner. If the branch
    advanced or cannot be resolved, the runner emits fixed sanitized `DEPLOY_HEAD_ADVANCED`
    evidence and stops before database access. Otherwise it repeats the read-only preflight and
    compares the current state digest with the authenticated artifact digest. Any mismatch stops
    before `--file` and requires a new PREFLIGHT.
-8. Require a green **Run protected preflight or atomic apply** job. Inspect its sanitized
-   summary and evidence artifact before performing the separate disposable-account E2E.
+9. Require a green **Run protected preflight or atomic apply** job and inspect its sanitized
+   summary and evidence artifact. This runbook does not authorize a fresh Verdant account or
+   browser E2E; that remains a separately authorized operation after the repair is verified.
 
 The environment-scoped `SUPABASE_DB_URL` must contain the pooled Postgres URL for the exact
-project. Never paste that URL into a workflow input, log, issue, or artifact. Environment
-approval is the human authorization gate; the receipt binding is a machine provenance and
-state-continuity gate, not a substitute for review.
+project. The same environment must hold `SUPABASE_DB_CA_CERT_B64`, produced by base64-encoding
+the Server root certificate downloaded from that production Supabase project's Dashboard
+without changing its bytes. The workflow exposes only the fixed certificate path to the
+database runner, forces certificate and hostname verification there, and removes the temporary
+certificate on every outcome. Never paste either secret into a workflow input, log, issue, or
+artifact. Founder self-review at the dedicated environment is the authorization gate; the
+receipt binding is the machine provenance and state-continuity gate.
 
 The workflow runs
 `scripts/apply-signup-acquisition-forward-repair.mjs`, which is intentionally not a generic
@@ -649,20 +676,23 @@ blocks both PREFLIGHT and the locked APPLY guard.
 
 The runner fails closed in this order:
 
-1. exact operation, production target, lowercase 40-character commit, and checked-out SHA;
-2. for APPLY only, the exact phrase, authenticated prior PREFLIGHT run/artifact, and freshly
+1. exact solo-founder authorization evidence and protected workflow attempt `1`;
+2. exact operation, production target, lowercase 40-character commit, and checked-out SHA;
+3. for APPLY only, the exact phrase, authenticated prior PREFLIGHT run/artifact, and freshly
    resolved deploy branch head;
-3. exact Supabase project identity derived from the protected URL;
-4. exact LF migration bytes, final newline, SHA-256, and transaction-safety scan;
-5. a bounded, transaction-enforced **read-only** preflight over every accepted ledger
+4. exact Supabase project identity derived from the protected URL;
+5. the fixed runner-temp Supabase production CA as an ordinary, non-symlinked, bounded,
+   parseable CA certificate, then forced `sslmode=verify-full` and hostname verification;
+6. exact LF migration bytes, final newline, SHA-256, and transaction-safety scan;
+7. a bounded, transaction-enforced **read-only** preflight over every accepted ledger
    identity, prerequisite, and postcondition;
-6. for an existing partial target table, exact non-repairable compatibility: an ordinary
+8. for an existing partial target table, exact non-repairable compatibility: an ordinary
    permanent, non-partitioned, non-FORCE-RLS table with the three exact columns, PK, FK,
    expected owner relationship, no extra constraints, no unexpected unique/exclusion index,
    no user trigger/rewrite rule/policy/publication/reloption, only repairable ACL principals,
    and only allowlisted existing sources. An absent table is also safe. RLS, client grants,
    the named source CHECK, and functions are repairable by the migration;
-7. exact prerequisites: ordinary permanent `auth.users`, `public.profiles`,
+9. exact prerequisites: ordinary permanent `auth.users`, `public.profiles`,
    `public.subscriptions`, and `public.user_roles` relations with every used typed column;
    the full 11-column profile order, types, nullability, defaults, generated/identity state;
    usable exact `profiles_pkey(user_id)` conflict support; the exact partial referral-code
@@ -671,31 +701,31 @@ The runner fails closed in this order:
    `public.app_role` operator label; pinned dependency definitions, owners, search paths, ACLs,
    effective privilege denials, and usable `user_roles` read access for `has_role`; and the
    enabled, fingerprinted `on_auth_user_created` trigger targeting `handle_new_user`;
-8. a deliberately narrow migration-ledger compatibility contract matching Verdant's existing
-   pinned production runner: current role `postgres`; ordinary permanent
-   `supabase_migrations.schema_migrations`; ordered `version`, `name`, `statements` columns with
-   exact types/nullability and no defaults/generated identity; exact `PRIMARY KEY(version)` and
-   backing index; current-role schema/table ownership and owner-only ACLs; no RLS, policies,
-   publication, inheritance, reloptions, user trigger, or rewrite rule; and effective
-   SELECT/INSERT/lock capability. This is a compatibility requirement evaluated by PREFLIGHT,
-   not a claim that this change measured today's live catalog;
-9. a boolean creation-default ACL contract over applicable `pg_default_acl` rows for the
-   current owner and `public` schema. Hardened defaults and the documented legacy
-   PUBLIC/anon/authenticated/service-role table/function defaults are accepted only because
-   the protected wrapper deterministically normalizes them; any other grantee, grantor, or
-   privilege blocks SAFE_TO_APPLY;
-10. pre-apply compatibility for all four replaceable function signatures: `handle_new_user`
+10. a deliberately narrow migration-ledger compatibility contract matching Verdant's existing
+    pinned production runner: current role `postgres`; ordinary permanent
+    `supabase_migrations.schema_migrations`; ordered `version`, `name`, `statements` columns with
+    exact types/nullability and no defaults/generated identity; exact `PRIMARY KEY(version)` and
+    backing index; current-role schema/table ownership and owner-only ACLs; no RLS, policies,
+    publication, inheritance, reloptions, user trigger, or rewrite rule; and effective
+    SELECT/INSERT/lock capability. This is a compatibility requirement evaluated by PREFLIGHT,
+    not a claim that this change measured today's live catalog;
+11. a boolean creation-default ACL contract over applicable `pg_default_acl` rows for the
+    current owner and `public` schema. Hardened defaults and the documented legacy
+    PUBLIC/anon/authenticated/service-role table/function defaults are accepted only because
+    the protected wrapper deterministically normalizes them; any other grantee, grantor, or
+    privilege blocks SAFE_TO_APPLY;
+12. pre-apply compatibility for all four replaceable function signatures: `handle_new_user`
     must exist, and every existing target function must have the expected unchangeable return
     shape, owner `postgres`, and only ACL/grantor entries the migration explicitly normalizes;
-11. the SHA/project/state-bound receipt comparison;
-12. the exact migration body, protected ACL normalization, and canonical bare-name ledger
+13. the SHA/project/state-bound receipt comparison;
+14. the exact migration body, protected ACL normalization, and canonical bare-name ledger
     insert in one
     `psql --single-transaction` file under explicit READ COMMITTED isolation and bounded lock
     and statement timeouts. The same transaction takes SHARE ROW EXCLUSIVE locks on the
     migration ledger, `auth.users`, and `public.profiles`, then repeats the non-repairable ledger
     and profile guards before the migration body. The `auth.users` lock closes the gap between
     the historical backfill and installation of the new insert trigger;
-13. an in-transaction exact ACL postcondition before the ledger insert, followed by the same
+15. an in-transaction exact ACL postcondition before the ledger insert, followed by the same
     bounded read-only query as postflight.
 
 An accepted exact ledger identity plus the full live schema contract returns
@@ -780,12 +810,10 @@ SELECT to_regclass('public.signup_acquisition_attributions') IS NOT NULL AS tabl
             OR version = '20260813030000') AS migration_recorded;
 ```
 
-Expect `true`, `3`, `1`. Then confirm end to end by completing a signup from the homepage CTA.
-
-Use a new disposable email address, confirm that account creation returns success rather
-than GoTrue HTTP 500, complete the initial grow/tent/plant setup, then remove the disposable
-account through the approved cleanup path. Record the observed HTTP/result classification;
-do not put the email address, access token, or user ID into the workflow artifact.
+Expect `true`, `3`, `1`. A fresh account or browser E2E remains a separate release gate and
+is not authorized by this production-repair runbook. If separately authorized later, use the
+approved disposable-account and cleanup path and keep email addresses, access tokens, and user
+IDs out of workflow artifacts.
 
 If `migration_recorded` is `0` but `table_exists` is `true` and `functions_present` is `3`,
 the apply **worked** and only the ledger row is missing — treat the object state as
@@ -794,11 +822,12 @@ exactly the condition that lets a later catch-up re-run it out of order.
 
 ### Failure and rollback notes
 
-- Before the apply transaction commits, rerun after correcting the enumerated blocker; no
-  persistent write is assumed.
+- Before the apply transaction commits, correct the enumerated blocker, then use a fresh
+  `workflow_dispatch` at attempt `1`; no persistent write is assumed.
 - A moved branch, rejected artifact, or receipt mismatch is not an APPLY retry signal. Run a
-  fresh PREFLIGHT, approve it through a different eligible reviewer, and start a separate
-  APPLY dispatch using the new run ID.
+  fresh PREFLIGHT dispatch, approve it as the founder through
+  `verdant-production-solo-founder`, and start a separate fresh APPLY dispatch using the new
+  run ID, exact attempt, and artifact SHA-256.
 - After a successful commit, do not delete the ledger row and do not edit the merged
   migration. Any genuine regression requires a separately reviewed additive forward
   migration.

@@ -9,9 +9,68 @@
  *  - Failure path returns "unavailable" instead of throwing.
  *  - Page remains read-only and no device-control surface introduced.
  */
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
+const MISSING_RETRACTED_AT = {
+  code: "42703",
+  message: "column diary_entries.retracted_at does not exist",
+};
+
+const countCompatHarness = vi.hoisted(() => ({
+  calls: [] as Array<{ kind: "count" | "merge"; filtered: boolean; growId: unknown }>,
+  responses: new Map<
+    string,
+    {
+      data: unknown;
+      error: { code: string; message: string } | null;
+      count?: number | null;
+    }
+  >(),
+}));
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    from: (table: string) => {
+      if (table !== "diary_entries") throw new Error(`Unexpected table: ${table}`);
+      const state = {
+        kind: "merge" as "count" | "merge",
+        filtered: false,
+        growId: undefined as unknown,
+      };
+      const chain = {
+        select: (_columns: string, options?: { head?: boolean }) => {
+          state.kind = options?.head === true ? "count" : "merge";
+          return chain;
+        },
+        eq: (column: string, value: unknown) => {
+          if (column === "grow_id") state.growId = value;
+          return chain;
+        },
+        is: (column: string) => {
+          if (column === "retracted_at") state.filtered = true;
+          return chain;
+        },
+        order: () => chain,
+        limit: () => chain,
+        then: (
+          resolveResult: (value: unknown) => unknown,
+          rejectResult?: (reason: unknown) => unknown,
+        ) => {
+          countCompatHarness.calls.push({ ...state });
+          const result = countCompatHarness.responses.get(
+            `${state.kind}:${state.filtered ? "filtered" : "fallback"}`,
+          ) ?? { data: [], error: null };
+          return Promise.resolve(result).then(resolveResult, rejectResult);
+        },
+      };
+      return chain;
+    },
+  },
+}));
+
+import { countGrowDiaryEntries, fetchGrowDiaryMergeWindow } from "@/hooks/useGrowDetailData";
 
 const ROOT = resolve(__dirname, "../..");
 const PAGE =
@@ -20,6 +79,58 @@ const PAGE =
   readFileSync(resolve(ROOT, "src/hooks/useGrowDetailData.ts"), "utf8") +
   "\n" +
   readFileSync(resolve(ROOT, "src/lib/growStatus.ts"), "utf8");
+
+beforeEach(() => {
+  countCompatHarness.calls = [];
+  countCompatHarness.responses.clear();
+});
+
+describe("GrowDetail — retraction-compatible count and merge window", () => {
+  it("retries concurrent diary count and window reads independently", async () => {
+    countCompatHarness.responses.set("count:filtered", {
+      data: null,
+      error: MISSING_RETRACTED_AT,
+    });
+    countCompatHarness.responses.set("count:fallback", {
+      data: null,
+      error: null,
+      count: 17,
+    });
+    countCompatHarness.responses.set("merge:filtered", {
+      data: null,
+      error: MISSING_RETRACTED_AT,
+    });
+    countCompatHarness.responses.set("merge:fallback", {
+      data: [{ id: "legacy-diary" }],
+      error: null,
+    });
+
+    const [count, windowResult] = await Promise.all([
+      countGrowDiaryEntries("grow-1"),
+      fetchGrowDiaryMergeWindow("grow-1"),
+    ]);
+
+    expect(count).toBe(17);
+    expect(windowResult).toEqual({ data: [{ id: "legacy-diary" }], error: null });
+    expect(
+      countCompatHarness.calls.filter((call) => call.kind === "count").map((call) => call.filtered),
+    ).toEqual([true, false]);
+    expect(
+      countCompatHarness.calls.filter((call) => call.kind === "merge").map((call) => call.filtered),
+    ).toEqual([true, false]);
+    expect(countCompatHarness.calls.every((call) => call.growId === "grow-1")).toBe(true);
+  });
+
+  it("keeps a non-column count failure unavailable without retrying", async () => {
+    countCompatHarness.responses.set("count:filtered", {
+      data: null,
+      error: { code: "PGRST301", message: "JWT expired" },
+    });
+
+    await expect(countGrowDiaryEntries("grow-1")).resolves.toBe("unavailable");
+    expect(countCompatHarness.calls).toEqual([{ kind: "count", filtered: true, growId: "grow-1" }]);
+  });
+});
 
 describe("GrowDetail — related counts", () => {
   it("counts plants via grow attribution (own grow_id OR the grow's tents)", () => {
@@ -48,8 +159,9 @@ describe("GrowDetail — related counts", () => {
     // Quick Log retractions (#786): the exact diary count must carry the
     // retraction filter, or retracted entries keep inflating Grow Detail
     // once the bounded merge window saturates.
+    expect(PAGE).toMatch(/countGrowDiaryEntries\(growId\)/);
     expect(PAGE).toMatch(
-      /countFrom\(\s*["']diary_entries["']\s*,\s*\(q\)\s*=>\s*q\.is\(\s*["']retracted_at["']\s*,\s*null\s*\)\s*\)/,
+      /function\s+countGrowDiaryEntries[\s\S]{0,500}\.is\(\s*["']retracted_at["']\s*,\s*null\s*\)/,
     );
   });
   it("issues a count query against action_queue (total) by grow_id", () => {

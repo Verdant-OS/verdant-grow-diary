@@ -17,6 +17,7 @@ interface FakeBuilder {
   then: (resolve: (r: Result) => unknown) => Promise<unknown>;
 }
 let nextResult: Result = { data: [], error: null };
+let resultQueue: Result[] = [];
 const calls: {
   table?: string;
   filters: Array<[string, unknown]>;
@@ -34,6 +35,7 @@ const calls: {
 
 function reset() {
   nextResult = { data: [], error: null };
+  resultQueue = [];
   calls.table = undefined;
   calls.filters = [];
   calls.ordered = undefined;
@@ -85,7 +87,8 @@ function builder(): FakeBuilder {
       calls.deleted = true;
       return b;
     },
-    then: (resolve: (r: Result) => unknown) => Promise.resolve(nextResult).then(resolve),
+    then: (resolve: (r: Result) => unknown) =>
+      Promise.resolve(resultQueue.shift() ?? nextResult).then(resolve),
   };
   return b;
 }
@@ -245,6 +248,18 @@ describe("fetchDiaryEntryRows", () => {
     // Quick Log retractions (#786): the only baseline filter is the
     // operational-read exclusion of retracted rows.
     expect(calls.filters).toEqual([["retracted_at", null]]);
+  });
+  it("retries once without retracted_at on the exact pre-migration error", async () => {
+    resultQueue = [
+      {
+        data: null,
+        error: { code: "42703", message: "column diary_entries.retracted_at does not exist" },
+      },
+      { data: [diaryRow], error: null },
+    ];
+
+    await expect(fetchDiaryEntryRows("g1")).resolves.toEqual([diaryRow]);
+    expect(calls.filters.filter(([column]) => column === "retracted_at")).toHaveLength(1);
   });
 });
 

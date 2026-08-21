@@ -14,6 +14,7 @@ import {
 } from "@/lib/growEventToDiaryRawEntry";
 import { ROOT_ZONE_GROW_EVENT_SELECT } from "@/lib/rootZoneObservationRules";
 import { buildFeedingDefaults } from "@/lib/feedingDefaultsViewModel";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 
 export const RECENT_FEEDINGS_DEFAULTS_LIMIT = 20;
 
@@ -64,20 +65,25 @@ export function useRecentFeedingsForDefaults(input: RecentFeedingsForDefaultsInp
       // Back-compat: older grows may only have diary_entries. Typed rows are
       // authoritative when present; otherwise retain the established bounded
       // fallback so a migration gap does not erase Last-Used defaults.
-      let legacy = supabase
-        .from("diary_entries")
-        .select("id,grow_id,plant_id,tent_id,entry_at,note,details")
-        .is("retracted_at", null)
-        .order("entry_at", { ascending: false })
-        .limit(RECENT_FEEDINGS_DEFAULTS_LIMIT);
-      if (plantId) {
-        legacy = legacy.eq("plant_id", plantId);
-      } else if (tentId) {
-        legacy = legacy.eq("tent_id", tentId);
-      } else if (growId) {
-        legacy = legacy.eq("grow_id", growId);
-      }
-      const { data: legacyData, error: legacyError } = await legacy;
+      const { data: legacyData, error: legacyError } = await selectWithRetractionCompat(
+        (withRetractionFilter) => {
+          let legacy = supabase
+            .from("diary_entries")
+            .select("id,grow_id,plant_id,tent_id,entry_at,note,details");
+          if (withRetractionFilter) legacy = legacy.is("retracted_at", null);
+          legacy = legacy
+            .order("entry_at", { ascending: false })
+            .limit(RECENT_FEEDINGS_DEFAULTS_LIMIT);
+          if (plantId) {
+            legacy = legacy.eq("plant_id", plantId);
+          } else if (tentId) {
+            legacy = legacy.eq("tent_id", tentId);
+          } else if (growId) {
+            legacy = legacy.eq("grow_id", growId);
+          }
+          return legacy;
+        },
+      );
       if (legacyError) throw legacyError;
       return (legacyData ?? []) as unknown[];
     },

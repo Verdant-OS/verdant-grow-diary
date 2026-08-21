@@ -40,6 +40,7 @@ const PROTECTED_MOBILE_ROUTES: string[] = [
   "/diagnostics",
   "/diagnostics-lighting-measurement",
   "/diagnostics-seo-artifacts",
+  "/diagnostics/quicklog",
   "/ingest-inspector",
   "/operator/ai-doctor-phase1",
   "/operator/billing-entitlement-resolution",

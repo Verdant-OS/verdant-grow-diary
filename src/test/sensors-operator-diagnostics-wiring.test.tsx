@@ -28,6 +28,7 @@ const sensorPageState = {
   readingsError: false,
   calibrationLoading: false,
   calibrationError: false,
+  calibrationAvailability: "available" as "available" | "schema_unavailable",
   readings: [] as Array<Record<string, unknown>>,
 };
 
@@ -61,6 +62,7 @@ vi.mock("@/hooks/use-tents", () => ({ useTents: () => ({ data: [] }) }));
 vi.mock("@/hooks/useSoilMoistureCalibrations", () => ({
   useSoilMoistureCalibrations: () => ({
     data: [],
+    availability: sensorPageState.calibrationAvailability,
     isLoading: sensorPageState.calibrationLoading,
     isError: sensorPageState.calibrationError,
     refetch: vi.fn(),
@@ -96,6 +98,7 @@ describe("Sensors page — operator diagnostics wiring", () => {
     sensorPageState.readingsError = false;
     sensorPageState.calibrationLoading = false;
     sensorPageState.calibrationError = false;
+    sensorPageState.calibrationAvailability = "available";
     sensorPageState.readings = [];
   });
 
@@ -135,6 +138,38 @@ describe("Sensors page — operator diagnostics wiring", () => {
     expect(screen.getByTestId("sensors-soil-moisture-calibration-error-badge")).toHaveTextContent(
       "Calibration unavailable",
     );
+    expect(screen.queryByText(/Uncalibrated/i)).toBeNull();
+  });
+
+  it("labels missing calibration schema unavailable without failing the Sensors page", async () => {
+    sensorPageState.calibrationAvailability = "schema_unavailable";
+    sensorPageState.readings = [
+      {
+        ts: new Date().toISOString(),
+        capturedAt: new Date().toISOString(),
+        tentId: sensorPageState.tentId,
+        temp: 0,
+        rh: 0,
+        vpd: 0,
+        co2: 0,
+        soil: 45,
+        observedMetrics: ["soil"],
+        source: "manual",
+        status: "usable",
+      },
+    ];
+    renderAt("/sensors");
+
+    expect(await screen.findByTestId("sensors-soil-moisture-calibration-error")).toHaveTextContent(
+      /Calibration records aren't available on this deployment/,
+    );
+    expect(screen.getByTestId("sensors-soil-moisture-calibration-error-badge")).toHaveTextContent(
+      "Calibration unavailable",
+    );
+    expect(screen.getByTestId("sensors-soil-calibration-capture-unavailable")).toHaveTextContent(
+      /Calibration capture is unavailable/,
+    );
+    expect(screen.queryByTestId("soil-moisture-calibration-capture")).toBeNull();
     expect(screen.queryByText(/Uncalibrated/i)).toBeNull();
   });
 

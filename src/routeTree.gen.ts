@@ -115,6 +115,7 @@ import { Route as PhenoHuntsIdCompareRouteImport } from './routes/pheno-hunts.$i
 import { Route as PhenoHuntsIdShowcaseRouteImport } from './routes/pheno-hunts.$id.showcase'
 import { Route as AppOperatorAdminLeadsRouteImport } from './routes/_app/_operator/admin.leads'
 import { Route as AppOperatorDemoOneTentLiveProofRouteImport } from './routes/_app/_operator/demo.one-tent-live-proof'
+import { Route as AppOperatorDiagnosticsQuicklogRouteImport } from './routes/_app/_operator/diagnostics_.quicklog'
 import { Route as AppOperatorInternalAiDoctorConfidenceAuditRouteImport } from './routes/_app/_operator/internal.ai-doctor-confidence-audit'
 import { Route as AppOperatorInternalAiDoctorPhase1PreviewRouteImport } from './routes/_app/_operator/internal.ai-doctor-phase1-preview'
 import { Route as AppOperatorInternalOneTentLoopProofRouteImport } from './routes/_app/_operator/internal.one-tent-loop-proof'
@@ -696,6 +697,12 @@ const AppOperatorDemoOneTentLiveProofRoute =
     path: '/demo/one-tent-live-proof',
     getParentRoute: () => AppOperatorRoute,
   } as any)
+const AppOperatorDiagnosticsQuicklogRoute =
+  AppOperatorDiagnosticsQuicklogRouteImport.update({
+    id: '/diagnostics_/quicklog',
+    path: '/diagnostics/quicklog',
+    getParentRoute: () => AppOperatorRoute,
+  } as any)
 const AppOperatorInternalAiDoctorConfidenceAuditRoute =
   AppOperatorInternalAiDoctorConfidenceAuditRouteImport.update({
     id: '/internal/ai-doctor-confidence-audit',
@@ -1027,6 +1034,7 @@ export interface FileRoutesByFullPath {
   '/genetics/': typeof AppGeneticsIndexRoute
   '/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
+  '/diagnostics/quicklog': typeof AppOperatorDiagnosticsQuicklogRoute
   '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
   '/internal/ai-doctor-phase1-preview': typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
   '/internal/one-tent-loop-proof': typeof AppOperatorInternalOneTentLoopProofRoute
@@ -1171,6 +1179,7 @@ export interface FileRoutesByTo {
   '/genetics': typeof AppGeneticsIndexRoute
   '/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
+  '/diagnostics/quicklog': typeof AppOperatorDiagnosticsQuicklogRoute
   '/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
   '/internal/ai-doctor-phase1-preview': typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
   '/internal/one-tent-loop-proof': typeof AppOperatorInternalOneTentLoopProofRoute
@@ -1319,6 +1328,7 @@ export interface FileRoutesById {
   '/_app/genetics/': typeof AppGeneticsIndexRoute
   '/_app/_operator/admin/leads': typeof AppOperatorAdminLeadsRoute
   '/_app/_operator/demo/one-tent-live-proof': typeof AppOperatorDemoOneTentLiveProofRoute
+  '/_app/_operator/diagnostics_/quicklog': typeof AppOperatorDiagnosticsQuicklogRoute
   '/_app/_operator/internal/ai-doctor-confidence-audit': typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
   '/_app/_operator/internal/ai-doctor-phase1-preview': typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
   '/_app/_operator/internal/one-tent-loop-proof': typeof AppOperatorInternalOneTentLoopProofRoute
@@ -1466,6 +1476,7 @@ export interface FileRouteTypes {
     | '/genetics/'
     | '/admin/leads'
     | '/demo/one-tent-live-proof'
+    | '/diagnostics/quicklog'
     | '/internal/ai-doctor-confidence-audit'
     | '/internal/ai-doctor-phase1-preview'
     | '/internal/one-tent-loop-proof'
@@ -1610,6 +1621,7 @@ export interface FileRouteTypes {
     | '/genetics'
     | '/admin/leads'
     | '/demo/one-tent-live-proof'
+    | '/diagnostics/quicklog'
     | '/internal/ai-doctor-confidence-audit'
     | '/internal/ai-doctor-phase1-preview'
     | '/internal/one-tent-loop-proof'
@@ -1757,6 +1769,7 @@ export interface FileRouteTypes {
     | '/_app/genetics/'
     | '/_app/_operator/admin/leads'
     | '/_app/_operator/demo/one-tent-live-proof'
+    | '/_app/_operator/diagnostics_/quicklog'
     | '/_app/_operator/internal/ai-doctor-confidence-audit'
     | '/_app/_operator/internal/ai-doctor-phase1-preview'
     | '/_app/_operator/internal/one-tent-loop-proof'
@@ -2600,6 +2613,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOperatorDemoOneTentLiveProofRouteImport
       parentRoute: typeof AppOperatorRoute
     }
+    '/_app/_operator/diagnostics_/quicklog': {
+      id: '/_app/_operator/diagnostics_/quicklog'
+      path: '/diagnostics/quicklog'
+      fullPath: '/diagnostics/quicklog'
+      preLoaderRoute: typeof AppOperatorDiagnosticsQuicklogRouteImport
+      parentRoute: typeof AppOperatorRoute
+    }
     '/_app/_operator/internal/ai-doctor-confidence-audit': {
       id: '/_app/_operator/internal/ai-doctor-confidence-audit'
       path: '/internal/ai-doctor-confidence-audit'
@@ -2886,6 +2906,7 @@ interface AppOperatorRouteChildren {
   AppOperatorPiIngestStatusRoute: typeof AppOperatorPiIngestStatusRoute
   AppOperatorAdminLeadsRoute: typeof AppOperatorAdminLeadsRoute
   AppOperatorDemoOneTentLiveProofRoute: typeof AppOperatorDemoOneTentLiveProofRoute
+  AppOperatorDiagnosticsQuicklogRoute: typeof AppOperatorDiagnosticsQuicklogRoute
   AppOperatorInternalAiDoctorConfidenceAuditRoute: typeof AppOperatorInternalAiDoctorConfidenceAuditRoute
   AppOperatorInternalAiDoctorPhase1PreviewRoute: typeof AppOperatorInternalAiDoctorPhase1PreviewRoute
   AppOperatorInternalOneTentLoopProofRoute: typeof AppOperatorInternalOneTentLoopProofRoute
@@ -2928,6 +2949,7 @@ const AppOperatorRouteChildren: AppOperatorRouteChildren = {
   AppOperatorPiIngestStatusRoute: AppOperatorPiIngestStatusRoute,
   AppOperatorAdminLeadsRoute: AppOperatorAdminLeadsRoute,
   AppOperatorDemoOneTentLiveProofRoute: AppOperatorDemoOneTentLiveProofRoute,
+  AppOperatorDiagnosticsQuicklogRoute: AppOperatorDiagnosticsQuicklogRoute,
   AppOperatorInternalAiDoctorConfidenceAuditRoute:
     AppOperatorInternalAiDoctorConfidenceAuditRoute,
   AppOperatorInternalAiDoctorPhase1PreviewRoute:

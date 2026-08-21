@@ -51,6 +51,11 @@ const manualDefinitionPattern = () =>
     `CREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\s+public\\.quicklog_save_manual\\s*\\(\\s*${MANUAL_NAMED_SIGNATURE}\\s*\\)\\s*RETURNS\\s+jsonb[\\s\\S]*?AS\\s+(\\$function\\$|\\$\\$)([\\s\\S]*?)\\1`,
     "i",
   );
+const manualDelegateDefinitionPattern = () =>
+  new RegExp(
+    `CREATE\\s+OR\\s+REPLACE\\s+FUNCTION\\s+public\\.(?:"quicklog_save_manual_pre_logged_at"|quicklog_save_manual_pre_logged_at)\\s*\\(\\s*${MANUAL_NAMED_SIGNATURE}\\s*\\)\\s*RETURNS\\s+jsonb[\\s\\S]*?AS\\s+(\\$function\\$|\\$\\$)([\\s\\S]*?)\\1`,
+    "i",
+  );
 const manualDelegateRenamePattern = () =>
   new RegExp(
     `ALTER\\s+FUNCTION\\s+public\\.quicklog_save_manual\\s*\\(\\s*${MANUAL_TYPE_SIGNATURE}\\s*\\)\\s+RENAME\\s+TO\\s+quicklog_save_manual_pre_logged_at`,
@@ -80,6 +85,17 @@ function delegatedSaveManualContract(): {
   }
   if (wrapperIndex < 1) {
     throw new Error("no exact quicklog_save_manual delegate transition");
+  }
+
+  for (let index = migrations.length - 1; index > wrapperIndex; index -= 1) {
+    const match = migrations[index].sql.match(manualDelegateDefinitionPattern());
+    if (match?.[2]) {
+      return {
+        delegateSql: migrations[index].sql,
+        delegateBody: match[2],
+        wrapperSql: migrations[wrapperIndex].sql,
+      };
+    }
   }
 
   for (let index = wrapperIndex - 1; index >= 0; index -= 1) {

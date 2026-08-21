@@ -55,6 +55,20 @@ describe("Alerts One-Tent Loop next-step card wiring", () => {
     expect(cta).toHaveTextContent(/Add to Action Queue/i);
   });
 
+  it("preserves grow scope when opening the Action Queue index", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="alert"
+        ids={{ growId: "g1" }}
+        testId="alerts-one-tent-loop-next-step-card"
+      />,
+    );
+    const cta = screen.getByTestId("alerts-one-tent-loop-next-step-card-cta");
+    expect(cta.getAttribute("href")).toBe("/actions?growId=g1");
+    expect(cta).toHaveTextContent(/Add to Action Queue/i);
+    expect(cta.getAttribute("href")).not.toMatch(/^\/alerts/);
+  });
+
   it("routes to /actions even when an alertId is present (Add to Action Queue is an action-queue navigation)", () => {
     renderCard(
       <OneTentLoopNextStepCard

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -203,9 +203,19 @@ export default function CreatePlantDialog({
 
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
+  const handoffSuppressedRef = useRef(false);
+  const mountedRef = useRef(true);
   const [form, setForm] = useState(() => emptyForm(initialTentId));
   /** Once grower explicitly picks a compatible tent after a conflict, allow write. */
   const [explicitCompatiblePick, setExplicitCompatiblePick] = useState(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      handoffSuppressedRef.current = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!open || explicitCompatiblePick) return;
@@ -280,6 +290,10 @@ export default function CreatePlantDialog({
   const formBlocked = binding.blockSubmit || !canWriteCreateGrowId(targetGrowId) || tentBlocksWrite;
 
   function handleOpenChange(next: boolean) {
+    // The insert may already be durable, so closing cannot cancel it. Let the
+    // grower dismiss a stalled refresh, but suppress the later Quick Log
+    // handoff so closing never causes a delayed navigation surprise.
+    if (!next && busy) handoffSuppressedRef.current = true;
     setOpen(next);
     if (!next) {
       setExplicitCompatiblePick(false);
@@ -345,6 +359,7 @@ export default function CreatePlantDialog({
       }
     }
 
+    handoffSuppressedRef.current = false;
     setBusy(true);
     const trimmedStrain = form.strain.trim();
     const payload: Record<string, unknown> = {
@@ -371,15 +386,27 @@ export default function CreatePlantDialog({
       .insert(validation.value as never)
       .select("id, name")
       .single();
-    setBusy(false);
     if (error) {
+      if (mountedRef.current) setBusy(false);
       toast.error(error.message);
       return;
     }
-    toast.success("Plant created");
+    // The insert is now durable. Record that fact before any cache refresh can
+    // stall or the grower can leave; navigation remains refresh-gated below.
     trackFunnelEvent("plant_created");
-    qc.invalidateQueries({ queryKey: ["plants"] });
-    qc.invalidateQueries({ queryKey: ["grow", "plants"] });
+    // The insert is durable before these reads, but the grower-facing plant
+    // lists can still be showing the pre-create cache. Keep the dialog and its
+    // handoff pending until both legacy Quick Log and owner-scoped grow views
+    // have settled their refresh, matching the guided Start Your Room path.
+    await Promise.allSettled([
+      qc.invalidateQueries({ queryKey: ["plants"] }),
+      qc.invalidateQueries({ queryKey: ["grow", "plants"] }),
+    ]);
+    const stillMounted = mountedRef.current;
+    const handoffSuppressed = handoffSuppressedRef.current;
+    if (stillMounted) setBusy(false);
+    toast.success("Plant created");
+    if (!stillMounted || handoffSuppressed) return;
     setForm(emptyForm(initialTentId));
     setExplicitCompatiblePick(false);
     setNestedTents([]);

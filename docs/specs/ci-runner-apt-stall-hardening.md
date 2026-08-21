@@ -254,10 +254,10 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
 
      # Handshake: block until the group id is published, bounded by a cap.
      # No fixed sleep, and no assumption about when setsid(2) takes effect.
-     # The cap is a backstop — with `--wait` the loop already ends when the
-     # worker does — so a worker that somehow never publishes costs 5 seconds
-     # rather than the whole job. Publication is the first thing the child
-     # does, before exec, so it precedes any real work.
+     # The cap bounds the POLLING only. What happens after it expires is the
+     # part that matters, and it is handled explicitly below — a cap that
+     # falls through to an unbounded wait is not a bound. Publication is the
+     # first thing the child does, before exec, so it precedes any real work.
      local waited=0
      while [ ! -s "$pgidfile" ] && [ "$waited" -lt 100 ]; do
        kill -0 "$child" 2>/dev/null || break
@@ -265,7 +265,23 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
        waited=$((waited + 1))
      done
      local pgid; pgid="$(cat "$pgidfile" 2>/dev/null)"; rm -f "$pgidfile"
-     if [ -z "$pgid" ]; then wait "$child"; return $?; fi   # finished already
+     if [ -z "$pgid" ]; then
+       # Two very different situations share "no pgid", and collapsing them is
+       # how the cap above stopped being a bound at all: it capped the POLLING
+       # and then fell through to an unbounded `wait` with no watchdog behind
+       # it, so a stalled install was unbounded again — the original defect,
+       # reached by a longer road.
+       if ! kill -0 "$child" 2>/dev/null; then
+         wait "$child"; return $?                    # finished inside the handshake
+       fi
+       # Still running and still unpublished: its group id is unknown, so this
+       # function cannot bound it and must not pretend to. Kill what is
+       # reachable and fail loudly rather than blocking forever.
+       echo "::error::attempt: process group never published; cannot bound $*"
+       kill -TERM "$child" 2>/dev/null; sleep 2; kill -KILL "$child" 2>/dev/null
+       wait "$child" 2>/dev/null
+       return 125                                    # timeout(1): the bound itself failed
+     fi
 
      # The watchdog records that IT escalated. Reading the timeout off $?
      # cannot work: 15 is both "TERM killed it" and "the command exited 15".
@@ -291,6 +307,11 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
          group_alive || exit 0                       # finished; no timeout
          sleep 1; waited=$((waited + 1))
        done
+       # The deadline expiring is not the same as the command still running.
+       # The loop can only observe liveness BEFORE its final sleep, so a
+       # command that finishes during that second falls out here having
+       # succeeded. Writing the marker unconditionally reported 124 for it.
+       group_alive || exit 0                         # finished inside the last second
        : > "$timedout"                               # we are escalating
        signal_group TERM
        graced=0

@@ -6,7 +6,7 @@
  * fallback when resolution fails: every failing condition yields no
  * suggestion at all, so an unscoped Quick Log stays a manual selection.
  *
- * Six independent conditions must hold, evaluated with an injectable clock:
+ * Seven independent conditions must hold, evaluated with an injectable clock:
  *   1. the stored timestamp parses to a finite instant;
  *   2. it is not in the future (a skewed clock is not evidence);
  *   3. it is at most 14 days old (strictly older → expired);
@@ -29,6 +29,14 @@
  * `tent_inactive`, `tent_grow_unassigned`, or `tent_grow_mismatch`. Offering a
  * target the write path will refuse is worse than offering nothing, so the
  * suggestion mirrors those checks rather than trusting the id.
+ *
+ * The general rule, since conditions 5-7 were each added separately after the
+ * previous one turned out not to cover the next field: THE STORED RECORD PROVES
+ * NOTHING. Every relationship it names must be re-derived from a live,
+ * RLS-filtered list that the write path also sees. A stored id is a lookup key,
+ * never evidence that the thing it names still exists, is still active, or is
+ * still related the way it was when the record was written. Any field added
+ * here later inherits that obligation.
  *
  * The storage key is namespaced per account, so one browser shared between
  * accounts can never surface another grower's plant. Grow and tent scope are

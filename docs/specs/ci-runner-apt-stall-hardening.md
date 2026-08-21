@@ -222,62 +222,291 @@ Keep `--with-deps` (so no behavior risk), but change how it fails:
    ```bash
    attempt() {                      # $1 = seconds, $2… = command
      local secs="$1"; shift
-     setsid "$@" &                  # new process group; $! is the PGID
-     local pgid=$!
+
+     # The child PUBLISHES its own process group id; the parent never guesses
+     # it. See "the group id is not $!" below for the two ways guessing fails.
+     local pgidfile; pgidfile="$(mktemp)"
+     local publish='ps -o pgid= -p $$ | tr -d " " >"$1"; shift; exec "$@"'
+     # `--wait` is REQUIRED, and for TWO reasons, not one.
+     #
+     # setsid(1) forks whenever it is already a process-group leader, which is
+     # exactly what a backgrounded job is under job control. The intermediary
+     # then exits immediately while the real worker runs on, and $! names a
+     # process that is already gone. That breaks this function twice over:
+     # the handshake below finds no pgid and starts no watchdog, and — the
+     # worse half — `wait "$child"` at the bottom reaps the INTERMEDIARY and
+     # returns its status, which is always 0. A failing apt would be reported
+     # as success. Measured with job control on: the intermediary is gone a
+     # quarter-second in, and a command exiting 7 is reported as 0.
+     #
+     # `--wait` keeps the intermediary alive for the worker's lifetime, so $!
+     # is a true proxy for both purposes. Needs util-linux >= 2.24;
+     # ubuntu-latest ships 2.39.
+     #
+     # It has one cost, recorded rather than discovered later: a signal-killed
+     # worker comes back as the RAW signal number (15) instead of the shell's
+     # 128+signal (143), and setsid prints `setsid: child N did not exit
+     # normally` to stderr. The timeout status is therefore taken from the
+     # watchdog's own marker below rather than inferred from $?, so it does not
+     # depend on whether setsid happened to fork.
+     setsid --wait sh -c "$publish" _ "$pgidfile" "$@" &
+     local child=$!
+
+     # Handshake: block until the group id is published, bounded by a cap.
+     # No fixed sleep, and no assumption about when setsid(2) takes effect.
+     # The cap bounds the POLLING only. What happens after it expires is the
+     # part that matters, and it is handled explicitly below — a cap that
+     # falls through to an unbounded wait is not a bound. Publication is the
+     # first thing the child does, before exec, so it precedes any real work.
+     local waited=0
+     while [ ! -s "$pgidfile" ] && [ "$waited" -lt 100 ]; do
+       kill -0 "$child" 2>/dev/null || break
+       sleep 0.05
+       waited=$((waited + 1))
+     done
+     local pgid; pgid="$(cat "$pgidfile" 2>/dev/null)"; rm -f "$pgidfile"
+     if [ -z "$pgid" ]; then
+       # Two very different situations share "no pgid", and collapsing them is
+       # how the cap above stopped being a bound at all: it capped the POLLING
+       # and then fell through to an unbounded `wait` with no watchdog behind
+       # it, so a stalled install was unbounded again — the original defect,
+       # reached by a longer road.
+       if ! kill -0 "$child" 2>/dev/null; then
+         wait "$child"; return $?                    # finished inside the handshake
+       fi
+       # The publish failed, but the group is still DISCOVERABLE: ask the
+       # kernel rather than the `ps` that just let us down.
+       #
+       # Which pid leads the group depends on whether setsid forked, so
+       # neither candidate can be assumed. Measured, both modes: without job
+       # control $child leads the group itself; with job control $child leads
+       # its OWN group and the worker leads a different one. Signalling
+       # $child alone therefore leaves the worker's entire subtree — the apt
+       # this function exists to contain — running.
+       #
+       # Reading /proc covers both shapes. The stat parse strips through the
+       # last ")" first because field 2 is the comm, which is parenthesised
+       # and may contain spaces; after that, field 3 is pgrp.
+       local kids="" childfile="/proc/$child/task/$child/children"
+       if [ -r "$childfile" ]; then kids="$(cat "$childfile" 2>/dev/null)"; fi
+       local worker="${kids%% *}"; [ -n "$worker" ] || worker="$child"
+       local rescued
+       rescued="$(sed 's/.*) //' "/proc/$worker/stat" 2>/dev/null | cut -d" " -f3)"
+
+       # NEVER signal a group this shell might be in. If the child has not
+       # reached setsid(2) yet — which is the very reason publication can time
+       # out — it is STILL IN THE CALLER'S process group, so the pgrp read
+       # above is ours and `kill -- -$rescued` would terminate this shell, the
+       # step, and any sibling work in it. Measured by holding setsid past the
+       # handshake: the caller died with status 143. A rescue that can kill the
+       # rescuer is worse than no rescue, so the check is a refusal, not a
+       # warning.
+       local mypgid
+       mypgid="$(sed 's/.*) //' "/proc/$$/stat" 2>/dev/null | cut -d" " -f3)"
+       case "$rescued" in "" | *[!0-9]*) rescued="" ;; esac   # only a real pgid
+
+       echo "::error::attempt: process group never published; cannot bound $*"
+       if [ -n "$rescued" ] && [ "$rescued" != "$mypgid" ] && [ "$rescued" != "1" ]; then
+         sudo -n kill -TERM -- -"$rescued" 2>/dev/null || kill -TERM -- -"$rescued" 2>/dev/null
+         sleep 2
+         sudo -n kill -KILL -- -"$rescued" 2>/dev/null || kill -KILL -- -"$rescued" 2>/dev/null
+       else
+         echo "::error::attempt: the worker never left this shell's process group; refusing to signal it"
+       fi
+       kill -KILL "$child" 2>/dev/null
+       wait "$child" 2>/dev/null
+       return 125                                    # timeout(1): the bound itself failed
+     fi
+
+     # The watchdog records that IT escalated. Reading the timeout off $?
+     # cannot work: 15 is both "TERM killed it" and "the command exited 15".
+     local timedout; timedout="$(mktemp)"; rm -f "$timedout"
+     # And records separately whether the escalation actually WORKED. These are
+     # different facts with different consequences: a deadline that fired and
+     # cleaned up is retryable; a group that survived KILL is not.
+     local unkilled; unkilled="$(mktemp)"; rm -f "$unkilled"
+
+     # Liveness is probed with pgrep, and signals are sent with sudo. Both
+     # matter, and neither is optional — see "the apt is not ours to signal"
+     # below.
+     # `--runstates D,R,S,T` covers every LIVE state and excludes Z: a zombie
+     # holds nothing and is not what this watchdog bounds. Needs procps-ng
+     # >= 3.3.16; ubuntu-latest ships 4.x.
+     group_alive() { pgrep -g "$pgid" --runstates D,R,S,T >/dev/null 2>&1; }
+     signal_group() {
+       sudo -n kill "-$1" -- -"$pgid" 2>/dev/null || kill "-$1" -- -"$pgid" 2>/dev/null
+     }
 
      # Self-terminating watchdog. It polls the GROUP and exits as soon as the
      # group is empty, so the parent never cancels it — and therefore can never
-     # cancel it mid-escalation. See the note below for why that matters.
+     # cancel it mid-escalation.
      (
        waited=0
        while [ "$waited" -lt "$secs" ]; do
-         kill -0 -- -"$pgid" 2>/dev/null || exit 0   # finished; no timeout
+         group_alive || exit 0                       # finished; no timeout
          sleep 1; waited=$((waited + 1))
        done
-       kill -TERM -- -"$pgid" 2>/dev/null
+       # The deadline expiring is not the same as the command still running.
+       # The loop can only observe liveness BEFORE its final sleep, so a
+       # command that finishes during that second falls out here having
+       # succeeded. Writing the marker unconditionally reported 124 for it.
+       group_alive || exit 0                         # finished inside the last second
+       : > "$timedout"                               # we are escalating
+       signal_group TERM
        graced=0
        while [ "$graced" -lt 30 ]; do
-         kill -0 -- -"$pgid" 2>/dev/null || exit 0   # whole group took TERM
+         group_alive || exit 0                       # whole group took TERM
          sleep 1; graced=$((graced + 1))
        done
-       kill -KILL -- -"$pgid" 2>/dev/null
+       signal_group KILL
+       # KILL is asynchronous: the kernel marks the target, it does not tear it
+       # down before the next syscall returns. Give the group a bounded moment
+       # to actually disappear before declaring failure. Costs nothing when the
+       # signal worked — the loop breaks on its first pass — and only delays the
+       # case where something genuinely survived, which is exactly when you want
+       # to be sure before shouting.
+       reaped=0
+       while [ "$reaped" -lt 5 ]; do
+         group_alive || break
+         sleep 1; reaped=$((reaped + 1))
+       done
+       # Never fail silently here. A group still alive after KILL means the
+       # signal did not land, and an unreported one is exactly how the runner
+       # ends up held by the apt this was built to stop.
+       if group_alive; then
+         echo "::error::timeout could not kill group $pgid; apt may still hold this runner"
+         : > "$unkilled"                             # fatal: do NOT retry into this
+       fi
      ) &
      local watchdog=$!
 
-     wait "$pgid"; local rc=$?
+     wait "$child"; local rc=$?
      wait "$watchdog" 2>/dev/null    # NOT `kill` — see below
+
+     # 124 is timeout(1)'s convention for "the deadline fired", and it is the
+     # only status here that does not depend on setsid's forking or on which
+     # signal landed. But 124 means "bounded AND cleaned up", which the caller
+     # is entitled to retry — so a group that survived the KILL must not borrow
+     # it. Retrying into a root-owned apt that still holds the dpkg lock stacks
+     # stalled attempts instead of recovering from one, and the ::error:: above
+     # is a report, not a control signal: nothing reads it.
+     local fired="" survived=""
+     [ -e "$timedout" ] && fired=1
+     [ -e "$unkilled" ] && survived=1
+     rm -f "$timedout" "$unkilled"
+     if [ -n "$survived" ]; then return 125; fi    # the bound itself failed
+     if [ -n "$fired" ]; then return 124; fi       # bounded, group is gone
      return "$rc"
    }
    ```
 
-   **Why the watchdog is never cancelled by the parent.** An earlier draft of this
-   snippet ended `wait "$pgid"; kill "$watchdog"`, and that reintroduced the very
-   failure the process group exists to prevent. `wait "$pgid"` waits on the group
-   **leader**. On a timeout the leader takes `TERM` and exits while a descendant —
-   `apt`, precisely the process being contained — either ignores `TERM` or sits in
-   uninterruptible I/O. `wait` returns, the next line kills the watchdog during its
-   grace period, and the promised group-wide `KILL` is never sent: the step reports
-   failure and apt keeps holding the runner, which is the exact flaw this section
-   rejects bare `timeout(1)` for. Polling the group instead makes the happy path cost
-   about a second and makes the escalation unskippable.
+**A probe taken the instant after `KILL` can report a failure that did not
+happen.** `kill -KILL` is asynchronous — the kernel marks the target rather than
+tearing it down before the next syscall returns — and `pgrep` additionally
+matches a process that is already dead but not yet reaped. An immediate probe
+can therefore print "apt may still hold this runner" when the escalation in fact
+succeeded.
 
-   `coreutils` `timeout` may stand in for the watchdog **only** with the command
-   launched into its own group and the signal directed at that group. The requirement is
-   the group, not the tool — and §6's fault-injection variant is what proves it, by
-   asserting no `apt` process survives a killed attempt.
+That is worth guarding even though the window is small, because of what the
+alarm is for. This repository already carries a worked example of the cost: the
+migration-drift probe went red, was correct, and was left unremediated for four
+days. An escalation alarm that cries wolf is one people learn to scroll past,
+and then the true positive lands in the same blind spot.
+
+`inference, not measured here`: reproducing the bare signal-and-probe sequence
+locally 30 times gave **0** false positives, not the failure rate the review
+reported — but that reproduction had a single `sleep` in the group, promptly
+reaped, with none of the root-owned `sudo`/`apt` descendants whose teardown is
+the slow part. It shows the race is not trivially reproducible, not that it
+cannot occur. The bounded poll is kept because it costs nothing when the signal
+worked and removes the question entirely.
+
+**The group id is not `$!`, and an immediate probe can miss the group
+entirely.** Two independent defects in the earlier `setsid "$@" & pgid=$!`
+form, both surfaced in review:
+
+- **Startup race.** The shell returns from the fork before the child has
+  necessarily called `setsid(2)`. A `pgrep -g` issued in that window finds no
+  such group, the watchdog reads that as "the install finished" and exits, and
+  the attempt then runs with **no timeout at all** — the exact opposite of this
+  function's purpose. It is also nondeterministic, which `AGENTS.md` forbids on
+  its own.
+- **`setsid` may fork.** util-linux `setsid` forks when the caller is already a
+  process group leader, so `$!` is then the parent it discards, not the group
+  id. A handshake that waited on `$!` alone would give up the moment that
+  parent exited and leave the real group unbounded.
+
+Publishing the id from inside the child closes both: the value is read from
+`ps -o pgid= -p $$` after the group exists, so it is correct by construction
+rather than inferred, and the parent blocks until it is published or the child
+is gone. An install that finishes inside the handshake window needs no watchdog
+and returns directly.
+
+**The apt is not ours to signal, and an earlier draft of this snippet did not
+notice.** `playwright install --with-deps` does not run apt itself. Verified
+in the lock-resolved `playwright-core@1.62.1`, function
+`transformCommandsForRoot`: when the process is not already root and `sudo`
+exists, it spawns `sudo -- sh -c "<apt commands>"`. The GitHub-hosted
+`ubuntu-latest` runner executes as the unprivileged `runner` user, so on
+every affected workflow the surviving `apt`/`dpkg` descendants are
+**root-owned** while this watchdog is not.
+
+Two consequences, and the first is the subtle one:
+
+- **`kill -0` cannot be used as the liveness probe.** Against a root-owned
+  process it fails with `EPERM`, and the shell surfaces that identically to
+  `ESRCH`. A `kill -0 … || exit 0` loop therefore reads "I am not allowed to
+  signal this" as "the group is empty", exits before the grace period, and
+  skips the `KILL` — silently restoring the exact failure this section
+  rejects bare `timeout(1)` for. `pgrep -g` reads `/proc` instead, which
+  needs no signal privilege and reports the truth.
+- **The signals themselves need privilege.** An unprivileged `kill -TERM`
+  at a root-owned group is a no-op that reports success. Hence `sudo -n`,
+  with the unprivileged call kept as a fallback for a root or
+  sudo-less environment.
+
+**Why the watchdog is never cancelled by the parent.** An earlier draft of this
+snippet ended `wait "$pgid"; kill "$watchdog"`, and that reintroduced the very
+failure the process group exists to prevent. `wait "$pgid"` waits on the group
+**leader**. On a timeout the leader takes `TERM` and exits while a descendant —
+`apt`, precisely the process being contained — either ignores `TERM` or sits in
+uninterruptible I/O. `wait` returns, the next line kills the watchdog during its
+grace period, and the promised group-wide `KILL` is never sent: the step reports
+failure and apt keeps holding the runner, which is the exact flaw this section
+rejects bare `timeout(1)` for. Polling the group instead makes the happy path cost
+about a second and makes the escalation unskippable.
+
+`coreutils` `timeout` may stand in for the watchdog **only** with the command
+launched into its own group and the signal directed at that group. The requirement is
+the group, not the tool — and §6's fault-injection variant is what proves it, by
+asserting no `apt` process survives a killed attempt.
 
 2. **apt resilience config** written before the install:
    `Acquire::Retries "3";` and `Acquire::http::Timeout "20";` in
    `/etc/apt/apt.conf.d/`, so apt itself gives up and retries rather than hanging.
 3. **Bounded retry** — up to 3 attempts, so the ~50%-per-attempt clearance rate
-   compounds to roughly 1-in-8 residual failure instead of 1-in-2.
+   compounds to roughly 1-in-8 residual failure instead of 1-in-2. **The loop must
+   stop immediately on status 125**, which `attempt()` returns when the bound
+   itself failed — the group was never published, or it survived the `KILL`.
+   Only 124 means "bounded and cleaned up", and only 124 is retryable. Retrying
+   after 125 launches a second install while a surviving root-owned `apt` may
+   still hold the dpkg lock, so three attempts stack three stalls instead of
+   compounding three independent ~50% chances; the arithmetic above assumes
+   independence that a held lock destroys. The `::error::` the watchdog prints
+   in that case is a report, not a control signal — nothing reads it, which is
+   exactly why the status has to carry the fact.
 4. **One composite action** at `.github/actions/install-playwright-browsers/`, so all
    19 call sites — across both seams (§3.2) — converge and the next fix is a one-file
    change.
 5. **Honest failure text** — when all attempts fail, say what actually failed. Name an
-   apt/mirror fault **only when apt was positively identified** as the failing phase
-   (the attempt died at the per-attempt timeout, or the captured output carries an apt
-   signature such as an `archive.ubuntu.com` acquire error). `playwright install
+   apt/mirror fault **only when apt was positively identified** as the failing phase:
+   the captured output carries an apt signature (an `archive.ubuntu.com` acquire
+   error, an `apt-get`/`dpkg` diagnostic), or the action set an explicit
+   still-in-the-apt-phase marker before handing off. **A timeout alone is not
+   identification** — an earlier revision of this line accepted one, and that was
+   wrong: the browser DOWNLOAD can equally stall past the per-attempt cap, and it
+   dies at the same timeout. Inferring apt from the clock reproduces the confident
+   misdiagnosis this item exists to prevent, just with extra steps. `playwright install
 --with-deps` also fails _after_ the apt phase — a browser download from the
    Playwright CDN, an unknown browser name, no disk space — and stamping those
    "apt/mirror fault, not a test failure" replaces Playwright's own actionable message
@@ -368,9 +597,11 @@ Inputs (mirroring `require-ci-secret`'s documentation density):
 | `attempt-timeout-minutes` | no       | `3`        | Per-attempt cap, enforced by the process-group timeout in §4 Option C — **not** by `timeout-minutes`, which composite steps do not support                                                                                                                                                                                                                                      |
 
 Behavior: write the apt resilience config; loop up to `attempts`, each bounded by
-`attempt-timeout-minutes`; on total failure, `::error::` with the attempt count and
-elapsed time, naming an apt/mirror fault **only when apt was positively identified**
-per §4 Option C item 5 and a generic install failure otherwise; append a short markdown
+`attempt-timeout-minutes`, **stopping early on status 125** (the bound itself
+failed — see item 3; 124 is the retryable one); on total failure, `::error::` with the attempt count and
+elapsed time, naming an apt/mirror fault **only when an apt signature or phase marker
+positively identifies it** per §4 Option C item 5 — never from a timeout alone — and a
+generic install failure otherwise; append a short markdown
 block to `$GITHUB_STEP_SUMMARY`.
 
 **Changed:** all **19** affected workflows, each executable install step replaced by a
@@ -393,10 +624,27 @@ the test commands.
 
 ### Phase 2 — Conditional on Phase 0 `(separate approval)`
 
-If Phase 0 returns `FAIL`, `with-deps` stays `true` and Phase 1's retry logic is the
-permanent mitigation. Nothing below applies.
+**Gating on a per-browser receipt, since there is no longer a single verdict.**
+Phase 0 now records `probe_results` keyed per browser, so "Phase 0 returned `PASS`"
+is not a statement that can be made any more — and the documented example is
+deliberately the mixed case, Chromium passing while WebKit fails. An earlier draft of
+this section still spoke in a single verdict and therefore contradicted the resolution
+table below, leaving the mixed case unauthorised in one place and handled in another.
+Resolved explicitly:
 
-If Phase 0 returns `PASS`, a later slice flips the composite action's `with-deps`
+| `probe_results`                 | Phase 2          | Effect                                                                                                                                      |
+| ------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **No browser passes**           | Does not proceed | `with-deps` stays `true`; Phase 1's retry logic is the permanent mitigation, and nothing below applies                                      |
+| **At least one browser passes** | Proceeds         | The default flips to `auto`, and `auto` gates **per browser** — a passing browser drops the apt install, a failing or unprobed one keeps it |
+| **Every browser passes**        | Proceeds         | Same mechanism; simply no browser left on the slow branch                                                                                   |
+
+**Any-browser-passes is the gate, not all-browsers-pass**, and the reason is that the
+resolution below is already per-browser: a WebKit `FAIL` costs WebKit its payoff and
+nothing else, so blocking Chromium's payoff on it would forfeit a measured saving to
+buy no safety at all. The safety comes from `auto` resolving over the browsers a step
+actually requests, not from withholding the phase.
+
+When Phase 2 proceeds, a later slice flips the composite action's `with-deps`
 **default** from `true` to **`auto`** — a one-line change in one file, versus 19 edits
 across two seam styles today. That reduction is the payoff of the convergence in
 Phase 1. Until that slice is approved and merged, Phase 1 installs deps exactly as
@@ -597,6 +845,17 @@ after the timeout fires **no `apt`/`apt-get`/`dpkg` process survives**. Signalli
 the direct child leaves apt holding the runner while the step reports failure — the
 failure mode that makes a bare `timeout(1)` look like it works. Without this the
 per-attempt cap is `NOT_MEASURED` in the way that matters.
+
+**The injected stall must be ROOT-owned, or the test is theatre.** This is the one
+detail that decides whether D-CI-5 can catch anything. Per §4 Option C, the real apt
+runs under `sudo -- sh -c`, so it is root-owned while the watchdog is not; the whole
+privilege problem lives in that asymmetry. A fault-injection variant that stalls an
+_unprivileged_ process would be killed by an unprivileged watchdog and report `PASS`
+against an implementation that cannot touch the real thing — a green light for the
+exact bug. So the variant must drive the genuine
+`playwright install --with-deps` path (pointing apt at an unreachable host), not a
+hand-rolled `sleep`, and it must assert on the process table rather than on the step's
+exit code, since the step fails either way.
 
 The compounded-retry claim (three attempts at ~50% each) stays `NOT_MEASURED`
 regardless; it needs a real mirror stall, which cannot be summoned on demand.

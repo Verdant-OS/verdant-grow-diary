@@ -17,6 +17,7 @@ import {
   evaluateEcowittTentSnapshotV0Metric,
   mapEcowittTentSnapshotV0MetricKey,
   readObservedAtIso,
+  resolveEcowittTentSnapshotV0TempCelsius,
   toFiniteMetricValue,
   type EcowittTentSnapshotV0MetricKey,
   type EcowittTentSnapshotV0RowLike,
@@ -126,8 +127,15 @@ function pickLatestPerMetric(
   for (const row of rows) {
     const metricKey = mapEcowittTentSnapshotV0MetricKey(row.metric);
     if (!metricKey) continue;
-    const value = toFiniteMetricValue(row.value);
-    if (value === null) continue;
+    const rawValue = toFiniteMetricValue(row.value);
+    if (rawValue === null) continue;
+    // Temp: convert temp_f → °C; Celsius keys stay as-is (implausible C fails evaluate).
+    let value = rawValue;
+    if (metricKey === "temp") {
+      const resolved = resolveEcowittTentSnapshotV0TempCelsius(row.metric, rawValue);
+      if (resolved.celsius === null) continue;
+      value = resolved.celsius;
+    }
     const capturedAt = readObservedAtIso(row);
     if (!capturedAt) continue;
     const capturedMs = Date.parse(capturedAt);
@@ -176,8 +184,14 @@ function buildSparkline(
 
   for (const row of rows) {
     if (mapEcowittTentSnapshotV0MetricKey(row.metric) !== key) continue;
-    const value = toFiniteMetricValue(row.value);
-    if (value === null) continue;
+    const rawValue = toFiniteMetricValue(row.value);
+    if (rawValue === null) continue;
+    let value = rawValue;
+    if (key === "temp") {
+      const resolved = resolveEcowittTentSnapshotV0TempCelsius(row.metric, rawValue);
+      if (resolved.celsius === null) continue;
+      value = resolved.celsius;
+    }
     const evaluation = evaluateEcowittTentSnapshotV0Metric(key, value);
     if (!evaluation.valid) continue;
     const capturedAt = readObservedAtIso(row);

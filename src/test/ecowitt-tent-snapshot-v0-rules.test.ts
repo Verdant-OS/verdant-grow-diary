@@ -11,6 +11,7 @@ import {
   isForbiddenSensorTruthSourceToken,
   isStuckZeroOrHundredPct,
   mapEcowittTentSnapshotV0MetricKey,
+  resolveEcowittTentSnapshotV0TempCelsius,
 } from "@/lib/ecowittTentSnapshotV0Rules";
 import {
   buildEcowittTentSnapshotV0ViewModel,
@@ -259,6 +260,47 @@ describe("buildEcowittTentSnapshotV0ViewModel", () => {
     expect(vm.unusedFieldNamesRefused).toEqual([...ECOWITT_TENT_SNAPSHOT_V0_UNUSED_FIELD_NAMES]);
     expect(vm.unusedFieldNamesRefused).toContain("co2");
     expect(vm.unusedFieldNamesRefused).toContain("soilmoisture2");
+  });
+});
+
+describe("ecowittTentSnapshotV0Rules — Safe-by-Design temperature units", () => {
+  it("rejects Fahrenheit-looking temperature_c as invalid (never Live 77 °C)", () => {
+    expect(evaluateEcowittTentSnapshotV0Metric("temp", 77).valid).toBe(false);
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temperature_c", value: 77, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.truthSource).toBe("invalid");
+    expect(temp?.badgeLabel).toBe("Invalid");
+    expect(temp?.value).toBeNull();
+    expect(temp?.unit).toBe("°C");
+  });
+
+  it("converts temp_f Fahrenheit to Celsius before Live display", () => {
+    expect(mapEcowittTentSnapshotV0MetricKey("temp_f")).toBe("temp");
+    const resolved = resolveEcowittTentSnapshotV0TempCelsius("temp_f", 77);
+    expect(resolved.fromFahrenheit).toBe(true);
+    expect(resolved.celsius).toBeCloseTo(25, 5);
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temp_f", value: 77, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.value).toBeCloseTo(25, 5);
+    expect(temp?.unit).toBe("°C");
+    expect(temp?.badgeLabel).toBe("Live");
+    expect(temp?.value).not.toBe(77);
+  });
+
+  it("keeps plausible Celsius temperature_c as Live", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temperature_c", value: 24, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.value).toBe(24);
+    expect(temp?.badgeLabel).toBe("Live");
   });
 });
 

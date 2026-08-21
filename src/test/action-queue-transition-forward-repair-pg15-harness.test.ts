@@ -11,6 +11,12 @@ const WORKFLOW_PATH = resolve(".github/workflows/action-queue-transition-forward
 const MIGRATION_PATH = resolve(
   "supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql",
 );
+const GUARD_MIGRATION_PATH = resolve(
+  "supabase/migrations/20260819190000_action_queue_guard_decision_fields_forward_repair.sql",
+);
+const TABLE_ACL_MIGRATION_PATH = resolve(
+  "supabase/migrations/20260820235900_action_queue_table_acl_forward_repair.sql",
+);
 const POSTGRES_IMAGE =
   "postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e";
 const DISPOSABLE_DATABASE_URL =
@@ -79,14 +85,30 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
     expect(inputs[0]).not.toContain("drop schema");
   });
 
-  it("pins the single forward migration by exact filename and digest", async () => {
+  it("pins all three forward migrations by exact filename and digest", async () => {
     const harness = await loadHarness();
     const migration = harness.validatePinnedMigrationFile();
     const source = readFileSync(MIGRATION_PATH, "utf8");
+    const guardMigration = harness.validatePinnedGuardMigrationFile();
+    const guardSource = readFileSync(GUARD_MIGRATION_PATH, "utf8");
+    const tableAclMigration = harness.validatePinnedTableAclMigrationFile();
+    const tableAclSource = readFileSync(TABLE_ACL_MIGRATION_PATH, "utf8");
 
     expect(migration.fileName).toBe("20260819190852_action_queue_transition_forward_repair.sql");
     expect(migration.sha256).toBe(createHash("sha256").update(source).digest("hex"));
     expect(migration.sql).toBe(source);
+    expect(guardMigration.fileName).toBe(
+      "20260819190000_action_queue_guard_decision_fields_forward_repair.sql",
+    );
+    expect(guardMigration.sha256).toBe(createHash("sha256").update(guardSource).digest("hex"));
+    expect(guardMigration.sql).toBe(guardSource);
+    expect(tableAclMigration.fileName).toBe(
+      "20260820235900_action_queue_table_acl_forward_repair.sql",
+    );
+    expect(tableAclMigration.sha256).toBe(
+      createHash("sha256").update(tableAclSource).digest("hex"),
+    );
+    expect(tableAclMigration.sql).toBe(tableAclSource);
   });
 
   it("names every required success and fail-closed runtime proof", () => {
@@ -95,6 +117,10 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
 
     for (const proof of [
       "proveLegacyBaseline",
+      "proveLegacyGuardBaseline",
+      "proveGuardRepairSuccess",
+      "proveGuardCanonicalReapply",
+      "proveUnknownGuardSourceRejected",
       "proveRepairSuccess",
       "proveOwnerTransitionAndRetry",
       "proveIllegalTransitionNoWrite",
@@ -114,6 +140,11 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
       "proveHardenedGrantBaselineConverges",
       "proveRequiredGrantDriftRejected",
       "proveInheritedMutationGrantRejected",
+      "proveMeasuredTableAclGap",
+      "proveTableAclRepairSuccess",
+      "proveTableAclCanonicalReapply",
+      "proveUnknownTableAclRejected",
+      "proveDirectTruncateFences",
     ]) {
       expect(source).toContain(proof);
     }
@@ -123,6 +154,12 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
     expect(source).toContain("420914cd6ffbd2d552c30e8d7b6ddf73");
     expect(source).toContain("set local role authenticated");
     expect(source).toContain("set local role anon");
+    expect(source).toContain("set local role sandbox_exec");
+    expect(source).toContain("direct_truncate_events");
+    expect(source).toContain("direct_truncate_queue");
+    expect(source).toContain("grant truncate on public.action_queue_events");
+    expect(source).toContain("truncate table public.action_queue_events, public.action_queue");
+    expect(source).toContain("42501");
     expect(source).toContain('"delivery_legacy_preflight", "apply"');
     expect(source).toContain('"delivery_canonical_ledger_absent"');
     expect(source).toContain('"schema_live_ledger_absent"');
@@ -153,13 +190,19 @@ describe("Action Queue transition forward-repair PostgreSQL 15 runtime gate", ()
         "scripts/verify-action-queue-transition-forward-repair-preflight-artifact.mjs",
         ".github/workflows/action-queue-transition-forward-repair-pg15.yml",
         ".github/workflows/apply-action-queue-transition-forward-repair.yml",
+        "supabase/migrations/20260819190000_action_queue_guard_decision_fields_forward_repair.sql",
         "supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql",
+        "supabase/migrations/20260820235900_action_queue_table_acl_forward_repair.sql",
+        "supabase/migrations/20260721225930_b34caa3e-17e4-47c1-9847-19d1c184d83c.sql",
         "supabase/migrations/20260725093000_restore_action_queue_owner_decisions.sql",
         "supabase/migrations/20260726093000_action_queue_transition_rpc.sql",
         "supabase/migrations/20260726094000_action_queue_transition_contract.sql",
         "supabase/migrations/20260728163100_production_breeding_workflow_reconciliation.sql",
         "src/test/action-queue-transition-forward-repair.test.ts",
         "src/test/action-queue-transition-forward-repair-pg15-harness.test.ts",
+        "src/test/action-queue-table-acl-forward-repair.test.ts",
+        "src/test/action-queue-guard-forward-repair-migration.test.ts",
+        "supabase/seed.sql",
         "src/test/solo-founder-production-authorization.test.ts",
         "src/test/apply-action-queue-transition-forward-repair.test.ts",
         "src/test/verify-action-queue-transition-forward-repair-preflight-artifact.test.ts",

@@ -29,7 +29,7 @@ permissions:
 jobs:
   verify-published-migration-integrity:
     name: Verify published migrations are unchanged vs base branch
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 5
     steps:
       - name: Checkout PR head with full history

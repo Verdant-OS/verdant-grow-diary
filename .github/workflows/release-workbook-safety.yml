@@ -26,7 +26,7 @@ on:
 jobs:
   release-workbook-safety:
     name: Workbook safety + traceability + snapshots
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 10
     permissions:
       contents: read

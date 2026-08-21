@@ -40,7 +40,7 @@ concurrency:
 jobs:
   one-tent-loop-proof-never-healthy:
     name: One-Tent Loop Proof never-healthy E2E (mocked)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
 
     steps:

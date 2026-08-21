@@ -22,7 +22,7 @@ permissions:
 jobs:
   spike-static:
     name: Nested static proofs and production isolation
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     steps:
       - name: Checkout

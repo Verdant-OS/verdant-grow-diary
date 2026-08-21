@@ -37,7 +37,7 @@ permissions:
 jobs:
   symptom-check-branch-e2e:
     name: Symptom Check branch E2E (mocked / non-destructive)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
 
     steps:

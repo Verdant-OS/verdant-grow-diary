@@ -17,7 +17,7 @@ jobs:
   scope-gate:
     name: Verify stabilization PR scope
     if: contains(github.event.pull_request.labels.*.name, 'test-stabilization')
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 5
     steps:
       - name: Checkout (full history)

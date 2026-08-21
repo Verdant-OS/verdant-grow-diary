@@ -11,7 +11,7 @@ on:
 jobs:
   verify:
     name: Verify _shared/lib mirror is in sync
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     permissions:
       contents: read
       issues: write # notify-edge-shared-drift.mjs opens/updates a tracking issue

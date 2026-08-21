@@ -16,7 +16,7 @@ on:
 jobs:
   testbench-static-safety:
     name: Typecheck + static safety scan for tools/ecowitt-testbench
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
     steps:
       - name: Checkout

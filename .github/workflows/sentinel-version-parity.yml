@@ -36,7 +36,7 @@ permissions:
 jobs:
   parity:
     name: Governance files agree on Sentinel-Version
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     steps:
       # Org policy requires every action pinned to a full-length commit SHA.
       # fetch-depth: 0 because the BUMP half needs real history — `git merge-base` cannot

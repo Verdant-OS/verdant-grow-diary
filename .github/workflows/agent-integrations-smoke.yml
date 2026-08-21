@@ -40,7 +40,7 @@ on:
 jobs:
   agent-integrations-smoke:
     name: Agent Integrations smoke (mocked / non-destructive)
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 15
 
     steps:

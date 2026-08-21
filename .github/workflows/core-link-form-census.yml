@@ -31,7 +31,7 @@ concurrency:
 jobs:
   focused-rules:
     name: Census rules and accessibility regressions
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -50,7 +50,7 @@ jobs:
   browser-census:
     name: Browser census (${{ matrix.lane }})
     needs: focused-rules
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-medium-4c-8g
     timeout-minutes: 40
     strategy:
       fail-fast: false

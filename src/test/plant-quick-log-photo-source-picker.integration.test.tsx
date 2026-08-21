@@ -12,12 +12,25 @@ import React from "react";
 const uploadCalls: Array<{ bucket: string; path: string; file: File }> = [];
 const saveCalls: Array<Record<string, unknown>> = [];
 const updateCalls: Array<Record<string, unknown>> = [];
+const saveResultState = vi.hoisted(() => ({
+  value: { ok: true, growEventId: "ge-1", reused: false } as {
+    ok: boolean;
+    growEventId: string | null;
+    reused: boolean;
+  },
+}));
+const photoPatchState = vi.hoisted(() => ({
+  data: [{ id: "diary-1" }] as Array<{ id: string }> | null,
+  error: null as unknown,
+}));
+const toastSuccessMock = vi.hoisted(() => vi.fn());
+const toastErrorMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/hooks/useQuickLogV2Save", () => ({
   useQuickLogV2Save: () => ({
     save: async (payload: Record<string, unknown>) => {
       saveCalls.push(payload);
-      return { ok: true, growEventId: "ge-1", reused: false };
+      return saveResultState.value;
     },
     saving: false,
     error: null,
@@ -40,7 +53,9 @@ vi.mock("@/integrations/supabase/client", () => ({
         updateCalls.push({ __table: table, ...payload });
         const chain = {
           eq: () => chain,
-          filter: () => Promise.resolve({ data: null, error: null }),
+          filter: () => chain,
+          select: () =>
+            Promise.resolve({ data: photoPatchState.data, error: photoPatchState.error }),
         };
         return chain;
       },
@@ -57,22 +72,25 @@ vi.mock("@/hooks/usePlantManualSensorHistory", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: toastSuccessMock, error: toastErrorMock },
 }));
 
 beforeEach(() => {
   uploadCalls.length = 0;
   saveCalls.length = 0;
   updateCalls.length = 0;
+  saveResultState.value = { ok: true, growEventId: "ge-1", reused: false };
+  photoPatchState.data = [{ id: "diary-1" }];
+  photoPatchState.error = null;
+  toastSuccessMock.mockReset();
+  toastErrorMock.mockReset();
   vi.restoreAllMocks();
   if (typeof URL.createObjectURL !== "function") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (URL as any).createObjectURL = vi.fn(() => "blob:mock-preview");
   } else {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock-preview");
   }
   if (typeof URL.revokeObjectURL !== "function") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (URL as any).revokeObjectURL = vi.fn();
   } else {
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
@@ -341,6 +359,64 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     expect(typeof (saveCalls[0].p_details as { photo_url?: string }).photo_url).toBe("string");
     expect(updateCalls[0].__table).toBe("diary_entries");
     expect(JSON.stringify(saveCalls[0])).not.toContain("user_id");
+  });
+
+  it("does not claim full photo success when the companion diary patch fails", async () => {
+    photoPatchState.error = { message: "diary update rejected" };
+    renderSheet();
+    const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
+    await pickFile(camera, makeImage("patch-failure.jpg"));
+    fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
+      target: { value: "Photo evidence needs an honest result" },
+    });
+
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+
+    expect(await screen.findByTestId("plant-quick-log-error")).toHaveTextContent(
+      /log was saved, but the photo could not be attached/i,
+    );
+    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
+    expect(toastSuccessMock).not.toHaveBeenCalled();
+    expect(saveCalls).toHaveLength(1);
+    expect(updateCalls).toHaveLength(1);
+  });
+
+  it("does not claim photo success when the confirmed save omits its event identity", async () => {
+    saveResultState.value = { ok: true, growEventId: null, reused: false };
+    renderSheet();
+    const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
+    await pickFile(camera, makeImage("missing-event-id.jpg"));
+    fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
+      target: { value: "Photo evidence needs a linked event" },
+    });
+
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+
+    expect(await screen.findByTestId("plant-quick-log-error")).toHaveTextContent(
+      /log was saved, but the photo could not be attached/i,
+    );
+    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
+    expect(toastSuccessMock).not.toHaveBeenCalled();
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  it("does not claim photo success when the companion update changes no diary row", async () => {
+    photoPatchState.data = [];
+    renderSheet();
+    const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
+    await pickFile(camera, makeImage("missing-diary-row.jpg"));
+    fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
+      target: { value: "Photo evidence needs a diary mirror" },
+    });
+
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+
+    expect(await screen.findByTestId("plant-quick-log-error")).toHaveTextContent(
+      /log was saved, but the photo could not be attached/i,
+    );
+    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
+    expect(toastSuccessMock).not.toHaveBeenCalled();
+    expect(updateCalls).toHaveLength(1);
   });
 
   it("saves a library photo without requiring typed notes", async () => {

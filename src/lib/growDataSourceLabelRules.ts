@@ -7,7 +7,10 @@
  * No React, no Supabase, no I/O. Deterministic for any given input + `now`.
  */
 
-import { GROW_DATA_SOURCE_LABEL_STALE_MS } from "../constants/sensorTiming";
+import {
+  LIVE_CURRENT_STATE_STALE_MS,
+  resolveCurrentStateStaleWindowMs,
+} from "@/lib/sensorTruthCanon";
 export type GrowDataSourceLabel =
   "Live" | "Manual" | "CSV history" | "Simulated" | "Demo" | "Stale" | "Unavailable";
 
@@ -23,7 +26,7 @@ export interface GrowDataSourceInput {
 }
 
 export interface GrowDataSourceLabelOptions {
-  /** Stale threshold in milliseconds. Default 15 minutes. */
+  /** Explicit stale threshold override. Defaults to the canonical source-aware window. */
   staleThresholdMs?: number;
   /** Injectable "now" for deterministic tests. */
   now?: number | Date;
@@ -37,8 +40,6 @@ export interface GrowDataSourceLabelResult {
   isTrustedForAi: boolean;
   reasons: string[];
 }
-
-const DEFAULT_STALE_MS = GROW_DATA_SOURCE_LABEL_STALE_MS;
 
 const DEMO_SOURCES = new Set(["mock", "demo", "fake", "sample", "fixture"]);
 const SIMULATED_SOURCES = new Set(["sim", "simulated", "simulation"]);
@@ -101,22 +102,26 @@ export function classifyGrowDataSource(
   options: GrowDataSourceLabelOptions = {},
 ): GrowDataSourceLabelResult {
   const reasons: string[] = [];
-  const staleThresholdMs =
+  const source = normalizeSource(input?.source);
+  const freshnessSource = source && MANUAL_SOURCES.has(source) ? "manual" : source;
+  const explicitStaleThresholdMs =
     typeof options.staleThresholdMs === "number" &&
     Number.isFinite(options.staleThresholdMs) &&
     options.staleThresholdMs > 0
       ? options.staleThresholdMs
-      : DEFAULT_STALE_MS;
+      : null;
+  const staleThresholdMs =
+    explicitStaleThresholdMs ?? resolveCurrentStateStaleWindowMs(freshnessSource);
+  const futureThresholdMs = explicitStaleThresholdMs ?? LIVE_CURRENT_STATE_STALE_MS;
   const now = resolveNow(options.now);
 
-  const source = normalizeSource(input?.source);
   const valuePresent = hasValue(input?.value);
   const tsRaw = input?.timestamp ?? null;
   const tsMillis = toMillis(tsRaw);
   const tsProvided = tsRaw !== null && tsRaw !== undefined && tsRaw !== "";
   const tsInvalid = tsProvided && tsMillis === null;
   const ageMs = tsMillis !== null ? now - tsMillis : null;
-  const isStale = ageMs !== null && (ageMs > staleThresholdMs || ageMs < -staleThresholdMs);
+  const isStale = ageMs !== null && (ageMs > staleThresholdMs || ageMs < -futureThresholdMs);
 
   // 1. Demo / mock always wins — never trusted, never Live.
   if (source && DEMO_SOURCES.has(source)) {

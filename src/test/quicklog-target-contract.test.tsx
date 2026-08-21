@@ -295,8 +295,10 @@ describe("Quick Log canonical target contract", () => {
   });
 
   it("holds an unknown route prefill instead of falling through to a remembered target", async () => {
+    // Seeded under the account-scoped key that IS readable, so the fence is
+    // real: a prefill hold must win over an offerable remembered target.
     setLocalStorageItemForTest(
-      "verdant.quickLog.lastTarget.v1",
+      "verdant.quickLog.lastTarget.v2.u1",
       JSON.stringify({
         plantId: "p1",
         growId: "g1",
@@ -564,8 +566,16 @@ describe("Quick Log canonical target contract", () => {
       "p1",
     );
     expect(
-      JSON.parse(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v1") ?? "{}"),
+      // Pin renegotiated with slice D5, which retires the unscoped `.v1`
+      // write (the approved map: "v1 write retired"; measured: it had zero
+      // readers, and writing it before the user check meant an anonymous
+      // session stored a plant id). The account-scoped record is now the
+      // observable for this contract. The assertion itself is unchanged —
+      // same frozen target, read from the key that actually gets written.
+      JSON.parse(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v2.u1") ?? "{}"),
     ).toEqual(expect.objectContaining({ plantId: "p1", growId: "g1", tentId: "t1" }));
+    // And the retired key must stay unwritten.
+    expect(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v1")).toBeNull();
     const invalidatedKeys = invalidateSpy.mock.calls.map(([options]) =>
       JSON.stringify(options!.queryKey),
     );

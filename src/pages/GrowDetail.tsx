@@ -300,13 +300,7 @@ export default function GrowDetail() {
           </Link>
         </div>
         {/* Recovery prompt only on a successful read: "unavailable" is
-            unknown, and unknown must never render as measured absence.
-
-            Never on an ARCHIVED grow. Archived Grow Detail is history, and
-            the CTA dispatches a grow-scoped Quick Log open — but
-            `GrowsProvider` excludes archived rows, so an account with any
-            active grow resolves that dispatched id to a DIFFERENT setup. The
-            prompt would be inviting a write against the wrong grow. */}
+            unknown, and unknown must never render as measured absence. */}
         {recent.status === "ok" && !grow.is_archived && (
           <GrowRecoveryPrompt
             growId={growId ?? null}

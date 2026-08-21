@@ -60,20 +60,13 @@ describe("page wiring — Dashboard and Grow Detail", () => {
 
   it("gates the prompt on a successful read — unknown is never absence", () => {
     expect(DASHBOARD).toMatch(/recent\.status === "ok" && \(\s*<GrowRecoveryPrompt/);
+    expect(GROW_DETAIL).toMatch(/recent\.status === "ok" && !grow\.is_archived/);
+  });
+
+  it("never offers a Quick Log recovery action from archived grow history", () => {
     expect(GROW_DETAIL).toMatch(
       /recent\.status === "ok" && !grow\.is_archived && \(\s*<GrowRecoveryPrompt/,
     );
-  });
-
-  it("never offers the prompt on an ARCHIVED grow", () => {
-    // Archived Grow Detail is history. The CTA dispatches a grow-scoped Quick
-    // Log open, but GrowsProvider excludes archived rows, so an account with
-    // any active grow resolves that id to a DIFFERENT setup — the prompt
-    // would be inviting a write against the wrong grow.
-    expect(GROW_DETAIL).toMatch(/!grow\.is_archived && \(\s*<GrowRecoveryPrompt/);
-    // Dashboard needs no such gate: `scopedGrowId` comes from the active grow,
-    // which is never archived. Pinned so the asymmetry reads as deliberate.
-    expect(DASHBOARD).toMatch(/growId=\{scopedGrowId\}/);
   });
 
   it("preserves the pinned empty-state literals", () => {

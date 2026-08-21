@@ -146,6 +146,8 @@ export function resolveOneTentLoopNextStep(
   // pages still validate the requested grow against their authenticated rows.
   const normalizedGrowId =
     typeof growId === "string" && growId.trim().length > 0 ? growId.trim() : null;
+  const normalizedTentId =
+    typeof tentId === "string" && tentId.trim().length > 0 ? tentId.trim() : null;
 
   switch (current) {
     case "grow":
@@ -184,6 +186,12 @@ export function resolveOneTentLoopNextStep(
       // an arbitrary query value into a sensor query.
       return enable(base, buildSensorsTentRouteHref(tentId));
     case "sensor-snapshot":
+      if (normalizedGrowId && normalizedTentId) {
+        return enable(
+          base,
+          `/doctor?growId=${encodeURIComponent(normalizedGrowId)}&tentId=${encodeURIComponent(normalizedTentId)}`,
+        );
+      }
       return enable(base, "/doctor");
     case "ai-doctor":
       // When a specific alertId is available, deep-link to that alert.

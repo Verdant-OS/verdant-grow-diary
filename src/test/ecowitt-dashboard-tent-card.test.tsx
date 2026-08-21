@@ -3,7 +3,7 @@
  *
  * Validates:
  *  - Dashboard imports and uses EcowittLatestSnapshotCard with tentSelection.
- *  - TentDetail imports and uses EcowittLatestSnapshotCard with id.
+ *  - TentDetail imports and uses EcowittTentSnapshotV0Card with id.
  *  - Grower card links to normal sensor history, never operator audit.
  *  - Source-code safety (no forbidden patterns).
  *
@@ -120,19 +120,20 @@ describe("Dashboard EcoWitt wiring — source code", () => {
 });
 
 describe("TentDetail EcoWitt wiring — source code", () => {
-  it("imports EcowittLatestSnapshotCard", () => {
+  it("imports EcowittTentSnapshotV0Card", () => {
     expect(TENT_DETAIL_SRC).toMatch(
-      /import\s+EcowittLatestSnapshotCard\s+from\s+["']@\/components\/EcowittLatestSnapshotCard["']/,
+      /import\s+EcowittTentSnapshotV0Card\s+from\s+["']@\/components\/EcowittTentSnapshotV0Card["']/,
     );
   });
 
-  it("renders the card with the viewed tent id", () => {
-    expect(TENT_DETAIL_SRC).toContain("<EcowittLatestSnapshotCard");
+  it("renders the V0 card with the viewed tent id", () => {
+    expect(TENT_DETAIL_SRC).toContain("<EcowittTentSnapshotV0Card");
     expect(TENT_DETAIL_SRC).toContain("tentId={id ?? null}");
   });
 
-  it("labels the section 'Latest EcoWitt Snapshot'", () => {
-    expect(TENT_DETAIL_SRC).toMatch(/Latest EcoWitt Snapshot/);
+  it("labels the V0 section via EcowittTentSnapshotV0Card (not legacy EcoWitt heading)", () => {
+    expect(TENT_DETAIL_SRC).toContain("EcowittTentSnapshotV0Card");
+    expect(TENT_DETAIL_SRC).not.toMatch(/Latest EcoWitt Snapshot/);
   });
 
   it("does not remove existing manual sensor UI", () => {
@@ -174,7 +175,9 @@ describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
     expect(screen.getByTestId("ecowitt-sensors-link")).toBeInTheDocument();
   });
 
-  it("stale reading renders Stale badge, not Live", async () => {
+  it("vendor source=ecowitt fails closed as Invalid, never Live (even when capture age is stale)", async () => {
+    // Constitution fence: transport/vendor token `ecowitt` is not a trust
+    // label. Freshness alone cannot promote it to Stale/Live on this card.
     rowsMock = [
       ecowittRow({
         captured_at: STALE_AT,
@@ -193,8 +196,9 @@ describe("EcowittLatestSnapshotCard — grower link and behavior", () => {
       { wrapper: wrap() },
     );
     await waitFor(() => expect(screen.getByTestId("ecowitt-source-badge")).toBeInTheDocument());
-    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Stale");
+    expect(screen.getByTestId("ecowitt-source-badge").textContent).toBe("Invalid");
     expect(screen.queryByText(/^Live$/)).toBeNull();
+    expect(screen.queryByText(/^Stale$/)).toBeNull();
   });
 
   it("manual source renders Manual, never Live", async () => {

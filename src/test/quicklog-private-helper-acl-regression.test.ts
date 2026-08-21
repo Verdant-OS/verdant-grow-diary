@@ -49,9 +49,10 @@ const MIGRATIONS_DIR = resolve(ROOT, "supabase/migrations");
  * `SELECT '--'; GRANT EXECUTE ON … TO authenticated;` on one line, stripping
  * from the first `--` swallows the rest of the line and the forbidden grant is
  * never scanned at all — the fence reports green precisely because the input
- * was mutilated. Ordinary quotes (with `''` doubling), quoted identifiers, and
- * dollar-quoted bodies are therefore passed through intact, and block comments
- * nest the way PostgreSQL nests them.
+ * was mutilated. Ordinary quotes (with `''` doubling), E/e strings (with
+ * backslash escapes), quoted identifiers, and dollar-quoted bodies are
+ * therefore passed through intact, and block comments nest the way PostgreSQL
+ * nests them.
  */
 function stripComments(sql: string): string {
   const src = sql.replace(/\r\n?/g, "\n");
@@ -69,8 +70,17 @@ function stripComments(sql: string): string {
     }
     const ch = src[i];
     if (ch === "'" || ch === '"') {
+      const isEscapeString =
+        ch === "'" &&
+        i > 0 &&
+        (src[i - 1] === "E" || src[i - 1] === "e") &&
+        (i < 2 || !/[A-Za-z0-9_$]/.test(src[i - 2]));
       let j = i + 1;
       while (j < src.length) {
+        if (isEscapeString && src[j] === "\\") {
+          j += 2;
+          continue;
+        }
         if (src[j] !== ch) {
           j += 1;
           continue;
@@ -431,6 +441,28 @@ describe("forward fence — migrations newer than the forward repair", () => {
     ).toBe(false);
   });
 
+  it("accepts doubled quotes inside quoted schema identifiers", () => {
+    expect(
+      migrationGrantsClientExecuteOn(
+        'GRANT EXECUTE ON ALL ROUTINES IN SCHEMA "odd""schema", public TO authenticated;',
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(true);
+    expect(
+      migrationLeavesWrapperWithoutRequiredGrant(
+        'REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA "odd""schema", public FROM service_role;',
+      ),
+    ).toBe(true);
+    // A doubled-quote identifier does not make a later PUBLIC grantee into
+    // the public schema when the schema list never names that schema.
+    expect(
+      migrationGrantsClientExecuteOn(
+        'GRANT EXECUTE ON ALL ROUTINES IN SCHEMA "odd""schema" TO public;',
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(false);
+  });
+
   it("keeps comment markers that live inside SQL string literals", () => {
     // The marker is data here, so the grant after it is real and must be seen.
     expect(
@@ -469,6 +501,31 @@ describe("forward fence — migrations newer than the forward repair", () => {
       migrationGrantsClientExecuteOn(
         stripComments(
           "/* outer /* inner */ GRANT EXECUTE ON ROUTINE public.quicklog_try_parse_uuid(text) TO anon; */",
+        ),
+        "quicklog_try_parse_uuid",
+      ),
+    ).toBe(false);
+  });
+
+  it("honours backslash escapes only inside PostgreSQL E/e string literals", () => {
+    for (const prefix of ["E", "e"]) {
+      expect(
+        migrationGrantsClientExecuteOn(
+          stripComments(
+            String.raw`SELECT ${prefix}'escaped quote: \' -- still data'; GRANT EXECUTE ON ROUTINE public.quicklog_try_parse_uuid(text) TO authenticated;`,
+          ),
+          "quicklog_try_parse_uuid",
+        ),
+      ).toBe(true);
+    }
+
+    // With standard-conforming strings, a backslash does not escape the
+    // quote. The marker after that quote is a real comment, so its apparent
+    // grant must remain non-executable.
+    expect(
+      migrationGrantsClientExecuteOn(
+        stripComments(
+          String.raw`SELECT '\'; -- GRANT EXECUTE ON ROUTINE public.quicklog_try_parse_uuid(text) TO authenticated;`,
         ),
         "quicklog_try_parse_uuid",
       ),

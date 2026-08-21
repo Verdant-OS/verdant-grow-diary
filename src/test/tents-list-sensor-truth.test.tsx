@@ -91,6 +91,7 @@ const H = vi.hoisted(() => {
     tents: [makeTent(TENT_ID, "Walkthrough Tent")] as ReturnType<typeof makeTent>[],
     byTent: { [TENT_ID]: ROWS } as Record<string, unknown[]>,
     statusByTent: { [TENT_ID]: "success" } as Record<string, string>,
+    refreshingByTent: { [TENT_ID]: false } as Record<string, boolean>,
     isLoading: false,
     isError: false,
     growIsLoading: false,
@@ -109,6 +110,7 @@ const H = vi.hoisted(() => {
     hookState.tents = [makeTent(TENT_ID, "Walkthrough Tent")];
     hookState.byTent = { [TENT_ID]: ROWS };
     hookState.statusByTent = { [TENT_ID]: "success" };
+    hookState.refreshingByTent = { [TENT_ID]: false };
     hookState.isLoading = false;
     hookState.isError = false;
     hookState.growIsLoading = false;
@@ -166,6 +168,7 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
     return {
       byTent: H.hookState.byTent,
       statusByTent: H.hookState.statusByTent,
+      refreshingByTent: H.hookState.refreshingByTent,
       isLoading: H.hookState.isLoading,
       isError: H.hookState.isError,
     };
@@ -693,6 +696,70 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     expect(H.hookState.manualHookCalls).toBe(1);
     expect(H.hookState.legacyManualHookCalls).toBe(0);
     expect(H.hookState.lastManualTentIds).toEqual([H.TENT_ID]);
+  });
+
+  it("never flashes Manual while cached-empty sensors refresh before fresh rows arrive", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.refreshingByTent = { [H.TENT_ID]: true };
+    H.hookState.manualCards = [H.manualCard()];
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(screen.getByTestId(`tents-list-sensor-loading-${H.TENT_ID}`)).toHaveTextContent(
+      /Loading sensor data/,
+    );
+    expect(screen.queryByText("Manual")).toBeNull();
+
+    const freshSensorTs = new Date().toISOString();
+    H.hookState.byTent = {
+      [H.TENT_ID]: [
+        { ...H.raw(freshSensorTs, "temperature_c", 23), source: "live" },
+        { ...H.raw(freshSensorTs, "humidity_pct", 54), source: "live" },
+      ],
+    };
+    H.hookState.refreshingByTent = { [H.TENT_ID]: false };
+    view.rerender(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("73.4");
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Live");
+  });
+
+  it("enables Manual only after a cached-empty sensor refresh settles empty", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.refreshingByTent = { [H.TENT_ID]: true };
+    H.hookState.manualCards = [H.manualCard()];
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(screen.getByTestId(`tents-list-sensor-loading-${H.TENT_ID}`)).toBeInTheDocument();
+    expect(screen.queryByText("Manual")).toBeNull();
+
+    H.hookState.refreshingByTent = { [H.TENT_ID]: false };
+    view.rerender(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(1);
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
   });
 
   it("keeps real sensor rows ahead of a persisted manual snapshot and skips its diary query", () => {

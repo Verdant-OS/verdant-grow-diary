@@ -128,14 +128,24 @@ export default function Tents() {
   const {
     byTent: readingsByTent,
     statusByTent: sensorStatusByTent,
+    refreshingByTent: sensorRefreshingByTent = {},
     retryTent: retrySensorTent,
   } = useSensorReadingsByTents(sensorTentIds);
+  const emptySensorRefreshTentIdSet = new Set(
+    sensorTentIds.filter(
+      (tentId) => sensorRefreshingByTent[tentId] && (readingsByTent[tentId]?.length ?? 0) === 0,
+    ),
+  );
   const sensorSetSettled = sensorTentIds.every(
-    (tentId) => (sensorStatusByTent[tentId] ?? "loading") !== "loading",
+    (tentId) =>
+      (sensorStatusByTent[tentId] ?? "loading") !== "loading" &&
+      !emptySensorRefreshTentIdSet.has(tentId),
   );
   const manualFallbackCandidateTentIds = sensorTentIds.filter(
     (tentId) =>
-      sensorStatusByTent[tentId] === "success" && (readingsByTent[tentId]?.length ?? 0) === 0,
+      sensorStatusByTent[tentId] === "success" &&
+      !emptySensorRefreshTentIdSet.has(tentId) &&
+      (readingsByTent[tentId]?.length ?? 0) === 0,
   );
   const manualFallbackTentIds = sensorSetSettled ? manualFallbackCandidateTentIds : [];
   const manualFallbackTentIdSet = new Set(manualFallbackCandidateTentIds);
@@ -550,7 +560,9 @@ export default function Tents() {
                 // (mock-fallback tents) are never queried — a uuid column
                 // cannot hold them, so their absence is established.
                 const sensorReadStatus = isUuid(t.id)
-                  ? (sensorStatusByTent[t.id] ?? "loading")
+                  ? emptySensorRefreshTentIdSet.has(t.id)
+                    ? "loading"
+                    : (sensorStatusByTent[t.id] ?? "loading")
                   : "success";
                 const manualFallbackEligible = manualFallbackTentIdSet.has(t.id);
                 const manualSnapshot = manualFallbackEligible

@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 
 const QUICKLOG = readFileSync("src/components/QuickLog.tsx", "utf8");
 const RECENT_TARGET_STORE = readFileSync("src/lib/quickLogRecentTargetStore.ts", "utf8");
+const PLANT_QUICK_LOG = readFileSync("src/components/PlantQuickLog.tsx", "utf8");
+const DAILY_CHECK = readFileSync("src/pages/DailyCheck.tsx", "utf8");
 // Prettier reflows these expressions as they grow, and a pin that breaks on a
 // line wrap teaches people to relax it. Collapse runs of whitespace so the
 // assertions stay about SEMANTICS; the negative pins below keep them strict.
@@ -110,5 +112,45 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
       QUICKLOG.indexOf("quick-log-recent-target-dismiss"),
     );
     expect(chipRegion).not.toMatch(/\blive data\b|\blive sensor\b|guaranteed/i);
+  });
+});
+
+describe("D5 — every plant-scoped save surface updates the memory", () => {
+  // These are WIRING pins, and that is the right tool for exactly this claim:
+  // "a call site exists / has not been deleted". They do not prove the write
+  // lands — the resolved-value coverage for that is in the suggestion rules
+  // and RTL suites. Stated so nobody mistakes them for behavioural proof.
+  //
+  // Why the pins exist at all: a remembered target that misses a save surface
+  // does not fail loudly. It silently offers an OLDER plant, which is valid
+  // and wrong, and only a grower who noticed would ever report it.
+  const FLAT_PLANT_QUICK_LOG = PLANT_QUICK_LOG.replace(/\s+/g, " ");
+  const FLAT_DAILY_CHECK = DAILY_CHECK.replace(/\s+/g, " ");
+
+  it("PlantQuickLog remembers the plant on a confirmed save", () => {
+    expect(PLANT_QUICK_LOG).toContain(
+      'import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore"',
+    );
+    // After the save is confirmed, never before it.
+    expect(FLAT_PLANT_QUICK_LOG).toMatch(
+      /toast\.success\("Log saved to timeline\."\);[\s\S]{0,600}rememberRecentQuickLogTarget\(/,
+    );
+    // Guarded on a real grow, and scoped to the signed-in account.
+    expect(FLAT_PLANT_QUICK_LOG).toMatch(
+      /if \(growId\) \{ rememberRecentQuickLogTarget\( \{ plantId, growId, tentId: tentId \?\? null,[\s\S]{0,120}user\?\.id \?\? null,/,
+    );
+  });
+
+  it("Daily Check remembers the plant, and only when the save named one", () => {
+    expect(DAILY_CHECK).toContain(
+      'import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore"',
+    );
+    expect(FLAT_DAILY_CHECK).toMatch(
+      /onSaveSuccess=\{\(result\) => \{ if \(!result\.target\.plantId\) return; rememberRecentQuickLogTarget\(/,
+    );
+    // A tent-scoped save must leave the previous record alone, not clear it.
+    expect(FLAT_DAILY_CHECK).not.toMatch(
+      /onSaveSuccess=\{\(result\) => \{ rememberRecentQuickLogTarget\(/,
+    );
   });
 });

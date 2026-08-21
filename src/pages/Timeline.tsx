@@ -160,6 +160,7 @@ import {
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
+import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -2222,17 +2223,18 @@ export default function Timeline() {
                           const et = getEventType(effectiveCareType);
                           const Icon = et.icon;
                           const plantName = e.details?.plant_name as string | undefined;
-                          // QuickLog writes `sensor_snapshot`; older entries may still use `sensor`.
-                          const sensor = (e.details?.sensor_snapshot ?? e.details?.sensor) as
-                            | {
-                                ts?: string;
-                                temp?: number;
-                                rh?: number;
-                                vpd?: number;
-                                co2?: number;
-                                soil?: number;
-                              }
-                            | undefined;
+                          // Canonical snapshots win, followed by the legacy
+                          // `sensor` shape and Plant Quick Log's compatibility
+                          // envelope. No persisted row is rewritten.
+                          const canonicalSensor = e.details?.sensor_snapshot;
+                          const legacySensor = e.details?.sensor;
+                          const manualCompatSensor = e.details?.manual_sensor_snapshot;
+                          const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
+                            Record<string, unknown> | undefined;
+                          const usesManualCompatSensor =
+                            canonicalSensor == null &&
+                            legacySensor == null &&
+                            manualCompatSensor != null;
                           const remindAt = e.details?.remind_at as string | undefined;
                           const eventTypeValue = effectiveCareType;
                           // Learning-loop rows (follow-up / outcome / decision) carry join
@@ -2452,25 +2454,44 @@ export default function Timeline() {
                               )}
                               {sensor &&
                                 (() => {
-                                  const snapTs = sensor.ts ?? e.entry_at;
+                                  const sensorViewModel = usesManualCompatSensor
+                                    ? buildTimelineSensorSnapshotViewModel(sensor, {
+                                        preferUnit: "F",
+                                        validateManualCompatibility: true,
+                                      })
+                                    : null;
+                                  const legacyDisplaySensor = sensor as {
+                                    temp?: number;
+                                    rh?: number;
+                                    vpd?: number;
+                                    co2?: number;
+                                    soil?: number;
+                                  };
+                                  const snapTs =
+                                    typeof sensor.ts === "string" ? sensor.ts : e.entry_at;
                                   const snapAgeMs = snapTs
                                     ? Date.now() - new Date(snapTs).getTime()
                                     : Number.POSITIVE_INFINITY;
                                   const snapStale =
                                     !Number.isFinite(snapAgeMs) ||
                                     snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
+                                  const rawVpd =
+                                    typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
+                                      ? sensor.vpd
+                                      : null;
                                   const vpdClassification = classifyVpdAgainstStage({
-                                    value: sensor.vpd ?? null,
+                                    value: rawVpd,
                                     stage: resolveTimelineDiaryEntryStage(e),
                                     stale: snapStale,
                                   });
                                   const rawSource =
-                                    (sensor as { source?: string | null }).source ?? null;
+                                    typeof sensor.source === "string" ? sensor.source : null;
                                   const sourceBadge = classifyTimelineSensorSource({
                                     rawSource,
                                     capturedAt: snapTs ?? null,
                                     staleMs: TIMELINE_SNAPSHOT_STALE_MS,
-                                    // Quick Log sensor_snapshot is intrinsically grower-entered.
+                                    // Persisted Quick Log snapshots are
+                                    // intrinsically grower-entered.
                                     fallback: "manual",
                                     context: "persisted_snapshot",
                                   });
@@ -2484,18 +2505,75 @@ export default function Timeline() {
                                         Manual snapshot
                                       </span>
                                       <TimelineSensorSourceBadge badge={sourceBadge} />
-                                      {sensor.temp != null && (
-                                        <SnapChip>
-                                          {((sensor.temp * 9) / 5 + 32).toFixed(1)}°F
-                                        </SnapChip>
+                                      {sensorViewModel?.kind === "invalid" && (
+                                        <span
+                                          className="text-[11px] text-destructive"
+                                          data-testid="timeline-manual-snapshot-invalid"
+                                        >
+                                          Review manual snapshot — invalid readings were not shown.
+                                        </span>
                                       )}
-                                      {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}
-                                      {sensor.vpd != null && <SnapChip>VPD {sensor.vpd}</SnapChip>}
-                                      {sensor.co2 != null && <SnapChip>CO₂ {sensor.co2}</SnapChip>}
-                                      {sensor.soil != null && (
-                                        <SnapChip>Soil {sensor.soil}%</SnapChip>
-                                      )}
-                                      {sensor.vpd != null && sourceBadge.canAssessStage && (
+                                      {sensorViewModel?.kind === "chips" &&
+                                        sensorViewModel.errors.length > 0 && (
+                                          <span
+                                            className="text-[11px] text-destructive"
+                                            data-testid="timeline-manual-snapshot-invalid"
+                                          >
+                                            Review manual snapshot — invalid readings were not
+                                            shown.
+                                          </span>
+                                        )}
+                                      {sensorViewModel?.kind === "chips" &&
+                                        sensorViewModel.errors.length === 0 &&
+                                        sensorViewModel.warnings.length > 0 && (
+                                          <span
+                                            className="text-[11px] text-warning-foreground"
+                                            data-testid="timeline-manual-snapshot-warning"
+                                          >
+                                            Check manual snapshot — a reading may need confirmation.
+                                          </span>
+                                        )}
+                                      {sensorViewModel?.kind === "chips" &&
+                                        sensorViewModel.chips.map((chip) => (
+                                          <SnapChip key={chip.metric}>
+                                            {chip.metric === "rh"
+                                              ? `${chip.value}% RH`
+                                              : chip.metric === "ph"
+                                                ? `pH ${chip.value}`
+                                                : chip.metric === "ec"
+                                                  ? `EC ${chip.value} mS/cm`
+                                                  : chip.metric === "vpd"
+                                                    ? `VPD ${chip.value}`
+                                                    : chip.metric === "co2"
+                                                      ? `CO₂ ${chip.value}`
+                                                      : chip.metric === "soil_moisture"
+                                                        ? `Soil ${chip.value}%`
+                                                        : chip.display}
+                                          </SnapChip>
+                                        ))}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.temp != null && (
+                                          <SnapChip>
+                                            {((legacyDisplaySensor.temp * 9) / 5 + 32).toFixed(1)}°F
+                                          </SnapChip>
+                                        )}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.rh != null && (
+                                          <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
+                                        )}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.vpd != null && (
+                                          <SnapChip>VPD {legacyDisplaySensor.vpd}</SnapChip>
+                                        )}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.co2 != null && (
+                                          <SnapChip>CO₂ {legacyDisplaySensor.co2}</SnapChip>
+                                        )}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.soil != null && (
+                                          <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
+                                        )}
+                                      {rawVpd != null && sourceBadge.canAssessStage && (
                                         <span
                                           className="text-[11px] text-muted-foreground"
                                           data-testid="timeline-vpd-stage-hint"

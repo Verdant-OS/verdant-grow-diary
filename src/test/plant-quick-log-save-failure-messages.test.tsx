@@ -15,10 +15,15 @@ import {
   quickLogReasonToOperatorMessage,
   quickLogSaveRecoveryAction,
 } from "@/lib/quickLogSaveErrorMessage";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const saveMock = vi.fn();
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
+const RECENT_TARGET_KEY = "verdant.quickLog.lastTarget.v2.user-1";
 
 vi.mock("@/hooks/useQuickLogV2Save", () => ({
   useQuickLogV2Save: () => ({ save: saveMock, saving: false, error: null }),
@@ -75,10 +80,42 @@ async function typeNoteAndSave() {
 }
 
 beforeEach(() => {
+  clearLocalStorageForTest();
   saveMock.mockReset();
   toastSuccess.mockReset();
   toastError.mockReset();
   Element.prototype.scrollIntoView ??= () => undefined;
+});
+
+describe("PlantQuickLog remembered target", () => {
+  it("remembers the plant only after its manual save is confirmed", async () => {
+    saveMock.mockResolvedValue({ ok: true, growEventId: "event-1" });
+    renderSheet();
+
+    await typeNoteAndSave();
+
+    const record = JSON.parse(getLocalStorageItemForTest(RECENT_TARGET_KEY) ?? "{}") as {
+      plantId?: string;
+      growId?: string | null;
+      tentId?: string | null;
+      savedAt?: string;
+    };
+    expect(record).toMatchObject({
+      plantId: "plant-1",
+      growId: "grow-1",
+      tentId: "tent-1",
+    });
+    expect(Number.isFinite(Date.parse(record.savedAt ?? ""))).toBe(true);
+  });
+
+  it("does not refresh remembered-target state after a refused save", async () => {
+    saveMock.mockResolvedValue({ ok: false, reason: "save_failed" });
+    renderSheet();
+
+    await typeNoteAndSave();
+
+    expect(getLocalStorageItemForTest(RECENT_TARGET_KEY)).toBeNull();
+  });
 });
 
 describe("PlantQuickLog save-failure messaging", () => {

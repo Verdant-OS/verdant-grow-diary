@@ -1591,6 +1591,98 @@ inverted the finding.
 
 ---
 
+## ⚠️ Production JS ships a LIVE payments token; every committed env file says test (recorded 2026-08-21)
+
+Recorded by Claude 2026-08-21 ~23:03 UTC at Cheek's instruction, after Cheek
+raised it. **Publishing is stopped by owner order while this stands.** Nothing
+here authorizes a publish, an env edit, or a token rotation.
+
+**Never reproduce a live token body** — in this file, a commit message, a PR, or
+chat. Class prefix, length and redacted context are sufficient and are all that
+appears below.
+
+### What is measured
+
+`established fact`, measured over live HTTPS 2026-08-21 23:03:25 UTC, then
+re-fetched and re-confirmed against the same bundle:
+
+| Axis                                             | Value                                                                                    |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Production bundle                                | `/assets/index-aTS7aKMk.js` (820,070 bytes)                                              |
+| Inlined key                                      | `VITE_PAYMENTS_CLIENT_TOKEN`                                                             |
+| Shipped class                                    | **`live_`**, body length 27, one distinct value, two occurrences in that bundle          |
+| `test_`-shaped tokens anywhere in the 20 bundles | **zero**                                                                                 |
+| Repo `.env.production`                           | **`test_`** class                                                                        |
+| Lovable project `.env.production`                | **`test_`** class, byte-identical to the repo file                                       |
+| `.env.development`                               | byte-identical to both (tree-hash digest `1a79e29c…`)                                    |
+| Serving commit at measurement                    | `ea31fbdfb934`, `buildTime 2026-08-21T15:53:46.096Z`, `dirty: true`, `ref: "__orphan__"` |
+
+**The shipped bundle came from neither `.env.production` file.** The live value
+was supplied at build time by something else — the Lovable platform env panel is
+the obvious candidate, but **which source wins at build time is `NOT_MEASURED`**
+and cannot be determined from this repository.
+
+### Why this is not merely an env-file discrepancy
+
+`scripts/lib/tree-hash.mjs` lists the committed `.env` files in
+`TREE_HASH_ROOTS`, and its own comment gives the reason: _"Committed Vite env
+files: `VITE_\*` values are inlined into shipped JS, so an env-only commit
+produces different app bytes and must move the hash."\_
+
+So `.env.production` is a hashed root **precisely because** its values reach
+shipped JS — and its shipped value differs from its committed value.
+
+**This closes a `NOT_MEASURED` that `docs/audits/architecture-audit-adjudication-2026-08-21.md`
+left open.** That document's §6.1 bound reads: the hashed roots "include inputs
+that never ship, so this still establishes drift in the build workspace at stamp
+time, and whether any shipped byte differs remains `NOT_MEASURED`." **A shipped
+byte does differ**, and it is a hashed root. The workspace-drift finding is no
+longer confined to inputs that never reach users. That document still carries the
+older bound in its own text; read this row alongside it.
+
+### The publish hazard cuts both ways
+
+Both branches are `inference`, because the winning source is unmeasured:
+
+- If the Lovable platform env still supplies the live token, a publish **keeps it
+  live** — the original concern.
+- If the file wins, a publish **swaps live → test and breaks live payments**,
+  silently, with no build-time error.
+
+Nobody can predict which from the repository. That is the whole reason the env
+surface must be read immediately before any publish, and the reason reading the
+**file alone does not answer it** — the file said `test_` while production shipped
+`live_`.
+
+### Severity, stated precisely
+
+`inference, high confidence`, not verified against Paddle: a Paddle **client-side
+token** is designed to be public, ships in the browser by intent, and cannot
+authorize server-side operations. On that reading this is **not** an API-key leak.
+
+What it **is**: an environment-provenance defect. Production is running **live**
+payments while every committed env file in the repository says test, and the
+mismatch is invisible to CI.
+
+### What else was checked, and came back clean
+
+All 20 production bundles were scanned for secret-class markers. One hit:
+`BRIDGE_TOKEN` in `sensorTestbenchIndicatorRules-BYI81Sq2.js`, which is a
+PowerShell **variable name** inside a copy-paste snippet template carrying the
+literal placeholder `<vbt_… mint a token to reveal>`. No token value.
+`VITE_SUPABASE_PUBLISHABLE_KEY` is the anon key — public by design and already
+committed in `.env`. No `service_role`, `SECRET`, or `PRIVATE_KEY` marker appears
+in any bundle.
+
+### Method note for whoever re-measures
+
+The landing HTML contains NUL bytes, so plain `grep` reports **no matches and no
+error** against it — the same trap `docs/agent-session-network-reachability.md`
+records. Use `grep -a`. A bundle scan that silently returns nothing is the failure
+mode to expect here.
+
+---
+
 ## Agents currently assigned
 
 | Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |

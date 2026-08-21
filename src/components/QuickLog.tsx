@@ -554,10 +554,42 @@ export default function QuickLog({
   // it only removes a now-invalid action while the dialog remains open.
   const [recentSuggestionClockMs, setRecentSuggestionClockMs] = useState(() => Date.now());
   const prefillNamesTarget = quickLogPrefillNamesAnyTarget(prefill);
-  const recentTargetRecord = useMemo(
-    () => (open && !prefillNamesTarget ? loadRecentTargetRecord(user?.id ?? null) : null),
-    [open, prefillNamesTarget, user?.id],
-  );
+  const recentTargetStorageKey = buildRecentTargetStorageKey(user?.id ?? null);
+  const [recentTargetSnapshot, setRecentTargetSnapshot] = useState(() => ({
+    storageKey: recentTargetStorageKey,
+    record: open && !prefillNamesTarget ? loadRecentTargetRecord(user?.id ?? null) : null,
+  }));
+  // Keep the snapshot paired with the account key that produced it. On an
+  // account change this makes the old account's record ineligible during the
+  // render before the effect below loads the new key.
+  const recentTargetRecord =
+    open && !prefillNamesTarget && recentTargetSnapshot.storageKey === recentTargetStorageKey
+      ? recentTargetSnapshot.record
+      : null;
+  useEffect(() => {
+    if (!open || prefillNamesTarget || !recentTargetStorageKey) {
+      setRecentTargetSnapshot({ storageKey: recentTargetStorageKey, record: null });
+      return;
+    }
+
+    setRecentTargetSnapshot({
+      storageKey: recentTargetStorageKey,
+      record: loadRecentTargetRecord(user?.id ?? null),
+    });
+
+    // `storage` fires in the other document, not the tab that performed the
+    // write. Follow only this signed-in account's key. Always re-read current
+    // storage instead of trusting event.newValue: if an older event arrives
+    // after a newer write, the rendered offer must not regress.
+    const handleRecentTargetStorage = (event: StorageEvent) => {
+      if (event.storageArea && event.storageArea !== window.localStorage) return;
+      if (event.key !== null && event.key !== recentTargetStorageKey) return;
+      const record = loadRecentTargetRecord(user?.id ?? null);
+      setRecentTargetSnapshot({ storageKey: recentTargetStorageKey, record });
+    };
+    window.addEventListener("storage", handleRecentTargetStorage);
+    return () => window.removeEventListener("storage", handleRecentTargetStorage);
+  }, [open, prefillNamesTarget, recentTargetStorageKey, user?.id]);
   const recentTargetSuggestion = useMemo(
     () =>
       resolveRecentTargetSuggestion({
@@ -1987,15 +2019,31 @@ export default function QuickLog({
                     // made minutes or hours later. Re-run the same pure rule
                     // against the current clock; if it no longer holds, retire
                     // the offer instead of applying it.
+                    const latestRecord = loadRecentTargetRecord(user?.id ?? null);
                     const current = resolveRecentTargetSuggestion({
-                      record: recentTargetRecord,
+                      record: latestRecord,
                       now: Date.now(),
                       visiblePlants: plants,
                       visibleGrows: grows,
                       visibleTents: activeTents,
                     });
                     if (!current) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
                       setRecentSuggestionDismissed(true);
+                      return;
+                    }
+                    // The click belongs to the plant named on the rendered
+                    // button. If another tab replaced A with B before its
+                    // storage event arrived, redraw B and require a new click;
+                    // never reinterpret consent for A as consent for B.
+                    if (current.plantId !== recentTargetSuggestion.plantId) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
                       return;
                     }
                     if (current.growId && current.growId !== activeGrowId) {

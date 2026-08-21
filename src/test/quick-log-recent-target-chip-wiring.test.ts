@@ -58,19 +58,38 @@ describe("D5 — remembered target is a suggestion, never a default", () => {
     );
   });
 
+  it("tracks only the signed-in account's storage key while the dialog is open", () => {
+    expect(FLAT).toMatch(/window\.addEventListener\("storage", handleRecentTargetStorage\)/);
+    expect(FLAT).toMatch(/event\.key !== null && event\.key !== recentTargetStorageKey/);
+    expect(FLAT).toMatch(
+      /handleRecentTargetStorage[\s\S]{0,350}const record = loadRecentTargetRecord\(user\?\.id \?\? null\)/,
+    );
+    expect(FLAT).toMatch(/window\.removeEventListener\("storage", handleRecentTargetStorage\)/);
+    // A snapshot is paired with its account key so the old account's value is
+    // ineligible even for the render before the subscription effect reloads.
+    expect(FLAT).toMatch(
+      /recentTargetSnapshot\.storageKey === recentTargetStorageKey \? recentTargetSnapshot\.record : null/,
+    );
+  });
+
   it("accepting the chip runs the same explicit selection as the Select", () => {
     // Renegotiated: acceptance now re-derives the suggestion against the
     // CURRENT clock before applying it, so the handler selects from that
     // re-derived value rather than the one captured when the dialog opened.
     expect(FLAT).toMatch(
-      /quick-log-recent-target-accept[\s\S]{0,1500}resolveRecentTargetSuggestion\(\{ record: recentTargetRecord, now: Date\.now\(\), visiblePlants: plants, visibleGrows: grows, visibleTents: activeTents, \}\)/,
+      /quick-log-recent-target-accept[\s\S]{0,1500}const latestRecord = loadRecentTargetRecord\(user\?\.id \?\? null\);[\s\S]{0,300}resolveRecentTargetSuggestion\(\{ record: latestRecord, now: Date\.now\(\), visiblePlants: plants, visibleGrows: grows, visibleTents: activeTents, \}\)/,
     );
     expect(FLAT).toMatch(
       /quick-log-recent-target-accept[\s\S]{0,1600}setPlantId\(current\.plantId\)/,
     );
     // An expired or no-longer-visible target retires the offer instead.
     expect(FLAT).toMatch(
-      /quick-log-recent-target-accept[\s\S]{0,1500}if \(!current\) \{ setRecentSuggestionDismissed\(true\); return; \}/,
+      /quick-log-recent-target-accept[\s\S]{0,1800}if \(!current\) \{[\s\S]{0,300}setRecentSuggestionDismissed\(true\); return; \}/,
+    );
+    // If storage changed from A to B before its event arrived, the A-labelled
+    // click redraws B and returns. It cannot silently reinterpret consent.
+    expect(FLAT).toMatch(
+      /if \(current\.plantId !== recentTargetSuggestion\.plantId\) \{[\s\S]{0,300}record: latestRecord,[\s\S]{0,80}return; \}/,
     );
     // Same lock guards the Select honors.
     expect(FLAT).toMatch(

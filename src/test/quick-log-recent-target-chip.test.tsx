@@ -77,6 +77,7 @@ import QuickLog from "@/components/QuickLog";
 import { RECENT_TARGET_SUGGESTION_MAX_AGE_MS } from "@/lib/quickLogRecentTargetSuggestion";
 import {
   clearLocalStorageForTest,
+  removeLocalStorageItemForTest,
   setLocalStorageItemForTest,
 } from "./helpers/localStorageTestHelper";
 
@@ -101,6 +102,7 @@ const PLANTS = [
 // Deterministic clock: the component reads Date.now() when it resolves the
 // suggestion, so freshness is expressed relative to a frozen NOW.
 const NOW = Date.parse("2026-08-19T12:00:00.000Z");
+const USER_STORAGE_KEY = "verdant.quickLog.lastTarget.v2.u1";
 
 function seed(key: string, plantId: string, ageMs: number) {
   setLocalStorageItemForTest(
@@ -110,6 +112,17 @@ function seed(key: string, plantId: string, ageMs: number) {
       growId: "g1",
       tentId: "t1",
       savedAt: new Date(NOW - ageMs).toISOString(),
+    }),
+  );
+}
+
+function dispatchStorageChange(key: string, oldValue: string | null, newValue: string | null) {
+  window.dispatchEvent(
+    new StorageEvent("storage", {
+      key,
+      oldValue,
+      newValue,
+      storageArea: window.localStorage,
     }),
   );
 }
@@ -127,6 +140,24 @@ function ReopenableQuickLog() {
         Open Quick Log
       </button>
       <QuickLog open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
+function AccountSwitchingQuickLog() {
+  const [, forceRender] = useState(0);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          userMock = { id: "u2" };
+          forceRender((value) => value + 1);
+        }}
+      >
+        Switch account
+      </button>
+      <QuickLog open onOpenChange={() => {}} />
     </>
   );
 }
@@ -362,5 +393,153 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
 
     expect(screen.getByTestId("quick-log-plant-select")).toHaveTextContent("OG Kush");
+  });
+
+  it("refreshes the visible offer when this account changes it in another tab", () => {
+    seed(USER_STORAGE_KEY, "p1", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with Blue Dream?",
+    );
+
+    const oldValue = window.localStorage.getItem(USER_STORAGE_KEY);
+    seed(USER_STORAGE_KEY, "p2", 30_000);
+    const newValue = window.localStorage.getItem(USER_STORAGE_KEY);
+    act(() => dispatchStorageChange(USER_STORAGE_KEY, oldValue, newValue));
+
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("re-reads the newest value instead of regressing to a delayed event payload", () => {
+    seed(USER_STORAGE_KEY, "p1", 60_000);
+    const delayedOldPayload = window.localStorage.getItem(USER_STORAGE_KEY);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with Blue Dream?",
+    );
+
+    // Storage has already advanced to p2 when an older p1 event is delivered.
+    seed(USER_STORAGE_KEY, "p2", 10_000);
+    act(() => dispatchStorageChange(USER_STORAGE_KEY, null, delayedOldPayload));
+
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("ignores storage changes outside the signed-in account key", () => {
+    seed(USER_STORAGE_KEY, "p1", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+
+    const otherKey = "verdant.quickLog.lastTarget.v2.someone-else";
+    seed(otherKey, "p2", 30_000);
+    act(() => dispatchStorageChange(otherKey, null, window.localStorage.getItem(otherKey)));
+
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with Blue Dream?",
+    );
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("switches storage subscriptions with the signed-in account", () => {
+    seed(USER_STORAGE_KEY, "p1", 60_000);
+    seed("verdant.quickLog.lastTarget.v2.u2", "p2", 30_000);
+    renderQL(<AccountSwitchingQuickLog />);
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with Blue Dream?",
+    );
+
+    // Radix marks content outside the modal aria-hidden, so address this
+    // test-only rerender control by text rather than accessibility role.
+    fireEvent.click(screen.getByText("Switch account"));
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+
+    // The retired u1 listener cannot overwrite the u2 offer.
+    const oldU1 = window.localStorage.getItem(USER_STORAGE_KEY);
+    seed(USER_STORAGE_KEY, "p1", 10_000);
+    act(() =>
+      dispatchStorageChange(USER_STORAGE_KEY, oldU1, window.localStorage.getItem(USER_STORAGE_KEY)),
+    );
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("removes the offer when this account clears it in another tab", () => {
+    seed(USER_STORAGE_KEY, "p2", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toBeInTheDocument();
+
+    const oldValue = window.localStorage.getItem(USER_STORAGE_KEY);
+    removeLocalStorageItemForTest(USER_STORAGE_KEY);
+    act(() => dispatchStorageChange(USER_STORAGE_KEY, oldValue, null));
+
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("does not accept a stale rendered offer when storage changed before its event arrived", () => {
+    seed(USER_STORAGE_KEY, "p1", 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with Blue Dream?",
+    );
+
+    // Model the narrow cross-tab race: the shared storage value is already B,
+    // but this tab has not received its storage event and still renders A.
+    seed(USER_STORAGE_KEY, "p2", 30_000);
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
+
+    // Refresh to B, but require a second explicit grower click. Never convert
+    // a click on an A-labelled offer into selection of B.
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toHaveTextContent(
+      "Continue with OG Kush?",
+    );
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("Blue Dream");
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
+    expect(screen.getByTestId("quick-log-plant-select")).toHaveTextContent("OG Kush");
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    // Both clicks only manage selection; neither saves.
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("cleans up the account storage listener when the dialog closes", () => {
+    seed(USER_STORAGE_KEY, "p1", 60_000);
+    const addSpy = vi.spyOn(window, "addEventListener");
+    const removeSpy = vi.spyOn(window, "removeEventListener");
+    renderQL(<ReopenableQuickLog />);
+
+    const storageHandlers = addSpy.mock.calls
+      .filter(([eventName]) => eventName === "storage")
+      .map(([, listener]) => listener);
+    expect(storageHandlers.length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(
+      storageHandlers.some((listener) =>
+        removeSpy.mock.calls.some(
+          ([eventName, removedListener]) => eventName === "storage" && removedListener === listener,
+        ),
+      ),
+    ).toBe(true);
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
   });
 });

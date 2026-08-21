@@ -142,7 +142,7 @@ Every row measured at `28c01a0`. `established fact` unless labelled otherwise.
 | ------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | Head SHA                  | `5aff994b5d21…`                                                        | **Stale by one commit** — deploy tip is `28c01a0` (#1078, `fix(billing): keep production checkout sandbox-only`)                             | The branch advanced between audit and adjudication                               |
 | `vercel.json` authority   | `PARTIAL / AMBIGUOUS`, "does not prove production is currently broken" | **Measured — `vercel.json` does not govern production**                                                                                      | §6.2                                                                             |
-| Zod boundary coverage     | `PARTIAL PASS`, "universal coverage is not proven"                     | **Upheld.** 11 `src` files and 2 of 34 edge functions import Zod, but importer counts do not measure boundary coverage                       | §6.3 — the audit's hedge was right; an earlier revision of this document was not |
+| Zod boundary coverage     | `PARTIAL PASS`, "universal coverage is not proven"                     | **Upheld.** 11 `src` files and **1** of 34 edge functions import Zod, but importer counts do not measure boundary coverage                   | §6.3 — the audit's hedge was right; an earlier revision of this document was not |
 | pnpm                      | "Reject for V0"                                                        | **Already structurally forbidden** — `pnpm-lock.yaml` is in `FORBIDDEN_LOCKFILES` in `scripts/check-bun-lockfile-policy.mjs`, enforced in CI | Not a preference; a gate                                                         |
 | TOOL-01 (Bun/npm closure) | `P2`, "only after the V0 and production truth gates are stable"        | **Dated `P1`**                                                                                                                               | §6.4 — `reviewBy` **2026-08-25**, gate first fails **2026-08-26** UTC            |
 | `hono` "not present"      | listed among absent infra                                              | **Precisely:** not a direct dependency, but pinned as a transitive security override (`hono: 4.12.34`, `@hono/node-server: 2.0.10`)          | h3/Nitro pulls it; the override is a supply-chain floor, not an adoption         |
@@ -250,9 +250,23 @@ were ever honoured by a host serving this app, and its security `headers` block 
 
 ### 6.3 Zod's reach is narrow — but that is a prompt to inventory, not a measured gap
 
-`established fact`: **11** files under `src/` and **2** of 34 edge functions import Zod.
-Zod is already installed (`^3.24.2` — **Zod 3**, not Zod 4; a v4 upgrade is its own migration
-and is not implied here).
+`established fact`, re-measured by import statement after a second review round: **11** files
+under `src/` and **1** of 34 edge functions import Zod — only `supabase/functions/mcp/index.ts`
+(`import { z } from "npm:zod@^3.24.2"`). Zod is already installed (`^3.24.2` — **Zod 3**, not
+Zod 4; a v4 upgrade is its own migration and is not implied here).
+
+An earlier revision said **2**, from `grep -rl "zod"` — a substring match that caught
+`supabase/functions/save-founder-prefs/index.ts:6`, which is a **comment** reading "Server
+re-validates via zod-equivalent parse". That function validates its input with a hand-written
+`validatePrefs`. Recorded rather than quietly corrected, because it is the third instance of
+one error class in this session — path mentions counted as imports, a `tsconfig.json` comment
+reused as a file count, and now a code comment counted as a dependency — twice by this
+document after it had criticised the same mistake elsewhere.
+
+**And `save-founder-prefs` is the argument, not merely the erratum.** It is a validated
+boundary that imports no schema library at all. A count of Zod importers would score it as
+unvalidated; it is not. That single case is why the framing below rejects importer counts as
+a coverage measure, rather than just correcting the numerator.
 
 **Corrected after review, and the correction matters more than the finding.** An earlier
 revision of this section called that a "genuine architectural gap and the single
@@ -364,10 +378,24 @@ architecture documents already existed (`docs/architecture.md`, `docs/grow-diary
 `docs/grow-os-architecture.md`); with #1051 merged, `docs/codebase-map.md` is the fourth. A fifth
 needs a much better reason than "the roadmap said so".
 
-**Precedent worth reusing:** `docs/grow-diary-architecture.md` is pinned by
-`src/test/grow-diary-architecture-doc.test.ts`. ARCH-02 should follow that pattern, and per
-`AGENTS.md` it must assert on **resolved values** — `await import()` the config and assert on
-the object — never a regex over source text.
+**Precedent worth reusing, with the rule applied where it belongs.** `docs/grow-diary-architecture.md`
+is pinned by `src/test/grow-diary-architecture-doc.test.ts`, which reads the document with
+`readFileSync`. That is correct and ARCH-02 should copy it: a Markdown document has no resolved
+object to import, and `AGENTS.md` says so directly — source-text scanning "remains correct for
+what it is actually good at ... The rule is about verifying _effective configuration_, not about
+banning `readFileSync`."
+
+An earlier revision of this section told ARCH-02 to `await import()` the document, which is not
+possible and would have forced an artificial duplicate module. The split ARCH-02 actually needs:
+
+| What is pinned                                                          | How                                                                                       |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `docs/codebase-map.md` — prose, tables, inventories                     | **Source scan** (`readFileSync`), exactly as the precedent does                           |
+| `config/architecture-contract.json` and the dependency facts it asserts | **Resolved values** — `await import()` the config and the manifest, assert on the objects |
+
+The resolved-value rule bites on the second row only, and that is where it matters: a contract
+claiming "Bun is canonical" or "device control is false" must read the live value, since a
+commented-out or relocated setting is indistinguishable from a live one to a text match.
 
 ---
 

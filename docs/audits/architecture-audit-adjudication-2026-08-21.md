@@ -221,8 +221,12 @@ These are the audit's strongest calls and they should survive into whatever cont
 
 Two independent observations:
 
-1. **`git cat-file -t 4b1c4867e685…` fails after a full fetch.** The SHA is absent from all
-   **167** remote branches and all tags.
+1. **`git cat-file -t 4b1c4867e685…` fails against the complete history.** The SHA is absent
+   from the repository. **Re-verified after `git fetch --unshallow`** — an earlier revision
+   asserted this from a shallow clone, where a missing object proves only that _the clone_ lacks
+   it. On full history (16,604 commits in the deploy tip's ancestry, 169 remote branches, 700
+   tags) the object still does not exist. This is the one leg of §6.1 that the shallow-clone
+   error weakened and that re-measurement has now genuinely established.
 2. **`dirty: true` here is the non-benign case.** `scripts/stamp-version.mjs` documents the
    one innocent reading in its own comment: _"In a history-less snapshot everything is
    'untracked', so `dirty:true` plus `commitSource:"none"` together read as identity from
@@ -259,15 +263,29 @@ Run at `28c01a017` against the production `treeHash`
 | Release-tag annotations — **244** of 700 `v*` tags carry `Tree-Hash:` | **no match**   |
 | Recomputation with `--scan=60` over `origin/verdant-grow-diary`       | **`NO_MATCH`** |
 
-**How far that search actually reaches — corrected after a further review round.** A reviewer
-read `--scan=60` as a 60-of-thousands sample. It is not: `git rev-list --count
-origin/verdant-grow-diary` is **58**, so the scan covered that ref's **entire reachable
-ancestry** — consistent with an orphan-style deploy branch, and the stamp itself carries
-`ref: "__orphan__"`. Over the branch production ships from, the search is exhaustive.
+**How far that search reaches — and a shallow-clone trap that produced a false claim.** A
+reviewer objected that `--scan=60` samples a fraction of the ancestry. An earlier revision of
+this paragraph _rejected_ that objection, citing `git rev-list --count origin/verdant-grow-diary`
+= **58** and concluding the scan was exhaustive. **That rejection was wrong, and the reviewer was
+right both times.**
 
-It is **not** exhaustive over the repository. **456 of 700 `v*` tags carry no `Tree-Hash:`
-annotation**, and 167 other remote branches were not recomputed. A commit outside those 58 could
-still reproduce this hash, and the canary below validates the _algorithm_, never the _coverage_.
+`established fact`: this agent session's checkout was a **shallow clone**
+(`git rev-parse --is-shallow-repository` → `true`, with a `.git/shallow` boundary file). In a
+shallow clone `git rev-list --count` reports only the commits the clone actually holds. After
+`git fetch --unshallow`, the same command returns **16,604** — exactly the figure the reviewer
+gave. The "58" was an artifact of the clone, not a property of the branch.
+
+> **Durable warning, in the same family as this repo's session-specific `BLOCKED` rule:
+> `git rev-list --count`, `git cat-file`, and `git log` all silently narrow to what a shallow
+> clone holds.** Agent sessions are commonly provisioned shallow. Check
+> `git rev-parse --is-shallow-repository` **before** citing any count, absence, or
+> "exhaustive" claim derived from local history.
+
+So the search bound, stated correctly: **60 commits recomputed out of 16,604**, plus 244
+annotated tags of 700. It is **not** exhaustive over the deploy branch, and not over the
+repository — **456 tags carry no `Tree-Hash:` annotation** and 169 other remote branches were
+not recomputed. The canary below validates the _algorithm_; it never validated the _coverage_,
+which is precisely what the reviewer said twice.
 
 **A canary rules out the tooling.** The resolver's own output warns that a `NO_MATCH` could mean
 the hash roots are broken rather than the build being unmatched, and prescribes resolving a
@@ -279,15 +297,17 @@ recorded hash reproduces under local recomputation. The resolver works.
 So the `NO_MATCH` is a **measured negative, not a tooling artifact** — stated to exactly its own
 reach:
 
-> Production's tree hash matches **no commit on the deploy branch** (all 58 — exhaustive) and
-> **no annotated release tag** (244 of 700). Whether some commit elsewhere in the repository
-> reproduces it is **`NOT_MEASURED`**.
+> Production's tree hash matched **none of the 60 commits recomputed** (of 16,604 in the deploy
+> tip's ancestry) and **no annotated release tag** (244 of 700). Whether some commit reproduces
+> it is **`NOT_MEASURED`** — the search is a bounded sample, not a proof of absence.
 
-An earlier revision wrote that as production corresponding to _no committed state_ and labelled
-it `FAIL`. That overstated a bounded search, and the shape of the mistake is worth naming: this
-same section had just been corrected for the opposite error — calling `BLOCKED` something that
-was measurable — and then overshot into asserting more than the measurement carried.
-Under-claiming and over-claiming are one failure, a label that does not match its evidence.
+Two earlier revisions got this wrong in opposite directions, and the sequence is the lesson.
+The first called it `BLOCKED` when a local resolver could measure it. The correction overshot to
+`FAIL`, asserting production corresponded to _no committed state_ on a bounded search. The
+defence of that overshoot then rested on a shallow-clone count. Under-claiming, over-claiming,
+and defending an over-claim with an unchecked measurement are one failure: **a label that does
+not match its evidence.** Three rounds of review were needed to land on the bound the evidence
+actually supports.
 
 Per the resolver's own text the surviving explanations are a build predating the search, or
 content that never matched any commit — "editor-modified snapshot, or a publish pipeline that
@@ -298,12 +318,12 @@ well inside the scanned ancestry. That is `inference`, not fact — the stamped 
 self-reported by a build whose SHA is not in the repository, so it cannot be checked
 independently.
 
-**What is owner-gated is narrower than before, and rests on two facts that stand without the
-hash search:** the served SHA is absent from all 167 fetched branches and every tag, and the
-stamp reports `dirty: true` with `commitSource: "git"` — the combination `stamp-version.mjs`
-itself calls "a bug worth surfacing". **This is the gap OPS-01 and OPS-02 exist to close and it
-is live now**, which is why both are raised. That raise does not depend on the overstated claim
-withdrawn above.
+**What is owner-gated rests on the two facts that survive independently of the tree-hash
+search** — the served SHA does not exist in the repository's complete history, and the stamp
+reports `dirty: true` with `commitSource: "git"`, the combination `stamp-version.mjs` itself
+calls "a bug worth surfacing". Neither needs the hash scan, and the second needs no local git at
+all: it is read straight off the live endpoint. **This is the gap OPS-01 and OPS-02 exist to
+close and it is live now**, which is why both are raised — not on the withdrawn claim above.
 
 ### 6.2 The `vercel.json` question is now measured, not ambiguous
 
@@ -487,8 +507,8 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching) |
 | Does production deliver the security headers `vercel.json` declares? | `NOT_MEASURED` — first check for OPS-02                                                               |
-| Does production's tree hash match any **deploy-branch** commit?      | **`FAIL` — measured; exhaustive over all 58 commits of the ref, plus 244 annotated tags (§6.1)**      |
-| Does it match a commit **elsewhere in the repository**?              | `NOT_MEASURED` — 456 unannotated `v*` tags and 167 other branches unsearched                          |
+| Does the served SHA exist in the repository?                         | **`FAIL` — measured on complete history after `git fetch --unshallow` (§6.1)**                        |
+| Does production's tree hash match any commit?                        | `NOT_MEASURED` — 60 of 16,604 recomputed, 244 of 700 tags annotated; a bounded sample                 |
 | What _is_ production commit `4b1c4867e685`, and why is it dirty?     | `BLOCKED` — narrowed, but still needs the publisher's view; owner-only                                |
 | Are all five npm consumers still real after §6.2?                    | `NOT_MEASURED` — cheapest TOOL-01 progress                                                            |
 | Runtime AI Doctor behaviour under the twenty adversarial cases       | `NOT_MEASURED` — AI-02 not run                                                                        |

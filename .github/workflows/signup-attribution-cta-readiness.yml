@@ -1,0 +1,151 @@
+name: Signup attribution CTA readiness
+
+# Secret-free static gate on every PR/push that touches signup attribution or
+# marketing CTA wiring. Optional protected live job confirms ledger + objects
+# when a DB URL is available — GitHub-hosted only (no Tenki / no vendor runners
+# for secret-bearing steps). Does not touch vendor PR #1076.
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql"
+      - "supabase/migrations/20260821150000_signup_acquisition_failure_safe_attribution.sql"
+      - "scripts/assert-signup-attribution-cta-readiness.mjs"
+      - "scripts/assert-signup-attribution-cta-readiness-applied.mjs"
+      - "scripts/lib/signupAttributionCtaReadiness.mjs"
+      - "src/lib/signupAttributionCtaReadinessRules.ts"
+      - "src/lib/authErrorRules.ts"
+      - "src/pages/Landing.tsx"
+      - "src/pages/Auth.tsx"
+      - "src/test/signup-attribution-cta-readiness.test.ts"
+      - "src/test/signup-acquisition-failure-safe-migration.test.ts"
+      - "src/test/auth-error-sanitization.test.ts"
+      - "src/test/auth-signup-acquisition-handoff.test.tsx"
+      - ".github/workflows/signup-attribution-cta-readiness.yml"
+  push:
+    branches: [verdant-grow-diary]
+    paths:
+      - "supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql"
+      - "supabase/migrations/20260821150000_signup_acquisition_failure_safe_attribution.sql"
+      - "scripts/assert-signup-attribution-cta-readiness.mjs"
+      - "scripts/assert-signup-attribution-cta-readiness-applied.mjs"
+      - "scripts/lib/signupAttributionCtaReadiness.mjs"
+      - "src/lib/signupAttributionCtaReadinessRules.ts"
+      - "src/pages/Landing.tsx"
+      - ".github/workflows/signup-attribution-cta-readiness.yml"
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Protected live readiness target (optional)"
+        required: true
+        default: "sandbox"
+        type: choice
+        options:
+          - sandbox
+          - live
+
+permissions:
+  contents: read
+
+jobs:
+  static-cta-readiness:
+    name: Static — attributed marketing CTA may be enabled
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Assert static CTA readiness (fail closed)
+        run: node scripts/assert-signup-attribution-cta-readiness.mjs
+      - name: Unit tests — guard, readiness payload, CTA gate
+        run: |
+          bunx vitest run \
+            src/test/signup-attribution-cta-readiness.test.ts \
+            src/test/signup-acquisition-failure-safe-migration.test.ts \
+            src/test/auth-error-sanitization.test.ts \
+            --reporter=dot
+
+  live-cta-readiness-sandbox:
+    name: Live — signup CTA readiness in SANDBOX
+    needs: static-cta-readiness
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/verdant-grow-diary') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'sandbox') }}
+    environment: verdant-sandbox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Prepare audit dir
+        run: mkdir -p "${{ github.workspace }}/audit/signup-cta-sandbox"
+      - name: Preflight — SUPABASE_DB_URL_SANDBOX configured
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL_SANDBOX
+          secret-value: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+          guard-heading: "Signup attribution CTA live readiness — SANDBOX"
+          report-path: ${{ github.workspace }}/audit/signup-cta-sandbox/report.md
+          log-prefix: signup-cta-readiness-sandbox
+          fix-steps-json: >-
+            ["1. Open **Settings → Environments → verdant-sandbox**.",
+             "2. Add `SUPABASE_DB_URL_SANDBOX` (pooled Postgres URL).",
+             "3. Re-run this workflow."]
+          reason-lines-json: >-
+            ["Without the DB URL this gate cannot confirm the forward-repair ledger",
+             "row or live attribution objects before treating marketing signup CTAs as ready."]
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Verify live readiness in sandbox
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_SANDBOX }}
+          TARGET_ENV: sandbox
+          REPORT_PATH: ${{ github.workspace }}/audit/signup-cta-sandbox/report.md
+        run: node scripts/assert-signup-attribution-cta-readiness-applied.mjs
+      - name: Upload sandbox report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signup-cta-readiness-sandbox
+          path: audit/signup-cta-sandbox
+          if-no-files-found: warn
+
+  live-cta-readiness-live:
+    name: Live — signup CTA readiness in LIVE (manual)
+    needs: static-cta-readiness
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/verdant-grow-diary' && inputs.target_env == 'live' }}
+    environment: verdant-production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Prepare audit dir
+        run: mkdir -p "${{ github.workspace }}/audit/signup-cta-live"
+      - name: Preflight — SUPABASE_DB_URL configured
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL
+          secret-value: ${{ secrets.SUPABASE_DB_URL }}
+          guard-heading: "Signup attribution CTA live readiness — LIVE"
+          report-path: ${{ github.workspace }}/audit/signup-cta-live/report.md
+          log-prefix: signup-cta-readiness-live
+          fix-steps-json: >-
+            ["1. Open **Settings → Environments → verdant-production**.",
+             "2. Add `SUPABASE_DB_URL` (pooled Postgres URL for production).",
+             "3. Re-run this workflow with target_env=live."]
+          reason-lines-json: >-
+            ["Production ledger confirmation for 20260813030000 is a protected,",
+             "manual gate. Secret-free PR CI only covers the static contract."]
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Verify live readiness in production
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          TARGET_ENV: live
+          REPORT_PATH: ${{ github.workspace }}/audit/signup-cta-live/report.md
+        run: node scripts/assert-signup-attribution-cta-readiness-applied.mjs
+      - name: Upload live report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signup-cta-readiness-live
+          path: audit/signup-cta-live
+          if-no-files-found: warn

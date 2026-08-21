@@ -80,9 +80,22 @@ STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 
 Do not continue until the context issue is resolved.`;
 
+/**
+ * CURRENT_STATE.md is deliberately absent from this list. It was imported here until
+ * 2026-08-21, when it measured 153,142 bytes / ~27,400 tokens — 19.1% of every context
+ * window, re-sent on every turn of every session regardless of whether that session went
+ * near operating state. CLAUDE.md now instructs an explicit read instead.
+ *
+ * That trade only holds while the instruction survives, so it is asserted below as
+ * CLAUDE_STATE_READ. Deleting an import is visible in a diff; deleting a sentence is not,
+ * and an agent with no path to operating state reasons from stale production facts —
+ * exactly what this file exists to prevent.
+ */
 const CLAUDE_IMPORTS = `@AGENTS.md
-@docs/agents/CURRENT_STATE.md
 @docs/agents/roles/claude.md`;
+
+/** The on-demand read that replaced the CURRENT_STATE.md import. */
+const CLAUDE_STATE_READ = "docs/agents/CURRENT_STATE.md";
 
 const LEGACY_ARCHIVE = "docs/archive/legacy/verdant-master-prompt-legacy.md";
 const LEGACY_HEADER = `> LEGACY — NOT ACTIVE AGENT INSTRUCTIONS
@@ -190,8 +203,18 @@ for (const path of [CANONICAL, ...ROLE_FILES]) {
 const claudeText = head.get("CLAUDE.md")?.text.replace(/\r\n/g, "\n") ?? "";
 if (claudeText && !claudeText.startsWith(CLAUDE_IMPORTS)) {
   problems.push(
-    "CLAUDE.md: the first three lines must import AGENTS.md, CURRENT_STATE.md, and " +
-      "the Claude role in that order",
+    "CLAUDE.md: the first two lines must import AGENTS.md and the Claude role in that " + "order",
+  );
+}
+
+// CURRENT_STATE.md is read on demand rather than imported, so this written instruction is
+// the only thing keeping operating state in front of an agent. Nothing else in the
+// governance set carries branch, production, migration, blocker or assignment facts.
+if (claudeText && !claudeText.includes(CLAUDE_STATE_READ)) {
+  problems.push(
+    "CLAUDE.md: must still instruct an explicit read of docs/agents/CURRENT_STATE.md. " +
+      "It is not imported (too large), so losing the instruction leaves agents with no " +
+      "path to operating state",
   );
 }
 

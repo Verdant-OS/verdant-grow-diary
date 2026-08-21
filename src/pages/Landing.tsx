@@ -26,6 +26,7 @@ import {
   resolvePaidAcquisitionSource,
 } from "@/lib/paidAcquisitionAttributionRules";
 import { buildAttributedSignupPath } from "@/lib/signupAcquisitionRules";
+import { ATTRIBUTED_MARKETING_SIGNUP_CTA_ENABLED } from "@/lib/signupAttributionCtaReadinessRules";
 import { resolveKnownRouteReturnTo } from "@/lib/authRedirectRules";
 
 /**
@@ -70,10 +71,19 @@ export default function Landing({
     () => resolveKnownRouteReturnTo(searchParams.get("redirectTo")),
     [searchParams],
   );
-  const signupPath = useMemo(
-    () => buildAttributedSignupPath({ source: acquisitionSource, redirectTo: returnTo }),
-    [acquisitionSource, returnTo],
-  );
+  // Attributed marketing CTAs stay behind the failure-safe attribution guard
+  // contract (CI + ATTRIBUTED_MARKETING_SIGNUP_CTA_ENABLED). When the flag is
+  // off, hand off to bare /auth signup so a missing analytics table cannot be
+  // reached via allowlisted UTM rewrite.
+  const signupPath = useMemo(() => {
+    if (!ATTRIBUTED_MARKETING_SIGNUP_CTA_ENABLED) {
+      const params = new URLSearchParams();
+      params.set("mode", "signup");
+      if (returnTo) params.set("redirectTo", returnTo);
+      return `/auth?${params.toString()}`;
+    }
+    return buildAttributedSignupPath({ source: acquisitionSource, redirectTo: returnTo });
+  }, [acquisitionSource, returnTo]);
   const signInPath = returnTo ? `/auth?redirectTo=${encodeURIComponent(returnTo)}` : "/auth";
 
   usePageSeo({

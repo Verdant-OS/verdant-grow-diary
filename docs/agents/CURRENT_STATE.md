@@ -1459,22 +1459,39 @@ Owner-gated, unchanged by this slice: the publisher's build log, the lockfile
 decision above, and whether to commission the §7.1 ADR against the merged
 `docs/codebase-map.md`.
 
-**The build log is no longer the only route to the provenance question.** #1090
-(`9133a4c45`) merged into this branch on 2026-08-21 at 20:10Z naming a candidate
-mechanism: a Vite plugin regenerated `supabase/functions/mcp/index.ts` — a
-`TREE_HASH_ROOTS` path — on every non-Windows build, so a hashed root was rewritten
-before the stamper ran. Verified in-repo: that file **is** inside the hashed roots,
-and the wiring existed at `ea31fbdfb`. The plugin's regeneration behaviour and its
-byte-difference are `source claim` from #1090, not verified. #1090 puts the stamp /
-`dirty` / `__orphan__` diagnosis outside its own scope, and explains nothing about
-`ref: "__orphan__"`. **Falsifiable without owner access:** once a build produced
-after #1090 is published, re-fetch `/version.json` and recompute that commit's tree.
-If the mismatch and `dirty: true` stop, the candidate holds; if they persist, it is
-refuted. **Not yet available:** at 2026-08-21 20:35Z production still served the
-pre-#1090 `ea31fbdfb934` (`buildTime 15:53:46.096Z`), so nothing is testable until
-the next publish. One caution — the named path is an edge-function source that publishing
-deploys, so the "hashed roots include inputs that never ship" reassurance does **not**
-cover it. Whether any shipped byte differed stays `NOT_MEASURED`.
+**A candidate for the provenance question exists, but it is weak — read the
+caveats before citing it.** #1090 (`9133a4c45`) merged into this branch on
+2026-08-21 at 20:10Z, naming a mechanism: a Vite plugin regenerated
+`supabase/functions/mcp/index.ts` — a `TREE_HASH_ROOTS` path — on every
+non-Windows `vite dev` / `vite build`. Verified in-repo: that file **is** inside
+the hashed roots, and the wiring existed at `ea31fbdfb`. The plugin's regeneration
+behaviour and its byte-difference are `source claim` from #1090, not verified.
+
+**The same-build version of this is impossible and was asserted here before being
+withdrawn.** `package.json:9-11` runs `stamp-version.mjs` inside `prebuild`, and
+only then `build` → `vite build`; the lifecycle orders `pre<script>` first, so one
+build's stamp is captured before any Vite hook fires. Codex refuted it in review of
+#1087. What survives is a **cross-build** version: a rewrite during an editor
+session or a previous build sits in the workspace when the next publish stamps it —
+which requires the build workspace to **persist between cycles**, an `inference`
+supported by `dirty: true` / `ref: "__orphan__"` and by #1090's own "the workspace
+no longer regenerates the file", not a measurement. Under a fresh-workspace-per-build
+premise the candidate collapses. The right investigation, per Codex, is mutations
+occurring **before** `stamp-version.mjs`.
+
+**The test is one-directional.** Once a post-#1090 build is published, re-fetch
+`/version.json` and recompute that commit's tree. Mismatch and `dirty: true`
+_stopping_ supports the candidate; _persisting_ does **not** refute it, since a
+workspace already dirtied by an earlier cycle stays dirty until something resets it.
+**Not yet available:** at 2026-08-21 20:35Z production still served the pre-#1090
+`ea31fbdfb934` (`buildTime 15:53:46.096Z`). #1090 puts the stamp / `dirty` /
+`__orphan__` diagnosis outside its own scope and explains nothing about
+`ref: "__orphan__"`, so the publisher's build log remains the route that settles it.
+
+One caution that is independent of all the above — the named path is an
+edge-function source that publishing deploys, so the "hashed roots include inputs
+that never ship" reassurance does **not** cover it. Whether any shipped byte
+differed stays `NOT_MEASURED`.
 
 ---
 

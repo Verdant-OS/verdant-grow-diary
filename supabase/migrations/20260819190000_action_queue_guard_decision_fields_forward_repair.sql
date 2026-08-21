@@ -1,6 +1,25 @@
 -- Forward-repair the Action Queue decision-field guard so the merged transition
 -- contract can be applied.
 --
+-- ORDERING IS LOAD-BEARING. This file is numbered 20260819190000 -- BEFORE
+-- 20260819190852_action_queue_transition_forward_repair.sql -- even though it
+-- was authored on 2026-08-20. That is deliberate, not a mistake:
+-- 20260819190852 aborts at its own guard-drift gate while service_role still
+-- holds EXECUTE on the guard, and on any environment carrying Supabase's
+-- default function grants that is exactly the state the preceding migrations
+-- leave. Numbered after it, this repair would never be reached on a clean
+-- in-order replay: fresh provisioning, a CI reset, and disaster recovery would
+-- all stop at 20260819190852 with nothing signalling why. Measured on
+-- PostgreSQL 16 by replaying 20260721225930 -> 20260725093000 -> 20260804091142
+-- under both regimes: with permissive default privileges the guard ends at
+-- {postgres, service_role} and the consumer's gate aborts; with a hardened
+-- default ACL it ends at {postgres} and the gate passes. Production is the
+-- permissive case -- that is where its service_role grant came from.
+--
+-- Production applied the two out of filename order under owner authorization
+-- on 2026-08-20 and is already at the contracted end state; this numbering
+-- exists so every OTHER environment reaches the same place unattended.
+--
 -- Production skipped 20260725093000_restore_action_queue_owner_decisions.sql.
 -- Measured against production on 2026-08-20, the live guard is still the
 -- revision created by 20260721225930_b34caa3e-17e4-47c1-9847-19d1c184d83c:
@@ -63,7 +82,7 @@ DECLARE
   v_acl_unrepaired boolean;
   v_acl_repaired boolean;
 BEGIN
-  PERFORM pg_catalog.pg_advisory_xact_lock(20260820, 222000);
+  PERFORM pg_catalog.pg_advisory_xact_lock(20260819, 190000);
 
   IF (
     SELECT pg_catalog.count(*)

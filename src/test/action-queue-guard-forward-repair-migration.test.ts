@@ -1,6 +1,6 @@
 /**
  * Static contract tests for
- * 20260820222000_action_queue_guard_decision_fields_forward_repair.sql.
+ * 20260819190000_action_queue_guard_decision_fields_forward_repair.sql.
  *
  * This migration exists for one reason: production skipped
  * 20260725093000_restore_action_queue_owner_decisions.sql, so the guard
@@ -29,7 +29,7 @@ import { describe, expect, it } from "vitest";
 const GUARD_V1 = "supabase/migrations/20260721225930_b34caa3e-17e4-47c1-9847-19d1c184d83c.sql";
 const GUARD_V2 = "supabase/migrations/20260725093000_restore_action_queue_owner_decisions.sql";
 const REPAIR =
-  "supabase/migrations/20260820222000_action_queue_guard_decision_fields_forward_repair.sql";
+  "supabase/migrations/20260819190000_action_queue_guard_decision_fields_forward_repair.sql";
 const CONSUMER = "supabase/migrations/20260819190852_action_queue_transition_forward_repair.sql";
 
 /** Exactly what the consumer migration pins for the repaired guard. */
@@ -63,7 +63,7 @@ function md5(text: string): string {
   return createHash("md5").update(Buffer.from(text, "utf8")).digest("hex");
 }
 
-describe("action_queue guard forward repair (20260820222000)", () => {
+describe("action_queue guard forward repair (20260819190000)", () => {
   const sql = read(REPAIR);
 
   it("embeds a guard body byte-identical to the one committed in 20260725093000", () => {
@@ -103,7 +103,7 @@ describe("action_queue guard forward repair (20260820222000)", () => {
     expect(sql).toMatch(/\$action_queue_guard_forward_repair_postflight\$/);
     expect(sql).toMatch(/action_queue_guard_forward_repair_state_drift/);
     expect(sql).toMatch(/action_queue_guard_forward_repair_postcondition_failed/);
-    expect(sql).toMatch(/pg_advisory_xact_lock\(20260820, 222000\)/);
+    expect(sql).toMatch(/pg_advisory_xact_lock\(20260819, 190000\)/);
   });
 
   it("accepts only the two guard bodies this repository has ever committed", () => {
@@ -134,6 +134,26 @@ describe("action_queue guard forward repair (20260820222000)", () => {
     expect(sql).not.toMatch(/ADD COLUMN/i);
     expect(sql).not.toMatch(/GRANT .* ON TABLE/i);
     expect(sql).not.toMatch(/target_device/i);
+  });
+});
+
+describe("replay ordering — the prerequisite must precede its consumer", () => {
+  it("sorts before 20260819190852, which aborts while service_role holds EXECUTE", () => {
+    // Measured on PostgreSQL 16: replaying 20260721225930 -> 20260725093000 ->
+    // 20260804091142 under Supabase-style default function grants leaves the
+    // guard at {postgres, service_role}, and 20260819190852's guard-drift gate
+    // aborts on exactly that. Numbered after it, this repair is unreachable on
+    // a clean in-order replay — fresh provisioning, CI reset, and disaster
+    // recovery would all stop there. Filename order IS the fix.
+    const repairVersion = REPAIR.split("/").pop()!.slice(0, 14);
+    const consumerVersion = CONSUMER.split("/").pop()!.slice(0, 14);
+    expect(repairVersion < consumerVersion).toBe(true);
+  });
+
+  it("still sorts after the migration whose guard body it reinstates", () => {
+    const repairVersion = REPAIR.split("/").pop()!.slice(0, 14);
+    const sourceVersion = GUARD_V2.split("/").pop()!.slice(0, 14);
+    expect(sourceVersion < repairVersion).toBe(true);
   });
 });
 

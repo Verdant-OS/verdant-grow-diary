@@ -3,7 +3,7 @@
 **Last updated:** 2026-08-20 UTC (second same-day edit)
 **Updated by:** Claude (2026-08-20, later edit: **the Action Queue transition
 contract is now APPLIED and the live security gap is CLOSED.** Cheek authorized
-the full sequence in session. `20260820222000` (guard forward repair) applied
+the full sequence in session. `20260819190000` (guard forward repair) applied
 first, then `20260819190852` (transition forward repair) applied and passed its
 own postflight. `authenticated` no longer holds UPDATE or DELETE on
 `action_queue` or `action_queue_events`; a rolled-back end-to-end probe proved a
@@ -539,11 +539,11 @@ session. Each migration was transmitted inside an md5 guard that verified the
 body at the database **before** executing a byte, so the applied text is
 hash-verified rather than assumed.
 
-**Order matters and was followed:** `20260820222000` first, then
+**Order matters and was followed:** `20260819190000` first, then
 `20260819190852`. The first migration's postflight is deliberately the second's
 guard-drift predicate.
 
-`supabase/migrations/20260820222000_action_queue_guard_decision_fields_forward_repair.sql`
+`supabase/migrations/20260819190000_action_queue_guard_decision_fields_forward_repair.sql`
 — applied (body md5 `a635a88a…`, 12,966 chars). It moved the guard from the
 `20260721225930` revision to the `20260725093000` one and closed the
 `service_role` ACL gap no committed migration had ever closed. All five drift

@@ -239,10 +239,45 @@ GitHub. That would explain the orphan SHA — **it would not explain `dirty: tru
 `commitSource: "git"`**, which says the build tree had uncommitted changes at stamp time.
 
 This supersedes the `CURRENT_STATE` Production-commit row (`f09febc354a4`, `dirty: false`,
-2026-08-20). Resolving it needs `scripts/resolve-release-provenance.mjs` run against the
-`treeHash` above by someone with the publisher's view. **This is exactly the gap OPS-01 and
-OPS-02 exist to close, and it is live right now** — which raises both above their assigned
-priority. It is owner-facing: no agent should attempt to reach the publisher.
+2026-08-20).
+
+#### The tree hash was resolved locally — this is measured, not `BLOCKED`
+
+**Corrected after review.** An earlier revision said resolving this "needs
+`scripts/resolve-release-provenance.mjs` run … by someone with the publisher's view", and marked
+the whole step owner-gated. That was wrong on its own terms: the resolver's header states
+_"Read-only; no network. Run it from a checkout with real history."_ It is a repository-side
+measurement, and this document had one available and did not take it. Labelling as `BLOCKED`
+something that could be measured is the precise failure this repo's status vocabulary exists to
+prevent.
+
+Run at `28c01a017` against the production `treeHash`
+`8773f6b2c0edb2618a7b1b6fc4f0d4bb01b984cbc9e3ed33be896a1e40152d41`:
+
+| Path                                                                  | Result         |
+| --------------------------------------------------------------------- | -------------- |
+| Release-tag annotations (244 of 700 `v*` tags carry `Tree-Hash:`)     | **no match**   |
+| Recomputation over the last 60 commits of `origin/verdant-grow-diary` | **`NO_MATCH`** |
+
+**A canary rules out the tooling.** The resolver's own output warns that a `NO_MATCH` could mean
+the hash roots are broken rather than the build being unmatched, and prescribes resolving a
+known-good stamp. Done: the working tree at `28c01a017` **plus one docs-only file** hashes to
+`0eeb9daa96ab…` and resolves **`MATCH via release-tag annotation → 28c01a017049…`**. That
+confirms two things at once — the hashed roots genuinely exclude docs, and the stamper's
+recorded hash reproduces under local recomputation. The resolver works.
+
+So the production `NO_MATCH` is a **measured negative about production**, not a tooling artifact.
+Per the resolver's own text the surviving explanations are that the build predates the scan
+window — weakened by its absence from all 244 annotated tags, which reach far further back than
+60 commits — or that "its content never matched any commit (editor-modified snapshot, or a
+publish pipeline that mutates hashed files such as `bun.lock` before prebuild)". `dirty: true`
+points at the second.
+
+**What remains owner-gated is narrower than before:** not _whether_ production's content
+corresponds to a committed state — it does not — but _what that content is and why_. That still
+needs the publisher's view, and no agent should attempt to reach it. **This is exactly the gap
+OPS-01 and OPS-02 exist to close, and it is live right now**, which raises both above their
+assigned priority.
 
 ### 6.2 The `vercel.json` question is now measured, not ambiguous
 
@@ -422,16 +457,17 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 
 ## 8. Known unknowns, and what stays blocked
 
-| Question                                                             | Status                                                                                                |
-| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching) |
-| Does production deliver the security headers `vercel.json` declares? | `NOT_MEASURED` — first check for OPS-02                                                               |
-| What is production commit `4b1c4867e685`, and why is it dirty?       | `BLOCKED` — needs the publisher's view; owner-only                                                    |
-| Are all five npm consumers still real after §6.2?                    | `NOT_MEASURED` — cheapest TOOL-01 progress                                                            |
-| Runtime AI Doctor behaviour under the twenty adversarial cases       | `NOT_MEASURED` — AI-02 not run                                                                        |
-| False-positive rate for any SPC rule                                 | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                          |
-| GA4 / GSC authenticated baselines                                    | `BLOCKED` — unchanged, blockers 2 and 3                                                               |
-| Indexation                                                           | `NOT_MEASURED` — unchanged                                                                            |
+| Question                                                             | Status                                                                                                                                    |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                     |
+| Does production deliver the security headers `vercel.json` declares? | `NOT_MEASURED` — first check for OPS-02                                                                                                   |
+| Does production's content correspond to any committed state?         | **`FAIL` — measured.** No release-tag annotation and no recomputation match over 60 commits; canary confirms the resolver is sound (§6.1) |
+| What _is_ production commit `4b1c4867e685`, and why is it dirty?     | `BLOCKED` — narrowed, but still needs the publisher's view; owner-only                                                                    |
+| Are all five npm consumers still real after §6.2?                    | `NOT_MEASURED` — cheapest TOOL-01 progress                                                                                                |
+| Runtime AI Doctor behaviour under the twenty adversarial cases       | `NOT_MEASURED` — AI-02 not run                                                                                                            |
+| False-positive rate for any SPC rule                                 | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                              |
+| GA4 / GSC authenticated baselines                                    | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                   |
+| Indexation                                                           | `NOT_MEASURED` — unchanged                                                                                                                |
 
 ---
 
@@ -466,7 +502,8 @@ Lead — peer, no rank). The adversarial questions worth putting to this documen
 
 1. Re-run the four live probes in §6.2 from a different network. Is HTTP 200 with no
    `Location` reproducible, or was one observation a cache artifact?
-2. Re-fetch and re-check `4b1c4867e685`. If it appears in a ref this session did not have,
+2. Re-run the provenance resolver against the production `treeHash` at a later tip, and re-check
+   `4b1c4867e685`. If it appears in a ref this session did not have,
    §6.1's first observation collapses — but the `dirty: true` + `commitSource: "git"`
    observation stands independently and still needs an explanation.
 3. ~~Challenge §6.3's counting method.~~ **Already raised and acted on** — Codex made exactly

@@ -201,7 +201,7 @@ These are the audit's strongest calls and they should survive into whatever cont
 
 ## 6. Findings the audit missed
 
-### 6.1 Production is serving a commit this repository does not contain — and it is stamped dirty
+### 6.1 Production's published content does not match the tree of the commit it names
 
 `established fact`, measured 2026-08-21 from `https://verdantgrowdiary.com/version.json`
 (HTTP 200):
@@ -219,28 +219,59 @@ These are the audit's strongest calls and they should survive into whatever cont
 }
 ```
 
-Two independent observations:
+> ## ⚠️ Two claims withdrawn — read this before citing §6.1
+>
+> Earlier revisions of this section were headed _"Production is serving a commit this repository
+> does not contain — and it is stamped dirty."_ **Both halves were wrong**, and review caught
+> both. What survives is narrower, better evidenced, and stated below.
+>
+> **Withdrawn 1 — "the repository does not contain it."** The commit **exists**. Queried against
+> the authoritative GitHub commit endpoint:
+>
+> ```
+> 4b1c4867e685d23d5e526304f6c8da4e35dc2601   "Completed Verdant audit"
+>   X-Lovable-Edit-ID: edt-5ea33791-7aa3-4810-b657-d5e4bb7dd505
+>   author/committer: lovable-dev[bot] (gpt-engineer-app[bot])   2026-08-21T09:44:40Z
+>   merge commit, parents: 28c01a017 (the pinned deploy tip) + a684da59b
+> ```
+>
+> `git cat-file` failed only because the commit is not reachable from any fetched head or tag —
+> it tests the **local object database**, never the server. `git fetch origin <sha>` retrieves it
+> fine. The `uncertainty` this section raised in its first draft — that a Lovable-side build
+> could stamp a commit from its own workspace — was the correct explanation all along, and two
+> later revisions argued against it on the strength of a local lookup that could not settle it.
+>
+> **Withdrawn 2 — `dirty: true` implies drifted build content.** `stamp-version.mjs` derives
+> `dirty` from repository-wide `git status --porcelain`, while `tree-hash.mjs:24` states that
+> "changes outside the hashed roots (`docs/`, `e2e/`, `.github/`, etc.) do not" move the hash.
+> **This document's own canary proved the point against itself**: a docs-only modification left
+> the hash identical. A dirty flag therefore says nothing about build-defining content unless the
+> changed paths intersect the hashed roots.
 
-1. **`git cat-file -t 4b1c4867e685…` fails against the complete history.** The SHA is absent
-   from the repository. **Re-verified after `git fetch --unshallow`** — an earlier revision
-   asserted this from a shallow clone, where a missing object proves only that _the clone_ lacks
-   it. On full history (16,604 commits in the deploy tip's ancestry, 169 remote branches, 700
-   tags) the object still does not exist. This is the one leg of §6.1 that the shallow-clone
-   error weakened and that re-measurement has now genuinely established.
-2. **`dirty: true` here is the non-benign case.** `scripts/stamp-version.mjs` documents the
-   one innocent reading in its own comment: _"In a history-less snapshot everything is
-   'untracked', so `dirty:true` plus `commitSource:"none"` together read as identity from
-   treeHash."_ Production reports `commitSource: "git"`, **not** `"none"`. The same comment
-   states the general rule: _"Never suppress — a dirty CI build is always a bug worth
-   surfacing."_
+#### What is actually measured
 
-`inference, high confidence`: production is serving a build whose source tree is not an exact
-committed state of this repository.
+`established fact`, by fetching the commit and recomputing its tree with the same module the
+stamper uses:
 
-`uncertainty`, and it must be stated: Lovable publishes from its own workspace, so a
-Lovable-side build could legitimately stamp a commit from an internal git that never reached
-GitHub. That would explain the orphan SHA — **it would not explain `dirty: true` alongside
-`commitSource: "git"`**, which says the build tree had uncommitted changes at stamp time.
+|                                              | Tree hash                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| Commit `4b1c4867e685` (fetched, 5,840 files) | `1f0eb7b4e6cd2ef0d375ee039c86704a39372feeb2c0b8bbb78fcfa76cb55674` |
+| **Stamped by the live build**                | `8773f6b2c0edb2618a7b1b6fc4f0d4bb01b984cbc9e3ed33be896a1e40152d41` |
+| Match                                        | **no**                                                             |
+
+**Production stamped commit `4b1c4867e685` and published content whose build-defining roots do
+not match that commit's tree.** Because only the hashed roots move this value, the difference
+lies inside build-defining paths — not in docs, e2e, or workflows.
+
+That is the whole finding, and it is narrow. Per the resolver's own text the explanations are an
+editor-modified snapshot at build time, or a publish pipeline that mutates hashed files such as
+`bun.lock` before prebuild. Distinguishing them needs the publisher's build log, which is
+owner-gated; **nothing here shows wrong content shipped, only that the stamp cannot be tied back
+to a committed tree.**
+
+It also explains the scans below: the commit is a Lovable merge that is **not on the deploy
+branch**, so recomputing over `origin/verdant-grow-diary` could never have found it, at any scan
+depth.
 
 This supersedes the `CURRENT_STATE` Production-commit row (`f09febc354a4`, `dirty: false`,
 2026-08-20).
@@ -332,12 +363,12 @@ well inside the scanned ancestry. That is `inference`, not fact — the stamped 
 self-reported by a build whose SHA is not in the repository, so it cannot be checked
 independently.
 
-**What is owner-gated rests on the two facts that survive independently of the tree-hash
-search** — the served SHA does not exist in the repository's complete history, and the stamp
-reports `dirty: true` with `commitSource: "git"`, the combination `stamp-version.mjs` itself
-calls "a bug worth surfacing". Neither needs the hash scan, and the second needs no local git at
-all: it is read straight off the live endpoint. **This is the gap OPS-01 and OPS-02 exist to
-close and it is live now**, which is why both are raised — not on the withdrawn claim above.
+**What is owner-gated is now a single, specific question:** why the published tree differs from
+the tree of the commit it stamps. That rests on the direct hash comparison above, not on the two
+withdrawn claims. It is a real release-provenance gap — a stamp that cannot be tied back to a
+committed tree defeats the purpose of stamping — and it is the kind of thing OPS-01 and OPS-02
+exist to define and detect. **It is not evidence that production is serving wrong or unreviewed
+code, and this document does not claim that.**
 
 ### 6.2 The `vercel.json` question is now measured, not ambiguous
 
@@ -517,18 +548,19 @@ commented-out or relocated setting is indistinguishable from a live one to a tex
 
 ## 8. Known unknowns, and what stays blocked
 
-| Question                                                             | Status                                                                                                |
-| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching) |
-| Does production deliver the security headers `vercel.json` declares? | `NOT_MEASURED` — first check for OPS-02                                                               |
-| Does the served SHA exist in the repository?                         | **`FAIL` — measured on complete history after `git fetch --unshallow` (§6.1)**                        |
-| Does production's tree hash match any commit?                        | `NOT_MEASURED` — 400 of 16,604 recomputed (last 17 days) plus 244 of 700 tags; a 2.4% sample          |
-| What _is_ production commit `4b1c4867e685`, and why is it dirty?     | `BLOCKED` — narrowed, but still needs the publisher's view; owner-only                                |
-| Are all five npm consumers still real after §6.2?                    | `NOT_MEASURED` — cheapest TOOL-01 progress                                                            |
-| Runtime AI Doctor behaviour under the twenty adversarial cases       | `NOT_MEASURED` — AI-02 not run                                                                        |
-| False-positive rate for any SPC rule                                 | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                          |
-| GA4 / GSC authenticated baselines                                    | `BLOCKED` — unchanged, blockers 2 and 3                                                               |
-| Indexation                                                           | `NOT_MEASURED` — unchanged                                                                            |
+| Question                                                             | Status                                                                                                                                          |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Applied-migration ledger vs. the 272 committed files                 | `NOT_MEASURED` — drift probe still blocked on both an owner secret and defect 3 (name-bound matching)                                           |
+| Does production deliver the security headers `vercel.json` declares? | `NOT_MEASURED` — first check for OPS-02                                                                                                         |
+| Does the served SHA exist in the repository?                         | **`PASS` — it does.** Confirmed via the GitHub commit endpoint; a Lovable merge commit off the deploy tip, unreachable from fetched refs (§6.1) |
+| Does production's tree hash match its **own stamped commit**?        | **`FAIL` — measured.** `1f0eb7b4e6cd` vs stamped `8773f6b2c0ed` (§6.1)                                                                          |
+| Why does the published tree differ from that commit's tree?          | `BLOCKED` — needs the publisher's build log; owner-only                                                                                         |
+| What _is_ production commit `4b1c4867e685`, and why is it dirty?     | `BLOCKED` — narrowed, but still needs the publisher's view; owner-only                                                                          |
+| Are all five npm consumers still real after §6.2?                    | `NOT_MEASURED` — cheapest TOOL-01 progress                                                                                                      |
+| Runtime AI Doctor behaviour under the twenty adversarial cases       | `NOT_MEASURED` — AI-02 not run                                                                                                                  |
+| False-positive rate for any SPC rule                                 | `NOT_MEASURED` — no synthetic dataset exists yet (SENSOR-02)                                                                                    |
+| GA4 / GSC authenticated baselines                                    | `BLOCKED` — unchanged, blockers 2 and 3                                                                                                         |
+| Indexation                                                           | `NOT_MEASURED` — unchanged                                                                                                                      |
 
 ---
 
@@ -585,6 +617,7 @@ route §6.1 to whoever holds the publisher's view.
 **One calibrated verdict:** the audit's engineering judgement is sound and its stack
 determinations survive independent re-derivation intact. Its first two assignments were
 blocked by an open PR it had already noticed — **#1051, now merged as `5c60bcd9`, so ARCH-01
-and ARCH-02 are live work rather than blocked.** What remains unresolved is the thing that was
-never on its roadmap: production is serving a dirty build from a commit this repository does
-not contain.
+and ARCH-02 are live work rather than blocked.** What remains unresolved is the thing that was never on its
+roadmap: production's published content does not match the tree of the commit it stamps
+(§6.1) — a narrower finding than earlier revisions of this document claimed, and one that took
+several review rounds to state correctly.

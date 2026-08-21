@@ -1426,11 +1426,14 @@ any shipped byte differs stays `NOT_MEASURED`.
 
 Two findings other agents should not rediscover:
 
-- **`vercel.json` does not govern production**, now measured rather than
-  inferred on three of its four keys — `redirects` (all eight, with a positive
-  control), `rewrites` (by response-content comparison), and `headers` (3 of 5
-  arrive; HSTS differs from the declared value). `projectSettings` stays
-  `inference`. Where the delivered headers originate is `NOT_MEASURED`.
+- **`vercel.json`'s measured runtime directives are not applied as declared in
+  production** — `redirects` (all eight, with a positive control), `rewrites`
+  (by response-content comparison), and `headers` (3 of 5 arrive; HSTS differs
+  from the declared value). **Whole-file authority is `NOT_MEASURED`, and the
+  categorical "does not govern production" is deliberately not asserted:** the
+  file also carries `projectSettings` (labelled `inference`), `cleanUrls` and
+  `git`, none of which were probed. Where the delivered headers originate is
+  also `NOT_MEASURED`.
 - **The Bun/npm lockfile transition is dated.** `reviewBy` is 2026-08-25 and
   `check-bun-lockfile-policy.mjs` compares strictly greater, so the gate first
   fails **2026-08-26 UTC**. Its prerequisite is an **inventory across all five

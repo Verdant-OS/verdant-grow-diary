@@ -36,12 +36,12 @@ touches no governance file and no operating-state file.
 
 `established fact`, measured from the open-PR list at the base ref.
 
-| PR | Branch | Governance surface | Base | State |
-| --- | --- | --- | --- | --- |
-| #1060 | `cursor/grok-peer-elevation-42e5` | **all twelve pinned files** + `CURRENT_STATE.md` + `cheek-approval-workflow.md` + new map doc | `9ae3bb8` | OPEN, draft |
-| #1051 | `claude/claude-md-documentation-j9b3ac` | `CLAUDE.md` (one of the twelve) | `77d8eec` | OPEN, draft |
-| #1033 | `claude/governance-operating-facts` | governance operating facts; stale validation commands | `654fe79` | OPEN |
-| #1059 | `claude/prettierignore-gemini-mirror-fence` | formatter fence over the `GEMINI.md` Sentinel mirror | `745f023` | OPEN, draft |
+| PR    | Branch                                      | Governance surface                                                                            | Base      | State       |
+| ----- | ------------------------------------------- | --------------------------------------------------------------------------------------------- | --------- | ----------- |
+| #1060 | `cursor/grok-peer-elevation-42e5`           | **all twelve pinned files** + `CURRENT_STATE.md` + `cheek-approval-workflow.md` + new map doc | `9ae3bb8` | OPEN, draft |
+| #1051 | `claude/claude-md-documentation-j9b3ac`     | `CLAUDE.md` (one of the twelve)                                                               | `77d8eec` | OPEN, draft |
+| #1033 | `claude/governance-operating-facts`         | governance operating facts; stale validation commands                                         | `654fe79` | OPEN        |
+| #1059 | `claude/prettierignore-gemini-mirror-fence` | formatter fence over the `GEMINI.md` Sentinel mirror                                          | `745f023` | OPEN, draft |
 
 Any twelve-file Sentinel bump must reconcile with #1051 and #1059, which touch two of the
 same twelve. That reconciliation is **not** performed here and is called out as an open
@@ -53,11 +53,11 @@ item in §7.
 
 `established fact`, each PR read individually at the base ref:
 
-| PR | `CURRENT_STATE.md` claim | Measured state | `closed_at` | Merged |
-| --- | --- | --- | --- | --- |
-| #828 | "stay open and parked" (line 526) | **CLOSED** | 2026-08-15T15:59:11Z | no |
-| #817 | "stay open and parked"; "still OPEN" | **CLOSED** | 2026-08-15T15:09:58Z | no |
-| #696 | "stay open and parked" | **CLOSED** | 2026-08-15T15:05:15Z | no |
+| PR   | `CURRENT_STATE.md` claim             | Measured state | `closed_at`          | Merged |
+| ---- | ------------------------------------ | -------------- | -------------------- | ------ |
+| #828 | "stay open and parked" (line 526)    | **CLOSED**     | 2026-08-15T15:59:11Z | no     |
+| #817 | "stay open and parked"; "still OPEN" | **CLOSED**     | 2026-08-15T15:09:58Z | no     |
+| #696 | "stay open and parked"               | **CLOSED**     | 2026-08-15T15:05:15Z | no     |
 
 All three closed unmerged inside a 54-minute window on 2026-08-15 — a deliberate closure
 sweep, not attrition. The `CURRENT_STATE.md` text asserting they "stay open and parked"
@@ -71,12 +71,12 @@ collision fence in `AGENTS.md`, `GEMINI.md`, `docs/agents/HANDOFF_PROTOCOL.md`,
 `inference`: merging #1060 unchanged promotes a stale operating fact out of the shift
 report — where it is cheap to correct — into seven governance files under Sentinel
 parity, where correcting it costs a twelve-file version bump. This is the defect class
-`docs/agents/roles/gemini.md` names directly: *"copied lists that drift from their source
-instead of importing it."*
+`docs/agents/roles/gemini.md` names directly: _"copied lists that drift from their source
+instead of importing it."_
 
 **Recommended remedy (for the #1060 owner, not applied here):** replace the parked-triple
-fence with the durable rule it was standing in for — *no competing Timeline / Alerts /
-Action Queue UI rewrite* — and drop the three PR numbers, or annotate them as closed
+fence with the durable rule it was standing in for — _no competing Timeline / Alerts /
+Action Queue UI rewrite_ — and drop the three PR numbers, or annotate them as closed
 2026-08-15. The behavioural fence is still correct; only its evidence is expired.
 
 The status of #913 and #699 — also described as OPEN in `CURRENT_STATE.md` — is
@@ -88,10 +88,10 @@ The status of #913 and #699 — also described as OPEN in `CURRENT_STATE.md` —
 
 `established fact`:
 
-| Source | Value | Format | Evidence |
-| --- | --- | --- | --- |
-| Repo at base ref | `2026-08-09.3` | dashes | present in 12/12 pinned files |
-| PR #1060 | `2026-08-20.2` | dashes | diff on all twelve |
+| Source                        | Value          | Format   | Evidence                       |
+| ----------------------------- | -------------- | -------- | ------------------------------ |
+| Repo at base ref              | `2026-08-09.3` | dashes   | present in 12/12 pinned files  |
+| PR #1060                      | `2026-08-20.2` | dashes   | diff on all twelve             |
 | Session prompt (this session) | `2026.09.01.1` | **dots** | **absent from the repository** |
 
 Two observations on the prompt value, both `established fact`: it uses a dot separator
@@ -99,7 +99,7 @@ where every stamp in the repository uses dashes, and it is dated 2026-09-01 — 
 after today's 2026-08-20.
 
 `inference, moderate confidence`: `2026.09.01.1` is a forward-dated or mistyped stamp
-rather than a distinct ratified revision, because the *substance* it carries is already
+rather than a distinct ratified revision, because the _substance_ it carries is already
 what #1060 implements. The prompt's §2 ("no exclusivity", "none outranks the others",
 "explicit task ownership", "one Owner + one Independent Reviewer") is the same charter
 #1060 lands under `2026-08-20.2`.
@@ -149,24 +149,24 @@ Both refs the file pins elsewhere are confirmed ancestors of the tip: `e012b633`
 
 Production `/version.json` was **not** re-measured this session — outbound fetch is
 blocked by network policy. It stays `BLOCKED`, and the file's existing caution that
-*merging is not a publish* still governs.
+_merging is not a publish_ still governs.
 
 ### 5.2 Tranche B+ is substantially delivered, not pending
 
 This is the largest single staleness. `CURRENT_STATE.md` lines 565–570 describe Tranche B+
 as an approved plan of slices still to ship. Measured:
 
-| Slice | File says | Measured at base ref |
-| --- | --- | --- |
-| B0a | "first merge gate" | **MERGED** — #1039 `de8ebad` |
-| B1 | planned | **MERGED** — #1040 `9141be8` |
-| B3a | planned | **MERGED** — #1042 `9b64456` |
-| D5 | planned | **OPEN** — #1043 |
-| D7 | planned | **MERGED** — #1041 `5640d77`, landed after this spec was measured |
-| B2 | "waits for A5" | **B2a MERGED** — #1049 `f09febc`; B2b still deferred to A5 |
-| B4 | "waits for A2" | **B4a MERGED** — #1047 `cff3efd`; B4b still deferred to A2 |
-| B5 | "waits for A3" | no merge found — unchanged |
-| B0b | owner-gated | unchanged |
+| Slice | File says          | Measured at base ref                                              |
+| ----- | ------------------ | ----------------------------------------------------------------- |
+| B0a   | "first merge gate" | **MERGED** — #1039 `de8ebad`                                      |
+| B1    | planned            | **MERGED** — #1040 `9141be8`                                      |
+| B3a   | planned            | **MERGED** — #1042 `9b64456`                                      |
+| D5    | planned            | **OPEN** — #1043                                                  |
+| D7    | planned            | **MERGED** — #1041 `5640d77`, landed after this spec was measured |
+| B2    | "waits for A5"     | **B2a MERGED** — #1049 `f09febc`; B2b still deferred to A5        |
+| B4    | "waits for A2"     | **B4a MERGED** — #1047 `cff3efd`; B4b still deferred to A2        |
+| B5    | "waits for A3"     | no merge found — unchanged                                        |
+| B0b   | owner-gated        | unchanged                                                         |
 
 Claude is the recorded owner of Tranche B+, so this row understates delivered work by the
 owning agent — the failure mode most likely to cause a duplicate build.
@@ -192,7 +192,9 @@ delivery at all. The Grok row is owned by #1060 — do not touch it here.
 - No `Sentinel-Version` change on any of the twelve pinned files.
 - No edit to `docs/agents/CURRENT_STATE.md` from this branch.
 - No closing, reopening, rebasing, or merging of any PR.
-- No production, GA4, GSC, sitemap, or `/version.json` measurement claim — none was taken.
+- No production, GA4, GSC, sitemap, or `/version.json` measurement claim — none was taken
+  **in this pass**. One was taken later the same night and is recorded separately in §8;
+  that addendum does not widen anything else this section withholds.
 - No schema, migration, RLS, edge-function, or `src/` change.
 - No role reassignment. Claude acted as Architect per `docs/agents/roles/claude.md`.
 
@@ -239,3 +241,84 @@ owned by open PR #1060, and the highest-value finding is time-critical to that P
 than to this one — #1060 would promote a fence over three PRs closed on 2026-08-15 into
 seven files under Sentinel parity. Route §2 into #1060 before it merges; apply §5 either
 inside #1060 or in a follow-up once it lands.
+
+---
+
+## 8. Addendum — production status measured post-publish (2026-08-21)
+
+**Added 2026-08-21 by Claude.** Base ref for this addendum:
+`6cf3ffda0686cfe77f3c4eda5d5ded6a770f7bc0` (`origin/verdant-grow-diary`), not the
+`9ae3bb88` of the original pass. It resolves one blocked item in §7 and supplies the
+Production status rows §5 could not measure. It changes nothing else in this document,
+and it still applies no edit to `docs/agents/CURRENT_STATE.md` — the §0 collision reason
+stands.
+
+### 8.1 The `/version.json` blocker in §7 is resolved, and was never a property of the endpoint
+
+§7 lists `Production /version.json — BLOCKED, network policy`. That was true of the
+session that recorded it and false of the endpoint. The same fetch returned `200` from a
+later session over the agent proxy.
+
+`BLOCKED` on a network read is per-session, not a property of the target — re-test before
+carrying one forward. Procedure, the control-host pairing that separates a session fault
+from a target fault, and the output-reading traps are in
+`docs/agent-session-network-reachability.md`.
+
+### 8.2 Measured — live HTTPS, 2026-08-21 ~00:30Z
+
+`established fact`, each value read from a response that was actually received.
+
+| Axis                      | Measured                                                                                                    |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `/version.json`           | `200`                                                                                                       |
+| Release identity          | `6cf3ffda0686` (#1062), `commitSource: "git"`, `dirty: false`                                               |
+| Tree hash                 | `0ce1b69261ac…`                                                                                             |
+| Provenance                | `resolve-release-provenance.mjs --hash=<treeHash> --ref=6cf3ffda0686 --scan=2` → **MATCH by recomputation** |
+| Build time                | `2026-08-21T00:27:10.316Z`                                                                                  |
+| Sitemap                   | `200`, **61** `<loc>`                                                                                       |
+| `/breeder-beta` canonical | `https://verdantgrowdiary.com/creator-beta`                                                                 |
+| `/breeder-beta` robots    | `index, follow`                                                                                             |
+
+Pre-publish baseline taken minutes earlier, for comparison: `5640d7744f38`, build
+`2026-08-20T23:56:37.091Z`, sitemap **56**, `/breeder-beta` self-canonical.
+
+**Publish lag is not the standing story tonight.** `ae9d53561ae0` (#1056) is the _direct
+parent_ of the served commit, so production carries it; the single commit on top is
+docs-only #1062. The publish was observed live within roughly 90 seconds of being
+started. Do not carry forward the older "publish lags git by four commits" note without
+re-measuring — that was a different night.
+
+### 8.3 Rows this makes stale in `CURRENT_STATE.md`
+
+For the owner of #1060 to fold in. Five rows, all in the **Production status** table.
+
+| Row                                  | Currently reads                                     | Should read                                      |
+| ------------------------------------ | --------------------------------------------------- | ------------------------------------------------ |
+| `/version.json`                      | `PASS` re-verified 2026-08-20                       | `PASS` re-verified 2026-08-21                    |
+| Production commit                    | `f09febc354a4` (#1049)                              | `6cf3ffda0686` (#1062), MATCH by recomputation   |
+| Production build time                | `2026-08-20T18:49:50.600Z`                          | `2026-08-21T00:27:10.316Z`                       |
+| Public sitemap                       | `PASS` — **56** live, 61 in-repo                    | `PASS` — **61** live; in-repo and live now agree |
+| Indexable routes outside the sitemap | `FAIL` **live**, `RESOLVED` in-repo pending publish | **`PASS`** — resolved live                       |
+
+The last row is the substantive one: **blocker 8's sibling item is now closed in
+production**, not merely in the repo. Five routes are advertised and `/breeder-beta`
+correctly is not, while carrying a cross-canonical to `/creator-beta` and staying
+`index, follow`. The cross-canonical survived hydration in the live build, which was the
+failure mode most likely to be silent — `usePageSeo` rewrites the head after the
+pre-rendered document, so a drift there would have shown nothing to a human and the wrong
+canonical to Googlebot.
+
+The branch-topology row in §5.1 also moves — the deploy pin advances to `6cf3ffda0686`.
+The 23-merge staleness §5.1 measured is unaffected in kind, only in count.
+
+### 8.4 What this addendum still does not claim
+
+- **Indexation remains unmeasured.** Pages surfacing in a third-party web index is a
+  `practical observation` sufficient to refute "not indexed", and nothing more. The
+  Ahrefs endpoints that would measure it returned `Insufficient plan`.
+- **GA4 and GSC authenticated baselines stay `BLOCKED`** (blockers 2 and 3). No
+  impression, click, position, or CTR claim is authorized by anything above.
+- **Migration state is untouched.** Publishing deploys the frontend and edge functions
+  only; it replays nothing under `supabase/migrations/`.
+- **Measurement Day 0 stays `UNSET`** and the four-week clock `NOT_STARTED`.
+- Single observations remain point-in-time. Production may publish again.

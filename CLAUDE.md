@@ -81,7 +81,7 @@ tanstackStart, viteReact, tailwindcss, tsconfigPaths and the `@` alias; do not r
 
 **`vercel.json` does not govern production.** Lovable publishes production and does not apply
 Vercel host configuration, so the redirects and headers in that file do not fire there — the
-six legacy public redirects return HTTP 200 with no `Location` header, and the destination is
+eight redirect entries in that file return HTTP 200 with no `Location` header, and the destination is
 reached by client rendering instead (`docs/seo/lighting-launch-verification.md`,
 §Non-blocking host mismatch). `CURRENT_STATE_ARCHIVE.md` lists the file as stale pre-SSR
 configuration awaiting retirement. Never reason about production redirect or header behaviour
@@ -141,8 +141,11 @@ so you recognise it rather than copy it:
   these as precedent.
 - Two `*Rules.ts` import Supabase (`sensorIngestNormalizationRules.ts`,
   `sensorWebhookIngestRules.ts`).
-- 39 of 492 components and 34 of 139 pages import `@/integrations/supabase/client` directly
-  instead of going through a hook.
+- 38 of 492 components and 33 of 139 pages import `@/integrations/supabase/client` directly
+  instead of going through a hook. (A plain path grep returns 39 and 34; the two extra hits are
+  `vi.mock("@/integrations/supabase/client")` in `src/components/QuickLog.test.tsx` and
+  `src/pages/support/__tests__/support-forms.test.tsx`, which are mocks, not production
+  imports. Count import statements, not path references.)
 
 Do not extend any of these patterns.
 

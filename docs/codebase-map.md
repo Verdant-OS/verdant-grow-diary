@@ -79,10 +79,13 @@ Several legal/marketing duplicates exist as routes **and** as redirect entries i
 `vercel.json` (`/strains → /cultivars`, `/features → /welcome`, `/terms-of-service → /terms`,
 `/privacy-policy → /privacy`, `/refunds` and `/refund-policy → /refund`, `/demo → /welcome`).
 **Those redirects do not fire in production.** Lovable is the production publisher and does
-not apply Vercel host configuration — the six legacy public redirects return HTTP 200 with no
+not apply Vercel host configuration — all **eight** redirect entries in that file return HTTP 200 with no
 `Location` header, so the destination is reached by client rendering, not by a host redirect
-(`docs/seo/lighting-launch-verification.md`, §Non-blocking host mismatch). `vercel.json` is
-stale pre-SSR configuration that `CURRENT_STATE_ARCHIVE.md` lists for retirement.
+(`docs/seo/lighting-launch-verification.md`, §Non-blocking host mismatch — that document says
+"six", counting only the aliases its own slice added; the file holds eight, and Lovable ignores
+all of them). The eight are `/strains`, `/strains/:slug`, `/features`, `/demo`, `/refunds`,
+`/refund-policy`, `/terms-of-service`, `/privacy-policy`. `vercel.json` is stale pre-SSR
+configuration that `CURRENT_STATE_ARCHIVE.md` lists for retirement.
 
 ### Authenticated routes (`src/routes/_app/*.tsx`)
 
@@ -452,7 +455,7 @@ Recorded as `established fact` about the tree, not as defects anyone has been as
   Queue sections remain accurate and useful.
 - **Two `*Rules.ts` modules import Supabase**, breaking the purity contract:
   `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`.
-- **39 of 492 components and 34 of 139 pages import `@/integrations/supabase/client`
+- **38 of 492 components and 33 of 139 pages import `@/integrations/supabase/client`
   directly** rather than going through a hook.
 - **`src/lib/*Advisor.ts` has zero files**, though the architecture table once named it as a
   layer. The nearest names are `manualSensorSnapshotAdvisorRules.ts` and

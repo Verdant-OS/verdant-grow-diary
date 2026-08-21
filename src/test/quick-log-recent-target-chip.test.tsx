@@ -14,7 +14,7 @@
  *    signed-out session all offer nothing.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { act, render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactElement } from "react";
 
@@ -333,6 +333,21 @@ describe("QuickLog — remembered target is an offer, never a default", () => {
     fireEvent.click(screen.getByTestId("quick-log-recent-target-accept"));
 
     // The offer is retired rather than applied — no plant is selected.
+    expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("removes the rendered offer as soon as its freshness window expires", () => {
+    seed("verdant.quickLog.lastTarget.v2.u1", "p2", RECENT_TARGET_SUGGESTION_MAX_AGE_MS - 60_000);
+    renderQL(<QuickLog open onOpenChange={() => {}} />);
+    expect(screen.getByTestId("quick-log-recent-target-suggestion")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(60_001);
+    });
+
     expect(screen.queryByTestId("quick-log-recent-target-suggestion")).not.toBeInTheDocument();
     expect(screen.getByTestId("quick-log-plant-select")).not.toHaveTextContent("OG Kush");
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();

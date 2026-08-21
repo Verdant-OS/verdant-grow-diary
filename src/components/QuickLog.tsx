@@ -111,6 +111,7 @@ import {
 import {
   buildRecentTargetStorageKey,
   parseRecentTargetRecord,
+  RECENT_TARGET_SUGGESTION_MAX_AGE_MS,
   resolveRecentTargetSuggestion,
 } from "@/lib/quickLogRecentTargetSuggestion";
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
@@ -548,6 +549,10 @@ export default function QuickLog({
   // a form and nothing else; testing the object for truthiness would withhold
   // the suggestion on exactly the open that needs it most.
   const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
+  // A single scheduled tick re-evaluates the rendered offer when its 14-day
+  // window closes. This is not a polling clock and never changes selection;
+  // it only removes a now-invalid action while the dialog remains open.
+  const [recentSuggestionClockMs, setRecentSuggestionClockMs] = useState(() => Date.now());
   const prefillNamesTarget = quickLogPrefillNamesAnyTarget(prefill);
   const recentTargetRecord = useMemo(
     () => (open && !prefillNamesTarget ? loadRecentTargetRecord(user?.id ?? null) : null),
@@ -557,13 +562,31 @@ export default function QuickLog({
     () =>
       resolveRecentTargetSuggestion({
         record: recentTargetRecord,
-        now: Date.now(),
+        // Date.now() revalidates on ordinary renders; the state timestamp is
+        // advanced by the expiry timer to guarantee a render at the boundary.
+        now: Math.max(Date.now(), recentSuggestionClockMs),
         visiblePlants: plants,
         visibleGrows: grows,
         visibleTents: activeTents,
       }),
-    [recentTargetRecord, plants, grows, activeTents],
+    [recentTargetRecord, plants, grows, activeTents, recentSuggestionClockMs],
   );
+  useEffect(() => {
+    if (!open || !recentTargetRecord) return;
+    const savedAtMs = Date.parse(recentTargetRecord.savedAt);
+    if (!Number.isFinite(savedAtMs)) return;
+
+    // The pure rule accepts the record at exactly MAX_AGE and rejects it one
+    // millisecond later, so schedule the same strict boundary. Fourteen days
+    // is below the browser timeout ceiling; close/record changes clear it.
+    const expiryDelayMs = savedAtMs + RECENT_TARGET_SUGGESTION_MAX_AGE_MS + 1 - Date.now();
+    if (expiryDelayMs <= 0) return;
+    const expiryTimer = window.setTimeout(
+      () => setRecentSuggestionClockMs(Date.now()),
+      expiryDelayMs,
+    );
+    return () => window.clearTimeout(expiryTimer);
+  }, [open, recentTargetRecord]);
   const showRecentTargetSuggestion =
     !prefillNamesTarget &&
     !recentSuggestionDismissed &&

@@ -1,11 +1,11 @@
 -- Disposable local-replay compatibility baseline.
 --
--- Fresh Supabase replay reaches the Action Queue ACL repair with the legacy
--- local Data API DML defaults already narrowed by the transition migration:
--- anon and authenticated each retain only SELECT/INSERT. The immutable repair
--- deliberately accepts only the measured hosted ACL or its canonical end
--- state, so validate this exact local-only input and converge it to canonical
--- immediately before that repair runs. Trusted-role ACLs remain untouched.
+-- Two independent fresh Supabase replay lanes measured the same legacy local
+-- ACL immediately after the transition migration: anon retains only the
+-- structural table privileges, while authenticated retains those privileges
+-- plus SELECT/INSERT. This disposable state is unsafe but exact; validate it
+-- without widening the accepted set, then converge it to canonical immediately
+-- before the immutable production repair runs. Trusted-role ACLs stay untouched.
 
 BEGIN;
 
@@ -176,24 +176,48 @@ BEGIN
 
   v_local_replay_acl_state :=
     v_direct_client_acl = ARRAY[
-      'action_queue|anon|INSERT|f',
-      'action_queue|anon|SELECT|f',
+      'action_queue|anon|MAINTAIN|f',
+      'action_queue|anon|REFERENCES|f',
+      'action_queue|anon|TRIGGER|f',
+      'action_queue|anon|TRUNCATE|f',
       'action_queue|authenticated|INSERT|f',
+      'action_queue|authenticated|MAINTAIN|f',
+      'action_queue|authenticated|REFERENCES|f',
       'action_queue|authenticated|SELECT|f',
-      'action_queue_events|anon|INSERT|f',
-      'action_queue_events|anon|SELECT|f',
+      'action_queue|authenticated|TRIGGER|f',
+      'action_queue|authenticated|TRUNCATE|f',
+      'action_queue_events|anon|MAINTAIN|f',
+      'action_queue_events|anon|REFERENCES|f',
+      'action_queue_events|anon|TRIGGER|f',
+      'action_queue_events|anon|TRUNCATE|f',
       'action_queue_events|authenticated|INSERT|f',
-      'action_queue_events|authenticated|SELECT|f'
+      'action_queue_events|authenticated|MAINTAIN|f',
+      'action_queue_events|authenticated|REFERENCES|f',
+      'action_queue_events|authenticated|SELECT|f',
+      'action_queue_events|authenticated|TRIGGER|f',
+      'action_queue_events|authenticated|TRUNCATE|f'
     ]::text[]
     AND v_effective_client_acl = ARRAY[
-      'action_queue|anon|INSERT',
-      'action_queue|anon|SELECT',
+      'action_queue|anon|MAINTAIN',
+      'action_queue|anon|REFERENCES',
+      'action_queue|anon|TRIGGER',
+      'action_queue|anon|TRUNCATE',
       'action_queue|authenticated|INSERT',
+      'action_queue|authenticated|MAINTAIN',
+      'action_queue|authenticated|REFERENCES',
       'action_queue|authenticated|SELECT',
-      'action_queue_events|anon|INSERT',
-      'action_queue_events|anon|SELECT',
+      'action_queue|authenticated|TRIGGER',
+      'action_queue|authenticated|TRUNCATE',
+      'action_queue_events|anon|MAINTAIN',
+      'action_queue_events|anon|REFERENCES',
+      'action_queue_events|anon|TRIGGER',
+      'action_queue_events|anon|TRUNCATE',
       'action_queue_events|authenticated|INSERT',
-      'action_queue_events|authenticated|SELECT'
+      'action_queue_events|authenticated|MAINTAIN',
+      'action_queue_events|authenticated|REFERENCES',
+      'action_queue_events|authenticated|SELECT',
+      'action_queue_events|authenticated|TRIGGER',
+      'action_queue_events|authenticated|TRUNCATE'
     ]::text[];
 
   v_canonical_acl_state :=

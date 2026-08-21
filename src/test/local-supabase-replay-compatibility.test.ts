@@ -344,8 +344,10 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(baselineSql).toContain("v_public_acl_count <> 0");
     expect(baselineSql).toContain("v_client_column_acl_count <> 0");
     expect(baselineSql).toContain("v_client_grant_option_count <> 0");
-    expect(baselineSql).toContain("'action_queue|anon|INSERT|f'");
-    expect(baselineSql).toContain("'action_queue_events|anon|SELECT|f'");
+    expect(baselineSql).toContain("'action_queue|anon|MAINTAIN|f'");
+    expect(baselineSql).toContain("'action_queue_events|anon|TRUNCATE|f'");
+    expect(baselineSql).not.toContain("'action_queue|anon|SELECT|f'");
+    expect(baselineSql).not.toContain("'action_queue_events|anon|INSERT|f'");
     expect(baselineSql).toContain("REVOKE ALL PRIVILEGES ON TABLE");
     expect(baselineSql).toContain("FROM PUBLIC, anon, authenticated");
     expect(baselineSql).toContain("GRANT SELECT, INSERT ON TABLE");

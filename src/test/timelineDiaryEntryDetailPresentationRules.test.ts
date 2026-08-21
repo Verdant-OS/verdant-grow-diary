@@ -67,6 +67,22 @@ describe("presentTimelineDiaryEntryDetails", () => {
     expect(result.extra).toEqual([]);
   });
 
+  it("keeps a dedicated manual sensor snapshot out of the raw fallback", () => {
+    const result = presentTimelineDiaryEntryDetails(
+      {
+        event_type: "observation",
+        manual_sensor_snapshot: {
+          temp_f: 82,
+          humidity_percent: 48,
+          source: "manual",
+        },
+      },
+      "fahrenheit",
+    );
+
+    expect(result.extra).toEqual([]);
+  });
+
   it("keeps the guided Symptom Check stage out of raw chips for its dedicated card", () => {
     const result = presentTimelineDiaryEntryDetails(
       { event_type: "observation", observation_stage: "flower" },

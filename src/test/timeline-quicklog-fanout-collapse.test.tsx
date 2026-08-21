@@ -512,6 +512,43 @@ describe("recent lane end-to-end (audit #9/#10 regression)", () => {
     expect(within(rows[0]).getByText("Environment check")).toBeInTheDocument();
   });
 
+  it("re-attaches a Plant Quick Log manual snapshot to its surviving spine exactly once", () => {
+    const spine = wateringSpine({
+      id: "ge-manual-snapshot",
+      event_type: "observation",
+      note: "Manual room check",
+      watering_events: undefined,
+    });
+    const companion = manualCompanion({
+      id: "de-manual-snapshot",
+      note: "Manual room check",
+      details: {
+        linked_grow_event_id: "ge-manual-snapshot",
+        manual_sensor_snapshot: {
+          temp_f: 82,
+          humidity_percent: 48,
+          ph: 6.2,
+          ec: 1.65,
+          source: "manual",
+        },
+      },
+    });
+
+    const lane = buildRecentLane([companion], [spine]);
+    expect(lane).toHaveLength(1);
+    expect((lane[0] as { id?: unknown }).id).toBe("ge-manual-snapshot");
+    expect(
+      (lane[0] as { details?: { manual_sensor_snapshot?: unknown } }).details
+        ?.manual_sensor_snapshot,
+    ).toEqual({
+      temp_f: 82,
+      humidity_percent: 48,
+      ph: 6.2,
+      ec: 1.65,
+      source: "manual",
+    });
+  });
+
   it("keeps a quicklog_save_event linked companion standalone when its grow_event parent is never fetched (Symptom Check E2E regression)", () => {
     // Mirrors e2e/symptom-check-branch.spec.ts: quicklog_save_event returns
     // a diary_entries row with details.linked_grow_event_id pointing at a

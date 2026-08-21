@@ -15,6 +15,10 @@ import {
   clearTemperatureUnitPreference,
   saveTemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const rpcMock = vi.fn();
 const storageRemove = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -42,6 +46,10 @@ vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({
     data: [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }],
   }),
+}));
+
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "user-1" } }),
 }));
 
 const toastSuccess = vi.fn();
@@ -103,6 +111,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  clearLocalStorageForTest();
   clearTemperatureUnitPreference();
   rpcMock.mockReset();
   storageRemove.mockReset();
@@ -204,6 +213,27 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     window.removeEventListener("verdant:entry-created", onEntryCreated);
   });
 
+  it("remembers the confirmed plant after structured Feed succeeds", async () => {
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-recent", reused: false });
+    renderSheet("plant:plant-1");
+    clickFeed();
+    fillRequiredFeedingFields();
+    clickSave();
+
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v2.user-1")).not.toBeNull(),
+    );
+    expect(
+      JSON.parse(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v2.user-1") ?? "null"),
+    ).toEqual({
+      plantId: "plant-1",
+      growId: "grow-1",
+      tentId: "tent-1",
+      savedAt: expect.any(String),
+    });
+  });
+
   it("maps optional pH/EC/runoff/water-temp fields into the writer payload", async () => {
     // Types a raw value expecting celsius passthrough into the writer
     // payload — pin the display unit explicitly rather than ride whatever
@@ -268,6 +298,22 @@ describe("QuickLogV2Sheet — structured feeding", () => {
       { name: "CRONK CalMag", amount: 1, unit: "ml_per_l" },
     ]);
     expect(payload.note).toBe("Runoff was clear; leaf posture held.");
+  });
+
+  it("carries a selected plant response into the feeding note and payload", async () => {
+    writeFeedingMock.mockResolvedValue({ ok: true, eventId: "evt-response", reused: false });
+    renderSheet("plant:plant-1");
+
+    fireEvent.click(screen.getByTestId("qlv2-response-chip-better"));
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("Response check: Better.");
+
+    clickFeed();
+    expect(screen.getByLabelText("Feeding note (optional)")).toHaveValue("Response check: Better.");
+    fillRequiredFeedingFields();
+    clickSave();
+
+    await waitFor(() => expect(writeFeedingMock).toHaveBeenCalledTimes(1));
+    expect(writeFeedingMock.mock.calls[0][0].note).toBe("Response check: Better.");
   });
 
   it("requires an honest applied volume and never guesses one", async () => {

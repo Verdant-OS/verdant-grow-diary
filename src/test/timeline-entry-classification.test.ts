@@ -169,6 +169,10 @@ describe("Shared helper wiring — no duplicated classification tables", () => {
       expect(MEASUREMENT_DETAIL_KEYS.has(k)).toBe(true);
     }
   });
+
+  it("classifies Plant Quick Log's manual snapshot envelope as measurement evidence", () => {
+    expect(MEASUREMENT_DETAIL_KEYS.has("manual_sensor_snapshot")).toBe(true);
+  });
 });
 
 describe("Static safety — no automation, device control, or service_role on the classification path", () => {

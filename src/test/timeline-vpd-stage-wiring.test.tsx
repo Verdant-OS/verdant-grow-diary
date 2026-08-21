@@ -25,8 +25,9 @@ describe("Timeline — stage-aware VPD wiring (static)", () => {
     expect(SRC).toMatch(/stale:\s*snapStale/);
   });
 
-  it("still renders the raw VPD chip", () => {
-    expect(SRC).toMatch(/SnapChip>VPD\s*\{sensor\.vpd\}/);
+  it("still renders VPD for legacy and manual compatibility snapshots", () => {
+    expect(SRC).toMatch(/SnapChip>VPD\s*\{legacyDisplaySensor\.vpd\}/);
+    expect(SRC).toMatch(/chip\.metric === ["']vpd["']/);
   });
 
   it("renders the stage-aware VPD hint test hook", () => {
@@ -35,7 +36,8 @@ describe("Timeline — stage-aware VPD wiring (static)", () => {
 
   it("gates stage interpretation on corroborated snapshot provenance", () => {
     expect(SRC).toMatch(/context:\s*["']persisted_snapshot["']/);
-    expect(SRC).toMatch(/sensor\.vpd\s*!=\s*null\s*&&\s*sourceBadge\.canAssessStage/);
+    expect(SRC).toMatch(/value:\s*rawVpd/);
+    expect(SRC).toMatch(/rawVpd\s*!=\s*null\s*&&\s*sourceBadge\.canAssessStage/);
   });
 
   it("does not duplicate hardcoded VPD target ranges in JSX", () => {

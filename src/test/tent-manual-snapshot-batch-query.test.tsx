@@ -9,6 +9,7 @@ const H = vi.hoisted(() => ({
   queryResult: {
     data: undefined as unknown,
     isLoading: true,
+    isFetching: true,
     isError: false,
     error: null as unknown,
   },
@@ -63,7 +64,13 @@ beforeEach(() => {
   H.response = { data: [], error: null };
   H.queryOptions = null;
   H.abortSignals = [];
-  H.queryResult = { data: undefined, isLoading: true, isError: false, error: null };
+  H.queryResult = {
+    data: undefined,
+    isLoading: true,
+    isFetching: true,
+    isError: false,
+    error: null,
+  };
 });
 
 describe("tent manual snapshot batch query", () => {
@@ -191,6 +198,7 @@ describe("tent manual snapshot batch query", () => {
     H.queryResult = {
       data,
       isLoading: false,
+      isFetching: false,
       isError: true,
       error: new Error("refresh failed"),
     };
@@ -204,6 +212,88 @@ describe("tent manual snapshot batch query", () => {
     expect(H.queryOptions).toMatchObject({ retry: false });
   });
 
+  it("keeps cached empty pending while a background refetch may discover a snapshot", () => {
+    H.queryResult = {
+      data: {
+        byTent: { [TENT_A]: { kind: "empty" } },
+        pageRequests: 1,
+      } satisfies TentManualSnapshotBatchData,
+      isLoading: false,
+      isFetching: true,
+      isError: false,
+      error: null,
+    };
+
+    const { result } = renderHook(() => useTentManualSnapshotBatch(OWNER_ID, [TENT_A]));
+
+    expect(result.current.byTent[TENT_A]).toEqual({
+      cards: [],
+      status: "loading",
+      unavailableReason: null,
+    });
+  });
+
+  it("keeps a cached card visible with an honest refreshing status", () => {
+    const data: TentManualSnapshotBatchData = {
+      byTent: {
+        [TENT_A]: {
+          kind: "found",
+          card: {
+            id: "manual-a",
+            title: "Manual sensor snapshot",
+            capturedAt: "2026-08-20T12:00:00.000Z",
+            sourceLabel: "Manual",
+            source: "manual",
+            tentId: TENT_A,
+            plantId: null,
+            isTentLevel: true,
+            notes: null,
+            readings: [{ field: "air_temp_c", value: 22, unit: "°C", derived: false }],
+            severity: "ok",
+            warnings: [],
+            errors: [],
+          },
+        },
+      },
+      pageRequests: 1,
+    };
+    H.queryResult = {
+      data,
+      isLoading: false,
+      isFetching: true,
+      isError: false,
+      error: null,
+    };
+
+    const { result } = renderHook(() => useTentManualSnapshotBatch(OWNER_ID, [TENT_A]));
+
+    expect(result.current.byTent[TENT_A]).toMatchObject({
+      status: "refreshing",
+      cards: [{ id: "manual-a" }],
+    });
+  });
+
+  it("returns established empty only after the background refetch settles", () => {
+    H.queryResult = {
+      data: {
+        byTent: { [TENT_A]: { kind: "empty" } },
+        pageRequests: 1,
+      } satisfies TentManualSnapshotBatchData,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+    };
+
+    const { result } = renderHook(() => useTentManualSnapshotBatch(OWNER_ID, [TENT_A]));
+
+    expect(result.current.byTent[TENT_A]).toEqual({
+      cards: [],
+      status: "success",
+      unavailableReason: null,
+    });
+  });
+
   it("never turns a capped or concurrency-ambiguous result into established empty", () => {
     H.queryResult = {
       data: {
@@ -214,6 +304,7 @@ describe("tent manual snapshot batch query", () => {
         pageRequests: 10,
       } satisfies TentManualSnapshotBatchData,
       isLoading: false,
+      isFetching: false,
       isError: false,
       error: null,
     };
@@ -239,6 +330,7 @@ describe("tent manual snapshot batch query", () => {
         pageRequests: 1,
       } satisfies TentManualSnapshotBatchData,
       isLoading: false,
+      isFetching: false,
       isError: true,
       error: new Error("refresh failed"),
     };

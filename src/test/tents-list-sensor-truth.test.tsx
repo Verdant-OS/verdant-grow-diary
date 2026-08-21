@@ -98,6 +98,7 @@ const H = vi.hoisted(() => {
     growIsError: false,
     manualCards: [] as ReturnType<typeof manualCard>[],
     manualIsLoading: false,
+    manualIsFetching: false,
     manualIsError: false,
     manualUnavailableReason: null as null | "cap_exhausted" | "concurrency_ambiguous",
     manualHookCalls: 0,
@@ -117,6 +118,7 @@ const H = vi.hoisted(() => {
     hookState.growIsError = false;
     hookState.manualCards = [];
     hookState.manualIsLoading = false;
+    hookState.manualIsFetching = false;
     hookState.manualIsError = false;
     hookState.manualUnavailableReason = null;
     hookState.manualHookCalls = 0;
@@ -195,7 +197,11 @@ vi.mock("@/hooks/useManualSnapshotTimelineCards", () => ({
         ? H.hookState.manualCards.length > 0
           ? "refresh_error"
           : "error"
-        : "success";
+        : H.hookState.manualIsFetching
+          ? H.hookState.manualCards.length > 0
+            ? "refreshing"
+            : "loading"
+          : "success";
     return {
       byTent: Object.fromEntries(
         tentIds.map((tentId) => [
@@ -888,6 +894,53 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
       "last loaded manual snapshot shown",
     );
     expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
+  });
+
+  it("does not claim no sensor data while cached-empty manual evidence refreshes", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualIsFetching = true;
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-manual-loading-${H.TENT_ID}`)).toHaveTextContent(
+      "Loading saved manual snapshot",
+    );
+    expect(screen.queryByText("No sensor data yet")).not.toBeInTheDocument();
+
+    H.hookState.manualIsFetching = false;
+    view.rerender(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-sensor-empty-${H.TENT_ID}`)).toHaveTextContent(
+      "No sensor data yet",
+    );
+  });
+
+  it("keeps a cached manual snapshot visible while labeling its refresh in progress", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualCards = [H.manualCard()];
+    H.hookState.manualIsFetching = true;
+
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-manual-refreshing-${H.TENT_ID}`)).toHaveTextContent(
+      "Refreshing saved manual snapshot",
+    );
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
+    expect(screen.queryByTestId(`tents-list-manual-refresh-stale-${H.TENT_ID}`)).toBeNull();
   });
 
   it("renders a capped manual scan as unavailable rather than established empty", () => {

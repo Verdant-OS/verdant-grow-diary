@@ -8,6 +8,7 @@ import {
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
 import {
   selectTentEnvironmentSnapshotFallback,
+  type TentEnvironmentManualReadStatus,
   type TentEnvironmentReadStatus,
 } from "@/lib/tentEnvironmentSnapshotFallbackRules";
 import type { TemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
@@ -22,7 +23,7 @@ export interface TentEnvironmentSnapshotStripProps {
   now: number;
   temperatureUnit: TemperatureUnitPreference;
   manualCards: readonly ManualSnapshotTimelineCard[];
-  manualStatus: TentEnvironmentReadStatus;
+  manualStatus: TentEnvironmentManualReadStatus;
   manualUnavailableReason?: TentManualSnapshotUnavailableReason | null;
 }
 
@@ -101,6 +102,14 @@ export default function TentEnvironmentSnapshotStrip({
   if (selection.kind === "manual_unusable") {
     return (
       <div className="space-y-1">
+        {selection.refreshing ? (
+          <p
+            className="text-xs text-muted-foreground animate-pulse"
+            data-testid={`tents-list-manual-refreshing-${tentId}`}
+          >
+            Refreshing saved manual snapshot…
+          </p>
+        ) : null}
         {selection.refreshWarning ? (
           <p
             className="text-xs text-amber-600"
@@ -150,6 +159,14 @@ export default function TentEnvironmentSnapshotStrip({
 
   return (
     <>
+      {selection.kind === "manual" && selection.refreshing ? (
+        <p
+          className="text-xs text-muted-foreground animate-pulse"
+          data-testid={`tents-list-manual-refreshing-${tentId}`}
+        >
+          Refreshing saved manual snapshot…
+        </p>
+      ) : null}
       {selection.refreshWarning ? (
         <p
           className="text-xs text-amber-600"

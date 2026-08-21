@@ -107,6 +107,17 @@ describe("tent environment snapshot fallback — manual diary states", () => {
     expect(result).toMatchObject({ refreshWarning: true });
   });
 
+  it("keeps cached empty pending while a manual snapshot refresh is in flight", () => {
+    expect(select({ manualStatus: "refreshing" })).toEqual({ kind: "manual_loading" });
+  });
+
+  it("keeps a cached manual card visible with a refresh-in-progress marker", () => {
+    const card = manualCard();
+    const result = select({ manualCards: [card], manualStatus: "refreshing" });
+    expect(result.kind).toBe("manual");
+    expect(result).toMatchObject({ refreshWarning: false, refreshing: true });
+  });
+
   it("treats an empty manual refresh failure as unavailable", () => {
     expect(select({ manualStatus: "refresh_error" })).toEqual({ kind: "manual_unavailable" });
   });
@@ -190,7 +201,11 @@ describe("tent environment snapshot fallback — diary card mapping", () => {
         }),
       ],
     });
-    expect(result).toEqual({ kind: "manual_unusable", severity: "ok", refreshWarning: false });
+    expect(result).toEqual({
+      kind: "manual_unusable",
+      severity: "ok",
+      refreshWarning: false,
+    });
   });
 
   it("normalizes nullish collections without inventing evidence", () => {

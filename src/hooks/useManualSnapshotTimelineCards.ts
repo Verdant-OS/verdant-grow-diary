@@ -149,7 +149,8 @@ export function tentManualSnapshotBatchQueryKey(
   ] as const;
 }
 
-export type TentManualSnapshotBatchReadStatus = "loading" | "error" | "refresh_error" | "success";
+export type TentManualSnapshotBatchReadStatus =
+  "loading" | "refreshing" | "error" | "refresh_error" | "success";
 
 export interface TentManualSnapshotBatchDisplay {
   cards: ManualSnapshotTimelineCard[];
@@ -167,6 +168,7 @@ function buildTentManualSnapshotBatchDisplay(
   tentIds: readonly string[],
   data: TentManualSnapshotBatchData | undefined,
   isLoading: boolean,
+  isFetching: boolean,
   isError: boolean,
 ): Record<string, TentManualSnapshotBatchDisplay> {
   const byTent: Record<string, TentManualSnapshotBatchDisplay> = {};
@@ -188,9 +190,11 @@ function buildTentManualSnapshotBatchDisplay(
     } else if (resolution?.kind === "found") {
       byTent[tentId] = {
         cards: [resolution.card],
-        status: "success",
+        status: isFetching ? "refreshing" : "success",
         unavailableReason: null,
       };
+    } else if (isFetching) {
+      byTent[tentId] = { cards: [], status: "loading", unavailableReason: null };
     } else if (resolution?.kind === "empty") {
       byTent[tentId] = { cards: [], status: "success", unavailableReason: null };
     } else {
@@ -227,6 +231,7 @@ export function useTentManualSnapshotBatch(
       normalizedTentIds,
       query.data,
       query.isLoading,
+      query.isFetching,
       query.isError,
     ),
     error: query.error,

@@ -5,12 +5,13 @@ import type {
 } from "@/lib/manualSensorSnapshotViewModel";
 
 export type TentEnvironmentReadStatus = "loading" | "error" | "refresh_error" | "success";
+export type TentEnvironmentManualReadStatus = TentEnvironmentReadStatus | "refreshing";
 
 export interface SelectTentEnvironmentSnapshotFallbackInput {
   sensorRows?: readonly BuildTentSnapshotInput[] | null;
   sensorStatus: TentEnvironmentReadStatus;
   manualCards?: readonly ManualSnapshotTimelineCard[] | null;
-  manualStatus: TentEnvironmentReadStatus;
+  manualStatus: TentEnvironmentManualReadStatus;
 }
 
 export type TentEnvironmentSnapshotSelection =
@@ -24,11 +25,13 @@ export type TentEnvironmentSnapshotSelection =
       rows: BuildTentSnapshotInput[];
       capturedAt: string;
       refreshWarning: boolean;
+      refreshing?: true;
     }
   | {
       kind: "manual_unusable";
       severity: ManualSnapshotCardSeverity;
       refreshWarning: boolean;
+      refreshing?: true;
     }
   | { kind: "empty" };
 
@@ -98,16 +101,24 @@ export function selectTentEnvironmentSnapshotFallback(
   }
 
   const card = newestManualCard(manualCards);
+  if (input.manualStatus === "refreshing" && !card) return { kind: "manual_loading" };
   if (!card) return { kind: "empty" };
   const rows = manualCardRows(card);
   const refreshWarning = input.manualStatus === "refresh_error";
+  const refreshing = input.manualStatus === "refreshing";
   if (rows.length === 0) {
-    return { kind: "manual_unusable", severity: card.severity, refreshWarning };
+    return {
+      kind: "manual_unusable",
+      severity: card.severity,
+      refreshWarning,
+      ...(refreshing ? { refreshing: true as const } : {}),
+    };
   }
   return {
     kind: "manual",
     rows,
     capturedAt: card.capturedAt,
     refreshWarning,
+    ...(refreshing ? { refreshing: true as const } : {}),
   };
 }

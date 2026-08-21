@@ -72,7 +72,7 @@ function ecowittRow(overrides: Record<string, unknown>): Record<string, unknown>
   return {
     id: crypto.randomUUID(),
     tent_id: TENT_A,
-    source: "ecowitt",
+    source: "live",
     captured_at: FRESH_AT,
     ts: FRESH_AT,
     raw_payload: {

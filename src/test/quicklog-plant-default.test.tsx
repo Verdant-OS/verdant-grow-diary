@@ -109,8 +109,10 @@ describe("QuickLog global manual target selection", () => {
 
   it("does not auto-select a remembered target", () => {
     plantsMock = many;
+    // The account-scoped key IS readable (slice D5), so this is the live
+    // case: a remembered target may be OFFERED, never silently applied.
     setLocalStorageItemForTest(
-      "verdant.quickLog.lastTarget.v1",
+      "verdant.quickLog.lastTarget.v2.u1",
       JSON.stringify({
         plantId: "p2",
         growId: "g1",

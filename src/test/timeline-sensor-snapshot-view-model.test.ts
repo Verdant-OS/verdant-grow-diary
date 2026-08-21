@@ -30,6 +30,129 @@ describe("buildTimelineSensorSnapshotViewModel", () => {
     expect(vm.chips[2].display).toBe("1.23 kPa");
   });
 
+  it("maps Plant Quick Log manual snapshot fields without promoting them to live", () => {
+    const vm = buildTimelineSensorSnapshotViewModel({
+      temp_f: 82,
+      humidity_percent: 48,
+      ph: 6.2,
+      ec: 1.65,
+      source: "manual",
+    });
+
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual(["82°F", "48%", "6.2 pH", "1.65 mS/cm"]);
+    expect(vm.sourceLabel).toBe("Manual");
+    expect(vm.isLive).toBe(false);
+  });
+
+  it("keeps the exact legacy soil alias visible", () => {
+    const vm = buildTimelineSensorSnapshotViewModel({ temp_f: 70, soil: 42 });
+
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual(["70°F", "42%"]);
+  });
+
+  it("fails impossible Plant Quick Log manual values closed", () => {
+    const vm = buildTimelineSensorSnapshotViewModel(
+      { humidity_percent: 150, ph: 99, ec: -2, source: "manual" },
+      { validateManualCompatibility: true },
+    );
+
+    expect(vm.kind).toBe("invalid");
+    if (vm.kind !== "invalid") return;
+    expect(vm.message).toMatch(/review/i);
+    expect(vm.errors).toEqual([
+      "Humidity must be between 0% and 100%.",
+      "Reservoir EC cannot be negative.",
+      "Reservoir pH must be between 0 and 14.",
+    ]);
+  });
+
+  it("carries realistic-range warnings with otherwise visible manual values", () => {
+    const vm = buildTimelineSensorSnapshotViewModel(
+      { ph: 4.2, source: "manual" },
+      { validateManualCompatibility: true },
+    );
+
+    expect(vm.kind).toBe("chips");
+    if (vm.kind !== "chips") return;
+    expect(vm.chips.map((chip) => chip.display)).toEqual(["4.2 pH"]);
+    expect(vm.errors).toEqual([]);
+    expect(vm.warnings).toHaveLength(1);
+    expect(vm.warnings[0]).toMatch(/outside the realistic/i);
+  });
+
+  it.each([0, 100])(
+    "flags stuck manual humidity at %s%% without hiding the reading",
+    (humidity) => {
+      const vm = buildTimelineSensorSnapshotViewModel(
+        { humidity_percent: humidity, source: "manual" },
+        { validateManualCompatibility: true },
+      );
+
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") return;
+      expect(vm.chips.map((chip) => chip.display)).toEqual([`${humidity}%`]);
+      expect(vm.errors).toEqual([]);
+      expect(vm.warnings).toEqual([
+        `Humidity ${humidity}% may indicate a stuck sensor; review before trusting.`,
+      ]);
+    },
+  );
+
+  it("uses the canonical 40–110°F presentation band for manual temperature", () => {
+    for (const temperature of [40, 110]) {
+      const vm = buildTimelineSensorSnapshotViewModel(
+        { temp_f: temperature, source: "manual" },
+        { validateManualCompatibility: true },
+      );
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") continue;
+      expect(vm.chips.map((chip) => chip.display)).toEqual([`${temperature}°F`]);
+      expect(vm.errors).toEqual([]);
+    }
+
+    for (const temperature of [39.9, 110.1, 500]) {
+      const vm = buildTimelineSensorSnapshotViewModel(
+        { temp_f: temperature, humidity_percent: 48, source: "manual" },
+        { validateManualCompatibility: true },
+      );
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") continue;
+      expect(vm.chips.map((chip) => chip.display)).toEqual(["48%"]);
+      expect(vm.errors).toEqual([
+        "Air temperature is outside the realistic 40–110°F grow-room range.",
+      ]);
+    }
+  });
+
+  it("suppresses EC at the canonical 20 mS/cm unit-mismatch threshold", () => {
+    const belowThreshold = buildTimelineSensorSnapshotViewModel(
+      { ec: 19.99, source: "manual" },
+      { validateManualCompatibility: true },
+    );
+    expect(belowThreshold.kind).toBe("chips");
+    if (belowThreshold.kind === "chips") {
+      expect(belowThreshold.chips.map((chip) => chip.display)).toEqual(["19.99 mS/cm"]);
+      expect(belowThreshold.errors).toEqual([]);
+    }
+
+    for (const ec of [20, 25]) {
+      const vm = buildTimelineSensorSnapshotViewModel(
+        { ec, humidity_percent: 48, source: "manual" },
+        { validateManualCompatibility: true },
+      );
+      expect(vm.kind).toBe("chips");
+      if (vm.kind !== "chips") continue;
+      expect(vm.chips.map((chip) => chip.display)).toEqual(["48%"]);
+      expect(vm.errors).toEqual([
+        "EC may use µS/cm while labeled mS/cm; the suspicious value was not shown.",
+      ]);
+    }
+  });
+
   it("renders soil moisture and CO2 only when present", () => {
     const a = buildTimelineSensorSnapshotViewModel({ temp_f: 70 });
     expect(a.kind === "chips" && a.chips.some((c) => c.metric === "soil_moisture")).toBe(false);

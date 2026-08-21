@@ -53,10 +53,50 @@ describe("classifyGrowDataSource", () => {
     expect(r.isTrustedForAi).toBe(false);
   });
 
-  it("classifies stale manual entry as Stale and not trusted", () => {
-    const r = classifyGrowDataSource({ source: "manual", value: 6, timestamp: old }, { now: NOW });
-    expect(r.label).toBe("Stale");
-    expect(r.isTrustedForAi).toBe(false);
+  it("uses the canonical 15-minute live and 24-hour manual freshness windows", () => {
+    const atLiveBoundary = new Date(NOW - 15 * 60 * 1000).toISOString();
+    const outsideLiveBoundary = new Date(NOW - 15 * 60 * 1000 - 1).toISOString();
+    const atManualBoundary = new Date(NOW - 24 * 60 * 60 * 1000).toISOString();
+    const outsideManualBoundary = new Date(NOW - 24 * 60 * 60 * 1000 - 1).toISOString();
+    const atFutureBoundary = new Date(NOW + 15 * 60 * 1000).toISOString();
+    const outsideFutureBoundary = new Date(NOW + 15 * 60 * 1000 + 1).toISOString();
+
+    expect(
+      classifyGrowDataSource(
+        { source: "sensor", value: 24.5, timestamp: atLiveBoundary },
+        { now: NOW },
+      ).label,
+    ).toBe("Live");
+    expect(
+      classifyGrowDataSource(
+        { source: "sensor", value: 24.5, timestamp: outsideLiveBoundary },
+        { now: NOW },
+      ).label,
+    ).toBe("Stale");
+    for (const source of ["manual", "user", "entry", "log"]) {
+      expect(
+        classifyGrowDataSource({ source, value: 6, timestamp: atManualBoundary }, { now: NOW })
+          .label,
+      ).toBe("Manual");
+    }
+    expect(
+      classifyGrowDataSource(
+        { source: "manual", value: 6, timestamp: outsideManualBoundary },
+        { now: NOW },
+      ).label,
+    ).toBe("Stale");
+    expect(
+      classifyGrowDataSource(
+        { source: "manual", value: 6, timestamp: atFutureBoundary },
+        { now: NOW },
+      ).label,
+    ).toBe("Manual");
+    expect(
+      classifyGrowDataSource(
+        { source: "manual", value: 6, timestamp: outsideFutureBoundary },
+        { now: NOW },
+      ).label,
+    ).toBe("Stale");
   });
 
   it("keeps CSV provenance separate from freshness", () => {
@@ -158,6 +198,22 @@ describe("classifyGrowDataSource", () => {
       { now: NOW, staleThresholdMs: 5 * 60 * 1000 },
     );
     expect(stale.label).toBe("Stale");
+
+    const manualOverride = classifyGrowDataSource(
+      { source: "manual", value: 1, timestamp: tenMinAgo },
+      { now: NOW, staleThresholdMs: 5 * 60 * 1000 },
+    );
+    expect(manualOverride.label).toBe("Stale");
+
+    const manualFutureOverride = classifyGrowDataSource(
+      {
+        source: "manual",
+        value: 1,
+        timestamp: new Date(NOW + 5 * 60 * 1000 + 1).toISOString(),
+      },
+      { now: NOW, staleThresholdMs: 5 * 60 * 1000 },
+    );
+    expect(manualFutureOverride.label).toBe("Stale");
   });
 
   it("is deterministic for repeated identical inputs", () => {

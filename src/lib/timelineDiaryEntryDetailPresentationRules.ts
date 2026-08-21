@@ -51,6 +51,7 @@ export const HIDDEN_DIARY_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "tent_id",
   "sensor",
   "sensor_snapshot",
+  "manual_sensor_snapshot",
   "remind_at",
   // Quick Log v2 companion-row plumbing (see quickLogDiaryCompanionRules.ts):
   // a schema version marker and a grow_events join id.

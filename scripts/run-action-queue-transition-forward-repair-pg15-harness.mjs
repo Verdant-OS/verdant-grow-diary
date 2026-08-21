@@ -21,6 +21,15 @@ const MIGRATION_SUFFIX = "_action_queue_transition_forward_repair.sql";
 const PINNED_MIGRATION_FILE = "20260819190852_action_queue_transition_forward_repair.sql";
 const EXPECTED_MIGRATION_SHA256 =
   "fb887c43be86affc39e59c2113e1d627053a6058e2b8de06a6571d9f34f66c49";
+const GUARD_MIGRATION_SUFFIX = "_action_queue_guard_decision_fields_forward_repair.sql";
+const PINNED_GUARD_MIGRATION_FILE =
+  "20260819190000_action_queue_guard_decision_fields_forward_repair.sql";
+const EXPECTED_GUARD_MIGRATION_SHA256 =
+  "7d8493e9b5dbb21709fa30fede767eb59fb2482cf8cfaf8d75b74afd0dd41f25";
+const TABLE_ACL_MIGRATION_SUFFIX = "_action_queue_table_acl_forward_repair.sql";
+const PINNED_TABLE_ACL_MIGRATION_FILE = "20260820235900_action_queue_table_acl_forward_repair.sql";
+const EXPECTED_TABLE_ACL_MIGRATION_SHA256 =
+  "25867036eccb978aa73b3a6268de20d46cab74cc818ee8ef33fbe7f072ceaf1e";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const OWNER_ID = "11111111-1111-4111-8111-111111111111";
@@ -161,8 +170,8 @@ function extractFunctionDefinition(relativePath, functionPrefix) {
   return source.slice(start, end + terminator.length);
 }
 
-const guardFunctionDefinition = extractFunctionDefinition(
-  "supabase/migrations/20260725093000_restore_action_queue_owner_decisions.sql",
+const legacyGuardFunctionDefinition = extractFunctionDefinition(
+  "supabase/migrations/20260721225930_b34caa3e-17e4-47c1-9847-19d1c184d83c.sql",
   "CREATE OR REPLACE FUNCTION public.action_queue_guard_decision_fields()",
 );
 const historicalTransitionMigration = readFileSync(
@@ -187,6 +196,40 @@ export function validatePinnedMigrationFile({
   const sha256 = createHash("sha256").update(sql).digest("hex");
   if (sha256 !== EXPECTED_MIGRATION_SHA256) {
     throw new Error("migration_digest_unrecognized");
+  }
+  return Object.freeze({ fileName: matches[0], sha256, sql });
+}
+
+export function validatePinnedGuardMigrationFile({
+  root = resolve(repoRoot, "supabase", "migrations"),
+} = {}) {
+  const matches = readdirSync(root)
+    .filter((name) => name.endsWith(GUARD_MIGRATION_SUFFIX))
+    .sort();
+  if (matches.length !== 1 || matches[0] !== PINNED_GUARD_MIGRATION_FILE) {
+    throw new Error("guard_migration_file_unrecognized");
+  }
+  const sql = readFileSync(resolve(root, matches[0]), "utf8");
+  const sha256 = createHash("sha256").update(sql).digest("hex");
+  if (sha256 !== EXPECTED_GUARD_MIGRATION_SHA256) {
+    throw new Error("guard_migration_digest_unrecognized");
+  }
+  return Object.freeze({ fileName: matches[0], sha256, sql });
+}
+
+export function validatePinnedTableAclMigrationFile({
+  root = resolve(repoRoot, "supabase", "migrations"),
+} = {}) {
+  const matches = readdirSync(root)
+    .filter((name) => name.endsWith(TABLE_ACL_MIGRATION_SUFFIX))
+    .sort();
+  if (matches.length !== 1 || matches[0] !== PINNED_TABLE_ACL_MIGRATION_FILE) {
+    throw new Error("table_acl_migration_file_unrecognized");
+  }
+  const sql = readFileSync(resolve(root, matches[0]), "utf8");
+  const sha256 = createHash("sha256").update(sql).digest("hex");
+  if (sha256 !== EXPECTED_TABLE_ACL_MIGRATION_SHA256) {
+    throw new Error("table_acl_migration_digest_unrecognized");
   }
   return Object.freeze({ fileName: matches[0], sha256, sql });
 }
@@ -216,11 +259,15 @@ begin
   if not exists (select 1 from pg_roles where rolname = 'service_role') then
     execute 'create role service_role nologin bypassrls';
   end if;
+  if not exists (select 1 from pg_roles where rolname = 'sandbox_exec') then
+    execute 'create role sandbox_exec nologin';
+  end if;
 end
 $roles$;
 alter role anon nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
 alter role authenticated nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
 alter role service_role nologin nosuperuser nocreatedb nocreaterole noinherit noreplication bypassrls;
+alter role sandbox_exec nologin nosuperuser nocreatedb nocreaterole noinherit noreplication nobypassrls;
 
 create function auth.uid() returns uuid
 language sql stable
@@ -420,21 +467,25 @@ create policy "Users delete own action_queue_events"
   on public.action_queue_events for delete to authenticated
   using (auth.uid() = user_id);
 
-${guardFunctionDefinition}
+${legacyGuardFunctionDefinition}
 alter function public.action_queue_guard_decision_fields() owner to postgres;
-revoke all on function public.action_queue_guard_decision_fields()
-  from public, anon, authenticated, service_role;
+revoke all on function public.action_queue_guard_decision_fields() from public;
+revoke execute on function public.action_queue_guard_decision_fields()
+  from anon, authenticated;
+grant execute on function public.action_queue_guard_decision_fields()
+  to service_role;
 create trigger trg_action_queue_guard_decision_fields
-before update of status, approved_at, rejected_at, completed_at
+before update of status, approved_at, rejected_at
 on public.action_queue
 for each row execute function public.action_queue_guard_decision_fields();
 
-grant usage on schema public, auth to anon, authenticated, service_role;
+grant usage on schema public, auth to anon, authenticated, service_role, sandbox_exec;
 grant execute on function auth.uid() to anon, authenticated, service_role;
 grant select on public.grows, public.tents, public.plants to authenticated;
-grant select, insert, update, delete on public.action_queue to authenticated;
-grant select, insert, update, delete on public.action_queue_events to authenticated;
-grant all privileges on public.action_queue, public.action_queue_events to service_role;
+grant all privileges on public.action_queue, public.action_queue_events
+  to anon, authenticated, service_role;
+grant select, insert on public.action_queue, public.action_queue_events
+  to sandbox_exec;
 
 insert into public.grows(id,user_id) values
   ('${OWNER_GROW_ID}','${OWNER_ID}'),
@@ -489,6 +540,24 @@ function migrationResult(env, spawnImpl = spawnSync) {
   });
 }
 
+function guardMigrationResult(env, spawnImpl = spawnSync) {
+  const migration = validatePinnedGuardMigrationFile();
+  return spawnPsql({
+    env,
+    input: `\\set VERBOSITY verbose\n${migration.sql}`,
+    spawnImpl,
+  });
+}
+
+function tableAclMigrationResult(env, spawnImpl = spawnSync) {
+  const migration = validatePinnedTableAclMigrationFile();
+  return spawnPsql({
+    env,
+    input: `\\set VERBOSITY verbose\n${migration.sql}`,
+    spawnImpl,
+  });
+}
+
 function requireMigrationSuccess(stage, env, spawnImpl = spawnSync) {
   const result = migrationResult(env, spawnImpl);
   if (result?.error || result?.status !== 0) {
@@ -498,6 +567,38 @@ function requireMigrationSuccess(stage, env, spawnImpl = spawnSync) {
 
 function requireMigrationFailure(stage, env, spawnImpl = spawnSync) {
   const result = migrationResult(env, spawnImpl);
+  if (!result?.error && result?.status === 0) {
+    throw new Error(`${stage}:unexpected_success`);
+  }
+  const failure = formatPsqlFailureCode(stage, result?.stderr);
+  if (failure !== `${stage}:55000`) throw new Error(failure);
+}
+
+function requireGuardMigrationSuccess(stage, env, spawnImpl = spawnSync) {
+  const result = guardMigrationResult(env, spawnImpl);
+  if (result?.error || result?.status !== 0) {
+    throw new Error(formatPsqlFailureCode(stage, result?.stderr));
+  }
+}
+
+function requireGuardMigrationFailure(stage, env, spawnImpl = spawnSync) {
+  const result = guardMigrationResult(env, spawnImpl);
+  if (!result?.error && result?.status === 0) {
+    throw new Error(`${stage}:unexpected_success`);
+  }
+  const failure = formatPsqlFailureCode(stage, result?.stderr);
+  if (failure !== `${stage}:55000`) throw new Error(failure);
+}
+
+function requireTableAclMigrationSuccess(stage, env, spawnImpl = spawnSync) {
+  const result = tableAclMigrationResult(env, spawnImpl);
+  if (result?.error || result?.status !== 0) {
+    throw new Error(formatPsqlFailureCode(stage, result?.stderr));
+  }
+}
+
+function requireTableAclMigrationFailure(stage, env, spawnImpl = spawnSync) {
+  const result = tableAclMigrationResult(env, spawnImpl);
   if (!result?.error && result?.status === 0) {
     throw new Error(`${stage}:unexpected_success`);
   }
@@ -537,6 +638,146 @@ function proveLegacyBaseline(env, spawnImpl = spawnSync) {
     env,
     spawnImpl,
   );
+}
+
+function proveLegacyGuardBaseline(env, spawnImpl = spawnSync) {
+  requireSqlTrue(
+    "legacy_guard_contract",
+    `select
+      p.proconfig = ARRAY['search_path=public']::text[]
+      and octet_length(replace(p.prosrc, E'\\r', '')) = 1028
+      and md5(replace(p.prosrc, E'\\r', '')) = '09459a9cc8532aae905639b3055c680f'
+      and owner_role.rolname = 'postgres'
+      and p.prosecdef
+      and not has_function_privilege('anon', p.oid, 'execute')
+      and not has_function_privilege('authenticated', p.oid, 'execute')
+      and has_function_privilege('service_role', p.oid, 'execute')
+      and (
+        select array_agg(
+          format(
+            '%s|%s|%s|%s',
+            coalesce(grantee.rolname, 'PUBLIC'),
+            acl.privilege_type,
+            acl.is_grantable,
+            grantor.rolname
+          )
+          order by coalesce(grantee.rolname, 'PUBLIC'), acl.privilege_type
+        )
+        from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as acl
+        left join pg_roles as grantee on grantee.oid = acl.grantee
+        join pg_roles as grantor on grantor.oid = acl.grantor
+      ) = ARRAY[
+        'postgres|EXECUTE|f|postgres',
+        'service_role|EXECUTE|f|postgres'
+      ]::text[]
+      and (
+        select array_agg(a.attname order by a.attname)
+        from pg_trigger as tg
+        cross join lateral unnest(tg.tgattr::smallint[]) as trigger_column(attnum)
+        join pg_attribute as a
+          on a.attrelid = tg.tgrelid
+         and a.attnum = trigger_column.attnum
+        where tg.tgrelid = 'public.action_queue'::regclass
+          and tg.tgname = 'trg_action_queue_guard_decision_fields'
+          and not tg.tgisinternal
+          and tg.tgenabled = 'O'
+          and tg.tgfoid = p.oid
+      ) = ARRAY['approved_at', 'rejected_at', 'status']::name[]
+    from pg_proc as p
+    join pg_roles as owner_role on owner_role.oid = p.proowner
+    where p.oid = 'public.action_queue_guard_decision_fields()'::regprocedure;`,
+    env,
+    spawnImpl,
+  );
+}
+
+function requireRepairedGuardContract(stage, env, spawnImpl = spawnSync) {
+  requireSqlTrue(
+    stage,
+    `select
+      p.proconfig = ARRAY['search_path=public, pg_temp']::text[]
+      and octet_length(replace(p.prosrc, E'\\r', '')) = 1101
+      and md5(replace(p.prosrc, E'\\r', '')) = '88e81c4dfbc6d17260def35d1a619ee1'
+      and owner_role.rolname = 'postgres'
+      and p.prosecdef
+      and not has_function_privilege('anon', p.oid, 'execute')
+      and not has_function_privilege('authenticated', p.oid, 'execute')
+      and not has_function_privilege('service_role', p.oid, 'execute')
+      and (
+        select array_agg(
+          format(
+            '%s|%s|%s|%s',
+            coalesce(grantee.rolname, 'PUBLIC'),
+            acl.privilege_type,
+            acl.is_grantable,
+            grantor.rolname
+          )
+          order by coalesce(grantee.rolname, 'PUBLIC'), acl.privilege_type
+        )
+        from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) as acl
+        left join pg_roles as grantee on grantee.oid = acl.grantee
+        join pg_roles as grantor on grantor.oid = acl.grantor
+      ) = ARRAY['postgres|EXECUTE|f|postgres']::text[]
+      and (
+        select array_agg(a.attname order by a.attname)
+        from pg_trigger as tg
+        cross join lateral unnest(tg.tgattr::smallint[]) as trigger_column(attnum)
+        join pg_attribute as a
+          on a.attrelid = tg.tgrelid
+         and a.attnum = trigger_column.attnum
+        where tg.tgrelid = 'public.action_queue'::regclass
+          and tg.tgname = 'trg_action_queue_guard_decision_fields'
+          and not tg.tgisinternal
+          and tg.tgenabled = 'O'
+          and tg.tgfoid = p.oid
+      ) = ARRAY['approved_at', 'completed_at', 'rejected_at', 'status']::name[]
+    from pg_proc as p
+    join pg_roles as owner_role on owner_role.oid = p.proowner
+    where p.oid = 'public.action_queue_guard_decision_fields()'::regprocedure;`,
+    env,
+    spawnImpl,
+  );
+}
+
+function proveGuardRepairSuccess(env, spawnImpl = spawnSync) {
+  const beforeOid = executeSql(
+    `select 'public.action_queue_guard_decision_fields()'::regprocedure::oid;`,
+    env,
+    { stage: "guard_repair_before", spawnImpl },
+  );
+  requireGuardMigrationSuccess("guard_repair_apply", env, spawnImpl);
+  const afterOid = executeSql(
+    `select 'public.action_queue_guard_decision_fields()'::regprocedure::oid;`,
+    env,
+    { stage: "guard_repair_after", spawnImpl },
+  );
+  if (beforeOid !== afterOid) throw new Error("guard_repair_apply:oid_changed");
+  requireRepairedGuardContract("guard_repair_catalog", env, spawnImpl);
+  requireSqlTrue(
+    "guard_repair_scope",
+    `select
+      (select count(*) = 2 from public.action_queue)
+      and (select count(*) = 0 from public.action_queue_events)
+      and to_regprocedure('public.action_queue_transition(uuid,text,text,text)') is null;`,
+    env,
+    spawnImpl,
+  );
+}
+
+function proveGuardCanonicalReapply(env, spawnImpl = spawnSync) {
+  const beforeOid = executeSql(
+    `select 'public.action_queue_guard_decision_fields()'::regprocedure::oid;`,
+    env,
+    { stage: "guard_reapply_before", spawnImpl },
+  );
+  requireGuardMigrationSuccess("guard_repair_reapply", env, spawnImpl);
+  const afterOid = executeSql(
+    `select 'public.action_queue_guard_decision_fields()'::regprocedure::oid;`,
+    env,
+    { stage: "guard_reapply_after", spawnImpl },
+  );
+  if (beforeOid !== afterOid) throw new Error("guard_repair_reapply:oid_changed");
+  requireRepairedGuardContract("guard_reapply_catalog", env, spawnImpl);
 }
 
 function requireDeliveryClassification(stage, expectedStatus, env, spawnImpl = spawnSync) {
@@ -597,6 +838,7 @@ function proveRepairSuccess(env, spawnImpl = spawnSync) {
 
 function proveHardenedGrantBaselineConverges(env, spawnImpl = spawnSync) {
   resetScaffold(env, spawnImpl);
+  requireGuardMigrationSuccess("hardened_grant_guard_repair", env, spawnImpl);
   executeSql(
     `revoke select, insert on public.action_queue from authenticated;
      revoke select, insert on public.action_queue_events from authenticated;`,
@@ -620,9 +862,240 @@ function proveHardenedGrantBaselineConverges(env, spawnImpl = spawnSync) {
   );
 }
 
+function measuredTableAclSql() {
+  return `with privilege_universe as (
+      select distinct acl.privilege_type
+      from aclexplode(acldefault('r', 'postgres'::regrole)) as acl
+      where acl.privilege_type not in ('UPDATE', 'DELETE')
+    ), subjects(role_name) as (
+      values ('anon'::text), ('authenticated'::text)
+    ), relations(table_name) as (
+      values ('action_queue'::text), ('action_queue_events'::text)
+    ), expected as (
+      select array_agg(
+        format('%s|%s|%s|f|postgres', r.table_name, s.role_name, u.privilege_type)
+        order by r.table_name, s.role_name, u.privilege_type
+      ) as rows
+      from relations r cross join subjects s cross join privilege_universe u
+    ), actual as (
+      select coalesce(array_agg(
+        format('%s|%s|%s|%s|%s', c.relname, grantee.rolname,
+               acl.privilege_type, acl.is_grantable, grantor.rolname)
+        order by c.relname, grantee.rolname, acl.privilege_type, grantor.rolname
+      ), array[]::text[]) as rows
+      from pg_class c
+      cross join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) acl
+      join pg_roles grantee on grantee.oid = acl.grantee
+      join pg_roles grantor on grantor.oid = acl.grantor
+      where c.oid in ('public.action_queue'::regclass,
+                      'public.action_queue_events'::regclass)
+        and grantee.rolname in ('anon', 'authenticated')
+    )
+    select actual.rows = expected.rows
+      and not exists (
+        select 1
+        from pg_class c
+        cross join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) acl
+        where c.oid in ('public.action_queue'::regclass,
+                        'public.action_queue_events'::regclass)
+          and acl.grantee = 0
+      )
+      and not exists (
+        select 1
+        from pg_attribute a
+        cross join lateral aclexplode(a.attacl) acl
+        left join pg_roles grantee on grantee.oid = acl.grantee
+        where a.attrelid in ('public.action_queue'::regclass,
+                             'public.action_queue_events'::regclass)
+          and a.attnum > 0 and not a.attisdropped
+          and (acl.grantee = 0 or grantee.rolname in ('anon', 'authenticated'))
+      )
+    from actual, expected;`;
+}
+
+function canonicalTableAclSql() {
+  return `with privilege_universe as (
+      select distinct acl.privilege_type
+      from aclexplode(acldefault('r', 'postgres'::regrole)) as acl
+    ), relations(table_name) as (
+      values ('action_queue'::text), ('action_queue_events'::text)
+    ), client_subjects(role_name) as (
+      values ('anon'::text), ('authenticated'::text)
+    ), client_direct as (
+      select coalesce(array_agg(
+        format('%s|%s|%s|%s|%s', c.relname, grantee.rolname,
+               acl.privilege_type, acl.is_grantable, grantor.rolname)
+        order by c.relname, grantee.rolname, acl.privilege_type, grantor.rolname
+      ), array[]::text[]) as rows
+      from pg_class c
+      cross join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) acl
+      join pg_roles grantee on grantee.oid = acl.grantee
+      join pg_roles grantor on grantor.oid = acl.grantor
+      where c.oid in ('public.action_queue'::regclass,
+                      'public.action_queue_events'::regclass)
+        and grantee.rolname in ('anon', 'authenticated')
+    ), client_effective as (
+      select coalesce(array_agg(
+        format('%s|%s|%s',r.table_name,s.role_name,u.privilege_type)
+        order by r.table_name,s.role_name,u.privilege_type
+      ),array[]::text[]) as rows
+      from relations r cross join client_subjects s cross join privilege_universe u
+      where has_table_privilege(
+        s.role_name,format('public.%I',r.table_name),u.privilege_type
+      )
+    ), privileged_effective as (
+      select coalesce(array_agg(
+        format('%s|%s|%s',r.table_name,s.role_name,u.privilege_type)
+        order by r.table_name,s.role_name,u.privilege_type
+      ),array[]::text[]) as rows
+      from relations r
+      cross join (values ('postgres'::text),('sandbox_exec'::text),('service_role'::text)) s(role_name)
+      cross join privilege_universe u
+      where has_table_privilege(
+        s.role_name,format('public.%I',r.table_name),u.privilege_type
+      )
+    ), expected_privileged as (
+      select array_agg(format('%s|%s|%s',table_name,role_name,privilege_type)
+                       order by table_name,role_name,privilege_type) as rows
+      from (
+        select r.table_name,s.role_name,u.privilege_type
+        from relations r
+        cross join (values ('postgres'::text),('service_role'::text)) s(role_name)
+        cross join privilege_universe u
+        union all
+        select r.table_name,'sandbox_exec'::text,u.privilege_type
+        from relations r cross join privilege_universe u
+        where u.privilege_type in ('SELECT','INSERT')
+      ) expected_rows
+    )
+    select client_direct.rows = array[
+        'action_queue|authenticated|INSERT|f|postgres',
+        'action_queue|authenticated|SELECT|f|postgres',
+        'action_queue_events|authenticated|INSERT|f|postgres',
+        'action_queue_events|authenticated|SELECT|f|postgres'
+      ]::text[]
+      and client_effective.rows = array[
+        'action_queue|authenticated|INSERT',
+        'action_queue|authenticated|SELECT',
+        'action_queue_events|authenticated|INSERT',
+        'action_queue_events|authenticated|SELECT'
+      ]::text[]
+      and privileged_effective.rows = expected_privileged.rows
+      and not exists (
+        select 1
+        from pg_class c
+        cross join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) acl
+        where c.oid in ('public.action_queue'::regclass,
+                        'public.action_queue_events'::regclass)
+          and acl.grantee = 0
+      )
+      and not exists (
+        select 1
+        from pg_attribute a
+        cross join lateral aclexplode(a.attacl) acl
+        left join pg_roles grantee on grantee.oid = acl.grantee
+        where a.attrelid in ('public.action_queue'::regclass,
+                             'public.action_queue_events'::regclass)
+          and a.attnum > 0 and not a.attisdropped
+          and (acl.grantee = 0 or grantee.rolname in ('anon', 'authenticated'))
+      )
+    from client_direct,client_effective,privileged_effective,expected_privileged;`;
+}
+
+function tableAclPreservedScopeSql() {
+  return `select md5(concat_ws('|',
+    (select format('%s:%s', count(*), md5(coalesce(string_agg(to_jsonb(q)::text, E'\\n' order by q.id), '')))
+       from public.action_queue q),
+    (select format('%s:%s', count(*), md5(coalesce(string_agg(to_jsonb(e)::text, E'\\n' order by e.id), '')))
+       from public.action_queue_events e),
+    (select md5(coalesce(string_agg(
+       format('%s|%s|%s|%s|%s|%s|%s', p.oid, p.polname, p.polpermissive,
+              p.polcmd, p.polroles::text, coalesce(pg_get_expr(p.polqual,p.polrelid),''),
+              coalesce(pg_get_expr(p.polwithcheck,p.polrelid),'')),
+       E'\\n' order by p.polrelid,p.polname), ''))
+       from pg_policy p
+       where p.polrelid in ('public.action_queue'::regclass,
+                            'public.action_queue_events'::regclass)),
+    (select md5(coalesce(string_agg(
+       format('%s|%s|%s|%s|%s|%s|%s', p.oid,p.proname,
+              pg_get_function_identity_arguments(p.oid),owner_role.rolname,
+              coalesce(p.proacl::text,''),pg_get_functiondef(p.oid),
+              coalesce(obj_description(p.oid,'pg_proc'),'')),
+       E'\\n' order by p.proname,pg_get_function_identity_arguments(p.oid)), ''))
+       from pg_proc p
+       join pg_namespace n on n.oid=p.pronamespace
+       join pg_roles owner_role on owner_role.oid=p.proowner
+       where n.nspname='public'
+         and p.proname like 'action_queue\\_%' escape '\\'),
+    (select md5(coalesce(string_agg(
+       format('%s|%s|%s|%s|%s',c.relname,coalesce(grantee.rolname,acl.grantee::text),
+              acl.privilege_type,acl.is_grantable,coalesce(grantor.rolname,acl.grantor::text)),
+       E'\\n' order by c.relname,acl.grantee,acl.privilege_type,acl.grantor), ''))
+       from pg_class c
+       cross join lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) acl
+       left join pg_roles grantee on grantee.oid=acl.grantee
+       left join pg_roles grantor on grantor.oid=acl.grantor
+       where c.oid in ('public.action_queue'::regclass,
+                       'public.action_queue_events'::regclass)
+         and coalesce(grantee.rolname,'PUBLIC') not in ('PUBLIC','anon','authenticated'))
+  ));`;
+}
+
+function proveMeasuredTableAclGap(env, spawnImpl = spawnSync) {
+  requireSqlTrue("measured_table_acl_gap", measuredTableAclSql(), env, spawnImpl);
+}
+
+function proveTableAclRepairSuccess(env, spawnImpl = spawnSync) {
+  const before = executeSql(tableAclPreservedScopeSql(), env, {
+    stage: "table_acl_scope_before",
+    spawnImpl,
+  });
+  requireTableAclMigrationSuccess("table_acl_repair_apply", env, spawnImpl);
+  const after = executeSql(tableAclPreservedScopeSql(), env, {
+    stage: "table_acl_scope_after",
+    spawnImpl,
+  });
+  if (before !== after) throw new Error("table_acl_repair_apply:scope_changed");
+  requireSqlTrue("table_acl_repair_catalog", canonicalTableAclSql(), env, spawnImpl);
+}
+
+function proveTableAclCanonicalReapply(env, spawnImpl = spawnSync) {
+  const before = executeSql(tableAclPreservedScopeSql(), env, {
+    stage: "table_acl_reapply_before",
+    spawnImpl,
+  });
+  requireTableAclMigrationSuccess("table_acl_repair_reapply", env, spawnImpl);
+  const after = executeSql(tableAclPreservedScopeSql(), env, {
+    stage: "table_acl_reapply_after",
+    spawnImpl,
+  });
+  if (before !== after) throw new Error("table_acl_repair_reapply:scope_changed");
+  requireSqlTrue("table_acl_reapply_catalog", canonicalTableAclSql(), env, spawnImpl);
+}
+
+function proveUnknownTableAclRejected(env, spawnImpl = spawnSync) {
+  executeSql("grant update on public.action_queue to anon;", env, {
+    stage: "unknown_table_acl_mutation",
+    spawnImpl,
+  });
+  requireTableAclMigrationFailure("unknown_table_acl", env, spawnImpl);
+  requireSqlTrue(
+    "unknown_table_acl_rollback",
+    "select has_table_privilege('anon','public.action_queue','update');",
+    env,
+    spawnImpl,
+  );
+  executeSql("revoke update on public.action_queue from anon;", env, {
+    stage: "unknown_table_acl_cleanup",
+    spawnImpl,
+  });
+  requireSqlTrue("unknown_table_acl_cleanup_catalog", canonicalTableAclSql(), env, spawnImpl);
+}
+
 const ROLE_SQL = Object.freeze({
   authenticated: "set local role authenticated;",
   anon: "set local role anon;",
+  sandbox_exec: "set local role sandbox_exec;",
 });
 
 function asRoleSql(role, userId, body, { commit = false } = {}) {
@@ -733,6 +1206,53 @@ function requireSqlFailure(stage, sql, env, spawnImpl = spawnSync) {
   if (!result?.error && result?.status === 0) {
     throw new Error(`${stage}:unexpected_success`);
   }
+}
+
+function requireSqlStateFailure(stage, sql, expectedSqlState, env, spawnImpl = spawnSync) {
+  const result = spawnPsql({
+    env,
+    input: `\\set VERBOSITY verbose\n${sql}`,
+    spawnImpl,
+  });
+  if (!result?.error && result?.status === 0) {
+    throw new Error(`${stage}:unexpected_success`);
+  }
+  const failure = formatPsqlFailureCode(stage, result?.stderr);
+  if (failure !== `${stage}:${expectedSqlState}`) throw new Error(failure);
+}
+
+function proveDirectTruncateFences(env, spawnImpl = spawnSync) {
+  for (const role of ["authenticated", "anon"]) {
+    requireSqlStateFailure(
+      `${role}_direct_truncate_events`,
+      asRoleSql(role, OWNER_ID, "truncate table public.action_queue_events;"),
+      "42501",
+      env,
+      spawnImpl,
+    );
+    requireSqlStateFailure(
+      `${role}_direct_truncate_queue`,
+      `begin;
+       grant truncate on public.action_queue_events to ${role};
+       ${ROLE_SQL[role]}
+       set local "request.jwt.claim.role" = '${role}';
+       set local "request.jwt.claim.sub" = '${OWNER_ID}';
+       truncate table public.action_queue_events, public.action_queue;
+       rollback;`,
+      "42501",
+      env,
+      spawnImpl,
+    );
+  }
+  requireSqlTrue("direct_truncate_acl_unchanged", canonicalTableAclSql(), env, spawnImpl);
+  requireSqlTrue(
+    "direct_truncate_rows_unchanged",
+    `select
+      (select count(*) = 2 from public.action_queue)
+      and (select count(*) = 0 from public.action_queue_events);`,
+    env,
+    spawnImpl,
+  );
 }
 
 function proveDirectMutationFences(env, spawnImpl = spawnSync) {
@@ -877,6 +1397,7 @@ function proveCanonicalReapply(env, spawnImpl = spawnSync) {
 
 function proveHistoricalContractRepair(env, spawnImpl = spawnSync) {
   resetScaffold(env, spawnImpl);
+  requireGuardMigrationSuccess("historical_contract_guard_repair", env, spawnImpl);
   executeSql(historicalTransitionMigration, env, {
     stage: "historical_transition",
     spawnImpl,
@@ -904,6 +1425,7 @@ function proveHistoricalContractRepair(env, spawnImpl = spawnSync) {
 
 function requireLegacyRollback(stage, mutationSql, env, spawnImpl = spawnSync) {
   resetScaffold(env, spawnImpl);
+  requireGuardMigrationSuccess(`${stage}_guard_repair`, env, spawnImpl);
   executeSql(mutationSql, env, { stage: `${stage}_mutation`, spawnImpl });
   requireMigrationFailure(stage, env, spawnImpl);
   requireSqlTrue(
@@ -911,6 +1433,63 @@ function requireLegacyRollback(stage, mutationSql, env, spawnImpl = spawnSync) {
     `select
       to_regprocedure('public.action_queue_transition(uuid,text,text,text)') is null
       and has_table_privilege('authenticated','public.action_queue','update');`,
+    env,
+    spawnImpl,
+  );
+}
+
+function proveUnknownGuardSourceRejected(env, spawnImpl = spawnSync) {
+  resetScaffold(env, spawnImpl);
+  executeSql(
+    `create or replace function public.action_queue_guard_decision_fields()
+       returns trigger language plpgsql security definer
+       set search_path=public
+       as $$
+       begin
+         perform 1;
+         return new;
+       end;
+       $$;`,
+    env,
+    { stage: "unknown_guard_source_mutation", spawnImpl },
+  );
+  const beforeOid = executeSql(
+    `select 'public.action_queue_guard_decision_fields()'::regprocedure::oid;`,
+    env,
+    { stage: "unknown_guard_source_before", spawnImpl },
+  );
+  requireGuardMigrationFailure("unknown_guard_source", env, spawnImpl);
+  const afterOid = executeSql(
+    `select 'public.action_queue_guard_decision_fields()'::regprocedure::oid;`,
+    env,
+    { stage: "unknown_guard_source_after", spawnImpl },
+  );
+  if (beforeOid !== afterOid) throw new Error("unknown_guard_source:oid_changed");
+  requireSqlTrue(
+    "unknown_guard_source_rollback",
+    `select
+      md5(replace(p.prosrc, E'\\r', '')) not in (
+        '09459a9cc8532aae905639b3055c680f',
+        '88e81c4dfbc6d17260def35d1a619ee1'
+      )
+      and p.proconfig = ARRAY['search_path=public']::text[]
+      and has_function_privilege('service_role', p.oid, 'execute')
+      and to_regprocedure('public.action_queue_transition(uuid,text,text,text)') is null
+      and (
+        select array_agg(a.attname order by a.attname)
+        from pg_trigger as tg
+        cross join lateral unnest(tg.tgattr::smallint[]) as trigger_column(attnum)
+        join pg_attribute as a
+          on a.attrelid = tg.tgrelid
+         and a.attnum = trigger_column.attnum
+        where tg.tgrelid = 'public.action_queue'::regclass
+          and tg.tgname = 'trg_action_queue_guard_decision_fields'
+          and not tg.tgisinternal
+          and tg.tgenabled = 'O'
+          and tg.tgfoid = p.oid
+      ) = ARRAY['approved_at', 'rejected_at', 'status']::name[]
+    from pg_proc as p
+    where p.oid = 'public.action_queue_guard_decision_fields()'::regprocedure;`,
     env,
     spawnImpl,
   );
@@ -938,6 +1517,7 @@ function provePartialContractRejected(env, spawnImpl = spawnSync) {
 
 function proveFunctionSourceRejected(env, spawnImpl = spawnSync) {
   resetScaffold(env, spawnImpl);
+  requireGuardMigrationSuccess("function_source_guard_repair", env, spawnImpl);
   executeSql(
     `create function public.action_queue_transition(
        p_action_queue_id uuid,
@@ -1020,6 +1600,7 @@ function proveRequiredGrantDriftRejected(env, spawnImpl = spawnSync) {
 
 function proveInheritedMutationGrantRejected(env, spawnImpl = spawnSync) {
   resetScaffold(env, spawnImpl);
+  requireGuardMigrationSuccess("inherited_mutation_grant_guard_repair", env, spawnImpl);
   executeSql(
     `do $role$
      begin
@@ -1068,11 +1649,21 @@ export async function runPg15Harness({
   const env = psqlEnvironment(connection, containerId, containerRuntime);
   try {
     validatePinnedMigrationFile();
+    validatePinnedGuardMigrationFile();
+    validatePinnedTableAclMigrationFile();
     attestDisposableTarget(env, spawnImpl);
     resetScaffold(env, spawnImpl);
     proveLegacyBaseline(env, spawnImpl);
+    proveLegacyGuardBaseline(env, spawnImpl);
+    proveGuardRepairSuccess(env, spawnImpl);
+    proveGuardCanonicalReapply(env, spawnImpl);
     proveProtectedDeliveryRecovery(env, spawnImpl);
     proveHardenedGrantBaselineConverges(env, spawnImpl);
+    proveMeasuredTableAclGap(env, spawnImpl);
+    proveTableAclRepairSuccess(env, spawnImpl);
+    proveTableAclCanonicalReapply(env, spawnImpl);
+    proveUnknownTableAclRejected(env, spawnImpl);
+    proveDirectTruncateFences(env, spawnImpl);
     proveOwnerTransitionAndRetry(env, spawnImpl);
     proveIllegalTransitionNoWrite(env, spawnImpl);
     proveDirectMutationFences(env, spawnImpl);
@@ -1090,6 +1681,7 @@ export async function runPg15Harness({
     proveRlsDisabledRejected(env, spawnImpl);
     proveRequiredGrantDriftRejected(env, spawnImpl);
     proveInheritedMutationGrantRejected(env, spawnImpl);
+    proveUnknownGuardSourceRejected(env, spawnImpl);
   } catch (error) {
     return fail(error instanceof Error ? error.message : "unknown");
   }

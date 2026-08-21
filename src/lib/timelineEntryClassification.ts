@@ -81,6 +81,7 @@ export const MEASUREMENT_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "ec",
   "runoff",
   "watering",
+  "manual_sensor_snapshot",
 ]);
 
 export interface ClassifyTimelineEntryInput {

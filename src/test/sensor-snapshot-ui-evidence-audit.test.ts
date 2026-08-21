@@ -47,11 +47,8 @@ const INTENTIONAL_BYPASSES: ReadonlyArray<{
 }> = [
   {
     file: "pages/Timeline.tsx",
-    why: "Legacy diary-entry shape {temp, rh, vpd, co2, soil} predates Quick Log v1. Quick Log items render via DiaryEntryBadges/TimelineMemorySection; this chip is for pre-Quick-Log rows only.",
-    // Marker is the distinctive expression that reads Timeline's own inline
-    // sensor shape (not v1's). Kept as a single contiguous token so prettier
-    // reflowing the accompanying type literal onto multiple lines can't break it.
-    marker: "sensor_snapshot ?? e.details?.sensor",
+    why: "Timeline owns canonical and legacy diary sensor shapes plus Plant Quick Log's manual compatibility envelope; the explicit precedence is fenced below.",
+    marker: "manualCompatSensor",
   },
   {
     file: "components/EcowittLatestSnapshotCard.tsx",
@@ -104,6 +101,14 @@ describe("Quick Log v1 snapshot normalizer — intentional bypasses", () => {
       expect(src).not.toMatch(/normalizeQuickLogSnapshotMetrics/);
     },
   );
+
+  it("keeps Timeline sensor precedence canonical, then legacy, then manual compatibility", () => {
+    const src = readSrc("pages/Timeline.tsx");
+    expect(src).toMatch(/const canonicalSensor = e\.details\?\.sensor_snapshot/);
+    expect(src).toMatch(/const legacySensor = e\.details\?\.sensor/);
+    expect(src).toMatch(/const manualCompatSensor = e\.details\?\.manual_sensor_snapshot/);
+    expect(src).toMatch(/canonicalSensor \?\? legacySensor \?\? manualCompatSensor/);
+  });
 });
 
 describe("Quick Log v1 grouped timeline section — sensor read-path", () => {

@@ -113,7 +113,7 @@ from `vercel.json`.
 | `src/hooks/`                 |   126 | React Query + Supabase access hooks                                                                                                        |
 | `src/constants/`             |    50 | Frozen domain tables **and pinned user-facing copy**                                                                                       |
 | `src/integrations/`          |     8 | Supabase browser/server clients, auth middleware, generated `types.ts`                                                                     |
-| `src/store/`, `src/context/` |     3 | React context providers (`auth`, `grows`, pheno sampling)                                                                                  |
+| `src/store/`, `src/context/` |     4 | React context providers: `auth`, `grows`, pheno sampling, and `TentQuickLogTargetContext` (Tent → AppShell Quick Log target wiring)        |
 
 ## Layering, as actually practised
 
@@ -178,8 +178,13 @@ User-facing copy is **data**, not JSX: it is pinned in `src/constants/*Copy.ts` 
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 API (`useNavigate`,
 `useLocation`, `useParams`, `Link`, `Outlet`, `Navigate`) on top of TanStack Router.
 
-**682 files import from it. Zero files under `src/components/` or `src/pages/` import
-`@tanstack/react-router` directly.** Vitest aliases the shim to a real MemoryRouter
+**666 files import from it. Zero files under `src/components/` or `src/pages/` import
+`@tanstack/react-router` directly.** Both figures are import statements, not path matches: 682
+files mention the shim path, but 16 of those are comments, regex assertions, `vi.mock(...)`
+references, or the shim's own test helper. The zero holds by either measure — `@tanstack/react-router`
+does not appear in `src/components/` or `src/pages/` at all.
+
+Vitest aliases the shim to a real MemoryRouter
 (`src/test/helpers/reactRouterCompat.vitest.tsx`) so component tests get working navigation.
 
 Follow the shim in new component code. Writing idiomatic TanStack Router hooks in a

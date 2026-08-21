@@ -1,4 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -57,6 +58,19 @@ type PublicPaddleBundleEvaluator = (input: { canonicalToken: string; bundle: str
   reason?: string;
 };
 
+type BoundedPublicAssetResponseConsumer = (input: {
+  response: EventEmitter & {
+    statusCode: number;
+    headers: Record<string, string | undefined>;
+    setTimeout: (timeoutMs: number, callback: () => void) => void;
+    destroy: () => void;
+  };
+  evaluateMetadata: PublicAssetMetadataEvaluator;
+  maxBytes: number;
+  kind: "html" | "javascript";
+  timeoutMs: number;
+}) => Promise<string>;
+
 const evaluatePublicDeploymentIdentity = (
   materializeCore as typeof materializeCore & {
     evaluatePublicDeploymentIdentity?: PublicIdentityEvaluator;
@@ -82,6 +96,11 @@ const evaluatePublicPaddleBundle = (
     evaluatePublicPaddleBundle?: PublicPaddleBundleEvaluator;
   }
 ).evaluatePublicPaddleBundle;
+const consumeBoundedPublicAssetResponse = (
+  materializeCore as typeof materializeCore & {
+    consumeBoundedPublicAssetResponse?: BoundedPublicAssetResponseConsumer;
+  }
+).consumeBoundedPublicAssetResponse;
 
 const tempRoots: string[] = [];
 
@@ -234,13 +253,14 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(preSecret).toContain("resolveCanonicalPaddleSandboxToken");
     expect(preSecret).toContain("resolvePublicMainModuleAsset");
     expect(preSecret).toContain("evaluateBoundedPublicAssetResponseMetadata");
+    expect(preSecret).toContain("consumeBoundedPublicAssetResponse");
     expect(preSecret).toContain("evaluatePublicPaddleBundle");
     expect(preSecret).toContain('readFileSync(".env.production", "utf8")');
     expect(preSecret).toContain('const PUBLIC_ORIGIN = "https://verdantgrowdiary.com"');
     expect(preSecret).toContain("PUBLIC_HTML_MAX_BYTES");
     expect(preSecret).toContain("PUBLIC_JAVASCRIPT_MAX_BYTES");
-    expect(preSecret).toContain("bytes > maxBytes");
     expect(preSecret).toContain("response.destroy");
+    expect(preSecret).not.toMatch(/async\s*\(response\)/u);
     expect(preSecret).not.toMatch(/console\.(?:log|error)\([^\n]*(?:token|body|treeHash)/i);
     expect(preSecret).not.toContain("scripts/stamp-version.mjs");
     expect(preSecret).not.toContain("console.log(body");
@@ -255,13 +275,22 @@ describe("temporary authenticated One-Tent Actions lane", () => {
     expect(inputBlock).not.toContain("paddle_token");
   });
 
-  it("rejects dirty or mismatched public content and accepts only the clean exact identity", () => {
+  it("rejects dirty, mismatched, or untrusted public identity and accepts both authoritative sources", () => {
     expect(evaluatePublicDeploymentIdentity).toBeTypeOf("function");
     if (!evaluatePublicDeploymentIdentity) return;
 
+    const cleanVersion = {
+      commit: SHA,
+      commitSource: "git",
+      dirty: false,
+      treeHash: TREE_HASH,
+      treeHashError: null,
+      inherited: null,
+    };
+
     expect(
       evaluatePublicDeploymentIdentity({
-        version: { commit: SHA, dirty: true, treeHash: TREE_HASH },
+        version: { ...cleanVersion, dirty: true },
         expectedSha: SHA,
         expectedTreeHash: TREE_HASH,
       }),
@@ -269,19 +298,90 @@ describe("temporary authenticated One-Tent Actions lane", () => {
 
     expect(
       evaluatePublicDeploymentIdentity({
-        version: { commit: SHA, dirty: false, treeHash: "c".repeat(64) },
+        version: { ...cleanVersion, treeHash: "c".repeat(64) },
         expectedSha: SHA,
         expectedTreeHash: TREE_HASH,
       }),
     ).toEqual({ ok: false, reason: "public_tree_mismatch" });
 
+    for (const commitSource of [undefined, "none", "untrusted"]) {
+      expect(
+        evaluatePublicDeploymentIdentity({
+          version: { ...cleanVersion, commitSource },
+          expectedSha: SHA,
+          expectedTreeHash: TREE_HASH,
+        }),
+      ).toEqual({ ok: false, reason: "public_commit_source_untrusted" });
+    }
     expect(
       evaluatePublicDeploymentIdentity({
-        version: { commit: SHA, dirty: false, treeHash: TREE_HASH },
+        version: { ...cleanVersion, treeHashError: "hash_failed" },
         expectedSha: SHA,
         expectedTreeHash: TREE_HASH,
       }),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: false, reason: "public_tree_hash_error_present" });
+    expect(
+      evaluatePublicDeploymentIdentity({
+        version: { ...cleanVersion, inherited: { commit: SHA } },
+        expectedSha: SHA,
+        expectedTreeHash: TREE_HASH,
+      }),
+    ).toEqual({ ok: false, reason: "public_identity_inherited" });
+
+    for (const commitSource of ["git", "github-env"]) {
+      expect(
+        evaluatePublicDeploymentIdentity({
+          version: { ...cleanVersion, commitSource },
+          expectedSha: SHA,
+          expectedTreeHash: TREE_HASH,
+        }),
+      ).toEqual({ ok: true });
+    }
+  });
+
+  it("settles a thrown public-asset evaluator as a sanitized rejection without an unhandled promise", async () => {
+    expect(consumeBoundedPublicAssetResponse).toBeTypeOf("function");
+    if (!consumeBoundedPublicAssetResponse) return;
+
+    let destroyed = false;
+    let unhandled = false;
+    const response = Object.assign(new EventEmitter(), {
+      statusCode: 200,
+      headers: { "content-type": "text/html" },
+      setTimeout: () => undefined,
+      destroy: () => {
+        destroyed = true;
+      },
+    });
+    const onUnhandled = () => {
+      unhandled = true;
+    };
+    process.once("unhandledRejection", onUnhandled);
+    try {
+      const outcome = await Promise.race([
+        consumeBoundedPublicAssetResponse({
+          response,
+          evaluateMetadata: () => {
+            throw new Error("attacker-controlled evaluator detail");
+          },
+          maxBytes: 64,
+          kind: "html",
+          timeoutMs: 1_000,
+        }).then(
+          () => "unexpected_resolution",
+          (error: unknown) => (error instanceof Error ? error.message : "non_error_rejection"),
+        ),
+        new Promise<string>((resolveTimeout) => {
+          setTimeout(() => resolveTimeout("hung"), 50);
+        }),
+      ]);
+      await new Promise<void>((resolveImmediate) => setImmediate(resolveImmediate));
+      expect(outcome).toBe("public_asset_response_setup_failed");
+      expect(destroyed).toBe(true);
+      expect(unhandled).toBe(false);
+    } finally {
+      process.removeListener("unhandledRejection", onUnhandled);
+    }
   });
 
   it("rejects Paddle live overrides, missing sandbox bytes, redirects, oversize, and cross-origin assets", () => {
@@ -501,6 +601,9 @@ describe("temporary authenticated One-Tent Actions lane", () => {
       expect(current, token).toBeGreaterThan(previous);
       previous = current;
     }
+    expect(guide).toContain("`commitSource` is `git` or `github-env`");
+    expect(guide).toContain("`treeHashError`");
+    expect(guide).toContain("`inherited`");
     expect(guide).not.toContain("one-tent-authenticated-proof-current");
   });
 });

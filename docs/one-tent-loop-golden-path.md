@@ -168,10 +168,11 @@ this immutable sequence; do not reuse an earlier run or rerun a failed attempt:
 2. Deploy that exact commit to `https://verdantgrowdiary.com`.
 3. Wait until `https://verdantgrowdiary.com/version.json` returns strict JSON
    whose `commit` is that exact lowercase 40-hex SHA, whose `dirty` field is
-   `false`, and whose `treeHash` matches the canonical hash computed from the
-   checked-out commit. The fixed-origin HTML and same-origin main JavaScript
-   must also contain the committed sandbox Paddle client token and no live-class
-   Paddle token.
+   `false`, whose `commitSource` is `git` or `github-env`, whose `treeHashError`
+   and `inherited` fields are both `null`, and whose `treeHash` matches the
+   canonical hash computed from the checked-out commit. The fixed-origin HTML
+   and same-origin main JavaScript must also contain the committed sandbox Paddle
+   client token and no live-class Paddle token.
 4. Dispatch the workflow from `verdant-grow-diary` with `run_mode=one_tent_proof` and
    `expected_sha=<same 40-hex commit>`, first attempt only.
 

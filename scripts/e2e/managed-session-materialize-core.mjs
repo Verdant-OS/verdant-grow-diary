@@ -3,7 +3,9 @@
  * session (from a live login or an existing e2e/.auth snapshot) into the
  * LOVABLE_BROWSER_* managed-session env the One-Tent preflight/walk expects.
  *
- * Pure + deterministic. No network, no fs, no clock. The CLI wrapper
+ * Validation helpers are pure + deterministic. The bounded public-response
+ * consumer only reads an injected response stream; it performs no network
+ * request, fs access, or clock read. The CLI wrapper
  * (materialize-managed-session.mjs) performs the login / file reads and calls
  * these. This module never fabricates a session — callers must supply a real
  * one; helpers only reshape and validate it.
@@ -52,6 +54,15 @@ export function evaluatePublicDeploymentIdentity({ version, expectedSha, expecte
   }
   if (version === null || typeof version !== "object" || Array.isArray(version)) {
     return { ok: false, reason: "invalid_public_version" };
+  }
+  if (version.commitSource !== "git" && version.commitSource !== "github-env") {
+    return { ok: false, reason: "public_commit_source_untrusted" };
+  }
+  if (version.treeHashError !== null) {
+    return { ok: false, reason: "public_tree_hash_error_present" };
+  }
+  if (version.inherited !== null) {
+    return { ok: false, reason: "public_identity_inherited" };
   }
   if (version.commit !== expectedSha) {
     return { ok: false, reason: "public_commit_mismatch" };
@@ -138,6 +149,89 @@ export function evaluateBoundedPublicAssetResponseMetadata({
     return { ok: false, reason: "public_asset_content_length_invalid" };
   }
   return { ok: true };
+}
+
+/**
+ * Consume a response that has already been opened by the fixed-origin caller.
+ * Setup/evaluator exceptions and stream failures always settle one sanitized
+ * rejection; raw errors, headers, and body bytes are never reflected.
+ */
+export function consumeBoundedPublicAssetResponse({
+  response,
+  evaluateMetadata,
+  maxBytes,
+  kind,
+  timeoutMs,
+} = {}) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const rejectFixed = (reason) => {
+      if (settled) return;
+      settled = true;
+      try {
+        response?.destroy();
+      } catch {
+        // Destruction is best-effort; the sanitized rejection still settles.
+      }
+      reject(new Error(reason));
+    };
+
+    try {
+      if (
+        !response ||
+        typeof response.on !== "function" ||
+        typeof response.setTimeout !== "function" ||
+        typeof response.destroy !== "function" ||
+        typeof evaluateMetadata !== "function" ||
+        !Number.isSafeInteger(timeoutMs) ||
+        timeoutMs <= 0
+      ) {
+        throw new Error("invalid_response_contract");
+      }
+      const metadata = evaluateMetadata({
+        statusCode: response.statusCode,
+        contentType: String(response.headers?.["content-type"] ?? ""),
+        contentEncoding: String(response.headers?.["content-encoding"] ?? "identity"),
+        contentLength: response.headers?.["content-length"],
+        maxBytes,
+        kind,
+      });
+      if (!metadata?.ok) {
+        rejectFixed("public_asset_response_metadata_rejected");
+        return;
+      }
+
+      const chunks = [];
+      let bytes = 0;
+      response.setTimeout(timeoutMs, () => rejectFixed("public_asset_response_timeout"));
+      response.on("data", (chunk) => {
+        try {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          bytes += buffer.length;
+          if (bytes > maxBytes) {
+            rejectFixed("public_asset_response_body_too_large");
+            return;
+          }
+          chunks.push(buffer);
+        } catch {
+          rejectFixed("public_asset_response_failed");
+        }
+      });
+      response.on("end", () => {
+        if (settled) return;
+        try {
+          const body = Buffer.concat(chunks).toString("utf8");
+          settled = true;
+          resolve(body);
+        } catch {
+          rejectFixed("public_asset_response_failed");
+        }
+      });
+      response.on("error", () => rejectFixed("public_asset_response_failed"));
+    } catch {
+      rejectFixed("public_asset_response_setup_failed");
+    }
+  });
 }
 
 /** Resolve exactly one same-origin hashed Vite entry module from bounded HTML. */

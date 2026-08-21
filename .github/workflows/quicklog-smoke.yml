@@ -220,7 +220,13 @@ jobs:
             return readFileSync(".env.production", "utf8");
           }
 
-          function fetchBoundedPublicAsset(url, kind, maxBytes, evaluateMetadata) {
+          function fetchBoundedPublicAsset(
+            url,
+            kind,
+            maxBytes,
+            consumeResponse,
+            evaluateMetadata,
+          ) {
             const parsedUrl = new URL(url);
             if (
               parsedUrl.origin !== PUBLIC_ORIGIN ||
@@ -241,36 +247,19 @@ jobs:
                   signal: AbortSignal.timeout(PUBLIC_VERSION_TIMEOUT_MS),
                   timeout: PUBLIC_VERSION_TIMEOUT_MS,
                 },
-                async (response) => {
-                  const metadata = evaluateMetadata({
-                    statusCode: response.statusCode,
-                    contentType: String(response.headers["content-type"] ?? ""),
-                    contentEncoding: String(response.headers["content-encoding"] ?? "identity"),
-                    contentLength: response.headers["content-length"],
-                    maxBytes,
-                    kind,
-                  });
-                  if (!metadata.ok) {
+                (response) => {
+                  try {
+                    consumeResponse({
+                      response,
+                      evaluateMetadata,
+                      maxBytes,
+                      kind,
+                      timeoutMs: PUBLIC_VERSION_TIMEOUT_MS,
+                    }).then(resolve, reject);
+                  } catch {
                     response.destroy();
-                    reject(new Error(metadata.reason));
-                    return;
+                    reject(new Error("public_asset_response_setup_failed"));
                   }
-
-                  const chunks = [];
-                  let bytes = 0;
-                  response.setTimeout(PUBLIC_VERSION_TIMEOUT_MS, () =>
-                    response.destroy(new Error("response_timeout")),
-                  );
-                  response.on("data", (chunk) => {
-                    bytes += chunk.length;
-                    if (bytes > maxBytes) {
-                      response.destroy(new Error("body_too_large"));
-                      return;
-                    }
-                    chunks.push(chunk);
-                  });
-                  response.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
-                  response.on("error", () => reject(new Error("response_failed")));
                 },
               );
               request.on("timeout", () => request.destroy(new Error("request_timeout")));
@@ -280,6 +269,7 @@ jobs:
 
           async function attestPublicVersion() {
             const {
+              consumeBoundedPublicAssetResponse,
               evaluateBoundedPublicAssetResponseMetadata,
               evaluatePublicDeploymentIdentity,
               evaluatePublicPaddleBundle,
@@ -374,6 +364,7 @@ jobs:
               `${PUBLIC_ORIGIN}/`,
               "html",
               PUBLIC_HTML_MAX_BYTES,
+              consumeBoundedPublicAssetResponse,
               evaluateBoundedPublicAssetResponseMetadata,
             );
             const mainAsset = resolvePublicMainModuleAsset({ html, publicOrigin: PUBLIC_ORIGIN });
@@ -384,6 +375,7 @@ jobs:
               mainAsset.url,
               "javascript",
               PUBLIC_JAVASCRIPT_MAX_BYTES,
+              consumeBoundedPublicAssetResponse,
               evaluateBoundedPublicAssetResponseMetadata,
             );
             const paddle = evaluatePublicPaddleBundle({

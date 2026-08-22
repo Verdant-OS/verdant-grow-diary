@@ -177,6 +177,37 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("shows a named-target verification block instead of a contradictory no-grow notice", async () => {
+    mountSection({
+      growId: null,
+      tentId: null,
+      plantId: null,
+      externalPersistenceBlockReason: "Confirming this Quick Log target. Please wait.",
+    });
+
+    expect(screen.getByTestId("quick-log-all-activities-persistence-block")).toHaveTextContent(
+      "Confirming this Quick Log target. Please wait.",
+    );
+    expect(screen.queryByTestId("quick-log-all-activities-no-grow")).not.toBeInTheDocument();
+
+    selectActivity("note");
+    const save = await screen.findByTestId("quick-log-all-activities-save");
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the no-grow notice for a genuinely unscoped activity editor", () => {
+    mountSection({ growId: null, tentId: null, plantId: null });
+
+    expect(screen.getByTestId("quick-log-all-activities-no-grow")).toHaveTextContent(
+      "Select a grow to enable Quick Log actions.",
+    );
+    expect(
+      screen.queryByTestId("quick-log-all-activities-persistence-block"),
+    ).not.toBeInTheDocument();
+  });
+
   it("uses the full visible symptom labels while preserving canonical test identities", () => {
     mountSection();
     fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));

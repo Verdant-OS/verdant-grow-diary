@@ -849,6 +849,11 @@ export default function QuickLogAllActivitiesSection({
   ]);
 
   const noContext = !growId;
+  // A named target can be temporarily unresolved while its authoritative
+  // selector query is pending or unavailable. Keep the existing no-context
+  // guards intact, but do not pair their generic prompt with the stronger
+  // verification block that already explains why saving is disabled.
+  const showNoContextNotice = noContext && !externalPersistenceBlockReason;
 
   return (
     <section
@@ -866,7 +871,7 @@ export default function QuickLogAllActivitiesSection({
         </p>
       </div>
 
-      {noContext && (
+      {showNoContextNotice && (
         <p
           role="note"
           className="text-xs text-muted-foreground"

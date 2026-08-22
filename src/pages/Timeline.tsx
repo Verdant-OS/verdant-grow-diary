@@ -18,6 +18,7 @@ import { isTimelineSymptomEvidenceWindowComplete } from "@/lib/timelineSymptomEv
 import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import { resolveCarriedPlantScope } from "@/lib/sensorRoutePlantIntentRules";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
@@ -1063,6 +1064,16 @@ export default function Timeline() {
     };
   }, [plantFilter, tentFilter, plantNamesById, tentNamesById, activeGrowId]);
 
+  // Carry the grower's selected plant onward to Sensors -> Doctor (B6/D-B6).
+  // The tent and plant filters are independent, so a plant chosen under
+  // "All tents" has its owning tent derived from the rows already loaded.
+  // A plant whose tent cannot be established is not carried at all rather
+  // than sent onward to be rejected downstream.
+  const carriedPlantScope = useMemo(
+    () => resolveCarriedPlantScope({ plantId: plantFilter, tentId: tentFilter, entries }),
+    [plantFilter, tentFilter, entries],
+  );
+
   const filtered = useMemo(() => {
     const afterStageEvent = entries.filter((e) => {
       if (stageFilter !== "all" && resolveTimelineDiaryEntryStage(e) !== stageFilter) return false;
@@ -1456,7 +1467,7 @@ export default function Timeline() {
       {pageReadView.showSensorsNextStep && (
         <OneTentLoopNextStepCard
           current="timeline"
-          ids={{ growId: activeGrowId ?? null, tentId: tentFilter || null }}
+          ids={{ growId: activeGrowId ?? null, ...carriedPlantScope }}
           testId="timeline-one-tent-loop-next-step-card"
           className="mb-3"
         />

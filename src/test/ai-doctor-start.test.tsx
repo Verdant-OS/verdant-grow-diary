@@ -521,3 +521,100 @@ describe("AiDoctorStart", () => {
     expect(document.getElementById(badgeId)).toHaveTextContent("In this tent");
   });
 });
+
+/**
+ * B6 page-level carried-plant proofs.
+ *
+ * Added after review. The rules-level fence asserted that the partition
+ * result exposes no selected/applied field — which freezes the RULES object's
+ * shape and proves nothing about the PRESENTER. A presenter could read
+ * `carriedPlantOptionId` and navigate or invoke without changing that shape
+ * at all, and no page test exercised a UUID `?plantId=` query. So the two
+ * properties that actually matter — the grower still chooses, and no paid
+ * call fires — were unproven where they live.
+ *
+ * These run against the rendered page.
+ */
+describe("AiDoctorStart · carried plant (B6)", () => {
+  const PLANT_ALPHA = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+  const PLANT_BETA = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  const CARRIED = {
+    grows: [{ id: "grow-1", name: "Autumn Run" }],
+    tents: [{ id: "tent-a", name: "Tent A", grow_id: "grow-1" }],
+    plants: [
+      { id: PLANT_BETA, name: "Beta", tentId: "tent-a" },
+      { id: PLANT_ALPHA, name: "Alpha", tentId: "tent-a" },
+    ],
+  };
+
+  function renderCarried(plantId: string) {
+    state.grows = CARRIED.grows;
+    state.tents = CARRIED.tents;
+    state.data = CARRIED.plants;
+    return renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${plantId}`);
+  }
+
+  it("orders the carried plant first and badges it — without selecting it", () => {
+    renderCarried(PLANT_ALPHA);
+
+    // Beta is listed first in the fixture; the carry must promote Alpha.
+    const options = screen.getAllByTestId(/^ai-doctor-start-option-\d+$/);
+    expect(options[0]).toHaveAccessibleName("Review Alpha with AI Doctor");
+    expect(screen.getByTestId("ai-doctor-start-option-0-carried")).toHaveTextContent(
+      "You came from here",
+    );
+
+    // Nothing removed: both plants still offered.
+    expect(options).toHaveLength(2);
+    expect(options[1]).toHaveAccessibleName("Review Beta with AI Doctor");
+
+    // THE properties that matter — the grower has not been moved anywhere and
+    // no paid model request fired merely from arriving with a carried plant.
+    expect(screen.getByTestId("location").textContent).toContain("/doctor");
+    expect(screen.queryByTestId("plant-detail")).toBeNull();
+    expect(state.invoke).not.toHaveBeenCalled();
+  });
+
+  it("announces the carried cue to screen readers, not just sighted users", () => {
+    renderCarried(PLANT_ALPHA);
+    const promoted = screen.getAllByTestId(/^ai-doctor-start-option-\d+$/)[0];
+    const describedBy = promoted.getAttribute("aria-describedby") ?? "";
+    const ids = describedBy.split(/\s+/).filter(Boolean);
+
+    // aria-label replaces descendant text, so BOTH badges must be described.
+    expect(ids).toContain("ai-doctor-start-option-0-carried");
+    expect(ids).toContain("ai-doctor-start-option-0-in-tent");
+    expect(document.getElementById(ids[0])).toHaveTextContent("You came from here");
+    // The action name stays the action, not the provenance.
+    expect(promoted).toHaveAccessibleName("Review Alpha with AI Doctor");
+  });
+
+  it("ignores a carried plant the account does not own — and still never invokes", () => {
+    state.grows = CARRIED.grows;
+    state.tents = CARRIED.tents;
+    state.data = CARRIED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a&plantId=99999999-8888-4777-8666-555555555555");
+
+    // NO option is badged — an unowned carry promotes nothing at all.
+    // (Deliberately not asserting a specific order here: the page applies its
+    // own ordering to the un-promoted list, and pinning that would be
+    // asserting an unrelated contract I have not verified.)
+    expect(document.querySelectorAll('[data-testid$="-carried"]')).toHaveLength(0);
+    // Both owned plants are still offered — nothing was removed.
+    expect(screen.getAllByTestId(/^ai-doctor-start-option-\d+$/)).toHaveLength(2);
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+    expect(state.invoke).not.toHaveBeenCalled();
+  });
+
+  it("ignores a malformed plant param rather than treating it as a target", () => {
+    state.grows = CARRIED.grows;
+    state.tents = CARRIED.tents;
+    state.data = CARRIED.plants;
+    renderPage("/doctor?growId=grow-1&tentId=tent-a&plantId=not-a-uuid");
+
+    expect(screen.queryByTestId("ai-doctor-start-option-0-carried")).toBeNull();
+    expect(screen.getByTestId("location").textContent).toContain("/doctor");
+    expect(state.invoke).not.toHaveBeenCalled();
+  });
+});

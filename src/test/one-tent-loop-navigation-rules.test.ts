@@ -165,8 +165,10 @@ describe("oneTentLoopNavigationRules", () => {
     expect(resolveOneTentLoopNextStep("timeline", { tentId: TENT, plantId: PLANT }).href).toBe(
       `/sensors?tentId=${TENT}&plantId=${PLANT}`,
     );
-    // A plant with no tent still carries — Sensors resolves its own tent, and
-    // dropping the plant here would silently defeat the handoff.
+    // The rules carry whatever the caller supplies; deciding WHETHER a
+    // tentless plant should travel is the caller's job, not this module's.
+    // Timeline uses resolveCarriedPlantScope to derive the tent first and
+    // drops the plant when it cannot — see sensor-route-plant-intent-rules.
     expect(resolveOneTentLoopNextStep("timeline", { plantId: PLANT }).href).toBe(
       `/sensors?plantId=${PLANT}`,
     );

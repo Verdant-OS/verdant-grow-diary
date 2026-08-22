@@ -8,7 +8,7 @@ changes Verdant's build order, architecture, or safety rules.
 | Field             | Value                                                                           |
 | ----------------- | ------------------------------------------------------------------------------- |
 | Source repository | `Verdant-OS/multi-agent-custom-automation-engine-solution-accelerator` (public) |
-| Measured at       | `b4a4a00` on `main` — "Merge pull request #1069", 2026-06-27                    |
+| Measured at       | `b4a4a00` on `main` — "Merge pull request #1069", `2026-06-26T20:50:10Z`        |
 | Read on           | 2026-08-22, shallow clone (`--depth 1`)                                         |
 | Owner             | Claude (Knowledge Library and Product Specification Architect)                  |
 | Scope             | Reference ingest only. No product code, schema, RLS, migration, or publish.     |
@@ -102,10 +102,15 @@ shape, and its structure is worth reading:
 - The plan is a **first-class object with an id**, rendered to a human before anything runs.
 - Approval is a **distinct awaited step**, not a flag consulted after execution starts.
 - There is an **explicit timeout path** and an **explicit cleanup path**.
-- **Rejection and timeout are ordinary outcomes**, not exceptions that crash the run —
-  matching `AGENTS.md`: "Quota denials should be calm, expected responses, not crashes."
 
-Learn the shape. Persist the state per rule 2 above.
+Learn those three. Persist the state per rule 2 above.
+
+**Learn the sequencing only — not the outcome handling.** An earlier revision of this
+document listed "rejection and timeout are ordinary outcomes, not exceptions that crash
+the run" as a fourth thing to learn, and cited `AGENTS.md`'s "Quota denials should be calm,
+expected responses, not crashes." **That was wrong — the code does the opposite.** The
+correction is recorded rather than silently removed, because the false version merged and
+an agent may have read it. See §5 for what actually happens.
 
 ### 4.2 Tools as services, not prompt text
 
@@ -116,6 +121,20 @@ Verdant's own layering — capability logic in modules, presenters stay thin.
 ## 5. What is demo-grade and should not be read as guidance
 
 - **In-memory approval store** — see rule 1. The single most important warning here.
+- **Rejection and timeout both raise a bare `Exception` and are handled as failures.**
+  `human_approval_manager.py:207` raises `Exception("Plan execution cancelled by user")`
+  when the plan is not approved. `_wait_for_user_approval()` returns `None` on
+  `asyncio.TimeoutError`, which is falsy, so **timeout falls into the same branch and
+  raises the same bare exception**. `orchestration_manager.py:543` then catches it in a
+  generic `except Exception`, sets `plan.overall_status = PlanStatus.failed` (`:576`),
+  emits `WebsocketMessageType.ERROR_MESSAGE` (`:582`), and re-raises.
+
+  So a human rejecting a plan — the designed-for outcome of an approval gate — is
+  recorded as an unexpected failure and surfaced as an error. This is the **opposite** of
+  `AGENTS.md`'s "Quota denials should be calm, expected responses, not crashes". In
+  Verdant, a rejected Action Queue item is a normal terminal state with its own audit
+  event, not an exception. Do not copy this path.
+
 - **`agent_registry.py`** is a process-global with a `threading.Lock`: adequate for one
   container, not a model for multi-instance state.
 - **`__azurite_db_queue__.json` / `__azurite_db_queue_extent__.json`** are committed at
@@ -133,12 +152,13 @@ Verdant's own layering — capability logic in modules, presenters stay thin.
 
 ## 7. Status ledger
 
-| Item                                                           | Status                                                  |
-| -------------------------------------------------------------- | ------------------------------------------------------- |
-| Repository cloned and structurally read                        | `PASS`                                                  |
-| Orchestration and approval path read at source                 | `PASS`                                                  |
-| Do-not-port rules recorded in this file and `CURRENT_STATE.md` | `PASS`                                                  |
-| Collision with another agent's open work                       | `NO_DATA` — no MACAE reference found in this repository |
-| Runtime behaviour of the accelerator                           | `NOT_MEASURED` — never deployed or executed             |
-| Applicability to any specific Verdant slice                    | `NOT_MEASURED` — no slice assigned                      |
-| Independent peer review of this ingest                         | pending — owner Claude, reviewer to be named            |
+| Item                                                           | Status                                                       |
+| -------------------------------------------------------------- | ------------------------------------------------------------ |
+| Repository cloned and structurally read                        | `PASS`                                                       |
+| Orchestration and approval path read at source                 | `PASS`                                                       |
+| Do-not-port rules recorded in this file and `CURRENT_STATE.md` | `PASS`                                                       |
+| Collision with another agent's open work                       | `PASS` — 18 open PRs enumerated 2026-08-22, none overlapping |
+| Runtime behaviour of the accelerator                           | `NOT_MEASURED` — never deployed or executed                  |
+| Applicability to any specific Verdant slice                    | `NOT_MEASURED` — no slice assigned                           |
+| Independent review of this ingest                              | owner Claude; reviewer **Blue Dream**, in Cursor             |
+| Owner acknowledgement                                          | **cheekhimself**, outside GitHub review-request              |

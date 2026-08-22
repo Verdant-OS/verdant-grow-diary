@@ -25,6 +25,26 @@ const PLANT = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
 const OTHER_PLANT = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
 const TENT = "11111111-2222-4333-8444-555555555555";
 
+const GROW = "22222222-3333-4444-8555-666666666666";
+const OTHER_GROW = "33333333-4444-4555-8666-777777777777";
+
+/**
+ * Build the lookup with every row defaulted into the scoped grow.
+ *
+ * The carry is grow-scoped, so without this each eligibility case below
+ * would fail for the wrong reason — a green suite proving only that
+ * `grow_id` was absent. A row may still set its own `grow_id` to exercise
+ * scope deliberately.
+ */
+function lookupInScope(
+  rows: readonly (Record<string, unknown> | null | undefined)[],
+): ReadonlyMap<string, string | null> {
+  return buildCarriablePlantTentLookup(
+    rows.map((row) => (row && typeof row === "object" ? { grow_id: GROW, ...row } : row)),
+    { growId: GROW },
+  );
+}
+
 function search(params: Record<string, string>): URLSearchParams {
   return new URLSearchParams(params);
 }
@@ -261,10 +281,53 @@ describe("shouldHoldCarryForPendingLookup", () => {
   });
 });
 
+describe("buildCarriablePlantTentLookup · grow scope", () => {
+  it("refuses a plant from another grow, however valid it otherwise is", () => {
+    // Active, owned, in a real tent — and still not carriable here. The
+    // directory read is account-wide, so a bookmarked URL pairing this
+    // grow's `growId` with that grow's `plantId` reaches this exact row.
+    // `Sensors.tsx:211` derives its grow FROM the selected tent, so carrying
+    // it would silently move the grower out of the grow they were reading.
+    const lookup = buildCarriablePlantTentLookup(
+      [
+        { id: PLANT, tent_id: TENT, grow_id: GROW },
+        { id: OTHER_PLANT, tent_id: TENT, grow_id: OTHER_GROW },
+      ],
+      { growId: GROW },
+    );
+
+    expect(lookup.get(PLANT)).toBe(TENT);
+    expect(lookup.has(OTHER_PLANT)).toBe(false);
+    expect(lookup.size).toBe(1);
+  });
+
+  it("refuses a plant with no grow at all", () => {
+    const lookup = buildCarriablePlantTentLookup(
+      [
+        { id: PLANT, tent_id: TENT, grow_id: null },
+        { id: OTHER_PLANT, tent_id: TENT },
+      ],
+      { growId: GROW },
+    );
+    expect(lookup.size).toBe(0);
+  });
+
+  it("carries nothing when the page has no resolved grow scope", () => {
+    // No scope means no way to check one, and Timeline reads nothing
+    // without a grow anyway — so this costs the grower nothing.
+    const rows = [{ id: PLANT, tent_id: TENT, grow_id: GROW }];
+    for (const growId of [null, undefined, "", "   ", "not-a-uuid", 42, {}]) {
+      expect(buildCarriablePlantTentLookup(rows, { growId }).size).toBe(0);
+    }
+    expect(buildCarriablePlantTentLookup(rows).size).toBe(0);
+    expect(buildCarriablePlantTentLookup(rows, null).size).toBe(0);
+  });
+});
+
 describe("resolveCarriedPlantScope · archived and merged plants", () => {
   it("drops an archived plant end-to-end, and takes its derived tent with it", () => {
     const ARCHIVED = "aaaaaaaa-1111-4111-8111-111111111111";
-    const lookup = buildCarriablePlantTentLookup([
+    const lookup = lookupInScope([
       { id: PLANT, tent_id: TENT },
       { id: ARCHIVED, tent_id: TENT, is_archived: true },
     ]);
@@ -291,7 +354,7 @@ describe("resolveCarriedPlantScope · archived and merged plants", () => {
 
 describe("buildCarriablePlantTentLookup", () => {
   it("maps plant rows to their current tent and skips unusable rows", () => {
-    const lookup = buildCarriablePlantTentLookup([
+    const lookup = lookupInScope([
       { id: PLANT, tent_id: TENT },
       { id: OTHER_PLANT, tent_id: null },
       { id: "p1", tent_id: TENT },
@@ -316,7 +379,7 @@ describe("buildCarriablePlantTentLookup", () => {
     const MERGED_SNAKE = "cccccccc-3333-4333-8333-333333333333";
     const MERGED_CAMEL = "dddddddd-4444-4444-8444-444444444444";
 
-    const lookup = buildCarriablePlantTentLookup([
+    const lookup = lookupInScope([
       { id: PLANT, tent_id: TENT },
       { id: ARCHIVED_SNAKE, tent_id: TENT, is_archived: true },
       { id: ARCHIVED_CAMEL, tent_id: TENT, isArchived: true },
@@ -336,7 +399,7 @@ describe("buildCarriablePlantTentLookup", () => {
   it("keeps a plant whose note merely mentions a merge without the marker", () => {
     // The exclusion is the RPC-emitted `Merged into <uuid>` marker, not the
     // word "merge". A grower's own note must not archive their plant.
-    const lookup = buildCarriablePlantTentLookup([
+    const lookup = lookupInScope([
       { id: PLANT, tent_id: TENT, last_note: "thinking about a merge later" },
       { id: OTHER_PLANT, tent_id: TENT, last_note: "Merged into not-a-uuid" },
     ]);
@@ -345,8 +408,8 @@ describe("buildCarriablePlantTentLookup", () => {
   });
 
   it("returns an empty map for absent input rather than throwing", () => {
-    expect(buildCarriablePlantTentLookup(null).size).toBe(0);
-    expect(buildCarriablePlantTentLookup(undefined).size).toBe(0);
+    expect(buildCarriablePlantTentLookup(null, { growId: GROW }).size).toBe(0);
+    expect(buildCarriablePlantTentLookup(undefined, { growId: GROW }).size).toBe(0);
   });
 });
 
@@ -396,6 +459,11 @@ describe("Timeline page wiring", () => {
       /shouldHoldCarryForPendingLookup\(\{\s*plantId:\s*plantFilter,\s*lookupStatus:\s*carriablePlantTentStatus,?\s*\}\)/,
     );
     expect(src).toMatch(/pending=\{carryHold\}/);
+    // The directory read is account-wide, so the ACTIVE GROW must reach the
+    // hook. Without it the carry can relocate the grower to another grow.
+    expect(src).toMatch(
+      /useTimelineNameDirectory\(\s*user\s*&&\s*activeGrowId\s*\?\s*user\s*:\s*null,\s*activeGrowId,?\s*\)/,
+    );
     // Historical diary attribution must not creep back in as the tent source.
     expect(src).not.toMatch(/resolveCarriedPlantScope\([^)]*entries/);
     // And the result must actually reach the card.

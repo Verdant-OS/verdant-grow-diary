@@ -1024,7 +1024,7 @@ export default function Timeline() {
   // Gated on a resolved grow scope so a rejected/invalid scope issues
   // no reads at all, matching the page's fail-closed read policy.
   const { plantNamesById, tentNamesById, carriablePlantTentById, carriablePlantTentStatus } =
-    useTimelineNameDirectory(user && activeGrowId ? user : null);
+    useTimelineNameDirectory(user && activeGrowId ? user : null, activeGrowId);
   const plantOptions = useMemo(
     () => deriveTimelinePlantOptions(entries, plantNamesById),
     [entries, plantNamesById],

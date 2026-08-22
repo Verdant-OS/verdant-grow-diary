@@ -69,6 +69,7 @@ export function readSensorsPlantRouteIntent(
 export interface PlantTentRowLike extends ArchivedPlantLike {
   id?: string | null;
   tent_id?: string | null;
+  grow_id?: string | null;
 }
 
 /**
@@ -82,22 +83,40 @@ export interface PlantTentRowLike extends ArchivedPlantLike {
  * failure this whole handoff exists to prevent. The same predicate is reused
  * rather than a second one written, so the two cannot drift apart.
  *
- * This matters because the directory feeding it deliberately includes
- * archived and merged rows: diary history keeps referencing them and still
- * needs their names. Filtering there would break the labels; filtering here
- * costs nothing, because an absent plant already falls into
- * `resolveCarriedPlantScope`'s fail-closed branch.
+ * **Membership is also page scope.** The directory read is account-wide, so
+ * without this it admits a plant from ANOTHER grow — reachable from a
+ * bookmarked URL pairing this grow's `growId` with that grow's `plantId`.
+ * The carry would then derive the other grow's tent, and `Sensors.tsx`
+ * derives its grow FROM the selected tent (`selectedTent?.growId`), so the
+ * grower would silently leave the grow whose Timeline they were reading.
+ * That is worse than the drops above: it moves them rather than losing
+ * something. A plant outside the scoped grow is therefore not carriable,
+ * and no resolved grow scope means nothing is.
+ *
+ * This all matters because the directory feeding it deliberately includes
+ * archived and merged rows, account-wide: diary history keeps referencing
+ * them and still needs their names. Filtering the READ would break the
+ * labels; filtering here costs nothing, because an absent plant already
+ * falls into `resolveCarriedPlantScope`'s fail-closed branch.
  *
  * Takes `plants` rows, never diary rows. See `resolveCarriedPlantScope`.
  */
 export function buildCarriablePlantTentLookup(
   rows: readonly (PlantTentRowLike | null | undefined)[] | null | undefined,
+  scope?: { growId?: unknown } | null,
 ): ReadonlyMap<string, string | null> {
+  const scopedGrowId = normalizePersistedPlantId(scope?.growId);
+  // No resolved grow scope means nothing is carriable. Timeline itself reads
+  // nothing without one, so this costs the grower nothing — and admitting a
+  // plant with no scope to check it against is how the crossing below gets in.
+  if (!scopedGrowId) return new Map<string, string | null>();
+
   const lookup = new Map<string, string | null>();
   for (const row of rows ?? []) {
     const id = normalizePersistedPlantId(row?.id);
     if (!id) continue;
     if (!isActivePlant(row)) continue;
+    if (normalizePersistedPlantId(row?.grow_id) !== scopedGrowId) continue;
     lookup.set(id, normalizePersistedPlantId(row?.tent_id));
   }
   return lookup;

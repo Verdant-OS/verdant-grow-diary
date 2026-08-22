@@ -25,6 +25,10 @@ const PLANT_ARCHIVED = "aaaaaaaa-1111-4111-8111-111111111111";
 const PLANT_MERGED = "cccccccc-3333-4333-8333-333333333333";
 const MERGE_TARGET = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
 const TENT = "11111111-2222-4333-8444-555555555555";
+const GROW = "22222222-3333-4444-8555-666666666666";
+const OTHER_GROW = "33333333-4444-4555-8666-777777777777";
+const OTHER_GROW_TENT = "44444444-5555-4666-8777-888888888888";
+const OTHER_GROW_PLANT = "55555555-6666-4777-8888-999999999999";
 
 const state = vi.hoisted(() => ({
   /** Every `.select(...)` argument, in call order, so the read is observable. */
@@ -74,14 +78,39 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     state.selects = [];
     state.plantsError = null;
     state.plants = [
-      { id: PLANT_ACTIVE, name: "Alpha", tent_id: TENT, is_archived: false, last_note: null },
-      { id: PLANT_ARCHIVED, name: "Beta", tent_id: TENT, is_archived: true, last_note: null },
+      {
+        id: PLANT_ACTIVE,
+        name: "Alpha",
+        tent_id: TENT,
+        grow_id: GROW,
+        is_archived: false,
+        last_note: null,
+      },
+      {
+        id: PLANT_ARCHIVED,
+        name: "Beta",
+        tent_id: TENT,
+        grow_id: GROW,
+        is_archived: true,
+        last_note: null,
+      },
       {
         id: PLANT_MERGED,
         name: "Gamma",
         tent_id: TENT,
+        grow_id: GROW,
         is_archived: false,
         last_note: `Merged into ${MERGE_TARGET}`,
+      },
+      // An ACTIVE plant the account owns, in a DIFFERENT grow. Reachable
+      // from a bookmarked URL pairing this grow with that plant.
+      {
+        id: OTHER_GROW_PLANT,
+        name: "Delta",
+        tent_id: OTHER_GROW_TENT,
+        grow_id: OTHER_GROW,
+        is_archived: false,
+        last_note: null,
       },
     ];
   });
@@ -89,7 +118,7 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
   afterEach(() => vi.clearAllMocks());
 
   it("reads the archive and merge fields the eligibility check needs", async () => {
-    renderHook(() => useTimelineNameDirectory("user-1"));
+    renderHook(() => useTimelineNameDirectory("user-1", GROW));
 
     await waitFor(() => expect(state.selects.some((c) => c.table === "plants")).toBe(true));
     const plantsSelect = state.selects.find((c) => c.table === "plants");
@@ -103,10 +132,13 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(columns).toContain("id");
     expect(columns).toContain("name");
     expect(columns).toContain("tent_id");
+    // Scopes the carry to this page's grow. Absent, an owned plant from
+    // another grow is admitted and the handoff relocates the grower.
+    expect(columns).toContain("grow_id");
   });
 
   it("excludes archived and merged plants from the carry lookup only", async () => {
-    const { result } = renderHook(() => useTimelineNameDirectory("user-1"));
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
 
     await waitFor(() => expect(result.current.carriablePlantTentById).not.toBeNull());
 
@@ -122,11 +154,28 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(names.get(PLANT_ACTIVE)).toBe("Alpha");
     expect(names.get(PLANT_ARCHIVED)).toBe("Beta");
     expect(names.get(PLANT_MERGED)).toBe("Gamma");
+    // The other-grow plant keeps its name too — history can reference it.
+    expect(names.get(OTHER_GROW_PLANT)).toBe("Delta");
+  });
+
+  it("refuses to carry an owned plant from a DIFFERENT grow", async () => {
+    // Reachable from a bookmarked URL pairing this grow's `growId` with
+    // another grow's `plantId`. The carry would derive the other grow's
+    // tent, and `Sensors.tsx:211` derives its grow FROM the selected tent —
+    // so the grower would silently leave the grow they were reading. That
+    // is worse than a dropped selection: it moves them.
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
+
+    await waitFor(() => expect(result.current.carriablePlantTentById).not.toBeNull());
+
+    expect(result.current.carriablePlantTentById!.has(OTHER_GROW_PLANT)).toBe(false);
+    // The in-grow plant is unaffected, so this is scope and not a blanket ban.
+    expect(result.current.carriablePlantTentById!.get(PLANT_ACTIVE)).toBe(TENT);
   });
 
   it("resolves the carry lookup to null — never an empty map — on a failed read", async () => {
     state.plantsError = { message: "network down" };
-    const { result } = renderHook(() => useTimelineNameDirectory("user-1"));
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
 
     await waitFor(() => expect(state.selects.length).toBeGreaterThan(0));
     await waitFor(() => expect(result.current.tentNamesById).not.toBeNull());
@@ -141,7 +190,7 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     // Raised in review: `null` meant BOTH "still loading" and "read failed",
     // and they need opposite handling — a consumer that holds on a failed
     // read waits forever; one that proceeds while pending drops the plant.
-    const { result } = renderHook(() => useTimelineNameDirectory("user-1"));
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
 
     // Before the read resolves the map is null AND the status says why.
     expect(result.current.carriablePlantTentById).toBeNull();
@@ -153,7 +202,7 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
 
   it("reports a failed read as unavailable, never as pending", async () => {
     state.plantsError = { message: "network down" };
-    const { result } = renderHook(() => useTimelineNameDirectory("user-1"));
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
 
     await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("unavailable"));
     // Terminal: the map is null and stays null, so a consumer must proceed
@@ -162,13 +211,13 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
   });
 
   it("reports a signed-out session as unavailable, since nothing is in flight", async () => {
-    const { result } = renderHook(() => useTimelineNameDirectory(null));
+    const { result } = renderHook(() => useTimelineNameDirectory(null, GROW));
     expect(result.current.carriablePlantTentStatus).toBe("unavailable");
     await waitFor(() => expect(result.current.carriablePlantTentById).toBeNull());
   });
 
   it("clears the carry lookup when there is no signed-in user", async () => {
-    const { result } = renderHook(() => useTimelineNameDirectory(null));
+    const { result } = renderHook(() => useTimelineNameDirectory(null, GROW));
     await waitFor(() => expect(result.current.carriablePlantTentById).toBeNull());
     expect(state.selects).toHaveLength(0);
   });

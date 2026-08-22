@@ -56,7 +56,10 @@ export interface TimelineNameDirectory {
  * (never an empty map); unresolved ids keep the presenter's neutral
  * fragment label either way.
  */
-export function useTimelineNameDirectory(userId: string | null): TimelineNameDirectory {
+export function useTimelineNameDirectory(
+  userId: string | null,
+  activeGrowId: string | null,
+): TimelineNameDirectory {
   const [plantNamesById, setPlantNamesById] = useState<ReadonlyMap<string, string> | null>(null);
   const [tentNamesById, setTentNamesById] = useState<ReadonlyMap<string, string> | null>(null);
   const [carriablePlantTentById, setCarriablePlantTentById] = useState<ReadonlyMap<
@@ -67,7 +70,7 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
     useState<CarriablePlantLookupStatus>(userId ? "pending" : "unavailable");
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || !activeGrowId) {
       setPlantNamesById(null);
       setTentNamesById(null);
       setCarriablePlantTentById(null);
@@ -80,12 +83,14 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
     (async () => {
       try {
         const [plantsResult, tentsResult] = await Promise.all([
-          // `is_archived` and `last_note` are read for eligibility only —
-          // `isActivePlant` needs both, and the merge marker lives in the
-          // note. The name maps below still keep archived/merged rows.
+          // `is_archived`, `last_note` and `grow_id` are read for carry
+          // ELIGIBILITY only — `isActivePlant` needs the first two (the merge
+          // marker lives in the note) and the third scopes the carry to this
+          // page's grow. The read itself stays account-wide, because the name
+          // maps below must keep archived, merged, and other-grow rows.
           supabase
             .from("plants")
-            .select("id,name,tent_id,is_archived,last_note")
+            .select("id,name,tent_id,grow_id,is_archived,last_note")
             .eq("user_id", userId),
           supabase.from("tents").select("id,name").eq("user_id", userId),
         ]);
@@ -93,7 +98,9 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
         setPlantNamesById(plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data));
         setTentNamesById(tentsResult?.error ? null : buildTimelineNameLookup(tentsResult?.data));
         setCarriablePlantTentById(
-          plantsResult?.error ? null : buildCarriablePlantTentLookup(plantsResult?.data),
+          plantsResult?.error
+            ? null
+            : buildCarriablePlantTentLookup(plantsResult?.data, { growId: activeGrowId }),
         );
         setCarriablePlantTentStatus(plantsResult?.error ? "unavailable" : "ready");
       } catch {
@@ -107,7 +114,7 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, activeGrowId]);
 
   return { plantNamesById, tentNamesById, carriablePlantTentById, carriablePlantTentStatus };
 }

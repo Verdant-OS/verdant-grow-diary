@@ -152,13 +152,24 @@ Verdant's own layering — capability logic in modules, presenters stay thin.
 
 ## 7. Status ledger
 
-| Item                                                           | Status                                                       |
-| -------------------------------------------------------------- | ------------------------------------------------------------ |
-| Repository cloned and structurally read                        | `PASS`                                                       |
-| Orchestration and approval path read at source                 | `PASS`                                                       |
-| Do-not-port rules recorded in this file and `CURRENT_STATE.md` | `PASS`                                                       |
-| Collision with another agent's open work                       | `PASS` — 18 open PRs enumerated 2026-08-22, none overlapping |
-| Runtime behaviour of the accelerator                           | `NOT_MEASURED` — never deployed or executed                  |
-| Applicability to any specific Verdant slice                    | `NOT_MEASURED` — no slice assigned                           |
-| Independent review of this ingest                              | owner Claude; reviewer **Blue Dream**, in Cursor             |
-| Owner acknowledgement                                          | **cheekhimself**, outside GitHub review-request              |
+**Collision check, stated precisely.** Open PRs enumerated 2026-08-22 at 15:42Z:
+**17 open, of which 16 are other than the PR carrying this correction.** None of the 16
+overlaps this slice — nearest by area are #1033 (governance operating facts) and #719
+(plantuml docs).
+
+**#1096 is deliberately excluded, and an earlier revision got this wrong.** That revision
+read "18 open PRs enumerated 2026-08-22, none overlapping". Two errors: the enumeration
+ran minutes before #1096 merged at 04:32Z, so the count aged out at once; and #1096 **is**
+the MACAE ingest itself, so counting it while asserting "none overlapping" was
+self-contradictory. It is the same work, not a collision.
+
+| Item                                                           | Status                                           |
+| -------------------------------------------------------------- | ------------------------------------------------ |
+| Repository cloned and structurally read                        | `PASS`                                           |
+| Orchestration and approval path read at source                 | `PASS`                                           |
+| Do-not-port rules recorded in this file and `CURRENT_STATE.md` | `PASS`                                           |
+| Collision with another agent's open work                       | `PASS` — see the note above the ledger           |
+| Runtime behaviour of the accelerator                           | `NOT_MEASURED` — never deployed or executed      |
+| Applicability to any specific Verdant slice                    | `NOT_MEASURED` — no slice assigned               |
+| Independent review of this ingest                              | owner Claude; reviewer **Blue Dream**, in Cursor |
+| Owner acknowledgement                                          | **cheekhimself**, outside GitHub review-request  |

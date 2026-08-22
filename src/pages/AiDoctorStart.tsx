@@ -253,13 +253,21 @@ export default function AiDoctorStart() {
                   data-testid={`ai-doctor-start-option-${index}`}
                   aria-label={`Review ${option.name} with AI Doctor`}
                   // The explicit aria-label replaces ALL descendant text in the
-                  // accessible name, so the "In this tent" badge below would be
-                  // silent to screen readers. Expose it as the DESCRIPTION
-                  // instead: same scope cue, action name unchanged.
+                  // accessible name, so both badges below would be silent to
+                  // screen readers. Expose them as the DESCRIPTION instead:
+                  // same cues, action name unchanged. aria-describedby takes a
+                  // space-separated id list, so BOTH must be named here — an
+                  // earlier version listed only the in-tent badge and left the
+                  // carried cue inaudible.
                   aria-describedby={
-                    inScopeIds.has(option.id)
-                      ? `ai-doctor-start-option-${index}-in-tent`
-                      : undefined
+                    [
+                      partitioned.carriedPlantOptionId === option.id
+                        ? `ai-doctor-start-option-${index}-carried`
+                        : null,
+                      inScopeIds.has(option.id) ? `ai-doctor-start-option-${index}-in-tent` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
                   }
                 >
                   <span className="min-w-0">

@@ -61,6 +61,49 @@ export function readSensorsPlantRouteIntent(
   return normalizePersistedPlantId(search?.get(SENSORS_PLANT_INTENT_QUERY_PARAM) ?? null);
 }
 
+/** Minimal row shape: any timeline entry that knows its plant and tent. */
+export interface PlantTentEntryLike {
+  plant_id?: string | null;
+  tent_id?: string | null;
+}
+
+/**
+ * Resolve the tent to carry alongside a plant.
+ *
+ * Timeline's tent and plant filters are INDEPENDENT: a grower can select a
+ * plant while the tent filter still reads "All tents". Carrying the plant
+ * alone in that case is worse than carrying nothing — Sensors would fall
+ * back to its own persisted tent, and the Doctor would then reject the plant
+ * for not belonging to it. The grower's selection would vanish silently,
+ * which is exactly the outcome this handoff exists to prevent.
+ *
+ * So an explicit tent always wins, and otherwise the plant's owning tent is
+ * derived from the rows already on the page. If neither yields a tent, the
+ * caller is told to carry NO plant (`plantId: null`) rather than emit one
+ * that is certain to be discarded downstream.
+ */
+export function resolveCarriedPlantScope(input: {
+  plantId?: unknown;
+  tentId?: unknown;
+  entries?: readonly (PlantTentEntryLike | null | undefined)[] | null;
+}): { plantId: string | null; tentId: string | null } {
+  const normalizedPlantId = normalizePersistedPlantId(input?.plantId);
+  const explicitTentId = normalizePersistedPlantId(input?.tentId);
+
+  if (!normalizedPlantId) return { plantId: null, tentId: explicitTentId };
+  if (explicitTentId) return { plantId: normalizedPlantId, tentId: explicitTentId };
+
+  for (const entry of input?.entries ?? []) {
+    if (normalizePersistedPlantId(entry?.plant_id) !== normalizedPlantId) continue;
+    const derivedTentId = normalizePersistedPlantId(entry?.tent_id);
+    if (derivedTentId) return { plantId: normalizedPlantId, tentId: derivedTentId };
+  }
+
+  // Fail closed: a plant whose tent cannot be established is dropped here
+  // rather than sent onward to be rejected.
+  return { plantId: null, tentId: null };
+}
+
 /**
  * Append a plant intent to an already-built internal href.
  *

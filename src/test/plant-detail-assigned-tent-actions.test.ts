@@ -43,6 +43,7 @@ function action(overrides: Partial<AssignedTentActionInputRow> = {}): AssignedTe
     suggested_change: "Review humidity control and lower RH target gradually.",
     reason: "Humidity is high [alert:al-1]",
     risk_level: "high",
+    target_device: null,
     created_at: "2026-05-23T10:00:00Z",
     ...overrides,
   };
@@ -136,11 +137,71 @@ describe("buildAssignedTentActions (pure)", () => {
     expect(rows.length).toBe(3);
   });
 
+  it("keeps the shared five-row panel cap while letting proof selection skip other-plant AI Coach rows before truncation", () => {
+    const newerOtherPlantCoachRows = Array.from({ length: 5 }, (_, index) =>
+      action({
+        id: `coach-other-${index + 1}`,
+        source: "ai_coach",
+        plant_id: "plant-other",
+        created_at: `2026-05-23T10:0${index}:00Z`,
+      }),
+    );
+    const selectedPlantCoachRow = action({
+      id: "coach-current-plant",
+      source: "ai_coach",
+      plant_id: "plant-current",
+      created_at: "2026-05-22T10:00:00Z",
+    });
+
+    const sharedPanelRows = buildAssignedTentActions(
+      [...newerOtherPlantCoachRows, selectedPlantCoachRow],
+      { tentId: "t1", growId: "g1" },
+    );
+    const proofRows = buildAssignedTentActions(
+      [...newerOtherPlantCoachRows, selectedPlantCoachRow],
+      { tentId: "t1", growId: "g1", selectedPlantIdForAiCoach: "plant-current" },
+    );
+
+    expect(sharedPanelRows.map((row) => row.id)).toEqual([
+      "coach-other-5",
+      "coach-other-4",
+      "coach-other-3",
+      "coach-other-2",
+      "coach-other-1",
+    ]);
+    expect(proofRows.map((row) => row.id)).toEqual(["coach-current-plant"]);
+  });
+
   it("links to assigned tent alerts via the [alert:<id>] back-pointer", () => {
     const [row] = buildAssignedTentActions([action({ reason: "RH high [alert:al-42]" })], {
       tentId: "t1",
     });
     expect(row.alertBackPointerId).toBe("al-42");
+  });
+
+  it("preserves the persisted plant id without treating a tent-wide row as plant-scoped", () => {
+    const [plantRow] = buildAssignedTentActions([action({ plant_id: "plant-1" })], {
+      tentId: "t1",
+    });
+    const [tentRow] = buildAssignedTentActions([action({ plant_id: null })], { tentId: "t1" });
+
+    expect(plantRow.plantId).toBe("plant-1");
+    expect(tentRow.plantId).toBeNull();
+  });
+
+  it("maps a persisted target device to a safe presence signal", () => {
+    const [row] = buildAssignedTentActions([action({ target_device: "fan-east" })], {
+      tentId: "t1",
+    });
+    expect(row.hasTargetDevice).toBe(true);
+  });
+
+  it("treats every non-null persisted target device as present", () => {
+    const rows = buildAssignedTentActions(
+      [action({ id: "empty", target_device: "" }), action({ id: "space", target_device: "   " })],
+      { tentId: "t1" },
+    );
+    expect(rows.map((row) => row.hasTargetDevice)).toEqual([true, true]);
   });
 
   it("does not invent fields when source row is sparse", () => {
@@ -204,6 +265,7 @@ describe("Plant Detail wiring", () => {
     expect(HOOK).toMatch(/\.from\(\s*["']action_queue["']\s*\)/);
     expect(HOOK).toMatch(/status["'],\s*["']pending_approval["']/);
     expect(HOOK).toMatch(/tent_id/);
+    expect(HOOK).toMatch(/target_device/);
   });
 });
 

@@ -189,7 +189,11 @@ async function installOneTentNetworkBoundary(
 const env = readManagedSessionEnv();
 const preflight = evaluateManagedSession(env);
 
-test.use({ viewport: ONE_TENT_PROOF_RUNTIME_CONTRACT.viewport });
+test.use({
+  viewport: ONE_TENT_PROOF_RUNTIME_CONTRACT.viewport,
+  isMobile: true,
+  hasTouch: true,
+});
 
 // BLOCKED receipt is emitted even when the walk never starts, so
 // operators/CI always get exactly one machine-readable proof line.

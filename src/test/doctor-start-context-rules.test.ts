@@ -234,3 +234,75 @@ describe("partitionDoctorEntryOptionsByTent — annotate, never remove", () => {
     );
   });
 });
+
+describe("partitionDoctorEntryOptionsByTent — carried plant (D-B6 / B6)", () => {
+  const TENT = "tent-1";
+  const OTHER_TENT = "tent-2";
+  const options = [
+    { id: "p1", name: "Alpha" },
+    { id: "p2", name: "Bravo" },
+    { id: "p3", name: "Charlie" },
+  ] as never[];
+  const plants = [
+    { id: "p1", tent_id: TENT },
+    { id: "p2", tent_id: TENT },
+    { id: "p3", tent_id: OTHER_TENT },
+  ] as never[];
+
+  it("orders the carried plant FIRST within its tent group without removing anything", () => {
+    const r = partitionDoctorEntryOptionsByTent({
+      options,
+      plants,
+      tentId: TENT,
+      carriedPlantId: "p2",
+    });
+    expect(r.carriedPlantOptionId).toBe("p2");
+    expect(r.inScope.map((o) => o.id)).toEqual(["p2", "p1"]);
+    // Lossless: inScope ∪ others is still exactly the input.
+    expect([...r.inScope, ...r.others].map((o) => o.id).sort()).toEqual(["p1", "p2", "p3"]);
+  });
+
+  it("fails closed for a plant in ANOTHER tent — never surfaces it as carried", () => {
+    const r = partitionDoctorEntryOptionsByTent({
+      options,
+      plants,
+      tentId: TENT,
+      carriedPlantId: "p3",
+    });
+    expect(r.carriedPlantOptionId).toBeNull();
+    expect(r.inScope.map((o) => o.id)).toEqual(["p1", "p2"]);
+  });
+
+  it("fails closed for a plant the grower does not own, or an absent one", () => {
+    for (const bad of ["p9", "", "   ", null, undefined]) {
+      const r = partitionDoctorEntryOptionsByTent({
+        options,
+        plants,
+        tentId: TENT,
+        carriedPlantId: bad,
+      });
+      expect(r.carriedPlantOptionId).toBeNull();
+      expect(r.inScope.map((o) => o.id)).toEqual(["p1", "p2"]);
+    }
+  });
+
+  it("carries nothing when there is no tent scope at all", () => {
+    const r = partitionDoctorEntryOptionsByTent({ options, plants, carriedPlantId: "p1" });
+    expect(r.carriedPlantOptionId).toBeNull();
+    expect(r.inScope).toEqual([]);
+    expect(r.others.map((o) => o.id)).toEqual(["p1", "p2", "p3"]);
+  });
+
+  it("is a LABEL, not a selection — the result exposes no selected/applied field", () => {
+    // The whole safety property of B6: a carried plant may be ordered and
+    // badged, never applied. If a future edit adds a selection field here,
+    // this fails and forces the decision back through review.
+    const r = partitionDoctorEntryOptionsByTent({
+      options,
+      plants,
+      tentId: TENT,
+      carriedPlantId: "p1",
+    });
+    expect(Object.keys(r).sort()).toEqual(["carriedPlantOptionId", "inScope", "others"]);
+  });
+});

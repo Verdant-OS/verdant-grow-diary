@@ -92,7 +92,9 @@ export function useTimelineNameDirectory(
             .from("plants")
             .select("id,name,tent_id,grow_id,is_archived,last_note")
             .eq("user_id", userId),
-          supabase.from("tents").select("id,name").eq("user_id", userId),
+          // `grow_id` resolves the EFFECTIVE grow of a plant whose own column is
+          // null but whose tent belongs to this grow. Names ignore it.
+          supabase.from("tents").select("id,name,grow_id").eq("user_id", userId),
         ]);
         if (cancelled) return;
         setPlantNamesById(plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data));
@@ -100,7 +102,10 @@ export function useTimelineNameDirectory(
         setCarriablePlantTentById(
           plantsResult?.error
             ? null
-            : buildCarriablePlantTentLookup(plantsResult?.data, { growId: activeGrowId }),
+            : buildCarriablePlantTentLookup(plantsResult?.data, {
+                growId: activeGrowId,
+                tents: tentsResult?.error ? [] : (tentsResult?.data ?? []),
+              }),
         );
         setCarriablePlantTentStatus(plantsResult?.error ? "unavailable" : "ready");
       } catch {

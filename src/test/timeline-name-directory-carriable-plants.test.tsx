@@ -29,6 +29,7 @@ const GROW = "22222222-3333-4444-8555-666666666666";
 const OTHER_GROW = "33333333-4444-4555-8666-777777777777";
 const OTHER_GROW_TENT = "44444444-5555-4666-8777-888888888888";
 const OTHER_GROW_PLANT = "55555555-6666-4777-8888-999999999999";
+const LEGACY_PLANT = "66666666-7777-4888-8999-aaaaaaaaaaaa";
 
 const state = vi.hoisted(() => ({
   /** Every `.select(...)` argument, in call order, so the read is observable. */
@@ -63,7 +64,13 @@ vi.mock("@/integrations/supabase/client", () => ({
                     data: state.plants.map((row) => project(row, columns)),
                     error: state.plantsError,
                   }
-                : { data: [{ id: TENT, name: "Tent A" }], error: null },
+                : {
+                    data: [
+                      { id: TENT, name: "Tent A", grow_id: GROW },
+                      { id: OTHER_GROW_TENT, name: "Tent B", grow_id: OTHER_GROW },
+                    ].map((row) => project(row, columns)),
+                    error: null,
+                  },
           };
         },
       };
@@ -102,6 +109,17 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
         is_archived: false,
         last_note: `Merged into ${MERGE_TARGET}`,
       },
+      // A LEGACY plant: no `grow_id` of its own, but its tent is in this
+      // grow. The repo supports this shape (growRepo BUG-A), and the Doctor
+      // still offers it, so the carry must not drop it.
+      {
+        id: LEGACY_PLANT,
+        name: "Epsilon",
+        tent_id: TENT,
+        grow_id: null,
+        is_archived: false,
+        last_note: null,
+      },
       // An ACTIVE plant the account owns, in a DIFFERENT grow. Reachable
       // from a bookmarked URL pairing this grow with that plant.
       {
@@ -135,6 +153,11 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     // Scopes the carry to this page's grow. Absent, an owned plant from
     // another grow is admitted and the handoff relocates the grower.
     expect(columns).toContain("grow_id");
+
+    // The TENTS read must also carry grow_id — it is what resolves the
+    // effective grow of a legacy plant whose own column is null.
+    const tentsSelect = state.selects.find((c) => c.table === "tents");
+    expect((tentsSelect?.columns ?? "").split(",").map((c) => c.trim())).toContain("grow_id");
   });
 
   it("excludes archived and merged plants from the carry lookup only", async () => {
@@ -146,7 +169,8 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(carriable.get(PLANT_ACTIVE)).toBe(TENT);
     expect(carriable.has(PLANT_ARCHIVED)).toBe(false);
     expect(carriable.has(PLANT_MERGED)).toBe(false);
-    expect(carriable.size).toBe(1);
+    // Alpha (own grow) and Epsilon (grow via its tent) — both carriable.
+    expect(carriable.size).toBe(2);
 
     // The NAME map must keep them: diary history still refers to those
     // plants, and dropping them would replace a real name with a fragment.
@@ -171,6 +195,16 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(result.current.carriablePlantTentById!.has(OTHER_GROW_PLANT)).toBe(false);
     // The in-grow plant is unaffected, so this is scope and not a blanket ban.
     expect(result.current.carriablePlantTentById!.get(PLANT_ACTIVE)).toBe(TENT);
+  });
+
+  it("carries a legacy plant whose grow comes from its tent, end to end", async () => {
+    // The hook half of the BUG-A case: proves the tents read, the grow_id
+    // column, and the effective-grow resolution are actually wired together,
+    // not just correct in the pure module.
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
+
+    await waitFor(() => expect(result.current.carriablePlantTentById).not.toBeNull());
+    expect(result.current.carriablePlantTentById!.get(LEGACY_PLANT)).toBe(TENT);
   });
 
   it("resolves the carry lookup to null — never an empty map — on a failed read", async () => {

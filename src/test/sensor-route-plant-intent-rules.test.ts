@@ -301,15 +301,58 @@ describe("buildCarriablePlantTentLookup · grow scope", () => {
     expect(lookup.size).toBe(1);
   });
 
-  it("refuses a plant with no grow at all", () => {
+  it("refuses a plant whose grow cannot be established at all", () => {
+    // Narrowed after review: a null `grow_id` alone is NOT disqualifying —
+    // see the legacy cases below. This is the case where no tent link
+    // resolves one either, so there is genuinely nothing to check.
     const lookup = buildCarriablePlantTentLookup(
       [
         { id: PLANT, tent_id: TENT, grow_id: null },
-        { id: OTHER_PLANT, tent_id: TENT },
+        { id: OTHER_PLANT, tent_id: null, grow_id: null },
       ],
-      { growId: GROW },
+      { growId: GROW, tents: [] },
     );
     expect(lookup.size).toBe(0);
+  });
+
+  it("carries a LEGACY plant whose grow comes from its tent, not its column", () => {
+    // `plants.grow_id` is nullable and legacy rows carry a tent without one.
+    // This is the repo's named `BUG-A` (`growRepo.fetchPlants`) and the reason
+    // `plantDropdownEligibilityRules` exists. `AiDoctorStart` calls
+    // `useGrowPlants()` unscoped, so it still OFFERS such a plant — refusing
+    // to carry it would recreate the silent mismatch this module closes.
+    const lookup = buildCarriablePlantTentLookup([{ id: PLANT, tent_id: TENT, grow_id: null }], {
+      growId: GROW,
+      tents: [{ id: TENT, grow_id: GROW }],
+    });
+    expect(lookup.get(PLANT)).toBe(TENT);
+    expect(lookup.size).toBe(1);
+  });
+
+  it("still refuses a legacy plant whose TENT belongs to another grow", () => {
+    // The tent rollup resolves scope; it must not widen it. A null column is
+    // not a licence to cross grows.
+    const lookup = buildCarriablePlantTentLookup([{ id: PLANT, tent_id: TENT, grow_id: null }], {
+      growId: GROW,
+      tents: [{ id: TENT, grow_id: OTHER_GROW }],
+    });
+    expect(lookup.size).toBe(0);
+  });
+
+  it("prefers the plant's own grow over its tent's when both exist", () => {
+    // Matches `getEffectivePlantGrowId`'s documented precedence, so the carry
+    // cannot disagree with the three other surfaces that resolve grow context.
+    const inOwnGrow = buildCarriablePlantTentLookup([{ id: PLANT, tent_id: TENT, grow_id: GROW }], {
+      growId: GROW,
+      tents: [{ id: TENT, grow_id: OTHER_GROW }],
+    });
+    expect(inOwnGrow.get(PLANT)).toBe(TENT);
+
+    const inTentGrow = buildCarriablePlantTentLookup(
+      [{ id: PLANT, tent_id: TENT, grow_id: OTHER_GROW }],
+      { growId: GROW, tents: [{ id: TENT, grow_id: GROW }] },
+    );
+    expect(inTentGrow.size).toBe(0);
   });
 
   it("carries nothing when the page has no resolved grow scope", () => {

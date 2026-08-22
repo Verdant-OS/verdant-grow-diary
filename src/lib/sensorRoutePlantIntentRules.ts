@@ -32,6 +32,7 @@
 
 import { isActivePlant, type ArchivedPlantLike } from "@/lib/archivedPlantVisibilityRules";
 import { isUuid } from "@/lib/isUuid";
+import { getEffectivePlantGrowId, type TentGrowLink } from "@/lib/plantGrowContextRules";
 
 /** Query parameter carrying the requested plant on `/sensors` and `/doctor`. */
 export const SENSORS_PLANT_INTENT_QUERY_PARAM = "plantId";
@@ -93,6 +94,17 @@ export interface PlantTentRowLike extends ArchivedPlantLike {
  * something. A plant outside the scoped grow is therefore not carriable,
  * and no resolved grow scope means nothing is.
  *
+ * Scope is judged on the EFFECTIVE grow — `plant.grow_id ?? tent.grow_id` via
+ * the shared `getEffectivePlantGrowId` — never the raw column. `plants.grow_id`
+ * is nullable and legacy rows carry a tent without one, so comparing the column
+ * directly drops a plant that genuinely belongs to this grow. That is not a
+ * hypothetical: it is the named `BUG-A` in `growRepo.fetchPlants`, and the
+ * reason `plantDropdownEligibilityRules` exists. `AiDoctorStart` calls
+ * `useGrowPlants()` unscoped, so it still OFFERS such a plant — dropping it
+ * here would recreate the silent mismatch this module exists to close. The
+ * canonical helper is reused rather than reimplemented so a fourth copy of
+ * this rule cannot drift from the other three.
+ *
  * This all matters because the directory feeding it deliberately includes
  * archived and merged rows, account-wide: diary history keeps referencing
  * them and still needs their names. Filtering the READ would break the
@@ -103,7 +115,7 @@ export interface PlantTentRowLike extends ArchivedPlantLike {
  */
 export function buildCarriablePlantTentLookup(
   rows: readonly (PlantTentRowLike | null | undefined)[] | null | undefined,
-  scope?: { growId?: unknown } | null,
+  scope?: { growId?: unknown; tents?: readonly TentGrowLink[] | null } | null,
 ): ReadonlyMap<string, string | null> {
   const scopedGrowId = normalizePersistedPlantId(scope?.growId);
   // No resolved grow scope means nothing is carriable. Timeline itself reads
@@ -111,12 +123,24 @@ export function buildCarriablePlantTentLookup(
   // plant with no scope to check it against is how the crossing below gets in.
   if (!scopedGrowId) return new Map<string, string | null>();
 
+  const tents = scope?.tents ?? [];
   const lookup = new Map<string, string | null>();
   for (const row of rows ?? []) {
     const id = normalizePersistedPlantId(row?.id);
     if (!id) continue;
     if (!isActivePlant(row)) continue;
-    if (normalizePersistedPlantId(row?.grow_id) !== scopedGrowId) continue;
+
+    // EFFECTIVE grow, never the raw column. `plants.grow_id` is nullable and
+    // legacy rows carry a tent without one; the repo's canonical helper is
+    // reused so this cannot drift from the other three places that resolve it.
+    const effectiveGrowId = normalizePersistedPlantId(
+      getEffectivePlantGrowId(
+        { id, grow_id: row?.grow_id ?? null, tent_id: row?.tent_id ?? null },
+        tents,
+      ),
+    );
+    if (effectiveGrowId !== scopedGrowId) continue;
+
     lookup.set(id, normalizePersistedPlantId(row?.tent_id));
   }
   return lookup;

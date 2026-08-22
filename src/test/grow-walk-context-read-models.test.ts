@@ -357,6 +357,48 @@ function actionQueueAuditEvents(count: number): Record<string, unknown>[] {
   }));
 }
 
+function boundedEvidenceFixtures(input: {
+  events: number;
+  photos: number;
+  alerts: number;
+  aiDoctor: number;
+}): Record<string, FixtureResult> {
+  const data = fixtures();
+  const event = (data.grow_events.data as Record<string, unknown>[])[0]!;
+  const photo = (data.diary_entries.data as Record<string, unknown>[])[0]!;
+  const alert = (data.alerts.data as Record<string, unknown>[])[0]!;
+  const aiDoctor = (data.ai_doctor_sessions.data as Record<string, unknown>[])[0]!;
+  data.grow_events = {
+    data: Array.from({ length: input.events }, (_, index) => ({
+      ...event,
+      id: `event-${index + 1}`,
+    })),
+    error: null,
+  };
+  data.diary_entries = {
+    data: Array.from({ length: input.photos }, (_, index) => ({
+      ...photo,
+      id: `photo-${index + 1}`,
+    })),
+    error: null,
+  };
+  data.alerts = {
+    data: Array.from({ length: input.alerts }, (_, index) => ({
+      ...alert,
+      id: `alert-${index + 1}`,
+    })),
+    error: null,
+  };
+  data.ai_doctor_sessions = {
+    data: Array.from({ length: input.aiDoctor }, (_, index) => ({
+      ...aiDoctor,
+      id: `session-${index + 1}`,
+    })),
+    error: null,
+  };
+  return data;
+}
+
 describe("getGrowWalkContextForOwnedTarget", () => {
   it("proves exact plant, tent, and grow scope before reading evidence lanes", async () => {
     const { client, calls } = clientFor(fixtures());
@@ -494,6 +536,55 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     );
     expect(result.data.context.derived.reasonCodes).toContain("worsening_observation");
     expect(result.data.context.derived.attentionBand).toBe("immediate_physical_verification");
+  });
+
+  it("detects coeval sensor-source disagreement before reducing to the latest reading", async () => {
+    const data = fixtures();
+    data.sensor_readings = {
+      data: [
+        {
+          id: "z-live-humidity",
+          tent_id: "tent-1",
+          metric: "humidity_pct",
+          value: 60,
+          quality: "ok",
+          source: "live",
+          ts: "2026-08-07T11:55:00.000Z",
+          captured_at: "2026-08-07T11:55:00.000Z",
+          created_at: "2026-08-07T11:55:01.000Z",
+          raw_payload: { secret: "must-not-cross" },
+        },
+        {
+          id: "manual-humidity",
+          tent_id: "tent-1",
+          metric: "humidity_pct",
+          value: 80,
+          quality: "ok",
+          source: "manual",
+          ts: "2026-08-07T11:54:30.000Z",
+          captured_at: "2026-08-07T11:54:30.000Z",
+          created_at: "2026-08-07T11:54:31.000Z",
+          raw_payload: { secret: "must-not-cross" },
+        },
+      ],
+      error: null,
+    };
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      clientFor(data).client,
+      { targetType: "plant", targetId: "plant-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.evidence.sensors.readings.humidity_pct?.id).toBe("z-live-humidity");
+    expect(result.data.context.evidence.sensors.contradictionMetrics).toEqual(["humidity_pct"]);
+    expect(result.data.context.derived.contradictionCodes).toContain("sensor_sources_disagree");
+    expect(result.data.context.derived.reasonCodes).toContain("contradictory_evidence");
+    expect(result.data.context.derived.evidenceConfidence).toBe("low");
+    expect(result.data.context.derived.attentionBand).toBe("immediate_physical_verification");
+    expect(JSON.stringify(result)).not.toContain("must-not-cross");
   });
 
   it("includes only environmental enclosing-tent events for a plant without importing watering, Worse, sibling, or grow-wide logs", async () => {
@@ -1124,6 +1215,57 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(result.data.context.evidence.actionQueue.openCount).toBe(11);
     expect(result.data.context.evidence.actionQueue.items).toHaveLength(11);
     expect(result.data.context.receipt.truncatedLanes).not.toContain("action_queue");
+  });
+
+  it("uses lookahead rows before marking every bounded evidence lane truncated", async () => {
+    const exactData = boundedEvidenceFixtures({
+      events: 100,
+      photos: 100,
+      alerts: 50,
+      aiDoctor: 1,
+    });
+    const { client: exactClient, calls: exactCalls } = clientFor(exactData);
+    const exact = await getGrowWalkContextForOwnedTarget(
+      exactClient,
+      { targetType: "plant", targetId: "plant-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(exact.ok).toBe(true);
+    if (!exact.ok) return;
+    expect(exact.data.context.evidence.recentEvents).toHaveLength(100);
+    expect(exact.data.context.evidence.photos).toHaveLength(100);
+    expect(exact.data.context.evidence.alerts).toHaveLength(50);
+    expect(exact.data.context.evidence.aiDoctor?.sessionId).toBe("session-1");
+    expect(exact.data.context.receipt.truncatedLanes).not.toEqual(
+      expect.arrayContaining(["events", "photos", "alerts", "ai_doctor"]),
+    );
+    expect(exactCalls).toContainEqual({ table: "grow_events", method: "limit", args: [101] });
+    expect(exactCalls).toContainEqual({ table: "diary_entries", method: "limit", args: [101] });
+    expect(exactCalls).toContainEqual({ table: "alerts", method: "limit", args: [51] });
+    expect(exactCalls).toContainEqual({ table: "ai_doctor_sessions", method: "limit", args: [2] });
+
+    const overflowData = boundedEvidenceFixtures({
+      events: 101,
+      photos: 101,
+      alerts: 51,
+      aiDoctor: 2,
+    });
+    const overflow = await getGrowWalkContextForOwnedTarget(
+      clientFor(overflowData).client,
+      { targetType: "plant", targetId: "plant-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(overflow.ok).toBe(true);
+    if (!overflow.ok) return;
+    expect(overflow.data.context.evidence.recentEvents).toHaveLength(100);
+    expect(overflow.data.context.evidence.photos).toHaveLength(100);
+    expect(overflow.data.context.evidence.alerts).toHaveLength(50);
+    expect(overflow.data.context.evidence.aiDoctor?.sessionId).toBe("session-1");
+    expect(overflow.data.context.receipt.truncatedLanes).toEqual(
+      expect.arrayContaining(["events", "photos", "alerts", "ai_doctor"]),
+    );
   });
 
   it("keeps an existing nonterminal Action Queue item even when it predates the evidence lookback", async () => {

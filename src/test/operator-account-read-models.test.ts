@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  findMcpSensorSourceContradictionMetrics,
   getLatestSensorSnapshotForOwnedTent,
   listRecentDiaryEntriesForOwnedGrow,
   listRecentDiaryEntriesForOwnedTent,
@@ -427,6 +428,113 @@ describe("owner-scoped Operator account read models", () => {
   });
 
   describe("selectLatestMcpSensorReadings", () => {
+    it("finds only coeval contradictions across canonical source classes", () => {
+      const now = new Date("2026-07-19T12:05:00Z");
+      expect(
+        findMcpSensorSourceContradictionMetrics(
+          [
+            row({
+              id: "live-current",
+              metric: "temperature_c",
+              value: 24,
+              source: "live",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+            row({
+              id: "manual-current",
+              metric: "temperature_c",
+              value: 30,
+              source: "manual",
+              captured_at: "2026-07-19T12:03:30Z",
+              ts: "2026-07-19T12:03:30Z",
+            }),
+            row({
+              id: "old-manual",
+              metric: "humidity_pct",
+              value: 80,
+              source: "manual",
+              captured_at: "2026-07-19T11:55:00Z",
+              ts: "2026-07-19T11:55:00Z",
+            }),
+            row({
+              id: "new-live",
+              metric: "humidity_pct",
+              value: 55,
+              source: "live",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+            row({
+              id: "live-cohort-boundary",
+              metric: "vpd_kpa",
+              value: 1,
+              source: "live",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+            row({
+              id: "manual-cohort-boundary",
+              metric: "vpd_kpa",
+              value: 2,
+              source: "manual",
+              captured_at: "2026-07-19T11:59:00Z",
+              ts: "2026-07-19T11:59:00Z",
+            }),
+            row({
+              id: "live-just-outside-cohort",
+              metric: "soil_moisture_pct",
+              value: 40,
+              source: "live",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+            row({
+              id: "manual-just-outside-cohort",
+              metric: "soil_moisture_pct",
+              value: 60,
+              source: "manual",
+              captured_at: "2026-07-19T11:58:59.999Z",
+              ts: "2026-07-19T11:58:59.999Z",
+            }),
+            row({
+              id: "pi-alias",
+              metric: "co2_ppm",
+              value: 700,
+              source: "pi_bridge",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+            row({
+              id: "live-alias",
+              metric: "co2_ppm",
+              value: 900,
+              source: "live",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+            row({
+              id: "live-same-value",
+              metric: "ec",
+              value: 1.2,
+              source: "live",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+            row({
+              id: "manual-same-value",
+              metric: "ec",
+              value: 1.2,
+              source: "manual",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+          ],
+          { now },
+        ),
+      ).toEqual(["temperature_c", "vpd_kpa"]);
+    });
+
     it("selects deterministically by capture, ingest, created, then id descending", () => {
       const rows = [
         row({

@@ -416,6 +416,7 @@ var DIARY_COLUMNS = "id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at"
 var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload";
 var SENSOR_CANDIDATE_LIMIT = 25;
 var KNOWN_METRIC_SET = new Set(OPERATOR_SENSOR_METRICS);
+var SENSOR_SOURCE_CONTRADICTION_WINDOW_MS = 5 * 60 * 1e3;
 function normalizeDiaryLimit(limit) {
   if (!Number.isFinite(limit)) return 10;
   return Math.min(50, Math.max(1, Math.trunc(limit)));
@@ -521,13 +522,47 @@ function newerReading(a, b) {
   }
   return a.id >= b.id ? a : b;
 }
-function selectLatestMcpSensorReadings(rows, options = {}) {
+function sensorSelectionClock(options) {
   const nowMs = (options.now ?? /* @__PURE__ */ new Date()).getTime();
   const requestedStaleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
-  const staleAfterMs =
-    Number.isFinite(requestedStaleAfterMs) && requestedStaleAfterMs >= 0
-      ? requestedStaleAfterMs
-      : STALE_THRESHOLD_MS;
+  return {
+    nowMs,
+    staleAfterMs:
+      Number.isFinite(requestedStaleAfterMs) && requestedStaleAfterMs >= 0
+        ? requestedStaleAfterMs
+        : STALE_THRESHOLD_MS,
+  };
+}
+function findMcpSensorSourceContradictionMetrics(rows, options = {}) {
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
+  const latestByMetricAndSource = /* @__PURE__ */ new Map();
+  for (const row of withoutDiagnosticSensorRows(rows)) {
+    if (!KNOWN_METRIC_SET.has(row.metric) || !isPlausibleMcpSensorValue(row)) continue;
+    const source = normalizeSensorSource(row.source);
+    if (source !== "live" && source !== "manual" && source !== "csv") continue;
+    if (deriveMcpFreshness(row, nowMs, staleAfterMs) !== "fresh") continue;
+    if (!Number.isFinite(effectiveCaptureMs(row))) continue;
+    const bySource = latestByMetricAndSource.get(row.metric) ?? /* @__PURE__ */ new Map();
+    const existing = bySource.get(source);
+    bySource.set(source, existing ? newerReading(existing, row) : row);
+    latestByMetricAndSource.set(row.metric, bySource);
+  }
+  return Object.freeze(
+    OPERATOR_SENSOR_METRICS.filter((metric) => {
+      const bySource = latestByMetricAndSource.get(metric);
+      if (!bySource || bySource.size < 2) return false;
+      const candidates = [...bySource.values()];
+      const newestAt = Math.max(...candidates.map(effectiveCaptureMs));
+      const coeval = candidates.filter(
+        (candidate) =>
+          newestAt - effectiveCaptureMs(candidate) <= SENSOR_SOURCE_CONTRADICTION_WINDOW_MS,
+      );
+      return coeval.length >= 2 && new Set(coeval.map((candidate) => candidate.value)).size > 1;
+    }),
+  );
+}
+function selectLatestMcpSensorReadings(rows, options = {}) {
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
   const selected = {};
   for (const row of withoutDiagnosticSensorRows(rows)) {
     if (!row || !KNOWN_METRIC_SET.has(row.metric)) continue;
@@ -605,6 +640,7 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
   }
   const candidates = results.flatMap((result) => (Array.isArray(result.data) ? result.data : []));
   const readings = selectLatestMcpSensorReadings(candidates, options);
+  const contradictionMetrics = findMcpSensorSourceContradictionMetrics(candidates, options);
   const ownedTent = {
     id: tent.id,
     name: tent.name,
@@ -621,6 +657,7 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
               tentId,
               readings,
             },
+      ...(contradictionMetrics.length > 0 ? { contradictionMetrics } : {}),
     },
   };
 }
@@ -1668,8 +1705,13 @@ var DEFAULT_LOOKBACK_HOURS = 72;
 var MIN_LOOKBACK_HOURS = 24;
 var MAX_LOOKBACK_HOURS = 168;
 var EVENT_LIMIT = 100;
+var EVENT_FETCH_LIMIT = EVENT_LIMIT + 1;
 var PHOTO_LIMIT = 100;
+var PHOTO_FETCH_LIMIT = PHOTO_LIMIT + 1;
 var ALERT_LIMIT = 50;
+var ALERT_FETCH_LIMIT = ALERT_LIMIT + 1;
+var AI_DOCTOR_LIMIT = 1;
+var AI_DOCTOR_FETCH_LIMIT = AI_DOCTOR_LIMIT + 1;
 var ACTION_QUEUE_LIMIT = 20;
 var ACTION_QUEUE_FETCH_LIMIT = ACTION_QUEUE_LIMIT + 1;
 var ACTION_QUEUE_AUDIT_LIMIT = 100;
@@ -2088,7 +2130,7 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
     .order("occurred_at", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(EVENT_LIMIT);
+    .limit(EVENT_FETCH_LIMIT);
   const diaryPhotoQuery = selectWithRetractionCompat((withRetractionFilter) => {
     let query = client
       .from("diary_entries")
@@ -2099,7 +2141,7 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
       .gte("entry_at", cutoff)
       .order("entry_at", { ascending: false })
       .order("id", { ascending: false })
-      .limit(PHOTO_LIMIT);
+      .limit(PHOTO_FETCH_LIMIT);
   });
   const alertsBase = client
     .from("alerts")
@@ -2108,7 +2150,7 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
     .in("status", ["open", "acknowledged"])
     .order("last_seen_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(ALERT_LIMIT);
+    .limit(ALERT_FETCH_LIMIT);
   const aiBase = client
     .from("ai_doctor_sessions")
     .select(AI_DOCTOR_COLUMNS)
@@ -2116,7 +2158,7 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
     .gte("created_at", cutoff)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(1);
+    .limit(AI_DOCTOR_FETCH_LIMIT);
   const actionBase = client
     .from("action_queue")
     .select(ACTION_QUEUE_COLUMNS)
@@ -2125,42 +2167,53 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(ACTION_QUEUE_FETCH_LIMIT);
-  const [eventLane, photoLane, alertLane, aiLane, actionFetchLane, sensorLane] = await Promise.all([
-    settleRows(() => eventAttributionScopeQuery(eventsBase, scope, tentPlantIds), EVENT_LIMIT),
-    settleRows(() => diaryPhotoQuery, PHOTO_LIMIT),
-    settleRows(() => alertAttributionScopeQuery(alertsBase, scope, tentPlantIds), ALERT_LIMIT),
-    settleRows(() => scopeQuery(aiBase, scope), 1),
-    settleRows(() => actionAttributionScopeQuery(actionBase, scope), ACTION_QUEUE_FETCH_LIMIT),
-    (async () => {
-      if (!scope.tent)
-        return {
-          evidence: { available: false, readings: {}, contradictionMetrics: [] },
-          failed: true,
-        };
-      try {
-        const result = await getLatestSensorSnapshotForOwnedTent(client, scope.tent.id, { now });
-        if (!result.ok) {
+  const [eventFetchLane, photoFetchLane, alertFetchLane, aiFetchLane, actionFetchLane, sensorLane] =
+    await Promise.all([
+      settleRows(
+        () => eventAttributionScopeQuery(eventsBase, scope, tentPlantIds),
+        EVENT_FETCH_LIMIT,
+      ),
+      settleRows(() => diaryPhotoQuery, PHOTO_FETCH_LIMIT),
+      settleRows(
+        () => alertAttributionScopeQuery(alertsBase, scope, tentPlantIds),
+        ALERT_FETCH_LIMIT,
+      ),
+      settleRows(() => scopeQuery(aiBase, scope), AI_DOCTOR_FETCH_LIMIT),
+      settleRows(() => actionAttributionScopeQuery(actionBase, scope), ACTION_QUEUE_FETCH_LIMIT),
+      (async () => {
+        if (!scope.tent)
+          return {
+            evidence: { available: false, readings: {}, contradictionMetrics: [] },
+            failed: true,
+          };
+        try {
+          const result = await getLatestSensorSnapshotForOwnedTent(client, scope.tent.id, { now });
+          if (!result.ok) {
+            return {
+              evidence: { available: false, readings: {}, contradictionMetrics: [] },
+              failed: true,
+            };
+          }
+          return {
+            evidence: {
+              available: true,
+              readings: result.data.snapshot?.readings ?? {},
+              contradictionMetrics: result.data.contradictionMetrics ?? [],
+            },
+            failed: false,
+          };
+        } catch {
           return {
             evidence: { available: false, readings: {}, contradictionMetrics: [] },
             failed: true,
           };
         }
-        return {
-          evidence: {
-            available: true,
-            readings: result.data.snapshot?.readings ?? {},
-            contradictionMetrics: [],
-          },
-          failed: false,
-        };
-      } catch {
-        return {
-          evidence: { available: false, readings: {}, contradictionMetrics: [] },
-          failed: true,
-        };
-      }
-    })(),
-  ]);
+      })(),
+    ]);
+  const eventLane = trimLookahead(eventFetchLane, EVENT_LIMIT);
+  const photoLane = trimLookahead(photoFetchLane, PHOTO_LIMIT);
+  const alertLane = trimLookahead(alertFetchLane, ALERT_LIMIT);
+  const aiLane = trimLookahead(aiFetchLane, AI_DOCTOR_LIMIT);
   const actionLane = trimLookahead(actionFetchLane, ACTION_QUEUE_LIMIT);
   const actionRows = actionLane.rows.filter((row) => belongsToActionQueueScope(row, scope));
   const actionAuditLane = await loadActionQueueAudits(client, scope, actionRows);

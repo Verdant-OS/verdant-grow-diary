@@ -11,6 +11,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../integrations/supabase/types";
 import { classifySnapshotFreshness } from "./sensor/sensorSnapshotFreshnessRules";
+import { normalizeSensorSource } from "./sensor/sensorSourceRules";
 import { withoutDiagnosticSensorRows } from "./sensorProvenanceFenceRules";
 import { STALE_THRESHOLD_MS } from "./sensorReadingNormalizationRules";
 import {
@@ -100,6 +101,8 @@ const SENSOR_COLUMNS =
   "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload" as const;
 const SENSOR_CANDIDATE_LIMIT = 25;
 const KNOWN_METRIC_SET: ReadonlySet<string> = new Set(OPERATOR_SENSOR_METRICS);
+/** Match the existing bounded sensor-snapshot cohort window. */
+const SENSOR_SOURCE_CONTRADICTION_WINDOW_MS = 5 * 60 * 1000;
 
 function normalizeDiaryLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit)) return 10;
@@ -307,6 +310,65 @@ function newerReading(a: McpSensorQueryRow, b: McpSensorQueryRow): McpSensorQuer
   return a.id >= b.id ? a : b;
 }
 
+function sensorSelectionClock(options: McpSensorSelectionOptions): {
+  readonly nowMs: number;
+  readonly staleAfterMs: number;
+} {
+  const nowMs = (options.now ?? new Date()).getTime();
+  const requestedStaleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
+  return {
+    nowMs,
+    staleAfterMs:
+      Number.isFinite(requestedStaleAfterMs) && requestedStaleAfterMs >= 0
+        ? requestedStaleAfterMs
+        : STALE_THRESHOLD_MS,
+  };
+}
+
+/**
+ * Find coeval, usable readings for one metric that disagree across canonical
+ * sources before the public snapshot collapses candidates to its newest row.
+ *
+ * The result intentionally contains metric keys only: source/value candidates
+ * remain query-only provenance and are never returned to MCP consumers.
+ */
+export function findMcpSensorSourceContradictionMetrics(
+  rows: readonly McpSensorQueryRow[] | null | undefined,
+  options: McpSensorSelectionOptions = {},
+): readonly string[] {
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
+  const latestByMetricAndSource = new Map<string, Map<string, McpSensorQueryRow>>();
+
+  for (const row of withoutDiagnosticSensorRows(rows)) {
+    if (!KNOWN_METRIC_SET.has(row.metric) || !isPlausibleMcpSensorValue(row)) continue;
+    const source = normalizeSensorSource(row.source);
+    // Demo, stale, invalid, and unknown sources cannot corroborate or
+    // contradict current evidence. Manual/csv remain useful but never live.
+    if (source !== "live" && source !== "manual" && source !== "csv") continue;
+    if (deriveMcpFreshness(row, nowMs, staleAfterMs) !== "fresh") continue;
+    if (!Number.isFinite(effectiveCaptureMs(row))) continue;
+
+    const bySource = latestByMetricAndSource.get(row.metric) ?? new Map();
+    const existing = bySource.get(source);
+    bySource.set(source, existing ? newerReading(existing, row) : row);
+    latestByMetricAndSource.set(row.metric, bySource);
+  }
+
+  return Object.freeze(
+    OPERATOR_SENSOR_METRICS.filter((metric) => {
+      const bySource = latestByMetricAndSource.get(metric);
+      if (!bySource || bySource.size < 2) return false;
+      const candidates = [...bySource.values()];
+      const newestAt = Math.max(...candidates.map(effectiveCaptureMs));
+      const coeval = candidates.filter(
+        (candidate) =>
+          newestAt - effectiveCaptureMs(candidate) <= SENSOR_SOURCE_CONTRADICTION_WINDOW_MS,
+      );
+      return coeval.length >= 2 && new Set(coeval.map((candidate) => candidate.value)).size > 1;
+    }),
+  );
+}
+
 /**
  * Select the newest eligible row per supported metric and strip query-only
  * provenance/tie-break fields before returning it to a consumer.
@@ -315,12 +377,7 @@ export function selectLatestMcpSensorReadings(
   rows: readonly McpSensorQueryRow[] | null | undefined,
   options: McpSensorSelectionOptions = {},
 ): Record<string, McpSensorReading> {
-  const nowMs = (options.now ?? new Date()).getTime();
-  const requestedStaleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
-  const staleAfterMs =
-    Number.isFinite(requestedStaleAfterMs) && requestedStaleAfterMs >= 0
-      ? requestedStaleAfterMs
-      : STALE_THRESHOLD_MS;
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
   const selected: Record<string, McpSensorQueryRow> = {};
 
   for (const row of withoutDiagnosticSensorRows(rows)) {
@@ -362,6 +419,8 @@ export async function getLatestSensorSnapshotForOwnedTent(
   OwnerScopedReadModelResult<{
     tent: OperatorOwnedTent;
     snapshot: null | { tentId: string; readings: Record<string, McpSensorReading> };
+    /** Internal source-conflict receipt for conservative evidence consumers. */
+    contradictionMetrics?: readonly string[];
   }>
 > {
   const { data: tent, error: tentError } = await client
@@ -419,6 +478,7 @@ export async function getLatestSensorSnapshotForOwnedTent(
     Array.isArray(result.data) ? (result.data as McpSensorQueryRow[]) : [],
   );
   const readings = selectLatestMcpSensorReadings(candidates, options);
+  const contradictionMetrics = findMcpSensorSourceContradictionMetrics(candidates, options);
   const ownedTent: OperatorOwnedTent = {
     id: tent.id,
     name: tent.name,
@@ -436,6 +496,7 @@ export async function getLatestSensorSnapshotForOwnedTent(
               tentId,
               readings,
             },
+      ...(contradictionMetrics.length > 0 ? { contradictionMetrics } : {}),
     },
   };
 }

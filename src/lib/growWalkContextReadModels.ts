@@ -54,8 +54,13 @@ const DEFAULT_LOOKBACK_HOURS = 72;
 const MIN_LOOKBACK_HOURS = 24;
 const MAX_LOOKBACK_HOURS = 168;
 const EVENT_LIMIT = 100;
+const EVENT_FETCH_LIMIT = EVENT_LIMIT + 1;
 const PHOTO_LIMIT = 100;
+const PHOTO_FETCH_LIMIT = PHOTO_LIMIT + 1;
 const ALERT_LIMIT = 50;
+const ALERT_FETCH_LIMIT = ALERT_LIMIT + 1;
+const AI_DOCTOR_LIMIT = 1;
+const AI_DOCTOR_FETCH_LIMIT = AI_DOCTOR_LIMIT + 1;
 const ACTION_QUEUE_LIMIT = 20;
 const ACTION_QUEUE_FETCH_LIMIT = ACTION_QUEUE_LIMIT + 1;
 const ACTION_QUEUE_AUDIT_LIMIT = 100;
@@ -763,7 +768,7 @@ export async function getGrowWalkContextForOwnedTarget(
     .order("occurred_at", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(EVENT_LIMIT);
+    .limit(EVENT_FETCH_LIMIT);
   const diaryPhotoQuery = selectWithRetractionCompat((withRetractionFilter) => {
     let query = client
       .from("diary_entries")
@@ -774,7 +779,7 @@ export async function getGrowWalkContextForOwnedTarget(
       .gte("entry_at", cutoff)
       .order("entry_at", { ascending: false })
       .order("id", { ascending: false })
-      .limit(PHOTO_LIMIT);
+      .limit(PHOTO_FETCH_LIMIT);
   });
   const alertsBase = client
     .from("alerts")
@@ -785,7 +790,7 @@ export async function getGrowWalkContextForOwnedTarget(
     .in("status", ["open", "acknowledged"])
     .order("last_seen_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(ALERT_LIMIT);
+    .limit(ALERT_FETCH_LIMIT);
   const aiBase = client
     .from("ai_doctor_sessions")
     .select(AI_DOCTOR_COLUMNS)
@@ -793,7 +798,7 @@ export async function getGrowWalkContextForOwnedTarget(
     .gte("created_at", cutoff)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
-    .limit(1);
+    .limit(AI_DOCTOR_FETCH_LIMIT);
   // AI evidence remains exact-target only. A plant's Action Queue evidence
   // includes its exact rows plus unassigned rows attached to its resolved tent;
   // it never crosses into a sibling or grow-wide action.
@@ -806,66 +811,72 @@ export async function getGrowWalkContextForOwnedTarget(
     .order("id", { ascending: false })
     .limit(ACTION_QUEUE_FETCH_LIMIT);
 
-  const [eventLane, photoLane, alertLane, aiLane, actionFetchLane, sensorLane] = await Promise.all([
-    settleRows<EventRow>(
-      () =>
-        eventAttributionScopeQuery(eventsBase, scope, tentPlantIds) as unknown as PromiseLike<{
-          data: unknown;
-          error: unknown;
-        }>,
-      EVENT_LIMIT,
-    ),
-    settleRows<DiaryPhotoRow>(() => diaryPhotoQuery, PHOTO_LIMIT),
-    settleRows<AlertRow>(
-      () =>
-        alertAttributionScopeQuery(alertsBase, scope, tentPlantIds) as unknown as PromiseLike<{
-          data: unknown;
-          error: unknown;
-        }>,
-      ALERT_LIMIT,
-    ),
-    settleRows<AiDoctorRow>(
-      () => scopeQuery(aiBase, scope) as unknown as PromiseLike<{ data: unknown; error: unknown }>,
-      1,
-    ),
-    settleRows<ActionQueueRow>(
-      () =>
-        actionAttributionScopeQuery(actionBase, scope) as unknown as PromiseLike<{
-          data: unknown;
-          error: unknown;
-        }>,
-      ACTION_QUEUE_FETCH_LIMIT,
-    ),
-    (async (): Promise<{ evidence: GrowWalkSensorEvidence; failed: boolean }> => {
-      if (!scope.tent)
-        return {
-          evidence: { available: false, readings: {}, contradictionMetrics: [] },
-          failed: true,
-        };
-      try {
-        const result = await getLatestSensorSnapshotForOwnedTent(client, scope.tent.id, { now });
-        if (!result.ok) {
+  const [eventFetchLane, photoFetchLane, alertFetchLane, aiFetchLane, actionFetchLane, sensorLane] =
+    await Promise.all([
+      settleRows<EventRow>(
+        () =>
+          eventAttributionScopeQuery(eventsBase, scope, tentPlantIds) as unknown as PromiseLike<{
+            data: unknown;
+            error: unknown;
+          }>,
+        EVENT_FETCH_LIMIT,
+      ),
+      settleRows<DiaryPhotoRow>(() => diaryPhotoQuery, PHOTO_FETCH_LIMIT),
+      settleRows<AlertRow>(
+        () =>
+          alertAttributionScopeQuery(alertsBase, scope, tentPlantIds) as unknown as PromiseLike<{
+            data: unknown;
+            error: unknown;
+          }>,
+        ALERT_FETCH_LIMIT,
+      ),
+      settleRows<AiDoctorRow>(
+        () =>
+          scopeQuery(aiBase, scope) as unknown as PromiseLike<{ data: unknown; error: unknown }>,
+        AI_DOCTOR_FETCH_LIMIT,
+      ),
+      settleRows<ActionQueueRow>(
+        () =>
+          actionAttributionScopeQuery(actionBase, scope) as unknown as PromiseLike<{
+            data: unknown;
+            error: unknown;
+          }>,
+        ACTION_QUEUE_FETCH_LIMIT,
+      ),
+      (async (): Promise<{ evidence: GrowWalkSensorEvidence; failed: boolean }> => {
+        if (!scope.tent)
+          return {
+            evidence: { available: false, readings: {}, contradictionMetrics: [] },
+            failed: true,
+          };
+        try {
+          const result = await getLatestSensorSnapshotForOwnedTent(client, scope.tent.id, { now });
+          if (!result.ok) {
+            return {
+              evidence: { available: false, readings: {}, contradictionMetrics: [] },
+              failed: true,
+            };
+          }
+          return {
+            evidence: {
+              available: true,
+              readings: result.data.snapshot?.readings ?? {},
+              contradictionMetrics: result.data.contradictionMetrics ?? [],
+            },
+            failed: false,
+          };
+        } catch {
           return {
             evidence: { available: false, readings: {}, contradictionMetrics: [] },
             failed: true,
           };
         }
-        return {
-          evidence: {
-            available: true,
-            readings: result.data.snapshot?.readings ?? {},
-            contradictionMetrics: [],
-          },
-          failed: false,
-        };
-      } catch {
-        return {
-          evidence: { available: false, readings: {}, contradictionMetrics: [] },
-          failed: true,
-        };
-      }
-    })(),
-  ]);
+      })(),
+    ]);
+  const eventLane = trimLookahead(eventFetchLane, EVENT_LIMIT);
+  const photoLane = trimLookahead(photoFetchLane, PHOTO_LIMIT);
+  const alertLane = trimLookahead(alertFetchLane, ALERT_LIMIT);
+  const aiLane = trimLookahead(aiFetchLane, AI_DOCTOR_LIMIT);
   const actionLane = trimLookahead(actionFetchLane, ACTION_QUEUE_LIMIT);
   const actionRows = actionLane.rows.filter((row) => belongsToActionQueueScope(row, scope));
   const actionAuditLane = await loadActionQueueAudits(client, scope, actionRows);

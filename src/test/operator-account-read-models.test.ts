@@ -54,6 +54,10 @@ function diaryClient(input: {
           calls.push({ table, method: "eq", args });
           return chain;
         },
+        is(...args: unknown[]) {
+          calls.push({ table, method: "is", args });
+          return chain;
+        },
         order(...args: unknown[]) {
           calls.push({ table, method: "order", args });
           return chain;
@@ -248,6 +252,11 @@ describe("owner-scoped Operator account read models", () => {
         table: "diary_entries",
         method: "eq",
         args: ["grow_id", "grow-1"],
+      });
+      expect(calls).toContainEqual({
+        table: "diary_entries",
+        method: "is",
+        args: ["retracted_at", null],
       });
       expect(calls).toContainEqual({
         table: "diary_entries",

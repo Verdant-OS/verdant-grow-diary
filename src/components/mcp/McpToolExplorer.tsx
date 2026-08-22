@@ -1,11 +1,12 @@
 /**
- * McpToolExplorer — interactive playground for the three advertised
+ * McpToolExplorer — interactive playground for the five advertised
  * Verdant MCP tools. Uses the same browser OAuth token minted by the
  * "Connect this browser" panel on Settings → Agent integrations.
  *
  * SAFETY:
- * - Read-only tools only (list_grows, list_recent_diary_entries,
- *   get_latest_sensor_snapshot). No writes, no Action Queue, no AI.
+ * - Read-only tools only (grows, diary, sensors, and bounded Grow Walk
+ *   target/context reads). Grow Walk may read existing AI Doctor metadata and
+ *   Action Queue summaries, but never invokes AI or changes/approves actions.
  * - The access token is never rendered, logged, or copied into the
  *   result payload. Only the tool's own `structuredContent`/`content`
  *   is shown.
@@ -30,10 +31,8 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Play, PlugZap, RotateCcw, ShieldAlert } from "lucide-react";
 import { callMcpTool, hasStoredToken, type ToolCallOutcome } from "@/lib/mcp/browserOAuthClient";
 import { MCP_MANIFEST, getSupabaseOrigin } from "@/lib/mcp/manifestView";
-import { loadLastValidInputs, saveLastValidInputs } from "@/lib/mcp/lastValidInputs";
+import { loadLastValidInputs, saveLastValidInputs, type ToolName } from "@/lib/mcp/lastValidInputs";
 import { readLocalToolPreferences } from "@/lib/mcp/localToolPreferences";
-
-type ToolName = "list_grows" | "list_recent_diary_entries" | "get_latest_sensor_snapshot";
 
 interface RunState {
   loading: boolean;
@@ -757,9 +756,8 @@ function ToolCard({
               >
                 <p className="font-medium">Re-run this tool?</p>
                 <p>
-                  The three built-in tools are read-only, but confirming avoids repeating side
-                  effects if a future tool ever isn't. The retry will send the current arguments
-                  as-is.
+                  All built-in tools are read-only, but confirming avoids repeating side effects if
+                  a future tool ever isn't. The retry will send the current arguments as-is.
                 </p>
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <Button
@@ -853,6 +851,24 @@ export default function McpToolExplorer() {
     () => loadLastValidInputs<{ tentId: string }>("get_latest_sensor_snapshot") ?? {},
     [],
   );
+  const walkTargetsCache = useMemo(
+    () =>
+      loadLastValidInputs<{
+        growId: string;
+        includeInactivePlants: boolean;
+        limit: string;
+      }>("list_grow_walk_targets") ?? {},
+    [],
+  );
+  const walkContextCache = useMemo(
+    () =>
+      loadLastValidInputs<{
+        targetType: "tent" | "plant";
+        targetId: string;
+        lookbackHours: string;
+      }>("get_grow_walk_context") ?? {},
+    [],
+  );
 
   // list_grows state
   const [includeArchived, setIncludeArchived] = useState<boolean>(
@@ -879,6 +895,34 @@ export default function McpToolExplorer() {
   );
   const [tentIdTouched, setTentIdTouched] = useState(false);
 
+  // list_grow_walk_targets state
+  const [walkGrowId, setWalkGrowId] = useState<string>(
+    typeof walkTargetsCache.growId === "string" ? walkTargetsCache.growId : "",
+  );
+  const [walkGrowIdTouched, setWalkGrowIdTouched] = useState(false);
+  const [includeInactivePlants, setIncludeInactivePlants] = useState<boolean>(
+    typeof walkTargetsCache.includeInactivePlants === "boolean"
+      ? walkTargetsCache.includeInactivePlants
+      : false,
+  );
+  const [walkTargetsLimit, setWalkTargetsLimit] = useState<string>(
+    typeof walkTargetsCache.limit === "string" ? walkTargetsCache.limit : "50",
+  );
+  const [walkTargetsLimitTouched, setWalkTargetsLimitTouched] = useState(false);
+
+  // get_grow_walk_context state
+  const [walkTargetType, setWalkTargetType] = useState<"tent" | "plant">(
+    walkContextCache.targetType === "tent" ? "tent" : "plant",
+  );
+  const [walkTargetId, setWalkTargetId] = useState<string>(
+    typeof walkContextCache.targetId === "string" ? walkContextCache.targetId : "",
+  );
+  const [walkTargetIdTouched, setWalkTargetIdTouched] = useState(false);
+  const [walkLookbackHours, setWalkLookbackHours] = useState<string>(
+    typeof walkContextCache.lookbackHours === "string" ? walkContextCache.lookbackHours : "72",
+  );
+  const [walkLookbackHoursTouched, setWalkLookbackHoursTouched] = useState(false);
+
   // Persist current form values as "last valid inputs" whenever a tool
   // returns an ok, non-error outcome — the exact fields the grower just
   // corrected, ready to pre-fill on the next visit.
@@ -901,6 +945,15 @@ export default function McpToolExplorer() {
   const growIdError = validateRequiredUuid(growId, "growId");
   const diaryLimitError = validateOptionalIntInRange(diaryLimit, 1, 50, "limit");
   const tentIdError = validateRequiredUuid(tentId, "tentId");
+  const walkGrowIdError = validateRequiredUuid(walkGrowId, "growId");
+  const walkTargetsLimitError = validateOptionalIntInRange(walkTargetsLimit, 1, 100, "limit");
+  const walkTargetIdError = validateRequiredUuid(walkTargetId, "targetId");
+  const walkLookbackHoursError = validateOptionalIntInRange(
+    walkLookbackHours,
+    24,
+    168,
+    "lookbackHours",
+  );
 
   const listGrowsErrors: FieldError[] = [];
   if (growsLimitError) {
@@ -926,6 +979,38 @@ export default function McpToolExplorer() {
   const sensorErrors: FieldError[] = [];
   if (tentIdError) {
     sensorErrors.push({ id: "sensor-tent", label: "Tent id", message: tentIdError });
+  }
+
+  const walkTargetsErrors: FieldError[] = [];
+  if (walkGrowIdError) {
+    walkTargetsErrors.push({
+      id: "grow-walk-targets-grow",
+      label: "Grow id",
+      message: walkGrowIdError,
+    });
+  }
+  if (walkTargetsLimitError) {
+    walkTargetsErrors.push({
+      id: "grow-walk-targets-limit",
+      label: "Limit",
+      message: walkTargetsLimitError,
+    });
+  }
+
+  const walkContextErrors: FieldError[] = [];
+  if (walkTargetIdError) {
+    walkContextErrors.push({
+      id: "grow-walk-context-target",
+      label: "Target id",
+      message: walkTargetIdError,
+    });
+  }
+  if (walkLookbackHoursError) {
+    walkContextErrors.push({
+      id: "grow-walk-context-lookback",
+      label: "Lookback hours",
+      message: walkLookbackHoursError,
+    });
   }
 
   return (
@@ -1178,6 +1263,236 @@ export default function McpToolExplorer() {
               telemetry — every other label stays as-is.
             </p>
           )}
+        </div>
+      </ToolCard>
+
+      <ToolCard
+        toolName="list_grow_walk_targets"
+        endpoint={endpoint}
+        connected={connected}
+        locallyEnabled={localPrefs["list_grow_walk_targets"] !== false}
+        onAuthLost={refreshAuth}
+        onRunOutcome={(outcome, category) =>
+          persistOnOk("list_grow_walk_targets", outcome, category, {
+            growId: walkGrowId,
+            includeInactivePlants,
+            limit: walkTargetsLimit,
+          })
+        }
+        fieldErrors={[
+          ...(walkGrowIdTouched && walkGrowIdError
+            ? [{ id: "grow-walk-targets-grow", label: "Grow id", message: walkGrowIdError }]
+            : []),
+          ...(walkTargetsLimitTouched && walkTargetsLimitError
+            ? [{ id: "grow-walk-targets-limit", label: "Limit", message: walkTargetsLimitError }]
+            : []),
+        ]}
+        onApplyArgs={(args) => {
+          const nextGrowId = typeof args.growId === "string" ? args.growId : "";
+          const nextIncludeInactivePlants = Boolean(args.includeInactivePlants);
+          const nextLimit =
+            args.limit === undefined || args.limit === null ? "" : String(args.limit);
+          setWalkGrowId(nextGrowId);
+          setIncludeInactivePlants(nextIncludeInactivePlants);
+          setWalkTargetsLimit(nextLimit);
+          setWalkGrowIdTouched(true);
+          setWalkTargetsLimitTouched(true);
+          saveLastValidInputs("list_grow_walk_targets", {
+            growId: nextGrowId,
+            includeInactivePlants: nextIncludeInactivePlants,
+            limit: nextLimit,
+          });
+        }}
+        buildArgs={() => {
+          const args: Record<string, unknown> = { growId: walkGrowId.trim() };
+          if (includeInactivePlants) args.includeInactivePlants = true;
+          const limit = coerceOptionalInt(walkTargetsLimit);
+          if (limit !== undefined) args.limit = limit;
+          return args;
+        }}
+      >
+        <div className="space-y-1">
+          <Label htmlFor="grow-walk-targets-grow">
+            Grow id <span className="text-muted-foreground">(required UUID)</span>
+          </Label>
+          <Input
+            id="grow-walk-targets-grow"
+            value={walkGrowId}
+            onChange={(e) => {
+              setWalkGrowId(e.target.value);
+              setWalkGrowIdTouched(true);
+            }}
+            onBlur={() => setWalkGrowIdTouched(true)}
+            aria-invalid={walkGrowIdTouched && !!walkGrowIdError}
+            aria-describedby={
+              walkGrowIdTouched && walkGrowIdError ? "grow-walk-targets-grow-error" : undefined
+            }
+            placeholder="e.g. 3f2e1a4b-…-9d2f"
+            spellCheck={false}
+          />
+          {walkGrowIdTouched ? (
+            <FieldError id="grow-walk-targets-grow-error" message={walkGrowIdError} />
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Run <code className="font-mono">list_grows</code> first to copy one of your own grow
+              ids.
+            </p>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="space-y-1">
+            <Label htmlFor="grow-walk-targets-inactive">Include inactive plants</Label>
+            <p className="text-xs text-muted-foreground">Defaults to false.</p>
+          </div>
+          <Switch
+            id="grow-walk-targets-inactive"
+            checked={includeInactivePlants}
+            onCheckedChange={setIncludeInactivePlants}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="grow-walk-targets-limit">
+            Limit <span className="text-muted-foreground">(optional, 1–100)</span>
+          </Label>
+          <Input
+            id="grow-walk-targets-limit"
+            inputMode="numeric"
+            value={walkTargetsLimit}
+            onChange={(e) => {
+              setWalkTargetsLimit(e.target.value);
+              setWalkTargetsLimitTouched(true);
+            }}
+            onBlur={() => setWalkTargetsLimitTouched(true)}
+            aria-invalid={walkTargetsLimitTouched && !!walkTargetsLimitError}
+            aria-describedby={
+              walkTargetsLimitTouched && walkTargetsLimitError
+                ? "grow-walk-targets-limit-error"
+                : undefined
+            }
+            placeholder="50"
+          />
+          {walkTargetsLimitTouched ? (
+            <FieldError id="grow-walk-targets-limit-error" message={walkTargetsLimitError} />
+          ) : null}
+        </div>
+      </ToolCard>
+
+      <ToolCard
+        toolName="get_grow_walk_context"
+        endpoint={endpoint}
+        connected={connected}
+        locallyEnabled={localPrefs["get_grow_walk_context"] !== false}
+        onAuthLost={refreshAuth}
+        onRunOutcome={(outcome, category) =>
+          persistOnOk("get_grow_walk_context", outcome, category, {
+            targetType: walkTargetType,
+            targetId: walkTargetId,
+            lookbackHours: walkLookbackHours,
+          })
+        }
+        fieldErrors={[
+          ...(walkTargetIdTouched && walkTargetIdError
+            ? [{ id: "grow-walk-context-target", label: "Target id", message: walkTargetIdError }]
+            : []),
+          ...(walkLookbackHoursTouched && walkLookbackHoursError
+            ? [
+                {
+                  id: "grow-walk-context-lookback",
+                  label: "Lookback hours",
+                  message: walkLookbackHoursError,
+                },
+              ]
+            : []),
+        ]}
+        onApplyArgs={(args) => {
+          const nextTargetType = args.targetType === "tent" ? "tent" : "plant";
+          const nextTargetId = typeof args.targetId === "string" ? args.targetId : "";
+          const nextLookbackHours =
+            args.lookbackHours === undefined || args.lookbackHours === null
+              ? ""
+              : String(args.lookbackHours);
+          setWalkTargetType(nextTargetType);
+          setWalkTargetId(nextTargetId);
+          setWalkLookbackHours(nextLookbackHours);
+          setWalkTargetIdTouched(true);
+          setWalkLookbackHoursTouched(true);
+          saveLastValidInputs("get_grow_walk_context", {
+            targetType: nextTargetType,
+            targetId: nextTargetId,
+            lookbackHours: nextLookbackHours,
+          });
+        }}
+        buildArgs={() => {
+          const args: Record<string, unknown> = {
+            targetType: walkTargetType,
+            targetId: walkTargetId.trim(),
+          };
+          const lookbackHours = coerceOptionalInt(walkLookbackHours);
+          if (lookbackHours !== undefined) args.lookbackHours = lookbackHours;
+          return args;
+        }}
+      >
+        <div className="space-y-1">
+          <Label htmlFor="grow-walk-context-type">Target type</Label>
+          <select
+            id="grow-walk-context-type"
+            value={walkTargetType}
+            onChange={(e) => setWalkTargetType(e.target.value === "tent" ? "tent" : "plant")}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="plant">Plant</option>
+            <option value="tent">Tent</option>
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="grow-walk-context-target">
+            Target id <span className="text-muted-foreground">(required UUID)</span>
+          </Label>
+          <Input
+            id="grow-walk-context-target"
+            value={walkTargetId}
+            onChange={(e) => {
+              setWalkTargetId(e.target.value);
+              setWalkTargetIdTouched(true);
+            }}
+            onBlur={() => setWalkTargetIdTouched(true)}
+            aria-invalid={walkTargetIdTouched && !!walkTargetIdError}
+            aria-describedby={
+              walkTargetIdTouched && walkTargetIdError
+                ? "grow-walk-context-target-error"
+                : undefined
+            }
+            placeholder="e.g. b7ce1a4b-…-9d2f"
+            spellCheck={false}
+          />
+          {walkTargetIdTouched ? (
+            <FieldError id="grow-walk-context-target-error" message={walkTargetIdError} />
+          ) : null}
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="grow-walk-context-lookback">
+            Lookback hours <span className="text-muted-foreground">(optional, 24–168)</span>
+          </Label>
+          <Input
+            id="grow-walk-context-lookback"
+            inputMode="numeric"
+            value={walkLookbackHours}
+            onChange={(e) => {
+              setWalkLookbackHours(e.target.value);
+              setWalkLookbackHoursTouched(true);
+            }}
+            onBlur={() => setWalkLookbackHoursTouched(true)}
+            aria-invalid={walkLookbackHoursTouched && !!walkLookbackHoursError}
+            aria-describedby={
+              walkLookbackHoursTouched && walkLookbackHoursError
+                ? "grow-walk-context-lookback-error"
+                : undefined
+            }
+            placeholder="72"
+          />
+          {walkLookbackHoursTouched ? (
+            <FieldError id="grow-walk-context-lookback-error" message={walkLookbackHoursError} />
+          ) : null}
         </div>
       </ToolCard>
     </section>

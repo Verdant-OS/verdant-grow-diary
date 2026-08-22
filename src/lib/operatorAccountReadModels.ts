@@ -19,6 +19,7 @@ import {
   validatePh,
   validateTempC,
 } from "./sensorValidation";
+import { selectWithRetractionCompat } from "./quick-log/retractionFilterCompat";
 
 export interface OperatorRecentDiaryEntry {
   id: string;
@@ -128,14 +129,15 @@ export async function listRecentDiaryEntriesForOwnedGrow(
   }
 
   // Deterministic: entry_at DESC, created_at DESC, id DESC (unique tie-breaker).
-  const { data, error } = await client
-    .from("diary_entries")
-    .select(DIARY_COLUMNS)
-    .eq("grow_id", growId)
-    .order("entry_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(normalizeDiaryLimit(limit));
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = client.from("diary_entries").select(DIARY_COLUMNS).eq("grow_id", growId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query
+      .order("entry_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(normalizeDiaryLimit(limit));
+  });
 
   if (error) {
     return { ok: false, reason: "unavailable", message: error.message };

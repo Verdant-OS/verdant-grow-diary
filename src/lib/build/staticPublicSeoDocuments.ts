@@ -685,7 +685,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/docs/mcp-api", {
     title: "Verdant Grow OS MCP API Reference | Tools, Parameters, Safety",
     description:
-      "Reference for the Verdant Grow OS MCP server: list_grows, list_recent_diary_entries, and get_latest_sensor_snapshot — parameters, response examples, and safety invariants.",
+      "Reference for the Verdant Grow OS MCP server: grows, diary, sensor, and bounded Grow Walk context reads — parameters, response examples, and safety invariants.",
     imageAlt: "Verdant Grow OS MCP API reference",
   }),
 ];

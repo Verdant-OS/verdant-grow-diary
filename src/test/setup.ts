@@ -3,6 +3,31 @@ import { beforeEach, afterEach } from "vitest";
 import { cleanup } from "@testing-library/react";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
+// Production deliberately retains this fence for the complete browser page
+// runtime. A Vitest worker hosts many unrelated test runtimes, so clean the
+// exact durable key and runtime singleton between tests instead of allowing an
+// ambiguous hierarchy-create outcome to disable a later test's creator UI.
+// These opaque test-only values intentionally avoid importing the production
+// module here, which would initialize its page-runtime singleton during setup.
+const HIERARCHY_CREATE_OUTCOME_RECOVERY_STORAGE_KEY =
+  "verdant:hierarchy-create-outcome-unknown:v1" as const;
+const HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_STATE_SLOT =
+  "__verdantHierarchyCreateOutcomeRecoveryRuntimeState" as const;
+
+function resetHierarchyCreateOutcomeRecoveryForTest(): void {
+  if (typeof window !== "undefined") {
+    try {
+      window.sessionStorage.removeItem(HIERARCHY_CREATE_OUTCOME_RECOVERY_STORAGE_KEY);
+    } catch {
+      // A blocked test-storage implementation is unreadable to the recovery
+      // helper too; always clear the independently retained runtime fence.
+    }
+  }
+  delete (globalThis as Record<string, unknown>)[
+    HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_STATE_SLOT
+  ];
+}
+
 // Ensure localStorage never leaks across tests (Diary Calendar persists
 // the active filter; stale state would break unrelated suites).
 beforeEach(() => {
@@ -26,6 +51,7 @@ afterEach(() => {
   if (typeof document !== "undefined") {
     document.body.replaceChildren();
   }
+  resetHierarchyCreateOutcomeRecoveryForTest();
 });
 
 // Node-environment suites must not touch `window` at setup evaluation time.

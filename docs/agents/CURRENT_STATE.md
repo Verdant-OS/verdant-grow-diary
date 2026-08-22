@@ -1818,10 +1818,25 @@ appearing twice, while both `.env.production` files still say `test_`. **A build
 did not reconcile the two.** The 2026-08-21 23:03:25 UTC reading of
 `/assets/index-aTS7aKMk.js` is superseded only in its bundle path; every other row held.
 
-**The shipped bundle came from neither `.env.production` file.** The live value
-was supplied at build time by something else — the Lovable platform env panel is
-the obvious candidate, but **which source wins at build time is `NOT_MEASURED`**
-and cannot be determined from this repository. One bound tightened and one did not:
+**The shipped value does not match what either `.env.production` says NOW.** State it
+that way and no further — an earlier revision said the bundle "came from neither
+`.env.production` file", which is a categorical attribution the evidence does not
+support, withdrawn 2026-08-22 after a review P2.
+
+**Which source supplied the value at build time is `NOT_MEASURED`**, and two candidates
+remain live:
+
+1. **A platform environment variable** overriding the files at resolution time — the
+   obvious candidate, and the one the §6.1 withdrawal below leans on.
+2. **The workspace `.env.production` itself carrying a `live_` value at build time and
+   being restored afterwards.** Both files were read _after_ deployment, so this is not
+   excluded by anything measured here. It is the more interesting candidate, because it
+   would explain the shipped token **and** the `treeHash` mismatch with one mechanism,
+   on a build already stamped `dirty: true`.
+
+**Do not discard candidate 2.** The §6.1 withdrawal argues candidate 1 is _likeliest_;
+it does not establish candidate 1 and does not exonerate the file. Only the
+owner-gated build log separates them. One bound tightened and one did not:
 the earlier scan covered all 20 production bundles for `test_`-shaped tokens and found
 none; **this re-measure scanned the main bundle only**, so the other nineteen are
 `NOT_MEASURED` at the 2026-08-22 reading rather than re-confirmed.
@@ -1860,12 +1875,18 @@ confined to inputs that never reach users."
 responsible for the `treeHash` mismatch_ reached shipped bytes. What is measured
 here is different: shipped JS diverges from what the **committed** `.env.production`
 prescribes. Those coincide only if the **workspace file on disk** differed at build
-time — and the likeliest mechanism does the opposite. Vite's `loadEnv` resolves
-`VITE_*` from platform environment variables as well as from `.env` files, and a
-platform variable overrides the file **without altering the file**. Under that
-mechanism the workspace `.env.production` is byte-identical to the committed one,
-contributes **nothing** to the tree-hash mismatch, and the mismatch is caused by
-some other, still-unidentified file.
+time — and there is a mechanism that produces the measurement without any such
+difference. Vite's `loadEnv` resolves `VITE_*` from platform environment variables as
+well as from `.env` files, and a platform variable overrides the file **without
+altering the file**. Under that mechanism the workspace `.env.production` is
+byte-identical to the committed one, contributes **nothing** to the tree-hash
+mismatch, and the mismatch is caused by some other, still-unidentified file.
+
+**That mechanism is sufficient to break the inference; it is not established as what
+happened.** The workspace file may equally have carried a `live_` value at build time
+and been restored afterwards — see the two candidates recorded above — in which case it
+_would_ have both moved the hash and shipped. Either way the §6.1 bound holds, because
+neither candidate is measured. Do not read this withdrawal as clearing the file.
 
 So two separate claims were conflated:
 

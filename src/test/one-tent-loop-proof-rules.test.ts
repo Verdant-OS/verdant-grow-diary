@@ -97,6 +97,33 @@ describe("oneTentLoopProofRules — evaluateLoop", () => {
     for (const r of rows) expect(r.status).toBe("passed");
   });
 
+  it("does not pass an AI Doctor Action Queue advisory when its selected session needs review", () => {
+    const evidence = fresh();
+    evidence.latest_ai_doctor = {
+      ...evidence.latest_ai_doctor!,
+      context_provenance: "current_state_reconstructed",
+    };
+    evidence.latest_action_queue = {
+      ...evidence.latest_action_queue!,
+      source: "ai_doctor",
+      linked_alert_id: null,
+      linked_ai_doctor_session_id: "s1",
+    };
+
+    const byId = Object.fromEntries(evaluateLoop(evidence).map((row) => [row.id, row]));
+    expect(byId["ai-doctor"].status).toBe("needs_review");
+    expect(byId["action-queue"].status).toBe("needs_review");
+  });
+
+  it("does not pass an alert-derived Action Queue advisory when its selected alert needs review", () => {
+    const evidence = fresh();
+    evidence.latest_alert = { ...evidence.latest_alert!, status: "resolved" };
+
+    const byId = Object.fromEntries(evaluateLoop(evidence).map((row) => [row.id, row]));
+    expect(byId["alert"].status).toBe("needs_review");
+    expect(byId["action-queue"].status).toBe("needs_review");
+  });
+
   it("missing grow blocks tent and plant downstream", () => {
     const rows = evaluateLoop({ ...fresh(), grow: null, tent: null, plant: null });
     const byId = Object.fromEntries(rows.map((r) => [r.id, r.status]));
@@ -352,13 +379,32 @@ describe("evaluateActionQueue — persisted approval and provenance", () => {
         risk_level: "low",
         linked_alert_id: "a1",
       },
-      { alert_id: "a1" },
+      { alert_id: "a1", alert_status: "passed" },
     );
     expect(row.status).toBe("passed");
     expect(row.deep_link).toBe("/actions/aq1");
     expect(row.evidence.join(" ").toLowerCase()).toMatch(/approval required/);
     expect(row.evidence.join(" ").toLowerCase()).toMatch(/no device command/);
     expect(row.evidence.join(" ")).toMatch(/Alert-derived advisory/);
+  });
+
+  it("fails closed when an alert-derived advisory has a matching id but no passed alert eligibility", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "environment_alert",
+        reason: "Review humidity [alert:a1]",
+        linked_alert_id: "a1",
+      },
+      { alert_id: "a1", alert_status: "needs_review" },
+    );
+
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/selected alert.*not eligible/i);
   });
 
   it("marks a persisted target device for review without treating it as an executed command", () => {
@@ -372,7 +418,7 @@ describe("evaluateActionQueue — persisted approval and provenance", () => {
         source: "environment_alert",
         linked_alert_id: "a1",
       },
-      { alert_id: "a1" },
+      { alert_id: "a1", alert_status: "passed" },
     );
     expect(row.status).toBe("needs_review");
     expect(row.missing_info.join(" ").toLowerCase()).toMatch(/target device/);
@@ -390,7 +436,7 @@ describe("evaluateActionQueue — persisted approval and provenance", () => {
         source: "environment_alert",
         linked_alert_id: "other-alert",
       },
-      { alert_id: "a1" },
+      { alert_id: "a1", alert_status: "passed" },
     );
     expect(row.status).toBe("needs_review");
     expect(row.missing_info.join(" ").toLowerCase()).toMatch(/matching.*alert/);
@@ -420,11 +466,29 @@ describe("evaluateActionQueue — persisted approval and provenance", () => {
         source: "ai_doctor",
         linked_ai_doctor_session_id: "s1",
       },
-      { ai_doctor_session_id: "s1" },
+      { ai_doctor_session_id: "s1", ai_doctor_status: "passed" },
     );
     expect(row.status).toBe("passed");
     expect(row.evidence.join(" ")).toMatch(/AI Doctor advisory/);
     expect(row.evidence.join(" ")).not.toMatch(/originating alert/i);
+  });
+
+  it("fails closed when an AI Doctor advisory has a matching id but no passed session eligibility", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "ai_doctor",
+        linked_ai_doctor_session_id: "s1",
+      },
+      { ai_doctor_session_id: "s1" },
+    );
+
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/selected ai doctor session.*not eligible/i);
   });
 
   it.each([
@@ -444,7 +508,7 @@ describe("evaluateActionQueue — persisted approval and provenance", () => {
           source: "ai_doctor",
           linked_ai_doctor_session_id: linkedSessionId,
         },
-        { ai_doctor_session_id: "s1" },
+        { ai_doctor_session_id: "s1", ai_doctor_status: "passed" },
       );
       expect(row.status).toBe("needs_review");
       expect(row.missing_info.join(" ")).toMatch(/nonempty.*session/i);
@@ -489,7 +553,7 @@ describe("evaluateActionQueue — persisted approval and provenance", () => {
         reason: "Review humidity [alert:alert-1] [session:session-1]",
         linked_ai_doctor_session_id: "session-1",
       },
-      { ai_doctor_session_id: "session-1" },
+      { ai_doctor_session_id: "session-1", ai_doctor_status: "passed" },
     );
     const rendered = [...row.evidence, ...row.missing_info].join(" ");
     expect(rendered).not.toMatch(/\[alert:/);

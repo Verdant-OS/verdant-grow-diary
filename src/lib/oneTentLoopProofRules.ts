@@ -248,8 +248,20 @@ export interface ActionQueueEvidence {
 }
 
 export interface ActionQueueProofContext {
+  /**
+   * Identifier and evaluated eligibility of the selected Alert evidence.
+   * An alert-derived advisory must not pass merely because its back-pointer
+   * matches an Alert row that is stale, resolved, or otherwise needs review.
+   */
   alert_id?: string | null;
+  alert_status?: LoopStepStatus | null;
+  /**
+   * Identifier and evaluated eligibility of the selected AI Doctor evidence.
+   * An AI Doctor advisory must not pass when its selected session is only
+   * reconstructed or otherwise unable to certify the required context.
+   */
   ai_doctor_session_id?: string | null;
+  ai_doctor_status?: LoopStepStatus | null;
 }
 
 export interface FollowUpEvidence {
@@ -953,6 +965,12 @@ export function evaluateActionQueue(
       if (!isMatchingAlert) {
         return actionQueueNeedsReview(a, "No matching scoped alert back-pointer is recorded.");
       }
+      if (context.alert_status !== "passed") {
+        return actionQueueNeedsReview(
+          a,
+          "The matching selected alert is not eligible as trusted evidence.",
+        );
+      }
       ev.push("Alert-derived advisory.");
       break;
     }
@@ -975,6 +993,12 @@ export function evaluateActionQueue(
       }
       if (linkedSessionId !== selectedSessionId) {
         return actionQueueNeedsReview(a, "AI Doctor advisory does not match the selected session.");
+      }
+      if (context.ai_doctor_status !== "passed") {
+        return actionQueueNeedsReview(
+          a,
+          "The matching selected AI Doctor session is not eligible as trusted evidence.",
+        );
       }
       ev.push("AI Doctor advisory.");
       break;
@@ -1270,7 +1294,9 @@ export function evaluateLoop(input: LoopEvidence): LoopStepRow[] {
   const alert = evaluateAlert(input.latest_alert);
   const aq = evaluateActionQueue(input.latest_action_queue, {
     alert_id: input.latest_alert?.id ?? null,
+    alert_status: alert.status,
     ai_doctor_session_id: input.latest_ai_doctor?.session_id ?? null,
+    ai_doctor_status: ai.status,
   });
   const followUp = evaluateFollowUp(input.latest_follow_up);
   const rows = [grow, tent, plant, quickLog, timeline, sensor, ai, alert, aq, followUp];

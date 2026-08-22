@@ -449,6 +449,20 @@ describe("OneTentLoopLiveProof page", () => {
           created_at: "2026-06-09T11:45:00.000Z",
         },
       ];
+      fixtures.actions = [
+        {
+          id: "aq-ai-current",
+          growId: "grow-current",
+          tentId: "tent-current",
+          status: "pending_approval",
+          source: "ai_doctor",
+          reason: "Review humidity [session:session-current]",
+          riskLevel: "low",
+          alertBackPointerId: null,
+          aiDoctorSessionBackPointerId: "session-current",
+          hasTargetDevice: false,
+        },
+      ];
 
       renderPage();
 
@@ -456,6 +470,9 @@ describe("OneTentLoopLiveProof page", () => {
       expect(aiDoctor.getAttribute("data-status")).toBe("needs_review");
       expect(aiDoctor.textContent).toMatch(/reconstructed.*current app state/i);
       expect(aiDoctor.textContent).toMatch(/not frozen/i);
+      const action = screen.getByTestId("loop-live-proof-step-action-queue");
+      expect(action.getAttribute("data-status")).toBe("needs_review");
+      expect(action.textContent).toMatch(/selected ai doctor session.*not eligible/i);
     } finally {
       vi.useRealTimers();
     }
@@ -485,12 +502,28 @@ describe("OneTentLoopLiveProof page", () => {
         ],
       },
     ];
+    fixtures.actions = [
+      {
+        id: "aq-current",
+        growId: "grow-current",
+        tentId: "tent-current",
+        status: "pending_approval",
+        source: "environment_alert",
+        reason: "Review humidity [alert:alert-current]",
+        riskLevel: "low",
+        alertBackPointerId: "alert-current",
+        hasTargetDevice: false,
+      },
+    ];
 
     renderPage();
 
     const alert = screen.getByTestId("loop-live-proof-step-alert");
     expect(alert.getAttribute("data-status")).toBe("needs_review");
     expect(alert.textContent).toMatch(/not open|resolved/i);
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("needs_review");
+    expect(action.textContent).toMatch(/selected alert.*not eligible/i);
   });
 
   it("does not pass an alert-derived action when no scoped matching alert exists", () => {

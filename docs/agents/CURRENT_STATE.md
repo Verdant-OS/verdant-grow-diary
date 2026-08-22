@@ -1538,7 +1538,7 @@ to read and ingest for future builds", authorised 2026-08-22 as a docs-only slic
 | Field                              | Value                                                                                                                                            |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Repository                         | `Verdant-OS/multi-agent-custom-automation-engine-solution-accelerator` (public)                                                                  |
-| Read at                            | `b4a4a00` on `main`, 2026-06-27 — shallow clone, read 2026-08-22                                                                                 |
+| Read at                            | `b4a4a00` on `main`, `2026-06-26T20:50:10Z` — shallow clone, read 2026-08-22                                                                     |
 | Digest                             | [`docs/knowledge-library/macae-reference-ingest.md`](../knowledge-library/macae-reference-ingest.md)                                             |
 | Clone path (ephemeral)             | `/home/user/verdant-os/multi-agent-custom-automation-engine-solution-accelerator` — does not survive the container; re-clone from the public URL |
 | Runtime behaviour                  | `NOT_MEASURED` — never deployed or executed                                                                                                      |

@@ -32,6 +32,7 @@ const fixtures = vi.hoisted(() => ({
   alerts: [] as Array<Record<string, unknown>>,
   aiSessions: [] as Array<Record<string, unknown>>,
   actions: [] as Array<Record<string, unknown>>,
+  proofSelectedPlantAiCoachRow: null as Record<string, unknown> | null,
   actionHookCalls: [] as unknown[][],
 }));
 
@@ -69,6 +70,7 @@ vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
     fixtures.actionHookCalls.push(args);
     return {
       rows: fixtures.actions,
+      proofSelectedPlantAiCoachRow: fixtures.proofSelectedPlantAiCoachRow,
       isLoading: false,
       isError: false,
       error: null,
@@ -109,6 +111,7 @@ beforeEach(() => {
   fixtures.alerts = [];
   fixtures.aiSessions = [];
   fixtures.actions = [];
+  fixtures.proofSelectedPlantAiCoachRow = null;
   fixtures.actionHookCalls = [];
 });
 
@@ -268,6 +271,21 @@ describe("OneTentLoopLiveProof page", () => {
         hasTargetDevice: false,
       },
     ];
+    // A valid direct Coach candidate must not displace the stronger passed
+    // alert-derived action that is already inside the ordinary bounded list.
+    fixtures.proofSelectedPlantAiCoachRow = {
+      id: "aq-coach-selected",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: "plant-current",
+      status: "pending_approval",
+      source: "ai_coach",
+      reason: "Review the selected plant.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    };
 
     renderPage();
 
@@ -339,6 +357,42 @@ describe("OneTentLoopLiveProof page", () => {
     expect(
       screen.getByTestId("loop-live-proof-step-action-queue").getAttribute("data-status"),
     ).toBe("passed");
+  });
+
+  it("uses the bounded exact selected-plant AI Coach proof row when newer non-causal actions fill the shared display cap", () => {
+    setCurrentTentPlantScope();
+    fixtures.actions = Array.from({ length: 6 }, (_, index) => ({
+      id: `aq-manual-${index + 1}`,
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: null,
+      status: "pending_approval",
+      source: "manual",
+      reason: "Manual action without a proof back-pointer.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    }));
+    fixtures.proofSelectedPlantAiCoachRow = {
+      id: "aq-coach-selected-beyond-display-cap",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: "plant-current",
+      status: "pending_approval",
+      source: "ai_coach",
+      reason: "Review the selected plant.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    };
+
+    renderPage();
+
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("passed");
+    expect(action.textContent).toMatch(/AI Coach advisory/);
   });
 
   it("uses the page's current clock instead of the fixed proof fallback for live freshness", () => {

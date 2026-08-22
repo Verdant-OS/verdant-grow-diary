@@ -35,6 +35,11 @@ import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import {
+  buildQuickLogPhotoAttachmentRecoveryKey,
+  hasQuickLogPhotoAttachmentRecoveryLock,
+  recordQuickLogPhotoAttachmentRecoveryLock,
+} from "@/lib/quickLogPhotoAttachmentRecovery";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
@@ -204,6 +209,7 @@ export default function QuickLogAllActivitiesSection({
   const [guidedSymptomCheck, setGuidedSymptomCheck] = useState(false);
   const [guidedSymptomStage, setGuidedSymptomStage] = useState<CanonicalQuickLogStage | null>(null);
   const [guidedSymptomStageConfirmed, setGuidedSymptomStageConfirmed] = useState(false);
+  const { user } = useAuth();
   // Photo activity: a real image is REQUIRED before Save — a photo entry with
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
@@ -213,21 +219,40 @@ export default function QuickLogAllActivitiesSection({
   // the uncertain write. A target switch must not disable a different plant's
   // editor, while returning to the original target must still prevent a blind
   // duplicate retry.
-  const [photoAttachmentUncertainTargetKeys, setPhotoAttachmentUncertainTargetKeys] = useState<
+  const currentPhotoAttachmentRecoveryScope = useMemo(
+    () => ({
+      ownerId: user?.id ?? null,
+      growId: currentTarget.growId,
+      tentId: currentTarget.tentId,
+      plantId: currentTarget.plantId,
+    }),
+    [currentTarget, user?.id],
+  );
+  const currentPhotoAttachmentRecoveryKey = useMemo(
+    () => buildQuickLogPhotoAttachmentRecoveryKey(currentPhotoAttachmentRecoveryScope),
+    [currentPhotoAttachmentRecoveryScope],
+  );
+  const [photoAttachmentUncertainRecoveryKeys, setPhotoAttachmentUncertainRecoveryKeys] = useState<
     ReadonlySet<string>
   >(() => new Set());
-  const photoAttachmentUncertain = photoAttachmentUncertainTargetKeys.has(currentTargetKey);
-  const markPhotoAttachmentUncertain = useCallback((target: QuickLogAllActivitiesSaveTarget) => {
-    const targetKey = buildQuickLogTargetKey(target);
-    setPhotoAttachmentUncertainTargetKeys((previous) => {
-      if (previous.has(targetKey)) return previous;
-      const next = new Set(previous);
-      next.add(targetKey);
-      return next;
-    });
-  }, []);
+  const photoAttachmentUncertain =
+    currentPhotoAttachmentRecoveryKey !== null &&
+    (photoAttachmentUncertainRecoveryKeys.has(currentPhotoAttachmentRecoveryKey) ||
+      hasQuickLogPhotoAttachmentRecoveryLock(currentPhotoAttachmentRecoveryScope));
+  const markPhotoAttachmentUncertain = useCallback(
+    (ownerId: string, target: QuickLogAllActivitiesSaveTarget) => {
+      const recoveryKey = recordQuickLogPhotoAttachmentRecoveryLock({ ownerId, ...target });
+      if (!recoveryKey) return;
+      setPhotoAttachmentUncertainRecoveryKeys((previous) => {
+        if (previous.has(recoveryKey)) return previous;
+        const next = new Set(previous);
+        next.add(recoveryKey);
+        return next;
+      });
+    },
+    [],
+  );
   const photoDiaryInFlightRef = useRef(false);
-  const { user } = useAuth();
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
@@ -571,6 +596,7 @@ export default function QuickLogAllActivitiesSection({
           setErrorForActivity(selected.id);
           return;
         }
+        const capturedOwnerId = user.id;
         if (!photoFile) {
           setErrorReason("Choose a photo before saving.");
           setErrorForActivity(selected.id);
@@ -600,7 +626,7 @@ export default function QuickLogAllActivitiesSection({
             if (typeof v === "string") photoExtraDetails[k] = v;
           }
           const entryResult = await createQuickLogPhotoDiaryEntry({
-            ownerId: user.id,
+            ownerId: capturedOwnerId,
             growId: capturedTarget.growId,
             tentId: capturedTarget.tentId,
             plantId: capturedTarget.plantId,
@@ -621,7 +647,7 @@ export default function QuickLogAllActivitiesSection({
             // cleanup is safe. An unresolved response loss does not: retain the
             // object and lock only this captured target's photo writes.
             if (failure.ambiguous) {
-              markPhotoAttachmentUncertain(capturedTarget);
+              markPhotoAttachmentUncertain(capturedOwnerId, capturedTarget);
               return;
             } else {
               try {
@@ -647,7 +673,7 @@ export default function QuickLogAllActivitiesSection({
           // the object rather than risking a committed diary row pointing to a
           // deleted photo, and lock only this captured target's photo save.
           if (uploadedPath) {
-            markPhotoAttachmentUncertain(capturedTarget);
+            markPhotoAttachmentUncertain(capturedOwnerId, capturedTarget);
             return;
           }
           setErrorReason("Photo save failed. Nothing was saved.");

@@ -34,7 +34,13 @@ import {
   buildOneTentLoopLiveProofTextReport,
   type LiveProofView,
 } from "@/lib/oneTentLoopLiveProofViewModel";
-import { hasFiniteRecognizedSensorSnapshotMetric } from "@/lib/oneTentLoopProofRules";
+import {
+  evaluateActionQueue,
+  evaluateAiDoctor,
+  evaluateAlert,
+  hasFiniteRecognizedSensorSnapshotMetric,
+} from "@/lib/oneTentLoopProofRules";
+import type { PlantAssignedTentActionRow } from "@/lib/plantAssignedTentActionRules";
 import type {
   OneTentLoopGap,
   OneTentLoopGapEvidenceChecklistItem,
@@ -43,6 +49,7 @@ import type {
 
 import type {
   ActionQueueEvidence,
+  ActionQueueProofContext,
   AiDoctorEvidence,
   AlertEvidence,
   EvidenceProvenance,
@@ -575,6 +582,56 @@ function toQuickLogEvidence(
   };
 }
 
+function toActionQueueEvidence(row: PlantAssignedTentActionRow): ActionQueueEvidence {
+  return {
+    id: row.id,
+    status: row.status,
+    approval_required: row.status === "pending_approval",
+    has_target_device: row.hasTargetDevice,
+    source: row.source,
+    reason: row.reason ?? null,
+    risk_level: row.riskLevel,
+    plant_id: row.plantId,
+    linked_alert_id: row.alertBackPointerId,
+    linked_ai_doctor_session_id: row.aiDoctorSessionBackPointerId,
+  };
+}
+
+/**
+ * Prefer a passed (or safety-blocked) causal Alert/AI Doctor action from the
+ * ordinary bounded list. A separately fetched exact selected-plant Coach row
+ * then beats non-causal rows that only occupy the display cap. Each candidate
+ * is run through the same pure evaluator used by the final proof, so this
+ * presenter never promotes a malformed or unsafe direct lookup.
+ */
+function selectLiveProofActionQueueRow(
+  rows: readonly PlantAssignedTentActionRow[],
+  exactSelectedPlantAiCoachRow: PlantAssignedTentActionRow | null,
+  context: ActionQueueProofContext,
+): PlantAssignedTentActionRow | null {
+  const proofScopedRows = rows.filter(
+    (row) =>
+      getActionQueueSourceKind(row) !== "ai_coach" || row.plantId === context.selected_plant_id,
+  );
+  const causalRow = proofScopedRows.find((row) => {
+    const source = getActionQueueSourceKind(row);
+    if (source !== "environment_alert" && source !== "ai_doctor") return false;
+    const status = evaluateActionQueue(toActionQueueEvidence(row), context).status;
+    return status === "passed" || status === "blocked";
+  });
+  if (causalRow) return causalRow;
+
+  const exactCoachIsEligible =
+    exactSelectedPlantAiCoachRow !== null &&
+    getActionQueueSourceKind(exactSelectedPlantAiCoachRow) === "ai_coach" &&
+    exactSelectedPlantAiCoachRow.plantId === context.selected_plant_id &&
+    evaluateActionQueue(toActionQueueEvidence(exactSelectedPlantAiCoachRow), context).status ===
+      "passed";
+  if (exactCoachIsEligible) return exactSelectedPlantAiCoachRow;
+
+  return proofScopedRows[0] ?? null;
+}
+
 export default function OneTentLoopLiveProof(): JSX.Element {
   const { user } = useAuth();
   const nowMs = useLiveProofReevaluationNowMs();
@@ -682,28 +739,20 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   const aqQ = usePlantAssignedTentActions(tent?.id ?? null, grow?.id ?? null, {
     selectedPlantIdForAiCoach: plant?.id ?? null,
   });
-  // The shared assigned-tent panel intentionally shows all pending tent
-  // actions. This plant-specific proof may only select AI Coach advice that
-  // carries this exact persisted plant id; tent-wide/other-plant Coach rows
-  // remain non-certifying here and the pure evaluator independently enforces
-  // the same fence for direct callers.
-  const aqRow =
-    (aqQ.rows ?? []).find(
-      (row) => getActionQueueSourceKind(row) !== "ai_coach" || row.plantId === plant?.id,
-    ) ?? null;
+  const actionQueueProofContext: ActionQueueProofContext = {
+    selected_plant_id: plant?.id ?? null,
+    alert_id: latest_alert?.id ?? null,
+    alert_status: evaluateAlert(latest_alert).status,
+    ai_doctor_session_id: latest_ai_doctor?.session_id ?? null,
+    ai_doctor_status: evaluateAiDoctor(latest_ai_doctor).status,
+  };
+  const aqRow = selectLiveProofActionQueueRow(
+    aqQ.rows ?? [],
+    aqQ.proofSelectedPlantAiCoachRow,
+    actionQueueProofContext,
+  );
   const latest_action_queue: ActionQueueEvidence | null = aqRow
-    ? {
-        id: aqRow.id,
-        status: aqRow.status,
-        approval_required: aqRow.status === "pending_approval",
-        has_target_device: aqRow.hasTargetDevice,
-        source: aqRow.source,
-        reason: aqRow.reason ?? null,
-        risk_level: aqRow.riskLevel,
-        plant_id: aqRow.plantId,
-        linked_alert_id: aqRow.alertBackPointerId,
-        linked_ai_doctor_session_id: aqRow.aiDoctorSessionBackPointerId,
-      }
+    ? toActionQueueEvidence(aqRow)
     : null;
 
   const latest_follow_up: FollowUpEvidence | null = null;

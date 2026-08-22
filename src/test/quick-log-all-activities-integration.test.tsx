@@ -17,6 +17,7 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 
 import QuickLogAllActivitiesSection from "@/components/QuickLogAllActivitiesSection";
 import { QUICK_LOG_ACTIVITY_DEFINITIONS } from "@/constants/quickLogActivityTypes";
+import { QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY } from "@/lib/quickLogPhotoAttachmentRecovery";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 import {
@@ -117,6 +118,9 @@ async function saveWithoutNote(activityId: string) {
 }
 
 beforeEach(() => {
+  // Recovery fences are intentionally browser-session durable. Keep each
+  // integration case isolated while exercising the real remount behavior.
+  window.sessionStorage.removeItem(QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY);
   rpcMock.mockReset();
   storageUploadMock.mockClear();
   storageUploadMock.mockImplementation(async (..._args: unknown[]) => ({
@@ -437,6 +441,55 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(storageRemoveMock).not.toHaveBeenCalled();
     expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+  });
+
+  it("keeps an ambiguous photo insert locked after legacy Quick Log closes and reopens", async () => {
+    diaryInsertMock.mockImplementationOnce(async () => {
+      throw new Error("network interrupted");
+    });
+
+    const firstOpen = mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [new File(["plant-a"], "plant-a.jpg", { type: "image/jpeg" })] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("quick-log-all-activities-photo-uncertain-recovery"),
+      ).toHaveTextContent(/could not confirm the photo attachment/i),
+    );
+
+    // Closing the legacy Quick Log unmounts this presenter. Reopening the
+    // same target must recover the exact retry fence rather than accepting a
+    // blind duplicate photo insert.
+    firstOpen.unmount();
+    const reopenedSameTarget = mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [new File(["plant-a-retry"], "plant-a-retry.jpg", { type: "image/jpeg" })] },
+    });
+    expect(
+      screen.getByTestId("quick-log-all-activities-photo-uncertain-recovery"),
+    ).toHaveTextContent(/check timeline before adding another photo/i);
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+    expect(diaryInsertMock).toHaveBeenCalledTimes(1);
+
+    // A durable lock for plant A must not cross-contaminate plant B after the
+    // same shell closes and reopens around a different valid target.
+    reopenedSameTarget.unmount();
+    mountSection({ plantId: OTHER_PLANT });
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [new File(["plant-b"], "plant-b.jpg", { type: "image/jpeg" })] },
+    });
+    expect(
+      screen.queryByTestId("quick-log-all-activities-photo-uncertain-recovery"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeEnabled();
   });
 
   it("keeps unresolved photo recovery bound to the captured plant after switching targets", async () => {

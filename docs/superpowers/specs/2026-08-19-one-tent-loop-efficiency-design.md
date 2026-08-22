@@ -196,10 +196,10 @@ after Codex review).** The Sensors loop card provably holds only
 this producer. `sensor-snapshot` branch threads that scope to `/doctor`
 (normalization-only in the rules per A2's precedent; validation on the
 consuming page mirroring `useScopedGrow`'s fail-closed pattern). AiDoctorStart
-uses the validated tent scope to **filter/annotate its plant option list**
-and show a tent-context line; the explicit plant choice stays — "Verdant will
-not guess which plant you mean" (`AiDoctorStart.tsx:50`) is doctrine, and S9's
-tap count is already 2. **No auto-triggered AI call — the readiness gate and
+uses the validated tent scope to **order and annotate its plant option list**
+(never to remove an option) and show a tent-context line; the explicit plant
+choice stays — "Verdant will not guess which plant you mean"
+(`AiDoctorStart.tsx:50`) is doctrine, and S9's tap count is already 2. **No auto-triggered AI call — the readiness gate and
 paid-call behavior are byte-untouched.** `/doctor` also mounts the loop card
 (`current="ai-doctor"`) so the visual chain stops breaking between Sensors
 and Doctor sessions. A validated plant-intent handoff _into_ Sensors (which
@@ -279,7 +279,7 @@ Before-values are the baseline table's; budgets bind only after the harness
 | S6 recovery                          | SHIPPED on Plant Detail (3 taps, 72 h window); `MISSING` on Dashboard/Grow Detail | **Plant Detail: 3 taps (unchanged). Dashboard/Grow Detail: 3 taps + exactly one explicit plant choice** inside the grow-scoped dialog (no plant derivation on those surfaces — hooks expose no plant rows; the D5 chip reduces the choice to one tap); check-in-only classification — never suppressed by Action Queue/alert activity; unknown never prompts; no guilt copy, no forced note/sensor/AI | B3a (+D5 for the one-tap choice)                |
 | S7 save → timeline evidence          | 0–1, uneven feedback                                                              | **≤1 everywhere, uniform confirmation, exactly one row**                                                                                                                                                                                                                                                                                                                                              | B2+B3                                           |
 | S8 timeline → trusted snapshot       | 1 (already met)                                                                   | unchanged; stale honesty via A4                                                                                                                                                                                                                                                                                                                                                                       | pin only                                        |
-| S9 snapshot → doctor context-ready   | 2 interactions / 1 explicit plant choice / 2 transitions (corrected)              | **count unchanged; carried tent scope filters/annotates the plant list and is visible; explicit choice retained; no silent selection**                                                                                                                                                                                                                                                                | B4 (D4; grow/tent carry only)                   |
+| S9 snapshot → doctor context-ready   | 2 interactions / 1 explicit plant choice / 2 transitions (corrected)              | **count unchanged; carried tent scope orders/annotates the plant list (never removes an option) and is visible; explicit choice retained; no silent selection**                                                                                                                                                                                                                                       | B4 (D4; grow/tent carry only)                   |
 | Duplicate-write risk                 | LOW–HIGH by surface                                                               | **LOW everywhere**                                                                                                                                                                                                                                                                                                                                                                                    | B2                                              |
 
 If runtime measurement contradicts a before-value, the baseline is corrected
@@ -337,12 +337,30 @@ project, and the §12-format report with exact counts.
 
 ## 11 · Copy proposed for ratification
 
-| Where                                                                          | String                                                                                                         | Status                                                                                           |
-| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Recovery prompt (B3a: Dashboard/GrowDetail; already live on PlantDetail recap) | "No recent check-in." + "Add a 10-second status: Better, Same, or Worse."                                      | **Already shipped verbatim** in `noRecentLogRecoveryRules.ts:33-38` — B3a reuses it, no new copy |
-| Recovery affordance button                                                     | "Add quick check"                                                                                              | **Already shipped** (same module) — supersedes the earlier draft's "Add status"                  |
-| D5 suggestion chip                                                             | "Continue with <plant name>?" · dismiss: "Choose another"                                                      | Ratified 2026-08-19 with this design                                                             |
-| B4 doctor tent-context line                                                    | Exact string proposed in the B4 PR (tent-scoped — a plant is not provable from the Sensors producer; see D-B6) | Pending — ratify at B4 review                                                                    |
+| Where                                                                          | String                                                                                                                                                                                              | Status                                                                                           |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Recovery prompt (B3a: Dashboard/GrowDetail; already live on PlantDetail recap) | "No recent check-in." + "Add a 10-second status: Better, Same, or Worse."                                                                                                                           | **Already shipped verbatim** in `noRecentLogRecoveryRules.ts:33-38` — B3a reuses it, no new copy |
+| Recovery affordance button                                                     | "Add quick check"                                                                                                                                                                                   | **Already shipped** (same module) — supersedes the earlier draft's "Add status"                  |
+| D5 suggestion chip                                                             | "Continue with `<plant name>`?" · dismiss: "Choose another"                                                                                                                                         | Ratified 2026-08-19 with this design                                                             |
+| B4 doctor tent-context line                                                    | "This link carried tent context: **`<tent name>`**." + (only when plants really are listed) " Its plants are listed first — you can still choose any plant."                                        | **Ratified 2026-08-21 by Cheek**, as shipped in B4a                                              |
+| B4 in-tent option badge                                                        | "In this tent"                                                                                                                                                                                      | Shipped with the line above; exposed to assistive tech as the link's description, not its name   |
+| B4 unverified-scope line                                                       | "Verdant couldn't check the grow or tent this link carried, so no tent context is applied." + (only when listed) " Every active plant is listed below." + retry "Try the check again" / "Checking…" | Shipped with the line above — distinct from the invalid case below, deliberately                 |
+| B4 unowned-scope line                                                          | "That link carried a grow or tent Verdant couldn't match to your account, so no tent context is applied." + (only when listed) " Every active plant is listed below."                               | Shipped with the line above                                                                      |
+
+The ratified line is **tent-scoped, never plant-scoped** — the Sensors loop card
+provably holds only `{ growId, tentId }`, so no plant is honestly nameable from
+this producer (D-B6). Two properties of the wording are load-bearing rather than
+stylistic, and a later edit must preserve both:
+
+- **"listed first", not "filtered to".** The carried scope reorders and badges
+  the options; it never removes one. A shorter list would be a softer way of
+  guessing, and "Verdant will not guess which plant you mean" is doctrine.
+- **Unverified ≠ unowned.** A failed ownership _read_ says Verdant could not
+  check, and offers a retry; a scope the account does not own says so plainly.
+  Collapsing them would report a network failure as a permissions verdict.
+
+Both list clauses are conditional on plants actually being listed, so the page
+never claims a list it is not showing.
 
 No other public copy changes in this tranche.
 

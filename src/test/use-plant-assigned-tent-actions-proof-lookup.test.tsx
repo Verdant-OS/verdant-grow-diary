@@ -2,9 +2,9 @@
  * usePlantAssignedTentActions — proof-only exact causal lookups.
  *
  * The normal assigned-tent panel deliberately reads a small, newest-first
- * window. Live Proof has a stricter identity requirement for AI Coach rows:
- * the selected plant's persisted row must remain reachable even when many
- * newer rows for other plants fill that normal window.
+ * window. Live Proof has stricter identity requirements for its separately
+ * scoped evidence rows, including a selected plant's persisted AI Coach row
+ * when many newer rows for other plants fill that normal window.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
@@ -37,8 +37,8 @@ vi.mock("@/integrations/supabase/client", () => {
   const escapeRegexLiteral = (value: string) => value.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 
   // Minimal PostgreSQL LIKE behavior for the test double: `%` and `_` are
-  // wildcards unless escaped by a backslash. This makes the bounded-read
-  // regression exercise the exact pattern sent to PostgREST before limit(1).
+  // wildcards unless escaped by a backslash. This makes the regression
+  // exercise the exact pattern sent to PostgREST before row shaping.
   const matchesLike = (value: string, pattern: string): boolean => {
     let source = "^";
     for (let index = 0; index < pattern.length; index += 1) {
@@ -65,7 +65,7 @@ vi.mock("@/integrations/supabase/client", () => {
             (row) => typeof row.reason === "string" && matchesLike(row.reason, likePattern),
           )
         : rows;
-    return matchingRows.slice(0, record.limit ?? 0);
+    return record.limit === null ? matchingRows : matchingRows.slice(0, record.limit);
   };
 
   const responseFor = (record: QueryRecord) => {
@@ -182,7 +182,7 @@ beforeEach(() => {
   supabaseState.proofAiDoctorError = null;
 });
 
-describe("usePlantAssignedTentActions — proof-only bounded lookups", () => {
+describe("usePlantAssignedTentActions — proof-only scoped lookups", () => {
   it("finds the exact selected-plant coach row beyond eleven newer other-plant rows with two bounded reads", async () => {
     const newerOtherPlantRows = Array.from({ length: 11 }, (_, index) =>
       action({
@@ -300,7 +300,7 @@ describe("usePlantAssignedTentActions — proof-only bounded lookups", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     // The generic panel remains capped independently; each causal source has
-    // one exact, separately bounded Live Proof evidence slot.
+    // one exact, separately scoped Live Proof evidence slot.
     expect(result.current.rows).toHaveLength(5);
     expect(result.current.proofSelectedAlertActionRow?.id).toBe("older-current-alert-action");
     expect(result.current.proofSelectedAiDoctorActionRow?.id).toBe(
@@ -311,7 +311,7 @@ describe("usePlantAssignedTentActions — proof-only bounded lookups", () => {
     const alertRead = findQuery((query) =>
       query.filters.some(([key, value]) => key === "source" && value === "environment_alert"),
     );
-    expect(alertRead).toMatchObject({ table: "action_queue", limit: 1 });
+    expect(alertRead).toMatchObject({ table: "action_queue", limit: null });
     expect(alertRead.filters).toEqual(
       expect.arrayContaining([
         ["status", "pending_approval"],
@@ -325,7 +325,7 @@ describe("usePlantAssignedTentActions — proof-only bounded lookups", () => {
     const aiDoctorRead = findQuery((query) =>
       query.filters.some(([key, value]) => key === "source" && value === "ai_doctor"),
     );
-    expect(aiDoctorRead).toMatchObject({ table: "action_queue", limit: 1 });
+    expect(aiDoctorRead).toMatchObject({ table: "action_queue", limit: null });
     expect(aiDoctorRead.filters).toEqual(
       expect.arrayContaining([
         ["status", "pending_approval"],
@@ -393,6 +393,71 @@ describe("usePlantAssignedTentActions — proof-only bounded lookups", () => {
       query.filters.some(([key, value]) => key === "source" && value === "ai_doctor"),
     );
     expect(aiDoctorRead.filters).toContainEqual(["reason.like", `%[session:session\\_current]%`]);
+  });
+
+  it("keeps the exact causal row after nine newer duplicate-token decoys", async () => {
+    const newerAlertDecoys = Array.from({ length: 9 }, (_, index) =>
+      action({
+        id: `newer-alert-decoy-${index + 1}`,
+        source: "environment_alert",
+        plant_id: null,
+        reason: `Review [alert:alert-other-${index + 1}] then [alert:${ALERT_ID}]`,
+        created_at: `2026-08-22T10:${String(10 + index).padStart(2, "0")}:00.000Z`,
+      }),
+    );
+    const newerAiDoctorDecoys = Array.from({ length: 9 }, (_, index) =>
+      action({
+        id: `newer-ai-doctor-decoy-${index + 1}`,
+        source: "ai_doctor",
+        plant_id: null,
+        reason: `Review [session:session-other-${index + 1}] then [session:${AI_DOCTOR_SESSION_ID}]`,
+        created_at: `2026-08-22T10:${String(10 + index).padStart(2, "0")}:00.000Z`,
+      }),
+    );
+    supabaseState.proofAlertRows = [
+      ...newerAlertDecoys,
+      action({
+        id: "older-exact-alert-after-decoy",
+        source: "environment_alert",
+        plant_id: null,
+        reason: `Review [alert:${ALERT_ID}]`,
+        created_at: "2026-08-22T09:00:00.000Z",
+      }),
+    ];
+    supabaseState.proofAiDoctorRows = [
+      ...newerAiDoctorDecoys,
+      action({
+        id: "older-exact-ai-doctor-after-decoy",
+        source: "ai_doctor",
+        plant_id: null,
+        reason: `Review [session:${AI_DOCTOR_SESSION_ID}]`,
+        created_at: "2026-08-22T09:00:00.000Z",
+      }),
+    ];
+
+    const { result } = renderHook(
+      () =>
+        usePlantAssignedTentActions(TENT_ID, GROW_ID, {
+          selectedAlertIdForProof: ALERT_ID,
+          selectedAiDoctorSessionIdForProof: AI_DOCTOR_SESSION_ID,
+        }),
+      { wrapper: wrapper(makeClient()) },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.proofSelectedAlertActionRow?.id).toBe("older-exact-alert-after-decoy");
+    expect(result.current.proofSelectedAiDoctorActionRow?.id).toBe(
+      "older-exact-ai-doctor-after-decoy",
+    );
+    const alertRead = findQuery((query) =>
+      query.filters.some(([key, value]) => key === "source" && value === "environment_alert"),
+    );
+    const aiDoctorRead = findQuery((query) =>
+      query.filters.some(([key, value]) => key === "source" && value === "ai_doctor"),
+    );
+    expect(alertRead).toMatchObject({ limit: null });
+    expect(aiDoctorRead).toMatchObject({ limit: null });
   });
 
   it("keeps the exact selected-plant coach row inside the proof display cap ahead of newer non-Coach rows", async () => {

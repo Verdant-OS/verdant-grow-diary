@@ -290,6 +290,10 @@ export default function QuickLogAllActivitiesSection({
           growEventId: null,
           source: "quick_log_v2",
         });
+        // The original response was lost, so the normal success branch never
+        // emitted its privacy-safe funnel event. This exact owner-scoped
+        // reconciliation is the first confirmed save outcome for the attempt.
+        trackQuickLogSuccess("photo", { reused: false });
       },
     );
     return () => {

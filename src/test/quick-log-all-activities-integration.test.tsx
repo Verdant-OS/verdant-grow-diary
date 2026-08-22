@@ -41,6 +41,7 @@ const diaryMaybeSingleMock = vi.fn<() => Promise<{ data: unknown; error: unknown
 const diaryOwnerEqMock = vi.fn(() => ({ maybeSingle: diaryMaybeSingleMock }));
 const diaryIdEqMock = vi.fn(() => ({ eq: diaryOwnerEqMock }));
 const diarySelectMock = vi.fn((..._args: unknown[]) => ({ eq: diaryIdEqMock }));
+const trackQuickLogSuccessMock = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -56,6 +57,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       select: (...args: unknown[]) => diarySelectMock(table, ...(args as [])),
     }),
   },
+}));
+
+vi.mock("@/lib/quickLogSuccessTelemetry", () => ({
+  trackQuickLogSuccess: (...args: unknown[]) => trackQuickLogSuccessMock(...args),
 }));
 
 vi.mock("@/store/auth", () => ({
@@ -136,6 +141,7 @@ beforeEach(() => {
   diaryIdEqMock.mockClear();
   diaryOwnerEqMock.mockClear();
   diaryMaybeSingleMock.mockClear();
+  trackQuickLogSuccessMock.mockReset();
   diaryInsertMock.mockImplementation(async (..._args: unknown[]) => ({ error: null }));
   diaryMaybeSingleMock.mockImplementation(async () => ({ data: null, error: null }));
 });
@@ -530,6 +536,10 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     await screen.findByTestId("quick-log-all-activities-form");
 
     await waitFor(() => expect(diarySelectMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(trackQuickLogSuccessMock).toHaveBeenCalledWith("photo", { reused: false }),
+    );
+    expect(trackQuickLogSuccessMock).toHaveBeenCalledTimes(1);
     expect(
       screen.queryByTestId("quick-log-all-activities-photo-uncertain-recovery"),
     ).not.toBeInTheDocument();

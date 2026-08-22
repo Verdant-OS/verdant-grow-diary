@@ -599,7 +599,7 @@ function toActionQueueEvidence(row: PlantAssignedTentActionRow): ActionQueueEvid
 
 /**
  * Prefer a passed (or safety-blocked) causal Alert/AI Doctor action. Exact
- * current-alert/session rows arrive through separately bounded reads before
+ * current-alert/session rows arrive through separately scoped reads before
  * the ordinary display window, so a busy tent cannot hide older causal
  * evidence. A separately fetched exact selected-plant Coach row then beats
  * non-causal rows that only occupy the display cap. Each candidate is run

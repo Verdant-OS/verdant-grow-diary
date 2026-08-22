@@ -49,9 +49,9 @@ export interface UsePlantAssignedTentActionsOptions {
    * shared bounded display cap. Other action sources remain tent-scoped.
    */
   selectedPlantIdForAiCoach?: string | null | undefined;
-  /** Exact selected alert back-pointer for a separately bounded proof lookup. */
+  /** Exact selected alert back-pointer for a separately scoped proof lookup. */
   selectedAlertIdForProof?: string | null | undefined;
-  /** Exact selected AI Doctor session back-pointer for a bounded proof lookup. */
+  /** Exact selected AI Doctor session back-pointer for a separately scoped proof lookup. */
   selectedAiDoctorSessionIdForProof?: string | null | undefined;
 }
 
@@ -64,7 +64,6 @@ const ACTION_QUEUE_READ_COLUMNS =
  * busy tent cannot push that row outside the generic newest-first window.
  */
 const PROOF_SELECTED_PLANT_AI_COACH_LIMIT = 1;
-const PROOF_EXACT_CAUSAL_ACTION_LIMIT = 1;
 const PROOF_BACK_POINTER_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 function normalizeSelectedPlantId(value: string | null | undefined): string | null {
@@ -99,6 +98,18 @@ function escapePostgrestLikeLiteral(value: string): string {
 
 function buildProofBackPointerLikePattern(kind: "alert" | "session", id: string): string {
   return `%[${kind}:${escapePostgrestLikeLiteral(id)}]%`;
+}
+
+/**
+ * The generic panel is intentionally display-capped. Exact causal proof
+ * queries are already scoped to an escaped back-pointer token, but that token
+ * can occur after a different first token in a reason. Preserve every returned
+ * candidate until the canonical parser verifies its first pointer below.
+ */
+function returnedProofCandidateCount(
+  rows: readonly AssignedTentActionInputRow[] | null | undefined,
+): number {
+  return Math.max(1, rows?.length ?? 0);
 }
 
 export function usePlantAssignedTentActions(
@@ -189,8 +200,7 @@ export function usePlantAssignedTentActions(
         .eq("tent_id", tentId as string)
         .eq("source", ACTION_QUEUE_SOURCE_VALUES.ENVIRONMENT_ALERT)
         .like("reason", buildProofBackPointerLikePattern("alert", alertIdForProof))
-        .order("created_at", { ascending: false })
-        .limit(PROOF_EXACT_CAUSAL_ACTION_LIMIT);
+        .order("created_at", { ascending: false });
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
@@ -217,8 +227,7 @@ export function usePlantAssignedTentActions(
         .eq("tent_id", tentId as string)
         .eq("source", ACTION_QUEUE_SOURCE_VALUES.AI_DOCTOR)
         .like("reason", buildProofBackPointerLikePattern("session", aiDoctorSessionIdForProof))
-        .order("created_at", { ascending: false })
-        .limit(PROOF_EXACT_CAUSAL_ACTION_LIMIT);
+        .order("created_at", { ascending: false });
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
@@ -226,7 +235,7 @@ export function usePlantAssignedTentActions(
     },
   });
 
-  // A proof-mode response is only evidence after every requested bounded read
+  // A proof-mode response is only evidence after every requested scoped read
   // settles cleanly. Otherwise a partial response could incorrectly certify
   // the loop while an older exact causal row is still unknown.
   const hasProofMode =
@@ -271,7 +280,7 @@ export function usePlantAssignedTentActions(
     : (buildAssignedTentActions(proofAlertQ.data ?? [], {
         tentId,
         growId,
-        limit: PROOF_EXACT_CAUSAL_ACTION_LIMIT,
+        limit: returnedProofCandidateCount(proofAlertQ.data),
       }).find(
         (row) =>
           selectedAlertIdForProof !== null &&
@@ -283,7 +292,7 @@ export function usePlantAssignedTentActions(
     : (buildAssignedTentActions(proofAiDoctorQ.data ?? [], {
         tentId,
         growId,
-        limit: PROOF_EXACT_CAUSAL_ACTION_LIMIT,
+        limit: returnedProofCandidateCount(proofAiDoctorQ.data),
       }).find(
         (row) =>
           selectedAiDoctorSessionIdForProof !== null &&

@@ -42,25 +42,68 @@ export interface TimelineNameDirectory {
   carriablePlantTentStatus: CarriablePlantLookupStatus;
 }
 
+/** Rows per directory page. Paged reads are compared against an exact count. */
+const DIRECTORY_PAGE_SIZE = 1000;
+
 /**
- * Did this read return fewer rows than exist?
- *
- * PostgREST caps rows server-side and still reports success, so an account
- * past that cap gets a SUBSET presented as a complete answer. For the two
- * NAME maps that is cosmetic — a label falls back to a neutral fragment. For
- * the CARRY it is a silent drop: a historical Timeline entry can still offer
- * a plant that fell outside the subset, and a lookup built from that subset
- * says "ready" without it, so the CTA is enabled and the plant disappears.
- *
- * Compared against an exact `count` rather than a hardcoded cap on purpose.
- * A literal would have to match the server's, and a literal set too high
- * produces a fence that can never fire — the failure mode this branch has
- * already hit more than once.
+ * Hard stop on the page loop. A runaway would hang Timeline's directory, and
+ * hitting it leaves `complete: false`, so the carry fails closed rather than
+ * silently serving a partial account.
  */
-function truncated(result: { data?: unknown[] | null; count?: number | null } | null): boolean {
-  if (!result) return false;
-  if (typeof result.count !== "number") return false;
-  return result.count > (result.data?.length ?? 0);
+const DIRECTORY_MAX_PAGES = 25;
+
+interface DirectoryRead<T> {
+  rows: T[] | null;
+  /** Whether every row the account holds was actually retrieved. */
+  complete: boolean;
+}
+
+/** One page of an owner-scoped read, as the Supabase builder returns it. */
+type DirectoryPageQuery<T> = (
+  from: number,
+  to: number,
+) => PromiseLike<{ data: T[] | null; error: unknown; count: number | null }>;
+
+/**
+ * Read one owner-scoped table in full.
+ *
+ * PostgREST caps rows server-side and still reports success, so a single
+ * unpaged read hands back a SUBSET presented as the whole account. An earlier
+ * revision only DETECTED that and dropped the carry — which review correctly
+ * showed is the same silent plant loss for the grower, just arrived at more
+ * politely. So the rows are actually fetched.
+ *
+ * Completeness is proven against the exact `count`, not against the page size.
+ * Stopping at "this page came back short" assumes the server's cap is at
+ * least `DIRECTORY_PAGE_SIZE`; if it were smaller, the very first page would
+ * look short and the loop would stop early while rows remained — a fence that
+ * fails silently, which is the shape this branch keeps having to remove.
+ *
+ * Takes a query builder rather than a table name so each call site keeps its
+ * literal table and its generated row types.
+ */
+async function readAllPages<T>(query: DirectoryPageQuery<T>): Promise<DirectoryRead<T>> {
+  const rows: T[] = [];
+  let total: number | null = null;
+
+  for (let page = 0; page < DIRECTORY_MAX_PAGES; page += 1) {
+    const from = page * DIRECTORY_PAGE_SIZE;
+    const result = await query(from, from + DIRECTORY_PAGE_SIZE - 1);
+
+    if (result?.error) return { rows: null, complete: false };
+
+    const batch = result?.data ?? [];
+    rows.push(...batch);
+    if (typeof result?.count === "number") total = result.count;
+
+    if (batch.length === 0) break;
+    if (total !== null && rows.length >= total) break;
+  }
+
+  // A missing count cannot prove or disprove completeness. Treated as
+  // complete to match the pre-existing behaviour of these reads rather than
+  // disabling the carry for every account on a server that omits it.
+  return { rows, complete: total === null || rows.length >= total };
 }
 
 interface DirectorySnapshot {
@@ -121,42 +164,46 @@ export function useTimelineNameDirectory(
           // marker lives in the note) and the third scopes the carry to this
           // page's grow. The read itself stays account-wide, because the name
           // maps below must keep archived, merged, and other-grow rows.
-          supabase
-            .from("plants")
-            .select("id,name,tent_id,grow_id,is_archived,last_note", { count: "exact" })
-            .eq("user_id", userId),
+          readAllPages((from, to) =>
+            supabase
+              .from("plants")
+              .select("id,name,tent_id,grow_id,is_archived,last_note", { count: "exact" })
+              .eq("user_id", userId)
+              .range(from, to),
+          ),
           // `grow_id` resolves the EFFECTIVE grow of a plant whose own column
           // is null but whose tent belongs to this grow; `is_archived` keeps
           // archived tents out of the CARRY (Sensors never sees them) while
           // the name map below still keeps them for history labels.
-          supabase
-            .from("tents")
-            .select("id,name,grow_id,is_archived", { count: "exact" })
-            .eq("user_id", userId),
+          readAllPages((from, to) =>
+            supabase
+              .from("tents")
+              .select("id,name,grow_id,is_archived", { count: "exact" })
+              .eq("user_id", userId)
+              .range(from, to),
+          ),
         ]);
         if (cancelled) return;
         setSnapshot({
           key,
-          plantNamesById: plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data),
-          tentNamesById: tentsResult?.error ? null : buildTimelineNameLookup(tentsResult?.data),
+          plantNamesById: buildTimelineNameLookup(plantsResult.rows ?? undefined),
+          tentNamesById: buildTimelineNameLookup(tentsResult.rows ?? undefined),
           // BOTH reads are required to verify a carry: plants supply the
           // candidates, tents prove the tent is live and can resolve a legacy
-          // plant's effective grow. A failed tents read used to degrade to an
-          // empty tent list, which produced an EMPTY map — and an empty map
-          // is not null, so the status below called it "ready" and Timeline
-          // enabled the handoff with the plant silently removed. That is
-          // "verification failed" wearing the costume of "nothing to carry".
-          // The two NAME maps still degrade independently: a lost label is
-          // cosmetic, a lost verification is not.
+          // plant's effective grow. Either one failing or coming back
+          // incomplete means verification did not happen — which is not the
+          // same as "nothing to carry", and must not be reported as ready.
+          // The two NAME maps degrade independently on whatever arrived: a
+          // lost label is cosmetic, a lost verification is not.
           carriablePlantTentById:
-            plantsResult?.error ||
-            tentsResult?.error ||
-            truncated(plantsResult) ||
-            truncated(tentsResult)
+            !plantsResult.rows ||
+            !tentsResult.rows ||
+            !plantsResult.complete ||
+            !tentsResult.complete
               ? null
-              : buildCarriablePlantTentLookup(plantsResult?.data, {
+              : buildCarriablePlantTentLookup(plantsResult.rows, {
                   growId: activeGrowId,
-                  tents: tentsResult?.data ?? [],
+                  tents: tentsResult.rows,
                 }),
         });
       } catch {

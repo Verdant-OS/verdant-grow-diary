@@ -41,6 +41,8 @@ const state = vi.hoisted(() => ({
   tentsError: null as unknown,
   /** Simulate a server-capped read: rows returned < rows that exist. */
   plantsTotalCount: null as number | null,
+  /** Every `.range()` the hook issued, so paging itself is observable. */
+  ranges: [] as Array<{ table: string; from: number; to: number }>,
 }));
 
 /**
@@ -62,29 +64,33 @@ vi.mock("@/integrations/supabase/client", () => ({
       return {
         select(columns: string) {
           state.selects.push({ table, columns });
+          const source =
+            table === "plants"
+              ? state.plants
+              : [
+                  { id: TENT, name: "Tent A", grow_id: GROW, is_archived: false },
+                  { id: OTHER_GROW_TENT, name: "Tent B", grow_id: OTHER_GROW, is_archived: false },
+                  { id: ARCHIVED_TENT, name: "Tent C", grow_id: GROW, is_archived: true },
+                ];
+          const error = table === "plants" ? state.plantsError : state.tentsError;
+          // `count` is the TOTAL the account holds, independent of what this
+          // page returns — exactly how PostgREST reports it.
+          const total =
+            table === "plants" ? (state.plantsTotalCount ?? source.length) : source.length;
           return {
-            eq: async () =>
-              table === "plants"
-                ? {
-                    data: state.plants.map((row) => project(row, columns)),
-                    error: state.plantsError,
-                    count: state.plantsTotalCount ?? state.plants.length,
-                  }
-                : state.tentsError
-                  ? { data: null, error: state.tentsError }
-                  : {
-                      data: [
-                        { id: TENT, name: "Tent A", grow_id: GROW, is_archived: false },
-                        {
-                          id: OTHER_GROW_TENT,
-                          name: "Tent B",
-                          grow_id: OTHER_GROW,
-                          is_archived: false,
-                        },
-                        { id: ARCHIVED_TENT, name: "Tent C", grow_id: GROW, is_archived: true },
-                      ].map((row) => project(row, columns)),
-                      error: null,
-                    },
+            eq: () => ({
+              // Honours `.range()` so a paged read is actually exercised. A
+              // mock that ignored the range would let a broken page loop pass.
+              range: async (from: number, to: number) => {
+                state.ranges.push({ table, from, to });
+                if (error) return { data: null, error, count: null };
+                return {
+                  data: source.slice(from, to + 1).map((row) => project(row, columns)),
+                  error: null,
+                  count: total,
+                };
+              },
+            }),
           };
         },
       };
@@ -100,6 +106,7 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     state.plantsError = null;
     state.tentsError = null;
     state.plantsTotalCount = null;
+    state.ranges = [];
     state.plants = [
       {
         id: PLANT_ACTIVE,
@@ -270,11 +277,50 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(result.current.carriablePlantTentById).not.toBeNull();
   });
 
-  it("treats a server-CAPPED read as unavailable, not as a complete carry", async () => {
-    // PostgREST caps rows and still reports success, so a large account gets
-    // a SUBSET presented as a complete answer. A historical Timeline entry
-    // can still offer a plant that fell outside it, and a lookup built from
-    // the subset says "ready" without that plant — enabled CTA, silent drop.
+  it("PAGES a large account instead of abandoning the carry", async () => {
+    // The finding this replaced a detect-and-drop fix for: recognising
+    // truncation and refusing is the same silent plant loss for the grower,
+    // every traversal, on any account past the cap. So the rows are fetched.
+    //
+    // 2,400 plants forces three pages at DIRECTORY_PAGE_SIZE 1000. The plant
+    // under test sits in the THIRD page, so it is reachable only if paging
+    // actually happened.
+    const bulk = Array.from({ length: 2399 }, (_, i) => ({
+      id: `${(i + 1).toString(16).padStart(8, "0")}-1111-4111-8111-111111111111`,
+      name: `Bulk ${i}`,
+      tent_id: TENT,
+      grow_id: GROW,
+      is_archived: false,
+      last_note: null,
+    }));
+    const lastPagePlant = {
+      id: PLANT_ACTIVE,
+      name: "Alpha",
+      tent_id: TENT,
+      grow_id: GROW,
+      is_archived: false,
+      last_note: null,
+    };
+    state.plants = [...bulk, lastPagePlant];
+
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
+    await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("ready"));
+
+    // THE property: the plant beyond the first page is carriable.
+    expect(result.current.carriablePlantTentById!.get(PLANT_ACTIVE)).toBe(TENT);
+    expect(result.current.carriablePlantTentById!.size).toBe(2400);
+
+    // And it took real pages to get there, not one oversized read.
+    const plantRanges = state.ranges.filter((r) => r.table === "plants");
+    expect(plantRanges.length).toBeGreaterThanOrEqual(3);
+    expect(plantRanges[0]).toEqual({ table: "plants", from: 0, to: 999 });
+    expect(plantRanges[1]).toEqual({ table: "plants", from: 1000, to: 1999 });
+  });
+
+  it("refuses the carry when the pages cannot account for every row", async () => {
+    // `count` says the account holds one more row than the pages ever
+    // return. Completeness is unproven, so the carry must not claim ready —
+    // this is the residual case AFTER paging, not a substitute for it.
     state.plantsTotalCount = state.plants.length + 1;
     const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
 
@@ -286,7 +332,7 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(result.current.plantNamesById!.get(PLANT_ACTIVE)).toBe("Alpha");
   });
 
-  it("treats a complete read as complete — the cap fence must not fire always", async () => {
+  it("treats a complete read as complete — the fence must not fire always", async () => {
     // The counterpart that keeps the fence honest. A guard that reports
     // truncation on every read would be indistinguishable from a broken
     // carry, and this branch has already shipped one fence that could not

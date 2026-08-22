@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import {
   ONE_TENT_LOOP_STEP_LABEL,
   ONE_TENT_LOOP_HELPER_COPY,
+  ONE_TENT_LOOP_PENDING_COPY,
   resolveOneTentLoopNextStep,
   type OneTentLoopIds,
   type OneTentLoopStep,
@@ -25,9 +26,24 @@ interface Props {
   ids?: OneTentLoopIds;
   className?: string;
   testId?: string;
+  /**
+   * Hold the CTA while a carried selection is still being verified.
+   *
+   * Presenter-only and opt-in: the owning page decides, because only it
+   * knows whether a second read is still in flight. Defaults false, so no
+   * existing mount changes. Never use this for a FAILED read — that is
+   * terminal and the step should stay offered without the carry.
+   */
+  pending?: boolean;
 }
 
-export default function OneTentLoopNextStepCard({ current, ids, className, testId }: Props) {
+export default function OneTentLoopNextStepCard({
+  current,
+  ids,
+  className,
+  testId,
+  pending = false,
+}: Props) {
   const step = resolveOneTentLoopNextStep(current, ids);
   const resolvedTestId = testId ?? "one-tent-loop-next-step-card";
   const currentLabel = ONE_TENT_LOOP_STEP_LABEL[current];
@@ -55,7 +71,18 @@ export default function OneTentLoopNextStepCard({ current, ids, className, testI
           {ONE_TENT_LOOP_HELPER_COPY[current]}
         </p>
       )}
-      {step.disabled ? (
+      {pending ? (
+        // Distinct from `-disabled`: that means "select a record", this means
+        // "already selected, still checking". A test that cannot tell them
+        // apart cannot prove the hold is the reason the CTA is absent.
+        <p
+          className="text-xs text-muted-foreground"
+          role="status"
+          data-testid={`${resolvedTestId}-pending`}
+        >
+          {ONE_TENT_LOOP_PENDING_COPY}
+        </p>
+      ) : step.disabled ? (
         <p className="text-xs text-muted-foreground" data-testid={`${resolvedTestId}-disabled`}>
           {step.disabledReason}
         </p>

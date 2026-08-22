@@ -68,6 +68,15 @@ export const ONE_TENT_LOOP_STEP_LABEL: Record<OneTentLoopStep, string> = {
 export const ONE_TENT_LOOP_DISABLED_COPY = "Next step unavailable until this record is selected.";
 
 /**
+ * Shown while a carried selection is still being checked.
+ *
+ * Deliberately NOT `ONE_TENT_LOOP_DISABLED_COPY`: that string says the
+ * record needs selecting, and here it already is — Verdant is verifying it.
+ * Reusing it would tell the grower to do something they have done.
+ */
+export const ONE_TENT_LOOP_PENDING_COPY = "Checking your selection before carrying it forward.";
+
+/**
  * Cautious helper copy describing why the next step matters. Presenter-only.
  * Must never imply automation, device control, or guaranteed action.
  * Action Queue wording stays approval-required. Empty string means no helper.

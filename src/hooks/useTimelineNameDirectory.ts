@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { buildTimelineNameLookup } from "@/lib/timelineEvidenceFilterRules";
-import { buildCarriablePlantTentLookup } from "@/lib/sensorRoutePlantIntentRules";
+import {
+  buildCarriablePlantTentLookup,
+  type CarriablePlantLookupStatus,
+} from "@/lib/sensorRoutePlantIntentRules";
 
 export interface TimelineNameDirectory {
   /** id → name over the owner's plants, INCLUDING archived/merged rows. Null while unavailable. */
@@ -27,6 +30,16 @@ export interface TimelineNameDirectory {
    *     them (history still refers to those plants); the carry must not.
    */
   carriablePlantTentById: ReadonlyMap<string, string | null> | null;
+  /**
+   * Whether the carry lookup has settled.
+   *
+   * The map alone cannot say: `null` means both "still loading" and "read
+   * failed", and those need opposite handling. A consumer that holds the
+   * handoff on a failed read waits forever; one that proceeds on a pending
+   * read drops the grower's plant. Callers must branch on this, not on
+   * `carriablePlantTentById === null`.
+   */
+  carriablePlantTentStatus: CarriablePlantLookupStatus;
 }
 
 /**
@@ -50,15 +63,20 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
     string,
     string | null
   > | null>(null);
+  const [carriablePlantTentStatus, setCarriablePlantTentStatus] =
+    useState<CarriablePlantLookupStatus>(userId ? "pending" : "unavailable");
 
   useEffect(() => {
     if (!userId) {
       setPlantNamesById(null);
       setTentNamesById(null);
       setCarriablePlantTentById(null);
+      // No signed-in user is terminal, not pending — nothing is in flight.
+      setCarriablePlantTentStatus("unavailable");
       return;
     }
     let cancelled = false;
+    setCarriablePlantTentStatus("pending");
     (async () => {
       try {
         const [plantsResult, tentsResult] = await Promise.all([
@@ -77,11 +95,13 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
         setCarriablePlantTentById(
           plantsResult?.error ? null : buildCarriablePlantTentLookup(plantsResult?.data),
         );
+        setCarriablePlantTentStatus(plantsResult?.error ? "unavailable" : "ready");
       } catch {
         if (cancelled) return;
         setPlantNamesById(null);
         setTentNamesById(null);
         setCarriablePlantTentById(null);
+        setCarriablePlantTentStatus("unavailable");
       }
     })();
     return () => {
@@ -89,5 +109,5 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
     };
   }, [userId]);
 
-  return { plantNamesById, tentNamesById, carriablePlantTentById };
+  return { plantNamesById, tentNamesById, carriablePlantTentById, carriablePlantTentStatus };
 }

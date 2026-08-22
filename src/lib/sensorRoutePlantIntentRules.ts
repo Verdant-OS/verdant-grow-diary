@@ -166,6 +166,41 @@ export function resolveCarriedPlantScope(input: {
 }
 
 /**
+ * Whether the carry lookup has settled.
+ *
+ * `null` conflated two states that need different handling — still loading
+ * and read failed — so they are named. "unavailable" is terminal and carries
+ * tent-only; "pending" resolves shortly and must not be mistaken for it.
+ */
+export type CarriablePlantLookupStatus = "pending" | "ready" | "unavailable";
+
+/**
+ * Whether the loop handoff must WAIT before it can be offered.
+ *
+ * The lookup is a second request, so it can still be in flight when the page
+ * is already interactive. `resolveCarriedPlantScope` correctly refuses to
+ * carry a plant it cannot validate — but during that window the next-step
+ * card was enabled with the plant already dropped, so a grower who clicked
+ * early traversed without their selection and was told nothing. The Timeline
+ * URL still holds `?plantId=`, so Back recovers it; the loss is to that
+ * traversal, not to the page. Silent either way, which is the point.
+ *
+ * Holding only applies when there is genuinely something to lose:
+ *   - status is not "pending" → never hold. A FAILED read is terminal, and
+ *     blocking on it would wait forever for an answer that never comes.
+ *   - no valid plant candidate → never hold. Nothing would be carried even
+ *     once the lookup lands, so waiting would cost the grower a click for
+ *     no gain. A malformed param is "no candidate", not "wait and see".
+ */
+export function shouldHoldCarryForPendingLookup(input: {
+  plantId?: unknown;
+  lookupStatus?: CarriablePlantLookupStatus | null;
+}): boolean {
+  if (input?.lookupStatus !== "pending") return false;
+  return normalizePersistedPlantId(input?.plantId) !== null;
+}
+
+/**
  * Append a plant intent to an already-built internal href.
  *
  * Composes with `buildSensorsTentRouteHref` rather than replacing it, so the

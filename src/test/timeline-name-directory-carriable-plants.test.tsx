@@ -137,6 +137,36 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(result.current.plantNamesById).toBeNull();
   });
 
+  it("names pending and ready as distinct states, not both as a null map", async () => {
+    // Raised in review: `null` meant BOTH "still loading" and "read failed",
+    // and they need opposite handling — a consumer that holds on a failed
+    // read waits forever; one that proceeds while pending drops the plant.
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1"));
+
+    // Before the read resolves the map is null AND the status says why.
+    expect(result.current.carriablePlantTentById).toBeNull();
+    expect(result.current.carriablePlantTentStatus).toBe("pending");
+
+    await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("ready"));
+    expect(result.current.carriablePlantTentById).not.toBeNull();
+  });
+
+  it("reports a failed read as unavailable, never as pending", async () => {
+    state.plantsError = { message: "network down" };
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1"));
+
+    await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("unavailable"));
+    // Terminal: the map is null and stays null, so a consumer must proceed
+    // tent-only rather than wait for a resolution that is not coming.
+    expect(result.current.carriablePlantTentById).toBeNull();
+  });
+
+  it("reports a signed-out session as unavailable, since nothing is in flight", async () => {
+    const { result } = renderHook(() => useTimelineNameDirectory(null));
+    expect(result.current.carriablePlantTentStatus).toBe("unavailable");
+    await waitFor(() => expect(result.current.carriablePlantTentById).toBeNull());
+  });
+
   it("clears the carry lookup when there is no signed-in user", async () => {
     const { result } = renderHook(() => useTimelineNameDirectory(null));
     await waitFor(() => expect(result.current.carriablePlantTentById).toBeNull());

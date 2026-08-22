@@ -18,7 +18,10 @@ import { isTimelineSymptomEvidenceWindowComplete } from "@/lib/timelineSymptomEv
 import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
-import { resolveCarriedPlantScope } from "@/lib/sensorRoutePlantIntentRules";
+import {
+  resolveCarriedPlantScope,
+  shouldHoldCarryForPendingLookup,
+} from "@/lib/sensorRoutePlantIntentRules";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
@@ -1020,9 +1023,8 @@ export default function Timeline() {
   // (includes is_archived rows) keeps filter labels on real names.
   // Gated on a resolved grow scope so a rejected/invalid scope issues
   // no reads at all, matching the page's fail-closed read policy.
-  const { plantNamesById, tentNamesById, carriablePlantTentById } = useTimelineNameDirectory(
-    user && activeGrowId ? user : null,
-  );
+  const { plantNamesById, tentNamesById, carriablePlantTentById, carriablePlantTentStatus } =
+    useTimelineNameDirectory(user && activeGrowId ? user : null);
   const plantOptions = useMemo(
     () => deriveTimelinePlantOptions(entries, plantNamesById),
     [entries, plantNamesById],
@@ -1078,6 +1080,16 @@ export default function Timeline() {
       }),
     [plantFilter, tentFilter, carriablePlantTentById],
   );
+
+  // The lookup is a second request and can still be in flight while the page
+  // is interactive. Offering the step during that window would carry the
+  // grower onward with their plant already dropped and say nothing about it,
+  // so the CTA waits — but only when a valid plant is actually at stake, and
+  // never on a failed read, which never settles.
+  const carryHold = shouldHoldCarryForPendingLookup({
+    plantId: plantFilter,
+    lookupStatus: carriablePlantTentStatus,
+  });
 
   const filtered = useMemo(() => {
     const afterStageEvent = entries.filter((e) => {
@@ -1473,6 +1485,7 @@ export default function Timeline() {
         <OneTentLoopNextStepCard
           current="timeline"
           ids={{ growId: activeGrowId ?? null, ...carriedPlantScope }}
+          pending={carryHold}
           testId="timeline-one-tent-loop-next-step-card"
           className="mb-3"
         />

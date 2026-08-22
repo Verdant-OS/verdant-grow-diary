@@ -17,6 +17,7 @@ import {
   readSensorsPlantRouteIntent,
   buildCarriablePlantTentLookup,
   resolveCarriedPlantScope,
+  shouldHoldCarryForPendingLookup,
   withSensorsPlantIntent,
 } from "@/lib/sensorRoutePlantIntentRules";
 
@@ -229,6 +230,37 @@ describe("resolveCarriedPlantScope", () => {
   });
 });
 
+describe("shouldHoldCarryForPendingLookup", () => {
+  it("holds only while a real plant candidate is genuinely still resolving", () => {
+    expect(shouldHoldCarryForPendingLookup({ plantId: PLANT, lookupStatus: "pending" })).toBe(true);
+  });
+
+  it("never holds once the lookup has settled either way", () => {
+    for (const lookupStatus of ["ready", "unavailable"] as const) {
+      expect(shouldHoldCarryForPendingLookup({ plantId: PLANT, lookupStatus })).toBe(false);
+    }
+    // A FAILED read is terminal. Holding on it would wait forever for an
+    // answer that never arrives, which is worse than carrying tent-only.
+    expect(shouldHoldCarryForPendingLookup({ plantId: PLANT, lookupStatus: "unavailable" })).toBe(
+      false,
+    );
+  });
+
+  it("never holds when nothing would be carried anyway", () => {
+    // Costing the grower a click to wait for a lookup whose answer changes
+    // nothing is a regression, not caution.
+    for (const plantId of ["", "   ", "not-a-uuid", "p1", null, undefined, 42, {}, [PLANT]]) {
+      expect(shouldHoldCarryForPendingLookup({ plantId, lookupStatus: "pending" })).toBe(false);
+    }
+  });
+
+  it("treats an absent or unknown status as settled rather than blocking", () => {
+    expect(shouldHoldCarryForPendingLookup({ plantId: PLANT })).toBe(false);
+    expect(shouldHoldCarryForPendingLookup({ plantId: PLANT, lookupStatus: null })).toBe(false);
+    expect(shouldHoldCarryForPendingLookup({})).toBe(false);
+  });
+});
+
 describe("resolveCarriedPlantScope · archived and merged plants", () => {
   it("drops an archived plant end-to-end, and takes its derived tent with it", () => {
     const ARCHIVED = "aaaaaaaa-1111-4111-8111-111111111111";
@@ -358,6 +390,12 @@ describe("Timeline page wiring", () => {
     // `plantTentById` name back would silently re-admit archived and merged
     // plants, which is the defect this rename encodes.
     expect(src).not.toMatch(/\bplantTentById\b/);
+    // The pending hold must reach the card. Computing it and not passing it
+    // would leave the CTA live through the exact window it exists to close.
+    expect(src).toMatch(
+      /shouldHoldCarryForPendingLookup\(\{\s*plantId:\s*plantFilter,\s*lookupStatus:\s*carriablePlantTentStatus,?\s*\}\)/,
+    );
+    expect(src).toMatch(/pending=\{carryHold\}/);
     // Historical diary attribution must not creep back in as the tent source.
     expect(src).not.toMatch(/resolveCarriedPlantScope\([^)]*entries/);
     // And the result must actually reach the card.

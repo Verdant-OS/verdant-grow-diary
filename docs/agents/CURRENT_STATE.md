@@ -1604,23 +1604,40 @@ differed stays `NOT_MEASURED`.
 
 ## One-Tent goal — blocked on external gates, not code work (recorded 2026-08-21)
 
-Recorded by Claude 2026-08-21 ~22:00 UTC. Every row was measured this turn unless
-labelled otherwise. **No agent performed any of the external transitions named
-below**, and none is authorized by this entry.
+Recorded by Claude 2026-08-21 ~22:00 UTC; **gate states re-checked 2026-08-22 17:12
+UTC.** **No agent performed any of the external transitions named below**, and none is
+authorized by this entry.
+
+**One of the four has since closed: #1091 merged on 2026-08-22.** The table below is
+now three open gates and one closed, not four open. Raised by a review bot on #1092
+and verified at source before correcting — the row had been left describing an
+unperformed owner action that had in fact already happened, which is the
+"propagation after change" failure mode this branch's own audit deliverable names.
+The other three gates are unchanged and still block.
 
 ### The four gates
 
-| Gate                                | State                                                                                                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #1091 ready-state / reviewer action | **Owner-only.** Draft at `74e1ad4`; review automation cannot engage until the transition happens. Not performed by any agent                             |
-| Public attestation                  | **STILL INVALID** (tip/lag re-measured 2026-08-22 17:09 UTC). Canonical `fd2d3e3f7553`, production `faea6e9c59ad` `dirty: true`, lag **`7`** — see below |
-| Disposable authenticated proof      | **Must remain UNDISPATCHED** while attestation is invalid                                                                                                |
-| #1076                               | **HELD.** Open, not draft, `requested_reviewers: cheekhimself` (verified 2026-08-21)                                                                     |
+| Gate                                | State                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #1091 ready-state / reviewer action | **CLOSED 2026-08-22.** #1091 is **merged** — `merged: true`, closed 12:38:29 UTC by `cheekhimself`, final head `c432f9836f74`. It is no longer a draft and no longer waiting on anyone. Superseded row text: "Owner-only. Draft at `74e1ad4`; review automation cannot engage until the transition happens. Not performed by any agent" |
+| Public attestation                  | **STILL INVALID** (tip/lag re-measured 2026-08-22 17:09 UTC). Canonical `fd2d3e3f7553`, production `faea6e9c59ad` `dirty: true`, lag **`7`** — see below                                                                                                                                                                                |
+| Disposable authenticated proof      | **Must remain UNDISPATCHED** while attestation is invalid                                                                                                                                                                                                                                                                               |
+| #1076                               | **HELD.** Open, not draft, `requested_reviewers: cheekhimself` (verified 2026-08-21)                                                                                                                                                                                                                                                    |
 
-### #1091 — 35/35 required is true; "clean head" is not
+### #1091 — 35/35 required is true; "clean head" is not (superseded head)
+
+> **#1091 MERGED 2026-08-22 12:38:29 UTC** as `72e766314` on the deploy branch,
+> from final head `c432f9836f74` — **not** `74e1ad4`. Everything below was measured
+> against `74e1ad4` and describes that head only. The branch advanced past it before
+> merging (`c432f983`, "fix: withhold paused One-Tent proof reads", 11:59:28 UTC,
+> touching five files under `src/`), so **do not read the smoke failure below as a
+> statement about the merged code.** Whether that check was re-run, and with what
+> result, on `c432f983` is `NOT_MEASURED` here. The finding is kept because the
+> _lesson_ survives the merge — "35/35 green" summarised away a red check — while
+> the _measurement_ does not.
 
 `established fact`, measured 2026-08-21 ~21:50 UTC against head `74e1ad4`
-(branch `codex/one-tent-polish-ea31`, **behind the deploy tip by 1**):
+(branch `codex/one-tent-polish-ea31`, **behind the deploy tip by 1 at that time**):
 
 **All 35 ruleset-required contexts are green** — enumerated, not assumed: the 32
 `Full test suite (shard n/32)` jobs, `Lint, typecheck, test, build`,
@@ -1650,6 +1667,10 @@ Codex's owned slice; adopting it would violate the collision fences in this file
 This entry is a handoff, not a claim on the work. But **"35/35 green" is the
 summary that hides this**, so a ready-state transition taken on that summary alone
 would carry an unexamined red into review.
+
+**That warning is now retrospective, not actionable.** #1091 merged on 2026-08-22
+from a later head. The point stands as a reading rule for the next PR summarised as
+"all required green"; it is no longer advice about #1091.
 
 ### Attestation — re-measured 2026-08-22, still invalid
 

@@ -2,8 +2,8 @@ name: Signup attribution CTA readiness
 
 # Secret-free static gate on every PR/push that touches signup attribution or
 # marketing CTA wiring. Optional protected live job confirms ledger + objects
-# when a DB URL is available — GitHub-hosted only (no Tenki / no vendor runners
-# for secret-bearing steps). Does not touch vendor PR #1076.
+# when a DB URL is available — GitHub-hosted runners only for secret-bearing
+# steps. Does not touch unrelated CI migration proposals.
 
 on:
   pull_request:

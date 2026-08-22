@@ -547,15 +547,26 @@ describe("AiDoctorStart · carried plant (B6)", () => {
     ],
   };
 
+  /**
+   * Render `/doctor` with a carried plant and return the ENTRY LOCATION.
+   *
+   * Returned so every fence below can compare the rendered location to the
+   * full string byte-for-byte. `toContain("/doctor")` passed for any path
+   * containing that substring and for any rewritten query, so it did not
+   * actually prove the grower stayed put — which is the whole point of the
+   * never-auto-select fence.
+   */
   function renderCarried(plantId: string) {
     state.grows = CARRIED.grows;
     state.tents = CARRIED.tents;
     state.data = CARRIED.plants;
-    return renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${plantId}`);
+    const entry = `/doctor?growId=grow-1&tentId=tent-a&plantId=${plantId}`;
+    renderPage(entry);
+    return entry;
   }
 
   it("orders the carried plant first and badges it — without selecting it", () => {
-    renderCarried(PLANT_ALPHA);
+    const entry = renderCarried(PLANT_ALPHA);
 
     // Beta is listed first in the fixture; the carry must promote Alpha.
     const options = screen.getAllByTestId(/^ai-doctor-start-option-\d+$/);
@@ -570,7 +581,7 @@ describe("AiDoctorStart · carried plant (B6)", () => {
 
     // THE properties that matter — the grower has not been moved anywhere and
     // no paid model request fired merely from arriving with a carried plant.
-    expect(screen.getByTestId("location").textContent).toContain("/doctor");
+    expect(screen.getByTestId("location").textContent).toBe(entry);
     expect(screen.queryByTestId("plant-detail")).toBeNull();
     expect(state.invoke).not.toHaveBeenCalled();
   });
@@ -593,7 +604,9 @@ describe("AiDoctorStart · carried plant (B6)", () => {
     state.grows = CARRIED.grows;
     state.tents = CARRIED.tents;
     state.data = CARRIED.plants;
-    renderPage("/doctor?growId=grow-1&tentId=tent-a&plantId=99999999-8888-4777-8666-555555555555");
+    const entry =
+      "/doctor?growId=grow-1&tentId=tent-a&plantId=99999999-8888-4777-8666-555555555555";
+    renderPage(entry);
 
     // NO option is badged — an unowned carry promotes nothing at all.
     // (Deliberately not asserting a specific order here: the page applies its
@@ -604,6 +617,9 @@ describe("AiDoctorStart · carried plant (B6)", () => {
     expect(screen.getAllByTestId(/^ai-doctor-start-option-\d+$/)).toHaveLength(2);
     expect(screen.getByText("Alpha")).toBeInTheDocument();
     expect(screen.getByText("Beta")).toBeInTheDocument();
+    // An unowned id is still a raw query value a presenter could navigate on,
+    // so pin the location here too — not just the absence of a paid call.
+    expect(screen.getByTestId("location").textContent).toBe(entry);
     expect(state.invoke).not.toHaveBeenCalled();
   });
 
@@ -611,10 +627,11 @@ describe("AiDoctorStart · carried plant (B6)", () => {
     state.grows = CARRIED.grows;
     state.tents = CARRIED.tents;
     state.data = CARRIED.plants;
-    renderPage("/doctor?growId=grow-1&tentId=tent-a&plantId=not-a-uuid");
+    const entry = "/doctor?growId=grow-1&tentId=tent-a&plantId=not-a-uuid";
+    renderPage(entry);
 
     expect(screen.queryByTestId("ai-doctor-start-option-0-carried")).toBeNull();
-    expect(screen.getByTestId("location").textContent).toContain("/doctor");
+    expect(screen.getByTestId("location").textContent).toBe(entry);
     expect(state.invoke).not.toHaveBeenCalled();
   });
 });

@@ -271,11 +271,17 @@ describe("Timeline page wiring", () => {
     const src = await fs.readFile("src/pages/Timeline.tsx", "utf8");
 
     expect(src).toContain("resolveCarriedPlantScope");
-    // The derivation must be fed the plant filter, the tent filter, and the
-    // rows the tent is derived from — dropping any one silently degrades it.
-    expect(src).toMatch(/resolveCarriedPlantScope\(\{\s*plantId:\s*plantFilter/);
-    expect(src).toMatch(/tentId:\s*tentFilter/);
-    expect(src).toMatch(/plantTentById\s*\}\)/);
+
+    // ONE assertion over the COMPLETE call shape, not three loose regexes.
+    // The looser version was itself defective, and Copilot caught it:
+    // `tentId: tentFilter` also appears at Timeline.tsx:1039 and :1061 in
+    // unrelated objects, so dropping that argument from the resolver call
+    // would have left the separate `/tentId:\s*tentFilter/` probe GREEN —
+    // the same "assertion agrees with something adjacent" defect this pin
+    // exists to catch.
+    expect(src).toMatch(
+      /resolveCarriedPlantScope\(\{\s*plantId:\s*plantFilter,\s*tentId:\s*tentFilter,\s*plantTentById,?\s*\}\)/,
+    );
     // Historical diary attribution must not creep back in as the tent source.
     expect(src).not.toMatch(/resolveCarriedPlantScope\([^)]*entries/);
     // And the result must actually reach the card.

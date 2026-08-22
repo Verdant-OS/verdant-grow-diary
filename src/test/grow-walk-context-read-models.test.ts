@@ -587,6 +587,33 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(JSON.stringify(result)).not.toContain("must-not-cross");
   });
 
+  it("reports the displayed AI Doctor confidence and only uses context confidence as a cap", async () => {
+    const cases = [
+      { displayed: 0.2, ceiling: "high", expected: "low" },
+      { displayed: 0.9, ceiling: "medium", expected: "medium" },
+      { displayed: 0.9, ceiling: "low", expected: "low" },
+      { displayed: null, ceiling: "high", expected: "unknown" },
+      { displayed: 1.1, ceiling: "high", expected: "unknown" },
+    ] as const;
+
+    for (const fixture of cases) {
+      const data = fixtures();
+      const session = (data.ai_doctor_sessions.data as Record<string, unknown>[])[0]!;
+      session.displayed_confidence = fixture.displayed;
+      session.context_confidence_ceiling = fixture.ceiling;
+
+      const result = await getGrowWalkContextForOwnedTarget(
+        clientFor(data).client,
+        { targetType: "plant", targetId: "plant-1" },
+        { now: new Date("2026-08-07T12:00:00.000Z") },
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      expect(result.data.context.evidence.aiDoctor?.confidenceBand).toBe(fixture.expected);
+    }
+  });
+
   it("includes only environmental enclosing-tent events for a plant without importing watering, Worse, sibling, or grow-wide logs", async () => {
     const data = fixtures();
     data.grow_events = {

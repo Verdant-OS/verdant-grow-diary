@@ -1885,14 +1885,20 @@ function toAlertEvidence2(row) {
   };
 }
 function confidenceBand(row) {
-  const ceiling = normalize3(row.context_confidence_ceiling);
-  if (ceiling === "low" || ceiling === "medium" || ceiling === "high") return ceiling;
-  if (typeof row.displayed_confidence !== "number" || !Number.isFinite(row.displayed_confidence)) {
+  if (
+    typeof row.displayed_confidence !== "number" ||
+    !Number.isFinite(row.displayed_confidence) ||
+    row.displayed_confidence < 0 ||
+    row.displayed_confidence > 1
+  ) {
     return "unknown";
   }
-  if (row.displayed_confidence < 0.4) return "low";
-  if (row.displayed_confidence < 0.75) return "medium";
-  return "high";
+  const displayed =
+    row.displayed_confidence < 0.4 ? "low" : row.displayed_confidence < 0.75 ? "medium" : "high";
+  const ceiling = normalize3(row.context_confidence_ceiling);
+  if (ceiling !== "low" && ceiling !== "medium" && ceiling !== "high") return displayed;
+  const rank = { low: 0, medium: 1, high: 2 };
+  return rank[displayed] > rank[ceiling] ? ceiling : displayed;
 }
 function missingInformationCount(value) {
   if (!isRecord2(value)) return 0;

@@ -45,6 +45,7 @@ function baseEvidence(): LoopEvidence {
       captured_at: "2026-06-09T11:59:00.000Z",
       confidence: 0.9,
       metric: "temperature",
+      has_usable_metric: true,
     },
     latest_ai_doctor: {
       session_id: "s1",
@@ -62,8 +63,10 @@ function baseEvidence(): LoopEvidence {
       metric: "vpd",
       severity: "warning",
       reason: "reason",
-      status: "active",
+      status: "open",
       created_at: "2026-06-09T11:50:00.000Z",
+      source: "environment_alerts",
+      has_trusted_event_reference: true,
     },
     latest_action_queue: {
       id: "aq1",

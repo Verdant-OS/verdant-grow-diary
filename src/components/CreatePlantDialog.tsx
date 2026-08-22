@@ -214,6 +214,7 @@ export default function CreatePlantDialog({
 
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
+  const createInFlightRef = useRef(false);
   const [createOutcomeUnknown, setCreateOutcomeUnknown] = useState(false);
   const handoffSuppressedRef = useRef(false);
   const mountedRef = useRef(true);
@@ -356,6 +357,7 @@ export default function CreatePlantDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy || createInFlightRef.current) return;
     if (!user) {
       toast.error("Not signed in");
       return;
@@ -390,130 +392,135 @@ export default function CreatePlantDialog({
     }
 
     handoffSuppressedRef.current = false;
+    createInFlightRef.current = true;
     setBusy(true);
-    const trimmedStrain = form.strain.trim();
-    const payload: Record<string, unknown> = {
-      id: plantId,
-      user_id: user.id,
-      name: form.name.trim(),
-      strain: trimmedStrain || null,
-      stage: form.stage,
-      health: form.health,
-      plant_type: form.plant_type,
-      grow_id: targetGrowId,
-    };
-    if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
-    if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
-
-    const validation = validatePlantInsertPayload(payload);
-    if (!validation.ok || !validation.value) {
-      setBusy(false);
-      toast.error(validation.errors[0] ?? "Plant details are incomplete");
-      return;
-    }
-
-    const attempt = {
-      plantId,
-      ownerId: user.id,
-      growId: targetGrowId,
-      tentId: validation.value.tent_id ?? null,
-    };
-    let data: unknown = null;
-    let error: unknown = null;
-    let insertThrew = false;
     try {
-      const result = await supabase
-        .from("plants")
-        .insert(validation.value as never)
-        .select("*")
-        .single();
-      data = result.data;
-      error = result.error;
-    } catch {
-      insertThrew = true;
-    }
+      const trimmedStrain = form.strain.trim();
+      const payload: Record<string, unknown> = {
+        id: plantId,
+        user_id: user.id,
+        name: form.name.trim(),
+        strain: trimmedStrain || null,
+        stage: form.stage,
+        health: form.health,
+        plant_type: form.plant_type,
+        grow_id: targetGrowId,
+      };
+      if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
+      if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
 
-    let confirmed = !error ? confirmPlantCreateAttemptRow(data, attempt) : null;
-    const needsReconciliation =
-      insertThrew || isAmbiguousPlantInsertError(error) || (!error && !confirmed);
-    if (needsReconciliation) {
-      const reconciliation = await reconcilePlantCreateAttempt(supabase, attempt);
-      if (reconciliation.status === "confirmed") confirmed = reconciliation.confirmed;
-    }
+      const validation = validatePlantInsertPayload(payload);
+      if (!validation.ok || !validation.value) {
+        setBusy(false);
+        toast.error(validation.errors[0] ?? "Plant details are incomplete");
+        return;
+      }
 
-    if (!confirmed && needsReconciliation) {
-      if (mountedRef.current) {
-        setBusy(false);
-        setCreateOutcomeUnknown(true);
+      const attempt = {
+        plantId,
+        ownerId: user.id,
+        growId: targetGrowId,
+        tentId: validation.value.tent_id ?? null,
+      };
+      let data: unknown = null;
+      let error: unknown = null;
+      let insertThrew = false;
+      try {
+        const result = await supabase
+          .from("plants")
+          .insert(validation.value as never)
+          .select("*")
+          .single();
+        data = result.data;
+        error = result.error;
+      } catch {
+        insertThrew = true;
       }
-      toast.error(
-        "Verdant could not confirm whether this plant was saved. Refresh before adding another.",
-      );
-      return;
-    }
-    if (error && !confirmed) {
-      if (mountedRef.current) setBusy(false);
-      const message =
-        typeof error === "object" &&
-        error &&
-        typeof (error as { message?: unknown }).message === "string"
-          ? (error as { message: string }).message
-          : "Plant could not be created";
-      toast.error(message);
-      return;
-    }
-    // The insert is now durable. Record that fact before any cache refresh can
-    // stall or the grower can leave; navigation remains refresh-gated below.
-    trackFunnelEvent("plant_created");
-    if (!confirmed) {
-      if (mountedRef.current) {
-        setBusy(false);
-        setOpen(false);
+
+      let confirmed = !error ? confirmPlantCreateAttemptRow(data, attempt) : null;
+      const needsReconciliation =
+        insertThrew || isAmbiguousPlantInsertError(error) || (!error && !confirmed);
+      if (needsReconciliation) {
+        const reconciliation = await reconcilePlantCreateAttempt(supabase, attempt);
+        if (reconciliation.status === "confirmed") confirmed = reconciliation.confirmed;
       }
-      toast.error(
-        "Plant was saved, but Verdant could not confirm its details. Refresh before adding another.",
-      );
-      return;
+
+      if (!confirmed && needsReconciliation) {
+        if (mountedRef.current) {
+          setBusy(false);
+          setCreateOutcomeUnknown(true);
+        }
+        toast.error(
+          "Verdant could not confirm whether this plant was saved. Refresh before adding another.",
+        );
+        return;
+      }
+      if (error && !confirmed) {
+        if (mountedRef.current) setBusy(false);
+        const message =
+          typeof error === "object" &&
+          error &&
+          typeof (error as { message?: unknown }).message === "string"
+            ? (error as { message: string }).message
+            : "Plant could not be created";
+        toast.error(message);
+        return;
+      }
+      // The insert is now durable. Record that fact before any cache refresh can
+      // stall or the grower can leave; navigation remains refresh-gated below.
+      trackFunnelEvent("plant_created");
+      if (!confirmed) {
+        if (mountedRef.current) {
+          setBusy(false);
+          setOpen(false);
+        }
+        toast.error(
+          "Plant was saved, but Verdant could not confirm its details. Refresh before adding another.",
+        );
+        return;
+      }
+      const isSubmittedOwnerCurrent = () =>
+        mountedRef.current && currentOwnerIdRef.current === user.id;
+      const cacheOptions = {
+        isOwnerCurrent: isSubmittedOwnerCurrent,
+        onGrowCacheConfirmed: (key) => {
+          recordConfirmedGrowPlantMeta(user.id, key);
+        },
+      };
+      const cacheReceipt = await primeConfirmedPlantCaches(qc, user.id, confirmed, cacheOptions);
+      if (!isSubmittedOwnerCurrent()) {
+        if (mountedRef.current) setBusy(false);
+        else toast.success("Plant created");
+        return;
+      }
+      // The insert is durable before these reads. Keep the dialog and its handoff
+      // pending until both legacy Quick Log and owner-scoped grow views have
+      // attempted authoritative reconciliation, matching Start Your Room.
+      await Promise.allSettled([
+        qc.invalidateQueries({ queryKey: ["plants"] }),
+        qc.invalidateQueries({ queryKey: ["grow", "plants"] }),
+      ]);
+      reaffirmConfirmedPlantCacheMeta(qc, confirmed, cacheReceipt, cacheOptions);
+      if (!isSubmittedOwnerCurrent()) {
+        if (mountedRef.current) setBusy(false);
+        else toast.success("Plant created");
+        return;
+      }
+      const stillMounted = mountedRef.current;
+      const handoffSuppressed = handoffSuppressedRef.current;
+      if (stillMounted) setBusy(false);
+      toast.success("Plant created");
+      if (!stillMounted || handoffSuppressed) return;
+      setForm(emptyForm(initialTentId));
+      setExplicitCompatiblePick(false);
+      setNestedTents([]);
+      setPendingNestedTentId(null);
+      setNestedTentCreatorMounted(false);
+      setOpen(false);
+      if (onCreated) onCreated(confirmed.row);
+    } finally {
+      createInFlightRef.current = false;
     }
-    const isSubmittedOwnerCurrent = () =>
-      mountedRef.current && currentOwnerIdRef.current === user.id;
-    const cacheOptions = {
-      isOwnerCurrent: isSubmittedOwnerCurrent,
-      onGrowCacheConfirmed: (key) => {
-        recordConfirmedGrowPlantMeta(user.id, key);
-      },
-    };
-    const cacheReceipt = await primeConfirmedPlantCaches(qc, user.id, confirmed, cacheOptions);
-    if (!isSubmittedOwnerCurrent()) {
-      if (mountedRef.current) setBusy(false);
-      else toast.success("Plant created");
-      return;
-    }
-    // The insert is durable before these reads. Keep the dialog and its handoff
-    // pending until both legacy Quick Log and owner-scoped grow views have
-    // attempted authoritative reconciliation, matching Start Your Room.
-    await Promise.allSettled([
-      qc.invalidateQueries({ queryKey: ["plants"] }),
-      qc.invalidateQueries({ queryKey: ["grow", "plants"] }),
-    ]);
-    reaffirmConfirmedPlantCacheMeta(qc, confirmed, cacheReceipt, cacheOptions);
-    if (!isSubmittedOwnerCurrent()) {
-      if (mountedRef.current) setBusy(false);
-      else toast.success("Plant created");
-      return;
-    }
-    const stillMounted = mountedRef.current;
-    const handoffSuppressed = handoffSuppressedRef.current;
-    if (stillMounted) setBusy(false);
-    toast.success("Plant created");
-    if (!stillMounted || handoffSuppressed) return;
-    setForm(emptyForm(initialTentId));
-    setExplicitCompatiblePick(false);
-    setNestedTents([]);
-    setPendingNestedTentId(null);
-    setNestedTentCreatorMounted(false);
-    setOpen(false);
-    if (onCreated) onCreated(confirmed.row);
   }
 
   return (

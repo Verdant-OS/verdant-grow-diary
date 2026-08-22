@@ -1,0 +1,124 @@
+/**
+ * One-Tent Loop alert-origin evidence resolver.
+ *
+ * The generic originating-timeline-event adapter deliberately normalizes
+ * persisted JSON without looking it up. The Live Proof needs a stricter,
+ * proof-specific gate: a claimed ref can certify an Alert only when it
+ * exactly resolves to provenance already loaded for the selected tent.
+ *
+ * Pure. No I/O, React, Supabase, fetch, schema, or writer behavior.
+ */
+
+import {
+  isTrustedTimelineEventSource,
+  type OriginatingTimelineEventRef,
+  type OriginatingTimelineEventSource,
+} from "@/lib/originatingTimelineEventRules";
+import type {
+  SensorSnapshot,
+  SensorSnapshotMetricRef,
+  SensorSnapshotMetricRefKey,
+} from "@/lib/sensorSnapshot";
+
+export interface OneTentLoopAlertEvidenceInput {
+  /** Sanitized, syntactic refs from the generic adapter. */
+  refs: readonly OriginatingTimelineEventRef[] | null | undefined;
+  /** Already-loaded current snapshot for this proof page. */
+  snapshot:
+    | Pick<SensorSnapshot, "source" | "tent_id" | "metric_refs" | "diary_evidence_ref">
+    | null
+    | undefined;
+  /** Persisted alert metric. Only deterministic known aliases are accepted. */
+  alert_metric: string | null | undefined;
+  /** Tent currently selected by the proof page. */
+  selected_tent_id: string | null | undefined;
+}
+
+const METRIC_KEY_BY_ALERT_METRIC: Readonly<Record<string, SensorSnapshotMetricRefKey>> = {
+  temp: "temp",
+  temperature: "temp",
+  temperature_c: "temp",
+  temp_c: "temp",
+  rh: "rh",
+  humidity: "rh",
+  humidity_pct: "rh",
+  vpd: "vpd",
+  vpd_kpa: "vpd",
+  soil: "soil",
+  soil_moisture: "soil",
+  soil_ec: "soil_ec",
+  soil_temp: "soil_temp",
+  soil_temp_c: "soil_temp",
+  ppfd: "ppfd",
+};
+
+function normalizeMetricKey(raw: string | null | undefined): SensorSnapshotMetricRefKey | null {
+  if (typeof raw !== "string") return null;
+  return METRIC_KEY_BY_ALERT_METRIC[raw.trim().toLowerCase()] ?? null;
+}
+
+function normalizedTrustedSource(
+  raw: string | null | undefined,
+): OriginatingTimelineEventSource | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim().toLowerCase();
+  if (value !== "live" && value !== "manual" && value !== "csv") return null;
+  const source = value as OriginatingTimelineEventSource;
+  return isTrustedTimelineEventSource(source) ? source : null;
+}
+
+function equalTrimmed(a: string | null | undefined, b: string | null | undefined): boolean {
+  return typeof a === "string" && typeof b === "string" && a.trim() !== "" && a.trim() === b.trim();
+}
+
+function matchesSensorMetricRef(
+  ref: OriginatingTimelineEventRef,
+  metricRef: SensorSnapshotMetricRef | null | undefined,
+): boolean {
+  if (!metricRef || ref.type !== "sensor_snapshot") return false;
+  const expectedSource = normalizedTrustedSource(metricRef.source);
+  return (
+    expectedSource !== null &&
+    ref.source === expectedSource &&
+    equalTrimmed(ref.id, metricRef.id) &&
+    equalTrimmed(ref.occurred_at, metricRef.captured_at)
+  );
+}
+
+function matchesDiaryEnvironmentCheckRef(
+  ref: OriginatingTimelineEventRef,
+  snapshot: OneTentLoopAlertEvidenceInput["snapshot"],
+): boolean {
+  const diaryRef = snapshot?.diary_evidence_ref;
+  // `snapshotFromEnvironmentCheck` is the sole producer of this exact
+  // ref and labels it manual. Do not let an arbitrary diary-shaped ref
+  // upgrade another snapshot source to trusted proof evidence.
+  return (
+    snapshot?.source === "manual" &&
+    ref.type === "diary_entry" &&
+    ref.source === "manual" &&
+    equalTrimmed(ref.id, diaryRef?.id) &&
+    equalTrimmed(ref.occurred_at, diaryRef?.entry_at)
+  );
+}
+
+/**
+ * True only when at least one persisted ref exactly resolves to the
+ * selected-tent snapshot's current metric provenance or its exact manual
+ * Environment Check diary provenance. Unknown, foreign, stale-shape, and
+ * self-declared refs fail closed.
+ */
+export function hasResolvedOneTentLoopAlertEvidence(input: OneTentLoopAlertEvidenceInput): boolean {
+  const selectedTentId = input.selected_tent_id;
+  const snapshot = input.snapshot;
+  if (!selectedTentId || !snapshot || snapshot.tent_id !== selectedTentId) return false;
+  if (!Array.isArray(input.refs) || input.refs.length === 0) return false;
+
+  const metricKey = normalizeMetricKey(input.alert_metric);
+  const metricRef = metricKey ? (snapshot.metric_refs?.[metricKey] ?? null) : null;
+
+  return input.refs.some(
+    (ref) =>
+      matchesSensorMetricRef(ref, metricRef) || matchesDiaryEnvironmentCheckRef(ref, snapshot),
+  );
+}

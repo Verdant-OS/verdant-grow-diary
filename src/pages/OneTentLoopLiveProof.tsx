@@ -26,7 +26,8 @@ import { useAlertsList } from "@/hooks/useAlertsList";
 import { useAiDoctorSessions } from "@/hooks/use-ai-doctor-sessions";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
 import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
-import { isTrustedTimelineEventSource } from "@/lib/originatingTimelineEventRules";
+import { hasResolvedOneTentLoopAlertEvidence } from "@/lib/oneTentLoopAlertEvidenceRules";
+import { getActionQueueSourceKind } from "@/lib/actionQueueProvenanceRules";
 import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import {
   buildOneTentLoopLiveProofView,
@@ -669,14 +670,25 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         created_at: alertRow.created_at ?? null,
         scope_matches_selected_context: true,
         source: alertRow.source ?? null,
-        has_trusted_event_reference: alertEvidenceRefs.some(
-          (ref) => ref.source !== undefined && isTrustedTimelineEventSource(ref.source),
-        ),
+        has_trusted_event_reference: hasResolvedOneTentLoopAlertEvidence({
+          refs: alertEvidenceRefs,
+          snapshot: snapState.snapshot,
+          alert_metric: alertRow.metric ?? null,
+          selected_tent_id: tent?.id ?? null,
+        }),
       }
     : null;
 
   const aqQ = usePlantAssignedTentActions(tent?.id ?? null, grow?.id ?? null);
-  const aqRow = (aqQ.rows ?? [])[0] ?? null;
+  // The shared assigned-tent panel intentionally shows all pending tent
+  // actions. This plant-specific proof may only select AI Coach advice that
+  // carries this exact persisted plant id; tent-wide/other-plant Coach rows
+  // remain non-certifying here and the pure evaluator independently enforces
+  // the same fence for direct callers.
+  const aqRow =
+    (aqQ.rows ?? []).find(
+      (row) => getActionQueueSourceKind(row) !== "ai_coach" || row.plantId === plant?.id,
+    ) ?? null;
   const latest_action_queue: ActionQueueEvidence | null = aqRow
     ? {
         id: aqRow.id,
@@ -686,6 +698,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         source: aqRow.source,
         reason: aqRow.reason ?? null,
         risk_level: aqRow.riskLevel,
+        plant_id: aqRow.plantId,
         linked_alert_id: aqRow.alertBackPointerId,
         linked_ai_doctor_session_id: aqRow.aiDoctorSessionBackPointerId,
       }

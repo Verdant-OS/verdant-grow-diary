@@ -3,8 +3,9 @@
  * Zero Supabase inserts when blocked; correct grow_id when allowed.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { unstable_batchedUpdates } from "react-dom";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
 import { isValidElement, type ReactNode } from "react";
@@ -466,6 +467,41 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(screen.queryByTestId("plant-create-outcome-unknown")).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["undefined", { code: undefined, message: "TypeError: Failed to fetch" }],
+    ["null", { code: null, message: "TypeError: Failed to fetch" }],
+  ] as const)(
+    "reconciles a committed plant after a returned response-loss failure with a %s code",
+    async (_codeKind, error) => {
+      singleMock.mockResolvedValueOnce({ data: null, error });
+      plantLookupMaybeSingleMock.mockResolvedValueOnce({ data: CREATED_ROW, error: null });
+      const onCreated = vi.fn();
+
+      render(
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <MemoryRouter>
+            <CreatePlantDialog
+              initiallyOpen
+              defaultGrowId={G1}
+              defaultTentId={T1}
+              onCreated={onCreated}
+            />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      await userEvent.type(screen.getByTestId("create-plant-name"), CREATED_ROW.name);
+      await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+      await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED_ROW));
+      expect(insertMock).toHaveBeenCalledTimes(1);
+      expect(plantLookupEqMock).toHaveBeenCalledWith("id", CREATED_ROW.id);
+      expect(screen.queryByTestId("plant-create-outcome-unknown")).not.toBeInTheDocument();
+    },
+  );
+
   it("reconciles a committed plant after a thrown transport failure", async () => {
     singleMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     plantLookupMaybeSingleMock.mockResolvedValueOnce({ data: CREATED_ROW, error: null });
@@ -518,6 +554,45 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(insertMock).toHaveBeenCalledTimes(1);
     expect(plantLookupMaybeSingleMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId("plant-create-outcome-unknown")).not.toBeInTheDocument();
+  });
+
+  it("prevents a second logical plant create while the first insert is unresolved", async () => {
+    let resolveInsert!: (result: { data: typeof CREATED_ROW; error: null }) => void;
+    const deferredInsert = new Promise<{ data: typeof CREATED_ROW; error: null }>((resolve) => {
+      resolveInsert = resolve;
+    });
+    singleMock.mockReturnValueOnce(deferredInsert);
+    const onCreated = vi.fn();
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter>
+          <CreatePlantDialog
+            initiallyOpen
+            defaultGrowId={G1}
+            defaultTentId={T1}
+            onCreated={onCreated}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), CREATED_ROW.name);
+    const form = screen.getByTestId("create-plant-form");
+    act(() => {
+      unstable_batchedUpdates(() => {
+        form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+    });
+
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveInsert({ data: CREATED_ROW, error: null });
+    });
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED_ROW));
   });
 
   it("refreshes the exact legacy and owner-scoped plant caches before create handoff", async () => {

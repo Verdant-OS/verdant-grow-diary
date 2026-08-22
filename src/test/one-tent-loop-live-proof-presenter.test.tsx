@@ -197,6 +197,26 @@ describe("OneTentLoopLiveProof page", () => {
 
   it("uses only the selected grow/tent/plant alert when proving an alert-derived action", () => {
     setCurrentTentPlantScope();
+    fixtures.sensorSnapshot = {
+      source: "live",
+      ts: "2026-06-09T10:55:00.000Z",
+      temp: 24,
+      rh: 58,
+      vpd: null,
+      co2: null,
+      soil: null,
+      soil_ec: null,
+      soil_temp: null,
+      ppfd: null,
+      tent_id: "tent-current",
+      metric_refs: {
+        rh: {
+          id: "event-current",
+          captured_at: "2026-06-09T10:55:00.000Z",
+          source: "live",
+        },
+      },
+    };
     fixtures.alerts = [
       {
         id: "alert-other",
@@ -252,6 +272,56 @@ describe("OneTentLoopLiveProof page", () => {
     const action = screen.getByTestId("loop-live-proof-step-action-queue");
     expect(action.getAttribute("data-status")).toBe("passed");
     expect(action.textContent).toMatch(/Alert-derived advisory/);
+  });
+
+  it("does not let a newer AI Coach action for another plant pass this plant's proof", () => {
+    setCurrentTentPlantScope();
+    fixtures.actions = [
+      {
+        id: "aq-coach-other-plant",
+        growId: "grow-current",
+        tentId: "tent-current",
+        plantId: "plant-other",
+        status: "pending_approval",
+        source: "ai_coach",
+        reason: "Review leaves.",
+        riskLevel: "low",
+        alertBackPointerId: null,
+        aiDoctorSessionBackPointerId: null,
+        hasTargetDevice: false,
+      },
+    ];
+
+    renderPage();
+
+    expect(
+      screen.getByTestId("loop-live-proof-step-action-queue").getAttribute("data-status"),
+    ).not.toBe("passed");
+  });
+
+  it("allows an exact selected-plant AI Coach action to remain advisory evidence", () => {
+    setCurrentTentPlantScope();
+    fixtures.actions = [
+      {
+        id: "aq-coach-current-plant",
+        growId: "grow-current",
+        tentId: "tent-current",
+        plantId: "plant-current",
+        status: "pending_approval",
+        source: "ai_coach",
+        reason: "Review leaves.",
+        riskLevel: "low",
+        alertBackPointerId: null,
+        aiDoctorSessionBackPointerId: null,
+        hasTargetDevice: false,
+      },
+    ];
+
+    renderPage();
+
+    expect(
+      screen.getByTestId("loop-live-proof-step-action-queue").getAttribute("data-status"),
+    ).toBe("passed");
   });
 
   it("uses the page's current clock instead of the fixed proof fallback for live freshness", () => {

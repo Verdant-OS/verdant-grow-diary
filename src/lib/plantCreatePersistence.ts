@@ -27,7 +27,7 @@ export function isAmbiguousPlantInsertError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const code = (error as { code?: unknown }).code;
   if (code === "23505") return true;
-  if (code !== "") return false;
+  if (code !== "" && code != null) return false;
   const message = (error as { message?: unknown }).message;
   return (
     typeof message === "string" &&

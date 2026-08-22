@@ -192,7 +192,7 @@ export interface AlertEvidence {
   scope_matches_selected_context?: boolean;
   /** Persisted producer slug; unknown sources cannot certify a proof row. */
   source?: string | null;
-  /** True only when a persisted trusted originating event ref is present. */
+  /** True only when the presenter resolved a persisted ref to selected-scope evidence. */
   has_trusted_event_reference?: boolean;
 }
 
@@ -243,11 +243,15 @@ export interface ActionQueueEvidence {
   source?: string | null;
   reason?: string | null;
   risk_level?: string | null;
+  /** Persisted plant scope. Null is tent-wide and cannot certify AI Coach advice for one plant. */
+  plant_id?: string | null;
   linked_alert_id?: string | null;
   linked_ai_doctor_session_id?: string | null;
 }
 
 export interface ActionQueueProofContext {
+  /** Plant selected by this proof page. Required to certify AI Coach advice. */
+  selected_plant_id?: string | null;
   /**
    * Identifier and evaluated eligibility of the selected Alert evidence.
    * An alert-derived advisory must not pass merely because its back-pointer
@@ -1003,9 +1007,19 @@ export function evaluateActionQueue(
       ev.push("AI Doctor advisory.");
       break;
     }
-    case "ai_coach":
+    case "ai_coach": {
+      const actionPlantId =
+        typeof a.plant_id === "string" && a.plant_id.trim().length > 0 ? a.plant_id.trim() : null;
+      const selectedPlantId =
+        typeof context.selected_plant_id === "string" && context.selected_plant_id.trim().length > 0
+          ? context.selected_plant_id.trim()
+          : null;
+      if (!actionPlantId || !selectedPlantId || actionPlantId !== selectedPlantId) {
+        return actionQueueNeedsReview(a, "AI Coach advisory is not scoped to the selected plant.");
+      }
       ev.push("AI Coach advisory.");
       break;
+    }
     default:
       return actionQueueNeedsReview(
         a,
@@ -1293,6 +1307,7 @@ export function evaluateLoop(input: LoopEvidence): LoopStepRow[] {
   const ai = evaluateAiDoctor(input.latest_ai_doctor);
   const alert = evaluateAlert(input.latest_alert);
   const aq = evaluateActionQueue(input.latest_action_queue, {
+    selected_plant_id: input.plant?.id ?? null,
     alert_id: input.latest_alert?.id ?? null,
     alert_status: alert.status,
     ai_doctor_session_id: input.latest_ai_doctor?.session_id ?? null,

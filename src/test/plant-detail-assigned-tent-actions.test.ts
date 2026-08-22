@@ -144,6 +144,16 @@ describe("buildAssignedTentActions (pure)", () => {
     expect(row.alertBackPointerId).toBe("al-42");
   });
 
+  it("preserves the persisted plant id without treating a tent-wide row as plant-scoped", () => {
+    const [plantRow] = buildAssignedTentActions([action({ plant_id: "plant-1" })], {
+      tentId: "t1",
+    });
+    const [tentRow] = buildAssignedTentActions([action({ plant_id: null })], { tentId: "t1" });
+
+    expect(plantRow.plantId).toBe("plant-1");
+    expect(tentRow.plantId).toBeNull();
+  });
+
   it("maps a persisted target device to a safe presence signal", () => {
     const [row] = buildAssignedTentActions([action({ target_device: "fan-east" })], {
       tentId: "t1",

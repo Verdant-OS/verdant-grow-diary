@@ -41,6 +41,8 @@ export interface PlantAssignedTentActionRow {
   id: string;
   growId: string;
   tentId: string | null;
+  /** Persisted plant scope. Null means tent-wide, never a selected-plant claim. */
+  plantId: string | null;
   status: "pending_approval";
   source: string | null;
   actionType: string | null;
@@ -74,6 +76,7 @@ function toRow(r: AssignedTentActionInputRow): PlantAssignedTentActionRow {
     id: r.id,
     growId: r.grow_id as string,
     tentId: r.tent_id ?? null,
+    plantId: r.plant_id ?? null,
     status: "pending_approval",
     source: r.source ?? null,
     actionType: r.action_type ?? null,

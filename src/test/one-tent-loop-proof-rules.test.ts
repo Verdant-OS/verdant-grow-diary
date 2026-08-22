@@ -516,16 +516,38 @@ describe("evaluateActionQueue — persisted approval and provenance", () => {
   );
 
   it("keeps AI Coach advice distinct from alert-derived evidence", () => {
-    const row = evaluateActionQueue({
-      id: "aq1",
-      status: "pending_approval",
-      approval_required: true,
-      has_device_control_marker: false,
-      has_target_device: false,
-      source: "ai_coach",
-    });
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "ai_coach",
+        plant_id: "p1",
+      },
+      { selected_plant_id: "p1" },
+    );
     expect(row.status).toBe("passed");
     expect(row.evidence.join(" ")).toMatch(/AI Coach advisory/);
+  });
+
+  it("fails closed when an AI Coach advisory belongs to another plant", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "ai_coach",
+        plant_id: "p-other",
+      },
+      { selected_plant_id: "p1" },
+    );
+
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/selected plant/i);
   });
 
   it("does not pass a manual or unknown source as Alert or AI evidence", () => {

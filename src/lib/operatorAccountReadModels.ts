@@ -10,10 +10,12 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../integrations/supabase/types";
+import { LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES } from "./liveSourceTruthGateRules";
 import { classifySnapshotFreshness } from "./sensor/sensorSnapshotFreshnessRules";
 import { normalizeSensorSource } from "./sensor/sensorSourceRules";
 import { withoutDiagnosticSensorRows } from "./sensorProvenanceFenceRules";
 import { STALE_THRESHOLD_MS } from "./sensorReadingNormalizationRules";
+import { celsiusToFahrenheit } from "./temperatureUnits";
 import {
   validateEcWithUnit,
   validateHumidity,
@@ -103,6 +105,29 @@ const SENSOR_CANDIDATE_LIMIT = 25;
 const KNOWN_METRIC_SET: ReadonlySet<string> = new Set(OPERATOR_SENSOR_METRICS);
 /** Match the existing bounded sensor-snapshot cohort window. */
 const SENSOR_SOURCE_CONTRADICTION_WINDOW_MS = 5 * 60 * 1000;
+// PPFD is not a Live Source Truth gate metric. Keep its source-conflict
+// deadband aligned with the established outcome-analysis PPFD tolerance.
+const PPFD_SOURCE_CONTRADICTION_TOLERANCE = 50;
+
+/**
+ * Reuse Verdant's source-truth comparator tolerances. Stored temperatures are
+ * Celsius, while the source-truth gate compares temperatures in Fahrenheit.
+ * PPFD is not a source-truth metric, so it uses the established
+ * outcome-analysis deadband in the same canonical unit.
+ */
+const MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE: Readonly<
+  Record<(typeof OPERATOR_SENSOR_METRICS)[number], number>
+> = Object.freeze({
+  temperature_c: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.temp_f,
+  humidity_pct: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.humidity_pct,
+  vpd_kpa: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.vpd_kpa,
+  co2_ppm: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.co2_ppm,
+  soil_moisture_pct: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_moisture_pct,
+  soil_temp_c: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_temp_f,
+  ph: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.ph,
+  ec: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_ec_ms_cm,
+  ppfd: PPFD_SOURCE_CONTRADICTION_TOLERANCE,
+});
 
 function normalizeDiaryLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit)) return 10;
@@ -325,6 +350,21 @@ function sensorSelectionClock(options: McpSensorSelectionOptions): {
   };
 }
 
+function comparableMcpSensorValue(metric: string, value: number): number {
+  return metric === "temperature_c" || metric === "soil_temp_c"
+    ? celsiusToFahrenheit(value)
+    : value;
+}
+
+function hasMaterialMcpSensorSourceConflict(
+  metric: (typeof OPERATOR_SENSOR_METRICS)[number],
+  candidates: readonly McpSensorQueryRow[],
+): boolean {
+  const values = candidates.map((candidate) => comparableMcpSensorValue(metric, candidate.value));
+  const spread = Math.max(...values) - Math.min(...values);
+  return spread > MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE[metric];
+}
+
 /**
  * Find coeval, usable readings for one metric that disagree across canonical
  * sources before the public snapshot collapses candidates to its newest row.
@@ -364,7 +404,7 @@ export function findMcpSensorSourceContradictionMetrics(
         (candidate) =>
           newestAt - effectiveCaptureMs(candidate) <= SENSOR_SOURCE_CONTRADICTION_WINDOW_MS,
       );
-      return coeval.length >= 2 && new Set(coeval.map((candidate) => candidate.value)).size > 1;
+      return coeval.length >= 2 && hasMaterialMcpSensorSourceConflict(metric, coeval);
     }),
   );
 }

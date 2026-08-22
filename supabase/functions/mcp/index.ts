@@ -94,6 +94,49 @@ ${JSON.stringify(rows, null, 2)}`,
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.24.0";
 import { z as z2 } from "npm:zod@^3.24.2";
 
+// src/lib/liveSourceTruthGateRules.ts
+var LIVE_SOURCE_TRUTH_STALE_AFTER_MS = 15 * 60 * 1e3;
+var LIVE_SOURCE_TRUTH_FUTURE_SKEW_MS = 5 * 60 * 1e3;
+var LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES = Object.freeze({
+  temp_f: 1.5,
+  humidity_pct: 3,
+  vpd_kpa: 0.2,
+  co2_ppm: 100,
+  soil_moisture_pct: 5,
+  soil_ec_ms_cm: 0.2,
+  soil_ec_us_cm: 200,
+  soil_temp_f: 1.5,
+  ph: 0.2,
+});
+var SUSPICIOUS_RANGES = Object.freeze({
+  temp_f: { min: 32, max: 120 },
+  humidity_pct: { min: 1, max: 99, forbid_exact: [0, 100] },
+  vpd_kpa: { min: 0, max: 5 },
+  co2_ppm: { min: 250, max: 5e3 },
+  soil_moisture_pct: { min: 1, max: 99, forbid_exact: [0, 100] },
+  soil_ec_ms_cm: { min: 0, max: 10 },
+  soil_ec_us_cm: { min: 0, max: 1e4 },
+  soil_temp_f: { min: 32, max: 120 },
+  ph: { min: 3, max: 10 },
+});
+var SUMMARY_COPY = Object.freeze({
+  verified_live: "Live proof verified from recent device evidence and controller comparison.",
+  unverified_live:
+    "Recent live-source evidence exists, but controller comparison is missing or incomplete.",
+  not_live_proof: "This evidence can support review, but it cannot prove live sensor truth.",
+  stale: "Sensor evidence is too old to prove current live conditions.",
+  invalid: "Sensor evidence is missing, malformed, or suspicious and cannot be trusted.",
+  mismatch: "Backend values and controller/app values disagree beyond tolerance.",
+});
+var CONFIDENCE_BY_VERDICT = Object.freeze({
+  verified_live: "high",
+  unverified_live: "medium",
+  not_live_proof: "low",
+  stale: "low",
+  invalid: "none",
+  mismatch: "none",
+});
+
 // src/lib/sensorLiveMembership.ts
 var TRUST_LIVE_ALIASES = /* @__PURE__ */ new Set(["live", "sensor", "realtime"]);
 
@@ -321,6 +364,11 @@ function withoutDiagnosticSensorRows(rows) {
 // src/lib/sensorReadingNormalizationRules.ts
 var STALE_THRESHOLD_MS = SENSOR_READING_NORMALIZATION_STALE_MS;
 
+// src/lib/temperatureUnits.ts
+function celsiusToFahrenheit(c) {
+  return c * (9 / 5) + 32;
+}
+
 // src/lib/ecUnits.ts
 var EC_PLAUSIBLE_MAX = {
   "mS/cm": 5,
@@ -417,6 +465,18 @@ var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,crea
 var SENSOR_CANDIDATE_LIMIT = 25;
 var KNOWN_METRIC_SET = new Set(OPERATOR_SENSOR_METRICS);
 var SENSOR_SOURCE_CONTRADICTION_WINDOW_MS = 5 * 60 * 1e3;
+var PPFD_SOURCE_CONTRADICTION_TOLERANCE = 50;
+var MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE = Object.freeze({
+  temperature_c: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.temp_f,
+  humidity_pct: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.humidity_pct,
+  vpd_kpa: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.vpd_kpa,
+  co2_ppm: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.co2_ppm,
+  soil_moisture_pct: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_moisture_pct,
+  soil_temp_c: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_temp_f,
+  ph: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.ph,
+  ec: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_ec_ms_cm,
+  ppfd: PPFD_SOURCE_CONTRADICTION_TOLERANCE,
+});
 function normalizeDiaryLimit(limit) {
   if (!Number.isFinite(limit)) return 10;
   return Math.min(50, Math.max(1, Math.trunc(limit)));
@@ -533,6 +593,16 @@ function sensorSelectionClock(options) {
         : STALE_THRESHOLD_MS,
   };
 }
+function comparableMcpSensorValue(metric, value) {
+  return metric === "temperature_c" || metric === "soil_temp_c"
+    ? celsiusToFahrenheit(value)
+    : value;
+}
+function hasMaterialMcpSensorSourceConflict(metric, candidates) {
+  const values = candidates.map((candidate) => comparableMcpSensorValue(metric, candidate.value));
+  const spread = Math.max(...values) - Math.min(...values);
+  return spread > MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE[metric];
+}
 function findMcpSensorSourceContradictionMetrics(rows, options = {}) {
   const { nowMs, staleAfterMs } = sensorSelectionClock(options);
   const latestByMetricAndSource = /* @__PURE__ */ new Map();
@@ -557,7 +627,7 @@ function findMcpSensorSourceContradictionMetrics(rows, options = {}) {
         (candidate) =>
           newestAt - effectiveCaptureMs(candidate) <= SENSOR_SOURCE_CONTRADICTION_WINDOW_MS,
       );
-      return coeval.length >= 2 && new Set(coeval.map((candidate) => candidate.value)).size > 1;
+      return coeval.length >= 2 && hasMaterialMcpSensorSourceConflict(metric, coeval);
     }),
   );
 }

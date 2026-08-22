@@ -450,6 +450,14 @@ describe("owner-scoped Operator account read models", () => {
               ts: "2026-07-19T12:03:30Z",
             }),
             row({
+              id: "manual-temperature-rounding",
+              metric: "temperature_c",
+              value: 24.1,
+              source: "csv",
+              captured_at: "2026-07-19T12:03:45Z",
+              ts: "2026-07-19T12:03:45Z",
+            }),
+            row({
               id: "old-manual",
               metric: "humidity_pct",
               value: 80,
@@ -533,6 +541,92 @@ describe("owner-scoped Operator account read models", () => {
           { now },
         ),
       ).toEqual(["temperature_c", "vpd_kpa"]);
+    });
+
+    it("does not treat source noise within the metric tolerance as a contradiction", () => {
+      const now = new Date("2026-07-19T12:05:00Z");
+      expect(
+        findMcpSensorSourceContradictionMetrics(
+          [
+            row({
+              id: "live-temperature",
+              metric: "temperature_c",
+              value: 24,
+              source: "live",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+            row({
+              id: "manual-temperature-rounding",
+              metric: "temperature_c",
+              value: 24.1,
+              source: "manual",
+              captured_at: "2026-07-19T12:03:30Z",
+              ts: "2026-07-19T12:03:30Z",
+            }),
+            row({
+              id: "live-vpd",
+              metric: "vpd_kpa",
+              value: 1,
+              source: "live",
+              captured_at: "2026-07-19T12:04:00Z",
+              ts: "2026-07-19T12:04:00Z",
+            }),
+            row({
+              id: "manual-vpd-boundary",
+              metric: "vpd_kpa",
+              value: 1.2,
+              source: "manual",
+              captured_at: "2026-07-19T12:03:30Z",
+              ts: "2026-07-19T12:03:30Z",
+            }),
+          ],
+          { now },
+        ),
+      ).toEqual([]);
+    });
+
+    it("uses a distinct source-conflict tolerance for every supported metric", () => {
+      const now = new Date("2026-07-19T12:05:00Z");
+      const cases = [
+        { metric: "temperature_c", base: 24, within: 24.1, beyond: 25 },
+        { metric: "humidity_pct", base: 50, within: 52, beyond: 54 },
+        { metric: "vpd_kpa", base: 1, within: 1.1, beyond: 1.21 },
+        { metric: "co2_ppm", base: 700, within: 750, beyond: 801 },
+        { metric: "soil_moisture_pct", base: 50, within: 53, beyond: 56 },
+        { metric: "soil_temp_c", base: 20, within: 20.1, beyond: 21 },
+        { metric: "ph", base: 6, within: 6.1, beyond: 6.3 },
+        { metric: "ec", base: 1, within: 1.1, beyond: 1.3 },
+        { metric: "ppfd", base: 500, within: 525, beyond: 551 },
+      ] as const;
+
+      for (const fixture of cases) {
+        const readings = (value: number) => [
+          row({
+            id: `live-${fixture.metric}`,
+            metric: fixture.metric,
+            value: fixture.base,
+            source: "live",
+            captured_at: "2026-07-19T12:04:00Z",
+            ts: "2026-07-19T12:04:00Z",
+          }),
+          row({
+            id: `manual-${fixture.metric}`,
+            metric: fixture.metric,
+            value,
+            source: "manual",
+            captured_at: "2026-07-19T12:03:30Z",
+            ts: "2026-07-19T12:03:30Z",
+          }),
+        ];
+
+        expect(findMcpSensorSourceContradictionMetrics(readings(fixture.within), { now })).toEqual(
+          [],
+        );
+        expect(findMcpSensorSourceContradictionMetrics(readings(fixture.beyond), { now })).toEqual([
+          fixture.metric,
+        ]);
+      }
     });
 
     it("selects deterministically by capture, ingest, created, then id descending", () => {

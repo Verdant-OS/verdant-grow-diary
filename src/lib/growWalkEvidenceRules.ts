@@ -17,6 +17,11 @@ import {
 const HOUR_MS = 60 * 60 * 1000;
 const RECENT_LOG_WINDOW_MS = 36 * HOUR_MS;
 const MAJOR_CHANGE_WINDOW_MS = 48 * HOUR_MS;
+/**
+ * Context readers must retain this much event history even when callers ask
+ * for the minimum display window, because the evidence rules below use it.
+ */
+export const GROW_WALK_EVENT_EVIDENCE_HISTORY_HOURS = 48;
 const FUTURE_TOLERANCE_MS = 2 * 60 * 1000;
 
 export interface GrowWalkEvidenceInput {
@@ -26,6 +31,11 @@ export interface GrowWalkEvidenceInput {
   readonly plantType?: string | null;
   readonly medium?: string | null;
   readonly potSize?: string | null;
+  /**
+   * Bounded internal event history for rules with a fixed 36/48-hour window.
+   * It is not itself a public context-output lane.
+   */
+  readonly fixedWindowEvents?: readonly GrowWalkEventEvidence[];
   readonly recentEvents: readonly GrowWalkEventEvidence[];
   readonly sensors: GrowWalkSensorEvidence;
   readonly photos: readonly GrowWalkPhotoMetadata[];
@@ -140,15 +150,22 @@ export function deriveGrowWalkEvidence(input: GrowWalkEvidenceInput): GrowWalkEv
   const missing = new Set<GrowWalkMissingEvidenceCode>();
   const contradictions = new Set<GrowWalkContradictionCode>();
 
-  const validEvents: Array<{ event: GrowWalkEventEvidence; iso: string; ms: number }> = [];
-  for (const event of input.recentEvents) {
-    const ms = toMs(event.occurredAt);
-    if (!isUsableTimestamp(ms, nowMs)) {
-      contradictions.add("future_or_malformed_timestamp");
-      continue;
+  const validEventsFor = (events: readonly GrowWalkEventEvidence[]) => {
+    const validEvents: Array<{ event: GrowWalkEventEvidence; iso: string; ms: number }> = [];
+    for (const event of events) {
+      const ms = toMs(event.occurredAt);
+      if (!isUsableTimestamp(ms, nowMs)) {
+        contradictions.add("future_or_malformed_timestamp");
+        continue;
+      }
+      validEvents.push({ event, iso: event.occurredAt, ms });
     }
-    validEvents.push({ event, iso: event.occurredAt, ms });
-  }
+    return validEvents;
+  };
+  const validEvents = validEventsFor(input.recentEvents);
+  const validFixedWindowEvents = input.fixedWindowEvents
+    ? validEventsFor(input.fixedWindowEvents)
+    : validEvents;
 
   const validPhotos: Array<{ photo: GrowWalkPhotoMetadata; iso: string; ms: number }> = [];
   for (const photo of input.photos) {
@@ -184,18 +201,18 @@ export function deriveGrowWalkEvidence(input: GrowWalkEvidenceInput): GrowWalkEv
     contradictions.add("sensor_sources_disagree");
   }
 
-  const recentEvents = validEvents.filter(
+  const recentLogEvents = validFixedWindowEvents.filter(
     ({ ms }) => ms <= nowMs && nowMs - ms <= RECENT_LOG_WINDOW_MS,
   );
-  const hasRecentLog = recentEvents.length > 0;
+  const hasRecentLog = recentLogEvents.length > 0;
   if (!hasRecentLog) missing.add("no_recent_grower_log");
 
-  const majorChanges = validEvents.filter(
+  const fixedWindowMajorChanges = validFixedWindowEvents.filter(
     ({ event, ms }) => event.isMajorChange && ms <= nowMs && nowMs - ms <= MAJOR_CHANGE_WINDOW_MS,
   );
-  const recentMajorChangeCount48h = majorChanges.length;
-  const latestMajorChangeAt = latestIso(majorChanges);
-  const latestMajorChangeMs = majorChanges.reduce<number | null>(
+  const recentMajorChangeCount48h = fixedWindowMajorChanges.length;
+  const latestMajorChangeAt = latestIso(fixedWindowMajorChanges);
+  const latestFixedWindowMajorChangeMs = fixedWindowMajorChanges.reduce<number | null>(
     (latest, current) => (latest === null || current.ms > latest ? current.ms : latest),
     null,
   );
@@ -203,8 +220,12 @@ export function deriveGrowWalkEvidence(input: GrowWalkEvidenceInput): GrowWalkEv
 
   const observations = validEvents.filter(({ event }) => isObservationEvent(event));
   const latestObservationAt = latestIso(observations);
+  const fixedWindowObservations = validFixedWindowEvents.filter(({ event }) =>
+    isObservationEvent(event),
+  );
   const hasPostInterventionObservation =
-    latestMajorChangeMs === null || observations.some(({ ms }) => ms > latestMajorChangeMs);
+    latestFixedWindowMajorChangeMs === null ||
+    fixedWindowObservations.some(({ ms }) => ms > latestFixedWindowMajorChangeMs);
   if (!hasPostInterventionObservation) {
     reasons.add("missing_post_intervention_observation");
     missing.add("no_post_intervention_observation");
@@ -216,9 +237,9 @@ export function deriveGrowWalkEvidence(input: GrowWalkEvidenceInput): GrowWalkEv
   // A stored photo receipt is metadata only; no visual content was inspected.
   missing.add("no_current_visual_evidence");
   if (
-    latestMajorChangeMs !== null &&
+    latestFixedWindowMajorChangeMs !== null &&
     validPhotos.length > 0 &&
-    validPhotos.every(({ ms }) => ms < latestMajorChangeMs)
+    validPhotos.every(({ ms }) => ms < latestFixedWindowMajorChangeMs)
   ) {
     missing.add("photo_predates_latest_major_change");
   }

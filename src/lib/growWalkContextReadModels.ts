@@ -16,7 +16,10 @@ import {
   type GrowWalkSensorEvidence,
   type GrowWalkTargetType,
 } from "./growWalkContracts";
-import { deriveGrowWalkEvidence } from "./growWalkEvidenceRules";
+import {
+  deriveGrowWalkEvidence,
+  GROW_WALK_EVENT_EVIDENCE_HISTORY_HOURS,
+} from "./growWalkEvidenceRules";
 import {
   getLatestSensorSnapshotForOwnedTent,
   type OwnerScopedReadModelResult,
@@ -634,12 +637,23 @@ function alertAttributionScopeQuery<T>(
  * attached to that plant's resolved tent. This retains plant-specific actions
  * while keeping sibling and grow-wide actions out of the target's context.
  */
-function actionAttributionScopeQuery<T>(query: T, scope: OwnedScope): T {
+function actionAttributionScopeQuery<T>(
+  query: T,
+  scope: OwnedScope,
+  tentPlantIds: readonly string[],
+): T {
   const chain = query as T & {
     eq: (column: string, value: string) => T;
     or: (filters: string) => T;
   };
-  if (!scope.plant) return scopeQuery(query, scope);
+  if (!scope.plant) {
+    const tentId = scope.tent?.id;
+    if (!tentId) return query;
+    if (tentPlantIds.length === 0) return chain.eq("tent_id", tentId);
+    return chain.or(
+      `tent_id.eq.${tentId},and(tent_id.is.null,plant_id.in.(${tentPlantIds.join(",")}))`,
+    );
+  }
   const tentId = scope.tent?.id;
   if (!tentId) return chain.eq("plant_id", scope.plant.id);
   return chain.or(`plant_id.eq.${scope.plant.id},and(plant_id.is.null,tent_id.eq.${tentId})`);
@@ -686,9 +700,18 @@ function belongsToAlertScope(
   );
 }
 
-function belongsToActionQueueScope(row: ActionQueueRow, scope: OwnedScope): boolean {
+function belongsToActionQueueScope(
+  row: ActionQueueRow,
+  scope: OwnedScope,
+  tentPlantIds: ReadonlySet<string>,
+): boolean {
   if (row.grow_id !== scope.grow.id) return false;
-  if (!scope.plant) return row.tent_id === (scope.tent?.id ?? null);
+  if (!scope.plant) {
+    return (
+      row.tent_id === (scope.tent?.id ?? null) ||
+      (row.tent_id === null && row.plant_id !== null && tentPlantIds.has(row.plant_id))
+    );
+  }
   if (row.plant_id === scope.plant.id) return true;
   const tentId = scope.tent?.id;
   return tentId !== undefined && row.plant_id === null && row.tent_id === tentId;
@@ -757,7 +780,11 @@ export async function getGrowWalkContextForOwnedTarget(
   const now = options.now ?? new Date();
   const generatedAt = now.toISOString();
   const lookbackHours = normalizeLookback(input.lookbackHours);
-  const cutoff = new Date(now.getTime() - lookbackHours * HOUR_MS).toISOString();
+  const cutoffMs = now.getTime() - lookbackHours * HOUR_MS;
+  const cutoff = new Date(cutoffMs).toISOString();
+  const evidenceEventCutoff = new Date(
+    now.getTime() - Math.max(lookbackHours, GROW_WALK_EVENT_EVIDENCE_HISTORY_HOURS) * HOUR_MS,
+  ).toISOString();
   const scopeResult = await resolveScope(client, input);
   if (!scopeResult.ok) return scopeResult;
   const scope = scopeResult.data;
@@ -771,7 +798,7 @@ export async function getGrowWalkContextForOwnedTarget(
     .eq("grow_id", scope.grow.id)
     .eq("source", "manual")
     .eq("is_deleted", false)
-    .gte("occurred_at", cutoff)
+    .gte("occurred_at", evidenceEventCutoff)
     .order("occurred_at", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -807,8 +834,9 @@ export async function getGrowWalkContextForOwnedTarget(
     .order("id", { ascending: false })
     .limit(AI_DOCTOR_FETCH_LIMIT);
   // AI evidence remains exact-target only. A plant's Action Queue evidence
-  // includes its exact rows plus unassigned rows attached to its resolved tent;
-  // it never crosses into a sibling or grow-wide action.
+  // includes its exact rows plus unassigned rows attached to its resolved tent.
+  // A tent additionally includes a legacy child-plant row only when it has no
+  // copied tent id; neither shape crosses into a sibling or grow-wide action.
   const actionBase = client
     .from("action_queue")
     .select(ACTION_QUEUE_COLUMNS)
@@ -844,7 +872,7 @@ export async function getGrowWalkContextForOwnedTarget(
       ),
       settleRows<ActionQueueRow>(
         () =>
-          actionAttributionScopeQuery(actionBase, scope) as unknown as PromiseLike<{
+          actionAttributionScopeQuery(actionBase, scope, tentPlantIds) as unknown as PromiseLike<{
             data: unknown;
             error: unknown;
           }>,
@@ -885,7 +913,9 @@ export async function getGrowWalkContextForOwnedTarget(
   const alertLane = trimLookahead(alertFetchLane, ALERT_LIMIT);
   const aiLane = trimLookahead(aiFetchLane, AI_DOCTOR_LIMIT);
   const actionLane = trimLookahead(actionFetchLane, ACTION_QUEUE_LIMIT);
-  const actionRows = actionLane.rows.filter((row) => belongsToActionQueueScope(row, scope));
+  const actionRows = actionLane.rows.filter((row) =>
+    belongsToActionQueueScope(row, scope, tentPlantIdSet),
+  );
   const actionAuditLane = await loadActionQueueAudits(client, scope, actionRows);
 
   const partial = new Set<GrowWalkEvidenceLane>();
@@ -894,6 +924,7 @@ export async function getGrowWalkContextForOwnedTarget(
     partial.add("events");
     partial.add("photos");
     partial.add("alerts");
+    partial.add("action_queue");
   }
   if (eventLane.failed) partial.add("events");
   if (photoLane.failed) partial.add("photos");
@@ -906,6 +937,7 @@ export async function getGrowWalkContextForOwnedTarget(
     truncated.add("events");
     truncated.add("photos");
     truncated.add("alerts");
+    truncated.add("action_queue");
   }
   if (eventLane.truncated) truncated.add("events");
   if (photoLane.truncated) truncated.add("photos");
@@ -914,9 +946,16 @@ export async function getGrowWalkContextForOwnedTarget(
   if (actionLane.truncated) truncated.add("action_queue");
   if (actionAuditLane.truncated) truncated.add("action_queue");
 
-  const events = eventLane.rows
+  const evidenceEvents = eventLane.rows
     .filter((row) => !row.is_deleted && belongsToEventScope(row, scope, tentPlantIdSet))
     .map(toEventEvidence);
+  // The caller's lookback remains the public event-output window. The bounded
+  // read intentionally extends to the fixed evidence horizon so the 36/48h
+  // rules cannot mistake a 24h response shape for missing history.
+  const events = evidenceEvents.filter((event) => {
+    const occurredAtMs = Date.parse(event.occurredAt);
+    return !Number.isFinite(occurredAtMs) || occurredAtMs >= cutoffMs;
+  });
   const photos = photoLane.rows
     .filter(
       (row) =>
@@ -940,6 +979,7 @@ export async function getGrowWalkContextForOwnedTarget(
     medium: clean(scope.plant?.medium),
     potSize: clean(scope.plant?.pot_size),
     recentEvents: events,
+    fixedWindowEvents: evidenceEvents,
     sensors: sensorLane.evidence,
     photos,
     alerts,

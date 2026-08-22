@@ -20,6 +20,7 @@ function clientFor(
       calls.push({ table, method: "from", args: [] });
       let metric: string | null = null;
       let capturedMode: "captured" | "legacy" | null = null;
+      let eventOccurredAtCutoff: string | null = null;
       let filtersRetractedAt = false;
       let actionQueueCreatedAtCutoff: string | null = null;
       let alertLastSeenAtCutoff: string | null = null;
@@ -39,6 +40,9 @@ function clientFor(
         },
         gte(...args: unknown[]) {
           calls.push({ table, method: "gte", args });
+          if (table === "grow_events" && args[0] === "occurred_at") {
+            eventOccurredAtCutoff = String(args[1]);
+          }
           if (table === "action_queue" && args[0] === "created_at") {
             actionQueueCreatedAtCutoff = String(args[1]);
           }
@@ -111,6 +115,13 @@ function clientFor(
             data = data.filter((row) => {
               const createdAt = (row as { created_at?: unknown }).created_at;
               return typeof createdAt !== "string" || createdAt >= actionQueueCutoff;
+            });
+          }
+          const eventCutoff = eventOccurredAtCutoff;
+          if (table === "grow_events" && Array.isArray(data) && eventCutoff) {
+            data = data.filter((row) => {
+              const occurredAt = (row as { occurred_at?: unknown }).occurred_at;
+              return typeof occurredAt !== "string" || occurredAt >= eventCutoff;
             });
           }
           const alertCutoff = alertLastSeenAtCutoff;
@@ -971,6 +982,138 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     );
   });
 
+  it("includes a legacy child-plant Action Queue item in a tent context without importing foreign or grow-wide actions", async () => {
+    const data = fixtures();
+    data.plants = {
+      data: [
+        { id: "plant-1", grow_id: "grow-1", tent_id: "tent-1" },
+        { id: "plant-2", grow_id: "grow-1", tent_id: "tent-1" },
+        { id: "foreign-plant", grow_id: "grow-1", tent_id: "tent-2" },
+      ],
+      error: null,
+    };
+    data.action_queue = {
+      data: [
+        ...(data.action_queue.data as Record<string, unknown>[]),
+        {
+          id: "legacy-child-action",
+          grow_id: "grow-1",
+          tent_id: null,
+          plant_id: "plant-2",
+          source: "environment_alert",
+          status: "approved",
+          risk_level: "medium",
+          reason: "Confirm the child plant before changing its environment. [alert:alert-1]",
+          created_at: "2026-08-07T11:20:00.000Z",
+        },
+        {
+          id: "foreign-child-action",
+          grow_id: "grow-1",
+          tent_id: null,
+          plant_id: "foreign-plant",
+          source: "manual",
+          status: "pending_approval",
+          risk_level: "low",
+          reason: "This must not cross into the selected tent.",
+          created_at: "2026-08-07T11:21:00.000Z",
+        },
+        {
+          id: "grow-wide-action",
+          grow_id: "grow-1",
+          tent_id: null,
+          plant_id: null,
+          source: "manual",
+          status: "pending_approval",
+          risk_level: "low",
+          reason: "This must not cross into the selected tent.",
+          created_at: "2026-08-07T11:22:00.000Z",
+        },
+      ],
+      error: null,
+    };
+    data.action_queue_events = {
+      data: [
+        ...(data.action_queue_events.data as Record<string, unknown>[]),
+        {
+          id: "legacy-child-action-event",
+          action_queue_id: "legacy-child-action",
+          grow_id: "grow-1",
+          event_type: "approved",
+          previous_status: "pending_approval",
+          new_status: "approved",
+          note: "Grower approved the child-plant inspection.",
+          created_at: "2026-08-07T11:20:01.000Z",
+        },
+        {
+          id: "foreign-child-action-event",
+          action_queue_id: "foreign-child-action",
+          grow_id: "grow-1",
+          event_type: "created",
+          previous_status: null,
+          new_status: "pending_approval",
+          note: "This audit must not cross into the selected tent.",
+          created_at: "2026-08-07T11:21:01.000Z",
+        },
+      ],
+      error: null,
+    };
+    const { client, calls } = clientFor(data);
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      client,
+      { targetType: "tent", targetId: "tent-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const actionItems = result.data.context.evidence.actionQueue.items;
+    expect(actionItems.map((item) => item.id)).toContain("legacy-child-action");
+    expect(actionItems.map((item) => item.id)).not.toEqual(
+      expect.arrayContaining(["foreign-child-action", "grow-wide-action"]),
+    );
+    expect(actionItems.find((item) => item.id === "legacy-child-action")).toMatchObject({
+      growId: "grow-1",
+      tentId: null,
+      plantId: "plant-2",
+      relatedAlertId: "alert-1",
+      auditTrail: [
+        {
+          id: "legacy-child-action-event",
+          eventType: "approved",
+          noteExcerpt: "Grower approved the child-plant inspection.",
+        },
+      ],
+    });
+    const actionScope = calls.find((call) => call.table === "action_queue" && call.method === "or");
+    expect(String(actionScope?.args[0])).toContain("tent_id.eq.tent-1");
+    expect(String(actionScope?.args[0])).toContain("tent_id.is.null");
+    expect(String(actionScope?.args[0])).toContain("plant_id.in.(plant-1,plant-2)");
+    expect(calls).toContainEqual({
+      table: "action_queue_events",
+      method: "in",
+      args: ["action_queue_id", ["aq-1", "legacy-child-action"]],
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /foreign-child-action|grow-wide-action|must not cross/i,
+    );
+  });
+
+  it("marks Action Queue evidence partial when a tent's child-plant relation read is unavailable", async () => {
+    const data = fixtures();
+    data.plants = { data: null, error: { message: "tent child relation unavailable" } };
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      clientFor(data).client,
+      { targetType: "tent", targetId: "tent-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.receipt.partialLanes).toContain("action_queue");
+  });
+
   it("keeps an acknowledged current alert when it predates the evidence lookback", async () => {
     const data = fixtures();
     data.alerts = {
@@ -1426,6 +1569,20 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     );
     expect(exact.data.context.evidence.actionQueue.items[0]?.auditTrail).toHaveLength(100);
 
+    const relationOverflowData = fixtures();
+    relationOverflowData.plants = { data: tentRelationPlants(101), error: null };
+    const relationOverflow = await getGrowWalkContextForOwnedTarget(
+      clientFor(relationOverflowData).client,
+      { targetType: "tent", targetId: "tent-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(relationOverflow.ok).toBe(true);
+    if (!relationOverflow.ok) return;
+    expect(relationOverflow.data.context.receipt.truncatedLanes).toEqual(
+      expect.arrayContaining(["events", "photos", "alerts", "action_queue"]),
+    );
+
     const overflowData = fixtures();
     overflowData.plants = { data: tentRelationPlants(101), error: null };
     overflowData.action_queue_events = { data: actionQueueAuditEvents(101), error: null };
@@ -1606,25 +1763,152 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(result.data.context.scope.tentId).toBe("tent-1");
   });
 
-  it.each([
-    { requested: undefined, expectedHours: 72, cutoff: "2026-08-04T12:00:00.000Z" },
-    { requested: 1, expectedHours: 24, cutoff: "2026-08-06T12:00:00.000Z" },
-    { requested: 500, expectedHours: 168, cutoff: "2026-07-31T12:00:00.000Z" },
-  ])("clamps lookback $requested", async ({ requested, expectedHours, cutoff }) => {
-    const { client, calls } = clientFor(fixtures());
+  it("keeps the requested event output window while deriving fixed-window evidence from 48 hours", async () => {
+    const data = fixtures();
+    data.grow_events = {
+      data: [
+        {
+          id: "water-30-hours-ago",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          event_type: "watering",
+          source: "manual",
+          occurred_at: "2026-08-06T06:00:00.000Z",
+          note: "Watered within the fixed evidence window.",
+          created_at: "2026-08-06T06:00:01.000Z",
+          is_deleted: false,
+        },
+      ],
+      error: null,
+    };
+    const { client, calls } = clientFor(data);
+
     const result = await getGrowWalkContextForOwnedTarget(
       client,
-      { targetType: "plant", targetId: "plant-1", lookbackHours: requested },
+      { targetType: "plant", targetId: "plant-1", lookbackHours: 24 },
       { now: new Date("2026-08-07T12:00:00.000Z") },
     );
+
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data.context.receipt.lookbackHours).toBe(expectedHours);
+    if (!result.ok) return;
+    expect(result.data.context.receipt.lookbackHours).toBe(24);
+    expect(result.data.context.evidence.recentEvents).toEqual([]);
+    expect(result.data.context.derived.missingEvidenceCodes).not.toContain("no_recent_grower_log");
+    expect(result.data.context.derived.recentMajorChangeCount48h).toBe(1);
+    expect(result.data.context.derived.latestMajorChangeAt).toBe("2026-08-06T06:00:00.000Z");
+    expect(result.data.context.derived.missingEvidenceCodes).toContain(
+      "no_post_intervention_observation",
+    );
     expect(calls).toContainEqual({
       table: "grow_events",
       method: "gte",
-      args: ["occurred_at", cutoff],
+      args: ["occurred_at", "2026-08-05T12:00:00.000Z"],
     });
   });
+
+  it("does not let a hidden fixed-window Worse observation widen a 24-hour response", async () => {
+    const data = fixtures();
+    data.grow_events = {
+      data: [
+        {
+          id: "water-30-hours-ago",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          event_type: "watering",
+          source: "manual",
+          occurred_at: "2026-08-06T06:00:00.000Z",
+          note: "Watered within the fixed evidence window.",
+          created_at: "2026-08-06T06:00:01.000Z",
+          is_deleted: false,
+        },
+        {
+          id: "worse-30-hours-ago",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          event_type: "observation",
+          source: "manual",
+          occurred_at: "2026-08-06T06:05:00.000Z",
+          note: "Response check: Worse.",
+          created_at: "2026-08-06T06:05:01.000Z",
+          is_deleted: false,
+        },
+      ],
+      error: null,
+    };
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      clientFor(data).client,
+      { targetType: "plant", targetId: "plant-1", lookbackHours: 24 },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.evidence.recentEvents).toEqual([]);
+    expect(result.data.context.derived.missingEvidenceCodes).not.toContain("no_recent_grower_log");
+    expect(result.data.context.derived.recentMajorChangeCount48h).toBe(1);
+    expect(result.data.context.derived.latestObservationAt).toBeNull();
+    expect(result.data.context.derived.reasonCodes).not.toContain("worsening_observation");
+    expect(result.data.context.derived.missingEvidenceCodes).not.toContain(
+      "no_post_intervention_observation",
+    );
+  });
+
+  it("reports extended evidence-history overflow even when a 24-hour event response is empty", async () => {
+    const data = fixtures();
+    data.grow_events = {
+      data: Array.from({ length: 101 }, (_, index) => ({
+        id: `water-30-hours-${index + 1}`,
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+        event_type: "watering",
+        source: "manual",
+        occurred_at: "2026-08-06T06:00:00.000Z",
+        note: "Watered within the fixed evidence window.",
+        created_at: "2026-08-06T06:00:01.000Z",
+        is_deleted: false,
+      })),
+      error: null,
+    };
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      clientFor(data).client,
+      { targetType: "plant", targetId: "plant-1", lookbackHours: 24 },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.evidence.recentEvents).toEqual([]);
+    expect(result.data.context.receipt.truncatedLanes).toContain("events");
+  });
+
+  it.each([
+    { requested: undefined, expectedHours: 72, eventCutoff: "2026-08-04T12:00:00.000Z" },
+    { requested: 1, expectedHours: 24, eventCutoff: "2026-08-05T12:00:00.000Z" },
+    { requested: 500, expectedHours: 168, eventCutoff: "2026-07-31T12:00:00.000Z" },
+  ])(
+    "clamps returned lookback $requested while retaining fixed event evidence history",
+    async ({ requested, expectedHours, eventCutoff }) => {
+      const { client, calls } = clientFor(fixtures());
+      const result = await getGrowWalkContextForOwnedTarget(
+        client,
+        { targetType: "plant", targetId: "plant-1", lookbackHours: requested },
+        { now: new Date("2026-08-07T12:00:00.000Z") },
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data.context.receipt.lookbackHours).toBe(expectedHours);
+      expect(calls).toContainEqual({
+        table: "grow_events",
+        method: "gte",
+        args: ["occurred_at", eventCutoff],
+      });
+    },
+  );
 
   it("returns a successful partial context when one non-scope lane fails", async () => {
     const data = fixtures();

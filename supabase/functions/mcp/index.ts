@@ -942,6 +942,7 @@ var GROW_WALK_CONTRADICTION_CODES = [
 var HOUR_MS = 60 * 60 * 1e3;
 var RECENT_LOG_WINDOW_MS = 36 * HOUR_MS;
 var MAJOR_CHANGE_WINDOW_MS = 48 * HOUR_MS;
+var GROW_WALK_EVENT_EVIDENCE_HISTORY_HOURS = 48;
 var FUTURE_TOLERANCE_MS = 2 * 60 * 1e3;
 function toMs(value) {
   if (value === null || value === void 0) return null;
@@ -1020,15 +1021,22 @@ function deriveGrowWalkEvidence(input) {
   const reasons = /* @__PURE__ */ new Set();
   const missing = /* @__PURE__ */ new Set();
   const contradictions = /* @__PURE__ */ new Set();
-  const validEvents = [];
-  for (const event of input.recentEvents) {
-    const ms = toMs(event.occurredAt);
-    if (!isUsableTimestamp(ms, nowMs)) {
-      contradictions.add("future_or_malformed_timestamp");
-      continue;
+  const validEventsFor = (events) => {
+    const validEvents2 = [];
+    for (const event of events) {
+      const ms = toMs(event.occurredAt);
+      if (!isUsableTimestamp(ms, nowMs)) {
+        contradictions.add("future_or_malformed_timestamp");
+        continue;
+      }
+      validEvents2.push({ event, iso: event.occurredAt, ms });
     }
-    validEvents.push({ event, iso: event.occurredAt, ms });
-  }
+    return validEvents2;
+  };
+  const validEvents = validEventsFor(input.recentEvents);
+  const validFixedWindowEvents = input.fixedWindowEvents
+    ? validEventsFor(input.fixedWindowEvents)
+    : validEvents;
   const validPhotos = [];
   for (const photo of input.photos) {
     const ms = toMs(photo.capturedAt);
@@ -1059,25 +1067,29 @@ function deriveGrowWalkEvidence(input) {
   if ((input.sensors.contradictionMetrics?.length ?? 0) > 0) {
     contradictions.add("sensor_sources_disagree");
   }
-  const recentEvents = validEvents.filter(
+  const recentLogEvents = validFixedWindowEvents.filter(
     ({ ms }) => ms <= nowMs && nowMs - ms <= RECENT_LOG_WINDOW_MS,
   );
-  const hasRecentLog = recentEvents.length > 0;
+  const hasRecentLog = recentLogEvents.length > 0;
   if (!hasRecentLog) missing.add("no_recent_grower_log");
-  const majorChanges = validEvents.filter(
+  const fixedWindowMajorChanges = validFixedWindowEvents.filter(
     ({ event, ms }) => event.isMajorChange && ms <= nowMs && nowMs - ms <= MAJOR_CHANGE_WINDOW_MS,
   );
-  const recentMajorChangeCount48h = majorChanges.length;
-  const latestMajorChangeAt = latestIso(majorChanges);
-  const latestMajorChangeMs = majorChanges.reduce(
+  const recentMajorChangeCount48h = fixedWindowMajorChanges.length;
+  const latestMajorChangeAt = latestIso(fixedWindowMajorChanges);
+  const latestFixedWindowMajorChangeMs = fixedWindowMajorChanges.reduce(
     (latest, current) => (latest === null || current.ms > latest ? current.ms : latest),
     null,
   );
   if (recentMajorChangeCount48h >= 3) reasons.add("stacked_major_changes_48h");
   const observations = validEvents.filter(({ event }) => isObservationEvent(event));
   const latestObservationAt = latestIso(observations);
+  const fixedWindowObservations = validFixedWindowEvents.filter(({ event }) =>
+    isObservationEvent(event),
+  );
   const hasPostInterventionObservation =
-    latestMajorChangeMs === null || observations.some(({ ms }) => ms > latestMajorChangeMs);
+    latestFixedWindowMajorChangeMs === null ||
+    fixedWindowObservations.some(({ ms }) => ms > latestFixedWindowMajorChangeMs);
   if (!hasPostInterventionObservation) {
     reasons.add("missing_post_intervention_observation");
     missing.add("no_post_intervention_observation");
@@ -1086,9 +1098,9 @@ function deriveGrowWalkEvidence(input) {
   if (worsening.length > 0) reasons.add("worsening_observation");
   missing.add("no_current_visual_evidence");
   if (
-    latestMajorChangeMs !== null &&
+    latestFixedWindowMajorChangeMs !== null &&
     validPhotos.length > 0 &&
-    validPhotos.every(({ ms }) => ms < latestMajorChangeMs)
+    validPhotos.every(({ ms }) => ms < latestFixedWindowMajorChangeMs)
   ) {
     missing.add("photo_predates_latest_major_change");
   }
@@ -2115,9 +2127,16 @@ function alertAttributionScopeQuery(query, scope, tentPlantIds) {
   }
   return chain.or(`plant_id.eq.${scope.plant.id},and(plant_id.is.null,tent_id.eq.${tentId})`);
 }
-function actionAttributionScopeQuery(query, scope) {
+function actionAttributionScopeQuery(query, scope, tentPlantIds) {
   const chain = query;
-  if (!scope.plant) return scopeQuery(query, scope);
+  if (!scope.plant) {
+    const tentId2 = scope.tent?.id;
+    if (!tentId2) return query;
+    if (tentPlantIds.length === 0) return chain.eq("tent_id", tentId2);
+    return chain.or(
+      `tent_id.eq.${tentId2},and(tent_id.is.null,plant_id.in.(${tentPlantIds.join(",")}))`,
+    );
+  }
   const tentId = scope.tent?.id;
   if (!tentId) return chain.eq("plant_id", scope.plant.id);
   return chain.or(`plant_id.eq.${scope.plant.id},and(plant_id.is.null,tent_id.eq.${tentId})`);
@@ -2148,9 +2167,14 @@ function belongsToAlertScope(row, scope, tentPlantIds) {
     (row.plant_id === null && row.tent_id === (scope.tent?.id ?? null))
   );
 }
-function belongsToActionQueueScope(row, scope) {
+function belongsToActionQueueScope(row, scope, tentPlantIds) {
   if (row.grow_id !== scope.grow.id) return false;
-  if (!scope.plant) return row.tent_id === (scope.tent?.id ?? null);
+  if (!scope.plant) {
+    return (
+      row.tent_id === (scope.tent?.id ?? null) ||
+      (row.tent_id === null && row.plant_id !== null && tentPlantIds.has(row.plant_id))
+    );
+  }
   if (row.plant_id === scope.plant.id) return true;
   const tentId = scope.tent?.id;
   return tentId !== void 0 && row.plant_id === null && row.tent_id === tentId;
@@ -2189,7 +2213,11 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
   const now = options.now ?? /* @__PURE__ */ new Date();
   const generatedAt = now.toISOString();
   const lookbackHours = normalizeLookback(input.lookbackHours);
-  const cutoff = new Date(now.getTime() - lookbackHours * HOUR_MS3).toISOString();
+  const cutoffMs = now.getTime() - lookbackHours * HOUR_MS3;
+  const cutoff = new Date(cutoffMs).toISOString();
+  const evidenceEventCutoff = new Date(
+    now.getTime() - Math.max(lookbackHours, GROW_WALK_EVENT_EVIDENCE_HISTORY_HOURS) * HOUR_MS3,
+  ).toISOString();
   const scopeResult = await resolveScope(client, input);
   if (!scopeResult.ok) return scopeResult;
   const scope = scopeResult.data;
@@ -2202,7 +2230,7 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
     .eq("grow_id", scope.grow.id)
     .eq("source", "manual")
     .eq("is_deleted", false)
-    .gte("occurred_at", cutoff)
+    .gte("occurred_at", evidenceEventCutoff)
     .order("occurred_at", { ascending: false })
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
@@ -2255,7 +2283,10 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
         ALERT_FETCH_LIMIT,
       ),
       settleRows(() => scopeQuery(aiBase, scope), AI_DOCTOR_FETCH_LIMIT),
-      settleRows(() => actionAttributionScopeQuery(actionBase, scope), ACTION_QUEUE_FETCH_LIMIT),
+      settleRows(
+        () => actionAttributionScopeQuery(actionBase, scope, tentPlantIds),
+        ACTION_QUEUE_FETCH_LIMIT,
+      ),
       (async () => {
         if (!scope.tent)
           return {
@@ -2291,7 +2322,9 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
   const alertLane = trimLookahead(alertFetchLane, ALERT_LIMIT);
   const aiLane = trimLookahead(aiFetchLane, AI_DOCTOR_LIMIT);
   const actionLane = trimLookahead(actionFetchLane, ACTION_QUEUE_LIMIT);
-  const actionRows = actionLane.rows.filter((row) => belongsToActionQueueScope(row, scope));
+  const actionRows = actionLane.rows.filter((row) =>
+    belongsToActionQueueScope(row, scope, tentPlantIdSet),
+  );
   const actionAuditLane = await loadActionQueueAudits(client, scope, actionRows);
   const partial = /* @__PURE__ */ new Set();
   const truncated = /* @__PURE__ */ new Set();
@@ -2299,6 +2332,7 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
     partial.add("events");
     partial.add("photos");
     partial.add("alerts");
+    partial.add("action_queue");
   }
   if (eventLane.failed) partial.add("events");
   if (photoLane.failed) partial.add("photos");
@@ -2311,6 +2345,7 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
     truncated.add("events");
     truncated.add("photos");
     truncated.add("alerts");
+    truncated.add("action_queue");
   }
   if (eventLane.truncated) truncated.add("events");
   if (photoLane.truncated) truncated.add("photos");
@@ -2318,9 +2353,13 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
   if (aiLane.truncated) truncated.add("ai_doctor");
   if (actionLane.truncated) truncated.add("action_queue");
   if (actionAuditLane.truncated) truncated.add("action_queue");
-  const events = eventLane.rows
+  const evidenceEvents = eventLane.rows
     .filter((row) => !row.is_deleted && belongsToEventScope(row, scope, tentPlantIdSet))
     .map(toEventEvidence2);
+  const events = evidenceEvents.filter((event) => {
+    const occurredAtMs = Date.parse(event.occurredAt);
+    return !Number.isFinite(occurredAtMs) || occurredAtMs >= cutoffMs;
+  });
   const photos = photoLane.rows
     .filter(
       (row) =>
@@ -2344,6 +2383,7 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
     medium: clean2(scope.plant?.medium),
     potSize: clean2(scope.plant?.pot_size),
     recentEvents: events,
+    fixedWindowEvents: evidenceEvents,
     sensors: sensorLane.evidence,
     photos,
     alerts,

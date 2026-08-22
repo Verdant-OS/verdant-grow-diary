@@ -91,6 +91,34 @@ describe("deriveGrowWalkEvidence", () => {
     expect(JSON.stringify(result)).not.toMatch(/deficien|overwater|disease|setpoint/i);
   });
 
+  it("uses fixed-window support only for the 36/48-hour log and major-change rules", () => {
+    const result = derive({
+      recentEvents: [],
+      fixedWindowEvents: [
+        event("water-30h", "watering", "2026-08-06T06:00:00.000Z", { isMajorChange: true }),
+        event("worse-30h", "observation", "2026-08-06T06:05:00.000Z", { response: "worse" }),
+      ],
+    });
+
+    expect(result.missingEvidenceCodes).not.toContain("no_recent_grower_log");
+    expect(result.recentMajorChangeCount48h).toBe(1);
+    expect(result.latestMajorChangeAt).toBe("2026-08-06T06:00:00.000Z");
+    expect(result.latestObservationAt).toBeNull();
+    expect(result.reasonCodes).not.toContain("worsening_observation");
+    expect(result.missingEvidenceCodes).not.toContain("no_post_intervention_observation");
+  });
+
+  it("requires a post-intervention observation after a fixed-window major change", () => {
+    const result = derive({
+      recentEvents: [],
+      fixedWindowEvents: [
+        event("water-30h", "watering", "2026-08-06T06:00:00.000Z", { isMajorChange: true }),
+      ],
+    });
+
+    expect(result.missingEvidenceCodes).toContain("no_post_intervention_observation");
+  });
+
   it("fails closed for bad timestamps and stale, adverse telemetry", () => {
     const result = derive({
       recentEvents: [event("future", "observation", "2026-08-08T12:00:00.000Z")],

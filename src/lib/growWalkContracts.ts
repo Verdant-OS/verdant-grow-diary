@@ -115,8 +115,8 @@ export interface GrowWalkActionQueueItem {
 export interface GrowWalkActionQueueEvidence {
   /**
    * Count of returned current nonterminal items. It is a lower bound only
-   * when the item list is truncated; the shared `action_queue` receipt can
-   * also report truncated audit history without affecting this count.
+   * when the item list or the tent-child relation support is partial or
+   * truncated; audit-history truncation alone does not affect this count.
    */
   readonly openCount: number;
   readonly items: readonly GrowWalkActionQueueItem[];

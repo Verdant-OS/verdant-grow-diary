@@ -30,6 +30,7 @@
  * Pure module. No React, no I/O, no Supabase, no clock, no randomness.
  */
 
+import { isActivePlant, type ArchivedPlantLike } from "@/lib/archivedPlantVisibilityRules";
 import { isUuid } from "@/lib/isUuid";
 
 /** Query parameter carrying the requested plant on `/sensors` and `/doctor`. */
@@ -61,8 +62,11 @@ export function readSensorsPlantRouteIntent(
   return normalizePersistedPlantId(search?.get(SENSORS_PLANT_INTENT_QUERY_PARAM) ?? null);
 }
 
-/** Minimal plant row: id plus its CURRENT tent assignment. */
-export interface PlantTentRowLike {
+/**
+ * Minimal plant row: id, its CURRENT tent assignment, and enough of the
+ * archive/merge fields for `isActivePlant` to judge eligibility.
+ */
+export interface PlantTentRowLike extends ArchivedPlantLike {
   id?: string | null;
   tent_id?: string | null;
 }
@@ -70,15 +74,30 @@ export interface PlantTentRowLike {
 /**
  * Build the plant id → current tent id lookup this handoff needs.
  *
+ * **Membership is eligibility, not existence.** A plant appears here only if
+ * the Doctor would actually offer it, which is why the name says "carriable".
+ * `AiDoctorStart` builds its choices with `buildAiDoctorEntryOptions`, which
+ * skips `!isActivePlant`, so an archived or merged plant carried this far
+ * matches no option and vanishes without a word — the precise silent-drop
+ * failure this whole handoff exists to prevent. The same predicate is reused
+ * rather than a second one written, so the two cannot drift apart.
+ *
+ * This matters because the directory feeding it deliberately includes
+ * archived and merged rows: diary history keeps referencing them and still
+ * needs their names. Filtering there would break the labels; filtering here
+ * costs nothing, because an absent plant already falls into
+ * `resolveCarriedPlantScope`'s fail-closed branch.
+ *
  * Takes `plants` rows, never diary rows. See `resolveCarriedPlantScope`.
  */
-export function buildTimelinePlantTentLookup(
+export function buildCarriablePlantTentLookup(
   rows: readonly (PlantTentRowLike | null | undefined)[] | null | undefined,
 ): ReadonlyMap<string, string | null> {
   const lookup = new Map<string, string | null>();
   for (const row of rows ?? []) {
     const id = normalizePersistedPlantId(row?.id);
     if (!id) continue;
+    if (!isActivePlant(row)) continue;
     lookup.set(id, normalizePersistedPlantId(row?.tent_id));
   }
   return lookup;
@@ -96,15 +115,25 @@ export function buildTimelinePlantTentLookup(
  * handoff exists to prevent. So the rule is: only ever emit a pair the
  * Doctor will actually accept, and otherwise emit no plant at all.
  *
- * The tent comes from `plantTentById` — built from `plants.tent_id` — and
- * never from diary rows. A diary entry records the tent an entry was made
- * IN, which is history: move a plant between tents and its old entries keep
- * pointing at the old one. Deriving from that would hand the Doctor a stale
- * tent and lose the very selection being carried.
+ * The tent comes from `carriablePlantTentById` — built from `plants.tent_id`
+ * by `buildCarriablePlantTentLookup` — and never from diary rows. A diary
+ * entry records the tent an entry was made IN, which is history: move a plant
+ * between tents and its old entries keep pointing at the old one. Deriving
+ * from that would hand the Doctor a stale tent and lose the very selection
+ * being carried.
+ *
+ * Pass the eligibility-filtered lookup, not a raw id→tent map. Absence from
+ * it is what makes an archived or merged plant fail closed here.
  *
  * Precedence:
  *   - no plant selected → pass the tent through untouched
- *   - plant's current tent unknown → carry NO plant (cannot be validated)
+ *   - plant absent from the lookup → carry NO plant. One branch covers three
+ *     distinct causes — still loading, read failed, or not carriable (not the
+ *     grower's, archived, or merged) — because the safe answer is identical
+ *     for all three and inventing a distinction would freeze shape without
+ *     changing behaviour. Note the consequence: with no explicit tent, the
+ *     tent goes too. The derived tent existed only to make the plant valid,
+ *     and a tent the grower never chose is scope Verdant would be inventing.
  *   - explicit tent that MATCHES the plant's current tent → carry both
  *   - explicit tent that CONTRADICTS it → keep the tent, drop the plant.
  *     The tent filter is the grower's live view; silently retargeting it to
@@ -114,17 +143,17 @@ export function buildTimelinePlantTentLookup(
 export function resolveCarriedPlantScope(input: {
   plantId?: unknown;
   tentId?: unknown;
-  plantTentById?: ReadonlyMap<string, string | null> | null;
+  carriablePlantTentById?: ReadonlyMap<string, string | null> | null;
 }): { plantId: string | null; tentId: string | null } {
   const normalizedPlantId = normalizePersistedPlantId(input?.plantId);
   const explicitTentId = normalizePersistedPlantId(input?.tentId);
 
   if (!normalizedPlantId) return { plantId: null, tentId: explicitTentId };
 
-  const currentTentId = input?.plantTentById?.get(normalizedPlantId) ?? null;
+  const currentTentId = input?.carriablePlantTentById?.get(normalizedPlantId) ?? null;
 
-  // Unknown assignment — the directory is still loading, the read failed, or
-  // the plant is not the grower's. Carrying it would be a guess.
+  // Not carriable — still loading, read failed, not the grower's, or
+  // archived/merged. Carrying it would be a guess the Doctor then discards.
   if (!currentTentId) return { plantId: null, tentId: explicitTentId };
 
   if (explicitTentId) {

@@ -15,7 +15,7 @@ import {
   SENSORS_PLANT_INTENT_QUERY_PARAM,
   normalizePersistedPlantId,
   readSensorsPlantRouteIntent,
-  buildTimelinePlantTentLookup,
+  buildCarriablePlantTentLookup,
   resolveCarriedPlantScope,
   withSensorsPlantIntent,
 } from "@/lib/sensorRoutePlantIntentRules";
@@ -149,20 +149,24 @@ describe("withSensorsPlantIntent", () => {
 describe("resolveCarriedPlantScope", () => {
   const OTHER_TENT = "99999999-8888-4777-8666-555555555555";
   // Current assignment, sourced from plants.tent_id — never from diary rows.
-  const plantTentById = new Map<string, string | null>([
+  const carriablePlantTentById = new Map<string, string | null>([
     [PLANT, TENT],
     [OTHER_PLANT, OTHER_TENT],
   ]);
 
   it("carries both when the explicit tent matches the plant's current tent", () => {
-    expect(resolveCarriedPlantScope({ plantId: PLANT, tentId: TENT, plantTentById })).toEqual({
+    expect(
+      resolveCarriedPlantScope({ plantId: PLANT, tentId: TENT, carriablePlantTentById }),
+    ).toEqual({
       plantId: PLANT,
       tentId: TENT,
     });
   });
 
   it("uses the plant's CURRENT tent when the filter reads All tents", () => {
-    expect(resolveCarriedPlantScope({ plantId: PLANT, tentId: "", plantTentById })).toEqual({
+    expect(
+      resolveCarriedPlantScope({ plantId: PLANT, tentId: "", carriablePlantTentById }),
+    ).toEqual({
       plantId: PLANT,
       tentId: TENT,
     });
@@ -173,9 +177,9 @@ describe("resolveCarriedPlantScope", () => {
     // grower has filtered to another. The Doctor only honours a plant inside
     // the carried tent, so emitting this pair would lose the selection
     // silently. Keep the tent the grower is actually looking at.
-    expect(resolveCarriedPlantScope({ plantId: PLANT, tentId: OTHER_TENT, plantTentById })).toEqual(
-      { plantId: null, tentId: OTHER_TENT },
-    );
+    expect(
+      resolveCarriedPlantScope({ plantId: PLANT, tentId: OTHER_TENT, carriablePlantTentById }),
+    ).toEqual({ plantId: null, tentId: OTHER_TENT });
   });
 
   it("drops the plant when its current tent is unknown — fail closed", () => {
@@ -189,18 +193,20 @@ describe("resolveCarriedPlantScope", () => {
       new Map<string, string | null>([[OTHER_PLANT, OTHER_TENT]]),
     ]) {
       expect(
-        resolveCarriedPlantScope({ plantId: PLANT, tentId: "", plantTentById: lookup }),
+        resolveCarriedPlantScope({ plantId: PLANT, tentId: "", carriablePlantTentById: lookup }),
       ).toEqual({ plantId: null, tentId: null });
       // An explicit tent still survives — only the plant is dropped.
       expect(
-        resolveCarriedPlantScope({ plantId: PLANT, tentId: TENT, plantTentById: lookup }),
+        resolveCarriedPlantScope({ plantId: PLANT, tentId: TENT, carriablePlantTentById: lookup }),
       ).toEqual({ plantId: null, tentId: TENT });
     }
   });
 
   it("passes a tent through untouched when no valid plant is selected", () => {
     for (const bad of ["", "   ", "p1", null, undefined]) {
-      expect(resolveCarriedPlantScope({ plantId: bad, tentId: TENT, plantTentById })).toEqual({
+      expect(
+        resolveCarriedPlantScope({ plantId: bad, tentId: TENT, carriablePlantTentById }),
+      ).toEqual({
         plantId: null,
         tentId: TENT,
       });
@@ -214,18 +220,46 @@ describe("resolveCarriedPlantScope", () => {
     // input left for stale history to enter through.
     const afterMove = new Map<string, string | null>([[PLANT, OTHER_TENT]]);
     expect(
-      resolveCarriedPlantScope({ plantId: PLANT, tentId: "", plantTentById: afterMove }),
+      resolveCarriedPlantScope({ plantId: PLANT, tentId: "", carriablePlantTentById: afterMove }),
     ).toEqual({ plantId: PLANT, tentId: OTHER_TENT });
     // And the pre-move tent is now the contradicting one, so it drops.
     expect(
-      resolveCarriedPlantScope({ plantId: PLANT, tentId: TENT, plantTentById: afterMove }),
+      resolveCarriedPlantScope({ plantId: PLANT, tentId: TENT, carriablePlantTentById: afterMove }),
     ).toEqual({ plantId: null, tentId: TENT });
   });
 });
 
-describe("buildTimelinePlantTentLookup", () => {
+describe("resolveCarriedPlantScope · archived and merged plants", () => {
+  it("drops an archived plant end-to-end, and takes its derived tent with it", () => {
+    const ARCHIVED = "aaaaaaaa-1111-4111-8111-111111111111";
+    const lookup = buildCarriablePlantTentLookup([
+      { id: PLANT, tent_id: TENT },
+      { id: ARCHIVED, tent_id: TENT, is_archived: true },
+    ]);
+
+    // No explicit tent: the tent was only ever derived to make the plant
+    // valid, so with the plant gone there is no scope left to carry. A tent
+    // the grower never chose would be scope Verdant invented.
+    expect(
+      resolveCarriedPlantScope({ plantId: ARCHIVED, tentId: "", carriablePlantTentById: lookup }),
+    ).toEqual({ plantId: null, tentId: null });
+
+    // An EXPLICIT tent is the grower's own live filter and survives.
+    expect(
+      resolveCarriedPlantScope({ plantId: ARCHIVED, tentId: TENT, carriablePlantTentById: lookup }),
+    ).toEqual({ plantId: null, tentId: TENT });
+
+    // Control: the active sibling in the same tent still carries, so the
+    // exclusion is the archive flag and not the fixture.
+    expect(
+      resolveCarriedPlantScope({ plantId: PLANT, tentId: "", carriablePlantTentById: lookup }),
+    ).toEqual({ plantId: PLANT, tentId: TENT });
+  });
+});
+
+describe("buildCarriablePlantTentLookup", () => {
   it("maps plant rows to their current tent and skips unusable rows", () => {
-    const lookup = buildTimelinePlantTentLookup([
+    const lookup = buildCarriablePlantTentLookup([
       { id: PLANT, tent_id: TENT },
       { id: OTHER_PLANT, tent_id: null },
       { id: "p1", tent_id: TENT },
@@ -240,9 +274,47 @@ describe("buildTimelinePlantTentLookup", () => {
     expect(lookup.size).toBe(2);
   });
 
+  it("excludes archived and merged plants — they are not carriable", () => {
+    // Not a style preference: `buildAiDoctorEntryOptions` skips
+    // `!isActivePlant`, so a carried archived plant matches no option at
+    // `/doctor` and disappears with no message. Both field conventions are
+    // covered because the plant rows in this repo carry either.
+    const ARCHIVED_SNAKE = "aaaaaaaa-1111-4111-8111-111111111111";
+    const ARCHIVED_CAMEL = "bbbbbbbb-2222-4222-8222-222222222222";
+    const MERGED_SNAKE = "cccccccc-3333-4333-8333-333333333333";
+    const MERGED_CAMEL = "dddddddd-4444-4444-8444-444444444444";
+
+    const lookup = buildCarriablePlantTentLookup([
+      { id: PLANT, tent_id: TENT },
+      { id: ARCHIVED_SNAKE, tent_id: TENT, is_archived: true },
+      { id: ARCHIVED_CAMEL, tent_id: TENT, isArchived: true },
+      // Merged without being archived: legacy rows exist in that shape, and
+      // `isMergedPlant` deliberately checks the marker independently.
+      { id: MERGED_SNAKE, tent_id: TENT, last_note: `Merged into ${OTHER_PLANT}` },
+      { id: MERGED_CAMEL, tent_id: TENT, lastNote: `Merged into ${OTHER_PLANT}` },
+    ]);
+
+    expect(lookup.get(PLANT)).toBe(TENT);
+    for (const excluded of [ARCHIVED_SNAKE, ARCHIVED_CAMEL, MERGED_SNAKE, MERGED_CAMEL]) {
+      expect(lookup.has(excluded)).toBe(false);
+    }
+    expect(lookup.size).toBe(1);
+  });
+
+  it("keeps a plant whose note merely mentions a merge without the marker", () => {
+    // The exclusion is the RPC-emitted `Merged into <uuid>` marker, not the
+    // word "merge". A grower's own note must not archive their plant.
+    const lookup = buildCarriablePlantTentLookup([
+      { id: PLANT, tent_id: TENT, last_note: "thinking about a merge later" },
+      { id: OTHER_PLANT, tent_id: TENT, last_note: "Merged into not-a-uuid" },
+    ]);
+    expect(lookup.get(PLANT)).toBe(TENT);
+    expect(lookup.get(OTHER_PLANT)).toBe(TENT);
+  });
+
   it("returns an empty map for absent input rather than throwing", () => {
-    expect(buildTimelinePlantTentLookup(null).size).toBe(0);
-    expect(buildTimelinePlantTentLookup(undefined).size).toBe(0);
+    expect(buildCarriablePlantTentLookup(null).size).toBe(0);
+    expect(buildCarriablePlantTentLookup(undefined).size).toBe(0);
   });
 });
 
@@ -280,8 +352,12 @@ describe("Timeline page wiring", () => {
     // the same "assertion agrees with something adjacent" defect this pin
     // exists to catch.
     expect(src).toMatch(
-      /resolveCarriedPlantScope\(\{\s*plantId:\s*plantFilter,\s*tentId:\s*tentFilter,\s*plantTentById,?\s*\}\)/,
+      /resolveCarriedPlantScope\(\{\s*plantId:\s*plantFilter,\s*tentId:\s*tentFilter,\s*carriablePlantTentById,?\s*\}\)/,
     );
+    // The page must consume the ELIGIBILITY-FILTERED map. Reading the raw
+    // `plantTentById` name back would silently re-admit archived and merged
+    // plants, which is the defect this rename encodes.
+    expect(src).not.toMatch(/\bplantTentById\b/);
     // Historical diary attribution must not creep back in as the tent source.
     expect(src).not.toMatch(/resolveCarriedPlantScope\([^)]*entries/);
     // And the result must actually reach the card.

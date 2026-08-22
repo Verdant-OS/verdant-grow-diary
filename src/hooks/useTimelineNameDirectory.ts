@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { buildTimelineNameLookup } from "@/lib/timelineEvidenceFilterRules";
-import { buildTimelinePlantTentLookup } from "@/lib/sensorRoutePlantIntentRules";
+import { buildCarriablePlantTentLookup } from "@/lib/sensorRoutePlantIntentRules";
 
 export interface TimelineNameDirectory {
   /** id → name over the owner's plants, INCLUDING archived/merged rows. Null while unavailable. */
@@ -9,16 +9,24 @@ export interface TimelineNameDirectory {
   /** id → name over the owner's tents, INCLUDING archived rows. Null while unavailable. */
   tentNamesById: ReadonlyMap<string, string> | null;
   /**
-   * plant id → its CURRENT tent id. Null while unavailable; a plant with no
-   * tent maps to null.
+   * plant id → its CURRENT tent id, over the plants that are actually
+   * CARRIABLE. Null while unavailable; a carriable plant with no tent maps
+   * to null.
    *
-   * Deliberately sourced from `plants.tent_id` and never from diary rows. A
-   * diary entry records the tent an entry was made in, which is history: a
-   * plant moved between tents keeps its old attribution on old entries. Any
-   * consumer asking "which tent is this plant in" must ask the plant row,
-   * because that is what downstream ownership checks validate against.
+   * Two filters are folded in, and both are load-bearing:
+   *
+   *   - Sourced from `plants.tent_id`, never from diary rows. A diary entry
+   *     records the tent an entry was made in, which is history: a plant
+   *     moved between tents keeps its old attribution on old entries. Any
+   *     consumer asking "which tent is this plant in" must ask the plant
+   *     row, because that is what downstream ownership checks validate
+   *     against.
+   *   - Archived and merged plants are excluded, unlike the two name maps
+   *     above. `AiDoctorStart` will not offer them, so carrying one produces
+   *     a selection that disappears with no explanation. The names must keep
+   *     them (history still refers to those plants); the carry must not.
    */
-  plantTentById: ReadonlyMap<string, string | null> | null;
+  carriablePlantTentById: ReadonlyMap<string, string | null> | null;
 }
 
 /**
@@ -38,35 +46,42 @@ export interface TimelineNameDirectory {
 export function useTimelineNameDirectory(userId: string | null): TimelineNameDirectory {
   const [plantNamesById, setPlantNamesById] = useState<ReadonlyMap<string, string> | null>(null);
   const [tentNamesById, setTentNamesById] = useState<ReadonlyMap<string, string> | null>(null);
-  const [plantTentById, setPlantTentById] = useState<ReadonlyMap<string, string | null> | null>(
-    null,
-  );
+  const [carriablePlantTentById, setCarriablePlantTentById] = useState<ReadonlyMap<
+    string,
+    string | null
+  > | null>(null);
 
   useEffect(() => {
     if (!userId) {
       setPlantNamesById(null);
       setTentNamesById(null);
-      setPlantTentById(null);
+      setCarriablePlantTentById(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
         const [plantsResult, tentsResult] = await Promise.all([
-          supabase.from("plants").select("id,name,tent_id").eq("user_id", userId),
+          // `is_archived` and `last_note` are read for eligibility only —
+          // `isActivePlant` needs both, and the merge marker lives in the
+          // note. The name maps below still keep archived/merged rows.
+          supabase
+            .from("plants")
+            .select("id,name,tent_id,is_archived,last_note")
+            .eq("user_id", userId),
           supabase.from("tents").select("id,name").eq("user_id", userId),
         ]);
         if (cancelled) return;
         setPlantNamesById(plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data));
         setTentNamesById(tentsResult?.error ? null : buildTimelineNameLookup(tentsResult?.data));
-        setPlantTentById(
-          plantsResult?.error ? null : buildTimelinePlantTentLookup(plantsResult?.data),
+        setCarriablePlantTentById(
+          plantsResult?.error ? null : buildCarriablePlantTentLookup(plantsResult?.data),
         );
       } catch {
         if (cancelled) return;
         setPlantNamesById(null);
         setTentNamesById(null);
-        setPlantTentById(null);
+        setCarriablePlantTentById(null);
       }
     })();
     return () => {
@@ -74,5 +89,5 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
     };
   }, [userId]);
 
-  return { plantNamesById, tentNamesById, plantTentById };
+  return { plantNamesById, tentNamesById, carriablePlantTentById };
 }

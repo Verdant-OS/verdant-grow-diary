@@ -21,9 +21,25 @@ export interface QuickLogPhotoAttachmentRecoveryScope {
   readonly plantId: string | null | undefined;
 }
 
-interface StoredPhotoAttachmentRecoveryLocks {
+interface LegacyStoredPhotoAttachmentRecoveryLocks {
   readonly version: 1;
   readonly locks: readonly string[];
+}
+
+interface StoredPhotoAttachmentRecoveryLock {
+  readonly key: string;
+  /** Exact preallocated diary id. Internal-only; never render this value. */
+  readonly diaryEntryId: string | null;
+}
+
+interface StoredPhotoAttachmentRecoveryLocks {
+  readonly version: 2;
+  readonly locks: readonly StoredPhotoAttachmentRecoveryLock[];
+}
+
+export interface QuickLogPhotoAttachmentRecoveryRecord {
+  /** Internal recovery identity for an owner-scoped exact diary-row lookup. */
+  readonly diaryEntryId: string | null;
 }
 
 function normalizeRequiredId(value: unknown): string | null {
@@ -36,6 +52,10 @@ function normalizeOptionalId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const normalized = value.trim();
   return normalized === "" ? null : normalized;
+}
+
+function normalizeDiaryEntryId(value: unknown): string | null {
+  return normalizeRequiredId(value);
 }
 
 /**
@@ -59,27 +79,48 @@ export function buildQuickLogPhotoAttachmentRecoveryKey(
   ]);
 }
 
-function readStoredLocks(): Set<string> {
-  if (typeof window === "undefined") return new Set();
+function readStoredLocks(): Map<string, string | null> {
+  if (typeof window === "undefined") return new Map();
   try {
     const raw = window.sessionStorage.getItem(QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY);
-    if (!raw) return new Set();
-    const parsed = JSON.parse(raw) as Partial<StoredPhotoAttachmentRecoveryLocks>;
-    if (parsed.version !== 1 || !Array.isArray(parsed.locks)) return new Set();
-    return new Set(parsed.locks.filter((value): value is string => typeof value === "string"));
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as
+      | Partial<LegacyStoredPhotoAttachmentRecoveryLocks>
+      | Partial<StoredPhotoAttachmentRecoveryLocks>;
+    if (!Array.isArray(parsed.locks)) return new Map();
+    if (parsed.version === 1) {
+      // Preserve old scope-only locks fail-closed. They cannot be reconciled
+      // automatically because the previous format did not retain an attempt id.
+      return new Map(
+        parsed.locks
+          .filter((value): value is string => typeof value === "string" && value !== "")
+          .map((key) => [key, null]),
+      );
+    }
+    if (parsed.version !== 2) return new Map();
+    return new Map(
+      parsed.locks.flatMap((value) => {
+        if (typeof value !== "object" || value === null) return [];
+        const key = (value as { key?: unknown }).key;
+        if (typeof key !== "string" || key === "") return [];
+        return [[key, normalizeDiaryEntryId((value as { diaryEntryId?: unknown }).diaryEntryId)]];
+      }),
+    );
   } catch {
     // Storage is only a retry fence. If unavailable, the caller's in-memory
     // state still retains the current mount's conservative lock.
-    return new Set();
+    return new Map();
   }
 }
 
-function writeStoredLocks(locks: ReadonlySet<string>): void {
+function writeStoredLocks(locks: ReadonlyMap<string, string | null>): void {
   if (typeof window === "undefined") return;
   try {
     const payload: StoredPhotoAttachmentRecoveryLocks = {
-      version: 1,
-      locks: Array.from(locks).sort(),
+      version: 2,
+      locks: Array.from(locks.entries())
+        .map(([key, diaryEntryId]) => ({ key, diaryEntryId }))
+        .sort((a, b) => a.key.localeCompare(b.key)),
     };
     window.sessionStorage.setItem(
       QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY,
@@ -100,17 +141,34 @@ export function hasQuickLogPhotoAttachmentRecoveryLock(
 }
 
 /**
+ * Returns the internal exact diary identity for a stored lock. The caller must
+ * use it only with an owner-scoped RLS lookup and must never render it.
+ */
+export function getQuickLogPhotoAttachmentRecoveryRecord(
+  scope: QuickLogPhotoAttachmentRecoveryScope,
+): QuickLogPhotoAttachmentRecoveryRecord | null {
+  const key = buildQuickLogPhotoAttachmentRecoveryKey(scope);
+  if (!key) return null;
+  const locks = readStoredLocks();
+  if (!locks.has(key)) return null;
+  return { diaryEntryId: locks.get(key) ?? null };
+}
+
+/**
  * Records a recovery fence after an insert remains ambiguous. This deliberately
  * does not clear any existing lock; only a future exact reconciliation or
  * explicit recovery may call the matching clear function.
  */
 export function recordQuickLogPhotoAttachmentRecoveryLock(
   scope: QuickLogPhotoAttachmentRecoveryScope,
+  diaryEntryId?: string | null,
 ): string | null {
   const key = buildQuickLogPhotoAttachmentRecoveryKey(scope);
   if (!key) return null;
   const locks = readStoredLocks();
-  locks.add(key);
+  // Never replace an existing exact attempt id with a missing/other value.
+  // A previous unresolved write remains the only safe reconciliation target.
+  if (!locks.has(key)) locks.set(key, normalizeDiaryEntryId(diaryEntryId));
   writeStoredLocks(locks);
   return key;
 }

@@ -33,6 +33,8 @@ const fixtures = vi.hoisted(() => ({
   aiSessions: [] as Array<Record<string, unknown>>,
   actions: [] as Array<Record<string, unknown>>,
   proofSelectedPlantAiCoachRow: null as Record<string, unknown> | null,
+  proofSelectedAlertActionRow: null as Record<string, unknown> | null,
+  proofSelectedAiDoctorActionRow: null as Record<string, unknown> | null,
   actionHookCalls: [] as unknown[][],
 }));
 
@@ -71,6 +73,8 @@ vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
     return {
       rows: fixtures.actions,
       proofSelectedPlantAiCoachRow: fixtures.proofSelectedPlantAiCoachRow,
+      proofSelectedAlertActionRow: fixtures.proofSelectedAlertActionRow,
+      proofSelectedAiDoctorActionRow: fixtures.proofSelectedAiDoctorActionRow,
       isLoading: false,
       isError: false,
       error: null,
@@ -112,6 +116,8 @@ beforeEach(() => {
   fixtures.aiSessions = [];
   fixtures.actions = [];
   fixtures.proofSelectedPlantAiCoachRow = null;
+  fixtures.proofSelectedAlertActionRow = null;
+  fixtures.proofSelectedAiDoctorActionRow = null;
   fixtures.actionHookCalls = [];
 });
 
@@ -330,7 +336,134 @@ describe("OneTentLoopLiveProof page", () => {
     expect(fixtures.actionHookCalls).toContainEqual([
       "tent-current",
       "grow-current",
-      { selectedPlantIdForAiCoach: "plant-current" },
+      {
+        selectedPlantIdForAiCoach: "plant-current",
+        selectedAlertIdForProof: null,
+        selectedAiDoctorSessionIdForProof: null,
+      },
+    ]);
+  });
+
+  it("prefers older exact current-alert evidence over Coach when newer unrelated actions fill the generic cap", () => {
+    setCurrentTentPlantScope();
+    fixtures.sensorSnapshot = {
+      source: "live",
+      ts: "2026-06-09T10:55:00.000Z",
+      temp: 24,
+      rh: 58,
+      vpd: null,
+      co2: null,
+      soil: null,
+      soil_ec: null,
+      soil_temp: null,
+      ppfd: null,
+      tent_id: "tent-current",
+      metric_refs: {
+        rh: {
+          id: "event-current",
+          captured_at: "2026-06-09T10:55:00.000Z",
+          source: "live",
+        },
+      },
+    };
+    fixtures.alerts = [
+      {
+        id: "alert-current",
+        grow_id: "grow-current",
+        tent_id: "tent-current",
+        plant_id: "plant-current",
+        metric: "humidity_pct",
+        severity: "warning",
+        reason: "Current tent humidity",
+        status: "open",
+        created_at: "2026-06-09T11:00:00.000Z",
+        source: "environment_alerts",
+        originating_timeline_events: [
+          {
+            id: "event-current",
+            type: "sensor_snapshot",
+            source: "live",
+            occurred_at: "2026-06-09T10:55:00.000Z",
+          },
+        ],
+      },
+    ];
+    fixtures.aiSessions = [
+      {
+        id: "session-current",
+        grow_id: "grow-current",
+        tent_id: "tent-current",
+        plant_id: "plant-current",
+        created_at: "2026-06-09T11:45:00.000Z",
+      },
+    ];
+    fixtures.actions = Array.from({ length: 6 }, (_, index) => ({
+      id: `newer-unrelated-${index + 1}`,
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: null,
+      status: "pending_approval",
+      source: "manual",
+      reason: "Manual action without a proof back-pointer.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    }));
+    fixtures.proofSelectedAlertActionRow = {
+      id: "older-current-alert-action",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: null,
+      status: "pending_approval",
+      source: "environment_alert",
+      reason: "Review humidity [alert:alert-current]",
+      riskLevel: "low",
+      alertBackPointerId: "alert-current",
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    };
+    fixtures.proofSelectedAiDoctorActionRow = {
+      id: "older-current-ai-doctor-action",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: null,
+      status: "pending_approval",
+      source: "ai_doctor",
+      reason: "Review leaf context [session:session-current]",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: "session-current",
+      hasTargetDevice: false,
+    };
+    fixtures.proofSelectedPlantAiCoachRow = {
+      id: "selected-plant-coach",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: "plant-current",
+      status: "pending_approval",
+      source: "ai_coach",
+      reason: "Review the selected plant.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    };
+
+    renderPage();
+
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("passed");
+    expect(action.textContent).toMatch(/Alert-derived advisory/);
+    expect(action.textContent).not.toMatch(/AI Coach advisory/);
+    expect(fixtures.actionHookCalls).toContainEqual([
+      "tent-current",
+      "grow-current",
+      {
+        selectedPlantIdForAiCoach: "plant-current",
+        selectedAlertIdForProof: "alert-current",
+        selectedAiDoctorSessionIdForProof: "session-current",
+      },
     ]);
   });
 
@@ -590,20 +723,20 @@ describe("OneTentLoopLiveProof page", () => {
           created_at: "2026-06-09T11:45:00.000Z",
         },
       ];
-      fixtures.actions = [
-        {
-          id: "aq-ai-current",
-          growId: "grow-current",
-          tentId: "tent-current",
-          status: "pending_approval",
-          source: "ai_doctor",
-          reason: "Review humidity [session:session-current]",
-          riskLevel: "low",
-          alertBackPointerId: null,
-          aiDoctorSessionBackPointerId: "session-current",
-          hasTargetDevice: false,
-        },
-      ];
+      // Exercise the separately bounded direct candidate, not the generic
+      // display list: current-state reconstruction must still fail closed.
+      fixtures.proofSelectedAiDoctorActionRow = {
+        id: "aq-ai-current",
+        growId: "grow-current",
+        tentId: "tent-current",
+        status: "pending_approval",
+        source: "ai_doctor",
+        reason: "Review humidity [session:session-current]",
+        riskLevel: "low",
+        alertBackPointerId: null,
+        aiDoctorSessionBackPointerId: "session-current",
+        hasTargetDevice: false,
+      };
 
       renderPage();
 

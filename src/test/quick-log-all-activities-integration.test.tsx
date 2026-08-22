@@ -34,7 +34,10 @@ const storageUploadMock = vi.fn(async (..._args: unknown[]) => ({
 }));
 const storageRemoveMock = vi.fn(async (..._args: unknown[]) => ({ data: null, error: null }));
 const diaryInsertMock = vi.fn(async (..._args: unknown[]) => ({ error: null }));
-const diaryMaybeSingleMock = vi.fn(async () => ({ data: null, error: null }));
+const diaryMaybeSingleMock = vi.fn<() => Promise<{ data: unknown; error: unknown }>>(async () => ({
+  data: null,
+  error: null,
+}));
 const diaryOwnerEqMock = vi.fn(() => ({ maybeSingle: diaryMaybeSingleMock }));
 const diaryIdEqMock = vi.fn(() => ({ eq: diaryOwnerEqMock }));
 const diarySelectMock = vi.fn((..._args: unknown[]) => ({ eq: diaryIdEqMock }));
@@ -489,6 +492,52 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(
       screen.queryByTestId("quick-log-all-activities-photo-uncertain-recovery"),
     ).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeEnabled();
+  });
+
+  it("re-enables the exact target only after a remount confirms its stored photo diary row", async () => {
+    let capturedDiaryEntryId: string | null = null;
+    diaryInsertMock.mockImplementationOnce(async (...args: unknown[]) => {
+      capturedDiaryEntryId = (args[1] as { id?: string } | undefined)?.id ?? null;
+      throw new Error("network interrupted");
+    });
+    // The first owner-scoped read cannot prove the response-loss outcome.
+    diaryMaybeSingleMock.mockResolvedValueOnce({ data: null, error: null });
+
+    const firstOpen = mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [new File(["plant-a"], "plant-a.jpg", { type: "image/jpeg" })] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("quick-log-all-activities-photo-uncertain-recovery"),
+      ).toBeInTheDocument(),
+    );
+    expect(capturedDiaryEntryId).toMatch(/^.+$/);
+
+    firstOpen.unmount();
+    // A later exact owner-scoped lookup proves that the original insert did
+    // commit. Only that proof may clear the browser-session retry fence.
+    diaryMaybeSingleMock.mockResolvedValueOnce({
+      data: { id: capturedDiaryEntryId },
+      error: null,
+    });
+    mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+
+    await waitFor(() => expect(diarySelectMock).toHaveBeenCalledTimes(2));
+    expect(
+      screen.queryByTestId("quick-log-all-activities-photo-uncertain-recovery"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [new File(["plant-a-next"], "plant-a-next.jpg", { type: "image/jpeg" })] },
+    });
     expect(screen.getByTestId("quick-log-all-activities-save")).toBeEnabled();
   });
 

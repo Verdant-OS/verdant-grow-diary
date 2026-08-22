@@ -120,7 +120,12 @@ function isDefinitiveNonCommitError(error: unknown): boolean {
   return typeof code === "string" && code.trim() !== "" && code !== "23505";
 }
 
-async function reconcileExactOwnerPhotoDiaryEntry(
+/**
+ * Read-only exact-id reconciliation for a preallocated photo diary attempt.
+ * It deliberately returns only a boolean: callers must not render or expose
+ * the stored row while deciding whether an ambiguous retry fence can clear.
+ */
+export async function hasConfirmedQuickLogPhotoDiaryEntryForOwner(
   ownerId: string,
   entryId: string,
 ): Promise<boolean> {
@@ -153,7 +158,7 @@ export async function createQuickLogPhotoDiaryEntry(
   try {
     const { error } = await supabase.from("diary_entries").insert(row as never);
     if (error) {
-      if (await reconcileExactOwnerPhotoDiaryEntry(input.ownerId, entryId)) {
+      if (await hasConfirmedQuickLogPhotoDiaryEntryForOwner(input.ownerId, entryId)) {
         return { ok: true };
       }
       if (!isDefinitiveNonCommitError(error)) {
@@ -171,7 +176,9 @@ export async function createQuickLogPhotoDiaryEntry(
     // client supplied this exact UUID, so only an owner-scoped lookup for that
     // row can prove the attachment exists. Any other outcome stays uncertain
     // and callers must retain the uploaded object rather than deleting it.
-    if (await reconcileExactOwnerPhotoDiaryEntry(input.ownerId, entryId)) return { ok: true };
+    if (await hasConfirmedQuickLogPhotoDiaryEntryForOwner(input.ownerId, entryId)) {
+      return { ok: true };
+    }
     return {
       ok: false,
       ambiguous: true,

@@ -1,5 +1,5 @@
 /**
- * usePlantAssignedTentActions — proof-only selected-plant AI Coach lookup.
+ * usePlantAssignedTentActions — proof-only exact causal lookups.
  *
  * The normal assigned-tent panel deliberately reads a small, newest-first
  * window. Live Proof has a stricter identity requirement for AI Coach rows:
@@ -24,18 +24,67 @@ const supabaseState = vi.hoisted(() => ({
   genericRows: [] as AssignedTentActionInputRow[],
   proofRows: [] as AssignedTentActionInputRow[],
   proofError: null as { message: string } | null,
+  proofAlertRows: [] as AssignedTentActionInputRow[],
+  proofAlertError: null as { message: string } | null,
+  proofAiDoctorRows: [] as AssignedTentActionInputRow[],
+  proofAiDoctorError: null as { message: string } | null,
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
   const hasFilter = (record: QueryRecord, key: string, value: unknown) =>
     record.filters.some(([filterKey, filterValue]) => filterKey === key && filterValue === value);
 
+  const escapeRegexLiteral = (value: string) => value.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+
+  // Minimal PostgreSQL LIKE behavior for the test double: `%` and `_` are
+  // wildcards unless escaped by a backslash. This makes the bounded-read
+  // regression exercise the exact pattern sent to PostgREST before limit(1).
+  const matchesLike = (value: string, pattern: string): boolean => {
+    let source = "^";
+    for (let index = 0; index < pattern.length; index += 1) {
+      const character = pattern[index];
+      if (character === "\\" && index + 1 < pattern.length) {
+        source += escapeRegexLiteral(pattern[index + 1]);
+        index += 1;
+      } else if (character === "%") {
+        source += ".*";
+      } else if (character === "_") {
+        source += ".";
+      } else {
+        source += escapeRegexLiteral(character);
+      }
+    }
+    return new RegExp(`${source}$`, "u").test(value);
+  };
+
+  const scopedProofRows = (record: QueryRecord, rows: AssignedTentActionInputRow[]) => {
+    const likePattern = record.filters.find(([key]) => key === "reason.like")?.[1];
+    const matchingRows =
+      typeof likePattern === "string"
+        ? rows.filter(
+            (row) => typeof row.reason === "string" && matchesLike(row.reason, likePattern),
+          )
+        : rows;
+    return matchingRows.slice(0, record.limit ?? 0);
+  };
+
   const responseFor = (record: QueryRecord) => {
-    const isProofLookup = hasFilter(record, "source", "ai_coach");
-    if (isProofLookup) {
+    if (hasFilter(record, "source", "ai_coach")) {
       return {
         data: supabaseState.proofRows.slice(0, record.limit ?? 0),
         error: supabaseState.proofError,
+      };
+    }
+    if (hasFilter(record, "source", "environment_alert")) {
+      return {
+        data: scopedProofRows(record, supabaseState.proofAlertRows),
+        error: supabaseState.proofAlertError,
+      };
+    }
+    if (hasFilter(record, "source", "ai_doctor")) {
+      return {
+        data: scopedProofRows(record, supabaseState.proofAiDoctorRows),
+        error: supabaseState.proofAiDoctorError,
       };
     }
     return { data: supabaseState.genericRows.slice(0, record.limit ?? 0), error: null };
@@ -46,6 +95,10 @@ vi.mock("@/integrations/supabase/client", () => {
       select: () => chain,
       eq: (key: string, value: unknown) => {
         record.filters.push([key, value]);
+        return chain;
+      },
+      like: (key: string, value: unknown) => {
+        record.filters.push([`${key}.like`, value]);
         return chain;
       },
       order: () => chain,
@@ -77,6 +130,10 @@ import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions
 const TENT_ID = "tent-current";
 const GROW_ID = "grow-current";
 const SELECTED_PLANT_ID = "plant-current";
+const ALERT_ID = "alert-current";
+const AI_DOCTOR_SESSION_ID = "session-current";
+const UNDERSCORE_ALERT_ID = "alert_current";
+const UNDERSCORE_AI_DOCTOR_SESSION_ID = "session_current";
 
 function action(overrides: Partial<AssignedTentActionInputRow> = {}): AssignedTentActionInputRow {
   return {
@@ -119,9 +176,13 @@ beforeEach(() => {
   supabaseState.genericRows = [];
   supabaseState.proofRows = [];
   supabaseState.proofError = null;
+  supabaseState.proofAlertRows = [];
+  supabaseState.proofAlertError = null;
+  supabaseState.proofAiDoctorRows = [];
+  supabaseState.proofAiDoctorError = null;
 });
 
-describe("usePlantAssignedTentActions — proof-only AI Coach lookup", () => {
+describe("usePlantAssignedTentActions — proof-only bounded lookups", () => {
   it("finds the exact selected-plant coach row beyond eleven newer other-plant rows with two bounded reads", async () => {
     const newerOtherPlantRows = Array.from({ length: 11 }, (_, index) =>
       action({
@@ -199,6 +260,141 @@ describe("usePlantAssignedTentActions — proof-only AI Coach lookup", () => {
     expect(result.current.proofSelectedPlantAiCoachRow).toBeNull();
   });
 
+  it("keeps exact older current-alert and AI Doctor rows reachable beyond the generic cap", async () => {
+    supabaseState.genericRows = Array.from({ length: 11 }, (_, index) =>
+      action({
+        id: `newer-unrelated-${index + 1}`,
+        source: "manual",
+        plant_id: null,
+        created_at: `2026-08-22T10:${String(20 + index).padStart(2, "0")}:00.000Z`,
+      }),
+    );
+    supabaseState.proofAlertRows = [
+      action({
+        id: "older-current-alert-action",
+        source: "environment_alert",
+        plant_id: null,
+        reason: `Review humidity [alert:${ALERT_ID}]`,
+        created_at: "2026-08-22T08:00:00.000Z",
+      }),
+    ];
+    supabaseState.proofAiDoctorRows = [
+      action({
+        id: "older-current-ai-doctor-action",
+        source: "ai_doctor",
+        plant_id: null,
+        reason: `Review leaf context [session:${AI_DOCTOR_SESSION_ID}]`,
+        created_at: "2026-08-22T07:00:00.000Z",
+      }),
+    ];
+
+    const { result } = renderHook(
+      () =>
+        usePlantAssignedTentActions(TENT_ID, GROW_ID, {
+          selectedAlertIdForProof: ALERT_ID,
+          selectedAiDoctorSessionIdForProof: AI_DOCTOR_SESSION_ID,
+        }),
+      { wrapper: wrapper(makeClient()) },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // The generic panel remains capped independently; each causal source has
+    // one exact, separately bounded Live Proof evidence slot.
+    expect(result.current.rows).toHaveLength(5);
+    expect(result.current.proofSelectedAlertActionRow?.id).toBe("older-current-alert-action");
+    expect(result.current.proofSelectedAiDoctorActionRow?.id).toBe(
+      "older-current-ai-doctor-action",
+    );
+    expect(supabaseState.queries).toHaveLength(3);
+
+    const alertRead = findQuery((query) =>
+      query.filters.some(([key, value]) => key === "source" && value === "environment_alert"),
+    );
+    expect(alertRead).toMatchObject({ table: "action_queue", limit: 1 });
+    expect(alertRead.filters).toEqual(
+      expect.arrayContaining([
+        ["status", "pending_approval"],
+        ["tent_id", TENT_ID],
+        ["grow_id", GROW_ID],
+        ["source", "environment_alert"],
+        ["reason.like", `%[alert:${ALERT_ID}]%`],
+      ]),
+    );
+
+    const aiDoctorRead = findQuery((query) =>
+      query.filters.some(([key, value]) => key === "source" && value === "ai_doctor"),
+    );
+    expect(aiDoctorRead).toMatchObject({ table: "action_queue", limit: 1 });
+    expect(aiDoctorRead.filters).toEqual(
+      expect.arrayContaining([
+        ["status", "pending_approval"],
+        ["tent_id", TENT_ID],
+        ["grow_id", GROW_ID],
+        ["source", "ai_doctor"],
+        ["reason.like", `%[session:${AI_DOCTOR_SESSION_ID}]%`],
+      ]),
+    );
+  });
+
+  it("escapes underscore back-pointers so newer causal lookalikes cannot crowd out exact rows", async () => {
+    supabaseState.proofAlertRows = [
+      action({
+        id: "newer-alert-lookalike",
+        source: "environment_alert",
+        plant_id: null,
+        reason: "Review humidity [alert:alertXcurrent]",
+        created_at: "2026-08-22T10:00:00.000Z",
+      }),
+      action({
+        id: "older-exact-alert",
+        source: "environment_alert",
+        plant_id: null,
+        reason: `Review humidity [alert:${UNDERSCORE_ALERT_ID}]`,
+        created_at: "2026-08-22T09:00:00.000Z",
+      }),
+    ];
+    supabaseState.proofAiDoctorRows = [
+      action({
+        id: "newer-ai-doctor-lookalike",
+        source: "ai_doctor",
+        plant_id: null,
+        reason: "Review leaves [session:sessionXcurrent]",
+        created_at: "2026-08-22T10:00:00.000Z",
+      }),
+      action({
+        id: "older-exact-ai-doctor",
+        source: "ai_doctor",
+        plant_id: null,
+        reason: `Review leaves [session:${UNDERSCORE_AI_DOCTOR_SESSION_ID}]`,
+        created_at: "2026-08-22T09:00:00.000Z",
+      }),
+    ];
+
+    const { result } = renderHook(
+      () =>
+        usePlantAssignedTentActions(TENT_ID, GROW_ID, {
+          selectedAlertIdForProof: UNDERSCORE_ALERT_ID,
+          selectedAiDoctorSessionIdForProof: UNDERSCORE_AI_DOCTOR_SESSION_ID,
+        }),
+      { wrapper: wrapper(makeClient()) },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.proofSelectedAlertActionRow?.id).toBe("older-exact-alert");
+    expect(result.current.proofSelectedAiDoctorActionRow?.id).toBe("older-exact-ai-doctor");
+
+    const alertRead = findQuery((query) =>
+      query.filters.some(([key, value]) => key === "source" && value === "environment_alert"),
+    );
+    expect(alertRead.filters).toContainEqual(["reason.like", `%[alert:alert\\_current]%`]);
+    const aiDoctorRead = findQuery((query) =>
+      query.filters.some(([key, value]) => key === "source" && value === "ai_doctor"),
+    );
+    expect(aiDoctorRead.filters).toContainEqual(["reason.like", `%[session:session\\_current]%`]);
+  });
+
   it("keeps the exact selected-plant coach row inside the proof display cap ahead of newer non-Coach rows", async () => {
     supabaseState.genericRows = Array.from({ length: 6 }, (_, index) =>
       action({
@@ -252,5 +448,24 @@ describe("usePlantAssignedTentActions — proof-only AI Coach lookup", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.rows).toEqual([]);
     expect(result.current.proofSelectedPlantAiCoachRow).toBeNull();
+  });
+
+  it("fails closed when an exact causal alert lookup errors", async () => {
+    supabaseState.genericRows = [
+      action({ id: "generic-alert", source: "environment_alert", plant_id: null }),
+    ];
+    supabaseState.proofAlertError = { message: "current alert lookup failed" };
+
+    const { result } = renderHook(
+      () =>
+        usePlantAssignedTentActions(TENT_ID, GROW_ID, {
+          selectedAlertIdForProof: ALERT_ID,
+        }),
+      { wrapper: wrapper(makeClient()) },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.rows).toEqual([]);
+    expect(result.current.proofSelectedAlertActionRow).toBeNull();
   });
 });

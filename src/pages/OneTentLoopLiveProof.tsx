@@ -598,14 +598,18 @@ function toActionQueueEvidence(row: PlantAssignedTentActionRow): ActionQueueEvid
 }
 
 /**
- * Prefer a passed (or safety-blocked) causal Alert/AI Doctor action from the
- * ordinary bounded list. A separately fetched exact selected-plant Coach row
- * then beats non-causal rows that only occupy the display cap. Each candidate
- * is run through the same pure evaluator used by the final proof, so this
- * presenter never promotes a malformed or unsafe direct lookup.
+ * Prefer a passed (or safety-blocked) causal Alert/AI Doctor action. Exact
+ * current-alert/session rows arrive through separately bounded reads before
+ * the ordinary display window, so a busy tent cannot hide older causal
+ * evidence. A separately fetched exact selected-plant Coach row then beats
+ * non-causal rows that only occupy the display cap. Each candidate is run
+ * through the same pure evaluator used by the final proof, so this presenter
+ * never promotes a malformed or unsafe direct lookup.
  */
 function selectLiveProofActionQueueRow(
   rows: readonly PlantAssignedTentActionRow[],
+  exactSelectedAlertActionRow: PlantAssignedTentActionRow | null,
+  exactSelectedAiDoctorActionRow: PlantAssignedTentActionRow | null,
   exactSelectedPlantAiCoachRow: PlantAssignedTentActionRow | null,
   context: ActionQueueProofContext,
 ): PlantAssignedTentActionRow | null {
@@ -613,13 +617,22 @@ function selectLiveProofActionQueueRow(
     (row) =>
       getActionQueueSourceKind(row) !== "ai_coach" || row.plantId === context.selected_plant_id,
   );
-  const causalRow = proofScopedRows.find((row) => {
+  const seenCausalRowIds = new Set<string>();
+  const causalCandidates = [
+    exactSelectedAlertActionRow,
+    exactSelectedAiDoctorActionRow,
+    ...proofScopedRows,
+  ];
+  let firstCausalRow: PlantAssignedTentActionRow | null = null;
+  for (const row of causalCandidates) {
+    if (!row || seenCausalRowIds.has(row.id)) continue;
+    seenCausalRowIds.add(row.id);
     const source = getActionQueueSourceKind(row);
-    if (source !== "environment_alert" && source !== "ai_doctor") return false;
+    if (source !== "environment_alert" && source !== "ai_doctor") continue;
+    if (!firstCausalRow) firstCausalRow = row;
     const status = evaluateActionQueue(toActionQueueEvidence(row), context).status;
-    return status === "passed" || status === "blocked";
-  });
-  if (causalRow) return causalRow;
+    if (status === "passed" || status === "blocked") return row;
+  }
 
   const exactCoachIsEligible =
     exactSelectedPlantAiCoachRow !== null &&
@@ -629,7 +642,7 @@ function selectLiveProofActionQueueRow(
       "passed";
   if (exactCoachIsEligible) return exactSelectedPlantAiCoachRow;
 
-  return proofScopedRows[0] ?? null;
+  return firstCausalRow ?? proofScopedRows[0] ?? null;
 }
 
 export default function OneTentLoopLiveProof(): JSX.Element {
@@ -738,6 +751,8 @@ export default function OneTentLoopLiveProof(): JSX.Element {
 
   const aqQ = usePlantAssignedTentActions(tent?.id ?? null, grow?.id ?? null, {
     selectedPlantIdForAiCoach: plant?.id ?? null,
+    selectedAlertIdForProof: latest_alert?.id ?? null,
+    selectedAiDoctorSessionIdForProof: latest_ai_doctor?.session_id ?? null,
   });
   const actionQueueProofContext: ActionQueueProofContext = {
     selected_plant_id: plant?.id ?? null,
@@ -748,6 +763,8 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   };
   const aqRow = selectLiveProofActionQueueRow(
     aqQ.rows ?? [],
+    aqQ.proofSelectedAlertActionRow,
+    aqQ.proofSelectedAiDoctorActionRow,
     aqQ.proofSelectedPlantAiCoachRow,
     actionQueueProofContext,
   );

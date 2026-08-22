@@ -34,9 +34,14 @@ import QuickLogSymptomCheckFields from "@/components/QuickLogSymptomCheckFields"
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import {
+  createQuickLogPhotoDiaryEntry,
+  hasConfirmedQuickLogPhotoDiaryEntryForOwner,
+} from "@/lib/quickLogPhotoDiaryEntry";
 import {
   buildQuickLogPhotoAttachmentRecoveryKey,
+  clearQuickLogPhotoAttachmentRecoveryLock,
+  getQuickLogPhotoAttachmentRecoveryRecord,
   hasQuickLogPhotoAttachmentRecoveryLock,
   recordQuickLogPhotoAttachmentRecoveryLock,
 } from "@/lib/quickLogPhotoAttachmentRecovery";
@@ -164,6 +169,11 @@ function newIdempotencyKey(activityId: QuickLogActivityId): string {
   return `qla-${activityId}-${Date.now()}-${rand}`;
 }
 
+function newPhotoDiaryEntryId(): string | null {
+  const id = globalThis.crypto?.randomUUID?.();
+  return typeof id === "string" && id.trim() !== "" ? id : null;
+}
+
 interface SavedRecord {
   id: string;
   activityId: QuickLogActivityId;
@@ -240,8 +250,11 @@ export default function QuickLogAllActivitiesSection({
     (photoAttachmentUncertainRecoveryKeys.has(currentPhotoAttachmentRecoveryKey) ||
       hasQuickLogPhotoAttachmentRecoveryLock(currentPhotoAttachmentRecoveryScope));
   const markPhotoAttachmentUncertain = useCallback(
-    (ownerId: string, target: QuickLogAllActivitiesSaveTarget) => {
-      const recoveryKey = recordQuickLogPhotoAttachmentRecoveryLock({ ownerId, ...target });
+    (ownerId: string, target: QuickLogAllActivitiesSaveTarget, diaryEntryId: string) => {
+      const recoveryKey = recordQuickLogPhotoAttachmentRecoveryLock(
+        { ownerId, ...target },
+        diaryEntryId,
+      );
       if (!recoveryKey) return;
       setPhotoAttachmentUncertainRecoveryKeys((previous) => {
         if (previous.has(recoveryKey)) return previous;
@@ -252,6 +265,37 @@ export default function QuickLogAllActivitiesSection({
     },
     [],
   );
+  // Re-check a remounted exact attempt through the signed-in owner's RLS
+  // view. A no-row/error result deliberately leaves the fence in place; only
+  // a confirmed exact diary row can re-enable this target's photo editor.
+  useEffect(() => {
+    const recovery = getQuickLogPhotoAttachmentRecoveryRecord(currentPhotoAttachmentRecoveryScope);
+    const ownerId = currentPhotoAttachmentRecoveryScope.ownerId;
+    if (!recovery?.diaryEntryId || typeof ownerId !== "string" || ownerId.trim() === "") return;
+
+    let active = true;
+    void hasConfirmedQuickLogPhotoDiaryEntryForOwner(ownerId, recovery.diaryEntryId).then(
+      (confirmed) => {
+        if (!active || !confirmed) return;
+        clearQuickLogPhotoAttachmentRecoveryLock(currentPhotoAttachmentRecoveryScope);
+        setPhotoAttachmentUncertainRecoveryKeys((previous) => {
+          const recoveryKey = currentPhotoAttachmentRecoveryKey;
+          if (!recoveryKey) return previous;
+          const next = new Set(previous);
+          next.delete(recoveryKey);
+          return next;
+        });
+        dispatchQuickLogV2EntryCreated({
+          createdAt: new Date().toISOString(),
+          growEventId: null,
+          source: "quick_log_v2",
+        });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [currentPhotoAttachmentRecoveryKey, currentPhotoAttachmentRecoveryScope]);
   const photoDiaryInFlightRef = useRef(false);
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
@@ -602,6 +646,14 @@ export default function QuickLogAllActivitiesSection({
           setErrorForActivity(selected.id);
           return;
         }
+        const photoDiaryEntryId = newPhotoDiaryEntryId();
+        if (!photoDiaryEntryId) {
+          setErrorReason(
+            "Verdant could not prepare a safe photo attachment. Refresh and try again.",
+          );
+          setErrorForActivity(selected.id);
+          return;
+        }
         if (photoDiaryInFlightRef.current) return;
         photoDiaryInFlightRef.current = true;
         // Tracks a successful upload so a LATER rejection (e.g. the diary
@@ -638,6 +690,7 @@ export default function QuickLogAllActivitiesSection({
             // attachment marker the plant-memory episodes key on.
             eventType: "photo",
             extraDetails: Object.keys(photoExtraDetails).length > 0 ? photoExtraDetails : null,
+            entryId: photoDiaryEntryId,
           });
           if (!entryResult.ok) {
             // (strictNullChecks is off in this app config, so cast the failure
@@ -647,7 +700,7 @@ export default function QuickLogAllActivitiesSection({
             // cleanup is safe. An unresolved response loss does not: retain the
             // object and lock only this captured target's photo writes.
             if (failure.ambiguous) {
-              markPhotoAttachmentUncertain(capturedOwnerId, capturedTarget);
+              markPhotoAttachmentUncertain(capturedOwnerId, capturedTarget, photoDiaryEntryId);
               return;
             } else {
               try {
@@ -673,7 +726,7 @@ export default function QuickLogAllActivitiesSection({
           // the object rather than risking a committed diary row pointing to a
           // deleted photo, and lock only this captured target's photo save.
           if (uploadedPath) {
-            markPhotoAttachmentUncertain(capturedOwnerId, capturedTarget);
+            markPhotoAttachmentUncertain(capturedOwnerId, capturedTarget, photoDiaryEntryId);
             return;
           }
           setErrorReason("Photo save failed. Nothing was saved.");

@@ -31,7 +31,10 @@ import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import SensorSourceInlineLegend from "@/components/SensorSourceInlineLegend";
 import { useLocation, useSearchParams } from "@/lib/react-router-compat";
-import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
+import {
+  readSensorsPlantRouteIntent,
+  resolveForwardedPlantIntent,
+} from "@/lib/sensorRoutePlantIntentRules";
 import { SENSOR_SOURCES_PARAM, parseSensorSourcesParam } from "@/lib/sensorSourceUrlRules";
 import { classifySensorMetricState, type SensorMetricKey } from "@/lib/sensorMetricStateRules";
 import {
@@ -120,6 +123,21 @@ export default function Sensors() {
   // writer until the route is resolved or the grower consciously reselects.
   const activeTentId =
     requiredTentGate.resolutionPending || requiredTentGate.reselectionRequired ? null : tentId;
+  // The plant arrived PAIRED with a tent. `selectTentByGrower` changes the
+  // local selection without touching the URL's `?plantId=`, so forwarding it
+  // unconditionally would hand the Doctor a new tent with the old plant and
+  // lose the cue to the mismatch. Sensors holds no plant rows and cannot
+  // check the pairing — but it knows whether the grower is still on the tent
+  // the plant came with, which is enough and fails closed.
+  const forwardedPlantIntentId = useMemo(
+    () =>
+      resolveForwardedPlantIntent({
+        plantId: carriedPlantIntentId,
+        routeTentId: sensorsTentRouteIntent.tentId,
+        activeTentId,
+      }),
+    [activeTentId, carriedPlantIntentId, sensorsTentRouteIntent.tentId],
+  );
   // Do not fetch the all-tents aggregate into the Sensors browser cache.
   // `null` is an explicit no-scope sentinel until a persisted tent is chosen.
   const readingsQuery = useGrowSensorReadings(activeTentId);
@@ -348,7 +366,7 @@ export default function Sensors() {
         ids={{
           growId: selectedGrowId ?? null,
           tentId: activeTentId,
-          plantId: carriedPlantIntentId,
+          plantId: forwardedPlantIntentId,
         }}
         testId="sensors-one-tent-loop-next-step-card"
         className="mb-3"

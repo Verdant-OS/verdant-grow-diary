@@ -42,6 +42,18 @@ export interface TimelineNameDirectory {
   carriablePlantTentStatus: CarriablePlantLookupStatus;
 }
 
+interface DirectorySnapshot {
+  key: string;
+  plantNamesById: ReadonlyMap<string, string> | null;
+  tentNamesById: ReadonlyMap<string, string> | null;
+  carriablePlantTentById: ReadonlyMap<string, string> | null;
+}
+
+/** Identity of the read a snapshot belongs to. Compared during render. */
+function directoryKey(userId: string | null, activeGrowId: string | null): string {
+  return `${userId ?? ""}\u0000${activeGrowId ?? ""}`;
+}
+
 /**
  * Read-only id → name directory for Timeline filter labels.
  *
@@ -60,26 +72,26 @@ export function useTimelineNameDirectory(
   userId: string | null,
   activeGrowId: string | null,
 ): TimelineNameDirectory {
-  const [plantNamesById, setPlantNamesById] = useState<ReadonlyMap<string, string> | null>(null);
-  const [tentNamesById, setTentNamesById] = useState<ReadonlyMap<string, string> | null>(null);
-  const [carriablePlantTentById, setCarriablePlantTentById] = useState<ReadonlyMap<
-    string,
-    string
-  > | null>(null);
-  const [carriablePlantTentStatus, setCarriablePlantTentStatus] =
-    useState<CarriablePlantLookupStatus>(userId ? "pending" : "unavailable");
+  // One keyed snapshot rather than four independent pieces of state.
+  //
+  // Raised in review: `pending` was set INSIDE the effect, so the render that
+  // first saw a new `activeGrowId` — a Back/Forward between two filtered grow
+  // URLs, say — still published the PREVIOUS grow's map with status "ready".
+  // Timeline would then render an enabled, tent-only CTA for one render and
+  // lose the plant if clicked, because the new plant is absent from the stale
+  // map. React runs effects after paint, so no effect-based fix closes that
+  // window; the key has to be compared during render.
+  const [snapshot, setSnapshot] = useState<DirectorySnapshot | null>(null);
+
+  const key = directoryKey(userId, activeGrowId);
+  const fresh = snapshot?.key === key;
 
   useEffect(() => {
     if (!userId || !activeGrowId) {
-      setPlantNamesById(null);
-      setTentNamesById(null);
-      setCarriablePlantTentById(null);
-      // No signed-in user is terminal, not pending — nothing is in flight.
-      setCarriablePlantTentStatus("unavailable");
+      setSnapshot({ key, plantNamesById: null, tentNamesById: null, carriablePlantTentById: null });
       return;
     }
     let cancelled = false;
-    setCarriablePlantTentStatus("pending");
     (async () => {
       try {
         const [plantsResult, tentsResult] = await Promise.all([
@@ -99,29 +111,48 @@ export function useTimelineNameDirectory(
           supabase.from("tents").select("id,name,grow_id,is_archived").eq("user_id", userId),
         ]);
         if (cancelled) return;
-        setPlantNamesById(plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data));
-        setTentNamesById(tentsResult?.error ? null : buildTimelineNameLookup(tentsResult?.data));
-        setCarriablePlantTentById(
-          plantsResult?.error
+        setSnapshot({
+          key,
+          plantNamesById: plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data),
+          tentNamesById: tentsResult?.error ? null : buildTimelineNameLookup(tentsResult?.data),
+          carriablePlantTentById: plantsResult?.error
             ? null
             : buildCarriablePlantTentLookup(plantsResult?.data, {
                 growId: activeGrowId,
                 tents: tentsResult?.error ? [] : (tentsResult?.data ?? []),
               }),
-        );
-        setCarriablePlantTentStatus(plantsResult?.error ? "unavailable" : "ready");
+        });
       } catch {
         if (cancelled) return;
-        setPlantNamesById(null);
-        setTentNamesById(null);
-        setCarriablePlantTentById(null);
-        setCarriablePlantTentStatus("unavailable");
+        setSnapshot({
+          key,
+          plantNamesById: null,
+          tentNamesById: null,
+          carriablePlantTentById: null,
+        });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [userId, activeGrowId]);
+  }, [key, userId, activeGrowId]);
 
-  return { plantNamesById, tentNamesById, carriablePlantTentById, carriablePlantTentStatus };
+  // A snapshot for a DIFFERENT key is not stale data to show — it is another
+  // grow's. Publish nothing until this key's read lands.
+  if (!fresh) {
+    return {
+      plantNamesById: null,
+      tentNamesById: null,
+      carriablePlantTentById: null,
+      carriablePlantTentStatus: userId && activeGrowId ? "pending" : "unavailable",
+    };
+  }
+
+  return {
+    plantNamesById: snapshot.plantNamesById,
+    tentNamesById: snapshot.tentNamesById,
+    carriablePlantTentById: snapshot.carriablePlantTentById,
+    // A settled read whose plant half failed is terminal, not pending.
+    carriablePlantTentStatus: snapshot.carriablePlantTentById ? "ready" : "unavailable",
+  };
 }

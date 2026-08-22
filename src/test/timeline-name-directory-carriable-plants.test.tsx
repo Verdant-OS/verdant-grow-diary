@@ -278,6 +278,31 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     await waitFor(() => expect(result.current.carriablePlantTentById).toBeNull());
   });
 
+  it("never publishes the PREVIOUS grow's map when the grow changes", async () => {
+    // Raised in review: `pending` was set inside the effect, so the first
+    // render for a new activeGrowId still published the old grow's map as
+    // "ready" — Timeline would show an enabled tent-only CTA for one render
+    // and lose the plant if clicked. React runs effects after paint, so the
+    // key must be compared during render, not repaired afterwards.
+    const { result, rerender } = renderHook(
+      ({ growId }: { growId: string }) => useTimelineNameDirectory("user-1", growId),
+      { initialProps: { growId: GROW } },
+    );
+
+    await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("ready"));
+    expect(result.current.carriablePlantTentById!.get(PLANT_ACTIVE)).toBe(TENT);
+
+    // Simulates Back/Forward between two filtered grow URLs on a MOUNTED
+    // Timeline. The very next render must not carry the old grow forward.
+    rerender({ growId: OTHER_GROW });
+
+    expect(result.current.carriablePlantTentStatus).toBe("pending");
+    expect(result.current.carriablePlantTentById).toBeNull();
+    // Names are keyed too — showing another grow's plant names would be a
+    // quieter version of the same bug.
+    expect(result.current.plantNamesById).toBeNull();
+  });
+
   it("clears the carry lookup when there is no signed-in user", async () => {
     const { result } = renderHook(() => useTimelineNameDirectory(null, GROW));
     await waitFor(() => expect(result.current.carriablePlantTentById).toBeNull());

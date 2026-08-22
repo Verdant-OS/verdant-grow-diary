@@ -287,6 +287,41 @@ export function shouldHoldCarryForPendingLookup(input: {
 }
 
 /**
+ * The plant intent Sensors may forward onward, given its CURRENT tent.
+ *
+ * The plant was carried *paired with* a tent — Timeline only ever emits a
+ * pair the Doctor will accept. Sensors lets the grower switch tents, and
+ * `selectTentByGrower` changes the local selection WITHOUT touching the
+ * URL's `?plantId=`. So after a switch the card would forward the new tent
+ * with the old plant, the Doctor would reject the mismatch, and the carried
+ * cue would vanish with no explanation — the same silent drop again, one
+ * page further along.
+ *
+ * Sensors cannot check the pairing itself: it holds no plant rows. What it
+ * DOES know is whether the grower is still on the tent the plant arrived
+ * with. That is sufficient and fail-closed:
+ *
+ *   - still on the carried tent → forward the plant
+ *   - moved to any other tent → drop it; the grower changed subject
+ *   - no tent resolved yet, or no tent in the route → drop it. There was
+ *     never a validated pairing to preserve.
+ */
+export function resolveForwardedPlantIntent(input: {
+  plantId?: unknown;
+  routeTentId?: unknown;
+  activeTentId?: unknown;
+}): string | null {
+  const plantId = normalizePersistedPlantId(input?.plantId);
+  if (!plantId) return null;
+
+  const routeTentId = normalizePersistedPlantId(input?.routeTentId);
+  const activeTentId = normalizePersistedPlantId(input?.activeTentId);
+  if (!routeTentId || !activeTentId) return null;
+
+  return routeTentId === activeTentId ? plantId : null;
+}
+
+/**
  * Append a plant intent to an already-built internal href.
  *
  * Composes with `buildSensorsTentRouteHref` rather than replacing it, so the

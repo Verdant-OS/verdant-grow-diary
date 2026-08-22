@@ -18,6 +18,7 @@ import {
   buildCarriablePlantTentLookup,
   type CarriableTentLink,
   resolveCarriedPlantScope,
+  resolveForwardedPlantIntent,
   shouldHoldCarryForPendingLookup,
   withSensorsPlantIntent,
 } from "@/lib/sensorRoutePlantIntentRules";
@@ -100,6 +101,62 @@ describe("readSensorsPlantRouteIntent", () => {
     // typed boundary exists so both fit without an adapter at the call site.
     expect(readSensorsPlantRouteIntent({ get: () => PLANT })).toBe(PLANT);
     expect(readSensorsPlantRouteIntent({ get: () => null })).toBeNull();
+  });
+});
+
+describe("resolveForwardedPlantIntent", () => {
+  const OTHER_TENT_ID = "99999999-8888-4777-8666-555555555555";
+
+  it("forwards the plant while the grower is still on the tent it arrived with", () => {
+    expect(
+      resolveForwardedPlantIntent({ plantId: PLANT, routeTentId: TENT, activeTentId: TENT }),
+    ).toBe(PLANT);
+  });
+
+  it("drops the plant once the grower switches to another tent", () => {
+    // `Sensors.selectTentByGrower` changes the local tent WITHOUT touching
+    // the URL's ?plantId=. Forwarding it anyway hands the Doctor a new tent
+    // with the old plant, and the cue vanishes to the mismatch.
+    expect(
+      resolveForwardedPlantIntent({
+        plantId: PLANT,
+        routeTentId: TENT,
+        activeTentId: OTHER_TENT_ID,
+      }),
+    ).toBeNull();
+  });
+
+  it("drops the plant when no tent is resolved or none was carried", () => {
+    // There was never a validated pairing to preserve, so there is nothing
+    // to forward. Fail closed rather than let a bare plant travel.
+    for (const [routeTentId, activeTentId] of [
+      [TENT, null],
+      [TENT, ""],
+      [null, TENT],
+      ["", TENT],
+      [null, null],
+      ["not-a-uuid", "not-a-uuid"],
+    ]) {
+      expect(resolveForwardedPlantIntent({ plantId: PLANT, routeTentId, activeTentId })).toBeNull();
+    }
+  });
+
+  it("never invents a plant from a malformed or absent intent", () => {
+    for (const plantId of ["", "   ", "not-a-uuid", "p1", null, undefined, 42, {}, [PLANT]]) {
+      expect(
+        resolveForwardedPlantIntent({ plantId, routeTentId: TENT, activeTentId: TENT }),
+      ).toBeNull();
+    }
+  });
+
+  it("compares tents case- and whitespace-insensitively, like every other id here", () => {
+    expect(
+      resolveForwardedPlantIntent({
+        plantId: PLANT,
+        routeTentId: `  ${TENT.toUpperCase()}  `,
+        activeTentId: TENT,
+      }),
+    ).toBe(PLANT);
   });
 });
 
@@ -533,6 +590,40 @@ describe("buildCarriablePlantTentLookup", () => {
  * this only pins that the page actually calls it and feeds the result to
  * the card. It proves the wiring is present, not that it is correct.
  */
+/**
+ * @source-scan-justified: the defect is a PAGE not calling a correct pure
+ * rule. That is invisible to any test of the rule itself — B6 shipped
+ * entirely inert in #1102 for exactly this reason — and rendering Sensors
+ * here would need its full grow/tent/readings/auth stack. The rule's own
+ * behaviour is covered by resolved-value tests above.
+ */
+describe("Sensors page wiring", () => {
+  it("forwards the GATED plant intent to the loop card, never the raw URL value", async () => {
+    const fs = await import("node:fs/promises");
+    const src = await fs.readFile("src/pages/Sensors.tsx", "utf8");
+
+    // The complete call, so dropping an argument cannot leave this green.
+    expect(src).toMatch(
+      /resolveForwardedPlantIntent\(\{\s*plantId:\s*carriedPlantIntentId,\s*routeTentId:\s*sensorsTentRouteIntent\.tentId,\s*activeTentId,?\s*\}\)/,
+    );
+
+    // THE pin: the CARD must consume the gated value. Reverting this one
+    // identifier re-opens the tent-switch mismatch with every rule test
+    // still green — the shape B6 shipped in as dead code once already.
+    //
+    // Scoped to the card's own `ids` block, not the whole file. A blanket
+    // `not.toMatch(/plantId: carriedPlantIntentId/)` was tried first and was
+    // itself defective: that exact text legitimately appears as the
+    // RESOLVER'S argument two dozen lines above, so the pin failed on correct
+    // code. Same "agrees with something adjacent" defect as the Timeline pin
+    // below — made twice now, which is why both are scoped to one call.
+    const cardIds = src.match(/current="sensor-snapshot"[\s\S]{0,400}?ids=\{\{([\s\S]*?)\}\}/);
+    expect(cardIds).not.toBeNull();
+    expect(cardIds![1]).toMatch(/plantId:\s*forwardedPlantIntentId/);
+    expect(cardIds![1]).not.toMatch(/carriedPlantIntentId/);
+  });
+});
+
 describe("Timeline page wiring", () => {
   it("derives the carried scope and spreads it into the loop card", async () => {
     const fs = await import("node:fs/promises");

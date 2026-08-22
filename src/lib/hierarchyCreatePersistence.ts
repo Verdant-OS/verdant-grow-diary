@@ -18,7 +18,7 @@ export type HierarchyCreateAttempt =
       rowId: string;
       ownerId: string;
       growId: string;
-      tentId: string;
+      tentId: string | null;
     };
 
 export interface ConfirmedHierarchyCreateRow {
@@ -131,6 +131,7 @@ export async function reconcileHierarchyCreateAttempt(
       .from(tableForAttempt(attempt) as never)
       .select(reconciliationSelectForAttempt(attempt))
       .eq("id", attempt.rowId)
+      .eq("user_id", attempt.ownerId)
       .maybeSingle();
     if (error) return { status: "unavailable" };
     if (!data) return { status: "not_found" };
@@ -145,7 +146,7 @@ export async function reconcileHierarchyCreateAttempt(
  * Insert one preallocated hierarchy row and reconcile only errors that may
  * have committed after the client lost its response. Callers can safely offer
  * a normal error retry only for `definitive_error`; `unknown` must stay locked
- * until a full page reload establishes fresh server state.
+ * until a later page runtime can complete exact owner-scoped reconciliation.
  */
 export async function persistHierarchyCreateAttempt(
   client: Pick<SupabaseClient, "from">,

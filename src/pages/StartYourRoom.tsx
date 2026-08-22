@@ -46,6 +46,7 @@ import {
   persistHierarchyCreateAttempt,
   type HierarchyCreateAttempt,
 } from "@/lib/hierarchyCreatePersistence";
+import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -72,9 +73,12 @@ export default function StartYourRoom() {
   const [ids, setIds] = useState<StartYourRoomIds>({ ...EMPTY_START_YOUR_ROOM_IDS });
   const [busy, setBusy] = useState(false);
   const createInFlightRef = useRef(false);
-  const [createOutcomeUnknown, setCreateOutcomeUnknown] = useState(false);
   const [verificationRetrying, setVerificationRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
+    ownerId: user?.id,
+    client: supabase,
+  });
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -137,7 +141,7 @@ export default function StartYourRoom() {
     const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
     if (result.status === "confirmed") return result.confirmed;
     if (result.status === "unknown") {
-      setCreateOutcomeUnknown(true);
+      recordUnknownCreateOutcome(attempt);
       setError(
         `Verdant could not confirm whether this ${attempt.entity} was saved. Refresh before adding another.`,
       );

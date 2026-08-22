@@ -38,6 +38,7 @@ import {
   newPlantCreateAttemptId,
   reconcilePlantCreateAttempt,
 } from "@/lib/plantCreatePersistence";
+import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 import {
   buildCreateGrowBindingView,
   canWriteCreateGrowId,
@@ -134,7 +135,6 @@ export default function CreatePlantDialog({
   const runTentRefresh = useCallback(() => refetchTents(), [refetchTents]);
   const growRetry = useCreateBindingRetry(runGrowRefresh);
   const tentRetry = useCreateBindingRetry(runTentRefresh);
-
   const binding = useMemo(
     () =>
       buildCreateGrowBindingView(
@@ -215,7 +215,10 @@ export default function CreatePlantDialog({
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
   const createInFlightRef = useRef(false);
-  const [createOutcomeUnknown, setCreateOutcomeUnknown] = useState(false);
+  const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
+    ownerId: user?.id,
+    client: supabase,
+  });
   const handoffSuppressedRef = useRef(false);
   const mountedRef = useRef(true);
   const currentOwnerIdRef = useRef<string | null>(user?.id ?? null);
@@ -223,7 +226,6 @@ export default function CreatePlantDialog({
   const [form, setForm] = useState(() => emptyForm(initialTentId));
   /** Once grower explicitly picks a compatible tent after a conflict, allow write. */
   const [explicitCompatiblePick, setExplicitCompatiblePick] = useState(false);
-
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -309,6 +311,7 @@ export default function CreatePlantDialog({
     tentBlocksWrite;
 
   function handleOpenChange(next: boolean) {
+    if (next && createOutcomeUnknown) return;
     // The insert may already be durable, so closing cannot cancel it. Let the
     // grower dismiss a stalled refresh, but suppress the later Quick Log
     // handoff so closing never causes a delayed navigation surprise.
@@ -448,8 +451,14 @@ export default function CreatePlantDialog({
       if (!confirmed && needsReconciliation) {
         if (mountedRef.current) {
           setBusy(false);
-          setCreateOutcomeUnknown(true);
         }
+        recordUnknownCreateOutcome({
+          entity: "plant",
+          rowId: plantId,
+          ownerId: user.id,
+          growId: targetGrowId,
+          tentId: validation.value.tent_id ?? null,
+        });
         toast.error(
           "Verdant could not confirm whether this plant was saved. Refresh before adding another.",
         );
@@ -527,7 +536,11 @@ export default function CreatePlantDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
+          <Button
+            size="sm"
+            className="gradient-leaf text-primary-foreground gap-1"
+            disabled={createOutcomeUnknown}
+          >
             <Plus className="h-4 w-4" /> New plant
           </Button>
         )}

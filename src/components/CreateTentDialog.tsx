@@ -39,6 +39,7 @@ import {
   newHierarchyCreateAttemptId,
   persistHierarchyCreateAttempt,
 } from "@/lib/hierarchyCreatePersistence";
+import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 
 export interface CreatedTent {
   id: string;
@@ -75,7 +76,6 @@ export default function CreateTentDialog({
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
   const createInFlightRef = useRef(false);
-  const [createOutcomeUnknown, setCreateOutcomeUnknown] = useState(false);
   const [form, setForm] = useState(EMPTY_TENT_FORM);
 
   const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
@@ -109,6 +109,11 @@ export default function CreateTentDialog({
     (tents ?? []).length,
   );
 
+  const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
+    ownerId: user?.id,
+    client: supabase,
+  });
+
   const formBlocked = writeBlocked || binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);
 
   function resetForm() {
@@ -122,7 +127,7 @@ export default function CreateTentDialog({
   }, [writeBlocked]);
 
   function handleOpenChange(next: boolean) {
-    if (next && writeBlocked) return;
+    if (next && (writeBlocked || createOutcomeUnknown)) return;
     setOpen(next);
     if (!next) resetForm();
   }
@@ -180,7 +185,7 @@ export default function CreateTentDialog({
     try {
       const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
       if (result.status === "unknown") {
-        setCreateOutcomeUnknown(true);
+        recordUnknownCreateOutcome(attempt);
         toast.error(
           "Verdant could not confirm whether this tent was saved. Refresh before adding another.",
         );
@@ -227,7 +232,11 @@ export default function CreateTentDialog({
     <Dialog open={open && !writeBlocked} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm" className="gradient-leaf text-primary-foreground gap-1">
+          <Button
+            size="sm"
+            className="gradient-leaf text-primary-foreground gap-1"
+            disabled={createOutcomeUnknown}
+          >
             <Plus className="h-4 w-4" /> New tent
           </Button>
         )}

@@ -33,6 +33,7 @@ import {
   newHierarchyCreateAttemptId,
   persistHierarchyCreateAttempt,
 } from "@/lib/hierarchyCreatePersistence";
+import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
 
 export default function Grows() {
   const navigate = useNavigate();
@@ -44,7 +45,15 @@ export default function Grows() {
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);
   const createInFlightRef = useRef(false);
-  const [createOutcomeUnknown, setCreateOutcomeUnknown] = useState(false);
+  const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
+    ownerId: user?.id,
+    client: supabase,
+  });
+
+  function handleOpenChange(next: boolean) {
+    if (next && createOutcomeUnknown) return;
+    setOpen(next);
+  }
 
   // Free-tier grow gate. The grows store already returns only non-archived
   // rows, so its length IS the active-grow count. Fails open while the
@@ -93,7 +102,7 @@ export default function Grows() {
     try {
       const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
       if (result.status === "unknown") {
-        setCreateOutcomeUnknown(true);
+        recordUnknownCreateOutcome(attempt);
         toast.error(
           "Verdant could not confirm whether this grow was saved. Refresh before adding another.",
         );
@@ -155,7 +164,7 @@ export default function Grows() {
         icon={<Sprout className="size-5" />}
         actions={
           <Button
-            onClick={() => setOpen(true)}
+            onClick={() => handleOpenChange(true)}
             size="sm"
             className="w-full gradient-leaf text-primary-foreground sm:w-auto"
             disabled={!growGate.allowed || createOutcomeUnknown}
@@ -199,7 +208,7 @@ export default function Grows() {
             Create your first grow to start logging.
           </p>
           <Button
-            onClick={() => setOpen(true)}
+            onClick={() => handleOpenChange(true)}
             className="gradient-leaf text-primary-foreground"
             disabled={createOutcomeUnknown}
           >
@@ -277,7 +286,7 @@ export default function Grows() {
         </ul>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="glass max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display">New grow</DialogTitle>

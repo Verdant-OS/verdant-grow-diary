@@ -96,12 +96,13 @@ describe("hierarchy create persistence", () => {
     ).toBeNull();
   });
 
-  it("reconciles only the preallocated id through the signed-in RLS client", async () => {
+  it("reconciles only the preallocated id for the signed-in owner", async () => {
     const maybeSingle = vi.fn().mockResolvedValue({
       data: { id: IDS.tent, user_id: IDS.owner, grow_id: IDS.grow, name: "Tent A" },
       error: null,
     });
-    const eq = vi.fn(() => ({ maybeSingle }));
+    const ownerEq = vi.fn(() => ({ maybeSingle }));
+    const eq = vi.fn(() => ({ eq: ownerEq }));
     const select = vi.fn(() => ({ eq }));
     const from = vi.fn(() => ({ select }));
 
@@ -111,6 +112,7 @@ describe("hierarchy create persistence", () => {
     expect(from).toHaveBeenCalledWith("tents");
     expect(select).toHaveBeenCalledWith("id,user_id,grow_id");
     expect(eq).toHaveBeenCalledWith("id", IDS.tent);
+    expect(ownerEq).toHaveBeenCalledWith("user_id", IDS.owner);
   });
 
   it("keeps an unreadable or mismatched reconciliation unavailable", async () => {
@@ -119,7 +121,7 @@ describe("hierarchy create persistence", () => {
       error: null,
     });
     const from = vi.fn(() => ({
-      select: () => ({ eq: () => ({ maybeSingle }) }),
+      select: () => ({ eq: () => ({ eq: () => ({ maybeSingle }) }) }),
     }));
 
     await expect(reconcileHierarchyCreateAttempt({ from } as never, TENT_ATTEMPT)).resolves.toEqual(
@@ -142,7 +144,7 @@ describe("hierarchy create persistence", () => {
           },
         }),
       }),
-      select: () => ({ eq: () => ({ maybeSingle }) }),
+      select: () => ({ eq: () => ({ eq: () => ({ maybeSingle }) }) }),
     }));
 
     await expect(
@@ -163,7 +165,9 @@ describe("hierarchy create persistence", () => {
         }),
       }),
       select: () => ({
-        eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
+        eq: () => ({
+          eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
+        }),
       }),
     }));
 

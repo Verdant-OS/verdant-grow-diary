@@ -65,6 +65,7 @@ export async function reconcilePlantCreateAttempt(
       .from("plants" as never)
       .select("*")
       .eq("id", attempt.plantId)
+      .eq("user_id", attempt.ownerId)
       .maybeSingle();
     if (error) return { status: "unavailable" };
     if (!data) return { status: "not_found" };

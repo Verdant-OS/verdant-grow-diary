@@ -1548,10 +1548,12 @@ to read and ingest for future builds", authorised 2026-08-22 as a docs-only slic
 bind, and are repeated here so this row is not safe to quote alone:
 
 1. **The in-memory approval store is an anti-pattern for Verdant.**
-   `HumanApprovalMagenticManager` holds approval state as `self.approvals: Dict[str, bool]`
-   with `asyncio.Event` and a 300-second timeout (`src/backend/v4/config/settings.py`). A
-   restart, a second replica, or a slow human loses the decision, and that path keeps no
-   audit record. Do not reproduce that shape.
+   `OrchestrationConfig` (`src/backend/v4/config/settings.py`) owns
+   `approvals: Dict[str, bool]` coordinated by `asyncio.Event`, with
+   `default_timeout: float = 300.0`; `HumanApprovalMagenticManager`
+   (`human_approval_manager.py`) uses that config. A restart, a second replica, or a
+   slow human loses the decision, and that path keeps no audit record. Do not
+   reproduce that shape.
 2. **The Action Queue stays durable** — `reason`, risk level, `status`, and an append-only
    audit trail, enforced with RLS. Approval is a persisted row, never process memory.
 3. **Read the approval-gate shape and the tools-as-services separation. Port nothing

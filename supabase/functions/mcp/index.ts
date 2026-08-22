@@ -177,6 +177,12 @@ function normalizeSensorSource(input) {
   if (v.length === 0) return "invalid";
   return ALIAS[v] ?? "invalid";
 }
+function rawSensorSourceValuesFor(targets) {
+  return Object.entries(ALIAS)
+    .filter(([, canonical]) => targets.includes(canonical))
+    .map(([raw]) => raw)
+    .sort();
+}
 
 // src/constants/sensorTiming.ts
 var SENSOR_FRESH_WINDOW_MINUTES = 15;
@@ -463,6 +469,8 @@ var OPERATOR_SENSOR_METRICS = [
 var DIARY_COLUMNS = "id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at";
 var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload";
 var SENSOR_CANDIDATE_LIMIT = 25;
+var SENSOR_CANDIDATE_LOOKAHEAD_LIMIT = SENSOR_CANDIDATE_LIMIT + 1;
+var MCP_SENSOR_CONFLICT_SOURCE_CLASSES = ["live", "manual", "csv"];
 var KNOWN_METRIC_SET = new Set(OPERATOR_SENSOR_METRICS);
 var SENSOR_SOURCE_CONTRADICTION_WINDOW_MS = 5 * 60 * 1e3;
 var PPFD_SOURCE_CONTRADICTION_TOLERANCE = 50;
@@ -603,15 +611,47 @@ function hasMaterialMcpSensorSourceConflict(metric, candidates) {
   const spread = Math.max(...values) - Math.min(...values);
   return spread > MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE[metric];
 }
+function sensorCandidateQuery(
+  client,
+  tentId,
+  metric,
+  branch,
+  sources,
+  limit = SENSOR_CANDIDATE_LIMIT,
+) {
+  const base = client
+    .from("sensor_readings")
+    .select(SENSOR_COLUMNS)
+    .eq("tent_id", tentId)
+    .eq("metric", metric);
+  const sourceScoped = sources && sources.length > 0 ? base.in("source", sources) : base;
+  const timestampScoped =
+    branch === "captured"
+      ? sourceScoped.not("captured_at", "is", null)
+      : sourceScoped.is("captured_at", null);
+  return timestampScoped
+    .order("captured_at", { ascending: false })
+    .order("ts", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+}
+function rowsFromSensorCandidateResult(result) {
+  return Array.isArray(result.data) ? result.data : [];
+}
+function usableMcpSensorConflictSource(row, nowMs, staleAfterMs) {
+  if (!KNOWN_METRIC_SET.has(row.metric) || !isPlausibleMcpSensorValue(row)) return null;
+  const source = normalizeSensorSource(row.source);
+  if (source !== "live" && source !== "manual" && source !== "csv") return null;
+  if (deriveMcpFreshness(row, nowMs, staleAfterMs) !== "fresh") return null;
+  return Number.isFinite(effectiveCaptureMs(row)) ? source : null;
+}
 function findMcpSensorSourceContradictionMetrics(rows, options = {}) {
   const { nowMs, staleAfterMs } = sensorSelectionClock(options);
   const latestByMetricAndSource = /* @__PURE__ */ new Map();
   for (const row of withoutDiagnosticSensorRows(rows)) {
-    if (!KNOWN_METRIC_SET.has(row.metric) || !isPlausibleMcpSensorValue(row)) continue;
-    const source = normalizeSensorSource(row.source);
-    if (source !== "live" && source !== "manual" && source !== "csv") continue;
-    if (deriveMcpFreshness(row, nowMs, staleAfterMs) !== "fresh") continue;
-    if (!Number.isFinite(effectiveCaptureMs(row))) continue;
+    const source = usableMcpSensorConflictSource(row, nowMs, staleAfterMs);
+    if (!source) continue;
     const bySource = latestByMetricAndSource.get(row.metric) ?? /* @__PURE__ */ new Map();
     const existing = bySource.get(source);
     bySource.set(source, existing ? newerReading(existing, row) : row);
@@ -679,36 +719,59 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
       message: "Tent not found for the signed-in grower.",
     };
   }
-  const results = await Promise.all(
-    OPERATOR_SENSOR_METRICS.flatMap((metric) => [
-      client
-        .from("sensor_readings")
-        .select(SENSOR_COLUMNS)
-        .eq("tent_id", tentId)
-        .eq("metric", metric)
-        .not("captured_at", "is", null)
-        .order("captured_at", { ascending: false })
-        .order("ts", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(SENSOR_CANDIDATE_LIMIT),
-      client
-        .from("sensor_readings")
-        .select(SENSOR_COLUMNS)
-        .eq("tent_id", tentId)
-        .eq("metric", metric)
-        .is("captured_at", null)
-        .order("ts", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(SENSOR_CANDIDATE_LIMIT),
-    ]),
+  const primaryQueries = OPERATOR_SENSOR_METRICS.flatMap((metric) =>
+    ["captured", "legacy"].map((branch) => ({
+      metric,
+      branch,
+      query: sensorCandidateQuery(
+        client,
+        tentId,
+        metric,
+        branch,
+        void 0,
+        SENSOR_CANDIDATE_LOOKAHEAD_LIMIT,
+      ),
+    })),
   );
-  const failed = results.find((result) => result.error);
-  if (failed?.error) {
-    return { ok: false, reason: "unavailable", message: failed.error.message };
+  const primaryResults = await Promise.all(primaryQueries.map(({ query }) => query));
+  const primaryFailure = primaryResults.find((result) => result.error);
+  if (primaryFailure?.error) {
+    return { ok: false, reason: "unavailable", message: primaryFailure.error.message };
   }
-  const candidates = results.flatMap((result) => (Array.isArray(result.data) ? result.data : []));
+  const primaryRows = primaryResults.map(rowsFromSensorCandidateResult);
+  const primaryCandidates = primaryRows.map((rows) => rows.slice(0, SENSOR_CANDIDATE_LIMIT));
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
+  const supplementalQueries = primaryQueries.flatMap((candidate, index) => {
+    if (primaryRows[index].length <= SENSOR_CANDIDATE_LIMIT) return [];
+    const representedSources = new Set(
+      withoutDiagnosticSensorRows(primaryCandidates[index])
+        .map((row) => usableMcpSensorConflictSource(row, nowMs, staleAfterMs))
+        .filter((source) => source !== null),
+    );
+    return MCP_SENSOR_CONFLICT_SOURCE_CLASSES.filter(
+      (source) => !representedSources.has(source),
+    ).map((source) => ({
+      metric: candidate.metric,
+      branch: candidate.branch,
+      query: sensorCandidateQuery(
+        client,
+        tentId,
+        candidate.metric,
+        candidate.branch,
+        rawSensorSourceValuesFor([source]),
+        SENSOR_CANDIDATE_LIMIT,
+      ),
+    }));
+  });
+  const supplementalResults = await Promise.all(supplementalQueries.map(({ query }) => query));
+  const supplementalFailure = supplementalResults.find((result) => result.error);
+  if (supplementalFailure?.error) {
+    return { ok: false, reason: "unavailable", message: supplementalFailure.error.message };
+  }
+  const candidates = [
+    ...primaryCandidates.flatMap((rows) => rows),
+    ...supplementalResults.flatMap(rowsFromSensorCandidateResult),
+  ];
   const readings = selectLatestMcpSensorReadings(candidates, options);
   const contradictionMetrics = findMcpSensorSourceContradictionMetrics(candidates, options);
   const ownedTent = {
@@ -2450,7 +2513,8 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
       strain: clean2(scope.plant?.strain),
       medium: clean2(scope.plant?.medium),
       potSize: clean2(scope.plant?.pot_size),
-      growType: clean2(scope.plant?.plant_type) ?? clean2(scope.grow.grow_type),
+      growType: clean2(scope.grow.grow_type),
+      plantType: clean2(scope.plant?.plant_type),
       plantStatus: clean2(scope.plant?.health),
     },
     evidence: {

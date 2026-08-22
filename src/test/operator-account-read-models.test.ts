@@ -164,6 +164,7 @@ function sensorClient(input: {
       const queryIndex = sensorQueryIndex++;
       let metric = "";
       let capturedMode: "captured" | "legacy" = "captured";
+      let sourceValues: readonly string[] | null = null;
       const chain = {
         select(...args: unknown[]) {
           calls.push({ table, method: "select", args });
@@ -184,6 +185,13 @@ function sensorClient(input: {
           capturedMode = "legacy";
           return chain;
         },
+        in(...args: unknown[]) {
+          calls.push({ table, method: "in", args });
+          if (args[0] === "source" && Array.isArray(args[1])) {
+            sourceValues = args[1].filter((value): value is string => typeof value === "string");
+          }
+          return chain;
+        },
         order(...args: unknown[]) {
           calls.push({ table, method: "order", args });
           return chain;
@@ -193,12 +201,14 @@ function sensorClient(input: {
           if (input.queryErrorAt === queryIndex) {
             return { data: null, error: { message: "sensor query failed" } };
           }
+          const limit = typeof args[0] === "number" ? args[0] : Number.POSITIVE_INFINITY;
           const data = (input.rows ?? []).filter(
             (row) =>
               row.metric === metric &&
-              (capturedMode === "legacy" ? row.captured_at === null : row.captured_at !== null),
+              (capturedMode === "legacy" ? row.captured_at === null : row.captured_at !== null) &&
+              (sourceValues === null || sourceValues.includes(row.source)),
           );
-          return { data, error: null };
+          return { data: data.slice(0, limit), error: null };
         },
       };
       return chain;
@@ -919,6 +929,241 @@ describe("owner-scoped Operator account read models", () => {
           tent: { id: "tent-1", name: "Empty tent", grow_id: "grow-1" },
           snapshot: null,
         },
+      });
+    });
+
+    it("does not supplement exactly 25 logical candidates or surface a nonexistent recovery failure", async () => {
+      const at = "2026-07-19T12:00:00Z";
+      const { client, calls } = sensorClient({
+        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        // Index 18 would be the first supplemental request after the 18
+        // primary metric/branch reads. Exactly 25 rows must not reach it.
+        queryErrorAt: OPERATOR_SENSOR_METRICS.length * 2,
+        rows: Array.from({ length: 25 }, (_, index) =>
+          row({
+            id: `live-${index}`,
+            metric: "humidity_pct",
+            value: 60,
+            source: "live",
+            captured_at: at,
+            ts: at,
+          }),
+        ),
+      });
+
+      await expect(
+        getLatestSensorSnapshotForOwnedTent(client, "tent-1", {
+          now: new Date("2026-07-19T12:05:00Z"),
+        }),
+      ).resolves.toMatchObject({
+        ok: true,
+        data: { snapshot: { tentId: "tent-1", readings: { humidity_pct: { value: 60 } } } },
+      });
+      expect(calls.some((call) => call.table === "sensor_readings" && call.method === "in")).toBe(
+        false,
+      );
+    });
+
+    it("uses a 26-row lookahead then recovers a hidden conflicting source", async () => {
+      const at = "2026-07-19T12:00:00Z";
+      const liveRows = Array.from({ length: 26 }, (_, index) =>
+        row({
+          id: `live-${index}`,
+          metric: "humidity_pct",
+          value: 60,
+          source: "live",
+          captured_at: at,
+          ts: at,
+        }),
+      );
+      const { client, calls } = sensorClient({
+        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        rows: [
+          ...liveRows,
+          row({
+            id: "manual-humidity",
+            metric: "humidity_pct",
+            value: 80,
+            source: "manual",
+            captured_at: "2026-07-19T11:59:00Z",
+            ts: "2026-07-19T11:59:00Z",
+          }),
+        ],
+      });
+
+      const result = await getLatestSensorSnapshotForOwnedTent(client, "tent-1", {
+        now: new Date("2026-07-19T12:05:00Z"),
+      });
+
+      expect(result).toMatchObject({
+        ok: true,
+        data: { contradictionMetrics: ["humidity_pct"] },
+      });
+      expect(calls).toContainEqual({
+        table: "sensor_readings",
+        method: "in",
+        args: ["source", expect.arrayContaining(["manual"])],
+      });
+      expect(
+        calls
+          .filter((call) => call.table === "sensor_readings" && call.method === "limit")
+          .slice(0, OPERATOR_SENSOR_METRICS.length * 2)
+          .map((call) => call.args),
+      ).toEqual(Array.from({ length: OPERATOR_SENSOR_METRICS.length * 2 }, () => [26]));
+    });
+
+    it("does not count a diagnostic canonical source as represented during a proven overflow", async () => {
+      const { client, calls } = sensorClient({
+        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        // These rows are supplied in the database query's DESC order. The
+        // first 25 include a diagnostic manual row; the usable manual reading
+        // is lookahead-only and needs source-specific recovery.
+        rows: [
+          ...Array.from({ length: 24 }, (_, index) =>
+            row({
+              id: `live-${index}`,
+              metric: "humidity_pct",
+              value: 60,
+              source: "live",
+              captured_at: "2026-07-19T12:03:00Z",
+              ts: "2026-07-19T12:03:00Z",
+            }),
+          ),
+          row({
+            id: "manual-diagnostic",
+            metric: "humidity_pct",
+            value: 80,
+            source: "manual",
+            captured_at: "2026-07-19T12:02:00Z",
+            ts: "2026-07-19T12:02:00Z",
+            raw_payload: {
+              vendor: "ecowitt_windows_testbench",
+              metadata: { confidence: "test" },
+            },
+          }),
+          row({
+            id: "manual-physical",
+            metric: "humidity_pct",
+            value: 80,
+            source: "manual",
+            captured_at: "2026-07-19T12:01:00Z",
+            ts: "2026-07-19T12:01:00Z",
+          }),
+        ],
+      });
+
+      await expect(
+        getLatestSensorSnapshotForOwnedTent(client, "tent-1", {
+          now: new Date("2026-07-19T12:05:00Z"),
+        }),
+      ).resolves.toMatchObject({
+        ok: true,
+        data: { contradictionMetrics: ["humidity_pct"] },
+      });
+      expect(calls).toContainEqual({
+        table: "sensor_readings",
+        method: "in",
+        args: ["source", expect.arrayContaining(["manual"])],
+      });
+    });
+
+    it("recovers a legacy manual alias beyond overflow despite its newest diagnostic row", async () => {
+      const { client, calls } = sensorClient({
+        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        rows: [
+          ...Array.from({ length: 26 }, (_, index) =>
+            row({
+              id: `legacy-live-${index}`,
+              metric: "humidity_pct",
+              value: 60,
+              source: "live",
+              captured_at: null,
+              ts: "2026-07-19T12:03:00Z",
+            }),
+          ),
+          row({
+            id: "legacy-manual-diagnostic",
+            metric: "humidity_pct",
+            value: 80,
+            source: "manual",
+            captured_at: null,
+            ts: "2026-07-19T12:02:00Z",
+            raw_payload: {
+              vendor: "ecowitt_windows_testbench",
+              metadata: { confidence: "test" },
+            },
+          }),
+          row({
+            id: "legacy-user-physical",
+            metric: "humidity_pct",
+            value: 80,
+            source: "user",
+            captured_at: null,
+            ts: "2026-07-19T12:01:00Z",
+          }),
+        ],
+      });
+
+      await expect(
+        getLatestSensorSnapshotForOwnedTent(client, "tent-1", {
+          now: new Date("2026-07-19T12:05:00Z"),
+        }),
+      ).resolves.toMatchObject({
+        ok: true,
+        data: { contradictionMetrics: ["humidity_pct"] },
+      });
+
+      const manualSourceScope = calls.findIndex(
+        (call) =>
+          call.table === "sensor_readings" &&
+          call.method === "in" &&
+          call.args[0] === "source" &&
+          Array.isArray(call.args[1]) &&
+          call.args[1].includes("user"),
+      );
+      expect(manualSourceScope).toBeGreaterThanOrEqual(0);
+      expect(
+        calls
+          .slice(manualSourceScope)
+          .find((call) => call.table === "sensor_readings" && call.method === "limit")?.args,
+      ).toEqual([25]);
+    });
+
+    it("does not fan out trusted-source reads when a metric branch is unsaturated", async () => {
+      const { client, calls } = sensorClient({
+        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        rows: [row({ metric: "humidity_pct", value: 60 })],
+      });
+
+      await expect(getLatestSensorSnapshotForOwnedTent(client, "tent-1")).resolves.toMatchObject({
+        ok: true,
+      });
+      expect(calls.some((call) => call.table === "sensor_readings" && call.method === "in")).toBe(
+        false,
+      );
+    });
+
+    it("fails closed after a proven overflow when a source recovery read is unavailable", async () => {
+      const at = "2026-07-19T12:00:00Z";
+      const { client } = sensorClient({
+        tent: { id: "tent-1", name: "Home tent", grow_id: "grow-1" },
+        queryErrorAt: OPERATOR_SENSOR_METRICS.length * 2,
+        rows: Array.from({ length: 26 }, (_, index) =>
+          row({
+            id: `live-${index}`,
+            metric: "humidity_pct",
+            value: 60,
+            source: "live",
+            captured_at: at,
+            ts: at,
+          }),
+        ),
+      });
+
+      await expect(getLatestSensorSnapshotForOwnedTent(client, "tent-1")).resolves.toEqual({
+        ok: false,
+        reason: "unavailable",
+        message: "sensor query failed",
       });
     });
 

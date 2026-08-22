@@ -199,6 +199,7 @@ export interface GrowWalkContext {
     readonly medium: string | null;
     readonly potSize: string | null;
     readonly growType: string | null;
+    readonly plantType: string | null;
     readonly plantStatus: string | null;
   };
   readonly evidence: {

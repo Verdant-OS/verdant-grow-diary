@@ -12,7 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../integrations/supabase/types";
 import { LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES } from "./liveSourceTruthGateRules";
 import { classifySnapshotFreshness } from "./sensor/sensorSnapshotFreshnessRules";
-import { normalizeSensorSource } from "./sensor/sensorSourceRules";
+import { normalizeSensorSource, rawSensorSourceValuesFor } from "./sensor/sensorSourceRules";
 import { withoutDiagnosticSensorRows } from "./sensorProvenanceFenceRules";
 import { STALE_THRESHOLD_MS } from "./sensorReadingNormalizationRules";
 import { celsiusToFahrenheit } from "./temperatureUnits";
@@ -102,6 +102,10 @@ const DIARY_COLUMNS = "id,grow_id,plant_id,tent_id,stage,note,entry_at,created_a
 const SENSOR_COLUMNS =
   "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload" as const;
 const SENSOR_CANDIDATE_LIMIT = 25;
+/** One extra row proves a branch overflow without widening its logical cohort. */
+const SENSOR_CANDIDATE_LOOKAHEAD_LIMIT = SENSOR_CANDIDATE_LIMIT + 1;
+const MCP_SENSOR_CONFLICT_SOURCE_CLASSES = ["live", "manual", "csv"] as const;
+type McpSensorConflictSource = (typeof MCP_SENSOR_CONFLICT_SOURCE_CLASSES)[number];
 const KNOWN_METRIC_SET: ReadonlySet<string> = new Set(OPERATOR_SENSOR_METRICS);
 /** Match the existing bounded sensor-snapshot cohort window. */
 const SENSOR_SOURCE_CONTRADICTION_WINDOW_MS = 5 * 60 * 1000;
@@ -365,6 +369,67 @@ function hasMaterialMcpSensorSourceConflict(
   return spread > MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE[metric];
 }
 
+type SensorCandidateBranch = "captured" | "legacy";
+
+type SensorCandidateQueryResult = {
+  readonly data: unknown;
+  readonly error: { readonly message: string } | null;
+};
+
+type SensorCandidateQuery = {
+  readonly metric: (typeof OPERATOR_SENSOR_METRICS)[number];
+  readonly branch: SensorCandidateBranch;
+  readonly query: PromiseLike<SensorCandidateQueryResult>;
+};
+
+function sensorCandidateQuery(
+  client: OwnerScopedSupabaseClient,
+  tentId: string,
+  metric: (typeof OPERATOR_SENSOR_METRICS)[number],
+  branch: SensorCandidateBranch,
+  sources?: readonly string[],
+  limit = SENSOR_CANDIDATE_LIMIT,
+): PromiseLike<SensorCandidateQueryResult> {
+  const base = client
+    .from("sensor_readings")
+    .select(SENSOR_COLUMNS)
+    .eq("tent_id", tentId)
+    .eq("metric", metric);
+  const sourceScoped = sources && sources.length > 0 ? base.in("source", sources) : base;
+  const timestampScoped =
+    branch === "captured"
+      ? sourceScoped.not("captured_at", "is", null)
+      : sourceScoped.is("captured_at", null);
+
+  return timestampScoped
+    .order("captured_at", { ascending: false })
+    .order("ts", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit) as unknown as PromiseLike<SensorCandidateQueryResult>;
+}
+
+function rowsFromSensorCandidateResult(result: SensorCandidateQueryResult): McpSensorQueryRow[] {
+  return Array.isArray(result.data) ? (result.data as McpSensorQueryRow[]) : [];
+}
+
+/**
+ * Canonical source membership used by both contradiction detection and
+ * saturated-branch recovery. Diagnostic, stale, invalid, and implausible rows
+ * must not make a source look represented.
+ */
+function usableMcpSensorConflictSource(
+  row: McpSensorQueryRow,
+  nowMs: number,
+  staleAfterMs: number,
+): McpSensorConflictSource | null {
+  if (!KNOWN_METRIC_SET.has(row.metric) || !isPlausibleMcpSensorValue(row)) return null;
+  const source = normalizeSensorSource(row.source);
+  if (source !== "live" && source !== "manual" && source !== "csv") return null;
+  if (deriveMcpFreshness(row, nowMs, staleAfterMs) !== "fresh") return null;
+  return Number.isFinite(effectiveCaptureMs(row)) ? source : null;
+}
+
 /**
  * Find coeval, usable readings for one metric that disagree across canonical
  * sources before the public snapshot collapses candidates to its newest row.
@@ -380,13 +445,8 @@ export function findMcpSensorSourceContradictionMetrics(
   const latestByMetricAndSource = new Map<string, Map<string, McpSensorQueryRow>>();
 
   for (const row of withoutDiagnosticSensorRows(rows)) {
-    if (!KNOWN_METRIC_SET.has(row.metric) || !isPlausibleMcpSensorValue(row)) continue;
-    const source = normalizeSensorSource(row.source);
-    // Demo, stale, invalid, and unknown sources cannot corroborate or
-    // contradict current evidence. Manual/csv remain useful but never live.
-    if (source !== "live" && source !== "manual" && source !== "csv") continue;
-    if (deriveMcpFreshness(row, nowMs, staleAfterMs) !== "fresh") continue;
-    if (!Number.isFinite(effectiveCaptureMs(row))) continue;
+    const source = usableMcpSensorConflictSource(row, nowMs, staleAfterMs);
+    if (!source) continue;
 
     const bySource = latestByMetricAndSource.get(row.metric) ?? new Map();
     const existing = bySource.get(source);
@@ -483,40 +543,67 @@ export async function getLatestSensorSnapshotForOwnedTent(
   // Fetch captured and legacy-null-captured candidates separately for every
   // supported metric. Their union contains the true COALESCE winner, while a
   // bounded window still lets the provenance fence skip newer diagnostics.
-  const results = await Promise.all(
-    OPERATOR_SENSOR_METRICS.flatMap((metric) => [
-      client
-        .from("sensor_readings")
-        .select(SENSOR_COLUMNS)
-        .eq("tent_id", tentId)
-        .eq("metric", metric)
-        .not("captured_at", "is", null)
-        .order("captured_at", { ascending: false })
-        .order("ts", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(SENSOR_CANDIDATE_LIMIT),
-      client
-        .from("sensor_readings")
-        .select(SENSOR_COLUMNS)
-        .eq("tent_id", tentId)
-        .eq("metric", metric)
-        .is("captured_at", null)
-        .order("ts", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(SENSOR_CANDIDATE_LIMIT),
-    ]),
+  const primaryQueries: SensorCandidateQuery[] = OPERATOR_SENSOR_METRICS.flatMap((metric) =>
+    (["captured", "legacy"] as const).map((branch) => ({
+      metric,
+      branch,
+      query: sensorCandidateQuery(
+        client,
+        tentId,
+        metric,
+        branch,
+        undefined,
+        SENSOR_CANDIDATE_LOOKAHEAD_LIMIT,
+      ),
+    })),
   );
+  const primaryResults = await Promise.all(primaryQueries.map(({ query }) => query));
 
-  const failed = results.find((result) => result.error);
-  if (failed?.error) {
-    return { ok: false, reason: "unavailable", message: failed.error.message };
+  const primaryFailure = primaryResults.find((result) => result.error);
+  if (primaryFailure?.error) {
+    return { ok: false, reason: "unavailable", message: primaryFailure.error.message };
   }
 
-  const candidates = results.flatMap((result) =>
-    Array.isArray(result.data) ? (result.data as McpSensorQueryRow[]) : [],
-  );
+  const primaryRows = primaryResults.map(rowsFromSensorCandidateResult);
+  const primaryCandidates = primaryRows.map((rows) => rows.slice(0, SENSOR_CANDIDATE_LIMIT));
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
+
+  // A broad branch can be dominated by one raw source. Only a 26th row proves
+  // overflow; keep the first 25 logical candidates and recover a bounded
+  // per-source cohort for any canonical source not represented by usable rows.
+  const supplementalQueries: SensorCandidateQuery[] = primaryQueries.flatMap((candidate, index) => {
+    if (primaryRows[index].length <= SENSOR_CANDIDATE_LIMIT) return [];
+
+    const representedSources = new Set(
+      withoutDiagnosticSensorRows(primaryCandidates[index])
+        .map((row) => usableMcpSensorConflictSource(row, nowMs, staleAfterMs))
+        .filter((source): source is McpSensorConflictSource => source !== null),
+    );
+    return MCP_SENSOR_CONFLICT_SOURCE_CLASSES.filter(
+      (source) => !representedSources.has(source),
+    ).map((source) => ({
+      metric: candidate.metric,
+      branch: candidate.branch,
+      query: sensorCandidateQuery(
+        client,
+        tentId,
+        candidate.metric,
+        candidate.branch,
+        rawSensorSourceValuesFor([source]),
+        SENSOR_CANDIDATE_LIMIT,
+      ),
+    }));
+  });
+  const supplementalResults = await Promise.all(supplementalQueries.map(({ query }) => query));
+  const supplementalFailure = supplementalResults.find((result) => result.error);
+  if (supplementalFailure?.error) {
+    return { ok: false, reason: "unavailable", message: supplementalFailure.error.message };
+  }
+
+  const candidates = [
+    ...primaryCandidates.flatMap((rows) => rows),
+    ...supplementalResults.flatMap(rowsFromSensorCandidateResult),
+  ];
   const readings = selectLatestMcpSensorReadings(candidates, options);
   const contradictionMetrics = findMcpSensorSourceContradictionMetrics(candidates, options);
   const ownedTent: OperatorOwnedTent = {

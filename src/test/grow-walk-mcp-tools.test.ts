@@ -177,7 +177,8 @@ describe("Grow Walk MCP tools", () => {
             strain: "Sour Diesel",
             medium: "coco",
             potSize: "5 gal",
-            growType: "autoflower",
+            growType: "indoor",
+            plantType: "autoflower",
             plantStatus: "watch",
           },
           evidence: {
@@ -228,7 +229,10 @@ describe("Grow Walk MCP tools", () => {
       },
     );
     expect(result.structuredContent).toMatchObject({
-      context: { receipt: { partialLanes: ["sensors"] } },
+      context: {
+        profile: { growType: "indoor", plantType: "autoflower" },
+        receipt: { partialLanes: ["sensors"] },
+      },
     });
   });
 

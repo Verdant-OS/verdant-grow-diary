@@ -1050,7 +1050,8 @@ export async function getGrowWalkContextForOwnedTarget(
       strain: clean(scope.plant?.strain),
       medium: clean(scope.plant?.medium),
       potSize: clean(scope.plant?.pot_size),
-      growType: clean(scope.plant?.plant_type) ?? clean(scope.grow.grow_type),
+      growType: clean(scope.grow.grow_type),
+      plantType: clean(scope.plant?.plant_type),
       plantStatus: clean(scope.plant?.health),
     },
     evidence: {

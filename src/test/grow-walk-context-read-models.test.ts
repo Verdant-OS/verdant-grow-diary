@@ -458,7 +458,8 @@ describe("getGrowWalkContextForOwnedTarget", () => {
       strain: "Sour Diesel",
       medium: "coco",
       potSize: "5 gal",
-      growType: "autoflower",
+      growType: "indoor",
+      plantType: "autoflower",
       plantStatus: "watch",
     });
     expect(result.data.context.evidence.photos).toEqual([
@@ -1866,6 +1867,8 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(result.data.context.scope.plantId).toBeNull();
     expect(result.data.context.profile.strain).toBeNull();
     expect(result.data.context.profile.medium).toBeNull();
+    expect(result.data.context.profile.growType).toBe("indoor");
+    expect(result.data.context.profile.plantType).toBeNull();
     expect(result.data.context.scope.tentId).toBe("tent-1");
   });
 

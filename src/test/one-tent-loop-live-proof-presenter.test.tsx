@@ -9,7 +9,7 @@
  *  - Renders approval-required + no-device-command copy for Action Queue
  */
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 
 const fixtures = vi.hoisted(() => ({
@@ -17,6 +17,18 @@ const fixtures = vi.hoisted(() => ({
   tents: [] as Array<Record<string, unknown>>,
   plants: [] as Array<Record<string, unknown>>,
   diary: [] as Array<Record<string, unknown>>,
+  sensorSnapshot: {
+    source: "unavailable",
+    ts: null,
+    temp: null,
+    rh: null,
+    vpd: null,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
+  } as Record<string, unknown>,
   alerts: [] as Array<Record<string, unknown>>,
   aiSessions: [] as Array<Record<string, unknown>>,
   actions: [] as Array<Record<string, unknown>>,
@@ -39,19 +51,11 @@ vi.mock("@/hooks/use-diary-entries", () => ({ useDiaryEntries: () => ({ data: fi
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => ({
     status: "ok",
-    snapshot: {
-      source: "unavailable",
-      ts: null,
-      temp: null,
-      rh: null,
-      vpd: null,
-      co2: null,
-      soil: null,
-      soil_ec: null,
-      soil_temp: null,
-      ppfd: null,
-    },
+    snapshot: fixtures.sensorSnapshot,
   }),
+}));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "owner-current" }, loading: false }),
 }));
 vi.mock("@/hooks/useAlertsList", () => ({
   useAlertsList: () => ({ status: "ok", alerts: fixtures.alerts, error: null, reload: () => {} }),
@@ -86,6 +90,18 @@ beforeEach(() => {
   fixtures.tents = [];
   fixtures.plants = [];
   fixtures.diary = [];
+  fixtures.sensorSnapshot = {
+    source: "unavailable",
+    ts: null,
+    temp: null,
+    rh: null,
+    vpd: null,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
+  };
   fixtures.alerts = [];
   fixtures.aiSessions = [];
   fixtures.actions = [];
@@ -203,6 +219,15 @@ describe("OneTentLoopLiveProof page", () => {
         reason: "Current tent humidity",
         status: "open",
         created_at: "2026-06-09T11:00:00.000Z",
+        source: "environment_alerts",
+        originating_timeline_events: [
+          {
+            id: "event-current",
+            type: "sensor_snapshot",
+            source: "live",
+            occurred_at: "2026-06-09T10:55:00.000Z",
+          },
+        ],
       },
     ];
     fixtures.actions = [
@@ -227,6 +252,245 @@ describe("OneTentLoopLiveProof page", () => {
     const action = screen.getByTestId("loop-live-proof-step-action-queue");
     expect(action.getAttribute("data-status")).toBe("passed");
     expect(action.textContent).toMatch(/Alert-derived advisory/);
+  });
+
+  it("uses the page's current clock instead of the fixed proof fallback for live freshness", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T12:20:00.000Z"));
+    try {
+      setCurrentTentPlantScope();
+      fixtures.sensorSnapshot = {
+        source: "live",
+        ts: "2026-06-09T12:00:00.000Z",
+        temp: 24,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+      };
+
+      renderPage();
+
+      const sensor = screen.getByTestId("loop-live-proof-step-sensor-snapshot");
+      expect(sensor.getAttribute("data-status")).toBe("stale");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("re-evaluates a live snapshot after it ages past the freshness limit while the page stays open", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T12:00:00.000Z"));
+    try {
+      setCurrentTentPlantScope();
+      fixtures.sensorSnapshot = {
+        source: "live",
+        ts: "2026-06-09T11:50:00.000Z",
+        temp: 24,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+      };
+
+      const page = renderPage();
+      const sensor = screen.getByTestId("loop-live-proof-step-sensor-snapshot");
+      expect(sensor.getAttribute("data-status")).toBe("passed");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6 * 60_000);
+      });
+
+      expect(sensor.getAttribute("data-status")).toBe("stale");
+      page.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("counts a trusted top-level diary photo reference without accepting a foreign storage path", () => {
+    setCurrentTentPlantScope();
+    fixtures.diary = [
+      {
+        id: "diary-photo-current",
+        plant_id: "plant-current",
+        tent_id: "tent-current",
+        entry_at: "2026-06-09T11:30:00.000Z",
+        note: "",
+        photo_url: "owner-current/grow-current/quick-log.jpg",
+        details: {},
+      },
+    ];
+
+    const trusted = renderPage();
+    expect(screen.getByTestId("loop-live-proof-step-quick-log").textContent).toMatch(
+      /includes:\s*photo/i,
+    );
+    trusted.unmount();
+
+    fixtures.diary = [
+      {
+        id: "diary-photo-foreign",
+        plant_id: "plant-current",
+        tent_id: "tent-current",
+        entry_at: "2026-06-09T11:30:00.000Z",
+        note: "",
+        photo_url: "other-owner/grow-current/quick-log.jpg",
+        details: {},
+      },
+    ];
+
+    renderPage();
+    expect(screen.getByTestId("loop-live-proof-step-quick-log").textContent).toMatch(
+      /no note\/photo\/action context/i,
+    );
+  });
+
+  it("marks a fresh live snapshot with no finite recognized metric as needs review", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T12:05:00.000Z"));
+    try {
+      setCurrentTentPlantScope();
+      fixtures.sensorSnapshot = {
+        source: "live",
+        ts: "2026-06-09T12:00:00.000Z",
+        temp: null,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+      };
+
+      renderPage();
+
+      const sensor = screen.getByTestId("loop-live-proof-step-sensor-snapshot");
+      expect(sensor.getAttribute("data-status")).toBe("needs_review");
+      expect(sensor.textContent).toMatch(/finite recognized metric/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not label current-state reconstruction as frozen AI Doctor session evidence", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T12:00:00.000Z"));
+    try {
+      setCurrentTentPlantScope();
+      fixtures.plants = [
+        {
+          id: "plant-current",
+          name: "Current plant",
+          grow_id: "grow-current",
+          tent_id: "tent-current",
+          stage: "veg",
+          medium: "coco",
+          pot_size: "3 gal",
+        },
+      ];
+      fixtures.diary = [
+        {
+          id: "diary-current",
+          plant_id: "plant-current",
+          tent_id: "tent-current",
+          entry_at: "2026-06-09T11:30:00.000Z",
+          note: "Observed leaves.",
+          photos: [{ id: "photo-current" }],
+        },
+      ];
+      fixtures.sensorSnapshot = {
+        source: "live",
+        ts: "2026-06-09T11:55:00.000Z",
+        temp: 24,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+      };
+      fixtures.alerts = [
+        {
+          id: "alert-current",
+          grow_id: "grow-current",
+          tent_id: "tent-current",
+          plant_id: "plant-current",
+          metric: "humidity_pct",
+          severity: "warning",
+          reason: "Current tent humidity",
+          status: "open",
+          created_at: "2026-06-09T11:00:00.000Z",
+          source: "environment_alerts",
+          originating_timeline_events: [
+            {
+              id: "event-current",
+              type: "sensor_snapshot",
+              source: "live",
+              occurred_at: "2026-06-09T10:55:00.000Z",
+            },
+          ],
+        },
+      ];
+      fixtures.aiSessions = [
+        {
+          id: "session-current",
+          grow_id: "grow-current",
+          tent_id: "tent-current",
+          plant_id: "plant-current",
+          created_at: "2026-06-09T11:45:00.000Z",
+        },
+      ];
+
+      renderPage();
+
+      const aiDoctor = screen.getByTestId("loop-live-proof-step-ai-doctor");
+      expect(aiDoctor.getAttribute("data-status")).toBe("needs_review");
+      expect(aiDoctor.textContent).toMatch(/reconstructed.*current app state/i);
+      expect(aiDoctor.textContent).toMatch(/not frozen/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not pass a resolved alert as current alert evidence", () => {
+    setCurrentTentPlantScope();
+    fixtures.alerts = [
+      {
+        id: "alert-current",
+        grow_id: "grow-current",
+        tent_id: "tent-current",
+        plant_id: "plant-current",
+        metric: "humidity_pct",
+        severity: "warning",
+        reason: "Resolved humidity alert",
+        status: "resolved",
+        created_at: "2026-06-09T11:00:00.000Z",
+        source: "environment_alerts",
+        originating_timeline_events: [
+          {
+            id: "event-current",
+            type: "sensor_snapshot",
+            source: "live",
+            occurred_at: "2026-06-09T10:55:00.000Z",
+          },
+        ],
+      },
+    ];
+
+    renderPage();
+
+    const alert = screen.getByTestId("loop-live-proof-step-alert");
+    expect(alert.getAttribute("data-status")).toBe("needs_review");
+    expect(alert.textContent).toMatch(/not open|resolved/i);
   });
 
   it("does not pass an alert-derived action when no scoped matching alert exists", () => {

@@ -17,6 +17,7 @@
 import * as React from "react";
 import { Link } from "@/lib/react-router-compat";
 import { useGrows } from "@/store/grows";
+import { useAuth } from "@/store/auth";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
@@ -24,11 +25,15 @@ import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useAiDoctorSessions } from "@/hooks/use-ai-doctor-sessions";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
+import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
+import { isTrustedTimelineEventSource } from "@/lib/originatingTimelineEventRules";
+import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import {
   buildOneTentLoopLiveProofView,
   buildOneTentLoopLiveProofTextReport,
   type LiveProofView,
 } from "@/lib/oneTentLoopLiveProofViewModel";
+import { hasFiniteRecognizedSensorSnapshotMetric } from "@/lib/oneTentLoopProofRules";
 import type {
   OneTentLoopGap,
   OneTentLoopGapEvidenceChecklistItem,
@@ -64,6 +69,22 @@ const STATUS_LABEL: Record<LoopStepStatus, string> = {
   invalid: "Invalid telemetry",
   demo_only: "Demo data only",
 };
+
+const LIVE_PROOF_REEVALUATION_INTERVAL_MS = 60_000;
+
+function useLiveProofReevaluationNowMs(): number {
+  const [nowMs, setNowMs] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(
+      () => setNowMs(Date.now()),
+      LIVE_PROOF_REEVALUATION_INTERVAL_MS,
+    );
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  return nowMs;
+}
 
 function statusToneClass(status: LoopStepStatus): string {
   // Deliberately avoid green success tones for non-live/untrusted rows.
@@ -524,9 +545,13 @@ function toPlantEvidence(p: AnyRow | null): PlantEvidence | null {
   };
 }
 
-function toQuickLogEvidence(d: AnyRow | null): QuickLogEvidence | null {
+function toQuickLogEvidence(
+  d: AnyRow | null,
+  viewerUserId: string | null,
+): QuickLogEvidence | null {
   if (!d || typeof d.id !== "string") return null;
   const details = (d.details ?? {}) as AnyRow;
+  const photoReference = parseDiaryPhotoDisplayReferenceFromRow(d, { viewerUserId });
   return {
     id: d.id,
     entry_at:
@@ -542,7 +567,7 @@ function toQuickLogEvidence(d: AnyRow | null): QuickLogEvidence | null {
           ? d.entry_type
           : null,
     has_note: typeof d.note === "string" && d.note.length > 0,
-    has_photo: Array.isArray(d.photos) && d.photos.length > 0,
+    has_photo: photoReference.kind === "external" || photoReference.kind === "storage",
     has_action_context: Boolean(details.action_id) || Boolean(details.linked_action_id),
     plant_id: typeof d.plant_id === "string" ? d.plant_id : null,
     tent_id: typeof d.tent_id === "string" ? d.tent_id : null,
@@ -550,6 +575,8 @@ function toQuickLogEvidence(d: AnyRow | null): QuickLogEvidence | null {
 }
 
 export default function OneTentLoopLiveProof(): JSX.Element {
+  const { user } = useAuth();
+  const nowMs = useLiveProofReevaluationNowMs();
   const { activeGrow, activeGrowId } = useGrows();
   const tentsQ = useTents();
   const plantsQ = usePlants();
@@ -574,7 +601,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   const scopedDiary = firstBy(diary, (d) =>
     plant ? d.plant_id === plant.id : d.tent_id === (tent?.id ?? "__none__"),
   );
-  const latest_quick_log = toQuickLogEvidence(scopedDiary);
+  const latest_quick_log = toQuickLogEvidence(scopedDiary, user?.id ?? null);
 
   const timeline: TimelineEvidence | null =
     diary.length > 0
@@ -593,6 +620,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         captured_at: snapState.snapshot.ts ?? null,
         confidence: null,
         metric: null,
+        has_usable_metric: hasFiniteRecognizedSensorSnapshotMetric(snapState.snapshot),
       }
     : null;
 
@@ -602,9 +630,19 @@ export default function OneTentLoopLiveProof(): JSX.Element {
     return alert.plant_id === null || alert.plant_id === plant?.id;
   });
   const alertRow = scopedAlerts[0] ?? null;
+  const alertEvidenceRefs = adaptOriginatingTimelineEventsFromRow(alertRow);
 
   const aiSessionsQ = useAiDoctorSessions(plant?.id ?? null);
   const latestSession = (aiSessionsQ.data ?? [])[0] ?? null;
+  const sessionScopeMatchesSelectedContext = Boolean(
+    latestSession &&
+    grow &&
+    tent &&
+    plant &&
+    latestSession.grow_id === grow.id &&
+    latestSession.tent_id === tent.id &&
+    latestSession.plant_id === plant.id,
+  );
   const latest_ai_doctor: AiDoctorEvidence | null = latestSession
     ? {
         session_id: latestSession.id,
@@ -616,6 +654,8 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         had_recent_photo: Boolean(latest_quick_log?.has_photo),
         had_recent_sensor_snapshot: Boolean(latest_sensor_snapshot),
         had_alerts: Boolean(alertRow),
+        context_provenance: "current_state_reconstructed",
+        session_scope_matches_selected_context: sessionScopeMatchesSelectedContext,
       }
     : null;
 
@@ -627,6 +667,11 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         reason: alertRow.reason ?? null,
         status: alertRow.status ?? null,
         created_at: alertRow.created_at ?? null,
+        scope_matches_selected_context: true,
+        source: alertRow.source ?? null,
+        has_trusted_event_reference: alertEvidenceRefs.some(
+          (ref) => ref.source !== undefined && isTrustedTimelineEventSource(ref.source),
+        ),
       }
     : null;
 
@@ -662,9 +707,9 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   };
 
   const view: LiveProofView = React.useMemo(
-    () => buildOneTentLoopLiveProofView(evidence),
+    () => buildOneTentLoopLiveProofView(evidence, nowMs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(evidence)],
+    [JSON.stringify(evidence), nowMs],
   );
 
   const report = React.useMemo(() => buildOneTentLoopLiveProofTextReport(view), [view]);

@@ -11,6 +11,7 @@ import {
   evaluateSensorSnapshot,
   evaluateActionQueue,
   evaluateAiDoctor,
+  evaluateAlert,
   enrichLoopStepRow,
   LOOP_STEP_IDS,
   type LoopEvidence,
@@ -48,6 +49,7 @@ function fresh(): LoopEvidence {
       captured_at: "2026-06-09T11:55:00.000Z",
       confidence: 0.9,
       metric: "temp",
+      has_usable_metric: true,
     },
     latest_ai_doctor: {
       session_id: "s1",
@@ -164,10 +166,59 @@ describe("evaluateSensorSnapshot — never healthy for bad data", () => {
   });
   it("fresh live snapshot is passed", () => {
     const row = evaluateSensorSnapshot(
-      { source: "live", captured_at: "2026-06-09T11:55:00.000Z" },
+      {
+        source: "live",
+        captured_at: "2026-06-09T11:55:00.000Z",
+        has_usable_metric: true,
+      },
       NOW,
     );
     expect(row.status).toBe("passed");
+  });
+
+  it("rejects a live snapshot one millisecond after injected now while keeping exact-now eligible", () => {
+    const exactNow = evaluateSensorSnapshot(
+      {
+        source: "live",
+        captured_at: "2026-06-09T12:00:00.000Z",
+        has_usable_metric: true,
+      },
+      NOW,
+    );
+    const future = evaluateSensorSnapshot(
+      {
+        source: "live",
+        captured_at: "2026-06-09T12:00:00.001Z",
+        has_usable_metric: true,
+      },
+      NOW,
+    );
+
+    expect(exactNow.status).toBe("passed");
+    expect(future.status).toBe("invalid");
+    expect(future.missing_info.join(" ")).toMatch(/future/i);
+  });
+
+  it("marks a fresh live snapshot without explicit usable-metric proof as needs_review", () => {
+    const row = evaluateSensorSnapshot(
+      { source: "live", captured_at: "2026-06-09T11:55:00.000Z" },
+      NOW,
+    );
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/finite recognized metric/i);
+  });
+
+  it("marks a fresh live snapshot with no finite recognized metric as needs_review", () => {
+    const row = evaluateSensorSnapshot(
+      {
+        source: "live",
+        captured_at: "2026-06-09T11:55:00.000Z",
+        has_usable_metric: false,
+      } as never,
+      NOW,
+    );
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/finite recognized metric/i);
   });
 });
 
@@ -195,6 +246,70 @@ describe("evaluateAiDoctor — missing context enumerated", () => {
     expect(joined).toMatch(/recent photo/);
     expect(joined).toMatch(/alerts/);
     expect(joined).not.toMatch(/pot size/);
+  });
+
+  it("does not pass context reconstructed from current app state as frozen session evidence", () => {
+    const row = evaluateAiDoctor({
+      session_id: "s1",
+      created_at: "2026-06-09T11:00:00.000Z",
+      had_plant_stage: true,
+      had_medium: true,
+      had_pot_size: true,
+      had_recent_log: true,
+      had_recent_photo: true,
+      had_recent_sensor_snapshot: true,
+      had_alerts: true,
+      context_provenance: "current_state_reconstructed",
+      session_scope_matches_selected_context: true,
+    } as never);
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/reconstructed.*not frozen/i);
+  });
+
+  it("does not pass a session whose persisted scope mismatches the selected grow, tent, or plant", () => {
+    const row = evaluateAiDoctor({
+      session_id: "s1",
+      created_at: "2026-06-09T11:00:00.000Z",
+      had_plant_stage: true,
+      had_medium: true,
+      had_pot_size: true,
+      had_recent_log: true,
+      had_recent_photo: true,
+      had_recent_sensor_snapshot: true,
+      had_alerts: true,
+      context_provenance: "frozen_session",
+      session_scope_matches_selected_context: false,
+    } as never);
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/scope.*selected/i);
+  });
+});
+
+describe("evaluateAlert — scoped, active, trusted evidence", () => {
+  const TRUSTED_ALERT = {
+    id: "a1",
+    metric: "temp",
+    severity: "warning",
+    reason: "temperature above target",
+    status: "open",
+    created_at: "2026-06-09T11:00:00.000Z",
+    source: "environment_alerts",
+    scope_matches_selected_context: true,
+    has_trusted_event_reference: true,
+  } as const;
+
+  it.each([
+    [
+      "is not scoped to the selected grow, tent, and plant",
+      { scope_matches_selected_context: false },
+    ],
+    ["is resolved", { status: "resolved" }],
+    ["is dismissed", { status: "dismissed" }],
+    ["has an unknown source", { source: "unknown-source" }],
+    ["has no trusted originating event reference", { has_trusted_event_reference: false }],
+  ])("needs review when it %s", (_label, override) => {
+    const row = evaluateAlert({ ...TRUSTED_ALERT, ...override } as never);
+    expect(row.status).toBe("needs_review");
   });
 });
 
@@ -311,6 +426,30 @@ describe("evaluateActionQueue — persisted approval and provenance", () => {
     expect(row.evidence.join(" ")).toMatch(/AI Doctor advisory/);
     expect(row.evidence.join(" ")).not.toMatch(/originating alert/i);
   });
+
+  it.each([
+    ["missing", null],
+    ["empty", ""],
+    ["whitespace", "   "],
+  ])(
+    "requires a nonempty matching AI Doctor session token when the back-pointer is %s",
+    (_label, linkedSessionId) => {
+      const row = evaluateActionQueue(
+        {
+          id: "aq1",
+          status: "pending_approval",
+          approval_required: true,
+          has_device_control_marker: false,
+          has_target_device: false,
+          source: "ai_doctor",
+          linked_ai_doctor_session_id: linkedSessionId,
+        },
+        { ai_doctor_session_id: "s1" },
+      );
+      expect(row.status).toBe("needs_review");
+      expect(row.missing_info.join(" ")).toMatch(/nonempty.*session/i);
+    },
+  );
 
   it("keeps AI Coach advice distinct from alert-derived evidence", () => {
     const row = evaluateActionQueue({

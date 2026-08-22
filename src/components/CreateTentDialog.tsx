@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -35,6 +35,10 @@ import {
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
+import {
+  newHierarchyCreateAttemptId,
+  persistHierarchyCreateAttempt,
+} from "@/lib/hierarchyCreatePersistence";
 
 export interface CreatedTent {
   id: string;
@@ -70,6 +74,8 @@ export default function CreateTentDialog({
   const qc = useQueryClient();
   const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
+  const createInFlightRef = useRef(false);
+  const [createOutcomeUnknown, setCreateOutcomeUnknown] = useState(false);
   const [form, setForm] = useState(EMPTY_TENT_FORM);
 
   const runGrowRefresh = useCallback(() => refreshGrows(), [refreshGrows]);
@@ -126,6 +132,7 @@ export default function CreateTentDialog({
     // React submit events bubble through portals. This dialog is nested inside
     // the plant form, so do not let a tent submit reach the parent form.
     e.stopPropagation();
+    if (busy || createInFlightRef.current) return;
     if (!tentGate.allowed) {
       toast.error(tentGate.blockedCopy);
       return;
@@ -134,12 +141,27 @@ export default function CreateTentDialog({
       toast.error("Not signed in");
       return;
     }
+    if (createOutcomeUnknown) {
+      toast.error("Refresh this page before trying to create another tent.");
+      return;
+    }
     if (formBlocked) {
       if (binding.toastMessage) toast.error(binding.toastMessage);
       return;
     }
-    setBusy(true);
+    if (!targetGrowId) {
+      toast.error("Choose a verified grow before creating a tent.");
+      return;
+    }
+    let tentId: string;
+    try {
+      tentId = newHierarchyCreateAttemptId();
+    } catch {
+      toast.error("Verdant could not start a safe tent save. Refresh and try again.");
+      return;
+    }
     const payload: Record<string, unknown> = {
+      id: tentId,
       user_id: user.id,
       name: form.name.trim(),
       size: form.size.trim() || null,
@@ -147,23 +169,58 @@ export default function CreateTentDialog({
       stage: form.stage,
       grow_id: targetGrowId,
     };
-    const { data, error } = await supabase
-      .from("tents")
-      .insert(payload as never)
-      .select("id, name, grow_id")
-      .single();
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    const attempt = {
+      entity: "tent" as const,
+      rowId: tentId,
+      ownerId: user.id,
+      growId: targetGrowId,
+    };
+    createInFlightRef.current = true;
+    setBusy(true);
+    try {
+      const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
+      if (result.status === "unknown") {
+        setCreateOutcomeUnknown(true);
+        toast.error(
+          "Verdant could not confirm whether this tent was saved. Refresh before adding another.",
+        );
+        return;
+      }
+      if (result.status === "definitive_error") {
+        toast.error(result.message);
+        return;
+      }
+
+      toast.success("Tent created");
+      trackFunnelEvent("tent_created");
+      qc.invalidateQueries({ queryKey: ["tents"] });
+      qc.invalidateQueries({ queryKey: ["grow", "tents"] });
+      const createdTent = {
+        id: result.confirmed.row.id,
+        name:
+          typeof result.confirmed.row.name === "string"
+            ? result.confirmed.row.name
+            : String(payload.name),
+        grow_id: targetGrowId,
+      };
+      // This row is confirmed. Close the completed form before delegating so a
+      // parent presentation error cannot leave its filled fields ready to send
+      // a second, different UUID insert.
+      resetForm();
+      setOpen(false);
+      if (onCreated) {
+        try {
+          await onCreated(createdTent);
+        } catch {
+          toast.error(
+            "Tent created, but this screen could not finish linking it. Refresh before adding another.",
+          );
+        }
+      }
+    } finally {
+      createInFlightRef.current = false;
+      setBusy(false);
     }
-    toast.success("Tent created");
-    trackFunnelEvent("tent_created");
-    qc.invalidateQueries({ queryKey: ["tents"] });
-    qc.invalidateQueries({ queryKey: ["grow", "tents"] });
-    if (data && onCreated) onCreated(data as CreatedTent);
-    resetForm();
-    setOpen(false);
   }
 
   return (
@@ -183,6 +240,16 @@ export default function CreateTentDialog({
           Start simple. You can add size, brand, and stage later. Verdant works best once your first
           plant memory exists.
         </p>
+
+        {createOutcomeUnknown && (
+          <p
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+            data-testid="tent-create-outcome-unknown"
+          >
+            Verdant could not confirm whether that tent was saved. Refresh this page before creating
+            another so you do not make a duplicate.
+          </p>
+        )}
 
         {binding.showLoading && (
           <p
@@ -369,7 +436,7 @@ export default function CreateTentDialog({
               </div>
             </details>
             <Button
-              disabled={busy || !tentGate.allowed || formBlocked}
+              disabled={busy || createOutcomeUnknown || !tentGate.allowed || formBlocked}
               className="gradient-leaf text-primary-foreground"
               data-testid="tent-create-submit"
             >

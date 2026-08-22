@@ -147,7 +147,16 @@ export interface SensorSnapshotEvidence {
   captured_at: string | null;
   confidence?: number | null;
   metric?: string | null;
+  /**
+   * Read-only adapter result: at least one recognized snapshot metric has a
+   * finite numeric value. The presenter must provide this for live snapshots
+   * so an empty envelope is never certified as usable live evidence.
+   */
+  has_usable_metric?: boolean;
 }
+
+export type AiDoctorContextProvenance =
+  "frozen_session" | "current_state_reconstructed" | "unknown";
 
 export interface AiDoctorEvidence {
   session_id: string | null;
@@ -159,6 +168,17 @@ export interface AiDoctorEvidence {
   had_recent_photo: boolean;
   had_recent_sensor_snapshot: boolean;
   had_alerts: boolean;
+  /**
+   * Whether the listed context came from immutable session evidence, or was
+   * only reconstructed from the app's current rows by a read-only presenter.
+   */
+  context_provenance?: AiDoctorContextProvenance;
+  /**
+   * False only when persisted grow/tent/plant identifiers disagree with the
+   * currently selected context. Omitted preserves compatibility with legacy
+   * frozen-session callers that did not persist all scope identifiers.
+   */
+  session_scope_matches_selected_context?: boolean;
 }
 
 export interface AlertEvidence {
@@ -168,6 +188,40 @@ export interface AlertEvidence {
   reason: string | null;
   status: string | null;
   created_at: string | null;
+  /** True only when the presenter has already applied the selected scope. */
+  scope_matches_selected_context?: boolean;
+  /** Persisted producer slug; unknown sources cannot certify a proof row. */
+  source?: string | null;
+  /** True only when a persisted trusted originating event ref is present. */
+  has_trusted_event_reference?: boolean;
+}
+
+export const RECOGNIZED_SNAPSHOT_METRIC_KEYS = [
+  "temp",
+  "rh",
+  "vpd",
+  "co2",
+  "soil",
+  "soil_ec",
+  "soil_temp",
+  "ppfd",
+] as const;
+
+export type RecognizedSnapshotMetricKey = (typeof RECOGNIZED_SNAPSHOT_METRIC_KEYS)[number];
+
+/**
+ * Returns true only when the current snapshot contains a finite value for a
+ * metric this proof surface recognizes. It deliberately ignores all other
+ * fields, including raw payloads and vendor-specific keys.
+ */
+export function hasFiniteRecognizedSensorSnapshotMetric(
+  snapshot: Partial<Record<RecognizedSnapshotMetricKey, unknown>> | null | undefined,
+): boolean {
+  for (const key of RECOGNIZED_SNAPSHOT_METRIC_KEYS) {
+    const value = snapshot?.[key];
+    if (typeof value === "number" && Number.isFinite(value)) return true;
+  }
+  return false;
 }
 
 export interface ActionQueueEvidence {
@@ -456,6 +510,7 @@ const ALLOWED_SENSOR_KEYS: ReadonlySet<string> = new Set([
   "captured_at",
   "confidence",
   "metric",
+  "has_usable_metric",
 ]);
 
 export function evaluateSensorSnapshot(
@@ -550,7 +605,10 @@ export function evaluateSensorSnapshot(
   const metricInput = (s as { metric?: unknown }).metric;
   const metricInvalid =
     metricInput !== undefined && metricInput !== null && typeof metricInput !== "string";
-  if (confidenceInvalid || metricInvalid) {
+  const usableMetricInput = (s as { has_usable_metric?: unknown }).has_usable_metric;
+  const usableMetricInvalid =
+    usableMetricInput !== undefined && typeof usableMetricInput !== "boolean";
+  if (confidenceInvalid || metricInvalid || usableMetricInvalid) {
     return {
       id: "sensor-snapshot",
       label: "Sensor Snapshot",
@@ -564,7 +622,9 @@ export function evaluateSensorSnapshot(
       missing_info: [
         confidenceInvalid
           ? "Confidence is malformed; excluded from healthy status."
-          : "Metric label is malformed; excluded from healthy status.",
+          : metricInvalid
+            ? "Metric label is malformed; excluded from healthy status."
+            : "Usable-metric flag is malformed; excluded from healthy status.",
       ],
       safety_note: "Malformed telemetry is never shown as healthy.",
       source: "invalid",
@@ -603,6 +663,19 @@ export function evaluateSensorSnapshot(
   const mins = minutesSince(s.captured_at, now_ms);
   const isLive = s.source === "live";
   const isManualish = s.source === "manual" || s.source === "csv";
+  const capturedAtMs = s.captured_at ? Date.parse(s.captured_at) : Number.NaN;
+  if (isLive && Number.isFinite(capturedAtMs) && capturedAtMs > now_ms) {
+    return {
+      id: "sensor-snapshot",
+      label: "Sensor Snapshot",
+      status: "invalid",
+      evidence: [`Source: ${s.source}`, `Captured: ${s.captured_at}`],
+      missing_info: ["Live reading timestamp is in the future; excluded from healthy status."],
+      safety_note: "Future-dated live readings are invalid and never shown as healthy.",
+      source: "invalid",
+      deep_link: "/sensors",
+    };
+  }
   const staleMinutes = isLive ? LIVE_STALE_MINUTES : MANUAL_STALE_HOURS * 60;
   const stale = mins !== null && mins > staleMinutes;
   const ev: string[] = [
@@ -638,6 +711,18 @@ export function evaluateSensorSnapshot(
       source: s.source,
     };
   }
+  if (s.has_usable_metric !== true) {
+    return {
+      id: "sensor-snapshot",
+      label: "Sensor Snapshot",
+      status: "needs_review",
+      evidence: ev,
+      missing_info: ["Live snapshot has no finite recognized metric value."],
+      safety_note:
+        "A live source without a usable recognized metric is not certified as healthy evidence.",
+      source: "live",
+    };
+  }
   // isLive && fresh
   return {
     id: "sensor-snapshot",
@@ -659,6 +744,41 @@ export function evaluateAiDoctor(a: AiDoctorEvidence | null): LoopStepRow {
       evidence: [],
       missing_info: ["No AI Doctor session recorded yet."],
       safety_note: "Viewing this proof page does not trigger a model call.",
+      deep_link: "/doctor",
+    };
+  }
+  if (a.context_provenance === "current_state_reconstructed") {
+    return {
+      id: "ai-doctor",
+      label: "AI Doctor",
+      status: "needs_review",
+      evidence: a.created_at ? [`Session created: ${a.created_at}`] : [],
+      missing_info: [
+        "AI Doctor context is reconstructed from current app state, not frozen with this session.",
+      ],
+      safety_note: "AI Doctor evidence stays cautious until session-scoped context is frozen.",
+      deep_link: "/doctor",
+    };
+  }
+  if (a.context_provenance === "unknown") {
+    return {
+      id: "ai-doctor",
+      label: "AI Doctor",
+      status: "needs_review",
+      evidence: a.created_at ? [`Session created: ${a.created_at}`] : [],
+      missing_info: ["Frozen AI Doctor session-context provenance is unknown."],
+      safety_note: "AI Doctor evidence stays cautious until session context is verifiable.",
+      deep_link: "/doctor",
+    };
+  }
+  if (a.session_scope_matches_selected_context === false) {
+    return {
+      id: "ai-doctor",
+      label: "AI Doctor",
+      status: "needs_review",
+      evidence: a.created_at ? [`Session created: ${a.created_at}`] : [],
+      missing_info: ["AI Doctor session scope does not match the selected grow, tent, and plant."],
+      safety_note: "AI Doctor evidence stays cautious when selected scope is not verifiable.",
       deep_link: "/doctor",
     };
   }
@@ -706,6 +826,52 @@ export function evaluateAlert(a: AlertEvidence | null): LoopStepRow {
   if (a.reason) ev.push(`Reason: ${a.reason}`);
   if (a.status) ev.push(`Status: ${a.status}`);
   if (a.created_at) ev.push(`Created: ${a.created_at}`);
+  if (a.scope_matches_selected_context === false) {
+    return {
+      id: "alert",
+      label: "Alert",
+      status: "needs_review",
+      evidence: ev,
+      missing_info: ["Alert is not scoped to the selected grow, tent, and plant."],
+      safety_note: "Only selected-scope alert evidence can support this proof.",
+      deep_link: `/alerts/${a.id}`,
+    };
+  }
+  if (a.status !== "open") {
+    return {
+      id: "alert",
+      label: "Alert",
+      status: "needs_review",
+      evidence: ev,
+      missing_info: ["Alert is not open and cannot certify current action evidence."],
+      safety_note: "Resolved, dismissed, or otherwise inactive alerts need review before use.",
+      deep_link: `/alerts/${a.id}`,
+    };
+  }
+  const recognizedSource =
+    a.source === "environment_alerts" || a.source === "ai_doctor" || a.source === "manual";
+  if (a.source !== undefined && !recognizedSource) {
+    return {
+      id: "alert",
+      label: "Alert",
+      status: "needs_review",
+      evidence: ev,
+      missing_info: ["Alert source is unknown and cannot certify proof evidence."],
+      safety_note: "Unknown alert provenance is never promoted to trusted evidence.",
+      deep_link: `/alerts/${a.id}`,
+    };
+  }
+  if (a.has_trusted_event_reference === false) {
+    return {
+      id: "alert",
+      label: "Alert",
+      status: "needs_review",
+      evidence: ev,
+      missing_info: ["Alert has no trusted originating event reference."],
+      safety_note: "Alert evidence needs a trusted persisted event reference before use.",
+      deep_link: `/alerts/${a.id}`,
+    };
+  }
   return {
     id: "alert",
     label: "Alert",
@@ -790,15 +956,29 @@ export function evaluateActionQueue(
       ev.push("Alert-derived advisory.");
       break;
     }
-    case "ai_doctor":
-      if (
-        a.linked_ai_doctor_session_id &&
-        a.linked_ai_doctor_session_id !== context.ai_doctor_session_id
-      ) {
+    case "ai_doctor": {
+      const linkedSessionId =
+        typeof a.linked_ai_doctor_session_id === "string" &&
+        a.linked_ai_doctor_session_id.trim().length > 0
+          ? a.linked_ai_doctor_session_id.trim()
+          : null;
+      const selectedSessionId =
+        typeof context.ai_doctor_session_id === "string" &&
+        context.ai_doctor_session_id.trim().length > 0
+          ? context.ai_doctor_session_id.trim()
+          : null;
+      if (!linkedSessionId || !selectedSessionId) {
+        return actionQueueNeedsReview(
+          a,
+          "AI Doctor advisory requires a nonempty matching selected session back-pointer.",
+        );
+      }
+      if (linkedSessionId !== selectedSessionId) {
         return actionQueueNeedsReview(a, "AI Doctor advisory does not match the selected session.");
       }
       ev.push("AI Doctor advisory.");
       break;
+    }
     case "ai_coach":
       ev.push("AI Coach advisory.");
       break;

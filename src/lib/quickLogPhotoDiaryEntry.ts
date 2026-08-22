@@ -20,6 +20,8 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export interface QuickLogPhotoDiaryEntryInput {
+  /** Authenticated owner used only to reconcile a lost insert response. */
+  ownerId: string;
   growId: string;
   tentId: string | null;
   plantId: string | null;
@@ -44,6 +46,12 @@ export interface QuickLogPhotoDiaryEntryInput {
   eventType?: "quicklog_photo_attachment" | "photo";
   /** Injectable clock for deterministic tests. Defaults to `new Date()`. */
   now?: () => Date;
+  /**
+   * Optional preallocated UUID for the row. Supplying it is useful when a
+   * caller owns an operation boundary; otherwise this helper allocates one
+   * before the insert so a lost response can be reconciled exactly.
+   */
+  entryId?: string;
 }
 
 export interface QuickLogPhotoDiaryEntryRow {
@@ -90,7 +98,44 @@ export function buildQuickLogPhotoDiaryEntryRow(
   };
 }
 
-export type QuickLogPhotoDiaryEntryResult = { ok: true } | { ok: false; message: string };
+export type QuickLogPhotoDiaryEntryResult =
+  { ok: true } | { ok: false; message: string; ambiguous?: boolean };
+
+const UNCERTAIN_PHOTO_ATTACHMENT_MESSAGE =
+  "Could not confirm the photo attachment; it may still appear in history.";
+
+function resolvePhotoDiaryEntryId(input: QuickLogPhotoDiaryEntryInput): string | null {
+  if (typeof input.entryId === "string" && input.entryId.trim() !== "") return input.entryId;
+  const crypto = globalThis.crypto;
+  if (!crypto || typeof crypto.randomUUID !== "function") return null;
+  return crypto.randomUUID();
+}
+
+function isDefinitiveNonCommitError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = (error as { code?: unknown }).code;
+  // A structured database/PostgREST code proves the server returned a
+  // terminal rejection. A unique collision is deliberately excluded: it may
+  // be a replay of this exact preallocated ID and needs reconciliation first.
+  return typeof code === "string" && code.trim() !== "" && code !== "23505";
+}
+
+async function reconcileExactOwnerPhotoDiaryEntry(
+  ownerId: string,
+  entryId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from("diary_entries")
+      .select("id")
+      .eq("id", entryId)
+      .eq("user_id", ownerId)
+      .maybeSingle();
+    return !error && data?.id === entryId;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Thin wrapper around the extracted `diary_entries.insert`. The caller
@@ -100,10 +145,37 @@ export type QuickLogPhotoDiaryEntryResult = { ok: true } | { ok: false; message:
 export async function createQuickLogPhotoDiaryEntry(
   input: QuickLogPhotoDiaryEntryInput,
 ): Promise<QuickLogPhotoDiaryEntryResult> {
-  const row = buildQuickLogPhotoDiaryEntryRow(input);
-  const { error } = await supabase.from("diary_entries").insert(row as never);
-  if (error) {
-    return { ok: false, message: `Photo diary entry failed: ${error.message}` };
+  const entryId = resolvePhotoDiaryEntryId(input);
+  if (!entryId) {
+    return { ok: false, message: "Photo diary entry could not be prepared." };
   }
-  return { ok: true };
+  const row = { ...buildQuickLogPhotoDiaryEntryRow(input), id: entryId };
+  try {
+    const { error } = await supabase.from("diary_entries").insert(row as never);
+    if (error) {
+      if (await reconcileExactOwnerPhotoDiaryEntry(input.ownerId, entryId)) {
+        return { ok: true };
+      }
+      if (!isDefinitiveNonCommitError(error)) {
+        return {
+          ok: false,
+          ambiguous: true,
+          message: UNCERTAIN_PHOTO_ATTACHMENT_MESSAGE,
+        };
+      }
+      return { ok: false, message: `Photo diary entry failed: ${error.message}` };
+    }
+    return { ok: true };
+  } catch {
+    // A rejected request may have committed before its response was lost. The
+    // client supplied this exact UUID, so only an owner-scoped lookup for that
+    // row can prove the attachment exists. Any other outcome stays uncertain
+    // and callers must retain the uploaded object rather than deleting it.
+    if (await reconcileExactOwnerPhotoDiaryEntry(input.ownerId, entryId)) return { ok: true };
+    return {
+      ok: false,
+      ambiguous: true,
+      message: UNCERTAIN_PHOTO_ATTACHMENT_MESSAGE,
+    };
+  }
 }

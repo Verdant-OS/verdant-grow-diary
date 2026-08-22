@@ -33,6 +33,10 @@ const storageUploadMock = vi.fn(async (..._args: unknown[]) => ({
 }));
 const storageRemoveMock = vi.fn(async (..._args: unknown[]) => ({ data: null, error: null }));
 const diaryInsertMock = vi.fn(async (..._args: unknown[]) => ({ error: null }));
+const diaryMaybeSingleMock = vi.fn(async () => ({ data: null, error: null }));
+const diaryOwnerEqMock = vi.fn(() => ({ maybeSingle: diaryMaybeSingleMock }));
+const diaryIdEqMock = vi.fn(() => ({ eq: diaryOwnerEqMock }));
+const diarySelectMock = vi.fn((..._args: unknown[]) => ({ eq: diaryIdEqMock }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -45,6 +49,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     },
     from: (table: string) => ({
       insert: (...args: unknown[]) => diaryInsertMock(table, ...(args as [])),
+      select: (...args: unknown[]) => diarySelectMock(table, ...(args as [])),
     }),
   },
 }));
@@ -56,6 +61,7 @@ vi.mock("@/store/auth", () => ({
 const GROW = "grow-1";
 const TENT = "tent-1";
 const PLANT = "plant-1";
+const OTHER_PLANT = "plant-2";
 
 function mountSection(props?: Partial<React.ComponentProps<typeof QuickLogAllActivitiesSection>>) {
   return render(
@@ -119,7 +125,12 @@ beforeEach(() => {
   }));
   storageRemoveMock.mockClear();
   diaryInsertMock.mockClear();
+  diarySelectMock.mockClear();
+  diaryIdEqMock.mockClear();
+  diaryOwnerEqMock.mockClear();
+  diaryMaybeSingleMock.mockClear();
   diaryInsertMock.mockImplementation(async (..._args: unknown[]) => ({ error: null }));
+  diaryMaybeSingleMock.mockImplementation(async () => ({ data: null, error: null }));
 });
 
 describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
@@ -403,7 +414,7 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
   });
 
-  it("Photo insert REJECTION surfaces an error and removes the orphaned upload", async () => {
+  it("Photo insert response loss retains the upload and locks the photo save as uncertain", async () => {
     diaryInsertMock.mockImplementationOnce(async () => {
       throw new Error("network interrupted");
     });
@@ -417,13 +428,86 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
 
     await waitFor(() =>
-      expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
-        /photo save failed/i,
-      ),
+      expect(
+        screen.getByTestId("quick-log-all-activities-photo-uncertain-recovery"),
+      ).toHaveTextContent(/could not confirm the photo attachment/i),
     );
-    // The uploaded object is cleaned up, and no success artifacts appear.
-    await waitFor(() => expect(storageRemoveMock).toHaveBeenCalledTimes(1));
+    // An insert may have committed before its response was lost. Never delete
+    // the object until an exact owner-scoped reconciliation proves otherwise.
+    expect(storageRemoveMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
     expect(screen.queryByTestId("quick-log-all-activities-saved-item")).toBeNull();
+  });
+
+  it("keeps unresolved photo recovery bound to the captured plant after switching targets", async () => {
+    let rejectInsert: ((reason?: unknown) => void) | null = null;
+    diaryInsertMock.mockImplementationOnce(
+      () =>
+        new Promise<never>((_resolve, reject) => {
+          rejectInsert = reject;
+        }),
+    );
+
+    const view = mountSection();
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [new File(["plant-a"], "plant-a.jpg", { type: "image/jpeg" })] },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+    await waitFor(() => expect(diaryInsertMock).toHaveBeenCalledTimes(1));
+
+    // The response for plant A is lost after the grower has already selected
+    // plant B. The recovery fence must remain attached to A, not the current
+    // presenter target.
+    view.rerender(
+      <MemoryRouter>
+        <QuickLogAllActivitiesSection
+          growId={GROW}
+          tentId={TENT}
+          plantId={OTHER_PLANT}
+          plantStage="flower"
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.queryByTestId("quick-log-all-activities-form")).toBeNull());
+    await act(async () => {
+      rejectInsert?.(new Error("network interrupted"));
+    });
+    await waitFor(() => expect(diarySelectMock).toHaveBeenCalledTimes(1));
+
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [new File(["plant-b"], "plant-b.jpg", { type: "image/jpeg" })] },
+    });
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeEnabled();
+    expect(
+      screen.queryByTestId("quick-log-all-activities-photo-uncertain-recovery"),
+    ).not.toBeInTheDocument();
+
+    // Returning to A must keep the no-blind-retry fence and show its recovery
+    // instruction again; B's usable editor must not clear A's uncertainty.
+    view.rerender(
+      <MemoryRouter>
+        <QuickLogAllActivitiesSection
+          growId={GROW}
+          tentId={TENT}
+          plantId={PLANT}
+          plantStage="flower"
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.queryByTestId("quick-log-all-activities-form")).toBeNull());
+    selectActivity("photo");
+    await screen.findByTestId("quick-log-all-activities-form");
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-photo-file"), {
+      target: { files: [new File(["plant-a-again"], "plant-a-again.jpg", { type: "image/jpeg" })] },
+    });
+    expect(
+      screen.getByTestId("quick-log-all-activities-photo-uncertain-recovery"),
+    ).toHaveTextContent(/check timeline before adding another photo/i);
+    expect(screen.getByTestId("quick-log-all-activities-save")).toBeDisabled();
   });
 
   it("Issue/Observation → quicklog_save_event carries observed sign + location (never a cause)", async () => {

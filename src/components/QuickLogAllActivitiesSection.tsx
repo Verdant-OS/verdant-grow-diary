@@ -208,6 +208,24 @@ export default function QuickLogAllActivitiesSection({
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  // A lost diary-insert response cannot prove the uploaded object is orphaned.
+  // Keep the object and lock only the exact grow/tent/plant target that owns
+  // the uncertain write. A target switch must not disable a different plant's
+  // editor, while returning to the original target must still prevent a blind
+  // duplicate retry.
+  const [photoAttachmentUncertainTargetKeys, setPhotoAttachmentUncertainTargetKeys] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const photoAttachmentUncertain = photoAttachmentUncertainTargetKeys.has(currentTargetKey);
+  const markPhotoAttachmentUncertain = useCallback((target: QuickLogAllActivitiesSaveTarget) => {
+    const targetKey = buildQuickLogTargetKey(target);
+    setPhotoAttachmentUncertainTargetKeys((previous) => {
+      if (previous.has(targetKey)) return previous;
+      const next = new Set(previous);
+      next.add(targetKey);
+      return next;
+    });
+  }, []);
   const photoDiaryInFlightRef = useRef(false);
   const { user } = useAuth();
   const [saved, setSaved] = useState<SavedRecord[]>([]);
@@ -406,6 +424,13 @@ export default function QuickLogAllActivitiesSection({
 
   const handleSave = useCallback(async () => {
     if (isMutationBlocked()) return;
+    if (selected?.id === "photo" && photoAttachmentUncertain) {
+      setErrorReason(
+        "Photo attachment status is uncertain. Check Timeline before adding another photo.",
+      );
+      setErrorForActivity("photo");
+      return;
+    }
     if (externalPersistenceBlockReason) {
       setErrorReason(externalPersistenceBlockReason);
       setErrorForActivity(selected?.id ?? null);
@@ -575,6 +600,7 @@ export default function QuickLogAllActivitiesSection({
             if (typeof v === "string") photoExtraDetails[k] = v;
           }
           const entryResult = await createQuickLogPhotoDiaryEntry({
+            ownerId: user.id,
             growId: capturedTarget.growId,
             tentId: capturedTarget.tentId,
             plantId: capturedTarget.plantId,
@@ -590,12 +616,19 @@ export default function QuickLogAllActivitiesSection({
           if (!entryResult.ok) {
             // (strictNullChecks is off in this app config, so cast the failure
             // branch explicitly rather than relying on discriminant narrowing.)
-            const failure = entryResult as { ok: false; message: string };
-            // Best-effort orphan cleanup; the entry is the source of truth.
-            try {
-              await supabase.storage.from("diary-photos").remove([path]);
-            } catch {
-              // Swallow — an orphaned object is harmless next to a false receipt.
+            const failure = entryResult as { ok: false; message: string; ambiguous?: boolean };
+            // A returned database rejection proves no diary row committed, so
+            // cleanup is safe. An unresolved response loss does not: retain the
+            // object and lock only this captured target's photo writes.
+            if (failure.ambiguous) {
+              markPhotoAttachmentUncertain(capturedTarget);
+              return;
+            } else {
+              try {
+                await supabase.storage.from("diary-photos").remove([path]);
+              } catch {
+                // Best-effort only after a definitive non-commit.
+              }
             }
             setErrorReason(failure.message);
             setErrorForActivity(selected.id);
@@ -610,15 +643,12 @@ export default function QuickLogAllActivitiesSection({
           });
           trackQuickLogSuccess("photo", { reused: false });
         } catch {
-          // A REJECTED promise (network interruption) must never escape the
-          // click handler as a silent nothing: surface the failure and clean
-          // up an already-uploaded object so no orphan is left behind.
+          // Any unexpected failure after upload remains unconfirmed. Retain
+          // the object rather than risking a committed diary row pointing to a
+          // deleted photo, and lock only this captured target's photo save.
           if (uploadedPath) {
-            try {
-              await supabase.storage.from("diary-photos").remove([uploadedPath]);
-            } catch {
-              // Best-effort only.
-            }
+            markPhotoAttachmentUncertain(capturedTarget);
+            return;
           }
           setErrorReason("Photo save failed. Nothing was saved.");
           setErrorForActivity(selected.id);
@@ -722,6 +752,8 @@ export default function QuickLogAllActivitiesSection({
     firstDetailNumberError,
     user,
     photoFile,
+    photoAttachmentUncertain,
+    markPhotoAttachmentUncertain,
     onSaveStart,
     onSaveEnd,
     isMutationBlocked,
@@ -1024,6 +1056,16 @@ export default function QuickLogAllActivitiesSection({
                   A photo entry needs an actual image — Save stays disabled until one is chosen.
                 </p>
               )}
+              {photoAttachmentUncertain && (
+                <p
+                  role="alert"
+                  className="text-[11px] text-destructive"
+                  data-testid={`${testIdPrefix}-photo-uncertain-recovery`}
+                >
+                  Could not confirm the photo attachment for this selected target. Check Timeline
+                  before adding another photo.
+                </p>
+              )}
             </div>
           )}
 
@@ -1182,6 +1224,7 @@ export default function QuickLogAllActivitiesSection({
                 mutationBlocked ||
                 !!externalPersistenceBlockReason ||
                 noContext ||
+                (selected.id === "photo" && photoAttachmentUncertain) ||
                 selectedAvailability?.disabled ||
                 selected.id === "manual_sensor_snapshot" ||
                 (requiresNote && note.trim().length === 0) ||

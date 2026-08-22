@@ -41,6 +41,11 @@ import {
   evaluateVerifiedGrowCreationGate,
   evaluateVerifiedTentCreationGate,
 } from "@/lib/entitlements/freeTierGates";
+import {
+  newHierarchyCreateAttemptId,
+  persistHierarchyCreateAttempt,
+  type HierarchyCreateAttempt,
+} from "@/lib/hierarchyCreatePersistence";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -66,6 +71,8 @@ export default function StartYourRoom() {
   const [form, setForm] = useState<StartYourRoomForm>({ ...DEFAULT_START_YOUR_ROOM_FORM });
   const [ids, setIds] = useState<StartYourRoomIds>({ ...EMPTY_START_YOUR_ROOM_IDS });
   const [busy, setBusy] = useState(false);
+  const createInFlightRef = useRef(false);
+  const [createOutcomeUnknown, setCreateOutcomeUnknown] = useState(false);
   const [verificationRetrying, setVerificationRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,8 +130,29 @@ export default function StartYourRoom() {
     }
   }
 
+  async function persistStartRoomAttempt(
+    attempt: HierarchyCreateAttempt,
+    payload: Record<string, unknown>,
+  ) {
+    const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
+    if (result.status === "confirmed") return result.confirmed;
+    if (result.status === "unknown") {
+      setCreateOutcomeUnknown(true);
+      setError(
+        `Verdant could not confirm whether this ${attempt.entity} was saved. Refresh before adding another.`,
+      );
+      return null;
+    }
+    setError(result.message);
+    return null;
+  }
+
   async function submitGrow() {
-    if (!user || busy) return;
+    if (!user || busy || createInFlightRef.current) return;
+    if (createOutcomeUnknown) {
+      setError("Refresh this page before trying to create another room item.");
+      return;
+    }
     if (!roomPreflightGate.allowed) {
       setError(roomPreflightGate.blockedCopy);
       return;
@@ -134,27 +162,49 @@ export default function StartYourRoom() {
       setError("Enter a grow name to continue.");
       return;
     }
-    setBusy(true);
-    setError(null);
-    const { data, error: err } = await supabase
-      .from("grows")
-      .insert({ user_id: user.id, ...payload } as never)
-      .select("id,name")
-      .single();
-    setBusy(false);
-    if (err || !data) {
-      setError(err?.message ?? "Could not create grow.");
+    let growId: string;
+    try {
+      growId = newHierarchyCreateAttemptId();
+    } catch {
+      setError("Verdant could not start a safe grow save. Refresh and try again.");
       return;
     }
-    setActiveGrowId(data.id);
-    await refresh();
-    setIds((prev) => ({ ...prev, growId: data.id }));
-    toast.success("Grow created");
-    setStep(nextStepAfter("grow"));
+    const attempt = { entity: "grow" as const, rowId: growId, ownerId: user.id };
+    createInFlightRef.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const confirmed = await persistStartRoomAttempt(attempt, {
+        id: growId,
+        user_id: user.id,
+        ...payload,
+      });
+      if (!confirmed) return;
+      setActiveGrowId(confirmed.row.id);
+      setIds((prev) => ({ ...prev, growId: confirmed.row.id }));
+      toast.success("Grow created");
+      setStep(nextStepAfter("grow"));
+      try {
+        await refresh();
+      } catch {
+        // The grow is already confirmed and the wizard is terminal for this
+        // stage. Advance rather than leave the grow form ready to duplicate.
+        toast.error(
+          "Grow created, but the list could not refresh. Refresh the page if it looks out of date.",
+        );
+      }
+    } finally {
+      createInFlightRef.current = false;
+      setBusy(false);
+    }
   }
 
   async function submitTent() {
-    if (!user || busy) return;
+    if (!user || busy || createInFlightRef.current) return;
+    if (createOutcomeUnknown) {
+      setError("Refresh this page before trying to create another room item.");
+      return;
+    }
     if (!tentGate.allowed) {
       setError(tentGate.blockedCopy);
       return;
@@ -164,63 +214,96 @@ export default function StartYourRoom() {
       setError("Enter a tent name. Grow context is required.");
       return;
     }
-    setBusy(true);
-    setError(null);
-    const { data, error: err } = await supabase
-      .from("tents")
-      .insert({ user_id: user.id, ...payload } as never)
-      .select("id,name")
-      .single();
-    setBusy(false);
-    if (err || !data) {
-      setError(err?.message ?? "Could not create tent.");
+    let tentId: string;
+    try {
+      tentId = newHierarchyCreateAttemptId();
+    } catch {
+      setError("Verdant could not start a safe tent save. Refresh and try again.");
       return;
     }
-    setIds((prev) => ({ ...prev, tentId: data.id }));
-    toast.success("Tent created and linked to grow");
-    setStep(nextStepAfter("tent"));
+    const attempt = {
+      entity: "tent" as const,
+      rowId: tentId,
+      ownerId: user.id,
+      growId: payload.grow_id,
+    };
+    createInFlightRef.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const confirmed = await persistStartRoomAttempt(attempt, {
+        id: tentId,
+        user_id: user.id,
+        ...payload,
+      });
+      if (!confirmed) return;
+      setIds((prev) => ({ ...prev, tentId: confirmed.row.id }));
+      toast.success("Tent created and linked to grow");
+      setStep(nextStepAfter("tent"));
+    } finally {
+      createInFlightRef.current = false;
+      setBusy(false);
+    }
   }
 
   async function submitPlant() {
-    if (!user || busy) return;
+    if (!user || busy || createInFlightRef.current) return;
+    if (createOutcomeUnknown) {
+      setError("Refresh this page before trying to create another room item.");
+      return;
+    }
     const payload = buildStartRoomPlantPayload(form, ids);
     if (!payload) {
       setError("Enter a plant name. Grow and tent must already exist.");
       return;
     }
+    let plantId: string;
+    try {
+      plantId = newHierarchyCreateAttemptId();
+    } catch {
+      setError("Verdant could not start a safe plant save. Refresh and try again.");
+      return;
+    }
+    const attempt = {
+      entity: "plant" as const,
+      rowId: plantId,
+      ownerId: user.id,
+      growId: payload.grow_id,
+      tentId: payload.tent_id,
+    };
+    createInFlightRef.current = true;
     setBusy(true);
     setError(null);
-    const { data, error: err } = await supabase
-      .from("plants")
-      .insert({ user_id: user.id, ...payload } as never)
-      .select("id,name,grow_id,tent_id")
-      .single();
-    if (err || !data) {
+    try {
+      const confirmed = await persistStartRoomAttempt(attempt, {
+        id: plantId,
+        user_id: user.id,
+        ...payload,
+      });
+      if (!confirmed) return;
+      // Fail closed if binding somehow dropped (should never happen with payload).
+      if (!confirmed.row.grow_id) {
+        setError(
+          "Plant was created without grow context. Use Plant Detail rescue or Lineage Repair.",
+        );
+        return;
+      }
+      // Quick Log is permanently mounted and can still hold the pre-wizard
+      // empty lists. Settle every target selector refresh before exposing the
+      // Finish handoff. A failed refresh remains recoverable inside Quick Log;
+      // it must not create a second plant or strand this completed wizard.
+      await Promise.allSettled([
+        refresh(),
+        queryClient.invalidateQueries({ queryKey: ["tents"] }),
+        queryClient.invalidateQueries({ queryKey: ["plants"] }),
+      ]);
+      setIds((prev) => ({ ...prev, plantId: confirmed.row.id }));
+      toast.success("Plant created and linked");
+      setStep(nextStepAfter("plant"));
+    } finally {
+      createInFlightRef.current = false;
       setBusy(false);
-      setError(err?.message ?? "Could not create plant.");
-      return;
     }
-    // Fail closed if binding somehow dropped (should never happen with payload).
-    if (!data.grow_id) {
-      setBusy(false);
-      setError(
-        "Plant was created without grow context. Use Plant Detail rescue or Lineage Repair.",
-      );
-      return;
-    }
-    // Quick Log is permanently mounted and can still hold the pre-wizard
-    // empty lists. Settle every target selector refresh before exposing the
-    // Finish handoff. A failed refresh remains recoverable inside Quick Log;
-    // it must not create a second plant or strand this completed wizard.
-    await Promise.allSettled([
-      refresh(),
-      queryClient.invalidateQueries({ queryKey: ["tents"] }),
-      queryClient.invalidateQueries({ queryKey: ["plants"] }),
-    ]);
-    setBusy(false);
-    setIds((prev) => ({ ...prev, plantId: data.id }));
-    toast.success("Plant created and linked");
-    setStep(nextStepAfter("plant"));
   }
 
   function finish() {
@@ -263,6 +346,16 @@ export default function StartYourRoom() {
         </h1>
         <p className="text-sm text-muted-foreground -mt-2">{START_YOUR_ROOM_COPY.pageSubtitle}</p>
 
+        {createOutcomeUnknown && (
+          <p
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+            data-testid="start-room-create-outcome-unknown"
+          >
+            Verdant could not confirm whether the last room item was saved. Refresh this page before
+            creating another so you do not make a duplicate.
+          </p>
+        )}
+
         {step === "grow" && (
           <section className="space-y-3" data-testid="start-your-room-step-grow">
             <div className="flex items-center gap-2 text-sm font-medium">
@@ -285,7 +378,9 @@ export default function StartYourRoom() {
             <Button
               type="button"
               className="w-full gradient-leaf text-primary-foreground"
-              disabled={busy || !roomPreflightGate.allowed || !canProceedGrow(form)}
+              disabled={
+                busy || createOutcomeUnknown || !roomPreflightGate.allowed || !canProceedGrow(form)
+              }
               onClick={submitGrow}
               data-testid="start-room-grow-submit"
             >
@@ -323,7 +418,9 @@ export default function StartYourRoom() {
             <Button
               type="button"
               className="w-full gradient-leaf text-primary-foreground"
-              disabled={busy || !tentGate.allowed || !canProceedTent(form, ids)}
+              disabled={
+                busy || createOutcomeUnknown || !tentGate.allowed || !canProceedTent(form, ids)
+              }
               onClick={submitTent}
               data-testid="start-room-tent-submit"
             >
@@ -376,7 +473,7 @@ export default function StartYourRoom() {
             <Button
               type="button"
               className="w-full gradient-leaf text-primary-foreground"
-              disabled={busy || !canProceedPlant(form, ids)}
+              disabled={busy || createOutcomeUnknown || !canProceedPlant(form, ids)}
               onClick={submitPlant}
               data-testid="start-room-plant-submit"
             >

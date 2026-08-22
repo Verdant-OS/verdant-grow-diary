@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
@@ -29,6 +29,10 @@ import {
   buildConnectedActivationRoutes,
   isOneTentActivationIntent,
 } from "@/lib/connectedOneTentActivationRules";
+import {
+  newHierarchyCreateAttemptId,
+  persistHierarchyCreateAttempt,
+} from "@/lib/hierarchyCreatePersistence";
 
 export default function Grows() {
   const navigate = useNavigate();
@@ -39,6 +43,8 @@ export default function Grows() {
   const [open, setOpen] = useState(activationIntent);
   const [form, setForm] = useState({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
   const [busy, setBusy] = useState(false);
+  const createInFlightRef = useRef(false);
+  const [createOutcomeUnknown, setCreateOutcomeUnknown] = useState(false);
 
   // Free-tier grow gate. The grows store already returns only non-archived
   // rows, so its length IS the active-grow count. Fails open while the
@@ -56,42 +62,73 @@ export default function Grows() {
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    if (!user) return;
+    if (!user || busy || createInFlightRef.current) return;
+    if (createOutcomeUnknown) {
+      toast.error("Refresh this page before trying to create another grow.");
+      return;
+    }
     if (!growGate.allowed) {
       toast.error(growGate.blockedCopy);
       return;
     }
-    setBusy(true);
-    const { data, error } = await supabase
-      .from("grows")
-      .insert({
-        user_id: user.id,
-        name: form.name.trim(),
-        grow_type: form.grow_type,
-        stage: form.stage,
-        notes: form.notes.trim() || null,
-      })
-      .select()
-      .single();
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
+    let growId: string;
+    try {
+      growId = newHierarchyCreateAttemptId();
+    } catch {
+      toast.error("Verdant could not start a safe grow save. Refresh and try again.");
       return;
     }
-    trackFunnelEvent("grow_created");
-    toast.success("Grow created");
-    await refresh();
-    if (data) setActiveGrowId(data.id);
-    setOpen(false);
-    setForm({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
-    if (data && activationIntent) {
-      navigate(
-        buildConnectedActivationRoutes({
-          growId: data.id,
-          tentId: null,
-          plantId: null,
-        }).addTent,
-      );
+
+    const attempt = { entity: "grow" as const, rowId: growId, ownerId: user.id };
+    const payload = {
+      id: growId,
+      user_id: user.id,
+      name: form.name.trim(),
+      grow_type: form.grow_type,
+      stage: form.stage,
+      notes: form.notes.trim() || null,
+    };
+    createInFlightRef.current = true;
+    setBusy(true);
+    try {
+      const result = await persistHierarchyCreateAttempt(supabase, attempt, payload);
+      if (result.status === "unknown") {
+        setCreateOutcomeUnknown(true);
+        toast.error(
+          "Verdant could not confirm whether this grow was saved. Refresh before adding another.",
+        );
+        return;
+      }
+      if (result.status === "definitive_error") {
+        toast.error(result.message);
+        return;
+      }
+
+      trackFunnelEvent("grow_created");
+      toast.success("Grow created");
+      setActiveGrowId(result.confirmed.row.id);
+      setOpen(false);
+      setForm({ name: "", grow_type: "tent", stage: "seedling", notes: "" });
+      if (activationIntent) {
+        navigate(
+          buildConnectedActivationRoutes({
+            growId: result.confirmed.row.id,
+            tentId: null,
+            plantId: null,
+          }).addTent,
+        );
+      }
+      try {
+        await refresh();
+      } catch {
+        // The insert is confirmed and the dialog is terminal. A stale list is
+        // recoverable after refresh; leaving this populated dialog open would
+        // invite a second logical create for the same grow.
+        toast.error("Grow created, but the list could not refresh. Refresh this page to see it.");
+      }
+    } finally {
+      createInFlightRef.current = false;
+      setBusy(false);
     }
   }
 
@@ -121,7 +158,7 @@ export default function Grows() {
             onClick={() => setOpen(true)}
             size="sm"
             className="w-full gradient-leaf text-primary-foreground sm:w-auto"
-            disabled={!growGate.allowed}
+            disabled={!growGate.allowed || createOutcomeUnknown}
             data-testid="grows-new-button"
           >
             <Plus data-icon="inline-start" />
@@ -161,7 +198,11 @@ export default function Grows() {
           <p className="text-sm text-muted-foreground mt-1 mb-4">
             Create your first grow to start logging.
           </p>
-          <Button onClick={() => setOpen(true)} className="gradient-leaf text-primary-foreground">
+          <Button
+            onClick={() => setOpen(true)}
+            className="gradient-leaf text-primary-foreground"
+            disabled={createOutcomeUnknown}
+          >
             Create grow
           </Button>
         </div>
@@ -241,6 +282,15 @@ export default function Grows() {
           <DialogHeader>
             <DialogTitle className="font-display">New grow</DialogTitle>
           </DialogHeader>
+          {createOutcomeUnknown && (
+            <p
+              className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+              data-testid="grow-create-outcome-unknown"
+            >
+              Verdant could not confirm whether that grow was saved. Refresh this page before
+              creating another so you do not make a duplicate.
+            </p>
+          )}
           <form onSubmit={create} className="grid gap-3">
             <div>
               <Label>Name</Label>
@@ -295,7 +345,10 @@ export default function Grows() {
                 rows={2}
               />
             </div>
-            <Button disabled={busy} className="gradient-leaf text-primary-foreground">
+            <Button
+              disabled={busy || createOutcomeUnknown}
+              className="gradient-leaf text-primary-foreground"
+            >
               Create grow
             </Button>
           </form>

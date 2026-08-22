@@ -18,12 +18,15 @@ const fixtures = vi.hoisted(() => ({
   tents: [] as Array<Record<string, unknown>>,
   tentsIsFetching: false,
   tentsIsError: false,
+  tentsIsPaused: false,
   plants: [] as Array<Record<string, unknown>>,
   plantsIsFetching: false,
   plantsIsError: false,
+  plantsIsPaused: false,
   diary: [] as Array<Record<string, unknown>>,
   diaryIsFetching: false,
   diaryIsError: false,
+  diaryIsPaused: false,
   sensorSnapshot: {
     source: "unavailable",
     ts: null,
@@ -37,14 +40,17 @@ const fixtures = vi.hoisted(() => ({
     ppfd: null,
   } as Record<string, unknown>,
   sensorIsFetching: false,
+  sensorIsPaused: false,
   alerts: [] as Array<Record<string, unknown>>,
   alertsStatus: "ok" as "idle" | "loading" | "ok" | "unavailable",
   aiSessions: [] as Array<Record<string, unknown>>,
   aiSessionsIsFetching: false,
   aiSessionsIsError: false,
+  aiSessionsIsPaused: false,
   actions: [] as Array<Record<string, unknown>>,
   actionQueueIsLoading: false,
   actionQueueIsError: false,
+  actionQueueIsPaused: false,
   proofSelectedPlantAiCoachRow: null as Record<string, unknown> | null,
   proofSelectedAlertActionRow: null as Record<string, unknown> | null,
   proofSelectedAiDoctorActionRow: null as Record<string, unknown> | null,
@@ -67,6 +73,7 @@ vi.mock("@/hooks/use-tents", () => ({
     data: fixtures.tents,
     isFetching: fixtures.tentsIsFetching,
     isError: fixtures.tentsIsError,
+    isPaused: fixtures.tentsIsPaused,
   }),
 }));
 vi.mock("@/hooks/use-plants", () => ({
@@ -74,6 +81,7 @@ vi.mock("@/hooks/use-plants", () => ({
     data: fixtures.plants,
     isFetching: fixtures.plantsIsFetching,
     isError: fixtures.plantsIsError,
+    isPaused: fixtures.plantsIsPaused,
   }),
 }));
 vi.mock("@/hooks/use-diary-entries", () => ({
@@ -81,6 +89,7 @@ vi.mock("@/hooks/use-diary-entries", () => ({
     data: fixtures.diary,
     isFetching: fixtures.diaryIsFetching,
     isError: fixtures.diaryIsError,
+    isPaused: fixtures.diaryIsPaused,
   }),
 }));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
@@ -88,6 +97,7 @@ vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
     status: "ok",
     snapshot: fixtures.sensorSnapshot,
     isFetching: fixtures.sensorIsFetching,
+    isPaused: fixtures.sensorIsPaused,
   }),
 }));
 vi.mock("@/store/auth", () => ({
@@ -106,6 +116,7 @@ vi.mock("@/hooks/use-ai-doctor-sessions", () => ({
     data: fixtures.aiSessions,
     isFetching: fixtures.aiSessionsIsFetching,
     isError: fixtures.aiSessionsIsError,
+    isPaused: fixtures.aiSessionsIsPaused,
   }),
 }));
 vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
@@ -116,8 +127,11 @@ vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
       proofSelectedPlantAiCoachRow: fixtures.proofSelectedPlantAiCoachRow,
       proofSelectedAlertActionRow: fixtures.proofSelectedAlertActionRow,
       proofSelectedAiDoctorActionRow: fixtures.proofSelectedAiDoctorActionRow,
-      isLoading: fixtures.actionQueueIsLoading,
+      // The real hook surfaces a paused proof read through isLoading so this
+      // presenter only needs its existing proof-read boundary.
+      isLoading: fixtures.actionQueueIsLoading || fixtures.actionQueueIsPaused,
       isError: fixtures.actionQueueIsError,
+      isPaused: fixtures.actionQueueIsPaused,
       error: null,
     };
   },
@@ -142,12 +156,15 @@ beforeEach(() => {
   fixtures.tents = [];
   fixtures.tentsIsFetching = false;
   fixtures.tentsIsError = false;
+  fixtures.tentsIsPaused = false;
   fixtures.plants = [];
   fixtures.plantsIsFetching = false;
   fixtures.plantsIsError = false;
+  fixtures.plantsIsPaused = false;
   fixtures.diary = [];
   fixtures.diaryIsFetching = false;
   fixtures.diaryIsError = false;
+  fixtures.diaryIsPaused = false;
   fixtures.sensorSnapshot = {
     source: "unavailable",
     ts: null,
@@ -161,14 +178,17 @@ beforeEach(() => {
     ppfd: null,
   };
   fixtures.sensorIsFetching = false;
+  fixtures.sensorIsPaused = false;
   fixtures.alerts = [];
   fixtures.alertsStatus = "ok";
   fixtures.aiSessions = [];
   fixtures.aiSessionsIsFetching = false;
   fixtures.aiSessionsIsError = false;
+  fixtures.aiSessionsIsPaused = false;
   fixtures.actions = [];
   fixtures.actionQueueIsLoading = false;
   fixtures.actionQueueIsError = false;
+  fixtures.actionQueueIsPaused = false;
   fixtures.proofSelectedPlantAiCoachRow = null;
   fixtures.proofSelectedAlertActionRow = null;
   fixtures.proofSelectedAiDoctorActionRow = null;
@@ -302,6 +322,15 @@ const PROOF_CACHED_ERROR_CASES: [string, () => void][] = [
   ["the diary query", () => (fixtures.diaryIsError = true)],
   ["the AI Doctor sessions query", () => (fixtures.aiSessionsIsError = true)],
   ["the Action Queue proof read", () => (fixtures.actionQueueIsError = true)],
+];
+
+const PROOF_PAUSED_CASES: [string, () => void][] = [
+  ["the tents query", () => (fixtures.tentsIsPaused = true)],
+  ["the plants query", () => (fixtures.plantsIsPaused = true)],
+  ["the diary query", () => (fixtures.diaryIsPaused = true)],
+  ["the sensor snapshot query", () => (fixtures.sensorIsPaused = true)],
+  ["the AI Doctor sessions query", () => (fixtures.aiSessionsIsPaused = true)],
+  ["the Action Queue proof read", () => (fixtures.actionQueueIsPaused = true)],
 ];
 
 const ACTIVE_SCOPE_ALERTS_INCOMPLETE_STATUSES: ("idle" | "unavailable")[] = ["idle", "unavailable"];
@@ -546,6 +575,24 @@ describe("OneTentLoopLiveProof page", () => {
       try {
         setSettledCurrentProofEvidence();
         markCachedError();
+
+        renderPage();
+
+        expectProofEvidenceWithheld();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(PROOF_PAUSED_CASES)(
+    "withholds all cached proof evidence while %s is paused",
+    (_label, markPaused) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+      try {
+        setSettledCurrentProofEvidence();
+        markPaused();
 
         renderPage();
 

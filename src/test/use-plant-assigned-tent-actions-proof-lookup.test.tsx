@@ -6,9 +6,9 @@
  * scoped evidence rows, including a selected plant's persisted AI Coach row
  * when many newer rows for other plants fill that normal window.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
 import type { AssignedTentActionInputRow } from "@/lib/plantAssignedTentActionRules";
@@ -193,6 +193,10 @@ beforeEach(() => {
   supabaseState.proofAiDoctorRows = [];
   supabaseState.proofAiDoctorError = null;
   supabaseState.fetchGate = null;
+});
+
+afterEach(() => {
+  onlineManager.setOnline(true);
 });
 
 describe("usePlantAssignedTentActions — proof-only scoped lookups", () => {
@@ -381,6 +385,110 @@ describe("usePlantAssignedTentActions — proof-only scoped lookups", () => {
       fetchGate.resolve();
       await Promise.resolve();
     });
+  });
+
+  it.each([
+    ["generic assigned-tent", ["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5]],
+    [
+      "selected-plant coach",
+      [
+        "plant_assigned_tent_actions",
+        "proof_selected_plant_ai_coach",
+        TENT_ID,
+        GROW_ID,
+        SELECTED_PLANT_ID,
+      ],
+    ],
+    [
+      "selected alert",
+      ["plant_assigned_tent_actions", "proof_selected_alert", TENT_ID, GROW_ID, ALERT_ID],
+    ],
+    [
+      "selected AI Doctor session",
+      [
+        "plant_assigned_tent_actions",
+        "proof_selected_ai_doctor",
+        TENT_ID,
+        GROW_ID,
+        AI_DOCTOR_SESSION_ID,
+      ],
+    ],
+  ])("fails closed while cached %s proof data is paused", async (_label, queryKey) => {
+    const cachedGenericRow = action({
+      id: "paused-cached-generic-alert",
+      source: "environment_alert",
+      plant_id: null,
+      reason: `Review humidity [alert:${ALERT_ID}]`,
+    });
+    const cachedCoachRow = action({
+      id: "paused-cached-selected-coach",
+      plant_id: SELECTED_PLANT_ID,
+    });
+    const cachedAlertRow = action({
+      id: "paused-cached-selected-alert",
+      source: "environment_alert",
+      plant_id: null,
+      reason: `Review humidity [alert:${ALERT_ID}]`,
+    });
+    const cachedAiDoctorRow = action({
+      id: "paused-cached-selected-ai-doctor",
+      source: "ai_doctor",
+      plant_id: null,
+      reason: `Review leaves [session:${AI_DOCTOR_SESSION_ID}]`,
+    });
+    const client = makeClient(Infinity);
+    client.setQueryData(["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5], [cachedGenericRow]);
+    client.setQueryData(
+      [
+        "plant_assigned_tent_actions",
+        "proof_selected_plant_ai_coach",
+        TENT_ID,
+        GROW_ID,
+        SELECTED_PLANT_ID,
+      ],
+      [cachedCoachRow],
+    );
+    client.setQueryData(
+      ["plant_assigned_tent_actions", "proof_selected_alert", TENT_ID, GROW_ID, ALERT_ID],
+      [cachedAlertRow],
+    );
+    client.setQueryData(
+      [
+        "plant_assigned_tent_actions",
+        "proof_selected_ai_doctor",
+        TENT_ID,
+        GROW_ID,
+        AI_DOCTOR_SESSION_ID,
+      ],
+      [cachedAiDoctorRow],
+    );
+
+    const { result } = renderHook(
+      () =>
+        usePlantAssignedTentActions(TENT_ID, GROW_ID, {
+          selectedPlantIdForAiCoach: SELECTED_PLANT_ID,
+          selectedAlertIdForProof: ALERT_ID,
+          selectedAiDoctorSessionIdForProof: AI_DOCTOR_SESSION_ID,
+        }),
+      { wrapper: wrapper(client) },
+    );
+
+    expect(supabaseState.queries).toHaveLength(0);
+    act(() => {
+      onlineManager.setOnline(false);
+      void client.invalidateQueries({ queryKey, exact: true });
+    });
+
+    await waitFor(() => expect(client.getQueryState(queryKey)?.fetchStatus).toBe("paused"));
+
+    // `isFetching` is false during an offline/paused TanStack read even
+    // though cached data remains in memory. Proof mode must withhold every
+    // direct and causal slot until it can obtain a settled response.
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.rows).toEqual([]);
+    expect(result.current.proofSelectedPlantAiCoachRow).toBeNull();
+    expect(result.current.proofSelectedAlertActionRow).toBeNull();
+    expect(result.current.proofSelectedAiDoctorActionRow).toBeNull();
   });
 
   it("keeps cached generic-panel rows visible during a generic background refetch", async () => {

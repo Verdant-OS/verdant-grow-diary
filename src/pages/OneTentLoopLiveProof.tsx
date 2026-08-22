@@ -694,7 +694,9 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   // and alert provenance so no downstream row can temporarily pass from a
   // stale cache.
   const sensorReadIsFetching = snapState.isFetching === true;
-  const snapSourceLabel = sensorReadIsFetching
+  const sensorReadIsPaused = snapState.isPaused === true;
+  const sensorReadIncomplete = sensorReadIsFetching || sensorReadIsPaused;
+  const snapSourceLabel = sensorReadIncomplete
     ? null
     : mapSnapshotSourceToLabel(snapState.snapshot.source);
   const latest_sensor_snapshot: SensorSnapshotEvidence | null = snapSourceLabel
@@ -754,7 +756,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         source: alertRow.source ?? null,
         has_trusted_event_reference: hasResolvedOneTentLoopAlertEvidence({
           refs: alertEvidenceRefs,
-          snapshot: sensorReadIsFetching ? null : snapState.snapshot,
+          snapshot: sensorReadIncomplete ? null : snapState.snapshot,
           alert_metric: alertRow.metric ?? null,
           selected_tent_id: tent?.id ?? null,
         }),
@@ -796,14 +798,18 @@ export default function OneTentLoopLiveProof(): JSX.Element {
     growsLoading ||
     tentsQ.isFetching === true ||
     tentsQ.isError === true ||
+    tentsQ.isPaused === true ||
     plantsQ.isFetching === true ||
     plantsQ.isError === true ||
+    plantsQ.isPaused === true ||
     diaryQ.isFetching === true ||
     diaryQ.isError === true ||
-    sensorReadIsFetching ||
+    diaryQ.isPaused === true ||
+    sensorReadIncomplete ||
     alertsReadIncomplete ||
     aiSessionsQ.isFetching === true ||
     aiSessionsQ.isError === true ||
+    aiSessionsQ.isPaused === true ||
     aqQ.isLoading === true ||
     aqQ.isError === true;
   const rawEvidence: LoopEvidence = {

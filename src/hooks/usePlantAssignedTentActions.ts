@@ -250,6 +250,9 @@ export function usePlantAssignedTentActions(
       proofAiCoachQ.isFetching ||
       proofAlertQ.isFetching ||
       proofAiDoctorQ.isFetching);
+  const proofReadPaused =
+    hasProofMode &&
+    (q.isPaused || proofAiCoachQ.isPaused || proofAlertQ.isPaused || proofAiDoctorQ.isPaused);
   const proofReadIncomplete =
     hasProofMode &&
     (hasInvalidCausalProofSelector ||
@@ -261,7 +264,8 @@ export function usePlantAssignedTentActions(
       proofAlertQ.isError ||
       proofAiDoctorQ.isLoading ||
       proofAiDoctorQ.isError ||
-      proofReadFetching);
+      proofReadFetching ||
+      proofReadPaused);
   const rows = proofReadIncomplete
     ? []
     : buildAssignedTentActions(q.data ?? [], {
@@ -317,7 +321,8 @@ export function usePlantAssignedTentActions(
       proofAiCoachQ.isLoading ||
       proofAlertQ.isLoading ||
       proofAiDoctorQ.isLoading ||
-      proofReadFetching,
+      proofReadFetching ||
+      proofReadPaused,
     isError: q.isError || proofAiCoachQ.isError || proofAlertQ.isError || proofAiDoctorQ.isError,
     error: q.error ?? proofAiCoachQ.error ?? proofAlertQ.error ?? proofAiDoctorQ.error,
   };

@@ -14,9 +14,16 @@ import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 
 const fixtures = vi.hoisted(() => ({
   activeGrow: null as Record<string, unknown> | null,
+  growsLoading: false,
   tents: [] as Array<Record<string, unknown>>,
+  tentsIsFetching: false,
+  tentsIsError: false,
   plants: [] as Array<Record<string, unknown>>,
+  plantsIsFetching: false,
+  plantsIsError: false,
   diary: [] as Array<Record<string, unknown>>,
+  diaryIsFetching: false,
+  diaryIsError: false,
   sensorSnapshot: {
     source: "unavailable",
     ts: null,
@@ -29,9 +36,15 @@ const fixtures = vi.hoisted(() => ({
     soil_temp: null,
     ppfd: null,
   } as Record<string, unknown>,
+  sensorIsFetching: false,
   alerts: [] as Array<Record<string, unknown>>,
+  alertsStatus: "ok" as "ok" | "loading",
   aiSessions: [] as Array<Record<string, unknown>>,
+  aiSessionsIsFetching: false,
+  aiSessionsIsError: false,
   actions: [] as Array<Record<string, unknown>>,
+  actionQueueIsLoading: false,
+  actionQueueIsError: false,
   proofSelectedPlantAiCoachRow: null as Record<string, unknown> | null,
   proofSelectedAlertActionRow: null as Record<string, unknown> | null,
   proofSelectedAiDoctorActionRow: null as Record<string, unknown> | null,
@@ -45,27 +58,55 @@ vi.mock("@/store/grows", () => ({
     grows: fixtures.activeGrow ? [fixtures.activeGrow] : [],
     setActiveGrowId: () => {},
     refresh: async () => {},
-    loading: false,
+    loading: fixtures.growsLoading,
     error: null,
   }),
 }));
-vi.mock("@/hooks/use-tents", () => ({ useTents: () => ({ data: fixtures.tents }) }));
-vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: fixtures.plants }) }));
-vi.mock("@/hooks/use-diary-entries", () => ({ useDiaryEntries: () => ({ data: fixtures.diary }) }));
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({
+    data: fixtures.tents,
+    isFetching: fixtures.tentsIsFetching,
+    isError: fixtures.tentsIsError,
+  }),
+}));
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({
+    data: fixtures.plants,
+    isFetching: fixtures.plantsIsFetching,
+    isError: fixtures.plantsIsError,
+  }),
+}));
+vi.mock("@/hooks/use-diary-entries", () => ({
+  useDiaryEntries: () => ({
+    data: fixtures.diary,
+    isFetching: fixtures.diaryIsFetching,
+    isError: fixtures.diaryIsError,
+  }),
+}));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => ({
     status: "ok",
     snapshot: fixtures.sensorSnapshot,
+    isFetching: fixtures.sensorIsFetching,
   }),
 }));
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "owner-current" }, loading: false }),
 }));
 vi.mock("@/hooks/useAlertsList", () => ({
-  useAlertsList: () => ({ status: "ok", alerts: fixtures.alerts, error: null, reload: () => {} }),
+  useAlertsList: () => ({
+    status: fixtures.alertsStatus,
+    alerts: fixtures.alerts,
+    error: null,
+    reload: () => {},
+  }),
 }));
 vi.mock("@/hooks/use-ai-doctor-sessions", () => ({
-  useAiDoctorSessions: () => ({ data: fixtures.aiSessions }),
+  useAiDoctorSessions: () => ({
+    data: fixtures.aiSessions,
+    isFetching: fixtures.aiSessionsIsFetching,
+    isError: fixtures.aiSessionsIsError,
+  }),
 }));
 vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
   usePlantAssignedTentActions: (...args: unknown[]) => {
@@ -75,8 +116,8 @@ vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
       proofSelectedPlantAiCoachRow: fixtures.proofSelectedPlantAiCoachRow,
       proofSelectedAlertActionRow: fixtures.proofSelectedAlertActionRow,
       proofSelectedAiDoctorActionRow: fixtures.proofSelectedAiDoctorActionRow,
-      isLoading: false,
-      isError: false,
+      isLoading: fixtures.actionQueueIsLoading,
+      isError: fixtures.actionQueueIsError,
       error: null,
     };
   },
@@ -97,9 +138,16 @@ function renderPage() {
 
 beforeEach(() => {
   fixtures.activeGrow = null;
+  fixtures.growsLoading = false;
   fixtures.tents = [];
+  fixtures.tentsIsFetching = false;
+  fixtures.tentsIsError = false;
   fixtures.plants = [];
+  fixtures.plantsIsFetching = false;
+  fixtures.plantsIsError = false;
   fixtures.diary = [];
+  fixtures.diaryIsFetching = false;
+  fixtures.diaryIsError = false;
   fixtures.sensorSnapshot = {
     source: "unavailable",
     ts: null,
@@ -112,9 +160,15 @@ beforeEach(() => {
     soil_temp: null,
     ppfd: null,
   };
+  fixtures.sensorIsFetching = false;
   fixtures.alerts = [];
+  fixtures.alertsStatus = "ok";
   fixtures.aiSessions = [];
+  fixtures.aiSessionsIsFetching = false;
+  fixtures.aiSessionsIsError = false;
   fixtures.actions = [];
+  fixtures.actionQueueIsLoading = false;
+  fixtures.actionQueueIsError = false;
   fixtures.proofSelectedPlantAiCoachRow = null;
   fixtures.proofSelectedAlertActionRow = null;
   fixtures.proofSelectedAiDoctorActionRow = null;
@@ -132,6 +186,139 @@ function setCurrentTentPlantScope() {
       tent_id: "tent-current",
     },
   ];
+}
+
+function setSettledCurrentProofEvidence() {
+  setCurrentTentPlantScope();
+  fixtures.tents = [
+    {
+      id: "tent-current",
+      name: "Current tent",
+      grow_id: "grow-current",
+      target_temp_c: 24,
+    },
+  ];
+  fixtures.plants = [
+    {
+      id: "plant-current",
+      name: "Current plant",
+      grow_id: "grow-current",
+      tent_id: "tent-current",
+      stage: "veg",
+      medium: "coco",
+      pot_size: "3 gal",
+    },
+  ];
+  fixtures.diary = [
+    {
+      id: "diary-current",
+      plant_id: "plant-current",
+      tent_id: "tent-current",
+      entry_at: "2026-06-09T10:50:00.000Z",
+      note: "Observed leaves.",
+      details: { event_type: "observation" },
+    },
+  ];
+  fixtures.sensorSnapshot = {
+    source: "live",
+    ts: "2026-06-09T10:55:00.000Z",
+    temp: 24,
+    rh: 58,
+    vpd: null,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
+    tent_id: "tent-current",
+    metric_refs: {
+      rh: {
+        id: "event-current",
+        captured_at: "2026-06-09T10:55:00.000Z",
+        source: "live",
+      },
+    },
+  };
+  fixtures.alerts = [
+    {
+      id: "alert-current",
+      grow_id: "grow-current",
+      tent_id: "tent-current",
+      plant_id: "plant-current",
+      metric: "humidity_pct",
+      severity: "warning",
+      reason: "Current tent humidity",
+      status: "open",
+      created_at: "2026-06-09T11:00:00.000Z",
+      source: "environment_alerts",
+      originating_timeline_events: [
+        {
+          id: "event-current",
+          type: "sensor_snapshot",
+          source: "live",
+          occurred_at: "2026-06-09T10:55:00.000Z",
+        },
+      ],
+    },
+  ];
+  fixtures.aiSessions = [
+    {
+      id: "session-current",
+      grow_id: "grow-current",
+      tent_id: "tent-current",
+      plant_id: "plant-current",
+      created_at: "2026-06-09T10:58:00.000Z",
+    },
+  ];
+  fixtures.actions = [
+    {
+      id: "aq-current",
+      growId: "grow-current",
+      tentId: "tent-current",
+      status: "pending_approval",
+      source: "environment_alert",
+      reason: "Review humidity [alert:alert-current]",
+      riskLevel: "low",
+      alertBackPointerId: "alert-current",
+      hasTargetDevice: false,
+    },
+  ];
+}
+
+const PROOF_REFRESH_CASES: [string, () => void][] = [
+  ["the grow read", () => (fixtures.growsLoading = true)],
+  ["the tents query", () => (fixtures.tentsIsFetching = true)],
+  ["the plants query", () => (fixtures.plantsIsFetching = true)],
+  ["the diary query", () => (fixtures.diaryIsFetching = true)],
+  ["the sensor snapshot query", () => (fixtures.sensorIsFetching = true)],
+  ["the alerts read", () => (fixtures.alertsStatus = "loading")],
+  ["the AI Doctor sessions query", () => (fixtures.aiSessionsIsFetching = true)],
+  ["the Action Queue proof read", () => (fixtures.actionQueueIsLoading = true)],
+];
+
+const PROOF_CACHED_ERROR_CASES: [string, () => void][] = [
+  ["the tents query", () => (fixtures.tentsIsError = true)],
+  ["the plants query", () => (fixtures.plantsIsError = true)],
+  ["the diary query", () => (fixtures.diaryIsError = true)],
+  ["the AI Doctor sessions query", () => (fixtures.aiSessionsIsError = true)],
+  ["the Action Queue proof read", () => (fixtures.actionQueueIsError = true)],
+];
+
+function expectProofEvidenceWithheld() {
+  expect(screen.getByTestId("one-tent-loop-live-proof-refreshing").textContent).toMatch(
+    /cached proof evidence is withheld.*scoped reads complete/i,
+  );
+  for (const id of LOOP_STEP_IDS) {
+    expect(screen.getByTestId(`loop-live-proof-step-${id}`).getAttribute("data-status")).not.toBe(
+      "passed",
+    );
+  }
+  expect(screen.getByTestId("loop-live-proof-step-alert").textContent).not.toMatch(
+    /current tent humidity/i,
+  );
+  expect(screen.getByTestId("loop-live-proof-step-action-queue").textContent).not.toMatch(
+    /alert-derived advisory/i,
+  );
 }
 
 const FORBIDDEN_HEALTH_COPY = [
@@ -301,6 +488,81 @@ describe("OneTentLoopLiveProof page", () => {
     const action = screen.getByTestId("loop-live-proof-step-action-queue");
     expect(action.getAttribute("data-status")).toBe("passed");
     expect(action.textContent).toMatch(/Alert-derived advisory/);
+  });
+
+  it("keeps settled scoped proof inputs available", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+    try {
+      setSettledCurrentProofEvidence();
+
+      renderPage();
+
+      for (const id of [
+        "grow",
+        "tent",
+        "plant",
+        "quick-log",
+        "timeline",
+        "sensor-snapshot",
+        "alert",
+        "action-queue",
+      ]) {
+        expect(screen.getByTestId(`loop-live-proof-step-${id}`).getAttribute("data-status")).toBe(
+          "passed",
+        );
+      }
+      expect(screen.queryByTestId("one-tent-loop-live-proof-refreshing")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(PROOF_REFRESH_CASES)(
+    "withholds all cached proof evidence while %s is refreshing",
+    (_label, markRefreshing) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+      try {
+        setSettledCurrentProofEvidence();
+        markRefreshing();
+
+        renderPage();
+
+        expectProofEvidenceWithheld();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(PROOF_CACHED_ERROR_CASES)(
+    "withholds cached proof evidence when %s retains rows after an error",
+    (_label, markCachedError) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+      try {
+        setSettledCurrentProofEvidence();
+        markCachedError();
+
+        renderPage();
+
+        expectProofEvidenceWithheld();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("does not report an in-flight proof read when no scope is selected", () => {
+    renderPage();
+
+    expect(screen.queryByTestId("one-tent-loop-live-proof-refreshing")).toBeNull();
+    for (const id of LOOP_STEP_IDS) {
+      expect(screen.getByTestId(`loop-live-proof-step-${id}`).getAttribute("data-status")).not.toBe(
+        "passed",
+      );
+    }
   });
 
   it("does not let a newer AI Coach action for another plant pass this plant's proof", () => {

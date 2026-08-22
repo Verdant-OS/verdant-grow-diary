@@ -58,10 +58,10 @@ function preferNewer(
 }
 
 export type SnapshotState =
-  | { status: "idle"; snapshot: SensorSnapshot }
-  | { status: "loading"; snapshot: SensorSnapshot }
-  | { status: "ok"; snapshot: SensorSnapshot }
-  | { status: "unavailable"; snapshot: SensorSnapshot };
+  | { status: "idle"; snapshot: SensorSnapshot; isFetching?: boolean }
+  | { status: "loading"; snapshot: SensorSnapshot; isFetching?: boolean }
+  | { status: "ok"; snapshot: SensorSnapshot; isFetching?: boolean }
+  | { status: "unavailable"; snapshot: SensorSnapshot; isFetching?: boolean };
 
 export function useLatestSensorSnapshot(
   growId: string | null | undefined,
@@ -174,15 +174,22 @@ export function useLatestSensorSnapshot(
   });
 
   if (!user || !growId) {
-    return { status: "idle", snapshot: EMPTY_SNAPSHOT };
+    return { status: "idle", snapshot: EMPTY_SNAPSHOT, isFetching: false };
   }
   if (query.isLoading || (query.isFetching && !query.data)) {
-    return { status: "loading", snapshot: EMPTY_SNAPSHOT };
+    return { status: "loading", snapshot: EMPTY_SNAPSHOT, isFetching: true };
   }
   if (query.isError) {
-    return { status: "unavailable", snapshot: EMPTY_SNAPSHOT };
+    return { status: "unavailable", snapshot: EMPTY_SNAPSHOT, isFetching: query.isFetching };
   }
-  return { status: "ok", snapshot: query.data ?? EMPTY_SNAPSHOT };
+  return {
+    status: "ok",
+    snapshot: query.data ?? EMPTY_SNAPSHOT,
+    // TanStack Query preserves cached data during a background refetch. The
+    // status remains "ok", so consumers that need current proof evidence
+    // must be able to withhold that cached snapshot until the read settles.
+    isFetching: query.isFetching,
+  };
 }
 
 export default useLatestSensorSnapshot;

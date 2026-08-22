@@ -648,7 +648,7 @@ function selectLiveProofActionQueueRow(
 export default function OneTentLoopLiveProof(): JSX.Element {
   const { user } = useAuth();
   const nowMs = useLiveProofReevaluationNowMs();
-  const { activeGrow, activeGrowId } = useGrows();
+  const { activeGrow, activeGrowId, loading: growsLoading } = useGrows();
   const tentsQ = useTents();
   const plantsQ = usePlants();
   const diaryQ = useDiaryEntries();
@@ -684,7 +684,15 @@ export default function OneTentLoopLiveProof(): JSX.Element {
       : null;
 
   const snapState = useLatestSensorSnapshot(grow?.id ?? null, tent ? [tent.id] : []);
-  const snapSourceLabel = mapSnapshotSourceToLabel(snapState.snapshot.source);
+  // A cached snapshot remains in TanStack Query while this scoped read is
+  // refreshing. It is not current proof evidence until that read settles.
+  // Keep the same gate for the direct sensor step, AI context reconstruction,
+  // and alert provenance so no downstream row can temporarily pass from a
+  // stale cache.
+  const sensorReadIsFetching = snapState.isFetching === true;
+  const snapSourceLabel = sensorReadIsFetching
+    ? null
+    : mapSnapshotSourceToLabel(snapState.snapshot.source);
   const latest_sensor_snapshot: SensorSnapshotEvidence | null = snapSourceLabel
     ? {
         source: snapSourceLabel,
@@ -742,7 +750,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         source: alertRow.source ?? null,
         has_trusted_event_reference: hasResolvedOneTentLoopAlertEvidence({
           refs: alertEvidenceRefs,
-          snapshot: snapState.snapshot,
+          snapshot: sensorReadIsFetching ? null : snapState.snapshot,
           alert_metric: alertRow.metric ?? null,
           selected_tent_id: tent?.id ?? null,
         }),
@@ -774,7 +782,27 @@ export default function OneTentLoopLiveProof(): JSX.Element {
 
   const latest_follow_up: FollowUpEvidence | null = null;
 
-  const evidence: LoopEvidence = {
+  // This page is a current-state proof, not a cached-history view. Every
+  // input below can retain old data while its scoped read refetches or after a
+  // background read fails, so let no individual stale row (including causal
+  // alert/action evidence) certify a step before all of the proof reads
+  // settle. The underlying hooks and their generic surfaces keep their
+  // existing cache behavior.
+  const proofEvidenceRefreshing =
+    growsLoading ||
+    tentsQ.isFetching === true ||
+    tentsQ.isError === true ||
+    plantsQ.isFetching === true ||
+    plantsQ.isError === true ||
+    diaryQ.isFetching === true ||
+    diaryQ.isError === true ||
+    sensorReadIsFetching ||
+    alertsQ.status === "loading" ||
+    aiSessionsQ.isFetching === true ||
+    aiSessionsQ.isError === true ||
+    aqQ.isLoading === true ||
+    aqQ.isError === true;
+  const rawEvidence: LoopEvidence = {
     grow,
     tent,
     plant,
@@ -786,6 +814,20 @@ export default function OneTentLoopLiveProof(): JSX.Element {
     latest_action_queue,
     latest_follow_up,
   };
+  const evidence: LoopEvidence = proofEvidenceRefreshing
+    ? {
+        grow: null,
+        tent: null,
+        plant: null,
+        latest_quick_log: null,
+        timeline: null,
+        latest_sensor_snapshot: null,
+        latest_ai_doctor: null,
+        latest_alert: null,
+        latest_action_queue: null,
+        latest_follow_up: null,
+      }
+    : rawEvidence;
 
   const view: LiveProofView = React.useMemo(
     () => buildOneTentLoopLiveProofView(evidence, nowMs),
@@ -809,6 +851,16 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         >
           {view.banner}
         </p>
+        {proofEvidenceRefreshing ? (
+          <p
+            data-testid="one-tent-loop-live-proof-refreshing"
+            role="status"
+            className="text-sm text-muted-foreground"
+          >
+            Current proof data is not settled. Cached proof evidence is withheld until all scoped
+            reads complete without errors.
+          </p>
+        ) : null}
         <p data-testid="one-tent-loop-live-proof-counts" className="text-xs text-muted-foreground">
           Passed: {view.counts.passed} · Needs review: {view.counts.needs_review} · Missing:{" "}
           {view.counts.missing} · Blocked: {view.counts.blocked} · Stale: {view.counts.stale} ·

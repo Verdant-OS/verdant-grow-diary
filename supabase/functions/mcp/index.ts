@@ -2411,7 +2411,9 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
       missingEvidenceCodes: addMissing(derived.missingEvidenceCodes, "plant_profile_incomplete"),
     };
   }
-  if (partial.size > 0 && derived.evidenceConfidence === "high") {
+  if (partial.has("events") || partial.has("alerts")) {
+    derived = { ...derived, evidenceConfidence: "low" };
+  } else if (partial.size > 0 && derived.evidenceConfidence === "high") {
     derived = { ...derived, evidenceConfidence: "medium" };
   }
   const context = {

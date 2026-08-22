@@ -410,6 +410,29 @@ function boundedEvidenceFixtures(input: {
   return data;
 }
 
+function routineReadyFixtures(): Record<string, FixtureResult> {
+  const data = fixtures();
+  data.grow_events = {
+    data: [
+      {
+        id: "routine-observation",
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+        event_type: "observation",
+        source: "manual",
+        occurred_at: "2026-08-07T10:00:00.000Z",
+        note: "Checked the plant; condition is unchanged.",
+        created_at: "2026-08-07T10:00:01.000Z",
+        is_deleted: false,
+      },
+    ],
+    error: null,
+  };
+  data.alerts = { data: [], error: null };
+  return data;
+}
+
 describe("getGrowWalkContextForOwnedTarget", () => {
   it("proves exact plant, tent, and grow scope before reading evidence lanes", async () => {
     const { client, calls } = clientFor(fixtures());
@@ -1993,9 +2016,92 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     },
   );
 
-  it("returns a successful partial context when one non-scope lane fails", async () => {
-    const data = fixtures();
-    data.alerts = { data: null, error: { message: "alerts unavailable" } };
+  it.each([
+    ["events", "grow_events"],
+    ["alerts", "alerts"],
+  ] as const)(
+    "treats a failed %s decision lane as insufficient evidence rather than a routine all-clear",
+    async (lane, table) => {
+      const data = routineReadyFixtures();
+      data[table] = { data: null, error: { message: `${lane} unavailable` } };
+      const { client } = clientFor(data);
+      const result = await getGrowWalkContextForOwnedTarget(
+        client,
+        { targetType: "plant", targetId: "plant-1" },
+        { now: new Date("2026-08-07T12:00:00.000Z") },
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.context.receipt.partialLanes).toEqual([lane]);
+      expect(result.data.context.derived.reasonCodes).toEqual([]);
+      expect(result.data.context.derived.evidenceConfidence).toBe("low");
+      expect(result.data.context.derived.attentionBand).toBe("insufficient_evidence");
+    },
+  );
+
+  it("treats a failed tent-relation read as incomplete event and alert evidence", async () => {
+    const data = routineReadyFixtures();
+    data.plants = { data: null, error: { message: "tent child relation unavailable" } };
+    const { client } = clientFor(data);
+    const result = await getGrowWalkContextForOwnedTarget(
+      client,
+      { targetType: "tent", targetId: "tent-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.receipt.partialLanes).toEqual([
+      "events",
+      "photos",
+      "alerts",
+      "action_queue",
+    ]);
+    expect(result.data.context.derived.reasonCodes).toEqual([]);
+    expect(result.data.context.derived.evidenceConfidence).toBe("low");
+    expect(result.data.context.derived.attentionBand).toBe("insufficient_evidence");
+  });
+
+  it("keeps surviving alert reasons actionable when event evidence is partial", async () => {
+    const data = routineReadyFixtures();
+    data.grow_events = { data: null, error: { message: "events unavailable" } };
+    data.alerts = {
+      data: [
+        {
+          id: "high-humidity-alert",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          title: "High humidity",
+          reason: "Needs physical confirmation.",
+          severity: "high",
+          status: "open",
+          metric: "humidity_pct",
+          source: "live",
+          last_seen_at: "2026-08-07T11:30:00.000Z",
+        },
+      ],
+      error: null,
+    };
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      clientFor(data).client,
+      { targetType: "plant", targetId: "plant-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.receipt.partialLanes).toEqual(["events"]);
+    expect(result.data.context.derived.reasonCodes).toContain(
+      "active_high_alert_needs_confirmation",
+    );
+    expect(result.data.context.derived.evidenceConfidence).toBe("low");
+    expect(result.data.context.derived.attentionBand).toBe("watch_today");
+  });
+
+  it("keeps a non-decision partial lane at its existing medium routine posture", async () => {
+    const data = routineReadyFixtures();
+    data.ai_doctor_sessions = { data: null, error: { message: "AI Doctor unavailable" } };
     const { client } = clientFor(data);
     const result = await getGrowWalkContextForOwnedTarget(
       client,
@@ -2004,9 +2110,10 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.context.evidence.alerts).toEqual([]);
-    expect(result.data.context.receipt.partialLanes).toContain("alerts");
-    expect(result.data.context.derived.evidenceConfidence).not.toBe("high");
+    expect(result.data.context.receipt.partialLanes).toEqual(["ai_doctor"]);
+    expect(result.data.context.derived.reasonCodes).toEqual([]);
+    expect(result.data.context.derived.evidenceConfidence).toBe("medium");
+    expect(result.data.context.derived.attentionBand).toBe("routine_observation");
   });
 
   it("bounds and sanitizes untrusted text and excludes secret or executable fields", async () => {

@@ -1017,7 +1017,12 @@ export async function getGrowWalkContextForOwnedTarget(
       missingEvidenceCodes: addMissing(derived.missingEvidenceCodes, "plant_profile_incomplete"),
     };
   }
-  if (partial.size > 0 && derived.evidenceConfidence === "high") {
+  // Events and alerts are decision-critical: an unavailable lane prevents a
+  // routine all-clear even when the surviving evidence looks complete. Other
+  // partial lanes retain the narrower high-to-medium confidence downgrade.
+  if (partial.has("events") || partial.has("alerts")) {
+    derived = { ...derived, evidenceConfidence: "low" };
+  } else if (partial.size > 0 && derived.evidenceConfidence === "high") {
     derived = { ...derived, evidenceConfidence: "medium" };
   }
 

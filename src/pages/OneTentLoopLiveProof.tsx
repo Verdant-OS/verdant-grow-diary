@@ -17,6 +17,7 @@
 import * as React from "react";
 import { Link } from "@/lib/react-router-compat";
 import { useGrows } from "@/store/grows";
+import { useAuth } from "@/store/auth";
 import { useTents } from "@/hooks/use-tents";
 import { usePlants } from "@/hooks/use-plants";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
@@ -24,11 +25,22 @@ import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useAiDoctorSessions } from "@/hooks/use-ai-doctor-sessions";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
+import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
+import { hasResolvedOneTentLoopAlertEvidence } from "@/lib/oneTentLoopAlertEvidenceRules";
+import { getActionQueueSourceKind } from "@/lib/actionQueueProvenanceRules";
+import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import {
   buildOneTentLoopLiveProofView,
   buildOneTentLoopLiveProofTextReport,
   type LiveProofView,
 } from "@/lib/oneTentLoopLiveProofViewModel";
+import {
+  evaluateActionQueue,
+  evaluateAiDoctor,
+  evaluateAlert,
+  hasFiniteRecognizedSensorSnapshotMetric,
+} from "@/lib/oneTentLoopProofRules";
+import type { PlantAssignedTentActionRow } from "@/lib/plantAssignedTentActionRules";
 import type {
   OneTentLoopGap,
   OneTentLoopGapEvidenceChecklistItem,
@@ -37,6 +49,7 @@ import type {
 
 import type {
   ActionQueueEvidence,
+  ActionQueueProofContext,
   AiDoctorEvidence,
   AlertEvidence,
   EvidenceProvenance,
@@ -64,6 +77,22 @@ const STATUS_LABEL: Record<LoopStepStatus, string> = {
   invalid: "Invalid telemetry",
   demo_only: "Demo data only",
 };
+
+const LIVE_PROOF_REEVALUATION_INTERVAL_MS = 60_000;
+
+function useLiveProofReevaluationNowMs(): number {
+  const [nowMs, setNowMs] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(
+      () => setNowMs(Date.now()),
+      LIVE_PROOF_REEVALUATION_INTERVAL_MS,
+    );
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  return nowMs;
+}
 
 function statusToneClass(status: LoopStepStatus): string {
   // Deliberately avoid green success tones for non-live/untrusted rows.
@@ -524,9 +553,13 @@ function toPlantEvidence(p: AnyRow | null): PlantEvidence | null {
   };
 }
 
-function toQuickLogEvidence(d: AnyRow | null): QuickLogEvidence | null {
+function toQuickLogEvidence(
+  d: AnyRow | null,
+  viewerUserId: string | null,
+): QuickLogEvidence | null {
   if (!d || typeof d.id !== "string") return null;
   const details = (d.details ?? {}) as AnyRow;
+  const photoReference = parseDiaryPhotoDisplayReferenceFromRow(d, { viewerUserId });
   return {
     id: d.id,
     entry_at:
@@ -542,15 +575,80 @@ function toQuickLogEvidence(d: AnyRow | null): QuickLogEvidence | null {
           ? d.entry_type
           : null,
     has_note: typeof d.note === "string" && d.note.length > 0,
-    has_photo: Array.isArray(d.photos) && d.photos.length > 0,
+    has_photo: photoReference.kind === "external" || photoReference.kind === "storage",
     has_action_context: Boolean(details.action_id) || Boolean(details.linked_action_id),
     plant_id: typeof d.plant_id === "string" ? d.plant_id : null,
     tent_id: typeof d.tent_id === "string" ? d.tent_id : null,
   };
 }
 
+function toActionQueueEvidence(row: PlantAssignedTentActionRow): ActionQueueEvidence {
+  return {
+    id: row.id,
+    status: row.status,
+    approval_required: row.status === "pending_approval",
+    has_target_device: row.hasTargetDevice,
+    source: row.source,
+    reason: row.reason ?? null,
+    risk_level: row.riskLevel,
+    plant_id: row.plantId,
+    linked_alert_id: row.alertBackPointerId,
+    linked_ai_doctor_session_id: row.aiDoctorSessionBackPointerId,
+  };
+}
+
+/**
+ * Prefer a passed (or safety-blocked) causal Alert/AI Doctor action. Exact
+ * current-alert/session rows arrive through separately scoped reads before
+ * the ordinary display window, so a busy tent cannot hide older causal
+ * evidence. A separately fetched exact selected-plant Coach row then beats
+ * non-causal rows that only occupy the display cap. Each candidate is run
+ * through the same pure evaluator used by the final proof, so this presenter
+ * never promotes a malformed or unsafe direct lookup.
+ */
+function selectLiveProofActionQueueRow(
+  rows: readonly PlantAssignedTentActionRow[],
+  exactSelectedAlertActionRow: PlantAssignedTentActionRow | null,
+  exactSelectedAiDoctorActionRow: PlantAssignedTentActionRow | null,
+  exactSelectedPlantAiCoachRow: PlantAssignedTentActionRow | null,
+  context: ActionQueueProofContext,
+): PlantAssignedTentActionRow | null {
+  const proofScopedRows = rows.filter(
+    (row) =>
+      getActionQueueSourceKind(row) !== "ai_coach" || row.plantId === context.selected_plant_id,
+  );
+  const seenCausalRowIds = new Set<string>();
+  const causalCandidates = [
+    exactSelectedAlertActionRow,
+    exactSelectedAiDoctorActionRow,
+    ...proofScopedRows,
+  ];
+  let firstCausalRow: PlantAssignedTentActionRow | null = null;
+  for (const row of causalCandidates) {
+    if (!row || seenCausalRowIds.has(row.id)) continue;
+    seenCausalRowIds.add(row.id);
+    const source = getActionQueueSourceKind(row);
+    if (source !== "environment_alert" && source !== "ai_doctor") continue;
+    if (!firstCausalRow) firstCausalRow = row;
+    const status = evaluateActionQueue(toActionQueueEvidence(row), context).status;
+    if (status === "passed" || status === "blocked") return row;
+  }
+
+  const exactCoachIsEligible =
+    exactSelectedPlantAiCoachRow !== null &&
+    getActionQueueSourceKind(exactSelectedPlantAiCoachRow) === "ai_coach" &&
+    exactSelectedPlantAiCoachRow.plantId === context.selected_plant_id &&
+    evaluateActionQueue(toActionQueueEvidence(exactSelectedPlantAiCoachRow), context).status ===
+      "passed";
+  if (exactCoachIsEligible) return exactSelectedPlantAiCoachRow;
+
+  return firstCausalRow ?? proofScopedRows[0] ?? null;
+}
+
 export default function OneTentLoopLiveProof(): JSX.Element {
-  const { activeGrow, activeGrowId } = useGrows();
+  const { user } = useAuth();
+  const nowMs = useLiveProofReevaluationNowMs();
+  const { activeGrow, activeGrowId, loading: growsLoading } = useGrows();
   const tentsQ = useTents();
   const plantsQ = usePlants();
   const diaryQ = useDiaryEntries();
@@ -559,6 +657,10 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   // redirect) this page must not fire /rest/v1/alerts at all — the
   // never-healthy E2E spec forbids that request on this route.
   const alertsQ = useAlertsList({ growId: activeGrowId ?? undefined }, { enabled: !!activeGrowId });
+  // An active proof scope needs a completed alerts read before an empty list
+  // can mean "no alert evidence." `idle`, `loading`, and `unavailable` are
+  // incomplete there; with no scope, the disabled hook's idle state is safe.
+  const alertsReadIncomplete = Boolean(activeGrowId) && alertsQ.status !== "ok";
 
   // Derive scoped tent/plant.
   const grow = toGrowEvidence(activeGrow as AnyRow | null);
@@ -574,7 +676,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   const scopedDiary = firstBy(diary, (d) =>
     plant ? d.plant_id === plant.id : d.tent_id === (tent?.id ?? "__none__"),
   );
-  const latest_quick_log = toQuickLogEvidence(scopedDiary);
+  const latest_quick_log = toQuickLogEvidence(scopedDiary, user?.id ?? null);
 
   const timeline: TimelineEvidence | null =
     diary.length > 0
@@ -586,18 +688,46 @@ export default function OneTentLoopLiveProof(): JSX.Element {
       : null;
 
   const snapState = useLatestSensorSnapshot(grow?.id ?? null, tent ? [tent.id] : []);
-  const snapSourceLabel = mapSnapshotSourceToLabel(snapState.snapshot.source);
+  // A cached snapshot remains in TanStack Query while this scoped read is
+  // refreshing. It is not current proof evidence until that read settles.
+  // Keep the same gate for the direct sensor step, AI context reconstruction,
+  // and alert provenance so no downstream row can temporarily pass from a
+  // stale cache.
+  const sensorReadIsFetching = snapState.isFetching === true;
+  const sensorReadIsPaused = snapState.isPaused === true;
+  const sensorReadIncomplete = sensorReadIsFetching || sensorReadIsPaused;
+  const snapSourceLabel = sensorReadIncomplete
+    ? null
+    : mapSnapshotSourceToLabel(snapState.snapshot.source);
   const latest_sensor_snapshot: SensorSnapshotEvidence | null = snapSourceLabel
     ? {
         source: snapSourceLabel,
         captured_at: snapState.snapshot.ts ?? null,
         confidence: null,
         metric: null,
+        has_usable_metric: hasFiniteRecognizedSensorSnapshotMetric(snapState.snapshot),
       }
     : null;
 
+  const scopedAlerts = (alertsQ.alerts ?? []).filter((alert) => {
+    if (!grow || !tent) return false;
+    if (alert.grow_id !== grow.id || alert.tent_id !== tent.id) return false;
+    return alert.plant_id === null || alert.plant_id === plant?.id;
+  });
+  const alertRow = scopedAlerts[0] ?? null;
+  const alertEvidenceRefs = adaptOriginatingTimelineEventsFromRow(alertRow);
+
   const aiSessionsQ = useAiDoctorSessions(plant?.id ?? null);
   const latestSession = (aiSessionsQ.data ?? [])[0] ?? null;
+  const sessionScopeMatchesSelectedContext = Boolean(
+    latestSession &&
+    grow &&
+    tent &&
+    plant &&
+    latestSession.grow_id === grow.id &&
+    latestSession.tent_id === tent.id &&
+    latestSession.plant_id === plant.id,
+  );
   const latest_ai_doctor: AiDoctorEvidence | null = latestSession
     ? {
         session_id: latestSession.id,
@@ -608,11 +738,12 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         had_recent_log: Boolean(latest_quick_log),
         had_recent_photo: Boolean(latest_quick_log?.has_photo),
         had_recent_sensor_snapshot: Boolean(latest_sensor_snapshot),
-        had_alerts: (alertsQ.alerts?.length ?? 0) > 0,
+        had_alerts: Boolean(alertRow),
+        context_provenance: "current_state_reconstructed",
+        session_scope_matches_selected_context: sessionScopeMatchesSelectedContext,
       }
     : null;
 
-  const alertRow = alertsQ.alerts?.[0] ?? null;
   const latest_alert: AlertEvidence | null = alertRow
     ? {
         id: alertRow.id,
@@ -621,26 +752,67 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         reason: alertRow.reason ?? null,
         status: alertRow.status ?? null,
         created_at: alertRow.created_at ?? null,
+        scope_matches_selected_context: true,
+        source: alertRow.source ?? null,
+        has_trusted_event_reference: hasResolvedOneTentLoopAlertEvidence({
+          refs: alertEvidenceRefs,
+          snapshot: sensorReadIncomplete ? null : snapState.snapshot,
+          alert_metric: alertRow.metric ?? null,
+          selected_tent_id: tent?.id ?? null,
+        }),
       }
     : null;
 
-  const aqQ = usePlantAssignedTentActions(tent?.id ?? null, grow?.id ?? null);
-  const aqRow = (aqQ.rows ?? [])[0] ?? null;
+  const aqQ = usePlantAssignedTentActions(tent?.id ?? null, grow?.id ?? null, {
+    selectedPlantIdForAiCoach: plant?.id ?? null,
+    selectedAlertIdForProof: latest_alert?.id ?? null,
+    selectedAiDoctorSessionIdForProof: latest_ai_doctor?.session_id ?? null,
+  });
+  const actionQueueProofContext: ActionQueueProofContext = {
+    selected_plant_id: plant?.id ?? null,
+    alert_id: latest_alert?.id ?? null,
+    alert_status: evaluateAlert(latest_alert).status,
+    ai_doctor_session_id: latest_ai_doctor?.session_id ?? null,
+    ai_doctor_status: evaluateAiDoctor(latest_ai_doctor).status,
+  };
+  const aqRow = selectLiveProofActionQueueRow(
+    aqQ.rows ?? [],
+    aqQ.proofSelectedAlertActionRow,
+    aqQ.proofSelectedAiDoctorActionRow,
+    aqQ.proofSelectedPlantAiCoachRow,
+    actionQueueProofContext,
+  );
   const latest_action_queue: ActionQueueEvidence | null = aqRow
-    ? {
-        id: aqRow.id,
-        status: aqRow.status ?? "pending_approval",
-        approval_required: true,
-        has_device_control_marker: false,
-        reason: aqRow.reason ?? null,
-        risk_level: (aqRow as { riskLevel?: string | null }).riskLevel ?? null,
-        linked_alert_id: null,
-      }
+    ? toActionQueueEvidence(aqRow)
     : null;
 
   const latest_follow_up: FollowUpEvidence | null = null;
 
-  const evidence: LoopEvidence = {
+  // This page is a current-state proof, not a cached-history view. Every
+  // input below can retain old data while its scoped read refetches or after a
+  // background read fails, so let no individual stale row (including causal
+  // alert/action evidence) certify a step before all of the proof reads
+  // settle. The underlying hooks and their generic surfaces keep their
+  // existing cache behavior.
+  const proofEvidenceRefreshing =
+    growsLoading ||
+    tentsQ.isFetching === true ||
+    tentsQ.isError === true ||
+    tentsQ.isPaused === true ||
+    plantsQ.isFetching === true ||
+    plantsQ.isError === true ||
+    plantsQ.isPaused === true ||
+    diaryQ.isFetching === true ||
+    diaryQ.isError === true ||
+    diaryQ.isPaused === true ||
+    sensorReadIncomplete ||
+    alertsReadIncomplete ||
+    aiSessionsQ.isFetching === true ||
+    aiSessionsQ.isError === true ||
+    aiSessionsQ.isPaused === true ||
+    aqQ.isLoading === true ||
+    aqQ.isError === true;
+  const rawEvidence: LoopEvidence = {
     grow,
     tent,
     plant,
@@ -652,11 +824,25 @@ export default function OneTentLoopLiveProof(): JSX.Element {
     latest_action_queue,
     latest_follow_up,
   };
+  const evidence: LoopEvidence = proofEvidenceRefreshing
+    ? {
+        grow: null,
+        tent: null,
+        plant: null,
+        latest_quick_log: null,
+        timeline: null,
+        latest_sensor_snapshot: null,
+        latest_ai_doctor: null,
+        latest_alert: null,
+        latest_action_queue: null,
+        latest_follow_up: null,
+      }
+    : rawEvidence;
 
   const view: LiveProofView = React.useMemo(
-    () => buildOneTentLoopLiveProofView(evidence),
+    () => buildOneTentLoopLiveProofView(evidence, nowMs),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(evidence)],
+    [JSON.stringify(evidence), nowMs],
   );
 
   const report = React.useMemo(() => buildOneTentLoopLiveProofTextReport(view), [view]);
@@ -675,6 +861,16 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         >
           {view.banner}
         </p>
+        {proofEvidenceRefreshing ? (
+          <p
+            data-testid="one-tent-loop-live-proof-refreshing"
+            role="status"
+            className="text-sm text-muted-foreground"
+          >
+            Current proof data is not settled. Cached proof evidence is withheld until all scoped
+            reads complete without errors.
+          </p>
+        ) : null}
         <p data-testid="one-tent-loop-live-proof-counts" className="text-xs text-muted-foreground">
           Passed: {view.counts.passed} · Needs review: {view.counts.needs_review} · Missing:{" "}
           {view.counts.missing} · Blocked: {view.counts.blocked} · Stale: {view.counts.stale} ·

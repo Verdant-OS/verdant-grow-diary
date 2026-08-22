@@ -134,6 +134,19 @@ describe("QuickLog photo attach — disabled (no upload path)", () => {
   });
 });
 
+describe("QuickLog active grow context", () => {
+  it("does not claim that no grow is selected while plant selection remains required", () => {
+    renderWithClient(<QuickLog open={true} onOpenChange={vi.fn()} />);
+
+    expect(screen.queryByTestId("quick-log-dialog-all-activities-no-grow")).toBeNull();
+    expect(screen.getByTestId("quick-log-plant-error")).toHaveTextContent(
+      "Choose a plant before saving this entry.",
+    );
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("QuickLog supported save · routes through quicklog_save_manual RPC", () => {
   it("refuses an ordinary crafted Water prefill before any RPC", async () => {
     renderWithClient(

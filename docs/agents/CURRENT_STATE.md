@@ -1155,15 +1155,46 @@ delivered, not pending:**
 | B2a shared save-key policy                 | **MERGED** — #1049 `f09febc`              |
 | B4a `/doctor` loop card                    | **MERGED** — #1047 `cff3efd`              |
 | D7 plant-scoped Better/Same/Worse          | **MERGED** — #1041 `5640d77`              |
-| D5 "Continue with <plant>?"                | **OPEN** — #1043                          |
+| D5 "Continue with `<plant>`?"              | **MERGED** — #1043 `e9e5ec5`              |
 | B2b                                        | still deferred to **A5** (unopened)       |
-| B4b                                        | still deferred to **A2** (unopened)       |
+| B4b                                        | **NONE REMAINING** — see note below       |
 | B5                                         | waits for **A3** (unopened)               |
 | B0b                                        | owner-gated authenticated session/CI path |
 
-Note the new dependency this created: B2b and B4b now block on Tranche A
-slices that have never been opened, so Tranche A is no longer only its own
-tranche — it gates the completion of Tranche B+. No schema, no migrations,
+**B4b has no remaining scope — do not open a slice for it.** Measured
+2026-08-22 at deploy tip `faea6e9c5` (recorded by #1095): A2 **has landed**
+(`oneTentLoopNavigationRules.ts` carries 5 `normalizedGrowId` uses, including
+the back-half `alertsPath(...)` / `actionsPath(...)` threading that was A2's
+scope), and with it in place B4a already satisfies **every** §6 B4 requirement
+— the `sensor-snapshot` → `?growId=&tentId=` carry, `doctorStartContextRules.ts`,
+the `AiDoctorStart` tent-context line and "In this tent" badge, the carry matrix,
+the fail-closed page validation, the no-paid-call pins, and the loop-card mount.
+The a/b split recorded here was an artifact of B4a shipping before A2, not two
+pieces of work. Building a "B4b" now would produce a second implementation of a
+merged slice, which `AGENTS.md` forbids.
+
+The remaining dependency: B2b and B5 block on Tranche A slices that have never
+been opened. Both re-verified 2026-08-22 **against each slice's own artifacts**,
+after a first attempt measured the wrong things (a raw literal count reported as
+dispatch sites, and an `Alerts.tsx` check that belongs to A5(c), not A3):
+
+- **A5** — "single dispatch" has not converged. `verdant:entry-created` still has
+  **5 independent emit sites** in non-test code: `PlantQuickLog.tsx:399`,
+  `QuickLog.tsx:1454`, `AppShell.tsx:390`, `useSavePhotoDiagnosisReview.ts:91`,
+  and the `dispatchQuickLogV2EntryCreated` helper in
+  `src/lib/quickLogV2EntryCreatedEvent.ts`. Count **emitters**, not literal
+  matches — the string appears 23 times across 13 files, but most of those are
+  comments, event-name constants, and `add`/`removeEventListener` in the
+  Timeline / DailyCheck / ActionFollowUp listeners.
+- **A3** — none of its artifacts exist. `src/lib/tentPlantDisplayLabel.ts` and
+  `src/lib/actionContextNameLookup.ts` are both absent,
+  `buildActionRowContextLabel` is absent from `actionQueueRowView.ts`, and none
+  of the four A3 test ids (`action-queue-row-context-names`,
+  `alert-detail-tent-label`, `alert-detail-plant-label`,
+  `action-detail-tent-label`) appear anywhere in `src/`.
+
+So Tranche A is no longer only its own tranche — it gates the completion of
+Tranche B+. No schema, no migrations,
 no new routes, no new Quick Log write paths, no production telemetry.
 
 **Named isolated spike (approved 2026-08-13, not SEO):**
@@ -1614,13 +1645,67 @@ differed stays `NOT_MEASURED`.
 
 ---
 
+## External reference scope — MACAE accelerator (recorded 2026-08-22)
+
+**Status: `REFERENCE_ONLY`. Owner: Claude.** This row records that the scope exists; it
+authorises no build, no slice, and no port. Recorded as its own timestamped row rather
+than as a new Last-updated block — it supersedes no measurement above.
+
+**Scope (`source claim`):** relayed by Cheek as "Grok has scoped this demo for all agents
+to read and ingest for future builds", authorised 2026-08-22 as a docs-only slice.
+
+| Field                              | Value                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Repository                         | `Verdant-OS/multi-agent-custom-automation-engine-solution-accelerator` (public)                                                                  |
+| Read at                            | `b4a4a00` on `main`, `2026-06-26T20:50:10Z` — shallow clone, read 2026-08-22                                                                     |
+| Digest                             | [`docs/knowledge-library/macae-reference-ingest.md`](../knowledge-library/macae-reference-ingest.md)                                             |
+| Clone path (ephemeral)             | `/home/user/verdant-os/multi-agent-custom-automation-engine-solution-accelerator` — does not survive the container; re-clone from the public URL |
+| Runtime behaviour                  | `NOT_MEASURED` — never deployed or executed                                                                                                      |
+| Applicability to any Verdant slice | `NOT_MEASURED` — no slice assigned                                                                                                               |
+| Slice owner                        | **Claude**                                                                                                                                       |
+| Owner-designated reviewer          | **Blue Dream**, in Cursor — not a GitHub handle (Cheek, 2026-08-22)                                                                              |
+| Protocol peer-review seat          | **Grok (GDP)** — filled by Cheek 2026-08-22; `HANDOFF_PROTOCOL.md:24` allows Grok, Claude or Codex                                               |
+| Owner acknowledgement              | **cheekhimself**, given out-of-band, outside the GitHub review-request mechanism                                                                 |
+
+Pairing recorded here per `docs/agents/HANDOFF_PROTOCOL.md:25`, which requires both names
+in this file and not only in the handoff block. **Read the two reviewer rows together —
+neither alone is the whole picture.**
+
+Blue Dream remains the owner's designated reviewer and reviews in Cursor, not on GitHub,
+so an empty GitHub reviewer list on these PRs is by design and not an oversight. The
+protocol peer-review seat is now filled by **Grok (GDP)** as the independent peer
+reviewer (Cheek, 2026-08-22). Blue Dream is **not** one of the three peers (Grok,
+Claude, Codex) that `HANDOFF_PROTOCOL.md:24` and `AGENTS.md:582-584` permit in that
+seat; Grok (GDP) is. Do **not** leave or restate `NOT FILLED` / "cannot infer" as the
+live claim for this seat.
+
+**Read the digest before acting on anything in that repository.** Its do-not-port rules
+bind, and are repeated here so this row is not safe to quote alone:
+
+1. **The in-memory approval store is an anti-pattern for Verdant.**
+   `OrchestrationConfig` (`src/backend/v4/config/settings.py`) owns
+   `approvals: Dict[str, bool]` coordinated by `asyncio.Event`, with
+   `default_timeout: float = 300.0`; `HumanApprovalMagenticManager`
+   (`human_approval_manager.py`) uses that config. A restart, a second replica, or a
+   slow human loses the decision, and that path keeps no audit record. Do not
+   reproduce that shape.
+2. **The Action Queue stays durable** — `reason`, risk level, `status`, and an append-only
+   audit trail, enforced with RLS. Approval is a persisted row, never process memory.
+3. **Read the approval-gate shape and the tools-as-services separation. Port nothing
+   else** — not the Azure runtime, not Cosmos DB, not Container Apps, not the in-memory
+   approval store.
+4. **Automation last.** Diary first, sensors second, AI third. This accelerator is an
+   automation-orchestration engine; it does not move up that order.
+
+---
+
 ## Agents currently assigned
 
-| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                                                                                                                                                                                  |
-| Claude            | **One-Tent Loop Tranche B+ — architect and implementer (Cheek, 2026-08-19). Substantially delivered as of 2026-08-21:** B0a (#1039), B1 (#1040), B3a (#1042), B2a (#1049), B4a (#1047) and D7 (#1041) merged; D5 (#1043) open; B2b/B4b/B5 blocked on unopened Tranche A slices A5/A2/A3. Also delivered #1062, the routed `CURRENT_STATE` refresh specification (`docs/specs/current-state-refresh-2026-08-20.md`). `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged                              |
-| Grok              | **Product Intelligence, Adversarial Audit, and Implementation Lead** (Cheek 2026-08-20, refined). Equally empowered to research, audit the live app, implement assigned slices, test, and independently review. Peer with Claude and Codex — **none outranks the others**; explicit task ownership controls. SEO/market/backlink strength retained (not a fence). Map: `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Does **not** take Tranche A remaining edit points (Codex) or Tranche B+ product code (Claude) unless done and unassigned. Prior delivered work unchanged: `ONE_TENT_LOOP_OPERATING_ORDER` repo slices 0/2/3/4; Slices 1 and 5 owner-`BLOCKED`; Cursor SDK spike gates on #985 / `CURSOR_API_KEY`. Reuse of the dispatcher not approved. Convex/Postgres spikes not paused. Production Convex HOLD. Not Unassigned |
-| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                                                                                                                                                                                  |
+| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                                                                                                                                                                                                                                                                                                       |
+| Claude            | **One-Tent Loop Tranche B+ — architect and implementer (Cheek, 2026-08-19). Substantially delivered as of 2026-08-21:** B0a (#1039), B1 (#1040), B3a (#1042), B2a (#1049), B4a (#1047) and D7 (#1041) merged; D5 (#1043) **merged** `e9e5ec5`; B2b/B5 blocked on unopened Tranche A slices A5/A3; **B4b has no remaining scope** — A2 landed and B4a already covers all of it, so do not open a B4b slice (see the Tranche B+ table note). Also delivered #1062, the routed `CURRENT_STATE` refresh specification (`docs/specs/current-state-refresh-2026-08-20.md`). `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
+| Grok              | **Product Intelligence, Adversarial Audit, and Implementation Lead** (Cheek 2026-08-20, refined). Equally empowered to research, audit the live app, implement assigned slices, test, and independently review. Peer with Claude and Codex — **none outranks the others**; explicit task ownership controls. SEO/market/backlink strength retained (not a fence). Map: `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Does **not** take Tranche A remaining edit points (Codex) or Tranche B+ product code (Claude) unless done and unassigned. Prior delivered work unchanged: `ONE_TENT_LOOP_OPERATING_ORDER` repo slices 0/2/3/4; Slices 1 and 5 owner-`BLOCKED`; Cursor SDK spike gates on #985 / `CURSOR_API_KEY`. Reuse of the dispatcher not approved. Convex/Postgres spikes not paused. Production Convex HOLD. Not Unassigned                                                                                                                      |
+| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                                                                                                                                                                                                                                                                                                       |

@@ -234,12 +234,22 @@ describe("evidenceRefForStep — hostile source string sanitization", () => {
 
   it("legitimate fresh live snapshot still passes (guardrail sanity)", () => {
     const row = evaluateSensorSnapshot(
-      { source: "live", captured_at: FRESH_ISO, confidence: 0.9 },
+      {
+        source: "live",
+        captured_at: FRESH_ISO,
+        confidence: 0.9,
+        has_usable_metric: true,
+      },
       NOW_MS,
     );
     expect(row.status).toBe("passed");
     const rows = evaluateLoop(
-      baseEvidence({ source: "live", captured_at: FRESH_ISO, confidence: 0.9 }),
+      baseEvidence({
+        source: "live",
+        captured_at: FRESH_ISO,
+        confidence: 0.9,
+        has_usable_metric: true,
+      }),
     );
     const sensor = rows.find((r) => r.id === "sensor-snapshot");
     expect(sensor?.status).toBe("passed");

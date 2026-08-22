@@ -84,7 +84,9 @@ describe("Plants/Tents — preselect grow on create", () => {
     expect(CREATE_PLANT).toMatch(/if \(formBlocked \|\| !targetGrowId\)/);
     expect(CREATE_TENT).toMatch(/if \(formBlocked\)/);
     // Disabled wiring must route through formBlocked (not binding.blockSubmit alone).
-    expect(CREATE_TENT).toMatch(/disabled=\{busy \|\| !tentGate\.allowed \|\| formBlocked\}/);
+    expect(CREATE_TENT).toMatch(
+      /disabled=\{busy \|\| createOutcomeUnknown \|\| !tentGate\.allowed \|\| formBlocked\}/,
+    );
     expect(CREATE_PLANT).toMatch(/disabled=\{busy \|\| formBlocked/);
     expect(CREATE_TENT).not.toMatch(/hardStop\.blockSubmit/);
     expect(CREATE_PLANT).not.toMatch(/hardStop\.blockSubmit/);

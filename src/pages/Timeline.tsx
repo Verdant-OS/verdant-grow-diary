@@ -110,6 +110,7 @@ import {
   buildGrowDiaryTimeline,
   resolveTimelineDiaryEntryStage,
 } from "@/lib/growDiaryTimelineRules";
+import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
@@ -232,6 +233,38 @@ interface Entry {
   entry_at: string;
   plant_id: string | null;
   tent_id: string | null;
+}
+
+interface TimelineDiaryPhotoDisplayRows {
+  rows: Entry[];
+  privatePhotoPathById: Map<string, string>;
+}
+
+/**
+ * Projects persisted diary photo references into Timeline-safe display rows.
+ * Only the shared owner-aware parser may nominate a private object for
+ * signing; historical `details.photo_url` remains a fallback for rows whose
+ * canonical top-level reference is unusable.
+ */
+function buildTimelineDiaryPhotoDisplayRows(
+  rows: Entry[],
+  viewerUserId: string | null,
+): TimelineDiaryPhotoDisplayRows {
+  const privatePhotoPathById = new Map<string, string>();
+  const displayRows = rows.map((row) => {
+    const reference = parseDiaryPhotoDisplayReferenceFromRow(row, { viewerUserId });
+
+    if (reference.kind === "external") {
+      return { ...row, photo_url: reference.url };
+    }
+    if (reference.kind === "storage") {
+      privatePhotoPathById.set(row.id, reference.path);
+    }
+
+    return { ...row, photo_url: null };
+  });
+
+  return { rows: displayRows, privatePhotoPathById };
 }
 
 type ActionEventType =
@@ -632,12 +665,10 @@ export default function Timeline() {
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
 
       const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
-      const privatePhotoPathById = new Map<string, string>();
-      const coreRows = rows.map((row) => {
-        if (!row.photo_url || row.photo_url.startsWith("http")) return row;
-        privatePhotoPathById.set(row.id, row.photo_url);
-        return { ...row, photo_url: null };
-      });
+      const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
+        rows,
+        user,
+      );
       const paths = [...new Set(privatePhotoPathById.values())];
 
       // Filtered by is_deleted here so the visible-event page (its 100-row
@@ -846,10 +877,12 @@ export default function Timeline() {
       });
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
-      const older = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
-      const paths = older
-        .map((r) => r.photo_url)
-        .filter((p): p is string => !!p && !p.startsWith("http"));
+      const rawOlder = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const { rows: older, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
+        rawOlder,
+        user,
+      );
+      const paths = [...new Set(privatePhotoPathById.values())];
       if (paths.length) {
         try {
           const signedResult = await supabase.storage
@@ -867,17 +900,14 @@ export default function Timeline() {
             );
           }
           older.forEach((row) => {
-            if (!row.photo_url || row.photo_url.startsWith("http")) return;
-            row.photo_url = signedMap.get(row.photo_url) ?? null;
+            const privatePath = privatePhotoPathById.get(row.id);
+            if (privatePath) row.photo_url = signedMap.get(privatePath) ?? null;
           });
         } catch {
           if (!isCurrentPage()) return;
           setPartialReadSources((current) =>
             mergeTimelinePartialSources(current, ["diary_photos"]),
           );
-          older.forEach((row) => {
-            if (row.photo_url && !row.photo_url.startsWith("http")) row.photo_url = null;
-          });
         }
       }
       if (isCurrentPage() && older.length) {

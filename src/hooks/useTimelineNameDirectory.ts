@@ -29,7 +29,7 @@ export interface TimelineNameDirectory {
    *     a selection that disappears with no explanation. The names must keep
    *     them (history still refers to those plants); the carry must not.
    */
-  carriablePlantTentById: ReadonlyMap<string, string | null> | null;
+  carriablePlantTentById: ReadonlyMap<string, string> | null;
   /**
    * Whether the carry lookup has settled.
    *
@@ -64,7 +64,7 @@ export function useTimelineNameDirectory(
   const [tentNamesById, setTentNamesById] = useState<ReadonlyMap<string, string> | null>(null);
   const [carriablePlantTentById, setCarriablePlantTentById] = useState<ReadonlyMap<
     string,
-    string | null
+    string
   > | null>(null);
   const [carriablePlantTentStatus, setCarriablePlantTentStatus] =
     useState<CarriablePlantLookupStatus>(userId ? "pending" : "unavailable");
@@ -92,9 +92,11 @@ export function useTimelineNameDirectory(
             .from("plants")
             .select("id,name,tent_id,grow_id,is_archived,last_note")
             .eq("user_id", userId),
-          // `grow_id` resolves the EFFECTIVE grow of a plant whose own column is
-          // null but whose tent belongs to this grow. Names ignore it.
-          supabase.from("tents").select("id,name,grow_id").eq("user_id", userId),
+          // `grow_id` resolves the EFFECTIVE grow of a plant whose own column
+          // is null but whose tent belongs to this grow; `is_archived` keeps
+          // archived tents out of the CARRY (Sensors never sees them) while
+          // the name map below still keeps them for history labels.
+          supabase.from("tents").select("id,name,grow_id,is_archived").eq("user_id", userId),
         ]);
         if (cancelled) return;
         setPlantNamesById(plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data));

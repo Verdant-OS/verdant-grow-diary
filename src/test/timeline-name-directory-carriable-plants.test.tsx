@@ -30,6 +30,8 @@ const OTHER_GROW = "33333333-4444-4555-8666-777777777777";
 const OTHER_GROW_TENT = "44444444-5555-4666-8777-888888888888";
 const OTHER_GROW_PLANT = "55555555-6666-4777-8888-999999999999";
 const LEGACY_PLANT = "66666666-7777-4888-8999-aaaaaaaaaaaa";
+const ARCHIVED_TENT = "77777777-8888-4999-8aaa-bbbbbbbbbbbb";
+const ARCHIVED_TENT_PLANT = "88888888-9999-4aaa-8bbb-cccccccccccc";
 
 const state = vi.hoisted(() => ({
   /** Every `.select(...)` argument, in call order, so the read is observable. */
@@ -66,8 +68,14 @@ vi.mock("@/integrations/supabase/client", () => ({
                   }
                 : {
                     data: [
-                      { id: TENT, name: "Tent A", grow_id: GROW },
-                      { id: OTHER_GROW_TENT, name: "Tent B", grow_id: OTHER_GROW },
+                      { id: TENT, name: "Tent A", grow_id: GROW, is_archived: false },
+                      {
+                        id: OTHER_GROW_TENT,
+                        name: "Tent B",
+                        grow_id: OTHER_GROW,
+                        is_archived: false,
+                      },
+                      { id: ARCHIVED_TENT, name: "Tent C", grow_id: GROW, is_archived: true },
                     ].map((row) => project(row, columns)),
                     error: null,
                   },
@@ -120,6 +128,17 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
         is_archived: false,
         last_note: null,
       },
+      // An ACTIVE plant in an ARCHIVED tent. Sensors never sees that tent
+      // (`fetchTents` filters it out), so carrying it would relocate the
+      // grower to a different live tent and then lose the plant.
+      {
+        id: ARCHIVED_TENT_PLANT,
+        name: "Zeta",
+        tent_id: ARCHIVED_TENT,
+        grow_id: GROW,
+        is_archived: false,
+        last_note: null,
+      },
       // An ACTIVE plant the account owns, in a DIFFERENT grow. Reachable
       // from a bookmarked URL pairing this grow with that plant.
       {
@@ -157,7 +176,11 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     // The TENTS read must also carry grow_id — it is what resolves the
     // effective grow of a legacy plant whose own column is null.
     const tentsSelect = state.selects.find((c) => c.table === "tents");
-    expect((tentsSelect?.columns ?? "").split(",").map((c) => c.trim())).toContain("grow_id");
+    const tentColumns = (tentsSelect?.columns ?? "").split(",").map((c) => c.trim());
+    expect(tentColumns).toContain("grow_id");
+    // Keeps archived tents out of the CARRY. Sensors' own tent read filters
+    // them, so a carried archived tent silently relocates the grower.
+    expect(tentColumns).toContain("is_archived");
   });
 
   it("excludes archived and merged plants from the carry lookup only", async () => {
@@ -170,6 +193,8 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(carriable.has(PLANT_ARCHIVED)).toBe(false);
     expect(carriable.has(PLANT_MERGED)).toBe(false);
     // Alpha (own grow) and Epsilon (grow via its tent) — both carriable.
+    // Zeta is excluded: active plant, right grow, but an ARCHIVED tent.
+    expect(carriable.has(ARCHIVED_TENT_PLANT)).toBe(false);
     expect(carriable.size).toBe(2);
 
     // The NAME map must keep them: diary history still refers to those
@@ -180,6 +205,9 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(names.get(PLANT_MERGED)).toBe("Gamma");
     // The other-grow plant keeps its name too — history can reference it.
     expect(names.get(OTHER_GROW_PLANT)).toBe("Delta");
+    expect(names.get(ARCHIVED_TENT_PLANT)).toBe("Zeta");
+    // Tent names keep archived tents too — history labels need them.
+    expect(result.current.tentNamesById!.get(ARCHIVED_TENT)).toBe("Tent C");
   });
 
   it("refuses to carry an owned plant from a DIFFERENT grow", async () => {

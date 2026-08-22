@@ -16,6 +16,7 @@ import {
   normalizePersistedPlantId,
   readSensorsPlantRouteIntent,
   buildCarriablePlantTentLookup,
+  type CarriableTentLink,
   resolveCarriedPlantScope,
   shouldHoldCarryForPendingLookup,
   withSensorsPlantIntent,
@@ -38,10 +39,11 @@ const OTHER_GROW = "33333333-4444-4555-8666-777777777777";
  */
 function lookupInScope(
   rows: readonly (Record<string, unknown> | null | undefined)[],
-): ReadonlyMap<string, string | null> {
+  tents: readonly CarriableTentLink[] = [{ id: TENT, grow_id: GROW }],
+): ReadonlyMap<string, string> {
   return buildCarriablePlantTentLookup(
     rows.map((row) => (row && typeof row === "object" ? { grow_id: GROW, ...row } : row)),
-    { growId: GROW },
+    { growId: GROW, tents },
   );
 }
 
@@ -170,7 +172,7 @@ describe("withSensorsPlantIntent", () => {
 describe("resolveCarriedPlantScope", () => {
   const OTHER_TENT = "99999999-8888-4777-8666-555555555555";
   // Current assignment, sourced from plants.tent_id — never from diary rows.
-  const carriablePlantTentById = new Map<string, string | null>([
+  const carriablePlantTentById = new Map<string, string>([
     [PLANT, TENT],
     [OTHER_PLANT, OTHER_TENT],
   ]);
@@ -204,14 +206,17 @@ describe("resolveCarriedPlantScope", () => {
   });
 
   it("drops the plant when its current tent is unknown — fail closed", () => {
-    // Directory still loading, read failed, plant not the grower's, or the
-    // plant has no tent. None of these may become a guess.
+    // Directory still loading, read failed, plant not the grower's, the plant
+    // has no tent, or its tent is archived. None of these may become a guess.
+    //
+    // All of them now present identically as ABSENCE from the lookup — the
+    // builder emits no entry rather than a null tent, so the old
+    // `[[PLANT, null]]` case is unrepresentable and the type says so.
     for (const lookup of [
       null,
       undefined,
-      new Map<string, string | null>(),
-      new Map<string, string | null>([[PLANT, null]]),
-      new Map<string, string | null>([[OTHER_PLANT, OTHER_TENT]]),
+      new Map<string, string>(),
+      new Map<string, string>([[OTHER_PLANT, OTHER_TENT]]),
     ]) {
       expect(
         resolveCarriedPlantScope({ plantId: PLANT, tentId: "", carriablePlantTentById: lookup }),
@@ -239,7 +244,7 @@ describe("resolveCarriedPlantScope", () => {
     // tent on old diary entries. Only plants.tent_id is authoritative, so a
     // lookup reflecting the move must win outright — there is no entries
     // input left for stale history to enter through.
-    const afterMove = new Map<string, string | null>([[PLANT, OTHER_TENT]]);
+    const afterMove = new Map<string, string>([[PLANT, OTHER_TENT]]);
     expect(
       resolveCarriedPlantScope({ plantId: PLANT, tentId: "", carriablePlantTentById: afterMove }),
     ).toEqual({ plantId: PLANT, tentId: OTHER_TENT });
@@ -293,7 +298,7 @@ describe("buildCarriablePlantTentLookup · grow scope", () => {
         { id: PLANT, tent_id: TENT, grow_id: GROW },
         { id: OTHER_PLANT, tent_id: TENT, grow_id: OTHER_GROW },
       ],
-      { growId: GROW },
+      { growId: GROW, tents: [{ id: TENT, grow_id: GROW }] },
     );
 
     expect(lookup.get(PLANT)).toBe(TENT);
@@ -359,11 +364,59 @@ describe("buildCarriablePlantTentLookup · grow scope", () => {
     // No scope means no way to check one, and Timeline reads nothing
     // without a grow anyway — so this costs the grower nothing.
     const rows = [{ id: PLANT, tent_id: TENT, grow_id: GROW }];
+    const tents = [{ id: TENT, grow_id: GROW }];
     for (const growId of [null, undefined, "", "   ", "not-a-uuid", 42, {}]) {
-      expect(buildCarriablePlantTentLookup(rows, { growId }).size).toBe(0);
+      expect(buildCarriablePlantTentLookup(rows, { growId, tents }).size).toBe(0);
     }
     expect(buildCarriablePlantTentLookup(rows).size).toBe(0);
     expect(buildCarriablePlantTentLookup(rows, null).size).toBe(0);
+  });
+});
+
+describe("buildCarriablePlantTentLookup · archived tents", () => {
+  const ARCHIVED_TENT = "77777777-8888-4999-8aaa-bbbbbbbbbbbb";
+
+  it("refuses an active plant sitting in an ARCHIVED tent", () => {
+    // `growRepo.fetchTents` filters `is_archived = false`, so Sensors never
+    // sees this tent. The loop card's timeline href is an ORDINARY intent
+    // (no requireExactMatch), so `resolveSensorsTentRouteSelection` finds no
+    // match and falls back to a DIFFERENT live tent — moving the grower, and
+    // then losing the plant to the tent mismatch at the Doctor.
+    const lookup = buildCarriablePlantTentLookup(
+      [
+        { id: PLANT, tent_id: ARCHIVED_TENT, grow_id: GROW },
+        { id: OTHER_PLANT, tent_id: TENT, grow_id: GROW },
+      ],
+      {
+        growId: GROW,
+        tents: [
+          { id: ARCHIVED_TENT, grow_id: GROW, is_archived: true },
+          { id: TENT, grow_id: GROW },
+        ],
+      },
+    );
+
+    expect(lookup.has(PLANT)).toBe(false);
+    // The live-tent sibling is unaffected — this is tent liveness, not a ban.
+    expect(lookup.get(OTHER_PLANT)).toBe(TENT);
+  });
+
+  it("accepts both archive field conventions on a tent row", () => {
+    const camel = buildCarriablePlantTentLookup([{ id: PLANT, tent_id: TENT, grow_id: GROW }], {
+      growId: GROW,
+      tents: [{ id: TENT, grow_id: GROW, isArchived: true }],
+    });
+    expect(camel.size).toBe(0);
+  });
+
+  it("treats a tent with no archive flag as live", () => {
+    // Rows that predate the column, and the name-directory shape, must not
+    // silently become uncarriable.
+    const lookup = buildCarriablePlantTentLookup([{ id: PLANT, tent_id: TENT, grow_id: GROW }], {
+      growId: GROW,
+      tents: [{ id: TENT, grow_id: GROW }],
+    });
+    expect(lookup.get(PLANT)).toBe(TENT);
   });
 });
 
@@ -399,6 +452,11 @@ describe("buildCarriablePlantTentLookup", () => {
   it("maps plant rows to their current tent and skips unusable rows", () => {
     const lookup = lookupInScope([
       { id: PLANT, tent_id: TENT },
+      // Narrowed after review: a tentless plant is now ABSENT rather than
+      // present-with-null. The Doctor honours a carried plant only inside a
+      // carried tent, so one with no tent had nothing to travel with and was
+      // already dropped downstream — the map now says so instead of implying
+      // a carriable plant whose tent happens to be unknown.
       { id: OTHER_PLANT, tent_id: null },
       { id: "p1", tent_id: TENT },
       { id: null, tent_id: TENT },
@@ -407,9 +465,9 @@ describe("buildCarriablePlantTentLookup", () => {
       {},
     ]);
     expect(lookup.get(PLANT)).toBe(TENT);
-    expect(lookup.get(OTHER_PLANT)).toBeNull();
+    expect(lookup.has(OTHER_PLANT)).toBe(false);
     expect(lookup.has("p1")).toBe(false);
-    expect(lookup.size).toBe(2);
+    expect(lookup.size).toBe(1);
   });
 
   it("excludes archived and merged plants — they are not carriable", () => {

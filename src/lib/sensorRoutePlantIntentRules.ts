@@ -94,6 +94,13 @@ export interface PlantTentRowLike extends ArchivedPlantLike {
  * something. A plant outside the scoped grow is therefore not carriable,
  * and no resolved grow scope means nothing is.
  *
+ * Membership also requires a LIVE tent. `growRepo.fetchTents` filters
+ * `is_archived = false`, so Sensors never sees an archived tent; an ordinary
+ * route intent naming one finds no match and `resolveSensorsTentRouteSelection`
+ * falls back to a DIFFERENT live tent — moving the grower, then losing the
+ * plant to the resulting mismatch. Archived tents stay in the name directory
+ * (history needs their names) and are excluded here only.
+ *
  * Scope is judged on the EFFECTIVE grow — `plant.grow_id ?? tent.grow_id` via
  * the shared `getEffectivePlantGrowId` — never the raw column. `plants.grow_id`
  * is nullable and legacy rows carry a tent without one, so comparing the column
@@ -113,35 +120,71 @@ export interface PlantTentRowLike extends ArchivedPlantLike {
  *
  * Takes `plants` rows, never diary rows. See `resolveCarriedPlantScope`.
  */
+/** A tent link that also says whether the tent is archived. */
+export interface CarriableTentLink extends TentGrowLink {
+  is_archived?: boolean | null;
+  isArchived?: boolean | null;
+}
+
+function isLiveTent(tent: CarriableTentLink | null | undefined): boolean {
+  if (!tent) return false;
+  return !(tent.is_archived ?? tent.isArchived ?? false);
+}
+
 export function buildCarriablePlantTentLookup(
   rows: readonly (PlantTentRowLike | null | undefined)[] | null | undefined,
-  scope?: { growId?: unknown; tents?: readonly TentGrowLink[] | null } | null,
-): ReadonlyMap<string, string | null> {
+  scope?: { growId?: unknown; tents?: readonly CarriableTentLink[] | null } | null,
+): ReadonlyMap<string, string> {
   const scopedGrowId = normalizePersistedPlantId(scope?.growId);
   // No resolved grow scope means nothing is carriable. Timeline itself reads
   // nothing without one, so this costs the grower nothing — and admitting a
   // plant with no scope to check it against is how the crossing below gets in.
-  if (!scopedGrowId) return new Map<string, string | null>();
+  if (!scopedGrowId) return new Map<string, string>();
 
-  const tents = scope?.tents ?? [];
-  const lookup = new Map<string, string | null>();
+  // LIVE tents only, for both jobs below. `growRepo.fetchTents` filters
+  // `is_archived = false`, so Sensors' tent list never contains an archived
+  // tent; carrying one means its ordinary route intent finds no match and
+  // `resolveSensorsTentRouteSelection` falls back to a DIFFERENT live tent,
+  // moving the grower and then losing the plant to the tent mismatch.
+  const liveTents = (scope?.tents ?? []).filter(isLiveTent);
+  const liveTentIds = new Set<string>();
+  for (const tent of liveTents) {
+    const tentId = normalizePersistedPlantId(tent?.id);
+    if (tentId) liveTentIds.add(tentId);
+  }
+
+  const lookup = new Map<string, string>();
   for (const row of rows ?? []) {
     const id = normalizePersistedPlantId(row?.id);
     if (!id) continue;
     if (!isActivePlant(row)) continue;
 
+    // A carriable plant must sit in a LIVE tent. The Doctor honours a carried
+    // plant only inside a carried tent, so a plant with no usable tent has
+    // nothing to travel with — it was already dropped downstream, now it is
+    // simply never emitted.
+    const tentId = normalizePersistedPlantId(row?.tent_id);
+    if (!tentId || !liveTentIds.has(tentId)) continue;
+
     // EFFECTIVE grow, never the raw column. `plants.grow_id` is nullable and
     // legacy rows carry a tent without one; the repo's canonical helper is
     // reused so this cannot drift from the other three places that resolve it.
+    //
+    // `liveTents` rather than every tent is belt-and-braces, NOT load-bearing:
+    // the gate above already proved this plant's tent is live, and the helper
+    // looks up only that tent. It is passed anyway so reordering the two gates
+    // cannot quietly reintroduce an archived tent as a grow source. Stated
+    // plainly because a test asserting otherwise passed for the wrong reason
+    // and was removed rather than left as a fence that cannot fail.
     const effectiveGrowId = normalizePersistedPlantId(
       getEffectivePlantGrowId(
         { id, grow_id: row?.grow_id ?? null, tent_id: row?.tent_id ?? null },
-        tents,
+        liveTents,
       ),
     );
     if (effectiveGrowId !== scopedGrowId) continue;
 
-    lookup.set(id, normalizePersistedPlantId(row?.tent_id));
+    lookup.set(id, tentId);
   }
   return lookup;
 }
@@ -186,7 +229,7 @@ export function buildCarriablePlantTentLookup(
 export function resolveCarriedPlantScope(input: {
   plantId?: unknown;
   tentId?: unknown;
-  carriablePlantTentById?: ReadonlyMap<string, string | null> | null;
+  carriablePlantTentById?: ReadonlyMap<string, string> | null;
 }): { plantId: string | null; tentId: string | null } {
   const normalizedPlantId = normalizePersistedPlantId(input?.plantId);
   const explicitTentId = normalizePersistedPlantId(input?.tentId);

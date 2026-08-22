@@ -236,13 +236,20 @@ export function usePlantAssignedTentActions(
   });
 
   // A proof-mode response is only evidence after every requested scoped read
-  // settles cleanly. Otherwise a partial response could incorrectly certify
-  // the loop while an older exact causal row is still unknown.
+  // settles cleanly. Cached data is also incomplete while a scope is
+  // refetching: otherwise an older exact causal row could certify the loop
+  // before the authoritative read returns.
   const hasProofMode =
     selectedPlantIdForAiCoach !== null ||
     selectedAlertIdForProof !== null ||
     selectedAiDoctorSessionIdForProof !== null ||
     hasInvalidCausalProofSelector;
+  const proofReadFetching =
+    hasProofMode &&
+    (q.isFetching ||
+      proofAiCoachQ.isFetching ||
+      proofAlertQ.isFetching ||
+      proofAiDoctorQ.isFetching);
   const proofReadIncomplete =
     hasProofMode &&
     (hasInvalidCausalProofSelector ||
@@ -253,7 +260,8 @@ export function usePlantAssignedTentActions(
       proofAlertQ.isLoading ||
       proofAlertQ.isError ||
       proofAiDoctorQ.isLoading ||
-      proofAiDoctorQ.isError);
+      proofAiDoctorQ.isError ||
+      proofReadFetching);
   const rows = proofReadIncomplete
     ? []
     : buildAssignedTentActions(q.data ?? [], {
@@ -305,7 +313,11 @@ export function usePlantAssignedTentActions(
     proofSelectedAlertActionRow,
     proofSelectedAiDoctorActionRow,
     isLoading:
-      q.isLoading || proofAiCoachQ.isLoading || proofAlertQ.isLoading || proofAiDoctorQ.isLoading,
+      q.isLoading ||
+      proofAiCoachQ.isLoading ||
+      proofAlertQ.isLoading ||
+      proofAiDoctorQ.isLoading ||
+      proofReadFetching,
     isError: q.isError || proofAiCoachQ.isError || proofAlertQ.isError || proofAiDoctorQ.isError,
     error: q.error ?? proofAiCoachQ.error ?? proofAlertQ.error ?? proofAiDoctorQ.error,
   };

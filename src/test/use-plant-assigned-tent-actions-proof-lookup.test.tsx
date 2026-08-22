@@ -7,7 +7,7 @@
  * when many newer rows for other plants fill that normal window.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
@@ -28,6 +28,7 @@ const supabaseState = vi.hoisted(() => ({
   proofAlertError: null as { message: string } | null,
   proofAiDoctorRows: [] as AssignedTentActionInputRow[],
   proofAiDoctorError: null as { message: string } | null,
+  fetchGate: null as Promise<void> | null,
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -109,7 +110,10 @@ vi.mock("@/integrations/supabase/client", () => {
       then: <TResult1 = unknown, TResult2 = never>(
         onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
         onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-      ) => Promise.resolve(responseFor(record)).then(onfulfilled, onrejected),
+      ) =>
+        Promise.resolve(supabaseState.fetchGate)
+          .then(() => responseFor(record))
+          .then(onfulfilled, onrejected),
     };
     return chain;
   };
@@ -154,10 +158,18 @@ function action(overrides: Partial<AssignedTentActionInputRow> = {}): AssignedTe
   };
 }
 
-function makeClient() {
+function makeClient(staleTime = 0) {
   return new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: { queries: { retry: false, gcTime: 0, staleTime } },
   });
+}
+
+function createDeferred() {
+  let resolvePromise: (() => void) | undefined;
+  const promise = new Promise<void>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return { promise, resolve: () => resolvePromise?.() };
 }
 
 function wrapper(client: QueryClient) {
@@ -180,6 +192,7 @@ beforeEach(() => {
   supabaseState.proofAlertError = null;
   supabaseState.proofAiDoctorRows = [];
   supabaseState.proofAiDoctorError = null;
+  supabaseState.fetchGate = null;
 });
 
 describe("usePlantAssignedTentActions — proof-only scoped lookups", () => {
@@ -258,6 +271,147 @@ describe("usePlantAssignedTentActions — proof-only scoped lookups", () => {
     expect(supabaseState.queries[0]).toMatchObject({ table: "action_queue", limit: 10 });
     expect(result.current.rows).toHaveLength(5);
     expect(result.current.proofSelectedPlantAiCoachRow).toBeNull();
+  });
+
+  it.each([
+    ["generic assigned-tent", ["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5]],
+    [
+      "selected-plant coach",
+      [
+        "plant_assigned_tent_actions",
+        "proof_selected_plant_ai_coach",
+        TENT_ID,
+        GROW_ID,
+        SELECTED_PLANT_ID,
+      ],
+    ],
+    [
+      "selected alert",
+      ["plant_assigned_tent_actions", "proof_selected_alert", TENT_ID, GROW_ID, ALERT_ID],
+    ],
+    [
+      "selected AI Doctor session",
+      [
+        "plant_assigned_tent_actions",
+        "proof_selected_ai_doctor",
+        TENT_ID,
+        GROW_ID,
+        AI_DOCTOR_SESSION_ID,
+      ],
+    ],
+  ])("fails closed while cached %s proof data is being refetched", async (_label, queryKey) => {
+    const cachedGenericRow = action({
+      id: "cached-generic-alert",
+      source: "environment_alert",
+      plant_id: null,
+      reason: `Review humidity [alert:${ALERT_ID}]`,
+    });
+    const cachedCoachRow = action({
+      id: "cached-selected-coach",
+      plant_id: SELECTED_PLANT_ID,
+    });
+    const cachedAlertRow = action({
+      id: "cached-selected-alert",
+      source: "environment_alert",
+      plant_id: null,
+      reason: `Review humidity [alert:${ALERT_ID}]`,
+    });
+    const cachedAiDoctorRow = action({
+      id: "cached-selected-ai-doctor",
+      source: "ai_doctor",
+      plant_id: null,
+      reason: `Review leaves [session:${AI_DOCTOR_SESSION_ID}]`,
+    });
+    const client = makeClient(Infinity);
+    client.setQueryData(["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5], [cachedGenericRow]);
+    client.setQueryData(
+      [
+        "plant_assigned_tent_actions",
+        "proof_selected_plant_ai_coach",
+        TENT_ID,
+        GROW_ID,
+        SELECTED_PLANT_ID,
+      ],
+      [cachedCoachRow],
+    );
+    client.setQueryData(
+      ["plant_assigned_tent_actions", "proof_selected_alert", TENT_ID, GROW_ID, ALERT_ID],
+      [cachedAlertRow],
+    );
+    client.setQueryData(
+      [
+        "plant_assigned_tent_actions",
+        "proof_selected_ai_doctor",
+        TENT_ID,
+        GROW_ID,
+        AI_DOCTOR_SESSION_ID,
+      ],
+      [cachedAiDoctorRow],
+    );
+
+    const { result } = renderHook(
+      () =>
+        usePlantAssignedTentActions(TENT_ID, GROW_ID, {
+          selectedPlantIdForAiCoach: SELECTED_PLANT_ID,
+          selectedAlertIdForProof: ALERT_ID,
+          selectedAiDoctorSessionIdForProof: AI_DOCTOR_SESSION_ID,
+        }),
+      { wrapper: wrapper(client) },
+    );
+
+    expect(supabaseState.queries).toHaveLength(0);
+    const fetchGate = createDeferred();
+    supabaseState.fetchGate = fetchGate.promise;
+    act(() => {
+      void client.invalidateQueries({ queryKey, exact: true });
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(true));
+
+    // Cached rows are not authoritative while each proof-scope query is
+    // refetching. Neither the generic candidate nor a direct exact lookup may
+    // certify the Live Proof in that window.
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.rows).toEqual([]);
+    expect(result.current.proofSelectedPlantAiCoachRow).toBeNull();
+    expect(result.current.proofSelectedAlertActionRow).toBeNull();
+    expect(result.current.proofSelectedAiDoctorActionRow).toBeNull();
+
+    await act(async () => {
+      fetchGate.resolve();
+      await Promise.resolve();
+    });
+  });
+
+  it("keeps cached generic-panel rows visible during a generic background refetch", async () => {
+    const cachedGenericRow = action({ id: "cached-generic-panel-row" });
+    const client = makeClient(Infinity);
+    client.setQueryData(["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5], [cachedGenericRow]);
+
+    const { result } = renderHook(() => usePlantAssignedTentActions(TENT_ID, GROW_ID), {
+      wrapper: wrapper(client),
+    });
+
+    expect(supabaseState.queries).toHaveLength(0);
+    const fetchGate = createDeferred();
+    supabaseState.fetchGate = fetchGate.promise;
+    act(() => {
+      void client.invalidateQueries({
+        queryKey: ["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5],
+        exact: true,
+      });
+    });
+
+    await waitFor(() => expect(supabaseState.queries).toHaveLength(1));
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.rows.map((row) => row.id)).toEqual(["cached-generic-panel-row"]);
+    expect(result.current.proofSelectedPlantAiCoachRow).toBeNull();
+
+    await act(async () => {
+      fetchGate.resolve();
+      await Promise.resolve();
+    });
   });
 
   it("keeps exact older current-alert and AI Doctor rows reachable beyond the generic cap", async () => {

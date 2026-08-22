@@ -43,6 +43,7 @@ function action(overrides: Partial<AssignedTentActionInputRow> = {}): AssignedTe
     suggested_change: "Review humidity control and lower RH target gradually.",
     reason: "Humidity is high [alert:al-1]",
     risk_level: "high",
+    target_device: null,
     created_at: "2026-05-23T10:00:00Z",
     ...overrides,
   };
@@ -143,6 +144,21 @@ describe("buildAssignedTentActions (pure)", () => {
     expect(row.alertBackPointerId).toBe("al-42");
   });
 
+  it("maps a persisted target device to a safe presence signal", () => {
+    const [row] = buildAssignedTentActions([action({ target_device: "fan-east" })], {
+      tentId: "t1",
+    });
+    expect(row.hasTargetDevice).toBe(true);
+  });
+
+  it("treats every non-null persisted target device as present", () => {
+    const rows = buildAssignedTentActions(
+      [action({ id: "empty", target_device: "" }), action({ id: "space", target_device: "   " })],
+      { tentId: "t1" },
+    );
+    expect(rows.map((row) => row.hasTargetDevice)).toEqual([true, true]);
+  });
+
   it("does not invent fields when source row is sparse", () => {
     const [row] = buildAssignedTentActions(
       [
@@ -204,6 +220,7 @@ describe("Plant Detail wiring", () => {
     expect(HOOK).toMatch(/\.from\(\s*["']action_queue["']\s*\)/);
     expect(HOOK).toMatch(/status["'],\s*["']pending_approval["']/);
     expect(HOOK).toMatch(/tent_id/);
+    expect(HOOK).toMatch(/target_device/);
   });
 });
 

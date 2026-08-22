@@ -36,7 +36,7 @@ export function usePlantAssignedTentActions(
       let query = supabase
         .from("action_queue")
         .select(
-          "id,grow_id,tent_id,plant_id,status,source,action_type,target_metric,suggested_change,reason,risk_level,created_at",
+          "id,grow_id,tent_id,plant_id,status,source,action_type,target_metric,suggested_change,reason,risk_level,target_device,created_at",
         )
         .eq("status", "pending_approval")
         .eq("tent_id", tentId as string)

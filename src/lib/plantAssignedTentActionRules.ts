@@ -11,6 +11,11 @@
  * already stored on the row render.
  */
 
+import {
+  extractSourceAiDoctorSessionId,
+  extractSourceAlertId,
+} from "@/lib/actionQueueProvenanceRules";
+
 export type AssignedTentActionStatus =
   "pending_approval" | "approved" | "rejected" | "completed" | "cancelled" | "simulated" | string;
 
@@ -28,6 +33,7 @@ export interface AssignedTentActionInputRow {
   suggested_change?: string | null;
   reason?: string | null;
   risk_level?: AssignedTentActionRisk | null;
+  target_device?: string | null;
   created_at?: string | null;
 }
 
@@ -45,16 +51,16 @@ export interface PlantAssignedTentActionRow {
   createdAt: string | null;
   /** Parsed alert id from `[alert:<id>]` back-pointer in `reason`, if any. */
   alertBackPointerId: string | null;
+  /** Parsed AI Doctor session id from `[session:<id>]`, if any. Never render raw. */
+  aiDoctorSessionBackPointerId: string | null;
+  /** Whether a persisted action names a target device. Never exposes the identifier. */
+  hasTargetDevice: boolean;
 }
 
 export const ASSIGNED_TENT_ACTIONS_DEFAULT_LIMIT = 5;
 
-const ALERT_BACK_POINTER_RE = /\[alert:([a-zA-Z0-9_-]+)\]/;
-
 export function extractAlertBackPointerId(reason: string | null | undefined): string | null {
-  if (!reason) return null;
-  const m = ALERT_BACK_POINTER_RE.exec(reason);
-  return m ? m[1] : null;
+  return extractSourceAlertId(reason);
 }
 
 export interface BuildAssignedTentActionsOptions {
@@ -77,6 +83,8 @@ function toRow(r: AssignedTentActionInputRow): PlantAssignedTentActionRow {
     riskLevel: r.risk_level ?? null,
     createdAt: r.created_at ?? null,
     alertBackPointerId: extractAlertBackPointerId(r.reason),
+    aiDoctorSessionBackPointerId: extractSourceAiDoctorSessionId(r.reason),
+    hasTargetDevice: r.target_device !== null && r.target_device !== undefined,
   };
 }
 

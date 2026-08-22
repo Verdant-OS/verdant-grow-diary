@@ -18,6 +18,12 @@
  *    and rules never re-emit unknown fields.
  */
 
+import {
+  getActionQueueSourceKind,
+  isActionDerivedFromAlert,
+  stripBackPointerTokens,
+} from "@/lib/actionQueueProvenanceRules";
+
 // ---------------------------------------------------------------------------
 // Public status model
 // ---------------------------------------------------------------------------
@@ -173,10 +179,23 @@ export interface ActionQueueEvidence {
    * marker. Verdant never creates such rows — this flag exists purely to
    * detect and block one if it were ever present, never to enable one.
    */
-  has_device_control_marker: boolean;
+  has_device_control_marker?: boolean;
+  /**
+   * Derived from the persisted `target_device` field by a read-only mapper.
+   * A target is not evidence of execution, but it keeps this proof from
+   * certifying the row as a no-device advisory.
+   */
+  has_target_device?: boolean;
+  source?: string | null;
   reason?: string | null;
   risk_level?: string | null;
   linked_alert_id?: string | null;
+  linked_ai_doctor_session_id?: string | null;
+}
+
+export interface ActionQueueProofContext {
+  alert_id?: string | null;
+  ai_doctor_session_id?: string | null;
 }
 
 export interface FollowUpEvidence {
@@ -698,7 +717,22 @@ export function evaluateAlert(a: AlertEvidence | null): LoopStepRow {
   };
 }
 
-export function evaluateActionQueue(a: ActionQueueEvidence | null): LoopStepRow {
+function actionQueueNeedsReview(a: ActionQueueEvidence, missingInfo: string): LoopStepRow {
+  return {
+    id: "action-queue",
+    label: "Approval-Required Action Queue",
+    status: "needs_review",
+    evidence: [`Status: ${a.status ?? "unknown"}`, "Approval required."],
+    missing_info: [missingInfo],
+    safety_note: "Approval required. Grower decides. This proof page performs no device action.",
+    deep_link: `/actions/${a.id}`,
+  };
+}
+
+export function evaluateActionQueue(
+  a: ActionQueueEvidence | null,
+  context: ActionQueueProofContext = {},
+): LoopStepRow {
   if (!a) {
     return {
       id: "action-queue",
@@ -730,18 +764,59 @@ export function evaluateActionQueue(a: ActionQueueEvidence | null): LoopStepRow 
       safety_note: "Action Queue must remain approval-required.",
     };
   }
+  if (a.status !== "pending_approval") {
+    return actionQueueNeedsReview(a, "Persisted status is not pending approval.");
+  }
+  if (a.has_target_device) {
+    return actionQueueNeedsReview(
+      a,
+      "A target device is recorded, so this read-only proof needs review before treating it as advisory evidence.",
+    );
+  }
   const ev: string[] = [`Status: ${a.status ?? "pending_approval"}`, "Approval required."];
   if (a.risk_level) ev.push(`Risk: ${a.risk_level}`);
-  if (a.reason) ev.push(`Reason: ${a.reason}`);
-  if (a.linked_alert_id) ev.push("Linked to originating alert.");
-  ev.push("No device command.");
+  const safeReason = stripBackPointerTokens(a.reason);
+  if (safeReason) ev.push(`Reason: ${safeReason}`);
+
+  switch (getActionQueueSourceKind(a)) {
+    case "environment_alert": {
+      const isMatchingAlert =
+        typeof context.alert_id === "string" &&
+        a.linked_alert_id === context.alert_id &&
+        isActionDerivedFromAlert(a, context.alert_id);
+      if (!isMatchingAlert) {
+        return actionQueueNeedsReview(a, "No matching scoped alert back-pointer is recorded.");
+      }
+      ev.push("Alert-derived advisory.");
+      break;
+    }
+    case "ai_doctor":
+      if (
+        a.linked_ai_doctor_session_id &&
+        a.linked_ai_doctor_session_id !== context.ai_doctor_session_id
+      ) {
+        return actionQueueNeedsReview(a, "AI Doctor advisory does not match the selected session.");
+      }
+      ev.push("AI Doctor advisory.");
+      break;
+    case "ai_coach":
+      ev.push("AI Coach advisory.");
+      break;
+    default:
+      return actionQueueNeedsReview(
+        a,
+        "Action Queue provenance is not a scoped alert or recognized AI advisory.",
+      );
+  }
+
+  ev.push("This proof page performs no device command.");
   return {
     id: "action-queue",
     label: "Approval-Required Action Queue",
     status: "passed",
     evidence: ev,
     missing_info: [],
-    safety_note: "Approval required. Grower decides. No device command.",
+    safety_note: "Approval required. Grower decides. This proof page performs no device action.",
     deep_link: `/actions/${a.id}`,
   };
 }
@@ -1013,7 +1088,10 @@ export function evaluateLoop(input: LoopEvidence): LoopStepRow[] {
   const sensor = evaluateSensorSnapshot(input.latest_sensor_snapshot, now_ms);
   const ai = evaluateAiDoctor(input.latest_ai_doctor);
   const alert = evaluateAlert(input.latest_alert);
-  const aq = evaluateActionQueue(input.latest_action_queue);
+  const aq = evaluateActionQueue(input.latest_action_queue, {
+    alert_id: input.latest_alert?.id ?? null,
+    ai_doctor_session_id: input.latest_ai_doctor?.session_id ?? null,
+  });
   const followUp = evaluateFollowUp(input.latest_follow_up);
   const rows = [grow, tent, plant, quickLog, timeline, sensor, ai, alert, aq, followUp];
   return rows.map((r) => enrichLoopStepRow(r, input));

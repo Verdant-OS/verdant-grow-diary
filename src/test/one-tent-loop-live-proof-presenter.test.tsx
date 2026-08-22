@@ -8,24 +8,34 @@
  *  - Contains zero write controls (button/form/input/select/textarea)
  *  - Renders approval-required + no-device-command copy for Action Queue
  */
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
 
+const fixtures = vi.hoisted(() => ({
+  activeGrow: null as Record<string, unknown> | null,
+  tents: [] as Array<Record<string, unknown>>,
+  plants: [] as Array<Record<string, unknown>>,
+  diary: [] as Array<Record<string, unknown>>,
+  alerts: [] as Array<Record<string, unknown>>,
+  aiSessions: [] as Array<Record<string, unknown>>,
+  actions: [] as Array<Record<string, unknown>>,
+}));
+
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    activeGrow: null,
-    activeGrowId: null,
-    grows: [],
+    activeGrow: fixtures.activeGrow,
+    activeGrowId: fixtures.activeGrow?.id ?? null,
+    grows: fixtures.activeGrow ? [fixtures.activeGrow] : [],
     setActiveGrowId: () => {},
     refresh: async () => {},
     loading: false,
     error: null,
   }),
 }));
-vi.mock("@/hooks/use-tents", () => ({ useTents: () => ({ data: [] }) }));
-vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: [] }) }));
-vi.mock("@/hooks/use-diary-entries", () => ({ useDiaryEntries: () => ({ data: [] }) }));
+vi.mock("@/hooks/use-tents", () => ({ useTents: () => ({ data: fixtures.tents }) }));
+vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: fixtures.plants }) }));
+vi.mock("@/hooks/use-diary-entries", () => ({ useDiaryEntries: () => ({ data: fixtures.diary }) }));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => ({
     status: "ok",
@@ -44,13 +54,18 @@ vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   }),
 }));
 vi.mock("@/hooks/useAlertsList", () => ({
-  useAlertsList: () => ({ status: "ok", alerts: [], error: null, reload: () => {} }),
+  useAlertsList: () => ({ status: "ok", alerts: fixtures.alerts, error: null, reload: () => {} }),
 }));
 vi.mock("@/hooks/use-ai-doctor-sessions", () => ({
-  useAiDoctorSessions: () => ({ data: [] }),
+  useAiDoctorSessions: () => ({ data: fixtures.aiSessions }),
 }));
 vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
-  usePlantAssignedTentActions: () => ({ rows: [], isLoading: false, isError: false, error: null }),
+  usePlantAssignedTentActions: () => ({
+    rows: fixtures.actions,
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
 }));
 
 import OneTentLoopLiveProof from "@/pages/OneTentLoopLiveProof";
@@ -64,6 +79,29 @@ function renderPage() {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+beforeEach(() => {
+  fixtures.activeGrow = null;
+  fixtures.tents = [];
+  fixtures.plants = [];
+  fixtures.diary = [];
+  fixtures.alerts = [];
+  fixtures.aiSessions = [];
+  fixtures.actions = [];
+});
+
+function setCurrentTentPlantScope() {
+  fixtures.activeGrow = { id: "grow-current", name: "Current grow", status: "active" };
+  fixtures.tents = [{ id: "tent-current", name: "Current tent", grow_id: "grow-current" }];
+  fixtures.plants = [
+    {
+      id: "plant-current",
+      name: "Current plant",
+      grow_id: "grow-current",
+      tent_id: "tent-current",
+    },
+  ];
 }
 
 const FORBIDDEN_HEALTH_COPY = [
@@ -139,6 +177,92 @@ describe("OneTentLoopLiveProof page", () => {
     renderPage();
     const pre = screen.getByTestId("one-tent-loop-live-proof-report-text");
     expect((pre.textContent ?? "").toLowerCase()).toMatch(/one-tent loop/);
+  });
+
+  it("uses only the selected grow/tent/plant alert when proving an alert-derived action", () => {
+    setCurrentTentPlantScope();
+    fixtures.alerts = [
+      {
+        id: "alert-other",
+        grow_id: "grow-current",
+        tent_id: "tent-other",
+        plant_id: "plant-other",
+        metric: "temperature_c",
+        severity: "warning",
+        reason: "Other tent temperature",
+        status: "open",
+        created_at: "2026-06-09T12:00:00.000Z",
+      },
+      {
+        id: "alert-current",
+        grow_id: "grow-current",
+        tent_id: "tent-current",
+        plant_id: "plant-current",
+        metric: "humidity_pct",
+        severity: "warning",
+        reason: "Current tent humidity",
+        status: "open",
+        created_at: "2026-06-09T11:00:00.000Z",
+      },
+    ];
+    fixtures.actions = [
+      {
+        id: "aq-current",
+        growId: "grow-current",
+        tentId: "tent-current",
+        status: "pending_approval",
+        source: "environment_alert",
+        reason: "Review humidity [alert:alert-current]",
+        riskLevel: "low",
+        alertBackPointerId: "alert-current",
+        hasTargetDevice: false,
+      },
+    ];
+
+    renderPage();
+
+    const alert = screen.getByTestId("loop-live-proof-step-alert");
+    expect(alert.textContent).toMatch(/humidity_pct/);
+    expect(alert.textContent).not.toMatch(/temperature_c/);
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("passed");
+    expect(action.textContent).toMatch(/Alert-derived advisory/);
+  });
+
+  it("does not pass an alert-derived action when no scoped matching alert exists", () => {
+    setCurrentTentPlantScope();
+    fixtures.alerts = [
+      {
+        id: "alert-other",
+        grow_id: "grow-current",
+        tent_id: "tent-other",
+        plant_id: "plant-other",
+        metric: "temperature_c",
+        severity: "warning",
+        reason: "Other tent temperature",
+        status: "open",
+        created_at: "2026-06-09T12:00:00.000Z",
+      },
+    ];
+    fixtures.actions = [
+      {
+        id: "aq-current",
+        growId: "grow-current",
+        tentId: "tent-current",
+        status: "pending_approval",
+        source: "environment_alert",
+        reason: "Review humidity",
+        riskLevel: "low",
+        alertBackPointerId: "alert-current",
+        hasTargetDevice: false,
+      },
+    ];
+
+    renderPage();
+
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("needs_review");
+    expect(action.textContent).toMatch(/matching.*alert/i);
   });
 });
 

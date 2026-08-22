@@ -596,6 +596,13 @@ export default function OneTentLoopLiveProof(): JSX.Element {
       }
     : null;
 
+  const scopedAlerts = (alertsQ.alerts ?? []).filter((alert) => {
+    if (!grow || !tent) return false;
+    if (alert.grow_id !== grow.id || alert.tent_id !== tent.id) return false;
+    return alert.plant_id === null || alert.plant_id === plant?.id;
+  });
+  const alertRow = scopedAlerts[0] ?? null;
+
   const aiSessionsQ = useAiDoctorSessions(plant?.id ?? null);
   const latestSession = (aiSessionsQ.data ?? [])[0] ?? null;
   const latest_ai_doctor: AiDoctorEvidence | null = latestSession
@@ -608,11 +615,10 @@ export default function OneTentLoopLiveProof(): JSX.Element {
         had_recent_log: Boolean(latest_quick_log),
         had_recent_photo: Boolean(latest_quick_log?.has_photo),
         had_recent_sensor_snapshot: Boolean(latest_sensor_snapshot),
-        had_alerts: (alertsQ.alerts?.length ?? 0) > 0,
+        had_alerts: Boolean(alertRow),
       }
     : null;
 
-  const alertRow = alertsQ.alerts?.[0] ?? null;
   const latest_alert: AlertEvidence | null = alertRow
     ? {
         id: alertRow.id,
@@ -629,12 +635,14 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   const latest_action_queue: ActionQueueEvidence | null = aqRow
     ? {
         id: aqRow.id,
-        status: aqRow.status ?? "pending_approval",
-        approval_required: true,
-        has_device_control_marker: false,
+        status: aqRow.status,
+        approval_required: aqRow.status === "pending_approval",
+        has_target_device: aqRow.hasTargetDevice,
+        source: aqRow.source,
         reason: aqRow.reason ?? null,
-        risk_level: (aqRow as { riskLevel?: string | null }).riskLevel ?? null,
-        linked_alert_id: null,
+        risk_level: aqRow.riskLevel,
+        linked_alert_id: aqRow.alertBackPointerId,
+        linked_ai_doctor_session_id: aqRow.aiDoctorSessionBackPointerId,
       }
     : null;
 

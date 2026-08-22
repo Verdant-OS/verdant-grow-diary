@@ -70,9 +70,11 @@ function baseEvidence(): LoopEvidence {
       status: "pending_approval",
       approval_required: true,
       has_device_control_marker: false,
-      reason: "review",
+      has_target_device: false,
+      source: "environment_alert",
+      reason: "review [alert:a1]",
       risk_level: "low",
-      linked_alert_id: null,
+      linked_alert_id: "a1",
     },
     latest_follow_up: {
       id: "f1",

@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type GrowQueryResponse = {
@@ -88,10 +89,15 @@ beforeEach(() => {
 describe("GrowsProvider owner transitions", () => {
   it("never renders owner A state to owner B while B's grow fetch is pending", async () => {
     const ownerBSnapshots: OwnerBSnapshot[] = [];
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     const view = render(
-      <GrowsProvider>
-        <GrowsProbe ownerBSnapshots={ownerBSnapshots} />
-      </GrowsProvider>,
+      <QueryClientProvider client={queryClient}>
+        <GrowsProvider>
+          <GrowsProbe ownerBSnapshots={ownerBSnapshots} />
+        </GrowsProvider>
+      </QueryClientProvider>,
     );
 
     await waitFor(() => expect(state.requests).toHaveLength(1));
@@ -111,9 +117,11 @@ describe("GrowsProvider owner transitions", () => {
 
     state.ownerId = "owner-b";
     view.rerender(
-      <GrowsProvider>
-        <GrowsProbe ownerBSnapshots={ownerBSnapshots} />
-      </GrowsProvider>,
+      <QueryClientProvider client={queryClient}>
+        <GrowsProvider>
+          <GrowsProbe ownerBSnapshots={ownerBSnapshots} />
+        </GrowsProvider>
+      </QueryClientProvider>,
     );
 
     await waitFor(() => expect(state.requests).toHaveLength(2));

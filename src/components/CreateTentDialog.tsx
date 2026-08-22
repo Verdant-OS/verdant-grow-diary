@@ -111,7 +111,6 @@ export default function CreateTentDialog({
 
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
-    client: supabase,
   });
 
   const formBlocked = writeBlocked || binding.blockSubmit || !canWriteCreateGrowId(targetGrowId);

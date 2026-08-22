@@ -217,7 +217,6 @@ export default function CreatePlantDialog({
   const createInFlightRef = useRef(false);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
-    client: supabase,
   });
   const handoffSuppressedRef = useRef(false);
   const mountedRef = useRef(true);

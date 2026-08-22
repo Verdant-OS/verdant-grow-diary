@@ -77,7 +77,6 @@ export default function StartYourRoom() {
   const [error, setError] = useState<string | null>(null);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
-    client: supabase,
   });
 
   useEffect(() => {

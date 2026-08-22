@@ -47,7 +47,6 @@ export default function Grows() {
   const createInFlightRef = useRef(false);
   const { createOutcomeUnknown, recordUnknownCreateOutcome } = useHierarchyCreateOutcomeRecovery({
     ownerId: user?.id,
-    client: supabase,
   });
 
   function handleOpenChange(next: boolean) {

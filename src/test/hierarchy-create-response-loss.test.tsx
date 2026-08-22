@@ -592,7 +592,7 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
     expect(screen.getByTestId("grows-new-button")).toBeDisabled();
   });
 
-  it("clears a prior-page Grow fence only after an exact owner-scoped row confirmation", async () => {
+  it("keeps a prior-page Grow fence passive until the provider-level coordinator obtains its visual receipt", async () => {
     state.durableRows.set("grows", { id: IDS.grow, user_id: IDS.owner });
     window.sessionStorage.setItem(
       HIERARCHY_CREATE_OUTCOME_RECOVERY_STORAGE_KEY,
@@ -616,13 +616,14 @@ describe("hierarchy creators recover an ambiguous committed insert", () => {
     );
 
     expect(screen.getByTestId("grows-new-button")).toBeDisabled();
-    await waitFor(() => {
-      const stored = JSON.parse(
-        window.sessionStorage.getItem(HIERARCHY_CREATE_OUTCOME_RECOVERY_STORAGE_KEY) ?? "{}",
-      ) as { attempts?: readonly unknown[] };
-      expect(stored.attempts).toEqual([]);
+    await act(async () => {
+      await Promise.resolve();
     });
-    expect(screen.getByTestId("grows-new-button")).toBeEnabled();
+    const stored = JSON.parse(
+      window.sessionStorage.getItem(HIERARCHY_CREATE_OUTCOME_RECOVERY_STORAGE_KEY) ?? "{}",
+    ) as { attempts?: readonly unknown[] };
+    expect(stored.attempts).toHaveLength(1);
+    expect(screen.getByTestId("grows-new-button")).toBeDisabled();
     expect(screen.queryByPlaceholderText("Tent #1, Backyard, Mothers…")).not.toBeInTheDocument();
   });
 

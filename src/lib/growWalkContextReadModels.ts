@@ -46,7 +46,7 @@ const LEGACY_DIARY_PHOTO_COLUMNS =
 const ALERT_COLUMNS =
   "id,grow_id,tent_id,plant_id,title,reason,severity,status,metric,source,last_seen_at" as const;
 const AI_DOCTOR_COLUMNS =
-  "id,grow_id,tent_id,plant_id,created_at,displayed_confidence,context_confidence_ceiling,context_sufficiency,sensor_snapshot_status,sensor_snapshot_reason_code" as const;
+  "id,grow_id,tent_id,plant_id,created_at,diagnosis,displayed_confidence,context_confidence_ceiling,context_sufficiency,sensor_snapshot_status,sensor_snapshot_reason_code" as const;
 const ACTION_QUEUE_COLUMNS =
   "id,grow_id,tent_id,plant_id,source,status,risk_level,reason,created_at" as const;
 const ACTION_QUEUE_AUDIT_COLUMNS =
@@ -147,6 +147,8 @@ interface AiDoctorRow {
   readonly tent_id: string | null;
   readonly plant_id: string | null;
   readonly created_at: string;
+  /** Sanitized persisted diagnosis; expose only allowlisted summary metadata. */
+  readonly diagnosis: unknown;
   readonly displayed_confidence: number | null;
   readonly context_confidence_ceiling: string | null;
   readonly context_sufficiency: unknown;
@@ -348,15 +350,39 @@ function missingInformationCount(value: unknown): number {
   return 0;
 }
 
+function diagnosisRiskLevel(value: unknown): GrowWalkAiDoctorEvidence["riskLevel"] {
+  if (!isRecord(value)) return "unknown";
+  const riskLevel = normalize(typeof value.riskLevel === "string" ? value.riskLevel : null);
+  return riskLevel === "low" || riskLevel === "medium" || riskLevel === "high"
+    ? riskLevel
+    : "unknown";
+}
+
+function diagnosisSummaryExcerpt(value: unknown): string | null {
+  return isRecord(value) && typeof value.summary === "string" ? excerpt(value.summary) : null;
+}
+
+/**
+ * A persisted diagnosis owns its explicit `missingInformation` list, including
+ * an empty list. Older sessions have no such field and fall back to their
+ * legacy context-sufficiency receipt below.
+ */
+function diagnosisMissingInformationCount(value: unknown): number | null {
+  if (!isRecord(value) || !Array.isArray(value.missingInformation)) return null;
+  return value.missingInformation.filter((item) => hasNonBlankString(item)).length;
+}
+
 function toAiDoctorEvidence(row: AiDoctorRow | undefined): GrowWalkAiDoctorEvidence | null {
   if (!row) return null;
+  const diagnosisMissingCount = diagnosisMissingInformationCount(row.diagnosis);
   return {
     sessionId: row.id,
     completedAt: row.created_at,
     confidenceBand: confidenceBand(row),
-    riskLevel: "unknown",
-    missingInformationCount: missingInformationCount(row.context_sufficiency),
-    summaryExcerpt: null,
+    riskLevel: diagnosisRiskLevel(row.diagnosis),
+    missingInformationCount:
+      diagnosisMissingCount ?? missingInformationCount(row.context_sufficiency),
+    summaryExcerpt: diagnosisSummaryExcerpt(row.diagnosis),
   };
 }
 

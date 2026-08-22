@@ -455,6 +455,7 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(result.data.context.evidence.aiDoctor).toMatchObject({
       sessionId: "session-1",
       confidenceBand: "medium",
+      riskLevel: "unknown",
       missingInformationCount: 1,
       summaryExcerpt: null,
     });
@@ -515,8 +516,90 @@ describe("getGrowWalkContextForOwnedTarget", () => {
       method: "in",
       args: ["action_queue_id", ["aq-1"]],
     });
+    expect(calls).toContainEqual({
+      table: "ai_doctor_sessions",
+      method: "select",
+      args: [expect.stringContaining("diagnosis")],
+    });
     expect(JSON.stringify(result)).not.toMatch(
       /suggested_change|target_device|originating_timeline_events|dedupe_key|user_id|must-not-cross|\[alert:/i,
+    );
+  });
+
+  it("preserves allowlisted persisted AI Doctor cautions without projecting its raw diagnosis", async () => {
+    const data = fixtures();
+    const session = (data.ai_doctor_sessions.data as Record<string, unknown>[])[0]!;
+    data.ai_doctor_sessions = {
+      data: [
+        {
+          ...session,
+          context_sufficiency: null,
+          diagnosis: {
+            riskLevel: "high",
+            summary: "  Inspect the canopy before making changes.  ",
+            missingInformation: ["fresh photo", "manual check"],
+            evidence: ["must-not-leak-ai-evidence"],
+            immediateAction: "must-not-leak-ai-action",
+            suggestedActions: [{ title: "must-not-leak-ai-suggestion" }],
+          },
+        },
+      ],
+      error: null,
+    };
+    const { client } = clientFor(data);
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      client,
+      { targetType: "plant", targetId: "plant-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.evidence.aiDoctor).toMatchObject({
+      riskLevel: "high",
+      missingInformationCount: 2,
+      summaryExcerpt: "Inspect the canopy before making changes.",
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /must-not-leak-ai-evidence|must-not-leak-ai-action|must-not-leak-ai-suggestion/i,
+    );
+  });
+
+  it("keeps an explicit empty diagnosis missing-information list and rejects malformed diagnosis fields", async () => {
+    const data = fixtures();
+    const session = (data.ai_doctor_sessions.data as Record<string, unknown>[])[0]!;
+    data.ai_doctor_sessions = {
+      data: [
+        {
+          ...session,
+          diagnosis: {
+            riskLevel: "critical",
+            summary: { private: "must-not-leak-malformed-summary" },
+            missingInformation: [],
+            evidence: "must-not-leak-malformed-evidence",
+          },
+        },
+      ],
+      error: null,
+    };
+    const { client } = clientFor(data);
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      client,
+      { targetType: "plant", targetId: "plant-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.evidence.aiDoctor).toMatchObject({
+      riskLevel: "unknown",
+      missingInformationCount: 0,
+      summaryExcerpt: null,
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /must-not-leak-malformed-summary|must-not-leak-malformed-evidence/i,
     );
   });
 

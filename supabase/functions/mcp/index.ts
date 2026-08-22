@@ -1778,7 +1778,7 @@ var LEGACY_DIARY_PHOTO_COLUMNS2 = "id,grow_id,tent_id,plant_id,entry_at,photo_ur
 var ALERT_COLUMNS2 =
   "id,grow_id,tent_id,plant_id,title,reason,severity,status,metric,source,last_seen_at";
 var AI_DOCTOR_COLUMNS =
-  "id,grow_id,tent_id,plant_id,created_at,displayed_confidence,context_confidence_ceiling,context_sufficiency,sensor_snapshot_status,sensor_snapshot_reason_code";
+  "id,grow_id,tent_id,plant_id,created_at,diagnosis,displayed_confidence,context_confidence_ceiling,context_sufficiency,sensor_snapshot_status,sensor_snapshot_reason_code";
 var ACTION_QUEUE_COLUMNS = "id,grow_id,tent_id,plant_id,source,status,risk_level,reason,created_at";
 var ACTION_QUEUE_AUDIT_COLUMNS =
   "id,action_queue_id,grow_id,event_type,previous_status,new_status,note,created_at";
@@ -1920,15 +1920,31 @@ function missingInformationCount(value) {
   }
   return 0;
 }
+function diagnosisRiskLevel(value) {
+  if (!isRecord2(value)) return "unknown";
+  const riskLevel = normalize3(typeof value.riskLevel === "string" ? value.riskLevel : null);
+  return riskLevel === "low" || riskLevel === "medium" || riskLevel === "high"
+    ? riskLevel
+    : "unknown";
+}
+function diagnosisSummaryExcerpt(value) {
+  return isRecord2(value) && typeof value.summary === "string" ? excerpt2(value.summary) : null;
+}
+function diagnosisMissingInformationCount(value) {
+  if (!isRecord2(value) || !Array.isArray(value.missingInformation)) return null;
+  return value.missingInformation.filter((item) => hasNonBlankString2(item)).length;
+}
 function toAiDoctorEvidence(row) {
   if (!row) return null;
+  const diagnosisMissingCount = diagnosisMissingInformationCount(row.diagnosis);
   return {
     sessionId: row.id,
     completedAt: row.created_at,
     confidenceBand: confidenceBand(row),
-    riskLevel: "unknown",
-    missingInformationCount: missingInformationCount(row.context_sufficiency),
-    summaryExcerpt: null,
+    riskLevel: diagnosisRiskLevel(row.diagnosis),
+    missingInformationCount:
+      diagnosisMissingCount ?? missingInformationCount(row.context_sufficiency),
+    summaryExcerpt: diagnosisSummaryExcerpt(row.diagnosis),
   };
 }
 function openActionStatus(value) {

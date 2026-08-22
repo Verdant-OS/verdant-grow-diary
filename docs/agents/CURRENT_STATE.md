@@ -1055,10 +1055,27 @@ pieces of work. Building a "B4b" now would produce a second implementation of a
 merged slice, which `AGENTS.md` forbids.
 
 The remaining dependency: B2b and B5 block on Tranche A slices that have never
-been opened — **A5** (re-verified 2026-08-22: 13 non-test files still dispatch
-`verdant:entry-created` across 23 sites) and **A3** (re-verified: `Alerts.tsx`
-exists and contains 0 `searchParams` references). So Tranche A is no longer only
-its own tranche — it gates the completion of Tranche B+. No schema, no migrations,
+been opened. Both re-verified 2026-08-22 **against each slice's own artifacts**,
+after a first attempt measured the wrong things (a raw literal count reported as
+dispatch sites, and an `Alerts.tsx` check that belongs to A5(c), not A3):
+
+- **A5** — "single dispatch" has not converged. `verdant:entry-created` still has
+  **5 independent emit sites** in non-test code: `PlantQuickLog.tsx:399`,
+  `QuickLog.tsx:1454`, `AppShell.tsx:390`, `useSavePhotoDiagnosisReview.ts:91`,
+  and the `dispatchQuickLogV2EntryCreated` helper in
+  `src/lib/quickLogV2EntryCreatedEvent.ts`. Count **emitters**, not literal
+  matches — the string appears 23 times across 13 files, but most of those are
+  comments, event-name constants, and `add`/`removeEventListener` in the
+  Timeline / DailyCheck / ActionFollowUp listeners.
+- **A3** — none of its artifacts exist. `src/lib/tentPlantDisplayLabel.ts` and
+  `src/lib/actionContextNameLookup.ts` are both absent,
+  `buildActionRowContextLabel` is absent from `actionQueueRowView.ts`, and none
+  of the four A3 test ids (`action-queue-row-context-names`,
+  `alert-detail-tent-label`, `alert-detail-plant-label`,
+  `action-detail-tent-label`) appear anywhere in `src/`.
+
+So Tranche A is no longer only its own tranche — it gates the completion of
+Tranche B+. No schema, no migrations,
 no new routes, no new Quick Log write paths, no production telemetry.
 
 **Named isolated spike (approved 2026-08-13, not SEO):**

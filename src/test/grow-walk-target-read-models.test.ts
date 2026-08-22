@@ -595,6 +595,52 @@ describe("listGrowWalkTargetsForOwnedGrow", () => {
     });
   });
 
+  it("maps a raw watch alert to low reviewable target attention", async () => {
+    const fixtures = successFixtures();
+    const event = (fixtures.grow_events.data as Record<string, unknown>[])[0]!;
+    fixtures.grow_events = {
+      data: [
+        {
+          ...event,
+          id: "routine-observation",
+          event_type: "observation",
+          note: "Checked the plant; condition is unchanged.",
+        },
+      ],
+      error: null,
+    };
+    fixtures.alerts = {
+      data: [
+        {
+          id: "watch-humidity-alert",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          title: "Humidity is worth watching",
+          reason: "The current value is near the preferred range.",
+          severity: "watch",
+          status: "open",
+          metric: "humidity_pct",
+          source: "live",
+          last_seen_at: "2026-08-07T11:50:00.000Z",
+        },
+      ],
+      error: null,
+    };
+
+    const result = await listGrowWalkTargetsForOwnedGrow(clientFor(fixtures).client, "grow-1", {
+      now: new Date("2026-08-07T12:00:00.000Z"),
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const target = result.data.targets.find((row) => row.targetId === "plant-1");
+    expect(target?.highestAlertSeverity).toBe("low");
+    expect(target?.reasonCodes).toEqual(["active_low_alert_needs_review"]);
+    expect(target?.latestAdverseEvidenceAt).toBeNull();
+    expect(target?.attentionBand).toBe("watch_today");
+  });
+
   it("labels every target historical when its owned grow is archived", async () => {
     const fixtures = successFixtures();
     fixtures.grows = {

@@ -914,6 +914,7 @@ var GROW_WALK_CONTEXT_VERSION = "grow-walk-v0.1";
 var GROW_WALK_REASON_CODES = [
   "active_high_alert_needs_confirmation",
   "active_medium_alert_needs_review",
+  "active_low_alert_needs_review",
   "multiple_adverse_evidence_lanes",
   "stacked_major_changes_48h",
   "stale_or_invalid_sensor_during_problem",
@@ -1122,8 +1123,12 @@ function deriveGrowWalkEvidence(input) {
   const activeMediumAlerts = validAlerts.filter(
     ({ alert }) => alert.severity === "medium" && isActiveAlert(alert),
   );
+  const activeLowAlerts = validAlerts.filter(
+    ({ alert }) => alert.severity === "low" && isActiveAlert(alert),
+  );
   if (activeHighAlerts.length > 0) reasons.add("active_high_alert_needs_confirmation");
   if (activeMediumAlerts.length > 0) reasons.add("active_medium_alert_needs_review");
+  if (activeLowAlerts.length > 0) reasons.add("active_low_alert_needs_review");
   if (
     normalize(input.stage).includes("flower") &&
     activeHighAlerts.some(({ alert }) => isHumidityAlert(alert))
@@ -2417,7 +2422,12 @@ async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
       missingEvidenceCodes: addMissing(derived.missingEvidenceCodes, "plant_profile_incomplete"),
     };
   }
-  if (partial.has("events") || partial.has("alerts")) {
+  if (
+    partial.has("events") ||
+    partial.has("alerts") ||
+    truncated.has("events") ||
+    truncated.has("alerts")
+  ) {
     derived = { ...derived, evidenceConfidence: "low" };
   } else if (partial.size > 0 && derived.evidenceConfidence === "high") {
     derived = { ...derived, evidenceConfidence: "medium" };

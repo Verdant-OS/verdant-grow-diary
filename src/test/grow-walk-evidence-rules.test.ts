@@ -190,6 +190,31 @@ describe("deriveGrowWalkEvidence", () => {
     expect(result.evidenceConfidence).toBe("high");
   });
 
+  it("keeps active low alerts reviewable without treating them as medium or high evidence", () => {
+    const result = derive({
+      alerts: [
+        {
+          id: "alert-low-1",
+          title: "Humidity is worth watching",
+          reasonExcerpt: "The current value is near the preferred range.",
+          severity: "low",
+          status: "open",
+          metric: "humidity_pct",
+          source: "live",
+          lastSeenAt: "2026-08-07T11:45:00.000Z",
+        },
+      ],
+    });
+
+    expect(result.reasonCodes).toEqual(["active_low_alert_needs_review"]);
+    expect(result.reasonCodes).not.toContain("active_medium_alert_needs_review");
+    expect(result.reasonCodes).not.toContain("active_high_alert_needs_confirmation");
+    expect(result.reasonCodes).not.toContain("flower_humidity_alert_needs_inspection");
+    expect(result.reasonCodes).not.toContain("multiple_adverse_evidence_lanes");
+    expect(result.latestAdverseEvidenceAt).toBeNull();
+    expect(result.evidenceConfidence).toBe("high");
+  });
+
   it("is deterministic and keeps photo records metadata-only", () => {
     const input = { sensors: sensors({ contradictionMetrics: ["humidity_pct"] }) };
     const first = derive(input);

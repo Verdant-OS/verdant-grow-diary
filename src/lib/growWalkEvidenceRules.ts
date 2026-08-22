@@ -263,8 +263,12 @@ export function deriveGrowWalkEvidence(input: GrowWalkEvidenceInput): GrowWalkEv
   const activeMediumAlerts = validAlerts.filter(
     ({ alert }) => alert.severity === "medium" && isActiveAlert(alert),
   );
+  const activeLowAlerts = validAlerts.filter(
+    ({ alert }) => alert.severity === "low" && isActiveAlert(alert),
+  );
   if (activeHighAlerts.length > 0) reasons.add("active_high_alert_needs_confirmation");
   if (activeMediumAlerts.length > 0) reasons.add("active_medium_alert_needs_review");
+  if (activeLowAlerts.length > 0) reasons.add("active_low_alert_needs_review");
 
   if (
     normalize(input.stage).includes("flower") &&

@@ -1017,10 +1017,16 @@ export async function getGrowWalkContextForOwnedTarget(
       missingEvidenceCodes: addMissing(derived.missingEvidenceCodes, "plant_profile_incomplete"),
     };
   }
-  // Events and alerts are decision-critical: an unavailable lane prevents a
-  // routine all-clear even when the surviving evidence looks complete. Other
-  // partial lanes retain the narrower high-to-medium confidence downgrade.
-  if (partial.has("events") || partial.has("alerts")) {
+  // Events and alerts are decision-critical: an unavailable or truncated
+  // lane prevents a routine all-clear even when the surviving evidence looks
+  // complete. Other partial lanes retain the narrower high-to-medium
+  // confidence downgrade; noncritical truncation remains receipt-only.
+  if (
+    partial.has("events") ||
+    partial.has("alerts") ||
+    truncated.has("events") ||
+    truncated.has("alerts")
+  ) {
     derived = { ...derived, evidenceConfidence: "low" };
   } else if (partial.size > 0 && derived.evidenceConfidence === "high") {
     derived = { ...derived, evidenceConfidence: "medium" };

@@ -2039,6 +2039,59 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     },
   );
 
+  it.each(["events", "alerts"] as const)(
+    "treats a truncated %s decision lane as low confidence and never a routine all-clear",
+    async (lane) => {
+      const data = routineReadyFixtures();
+      if (lane === "events") {
+        const event = (data.grow_events.data as Record<string, unknown>[])[0]!;
+        data.grow_events = {
+          data: Array.from({ length: 101 }, (_, index) => ({
+            ...event,
+            id: `routine-event-${index + 1}`,
+          })),
+          error: null,
+        };
+      } else {
+        data.alerts = {
+          data: Array.from({ length: 51 }, (_, index) => ({
+            id: `active-watch-${index + 1}`,
+            grow_id: "grow-1",
+            tent_id: "tent-1",
+            plant_id: "plant-1",
+            title: "Active watch alert",
+            reason: "This row remains an active low-severity review signal.",
+            severity: "watch",
+            status: "open",
+            metric: "humidity_pct",
+            source: "live",
+            last_seen_at: "2026-08-07T11:30:00.000Z",
+          })),
+          error: null,
+        };
+      }
+
+      const result = await getGrowWalkContextForOwnedTarget(
+        clientFor(data).client,
+        { targetType: "plant", targetId: "plant-1" },
+        { now: new Date("2026-08-07T12:00:00.000Z") },
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.context.receipt.partialLanes).toEqual([]);
+      expect(result.data.context.receipt.truncatedLanes).toEqual([lane]);
+      expect(result.data.context.derived.evidenceConfidence).toBe("low");
+      if (lane === "events") {
+        expect(result.data.context.derived.reasonCodes).toEqual([]);
+        expect(result.data.context.derived.attentionBand).toBe("insufficient_evidence");
+      } else {
+        expect(result.data.context.derived.reasonCodes).toEqual(["active_low_alert_needs_review"]);
+        expect(result.data.context.derived.attentionBand).toBe("watch_today");
+      }
+    },
+  );
+
   it("treats a failed tent-relation read as incomplete event and alert evidence", async () => {
     const data = routineReadyFixtures();
     data.plants = { data: null, error: { message: "tent child relation unavailable" } };
@@ -2132,6 +2185,67 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(result.data.context.derived.reasonCodes).toEqual(["active_medium_alert_needs_review"]);
     expect(result.data.context.derived.evidenceConfidence).toBe("high");
     expect(result.data.context.derived.attentionBand).toBe("watch_today");
+  });
+
+  it("keeps a raw watch alert reviewable without upgrading it to medium severity", async () => {
+    const data = routineReadyFixtures();
+    data.alerts = {
+      data: [
+        {
+          id: "watch-humidity-alert",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          title: "Humidity is worth watching",
+          reason: "The current value is near the preferred range.",
+          severity: "watch",
+          status: "open",
+          metric: "humidity_pct",
+          source: "live",
+          last_seen_at: "2026-08-07T11:30:00.000Z",
+        },
+      ],
+      error: null,
+    };
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      clientFor(data).client,
+      { targetType: "plant", targetId: "plant-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.evidence.alerts[0]?.severity).toBe("low");
+    expect(result.data.context.derived.reasonCodes).toEqual(["active_low_alert_needs_review"]);
+    expect(result.data.context.derived.evidenceConfidence).toBe("high");
+    expect(result.data.context.derived.attentionBand).toBe("watch_today");
+  });
+
+  it("keeps noncritical photo truncation at its existing routine posture", async () => {
+    const data = routineReadyFixtures();
+    const photo = (data.diary_entries.data as Record<string, unknown>[])[0]!;
+    data.diary_entries = {
+      data: Array.from({ length: 101 }, (_, index) => ({
+        ...photo,
+        id: `routine-photo-${index + 1}`,
+      })),
+      error: null,
+    };
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      clientFor(data).client,
+      { targetType: "plant", targetId: "plant-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.receipt.partialLanes).toEqual([]);
+    expect(result.data.context.receipt.truncatedLanes).toEqual(["photos"]);
+    expect(result.data.context.derived.reasonCodes).toEqual([]);
+    expect(result.data.context.derived.evidenceConfidence).toBe("high");
+    expect(result.data.context.derived.attentionBand).toBe("routine_observation");
   });
 
   it("keeps a non-decision partial lane at its existing medium routine posture", async () => {

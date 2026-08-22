@@ -38,6 +38,7 @@ const state = vi.hoisted(() => ({
   selects: [] as Array<{ table: string; columns: string }>,
   plants: [] as Array<Record<string, unknown>>,
   plantsError: null as unknown,
+  tentsError: null as unknown,
 }));
 
 /**
@@ -66,19 +67,21 @@ vi.mock("@/integrations/supabase/client", () => ({
                     data: state.plants.map((row) => project(row, columns)),
                     error: state.plantsError,
                   }
-                : {
-                    data: [
-                      { id: TENT, name: "Tent A", grow_id: GROW, is_archived: false },
-                      {
-                        id: OTHER_GROW_TENT,
-                        name: "Tent B",
-                        grow_id: OTHER_GROW,
-                        is_archived: false,
-                      },
-                      { id: ARCHIVED_TENT, name: "Tent C", grow_id: GROW, is_archived: true },
-                    ].map((row) => project(row, columns)),
-                    error: null,
-                  },
+                : state.tentsError
+                  ? { data: null, error: state.tentsError }
+                  : {
+                      data: [
+                        { id: TENT, name: "Tent A", grow_id: GROW, is_archived: false },
+                        {
+                          id: OTHER_GROW_TENT,
+                          name: "Tent B",
+                          grow_id: OTHER_GROW,
+                          is_archived: false,
+                        },
+                        { id: ARCHIVED_TENT, name: "Tent C", grow_id: GROW, is_archived: true },
+                      ].map((row) => project(row, columns)),
+                      error: null,
+                    },
           };
         },
       };
@@ -92,6 +95,7 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
   beforeEach(() => {
     state.selects = [];
     state.plantsError = null;
+    state.tentsError = null;
     state.plants = [
       {
         id: PLANT_ACTIVE,
@@ -260,6 +264,25 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
 
     await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("ready"));
     expect(result.current.carriablePlantTentById).not.toBeNull();
+  });
+
+  it("reports a failed TENTS read as unavailable, not an empty ready carry", async () => {
+    // Raised in review. Both reads are required to verify a carry: plants
+    // supply the candidates, tents prove the tent is live and resolve a
+    // legacy plant's effective grow. Degrading to an empty tent list built
+    // an EMPTY map — and an empty map is not null, so the status said
+    // "ready" and Timeline enabled the handoff with the plant silently
+    // removed. Verification failed must not present as nothing-to-carry.
+    state.tentsError = { message: "tents read failed" };
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
+
+    await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("unavailable"));
+    expect(result.current.carriablePlantTentById).toBeNull();
+
+    // Plant NAMES survive: a lost label is cosmetic, a lost verification is
+    // not, so the two degrade independently.
+    expect(result.current.plantNamesById!.get(PLANT_ACTIVE)).toBe("Alpha");
+    expect(result.current.tentNamesById).toBeNull();
   });
 
   it("reports a failed read as unavailable, never as pending", async () => {

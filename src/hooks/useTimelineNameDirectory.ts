@@ -115,12 +115,22 @@ export function useTimelineNameDirectory(
           key,
           plantNamesById: plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data),
           tentNamesById: tentsResult?.error ? null : buildTimelineNameLookup(tentsResult?.data),
-          carriablePlantTentById: plantsResult?.error
-            ? null
-            : buildCarriablePlantTentLookup(plantsResult?.data, {
-                growId: activeGrowId,
-                tents: tentsResult?.error ? [] : (tentsResult?.data ?? []),
-              }),
+          // BOTH reads are required to verify a carry: plants supply the
+          // candidates, tents prove the tent is live and can resolve a legacy
+          // plant's effective grow. A failed tents read used to degrade to an
+          // empty tent list, which produced an EMPTY map — and an empty map
+          // is not null, so the status below called it "ready" and Timeline
+          // enabled the handoff with the plant silently removed. That is
+          // "verification failed" wearing the costume of "nothing to carry".
+          // The two NAME maps still degrade independently: a lost label is
+          // cosmetic, a lost verification is not.
+          carriablePlantTentById:
+            plantsResult?.error || tentsResult?.error
+              ? null
+              : buildCarriablePlantTentLookup(plantsResult?.data, {
+                  growId: activeGrowId,
+                  tents: tentsResult?.data ?? [],
+                }),
         });
       } catch {
         if (cancelled) return;

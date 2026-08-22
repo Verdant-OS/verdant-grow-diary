@@ -142,6 +142,14 @@ export interface PartitionDoctorEntryOptionsInput {
   options?: readonly AiDoctorEntryOption[] | null;
   plants?: readonly AiDoctorEntryPlant[] | null;
   tentId?: string | null;
+  /**
+   * Plant carried from Timeline through Sensors (D-B6 handoff). Untrusted:
+   * it is honoured only when it names a plant the grower actually owns AND
+   * that plant sits in the carried tent. It reorders and labels; it NEVER
+   * selects. "Verdant will not guess which plant you mean" is doctrine, and
+   * a carried intent is still the grower's to confirm.
+   */
+  carriedPlantId?: string | null;
 }
 
 export interface PartitionedDoctorEntryOptions {
@@ -149,6 +157,11 @@ export interface PartitionedDoctorEntryOptions {
   inScope: readonly AiDoctorEntryOption[];
   /** Every other option, in builder order. Never a dropped choice. */
   others: readonly AiDoctorEntryOption[];
+  /**
+   * The validated carried plant's option id, or null. Presenters may label
+   * and order by it. It is NOT a selection and must never be applied as one.
+   */
+  carriedPlantOptionId: string | null;
 }
 
 /**
@@ -163,7 +176,7 @@ export function partitionDoctorEntryOptionsByTent(
   const options = Array.isArray(input?.options) ? input.options : [];
   const tentId = trimmed(input?.tentId);
   if (!tentId || options.length === 0) {
-    return { inScope: [], others: options };
+    return { inScope: [], others: options, carriedPlantOptionId: null };
   }
 
   const plants = Array.isArray(input?.plants) ? input.plants : [];
@@ -181,5 +194,25 @@ export function partitionDoctorEntryOptionsByTent(
     if (option && plantTentById.get(option.id) === tentId) inScope.push(option);
     else others.push(option);
   }
-  return { inScope, others };
+
+  // Honour the carried plant only if it is BOTH one of the grower's own
+  // options AND in the carried tent. A plant from another tent, another
+  // account, or no longer present fails closed to null rather than being
+  // surfaced as "where you came from".
+  const requestedPlantId = trimmed(input?.carriedPlantId);
+  const carriedPlantOptionId =
+    requestedPlantId && inScope.some((option) => option.id === requestedPlantId)
+      ? requestedPlantId
+      : null;
+
+  // Order the carried plant first WITHIN its tent group. Nothing is removed:
+  // inScope ∪ others still equals the input.
+  const orderedInScope = carriedPlantOptionId
+    ? [
+        ...inScope.filter((option) => option.id === carriedPlantOptionId),
+        ...inScope.filter((option) => option.id !== carriedPlantOptionId),
+      ]
+    : inScope;
+
+  return { inScope: orderedInScope, others, carriedPlantOptionId };
 }

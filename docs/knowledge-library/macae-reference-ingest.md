@@ -163,14 +163,14 @@ ran minutes before #1096 merged at 04:32Z, so the count aged out at once; and #1
 the MACAE ingest itself, so counting it while asserting "none overlapping" was
 self-contradictory. It is the same work, not a collision.
 
-| Item                                                           | Status                                           |
-| -------------------------------------------------------------- | ------------------------------------------------ |
-| Repository cloned and structurally read                        | `PASS`                                           |
-| Orchestration and approval path read at source                 | `PASS`                                           |
-| Do-not-port rules recorded in this file and `CURRENT_STATE.md` | `PASS`                                           |
-| Collision with another agent's open work                       | `PASS` — see the note above the ledger           |
-| Runtime behaviour of the accelerator                           | `NOT_MEASURED` — never deployed or executed      |
-| Applicability to any specific Verdant slice                    | `NOT_MEASURED` — no slice assigned               |
-| Independent review of this ingest                              | owner Claude; owner-designated Cursor reviewer **Blue Dream** |
+| Item                                                           | Status                                                                 |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Repository cloned and structurally read                        | `PASS`                                                                 |
+| Orchestration and approval path read at source                 | `PASS`                                                                 |
+| Do-not-port rules recorded in this file and `CURRENT_STATE.md` | `PASS`                                                                 |
+| Collision with another agent's open work                       | `PASS` — see the note above the ledger                                 |
+| Runtime behaviour of the accelerator                           | `NOT_MEASURED` — never deployed or executed                            |
+| Applicability to any specific Verdant slice                    | `NOT_MEASURED` — no slice assigned                                     |
+| Independent review of this ingest                              | owner Claude; owner-designated Cursor reviewer **Blue Dream**          |
 | Protocol peer-review seat                                      | **Grok (GDP)** — filled by Cheek 2026-08-22 (`HANDOFF_PROTOCOL.md:24`) |
-| Owner acknowledgement                                          | **cheekhimself**, outside GitHub review-request  |
+| Owner acknowledgement                                          | **cheekhimself**, outside GitHub review-request                        |

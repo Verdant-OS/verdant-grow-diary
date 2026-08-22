@@ -1545,7 +1545,7 @@ to read and ingest for future builds", authorised 2026-08-22 as a docs-only slic
 | Applicability to any Verdant slice | `NOT_MEASURED` — no slice assigned                                                                                                               |
 | Slice owner                        | **Claude**                                                                                                                                       |
 | Owner-designated reviewer          | **Blue Dream**, in Cursor — not a GitHub handle (Cheek, 2026-08-22)                                                                              |
-| Protocol peer-review seat          | **Grok (GDP)** — filled by Cheek 2026-08-22; `HANDOFF_PROTOCOL.md:24` allows Grok, Claude or Codex                                              |
+| Protocol peer-review seat          | **Grok (GDP)** — filled by Cheek 2026-08-22; `HANDOFF_PROTOCOL.md:24` allows Grok, Claude or Codex                                               |
 | Owner acknowledgement              | **cheekhimself**, given out-of-band, outside the GitHub review-request mechanism                                                                 |
 
 Pairing recorded here per `docs/agents/HANDOFF_PROTOCOL.md:25`, which requires both names

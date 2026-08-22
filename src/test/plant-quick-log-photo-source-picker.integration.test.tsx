@@ -22,6 +22,7 @@ const saveResultState = vi.hoisted(() => ({
 const photoPatchState = vi.hoisted(() => ({
   data: [{ id: "diary-1" }] as Array<{ id: string }> | null,
   error: null as unknown,
+  rejectOnSelect: false,
 }));
 const toastSuccessMock = vi.hoisted(() => vi.fn());
 const toastErrorMock = vi.hoisted(() => vi.fn());
@@ -55,7 +56,9 @@ vi.mock("@/integrations/supabase/client", () => ({
           eq: () => chain,
           filter: () => chain,
           select: () =>
-            Promise.resolve({ data: photoPatchState.data, error: photoPatchState.error }),
+            photoPatchState.rejectOnSelect
+              ? Promise.reject(new Error("diary update unavailable"))
+              : Promise.resolve({ data: photoPatchState.data, error: photoPatchState.error }),
         };
         return chain;
       },
@@ -82,6 +85,7 @@ beforeEach(() => {
   saveResultState.value = { ok: true, growEventId: "ge-1", reused: false };
   photoPatchState.data = [{ id: "diary-1" }];
   photoPatchState.error = null;
+  photoPatchState.rejectOnSelect = false;
   toastSuccessMock.mockReset();
   toastErrorMock.mockReset();
   vi.restoreAllMocks();
@@ -99,17 +103,24 @@ beforeEach(() => {
 
 import PlantQuickLog from "@/components/PlantQuickLog";
 
-function renderSheet() {
+function renderSheet({
+  onOpenChange = () => {},
+  onSaved,
+}: {
+  onOpenChange?: (open: boolean) => void;
+  onSaved?: () => void;
+} = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <PlantQuickLog
         open
-        onOpenChange={() => {}}
+        onOpenChange={onOpenChange}
         plantId="plant-1"
         plantName="Plant 1"
         growId="grow-1"
         tentId="tent-1"
+        onSaved={onSaved}
       />
     </QueryClientProvider>,
   );
@@ -361,9 +372,12 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     expect(JSON.stringify(saveCalls[0])).not.toContain("user_id");
   });
 
-  it("does not claim full photo success when the companion diary patch fails", async () => {
+  it("keeps a confirmed nested-photo save successful when top-level normalization fails", async () => {
     photoPatchState.error = { message: "diary update rejected" };
-    renderSheet();
+    const onOpenChange = vi.fn();
+    const onSaved = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    renderSheet({ onOpenChange, onSaved });
     const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
     await pickFile(camera, makeImage("patch-failure.jpg"));
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
@@ -372,18 +386,25 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
 
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
 
-    expect(await screen.findByTestId("plant-quick-log-error")).toHaveTextContent(
-      /log was saved, but the photo could not be attached/i,
+    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith("Log saved to timeline."));
+    expect(screen.queryByTestId("plant-quick-log-error")).toBeNull();
+    expect(screen.getByTestId("plant-quick-log-save-helper")).not.toHaveTextContent(
+      /page refresh/i,
     );
-    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
-    expect(toastSuccessMock).not.toHaveBeenCalled();
     expect(saveCalls).toHaveLength(1);
+    expect(uploadCalls).toHaveLength(1);
+    expect((saveCalls[0].p_details as { photo_url?: string }).photo_url).toBe(uploadCalls[0].path);
     expect(updateCalls).toHaveLength(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 
-  it("does not claim photo success when the confirmed save omits its event identity", async () => {
+  it("keeps a confirmed save fail-closed when it omits its event identity", async () => {
     saveResultState.value = { ok: true, growEventId: null, reused: false };
-    renderSheet();
+    const onOpenChange = vi.fn();
+    const onSaved = vi.fn();
+    renderSheet({ onOpenChange, onSaved });
     const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
     await pickFile(camera, makeImage("missing-event-id.jpg"));
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
@@ -398,11 +419,16 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
     expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
     expect(toastSuccessMock).not.toHaveBeenCalled();
     expect(updateCalls).toHaveLength(0);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 
-  it("does not claim photo success when the companion update changes no diary row", async () => {
+  it("keeps a confirmed nested-photo save successful when top-level normalization finds no row", async () => {
     photoPatchState.data = [];
-    renderSheet();
+    const onOpenChange = vi.fn();
+    const onSaved = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    renderSheet({ onOpenChange, onSaved });
     const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
     await pickFile(camera, makeImage("missing-diary-row.jpg"));
     fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
@@ -411,12 +437,45 @@ describe("PlantQuickLog photo source picker — both sources reach same preview 
 
     fireEvent.click(screen.getByTestId("plant-quick-log-save"));
 
-    expect(await screen.findByTestId("plant-quick-log-error")).toHaveTextContent(
-      /log was saved, but the photo could not be attached/i,
+    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith("Log saved to timeline."));
+    expect(screen.queryByTestId("plant-quick-log-error")).toBeNull();
+    expect(screen.getByTestId("plant-quick-log-save-helper")).not.toHaveTextContent(
+      /page refresh/i,
     );
-    expect(screen.getByTestId("plant-quick-log-save")).toBeDisabled();
-    expect(toastSuccessMock).not.toHaveBeenCalled();
+    expect(uploadCalls).toHaveLength(1);
+    expect((saveCalls[0].p_details as { photo_url?: string }).photo_url).toBe(uploadCalls[0].path);
     expect(updateCalls).toHaveLength(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a confirmed nested-photo save successful when top-level normalization rejects", async () => {
+    photoPatchState.rejectOnSelect = true;
+    const onOpenChange = vi.fn();
+    const onSaved = vi.fn();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    renderSheet({ onOpenChange, onSaved });
+    const camera = document.getElementById("plant-quick-log-photo-input") as HTMLInputElement;
+    await pickFile(camera, makeImage("throwing-normalizer.jpg"));
+    fireEvent.change(screen.getByTestId("plant-quick-log-note"), {
+      target: { value: "The nested diary reference is the durable receipt" },
+    });
+
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+
+    await waitFor(() => expect(toastSuccessMock).toHaveBeenCalledWith("Log saved to timeline."));
+    expect(screen.queryByTestId("plant-quick-log-error")).toBeNull();
+    expect(screen.getByTestId("plant-quick-log-save-helper")).not.toHaveTextContent(
+      /page refresh/i,
+    );
+    expect(saveCalls).toHaveLength(1);
+    expect(uploadCalls).toHaveLength(1);
+    expect((saveCalls[0].p_details as { photo_url?: string }).photo_url).toBe(uploadCalls[0].path);
+    expect(updateCalls).toHaveLength(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 
   it("saves a library photo without requiring typed notes", async () => {

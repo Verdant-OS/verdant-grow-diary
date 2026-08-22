@@ -11,8 +11,9 @@
  *
  * Safety contract is enforced by src/test/plant-quick-log.test.ts — persist
  * goes through useQuickLogV2Save → quicklog_save_manual. Photo bytes still
- * upload to diary-photos; the companion photo_url column may be patched
- * after a successful RPC. Manual sensor values stay under
+ * upload to diary-photos; the successful RPC persists the companion
+ * details.photo_url reference, while the top-level photo_url normalization is
+ * best-effort. Manual sensor values stay under
  * details.manual_sensor_snapshot with source "manual".
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -365,16 +366,26 @@ export default function PlantQuickLog({
         return;
       }
 
-      let photoAttachmentFailed = !!uploadedPath && !result.growEventId;
+      const photoAttachmentFailed = !!uploadedPath && !result.growEventId;
       if (uploadedPath && result.growEventId) {
-        const { data: patchedEntries, error: photoErr } = await supabase
-          .from("diary_entries")
-          .update({ photo_url: uploadedPath })
-          .filter("details->>linked_grow_event_id", "eq", result.growEventId)
-          .select("id");
-        if (photoErr || !Array.isArray(patchedEntries) || patchedEntries.length !== 1) {
-          console.error("PlantQuickLog companion photo_url patch failed");
-          photoAttachmentFailed = true;
+        // quicklog_save_manual has already durably mirrored details.photo_url
+        // at this point. This only normalizes the legacy top-level column; a
+        // failed or empty patch must not turn that confirmed photo save into a
+        // retry lock because Timeline safely falls back to details.photo_url.
+        try {
+          const { data: patchedEntries, error: photoErr } = await supabase
+            .from("diary_entries")
+            .update({ photo_url: uploadedPath })
+            .filter("details->>linked_grow_event_id", "eq", result.growEventId)
+            .select("id");
+          if (photoErr || !Array.isArray(patchedEntries) || patchedEntries.length !== 1) {
+            console.warn("PlantQuickLog companion photo_url normalization did not complete");
+          }
+        } catch (photoErr) {
+          console.warn(
+            "PlantQuickLog companion photo_url normalization did not complete",
+            photoErr,
+          );
         }
       }
 

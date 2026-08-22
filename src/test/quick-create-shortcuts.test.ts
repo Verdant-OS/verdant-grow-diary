@@ -19,6 +19,10 @@ const ROOT = resolve(__dirname, "../..");
 const TENT_DETAIL = readFileSync(resolve(ROOT, "src/pages/TentDetail.tsx"), "utf8");
 const CREATE_PLANT = readFileSync(resolve(ROOT, "src/components/CreatePlantDialog.tsx"), "utf8");
 const CREATE_TENT = readFileSync(resolve(ROOT, "src/components/CreateTentDialog.tsx"), "utf8");
+const HIERARCHY_CREATE_PERSISTENCE = readFileSync(
+  resolve(ROOT, "src/lib/hierarchyCreatePersistence.ts"),
+  "utf8",
+);
 
 describe("Quick creation shortcuts — TentDetail → Add Plant", () => {
   it("imports CreatePlantDialog", () => {
@@ -89,16 +93,20 @@ describe("Quick creation shortcuts — CreateTentDialog onCreated contract", () 
     expect(CREATE_TENT).toMatch(/onCreated\?:\s*\(tent:\s*CreatedTent\)\s*=>\s*void/);
   });
 
-  it("returns the inserted row with its verified setup binding", () => {
-    expect(CREATE_TENT).toMatch(
-      /\.insert\(payload as never\)\s*\.select\("id, name, grow_id"\)\s*\.single\(\)/,
-    );
+  it("returns only a reconciled row with its verified setup binding", () => {
+    expect(CREATE_TENT).toMatch(/persistHierarchyCreateAttempt/);
+    expect(HIERARCHY_CREATE_PERSISTENCE).toMatch(/return "tents"/);
+    expect(HIERARCHY_CREATE_PERSISTENCE).toMatch(/\.select\(selectForAttempt\(attempt\)\)/);
+    expect(HIERARCHY_CREATE_PERSISTENCE).toMatch(/confirmHierarchyCreateAttemptRow/);
   });
 
-  it("invokes onCreated only on successful insert", () => {
-    expect(CREATE_TENT).toMatch(
-      /if\s*\(data\s*&&\s*onCreated\)\s*onCreated\(data as CreatedTent\)/,
-    );
+  it("invokes onCreated only after a confirmed insert or reconciliation", () => {
+    const unknownGate = CREATE_TENT.indexOf('if (result.status === "unknown")');
+    const errorGate = CREATE_TENT.indexOf('if (result.status === "definitive_error")');
+    const callback = CREATE_TENT.indexOf("if (onCreated)");
+    expect(unknownGate).toBeGreaterThan(-1);
+    expect(errorGate).toBeGreaterThan(unknownGate);
+    expect(callback).toBeGreaterThan(errorGate);
   });
 });
 
@@ -142,12 +150,9 @@ describe("Quick creation shortcuts — V0 safety guardrails", () => {
   });
 
   it("CreateTentDialog inserts into the tents table only", () => {
-    const tables = Array.from(
-      CREATE_TENT.matchAll(/\.from\("([^"]+)"\)[\s\S]{0,200}?\.insert\(/g),
-      (m) => m[1],
-    );
-    expect(new Set(tables)).toEqual(new Set(["tents"]));
-    expect(CREATE_TENT).toContain('.from("tents")');
-    expect(CREATE_TENT).toContain(".insert(payload as never)");
+    expect(CREATE_TENT).toContain("persistHierarchyCreateAttempt");
+    expect(CREATE_TENT).toMatch(/entity:\s*"tent"/);
+    expect(HIERARCHY_CREATE_PERSISTENCE).toMatch(/return "tents"/);
+    expect(HIERARCHY_CREATE_PERSISTENCE).toContain(".insert(payload as never)");
   });
 });

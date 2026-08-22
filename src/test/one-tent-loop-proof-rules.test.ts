@@ -11,6 +11,7 @@ import {
   evaluateSensorSnapshot,
   evaluateActionQueue,
   evaluateAiDoctor,
+  evaluateAlert,
   enrichLoopStepRow,
   LOOP_STEP_IDS,
   type LoopEvidence,
@@ -48,6 +49,7 @@ function fresh(): LoopEvidence {
       captured_at: "2026-06-09T11:55:00.000Z",
       confidence: 0.9,
       metric: "temp",
+      has_usable_metric: true,
     },
     latest_ai_doctor: {
       session_id: "s1",
@@ -73,7 +75,9 @@ function fresh(): LoopEvidence {
       status: "pending_approval",
       approval_required: true,
       has_device_control_marker: false,
-      reason: "raise humidity",
+      has_target_device: false,
+      source: "environment_alert",
+      reason: "raise humidity [alert:a1]",
       risk_level: "low",
       linked_alert_id: "a1",
     },
@@ -91,6 +95,33 @@ describe("oneTentLoopProofRules — evaluateLoop", () => {
   it("complete fresh evidence marks all steps passed", () => {
     const rows = evaluateLoop(fresh());
     for (const r of rows) expect(r.status).toBe("passed");
+  });
+
+  it("does not pass an AI Doctor Action Queue advisory when its selected session needs review", () => {
+    const evidence = fresh();
+    evidence.latest_ai_doctor = {
+      ...evidence.latest_ai_doctor!,
+      context_provenance: "current_state_reconstructed",
+    };
+    evidence.latest_action_queue = {
+      ...evidence.latest_action_queue!,
+      source: "ai_doctor",
+      linked_alert_id: null,
+      linked_ai_doctor_session_id: "s1",
+    };
+
+    const byId = Object.fromEntries(evaluateLoop(evidence).map((row) => [row.id, row]));
+    expect(byId["ai-doctor"].status).toBe("needs_review");
+    expect(byId["action-queue"].status).toBe("needs_review");
+  });
+
+  it("does not pass an alert-derived Action Queue advisory when its selected alert needs review", () => {
+    const evidence = fresh();
+    evidence.latest_alert = { ...evidence.latest_alert!, status: "resolved" };
+
+    const byId = Object.fromEntries(evaluateLoop(evidence).map((row) => [row.id, row]));
+    expect(byId["alert"].status).toBe("needs_review");
+    expect(byId["action-queue"].status).toBe("needs_review");
   });
 
   it("missing grow blocks tent and plant downstream", () => {
@@ -162,10 +193,59 @@ describe("evaluateSensorSnapshot — never healthy for bad data", () => {
   });
   it("fresh live snapshot is passed", () => {
     const row = evaluateSensorSnapshot(
-      { source: "live", captured_at: "2026-06-09T11:55:00.000Z" },
+      {
+        source: "live",
+        captured_at: "2026-06-09T11:55:00.000Z",
+        has_usable_metric: true,
+      },
       NOW,
     );
     expect(row.status).toBe("passed");
+  });
+
+  it("rejects a live snapshot one millisecond after injected now while keeping exact-now eligible", () => {
+    const exactNow = evaluateSensorSnapshot(
+      {
+        source: "live",
+        captured_at: "2026-06-09T12:00:00.000Z",
+        has_usable_metric: true,
+      },
+      NOW,
+    );
+    const future = evaluateSensorSnapshot(
+      {
+        source: "live",
+        captured_at: "2026-06-09T12:00:00.001Z",
+        has_usable_metric: true,
+      },
+      NOW,
+    );
+
+    expect(exactNow.status).toBe("passed");
+    expect(future.status).toBe("invalid");
+    expect(future.missing_info.join(" ")).toMatch(/future/i);
+  });
+
+  it("marks a fresh live snapshot without explicit usable-metric proof as needs_review", () => {
+    const row = evaluateSensorSnapshot(
+      { source: "live", captured_at: "2026-06-09T11:55:00.000Z" },
+      NOW,
+    );
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/finite recognized metric/i);
+  });
+
+  it("marks a fresh live snapshot with no finite recognized metric as needs_review", () => {
+    const row = evaluateSensorSnapshot(
+      {
+        source: "live",
+        captured_at: "2026-06-09T11:55:00.000Z",
+        has_usable_metric: false,
+      } as never,
+      NOW,
+    );
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/finite recognized metric/i);
   });
 });
 
@@ -194,16 +274,80 @@ describe("evaluateAiDoctor — missing context enumerated", () => {
     expect(joined).toMatch(/alerts/);
     expect(joined).not.toMatch(/pot size/);
   });
+
+  it("does not pass context reconstructed from current app state as frozen session evidence", () => {
+    const row = evaluateAiDoctor({
+      session_id: "s1",
+      created_at: "2026-06-09T11:00:00.000Z",
+      had_plant_stage: true,
+      had_medium: true,
+      had_pot_size: true,
+      had_recent_log: true,
+      had_recent_photo: true,
+      had_recent_sensor_snapshot: true,
+      had_alerts: true,
+      context_provenance: "current_state_reconstructed",
+      session_scope_matches_selected_context: true,
+    } as never);
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/reconstructed.*not frozen/i);
+  });
+
+  it("does not pass a session whose persisted scope mismatches the selected grow, tent, or plant", () => {
+    const row = evaluateAiDoctor({
+      session_id: "s1",
+      created_at: "2026-06-09T11:00:00.000Z",
+      had_plant_stage: true,
+      had_medium: true,
+      had_pot_size: true,
+      had_recent_log: true,
+      had_recent_photo: true,
+      had_recent_sensor_snapshot: true,
+      had_alerts: true,
+      context_provenance: "frozen_session",
+      session_scope_matches_selected_context: false,
+    } as never);
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/scope.*selected/i);
+  });
 });
 
-describe("evaluateActionQueue — approval-required and no device command", () => {
+describe("evaluateAlert — scoped, active, trusted evidence", () => {
+  const TRUSTED_ALERT = {
+    id: "a1",
+    metric: "temp",
+    severity: "warning",
+    reason: "temperature above target",
+    status: "open",
+    created_at: "2026-06-09T11:00:00.000Z",
+    source: "environment_alerts",
+    scope_matches_selected_context: true,
+    has_trusted_event_reference: true,
+  } as const;
+
+  it.each([
+    [
+      "is not scoped to the selected grow, tent, and plant",
+      { scope_matches_selected_context: false },
+    ],
+    ["is resolved", { status: "resolved" }],
+    ["is dismissed", { status: "dismissed" }],
+    ["has an unknown source", { source: "unknown-source" }],
+    ["has no trusted originating event reference", { has_trusted_event_reference: false }],
+  ])("needs review when it %s", (_label, override) => {
+    const row = evaluateAlert({ ...TRUSTED_ALERT, ...override } as never);
+    expect(row.status).toBe("needs_review");
+  });
+});
+
+describe("evaluateActionQueue — persisted approval and provenance", () => {
   it("missing row is missing", () => {
     const row = evaluateActionQueue(null);
     expect(row.status).toBe("missing");
     expect(row.safety_note.toLowerCase()).toMatch(/approval required/);
     expect(row.safety_note.toLowerCase()).toMatch(/no device command/);
   });
-  it("row with device command is blocked as unsafe", () => {
+  it("row with an executable command marker is blocked as unsafe", () => {
     const row = evaluateActionQueue({
       id: "aq1",
       status: "pending_approval",
@@ -223,19 +367,219 @@ describe("evaluateActionQueue — approval-required and no device command", () =
     expect(row.status).toBe("blocked");
   });
   it("approval-required row without device command is passed", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "environment_alert",
+        reason: "raise rh [alert:a1]",
+        risk_level: "low",
+        linked_alert_id: "a1",
+      },
+      { alert_id: "a1", alert_status: "passed" },
+    );
+    expect(row.status).toBe("passed");
+    expect(row.deep_link).toBe("/actions/aq1");
+    expect(row.evidence.join(" ").toLowerCase()).toMatch(/approval required/);
+    expect(row.evidence.join(" ").toLowerCase()).toMatch(/no device command/);
+    expect(row.evidence.join(" ")).toMatch(/Alert-derived advisory/);
+  });
+
+  it("fails closed when an alert-derived advisory has a matching id but no passed alert eligibility", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "environment_alert",
+        reason: "Review humidity [alert:a1]",
+        linked_alert_id: "a1",
+      },
+      { alert_id: "a1", alert_status: "needs_review" },
+    );
+
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/selected alert.*not eligible/i);
+  });
+
+  it("marks a persisted target device for review without treating it as an executed command", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: true,
+        source: "environment_alert",
+        linked_alert_id: "a1",
+      },
+      { alert_id: "a1", alert_status: "passed" },
+    );
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ").toLowerCase()).toMatch(/target device/);
+    expect(row.missing_info.join(" ").toLowerCase()).not.toMatch(/executed/);
+  });
+
+  it("does not pass an environment alert action linked to a different alert", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "environment_alert",
+        linked_alert_id: "other-alert",
+      },
+      { alert_id: "a1", alert_status: "passed" },
+    );
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ").toLowerCase()).toMatch(/matching.*alert/);
+  });
+
+  it("does not pass a row whose persisted status is not pending approval", () => {
+    const row = evaluateActionQueue({
+      id: "aq1",
+      status: "approved",
+      approval_required: true,
+      has_device_control_marker: false,
+      has_target_device: false,
+      source: "ai_coach",
+    });
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ").toLowerCase()).toMatch(/pending approval/);
+  });
+
+  it("keeps a matching AI Doctor advisory as non-alert recommendation evidence", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "ai_doctor",
+        linked_ai_doctor_session_id: "s1",
+      },
+      { ai_doctor_session_id: "s1", ai_doctor_status: "passed" },
+    );
+    expect(row.status).toBe("passed");
+    expect(row.evidence.join(" ")).toMatch(/AI Doctor advisory/);
+    expect(row.evidence.join(" ")).not.toMatch(/originating alert/i);
+  });
+
+  it("fails closed when an AI Doctor advisory has a matching id but no passed session eligibility", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "ai_doctor",
+        linked_ai_doctor_session_id: "s1",
+      },
+      { ai_doctor_session_id: "s1" },
+    );
+
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/selected ai doctor session.*not eligible/i);
+  });
+
+  it.each([
+    ["missing", null],
+    ["empty", ""],
+    ["whitespace", "   "],
+  ])(
+    "requires a nonempty matching AI Doctor session token when the back-pointer is %s",
+    (_label, linkedSessionId) => {
+      const row = evaluateActionQueue(
+        {
+          id: "aq1",
+          status: "pending_approval",
+          approval_required: true,
+          has_device_control_marker: false,
+          has_target_device: false,
+          source: "ai_doctor",
+          linked_ai_doctor_session_id: linkedSessionId,
+        },
+        { ai_doctor_session_id: "s1", ai_doctor_status: "passed" },
+      );
+      expect(row.status).toBe("needs_review");
+      expect(row.missing_info.join(" ")).toMatch(/nonempty.*session/i);
+    },
+  );
+
+  it("keeps AI Coach advice distinct from alert-derived evidence", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "ai_coach",
+        plant_id: "p1",
+      },
+      { selected_plant_id: "p1" },
+    );
+    expect(row.status).toBe("passed");
+    expect(row.evidence.join(" ")).toMatch(/AI Coach advisory/);
+  });
+
+  it("fails closed when an AI Coach advisory belongs to another plant", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "ai_coach",
+        plant_id: "p-other",
+      },
+      { selected_plant_id: "p1" },
+    );
+
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ")).toMatch(/selected plant/i);
+  });
+
+  it("does not pass a manual or unknown source as Alert or AI evidence", () => {
     const row = evaluateActionQueue({
       id: "aq1",
       status: "pending_approval",
       approval_required: true,
       has_device_control_marker: false,
-      reason: "raise rh",
-      risk_level: "low",
-      linked_alert_id: "a1",
+      has_target_device: false,
+      source: "manual",
     });
-    expect(row.status).toBe("passed");
-    expect(row.deep_link).toBe("/actions/aq1");
-    expect(row.evidence.join(" ").toLowerCase()).toMatch(/approval required/);
-    expect(row.evidence.join(" ").toLowerCase()).toMatch(/no device command/);
+    expect(row.status).toBe("needs_review");
+    expect(row.missing_info.join(" ").toLowerCase()).toMatch(/provenance/);
+  });
+
+  it("never re-emits internal alert or session back-pointers in proof evidence", () => {
+    const row = evaluateActionQueue(
+      {
+        id: "aq1",
+        status: "pending_approval",
+        approval_required: true,
+        has_device_control_marker: false,
+        has_target_device: false,
+        source: "ai_doctor",
+        reason: "Review humidity [alert:alert-1] [session:session-1]",
+        linked_ai_doctor_session_id: "session-1",
+      },
+      { ai_doctor_session_id: "session-1", ai_doctor_status: "passed" },
+    );
+    const rendered = [...row.evidence, ...row.missing_info].join(" ");
+    expect(rendered).not.toMatch(/\[alert:/);
+    expect(rendered).not.toMatch(/\[session:/);
   });
 });
 

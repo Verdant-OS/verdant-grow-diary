@@ -58,10 +58,10 @@ function preferNewer(
 }
 
 export type SnapshotState =
-  | { status: "idle"; snapshot: SensorSnapshot }
-  | { status: "loading"; snapshot: SensorSnapshot }
-  | { status: "ok"; snapshot: SensorSnapshot }
-  | { status: "unavailable"; snapshot: SensorSnapshot };
+  | { status: "idle"; snapshot: SensorSnapshot; isFetching?: boolean; isPaused?: boolean }
+  | { status: "loading"; snapshot: SensorSnapshot; isFetching?: boolean; isPaused?: boolean }
+  | { status: "ok"; snapshot: SensorSnapshot; isFetching?: boolean; isPaused?: boolean }
+  | { status: "unavailable"; snapshot: SensorSnapshot; isFetching?: boolean; isPaused?: boolean };
 
 export function useLatestSensorSnapshot(
   growId: string | null | undefined,
@@ -174,15 +174,36 @@ export function useLatestSensorSnapshot(
   });
 
   if (!user || !growId) {
-    return { status: "idle", snapshot: EMPTY_SNAPSHOT };
+    return { status: "idle", snapshot: EMPTY_SNAPSHOT, isFetching: false, isPaused: false };
   }
   if (query.isLoading || (query.isFetching && !query.data)) {
-    return { status: "loading", snapshot: EMPTY_SNAPSHOT };
+    return {
+      status: "loading",
+      snapshot: EMPTY_SNAPSHOT,
+      isFetching: true,
+      isPaused: query.isPaused,
+    };
   }
   if (query.isError) {
-    return { status: "unavailable", snapshot: EMPTY_SNAPSHOT };
+    return {
+      status: "unavailable",
+      snapshot: EMPTY_SNAPSHOT,
+      isFetching: query.isFetching,
+      isPaused: query.isPaused,
+    };
   }
-  return { status: "ok", snapshot: query.data ?? EMPTY_SNAPSHOT };
+  return {
+    status: "ok",
+    snapshot: query.data ?? EMPTY_SNAPSHOT,
+    // TanStack Query preserves cached data during a background refetch. The
+    // status remains "ok", so consumers that need current proof evidence
+    // must be able to withhold that cached snapshot until the read settles.
+    isFetching: query.isFetching,
+    // An offline/paused fetch also leaves cached data in place while
+    // `isFetching` is false. Expose that state for proof-only consumers;
+    // generic snapshot users preserve their normal cache behavior.
+    isPaused: query.isPaused,
+  };
 }
 
 export default useLatestSensorSnapshot;

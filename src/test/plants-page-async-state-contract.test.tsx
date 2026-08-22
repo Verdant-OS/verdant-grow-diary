@@ -235,6 +235,45 @@ describe("Plants page async-state contract", () => {
     expect(stalePrimary.refetch).toHaveBeenCalledTimes(1);
   });
 
+  it("shows an honest retry state when a cached-empty primary refresh fails", () => {
+    const staleEmptyPrimary = {
+      ...successfulQuery([]),
+      isError: true,
+    };
+    mocks.queries.active = successfulQuery([]);
+    mocks.queries.archivedByGrow.set("grow-a", staleEmptyPrimary);
+
+    renderPlants();
+
+    expect(screen.getByTestId("plants-limited-data")).toBeInTheDocument();
+    expect(screen.getByTestId("plants-primary-refresh-error")).toHaveTextContent(
+      "Plant list refresh unavailable",
+    );
+    expect(screen.queryByText(/No plants/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("plants-empty-unconfirmed")).toHaveTextContent(
+      "cannot confirm whether this grow has plants",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry plant list refresh" }));
+    expect(staleEmptyPrimary.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps filter-specific no-match copy when cached rows exist during a refresh failure", () => {
+    const stalePrimary = {
+      ...successfulQuery([mocks.plant]),
+      isError: true,
+    };
+    mocks.queries.archivedByGrow.set("grow-a", stalePrimary);
+
+    renderPlants();
+    fireEvent.change(screen.getByTestId("plants-search-input"), {
+      target: { value: "not this plant" },
+    });
+
+    expect(screen.getByTestId("plants-primary-refresh-error")).toBeInTheDocument();
+    expect(screen.getByText("No plants match this search.")).toBeInTheDocument();
+    expect(screen.queryByTestId("plants-empty-unconfirmed")).not.toBeInTheDocument();
+  });
+
   it("retries only the selected failed supplemental query", () => {
     const failedTents = { ...mocks.makeQuery(undefined), isError: true };
     mocks.queries.tents = failedTents;

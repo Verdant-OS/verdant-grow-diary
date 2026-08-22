@@ -69,6 +69,7 @@ const FRESH: LoopEvidence = {
     captured_at: "2026-06-09T11:55:00.000Z",
     confidence: 0.9,
     metric: "temp",
+    has_usable_metric: true,
   },
   latest_ai_doctor: {
     session_id: "s1",

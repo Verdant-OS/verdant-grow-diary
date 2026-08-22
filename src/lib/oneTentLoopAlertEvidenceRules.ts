@@ -14,6 +14,7 @@ import {
   type OriginatingTimelineEventRef,
   type OriginatingTimelineEventSource,
 } from "@/lib/originatingTimelineEventRules";
+import { isVerifiedSnapshotLiveRowSource } from "@/lib/sensorLiveMembership";
 import type {
   SensorSnapshot,
   SensorSnapshotMetricRef,
@@ -77,15 +78,31 @@ function equalTrimmed(a: string | null | undefined, b: string | null | undefined
 function matchesSensorMetricRef(
   ref: OriginatingTimelineEventRef,
   metricRef: SensorSnapshotMetricRef | null | undefined,
+  snapshot: OneTentLoopAlertEvidenceInput["snapshot"],
 ): boolean {
   if (!metricRef || ref.type !== "sensor_snapshot") return false;
+  const metricSource =
+    typeof metricRef.source === "string" ? metricRef.source.trim().toLowerCase() : "";
+  const isExactMetricRef =
+    equalTrimmed(ref.id, metricRef.id) && equalTrimmed(ref.occurred_at, metricRef.captured_at);
+  if (!isExactMetricRef) return false;
+
+  if (metricSource === "pi_bridge") {
+    // The generic timeline-ref normalizer preserves its closed source union
+    // and therefore stores legacy Pi bridge refs as `unknown`. This
+    // proof-only exception is deliberately narrower than trusting unknown:
+    // it is available only for a raw source in the verified snapshot-live
+    // reservation, a selected snapshot already classified live, and this
+    // exact sensor row. This keeps arbitrary unknown/provider refs blocked.
+    return (
+      snapshot?.source === "live" &&
+      isVerifiedSnapshotLiveRowSource(metricSource) &&
+      (ref.source === "live" || ref.source === "unknown")
+    );
+  }
+
   const expectedSource = normalizedTrustedSource(metricRef.source);
-  return (
-    expectedSource !== null &&
-    ref.source === expectedSource &&
-    equalTrimmed(ref.id, metricRef.id) &&
-    equalTrimmed(ref.occurred_at, metricRef.captured_at)
-  );
+  return expectedSource !== null && ref.source === expectedSource && isExactMetricRef;
 }
 
 function matchesDiaryEnvironmentCheckRef(
@@ -130,7 +147,7 @@ export function hasResolvedOneTentLoopAlertEvidence(input: OneTentLoopAlertEvide
 
   return input.refs.some(
     (ref) =>
-      matchesSensorMetricRef(ref, metricRef) ||
+      matchesSensorMetricRef(ref, metricRef, snapshot) ||
       matchesDiaryEnvironmentCheckRef(ref, snapshot, metricKey),
   );
 }

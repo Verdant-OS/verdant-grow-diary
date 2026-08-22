@@ -1526,6 +1526,42 @@ differed stays `NOT_MEASURED`.
 
 ---
 
+## External reference scope — MACAE accelerator (recorded 2026-08-22)
+
+**Status: `REFERENCE_ONLY`. Owner: Claude.** This row records that the scope exists; it
+authorises no build, no slice, and no port. Recorded as its own timestamped row rather
+than as a new Last-updated block — it supersedes no measurement above.
+
+**Scope (`source claim`):** relayed by Cheek as "Grok has scoped this demo for all agents
+to read and ingest for future builds", authorised 2026-08-22 as a docs-only slice.
+
+| Field                              | Value                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Repository                         | `Verdant-OS/multi-agent-custom-automation-engine-solution-accelerator` (public)                                                                  |
+| Read at                            | `b4a4a00` on `main`, 2026-06-27 — shallow clone, read 2026-08-22                                                                                 |
+| Digest                             | [`docs/knowledge-library/macae-reference-ingest.md`](../knowledge-library/macae-reference-ingest.md)                                             |
+| Clone path (ephemeral)             | `/home/user/verdant-os/multi-agent-custom-automation-engine-solution-accelerator` — does not survive the container; re-clone from the public URL |
+| Runtime behaviour                  | `NOT_MEASURED` — never deployed or executed                                                                                                      |
+| Applicability to any Verdant slice | `NOT_MEASURED` — no slice assigned                                                                                                               |
+
+**Read the digest before acting on anything in that repository.** Its do-not-port rules
+bind, and are repeated here so this row is not safe to quote alone:
+
+1. **The in-memory approval store is an anti-pattern for Verdant.**
+   `HumanApprovalMagenticManager` holds approval state as `self.approvals: Dict[str, bool]`
+   with `asyncio.Event` and a 300-second timeout (`src/backend/v4/config/settings.py`). A
+   restart, a second replica, or a slow human loses the decision, and that path keeps no
+   audit record. Do not reproduce that shape.
+2. **The Action Queue stays durable** — `reason`, risk level, `status`, and an append-only
+   audit trail, enforced with RLS. Approval is a persisted row, never process memory.
+3. **Read the approval-gate shape and the tools-as-services separation. Port nothing
+   else** — not the Azure runtime, not Cosmos DB, not Container Apps, not the in-memory
+   approval store.
+4. **Automation last.** Diary first, sensors second, AI third. This accelerator is an
+   automation-orchestration engine; it does not move up that order.
+
+---
+
 ## Agents currently assigned
 
 | Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |

@@ -657,6 +657,10 @@ export default function OneTentLoopLiveProof(): JSX.Element {
   // redirect) this page must not fire /rest/v1/alerts at all — the
   // never-healthy E2E spec forbids that request on this route.
   const alertsQ = useAlertsList({ growId: activeGrowId ?? undefined }, { enabled: !!activeGrowId });
+  // An active proof scope needs a completed alerts read before an empty list
+  // can mean "no alert evidence." `idle`, `loading`, and `unavailable` are
+  // incomplete there; with no scope, the disabled hook's idle state is safe.
+  const alertsReadIncomplete = Boolean(activeGrowId) && alertsQ.status !== "ok";
 
   // Derive scoped tent/plant.
   const grow = toGrowEvidence(activeGrow as AnyRow | null);
@@ -797,7 +801,7 @@ export default function OneTentLoopLiveProof(): JSX.Element {
     diaryQ.isFetching === true ||
     diaryQ.isError === true ||
     sensorReadIsFetching ||
-    alertsQ.status === "loading" ||
+    alertsReadIncomplete ||
     aiSessionsQ.isFetching === true ||
     aiSessionsQ.isError === true ||
     aqQ.isLoading === true ||

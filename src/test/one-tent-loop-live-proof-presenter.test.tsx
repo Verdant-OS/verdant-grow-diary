@@ -38,7 +38,7 @@ const fixtures = vi.hoisted(() => ({
   } as Record<string, unknown>,
   sensorIsFetching: false,
   alerts: [] as Array<Record<string, unknown>>,
-  alertsStatus: "ok" as "ok" | "loading",
+  alertsStatus: "ok" as "idle" | "loading" | "ok" | "unavailable",
   aiSessions: [] as Array<Record<string, unknown>>,
   aiSessionsIsFetching: false,
   aiSessionsIsError: false,
@@ -304,6 +304,8 @@ const PROOF_CACHED_ERROR_CASES: [string, () => void][] = [
   ["the Action Queue proof read", () => (fixtures.actionQueueIsError = true)],
 ];
 
+const ACTIVE_SCOPE_ALERTS_INCOMPLETE_STATUSES: ("idle" | "unavailable")[] = ["idle", "unavailable"];
+
 function expectProofEvidenceWithheld() {
   expect(screen.getByTestId("one-tent-loop-live-proof-refreshing").textContent).toMatch(
     /cached proof evidence is withheld.*scoped reads complete/i,
@@ -554,7 +556,26 @@ describe("OneTentLoopLiveProof page", () => {
     },
   );
 
+  it.each(ACTIVE_SCOPE_ALERTS_INCOMPLETE_STATUSES)(
+    "withholds cached proof evidence while an active-scope alerts read is %s",
+    (alertsStatus) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+      try {
+        setSettledCurrentProofEvidence();
+        fixtures.alertsStatus = alertsStatus;
+
+        renderPage();
+
+        expectProofEvidenceWithheld();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it("does not report an in-flight proof read when no scope is selected", () => {
+    fixtures.alertsStatus = "idle";
     renderPage();
 
     expect(screen.queryByTestId("one-tent-loop-live-proof-refreshing")).toBeNull();

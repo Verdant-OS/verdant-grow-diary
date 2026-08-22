@@ -196,10 +196,10 @@ after Codex review).** The Sensors loop card provably holds only
 this producer. `sensor-snapshot` branch threads that scope to `/doctor`
 (normalization-only in the rules per A2's precedent; validation on the
 consuming page mirroring `useScopedGrow`'s fail-closed pattern). AiDoctorStart
-uses the validated tent scope to **filter/annotate its plant option list**
-and show a tent-context line; the explicit plant choice stays — "Verdant will
-not guess which plant you mean" (`AiDoctorStart.tsx:50`) is doctrine, and S9's
-tap count is already 2. **No auto-triggered AI call — the readiness gate and
+uses the validated tent scope to **order and annotate its plant option list**
+(never to remove an option) and show a tent-context line; the explicit plant
+choice stays — "Verdant will not guess which plant you mean"
+(`AiDoctorStart.tsx:50`) is doctrine, and S9's tap count is already 2. **No auto-triggered AI call — the readiness gate and
 paid-call behavior are byte-untouched.** `/doctor` also mounts the loop card
 (`current="ai-doctor"`) so the visual chain stops breaking between Sensors
 and Doctor sessions. A validated plant-intent handoff _into_ Sensors (which
@@ -279,7 +279,7 @@ Before-values are the baseline table's; budgets bind only after the harness
 | S6 recovery                          | SHIPPED on Plant Detail (3 taps, 72 h window); `MISSING` on Dashboard/Grow Detail | **Plant Detail: 3 taps (unchanged). Dashboard/Grow Detail: 3 taps + exactly one explicit plant choice** inside the grow-scoped dialog (no plant derivation on those surfaces — hooks expose no plant rows; the D5 chip reduces the choice to one tap); check-in-only classification — never suppressed by Action Queue/alert activity; unknown never prompts; no guilt copy, no forced note/sensor/AI | B3a (+D5 for the one-tap choice)                |
 | S7 save → timeline evidence          | 0–1, uneven feedback                                                              | **≤1 everywhere, uniform confirmation, exactly one row**                                                                                                                                                                                                                                                                                                                                              | B2+B3                                           |
 | S8 timeline → trusted snapshot       | 1 (already met)                                                                   | unchanged; stale honesty via A4                                                                                                                                                                                                                                                                                                                                                                       | pin only                                        |
-| S9 snapshot → doctor context-ready   | 2 interactions / 1 explicit plant choice / 2 transitions (corrected)              | **count unchanged; carried tent scope filters/annotates the plant list and is visible; explicit choice retained; no silent selection**                                                                                                                                                                                                                                                                | B4 (D4; grow/tent carry only)                   |
+| S9 snapshot → doctor context-ready   | 2 interactions / 1 explicit plant choice / 2 transitions (corrected)              | **count unchanged; carried tent scope orders/annotates the plant list (never removes an option) and is visible; explicit choice retained; no silent selection**                                                                                                                                                                                                                                       | B4 (D4; grow/tent carry only)                   |
 | Duplicate-write risk                 | LOW–HIGH by surface                                                               | **LOW everywhere**                                                                                                                                                                                                                                                                                                                                                                                    | B2                                              |
 
 If runtime measurement contradicts a before-value, the baseline is corrected

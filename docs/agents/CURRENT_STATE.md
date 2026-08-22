@@ -1543,6 +1543,16 @@ to read and ingest for future builds", authorised 2026-08-22 as a docs-only slic
 | Clone path (ephemeral)             | `/home/user/verdant-os/multi-agent-custom-automation-engine-solution-accelerator` — does not survive the container; re-clone from the public URL |
 | Runtime behaviour                  | `NOT_MEASURED` — never deployed or executed                                                                                                      |
 | Applicability to any Verdant slice | `NOT_MEASURED` — no slice assigned                                                                                                               |
+| Slice owner                        | **Claude**                                                                                                                                       |
+| Independent reviewer               | **Blue Dream**, reviewing in Cursor — **not a GitHub handle** (Cheek, 2026-08-22)                                                                |
+| Owner acknowledgement              | **cheekhimself**, given out-of-band, outside the GitHub review-request mechanism                                                                 |
+
+Pairing recorded here per `docs/agents/HANDOFF_PROTOCOL.md:25`, which requires both names
+in this file and not only in the handoff block. Two facts so the next reader does not
+re-derive them: **no GitHub reviewer is requested on these PRs by design** — an empty
+reviewer list is not an oversight; and **Blue Dream is not one of the three peers** (Grok,
+Claude, Codex) named in that protocol's "One owner + independent reviewer" clause, so this
+is an owner-designated reviewer outside that set rather than a peer review under it.
 
 **Read the digest before acting on anything in that repository.** Its do-not-port rules
 bind, and are repeated here so this row is not safe to quote alone:

@@ -203,8 +203,31 @@ choice stays — "Verdant will not guess which plant you mean"
 paid-call behavior are byte-untouched.** `/doctor` also mounts the loop card
 (`current="ai-doctor"`) so the visual chain stops breaking between Sensors
 and Doctor sessions. A validated plant-intent handoff _into_ Sensors (which
-would let a plant survive Timeline→Sensors→Doctor) is a deferred follow-up,
-not part of B4.
+would let a plant survive Timeline→Sensors→Doctor) was a deferred follow-up,
+not part of B4. **Cheek approved it 2026-08-22; it ships as slice B6.**
+
+**B6 changes this decision's premise, and says so rather than quietly
+outgrowing it.** "No plant parameter can honestly be emitted from this
+producer" was an _epistemic_ constraint, not a stylistic one: Sensors held no
+plant, so emitting one would have been fabrication. B6 removes the premise
+rather than the constraint — Timeline hands Sensors a plant it genuinely has,
+so emitting it is honest. The constraint itself is unchanged: Sensors still
+never invents a plant, and still emits nothing when none was carried.
+
+Sensors deliberately does **not** resolve the carried plant. It loads tents
+and readings and holds no plant rows, so it can neither check ownership nor
+name the plant — and rendering a raw UUID is the exact defect A3 exists to
+remove. The plant therefore travels as an untrusted UUID-only intent and is
+validated at `AiDoctorStart`, where the grower's own rows already live. That
+moves _where_ the check happens, never _whether_ it happens.
+
+At the Doctor the carried plant is honoured only when it is both one of the
+grower's own options and inside the carried tent; anything else fails closed
+to null. It is then ordered first within its tent group and labelled "You came
+from here" — and it is **never auto-selected**. A carried intent is the
+grower's prior choice, not an inference, but it is still theirs to confirm:
+D5 already set the precedent that a remembered target is offered and never
+applied.
 
 **D-B7 — Post-save continuation is one typed contract.** After A5(d) lands
 (single dispatch), B3b unifies the five `verdant:entry-created` shapes onto

@@ -20,6 +20,7 @@ import {
   partitionDoctorEntryOptionsByTent,
   resolveDoctorStartScope,
 } from "@/lib/doctorStartContextRules";
+import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { plantsPath } from "@/lib/routes";
 import { useGrows } from "@/store/grows";
 
@@ -124,8 +125,12 @@ export default function AiDoctorStart() {
         options,
         plants: plantsQuery.data,
         tentId: resolvedScope.tentId,
+        // D-B6: the plant the grower came from, carried Timeline -> Sensors
+        // -> here. Untrusted until the partition checks it against the
+        // grower's own in-tent options. It orders and labels only.
+        carriedPlantId: readSensorsPlantRouteIntent(searchParams),
       }),
-    [options, plantsQuery.data, resolvedScope.tentId],
+    [options, plantsQuery.data, resolvedScope.tentId, searchParams],
   );
   const orderedOptions = useMemo(
     () => [...partitioned.inScope, ...partitioned.others],
@@ -259,6 +264,15 @@ export default function AiDoctorStart() {
                 >
                   <span className="min-w-0">
                     <span className="block break-words font-semibold">{option.name}</span>
+                    {partitioned.carriedPlantOptionId === option.id ? (
+                      <span
+                        className="mt-1 mr-1 inline-block rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary"
+                        id={`ai-doctor-start-option-${index}-carried`}
+                        data-testid={`ai-doctor-start-option-${index}-carried`}
+                      >
+                        You came from here
+                      </span>
+                    ) : null}
                     {inScopeIds.has(option.id) ? (
                       <span
                         className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"

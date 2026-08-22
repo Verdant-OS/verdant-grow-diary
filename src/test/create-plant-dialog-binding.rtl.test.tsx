@@ -14,9 +14,10 @@ const insertMock = vi.hoisted(() => vi.fn());
 const singleMock = vi.hoisted(() => vi.fn());
 const selectMock = vi.hoisted(() => vi.fn(() => ({ single: singleMock })));
 const plantLookupMaybeSingleMock = vi.hoisted(() => vi.fn());
-const plantLookupEqMock = vi.hoisted(() =>
+const plantLookupOwnerEqMock = vi.hoisted(() =>
   vi.fn(() => ({ maybeSingle: plantLookupMaybeSingleMock })),
 );
+const plantLookupEqMock = vi.hoisted(() => vi.fn(() => ({ eq: plantLookupOwnerEqMock })));
 const plantLookupSelectMock = vi.hoisted(() => vi.fn(() => ({ eq: plantLookupEqMock })));
 const successToastMock = vi.hoisted(() => vi.fn());
 const funnelEventMock = vi.hoisted(() => vi.fn());
@@ -204,6 +205,7 @@ beforeEach(() => {
   selectMock.mockClear();
   plantLookupMaybeSingleMock.mockReset();
   plantLookupMaybeSingleMock.mockResolvedValue({ data: null, error: null });
+  plantLookupOwnerEqMock.mockClear();
   plantLookupEqMock.mockClear();
   plantLookupSelectMock.mockClear();
   vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue(CREATED_ROW.id);
@@ -397,6 +399,7 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(plantLookupSelectMock).toHaveBeenCalledWith("*");
     expect(plantLookupEqMock).toHaveBeenCalledWith("id", CREATED_ROW.id);
     expect(successToastMock).toHaveBeenCalledWith("Plant created");
+    expect(plantLookupOwnerEqMock).toHaveBeenCalledWith("user_id", USER_ID);
   });
 
   it("blocks a blind retry when a duplicate response cannot be reconciled", async () => {

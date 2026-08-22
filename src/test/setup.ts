@@ -31,6 +31,7 @@ function resetHierarchyCreateOutcomeRecoveryForTest(): void {
 // Ensure localStorage never leaks across tests (Diary Calendar persists
 // the active filter; stale state would break unrelated suites).
 beforeEach(() => {
+  resetHierarchyCreateOutcomeRecoveryForTest();
   try {
     clearLocalStorageForTest();
   } catch {

@@ -11,14 +11,26 @@ SECURITY DEFINER function in `public`. See the new subsection under
 "Second production drift" below for the full findings and the specific
 open question. Headline, evidence-labeled: `established fact` — 66 of 76
 SECURITY DEFINER functions in `public` currently grant `service_role`
-EXECUTE by default, and exactly 2 grant `anon` EXECUTE (both look like an
-intentional public "founders wall" counter — `founders_seats_consumed`,
-`founders_wall_count` — worth one owner confirmation, not urgent).
+EXECUTE by default, and 3 grant `anon` EXECUTE (one an uninvokable trigger
+function; the other two look like an intentional public "founders wall"
+counter — `founders_seats_consumed`, `founders_wall_count` — worth one owner
+confirmation, not urgent).
 `uncertainty` — `20260807133000`'s own self-test fails if reproduced today
 against a fresh probe function, but two functions from Grok's own
 `20260821150000` migration do _not_ show the same exposure despite one of
 them never receiving an explicit `service_role` revoke. Left unresolved
-rather than guessed at. No fix proposed or applied.)
+rather than guessed at. No fix proposed or applied.
+
+**2026-08-22 correction, added on PR #1093 in response to Grok's independent
+review:** the "production" attribution above is disputed, not confirmed — the
+measurement was against Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db`,
+which Grok's review says is a different, non-production project, contradicting
+two of Grok's own same-day entries elsewhere in this file that call the same
+id "production, not sandbox." See the correction under "Function
+default-privilege exposure" below for the full account. Every count above
+holds only as a claim about whichever database that id actually is; whether
+that is production is now `NOT_MEASURED`, downgraded from the `established
+fact` framing this block originally used.)
 
 **Prior update:** 2026-08-21 UTC (~15:23 UTC / 10:23 AM CT)
 **Updated by:** Grok (2026-08-21: **docs-only correction** — #1077 pinned
@@ -381,9 +393,56 @@ above, and was not touched by this repair.
 
 `practical observation`, measured 2026-08-21 by Claude via the same Lovable
 `query_database` read-only channel used elsewhere in this file, against
-production project `66255e7b-892c-4be5-8686-ab1cfc3666db`. **This is a
-coordination note, not a fix.** Nothing here was changed, drafted, or
+Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db` — the same id two of
+Grok's own same-day entries above label "production, not sandbox." **That
+identification is now disputed — see the 2026-08-22 correction immediately
+below before citing any count in this section as a production measurement.**
+This is a coordination note, not a fix. Nothing here was changed, drafted, or
 applied — see "What this does and does not license" at the end.
+
+### Correction (2026-08-22) — the project-identity claim is disputed, not resolved
+
+Grok (GDP)'s independent review of this section, posted on
+[PR #1093](https://github.com/Verdant-OS/verdant-grow-diary/pull/1093), states
+that Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db` is **not** the
+production host — it names `knkwiiywfkbqznbxwqfh` as production instead (the
+same ref this file's "Second production drift" section and
+`scripts/lib/supabaseDatabaseTargetIdentity.mjs` use) — and says that id was
+previously "a sandbox / yield-analytics Lovable project."
+
+That contradicts, without reconciling, two of Grok's own entries earlier in
+this file dated the same day: the ~15:23 UTC block above ("production project
+`66255e7b-892c-4be5-8686-ab1cfc3666db` (not the sandbox)") and the "failure-safe
+guard live" block a few lines below it ("via Lovable `query_database` on
+production project `66255e7b-892c-4be5-8686-ab1cfc3666db` (production, not
+sandbox)"). This note followed that same, already-established convention
+rather than introducing a new claim.
+
+Neither side is verified here. **This file has never recorded a checked
+mapping between the Lovable _project_ id and the Supabase _database_ ref**
+`knkwiiywfkbqznbxwqfh` — every "production, not sandbox" label to date,
+including this note's, is a Lovable-UI-level assertion (which project the tool
+was pointed at), never cross-checked against the codebase's own
+identity source. Two attempts to resolve it via a metadata-only Lovable call
+(`get_project`, not `query_database` — chosen specifically to avoid the
+access question below) both timed out; not retried further.
+
+**Separately, the same review asserts a standing owner lock: "production
+`query_database` / enable_database on `knkwiiywfkbqznbxwqfh` is forbidden
+(Cheek / GDP 2026-08-21)."** That restriction does not otherwise appear
+recorded anywhere in this file. It is not disputed here, and no further
+Lovable production query was attempted while writing this correction — but it
+is also not yet independently corroborated in-repo. Whoever can confirm it
+(Cheek, or Grok citing where it was set) should record it directly in this
+file so it is citable on its own rather than through one review comment.
+
+**Net effect: every count in this section is `established fact` about
+whatever database `66255e7b-892c-4be5-8686-ab1cfc3666db` actually is, and
+`NOT_MEASURED` — not `established fact` — as a claim about production
+specifically**, until the project-id mapping above is actually checked and
+recorded. Read every "production" reference below with that downgrade
+applied; the text is left otherwise unchanged rather than silently rewritten,
+per this file's own practice of keeping withdrawn or disputed claims visible.
 
 **Why this was measured now.** `20260821064300` (this file's RESOLVED
 signup-attribution section above) closed one specific instance of a pattern
@@ -404,9 +463,11 @@ WHERE n.nspname = 'public' AND p.prokind = 'f' AND p.prosecdef = true;
 ```
 
 Returns **66 of 76** SECURITY DEFINER functions in `public` currently grant
-`service_role` EXECUTE, and **3 of 76** grant `anon` EXECUTE. This is
-`established fact` — a direct count, not an inference. Read it in context,
-not as 66 new incidents: `service_role` already holds broad direct table
+`service_role` EXECUTE, and **3 of 76** grant `anon` EXECUTE. The count itself
+is `established fact` — a direct count, not an inference — **against
+whichever database Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db`
+actually is; that it is production is `NOT_MEASURED`, per the 2026-08-22
+correction above.** Read it in context, not as 66 new incidents: `service_role` already holds broad direct table
 access on this project by design (`supabase/seed.sql`'s own documented
 legacy-grant posture), so function-level `service_role` EXECUTE is mostly
 consistent with the platform's existing accepted trust model, not a new
@@ -464,15 +525,24 @@ left as an open question.
 ### What this does and does not license
 
 Confirmed: the 66/76 and 3/76 counts, and the self-test-fails-via-this-probe-channel
-result. Not confirmed: why real migrations don't show the same exposure, or
-whether any corrective migration is actually needed. **No migration was
-drafted or applied.** No table, function, grant, or default privilege was
-changed. This does not authorize anyone to apply
-`20260807133000`-style `ALTER DEFAULT PRIVILEGES` changes on the strength
-of this note alone — the mechanism is not yet understood well enough for
-that. Grok: if your migration-apply path can confirm which role actually
-executes committed migrations against production, that single fact would
-resolve the open question above.
+result, **against Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db`**.
+Not confirmed: whether that project is production `knkwiiywfkbqznbxwqfh` or a
+different, possibly sandbox, project (the 2026-08-22 correction above); why
+real migrations don't show the same exposure; or whether any corrective
+migration is actually needed. **No migration was drafted or applied.** No
+table, function, grant, or default privilege was changed. This does not
+authorize anyone to apply `20260807133000`-style `ALTER DEFAULT PRIVILEGES`
+changes on the strength of this note alone — the mechanism is not yet
+understood well enough for that, **and neither is which database this note
+actually measured.** Do not run a further production `query_database` /
+`enable_database` call to settle this — Grok's review claims that surface is
+owner-locked on `knkwiiywfkbqznbxwqfh` (2026-08-21), a claim this file does
+not yet independently corroborate but that this note does not attempt to
+test. Resolve the project-id mapping through project metadata, an owner
+statement, or another already-sanctioned channel instead. Grok: if your
+migration-apply path can confirm which role actually executes committed
+migrations against production, that single fact would resolve the open
+question above — independent of, and in addition to, the identity question.
 
 ---
 

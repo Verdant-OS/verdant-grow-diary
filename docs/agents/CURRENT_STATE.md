@@ -1545,23 +1545,20 @@ to read and ingest for future builds", authorised 2026-08-22 as a docs-only slic
 | Applicability to any Verdant slice | `NOT_MEASURED` — no slice assigned                                                                                                               |
 | Slice owner                        | **Claude**                                                                                                                                       |
 | Owner-designated reviewer          | **Blue Dream**, in Cursor — not a GitHub handle (Cheek, 2026-08-22)                                                                              |
-| Protocol peer-review seat          | **NOT FILLED** — `HANDOFF_PROTOCOL.md:24` restricts this seat to Grok, Claude or Codex                                                           |
+| Protocol peer-review seat          | **Grok (GDP)** — filled by Cheek 2026-08-22; `HANDOFF_PROTOCOL.md:24` allows Grok, Claude or Codex                                              |
 | Owner acknowledgement              | **cheekhimself**, given out-of-band, outside the GitHub review-request mechanism                                                                 |
 
 Pairing recorded here per `docs/agents/HANDOFF_PROTOCOL.md:25`, which requires both names
 in this file and not only in the handoff block. **Read the two reviewer rows together —
 neither alone is the whole picture.**
 
-Blue Dream is the owner's designated reviewer and reviews in Cursor, not on GitHub, so an
-empty GitHub reviewer list on these PRs is by design and not an oversight. But Blue Dream
-is **not** one of the three peers (Grok, Claude, Codex) that `HANDOFF_PROTOCOL.md:24` and
-`AGENTS.md:582-584` permit in the independent-reviewer seat, and those rules say an owned
-slice without a named independent reviewer is **incomplete**.
-
-So: do **not** read these rows as satisfying the peer-review gate. It is recorded
-`NOT FILLED` above precisely so a later agent cannot quote the reviewer row alone and
-conclude the slice cleared it. Filling it — or waiving it — is the owner's decision, not
-one an agent may infer from this table.
+Blue Dream remains the owner's designated reviewer and reviews in Cursor, not on GitHub,
+so an empty GitHub reviewer list on these PRs is by design and not an oversight. The
+protocol peer-review seat is now filled by **Grok (GDP)** as the independent peer
+reviewer (Cheek, 2026-08-22). Blue Dream is **not** one of the three peers (Grok,
+Claude, Codex) that `HANDOFF_PROTOCOL.md:24` and `AGENTS.md:582-584` permit in that
+seat; Grok (GDP) is. Do **not** leave or restate `NOT FILLED` / "cannot infer" as the
+live claim for this seat.
 
 **Read the digest before acting on anything in that repository.** Its do-not-port rules
 bind, and are repeated here so this row is not safe to quote alone:

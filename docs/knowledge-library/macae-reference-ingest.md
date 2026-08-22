@@ -171,5 +171,6 @@ self-contradictory. It is the same work, not a collision.
 | Collision with another agent's open work                       | `PASS` — see the note above the ledger           |
 | Runtime behaviour of the accelerator                           | `NOT_MEASURED` — never deployed or executed      |
 | Applicability to any specific Verdant slice                    | `NOT_MEASURED` — no slice assigned               |
-| Independent review of this ingest                              | owner Claude; reviewer **Blue Dream**, in Cursor |
+| Independent review of this ingest                              | owner Claude; owner-designated Cursor reviewer **Blue Dream** |
+| Protocol peer-review seat                                      | **Grok (GDP)** — filled by Cheek 2026-08-22 (`HANDOFF_PROTOCOL.md:24`) |
 | Owner acknowledgement                                          | **cheekhimself**, outside GitHub review-request  |

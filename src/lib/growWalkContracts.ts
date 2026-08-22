@@ -12,6 +12,7 @@ export const GROW_WALK_ATTENTION_BANDS = [
 
 export const GROW_WALK_REASON_CODES = [
   "active_high_alert_needs_confirmation",
+  "active_medium_alert_needs_review",
   "multiple_adverse_evidence_lanes",
   "stacked_major_changes_48h",
   "stale_or_invalid_sensor_during_problem",

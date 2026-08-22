@@ -253,13 +253,18 @@ export function deriveGrowWalkEvidence(input: GrowWalkEvidenceInput): GrowWalkEv
 
   const profileIncomplete =
     !hasText(input.stage) ||
+    normalize(input.plantType) === "unknown" ||
     (hasText(input.plantType) && (!hasText(input.medium) || !hasText(input.potSize)));
   if (profileIncomplete) missing.add("plant_profile_incomplete");
 
   const activeHighAlerts = validAlerts.filter(
     ({ alert }) => alert.severity === "high" && isActiveAlert(alert),
   );
+  const activeMediumAlerts = validAlerts.filter(
+    ({ alert }) => alert.severity === "medium" && isActiveAlert(alert),
+  );
   if (activeHighAlerts.length > 0) reasons.add("active_high_alert_needs_confirmation");
+  if (activeMediumAlerts.length > 0) reasons.add("active_medium_alert_needs_review");
 
   if (
     normalize(input.stage).includes("flower") &&

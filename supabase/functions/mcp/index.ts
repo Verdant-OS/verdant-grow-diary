@@ -913,6 +913,7 @@ function sortGrowWalkTargets(targets) {
 var GROW_WALK_CONTEXT_VERSION = "grow-walk-v0.1";
 var GROW_WALK_REASON_CODES = [
   "active_high_alert_needs_confirmation",
+  "active_medium_alert_needs_review",
   "multiple_adverse_evidence_lanes",
   "stacked_major_changes_48h",
   "stale_or_invalid_sensor_during_problem",
@@ -1112,12 +1113,17 @@ function deriveGrowWalkEvidence(input) {
   }
   const profileIncomplete =
     !hasText(input.stage) ||
+    normalize(input.plantType) === "unknown" ||
     (hasText(input.plantType) && (!hasText(input.medium) || !hasText(input.potSize)));
   if (profileIncomplete) missing.add("plant_profile_incomplete");
   const activeHighAlerts = validAlerts.filter(
     ({ alert }) => alert.severity === "high" && isActiveAlert(alert),
   );
+  const activeMediumAlerts = validAlerts.filter(
+    ({ alert }) => alert.severity === "medium" && isActiveAlert(alert),
+  );
   if (activeHighAlerts.length > 0) reasons.add("active_high_alert_needs_confirmation");
+  if (activeMediumAlerts.length > 0) reasons.add("active_medium_alert_needs_review");
   if (
     normalize(input.stage).includes("flower") &&
     activeHighAlerts.some(({ alert }) => isHumidityAlert(alert))

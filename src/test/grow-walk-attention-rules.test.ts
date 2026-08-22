@@ -61,6 +61,11 @@ describe("Grow Walk attention", () => {
     ).toBe("watch_today");
     expect(
       deriveGrowWalkAttentionBand(
+        derivation({ reasonCodes: ["active_medium_alert_needs_review"] }),
+      ),
+    ).toBe("watch_today");
+    expect(
+      deriveGrowWalkAttentionBand(
         derivation({
           reasonCodes: ["active_high_alert_needs_confirmation", "multiple_adverse_evidence_lanes"],
         }),

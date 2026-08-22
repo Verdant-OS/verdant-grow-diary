@@ -2099,6 +2099,41 @@ describe("getGrowWalkContextForOwnedTarget", () => {
     expect(result.data.context.derived.attentionBand).toBe("watch_today");
   });
 
+  it("keeps a raw warning alert reviewable without upgrading it to high severity", async () => {
+    const data = routineReadyFixtures();
+    data.alerts = {
+      data: [
+        {
+          id: "warning-humidity-alert",
+          grow_id: "grow-1",
+          tent_id: "tent-1",
+          plant_id: "plant-1",
+          title: "Humidity needs a check",
+          reason: "The current value is outside the preferred range.",
+          severity: "warning",
+          status: "open",
+          metric: "humidity_pct",
+          source: "live",
+          last_seen_at: "2026-08-07T11:30:00.000Z",
+        },
+      ],
+      error: null,
+    };
+
+    const result = await getGrowWalkContextForOwnedTarget(
+      clientFor(data).client,
+      { targetType: "plant", targetId: "plant-1" },
+      { now: new Date("2026-08-07T12:00:00.000Z") },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.context.evidence.alerts[0]?.severity).toBe("medium");
+    expect(result.data.context.derived.reasonCodes).toEqual(["active_medium_alert_needs_review"]);
+    expect(result.data.context.derived.evidenceConfidence).toBe("high");
+    expect(result.data.context.derived.attentionBand).toBe("watch_today");
+  });
+
   it("keeps a non-decision partial lane at its existing medium routine posture", async () => {
     const data = routineReadyFixtures();
     data.ai_doctor_sessions = { data: null, error: { message: "AI Doctor unavailable" } };

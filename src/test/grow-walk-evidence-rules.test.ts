@@ -156,6 +156,40 @@ describe("deriveGrowWalkEvidence", () => {
     expect(result.evidenceConfidence).toBe("low");
   });
 
+  it("treats a normalized unknown plant type as incomplete without penalizing an absent optional type", () => {
+    const unknownType = derive({ plantType: "  UNKNOWN  " });
+    expect(unknownType.missingEvidenceCodes).toContain("plant_profile_incomplete");
+    expect(unknownType.evidenceConfidence).toBe("medium");
+
+    const absentType = derive({ plantType: null });
+    expect(absentType.missingEvidenceCodes).not.toContain("plant_profile_incomplete");
+    expect(absentType.evidenceConfidence).toBe("high");
+  });
+
+  it("keeps active medium alerts reviewable without treating them as high-alert adverse evidence", () => {
+    const result = derive({
+      alerts: [
+        {
+          id: "alert-medium-1",
+          title: "Humidity needs a check",
+          reasonExcerpt: "The current value is outside the preferred range.",
+          severity: "medium",
+          status: "open",
+          metric: "humidity_pct",
+          source: "live",
+          lastSeenAt: "2026-08-07T11:45:00.000Z",
+        },
+      ],
+    });
+
+    expect(result.reasonCodes).toEqual(["active_medium_alert_needs_review"]);
+    expect(result.reasonCodes).not.toContain("active_high_alert_needs_confirmation");
+    expect(result.reasonCodes).not.toContain("flower_humidity_alert_needs_inspection");
+    expect(result.reasonCodes).not.toContain("multiple_adverse_evidence_lanes");
+    expect(result.latestAdverseEvidenceAt).toBeNull();
+    expect(result.evidenceConfidence).toBe("high");
+  });
+
   it("is deterministic and keeps photo records metadata-only", () => {
     const input = { sensors: sensors({ contradictionMetrics: ["humidity_pct"] }) };
     const first = derive(input);

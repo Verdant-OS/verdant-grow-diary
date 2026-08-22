@@ -73,11 +73,24 @@ type DirectoryPageQuery<T> = (
  * showed is the same silent plant loss for the grower, just arrived at more
  * politely. So the rows are actually fetched.
  *
- * Completeness is proven against the exact `count`, not against the page size.
- * Stopping at "this page came back short" assumes the server's cap is at
- * least `DIRECTORY_PAGE_SIZE`; if it were smaller, the very first page would
- * look short and the loop would stop early while rows remained — a fence that
- * fails silently, which is the shape this branch keeps having to remove.
+ * Two independent things must both hold, and an earlier revision of this
+ * function got the first right while quietly assuming the second:
+ *
+ *   1. STOPPING is proven against the exact `count`, never against the page
+ *      size. "This page came back short" would assume the server's cap is at
+ *      least `DIRECTORY_PAGE_SIZE`.
+ *   2. ADVANCING moves by the rows the server ACTUALLY returned, never by the
+ *      window that was requested — the same assumption, one line further on.
+ *      With a server cap of 500, requesting `0..999` yields rows 0-499; a
+ *      next window of `1000..1999` skips 500-999 forever. The count check
+ *      then reports the read incomplete and the carry is refused, so the
+ *      grower loses the plant on every traversal.
+ *
+ * Rows are ordered by `id` before ranging. Without a deterministic order the
+ * ranges are not a stable partition at all: a planner-order change or a
+ * concurrent write can hand back one row twice and skip another while the
+ * total still satisfies the completeness check. `id` is unique, so it is a
+ * total order with no tie-break needed — see AGENTS.md on stable sorting.
  *
  * Takes a query builder rather than a table name so each call site keeps its
  * literal table and its generated row types.
@@ -86,8 +99,8 @@ async function readAllPages<T>(query: DirectoryPageQuery<T>): Promise<DirectoryR
   const rows: T[] = [];
   let total: number | null = null;
 
+  let from = 0;
   for (let page = 0; page < DIRECTORY_MAX_PAGES; page += 1) {
-    const from = page * DIRECTORY_PAGE_SIZE;
     const result = await query(from, from + DIRECTORY_PAGE_SIZE - 1);
 
     if (result?.error) return { rows: null, complete: false };
@@ -97,6 +110,8 @@ async function readAllPages<T>(query: DirectoryPageQuery<T>): Promise<DirectoryR
     if (typeof result?.count === "number") total = result.count;
 
     if (batch.length === 0) break;
+    // By what came back, NOT by what was asked for. See (2) above.
+    from += batch.length;
     if (total !== null && rows.length >= total) break;
   }
 
@@ -169,6 +184,7 @@ export function useTimelineNameDirectory(
               .from("plants")
               .select("id,name,tent_id,grow_id,is_archived,last_note", { count: "exact" })
               .eq("user_id", userId)
+              .order("id", { ascending: true })
               .range(from, to),
           ),
           // `grow_id` resolves the EFFECTIVE grow of a plant whose own column
@@ -180,6 +196,7 @@ export function useTimelineNameDirectory(
               .from("tents")
               .select("id,name,grow_id,is_archived", { count: "exact" })
               .eq("user_id", userId)
+              .order("id", { ascending: true })
               .range(from, to),
           ),
         ]);

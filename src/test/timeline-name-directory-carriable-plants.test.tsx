@@ -43,6 +43,10 @@ const state = vi.hoisted(() => ({
   plantsTotalCount: null as number | null,
   /** Every `.range()` the hook issued, so paging itself is observable. */
   ranges: [] as Array<{ table: string; from: number; to: number }>,
+  /** Server-side row cap, PostgREST style. Null = honour the range in full. */
+  serverRowCap: null as number | null,
+  /** Every `.order()` the hook issued, so partition stability is observable. */
+  orders: [] as Array<{ table: string; column: string }>,
 }));
 
 /**
@@ -79,15 +83,26 @@ vi.mock("@/integrations/supabase/client", () => ({
             table === "plants" ? (state.plantsTotalCount ?? source.length) : source.length;
           return {
             eq: () => ({
-              // Honours `.range()` so a paged read is actually exercised. A
-              // mock that ignored the range would let a broken page loop pass.
-              range: async (from: number, to: number) => {
-                state.ranges.push({ table, from, to });
-                if (error) return { data: null, error, count: null };
+              order: (column: string) => {
+                state.orders.push({ table, column });
                 return {
-                  data: source.slice(from, to + 1).map((row) => project(row, columns)),
-                  error: null,
-                  count: total,
+                  // Honours `.range()` so a paged read is actually exercised,
+                  // and enforces `serverRowCap` the way PostgREST does: a
+                  // requested window may come back SHORT without being the
+                  // end of the data. A mock that always returned the full
+                  // window would let an advance-by-page-size loop pass.
+                  range: async (from: number, to: number) => {
+                    state.ranges.push({ table, from, to });
+                    if (error) return { data: null, error, count: null };
+                    const width = to - from + 1;
+                    const capped = state.serverRowCap ?? width;
+                    const rows = source.slice(from, from + Math.min(width, capped));
+                    return {
+                      data: rows.map((row) => project(row, columns)),
+                      error: null,
+                      count: total,
+                    };
+                  },
                 };
               },
             }),
@@ -107,6 +122,8 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     state.tentsError = null;
     state.plantsTotalCount = null;
     state.ranges = [];
+    state.serverRowCap = null;
+    state.orders = [];
     state.plants = [
       {
         id: PLANT_ACTIVE,
@@ -315,6 +332,57 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     expect(plantRanges.length).toBeGreaterThanOrEqual(3);
     expect(plantRanges[0]).toEqual({ table: "plants", from: 0, to: 999 });
     expect(plantRanges[1]).toEqual({ table: "plants", from: 1000, to: 1999 });
+  });
+
+  it("advances by the rows RETURNED when the server cap is below the page size", async () => {
+    // The trap the previous revision named for its STOP condition and then
+    // walked into on its ADVANCE. With a 500-row cap, requesting 0..999
+    // yields 0-499; a next window of 1000..1999 skips 500-999 forever.
+    //
+    // 600 plants + a 500 cap puts the plant under test at index 599 — inside
+    // the window that a page-size advance would jump straight over.
+    state.serverRowCap = 500;
+    const bulk = Array.from({ length: 599 }, (_, i) => ({
+      id: `${(i + 1).toString(16).padStart(8, "0")}-1111-4111-8111-111111111111`,
+      name: `Bulk ${i}`,
+      tent_id: TENT,
+      grow_id: GROW,
+      is_archived: false,
+      last_note: null,
+    }));
+    state.plants = [
+      ...bulk,
+      {
+        id: PLANT_ACTIVE,
+        name: "Alpha",
+        tent_id: TENT,
+        grow_id: GROW,
+        is_archived: false,
+        last_note: null,
+      },
+    ];
+
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
+    await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("ready"));
+
+    expect(result.current.carriablePlantTentById!.get(PLANT_ACTIVE)).toBe(TENT);
+    expect(result.current.carriablePlantTentById!.size).toBe(600);
+
+    // The second window must start at 500 — what came back — not at 1000.
+    const plantRanges = state.ranges.filter((r) => r.table === "plants");
+    expect(plantRanges[0].from).toBe(0);
+    expect(plantRanges[1].from).toBe(500);
+  });
+
+  it("orders both directory reads so the ranges are a stable partition", async () => {
+    // Without a deterministic order the windows are not a partition at all:
+    // a planner-order change or concurrent write can return one row twice
+    // and skip another while the total still satisfies completeness.
+    renderHook(() => useTimelineNameDirectory("user-1", GROW));
+
+    await waitFor(() => expect(state.orders.length).toBeGreaterThanOrEqual(2));
+    expect(state.orders).toContainEqual({ table: "plants", column: "id" });
+    expect(state.orders).toContainEqual({ table: "tents", column: "id" });
   });
 
   it("refuses the carry when the pages cannot account for every row", async () => {

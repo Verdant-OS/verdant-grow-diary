@@ -1,6 +1,14 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-22 UTC (17:32 UTC)
+**Last updated:** 2026-08-22 UTC (23:41 UTC)
+**Updated by:** Codex (2026-08-22, documentation-only provenance correction.)
+
+**Observation:** At 23:41 UTC, the GitHub pull-request record for #1076 reported
+`state: closed`, `merged_at: null`, and `closed_at: 2026-08-22T22:52:52Z`. This
+closes #1076 unmerged; it does not authorize its workflow migration. Historical audit
+measurements and timings below remain unchanged.
+
+**Prior update:** 2026-08-22 UTC (17:32 UTC)
 **Updated by:** Claude (2026-08-22, review round: **the payments-token severity was
 INVERTED and is corrected.** An earlier revision said production "is running **live**
 payments". It is not. At the served SHA a `live_` token resolves to `unavailable`

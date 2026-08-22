@@ -35,6 +35,7 @@ interface QuerySpec {
   columns: string | null;
   count: string | null;
   filters: QueryFilter[];
+  range?: { from: number; to: number };
 }
 
 interface QueryResult {
@@ -76,6 +77,14 @@ vi.mock("@/integrations/supabase/client", () => {
         return query;
       },
       limit() {
+        return query;
+      },
+      // `useTimelineNameDirectory` pages its reads, so the chain has to
+      // accept `.range()`. Without it the call returned undefined, the page
+      // loop saw an empty batch, and the name maps came back empty — which
+      // is how this suite caught the paging change.
+      range(from: number, to: number) {
+        spec.range = { from, to };
         return query;
       },
       then<TResult1 = QueryResult, TResult2 = never>(

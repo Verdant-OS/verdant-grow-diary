@@ -201,7 +201,28 @@ export function resolveOneTentLoopNextStep(
       // Carry the plant as a second UUID-only intent so it can survive
       // Timeline -> Sensors -> Doctor. Sensors does not resolve it; the
       // consuming Doctor page revalidates it against authenticated rows.
-      return enable(base, withSensorsPlantIntent(buildSensorsTentRouteHref(tentId), plantId));
+      // A carried plant makes the tent EXACT, not a preference.
+      //
+      // The href outlives the directory read that validated it: a grower can
+      // revisit it from browser history after that tent is archived or
+      // deleted. An ordinary intent then finds no match and
+      // `resolveSensorsTentRouteSelection` falls back to another live tent —
+      // relocating the grower and losing the plant to the resulting mismatch.
+      // Filtering archived tents when the link is BUILT cannot protect a
+      // later visit; only the link itself can.
+      //
+      // Required only when a plant rides along. A bare tent carry keeps its
+      // existing forgiving behaviour: there is no pair to break, and making
+      // it exact would change a shipped contract this finding does not reach.
+      return enable(
+        base,
+        withSensorsPlantIntent(
+          buildSensorsTentRouteHref(tentId, {
+            requireExactMatch: normalizedPlantId !== null,
+          }),
+          plantId,
+        ),
+      );
     case "sensor-snapshot":
       if (normalizedGrowId && normalizedTentId) {
         const scopedHref = `/doctor?growId=${encodeURIComponent(normalizedGrowId)}&tentId=${encodeURIComponent(normalizedTentId)}`;

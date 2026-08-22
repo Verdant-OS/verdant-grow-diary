@@ -42,6 +42,27 @@ export interface TimelineNameDirectory {
   carriablePlantTentStatus: CarriablePlantLookupStatus;
 }
 
+/**
+ * Did this read return fewer rows than exist?
+ *
+ * PostgREST caps rows server-side and still reports success, so an account
+ * past that cap gets a SUBSET presented as a complete answer. For the two
+ * NAME maps that is cosmetic — a label falls back to a neutral fragment. For
+ * the CARRY it is a silent drop: a historical Timeline entry can still offer
+ * a plant that fell outside the subset, and a lookup built from that subset
+ * says "ready" without it, so the CTA is enabled and the plant disappears.
+ *
+ * Compared against an exact `count` rather than a hardcoded cap on purpose.
+ * A literal would have to match the server's, and a literal set too high
+ * produces a fence that can never fire — the failure mode this branch has
+ * already hit more than once.
+ */
+function truncated(result: { data?: unknown[] | null; count?: number | null } | null): boolean {
+  if (!result) return false;
+  if (typeof result.count !== "number") return false;
+  return result.count > (result.data?.length ?? 0);
+}
+
 interface DirectorySnapshot {
   key: string;
   plantNamesById: ReadonlyMap<string, string> | null;
@@ -102,13 +123,16 @@ export function useTimelineNameDirectory(
           // maps below must keep archived, merged, and other-grow rows.
           supabase
             .from("plants")
-            .select("id,name,tent_id,grow_id,is_archived,last_note")
+            .select("id,name,tent_id,grow_id,is_archived,last_note", { count: "exact" })
             .eq("user_id", userId),
           // `grow_id` resolves the EFFECTIVE grow of a plant whose own column
           // is null but whose tent belongs to this grow; `is_archived` keeps
           // archived tents out of the CARRY (Sensors never sees them) while
           // the name map below still keeps them for history labels.
-          supabase.from("tents").select("id,name,grow_id,is_archived").eq("user_id", userId),
+          supabase
+            .from("tents")
+            .select("id,name,grow_id,is_archived", { count: "exact" })
+            .eq("user_id", userId),
         ]);
         if (cancelled) return;
         setSnapshot({
@@ -125,7 +149,10 @@ export function useTimelineNameDirectory(
           // The two NAME maps still degrade independently: a lost label is
           // cosmetic, a lost verification is not.
           carriablePlantTentById:
-            plantsResult?.error || tentsResult?.error
+            plantsResult?.error ||
+            tentsResult?.error ||
+            truncated(plantsResult) ||
+            truncated(tentsResult)
               ? null
               : buildCarriablePlantTentLookup(plantsResult?.data, {
                   growId: activeGrowId,

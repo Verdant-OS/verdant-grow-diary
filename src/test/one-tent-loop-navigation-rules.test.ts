@@ -162,8 +162,19 @@ describe("oneTentLoopNavigationRules", () => {
     // rule applies to the plant as to the tent.
     const TENT = "00000000-0000-4000-8000-00000000000a";
     const PLANT = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+    // RENEGOTIATED: the carried tent is now `tentIntent=required`, not a
+    // preference. The href outlives the read that validated it — revisited
+    // from history after that tent is archived, an ordinary intent falls back
+    // to another live tent and relocates the grower. Exact fails closed
+    // instead, and `buildSensorsRequiredTentGate` asks for a reselection.
     expect(resolveOneTentLoopNextStep("timeline", { tentId: TENT, plantId: PLANT }).href).toBe(
-      `/sensors?tentId=${TENT}&plantId=${PLANT}`,
+      `/sensors?tentId=${TENT}&tentIntent=required&plantId=${PLANT}`,
+    );
+
+    // And ONLY when a plant rides along. A bare tent carry keeps its shipped
+    // forgiving behaviour — asserted above at the same tent, without a plant.
+    expect(resolveOneTentLoopNextStep("timeline", { tentId: TENT }).href).not.toContain(
+      "tentIntent=required",
     );
     // The rules carry whatever the caller supplies; deciding WHETHER a
     // tentless plant should travel is the caller's job, not this module's.

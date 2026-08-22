@@ -39,6 +39,8 @@ const state = vi.hoisted(() => ({
   plants: [] as Array<Record<string, unknown>>,
   plantsError: null as unknown,
   tentsError: null as unknown,
+  /** Simulate a server-capped read: rows returned < rows that exist. */
+  plantsTotalCount: null as number | null,
 }));
 
 /**
@@ -66,6 +68,7 @@ vi.mock("@/integrations/supabase/client", () => ({
                 ? {
                     data: state.plants.map((row) => project(row, columns)),
                     error: state.plantsError,
+                    count: state.plantsTotalCount ?? state.plants.length,
                   }
                 : state.tentsError
                   ? { data: null, error: state.tentsError }
@@ -96,6 +99,7 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
     state.selects = [];
     state.plantsError = null;
     state.tentsError = null;
+    state.plantsTotalCount = null;
     state.plants = [
       {
         id: PLANT_ACTIVE,
@@ -264,6 +268,34 @@ describe("useTimelineNameDirectory · carriable plant lookup", () => {
 
     await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("ready"));
     expect(result.current.carriablePlantTentById).not.toBeNull();
+  });
+
+  it("treats a server-CAPPED read as unavailable, not as a complete carry", async () => {
+    // PostgREST caps rows and still reports success, so a large account gets
+    // a SUBSET presented as a complete answer. A historical Timeline entry
+    // can still offer a plant that fell outside it, and a lookup built from
+    // the subset says "ready" without that plant — enabled CTA, silent drop.
+    state.plantsTotalCount = state.plants.length + 1;
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
+
+    await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("unavailable"));
+    expect(result.current.carriablePlantTentById).toBeNull();
+
+    // Names still resolve from whatever DID come back: a truncated label is
+    // cosmetic, a truncated verification is not.
+    expect(result.current.plantNamesById!.get(PLANT_ACTIVE)).toBe("Alpha");
+  });
+
+  it("treats a complete read as complete — the cap fence must not fire always", async () => {
+    // The counterpart that keeps the fence honest. A guard that reports
+    // truncation on every read would be indistinguishable from a broken
+    // carry, and this branch has already shipped one fence that could not
+    // fail; this is the one that proves this one can pass.
+    state.plantsTotalCount = state.plants.length;
+    const { result } = renderHook(() => useTimelineNameDirectory("user-1", GROW));
+
+    await waitFor(() => expect(result.current.carriablePlantTentStatus).toBe("ready"));
+    expect(result.current.carriablePlantTentById!.get(PLANT_ACTIVE)).toBe(TENT);
   });
 
   it("reports a failed TENTS read as unavailable, not an empty ready carry", async () => {

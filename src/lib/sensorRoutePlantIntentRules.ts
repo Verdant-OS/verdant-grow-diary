@@ -61,47 +61,79 @@ export function readSensorsPlantRouteIntent(
   return normalizePersistedPlantId(search?.get(SENSORS_PLANT_INTENT_QUERY_PARAM) ?? null);
 }
 
-/** Minimal row shape: any timeline entry that knows its plant and tent. */
-export interface PlantTentEntryLike {
-  plant_id?: string | null;
+/** Minimal plant row: id plus its CURRENT tent assignment. */
+export interface PlantTentRowLike {
+  id?: string | null;
   tent_id?: string | null;
 }
 
 /**
- * Resolve the tent to carry alongside a plant.
+ * Build the plant id → current tent id lookup this handoff needs.
  *
- * Timeline's tent and plant filters are INDEPENDENT: a grower can select a
- * plant while the tent filter still reads "All tents". Carrying the plant
- * alone in that case is worse than carrying nothing — Sensors would fall
- * back to its own persisted tent, and the Doctor would then reject the plant
- * for not belonging to it. The grower's selection would vanish silently,
- * which is exactly the outcome this handoff exists to prevent.
+ * Takes `plants` rows, never diary rows. See `resolveCarriedPlantScope`.
+ */
+export function buildTimelinePlantTentLookup(
+  rows: readonly (PlantTentRowLike | null | undefined)[] | null | undefined,
+): ReadonlyMap<string, string | null> {
+  const lookup = new Map<string, string | null>();
+  for (const row of rows ?? []) {
+    const id = normalizePersistedPlantId(row?.id);
+    if (!id) continue;
+    lookup.set(id, normalizePersistedPlantId(row?.tent_id));
+  }
+  return lookup;
+}
+
+/**
+ * Resolve the plant/tent pair to carry onward to Sensors → Doctor.
  *
- * So an explicit tent always wins, and otherwise the plant's owning tent is
- * derived from the rows already on the page. If neither yields a tent, the
- * caller is told to carry NO plant (`plantId: null`) rather than emit one
- * that is certain to be discarded downstream.
+ * Timeline's tent and plant filters are INDEPENDENT — `tentFilter` is
+ * component state, `plantFilter` comes from the URL — so they can disagree,
+ * and either can be set without the other. Downstream, `AiDoctorStart`
+ * honours a carried plant only when it belongs to the carried tent, checked
+ * against the grower's CURRENT plant rows. Anything this function emits that
+ * fails that check disappears silently, which is the exact failure the whole
+ * handoff exists to prevent. So the rule is: only ever emit a pair the
+ * Doctor will actually accept, and otherwise emit no plant at all.
+ *
+ * The tent comes from `plantTentById` — built from `plants.tent_id` — and
+ * never from diary rows. A diary entry records the tent an entry was made
+ * IN, which is history: move a plant between tents and its old entries keep
+ * pointing at the old one. Deriving from that would hand the Doctor a stale
+ * tent and lose the very selection being carried.
+ *
+ * Precedence:
+ *   - no plant selected → pass the tent through untouched
+ *   - plant's current tent unknown → carry NO plant (cannot be validated)
+ *   - explicit tent that MATCHES the plant's current tent → carry both
+ *   - explicit tent that CONTRADICTS it → keep the tent, drop the plant.
+ *     The tent filter is the grower's live view; silently retargeting it to
+ *     follow a stale URL plant would move the page under them.
+ *   - no explicit tent → carry the plant with its current tent
  */
 export function resolveCarriedPlantScope(input: {
   plantId?: unknown;
   tentId?: unknown;
-  entries?: readonly (PlantTentEntryLike | null | undefined)[] | null;
+  plantTentById?: ReadonlyMap<string, string | null> | null;
 }): { plantId: string | null; tentId: string | null } {
   const normalizedPlantId = normalizePersistedPlantId(input?.plantId);
   const explicitTentId = normalizePersistedPlantId(input?.tentId);
 
   if (!normalizedPlantId) return { plantId: null, tentId: explicitTentId };
-  if (explicitTentId) return { plantId: normalizedPlantId, tentId: explicitTentId };
 
-  for (const entry of input?.entries ?? []) {
-    if (normalizePersistedPlantId(entry?.plant_id) !== normalizedPlantId) continue;
-    const derivedTentId = normalizePersistedPlantId(entry?.tent_id);
-    if (derivedTentId) return { plantId: normalizedPlantId, tentId: derivedTentId };
+  const currentTentId = input?.plantTentById?.get(normalizedPlantId) ?? null;
+
+  // Unknown assignment — the directory is still loading, the read failed, or
+  // the plant is not the grower's. Carrying it would be a guess.
+  if (!currentTentId) return { plantId: null, tentId: explicitTentId };
+
+  if (explicitTentId) {
+    return explicitTentId === currentTentId
+      ? { plantId: normalizedPlantId, tentId: explicitTentId }
+      : { plantId: null, tentId: explicitTentId };
   }
 
-  // Fail closed: a plant whose tent cannot be established is dropped here
-  // rather than sent onward to be rejected.
-  return { plantId: null, tentId: null };
+  return { plantId: normalizedPlantId, tentId: currentTentId };
 }
 
 /**

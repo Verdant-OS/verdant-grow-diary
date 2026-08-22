@@ -15,6 +15,7 @@ import {
   SENSORS_PLANT_INTENT_QUERY_PARAM,
   normalizePersistedPlantId,
   readSensorsPlantRouteIntent,
+  buildTimelinePlantTentLookup,
   resolveCarriedPlantScope,
   withSensorsPlantIntent,
 } from "@/lib/sensorRoutePlantIntentRules";
@@ -146,60 +147,102 @@ describe("withSensorsPlantIntent", () => {
 });
 
 describe("resolveCarriedPlantScope", () => {
-  const entries = [
-    { plant_id: OTHER_PLANT, tent_id: "99999999-8888-4777-8666-555555555555" },
-    { plant_id: PLANT, tent_id: TENT },
-  ];
+  const OTHER_TENT = "99999999-8888-4777-8666-555555555555";
+  // Current assignment, sourced from plants.tent_id — never from diary rows.
+  const plantTentById = new Map<string, string | null>([
+    [PLANT, TENT],
+    [OTHER_PLANT, OTHER_TENT],
+  ]);
 
-  it("keeps an explicitly selected tent and does not derive over it", () => {
-    const explicit = "22222222-3333-4444-8555-666666666666";
-    expect(resolveCarriedPlantScope({ plantId: PLANT, tentId: explicit, entries })).toEqual({
-      plantId: PLANT,
-      tentId: explicit,
-    });
-  });
-
-  it("derives the plant's own tent when the tent filter is All tents", () => {
-    // The P2 case: independent filters. Carrying the plant WITHOUT its tent
-    // would let Sensors fall back to another tent and the Doctor discard the
-    // plant — the grower's selection would vanish silently.
-    expect(resolveCarriedPlantScope({ plantId: PLANT, tentId: "", entries })).toEqual({
+  it("carries both when the explicit tent matches the plant's current tent", () => {
+    expect(resolveCarriedPlantScope({ plantId: PLANT, tentId: TENT, plantTentById })).toEqual({
       plantId: PLANT,
       tentId: TENT,
     });
   });
 
-  it("drops the plant when no tent can be established — fail closed", () => {
-    for (const noTent of [
-      [],
+  it("uses the plant's CURRENT tent when the filter reads All tents", () => {
+    expect(resolveCarriedPlantScope({ plantId: PLANT, tentId: "", plantTentById })).toEqual({
+      plantId: PLANT,
+      tentId: TENT,
+    });
+  });
+
+  it("drops the plant when the explicit tent CONTRADICTS its current tent", () => {
+    // Independent filters can disagree — a URL plant from one tent while the
+    // grower has filtered to another. The Doctor only honours a plant inside
+    // the carried tent, so emitting this pair would lose the selection
+    // silently. Keep the tent the grower is actually looking at.
+    expect(resolveCarriedPlantScope({ plantId: PLANT, tentId: OTHER_TENT, plantTentById })).toEqual(
+      { plantId: null, tentId: OTHER_TENT },
+    );
+  });
+
+  it("drops the plant when its current tent is unknown — fail closed", () => {
+    // Directory still loading, read failed, plant not the grower's, or the
+    // plant has no tent. None of these may become a guess.
+    for (const lookup of [
       null,
       undefined,
-      [{ plant_id: PLANT, tent_id: null }],
-      [{ plant_id: PLANT, tent_id: "not-a-uuid" }],
-      [{ plant_id: OTHER_PLANT, tent_id: TENT }],
+      new Map<string, string | null>(),
+      new Map<string, string | null>([[PLANT, null]]),
+      new Map<string, string | null>([[OTHER_PLANT, OTHER_TENT]]),
     ]) {
       expect(
-        resolveCarriedPlantScope({ plantId: PLANT, tentId: "", entries: noTent as never }),
+        resolveCarriedPlantScope({ plantId: PLANT, tentId: "", plantTentById: lookup }),
       ).toEqual({ plantId: null, tentId: null });
+      // An explicit tent still survives — only the plant is dropped.
+      expect(
+        resolveCarriedPlantScope({ plantId: PLANT, tentId: TENT, plantTentById: lookup }),
+      ).toEqual({ plantId: null, tentId: TENT });
     }
   });
 
-  it("passes a tent through untouched when no plant is selected", () => {
-    expect(resolveCarriedPlantScope({ plantId: "", tentId: TENT, entries })).toEqual({
-      plantId: null,
-      tentId: TENT,
-    });
-    expect(resolveCarriedPlantScope({ plantId: "p1", tentId: TENT, entries })).toEqual({
-      plantId: null,
-      tentId: TENT,
-    });
+  it("passes a tent through untouched when no valid plant is selected", () => {
+    for (const bad of ["", "   ", "p1", null, undefined]) {
+      expect(resolveCarriedPlantScope({ plantId: bad, tentId: TENT, plantTentById })).toEqual({
+        plantId: null,
+        tentId: TENT,
+      });
+    }
   });
 
-  it("ignores malformed rows rather than throwing on them", () => {
-    const messy = [null, undefined, {}, { plant_id: PLANT }, { plant_id: PLANT, tent_id: TENT }];
+  it("never sources the tent from historical diary attribution", () => {
+    // Regression for the review finding: a plant MOVED tents keeps its old
+    // tent on old diary entries. Only plants.tent_id is authoritative, so a
+    // lookup reflecting the move must win outright — there is no entries
+    // input left for stale history to enter through.
+    const afterMove = new Map<string, string | null>([[PLANT, OTHER_TENT]]);
     expect(
-      resolveCarriedPlantScope({ plantId: PLANT, tentId: "", entries: messy as never }),
-    ).toEqual({ plantId: PLANT, tentId: TENT });
+      resolveCarriedPlantScope({ plantId: PLANT, tentId: "", plantTentById: afterMove }),
+    ).toEqual({ plantId: PLANT, tentId: OTHER_TENT });
+    // And the pre-move tent is now the contradicting one, so it drops.
+    expect(
+      resolveCarriedPlantScope({ plantId: PLANT, tentId: TENT, plantTentById: afterMove }),
+    ).toEqual({ plantId: null, tentId: TENT });
+  });
+});
+
+describe("buildTimelinePlantTentLookup", () => {
+  it("maps plant rows to their current tent and skips unusable rows", () => {
+    const lookup = buildTimelinePlantTentLookup([
+      { id: PLANT, tent_id: TENT },
+      { id: OTHER_PLANT, tent_id: null },
+      { id: "p1", tent_id: TENT },
+      { id: null, tent_id: TENT },
+      null,
+      undefined,
+      {},
+    ]);
+    expect(lookup.get(PLANT)).toBe(TENT);
+    expect(lookup.get(OTHER_PLANT)).toBeNull();
+    expect(lookup.has("p1")).toBe(false);
+    expect(lookup.size).toBe(2);
+  });
+
+  it("returns an empty map for absent input rather than throwing", () => {
+    expect(buildTimelinePlantTentLookup(null).size).toBe(0);
+    expect(buildTimelinePlantTentLookup(undefined).size).toBe(0);
   });
 });
 
@@ -232,7 +275,9 @@ describe("Timeline page wiring", () => {
     // rows the tent is derived from — dropping any one silently degrades it.
     expect(src).toMatch(/resolveCarriedPlantScope\(\{\s*plantId:\s*plantFilter/);
     expect(src).toMatch(/tentId:\s*tentFilter/);
-    expect(src).toMatch(/entries\s*\}\)/);
+    expect(src).toMatch(/plantTentById\s*\}\)/);
+    // Historical diary attribution must not creep back in as the tent source.
+    expect(src).not.toMatch(/resolveCarriedPlantScope\([^)]*entries/);
     // And the result must actually reach the card.
     expect(src).toMatch(/current="timeline"[\s\S]{0,200}\.\.\.carriedPlantScope/);
     // The pre-fix shape must not come back.

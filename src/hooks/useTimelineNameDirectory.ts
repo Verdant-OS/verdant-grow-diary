@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { buildTimelineNameLookup } from "@/lib/timelineEvidenceFilterRules";
+import { buildTimelinePlantTentLookup } from "@/lib/sensorRoutePlantIntentRules";
 
 export interface TimelineNameDirectory {
   /** id → name over the owner's plants, INCLUDING archived/merged rows. Null while unavailable. */
   plantNamesById: ReadonlyMap<string, string> | null;
   /** id → name over the owner's tents, INCLUDING archived rows. Null while unavailable. */
   tentNamesById: ReadonlyMap<string, string> | null;
+  /**
+   * plant id → its CURRENT tent id. Null while unavailable; a plant with no
+   * tent maps to null.
+   *
+   * Deliberately sourced from `plants.tent_id` and never from diary rows. A
+   * diary entry records the tent an entry was made in, which is history: a
+   * plant moved between tents keeps its old attribution on old entries. Any
+   * consumer asking "which tent is this plant in" must ask the plant row,
+   * because that is what downstream ownership checks validate against.
+   */
+  plantTentById: ReadonlyMap<string, string | null> | null;
 }
 
 /**
@@ -26,27 +38,35 @@ export interface TimelineNameDirectory {
 export function useTimelineNameDirectory(userId: string | null): TimelineNameDirectory {
   const [plantNamesById, setPlantNamesById] = useState<ReadonlyMap<string, string> | null>(null);
   const [tentNamesById, setTentNamesById] = useState<ReadonlyMap<string, string> | null>(null);
+  const [plantTentById, setPlantTentById] = useState<ReadonlyMap<string, string | null> | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!userId) {
       setPlantNamesById(null);
       setTentNamesById(null);
+      setPlantTentById(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
         const [plantsResult, tentsResult] = await Promise.all([
-          supabase.from("plants").select("id,name").eq("user_id", userId),
+          supabase.from("plants").select("id,name,tent_id").eq("user_id", userId),
           supabase.from("tents").select("id,name").eq("user_id", userId),
         ]);
         if (cancelled) return;
         setPlantNamesById(plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data));
         setTentNamesById(tentsResult?.error ? null : buildTimelineNameLookup(tentsResult?.data));
+        setPlantTentById(
+          plantsResult?.error ? null : buildTimelinePlantTentLookup(plantsResult?.data),
+        );
       } catch {
         if (cancelled) return;
         setPlantNamesById(null);
         setTentNamesById(null);
+        setPlantTentById(null);
       }
     })();
     return () => {
@@ -54,5 +74,5 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
     };
   }, [userId]);
 
-  return { plantNamesById, tentNamesById };
+  return { plantNamesById, tentNamesById, plantTentById };
 }

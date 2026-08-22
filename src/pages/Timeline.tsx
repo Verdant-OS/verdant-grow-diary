@@ -1020,7 +1020,7 @@ export default function Timeline() {
   // (includes is_archived rows) keeps filter labels on real names.
   // Gated on a resolved grow scope so a rejected/invalid scope issues
   // no reads at all, matching the page's fail-closed read policy.
-  const { plantNamesById, tentNamesById } = useTimelineNameDirectory(
+  const { plantNamesById, tentNamesById, plantTentById } = useTimelineNameDirectory(
     user && activeGrowId ? user : null,
   );
   const plantOptions = useMemo(
@@ -1070,8 +1070,8 @@ export default function Timeline() {
   // A plant whose tent cannot be established is not carried at all rather
   // than sent onward to be rejected downstream.
   const carriedPlantScope = useMemo(
-    () => resolveCarriedPlantScope({ plantId: plantFilter, tentId: tentFilter, entries }),
-    [plantFilter, tentFilter, entries],
+    () => resolveCarriedPlantScope({ plantId: plantFilter, tentId: tentFilter, plantTentById }),
+    [plantFilter, tentFilter, plantTentById],
   );
 
   const filtered = useMemo(() => {

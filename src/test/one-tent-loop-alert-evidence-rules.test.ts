@@ -121,6 +121,57 @@ describe("hasResolvedOneTentLoopAlertEvidence", () => {
     ).toBe(true);
   });
 
+  it.each([
+    ["missing", null],
+    ["unknown", "leaf_wetness"],
+  ])(
+    "fails closed for a manual Environment Check diary ref when the alert metric is %s",
+    (_label, alertMetric) => {
+      expect(
+        hasResolvedOneTentLoopAlertEvidence({
+          refs: [
+            {
+              id: "diary-current",
+              type: "diary_entry",
+              source: "manual",
+              occurred_at: DIARY_AT,
+            },
+          ],
+          snapshot: snapshot({
+            source: "manual",
+            metric_refs: undefined,
+            diary_evidence_ref: { id: "diary-current", entry_at: DIARY_AT },
+          }),
+          alert_metric: alertMetric,
+          selected_tent_id: TENT_ID,
+        }),
+      ).toBe(false);
+    },
+  );
+
+  it("fails closed for a manual Environment Check diary ref without a finite value for its alert metric", () => {
+    expect(
+      hasResolvedOneTentLoopAlertEvidence({
+        refs: [
+          {
+            id: "diary-current",
+            type: "diary_entry",
+            source: "manual",
+            occurred_at: DIARY_AT,
+          },
+        ],
+        snapshot: snapshot({
+          source: "manual",
+          rh: null,
+          metric_refs: undefined,
+          diary_evidence_ref: { id: "diary-current", entry_at: DIARY_AT },
+        }),
+        alert_metric: "rh",
+        selected_tent_id: TENT_ID,
+      }),
+    ).toBe(false);
+  });
+
   it.each(INVALID_REFS)("fails closed for a %s ref", (_label, ref) => {
     expect(resolves([ref])).toBe(false);
   });

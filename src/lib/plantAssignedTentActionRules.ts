@@ -14,6 +14,7 @@
 import {
   extractSourceAiDoctorSessionId,
   extractSourceAlertId,
+  getActionQueueSourceKind,
 } from "@/lib/actionQueueProvenanceRules";
 
 export type AssignedTentActionStatus =
@@ -69,6 +70,12 @@ export interface BuildAssignedTentActionsOptions {
   tentId: string | null | undefined;
   growId?: string | null | undefined;
   limit?: number;
+  /**
+   * Live Proof-only selector. When supplied, other-plant/tent-wide AI Coach
+   * rows are excluded before the normal display cap. All other source kinds
+   * preserve the shared assigned-tent panel semantics.
+   */
+  selectedPlantIdForAiCoach?: string | null | undefined;
 }
 
 function toRow(r: AssignedTentActionInputRow): PlantAssignedTentActionRow {
@@ -107,6 +114,10 @@ export function buildAssignedTentActions(
   if (!rows || rows.length === 0) return [];
   const growId = opts.growId ?? null;
   const limit = Math.max(1, opts.limit ?? ASSIGNED_TENT_ACTIONS_DEFAULT_LIMIT);
+  const selectedPlantIdForAiCoach =
+    typeof opts.selectedPlantIdForAiCoach === "string" && opts.selectedPlantIdForAiCoach.trim()
+      ? opts.selectedPlantIdForAiCoach
+      : null;
 
   const scoped = rows.filter((r) => {
     if (!r) return false;
@@ -117,7 +128,15 @@ export function buildAssignedTentActions(
     return true;
   });
 
-  const mapped = scoped.map(toRow);
+  const proofScoped = selectedPlantIdForAiCoach
+    ? scoped.filter(
+        (row) =>
+          getActionQueueSourceKind(row) !== "ai_coach" ||
+          row.plant_id === selectedPlantIdForAiCoach,
+      )
+    : scoped;
+
+  const mapped = proofScoped.map(toRow);
   mapped.sort((a, b) => {
     const at = a.createdAt ? Date.parse(a.createdAt) : 0;
     const bt = b.createdAt ? Date.parse(b.createdAt) : 0;

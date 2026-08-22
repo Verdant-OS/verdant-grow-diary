@@ -25,7 +25,10 @@ export interface OneTentLoopAlertEvidenceInput {
   refs: readonly OriginatingTimelineEventRef[] | null | undefined;
   /** Already-loaded current snapshot for this proof page. */
   snapshot:
-    | Pick<SensorSnapshot, "source" | "tent_id" | "metric_refs" | "diary_evidence_ref">
+    | Pick<
+        SensorSnapshot,
+        "source" | "tent_id" | "metric_refs" | "diary_evidence_ref" | SensorSnapshotMetricRefKey
+      >
     | null
     | undefined;
   /** Persisted alert metric. Only deterministic known aliases are accepted. */
@@ -88,8 +91,10 @@ function matchesSensorMetricRef(
 function matchesDiaryEnvironmentCheckRef(
   ref: OriginatingTimelineEventRef,
   snapshot: OneTentLoopAlertEvidenceInput["snapshot"],
+  metricKey: SensorSnapshotMetricRefKey,
 ): boolean {
   const diaryRef = snapshot?.diary_evidence_ref;
+  const metricValue = snapshot?.[metricKey];
   // `snapshotFromEnvironmentCheck` is the sole producer of this exact
   // ref and labels it manual. Do not let an arbitrary diary-shaped ref
   // upgrade another snapshot source to trusted proof evidence.
@@ -97,6 +102,8 @@ function matchesDiaryEnvironmentCheckRef(
     snapshot?.source === "manual" &&
     ref.type === "diary_entry" &&
     ref.source === "manual" &&
+    typeof metricValue === "number" &&
+    Number.isFinite(metricValue) &&
     equalTrimmed(ref.id, diaryRef?.id) &&
     equalTrimmed(ref.occurred_at, diaryRef?.entry_at)
   );
@@ -115,10 +122,15 @@ export function hasResolvedOneTentLoopAlertEvidence(input: OneTentLoopAlertEvide
   if (!Array.isArray(input.refs) || input.refs.length === 0) return false;
 
   const metricKey = normalizeMetricKey(input.alert_metric);
-  const metricRef = metricKey ? (snapshot.metric_refs?.[metricKey] ?? null) : null;
+  // A manual Environment Check ref is only evidence for a specific supported
+  // alert metric. Without that binding, an arbitrary or missing metric could
+  // self-certify through the diary fallback.
+  if (!metricKey) return false;
+  const metricRef = snapshot.metric_refs?.[metricKey] ?? null;
 
   return input.refs.some(
     (ref) =>
-      matchesSensorMetricRef(ref, metricRef) || matchesDiaryEnvironmentCheckRef(ref, snapshot),
+      matchesSensorMetricRef(ref, metricRef) ||
+      matchesDiaryEnvironmentCheckRef(ref, snapshot, metricKey),
   );
 }

@@ -23,11 +23,23 @@ export interface UsePlantAssignedTentActionsResult {
   error: unknown;
 }
 
+export interface UsePlantAssignedTentActionsOptions {
+  /**
+   * Narrow Live Proof selector: skip nonmatching AI Coach rows before the
+   * shared bounded display cap. Other action sources remain tent-scoped.
+   */
+  selectedPlantIdForAiCoach?: string | null | undefined;
+}
+
 export function usePlantAssignedTentActions(
   tentId: string | null | undefined,
   growId: string | null | undefined,
-  limit: number = ASSIGNED_TENT_ACTIONS_DEFAULT_LIMIT,
+  limitOrOptions: number | UsePlantAssignedTentActionsOptions = ASSIGNED_TENT_ACTIONS_DEFAULT_LIMIT,
 ): UsePlantAssignedTentActionsResult {
+  const limit =
+    typeof limitOrOptions === "number" ? limitOrOptions : ASSIGNED_TENT_ACTIONS_DEFAULT_LIMIT;
+  const selectedPlantIdForAiCoach =
+    typeof limitOrOptions === "number" ? null : (limitOrOptions.selectedPlantIdForAiCoach ?? null);
   const enabled = !!tentId;
   const q = useQuery({
     queryKey: ["plant_assigned_tent_actions", tentId ?? null, growId ?? null, limit],
@@ -49,7 +61,12 @@ export function usePlantAssignedTentActions(
     },
   });
 
-  const rows = buildAssignedTentActions(q.data ?? [], { tentId, growId, limit });
+  const rows = buildAssignedTentActions(q.data ?? [], {
+    tentId,
+    growId,
+    limit,
+    selectedPlantIdForAiCoach,
+  });
   return {
     rows,
     isLoading: q.isLoading,

@@ -32,6 +32,7 @@ const fixtures = vi.hoisted(() => ({
   alerts: [] as Array<Record<string, unknown>>,
   aiSessions: [] as Array<Record<string, unknown>>,
   actions: [] as Array<Record<string, unknown>>,
+  actionHookCalls: [] as unknown[][],
 }));
 
 vi.mock("@/store/grows", () => ({
@@ -64,12 +65,15 @@ vi.mock("@/hooks/use-ai-doctor-sessions", () => ({
   useAiDoctorSessions: () => ({ data: fixtures.aiSessions }),
 }));
 vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
-  usePlantAssignedTentActions: () => ({
-    rows: fixtures.actions,
-    isLoading: false,
-    isError: false,
-    error: null,
-  }),
+  usePlantAssignedTentActions: (...args: unknown[]) => {
+    fixtures.actionHookCalls.push(args);
+    return {
+      rows: fixtures.actions,
+      isLoading: false,
+      isError: false,
+      error: null,
+    };
+  },
 }));
 
 import OneTentLoopLiveProof from "@/pages/OneTentLoopLiveProof";
@@ -105,6 +109,7 @@ beforeEach(() => {
   fixtures.alerts = [];
   fixtures.aiSessions = [];
   fixtures.actions = [];
+  fixtures.actionHookCalls = [];
 });
 
 function setCurrentTentPlantScope() {
@@ -297,6 +302,18 @@ describe("OneTentLoopLiveProof page", () => {
     expect(
       screen.getByTestId("loop-live-proof-step-action-queue").getAttribute("data-status"),
     ).not.toBe("passed");
+  });
+
+  it("requests pre-cap selected-plant filtering for AI Coach proof evidence", () => {
+    setCurrentTentPlantScope();
+
+    renderPage();
+
+    expect(fixtures.actionHookCalls).toContainEqual([
+      "tent-current",
+      "grow-current",
+      { selectedPlantIdForAiCoach: "plant-current" },
+    ]);
   });
 
   it("allows an exact selected-plant AI Coach action to remain advisory evidence", () => {

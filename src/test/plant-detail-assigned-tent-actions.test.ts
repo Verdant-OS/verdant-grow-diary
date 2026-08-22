@@ -137,6 +137,41 @@ describe("buildAssignedTentActions (pure)", () => {
     expect(rows.length).toBe(3);
   });
 
+  it("keeps the shared five-row panel cap while letting proof selection skip other-plant AI Coach rows before truncation", () => {
+    const newerOtherPlantCoachRows = Array.from({ length: 5 }, (_, index) =>
+      action({
+        id: `coach-other-${index + 1}`,
+        source: "ai_coach",
+        plant_id: "plant-other",
+        created_at: `2026-05-23T10:0${index}:00Z`,
+      }),
+    );
+    const selectedPlantCoachRow = action({
+      id: "coach-current-plant",
+      source: "ai_coach",
+      plant_id: "plant-current",
+      created_at: "2026-05-22T10:00:00Z",
+    });
+
+    const sharedPanelRows = buildAssignedTentActions(
+      [...newerOtherPlantCoachRows, selectedPlantCoachRow],
+      { tentId: "t1", growId: "g1" },
+    );
+    const proofRows = buildAssignedTentActions(
+      [...newerOtherPlantCoachRows, selectedPlantCoachRow],
+      { tentId: "t1", growId: "g1", selectedPlantIdForAiCoach: "plant-current" },
+    );
+
+    expect(sharedPanelRows.map((row) => row.id)).toEqual([
+      "coach-other-5",
+      "coach-other-4",
+      "coach-other-3",
+      "coach-other-2",
+      "coach-other-1",
+    ]);
+    expect(proofRows.map((row) => row.id)).toEqual(["coach-current-plant"]);
+  });
+
   it("links to assigned tent alerts via the [alert:<id>] back-pointer", () => {
     const [row] = buildAssignedTentActions([action({ reason: "RH high [alert:al-42]" })], {
       tentId: "t1",

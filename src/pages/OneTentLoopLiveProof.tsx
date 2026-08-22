@@ -679,7 +679,9 @@ export default function OneTentLoopLiveProof(): JSX.Element {
       }
     : null;
 
-  const aqQ = usePlantAssignedTentActions(tent?.id ?? null, grow?.id ?? null);
+  const aqQ = usePlantAssignedTentActions(tent?.id ?? null, grow?.id ?? null, {
+    selectedPlantIdForAiCoach: plant?.id ?? null,
+  });
   // The shared assigned-tent panel intentionally shows all pending tent
   // actions. This plant-specific proof may only select AI Coach advice that
   // carries this exact persisted plant id; tent-wide/other-plant Coach rows

@@ -32,7 +32,7 @@
 
 import { isActivePlant, type ArchivedPlantLike } from "@/lib/archivedPlantVisibilityRules";
 import { isUuid } from "@/lib/isUuid";
-import { getEffectivePlantGrowId, type TentGrowLink } from "@/lib/plantGrowContextRules";
+import { type TentGrowLink } from "@/lib/plantGrowContextRules";
 
 /** Query parameter carrying the requested plant on `/sensors` and `/doctor`. */
 export const SENSORS_PLANT_INTENT_QUERY_PARAM = "plantId";
@@ -101,16 +101,19 @@ export interface PlantTentRowLike extends ArchivedPlantLike {
  * plant to the resulting mismatch. Archived tents stay in the name directory
  * (history needs their names) and are excluded here only.
  *
- * Scope is judged on the EFFECTIVE grow — `plant.grow_id ?? tent.grow_id` via
- * the shared `getEffectivePlantGrowId` — never the raw column. `plants.grow_id`
- * is nullable and legacy rows carry a tent without one, so comparing the column
- * directly drops a plant that genuinely belongs to this grow. That is not a
- * hypothetical: it is the named `BUG-A` in `growRepo.fetchPlants`, and the
- * reason `plantDropdownEligibilityRules` exists. `AiDoctorStart` calls
- * `useGrowPlants()` unscoped, so it still OFFERS such a plant — dropping it
- * here would recreate the silent mismatch this module exists to close. The
- * canonical helper is reused rather than reimplemented so a fourth copy of
- * this rule cannot drift from the other three.
+ * Scope is judged on BOTH halves of the pair, and neither vouches for the
+ * other. The tent must be live and in the scoped grow; the plant's own
+ * `grow_id` may be null — legacy rows carry a tent without one, the named
+ * `BUG-A` in `growRepo.fetchPlants` and the reason
+ * `plantDropdownEligibilityRules` exists — but a non-null value that
+ * contradicts the scope is refused.
+ *
+ * That asymmetry is the whole rule: an ABSENT grow is a gap the tent can
+ * fill, a CONTRADICTORY one is a mismatched row. `getEffectivePlantGrowId`
+ * collapses the two by preferring the plant column, which is right for
+ * resolving "which grow is this plant in" and wrong as a validator — it lets
+ * the plant column vouch for a tent in another grow, and `Sensors.tsx:228`
+ * derives the grow FROM that tent.
  *
  * This all matters because the directory feeding it deliberately includes
  * archived and merged rows, account-wide: diary history keeps referencing
@@ -122,6 +125,8 @@ export interface PlantTentRowLike extends ArchivedPlantLike {
  */
 /** A tent link that also says whether the tent is archived. */
 export interface CarriableTentLink extends TentGrowLink {
+  /** camelCase variants, since both conventions reach this module. */
+  growId?: string | null;
   is_archived?: boolean | null;
   isArchived?: boolean | null;
 }
@@ -146,11 +151,21 @@ export function buildCarriablePlantTentLookup(
   // tent; carrying one means its ordinary route intent finds no match and
   // `resolveSensorsTentRouteSelection` falls back to a DIFFERENT live tent,
   // moving the grower and then losing the plant to the tent mismatch.
-  const liveTents = (scope?.tents ?? []).filter(isLiveTent);
-  const liveTentIds = new Set<string>();
-  for (const tent of liveTents) {
+  // LIVE tents INSIDE the scoped grow, which is the only set a carry may
+  // name. Two separate reasons, and both have already bitten:
+  //
+  //   - archived: `growRepo.fetchTents` filters `is_archived = false`, so
+  //     Sensors never sees one; its ordinary route intent finds no match and
+  //     falls back to a DIFFERENT live tent, moving the grower.
+  //   - out-of-grow: `Sensors.tsx:228` derives `selectedGrowId` FROM the
+  //     selected tent, so naming a tent in another grow moves the grower
+  //     there — even when the plant's own `grow_id` says otherwise.
+  const scopedTentIds = new Set<string>();
+  for (const tent of scope?.tents ?? []) {
+    if (!isLiveTent(tent)) continue;
+    if (normalizePersistedPlantId(tent?.grow_id ?? tent?.growId) !== scopedGrowId) continue;
     const tentId = normalizePersistedPlantId(tent?.id);
-    if (tentId) liveTentIds.add(tentId);
+    if (tentId) scopedTentIds.add(tentId);
   }
 
   const lookup = new Map<string, string>();
@@ -159,30 +174,27 @@ export function buildCarriablePlantTentLookup(
     if (!id) continue;
     if (!isActivePlant(row)) continue;
 
-    // A carriable plant must sit in a LIVE tent. The Doctor honours a carried
-    // plant only inside a carried tent, so a plant with no usable tent has
-    // nothing to travel with — it was already dropped downstream, now it is
-    // simply never emitted.
+    // The TENT is what travels and what Sensors resolves a grow from, so it
+    // must itself be live and in scope. A plant with no such tent has
+    // nothing to travel with.
     const tentId = normalizePersistedPlantId(row?.tent_id);
-    if (!tentId || !liveTentIds.has(tentId)) continue;
+    if (!tentId || !scopedTentIds.has(tentId)) continue;
 
-    // EFFECTIVE grow, never the raw column. `plants.grow_id` is nullable and
-    // legacy rows carry a tent without one; the repo's canonical helper is
-    // reused so this cannot drift from the other three places that resolve it.
+    // The plant's OWN grow may be null — legacy rows carry a tent without
+    // one, which is the repo's named `BUG-A` and why the tent supplies scope
+    // above. But a non-null value that CONTRADICTS the scope is not a
+    // resolvable gap; it is a mismatched row, and admitting it was a real
+    // defect: `GrowLineageRepair` repoints `tents.grow_id` without touching
+    // its plants, so plant-in-A / tent-in-B is reachable and ownership-only
+    // RLS permits it.
     //
-    // `liveTents` rather than every tent is belt-and-braces, NOT load-bearing:
-    // the gate above already proved this plant's tent is live, and the helper
-    // looks up only that tent. It is passed anyway so reordering the two gates
-    // cannot quietly reintroduce an archived tent as a grow source. Stated
-    // plainly because a test asserting otherwise passed for the wrong reason
-    // and was removed rather than left as a fence that cannot fail.
-    const effectiveGrowId = normalizePersistedPlantId(
-      getEffectivePlantGrowId(
-        { id, grow_id: row?.grow_id ?? null, tent_id: row?.tent_id ?? null },
-        liveTents,
-      ),
-    );
-    if (effectiveGrowId !== scopedGrowId) continue;
+    // Deliberately NOT `getEffectivePlantGrowId`. That helper answers "which
+    // grow is this plant in", preferring the plant column — correct for
+    // RESOLVING an absent grow, wrong as a VALIDATOR, because it lets the
+    // plant column vouch for a tent in another grow. Using it here shipped
+    // exactly that hole, with a test asserting the behaviour was intended.
+    const ownGrowId = normalizePersistedPlantId(row?.grow_id);
+    if (ownGrowId && ownGrowId !== scopedGrowId) continue;
 
     lookup.set(id, tentId);
   }

@@ -401,20 +401,44 @@ describe("buildCarriablePlantTentLookup · grow scope", () => {
     expect(lookup.size).toBe(0);
   });
 
-  it("prefers the plant's own grow over its tent's when both exist", () => {
-    // Matches `getEffectivePlantGrowId`'s documented precedence, so the carry
-    // cannot disagree with the three other surfaces that resolve grow context.
-    const inOwnGrow = buildCarriablePlantTentLookup([{ id: PLANT, tent_id: TENT, grow_id: GROW }], {
-      growId: GROW,
-      tents: [{ id: TENT, grow_id: OTHER_GROW }],
-    });
-    expect(inOwnGrow.get(PLANT)).toBe(TENT);
+  it("refuses either half of a MISMATCHED plant/tent pair — neither vouches for the other", () => {
+    // REVERSED after review. This test previously asserted the plant column
+    // WINS — `expect(inOwnGrow.get(PLANT)).toBe(TENT)` with that tent in
+    // another grow — justified by `getEffectivePlantGrowId`'s precedence.
+    // That justification was wrong: the helper RESOLVES "which grow is this
+    // plant in", which is the right question when the plant has no grow and
+    // the wrong one when it has a contradictory one. Using it as a validator
+    // let the plant column vouch for a tent in another grow, and
+    // `Sensors.tsx:228` derives the grow FROM the tent — so the grower was
+    // moved. The row shape is reachable: `GrowLineageRepair` repoints
+    // `tents.grow_id` without touching its plants.
+    const plantInScopeTentOutside = buildCarriablePlantTentLookup(
+      [{ id: PLANT, tent_id: TENT, grow_id: GROW }],
+      { growId: GROW, tents: [{ id: TENT, grow_id: OTHER_GROW }] },
+    );
+    expect(plantInScopeTentOutside.size).toBe(0);
 
-    const inTentGrow = buildCarriablePlantTentLookup(
+    const tentInScopePlantOutside = buildCarriablePlantTentLookup(
       [{ id: PLANT, tent_id: TENT, grow_id: OTHER_GROW }],
       { growId: GROW, tents: [{ id: TENT, grow_id: GROW }] },
     );
-    expect(inTentGrow.size).toBe(0);
+    expect(tentInScopePlantOutside.size).toBe(0);
+
+    // The asymmetry that survives: an ABSENT plant grow is a gap the tent
+    // fills (BUG-A), a CONTRADICTORY one is a mismatched row.
+    const legacyInScope = buildCarriablePlantTentLookup(
+      [{ id: PLANT, tent_id: TENT, grow_id: null }],
+      { growId: GROW, tents: [{ id: TENT, grow_id: GROW }] },
+    );
+    expect(legacyInScope.get(PLANT)).toBe(TENT);
+  });
+
+  it("accepts a tent row using the camelCase grow field", () => {
+    const lookup = buildCarriablePlantTentLookup([{ id: PLANT, tent_id: TENT, grow_id: GROW }], {
+      growId: GROW,
+      tents: [{ id: TENT, growId: GROW }],
+    });
+    expect(lookup.get(PLANT)).toBe(TENT);
   });
 
   it("carries nothing when the page has no resolved grow scope", () => {

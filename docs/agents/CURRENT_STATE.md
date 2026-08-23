@@ -148,7 +148,15 @@ overcorrected: two in-repo documents already record a checked, dated,
 attributed mapping from this Lovable project id to production Supabase ref
 `knkwiiywfkbqznbxwqfh`, which this paragraph should have found and cited
 instead of downgrading to `NOT_MEASURED`. The 66/76 and 3/76 counts are
-`established fact` about production again. Prior header follows.)
+`established fact` about production again — but "by default" in the
+headline just above is not: `has_function_privilege` proves effective
+access, not provenance, and 2 of the 66 are proven explicit grants. Also
+flagged: the committed migration for `founders_guard_immutables()` (one of
+the 3 in the `anon` set) does not declare `SECURITY DEFINER`, so it should
+not satisfy the query's own `p.prosecdef = true` filter — either the live
+function differs from its migration (unrecorded drift) or this list has an
+error; not resolved. See "Function default-privilege exposure" below for
+the full account of all three. Prior header follows.)
 
 **Prior update:** 2026-08-21 UTC (~15:23 UTC / 10:23 AM CT)
 **Updated by:** Grok (2026-08-21: **docs-only correction** — #1077 pinned
@@ -635,6 +643,21 @@ versus an explicit grant like these two. That per-function provenance check
 (`aclexplode`/`pg_default_acl` against each of the 66, not just a fresh probe
 function) was not done and stays open.
 
+**4. The third `anon`-set member does not check out against its own
+migration, raised by a separate Copilot review comment on this same PR.**
+`founders_guard_immutables()`'s only committed definition
+(`supabase/migrations/20260719044601_4a9e443b-d980-4890-b85e-5ae6549a907f.sql:74-78`)
+declares `RETURNS trigger LANGUAGE plpgsql` — no `SECURITY DEFINER` — and no
+later migration redefines it (grepped, zero other matches). The catalog query
+above filters on `p.prosecdef = true`, so this function should not have been
+in its result set at all. Two explanations are consistent with what's
+recorded and neither is confirmed: the live function differs from its
+migration (unrecorded drift, the same class of gap this whole file tracks
+elsewhere), or the original 3-function list is simply wrong about which
+function is the trigger. Left open rather than guessed at — this also means
+the "3 of 76" `anon` count itself, not just the "by default" framing, now
+has an unresolved question mark on one of its three members.
+
 **Why this was measured now.** `20260821064300` (this file's RESOLVED
 signup-attribution section above) closed one specific instance of a pattern
 — a function whose migration revoked PUBLIC/anon/authenticated but not
@@ -677,33 +700,49 @@ default-ACL mechanism is live; it does not prove how many of the 66 actually
 came from it versus an explicit grant. Read "66... grant `service_role`
 EXECUTE" as the accurate headline; "by default" is unproven per-function.
 
-**The `anon` set is the one worth an owner's eyes.** All 3 are
-`founders_guard_immutables()` (returns `trigger`, not callable as an RPC —
-Postgres refuses to invoke a trigger-typed function outside trigger
-context regardless of its grants), `founders_seats_consumed()`, and
-`founders_wall_count()` — the latter two are `SELECT COUNT(*)::int FROM
-public.founders [WHERE status = 'confirmed']`, no PII, and read like a
-deliberate public "X founders joined" counter. `inference`: probably
-intentional. Not verified with Cheek.
+**The `anon` set is the one worth an owner's eyes** — and, per correction
+point 4 below, one of the three is now flagged, not confirmed. All 3 are
+recorded as `founders_guard_immutables()` (returns `trigger`, not callable
+as an RPC — Postgres refuses to invoke a trigger-typed function outside
+trigger context regardless of its grants; **but see correction point 4: its
+committed migration doesn't declare `SECURITY DEFINER`, so its presence in
+this `prosecdef = true`-filtered list is itself unresolved**),
+`founders_seats_consumed()`, and `founders_wall_count()` — the latter two are
+`SELECT COUNT(*)::int FROM public.founders [WHERE status = 'confirmed']`, no
+PII, and read like a deliberate public "X founders joined" counter, now
+confirmed as **explicit** grants (correction point 3) rather than
+default-derived ones. `inference`: probably intentional. Not verified with
+Cheek.
 
 ### Uncertain: whether the default-privilege mechanism is still live today
 
 `20260807133000_global_default_privilege_hardening.sql` REVOKEs
 `EXECUTE ON FUNCTIONS` and `ALL ON TABLES` from `PUBLIC, anon` at the
-default-privilege level, in four role/schema-scope combinations, all of
-them `FOR ROLE postgres` (explicitly or via the executing role). Its own
-postflight self-test creates a throwaway function and asserts `anon` gets
-no EXECUTE.
+default-privilege level, in four statements each for functions and tables.
+**Corrected 2026-08-23 (Copilot review, this PR) — only two of the four
+function statements explicitly say `FOR ROLE postgres`; the other two carry
+no `FOR ROLE` clause at all**, so per Postgres semantics they target
+whichever role executes the migration — which this same subsection says,
+two paragraphs down, is unconfirmed. The original wording ("all of them FOR
+ROLE postgres, explicitly or via the executing role") asserted the
+executing role equals `postgres`; that is not established. Its own
+postflight self-test creates a throwaway function and asserts `anon` gets no
+EXECUTE.
 
 Reproducing that exact self-test today, in a rolled-back transaction via
 the Lovable SQL channel, **it fails** — a fresh throwaway function gets
-`anon` **and** `service_role` EXECUTE. `pg_default_acl` shows why on its
-face: there are two separate default-ACL entries for functions in `public`
-— one owned by `postgres` (unchanged by that migration; still lists
-`anon=X` and `service_role=X`) and a second owned by `supabase_admin`,
-which `20260807133000` never targeted at all. Both grant EXECUTE to
-`anon`/`authenticated`/`service_role` by default. The identical two-bucket
-split exists for tables too.
+`anon` **and** `service_role` EXECUTE. `pg_default_acl` shows two separate
+default-ACL entries for functions in `public`: one owned by `postgres`,
+which still lists `anon=X` and `service_role=X`, and a second owned by
+`supabase_admin`. **Corrected 2026-08-23 — the claims that the `postgres`
+entry was "unchanged by that migration" and that `supabase_admin` was
+"never targeted at all" both overclaimed.** Whether the migration actually
+applied as committed, and which role executed its two unqualified
+statements, are exactly the open questions this subsection already carries;
+neither can be assumed to answer itself. What's directly observed, and
+stands: both default-ACL entries currently grant EXECUTE to
+`anon`/`authenticated`/`service_role`. The identical two-bucket split exists
+for tables too.
 
 **Corrected 2026-08-23 (see the correction above, point 2) — this was a
 self-contradiction, not a discrepancy, for one of the two functions.** This
@@ -734,12 +773,16 @@ either case.
 ### What this does and does not license
 
 Confirmed: the 66/76 and 3/76 counts (effective privilege, not proven
-per-function provenance — see correction point 3), against production
+per-function provenance — see correction point 3; and one member of the 3
+is itself unresolved, correction point 4), against production
 `66255e7b-892c-4be5-8686-ab1cfc3666db` / `knkwiiywfkbqznbxwqfh` (the
 2026-08-23 correction above restores this after the 2026-08-22 downgrade),
 and the self-test-fails-via-this-probe-channel result. Not confirmed: how
 many of the 66 came from the default-ACL mechanism specifically versus an
-explicit grant (at least 2 are proven explicit, correction point 3); or
+explicit grant (at least 2 are proven explicit, correction point 3);
+whether `founders_guard_immutables()` genuinely belongs in a
+`prosecdef = true` population given its committed definition says
+otherwise (correction point 4); or
 whether any corrective migration is actually needed — the "real migrations
 don't show the same exposure" question is resolved as of correction point 2,
 not open. **No migration was drafted or applied.** No table, function,

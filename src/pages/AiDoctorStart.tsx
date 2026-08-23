@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { buildAiDoctorEntryOptions } from "@/lib/aiDoctorEntryRules";
 import {
+  DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY,
   partitionDoctorEntryOptionsByTent,
   resolveDoctorStartScope,
 } from "@/lib/doctorStartContextRules";
@@ -28,10 +29,11 @@ export default function AiDoctorStart() {
   const plantsQuery = useGrowPlants();
   const options = useMemo(() => buildAiDoctorEntryOptions(plantsQuery.data), [plantsQuery.data]);
 
-  // Back-half context carry (D-B6). The Sensors loop card can only ever emit
-  // `{ growId, tentId }`, so that is all this page reads — and it validates
-  // both against rows the grower owns before rendering anything. An id in a
-  // URL is a request, not a grant.
+  // Back-half context carry (D-B6 / Doctor-says-so). Sensors may re-emit a
+  // UUID-only plant intent alongside grow/tent. Grow and tent are validated
+  // here against rows the grower owns; the plant is validated only against
+  // the grower's loaded options + carried tent. An id in a URL is a request,
+  // not a grant — and an unacceptable plant is messaged, never silently dropped.
   const [searchParams] = useSearchParams();
   const { grows, loading: growsLoading, error: growsError, refresh: refreshGrows } = useGrows();
   const tentsQuery = useGrowTents();
@@ -45,6 +47,10 @@ export default function AiDoctorStart() {
   // FAILURE is reported as a failure to verify, never as invalid ownership.
   const requestedGrowId = (searchParams.get("growId") ?? "").trim();
   const requestedTentId = (searchParams.get("tentId") ?? "").trim();
+  const carriedPlantIntentId = useMemo(
+    () => readSensorsPlantRouteIntent(searchParams),
+    [searchParams],
+  );
   // Settling is per-parameter for the same reason failing is: a read the URL
   // does not depend on must not gate it. On a tent-only URL the grows read
   // only enriches the derived owning grow — it cannot change the ordering,
@@ -118,19 +124,19 @@ export default function AiDoctorStart() {
 
   // Carried tent scope reorders and labels the choices. It never removes one:
   // the explicit plant choice below is doctrine, and a shorter list is a
-  // softer way of guessing.
+  // softer way of guessing. A carried plant may be ordered/badged; it is
+  // NEVER applied as a selection.
   const partitioned = useMemo(
     () =>
       partitionDoctorEntryOptionsByTent({
         options,
         plants: plantsQuery.data,
         tentId: resolvedScope.tentId,
-        // D-B6: the plant the grower came from, carried Timeline -> Sensors
-        // -> here. Untrusted until the partition checks it against the
-        // grower's own in-tent options. It orders and labels only.
-        carriedPlantId: readSensorsPlantRouteIntent(searchParams),
+        // Doctor-says-so: Timeline → Sensors re-emitted UUID intent. Untrusted
+        // until checked against the grower's own in-tent options.
+        carriedPlantId: carriedPlantIntentId,
       }),
-    [options, plantsQuery.data, resolvedScope.tentId, searchParams],
+    [options, plantsQuery.data, resolvedScope.tentId, carriedPlantIntentId],
   );
   const orderedOptions = useMemo(
     () => [...partitioned.inScope, ...partitioned.others],
@@ -140,6 +146,16 @@ export default function AiDoctorStart() {
     () => new Set(partitioned.inScope.map((option) => option.id)),
     [partitioned],
   );
+  // Do not flash "unavailable" while plants or ownership reads are still
+  // settling — that would present an unknown answer as a negative one.
+  const showUnavailableCarriedPlant =
+    !!carriedPlantIntentId &&
+    partitioned.hasUnavailableCarriedPlant &&
+    !plantsQuery.isLoading &&
+    !plantsQuery.isError &&
+    !scopeOrderingPending &&
+    scopeReadsSettled &&
+    !scopeReadFailed;
 
   return (
     <div className="mx-auto w-full max-w-4xl">
@@ -216,6 +232,15 @@ export default function AiDoctorStart() {
             >
               That link carried a grow or tent Verdant couldn't match to your account, so no tent
               context is applied.{everyPlantListedSuffix}
+            </p>
+          ) : null}
+          {showUnavailableCarriedPlant ? (
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              data-testid="ai-doctor-start-carried-plant-unavailable"
+            >
+              {DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY}
+              {everyPlantListedSuffix}
             </p>
           ) : null}
         </div>

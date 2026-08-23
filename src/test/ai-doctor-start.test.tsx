@@ -520,4 +520,74 @@ describe("AiDoctorStart", () => {
     expect(promoted).toHaveAccessibleName("Review Alpha with AI Doctor");
     expect(document.getElementById(badgeId)).toHaveTextContent("In this tent");
   });
+
+  // ---- Doctor-says-so plant carry (closed #1104; thin follow-up to inert #1102) ----
+
+  const PLANT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const PLANT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const PLANT_MISSING = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+  it("badges a validated carried plant without auto-selecting it", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = [
+      { id: PLANT_B, name: "Beta", tentId: "tent-b" },
+      { id: PLANT_A, name: "Alpha", tentId: "tent-a" },
+    ];
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_A}`);
+
+    expect(screen.getByTestId("ai-doctor-start-option-0-carried")).toHaveTextContent(
+      /You came from here/,
+    );
+    expect(screen.queryByTestId("ai-doctor-start-carried-plant-unavailable")).toBeNull();
+    // Still on /doctor — never navigated / never applied selection.
+    expect(screen.getByTestId("location")).toHaveTextContent("/doctor");
+    expect(screen.queryByTestId("plant-detail")).toBeNull();
+    expect(state.invoke).not.toHaveBeenCalled();
+    // UUID must not appear as visible copy.
+    expect(screen.getByTestId("ai-doctor-start").textContent ?? "").not.toContain(PLANT_A);
+  });
+
+  it("shows an unavailable message when the carried plant is not in the carried tent", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = [
+      { id: PLANT_B, name: "Beta", tentId: "tent-b" },
+      { id: PLANT_A, name: "Alpha", tentId: "tent-a" },
+    ];
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_B}`);
+
+    const message = screen.getByTestId("ai-doctor-start-carried-plant-unavailable");
+    expect(message).toHaveTextContent(/couldn't offer for review/i);
+    expect(message).toHaveTextContent(/No plant was selected/i);
+    expect(message.textContent ?? "").not.toContain(PLANT_B);
+    expect(screen.queryByTestId("ai-doctor-start-option-0-carried")).toBeNull();
+    expect(screen.getByTestId("location")).toHaveTextContent("/doctor");
+    expect(screen.queryByTestId("plant-detail")).toBeNull();
+  });
+
+  it("shows unavailable when the carried plant is outside the loaded active options", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = [
+      { id: PLANT_B, name: "Beta", tentId: "tent-b" },
+      { id: PLANT_A, name: "Alpha", tentId: "tent-a" },
+    ];
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_MISSING}`);
+
+    expect(screen.getByTestId("ai-doctor-start-carried-plant-unavailable")).toBeInTheDocument();
+    expect(screen.queryByTestId("ai-doctor-start-option-0-carried")).toBeNull();
+  });
+
+  it("does not flash carried-plant unavailable while ownership reads are still loading", () => {
+    state.growsLoading = true;
+    state.tentsLoading = true;
+    state.data = [
+      { id: PLANT_B, name: "Beta", tentId: "tent-b" },
+      { id: PLANT_A, name: "Alpha", tentId: "tent-a" },
+    ];
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_B}`);
+
+    expect(screen.queryByTestId("ai-doctor-start-carried-plant-unavailable")).toBeNull();
+  });
 });

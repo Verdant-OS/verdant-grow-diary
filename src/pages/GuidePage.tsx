@@ -21,6 +21,7 @@ import { findGuideBySlug, VERDANT_SEO_GUIDES } from "@/constants/verdantSeoConte
 import { buildGuideQuickLogStarterHref } from "@/lib/quickLogStarterLinks";
 import { resolveGuideFaqFromHash } from "@/lib/guideFaqHashResolver";
 import { OREOZ_GELONADE_GUIDE_SLUG } from "@/constants/oreozGelonadeExperience";
+import { getStaticRouteMetadata } from "@/lib/build/staticRouteHead";
 
 export default function GuidePage() {
   const { slug } = useParams<{ slug: string }>();
@@ -32,6 +33,8 @@ export default function GuidePage() {
   const [highlightedFaq, setHighlightedFaq] = useState<string | undefined>(initialFaqValue);
   const faqItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const evidenceTableInstructionsId = useId();
+  const guideSeoPath = guide ? `/guides/${guide.slug}` : "/guides";
+  const guideSeoMetadata = getStaticRouteMetadata(guideSeoPath);
 
   useEffect(() => {
     const resolved = resolveGuideFaqFromHash(guide, location.hash);
@@ -66,7 +69,8 @@ export default function GuidePage() {
     description:
       guide?.description ??
       "Verdant grower guides on grow diary logging, sensor truth, VPD, and AI Doctor.",
-    path: guide ? `/guides/${guide.slug}` : "/guides",
+    path: guideSeoPath,
+    ogImage: guideSeoMetadata?.image,
     ogType: guide ? "article" : "website",
   });
 

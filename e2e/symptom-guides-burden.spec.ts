@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const ROUTES = [
   "/guides/cannabis-leaf-symptoms",
@@ -8,6 +8,51 @@ const ROUTES = [
 ] as const;
 
 const HUB_ROUTE = ROUTES[0];
+
+interface GuideHeadSnapshot {
+  title: string;
+  titleCount: number;
+  h1: string | null;
+  canonical: string | null;
+  canonicalCount: number;
+  ogUrl: string | null;
+  ogUrlCount: number;
+  ogImage: string | null;
+  ogImageCount: number;
+  twitterImage: string | null;
+  twitterImageCount: number;
+}
+
+async function readGuideHead(page: Page): Promise<GuideHeadSnapshot> {
+  return page.evaluate(() => {
+    const readHeadValue = (selector: string, attribute: "content" | "href") => {
+      const nodes = document.head.querySelectorAll<HTMLElement>(selector);
+      return {
+        count: nodes.length,
+        value: nodes.item(0)?.getAttribute(attribute) ?? null,
+      };
+    };
+
+    const canonical = readHeadValue('link[rel="canonical"]', "href");
+    const ogUrl = readHeadValue('meta[property="og:url"]', "content");
+    const ogImage = readHeadValue('meta[property="og:image"]', "content");
+    const twitterImage = readHeadValue('meta[name="twitter:image"]', "content");
+
+    return {
+      title: document.title,
+      titleCount: document.head.querySelectorAll("title").length,
+      h1: document.querySelector("h1")?.textContent?.trim() ?? null,
+      canonical: canonical.value,
+      canonicalCount: canonical.count,
+      ogUrl: ogUrl.value,
+      ogUrlCount: ogUrl.count,
+      ogImage: ogImage.value,
+      ogImageCount: ogImage.count,
+      twitterImage: twitterImage.value,
+      twitterImageCount: twitterImage.count,
+    };
+  });
+}
 
 const VIEWPORTS = [
   { name: "small-phone", width: 320, height: 720 },
@@ -86,5 +131,52 @@ test.describe("public symptom guides — responsive burden", () => {
     await link.click();
     await expect(page).toHaveURL(new RegExp(`${HUB_ROUTE}$`));
     await expect(page.getByTestId("symptom-reference-table")).toBeVisible();
+  });
+
+  test("same-document guide navigation preserves destination route metadata", async ({
+    context,
+    page,
+  }) => {
+    const directDestination = await context.newPage();
+    await directDestination.goto(HUB_ROUTE, { waitUntil: "domcontentloaded" });
+    await expect(directDestination.getByTestId("guide-page")).toBeVisible();
+    await directDestination.waitForLoadState("networkidle");
+    const expectedDestination = await readGuideHead(directDestination);
+    await directDestination.close();
+
+    expect(expectedDestination).toMatchObject({
+      titleCount: 1,
+      canonicalCount: 1,
+      ogUrlCount: 1,
+      ogImageCount: 1,
+      twitterImageCount: 1,
+    });
+    expect(expectedDestination.ogImage).toBeTruthy();
+    expect(expectedDestination.twitterImage).toBe(expectedDestination.ogImage);
+
+    await page.goto("/guides/cannabis-leaves-turning-yellow", {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByTestId("guide-page")).toBeVisible();
+    // The SSR H1 is visible before React owns the Link. Wait for the client
+    // bundle so this assertion proves a hydrated router transition, not a
+    // second document request that happens to return correct metadata.
+    await page.waitForLoadState("networkidle");
+    const originalTimeOrigin = await page.evaluate(() => performance.timeOrigin);
+    const documentRequests: string[] = [];
+    page.on("request", (request) => {
+      if (request.resourceType() === "document") documentRequests.push(request.url());
+    });
+
+    await page.getByRole("link", { name: "Open the symptom evidence hub", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`${HUB_ROUTE}$`));
+    await expect(page.getByTestId("guide-page")).toHaveAttribute(
+      "data-guide-slug",
+      "cannabis-leaf-symptoms",
+    );
+
+    await expect.poll(() => readGuideHead(page)).toEqual(expectedDestination);
+    expect(await page.evaluate(() => performance.timeOrigin)).toBe(originalTimeOrigin);
+    expect(documentRequests).toEqual([]);
   });
 });

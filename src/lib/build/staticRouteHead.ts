@@ -42,6 +42,17 @@ const METADATA_BY_PATH = new Map<string, ResolvedStaticRouteMetadata>(
   ]),
 );
 
+/**
+ * Return the exact resolved metadata shared by SSR, the SEO manifest, and
+ * hydrated public pages. Unknown paths stay undefined so callers cannot
+ * invent metadata outside the registered public-route set.
+ */
+export function getStaticRouteMetadata(
+  path: string,
+): Readonly<ResolvedStaticRouteMetadata> | undefined {
+  return METADATA_BY_PATH.get(path);
+}
+
 export interface StaticRouteHead {
   meta: Array<Record<string, string>>;
   links: Array<Record<string, string>>;
@@ -57,7 +68,7 @@ export interface StaticRouteHead {
  * manifest does not also publish.
  */
 export function staticRouteHead(path: string): StaticRouteHead {
-  const metadata = METADATA_BY_PATH.get(path);
+  const metadata = getStaticRouteMetadata(path);
   if (!metadata) return { meta: [], links: [], scripts: [] };
 
   const meta: Array<Record<string, string>> = [

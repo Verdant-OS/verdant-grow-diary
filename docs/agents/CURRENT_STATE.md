@@ -1,6 +1,35 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-23 UTC (02:09 UTC)
+**Last updated:** 2026-08-23 UTC (~17:15 UTC)
+**Updated by:** Claude (2026-08-23, PR #1093 review round: **the 2026-08-22
+project-identity downgrade in the "Function default-privilege exposure"
+section overcorrected, and two further defects in that same section are
+fixed.** Raised by Codex review on PR #1093, verified against primary
+sources before accepting.
+
+The 2026-08-22 correction said this file "has never recorded a checked
+mapping" from Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db` to
+Supabase ref `knkwiiywfkbqznbxwqfh` — false. `docs/LOCAL_SUPABASE_SETUP.md`
+and `docs/signup-attribution-outage-operator-runbook.md:61-64` both record
+that exact mapping, dated 2026-08-13, attributed, and operationally
+confirmed by the signup-attribution fix this file's own RESOLVED section
+verified worked in production. The 66/76 and 3/76 counts are restored to
+`established fact` about production. Full account:
+"Correction (2026-08-23)" under "Function default-privilege exposure."
+
+Also fixed in the same pass: a self-contradiction (this file's own ~15:23
+UTC entry already said the signup readiness RPC has `service_role=X`, while
+a later paragraph in the same section claimed it did not — only
+`handle_new_user` actually lacks the exposure, and it has a mundane
+explanation: an already-hardened function survived a later body replacement,
+which `CREATE OR REPLACE FUNCTION` is expected to do); and an unproven "by
+default" attribution (`has_function_privilege` cannot distinguish a default
+grant from an explicit one, and 2 of the 66 are proven explicit grants from
+their own defining migrations). Neither finding changes any table, function,
+grant, or default privilege — docs-only, same as the section it corrects.
+Prior header follows.)
+
+**Prior update:** 2026-08-23 UTC (02:09 UTC)
 **Updated by:** Claude (2026-08-22, review round: **the payments-token severity was
 INVERTED and is corrected.** An earlier revision said production "is running **live**
 payments". It is not. At the served SHA a `live_` token resolves to `unavailable`
@@ -112,7 +141,14 @@ id "production, not sandbox." See the correction under "Function
 default-privilege exposure" below for the full account. Every count above
 holds only as a claim about whichever database that id actually is; whether
 that is production is now `NOT_MEASURED`, downgraded from the `established
-fact` framing this block originally used. Prior header follows.)
+fact` framing this block originally used.
+
+**Superseded 2026-08-23 — see the top of this file.** This downgrade
+overcorrected: two in-repo documents already record a checked, dated,
+attributed mapping from this Lovable project id to production Supabase ref
+`knkwiiywfkbqznbxwqfh`, which this paragraph should have found and cited
+instead of downgrading to `NOT_MEASURED`. The 66/76 and 3/76 counts are
+`established fact` about production again. Prior header follows.)
 
 **Prior update:** 2026-08-21 UTC (~15:23 UTC / 10:23 AM CT)
 **Updated by:** Grok (2026-08-21: **docs-only correction** — #1077 pinned
@@ -476,11 +512,15 @@ above, and was not touched by this repair.
 `practical observation`, measured 2026-08-21 by Claude via the same Lovable
 `query_database` read-only channel used elsewhere in this file, against
 Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db` — the same id two of
-Grok's own same-day entries above label "production, not sandbox." **That
-identification is now disputed — see the 2026-08-22 correction immediately
-below before citing any count in this section as a production measurement.**
-This is a coordination note, not a fix. Nothing here was changed, drafted, or
-applied — see "What this does and does not license" at the end.
+Grok's own same-day entries above label "production, not sandbox," and the
+same id `docs/LOCAL_SUPABASE_SETUP.md` and
+`docs/signup-attribution-outage-operator-runbook.md:61-64` independently map
+to production Supabase ref `knkwiiywfkbqznbxwqfh`. **That identification was
+disputed by a 2026-08-22 review comment and briefly downgraded here; the
+2026-08-23 correction below restores it against the sourced mapping — read
+that correction, not the 2026-08-22 one, before citing any count in this
+section.** This is a coordination note, not a fix. Nothing here was changed,
+drafted, or applied — see "What this does and does not license" at the end.
 
 ### Correction (2026-08-22) — the project-identity claim is disputed, not resolved
 
@@ -526,6 +566,75 @@ recorded. Read every "production" reference below with that downgrade
 applied; the text is left otherwise unchanged rather than silently rewritten,
 per this file's own practice of keeping withdrawn or disputed claims visible.
 
+### Correction (2026-08-23) — the 2026-08-22 correction overcorrected, and two further defects are fixed
+
+Raised by Codex review on this same PR (#1093); verified against primary sources
+before accepting rather than taken on the bot's word.
+
+**1. The project-identity `NOT_MEASURED` downgrade above was itself wrong.** It
+said "this file has never recorded a checked mapping between the Lovable
+project id and the Supabase database ref" — false.
+`docs/LOCAL_SUPABASE_SETUP.md`'s "Project identifiers" table (line 14) and
+`docs/signup-attribution-outage-operator-runbook.md`'s "Provenance" section
+(lines 61–64) both record exactly that mapping: Lovable project id
+`66255e7b-892c-4be5-8686-ab1cfc3666db` = Supabase ref
+`knkwiiywfkbqznbxwqfh`, because `query_database` "takes the Lovable UUID, not
+the host ref." The runbook's record is dated 2026-08-13, attributed ("Run by:
+Claude, during the pre-merge audit of #969"), and was the operational basis
+for the signup-attribution fix this file's own RESOLVED section later
+confirmed worked in production — this mapping has been acted on and its
+consequences independently verified, not merely asserted once.
+
+Grok's review comment that prompted the 2026-08-22 downgrade cites neither
+document. It rests on "GDP previously used `66255e7b…` as a sandbox /
+yield-analytics Lovable project," with no date or source given. Weighed
+against a dated, attributed, operationally-confirmed in-repo record, an
+uncited recollection does not carry it. **Restoring the 66/76 and 3/76
+counts to `established fact` about production**, per the mapping above. If
+Grok holds evidence this specific project was repointed or repurposed after
+2026-08-13 — the one theory that would reconcile both claims — that needs its
+own dated citation in this file, not a second uncited assertion; until then
+this is the governing record.
+
+**2. The "two functions... do not show the same exposure" uncertainty
+(in the "Uncertain" subsection below) was a self-contradiction, not a
+discrepancy.** It named both `handle_new_user()` and
+`signup_acquisition_readiness_operator_snapshot()` as not showing
+`service_role` EXECUTE. But this file's own ~15:23 UTC measurement, recorded
+earlier in this same section, already says the opposite for the second
+function: "Readiness RPC **does** have `service_role=X` (default privileges
+leftover)" — which is not a discrepancy at all, it is exactly what the
+default-ACL theory predicts for a newly created function. Only
+`handle_new_user` actually lacks the exposure, and it has a mundane
+explanation the original text missed: it is a `CREATE OR REPLACE` of a
+function whose `service_role` EXECUTE was already explicitly revoked by the
+2026-08-21 ad-hoc supplement (captured afterward as `20260821064300`)
+_before_ `20260821150000` replaced its body — and `CREATE OR REPLACE
+FUNCTION` does not reset an existing grant back to the default ACL. There is
+no unexplained gap in the default-privilege mechanism; there is one
+already-hardened function whose hardening survived a later body replacement,
+exactly as expected.
+
+**3. The "66... grant `service_role` EXECUTE by default" headline conflates
+effective privilege with provenance.** `has_function_privilege(role,
+function, 'EXECUTE')` reports only whether a role currently has the
+privilege, by any path — an explicit `GRANT`, `PUBLIC`, role inheritance, or
+an unrevoked default ACL — never which one. At least 2 of the 66 are proven,
+from their own defining migrations, to hold **explicit** grants, not
+default-derived ones:
+`supabase/migrations/20260719044601_4a9e443b-d980-4890-b85e-5ae6549a907f.sql:134`
+and
+`supabase/migrations/20260719052812_c25ba6a6-dcdb-40c7-9dbf-292b35af9150.sql:43-44`
+both read `GRANT EXECUTE ON FUNCTION ... TO anon, authenticated,
+service_role` for `founders_wall_count()` and `founders_seats_consumed()`
+respectively — the same two functions already called out below as a
+deliberate public counter. The self-test in the "Uncertain" subsection proves
+the default-ACL mechanism itself is live today; it does not prove how many of
+the 66 actually got their `service_role` EXECUTE through that mechanism
+versus an explicit grant like these two. That per-function provenance check
+(`aclexplode`/`pg_default_acl` against each of the 66, not just a fresh probe
+function) was not done and stays open.
+
 **Why this was measured now.** `20260821064300` (this file's RESOLVED
 signup-attribution section above) closed one specific instance of a pattern
 — a function whose migration revoked PUBLIC/anon/authenticated but not
@@ -544,19 +653,29 @@ FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public' AND p.prokind = 'f' AND p.prosecdef = true;
 ```
 
-Returns **66 of 76** SECURITY DEFINER functions in `public` currently grant
-`service_role` EXECUTE, and **3 of 76** grant `anon` EXECUTE. The count itself
-is `established fact` — a direct count, not an inference — **against
-whichever database Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db`
-actually is; that it is production is `NOT_MEASURED`, per the 2026-08-22
-correction above.** Read it in context, not as 66 new incidents: `service_role` already holds broad direct table
-access on this project by design (`supabase/seed.sql`'s own documented
-legacy-grant posture), so function-level `service_role` EXECUTE is mostly
-consistent with the platform's existing accepted trust model, not a new
-class of exposure. The two functions individually hardened so far
-(Action Queue guard, signup) were judged sensitive enough to warrant the
-extra step on a case-by-case basis — that pattern, not a blanket revoke
-across all 66, is what this file's precedent supports.
+Returns **66 of 76** SECURITY DEFINER functions in `public` currently have
+effective `service_role` EXECUTE, and **3 of 76** have effective `anon`
+EXECUTE. The count itself is `established fact` — a direct count, not an
+inference — against production, per the 2026-08-23 correction above
+(restoring the 2026-08-22 downgrade). Read it in context, not as 66 new
+incidents: `service_role` already holds broad direct table access on this
+project by design (`supabase/seed.sql`'s own documented legacy-grant
+posture), so function-level `service_role` EXECUTE is mostly consistent with
+the platform's existing accepted trust model, not a new class of exposure.
+The two functions individually hardened so far (Action Queue guard, signup)
+were judged sensitive enough to warrant the extra step on a case-by-case
+basis — that pattern, not a blanket revoke across all 66, is what this
+file's precedent supports.
+
+**"By default" is this section's own headline word, and it overclaims — see
+point 3 of the 2026-08-23 correction above.** `has_function_privilege` proves
+current effective access, never its provenance. At least 2 of the 66
+(`founders_wall_count`, `founders_seats_consumed`, immediately below) are
+confirmed **explicit** grants from their defining migrations, not
+default-ACL leftovers. The self-test in "Uncertain," below, proves the
+default-ACL mechanism is live; it does not prove how many of the 66 actually
+came from it versus an explicit grant. Read "66... grant `service_role`
+EXECUTE" as the accurate headline; "by default" is unproven per-function.
 
 **The `anon` set is the one worth an owner's eyes.** All 3 are
 `founders_guard_immutables()` (returns `trigger`, not callable as an RPC —
@@ -586,45 +705,55 @@ which `20260807133000` never targeted at all. Both grant EXECUTE to
 `anon`/`authenticated`/`service_role` by default. The identical two-bucket
 split exists for tables too.
 
-**That would be a clean root-cause finding, except it doesn't hold up
-against real migrations.** Two functions created by Grok's own
-`20260821150000` today — the replaced `handle_new_user()` and the new
-`signup_acquisition_readiness_operator_snapshot()` — do **not** show
-`service_role` EXECUTE, and the second one never received an explicit
-`service_role` revoke in that migration (only `PUBLIC` and `anon` are
-revoked; `service_role` is untouched in the file). If the `postgres`-owned
-default-ACL bucket really governs objects created by real migrations the
-way it governs my probe functions, that function should be exposed. It
-is not.
+**Corrected 2026-08-23 (see the correction above, point 2) — this was a
+self-contradiction, not a discrepancy, for one of the two functions.** This
+subsection originally claimed both `handle_new_user()` and the new
+`signup_acquisition_readiness_operator_snapshot()`, from Grok's own
+`20260821150000`, failed to show `service_role` EXECUTE. This file's own
+~15:23 UTC measurement, recorded earlier in this same section, already says
+the readiness RPC **does** have `service_role=X` ("default privileges
+leftover") — exactly what the default-ACL bucket predicts for a newly
+created function, not an exception to it.
 
-I do not have a confirmed explanation for the discrepancy — plausibly the
-role/connection context Lovable's SQL-editor channel runs under differs
-from whatever applies committed migrations, but that is `inference`, not
-verified. Rather than draft an `ALTER DEFAULT PRIVILEGES ... FOR ROLE
-supabase_admin` corrective migration on an unconfirmed theory, this is
-left as an open question.
+Only `handle_new_user()` actually lacks the exposure, and it has a mundane
+explanation rather than an open question: it is a `CREATE OR REPLACE` of a
+function whose `service_role` EXECUTE was already explicitly revoked by the
+2026-08-21 ad-hoc supplement (captured afterward as `20260821064300`)
+_before_ `20260821150000` replaced its body. `CREATE OR REPLACE FUNCTION`
+does not reset an existing grant back to the default ACL, so a
+previously-hardened function stays hardened across a later body replacement.
+That is expected behavior, not a gap in the mechanism.
+
+So the `postgres`-owned default-ACL bucket is consistent with both real
+migrations measured here once each function's own grant history is
+accounted for: a brand-new function (the readiness RPC) inherits the default
+ACL; a replaced function (`handle_new_user`) keeps whatever was already
+explicitly granted or revoked on it. No corrective migration is implied by
+either case.
 
 ### What this does and does not license
 
-Confirmed: the 66/76 and 3/76 counts, and the self-test-fails-via-this-probe-channel
-result, **against Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db`**.
-Not confirmed: whether that project is production `knkwiiywfkbqznbxwqfh` or a
-different, possibly sandbox, project (the 2026-08-22 correction above); why
-real migrations don't show the same exposure; or whether any corrective
-migration is actually needed. **No migration was drafted or applied.** No
-table, function, grant, or default privilege was changed. This does not
-authorize anyone to apply `20260807133000`-style `ALTER DEFAULT PRIVILEGES`
-changes on the strength of this note alone — the mechanism is not yet
-understood well enough for that, **and neither is which database this note
-actually measured.** Do not run a further production `query_database` /
+Confirmed: the 66/76 and 3/76 counts (effective privilege, not proven
+per-function provenance — see correction point 3), against production
+`66255e7b-892c-4be5-8686-ab1cfc3666db` / `knkwiiywfkbqznbxwqfh` (the
+2026-08-23 correction above restores this after the 2026-08-22 downgrade),
+and the self-test-fails-via-this-probe-channel result. Not confirmed: how
+many of the 66 came from the default-ACL mechanism specifically versus an
+explicit grant (at least 2 are proven explicit, correction point 3); or
+whether any corrective migration is actually needed — the "real migrations
+don't show the same exposure" question is resolved as of correction point 2,
+not open. **No migration was drafted or applied.** No table, function,
+grant, or default privilege was changed. This does not authorize anyone to
+apply `20260807133000`-style `ALTER DEFAULT PRIVILEGES` changes on the
+strength of this note alone — per-function grant provenance across all 66 is
+still unchecked. Do not run a further production `query_database` /
 `enable_database` call to settle this — Grok's review claims that surface is
 owner-locked on `knkwiiywfkbqznbxwqfh` (2026-08-21), a claim this file does
 not yet independently corroborate but that this note does not attempt to
-test. Resolve the project-id mapping through project metadata, an owner
-statement, or another already-sanctioned channel instead. Grok: if your
-migration-apply path can confirm which role actually executes committed
-migrations against production, that single fact would resolve the open
-question above — independent of, and in addition to, the identity question.
+test. Grok: if your migration-apply path can confirm which role actually
+executes committed migrations against production, that fact is still open
+and would resolve it — independent of the identity and exposure questions
+above, both now settled.
 
 ---
 

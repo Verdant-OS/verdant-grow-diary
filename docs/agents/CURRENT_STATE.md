@@ -605,7 +605,8 @@ own dated citation in this file, not a second uncited assertion; until then
 this is the governing record.
 
 **2. The "two functions... do not show the same exposure" uncertainty
-(in the "Uncertain" subsection below) was a self-contradiction, not a
+(in the default-privilege-mechanism subsection below, later renamed — see
+its own note) was a self-contradiction, not a
 discrepancy.** It named both `handle_new_user()` and
 `signup_acquisition_readiness_operator_snapshot()` as not showing
 `service_role` EXECUTE. But this file's own ~15:23 UTC measurement, recorded
@@ -779,7 +780,17 @@ the default ACL already in effect at creation, are what actually produced
 the current grant stays unmeasured, per the same correction. `inference`:
 probably intentional either way. Not verified with Cheek.
 
-### Uncertain: whether the default-privilege mechanism is still live today
+### The default-privilege mechanism is confirmed live; migration provenance is not
+
+**Renamed 2026-08-23 (Codex review, this PR).** This subsection's own
+self-test below (a fresh throwaway function receiving `anon`/`service_role`
+EXECUTE, and both `pg_default_acl` entries retaining those grants today)
+directly confirms the mechanism is live — that was never actually in doubt
+once the self-test ran. The heading previously said otherwise. What genuinely
+stays open, narrower than the old heading implied: whether
+`20260807133000` applied as committed, and which role executed its
+unqualified statements and `20260821150000` — both already carried below,
+neither about whether the mechanism itself exists.
 
 `20260807133000_global_default_privilege_hardening.sql` REVOKEs
 `EXECUTE ON FUNCTIONS` and `ALL ON TABLES` from `PUBLIC, anon` at the

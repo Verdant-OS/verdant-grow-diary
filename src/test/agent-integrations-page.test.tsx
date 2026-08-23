@@ -134,13 +134,15 @@ describe("AgentIntegrations page", () => {
     );
   });
 
-  it("lists exactly the three shipped MCP tools by name", () => {
+  it("lists exactly the five shipped MCP tools by name", () => {
     renderAgentIntegrations();
     const names = MCP_MANIFEST.tools.map((t) => t.name);
     expect(names).toEqual([
       "list_grows",
       "list_recent_diary_entries",
       "get_latest_sensor_snapshot",
+      "list_grow_walk_targets",
+      "get_grow_walk_context",
     ]);
     for (const n of names) {
       expect(screen.getByTestId(`mcp-tool-${n}`)).toBeTruthy();
@@ -438,6 +440,10 @@ describe("OAuthConsent route regression", () => {
     expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/grows/i);
     expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/diary/i);
     expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/sensor/i);
+    expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/grow walk/i);
+    expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/alert reasons/i);
+    expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/ai doctor/i);
+    expect(screen.getByTestId("oauth-consent-scope").textContent).toMatch(/audit history/i);
     expect(screen.getByTestId("oauth-consent-safety").textContent).toMatch(/action queue/i);
     expect(screen.getByTestId("oauth-consent-safety").textContent).toMatch(/ai doctor/i);
     expect(screen.getByTestId("oauth-consent-safety").textContent).toMatch(/device/i);

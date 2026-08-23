@@ -86,6 +86,13 @@ export const KNOWN_MONEY_MIGRATIONS = new Set([
   "20260621015000_apply_paddle_subscription_update_rpc.sql",
   "20260622170000_billing_subscription_update_audit.sql",
   "20260622171621_billing_subscription_update_audit_retention.sql",
+  // Hosted-sandbox ledger history restored from the official Supabase CLI
+  // fetch output. These rows are money-adjacent and therefore reviewed/known,
+  // but later canonical migrations carry the deploy-required contracts.
+  "20260710005819_ai_credit_spend_union_hardening.sql",
+  "20260710012854_lovable_paddle_sink_subscriptions_and_events.sql",
+  "20260710013213_pheno_tracker_pro_entitlement_enforcement.sql",
+  "20260710013235_pheno_entitlement_anti_oracle_guard.sql",
   "20260714230000_paddle_paid_launch_ordering_and_founder.sql",
   "20260715001000_paddle_paid_launch_review_hardening.sql",
   "20260717193000_entitlement_status_parity.sql",

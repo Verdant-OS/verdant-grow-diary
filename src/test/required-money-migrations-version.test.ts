@@ -16,11 +16,26 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  KNOWN_MONEY_MIGRATIONS,
   REQUIRED_MONEY_MIGRATIONS,
   migrationVersion,
 } from "../../scripts/required-money-migrations.mjs";
 
 describe("migrationVersion()", () => {
+  it("recognizes restored sandbox money history without making it deploy-required", () => {
+    const restoredSandboxHistory = [
+      "20260710005819_ai_credit_spend_union_hardening.sql",
+      "20260710012854_lovable_paddle_sink_subscriptions_and_events.sql",
+      "20260710013213_pheno_tracker_pro_entitlement_enforcement.sql",
+      "20260710013235_pheno_entitlement_anti_oracle_guard.sql",
+    ];
+
+    for (const filename of restoredSandboxHistory) {
+      expect(KNOWN_MONEY_MIGRATIONS.has(filename)).toBe(true);
+      expect(REQUIRED_MONEY_MIGRATIONS).not.toContain(filename);
+    }
+  });
+
   it("requires the final AI-credit service contract repair in every deploy target", () => {
     expect(REQUIRED_MONEY_MIGRATIONS).toContain(
       "20260727050000_ai_credit_service_contract_forward_reassert.sql",

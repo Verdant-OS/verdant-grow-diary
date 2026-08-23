@@ -33,7 +33,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { computeTreeHash, isBinary, normalizeCrlf } from "../../scripts/lib/tree-hash.mjs";
 
 const REPO_ROOT = resolve(__dirname, "../..");
@@ -101,6 +101,37 @@ function runStamper(
   });
   const record = JSON.parse(readFileSync(join(cwd, "public/version.json"), "utf8"));
   return { record, stdout };
+}
+
+function makeCommittedSandbox(additionalFiles: Record<string, string> = {}): {
+  box: string;
+  sha: string;
+} {
+  const box = makeSandbox();
+  mkdirSync(join(box, "src/generated"), { recursive: true });
+  writeFileSync(join(box, "public/version.json"), '{"tracked":"before-stamp"}\n');
+  writeFileSync(join(box, "src/generated/buildInfo.ts"), "export const beforeStamp = true;\n");
+  for (const [relativePath, contents] of Object.entries(additionalFiles)) {
+    const target = join(box, relativePath);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, contents);
+  }
+  git(box, ["init", "-q"]);
+  git(box, ["add", "-A"]);
+  git(box, ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "init"]);
+  return { box, sha: git(box, ["rev-parse", "HEAD"]) };
+}
+
+function attachOriginDefault(box: string, branch: string): string {
+  const remote = makeTempRoot();
+  git(remote, ["init", "--bare", "-q"]);
+  git(box, ["branch", "-M", branch]);
+  git(box, ["remote", "add", "origin", remote]);
+  git(box, ["push", "-u", "origin", branch]);
+  git(remote, ["symbolic-ref", "HEAD", `refs/heads/${branch}`]);
+  git(box, ["fetch", "origin"]);
+  git(box, ["symbolic-ref", "refs/remotes/origin/HEAD", `refs/remotes/origin/${branch}`]);
+  return remote;
 }
 
 const LEGACY_FIELDS = [
@@ -301,6 +332,105 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
     expect(record.version).toMatch(new RegExp(`^0\\.0\\.0\\+\\d{8}\\.${sha.slice(0, 12)}`));
     expect(record.treeHash).toMatch(/^[0-9a-f]{64}$/);
     expect(record.inherited).toBeNull();
+  });
+
+  it("ignores only persistent generated stamp outputs when reporting dirty", () => {
+    const { box } = makeCommittedSandbox({
+      "config/publisher.json": '{"mode":"clean"}\n',
+      "supabase/functions/example/index.ts": "export const edge = true;\n",
+    });
+
+    expect(runStamper(box).record.dirty).toBe(false);
+    const generatedResidue = git(box, ["status", "--porcelain"]);
+    expect(generatedResidue).toMatch(/public[\\/]version\.json/);
+    expect(generatedResidue).toMatch(/src[\\/]generated[\\/]buildInfo\.ts/);
+    expect(runStamper(box).record.dirty).toBe(false);
+
+    const meaningfulMutations: Array<[string, string]> = [
+      ["src/components/App.tsx", "export const x = 2;\n"],
+      ["config/publisher.json", '{"mode":"changed"}\n'],
+      ["supabase/functions/example/index.ts", "export const edge = false;\n"],
+    ];
+    for (const [relativePath, contents] of meaningfulMutations) {
+      writeFileSync(join(box, relativePath), contents);
+      expect(runStamper(box).record.dirty, relativePath).toBe(true);
+      git(box, ["checkout", "--", relativePath]);
+    }
+  });
+
+  it("uses the matching canonical origin default for detached and orphan refs", () => {
+    for (const rawRef of ["HEAD", "__orphan__"] as const) {
+      const { box, sha } = makeCommittedSandbox();
+      attachOriginDefault(box, "main");
+      if (rawRef === "HEAD") {
+        git(box, ["checkout", "--detach", sha]);
+      } else {
+        git(box, ["branch", rawRef, sha]);
+        git(box, ["checkout", rawRef]);
+      }
+
+      const { record } = runStamper(box);
+      expect(record.commit).toBe(sha);
+      expect(record.ref).toBe("main");
+    }
+  });
+
+  it("preserves a raw ref when origin default is unavailable or does not describe this checkout", () => {
+    const withoutOrigin = makeCommittedSandbox();
+    git(withoutOrigin.box, ["checkout", "--detach", withoutOrigin.sha]);
+    expect(runStamper(withoutOrigin.box).record.ref).toBe("HEAD");
+
+    const unsynced = makeCommittedSandbox();
+    attachOriginDefault(unsynced.box, "main");
+    const originDefaultSha = unsynced.sha;
+    writeFileSync(join(unsynced.box, "src/components/App.tsx"), "export const x = 2;\n");
+    git(unsynced.box, ["add", "src/components/App.tsx"]);
+    git(unsynced.box, [
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "commit",
+      "-qm",
+      "ahead",
+    ]);
+    const aheadSha = git(unsynced.box, ["rev-parse", "HEAD"]);
+    git(unsynced.box, ["checkout", "--detach", aheadSha]);
+
+    const { record } = runStamper(unsynced.box, { GITHUB_SHA: originDefaultSha });
+    expect(record.commit).toBe(originDefaultSha);
+    expect(record.ref).toBe("HEAD");
+
+    const originMismatch = makeCommittedSandbox();
+    const mismatchRemote = attachOriginDefault(originMismatch.box, "main");
+    const matchingSha = originMismatch.sha;
+    git(originMismatch.box, ["checkout", "-b", "later-default"]);
+    writeFileSync(join(originMismatch.box, "src/components/App.tsx"), "export const x = 2;\n");
+    git(originMismatch.box, ["add", "src/components/App.tsx"]);
+    git(originMismatch.box, [
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "commit",
+      "-qm",
+      "later default",
+    ]);
+    git(originMismatch.box, ["push", "origin", "later-default"]);
+    git(mismatchRemote, ["symbolic-ref", "HEAD", "refs/heads/later-default"]);
+    git(originMismatch.box, ["remote", "set-head", "origin", "-a"]);
+    git(originMismatch.box, ["checkout", "--detach", matchingSha]);
+
+    const originMismatchRecord = runStamper(originMismatch.box).record;
+    expect(originMismatchRecord.commit).toBe(matchingSha);
+    expect(originMismatchRecord.ref).toBe("HEAD");
+
+    const withExplicitRef = makeCommittedSandbox();
+    attachOriginDefault(withExplicitRef.box, "main");
+    git(withExplicitRef.box, ["checkout", "--detach", withExplicitRef.sha]);
+    expect(runStamper(withExplicitRef.box, { GITHUB_REF_NAME: "__orphan__" }).record.ref).toBe(
+      "__orphan__",
+    );
   });
 
   it("treats a set-but-empty or malformed GITHUB_SHA as absent (forgery regression)", () => {

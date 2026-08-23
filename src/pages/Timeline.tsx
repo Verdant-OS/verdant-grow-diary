@@ -1456,7 +1456,13 @@ export default function Timeline() {
       {pageReadView.showSensorsNextStep && (
         <OneTentLoopNextStepCard
           current="timeline"
-          ids={{ growId: activeGrowId ?? null, tentId: tentFilter || null }}
+          ids={{
+            growId: activeGrowId ?? null,
+            tentId: tentFilter || null,
+            // Doctor-says-so: pass the grower's Timeline plant filter as a
+            // UUID-only intent. Sensors re-emits it; Doctor validates it.
+            plantId: plantFilter || null,
+          }}
           testId="timeline-one-tent-loop-next-step-card"
           className="mb-3"
         />

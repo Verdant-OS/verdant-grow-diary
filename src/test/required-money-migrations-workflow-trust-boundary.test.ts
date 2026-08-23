@@ -349,6 +349,9 @@ describe("prefix-diff-sarif workflow trust boundary", () => {
     expect(PREFIX_LIVE_JOB).not.toMatch(
       /if:\s*steps\.diff-json\.outputs\.exit != '0'/,
     );
+    expect(PREFIX_LIVE_JOB).not.toMatch(
+      /if:\s*steps\.diff-sarif\.outputs\.exit != '0'/,
+    );
   });
 
   it("has no combined or cross-environment secret fallback", () => {

@@ -1645,27 +1645,25 @@ differed stays `NOT_MEASURED`.
 
 ## One-Tent goal — blocked on external gates, not code work (recorded 2026-08-21)
 
-Recorded by Claude 2026-08-21 ~22:00 UTC; **all four gate states re-checked
+Recorded by Claude 2026-08-21 ~22:00 UTC; **all four gate states were re-checked
 2026-08-22 — the first three at 17:12 UTC and #1076 re-queried at 17:24 UTC**, after
 review flagged that a blanket "re-checked" claim sat above a row still dated
-2026-08-21. **No agent performed any of the external transitions named below**, and none is
-authorized by this entry.
+2026-08-21. At that measurement, **no agent performed any of the external transitions
+named below**, and none was authorized by this entry.
 
-**One of the four has since closed: #1091 merged on 2026-08-22.** The table below is
-now three open gates and one closed, not four open. Raised by a review bot on #1092
-and verified at source before correcting — the row had been left describing an
-unperformed owner action that had in fact already happened, which is the
-"propagation after change" failure mode this branch's own audit deliverable names.
-The other three gates are unchanged and still block.
+**Two of the four have since closed: #1091 merged on 2026-08-22, and #1076 is now
+closed unmerged.** The table below now records two active gates and two closed records,
+not four open gates. The public attestation and disposable authenticated proof remain
+the active blockers.
 
-### The four gates
+### Two active gates and two resolved records
 
 | Gate                                | State                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | #1091 ready-state / reviewer action | **CLOSED 2026-08-22.** #1091 is **merged** — `merged: true`, closed 12:38:29 UTC by `cheekhimself`, final head `c432f9836f74`. It is no longer a draft and no longer waiting on anyone. Superseded row text: "Owner-only. Draft at `74e1ad4`; review automation cannot engage until the transition happens. Not performed by any agent"                                                                                                                                                                                                         |
 | Public attestation                  | **STILL INVALID** (tip/lag re-measured 2026-08-22 18:22 UTC). Canonical `70ba566cdb11`, production `faea6e9c59ad` `dirty: true`, lag **`10`** — see below                                                                                                                                                                                                                                                                                                                                                                                       |
 | Disposable authenticated proof      | **Must remain UNDISPATCHED** while attestation is invalid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| #1076                               | **HELD.** Re-queried 2026-08-22 17:24 UTC rather than carried forward: still `open`, `draft: false`, `merged: false`, `requested_reviewers: [cheekhimself]`, head `c762996a93ea`, last updated 14:06:03Z. It is `ci: migrate workflows to tenki` from `tenki-cloud[bot]` — 86 workflow files, `runs-on:` labels only. Adjacent signal worth knowing before anyone weighs it: the `tenki-reviewer` bot posted "Insufficient balance to process this code review" on #1092 the same day, so that vendor's review lane is currently non-functional |
+| #1076 CI runner migration proposal  | **CLOSED UNMERGED.** Retained as a resolved record for traceability; it no longer blocks or authorizes a workflow migration.                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ### #1091 — 35/35 required is true; "clean head" is not (superseded head)
 

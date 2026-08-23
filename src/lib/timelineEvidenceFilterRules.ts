@@ -258,23 +258,32 @@ export function buildTimelineNameLookup(rows: unknown): ReadonlyMap<string, stri
 }
 
 /**
- * Build the owner-scoped plant → current tent relationship used only for the
- * Timeline handoff to Sensors. Invalid, unassigned, or placeholder ids are
- * omitted so callers cannot turn an unresolved relationship into route intent.
+ * Build the owner-and-grow-scoped plant → current tent relationship used only
+ * for the Timeline handoff to Sensors. A direct plant grow attribution wins;
+ * legacy null plant attribution may roll up through a tent in the active grow.
+ * Conflicting, invalid, unassigned, or placeholder ids are omitted so callers
+ * cannot turn an unresolved relationship into route intent or switch grows.
  * As with the name directory, `null` means the read itself was unavailable;
  * an empty map means the read succeeded but supplied no usable relationship.
  */
 export function buildTimelinePlantTentLookup(
   plantRows: unknown,
   ownerTentRows: unknown,
+  growId: unknown,
 ): ReadonlyMap<string, string> | null {
   if (!Array.isArray(plantRows) || !Array.isArray(ownerTentRows)) return null;
+  const activeGrowId = normalizePersistedGrowTentId(growId);
+  if (!activeGrowId) return null;
 
-  const ownerTentIds = new Set<string>();
+  const ownerTentGrowIds = new Map<string, string>();
   for (const row of ownerTentRows) {
     if (!row || typeof row !== "object") continue;
-    const tentId = normalizePersistedGrowTentId((row as Record<string, unknown>).id);
-    if (tentId) ownerTentIds.add(tentId);
+    const record = row as Record<string, unknown>;
+    const tentId = normalizePersistedGrowTentId(record.id);
+    const tentGrowId = normalizePersistedGrowTentId(record.grow_id);
+    if (tentId && tentGrowId && !ownerTentGrowIds.has(tentId)) {
+      ownerTentGrowIds.set(tentId, tentGrowId);
+    }
   }
 
   const lookup = new Map<string, string>();
@@ -283,7 +292,21 @@ export function buildTimelinePlantTentLookup(
     const record = row as Record<string, unknown>;
     const plantId = normalizePersistedPlantId(record.id);
     const tentId = normalizePersistedGrowTentId(record.tent_id);
-    if (!plantId || !tentId || !ownerTentIds.has(tentId) || lookup.has(plantId)) continue;
+    const tentGrowId = tentId ? ownerTentGrowIds.get(tentId) : null;
+    const directPlantGrowId = normalizePersistedGrowTentId(record.grow_id);
+    const hasMalformedDirectGrowId = record.grow_id != null && !directPlantGrowId;
+    const effectivePlantGrowId = directPlantGrowId ?? tentGrowId;
+    if (
+      !plantId ||
+      !tentId ||
+      !tentGrowId ||
+      hasMalformedDirectGrowId ||
+      tentGrowId !== activeGrowId ||
+      effectivePlantGrowId !== activeGrowId ||
+      lookup.has(plantId)
+    ) {
+      continue;
+    }
     lookup.set(plantId, tentId);
   }
   return lookup;

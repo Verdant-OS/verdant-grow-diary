@@ -46,6 +46,10 @@ function recordingClient(options: { includeTent?: boolean } = {}) {
           calls.push({ table, method: "eq", args });
           return diary;
         },
+        is(...args: unknown[]) {
+          calls.push({ table, method: "is", args });
+          return diary;
+        },
         order(...args: unknown[]) {
           calls.push({ table, method: "order", args });
           return diary;

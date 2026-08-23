@@ -10,15 +10,19 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../integrations/supabase/types";
+import { LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES } from "./liveSourceTruthGateRules";
 import { classifySnapshotFreshness } from "./sensor/sensorSnapshotFreshnessRules";
+import { normalizeSensorSource, rawSensorSourceValuesFor } from "./sensor/sensorSourceRules";
 import { withoutDiagnosticSensorRows } from "./sensorProvenanceFenceRules";
 import { STALE_THRESHOLD_MS } from "./sensorReadingNormalizationRules";
+import { celsiusToFahrenheit } from "./temperatureUnits";
 import {
   validateEcWithUnit,
   validateHumidity,
   validatePh,
   validateTempC,
 } from "./sensorValidation";
+import { selectWithRetractionCompat } from "./quick-log/retractionFilterCompat";
 
 export interface OperatorRecentDiaryEntry {
   id: string;
@@ -98,7 +102,36 @@ const DIARY_COLUMNS = "id,grow_id,plant_id,tent_id,stage,note,entry_at,created_a
 const SENSOR_COLUMNS =
   "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload" as const;
 const SENSOR_CANDIDATE_LIMIT = 25;
+/** One extra row proves a branch overflow without widening its logical cohort. */
+const SENSOR_CANDIDATE_LOOKAHEAD_LIMIT = SENSOR_CANDIDATE_LIMIT + 1;
+const MCP_SENSOR_CONFLICT_SOURCE_CLASSES = ["live", "manual", "csv"] as const;
+type McpSensorConflictSource = (typeof MCP_SENSOR_CONFLICT_SOURCE_CLASSES)[number];
 const KNOWN_METRIC_SET: ReadonlySet<string> = new Set(OPERATOR_SENSOR_METRICS);
+/** Match the existing bounded sensor-snapshot cohort window. */
+const SENSOR_SOURCE_CONTRADICTION_WINDOW_MS = 5 * 60 * 1000;
+// PPFD is not a Live Source Truth gate metric. Keep its source-conflict
+// deadband aligned with the established outcome-analysis PPFD tolerance.
+const PPFD_SOURCE_CONTRADICTION_TOLERANCE = 50;
+
+/**
+ * Reuse Verdant's source-truth comparator tolerances. Stored temperatures are
+ * Celsius, while the source-truth gate compares temperatures in Fahrenheit.
+ * PPFD is not a source-truth metric, so it uses the established
+ * outcome-analysis deadband in the same canonical unit.
+ */
+const MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE: Readonly<
+  Record<(typeof OPERATOR_SENSOR_METRICS)[number], number>
+> = Object.freeze({
+  temperature_c: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.temp_f,
+  humidity_pct: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.humidity_pct,
+  vpd_kpa: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.vpd_kpa,
+  co2_ppm: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.co2_ppm,
+  soil_moisture_pct: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_moisture_pct,
+  soil_temp_c: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_temp_f,
+  ph: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.ph,
+  ec: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_ec_ms_cm,
+  ppfd: PPFD_SOURCE_CONTRADICTION_TOLERANCE,
+});
 
 function normalizeDiaryLimit(limit: number | undefined): number {
   if (!Number.isFinite(limit)) return 10;
@@ -128,14 +161,15 @@ export async function listRecentDiaryEntriesForOwnedGrow(
   }
 
   // Deterministic: entry_at DESC, created_at DESC, id DESC (unique tie-breaker).
-  const { data, error } = await client
-    .from("diary_entries")
-    .select(DIARY_COLUMNS)
-    .eq("grow_id", growId)
-    .order("entry_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(normalizeDiaryLimit(limit));
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = client.from("diary_entries").select(DIARY_COLUMNS).eq("grow_id", growId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query
+      .order("entry_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(normalizeDiaryLimit(limit));
+  });
 
   if (error) {
     return { ok: false, reason: "unavailable", message: error.message };
@@ -305,6 +339,136 @@ function newerReading(a: McpSensorQueryRow, b: McpSensorQueryRow): McpSensorQuer
   return a.id >= b.id ? a : b;
 }
 
+function sensorSelectionClock(options: McpSensorSelectionOptions): {
+  readonly nowMs: number;
+  readonly staleAfterMs: number;
+} {
+  const nowMs = (options.now ?? new Date()).getTime();
+  const requestedStaleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
+  return {
+    nowMs,
+    staleAfterMs:
+      Number.isFinite(requestedStaleAfterMs) && requestedStaleAfterMs >= 0
+        ? requestedStaleAfterMs
+        : STALE_THRESHOLD_MS,
+  };
+}
+
+function comparableMcpSensorValue(metric: string, value: number): number {
+  return metric === "temperature_c" || metric === "soil_temp_c"
+    ? celsiusToFahrenheit(value)
+    : value;
+}
+
+function hasMaterialMcpSensorSourceConflict(
+  metric: (typeof OPERATOR_SENSOR_METRICS)[number],
+  candidates: readonly McpSensorQueryRow[],
+): boolean {
+  const values = candidates.map((candidate) => comparableMcpSensorValue(metric, candidate.value));
+  const spread = Math.max(...values) - Math.min(...values);
+  return spread > MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE[metric];
+}
+
+type SensorCandidateBranch = "captured" | "legacy";
+
+type SensorCandidateQueryResult = {
+  readonly data: unknown;
+  readonly error: { readonly message: string } | null;
+};
+
+type SensorCandidateQuery = {
+  readonly metric: (typeof OPERATOR_SENSOR_METRICS)[number];
+  readonly branch: SensorCandidateBranch;
+  readonly query: PromiseLike<SensorCandidateQueryResult>;
+};
+
+function sensorCandidateQuery(
+  client: OwnerScopedSupabaseClient,
+  tentId: string,
+  metric: (typeof OPERATOR_SENSOR_METRICS)[number],
+  branch: SensorCandidateBranch,
+  sources?: readonly string[],
+  limit = SENSOR_CANDIDATE_LIMIT,
+): PromiseLike<SensorCandidateQueryResult> {
+  const base = client
+    .from("sensor_readings")
+    .select(SENSOR_COLUMNS)
+    .eq("tent_id", tentId)
+    .eq("metric", metric);
+  const sourceScoped = sources && sources.length > 0 ? base.in("source", sources) : base;
+  const timestampScoped =
+    branch === "captured"
+      ? sourceScoped.not("captured_at", "is", null)
+      : sourceScoped.is("captured_at", null);
+
+  return timestampScoped
+    .order("captured_at", { ascending: false })
+    .order("ts", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit) as unknown as PromiseLike<SensorCandidateQueryResult>;
+}
+
+function rowsFromSensorCandidateResult(result: SensorCandidateQueryResult): McpSensorQueryRow[] {
+  return Array.isArray(result.data) ? (result.data as McpSensorQueryRow[]) : [];
+}
+
+/**
+ * Canonical source membership used by both contradiction detection and
+ * saturated-branch recovery. Diagnostic, stale, invalid, and implausible rows
+ * must not make a source look represented.
+ */
+function usableMcpSensorConflictSource(
+  row: McpSensorQueryRow,
+  nowMs: number,
+  staleAfterMs: number,
+): McpSensorConflictSource | null {
+  if (!KNOWN_METRIC_SET.has(row.metric) || !isPlausibleMcpSensorValue(row)) return null;
+  const source = normalizeSensorSource(row.source);
+  if (source !== "live" && source !== "manual" && source !== "csv") return null;
+  if (deriveMcpFreshness(row, nowMs, staleAfterMs) !== "fresh") return null;
+  return Number.isFinite(effectiveCaptureMs(row)) ? source : null;
+}
+
+/**
+ * Find coeval, usable readings for one metric that disagree across canonical
+ * sources before the public snapshot collapses candidates to its newest row.
+ *
+ * The result intentionally contains metric keys only: source/value candidates
+ * remain query-only provenance and are never returned to MCP consumers.
+ */
+export function findMcpSensorSourceContradictionMetrics(
+  rows: readonly McpSensorQueryRow[] | null | undefined,
+  options: McpSensorSelectionOptions = {},
+): readonly string[] {
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
+  const latestByMetricAndSource = new Map<string, Map<string, McpSensorQueryRow>>();
+
+  for (const row of withoutDiagnosticSensorRows(rows)) {
+    const source = usableMcpSensorConflictSource(row, nowMs, staleAfterMs);
+    if (!source) continue;
+
+    const bySource = latestByMetricAndSource.get(row.metric) ?? new Map();
+    const existing = bySource.get(source);
+    bySource.set(source, existing ? newerReading(existing, row) : row);
+    latestByMetricAndSource.set(row.metric, bySource);
+  }
+
+  return Object.freeze(
+    OPERATOR_SENSOR_METRICS.filter((metric) => {
+      const bySource = latestByMetricAndSource.get(metric);
+      if (!bySource || bySource.size < 2) return false;
+      const candidates = [...bySource.values()];
+      const newestAt = Math.max(...candidates.map(effectiveCaptureMs));
+      const coeval = candidates.filter(
+        (candidate) =>
+          newestAt - effectiveCaptureMs(candidate) <= SENSOR_SOURCE_CONTRADICTION_WINDOW_MS,
+      );
+      return coeval.length >= 2 && hasMaterialMcpSensorSourceConflict(metric, coeval);
+    }),
+  );
+}
+
 /**
  * Select the newest eligible row per supported metric and strip query-only
  * provenance/tie-break fields before returning it to a consumer.
@@ -313,12 +477,7 @@ export function selectLatestMcpSensorReadings(
   rows: readonly McpSensorQueryRow[] | null | undefined,
   options: McpSensorSelectionOptions = {},
 ): Record<string, McpSensorReading> {
-  const nowMs = (options.now ?? new Date()).getTime();
-  const requestedStaleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
-  const staleAfterMs =
-    Number.isFinite(requestedStaleAfterMs) && requestedStaleAfterMs >= 0
-      ? requestedStaleAfterMs
-      : STALE_THRESHOLD_MS;
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
   const selected: Record<string, McpSensorQueryRow> = {};
 
   for (const row of withoutDiagnosticSensorRows(rows)) {
@@ -360,6 +519,8 @@ export async function getLatestSensorSnapshotForOwnedTent(
   OwnerScopedReadModelResult<{
     tent: OperatorOwnedTent;
     snapshot: null | { tentId: string; readings: Record<string, McpSensorReading> };
+    /** Internal source-conflict receipt for conservative evidence consumers. */
+    contradictionMetrics?: readonly string[];
   }>
 > {
   const { data: tent, error: tentError } = await client
@@ -382,41 +543,69 @@ export async function getLatestSensorSnapshotForOwnedTent(
   // Fetch captured and legacy-null-captured candidates separately for every
   // supported metric. Their union contains the true COALESCE winner, while a
   // bounded window still lets the provenance fence skip newer diagnostics.
-  const results = await Promise.all(
-    OPERATOR_SENSOR_METRICS.flatMap((metric) => [
-      client
-        .from("sensor_readings")
-        .select(SENSOR_COLUMNS)
-        .eq("tent_id", tentId)
-        .eq("metric", metric)
-        .not("captured_at", "is", null)
-        .order("captured_at", { ascending: false })
-        .order("ts", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(SENSOR_CANDIDATE_LIMIT),
-      client
-        .from("sensor_readings")
-        .select(SENSOR_COLUMNS)
-        .eq("tent_id", tentId)
-        .eq("metric", metric)
-        .is("captured_at", null)
-        .order("ts", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(SENSOR_CANDIDATE_LIMIT),
-    ]),
+  const primaryQueries: SensorCandidateQuery[] = OPERATOR_SENSOR_METRICS.flatMap((metric) =>
+    (["captured", "legacy"] as const).map((branch) => ({
+      metric,
+      branch,
+      query: sensorCandidateQuery(
+        client,
+        tentId,
+        metric,
+        branch,
+        undefined,
+        SENSOR_CANDIDATE_LOOKAHEAD_LIMIT,
+      ),
+    })),
   );
+  const primaryResults = await Promise.all(primaryQueries.map(({ query }) => query));
 
-  const failed = results.find((result) => result.error);
-  if (failed?.error) {
-    return { ok: false, reason: "unavailable", message: failed.error.message };
+  const primaryFailure = primaryResults.find((result) => result.error);
+  if (primaryFailure?.error) {
+    return { ok: false, reason: "unavailable", message: primaryFailure.error.message };
   }
 
-  const candidates = results.flatMap((result) =>
-    Array.isArray(result.data) ? (result.data as McpSensorQueryRow[]) : [],
-  );
+  const primaryRows = primaryResults.map(rowsFromSensorCandidateResult);
+  const primaryCandidates = primaryRows.map((rows) => rows.slice(0, SENSOR_CANDIDATE_LIMIT));
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
+
+  // A broad branch can be dominated by one raw source. Only a 26th row proves
+  // overflow; keep the first 25 logical candidates and recover a bounded
+  // per-source cohort for any canonical source not represented by usable rows.
+  const supplementalQueries: SensorCandidateQuery[] = primaryQueries.flatMap((candidate, index) => {
+    if (primaryRows[index].length <= SENSOR_CANDIDATE_LIMIT) return [];
+
+    const representedSources = new Set(
+      withoutDiagnosticSensorRows(primaryCandidates[index])
+        .map((row) => usableMcpSensorConflictSource(row, nowMs, staleAfterMs))
+        .filter((source): source is McpSensorConflictSource => source !== null),
+    );
+    return MCP_SENSOR_CONFLICT_SOURCE_CLASSES.filter(
+      (source) => !representedSources.has(source),
+    ).map((source) => ({
+      metric: candidate.metric,
+      branch: candidate.branch,
+      query: sensorCandidateQuery(
+        client,
+        tentId,
+        candidate.metric,
+        candidate.branch,
+        rawSensorSourceValuesFor([source]),
+        SENSOR_CANDIDATE_LIMIT,
+      ),
+    }));
+  });
+  const supplementalResults = await Promise.all(supplementalQueries.map(({ query }) => query));
+  const supplementalFailure = supplementalResults.find((result) => result.error);
+  if (supplementalFailure?.error) {
+    return { ok: false, reason: "unavailable", message: supplementalFailure.error.message };
+  }
+
+  const candidates = [
+    ...primaryCandidates.flatMap((rows) => rows),
+    ...supplementalResults.flatMap(rowsFromSensorCandidateResult),
+  ];
   const readings = selectLatestMcpSensorReadings(candidates, options);
+  const contradictionMetrics = findMcpSensorSourceContradictionMetrics(candidates, options);
   const ownedTent: OperatorOwnedTent = {
     id: tent.id,
     name: tent.name,
@@ -434,6 +623,7 @@ export async function getLatestSensorSnapshotForOwnedTent(
               tentId,
               readings,
             },
+      ...(contradictionMetrics.length > 0 ? { contradictionMetrics } : {}),
     },
   };
 }

@@ -48,6 +48,37 @@ export interface FixturePageRelationship {
   relatedTentName: string;
 }
 
+export type QuickLogFixtureBoundary = Readonly<{
+  growId: string;
+  tentId: string;
+}>;
+
+/**
+ * Keep every write-producing Quick Log target inside the routed fixture's
+ * original grow and tent. Messages intentionally omit the identifiers so CI
+ * artifacts do not disclose private route context.
+ */
+export function assertSameQuickLogFixtureBoundary(
+  initial: QuickLogFixtureBoundary | null | undefined,
+  selected: QuickLogFixtureBoundary,
+): void {
+  if (!initial) {
+    throw new Error("Initial Quick Log fixture boundary is unavailable.");
+  }
+
+  const errors: string[] = [];
+  if (selected.growId !== initial.growId) {
+    errors.push("Selected target plant is not in the routed plant's grow.");
+  }
+  if (selected.tentId !== initial.tentId) {
+    errors.push("Selected target plant is not in the routed plant's tent.");
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Quick Log fixture boundary validation failed:\n - ${errors.join("\n - ")}`);
+  }
+}
+
 /**
  * Known patterns that indicate the URL points at a real / production grow.
  * Extend this list when new known-real plants are identified.
@@ -224,7 +255,14 @@ export async function validateQuickLogFixturePage(
     throw new Error(`Fixture env validation failed:\n - ${envCheck.errors.join("\n - ")}`);
   }
 
-  if (page.url().includes("/auth")) {
+  const resolvedPageUrl = page.url();
+  if (isLikelyRealPlantUrl(resolvedPageUrl)) {
+    throw new Error(
+      "Fixture validation resolved to the production Verdant host. Refusing to run write-producing smoke after a redirect.",
+    );
+  }
+
+  if (resolvedPageUrl.includes("/auth")) {
     throw new Error(
       "Fixture validation reached /auth instead of the configured Plant Detail page.",
     );

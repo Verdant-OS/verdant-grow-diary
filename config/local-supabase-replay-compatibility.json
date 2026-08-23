@@ -11,6 +11,13 @@
   ],
   "compatibility_noops": [
     {
+      "canonical_path": "supabase/migrations/20260709015758_d49efeac-492c-4f7b-9746-3638f44fa287.sql",
+      "canonical_sha256": "e6e43a24415c340c0f9f024ef73bd6b96f7c8bc7638c172c2dc79f9a56c202b5",
+      "duplicate_path": "supabase/migrations/20260710013255_staff_role_grant_trigger_and_backfill.sql",
+      "duplicate_sha256": "8b443cc919ba4a74f02059e98d0c8f5743ba5a3bb97569a1e16d046ed7f90850",
+      "reason": "The restored hosted-ledger row repeats the staff bootstrap from 20260709015647, including its verified-email backfill, after 20260709015758 replaced the trigger target with the final allowlist helper. Reapplying it late can recreate an operator-revoked staff role, so only the SHA-verified disposable replay copy is no-op'd."
+    },
+    {
       "canonical_path": "supabase/migrations/20260710002000_pheno_hunt_setup_backfill.sql",
       "canonical_sha256": "6430f43b20cf86cbf4973e95931c475dfe3ce786723347a55c988715076475ee",
       "duplicate_path": "supabase/migrations/20260710003638_pheno_hunt_setup_backfill.sql",

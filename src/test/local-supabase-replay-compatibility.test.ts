@@ -31,6 +31,9 @@ const RESTORED_HISTORY_SQL = resolve(
 const RESTORED_HISTORY_RAW_CONTROL = resolve(
   "supabase/tests/restored_history_raw_setup_backfill_control.sql",
 );
+const RESTORED_HISTORY_RAW_STAFF_CONTROL = resolve(
+  "supabase/tests/restored_history_raw_staff_backfill_control.sql",
+);
 const MAKEFILE = resolve("Makefile");
 const ACTIVE_LOCAL_REPLAY_DOCS = [
   resolve("README.md"),
@@ -378,7 +381,8 @@ describe("local Supabase replay compatibility workspace", () => {
     const workflow = readFileSync(RESTORED_HISTORY_WORKFLOW, "utf8");
     const script = readFileSync(RESTORED_HISTORY_SCRIPT, "utf8");
     const sql = readFileSync(RESTORED_HISTORY_SQL, "utf8");
-    const rawControl = readFileSync(RESTORED_HISTORY_RAW_CONTROL, "utf8");
+    const rawSetupControl = readFileSync(RESTORED_HISTORY_RAW_CONTROL, "utf8");
+    const rawStaffControl = readFileSync(RESTORED_HISTORY_RAW_STAFF_CONTROL, "utf8");
 
     expect(workflow).toContain("node scripts/run-restored-history-incremental-harness.mjs");
     expect(workflow).toContain("ref: ${{ github.event.pull_request.head.sha || github.sha }}");
@@ -386,11 +390,13 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(workflow).toContain('"supabase/config.toml"');
     expect(workflow).toContain('"supabase/seed.sql"');
     expect(workflow).toContain('"supabase/tests/restored_history_raw_setup_backfill_control.sql"');
+    expect(workflow).toContain('"supabase/tests/restored_history_raw_staff_backfill_control.sql"');
     expect(script).toContain("prepareReplayWorkspace");
     expect(script).toContain("source_migrations_unchanged");
     expect(script).toContain("prepared-late-apply");
     expect(script).toContain("preparedSqlHarness");
     expect(script).toContain("restored_history_raw_setup_backfill_control.sql");
+    expect(script).toContain("restored_history_raw_staff_backfill_control.sql");
     const restoredArray = script.match(/RESTORED_MIGRATIONS\s*=\s*\[([\s\S]*?)\];/);
     expect(restoredArray).toBeTruthy();
     const runnerMigrations = [...(restoredArray?.[1].matchAll(/"([^"]+\.sql)"/g) ?? [])].map(
@@ -412,9 +418,16 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(script).toContain("credential-bearing output suppressed");
     expect(script).toContain('process.once("SIGINT"');
     expect(script).toContain('process.once("SIGTERM"');
-    expect(rawControl).toContain("\\ir ../migrations/20260710003638_pheno_hunt_setup_backfill.sql");
-    expect(rawControl).toContain("raw duplicate backfill did not overwrite intentional NULL");
-    expect(rawControl).toContain("ROLLBACK;");
+    expect(rawSetupControl).toContain(
+      "\\ir ../migrations/20260710003638_pheno_hunt_setup_backfill.sql",
+    );
+    expect(rawSetupControl).toContain("raw duplicate backfill did not overwrite intentional NULL");
+    expect(rawSetupControl).toContain("ROLLBACK;");
+    expect(rawStaffControl).toContain(
+      "\\ir ../migrations/20260710013255_staff_role_grant_trigger_and_backfill.sql",
+    );
+    expect(rawStaffControl).toContain("raw duplicate backfill did not recreate revoked staff");
+    expect(rawStaffControl).toContain("ROLLBACK;");
 
     const baselineIndex = sql.indexOf("CREATE TEMP TABLE restored_history_baseline_catalog");
     const preparedMigrationIndexes = RESTORED_HISTORY_MIGRATIONS.map((filename) => {
@@ -438,7 +451,9 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(sql).toContain("repair changed the authoritative service AI spend body");
     expect(sql).toContain("repair changed pheno policy definitions");
     expect(sql).toContain("prepared compatibility path replayed the duplicate setup backfill");
+    expect(sql).toContain("prepared compatibility path recreated revoked staff");
     expect(sql).toContain("repair path did not preserve intentional setup NULL");
+    expect(sql).toContain("repair path recreated revoked staff");
     expect(sql).toContain("ROLLBACK;");
   });
 
@@ -549,7 +564,7 @@ describe("local Supabase replay compatibility workspace", () => {
     };
     expect(report).toMatchObject({
       mode: "verify_only",
-      compatibility_entry_count: 20,
+      compatibility_entry_count: 21,
       compatibility_patch_count: 4,
       compatibility_injection_count: 2,
       source_migrations_unchanged: true,
@@ -581,6 +596,51 @@ describe("local Supabase replay compatibility workspace", () => {
     const canonical = readFileSync(resolve(entry?.canonical_path ?? "missing"), "utf8");
     const duplicate = readFileSync(resolve(entry?.duplicate_path ?? "missing"), "utf8");
     expect(normalizedSqlEffects(duplicate)).toBe(normalizedSqlEffects(canonical));
+  });
+
+  it("no-ops the restored staff backfill so a revoked role stays revoked", () => {
+    const manifest = JSON.parse(readFileSync(REAL_MANIFEST, "utf8")) as {
+      compatibility_noops: Array<{
+        canonical_path: string;
+        canonical_sha256: string;
+        duplicate_path: string;
+        duplicate_sha256: string;
+        reason: string;
+      }>;
+    };
+    const entry = manifest.compatibility_noops.find((candidate) =>
+      candidate.duplicate_path.endsWith("20260710013255_staff_role_grant_trigger_and_backfill.sql"),
+    );
+
+    expect(entry).toMatchObject({
+      canonical_path: "supabase/migrations/20260709015758_d49efeac-492c-4f7b-9746-3638f44fa287.sql",
+      canonical_sha256: "e6e43a24415c340c0f9f024ef73bd6b96f7c8bc7638c172c2dc79f9a56c202b5",
+      duplicate_path:
+        "supabase/migrations/20260710013255_staff_role_grant_trigger_and_backfill.sql",
+      duplicate_sha256: "8b443cc919ba4a74f02059e98d0c8f5743ba5a3bb97569a1e16d046ed7f90850",
+    });
+    expect(entry?.reason).toContain("20260709015647");
+    expect(entry?.reason).toContain("20260709015758");
+    expect(entry?.reason).toContain("operator-revoked staff role");
+
+    const canonical = readFileSync(resolve(entry?.canonical_path ?? "missing"), "utf8");
+    const duplicate = readFileSync(resolve(entry?.duplicate_path ?? "missing"), "utf8");
+    const bootstrap = readFileSync(
+      resolve("supabase/migrations/20260709015647_065119c0-6151-4d81-90b7-9ae48fac6d02.sql"),
+      "utf8",
+    );
+    const bootstrapPrefix = bootstrap.slice(0, bootstrap.indexOf("-- Metered 10,000/month cap"));
+    expect(normalizedSqlEffects(duplicate)).toBe(normalizedSqlEffects(bootstrapPrefix));
+    const backfillMarker = "INSERT INTO public.user_roles (user_id, role)";
+    const normalizeBackfill = (value: string) =>
+      normalizedSqlEffects(value.slice(value.lastIndexOf(backfillMarker))).replace(
+        "ON CONFLICT (user_id, role) DO NOTHING;",
+        "ON CONFLICT DO NOTHING;",
+      );
+    expect(normalizeBackfill(duplicate)).toBe(normalizeBackfill(canonical));
+    expect(canonical).toContain(
+      "EXECUTE FUNCTION public.grant_staff_role_for_verified_allowlist();",
+    );
   });
 
   it("no-ops the restored core-schema export after the newer dual-timestamp wrapper", () => {

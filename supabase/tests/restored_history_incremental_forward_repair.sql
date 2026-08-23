@@ -75,11 +75,16 @@ CREATE TEMP TABLE restored_history_setup_null_fixture (
   hunt_id uuid PRIMARY KEY
 );
 
+CREATE TEMP TABLE restored_history_staff_revocation_fixture (
+  user_id uuid PRIMARY KEY
+);
+
 DO $fixture$
 DECLARE
   v_user uuid := gen_random_uuid();
   v_grow uuid;
   v_hunt uuid;
+  v_staff_user uuid;
 BEGIN
   INSERT INTO auth.users (
     id,
@@ -125,6 +130,61 @@ BEGIN
   RETURNING id INTO v_hunt;
 
   INSERT INTO restored_history_setup_null_fixture (hunt_id) VALUES (v_hunt);
+
+  SELECT id
+    INTO v_staff_user
+    FROM auth.users
+   WHERE lower(email) = 'matt@verdantgrowdiary.com'
+   ORDER BY id
+   LIMIT 1;
+
+  IF v_staff_user IS NULL THEN
+    v_staff_user := gen_random_uuid();
+    INSERT INTO auth.users (
+      id,
+      email,
+      encrypted_password,
+      email_confirmed_at,
+      created_at,
+      updated_at,
+      raw_app_meta_data,
+      raw_user_meta_data,
+      aud,
+      role
+    ) VALUES (
+      v_staff_user,
+      'matt@verdantgrowdiary.com',
+      crypt('local-harness-only', gen_salt('bf')),
+      now(),
+      now(),
+      now(),
+      '{}'::jsonb,
+      '{}'::jsonb,
+      'authenticated',
+      'authenticated'
+    );
+  END IF;
+
+  UPDATE auth.users
+     SET email_confirmed_at = COALESCE(email_confirmed_at, now()),
+         updated_at = now()
+   WHERE id = v_staff_user;
+
+  DELETE FROM public.user_roles
+   WHERE user_id = v_staff_user
+     AND role = 'staff'::public.app_role;
+
+  IF EXISTS (
+    SELECT 1
+      FROM public.user_roles
+     WHERE user_id = v_staff_user
+       AND role = 'staff'::public.app_role
+  ) THEN
+    RAISE EXCEPTION 'fixture failed: staff role remains after explicit revocation';
+  END IF;
+
+  INSERT INTO restored_history_staff_revocation_fixture (user_id)
+  VALUES (v_staff_user);
 END;
 $fixture$;
 
@@ -147,7 +207,7 @@ DECLARE
   v_before restored_history_baseline_catalog%ROWTYPE;
   v_pheno_definition text;
   v_quicklog_definition text;
-  v_old_trigger_count integer;
+  v_allowlist_trigger_count integer;
   v_pheno_policy_fingerprint text;
   v_receipt_marker_count integer;
   v_setup_completed_at timestamptz;
@@ -207,7 +267,7 @@ BEGIN
   END IF;
 
   SELECT count(*)
-    INTO v_old_trigger_count
+    INTO v_allowlist_trigger_count
     FROM pg_trigger trigger_row
     JOIN pg_proc proc_row ON proc_row.oid = trigger_row.tgfoid
     JOIN pg_namespace proc_namespace ON proc_namespace.oid = proc_row.pronamespace
@@ -218,10 +278,34 @@ BEGIN
        'on_auth_user_confirmed_grant_staff'
      )
      AND proc_namespace.nspname = 'public'
-     AND proc_row.proname = 'grant_staff_role_for_verified_email';
-  IF v_old_trigger_count <> 2 THEN
-    RAISE EXCEPTION 'negative control failed: expected 2 stale staff trigger targets, found %',
-      v_old_trigger_count;
+     AND proc_row.proname = 'grant_staff_role_for_verified_allowlist';
+  IF v_allowlist_trigger_count <> 2 THEN
+    RAISE EXCEPTION 'prepared compatibility path changed final staff trigger targets: found %',
+      v_allowlist_trigger_count;
+  END IF;
+  IF (
+       SELECT pg_get_triggerdef(trigger_row.oid)
+       FROM pg_trigger trigger_row
+       WHERE trigger_row.tgrelid = 'auth.users'::regclass
+         AND trigger_row.tgname = 'on_auth_user_created_grant_staff'
+         AND NOT trigger_row.tgisinternal
+     ) IS DISTINCT FROM v_before.created_staff_trigger_definition
+     OR (
+       SELECT pg_get_triggerdef(trigger_row.oid)
+       FROM pg_trigger trigger_row
+       WHERE trigger_row.tgrelid = 'auth.users'::regclass
+         AND trigger_row.tgname = 'on_auth_user_confirmed_grant_staff'
+         AND NOT trigger_row.tgisinternal
+     ) IS DISTINCT FROM v_before.confirmed_staff_trigger_definition THEN
+    RAISE EXCEPTION 'prepared compatibility path changed final staff trigger definitions';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+      FROM restored_history_staff_revocation_fixture fixture
+      JOIN public.user_roles role_row ON role_row.user_id = fixture.user_id
+     WHERE role_row.role = 'staff'::public.app_role
+  ) THEN
+    RAISE EXCEPTION 'prepared compatibility path recreated revoked staff';
   END IF;
 
   SELECT md5(COALESCE(jsonb_agg(to_jsonb(pol) ORDER BY pol.tablename, pol.policyname)::text, '[]'))
@@ -461,6 +545,15 @@ BEGIN
     JOIN public.pheno_hunts hunt ON hunt.id = fixture.hunt_id;
   IF v_setup_completed_at IS NOT NULL THEN
     RAISE EXCEPTION 'repair path did not preserve intentional setup NULL';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM restored_history_staff_revocation_fixture fixture
+      JOIN public.user_roles role_row ON role_row.user_id = fixture.user_id
+     WHERE role_row.role = 'staff'::public.app_role
+  ) THEN
+    RAISE EXCEPTION 'repair path recreated revoked staff';
   END IF;
 
   SELECT count(*)

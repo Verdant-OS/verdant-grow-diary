@@ -27,9 +27,13 @@ const SQL_HARNESS = resolve(
   REPO_ROOT,
   "supabase/tests/restored_history_incremental_forward_repair.sql",
 );
-const RAW_BACKFILL_CONTROL = resolve(
+const RAW_SETUP_BACKFILL_CONTROL = resolve(
   REPO_ROOT,
   "supabase/tests/restored_history_raw_setup_backfill_control.sql",
+);
+const RAW_STAFF_BACKFILL_CONTROL = resolve(
+  REPO_ROOT,
+  "supabase/tests/restored_history_raw_staff_backfill_control.sql",
 );
 
 let tempRoot;
@@ -168,8 +172,11 @@ process.once("SIGTERM", () => handleSignal("SIGTERM", 143));
 async function main() {
   for (const binary of ["node", "supabase", "psql"]) requireBinary(binary);
   if (!existsSync(SQL_HARNESS)) throw new Error(`missing SQL harness: ${SQL_HARNESS}`);
-  if (!existsSync(RAW_BACKFILL_CONTROL)) {
-    throw new Error(`missing raw backfill control: ${RAW_BACKFILL_CONTROL}`);
+  if (!existsSync(RAW_SETUP_BACKFILL_CONTROL)) {
+    throw new Error(`missing raw setup backfill control: ${RAW_SETUP_BACKFILL_CONTROL}`);
+  }
+  if (!existsSync(RAW_STAFF_BACKFILL_CONTROL)) {
+    throw new Error(`missing raw staff backfill control: ${RAW_STAFF_BACKFILL_CONTROL}`);
   }
 
   tempRoot = mkdtempSync(join(tmpdir(), "verdant-restored-history-"));
@@ -238,7 +245,10 @@ async function main() {
   // First prove why the raw duplicate backfill is unsafe. This source-tree
   // control is transactionally rolled back and never represents a supported
   // apply path.
-  run("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", RAW_BACKFILL_CONTROL], {
+  run("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", RAW_SETUP_BACKFILL_CONTROL], {
+    env: postgresEnv,
+  });
+  run("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", RAW_STAFF_BACKFILL_CONTROL], {
     env: postgresEnv,
   });
 

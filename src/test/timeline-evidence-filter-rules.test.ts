@@ -8,6 +8,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildTimelineNameLookup,
+  buildTimelinePlantTentLookup,
   deriveTimelineEventTypeOptions,
   deriveTimelinePlantOptions,
   deriveTimelineTentOptions,
@@ -327,6 +328,63 @@ describe("buildTimelineNameLookup", () => {
     ]);
     expect(lookup?.get("p1")).toBe("First");
     expect(buildTimelineNameLookup([])?.size).toBe(0);
+  });
+});
+
+describe("buildTimelinePlantTentLookup", () => {
+  const PLANT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const PLANT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const TENT_A = "11111111-1111-4111-8111-111111111111";
+  const TENT_B = "22222222-2222-4222-8222-222222222222";
+
+  it("returns null for an unavailable source and an empty map for an empty read", () => {
+    expect(buildTimelinePlantTentLookup(null, [])).toBeNull();
+    expect(buildTimelinePlantTentLookup([], undefined)).toBeNull();
+    expect(buildTimelinePlantTentLookup({}, [])).toBeNull();
+    expect(buildTimelinePlantTentLookup([], [])?.size).toBe(0);
+  });
+
+  it("keeps only normalized persisted plant/tent relationships", () => {
+    const lookup = buildTimelinePlantTentLookup(
+      [
+        { id: ` ${PLANT_A.toUpperCase()} `, tent_id: ` ${TENT_A.toUpperCase()} ` },
+        { id: PLANT_B, tent_id: TENT_B },
+        { id: "plant-placeholder", tent_id: TENT_A },
+        { id: PLANT_A, tent_id: null },
+        { id: PLANT_B, tent_id: "tent-placeholder" },
+        null,
+        "junk",
+      ],
+      [{ id: TENT_A }, { id: TENT_B }],
+    );
+
+    expect(lookup).not.toBeNull();
+    expect([...(lookup?.entries() ?? [])]).toEqual([
+      [PLANT_A, TENT_A],
+      [PLANT_B, TENT_B],
+    ]);
+  });
+
+  it("is deterministic: the first valid relationship wins", () => {
+    const lookup = buildTimelinePlantTentLookup(
+      [
+        { id: PLANT_A, tent_id: null },
+        { id: PLANT_A, tent_id: TENT_A },
+        { id: PLANT_A, tent_id: TENT_B },
+      ],
+      [{ id: TENT_A }, { id: TENT_B }],
+    );
+
+    expect(lookup?.get(PLANT_A)).toBe(TENT_A);
+  });
+
+  it("omits a syntactically valid plant tent that is absent from the owner's tent rows", () => {
+    const lookup = buildTimelinePlantTentLookup(
+      [{ id: PLANT_A, tent_id: TENT_B }],
+      [{ id: TENT_A }],
+    );
+
+    expect(lookup?.has(PLANT_A)).toBe(false);
   });
 });
 

@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { buildTimelineNameLookup } from "@/lib/timelineEvidenceFilterRules";
+import {
+  buildTimelineNameLookup,
+  buildTimelinePlantTentLookup,
+} from "@/lib/timelineEvidenceFilterRules";
 
 export interface TimelineNameDirectory {
   /** id → name over the owner's plants, INCLUDING archived/merged rows. Null while unavailable. */
   plantNamesById: ReadonlyMap<string, string> | null;
+  /** plant id → current tent id over the same owner-scoped rows. Null while unavailable. */
+  plantTentIdsById: ReadonlyMap<string, string> | null;
   /** id → name over the owner's tents, INCLUDING archived rows. Null while unavailable. */
   tentNamesById: ReadonlyMap<string, string> | null;
 }
@@ -24,28 +29,45 @@ export interface TimelineNameDirectory {
  * fragment label either way.
  */
 export function useTimelineNameDirectory(userId: string | null): TimelineNameDirectory {
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const [plantNamesById, setPlantNamesById] = useState<ReadonlyMap<string, string> | null>(null);
+  const [plantTentIdsById, setPlantTentIdsById] = useState<ReadonlyMap<string, string> | null>(
+    null,
+  );
   const [tentNamesById, setTentNamesById] = useState<ReadonlyMap<string, string> | null>(null);
 
   useEffect(() => {
     if (!userId) {
+      setLoadedUserId(null);
       setPlantNamesById(null);
+      setPlantTentIdsById(null);
       setTentNamesById(null);
       return;
     }
+    // A direct account transition must not expose the prior owner's directory
+    // for even one render while the replacement read is in flight.
+    setLoadedUserId(null);
     let cancelled = false;
     (async () => {
       try {
         const [plantsResult, tentsResult] = await Promise.all([
-          supabase.from("plants").select("id,name").eq("user_id", userId),
+          supabase.from("plants").select("id,name,tent_id").eq("user_id", userId),
           supabase.from("tents").select("id,name").eq("user_id", userId),
         ]);
         if (cancelled) return;
         setPlantNamesById(plantsResult?.error ? null : buildTimelineNameLookup(plantsResult?.data));
+        setPlantTentIdsById(
+          plantsResult?.error || tentsResult?.error
+            ? null
+            : buildTimelinePlantTentLookup(plantsResult?.data, tentsResult?.data),
+        );
         setTentNamesById(tentsResult?.error ? null : buildTimelineNameLookup(tentsResult?.data));
+        setLoadedUserId(userId);
       } catch {
         if (cancelled) return;
+        setLoadedUserId(null);
         setPlantNamesById(null);
+        setPlantTentIdsById(null);
         setTentNamesById(null);
       }
     })();
@@ -54,5 +76,8 @@ export function useTimelineNameDirectory(userId: string | null): TimelineNameDir
     };
   }, [userId]);
 
-  return { plantNamesById, tentNamesById };
+  if (!userId || loadedUserId !== userId) {
+    return { plantNamesById: null, plantTentIdsById: null, tentNamesById: null };
+  }
+  return { plantNamesById, plantTentIdsById, tentNamesById };
 }

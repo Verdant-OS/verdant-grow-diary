@@ -275,6 +275,7 @@ function ToolCard({
   children,
   buildArgs,
   fieldErrors,
+  hasInvalidFields = false,
   onAuthLost,
   onRunOutcome,
   onApplyArgs,
@@ -291,6 +292,8 @@ function ToolCard({
   children: React.ReactNode;
   buildArgs: () => Record<string, unknown>;
   fieldErrors: FieldError[];
+  /** Blocks execution even before the grower has touched a required field. */
+  hasInvalidFields?: boolean;
   onAuthLost: () => void;
   onRunOutcome?: (outcome: ToolCallOutcome, category: OutcomeCategory) => void;
   onApplyArgs?: (args: Record<string, unknown>) => void;
@@ -299,7 +302,8 @@ function ToolCard({
 
   const tool = useMemo(() => MCP_MANIFEST.tools.find((t) => t.name === toolName)!, [toolName]);
 
-  const invalid = fieldErrors.length > 0;
+  const hasVisibleErrors = fieldErrors.length > 0;
+  const invalid = hasInvalidFields || hasVisibleErrors;
 
   const [showDiff, setShowDiff] = useState(false);
   const [onlyChanged, setOnlyChanged] = useState(true);
@@ -370,7 +374,7 @@ function ToolCard({
 
       <div className="space-y-3">{children}</div>
 
-      {invalid ? (
+      {hasVisibleErrors ? (
         <div
           id={summaryId}
           role="alert"
@@ -420,7 +424,7 @@ function ToolCard({
         <Button
           onClick={run}
           disabled={!connected || state.loading || invalid || !locallyEnabled}
-          aria-describedby={invalid ? summaryId : undefined}
+          aria-describedby={hasVisibleErrors ? summaryId : undefined}
           data-testid={`tool-explorer-run-${toolName}`}
         >
           {state.loading ? (
@@ -1139,6 +1143,7 @@ export default function McpToolExplorer() {
         onRunOutcome={(outcome, category) =>
           persistOnOk("list_recent_diary_entries", outcome, category, { growId, diaryLimit })
         }
+        hasInvalidFields={Boolean(growIdError || diaryLimitError)}
         fieldErrors={[
           ...(growIdTouched && growIdError
             ? [{ id: "list-diary-grow", label: "Grow id", message: growIdError }]
@@ -1227,6 +1232,7 @@ export default function McpToolExplorer() {
         onRunOutcome={(outcome, category) =>
           persistOnOk("get_latest_sensor_snapshot", outcome, category, { tentId })
         }
+        hasInvalidFields={Boolean(tentIdError)}
         fieldErrors={tentIdTouched ? sensorErrors : []}
         onApplyArgs={(args) => {
           const nextTentId = typeof args.tentId === "string" ? args.tentId : "";
@@ -1279,6 +1285,7 @@ export default function McpToolExplorer() {
             limit: walkTargetsLimit,
           })
         }
+        hasInvalidFields={Boolean(walkGrowIdError || walkTargetsLimitError)}
         fieldErrors={[
           ...(walkGrowIdTouched && walkGrowIdError
             ? [{ id: "grow-walk-targets-grow", label: "Grow id", message: walkGrowIdError }]
@@ -1390,6 +1397,7 @@ export default function McpToolExplorer() {
             lookbackHours: walkLookbackHours,
           })
         }
+        hasInvalidFields={Boolean(walkTargetIdError || walkLookbackHoursError)}
         fieldErrors={[
           ...(walkTargetIdTouched && walkTargetIdError
             ? [{ id: "grow-walk-context-target", label: "Target id", message: walkTargetIdError }]

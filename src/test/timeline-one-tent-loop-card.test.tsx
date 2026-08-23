@@ -144,11 +144,17 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
     expect(cardSource).not.toContain("plantId: plantFilter || null");
   });
 
-  it("Timeline owner directory selects plant tent relationships in the existing read", async () => {
+  it("Timeline directory proves plant tent relationships against the active grow", async () => {
     const fs = await import("node:fs/promises");
-    const src = await fs.readFile("src/hooks/useTimelineNameDirectory.ts", "utf8");
+    const hookSrc = await fs.readFile("src/hooks/useTimelineNameDirectory.ts", "utf8");
+    const pageSrc = await fs.readFile("src/pages/Timeline.tsx", "utf8");
 
-    expect(src).toContain('.select("id,name,tent_id").eq("user_id", userId)');
-    expect(src).toContain("buildTimelinePlantTentLookup(plantsResult?.data, tentsResult?.data)");
+    expect(hookSrc).toContain('.select("id,name,tent_id,grow_id").eq("user_id", userId)');
+    expect(hookSrc).toContain('.select("id,name,grow_id").eq("user_id", userId)');
+    expect(hookSrc).toContain(
+      "buildTimelinePlantTentLookup(plantsResult?.data, tentsResult?.data, growId)",
+    );
+    expect(pageSrc).toContain("grows.some((grow) => grow.id === activeGrowId)");
+    expect(pageSrc).toContain("useTimelineNameDirectory(\n    user,\n    directoryGrowId,");
   });
 });

@@ -1020,8 +1020,16 @@ export default function Timeline() {
   // (includes is_archived rows) keeps filter labels on real names.
   // Gated on a resolved grow scope so a rejected/invalid scope issues
   // no reads at all, matching the page's fail-closed read policy.
+  const directoryGrowId =
+    !growsLoading &&
+    !growsError &&
+    activeGrowId &&
+    grows.some((grow) => grow.id === activeGrowId)
+      ? activeGrowId
+      : null;
   const { plantNamesById, plantTentIdsById, tentNamesById } = useTimelineNameDirectory(
-    user && activeGrowId ? user : null,
+    user,
+    directoryGrowId,
   );
   const plantOptions = useMemo(
     () => deriveTimelinePlantOptions(entries, plantNamesById),

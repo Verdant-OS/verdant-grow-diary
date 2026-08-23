@@ -334,28 +334,41 @@ describe("buildTimelineNameLookup", () => {
 describe("buildTimelinePlantTentLookup", () => {
   const PLANT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   const PLANT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const PLANT_C = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
   const TENT_A = "11111111-1111-4111-8111-111111111111";
   const TENT_B = "22222222-2222-4222-8222-222222222222";
+  const TENT_C = "55555555-5555-4555-8555-555555555555";
+  const GROW_A = "33333333-3333-4333-8333-333333333333";
+  const GROW_B = "44444444-4444-4444-8444-444444444444";
 
   it("returns null for an unavailable source and an empty map for an empty read", () => {
-    expect(buildTimelinePlantTentLookup(null, [])).toBeNull();
-    expect(buildTimelinePlantTentLookup([], undefined)).toBeNull();
-    expect(buildTimelinePlantTentLookup({}, [])).toBeNull();
-    expect(buildTimelinePlantTentLookup([], [])?.size).toBe(0);
+    expect(buildTimelinePlantTentLookup(null, [], GROW_A)).toBeNull();
+    expect(buildTimelinePlantTentLookup([], undefined, GROW_A)).toBeNull();
+    expect(buildTimelinePlantTentLookup({}, [], GROW_A)).toBeNull();
+    expect(buildTimelinePlantTentLookup([], [], "grow-placeholder")).toBeNull();
+    expect(buildTimelinePlantTentLookup([], [], GROW_A)?.size).toBe(0);
   });
 
-  it("keeps only normalized persisted plant/tent relationships", () => {
+  it("keeps only normalized relationships in the active grow", () => {
     const lookup = buildTimelinePlantTentLookup(
       [
-        { id: ` ${PLANT_A.toUpperCase()} `, tent_id: ` ${TENT_A.toUpperCase()} ` },
-        { id: PLANT_B, tent_id: TENT_B },
-        { id: "plant-placeholder", tent_id: TENT_A },
-        { id: PLANT_A, tent_id: null },
-        { id: PLANT_B, tent_id: "tent-placeholder" },
+        {
+          id: ` ${PLANT_A.toUpperCase()} `,
+          tent_id: ` ${TENT_A.toUpperCase()} `,
+          grow_id: ` ${GROW_A.toUpperCase()} `,
+        },
+        { id: PLANT_B, tent_id: TENT_B, grow_id: null },
+        { id: "plant-placeholder", tent_id: TENT_A, grow_id: GROW_A },
+        { id: PLANT_A, tent_id: null, grow_id: GROW_A },
+        { id: PLANT_B, tent_id: "tent-placeholder", grow_id: GROW_A },
         null,
         "junk",
       ],
-      [{ id: TENT_A }, { id: TENT_B }],
+      [
+        { id: TENT_A, grow_id: GROW_A },
+        { id: TENT_B, grow_id: GROW_A },
+      ],
+      GROW_A,
     );
 
     expect(lookup).not.toBeNull();
@@ -369,10 +382,14 @@ describe("buildTimelinePlantTentLookup", () => {
     const lookup = buildTimelinePlantTentLookup(
       [
         { id: PLANT_A, tent_id: null },
-        { id: PLANT_A, tent_id: TENT_A },
-        { id: PLANT_A, tent_id: TENT_B },
+        { id: PLANT_A, tent_id: TENT_A, grow_id: GROW_A },
+        { id: PLANT_A, tent_id: TENT_B, grow_id: GROW_A },
       ],
-      [{ id: TENT_A }, { id: TENT_B }],
+      [
+        { id: TENT_A, grow_id: GROW_A },
+        { id: TENT_B, grow_id: GROW_A },
+      ],
+      GROW_A,
     );
 
     expect(lookup?.get(PLANT_A)).toBe(TENT_A);
@@ -380,11 +397,53 @@ describe("buildTimelinePlantTentLookup", () => {
 
   it("omits a syntactically valid plant tent that is absent from the owner's tent rows", () => {
     const lookup = buildTimelinePlantTentLookup(
-      [{ id: PLANT_A, tent_id: TENT_B }],
-      [{ id: TENT_A }],
+      [{ id: PLANT_A, tent_id: TENT_B, grow_id: GROW_A }],
+      [{ id: TENT_A, grow_id: GROW_A }],
+      GROW_A,
     );
 
     expect(lookup?.has(PLANT_A)).toBe(false);
+  });
+
+  it("fails closed for a direct plant grow conflict or a tent in another grow", () => {
+    const lookup = buildTimelinePlantTentLookup(
+      [
+        { id: PLANT_A, tent_id: TENT_A, grow_id: GROW_B },
+        { id: PLANT_B, tent_id: TENT_B, grow_id: null },
+        { id: PLANT_C, tent_id: TENT_B, grow_id: GROW_A },
+      ],
+      [
+        { id: TENT_A, grow_id: GROW_A },
+        { id: TENT_B, grow_id: GROW_B },
+      ],
+      GROW_A,
+    );
+
+    expect(lookup?.has(PLANT_A)).toBe(false);
+    expect(lookup?.has(PLANT_B)).toBe(false);
+    expect(lookup?.has(PLANT_C)).toBe(false);
+  });
+
+  it("does not roll malformed direct grow attribution through an otherwise matching tent", () => {
+    const lookup = buildTimelinePlantTentLookup(
+      [{ id: PLANT_A, tent_id: TENT_A, grow_id: "grow-placeholder" }],
+      [{ id: TENT_A, grow_id: GROW_A }],
+      GROW_A,
+    );
+
+    expect(lookup?.has(PLANT_A)).toBe(false);
+  });
+
+  it("omits relationships when tent grow lineage is null or malformed", () => {
+    for (const tentGrowId of [null, "grow-placeholder"]) {
+      const lookup = buildTimelinePlantTentLookup(
+        [{ id: PLANT_A, tent_id: TENT_C, grow_id: GROW_A }],
+        [{ id: TENT_C, grow_id: tentGrowId }],
+        GROW_A,
+      );
+
+      expect(lookup?.has(PLANT_A)).toBe(false);
+    }
   });
 });
 

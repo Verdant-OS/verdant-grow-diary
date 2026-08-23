@@ -702,18 +702,40 @@ incidents: `service_role` already holds broad direct table access on this
 project by design (`supabase/seed.sql`'s own documented legacy-grant
 posture), so function-level `service_role` EXECUTE is mostly consistent with
 the platform's existing accepted trust model, not a new class of exposure.
-**Corrected 2026-08-23 (Codex review, this PR) — "two functions" undercounted
-the precedent.** The two hardening efforts so far are the Action Queue guard
-(1 function) and the signup migration — but the signup migration,
-`20260821064300_signup_acquisition_service_role_hardening.sql:71-75`, revokes
-`service_role` from the table **and all four** signup functions
-(`handle_new_user`, `record_signup_acquisition_first_touch`,
-`signup_acquisition_operator_snapshot`, `signup_to_paid_operator_snapshot`),
-not one. So the actual precedent is **two hardening slices covering five
-functions** (plus one table), not two functions — a materially stronger
-case-by-case track record than the original count implied. Judged sensitive
-enough to warrant the extra step each time — that pattern, not a blanket
-revoke across all 66, is what this file's precedent supports.
+**Corrected 2026-08-23, twice — "two functions," then "two slices," both
+undercounted, and this file stops trying to hand-enumerate a moving count.**
+The first correction expanded the Action Queue guard (1 function) and the
+signup migration
+(`20260821064300_signup_acquisition_service_role_hardening.sql:71-75`, which
+revokes `service_role` from a table and **four** functions, not one) to "two
+slices covering five functions." A second Codex review round on this same PR
+then found three more migrations doing the identical thing —
+`20260819190852_action_queue_transition_forward_repair.sql:767`,
+`20260818010000_quicklog_manual_delegate_forward_repair.sql:819`, and
+`20260728090736_ai_credit_pack_portability.sql:398,405` — each verified
+directly.
+
+**Rather than patch the number a third time, a full-repository check:**
+`grep -rl "FROM service_role" supabase/migrations/` returns **11** distinct
+migration files with an explicit, literal `REVOKE ... FROM service_role` on
+a function, spanning 2026-07-15 through 2026-08-21 — Paddle, AI credits
+(three separate migrations), AI Doctor review evidence, two signup-window
+files, quicklog, and both Action Queue migrations. **That count is itself a
+floor, not a ceiling**: the grep matches only the literal substring `FROM
+service_role`, so a multi-role form like `FROM PUBLIC, anon, authenticated,
+service_role` on one line would not match, and this file's own
+`aclexplode`/default-ACL findings above show effective privilege and
+migration text are already two different questions. No further attempt to
+produce an exact total was made.
+
+**So the framing this paragraph opened with was backwards.** Individual
+function-level `service_role` hardening is not two exceptional cases judged
+sensitive enough to warrant a rare extra step — it is a **routine, recurring
+practice** already exercised at least 11 times across the migration history.
+That is a stronger, not weaker, precedent for the case-by-case
+recommendation below: it is normal practice in this codebase already, not a
+departure from it. It still does not, by itself, license a blanket revoke
+across all 66 — that remains a separate decision this note does not make.
 
 **"By default" is this section's own headline word, and it overclaims — see
 point 3 of the 2026-08-23 correction above.** `has_function_privilege` proves

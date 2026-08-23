@@ -702,55 +702,53 @@ incidents: `service_role` already holds broad direct table access on this
 project by design (`supabase/seed.sql`'s own documented legacy-grant
 posture), so function-level `service_role` EXECUTE is mostly consistent with
 the platform's existing accepted trust model, not a new class of exposure.
-**Corrected 2026-08-23, three times now on this one claim — read the count
-below as a citation list, not a number to trust at face value.** In order:
-"two functions" (Action Queue guard, 1; signup, actually a table + **four**
-functions, not one — `20260821064300_signup_acquisition_service_role_hardening.sql:71-75`)
-→ a Codex round found three more migrations doing the same thing → a
-`grep -rl "FROM service_role" supabase/migrations/` run in response returned
-**11** files, presented as "function-level hardening... at least 11 times" →
-a further Codex round checked each of those 11 and found the grep pattern
-does not distinguish `ON TABLE` from `ON FUNCTION`: **6 of the 11 are
-table-only revokes**, verified by re-reading each file directly, listed
-below. Only **5 of the 11 revoke a function**:
+**Corrected 2026-08-23, four times now on this one claim. The fourth
+correction is not another number — it is the conclusion that counting by
+text search does not converge, so this file stops trying.** In order: "two
+functions" → "two slices, five functions" (the signup migration alone
+revokes a table and four functions, not one —
+`20260821064300_signup_acquisition_service_role_hardening.sql:71-75`) → a
+Codex round found three more migrations doing the same thing → an
+exhaustive-feeling `grep -rl "FROM service_role"` returned 11 files, six of
+which turned out to be table revokes, not function revokes, once each was
+read directly, leaving 5 verified function-hardening migrations (Action
+Queue guard, Action Queue transition, signup's four, quicklog, and AI
+credit pack's conditional legacy-signature cleanup) → a further round found
+a sixth, `20260728103000_schema_audit_trust_hardening.sql:351-354` —
+`REVOKE ALL ON FUNCTION public.admin_schema_audit(...) FROM PUBLIC, anon,
+authenticated, service_role;` — a **multi-role REVOKE on one line**, the
+exact blind spot the previous correction had already named as unchecked.
+Verified directly, and it is real.
 
-- `20260819190000_action_queue_guard_decision_fields_forward_repair.sql` —
-  `action_queue_guard_decision_fields`
-- `20260819190852_action_queue_transition_forward_repair.sql` —
-  `action_queue_transition`
-- `20260821064300_signup_acquisition_service_role_hardening.sql` — a table
-  plus `handle_new_user`, `record_signup_acquisition_first_touch`,
-  `signup_acquisition_operator_snapshot`, `signup_to_paid_operator_snapshot`
-- `20260818010000_quicklog_manual_delegate_forward_repair.sql` —
-  `quicklog_save_manual_pre_logged_at`
-- `20260728090736_ai_credit_pack_portability.sql` — legacy-signature
-  `ai_credit_spend`/`ai_credit_refund` overloads being retired, **conditionally**
-  (`IF to_regprocedure(...) IS NOT NULL`), alongside an explicit `GRANT ...
-TO service_role` on the current-signature `ai_credit_spend` in the same
-  file — version-migration cleanup, not the same shape as the other four.
+**Four passes, four different SQL shapes each missed by the pass before it**
+(a bare single-role REVOKE, a table REVOKE misread as a function REVOKE, a
+multi-role REVOKE, and — per the previous correction's own still-unchecked
+caveat — a schema-wide `ON ALL FUNCTIONS`/`ON ALL ROUTINES IN SCHEMA` form
+that remains unchecked now too. This repo's own migrations elsewhere
+document that PostgreSQL 11+ accepts `ROUTINE` as an alias for `FUNCTION`
+in these grants, which a search for the literal word `FUNCTION` alone would
+also miss). That pattern is itself the finding: a grep-based census of
+`service_role` REVOKEs across free-form SQL migration text is not a method
+that terminates at a trustworthy number, no matter how many more rounds it
+runs for.
 
-The other 6 —
-`20260715001000_paddle_paid_launch_review_hardening.sql`,
-`20260719043000_ai_credit_result_cache.sql`,
-`20260719180000_ai_doctor_review_evidence_receipts.sql`,
-`20260721190434_d4c06065-8426-4d69-aac6-f1135e381aee.sql`,
-`20260721190735_ad890fa2-a669-48bb-92fc-89376b84370f.sql`, and
-`20260727050000_ai_credit_service_contract_forward_reassert.sql` — revoke
-`service_role` on a **table**, not a function. That is a different and
-better-explained pattern: `service_role` holds broad direct table access on
-this project **by design** (the seed.sql posture this paragraph already
-cites), so a table-specific revoke is a straightforward per-table
-tightening, not evidence about function-level judgment calls.
-
-**So, for the claim this paragraph is actually about — function-level
-`service_role` hardening — the verified count is 5 migrations, not 2, not 11.** Whether even 5 is complete is not established: the classification
-above (grep, then manually re-reading each hit) has the same blind spots as
-before — a schema-wide `ON ALL FUNCTIONS IN SCHEMA` revoke would not be
-caught by either pass — so this is offered as the best verified count
-available, not a claim of exhaustiveness. It is still more than the original
-"two," and still supports "case-by-case, judged individually," not a
-blanket revoke across all 66 — that remains a separate decision this note
-does not make.
+**So this file drops the enumerated count and states only what is actually
+supportable: individual function-level `service_role` hardening is
+demonstrated, by direct citation, in at least six migrations spanning
+2026-07-28 through 2026-08-21** (`schema_audit_trust_hardening`,
+`ai_credit_pack_portability`, `quicklog_manual_delegate_forward_repair`,
+both Action Queue forward repairs, and `signup_acquisition_service_role_hardening`),
+**using at least three distinct REVOKE forms** (single-role, multi-role, and
+conditional/legacy-signature). Whether the true total is 6, 10, or 20 is
+`NOT_MEASURED` and this file will not guess at it again by grep; a
+trustworthy census would need to query the live catalog (`pg_proc` /
+`aclexplode`) or parse SQL properly, not pattern-match migration text. What
+six independently-verified instances across three SQL shapes do establish:
+this is not "two exceptional cases" and it is not a settled small number
+either — it is routine enough, and varied enough in how it is written, that
+"case-by-case, judged individually" is well supported without needing an
+exact count. It still does not, by itself, license a blanket revoke across
+all 66 — that remains a separate decision this note does not make.
 
 **"By default" is this section's own headline word, and it overclaims — see
 point 3 of the 2026-08-23 correction above.** `has_function_privilege` proves

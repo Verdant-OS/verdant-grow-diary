@@ -1,24 +1,26 @@
 /**
- * `/doctor` context consumer — validation rules (Tranche B+ slice B4a, D-B6).
+ * `/doctor` context consumer — validation rules (Tranche B+ slice B4a, D-B6,
+ * Doctor-says-so plant carry).
  *
- * The Sensors loop card provably holds only `{ growId, tentId }`, so the
- * back-half carry into `/doctor` is `?growId=&tentId=` and nothing more — a
- * plant is not derivable from that producer. This module is the CONSUMING
- * half of that contract.
+ * Grow/tent arrive as `?growId=&tentId=`. A plant may also arrive as a
+ * UUID-only `?plantId=` intent re-emitted by Sensors (never resolved there).
+ * This module is the CONSUMING half of that contract.
  *
  * Two properties matter more than convenience:
  *
  *  1. **Fail closed.** Threading a raw id through a URL grants no trust. A
  *     grow or tent that does not resolve against rows the grower actually
  *     owns is discarded and reported as invalid — never rendered, never used
- *     to scope a query. Normalization happens in the producing rules;
- *     validation happens here, mirroring `useScopedGrow`'s pattern.
+ *     to scope a query. A carried plant that does not resolve against the
+ *     grower's loaded options + carried tent is flagged unavailable so the
+ *     page can explain — never silently dropped. Normalization happens in
+ *     the producing rules; validation happens here.
  *
- *  2. **Annotate, never remove.** Carried scope may reorder and label the
- *     plant options, but every plant the grower could choose before is still
- *     choosable after. "Verdant will not guess which plant you mean"
- *     (`AiDoctorStart.tsx`) is doctrine; silently shortening the list is a
- *     softer form of guessing.
+ *  2. **Annotate, never remove / never auto-select.** Carried scope may
+ *     reorder and label the plant options, but every plant the grower could
+ *     choose before is still choosable after. "Verdant will not guess which
+ *     plant you mean" (`AiDoctorStart.tsx`) is doctrine; silently shortening
+ *     the list or applying a carried plant as a selection is forbidden.
  *
  * Pure: no storage, no clock, no I/O, no network. Never throws.
  */
@@ -142,6 +144,14 @@ export interface PartitionDoctorEntryOptionsInput {
   options?: readonly AiDoctorEntryOption[] | null;
   plants?: readonly AiDoctorEntryPlant[] | null;
   tentId?: string | null;
+  /**
+   * Plant carried from Timeline through Sensors (D-B6 handoff). Untrusted:
+   * it is honoured only when it names a plant the grower actually owns AND
+   * that plant sits in the carried tent. It reorders and labels; it NEVER
+   * selects. "Verdant will not guess which plant you mean" is doctrine, and
+   * a carried intent is still the grower's to confirm.
+   */
+  carriedPlantId?: string | null;
 }
 
 export interface PartitionedDoctorEntryOptions {
@@ -149,7 +159,27 @@ export interface PartitionedDoctorEntryOptions {
   inScope: readonly AiDoctorEntryOption[];
   /** Every other option, in builder order. Never a dropped choice. */
   others: readonly AiDoctorEntryOption[];
+  /**
+   * The validated carried plant's option id, or null. Presenters may label
+   * and order by it. It is NOT a selection and must never be applied as one.
+   */
+  carriedPlantOptionId: string | null;
+  /**
+   * True when a plant UUID was carried but did not resolve to an acceptable
+   * in-tent option (missing, wrong tent, archived/absent from active options,
+   * or outside the loaded set). Presenters MUST tell the grower — never
+   * silently drop the cue. Still never auto-selects.
+   */
+  hasUnavailableCarriedPlant: boolean;
 }
+
+/**
+ * Grower-facing copy when a carried plant intent cannot be offered.
+ * Pinned here so tests assert the exact string; never invent a plant name
+ * from a raw UUID.
+ */
+export const DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY =
+  "That link carried a plant Verdant couldn't offer for review here — it may be missing, in another tent, archived, or outside the plants loaded on this page. No plant was selected.";
 
 /**
  * Split the option list by carried tent scope, losslessly.
@@ -162,8 +192,17 @@ export function partitionDoctorEntryOptionsByTent(
 ): PartitionedDoctorEntryOptions {
   const options = Array.isArray(input?.options) ? input.options : [];
   const tentId = trimmed(input?.tentId);
+  const requestedPlantId = trimmed(input?.carriedPlantId);
+
   if (!tentId || options.length === 0) {
-    return { inScope: [], others: options };
+    // A carried plant with no usable tent/options cannot be offered — say so
+    // when an intent was present. Absent intent stays quiet.
+    return {
+      inScope: [],
+      others: options,
+      carriedPlantOptionId: null,
+      hasUnavailableCarriedPlant: !!requestedPlantId,
+    };
   }
 
   const plants = Array.isArray(input?.plants) ? input.plants : [];
@@ -181,5 +220,30 @@ export function partitionDoctorEntryOptionsByTent(
     if (option && plantTentById.get(option.id) === tentId) inScope.push(option);
     else others.push(option);
   }
-  return { inScope, others };
+
+  // Honour the carried plant only if it is BOTH one of the grower's own
+  // options AND in the carried tent. A plant from another tent, another
+  // account, or no longer present fails closed to null — and flags
+  // unavailable so the page can explain instead of silently dropping it.
+  const carriedPlantOptionId =
+    requestedPlantId && inScope.some((option) => option.id === requestedPlantId)
+      ? requestedPlantId
+      : null;
+  const hasUnavailableCarriedPlant = !!requestedPlantId && !carriedPlantOptionId;
+
+  // Order the carried plant first WITHIN its tent group. Nothing is removed:
+  // inScope ∪ others still equals the input.
+  const orderedInScope = carriedPlantOptionId
+    ? [
+        ...inScope.filter((option) => option.id === carriedPlantOptionId),
+        ...inScope.filter((option) => option.id !== carriedPlantOptionId),
+      ]
+    : inScope;
+
+  return {
+    inScope: orderedInScope,
+    others,
+    carriedPlantOptionId,
+    hasUnavailableCarriedPlant,
+  };
 }

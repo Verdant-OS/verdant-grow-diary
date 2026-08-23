@@ -152,10 +152,12 @@ describe("D5 — every plant-scoped save surface updates the memory", () => {
     expect(PLANT_QUICK_LOG).toContain(
       'import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore"',
     );
-    // After the save is confirmed, never before it.
-    expect(FLAT_PLANT_QUICK_LOG).toMatch(
-      /toast\.success\("Log saved to timeline\."\);[\s\S]{0,600}rememberRecentQuickLogTarget\(/,
-    );
+    // After the RPC is confirmed, never before it. Photo attachment may still
+    // be incomplete, but the parent log is durable and should become current.
+    const refusedSave = FLAT_PLANT_QUICK_LOG.indexOf("if (!result.ok)");
+    const rememberedSave = FLAT_PLANT_QUICK_LOG.indexOf("rememberRecentQuickLogTarget(");
+    expect(refusedSave).toBeGreaterThanOrEqual(0);
+    expect(rememberedSave).toBeGreaterThan(refusedSave);
     // Guarded on a real grow, and scoped to the signed-in account.
     expect(FLAT_PLANT_QUICK_LOG).toMatch(
       /if \(growId\) \{ rememberRecentQuickLogTarget\( \{ plantId, growId, tentId: tentId \?\? null,[\s\S]{0,120}user\?\.id \?\? null,/,

@@ -11,8 +11,9 @@
  *
  * Safety contract is enforced by src/test/plant-quick-log.test.ts — persist
  * goes through useQuickLogV2Save → quicklog_save_manual. Photo bytes still
- * upload to diary-photos; the companion photo_url column may be patched
- * after a successful RPC. Manual sensor values stay under
+ * upload to diary-photos; the successful RPC persists the companion
+ * details.photo_url reference, while the top-level photo_url normalization is
+ * best-effort. Manual sensor values stay under
  * details.manual_sensor_snapshot with source "manual".
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -138,6 +139,7 @@ export default function PlantQuickLog({
   const tempUnit = temperatureInputUnitFromPreference(useTemperatureUnitPreference());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoAttachmentUnconfirmed, setPhotoAttachmentUnconfirmed] = useState(false);
 
   // Missed-log recovery / follow-up prompts open this sheet with the intent
   // to record a status. Land the tired grower on the Better/Same/Worse
@@ -191,21 +193,23 @@ export default function PlantQuickLog({
   const hasPlantResponseCheck = hasResponseCheck(note);
   const timelineNote = buildTimelineNote(note, hasPhoto, hasManualReadings);
   const hasAnyContent = timelineNote.trim().length > 0;
-  const canSave = hasAnyContent && !busy && !!growId;
+  const canSave = hasAnyContent && !busy && !photoAttachmentUnconfirmed && !!growId;
 
   const saveHelper = !growId
     ? "Missing grow context. This plant needs a grow before saving."
-    : busy
-      ? "Saving this log to the timeline…"
-      : !hasAnyContent
-        ? "Tap what changed, add a photo, or add a manual reading."
-        : hasPlantResponseCheck
-          ? "Ready to save this plant response follow-up."
-          : hasPhoto
-            ? "Ready to save this photo and log to the timeline."
-            : hasManualReadings
-              ? "Ready to save these manual readings to the timeline."
-              : "Ready to save what changed to the timeline.";
+    : photoAttachmentUnconfirmed
+      ? "This log was saved, but its photo attachment needs a page refresh before another log."
+      : busy
+        ? "Saving this log to the timeline…"
+        : !hasAnyContent
+          ? "Tap what changed, add a photo, or add a manual reading."
+          : hasPlantResponseCheck
+            ? "Ready to save this plant response follow-up."
+            : hasPhoto
+              ? "Ready to save this photo and log to the timeline."
+              : hasManualReadings
+                ? "Ready to save these manual readings to the timeline."
+                : "Ready to save what changed to the timeline.";
 
   function deltaFor(metric: ManualSensorMetric, raw: string): ChronologyDelta | null {
     const current = parseOptionalNumber(raw);
@@ -267,7 +271,7 @@ export default function PlantQuickLog({
   }
 
   async function handleSave() {
-    if (busy) return;
+    if (busy || photoAttachmentUnconfirmed) return;
     blurActiveElement();
     setError(null);
 
@@ -362,17 +366,29 @@ export default function PlantQuickLog({
         return;
       }
 
+      const photoAttachmentFailed = !!uploadedPath && !result.growEventId;
       if (uploadedPath && result.growEventId) {
-        const { error: photoErr } = await supabase
-          .from("diary_entries")
-          .update({ photo_url: uploadedPath })
-          .filter("details->>linked_grow_event_id", "eq", result.growEventId);
-        if (photoErr) {
-          console.error("PlantQuickLog companion photo_url patch failed", photoErr);
+        // quicklog_save_manual has already durably mirrored details.photo_url
+        // at this point. This only normalizes the legacy top-level column; a
+        // failed or empty patch must not turn that confirmed photo save into a
+        // retry lock because Timeline safely falls back to details.photo_url.
+        try {
+          const { data: patchedEntries, error: photoErr } = await supabase
+            .from("diary_entries")
+            .update({ photo_url: uploadedPath })
+            .filter("details->>linked_grow_event_id", "eq", result.growEventId)
+            .select("id");
+          if (photoErr || !Array.isArray(patchedEntries) || patchedEntries.length !== 1) {
+            console.warn("PlantQuickLog companion photo_url normalization did not complete");
+          }
+        } catch (photoErr) {
+          console.warn(
+            "PlantQuickLog companion photo_url normalization did not complete",
+            photoErr,
+          );
         }
       }
 
-      toast.success("Log saved to timeline.");
       // D5: this is a confirmed plant-scoped save, so it is the most recent
       // target. Without this the remembered record goes stale here and an
       // unscoped Quick Log would offer an OLDER plant — a suggestion that is
@@ -400,6 +416,14 @@ export default function PlantQuickLog({
           detail: { plantId, createdAt: new Date().toISOString() },
         }),
       );
+      if (photoAttachmentFailed) {
+        setPhotoAttachmentUnconfirmed(true);
+        setError(
+          "Your log was saved, but the photo could not be attached. Refresh before creating another log so you do not duplicate it.",
+        );
+        return;
+      }
+      toast.success("Log saved to timeline.");
       resetForm();
       onOpenChange(false);
       onSaved?.();

@@ -9,6 +9,8 @@
  */
 
 import { buildSensorsTentRouteHref } from "@/lib/sensorRouteTentIntentRules";
+import { withSensorsPlantIntent } from "@/lib/sensorRoutePlantIntentRules";
+import { normalizePersistedPlantId } from "@/lib/sensorRoutePlantIntentRules";
 import {
   buildPlantQuickLogPrefill,
   type PlantQuickLogPrefill,
@@ -148,6 +150,9 @@ export function resolveOneTentLoopNextStep(
     typeof growId === "string" && growId.trim().length > 0 ? growId.trim() : null;
   const normalizedTentId =
     typeof tentId === "string" && tentId.trim().length > 0 ? tentId.trim() : null;
+  // UUID-only. A malformed plant degrades to "no plant carried" rather than
+  // travelling onward as a filter nobody validated (D-B6 handoff).
+  const normalizedPlantId = normalizePersistedPlantId(plantId);
 
   switch (current) {
     case "grow":
@@ -184,13 +189,17 @@ export function resolveOneTentLoopNextStep(
       // UUID-only intent. Sensors still validates it against authenticated
       // tent rows before selecting it, so this never grants access or turns
       // an arbitrary query value into a sensor query.
-      return enable(base, buildSensorsTentRouteHref(tentId));
+      // Carry the plant as a second UUID-only intent so it can survive
+      // Timeline -> Sensors -> Doctor. Sensors does not resolve it; the
+      // consuming Doctor page revalidates it against authenticated rows.
+      return enable(base, withSensorsPlantIntent(buildSensorsTentRouteHref(tentId), plantId));
     case "sensor-snapshot":
       if (normalizedGrowId && normalizedTentId) {
-        return enable(
-          base,
-          `/doctor?growId=${encodeURIComponent(normalizedGrowId)}&tentId=${encodeURIComponent(normalizedTentId)}`,
-        );
+        const scopedHref = `/doctor?growId=${encodeURIComponent(normalizedGrowId)}&tentId=${encodeURIComponent(normalizedTentId)}`;
+        // A plant rides along ONLY as a validated UUID and ONLY inside a
+        // complete grow/tent scope. AiDoctorStart orders and labels it; it
+        // never auto-selects — "Verdant will not guess which plant you mean".
+        return enable(base, withSensorsPlantIntent(scopedHref, normalizedPlantId));
       }
       return enable(base, "/doctor");
     case "ai-doctor":

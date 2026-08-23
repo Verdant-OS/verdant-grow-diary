@@ -156,9 +156,40 @@ describe("oneTentLoopNavigationRules", () => {
     ).toBe("/sensors?tentId=00000000-0000-4000-8000-00000000000a");
     // A malformed local filter must not become an untrusted route query.
     expect(resolveOneTentLoopNextStep("timeline", { tentId: "tent-a" }).href).toBe("/sensors");
+
+    // D-B6 handoff: Timeline hands its plant to Sensors so it can survive
+    // Timeline -> Sensors -> Doctor. UUID-only, and the same malformed-value
+    // rule applies to the plant as to the tent.
+    const TENT = "00000000-0000-4000-8000-00000000000a";
+    const PLANT = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+    expect(resolveOneTentLoopNextStep("timeline", { tentId: TENT, plantId: PLANT }).href).toBe(
+      `/sensors?tentId=${TENT}&plantId=${PLANT}`,
+    );
+    // A plant with no tent still carries — Sensors resolves its own tent, and
+    // dropping the plant here would silently defeat the handoff.
+    expect(resolveOneTentLoopNextStep("timeline", { plantId: PLANT }).href).toBe(
+      `/sensors?plantId=${PLANT}`,
+    );
+    // Malformed plant never becomes a route query.
+    for (const bad of ["plant-a", "", "   ", null, undefined]) {
+      expect(resolveOneTentLoopNextStep("timeline", { tentId: TENT, plantId: bad }).href).toBe(
+        `/sensors?tentId=${TENT}`,
+      );
+    }
   });
 
   it("routes sensor-snapshot → ai doctor with only a complete normalized grow/tent scope", () => {
+    // RENEGOTIATED for the D-B6 plant handoff, not loosened. Before this
+    // slice the producer could hold no plant at all, so the pin asserted a
+    // plant NEVER carries. Timeline can now hand one to Sensors, so the rule
+    // is narrower and stated exactly: a plant carries if and only if it is a
+    // real UUID AND the grow/tent scope is complete.
+    //
+    // The malformed case below is why the old assertion stayed green through
+    // this change on its own — "plant-must-not-carry" is not a UUID, so it
+    // never carried and still does not. Keeping it and adding the positive
+    // case is what makes the test describe the new contract rather than
+    // accidentally agreeing with it.
     expect(
       resolveOneTentLoopNextStep("sensor-snapshot", {
         growId: " grow / one ",
@@ -166,6 +197,29 @@ describe("oneTentLoopNavigationRules", () => {
         plantId: "plant-must-not-carry",
       }).href,
     ).toBe("/doctor?growId=grow%20%2F%20one&tentId=tent%20%3F%20one");
+
+    // A real UUID inside a complete scope now carries.
+    const PLANT = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+    const carried = resolveOneTentLoopNextStep("sensor-snapshot", {
+      growId: "g1",
+      tentId: "t1",
+      plantId: PLANT,
+    }).href;
+    expect(carried).toBe(`/doctor?growId=g1&tentId=t1&plantId=${PLANT}`);
+
+    // A plant NEVER carries without a complete grow/tent scope — it must not
+    // smuggle a target past the fail-closed scope gate.
+    for (const partial of [
+      { plantId: PLANT },
+      { growId: "g1", plantId: PLANT },
+      { tentId: "t1", plantId: PLANT },
+      { growId: "   ", tentId: "t1", plantId: PLANT },
+      { growId: "g1", tentId: "   ", plantId: PLANT },
+    ]) {
+      const href = resolveOneTentLoopNextStep("sensor-snapshot", partial).href;
+      expect(href).toBe("/doctor");
+      expect(href).not.toContain("plantId");
+    }
 
     for (const ids of [
       {},

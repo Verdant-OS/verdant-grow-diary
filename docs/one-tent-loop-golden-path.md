@@ -139,7 +139,9 @@ device control.
 ## Browser-proof status (authenticated UI walk)
 
 - Contract suite: **PASS** (`src/test/one-tent-loop-golden-path.test.ts`, `src/test/one-tent-loop-safety-regression.test.ts`)
-- Authenticated UI proof: **READY TO RUN when managed session is injected**, otherwise **BLOCKED_BY_MANAGED_SESSION_INJECTOR**
+- Authenticated UI proof: source contract **READY**; an Actions execution remains
+  blocked until the immutable publish sequence below is complete and a managed
+  session is injected, otherwise **BLOCKED_BY_MANAGED_SESSION_INJECTOR**
 
 ### Required injected environment variables
 
@@ -150,8 +152,35 @@ Variable names only — never document values.
 - `LOVABLE_BROWSER_SUPABASE_STORAGE_KEY`
 - `LOVABLE_BROWSER_COOKIES_JSON` (optional, canonical)
 - `LOVABLE_BROWSER_SUPABASE_COOKIES_JSON` (optional, legacy fallback)
-- `LOVABLE_E2E_TARGET_PROJECT_REF` (required for teardown; optional
-  belt-and-suspenders for seed/preflight)
+- `LOVABLE_E2E_TARGET_PROJECT_REF` (required exact project pin for
+  materialization, preflight, seed, browser proof, and teardown)
+- `E2E_EXPECTED_SHA` (required lowercase 40-hex deployed commit)
+- `E2E_ONE_TENT_FIXTURE_MARKER` (static marker locally, or the workflow's
+  run-and-first-attempt marker)
+
+### Authenticated Actions proof dispatch order
+
+The proof dispatch is intentionally unavailable as a pre-deploy preview. Follow
+this immutable sequence; do not reuse an earlier run or rerun a failed attempt:
+
+1. Merge the exact proof commit into `verdant-grow-diary` without rewriting its
+   identity.
+2. Deploy that exact commit to `https://verdantgrowdiary.com`.
+3. Wait until `https://verdantgrowdiary.com/version.json` returns strict JSON
+   whose `commit` is that exact lowercase 40-hex SHA, whose `dirty` field is
+   `false`, whose `commitSource` is `git` or `github-env`, whose `treeHashError`
+   and `inherited` fields are both `null`, and whose `treeHash` matches the
+   canonical hash computed from the checked-out commit. The fixed-origin HTML
+   and same-origin main JavaScript must also contain the committed sandbox Paddle
+   client token and no live-class Paddle token.
+4. Dispatch the workflow from `verdant-grow-diary` with `run_mode=one_tent_proof` and
+   `expected_sha=<same 40-hex commit>`, first attempt only.
+
+Proof mode uses the fixed public HTTPS origin and fails before credentials when
+the mode, default ref, SHA format, Actions SHA, checked-out HEAD, canonical tree,
+clean public version, or deployed Paddle token class does not match.
+`run_mode=quicklog_smoke` remains the separate ordinary smoke dispatch and does
+not require `expected_sha`.
 
 ### Machine-readable receipts
 
@@ -160,20 +189,22 @@ exactly **one** compact JSON line with a stable prefix:
 
 ```text
 ONE_TENT_PREFLIGHT_JSON={"schema_version":"1",...}
-ONE_TENT_BROWSER_PROOF_JSON={"schema_version":"1",...}
-ONE_TENT_TEARDOWN_JSON={"schema_version":"1",...}
+ONE_TENT_BROWSER_PROOF_JSON={"schema_version":"4",...}
+ONE_TENT_TEARDOWN_JSON={"schema_version":"3",...}
 ```
 
-Receipt rules (all three):
+Receipt rules (all three, with the schema versions above):
 
-- One JSON object per line, `schema_version: "1"`.
 - Deterministic: same inputs ⇒ byte-identical line. Stable key order,
   lexically sorted `missing[]`, no timestamps, no randomness, no
   worker IDs, no file paths, no stack traces.
 - **Never** contains tokens, cookies, session JSON, emails, row IDs, or
   raw provider errors.
-- Suitable for parsing in CI/operator scripts. The human-readable
-  output remains authoritative for operators.
+- Suitable for parsing in CI/operator scripts. The authenticated workflow
+  retains only the sanitized composite browser receipt; raw Playwright and
+  authentication artifacts are deleted. Its final `always()` cleanup removes
+  `test-results/`, `playwright-report/`, `e2e/results/playwright-report.json`,
+  the private authentication files, and the raw proof log. None are uploaded.
 
 Contracts live in `e2e/helpers/lovableManagedSupabaseSession.ts`
 (preflight), `e2e/helpers/oneTentBrowserProofReceipt.ts` (browser
@@ -262,7 +293,7 @@ cookies, session JSON, or authorization headers.
 
 `bun run e2e:one-tent:teardown` removes **only** managed-user
 golden-path fixture rows, resolved by the authenticated user id + the
-exact `[GOLDEN-PATH-FIXTURE]` fixture names + the exact fixture
+exact validated static or run-and-attempt marker fixture names + the exact fixture
 relationships (grow → tent/plant → scoped children). It:
 
 - **defaults to dry-run** — destructive mode requires BOTH
@@ -273,45 +304,59 @@ relationships (grow → tent/plant → scoped children). It:
 - uses the managed user's own authenticated client (anon key + Bearer
   token), never service_role, so RLS remains part of the safety
   boundary;
-- deletes child-before-parent: follow-up markers (`diary_entries`
-  rows with `details.event_type = "action_followup"`) → Action Queue →
-  alerts → Quick Logs (`grow_events`) → sensor readings → grow targets
-  → plant → tent → grow, stopping before parents if any stage fails;
-- is idempotent: an already-clean environment reports
-  `status: "completed"` with zero counts;
+- removes owner-deletable diary photos, diary entries, sensor readings, grow
+  targets, and unreferenced alerts in dependency order;
+- never directly deletes protected `grow_events`: it retains and re-verifies
+  the exact owner + fixture-grow Quick Log IDs, their exact environment rows,
+  idempotency keys, and the deduplicated audit-row union reachable from exact
+  event IDs or exact keys, then retains the parent hierarchy;
+- counts existing diary-entry audit rows by exact discovered diary IDs; dry-run
+  predicts one immutable delete-audit row per planned diary deletion, and
+  execute requires the post-delete count to equal baseline plus rows actually
+  deleted before any later child or parent deletion; repeated cleanup recovers
+  tombstoned diary IDs through owner + delete action + exact snapshot grow ID,
+  selects no snapshots, and preserves the same retained count after live diary
+  rows are gone;
+- retains append-only Action Queue/events, AI Doctor, and AI-credit history;
+  when retained Action Queue history can point to the fixture alert, it also
+  retains and counts that source alert and its append-only alert events so the
+  protected audit link remains usable, together with the hierarchy needed to
+  preserve that history; the sanitized receipt reports those counts as
+  `alert_rows` and `alert_event_rows`, never their identifiers or contents;
+- reports `completed_with_retained_history` whenever protected history
+  remains; it never claims zero-count or full cleanup;
+- reports `fixture_not_found` when the exact dynamic fixture is absent;
 - never deletes unrelated data: no partial-name matching, every query
   is scoped by `user_id` plus fixture `grow_id`/`tent_id`.
 
-**Known limit (honest):** `sensor_readings` currently has no
-owner-scoped DELETE policy and no cascading FK, so an authenticated
-teardown cannot remove the seeded manual snapshot. The run stops
-before deleting parents and reports
-`sensor_rows_delete_blocked_by_rls`. Fixing that requires a future
-migration (out of scope for test tooling, which must not change RLS).
+**Known limit (honest):** `grow_events` are deliberately not owner-deletable,
+and `sensor_readings` or other protected history may also lack owner DELETE
+permission. Cleanup records those rows as retained history and keeps parent
+rows instead of erasing or obscuring that evidence.
 
 Preserve failed-run fixtures until debugging is complete — the
 Playwright spec never auto-tears-down after a BLOCKED or FAILED proof.
-Optional cleanup after a fully **passing** proof only:
-`LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS=true` (teardown output and receipt
-are printed, and a teardown failure is never hidden).
+Manual proof runs may leave cleanup disabled; a passing receipt then reports
+`cleanup.status=not_run` honestly. Optional cleanup after a fully **passing**
+manual proof is enabled with `LOVABLE_E2E_TEARDOWN_AFTER_SUCCESS=true`.
+The GitHub Actions proof lane always requires cleanup and sets that variable to
+`true`; the sanitized teardown result is composited into the browser receipt,
+raw child output is not retained, and a teardown failure is never hidden.
 
 ### Evidence receipt (per-stage, filled by the browser walk)
 
-| #   | Stage                                                                   | Outcome                                      |
-| --- | ----------------------------------------------------------------------- | -------------------------------------------- |
-| 1   | Auth restored                                                           | PASS / BLOCKED_BY_MANAGED_SESSION_INJECTOR   |
-| 2   | Grow resolved                                                           | PASS                                         |
-| 3   | Tent resolved                                                           | PASS                                         |
-| 4   | Plant resolved                                                          | PASS                                         |
-| 5   | Quick Log persisted                                                     | PASS                                         |
-| 6   | Timeline row visible (single, refresh-stable)                           | PASS                                         |
-| 7   | Manual sensor provenance visible (never Live)                           | PASS                                         |
-| 8   | AI Doctor network boundary verified (Edge Function stub, no paid model) | PASS                                         |
-| 9   | Alert verified (VPD > target, single)                                   | PASS                                         |
-| 10  | Action Queue suggestion verified (approval-required, no device command) | PASS                                         |
-| 11  | Grower decision verified (user-initiated approve/complete)              | PASS                                         |
-| 12  | Follow-up marker verified (survives refresh, single)                    | PASS                                         |
-| 13  | Auto-diary follow-up                                                    | **HONESTLY UNSUPPORTED** — marker-level only |
+| #   | Stage                                                                   | Outcome                                    |
+| --- | ----------------------------------------------------------------------- | ------------------------------------------ |
+| 1   | Auth restored and public deployment SHA matched                         | PASS / BLOCKED_BY_MANAGED_SESSION_INJECTOR |
+| 2   | Grow, Tent, and Plant created and refresh-persisted                     | PASS                                       |
+| 3   | Quick Log photo and exact 82°F / 48% manual snapshot persisted          | PASS                                       |
+| 4   | Zero `sensor_readings` before operator evidence                         | PASS                                       |
+| 5   | `/tents` shows Manual, 82°F, 48%, unavailable VPD, never Live/empty     | PASS                                       |
+| 6   | Operator sensor evidence seeded only after the manual Tent proof        | PASS                                       |
+| 7   | Timeline → Sensors → intercepted AI Doctor → Alert handoffs             | PASS                                       |
+| 8   | Approval-required Action Queue control observed but never clicked       | PASS                                       |
+| 9   | Paddle sandbox/test/no-real-charge copy observed without checkout click | PASS                                       |
+| 10  | Owner cleanup composited, with retained history reported honestly       | PASS                                       |
 
 ### Production-fix rule for this proof
 
@@ -476,7 +521,6 @@ Slice 4e — Quick Log handoff for capturing a new follow-up photo.
 - No schema, RLS, migration, Edge, auth, storage-policy, AI, device,
   or Action Queue write-path changes in this slice.
 
-
 ## Action Response Memory V1 — Milestone 5 status
 
 Milestone 5 turns the completed Action Queue lifecycle into durable,
@@ -513,7 +557,7 @@ Contract notes for Milestone 5:
 - The canonical response row is the Slice 4c evidence row
   (`diary_entries.details.event_type = "action_followup"`) **with an
   explicit grower-selected `details.outcome`** (`improved | unchanged |
-  declined | too_soon | unclear`). Auto reminder markers (same event type,
+declined | too_soon | unclear`). Auto reminder markers (same event type,
   no outcome) are legacy rows and never become canonical memories.
 - The authoritative relationship is `details.action_queue_id`, written by
   the evidence service from the RLS-reverified action row. Cross-surface

@@ -100,6 +100,7 @@ describe("startYourRoomRules", () => {
 
 describe("StartYourRoom page safety surface", () => {
   const PAGE = readFileSync(resolve(ROOT, "src/pages/StartYourRoom.tsx"), "utf8");
+  const PERSISTENCE = readFileSync(resolve(ROOT, "src/lib/hierarchyCreatePersistence.ts"), "utf8");
   const APP = readAllRouteModuleSources();
   const ONBOARD = readFileSync(resolve(ROOT, "src/pages/Onboarding.tsx"), "utf8");
 
@@ -115,10 +116,13 @@ describe("StartYourRoom page safety surface", () => {
   });
 
   it("writes only grows/tents/plants inserts — no device control", () => {
-    expect(PAGE).toMatch(/\.from\("grows"\)/);
-    expect(PAGE).toMatch(/\.from\("tents"\)/);
-    expect(PAGE).toMatch(/\.from\("plants"\)/);
-    expect(PAGE).not.toMatch(/service_role|functions\.invoke|\bmqtt\b|device_control/i);
+    expect(PAGE).toMatch(/persistHierarchyCreateAttempt/);
+    expect(PERSISTENCE).toMatch(/return "grows"/);
+    expect(PERSISTENCE).toMatch(/return "tents"/);
+    expect(PERSISTENCE).toMatch(/return "plants"/);
+    expect(`${PAGE}\n${PERSISTENCE}`).not.toMatch(
+      /service_role|functions\.invoke|\bmqtt\b|device_control/i,
+    );
   });
 
   it("uses pure payload builders (guaranteed binding)", () => {

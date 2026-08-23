@@ -14,6 +14,8 @@
  *  - Case-insensitive, trimmed. Empty query returns all rows.
  */
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { normalizePersistedGrowTentId } from "@/lib/growTentSelectionRules";
+import { normalizePersistedPlantId } from "@/lib/sensorRoutePlantIntentRules";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -253,6 +255,38 @@ export function buildTimelineNameLookup(rows: unknown): ReadonlyMap<string, stri
     if (!m.has(id.trim())) m.set(id.trim(), name.trim());
   }
   return m;
+}
+
+/**
+ * Build the owner-scoped plant → current tent relationship used only for the
+ * Timeline handoff to Sensors. Invalid, unassigned, or placeholder ids are
+ * omitted so callers cannot turn an unresolved relationship into route intent.
+ * As with the name directory, `null` means the read itself was unavailable;
+ * an empty map means the read succeeded but supplied no usable relationship.
+ */
+export function buildTimelinePlantTentLookup(
+  plantRows: unknown,
+  ownerTentRows: unknown,
+): ReadonlyMap<string, string> | null {
+  if (!Array.isArray(plantRows) || !Array.isArray(ownerTentRows)) return null;
+
+  const ownerTentIds = new Set<string>();
+  for (const row of ownerTentRows) {
+    if (!row || typeof row !== "object") continue;
+    const tentId = normalizePersistedGrowTentId((row as Record<string, unknown>).id);
+    if (tentId) ownerTentIds.add(tentId);
+  }
+
+  const lookup = new Map<string, string>();
+  for (const row of plantRows) {
+    if (!row || typeof row !== "object") continue;
+    const record = row as Record<string, unknown>;
+    const plantId = normalizePersistedPlantId(record.id);
+    const tentId = normalizePersistedGrowTentId(record.tent_id);
+    if (!plantId || !tentId || !ownerTentIds.has(tentId) || lookup.has(plantId)) continue;
+    lookup.set(plantId, tentId);
+  }
+  return lookup;
 }
 
 /**

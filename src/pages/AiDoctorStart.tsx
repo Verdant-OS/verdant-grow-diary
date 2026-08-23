@@ -99,7 +99,7 @@ export default function AiDoctorStart() {
   // the failure paragraph would otherwise describe a list the page has just
   // replaced.
   const plantsAreListed =
-    !plantsQuery.isLoading && !plantsQuery.isError && !scopeOrderingPending && options.length > 0;
+    !plantsQuery.isPending && !plantsQuery.isError && !scopeOrderingPending && options.length > 0;
   const everyPlantListedSuffix = plantsAreListed ? " Every active plant is listed below." : "";
   const retryScopeReads = () => {
     if (requestedGrowId && growsError) void refreshGrows();
@@ -151,7 +151,7 @@ export default function AiDoctorStart() {
   const showUnavailableCarriedPlant =
     !!carriedPlantIntentId &&
     partitioned.hasUnavailableCarriedPlant &&
-    !plantsQuery.isLoading &&
+    !plantsQuery.isPending &&
     !plantsQuery.isError &&
     !scopeOrderingPending &&
     scopeReadsSettled &&
@@ -237,6 +237,7 @@ export default function AiDoctorStart() {
           {showUnavailableCarriedPlant ? (
             <p
               className="mt-2 text-sm text-muted-foreground"
+              role="status"
               data-testid="ai-doctor-start-carried-plant-unavailable"
             >
               {DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY}
@@ -245,7 +246,7 @@ export default function AiDoctorStart() {
           ) : null}
         </div>
 
-        {plantsQuery.isLoading || scopeOrderingPending ? (
+        {plantsQuery.isPending || scopeOrderingPending ? (
           <GrowDataLoadingState resource="Active plants" testId="ai-doctor-start-loading" />
         ) : plantsQuery.isError ? (
           <GrowDataLoadError
@@ -282,9 +283,14 @@ export default function AiDoctorStart() {
                   // silent to screen readers. Expose it as the DESCRIPTION
                   // instead: same scope cue, action name unchanged.
                   aria-describedby={
-                    inScopeIds.has(option.id)
-                      ? `ai-doctor-start-option-${index}-in-tent`
-                      : undefined
+                    [
+                      partitioned.carriedPlantOptionId === option.id
+                        ? `ai-doctor-start-option-${index}-carried`
+                        : null,
+                      inScopeIds.has(option.id) ? `ai-doctor-start-option-${index}-in-tent` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
                   }
                 >
                   <span className="min-w-0">

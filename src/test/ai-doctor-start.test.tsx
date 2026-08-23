@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   data: [] as Array<Record<string, unknown>>,
   isLoading: false,
+  isPending: false,
   isError: false,
   refetch: vi.fn(async () => undefined),
   invoke: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("@/hooks/useGrowData", () => ({
   useGrowPlants: () => ({
     data: state.data,
     isLoading: state.isLoading,
+    isPending: state.isPending,
     isError: state.isError,
     refetch: state.refetch,
   }),
@@ -85,6 +87,7 @@ describe("AiDoctorStart", () => {
   beforeEach(() => {
     state.data = [];
     state.isLoading = false;
+    state.isPending = false;
     state.isError = false;
     state.refetch.mockClear();
     state.invoke.mockClear();
@@ -104,10 +107,27 @@ describe("AiDoctorStart", () => {
 
   it("renders a distinct loading state without implying an empty plant list", () => {
     state.isLoading = true;
+    state.isPending = true;
     renderPage();
 
     expect(screen.getByTestId("ai-doctor-start-loading")).toHaveAttribute("role", "status");
     expect(screen.queryByText("No active plants to review")).toBeNull();
+  });
+
+  it("treats an offline-paused plant read as unknown instead of an empty or unavailable list", () => {
+    state.isPending = true;
+    state.isLoading = false;
+    state.isError = false;
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_MISSING}`);
+
+    expect(screen.getByTestId("ai-doctor-start-loading")).toHaveAttribute("role", "status");
+    expect(screen.queryByText("No active plants to review")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-start-carried-plant-unavailable")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-start-options")).toBeNull();
+    expect(screen.queryByTestId("plant-detail")).toBeNull();
+    expect(state.invoke).not.toHaveBeenCalled();
   });
 
   it("renders the failed-read state and retries without inventing plant choices", () => {
@@ -536,9 +556,13 @@ describe("AiDoctorStart", () => {
     ];
     renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_A}`);
 
-    expect(screen.getByTestId("ai-doctor-start-option-0-carried")).toHaveTextContent(
-      /You came from here/,
-    );
+    const option = screen.getAllByRole("link", { name: /with AI Doctor/i })[0];
+    const carriedBadgeId = "ai-doctor-start-option-0-carried";
+    const inTentBadgeId = "ai-doctor-start-option-0-in-tent";
+    expect(option).toHaveAttribute("aria-describedby", `${carriedBadgeId} ${inTentBadgeId}`);
+    expect(option).toHaveAccessibleName("Review Alpha with AI Doctor");
+    expect(document.getElementById(carriedBadgeId)).toHaveTextContent("You came from here");
+    expect(document.getElementById(inTentBadgeId)).toHaveTextContent("In this tent");
     expect(screen.queryByTestId("ai-doctor-start-carried-plant-unavailable")).toBeNull();
     // Still on /doctor — never navigated / never applied selection.
     expect(screen.getByTestId("location")).toHaveTextContent("/doctor");
@@ -558,6 +582,7 @@ describe("AiDoctorStart", () => {
     renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_B}`);
 
     const message = screen.getByTestId("ai-doctor-start-carried-plant-unavailable");
+    expect(message).toHaveAttribute("role", "status");
     expect(message).toHaveTextContent(/couldn't offer for review/i);
     expect(message).toHaveTextContent(/No plant was selected/i);
     expect(message.textContent ?? "").not.toContain(PLANT_B);

@@ -11,6 +11,7 @@
 import { buildSensorsTentRouteHref } from "@/lib/sensorRouteTentIntentRules";
 import { withSensorsPlantIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { normalizePersistedPlantId } from "@/lib/sensorRoutePlantIntentRules";
+import { normalizePersistedGrowTentId } from "@/lib/growTentSelectionRules";
 import {
   buildPlantQuickLogPrefill,
   type PlantQuickLogPrefill,
@@ -115,6 +116,42 @@ export interface OneTentLoopNextStep {
   disabledReason: string | null;
 }
 
+export interface ResolveTimelineSensorHandoffIdsInput {
+  plantId?: unknown;
+  tentId?: unknown;
+  /** Owner-scoped plant → current tent directory. Null means the read is unavailable. */
+  plantTentIdsById?: ReadonlyMap<string, string> | null;
+}
+
+/**
+ * Resolve only a compatible Timeline plant/tent pair for the Sensors handoff.
+ *
+ * The grower's explicit tent filter wins when it conflicts with the selected
+ * plant's current assignment, but the plant is then omitted. Missing directory
+ * evidence also omits the plant. This is deliberately conservative: no plant
+ * route intent is ever paired with a guessed or independently defaulted tent.
+ */
+export function resolveTimelineSensorHandoffIds(
+  input: ResolveTimelineSensorHandoffIdsInput,
+): Pick<OneTentLoopIds, "tentId" | "plantId"> {
+  const selectedTentId = normalizePersistedGrowTentId(input.tentId);
+  const selectedPlantId = normalizePersistedPlantId(input.plantId);
+
+  if (!selectedPlantId) {
+    return { tentId: selectedTentId, plantId: null };
+  }
+
+  const ownerTentId = normalizePersistedGrowTentId(input.plantTentIdsById?.get(selectedPlantId));
+  if (!ownerTentId) {
+    return { tentId: selectedTentId, plantId: null };
+  }
+  if (selectedTentId && selectedTentId !== ownerTentId) {
+    return { tentId: selectedTentId, plantId: null };
+  }
+
+  return { tentId: ownerTentId, plantId: selectedPlantId };
+}
+
 export function getNextLoopStep(current: OneTentLoopStep): OneTentLoopStep | null {
   const idx = ONE_TENT_LOOP_ORDER.indexOf(current);
   if (idx < 0) return null;
@@ -185,14 +222,21 @@ export function resolveOneTentLoopNextStep(
       }
       return base;
     case "timeline":
-      // Carry an explicitly selected timeline tent into Sensors as a
-      // UUID-only intent. Sensors still validates it against authenticated
-      // tent rows before selecting it, so this never grants access or turns
-      // an arbitrary query value into a sensor query.
-      // Carry the plant as a second UUID-only intent so it can survive
-      // Timeline -> Sensors -> Doctor. Sensors does not resolve it; the
-      // consuming Doctor page revalidates it against authenticated rows.
-      return enable(base, withSensorsPlantIntent(buildSensorsTentRouteHref(tentId), plantId));
+      // A plant may travel only with a complete, compatible tent selected by
+      // the owner-scoped Timeline resolver. Required intent prevents Sensors
+      // from pairing that plant with a first-available fallback if its tent
+      // disappears before the destination resolves. Direct callers that pass
+      // a plant without a tent fail closed to a generic Sensors route.
+      if (normalizedTentId && normalizedPlantId) {
+        return enable(
+          base,
+          withSensorsPlantIntent(
+            buildSensorsTentRouteHref(normalizedTentId, { requireExactMatch: true }),
+            normalizedPlantId,
+          ),
+        );
+      }
+      return enable(base, buildSensorsTentRouteHref(normalizedTentId));
     case "sensor-snapshot":
       if (normalizedGrowId && normalizedTentId) {
         const scopedHref = `/doctor?growId=${encodeURIComponent(normalizedGrowId)}&tentId=${encodeURIComponent(normalizedTentId)}`;

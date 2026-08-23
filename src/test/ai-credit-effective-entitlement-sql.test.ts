@@ -14,22 +14,26 @@ const MIGRATION = readSource(
  * FINAL-STATE guard. The 20260620231000 assertions below pin history, but a
  * later CREATE OR REPLACE can (and once did — 20260709015647) silently undo
  * the hardening while this file stays green. So also resolve the LATEST
- * migration that REDEFINES ai_credit_spend and pin the invariants there.
- * Mentions don't count — only a CREATE OR REPLACE of the function body.
+ * migration that REDEFINES the authoritative seven-argument ai_credit_spend
+ * overload and pin the invariants there. The retired five-argument overload
+ * has a different final ACL contract and must not shadow this selection.
+ * Mentions don't count — only the exact CREATE OR REPLACE declaration does.
  */
-function latestMigrationDefining(fnSignature: string): string {
+function latestMigrationDefining(declaration: RegExp): string {
   const dir = resolve(process.cwd(), "supabase", "migrations");
   const files = readdirSync(dir)
     .filter((f) => f.endsWith(".sql"))
     .sort();
   for (let i = files.length - 1; i >= 0; i -= 1) {
     const body = readFileSync(join(dir, files[i]), "utf8");
-    if (body.includes(`CREATE OR REPLACE FUNCTION ${fnSignature}`)) return body;
+    if (declaration.test(body)) return body;
   }
-  throw new Error(`No migration defines ${fnSignature}`);
+  throw new Error(`No migration matches ${declaration}`);
 }
 
-const FINAL = latestMigrationDefining("public.ai_credit_spend");
+const FINAL = latestMigrationDefining(
+  /CREATE OR REPLACE FUNCTION public\.ai_credit_spend\(\s*p_user_id uuid,\s*p_billing_environment text,\s*p_feature text,\s*p_grow_id uuid,\s*p_model_tier text,\s*p_idempotency_key text,\s*p_result jsonb DEFAULT NULL::jsonb\s*\)/i,
+);
 
 describe("AI credit SQL effective entitlement hardening", () => {
   it("adds a deterministic SQL helper for effective credit plan resolution", () => {

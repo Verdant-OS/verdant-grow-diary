@@ -475,6 +475,7 @@ describeIfHarness("MCP local RLS integration", () => {
           metric: "temperature_c",
           value: 24,
           source: "manual",
+          quality: "ok",
           ts: new Date(now - 30_000).toISOString(),
         },
         {

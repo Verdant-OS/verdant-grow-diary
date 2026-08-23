@@ -31,10 +31,44 @@ describe("Quick Log authenticated route target contract", () => {
       /report\.run\(15,\s*"Save uses displayed target"[\s\S]*?(?=report\.run\(16,)/,
     );
     expect(step, "step 15 target assertion missing").toBeTruthy();
-    expect(step![0]).toContain('getAttribute("data-target-plant-id")');
+    expect(step![0]).toContain("const displayedTarget = await readTargetTuple(dialog)");
+    expect(step![0]).toContain("const displayedTargetId = displayedTarget.plantId");
     expect(step![0]).toMatch(/expect\.poll\(\(\)\s*=>\s*observedRpcTargetId\)/);
     expect(step![0]).toMatch(/toBe\(displayedTargetId\)/);
     expect(step![0]).toContain('getByTestId("quick-log-save").click()');
+  });
+
+  it("revalidates the fixture boundary before structured handoff and both successful saves", () => {
+    const cases = [
+      {
+        step: 12,
+        next: 13,
+        action: 'getByRole("button", { name: /^watering$/i, exact: true }).click()',
+      },
+      {
+        step: 15,
+        next: 16,
+        action: 'getByTestId("quick-log-save").click()',
+      },
+      {
+        step: 21,
+        next: 22,
+        action: 'getByTestId("quick-log-save").click()',
+      },
+    ] as const;
+
+    for (const { step, next, action } of cases) {
+      const block = SMOKE.match(
+        new RegExp(`report\\.run\\(${step},[\\s\\S]*?(?=report\\.run\\(${next},)`),
+      );
+      expect(block, `step ${step} fixture-boundary assertion missing`).toBeTruthy();
+      const guard = block![0].indexOf("assertSameQuickLogFixtureBoundary(initialTarget,");
+      const actionIndex = block![0].indexOf(action);
+      expect(guard, `step ${step} must invoke the tested fixture-boundary guard`).toBeGreaterThan(
+        0,
+      );
+      expect(actionIndex, `step ${step} action missing`).toBeGreaterThan(guard);
+    }
   });
 
   it("keeps Watering on the structured Quick Log v2 handoff instead of the legacy Event select", () => {

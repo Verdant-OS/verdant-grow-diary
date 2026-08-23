@@ -28,6 +28,9 @@ const RESTORED_HISTORY_SCRIPT = resolve("scripts/run-restored-history-incrementa
 const RESTORED_HISTORY_SQL = resolve(
   "supabase/tests/restored_history_incremental_forward_repair.sql",
 );
+const RESTORED_HISTORY_RAW_CONTROL = resolve(
+  "supabase/tests/restored_history_raw_setup_backfill_control.sql",
+);
 const MAKEFILE = resolve("Makefile");
 const ACTIVE_LOCAL_REPLAY_DOCS = [
   resolve("README.md"),
@@ -55,6 +58,17 @@ const temporaryRoots: string[] = [];
 
 function sha256(value: string): string {
   return createHash("sha256").update(value.replaceAll("\r\n", "\n")).digest("hex");
+}
+
+function normalizedSqlEffects(value: string): string {
+  return value
+    .replaceAll("\r\n", "\n")
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n")
+    .replace(/;+\s*$/, ";")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function makeTemporaryRoot(): string {
@@ -364,14 +378,19 @@ describe("local Supabase replay compatibility workspace", () => {
     const workflow = readFileSync(RESTORED_HISTORY_WORKFLOW, "utf8");
     const script = readFileSync(RESTORED_HISTORY_SCRIPT, "utf8");
     const sql = readFileSync(RESTORED_HISTORY_SQL, "utf8");
+    const rawControl = readFileSync(RESTORED_HISTORY_RAW_CONTROL, "utf8");
 
     expect(workflow).toContain("node scripts/run-restored-history-incremental-harness.mjs");
     expect(workflow).toContain("ref: ${{ github.event.pull_request.head.sha || github.sha }}");
     expect(workflow).toContain('"supabase/migrations/**"');
     expect(workflow).toContain('"supabase/config.toml"');
     expect(workflow).toContain('"supabase/seed.sql"');
+    expect(workflow).toContain('"supabase/tests/restored_history_raw_setup_backfill_control.sql"');
     expect(script).toContain("prepareReplayWorkspace");
     expect(script).toContain("source_migrations_unchanged");
+    expect(script).toContain("prepared-late-apply");
+    expect(script).toContain("preparedSqlHarness");
+    expect(script).toContain("restored_history_raw_setup_backfill_control.sql");
     const restoredArray = script.match(/RESTORED_MIGRATIONS\s*=\s*\[([\s\S]*?)\];/);
     expect(restoredArray).toBeTruthy();
     const runnerMigrations = [...(restoredArray?.[1].matchAll(/"([^"]+\.sql)"/g) ?? [])].map(
@@ -393,9 +412,12 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(script).toContain("credential-bearing output suppressed");
     expect(script).toContain('process.once("SIGINT"');
     expect(script).toContain('process.once("SIGTERM"');
+    expect(rawControl).toContain("\\ir ../migrations/20260710003638_pheno_hunt_setup_backfill.sql");
+    expect(rawControl).toContain("raw duplicate backfill did not overwrite intentional NULL");
+    expect(rawControl).toContain("ROLLBACK;");
 
     const baselineIndex = sql.indexOf("CREATE TEMP TABLE restored_history_baseline_catalog");
-    const rawMigrationIndexes = RESTORED_HISTORY_MIGRATIONS.map((filename) => {
+    const preparedMigrationIndexes = RESTORED_HISTORY_MIGRATIONS.map((filename) => {
       const include = `\\ir ../migrations/${filename}`;
       expect(sql.split(include)).toHaveLength(2);
       return sql.indexOf(include);
@@ -406,15 +428,17 @@ describe("local Supabase replay compatibility workspace", () => {
     );
     const postIndex = sql.indexOf("DO $repair$");
     expect(baselineIndex).toBeGreaterThan(-1);
-    expect(rawMigrationIndexes).toEqual([...rawMigrationIndexes].sort((a, b) => a - b));
-    expect(rawMigrationIndexes[0]).toBeGreaterThan(baselineIndex);
-    expect(controlIndex).toBeGreaterThan(rawMigrationIndexes.at(-1) ?? -1);
+    expect(preparedMigrationIndexes).toEqual([...preparedMigrationIndexes].sort((a, b) => a - b));
+    expect(preparedMigrationIndexes[0]).toBeGreaterThan(baselineIndex);
+    expect(controlIndex).toBeGreaterThan(preparedMigrationIndexes.at(-1) ?? -1);
     expect(repairIndex).toBeGreaterThan(controlIndex);
     expect(postIndex).toBeGreaterThan(repairIndex);
     expect(sql).toContain("negative control failed: restored legacy AI spend was not reopened");
     expect(sql).toContain("repair failed: retired legacy AI spend remains executable");
     expect(sql).toContain("repair changed the authoritative service AI spend body");
     expect(sql).toContain("repair changed pheno policy definitions");
+    expect(sql).toContain("prepared compatibility path replayed the duplicate setup backfill");
+    expect(sql).toContain("repair path did not preserve intentional setup NULL");
     expect(sql).toContain("ROLLBACK;");
   });
 
@@ -525,11 +549,38 @@ describe("local Supabase replay compatibility workspace", () => {
     };
     expect(report).toMatchObject({
       mode: "verify_only",
-      compatibility_entry_count: 19,
+      compatibility_entry_count: 20,
       compatibility_patch_count: 4,
       compatibility_injection_count: 2,
       source_migrations_unchanged: true,
     });
+  });
+
+  it("no-ops the restored duplicate guided-setup backfill without editing history", () => {
+    const manifest = JSON.parse(readFileSync(REAL_MANIFEST, "utf8")) as {
+      compatibility_noops: Array<{
+        canonical_path: string;
+        canonical_sha256: string;
+        duplicate_path: string;
+        duplicate_sha256: string;
+        reason: string;
+      }>;
+    };
+    const entry = manifest.compatibility_noops.find((candidate) =>
+      candidate.duplicate_path.endsWith("20260710003638_pheno_hunt_setup_backfill.sql"),
+    );
+
+    expect(entry).toMatchObject({
+      canonical_path: "supabase/migrations/20260710002000_pheno_hunt_setup_backfill.sql",
+      canonical_sha256: "6430f43b20cf86cbf4973e95931c475dfe3ce786723347a55c988715076475ee",
+      duplicate_path: "supabase/migrations/20260710003638_pheno_hunt_setup_backfill.sql",
+      duplicate_sha256: "8945dbff9369d88ecad8d9a19c19cbb30d7c5a415107662e6b9203dfb84c5c4e",
+    });
+    expect(entry?.reason).toContain("intentionally cleared legacy-hunt NULL");
+
+    const canonical = readFileSync(resolve(entry?.canonical_path ?? "missing"), "utf8");
+    const duplicate = readFileSync(resolve(entry?.duplicate_path ?? "missing"), "utf8");
+    expect(normalizedSqlEffects(duplicate)).toBe(normalizedSqlEffects(canonical));
   });
 
   it("no-ops the restored core-schema export after the newer dual-timestamp wrapper", () => {

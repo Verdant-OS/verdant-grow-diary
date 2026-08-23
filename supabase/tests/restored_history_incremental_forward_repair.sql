@@ -68,8 +68,69 @@ SELECT
       AND pol.tablename LIKE 'pheno_%'
   ) AS pheno_policy_fingerprint;
 
--- Apply the ten official CLI-fetched files raw and late. These are immutable
--- repository inputs, not compatibility-rewritten copies.
+-- Seed an intentionally incomplete legacy hunt. The canonical backfill ran in
+-- the baseline history already; this later NULL is valid grower state and must
+-- survive the restored duplicate version.
+CREATE TEMP TABLE restored_history_setup_null_fixture (
+  hunt_id uuid PRIMARY KEY
+);
+
+DO $fixture$
+DECLARE
+  v_user uuid := gen_random_uuid();
+  v_grow uuid;
+  v_hunt uuid;
+BEGIN
+  INSERT INTO auth.users (
+    id,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    created_at,
+    updated_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    aud,
+    role
+  ) VALUES (
+    v_user,
+    'restored-history-safe-' || replace(v_user::text, '-', '') || '@verdant.test',
+    crypt('local-harness-only', gen_salt('bf')),
+    now(),
+    now(),
+    now(),
+    '{}'::jsonb,
+    '{}'::jsonb,
+    'authenticated',
+    'authenticated'
+  );
+
+  INSERT INTO public.grows (user_id, name)
+  VALUES (v_user, 'Restored history prepared backfill control')
+  RETURNING id INTO v_grow;
+
+  INSERT INTO public.pheno_hunts (
+    user_id,
+    grow_id,
+    name,
+    created_at,
+    setup_completed_at
+  ) VALUES (
+    v_user,
+    v_grow,
+    'Intentional incomplete legacy hunt',
+    timestamptz '2026-07-01 12:00:00+00',
+    NULL
+  )
+  RETURNING id INTO v_hunt;
+
+  INSERT INTO restored_history_setup_null_fixture (hunt_id) VALUES (v_hunt);
+END;
+$fixture$;
+
+-- Apply the ten official CLI-fetched files late through the SHA-verified
+-- compatibility workspace. Duplicate historical effects are no-op'd only in
+-- this disposable copy; the repository inputs remain immutable.
 \ir ../migrations/20260710003624_pheno_hunt_guided_setup_onboarding.sql
 \ir ../migrations/20260710003638_pheno_hunt_setup_backfill.sql
 \ir ../migrations/20260710005819_ai_credit_spend_union_hardening.sql
@@ -89,6 +150,7 @@ DECLARE
   v_old_trigger_count integer;
   v_pheno_policy_fingerprint text;
   v_receipt_marker_count integer;
+  v_setup_completed_at timestamptz;
 BEGIN
   SELECT * INTO STRICT v_before FROM restored_history_baseline_catalog;
 
@@ -132,12 +194,16 @@ BEGIN
   v_quicklog_definition := pg_get_functiondef(
     'public.quicklog_save_event(text,uuid,text,uuid,uuid,text,text,jsonb,timestamptz,jsonb,jsonb,jsonb)'::regprocedure
   );
-  IF position('quicklog_save_event_pre_logged_at' IN v_quicklog_definition) > 0
-     OR position('verdant.quicklog_logged_at' IN v_quicklog_definition) > 0 THEN
-    RAISE EXCEPTION 'negative control failed: restored Quick Log wrapper stayed canonical';
+  IF v_quicklog_definition IS DISTINCT FROM v_before.quicklog_definition THEN
+    RAISE EXCEPTION 'prepared compatibility path changed the canonical Quick Log wrapper';
   END IF;
-  IF v_quicklog_definition IS NOT DISTINCT FROM v_before.quicklog_definition THEN
-    RAISE EXCEPTION 'negative control failed: restored Quick Log wrapper body did not change';
+
+  SELECT hunt.setup_completed_at
+    INTO STRICT v_setup_completed_at
+    FROM restored_history_setup_null_fixture fixture
+    JOIN public.pheno_hunts hunt ON hunt.id = fixture.hunt_id;
+  IF v_setup_completed_at IS NOT NULL THEN
+    RAISE EXCEPTION 'prepared compatibility path replayed the duplicate setup backfill';
   END IF;
 
   SELECT count(*)
@@ -198,6 +264,7 @@ DECLARE
   v_allowlist_trigger_count integer;
   v_pheno_policy_fingerprint text;
   v_receipt_marker_count integer;
+  v_setup_completed_at timestamptz;
 BEGIN
   SELECT * INTO STRICT v_before FROM restored_history_baseline_catalog;
 
@@ -388,6 +455,14 @@ BEGIN
     RAISE EXCEPTION 'repair changed pheno policy definitions';
   END IF;
 
+  SELECT hunt.setup_completed_at
+    INTO STRICT v_setup_completed_at
+    FROM restored_history_setup_null_fixture fixture
+    JOIN public.pheno_hunts hunt ON hunt.id = fixture.hunt_id;
+  IF v_setup_completed_at IS NOT NULL THEN
+    RAISE EXCEPTION 'repair path did not preserve intentional setup NULL';
+  END IF;
+
   SELECT count(*)
     INTO v_receipt_marker_count
     FROM pg_policies pol
@@ -409,6 +484,6 @@ BEGIN
 END;
 $repair$;
 
-SELECT 'PASS: late restored history converged through the additive repair' AS result;
+SELECT 'PASS: prepared late history preserved grower state and converged through repair' AS result;
 
 ROLLBACK;

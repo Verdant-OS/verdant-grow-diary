@@ -27,9 +27,14 @@ const SQL_HARNESS = resolve(
   REPO_ROOT,
   "supabase/tests/restored_history_incremental_forward_repair.sql",
 );
+const RAW_BACKFILL_CONTROL = resolve(
+  REPO_ROOT,
+  "supabase/tests/restored_history_raw_setup_backfill_control.sql",
+);
 
 let tempRoot;
 let replayWorkdir;
+let lateApplyWorkdir;
 let stackStartAttempted = false;
 let cleanupAttempted = false;
 
@@ -148,6 +153,7 @@ function cleanup() {
   }
   tempRoot = undefined;
   replayWorkdir = undefined;
+  lateApplyWorkdir = undefined;
   return true;
 }
 
@@ -162,16 +168,38 @@ process.once("SIGTERM", () => handleSignal("SIGTERM", 143));
 async function main() {
   for (const binary of ["node", "supabase", "psql"]) requireBinary(binary);
   if (!existsSync(SQL_HARNESS)) throw new Error(`missing SQL harness: ${SQL_HARNESS}`);
+  if (!existsSync(RAW_BACKFILL_CONTROL)) {
+    throw new Error(`missing raw backfill control: ${RAW_BACKFILL_CONTROL}`);
+  }
 
   tempRoot = mkdtempSync(join(tmpdir(), "verdant-restored-history-"));
   replayWorkdir = join(tempRoot, "target-baseline");
+  lateApplyWorkdir = join(tempRoot, "prepared-late-apply");
 
-  const report = prepareReplayWorkspace({
+  const baselineReport = prepareReplayWorkspace({
     sourceRoot: REPO_ROOT,
     outputRoot: replayWorkdir,
   });
-  if (report.mode !== "prepared" || report.source_migrations_unchanged !== true) {
+  const lateApplyReport = prepareReplayWorkspace({
+    sourceRoot: REPO_ROOT,
+    outputRoot: lateApplyWorkdir,
+  });
+  if (
+    baselineReport.mode !== "prepared" ||
+    baselineReport.source_migrations_unchanged !== true ||
+    lateApplyReport.mode !== "prepared" ||
+    lateApplyReport.source_migrations_unchanged !== true ||
+    baselineReport.source_migration_tree_sha256 !== lateApplyReport.source_migration_tree_sha256 ||
+    baselineReport.prepared_migration_tree_sha256 !== lateApplyReport.prepared_migration_tree_sha256
+  ) {
     throw new Error("replay preparer did not prove immutable source migrations");
+  }
+  const preparedSqlHarness = resolve(
+    lateApplyWorkdir,
+    "supabase/tests/restored_history_incremental_forward_repair.sql",
+  );
+  if (!existsSync(preparedSqlHarness)) {
+    throw new Error(`prepared SQL harness missing: ${preparedSqlHarness}`);
   }
 
   // The disposable baseline must match the target branch: the restored
@@ -207,10 +235,17 @@ async function main() {
 
   run("supabase", ["db", "reset", "--workdir", replayWorkdir, "--local"]);
 
-  // The SQL harness snapshots the exact target baseline, applies all ten raw
-  // historical files, proves the regressions, applies the repair, checks exact
-  // convergence, and rolls the entire adversarial exercise back in one session.
-  run("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", SQL_HARNESS], {
+  // First prove why the raw duplicate backfill is unsafe. This source-tree
+  // control is transactionally rolled back and never represents a supported
+  // apply path.
+  run("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", RAW_BACKFILL_CONTROL], {
+    env: postgresEnv,
+  });
+
+  // Then exercise the supported path: every restored file is read from a
+  // second SHA-verified compatibility workspace, so duplicate history is
+  // no-op'd before the additive repair converges the remaining late effects.
+  run("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", preparedSqlHarness], {
     env: postgresEnv,
   });
 

@@ -11,6 +11,13 @@
   ],
   "compatibility_noops": [
     {
+      "canonical_path": "supabase/migrations/20260710002000_pheno_hunt_setup_backfill.sql",
+      "canonical_sha256": "6430f43b20cf86cbf4973e95931c475dfe3ce786723347a55c988715076475ee",
+      "duplicate_path": "supabase/migrations/20260710003638_pheno_hunt_setup_backfill.sql",
+      "duplicate_sha256": "8945dbff9369d88ecad8d9a19c19cbb30d7c5a415107662e6b9203dfb84c5c4e",
+      "reason": "The restored hosted-ledger row repeats canonical 20260710002000, including its bounded setup_completed_at backfill. Reapplying that UPDATE late can overwrite an intentionally cleared legacy-hunt NULL, so only the SHA-verified disposable replay copy is no-op'd."
+    },
+    {
       "canonical_path": "supabase/migrations/20260721103000_ai_credit_grants.sql",
       "canonical_sha256": "ad0b717b4ab3bd245067e1d669a7d5627641d0bfb65babcb16ef0dc85a3c0296",
       "duplicate_path": "supabase/migrations/20260721182752_4fc51714-bc29-4044-9b91-180c065e997f.sql",

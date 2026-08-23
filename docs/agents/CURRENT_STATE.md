@@ -624,24 +624,41 @@ already-hardened function whose hardening survived a later body replacement,
 exactly as expected.
 
 **3. The "66... grant `service_role` EXECUTE by default" headline conflates
-effective privilege with provenance.** `has_function_privilege(role,
-function, 'EXECUTE')` reports only whether a role currently has the
-privilege, by any path — an explicit `GRANT`, `PUBLIC`, role inheritance, or
-an unrevoked default ACL — never which one. At least 2 of the 66 are proven,
-from their own defining migrations, to hold **explicit** grants, not
-default-derived ones:
+effective privilege with provenance — and this point's own first pass
+overclaimed too, corrected on a second Codex review round on this same PR
+before it even merged.** `has_function_privilege(role, function, 'EXECUTE')`
+reports only whether a role currently has the privilege, by any path — an
+explicit `GRANT`, `PUBLIC`, role inheritance, or an unrevoked default ACL —
+never which one. At least 2 of the 66,
 `supabase/migrations/20260719044601_4a9e443b-d980-4890-b85e-5ae6549a907f.sql:134`
 and
 `supabase/migrations/20260719052812_c25ba6a6-dcdb-40c7-9dbf-292b35af9150.sql:43-44`
-both read `GRANT EXECUTE ON FUNCTION ... TO anon, authenticated,
-service_role` for `founders_wall_count()` and `founders_seats_consumed()`
-respectively — the same two functions already called out below as a
-deliberate public counter. The self-test in the "Uncertain" subsection proves
-the default-ACL mechanism itself is live today; it does not prove how many of
-the 66 actually got their `service_role` EXECUTE through that mechanism
-versus an explicit grant like these two. That per-function provenance check
-(`aclexplode`/`pg_default_acl` against each of the 66, not just a fresh probe
-function) was not done and stays open.
+(`founders_wall_count()` and `founders_seats_consumed()`), have migrations
+that **explicitly, intentionally** `GRANT EXECUTE ... TO anon, authenticated,
+service_role` — that much is established fact about the migration source,
+and it does distinguish these two from a function whose access was never
+deliberately authored at all.
+
+**What that does not establish, on the corrected re-read: that the resulting
+ACL entry actually originated from the grant rather than already being
+present.** Both migrations `CREATE FUNCTION` first and `GRANT` several
+statements later (verified: line 125 then 134 in the `founders_wall_count`
+file). If the permissive default-ACL regime this section's own self-test
+shows is live today was already in effect on 2026-07-19 when these functions
+were created, `service_role` (and `anon`) EXECUTE would have landed on them
+automatically at `CREATE` time, before the explicit `GRANT` ever ran —
+making that `GRANT` a redundant restatement, not the origin. The final ACL
+cannot tell the two paths apart once both converge on the same entry, and
+whether that regime held as far back as July — three weeks before
+`20260807133000` even attempted to harden it — is itself unmeasured. So:
+**intentional authorization is established fact for these two; default-vs-
+explicit origin for them is `NOT_MEASURED`, same as the other 64.** The
+self-test still proves the default-ACL mechanism itself is live today; it
+proves nothing about how many of the 66 — these two included — actually got
+their `service_role` EXECUTE through it versus a grant that may have been
+redundant. That per-function provenance check (`aclexplode`/`pg_default_acl`,
+with creation-time evidence this repo does not have) was not done and stays
+open for all 66, no exceptions.
 
 **4. The third `anon`-set member does not check out against its own
 migration, raised by a separate Copilot review comment on this same PR.**
@@ -694,11 +711,14 @@ file's precedent supports.
 point 3 of the 2026-08-23 correction above.** `has_function_privilege` proves
 current effective access, never its provenance. At least 2 of the 66
 (`founders_wall_count`, `founders_seats_consumed`, immediately below) are
-confirmed **explicit** grants from their defining migrations, not
-default-ACL leftovers. The self-test in "Uncertain," below, proves the
+confirmed to have **deliberate, explicit grant statements** in their
+defining migrations — but per point 3's own correction, whether that grant
+is what actually produced their current ACL entry, versus the default-ACL
+mechanism already having done so at `CREATE` time, is itself unmeasured, no
+different from the other 64. The self-test in "Uncertain," below, proves the
 default-ACL mechanism is live; it does not prove how many of the 66 actually
-came from it versus an explicit grant. Read "66... grant `service_role`
-EXECUTE" as the accurate headline; "by default" is unproven per-function.
+came from it versus a grant. Read "66... grant `service_role` EXECUTE" as
+the accurate headline; "by default" is unproven per-function, for all 66.
 
 **The `anon` set is the one worth an owner's eyes** — and, per correction
 point 4 below, one of the three is now flagged, not confirmed. All 3 are
@@ -710,9 +730,11 @@ this `prosecdef = true`-filtered list is itself unresolved**),
 `founders_seats_consumed()`, and `founders_wall_count()` — the latter two are
 `SELECT COUNT(*)::int FROM public.founders [WHERE status = 'confirmed']`, no
 PII, and read like a deliberate public "X founders joined" counter, now
-confirmed as **explicit** grants (correction point 3) rather than
-default-derived ones. `inference`: probably intentional. Not verified with
-Cheek.
+confirmed to have **deliberate, explicit grant statements** in their
+migrations (correction point 3) — though whether those statements, versus
+the default ACL already in effect at creation, are what actually produced
+the current grant stays unmeasured, per the same correction. `inference`:
+probably intentional either way. Not verified with Cheek.
 
 ### Uncertain: whether the default-privilege mechanism is still live today
 
@@ -778,11 +800,13 @@ is itself unresolved, correction point 4), against production
 `66255e7b-892c-4be5-8686-ab1cfc3666db` / `knkwiiywfkbqznbxwqfh` (the
 2026-08-23 correction above restores this after the 2026-08-22 downgrade),
 and the self-test-fails-via-this-probe-channel result. Not confirmed: how
-many of the 66 came from the default-ACL mechanism specifically versus an
-explicit grant (at least 2 are proven explicit, correction point 3);
-whether `founders_guard_immutables()` genuinely belongs in a
-`prosecdef = true` population given its committed definition says
-otherwise (correction point 4); or
+many of the 66 — all of them, no exceptions, including the 2 with deliberate
+grant statements in their migrations (correction point 3, itself corrected
+on re-review: intentional authorization is established for those 2, but
+default-vs-explicit _origin_ is not) — came from the default-ACL mechanism
+versus a grant; whether `founders_guard_immutables()` genuinely belongs in a
+`prosecdef = true` population given its committed definition says otherwise
+(correction point 4); or
 whether any corrective migration is actually needed — the "real migrations
 don't show the same exposure" question is resolved as of correction point 2,
 not open. **No migration was drafted or applied.** No table, function,

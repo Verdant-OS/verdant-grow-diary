@@ -126,6 +126,63 @@ export const MCP_MANIFEST: MCPManifestView = Object.freeze({
         },
       ],
     },
+    {
+      name: "list_grow_walk_targets",
+      title: "List Grow Walk targets",
+      description:
+        "List the signed-in Verdant grower's own tents and plants within one owned grow, ordered by deterministic physical-inspection priority. Results preserve missing evidence and source limits; archived targets are labeled historical; exact sensor evidence is loaded only by get_grow_walk_context. Priority is scouting guidance, not a diagnosis. Read-only.",
+      readOnly: true,
+      params: [
+        {
+          name: "growId",
+          type: "string (uuid)",
+          required: true,
+          description: "Owned grow id whose tents and plants should be listed.",
+        },
+        {
+          name: "includeInactivePlants",
+          type: "boolean",
+          required: false,
+          description: "Include archived or inactive plant records. Defaults to false.",
+        },
+        {
+          name: "limit",
+          type: "integer",
+          required: false,
+          description: "Maximum targets to return. Defaults to 50.",
+          constraints: "1–100",
+        },
+      ],
+    },
+    {
+      name: "get_grow_walk_context",
+      title: "Get Grow Walk context",
+      description:
+        "Fetch bounded, source-labeled evidence for one tent or plant the signed-in grower owns. Photo rows are metadata only, sensor evidence keeps source/quality/freshness labels, and partial lanes are named explicitly. Archived targets are labeled as historical. The result supports physical inspection and does not diagnose, approve actions, or control equipment. Read-only.",
+      readOnly: true,
+      params: [
+        {
+          name: "targetType",
+          type: "string enum",
+          required: true,
+          description: "Whether the owned target is a tent or plant.",
+          constraints: "tent | plant",
+        },
+        {
+          name: "targetId",
+          type: "string (uuid)",
+          required: true,
+          description: "Owned tent or plant id to review.",
+        },
+        {
+          name: "lookbackHours",
+          type: "integer",
+          required: false,
+          description: "Bounded history window in hours. Defaults to 72.",
+          constraints: "24–168",
+        },
+      ],
+    },
   ],
 }) as MCPManifestView;
 

@@ -793,10 +793,22 @@ does not reset an existing grant back to the default ACL, so a
 previously-hardened function stays hardened across a later body replacement.
 That is expected behavior, not a gap in the mechanism.
 
-So the `postgres`-owned default-ACL bucket is consistent with both real
-migrations measured here once each function's own grant history is
-accounted for: a brand-new function (the readiness RPC) inherits the default
-ACL; a replaced function (`handle_new_user`) keeps whatever was already
+**Corrected 2026-08-23 (Codex review, this PR) — the sentence below
+attributed this to the `postgres`-owned bucket specifically, silently
+reverting to the assumption already disputed two paragraphs up.** Which
+default-ACL entry actually applied to the readiness RPC at creation time
+depends on `20260821150000`'s executing role — `postgres` and
+`supabase_admin` each own a separate entry, and only the one matching the
+object's creator governs it. That executor is unconfirmed, same as before;
+`proowner` on the function itself was not checked either. Since both
+entries currently show the identical `anon=X`/`service_role=X` pattern
+(lines 764–766 above), either would explain what was observed, so the
+observation cannot be used to name which one. Corrected: the applicable
+default-ACL bucket — `postgres`'s or `supabase_admin`'s, still
+`NOT_MEASURED` which — is consistent with both real migrations measured
+here once each function's own grant history is accounted for: a brand-new
+function (the readiness RPC) inherits whichever default ACL governs its
+creator; a replaced function (`handle_new_user`) keeps whatever was already
 explicitly granted or revoked on it. No corrective migration is implied by
 either case.
 

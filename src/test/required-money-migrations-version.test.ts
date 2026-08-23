@@ -52,6 +52,12 @@ describe("migrationVersion()", () => {
     expect(REQUIRED_MONEY_MIGRATIONS).toContain("20260728090736_ai_credit_pack_portability.sql");
   });
 
+  it("requires the restored-history incremental convergence repair in every deploy target", () => {
+    expect(REQUIRED_MONEY_MIGRATIONS).toContain(
+      "20260823120000_restored_history_ai_credit_pheno_quicklog_repair.sql",
+    );
+  });
+
   it("extracts the 14-digit prefix from a well-formed filename", () => {
     expect(migrationVersion("20260721103000_ai_credit_grants.sql")).toBe("20260721103000");
   });

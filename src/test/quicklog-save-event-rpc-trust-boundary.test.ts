@@ -54,28 +54,61 @@ const sql = mig?.sql ?? "";
 const bodyMatch = sql.match(
   /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_event[\s\S]*?\$function\$([\s\S]*?)\$function\$/i,
 );
+const quicklogDefinition = bodyMatch?.[0] ?? "";
 const wrapperBody = bodyMatch?.[1] ?? "";
 
+function functionBody(sourceSql: string, functionName: string): string {
+  const escapedName = functionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return (
+    sourceSql.match(
+      new RegExp(
+        `CREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\s+public\\.${escapedName}[\\s\\S]*?\\$function\\$([\\s\\S]*?)\\$function\\$`,
+        "i",
+      ),
+    )?.[1] ?? ""
+  );
+}
+
 function findDelegatedRpcBody(): string {
-  if (
-    !mig ||
-    !/RENAME\s+TO\s+quicklog_save_event_pre_logged_at/i.test(sql) ||
-    !/quicklog_save_event_pre_logged_at\s*\(/i.test(wrapperBody)
-  ) {
+  if (!mig || !/quicklog_save_event_pre_logged_at\s*\(/i.test(wrapperBody)) {
     return "";
   }
 
+  const latestName = mig.path.split(/[\\/]/).pop() ?? "";
   const earlier = readdirSync(MIG_DIR)
-    .filter((name) => name.localeCompare(mig.path.split(/[\\/]/).pop() ?? "") < 0)
+    .filter((name) => name.localeCompare(latestName) < 0)
     .sort((a, b) => b.localeCompare(a));
+
+  // Prefer a later hardening migration that directly redefines the private
+  // delegate. None exists today, but resolving it keeps this guard aligned
+  // with the effective catalog if one is added later.
   for (const name of earlier) {
     const priorSql = readFileSync(join(MIG_DIR, name), "utf8");
-    const match = priorSql.match(
-      /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.quicklog_save_event[\s\S]*?\$function\$([\s\S]*?)\$function\$/i,
-    );
-    if (match?.[1]) return match[1];
+    const directDelegate = functionBody(priorSql, "quicklog_save_event_pre_logged_at");
+    if (directDelegate) return directDelegate;
+  }
+
+  // Otherwise find the foundation migration that renamed the already-proven
+  // public implementation, then resolve the latest public body before that
+  // rename. A later additive wrapper reassertion must not make this guard
+  // accidentally inspect only the thin delegating layer.
+  const renameBoundary = earlier.find((name) =>
+    /ALTER\s+FUNCTION\s+public\.quicklog_save_event[\s\S]*?RENAME\s+TO\s+quicklog_save_event_pre_logged_at/i.test(
+      readFileSync(join(MIG_DIR, name), "utf8"),
+    ),
+  );
+  if (!renameBoundary) return "";
+
+  for (const name of earlier.filter((candidate) => candidate.localeCompare(renameBoundary) < 0)) {
+    const priorSql = readFileSync(join(MIG_DIR, name), "utf8");
+    const priorBody = functionBody(priorSql, "quicklog_save_event");
+    if (priorBody) return priorBody;
   }
   return "";
+}
+
+function expectsPrivateDelegate(): boolean {
+  return /quicklog_save_event_pre_logged_at\s*\(/i.test(wrapperBody);
 }
 
 // The latest foundation keeps the public signature as a narrow timestamp
@@ -90,20 +123,24 @@ describe("quicklog_save_event — migration discoverable", () => {
   it("a migration defines public.quicklog_save_event", () => {
     expect(mig).not.toBeNull();
     expect(body.length).toBeGreaterThan(200);
+    if (expectsPrivateDelegate()) {
+      expect(delegatedBody.length).toBeGreaterThan(200);
+      expect(wrapperBody).toMatch(/quicklog_save_event_pre_logged_at\s*\(/i);
+    }
   });
 });
 
 describe("quicklog_save_event — identity and authentication", () => {
   it("is SECURITY DEFINER with a pinned search_path", () => {
-    expect(sql).toMatch(/SECURITY\s+DEFINER/i);
-    expect(sql).toMatch(/SET\s+search_path\s+TO\s+'public'\s*,\s*'pg_temp'/i);
+    expect(quicklogDefinition).toMatch(/SECURITY\s+DEFINER/i);
+    expect(quicklogDefinition).toMatch(/SET\s+search_path\s+TO\s+'public'\s*,\s*'pg_temp'/i);
   });
 
   it("derives uid from auth.uid(), never from a client param", () => {
     expect(body).toMatch(/uid\s+uuid\s*:=\s*auth\.uid\(\)/i);
-    // Reject any client-supplied user_id parameter shapes.
-    expect(sql).not.toMatch(/\bp_user_id\b/i);
-    expect(sql).not.toMatch(/\b_user_id\s+uuid\b/i);
+    // Reject any client-supplied user_id parameter shapes on the public RPC.
+    expect(quicklogDefinition).not.toMatch(/\bp_user_id\b/i);
+    expect(quicklogDefinition).not.toMatch(/\b_user_id\s+uuid\b/i);
   });
 
   it("rejects unauthenticated callers with 'not_authenticated'", () => {

@@ -18,12 +18,13 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   statSync,
   writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -63,6 +64,8 @@ function parseArgs(argv) {
     sourceRoot: DEFAULT_SOURCE_ROOT,
     manifestPath: null,
     outputRoot: null,
+    verifyCleanupWorkdir: null,
+    verifyWorkdir: null,
     verifyOnly: false,
     json: false,
   };
@@ -71,7 +74,11 @@ function parseArgs(argv) {
     if (arg.startsWith("--source=")) args.sourceRoot = resolve(arg.slice(9));
     else if (arg.startsWith("--manifest=")) args.manifestPath = resolve(arg.slice(11));
     else if (arg.startsWith("--output=")) args.outputRoot = resolve(arg.slice(9));
-    else if (arg === "--verify-only") args.verifyOnly = true;
+    else if (arg.startsWith("--verify-cleanup-workdir=")) {
+      args.verifyCleanupWorkdir = resolve(arg.slice("--verify-cleanup-workdir=".length));
+    } else if (arg.startsWith("--verify-workdir=")) {
+      args.verifyWorkdir = resolve(arg.slice("--verify-workdir=".length));
+    } else if (arg === "--verify-only") args.verifyOnly = true;
     else if (arg === "--json") args.json = true;
     else if (arg === "--help" || arg === "-h") {
       return { ...args, help: true };
@@ -84,6 +91,18 @@ function parseArgs(argv) {
       args.sourceRoot,
       "config",
       "local-supabase-replay-compatibility.json",
+    );
+  }
+  const selectedModes = [
+    Boolean(args.outputRoot),
+    Boolean(args.verifyCleanupWorkdir),
+    Boolean(args.verifyWorkdir),
+    args.verifyOnly,
+  ].filter(Boolean).length;
+  if (selectedModes > 1) {
+    fail(
+      "invalid_argument",
+      "Choose exactly one of --output, --verify-workdir, --verify-cleanup-workdir, or --verify-only",
     );
   }
   return args;
@@ -378,6 +397,225 @@ function compatibilityNoop(entry) {
   ].join("\n");
 }
 
+function migrationFileFingerprints(sourceRoot) {
+  const migrationsRoot = resolve(sourceRoot, "supabase", "migrations");
+  assertExistingDirectory(migrationsRoot, "Migration source");
+  return readdirSync(migrationsRoot, { withFileTypes: true })
+    .map((entry) => {
+      if (!entry.isFile()) {
+        fail(
+          "invalid_migration_tree",
+          `Migration tree entries must be regular files: ${entry.name}`,
+        );
+      }
+      return {
+        filename: entry.name,
+        sha256: sha256File(resolve(migrationsRoot, entry.name)),
+      };
+    })
+    .sort((a, b) => a.filename.localeCompare(b.filename));
+}
+
+function migrationTreeSha256(entries) {
+  const digest = createHash("sha256");
+  for (const entry of entries) {
+    digest.update(entry.filename, "utf8");
+    digest.update("\0", "utf8");
+    digest.update(entry.sha256, "utf8");
+    digest.update("\n", "utf8");
+  }
+  return digest.digest("hex");
+}
+
+function optionalFileSha256(path) {
+  return existsSync(path) ? sha256File(path) : null;
+}
+
+function preparedMigrationTreeSha256(verified) {
+  const fingerprints = new Map(
+    migrationFileFingerprints(verified.sourceRoot).map((entry) => [entry.filename, entry.sha256]),
+  );
+
+  for (const entry of verified.entries) {
+    const filename = entry.duplicate_path.slice(MIGRATION_PREFIX.length);
+    fingerprints.set(filename, sha256Text(compatibilityNoop(entry)));
+  }
+  for (const patch of verified.patches) {
+    const filename = patch.source_path.slice(MIGRATION_PREFIX.length);
+    let patchedSql = readFileSync(
+      resolve(verified.sourceRoot, patch.source_path),
+      "utf8",
+    ).replaceAll("\r\n", "\n");
+    for (const replacement of patch.replacements) {
+      patchedSql = patchedSql.replace(replacement.from, replacement.to);
+    }
+    fingerprints.set(filename, sha256Text(patchedSql));
+  }
+  for (const injection of verified.injections) {
+    const filename = injection.output_path.slice(MIGRATION_PREFIX.length);
+    const templateSql = readFileSync(
+      resolve(verified.sourceRoot, injection.template_path),
+      "utf8",
+    ).replaceAll("\r\n", "\n");
+    fingerprints.set(filename, sha256Text(templateSql));
+  }
+
+  return migrationTreeSha256(
+    [...fingerprints.entries()]
+      .map(([filename, sha256]) => ({ filename, sha256 }))
+      .sort((a, b) => a.filename.localeCompare(b.filename)),
+  );
+}
+
+function buildReport(verified, mode) {
+  return {
+    version: 1,
+    mode,
+    source_migrations_unchanged: true,
+    source_migration_tree_sha256: migrationTreeSha256(
+      migrationFileFingerprints(verified.sourceRoot),
+    ),
+    source_config_sha256: sha256File(resolve(verified.sourceRoot, "supabase", "config.toml")),
+    source_seed_sha256: optionalFileSha256(resolve(verified.sourceRoot, "supabase", "seed.sql")),
+    source_manifest_sha256: sha256File(verified.manifestPath),
+    prepared_migration_tree_sha256: preparedMigrationTreeSha256(verified),
+    compatibility_entry_count: verified.entries.length,
+    compatibility_patch_count: verified.patches.length,
+    compatibility_injection_count: verified.injections.length,
+    entries: verified.entries,
+    patches: verified.patches,
+    injections: verified.injections,
+  };
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, nested]) => [key, canonicalJson(nested)]),
+    );
+  }
+  return value;
+}
+
+export function verifyPreparedReplayWorkspace({
+  sourceRoot = DEFAULT_SOURCE_ROOT,
+  manifestPath = DEFAULT_MANIFEST_PATH,
+  verifyWorkdir,
+} = {}) {
+  if (!verifyWorkdir) fail("missing_workdir", "--verify-workdir is required");
+
+  const verified = loadAndVerifyManifest({ sourceRoot, manifestPath });
+  const requestedWorkdir = resolve(verifyWorkdir);
+  assertExistingDirectory(requestedWorkdir, "Prepared replay workdir");
+  const workdir = realpathSync(requestedWorkdir);
+  if (workdir === verified.sourceRoot || isInside(verified.sourceRoot, workdir)) {
+    fail("unsafe_workdir", "Prepared replay workdir must be outside the source repository");
+  }
+
+  const reportPath = resolve(workdir, REPORT_NAME);
+  assertExistingFile(reportPath, "Prepared replay report");
+  let actualReport;
+  try {
+    actualReport = JSON.parse(readFileSync(reportPath, "utf8"));
+  } catch (error) {
+    fail("invalid_report", `Prepared replay report is not valid JSON: ${error.message}`);
+  }
+
+  const expectedReport = buildReport(verified, "prepared");
+  if (
+    JSON.stringify(canonicalJson(actualReport)) !== JSON.stringify(canonicalJson(expectedReport))
+  ) {
+    fail("stale_workdir", "Prepared replay report does not match the current source tree");
+  }
+
+  const actualMigrationTreeSha256 = migrationTreeSha256(migrationFileFingerprints(workdir));
+  if (actualMigrationTreeSha256 !== expectedReport.prepared_migration_tree_sha256) {
+    fail("workdir_drift", "Prepared replay migration tree no longer matches its report");
+  }
+  if (
+    sha256File(resolve(workdir, "supabase", "config.toml")) !== expectedReport.source_config_sha256
+  ) {
+    fail("workdir_drift", "Prepared replay Supabase config no longer matches its source");
+  }
+  if (
+    optionalFileSha256(resolve(workdir, "supabase", "seed.sql")) !==
+    expectedReport.source_seed_sha256
+  ) {
+    fail("workdir_drift", "Prepared replay seed no longer matches its source");
+  }
+
+  return { ...expectedReport, mode: "verified_prepared" };
+}
+
+export function verifyCleanupReplayWorkspace({
+  sourceRoot = DEFAULT_SOURCE_ROOT,
+  verifyCleanupWorkdir,
+} = {}) {
+  if (!verifyCleanupWorkdir) {
+    fail("missing_workdir", "--verify-cleanup-workdir is required");
+  }
+
+  const requestedSource = resolve(sourceRoot);
+  assertExistingDirectory(requestedSource, "Source repository");
+  const source = realpathSync(requestedSource);
+  const requestedWorkdir = resolve(verifyCleanupWorkdir);
+  assertExistingDirectory(requestedWorkdir, "Prepared replay cleanup workdir");
+  const workdir = realpathSync(requestedWorkdir);
+  if (workdir === source || isInside(source, workdir)) {
+    fail("unsafe_workdir", "Cleanup workdir must be outside the source repository");
+  }
+  assertExistingFile(resolve(workdir, "supabase", "config.toml"), "Prepared Supabase config");
+  assertExistingDirectory(resolve(workdir, "supabase", "migrations"), "Prepared migrations");
+
+  const reportPath = resolve(workdir, REPORT_NAME);
+  assertExistingFile(reportPath, "Prepared replay report");
+  let report;
+  try {
+    report = JSON.parse(readFileSync(reportPath, "utf8"));
+  } catch (error) {
+    fail("invalid_report", `Prepared replay report is not valid JSON: ${error.message}`);
+  }
+
+  const digestFields = [
+    "source_migration_tree_sha256",
+    "source_config_sha256",
+    "source_manifest_sha256",
+    "prepared_migration_tree_sha256",
+  ];
+  const validDigest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+  if (
+    report?.version !== 1 ||
+    report?.mode !== "prepared" ||
+    report?.source_migrations_unchanged !== true ||
+    digestFields.some((field) => !validDigest(report[field])) ||
+    (report?.source_seed_sha256 !== null && !validDigest(report?.source_seed_sha256)) ||
+    !Array.isArray(report?.entries) ||
+    !Array.isArray(report?.patches) ||
+    !Array.isArray(report?.injections) ||
+    report.compatibility_entry_count !== report.entries.length ||
+    report.compatibility_patch_count !== report.patches.length ||
+    report.compatibility_injection_count !== report.injections.length
+  ) {
+    fail("invalid_report", "Cleanup workdir does not contain a valid prepared replay report");
+  }
+
+  const actualMigrationTreeSha256 = migrationTreeSha256(migrationFileFingerprints(workdir));
+  if (actualMigrationTreeSha256 !== report.prepared_migration_tree_sha256) {
+    fail("workdir_drift", "Cleanup workdir migration tree does not match its prepared report");
+  }
+  if (sha256File(resolve(workdir, "supabase", "config.toml")) !== report.source_config_sha256) {
+    fail("workdir_drift", "Cleanup workdir Supabase config does not match its prepared report");
+  }
+  if (optionalFileSha256(resolve(workdir, "supabase", "seed.sql")) !== report.source_seed_sha256) {
+    fail("workdir_drift", "Cleanup workdir seed does not match its prepared report");
+  }
+
+  return { ...report, mode: "verified_for_cleanup" };
+}
+
 export function prepareReplayWorkspace({
   sourceRoot = DEFAULT_SOURCE_ROOT,
   manifestPath = DEFAULT_MANIFEST_PATH,
@@ -385,7 +623,8 @@ export function prepareReplayWorkspace({
   verifyOnly = false,
 } = {}) {
   const verified = loadAndVerifyManifest({ sourceRoot, manifestPath });
-  const output = outputRoot ? resolve(outputRoot) : null;
+  const requestedOutput = outputRoot ? resolve(outputRoot) : null;
+  let output = requestedOutput;
 
   if (!verifyOnly) {
     if (!output) fail("missing_output", "--output is required unless --verify-only is used");
@@ -396,7 +635,21 @@ export function prepareReplayWorkspace({
       fail("unsafe_output", "Output path must be outside the source repository");
     }
 
+    const outputParent = dirname(output);
+    assertExistingDirectory(outputParent, "Output parent");
+    const realOutputCandidate = resolve(realpathSync(outputParent), basename(output));
+    if (
+      realOutputCandidate === verified.sourceRoot ||
+      isInside(verified.sourceRoot, realOutputCandidate)
+    ) {
+      fail("unsafe_output", "Resolved output path must be outside the source repository");
+    }
+
     mkdirSync(output, { recursive: false });
+    output = realpathSync(output);
+    if (output === verified.sourceRoot || isInside(verified.sourceRoot, output)) {
+      fail("unsafe_output", "Created output path resolved inside the source repository");
+    }
     const sourceSupabase = resolve(verified.sourceRoot, "supabase");
     cpSync(sourceSupabase, resolve(output, "supabase"), {
       recursive: true,
@@ -427,17 +680,7 @@ export function prepareReplayWorkspace({
     }
   }
 
-  const report = {
-    version: 1,
-    mode: verifyOnly ? "verify_only" : "prepared",
-    source_migrations_unchanged: true,
-    compatibility_entry_count: verified.entries.length,
-    compatibility_patch_count: verified.patches.length,
-    compatibility_injection_count: verified.injections.length,
-    entries: verified.entries,
-    patches: verified.patches,
-    injections: verified.injections,
-  };
+  const report = buildReport(verified, verifyOnly ? "verify_only" : "prepared");
 
   if (!verifyOnly) {
     writeFileSync(resolve(output, REPORT_NAME), `${JSON.stringify(report, null, 2)}\n`, "utf8");
@@ -449,11 +692,16 @@ function printHelp() {
   console.log(`Usage:
   node scripts/prepare-local-supabase-replay.mjs --verify-only [--json]
   node scripts/prepare-local-supabase-replay.mjs --output=<new-dir> [--json]
+  node scripts/prepare-local-supabase-replay.mjs --verify-workdir=<dir> [--json]
+  node scripts/prepare-local-supabase-replay.mjs --verify-cleanup-workdir=<dir> [--json]
 
 Options:
   --source=<repo-root>       Source repository (default: script repository)
   --manifest=<json-path>     Compatibility manifest override
   --output=<new-dir>         Disposable Supabase project workdir
+  --verify-workdir=<dir>     Prove a prepared workdir matches current source
+  --verify-cleanup-workdir=<dir>
+                             Validate a stale workdir only for safe cleanup
   --verify-only              Verify immutable fingerprints without copying
   --json                     Emit the deterministic JSON report`);
 }
@@ -465,7 +713,11 @@ function main() {
       printHelp();
       return;
     }
-    const report = prepareReplayWorkspace(args);
+    const report = args.verifyWorkdir
+      ? verifyPreparedReplayWorkspace(args)
+      : args.verifyCleanupWorkdir
+        ? verifyCleanupReplayWorkspace(args)
+        : prepareReplayWorkspace(args);
     if (args.json) console.log(JSON.stringify(report));
     else {
       console.log(

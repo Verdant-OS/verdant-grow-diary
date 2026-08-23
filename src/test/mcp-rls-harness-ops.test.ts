@@ -260,6 +260,12 @@ describe("MCP RLS harness ops — package script + README surface", () => {
     };
     const script = pkg.scripts?.["test:mcp:rls:local"];
     expect(script).toBe("bunx vitest run src/test/mcp-local-rls-integration.test.ts");
+    expect(pkg.scripts?.["sb:status"]).toBeUndefined();
+    for (const [name, command] of Object.entries(pkg.scripts ?? {})) {
+      expect(command, `${name} must not bypass the prepared replay workdir`).not.toMatch(
+        /^supabase\s+status\s*$/,
+      );
+    }
     // No embedded secrets or env value assignments in the script itself.
     expect(script).not.toMatch(/eyJ[A-Za-z0-9_-]{8,}/);
     expect(script).not.toMatch(/sb_(secret|publishable)_/);
@@ -310,8 +316,26 @@ describe("MCP RLS harness ops — package script + README surface", () => {
     }
     // Keys are masked before any later step can print them.
     expect(wf).toContain("::add-mask::");
-    // Migrations are applied locally before the harness runs.
-    expect(wf).toContain("supabase db reset --local");
+    // Every fresh replay is prepared in a disposable compatibility workspace
+    // before local Supabase starts, and every lifecycle command targets it.
+    const prepareIndex = wf.indexOf("Prepare immutable migration replay workspace");
+    const startIndex = wf.indexOf("Start local Supabase");
+    expect(prepareIndex).toBeGreaterThan(-1);
+    expect(startIndex).toBeGreaterThan(prepareIndex);
+    expect(wf).toContain("node scripts/prepare-local-supabase-replay.mjs");
+    expect(wf).toContain('"package.json"');
+    expect(wf).toContain('"bun.lock"');
+    expect(wf).toContain('supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" --local');
+    const lifecycleCommands = wf
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(
+        (line) => !line.startsWith("#") && /\bsupabase (start|status|db reset|stop)\b/.test(line),
+      );
+    expect(lifecycleCommands.length).toBeGreaterThanOrEqual(5);
+    for (const command of lifecycleCommands) {
+      expect(command).toContain('--workdir "$SUPABASE_REPLAY_WORKDIR"');
+    }
     // Uploaded paths never include env files or Supabase config.
     const uploadPath = wf.match(/path:\s*\|([\s\S]*?)if-no-files-found/);
     expect(uploadPath).toBeTruthy();

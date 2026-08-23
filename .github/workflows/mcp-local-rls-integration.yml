@@ -30,8 +30,17 @@ on:
       - "src/test/mcp-local-rls-integration.test.ts"
       - "src/test/helpers/mcpRlsHarnessOps.ts"
       - "scripts/sanitize-mcp-rls-artifacts.mjs"
+      - "scripts/prepare-local-supabase-replay.mjs"
+      - "config/local-supabase-replay-compatibility.json"
+      - "config/local-supabase-replay/**"
+      - "src/test/local-supabase-replay-compatibility.test.ts"
+      - "src/test/mcp-rls-harness-ops.test.ts"
+      - "package.json"
+      - "bun.lock"
       - ".lovable/mcp/manifest.json"
       - "supabase/migrations/**"
+      - "supabase/config.toml"
+      - "supabase/seed.sql"
       - ".github/workflows/mcp-local-rls-integration.yml"
   pull_request:
     branches: [main, verdant-grow-diary]
@@ -40,8 +49,17 @@ on:
       - "src/test/mcp-local-rls-integration.test.ts"
       - "src/test/helpers/mcpRlsHarnessOps.ts"
       - "scripts/sanitize-mcp-rls-artifacts.mjs"
+      - "scripts/prepare-local-supabase-replay.mjs"
+      - "config/local-supabase-replay-compatibility.json"
+      - "config/local-supabase-replay/**"
+      - "src/test/local-supabase-replay-compatibility.test.ts"
+      - "src/test/mcp-rls-harness-ops.test.ts"
+      - "package.json"
+      - "bun.lock"
       - ".lovable/mcp/manifest.json"
       - "supabase/migrations/**"
+      - "supabase/config.toml"
+      - "supabase/seed.sql"
       - ".github/workflows/mcp-local-rls-integration.yml"
 
 jobs:
@@ -60,6 +78,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -77,19 +97,38 @@ jobs:
           # two fast lane failures on 2026-07-09). Bump deliberately.
           version: 2.109.1
 
+      - name: Prepare immutable migration replay workspace
+        run: |
+          set -euo pipefail
+          bun run test:local-supabase-replay
+          REPLAY_WORKDIR="${RUNNER_TEMP}/verdant-mcp-supabase-replay-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          node scripts/prepare-local-supabase-replay.mjs \
+            --output="${REPLAY_WORKDIR}" \
+            --json
+          echo "SUPABASE_REPLAY_WORKDIR=${REPLAY_WORKDIR}" >> "$GITHUB_ENV"
+
       - name: Start local Supabase
         run: |
-          supabase start --exclude studio,inbucket,imgproxy,pgadmin-schema-diff,pgbouncer,realtime,edge-runtime,logflare,vector
+          set -euo pipefail
+          if ! supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" --exclude studio,inbucket,imgproxy,pgadmin-schema-diff,pgbouncer,realtime,edge-runtime,logflare,vector >/dev/null 2>&1; then
+            echo "::error::Local Supabase failed to start; credential-bearing CLI output was suppressed."
+            exit 1
+          fi
 
       - name: Extract local Supabase env (masked)
         id: sb
         run: |
           set -euo pipefail
           # Machine-readable key=value output from Supabase CLI.
-          eval "$(supabase status -o env)"
+          if ! STATUS_ENV="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o env 2>/dev/null)"; then
+            echo "::error::Local Supabase status failed; credential-bearing CLI output was suppressed."
+            exit 1
+          fi
+          eval "${STATUS_ENV}"
           # Mask the ephemeral local keys so they never render in any log.
           echo "::add-mask::${ANON_KEY}"
           echo "::add-mask::${SERVICE_ROLE_KEY}"
+          echo "::add-mask::${DB_URL}"
           {
             echo "api_url=${API_URL}"
             echo "anon_key=${ANON_KEY}"
@@ -118,7 +157,7 @@ jobs:
           wait_ready "auth" "${LOCAL_URL}/auth/v1/health"
           wait_ready "rest" "${LOCAL_URL}/rest/v1/"
           # DB readiness proxy: the CLI reports status only when services run.
-          supabase status > /dev/null
+          supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" > /dev/null
 
       - name: Apply and verify local migrations
         run: |
@@ -126,9 +165,9 @@ jobs:
           # Reset the LOCAL database and re-apply every repo migration
           # deterministically. Fails the job clearly if any migration fails.
           # This never touches a hosted project (no link, no remote push).
-          supabase db reset --local
+          supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" --local
           echo "Applied local migrations:"
-          supabase migration list --local
+          supabase migration list --workdir "$SUPABASE_REPLAY_WORKDIR" --local
 
       - name: Grant hosted-parity API-role privileges (LOCAL database only)
         env:
@@ -142,7 +181,18 @@ jobs:
           # exactly the tables this harness exercises — RLS remains the
           # isolation boundary under test. This psql targets 127.0.0.1 only
           # and never runs against a hosted project.
-          psql "${DB_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+          export PGHOST="$(node -e 'const u=new URL(process.env.DB_URL); process.stdout.write(u.hostname === "[::1]" ? "::1" : u.hostname)')"
+          export PGPORT="$(node -e 'const u=new URL(process.env.DB_URL); process.stdout.write(u.port || "5432")')"
+          export PGUSER="$(node -e 'const u=new URL(process.env.DB_URL); process.stdout.write(decodeURIComponent(u.username))')"
+          export PGPASSWORD="$(node -e 'const u=new URL(process.env.DB_URL); process.stdout.write(decodeURIComponent(u.password))')"
+          export PGDATABASE="$(node -e 'const u=new URL(process.env.DB_URL); process.stdout.write(decodeURIComponent(u.pathname.replace(/^\//, "")))')"
+          export PGSSLMODE=disable
+          case "${PGHOST}" in
+            localhost|127.0.0.1|::1) ;;
+            *) echo "::error::Refusing non-loopback PostgreSQL host"; exit 1 ;;
+          esac
+          echo "::add-mask::${PGPASSWORD}"
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
           GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
           GRANT ALL ON TABLE
             public.grows, public.tents, public.diary_entries, public.sensor_readings
@@ -222,4 +272,10 @@ jobs:
 
       - name: Stop local Supabase
         if: always()
-        run: supabase stop --no-backup || true
+        run: |
+          if [[ -n "${SUPABASE_REPLAY_WORKDIR:-}" ]]; then
+            if ! supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup >/dev/null 2>&1; then
+              echo "::error::Local Supabase cleanup failed; the runner workdir was preserved."
+              exit 1
+            fi
+          fi

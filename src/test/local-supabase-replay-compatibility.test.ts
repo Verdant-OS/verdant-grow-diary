@@ -7,6 +7,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,15 +19,42 @@ const REAL_MANIFEST = resolve("config/local-supabase-replay-compatibility.json")
 const SECURITY_DB_WORKFLOW = resolve(".github/workflows/security-db-local.yml");
 const IRRIGATION_EVIDENCE_WORKFLOW = resolve(".github/workflows/irrigation-evidence-gate.yml");
 const IRRIGATION_PGTAP_WORKFLOW = resolve(".github/workflows/irrigation-pgtap-rls-gate.yml");
+const MCP_RLS_WORKFLOW = resolve(".github/workflows/mcp-local-rls-integration.yml");
+const IRRIGATION_INTEGRITY_SCRIPT = resolve("scripts/run-irrigation-integrity-suite.mjs");
+const RESTORED_HISTORY_WORKFLOW = resolve(
+  ".github/workflows/restored-history-incremental-gate.yml",
+);
+const RESTORED_HISTORY_SCRIPT = resolve("scripts/run-restored-history-incremental-harness.mjs");
+const RESTORED_HISTORY_SQL = resolve(
+  "supabase/tests/restored_history_incremental_forward_repair.sql",
+);
+const MAKEFILE = resolve("Makefile");
+const ACTIVE_LOCAL_REPLAY_DOCS = [
+  resolve("README.md"),
+  resolve("docs/security-regression-tests.md"),
+  resolve("docs/pheno-paid-smoke-local-setup.md"),
+];
 const LOCAL_SEED = resolve("supabase/seed.sql");
 const ACTION_QUEUE_ACL_MIGRATION =
   "supabase/migrations/20260820235900_action_queue_table_acl_forward_repair.sql";
 const ACTION_QUEUE_ACL_MIGRATION_SHA256 =
   "25867036eccb978aa73b3a6268de20d46cab74cc818ee8ef33fbe7f072ceaf1e";
+const RESTORED_HISTORY_MIGRATIONS = [
+  "20260710003624_pheno_hunt_guided_setup_onboarding.sql",
+  "20260710003638_pheno_hunt_setup_backfill.sql",
+  "20260710005819_ai_credit_spend_union_hardening.sql",
+  "20260710012854_lovable_paddle_sink_subscriptions_and_events.sql",
+  "20260710012950_app_role_add_staff_value.sql",
+  "20260710013213_pheno_tracker_pro_entitlement_enforcement.sql",
+  "20260710013235_pheno_entitlement_anti_oracle_guard.sql",
+  "20260710013255_staff_role_grant_trigger_and_backfill.sql",
+  "20260725033124_core_schema_forward_repair.sql",
+  "20260728230229_ai_doctor_receipts_server_only_deny_marker.sql",
+];
 const temporaryRoots: string[] = [];
 
 function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
+  return createHash("sha256").update(value.replaceAll("\r\n", "\n")).digest("hex");
 }
 
 function makeTemporaryRoot(): string {
@@ -216,7 +244,11 @@ describe("local Supabase replay compatibility workspace", () => {
     for (const command of lifecycleCommands) {
       expect(command).toContain('--workdir "$SUPABASE_REPLAY_WORKDIR"');
     }
-    expect(workflow).not.toMatch(/\bsupabase\s+(link|db push)\b/);
+    const executableWorkflow = workflow
+      .split(/\r?\n/)
+      .filter((line) => !line.trim().startsWith("#"))
+      .join("\n");
+    expect(executableWorkflow).not.toMatch(/\bsupabase\s+(link|db push)\b/);
   });
 
   it("routes irrigation pgTAP through replay without publishing startup credentials", () => {
@@ -243,6 +275,229 @@ describe("local Supabase replay compatibility workspace", () => {
     const artifactBlock = workflow.slice(workflow.indexOf("name: irrigation-pgtap-rls-gate-logs"));
     expect(artifactBlock).not.toContain("irrigation-pgtap-supabase-start.log");
     expect(workflow).not.toMatch(/\bsupabase\s+(link|db push)\b/);
+  });
+
+  it("routes the opt-in MCP RLS lane through the disposable replay workdir", () => {
+    const workflow = readFileSync(MCP_RLS_WORKFLOW, "utf8");
+    const prepareIndex = workflow.indexOf("Prepare immutable migration replay workspace");
+    const startIndex = workflow.indexOf("Start local Supabase");
+    const lifecycleCommands = workflow
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(
+        (line) => !line.startsWith("#") && /\bsupabase (start|status|db reset|stop)\b/.test(line),
+      );
+
+    expect(prepareIndex).toBeGreaterThan(-1);
+    expect(startIndex).toBeGreaterThan(prepareIndex);
+    expect(workflow).toContain("node scripts/prepare-local-supabase-replay.mjs");
+    expect(workflow).toContain('"scripts/prepare-local-supabase-replay.mjs"');
+    expect(workflow).toContain('"config/local-supabase-replay-compatibility.json"');
+    expect(workflow).toContain('"config/local-supabase-replay/**"');
+    expect(workflow).toContain('"src/test/local-supabase-replay-compatibility.test.ts"');
+    expect(workflow).toContain('"src/test/mcp-rls-harness-ops.test.ts"');
+    expect(workflow).toContain('"package.json"');
+    expect(workflow).toContain('"bun.lock"');
+    expect(workflow).toContain("bun run test:local-supabase-replay");
+    expect(lifecycleCommands.length).toBeGreaterThanOrEqual(5);
+    for (const command of lifecycleCommands) {
+      expect(command).toContain('--workdir "$SUPABASE_REPLAY_WORKDIR"');
+    }
+    expect(workflow).toContain(
+      'supabase migration list --workdir "$SUPABASE_REPLAY_WORKDIR" --local',
+    );
+    expect(workflow).toContain('"supabase/migrations/**"');
+    expect(workflow).toContain('"supabase/config.toml"');
+    expect(workflow).toContain('"supabase/seed.sql"');
+    expect(workflow).toContain("ref: ${{ github.event.pull_request.head.sha || github.sha }}");
+    expect(workflow).toContain("credential-bearing CLI output was suppressed");
+    expect(workflow).toContain('echo "::add-mask::${DB_URL}"');
+    expect(workflow).toMatch(
+      /supabase start --workdir "\$SUPABASE_REPLAY_WORKDIR"[^\n]*>\/dev\/null 2>&1/,
+    );
+    expect(workflow).toContain(
+      'STATUS_ENV="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o env 2>/dev/null)"',
+    );
+    const cleanupBlock = workflow.slice(workflow.indexOf("- name: Stop local Supabase"));
+    expect(cleanupBlock).toContain(
+      'supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup >/dev/null 2>&1',
+    );
+    expect(cleanupBlock).not.toContain("|| true");
+    expect(workflow).not.toContain('psql "${DB_URL}"');
+    expect(workflow).toContain("export PGPASSWORD=");
+    expect(workflow).toContain('case "${PGHOST}" in');
+    expect(workflow).toContain("localhost|127.0.0.1|::1");
+    expect(workflow).toContain("psql -X -v ON_ERROR_STOP=1");
+    const executableWorkflow = workflow
+      .split(/\r?\n/)
+      .filter((line) => !line.trim().startsWith("#"))
+      .join("\n");
+    expect(executableWorkflow).not.toMatch(/\bsupabase\s+(link|db push)\b/);
+  });
+
+  it("routes the one-shot irrigation integrity command through replay", () => {
+    const script = readFileSync(IRRIGATION_INTEGRITY_SCRIPT, "utf8");
+
+    expect(script).toContain("scripts/prepare-local-supabase-replay.mjs");
+    expect(script).toContain("--output=${replayWorkdir}");
+    expect(script).toMatch(/\[\s*"start",\s*"--workdir",\s*replayWorkdir\s*\]/);
+    expect(script).toMatch(/\[\s*"status",\s*"--workdir",\s*replayWorkdir,\s*"-o",\s*"env"\s*\]/);
+    expect(script).toMatch(/\[\s*"db",\s*"reset",\s*"--workdir",\s*replayWorkdir\s*\]/);
+    expect(script).toMatch(/\[\s*"stop",\s*"--workdir",\s*replayWorkdir,\s*"--no-backup"\s*\]/);
+    expect(script).toContain("source_migrations_unchanged !== true");
+    expect(script).toContain('basename(resolvedRoot).startsWith("verdant-irrigation-replay-")');
+    expect(script).toContain('process.once("exit", cleanupReplayWorkspace)');
+    expect(script).not.toContain('endsWith(".local")');
+    expect(script.indexOf("replayStackStarted = true")).toBeLessThan(
+      script.indexOf('run("supabase", ["start", "--workdir", replayWorkdir]'),
+    );
+    expect(script).toContain("credential-bearing output suppressed");
+    expect(script).not.toMatch(/run\(\s*"psql",\s*\[\s*dbUrl/);
+    expect(script).toContain("postgresEnvFromUrl(dbUrl)");
+    expect(script).toContain("if (replayCleanupBlocked) return false");
+    expect(script.indexOf("replayCleanupBlocked = true")).toBeLessThan(
+      script.indexOf("`local stack did not stop; preserved bounded workdir"),
+    );
+  });
+
+  it("runs a real late-history negative control before the additive repair", () => {
+    const workflow = readFileSync(RESTORED_HISTORY_WORKFLOW, "utf8");
+    const script = readFileSync(RESTORED_HISTORY_SCRIPT, "utf8");
+    const sql = readFileSync(RESTORED_HISTORY_SQL, "utf8");
+
+    expect(workflow).toContain("node scripts/run-restored-history-incremental-harness.mjs");
+    expect(workflow).toContain("ref: ${{ github.event.pull_request.head.sha || github.sha }}");
+    expect(workflow).toContain('"supabase/migrations/**"');
+    expect(workflow).toContain('"supabase/config.toml"');
+    expect(workflow).toContain('"supabase/seed.sql"');
+    expect(script).toContain("prepareReplayWorkspace");
+    expect(script).toContain("source_migrations_unchanged");
+    const restoredArray = script.match(/RESTORED_MIGRATIONS\s*=\s*\[([\s\S]*?)\];/);
+    expect(restoredArray).toBeTruthy();
+    const runnerMigrations = [...(restoredArray?.[1].matchAll(/"([^"]+\.sql)"/g) ?? [])].map(
+      (match) => match[1],
+    );
+    expect(runnerMigrations).toEqual(RESTORED_HISTORY_MIGRATIONS);
+    expect(script).toContain(
+      '"20260823120000_restored_history_ai_credit_pheno_quicklog_repair.sql"',
+    );
+    expect(script).toContain("removeBaselineMigration(filename)");
+    expect(script).toMatch(/run\(\s*"supabase",\s*\[\s*"start",\s*"--workdir",\s*replayWorkdir/);
+    expect(script).toMatch(/\["db",\s*"reset",\s*"--workdir",\s*replayWorkdir,\s*"--local"\]/);
+    expect(script).toMatch(/\["stop",\s*"--workdir",\s*replayWorkdir,\s*"--no-backup"\]/);
+    expect(script).not.toMatch(/\bsupabase\s+(link|db push)\b/);
+    expect(script).not.toContain('endsWith(".local")');
+    const startCallIndex = script.search(/run\(\s*"supabase",\s*\[\s*"start"/);
+    expect(startCallIndex).toBeGreaterThan(-1);
+    expect(script.indexOf("stackStartAttempted = true")).toBeLessThan(startCallIndex);
+    expect(script).toContain("credential-bearing output suppressed");
+    expect(script).toContain('process.once("SIGINT"');
+    expect(script).toContain('process.once("SIGTERM"');
+
+    const baselineIndex = sql.indexOf("CREATE TEMP TABLE restored_history_baseline_catalog");
+    const rawMigrationIndexes = RESTORED_HISTORY_MIGRATIONS.map((filename) => {
+      const include = `\\ir ../migrations/${filename}`;
+      expect(sql.split(include)).toHaveLength(2);
+      return sql.indexOf(include);
+    });
+    const controlIndex = sql.indexOf("DO $control$");
+    const repairIndex = sql.indexOf(
+      "20260823120000_restored_history_ai_credit_pheno_quicklog_repair.sql",
+    );
+    const postIndex = sql.indexOf("DO $repair$");
+    expect(baselineIndex).toBeGreaterThan(-1);
+    expect(rawMigrationIndexes).toEqual([...rawMigrationIndexes].sort((a, b) => a - b));
+    expect(rawMigrationIndexes[0]).toBeGreaterThan(baselineIndex);
+    expect(controlIndex).toBeGreaterThan(rawMigrationIndexes.at(-1) ?? -1);
+    expect(repairIndex).toBeGreaterThan(controlIndex);
+    expect(postIndex).toBeGreaterThan(repairIndex);
+    expect(sql).toContain("negative control failed: restored legacy AI spend was not reopened");
+    expect(sql).toContain("repair failed: retired legacy AI spend remains executable");
+    expect(sql).toContain("repair changed the authoritative service AI spend body");
+    expect(sql).toContain("repair changed pheno policy definitions");
+    expect(sql).toContain("ROLLBACK;");
+  });
+
+  it("keeps supported Makefile and active runbook lifecycle commands on replay", () => {
+    const makefile = readFileSync(MAKEFILE, "utf8");
+    const makeLifecycle = makefile
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(
+        (line) => !line.startsWith("#") && /\bsupabase (start|status|db reset|stop)\b/.test(line),
+      );
+
+    expect(makefile).toContain("check-replay-workdir");
+    expect(makefile).toContain('--verify-workdir="$(SUPABASE_REPLAY_WORKDIR)"');
+    expect(makefile).toContain('--verify-cleanup-workdir="$(SUPABASE_REPLAY_WORKDIR)"');
+    expect(makefile).toMatch(/^stop: check-cli check-replay-cleanup-workdir\b/m);
+    expect(makeLifecycle).toHaveLength(5);
+    for (const command of makeLifecycle) {
+      expect(command).toContain('--workdir "$(SUPABASE_REPLAY_WORKDIR)"');
+    }
+    for (const command of makeLifecycle.filter((line) =>
+      /\bsupabase (start|status|stop)\b/.test(line),
+    )) {
+      expect(command).toContain(">/dev/null 2>&1");
+    }
+    expect(makefile.match(/credential-bearing output was suppressed/g)).toHaveLength(3);
+    const startRecipe = makefile.slice(makefile.indexOf("start: "), makefile.indexOf("stop: "));
+    const startCommandIndex = startRecipe.indexOf("supabase start");
+    const partialCleanupIndex = startRecipe.indexOf("supabase stop");
+    expect(startCommandIndex).toBeGreaterThan(-1);
+    expect(partialCleanupIndex).toBeGreaterThan(startCommandIndex);
+    expect(startRecipe).toContain("Partial-start cleanup also failed");
+
+    let documentedLifecycleCount = 0;
+    for (const path of ACTIVE_LOCAL_REPLAY_DOCS) {
+      const document = readFileSync(path, "utf8");
+      const runnableBlocks = [...document.matchAll(/```(?:bash|powershell)\r?\n([\s\S]*?)```/g)]
+        .map((match) => match[1])
+        .join("\n");
+      const commands = runnableBlocks
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(
+          (line) =>
+            !line.startsWith("#") &&
+            /(?:^|[!&=(]\s*)supabase (start|status|db reset|stop|migration up)\b/.test(line),
+        );
+      documentedLifecycleCount += commands.length;
+      for (const command of commands) {
+        expect(command).toContain("--workdir");
+      }
+      expect(document).not.toContain('eval "$(supabase status');
+      expect(document).toContain('STATUS_ENV="$(supabase status');
+      expect(document).toContain('"ANON_KEY","SERVICE_ROLE_KEY"');
+      expect(document).toContain("trap cleanup_replay EXIT");
+      expect(document).toContain("(\nset -euo pipefail");
+      expect(document).toMatch(/trap cleanup_replay EXIT[\s\S]*?\n\)\n```/);
+      expect(document).toContain("stack_start_attempted=0");
+      expect(document).toContain("stack_start_attempted=1");
+      const cleanup = document.match(/cleanup_replay\(\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+      expect(cleanup).toContain('if [ "${stack_start_attempted}" -eq 0 ]');
+      expect(cleanup).toMatch(/elif supabase stop[\s\S]*?; then\s+rm -rf -- "\$\{replay_parent\}"/);
+      expect(cleanup).not.toContain("|| true");
+    }
+    expect(documentedLifecycleCount).toBeGreaterThanOrEqual(10);
+
+    const phenoRunbook = readFileSync(resolve("docs/pheno-paid-smoke-local-setup.md"), "utf8");
+    const powerShell = phenoRunbook.match(
+      /### Windows PowerShell\s+```powershell([\s\S]*?)```/,
+    )?.[1];
+    expect(powerShell).toBeTruthy();
+    expect(powerShell).toContain("function Assert-NativeSuccess");
+    expect(powerShell).toContain("$statusLines = & supabase status");
+    expect(powerShell).toContain('Assert-NativeSuccess "supabase status"');
+    expect(powerShell).toContain("$stackStartAttempted = $false");
+    expect(powerShell).toContain("$stackStartAttempted = $true");
+    expect(powerShell).toContain("$stopExit = $LASTEXITCODE");
+    expect(powerShell).toMatch(
+      /if \(\$stopExit -eq 0\) \{[\s\S]*?Remove-Item -LiteralPath \$replayParent -Recurse -Force -ErrorAction Stop/,
+    );
+    expect(powerShell).toMatch(
+      /else \{\s+Write-Warning "Local Supabase cleanup failed; preserved \$replayParent\."/,
+    );
   });
 
   it("reapplies the irrigation browser-write deny boundary after blanket local grants", () => {
@@ -299,8 +554,7 @@ describe("local Supabase replay compatibility workspace", () => {
     });
     expect(entry?.reason).toContain("20260725024026");
 
-    const normalize = (path: string) =>
-      readFileSync(resolve(path), "utf8").replace(/\r\n?/g, "\n");
+    const normalize = (path: string) => readFileSync(resolve(path), "utf8").replace(/\r\n?/g, "\n");
     const canonical = normalize(entry?.canonical_path ?? "missing");
     const duplicate = normalize(entry?.duplicate_path ?? "missing");
     expect(duplicate).toBe(`${canonical}\n;\n`);
@@ -423,6 +677,177 @@ describe("local Supabase replay compatibility workspace", () => {
         "utf8",
       ),
     ).toBe(fixture.duplicateSql);
+  });
+
+  it("verifies a prepared workdir against the current source and deterministic report", () => {
+    const fixture = writeFixture();
+    const output = join(fixture.container, "replay");
+    const prepared = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      `--output=${output}`,
+      "--json",
+    ]);
+
+    expect(prepared.status).toBe(0);
+    const report = JSON.parse(prepared.stdout.trim()) as Record<string, unknown>;
+    for (const digest of [
+      "source_migration_tree_sha256",
+      "source_config_sha256",
+      "source_seed_sha256",
+      "source_manifest_sha256",
+      "prepared_migration_tree_sha256",
+    ]) {
+      expect(report[digest], digest).toMatch(/^[a-f0-9]{64}$/);
+    }
+
+    const verified = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      `--verify-workdir=${output}`,
+      "--json",
+    ]);
+    expect(verified.status).toBe(0);
+    expect(JSON.parse(verified.stdout.trim())).toMatchObject({
+      mode: "verified_prepared",
+      source_migrations_unchanged: true,
+    });
+  });
+
+  it("rejects a prepared workdir after the source migration tree advances", () => {
+    const fixture = writeFixture();
+    const output = join(fixture.container, "replay");
+    expect(
+      runScript([
+        `--source=${fixture.sourceRoot}`,
+        `--manifest=${fixture.manifestPath}`,
+        `--output=${output}`,
+      ]).status,
+    ).toBe(0);
+    writeFileSync(
+      join(fixture.sourceRoot, "supabase", "migrations", "20260722000000_new_source.sql"),
+      "SELECT 2;\n",
+    );
+
+    const verified = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      `--verify-workdir=${output}`,
+    ]);
+    expect(verified.status).toBe(1);
+    expect(verified.stderr).toContain("[supabase-replay] stale_workdir");
+
+    const cleanupVerified = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--verify-cleanup-workdir=${output}`,
+      "--json",
+    ]);
+    expect(cleanupVerified.status).toBe(0);
+    expect(JSON.parse(cleanupVerified.stdout.trim())).toMatchObject({
+      mode: "verified_for_cleanup",
+      source_migrations_unchanged: true,
+    });
+  });
+
+  it("rejects cleanup authorization for a workdir inside the source repository", () => {
+    const fixture = writeFixture();
+    const output = join(fixture.container, "replay");
+    expect(
+      runScript([
+        `--source=${fixture.sourceRoot}`,
+        `--manifest=${fixture.manifestPath}`,
+        `--output=${output}`,
+      ]).status,
+    ).toBe(0);
+    writeFileSync(
+      join(fixture.sourceRoot, "local-supabase-replay-report.json"),
+      readFileSync(join(output, "local-supabase-replay-report.json"), "utf8"),
+    );
+
+    const verified = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--verify-cleanup-workdir=${fixture.sourceRoot}`,
+    ]);
+    expect(verified.status).toBe(1);
+    expect(verified.stderr).toContain("[supabase-replay] unsafe_workdir");
+  });
+
+  it("rejects a shape-valid forged cleanup report that does not match the workdir", () => {
+    const forgedRoot = join(makeTemporaryRoot(), "forged-replay");
+    mkdirSync(join(forgedRoot, "supabase", "migrations"), { recursive: true });
+    writeFileSync(join(forgedRoot, "supabase", "config.toml"), 'project_id = "forged"\n');
+    const forgedReport = {
+      version: 1,
+      mode: "prepared",
+      source_migrations_unchanged: true,
+      source_migration_tree_sha256: "0".repeat(64),
+      source_config_sha256: "0".repeat(64),
+      source_seed_sha256: null,
+      source_manifest_sha256: "0".repeat(64),
+      prepared_migration_tree_sha256: "0".repeat(64),
+      compatibility_entry_count: 0,
+      compatibility_patch_count: 0,
+      compatibility_injection_count: 0,
+      entries: [],
+      patches: [],
+      injections: [],
+    };
+    writeFileSync(
+      join(forgedRoot, "local-supabase-replay-report.json"),
+      `${JSON.stringify(forgedReport)}\n`,
+    );
+
+    const verified = runScript([`--verify-cleanup-workdir=${forgedRoot}`]);
+    expect(verified.status).toBe(1);
+    expect(verified.stderr).toContain("[supabase-replay] workdir_drift");
+  });
+
+  it("rejects changed prepared migrations even when the report is untouched", () => {
+    const fixture = writeFixture();
+    const output = join(fixture.container, "replay");
+    expect(
+      runScript([
+        `--source=${fixture.sourceRoot}`,
+        `--manifest=${fixture.manifestPath}`,
+        `--output=${output}`,
+      ]).status,
+    ).toBe(0);
+    writeFileSync(
+      join(output, "supabase", "migrations", fixture.canonicalName),
+      `${fixture.canonicalSql}SELECT 2;\n`,
+    );
+
+    const verified = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      `--verify-workdir=${output}`,
+    ]);
+    expect(verified.status).toBe(1);
+    expect(verified.stderr).toContain("[supabase-replay] workdir_drift");
+  });
+
+  it("rejects a forged prepared report instead of trusting its presence", () => {
+    const fixture = writeFixture();
+    const output = join(fixture.container, "replay");
+    expect(
+      runScript([
+        `--source=${fixture.sourceRoot}`,
+        `--manifest=${fixture.manifestPath}`,
+        `--output=${output}`,
+      ]).status,
+    ).toBe(0);
+    const reportPath = join(output, "local-supabase-replay-report.json");
+    const report = JSON.parse(readFileSync(reportPath, "utf8")) as Record<string, unknown>;
+    report.source_seed_sha256 = "0".repeat(64);
+    writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+
+    const verified = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      `--verify-workdir=${output}`,
+    ]);
+    expect(verified.status).toBe(1);
+    expect(verified.stderr).toContain("[supabase-replay] stale_workdir");
   });
 
   it("patches exact fingerprinted text only in the disposable workspace", () => {
@@ -609,6 +1034,27 @@ describe("local Supabase replay compatibility workspace", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("[supabase-replay] unsafe_output");
     expect(existsSync(output)).toBe(false);
+  });
+
+  it("rejects an external symlink or junction parent that resolves into the source", () => {
+    const fixture = writeFixture();
+    const linkedParent = join(fixture.container, "source-link");
+    symlinkSync(
+      fixture.sourceRoot,
+      linkedParent,
+      process.platform === "win32" ? "junction" : "dir",
+    );
+    const escapedOutput = join(linkedParent, "escaped-output");
+
+    const result = runScript([
+      `--source=${fixture.sourceRoot}`,
+      `--manifest=${fixture.manifestPath}`,
+      `--output=${escapedOutput}`,
+    ]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("[supabase-replay] unsafe_output");
+    expect(existsSync(join(fixture.sourceRoot, "escaped-output"))).toBe(false);
   });
 
   it("rejects an existing output directory instead of reusing stale files", () => {

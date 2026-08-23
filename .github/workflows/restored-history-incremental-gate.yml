@@ -1,0 +1,58 @@
+name: Restored migration incremental convergence
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/config.toml"
+      - "supabase/seed.sql"
+      - "supabase/tests/restored_history_incremental_forward_repair.sql"
+      - "scripts/run-restored-history-incremental-harness.mjs"
+      - "scripts/prepare-local-supabase-replay.mjs"
+      - "scripts/required-money-migrations.mjs"
+      - "src/test/restored-history-incremental-forward-repair.test.ts"
+      - "config/local-supabase-replay-compatibility.json"
+      - "config/local-supabase-replay/**"
+      - ".github/workflows/restored-history-incremental-gate.yml"
+  push:
+    branches:
+      - verdant-grow-diary
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/config.toml"
+      - "supabase/seed.sql"
+      - "supabase/tests/restored_history_incremental_forward_repair.sql"
+      - "scripts/run-restored-history-incremental-harness.mjs"
+      - "scripts/prepare-local-supabase-replay.mjs"
+      - "scripts/required-money-migrations.mjs"
+      - "src/test/restored-history-incremental-forward-repair.test.ts"
+      - "config/local-supabase-replay-compatibility.json"
+      - "config/local-supabase-replay/**"
+      - ".github/workflows/restored-history-incremental-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restored-history-incremental-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  restored-history-incremental:
+    name: Restored history incremental PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
+        with:
+          version: 2.109.1
+
+      - name: Prove late-history negative control and additive convergence
+        run: node scripts/run-restored-history-incremental-harness.mjs

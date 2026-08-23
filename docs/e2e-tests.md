@@ -118,8 +118,8 @@ Provide either session files (preferred) OR email+password pairs:
 
 Local Supabase + `service_role` required. See
 [docs/pheno-paid-smoke-local-setup.md](./pheno-paid-smoke-local-setup.md)
-for the full local setup (Docker + `supabase start` + test accounts +
-`bun run test:pheno-paid-smoke:seed`). The seeder writes real evidence
+for the full local setup (Docker + a prepared compatibility workdir + test
+accounts + `bun run test:pheno-paid-smoke:seed`). The seeder writes real evidence
 rows so `comparison-ready` is produced by the same code path the app uses
 — nothing is faked. **Never** seed against hosted Supabase and **never**
 paste `service_role`, cookies, passwords, or hunt ids into chat.
@@ -151,7 +151,7 @@ bun run test:pheno-paid-smoke:verify-tests  # unit + CLI tests for the verifier 
 
 | Step                                               | Automation                                                                                                                                                                                                                                                                                              |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A. Free gate + returnTo on Upgrade CTA             | Automated — gate and CTA asserted affirmatively (visible testids, exact `/pricing?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fnew` href (the `plan` preselect was added by #940), click-through renders plan content); an `/auth` bounce or absent gate/CTA FAILS                                                                                                  |
+| A. Free gate + returnTo on Upgrade CTA             | Automated — gate and CTA asserted affirmatively (visible testids, exact `/pricing?plan=pro_annual&returnTo=%2Fpheno-hunts%2Fnew` href (the `plan` preselect was added by #940), click-through renders plan content); an `/auth` bounce or absent gate/CTA FAILS                                         |
 | B. CheckoutSuccess sanitization + entitlement wait | Automated (route contract only)                                                                                                                                                                                                                                                                         |
 | B. Paddle iframe payment                           | **MANUAL** — iframe is cross-origin; no real charge is ever performed                                                                                                                                                                                                                                   |
 | C. Pro hunt creation flow                          | Requires Pro session + fixture; automated when inputs present                                                                                                                                                                                                                                           |

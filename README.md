@@ -281,8 +281,13 @@ requires production secrets.
 
 **Required local services**
 
-- Local Supabase running (e.g. `supabase start`) with this repo's
-  migrations applied (`supabase db reset` or `supabase migration up`).
+- Local Supabase running from a SHA-verified disposable replay workspace.
+  Raw root-level `supabase start`, `supabase db reset`, and
+  `supabase migration up` are unsupported because they bypass the immutable
+  migration compatibility manifest. Use the one-shot wrapper under **Run it**;
+  it targets one prepared workdir for the entire lifecycle, attempts cleanup
+  after a partial start or test failure, and preserves the bounded workdir when
+  the local stack cannot be stopped safely.
 - **Local grants:** the local CLI stack does not grant API-role table
   privileges the way hosted Lovable Cloud's migration runner does, so
   every PostgREST request fails with `42501 permission denied` until you
@@ -296,16 +301,85 @@ requires production secrets.
     public.sensor_readings TO authenticated;
   ```
 
-  The CI workflow runs this automatically after `supabase db reset --local`.
+  The CI workflow runs this automatically after the prepared-workdir reset.
 
 **Run it**
 
 ```bash
-MCP_LOCAL_RLS_HARNESS=1 \
-LOCAL_SUPABASE_URL=http://127.0.0.1:54321 \
-LOCAL_SUPABASE_ANON_KEY=<local-anon-key> \
-LOCAL_SUPABASE_SERVICE_ROLE_KEY=<local-service-role-key> \
+(
+set -euo pipefail
+replay_parent="$(mktemp -d)"
+export SUPABASE_REPLAY_WORKDIR="${replay_parent}/workspace"
+stack_start_attempted=0
+cleanup_replay() {
+  local primary_status=$?
+  trap - EXIT
+  unset STATUS_ENV API_URL DB_URL ANON_KEY SERVICE_ROLE_KEY
+  unset MCP_LOCAL_RLS_HARNESS LOCAL_SUPABASE_URL
+  unset LOCAL_SUPABASE_ANON_KEY LOCAL_SUPABASE_SERVICE_ROLE_KEY
+  if [ "${stack_start_attempted}" -eq 0 ]; then
+    rm -rf -- "${replay_parent}"
+  elif supabase stop --workdir "${SUPABASE_REPLAY_WORKDIR}" --no-backup >/dev/null 2>&1; then
+    rm -rf -- "${replay_parent}"
+  else
+    echo "Local Supabase cleanup failed; preserved ${replay_parent}." >&2
+    if [ "${primary_status}" -eq 0 ]; then primary_status=1; fi
+  fi
+  exit "${primary_status}"
+}
+trap cleanup_replay EXIT
+
+node scripts/prepare-local-supabase-replay.mjs \
+  --output="${SUPABASE_REPLAY_WORKDIR}" --json
+stack_start_attempted=1
+if ! supabase start --workdir "${SUPABASE_REPLAY_WORKDIR}" >/dev/null 2>&1; then
+  echo "Local Supabase failed to start; credential-bearing output was suppressed." >&2
+  exit 1
+fi
+supabase db reset --workdir "${SUPABASE_REPLAY_WORKDIR}" --local
+if ! STATUS_ENV="$(supabase status --workdir "${SUPABASE_REPLAY_WORKDIR}" -o env 2>/dev/null)"; then
+  echo "Local Supabase status failed; credential-bearing output was suppressed." >&2
+  exit 1
+fi
+eval "${STATUS_ENV}"
+unset STATUS_ENV
+export API_URL DB_URL ANON_KEY SERVICE_ROLE_KEY
+node -e 'const ok=new Set(["localhost","127.0.0.1","[::1]"]); for (const n of ["API_URL","DB_URL","ANON_KEY","SERVICE_ROLE_KEY"]) { const v=process.env[n]; if (!v) throw new Error(`${n} is missing`); if (n.endsWith("_URL") && !ok.has(new URL(v).hostname.toLowerCase())) throw new Error(`${n} is not loopback`); }'
+
+node --input-type=module <<'NODE'
+import { spawnSync } from "node:child_process";
+const parsed = new URL(process.env.DB_URL);
+const env = {
+  ...process.env,
+  PGHOST: parsed.hostname === "[::1]" ? "::1" : parsed.hostname,
+  PGPORT: parsed.port || "5432",
+  PGUSER: decodeURIComponent(parsed.username),
+  PGPASSWORD: decodeURIComponent(parsed.password),
+  PGDATABASE: decodeURIComponent(parsed.pathname.replace(/^\//, "")),
+  PGSSLMODE: "disable",
+};
+const sql = `
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.grows, public.tents, public.diary_entries,
+  public.sensor_readings TO service_role;
+GRANT SELECT ON TABLE public.grows, public.tents, public.diary_entries,
+  public.sensor_readings TO authenticated;
+`;
+const result = spawnSync("psql", ["-X", "-v", "ON_ERROR_STOP=1"], {
+  env,
+  input: sql,
+  stdio: ["pipe", "inherit", "inherit"],
+});
+if (result.error) throw result.error;
+if (result.status !== 0) process.exit(result.status ?? 1);
+NODE
+
+export MCP_LOCAL_RLS_HARNESS=1
+export LOCAL_SUPABASE_URL="${API_URL}"
+export LOCAL_SUPABASE_ANON_KEY="${ANON_KEY}"
+export LOCAL_SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
 bun run test:mcp:rls:local
+)
 ```
 
 The `test:mcp:rls:local` package script is a thin wrapper around
@@ -318,11 +392,13 @@ The `mcp-local-rls-integration` workflow
 (`.github/workflows/mcp-local-rls-integration.yml`) runs the harness
 against a fresh local Supabase on the runner:
 
-1. starts local Supabase via the CLI (no `supabase link`, no remote
-   `db push`, no hosted refs, no repo secrets),
+1. verifies the immutable replay manifest, prepares a disposable workdir, and
+   starts local Supabase through it (no `supabase link`, no remote `db push`,
+   no hosted refs, no repo secrets),
 2. masks the ephemeral local keys and waits for auth/REST readiness with
    a bounded retry loop,
-3. applies and verifies repo migrations with `supabase db reset --local`,
+3. applies and verifies repo migrations with `supabase db reset --workdir
+"$SUPABASE_REPLAY_WORKDIR" --local`,
 4. runs the harness, and
 5. **only when the job fails**, uploads sanitized debug artifacts from
    `artifacts/mcp-local-rls/` (harness log, response snapshots, vitest
@@ -496,9 +572,9 @@ Runtime:
 
 Environment variables:
 
-| Variable                                           | Required?       | Purpose                                                                                                                                                                          |
-| -------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SUPABASE_DB_URL` | Yes (diff mode) | Direct Postgres connection string used by `psql`. In CI, each protected environment binds its own environment secret into this process variable. |
+| Variable          | Required?       | Purpose                                                                                                                                            |
+| ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_DB_URL` | Yes (diff mode) | Direct Postgres connection string used by `psql`. In CI, each protected environment binds its own environment secret into this process variable.   |
 | `TARGET_ENV`      | Optional        | `sandbox` or `live`. Used for target-identity validation and stamped into JSON/SARIF output as `target_env`; it does not select a fallback secret. |
 
 The connection string must be the **direct** Postgres URL for the target
@@ -776,7 +852,7 @@ confirm all four:
 - [ ] The run was triggered by `push` or `pull_request` on a branch you
       have permission to see (not a fork PR).
 - [ ] `upload-sarif` step logs `SARIF upload complete` (not `Resource
-    not accessible` or `Invalid SARIF file`).
+  not accessible` or `Invalid SARIF file`).
 
 If all four are true and findings still don't show, jump to the
 _Security tab looks empty (GitHub UI gotchas)_ table below — the cause
@@ -2615,18 +2691,18 @@ Common failure modes and the fastest fix for each. All apply to both
 `scripts/assert-required-money-migrations-applied.mjs` and
 `scripts/diff-money-migration-prefixes.mjs` unless noted.
 
-| Symptom                                                                   | Likely cause                                                                                                                        | Quickest fix                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`    | `SUPABASE_DB_URL` is not set                                                                                                        | `export SUPABASE_DB_URL=...` and set `TARGET_ENV=sandbox` or `TARGET_ENV=live` to match that connection. Verify with `env \| grep SUPABASE_DB_URL`.                                                                                                                   |
-| `psql: command not found` / `spawn psql ENOENT`                           | Postgres client not installed or not on `PATH`                                                                                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`.                                                                                                                               |
-| Applied-check reports drift but sandbox is definitely up to date          | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox)                                                              | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output.                                                                                                                               |
-| `psql: FATAL: password authentication failed`                             | Stale or wrong pooler credentials in the DB URL                                                                                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`.                                                                                                                     |
-| `Tracker query failed` / SARIF `money-migration-tooling`                  | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB)                                                        | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.                                                                                                                                   |
-| Exit `1` immediately, no drift table                                      | Manifest entry missing a 14-digit prefix (`money-migration-malformed`)                                                              | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`.                                                                                                               |
-| `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs                                                                   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.                                                                                                                                         |
+| Symptom                                                                   | Likely cause                                                                                                                        | Quickest fix                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`    | `SUPABASE_DB_URL` is not set                                                                                                        | `export SUPABASE_DB_URL=...` and set `TARGET_ENV=sandbox` or `TARGET_ENV=live` to match that connection. Verify with `env \| grep SUPABASE_DB_URL`.                                                                                                                           |
+| `psql: command not found` / `spawn psql ENOENT`                           | Postgres client not installed or not on `PATH`                                                                                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`.                                                                                                                                       |
+| Applied-check reports drift but sandbox is definitely up to date          | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox)                                                              | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output.                                                                                                                                       |
+| `psql: FATAL: password authentication failed`                             | Stale or wrong pooler credentials in the DB URL                                                                                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`.                                                                                                                             |
+| `Tracker query failed` / SARIF `money-migration-tooling`                  | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB)                                                        | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.                                                                                                                                           |
+| Exit `1` immediately, no drift table                                      | Manifest entry missing a 14-digit prefix (`money-migration-malformed`)                                                              | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`.                                                                                                                       |
+| `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs                                                                   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.                                                                                                                                                 |
 | CI green locally, red in Actions                                          | The protected environment's DB secret is missing or misnamed                                                                        | In **Settings → Environments**, verify `verdant-sandbox` has `SUPABASE_DB_URL_SANDBOX` and `verdant-production` has `SUPABASE_DB_URL`. Each workflow binds its environment secret to the process variable `SUPABASE_DB_URL`; neither uses `DATABASE_URL` or a fallback alias. |
-| Sandbox smoke script hangs                                                | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement                                                          | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                                                                                                                                                  |
-| `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push. |
+| Sandbox smoke script hangs                                                | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement                                                          | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                                                                                                                                                          |
+| `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push.         |
 
 ##### `--sarif` specific issues
 

@@ -3,7 +3,9 @@
  * One-shot orchestrator for the irrigation evidence integrity suite.
  *
  * Steps (fail-closed, per-step reported):
- *   1. supabase start           — boot the disposable local stack
+ *   0. prepare replay workspace — verify immutable source migration hashes and
+ *                                 build the disposable compatibility copy
+ *   1. supabase start           — boot that disposable local stack
  *   2. supabase db reset        — apply migrations + seed.sql (prod-parity ACL)
  *   3. runtime harness          — scripts/run-irrigation-evidence-rls-harness.ts
  *                                 against the disposable stack (loopback only)
@@ -21,12 +23,18 @@
  * Windows / macOS / Linux friendly. Requires: node, bun, supabase CLI, psql.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const PRODUCTION_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
+const REPLAY_PREPARER = resolve(REPO_ROOT, "scripts/prepare-local-supabase-replay.mjs");
+let replayTempRoot;
+let replayWorkdir;
+let replayStackStarted = false;
+let replayCleanupBlocked = false;
 
 const STATIC_PIN_FILES = [
   "src/test/irrigation-evidence-rls-harness-static-safety.test.ts",
@@ -71,6 +79,18 @@ function run(cmd, args, opts = {}) {
   return r;
 }
 
+function postgresEnvFromUrl(value) {
+  const parsed = new URL(value);
+  return {
+    PGHOST: parsed.hostname === "[::1]" ? "::1" : parsed.hostname,
+    PGPORT: parsed.port || "5432",
+    PGUSER: decodeURIComponent(parsed.username),
+    PGPASSWORD: decodeURIComponent(parsed.password),
+    PGDATABASE: decodeURIComponent(parsed.pathname.replace(/^\//, "")),
+    PGSSLMODE: "disable",
+  };
+}
+
 function requireBin(bin) {
   const probe = spawnSync(bin, ["--version"], {
     stdio: "ignore",
@@ -83,7 +103,11 @@ function requireBin(bin) {
 }
 
 // -- Preflight --------------------------------------------------------------
-for (const f of [...STATIC_PIN_FILES, ...PGTAP_FILES]) {
+for (const f of [
+  ...STATIC_PIN_FILES,
+  ...PGTAP_FILES,
+  "scripts/prepare-local-supabase-replay.mjs",
+]) {
   if (!existsSync(resolve(REPO_ROOT, f))) {
     console.error(`[irrigation-integrity] missing expected file: ${f}`);
     process.exit(2);
@@ -91,20 +115,59 @@ for (const f of [...STATIC_PIN_FILES, ...PGTAP_FILES]) {
 }
 for (const bin of ["node", "bun", "supabase", "psql"]) requireBin(bin);
 
+replayTempRoot = mkdtempSync(join(tmpdir(), "verdant-irrigation-replay-"));
+replayWorkdir = join(replayTempRoot, "workspace");
+process.once("exit", cleanupReplayWorkspace);
+
+// Every supported fresh replay must use the SHA-pinned compatibility copy.
+// The source migration tree remains untouched; only this disposable workdir
+// receives sanctioned no-ops, patches, and injections.
+{
+  const prepared = run("node", [REPLAY_PREPARER, `--output=${replayWorkdir}`, "--json"], {
+    capture: true,
+  });
+  if (prepared.status !== 0) {
+    fail(
+      "prepare replay workspace",
+      (prepared.stderr || prepared.stdout || "").trim().slice(0, 400),
+    );
+    printSummaryAndExit(1);
+  }
+  let report;
+  try {
+    report = JSON.parse(prepared.stdout || "{}");
+  } catch {
+    fail("prepare replay workspace", "preparer did not return valid JSON evidence");
+    printSummaryAndExit(1);
+  }
+  if (report.source_migrations_unchanged !== true || report.mode !== "prepared") {
+    fail("prepare replay workspace", "preparer did not prove immutable source migrations");
+    printSummaryAndExit(1);
+  }
+  ok(
+    "prepare replay workspace",
+    `${report.compatibility_entry_count} no-ops, ${report.compatibility_patch_count} patches, ${report.compatibility_injection_count} injections`,
+  );
+}
+
 // -- 1. supabase start ------------------------------------------------------
 let apiUrl, dbUrl, anonKey, serviceKey;
 try {
   // Idempotent: `supabase start` is a no-op if already running.
-  const start = run("supabase", ["start"], { capture: true });
+  // Arm cleanup before startup because the CLI can create some containers and
+  // then exit nonzero during health checks.
+  replayStackStarted = true;
+  const start = run("supabase", ["start", "--workdir", replayWorkdir], { capture: true });
   if (start.status !== 0) {
-    fail("supabase start", (start.stderr || start.stdout || "").trim().slice(0, 400));
+    fail("supabase start", "CLI startup failed; credential-bearing output suppressed");
     printSummaryAndExit(1);
   }
-  process.stdout.write(start.stdout ?? "");
 
-  const status = run("supabase", ["status", "-o", "env"], { capture: true });
+  const status = run("supabase", ["status", "--workdir", replayWorkdir, "-o", "env"], {
+    capture: true,
+  });
   if (status.status !== 0) {
-    fail("supabase status", (status.stderr || status.stdout || "").trim().slice(0, 400));
+    fail("supabase status", "CLI status failed; credential-bearing output suppressed");
     printSummaryAndExit(1);
   }
   const env = Object.fromEntries(
@@ -125,8 +188,7 @@ try {
   // Loopback guard — this suite must never touch a hosted project.
   const dbHost = new URL(dbUrl).hostname.toLowerCase();
   const apiHost = new URL(apiUrl).hostname.toLowerCase();
-  const isLoopback = (h) =>
-    h === "localhost" || h === "127.0.0.1" || h === "::1" || h.endsWith(".local");
+  const isLoopback = (h) => h === "localhost" || h === "127.0.0.1" || h === "[::1]";
   if (!isLoopback(dbHost) || !isLoopback(apiHost)) {
     fail("loopback guard", `refusing non-loopback stack api=${apiHost} db=${dbHost}`);
     printSummaryAndExit(1);
@@ -143,7 +205,7 @@ try {
 
 // -- 2. supabase db reset ---------------------------------------------------
 {
-  const r = run("supabase", ["db", "reset"]);
+  const r = run("supabase", ["db", "reset", "--workdir", replayWorkdir]);
   if (r.status !== 0) {
     fail("supabase db reset", `exit ${r.status}`);
     printSummaryAndExit(1);
@@ -176,7 +238,9 @@ try {
 
 // -- 4/5. pgTAP suites ------------------------------------------------------
 for (const sql of PGTAP_FILES) {
-  const r = run("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", sql]);
+  const r = run("psql", ["-X", "-v", "ON_ERROR_STOP=1", "-f", sql], {
+    env: postgresEnvFromUrl(dbUrl),
+  });
   const label = `pgTAP ${sql.split("/").pop()}`;
   if (r.status !== 0) fail(label, `exit ${r.status}`);
   else ok(label, "structural + ACL matrix", ["trust-boundary-contract"]);
@@ -193,6 +257,7 @@ for (const sql of PGTAP_FILES) {
 printSummaryAndExit(results.some((r) => r.status === "FAIL") ? 1 : 0);
 
 function printSummaryAndExit(code) {
+  if (!cleanupReplayWorkspace()) code = 1;
   const line = "-".repeat(78);
   console.log(`\n${line}`);
   console.log("Irrigation Integrity Suite — comparison against static pins");
@@ -211,4 +276,49 @@ function printSummaryAndExit(code) {
   console.log(`Total: ${results.length}  Pass: ${pass}  Fail: ${failN}`);
   console.log(line);
   process.exit(code);
+}
+
+function cleanupReplayWorkspace() {
+  if (!replayTempRoot || !replayWorkdir) return true;
+  if (replayCleanupBlocked) return false;
+
+  if (replayStackStarted) {
+    const stop = spawnSync("supabase", ["stop", "--workdir", replayWorkdir, "--no-backup"], {
+      cwd: REPO_ROOT,
+      stdio: "ignore",
+      shell: process.platform === "win32",
+    });
+    if (stop.error || stop.status !== 0) {
+      replayCleanupBlocked = true;
+      fail(
+        "cleanup replay workspace",
+        `local stack did not stop; preserved bounded workdir ${replayWorkdir}`,
+      );
+      return false;
+    }
+    replayStackStarted = false;
+  }
+
+  const resolvedTemp = resolve(tmpdir());
+  const resolvedRoot = resolve(replayTempRoot);
+  const isBoundedTemp =
+    resolvedRoot.startsWith(`${resolvedTemp}${sep}`) &&
+    basename(resolvedRoot).startsWith("verdant-irrigation-replay-");
+  if (!isBoundedTemp) {
+    console.error(
+      `[irrigation-integrity] refusing to clean unexpected replay path: ${resolvedRoot}`,
+    );
+    fail("cleanup replay workspace", `refused unexpected path ${resolvedRoot}`);
+    return false;
+  }
+  try {
+    rmSync(resolvedRoot, { recursive: true, force: true });
+  } catch (error) {
+    fail("cleanup replay workspace", String(error?.message ?? error));
+    return false;
+  }
+  replayTempRoot = undefined;
+  replayWorkdir = undefined;
+  replayCleanupBlocked = false;
+  return true;
 }

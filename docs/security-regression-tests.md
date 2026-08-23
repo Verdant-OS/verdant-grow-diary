@@ -60,18 +60,54 @@ mark the check required until it is stable across multiple PRs.
 ### Local run
 
 ```bash
-supabase start
-supabase db reset
-export SUPABASE_URL=http://127.0.0.1:54321
-export SUPABASE_ANON_KEY=...          # from `supabase status`
-export SUPABASE_SERVICE_ROLE_KEY=...  # local only; NEVER production
-# optional: export SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+(
+set -euo pipefail
+replay_parent="$(mktemp -d)"
+export SUPABASE_REPLAY_WORKDIR="${replay_parent}/workspace"
+stack_start_attempted=0
+cleanup_replay() {
+  local primary_status=$?
+  trap - EXIT
+  unset STATUS_ENV API_URL DB_URL ANON_KEY SERVICE_ROLE_KEY
+  if [ "${stack_start_attempted}" -eq 0 ]; then
+    rm -rf -- "${replay_parent}"
+  elif supabase stop --workdir "${SUPABASE_REPLAY_WORKDIR}" --no-backup >/dev/null 2>&1; then
+    rm -rf -- "${replay_parent}"
+  else
+    echo "Local Supabase cleanup failed; preserved ${replay_parent}." >&2
+    if [ "${primary_status}" -eq 0 ]; then primary_status=1; fi
+  fi
+  exit "${primary_status}"
+}
+trap cleanup_replay EXIT
+
+node scripts/prepare-local-supabase-replay.mjs \
+  --output="${SUPABASE_REPLAY_WORKDIR}" --json
+stack_start_attempted=1
+if ! supabase start --workdir "${SUPABASE_REPLAY_WORKDIR}" >/dev/null 2>&1; then
+  echo "Local Supabase failed to start; credential-bearing output was suppressed." >&2
+  exit 1
+fi
+supabase db reset --workdir "${SUPABASE_REPLAY_WORKDIR}" --local
+if ! STATUS_ENV="$(supabase status --workdir "${SUPABASE_REPLAY_WORKDIR}" -o env 2>/dev/null)"; then
+  echo "Local Supabase status failed; credential-bearing output was suppressed." >&2
+  exit 1
+fi
+eval "${STATUS_ENV}"
+unset STATUS_ENV
+export API_URL DB_URL ANON_KEY SERVICE_ROLE_KEY
+node -e 'const ok=new Set(["localhost","127.0.0.1","[::1]"]); for (const n of ["API_URL","DB_URL","ANON_KEY","SERVICE_ROLE_KEY"]) { const v=process.env[n]; if (!v) throw new Error(`${n} is missing`); if (n.endsWith("_URL") && !ok.has(new URL(v).hostname.toLowerCase())) throw new Error(`${n} is not loopback`); }'
+export SUPABASE_URL="${API_URL}"
+export SUPABASE_ANON_KEY="${ANON_KEY}"
+export SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}" # local only; NEVER production
+export SUPABASE_DB_URL="${DB_URL}"
 
 bun run test:pi-ingest-db-security
 bun run test:storage-db-security
 bun run test:profiles-db-security
 bun run test:customer-mode-db-security
 bun run test:security-db-local     # aggregate — runs all of the above
+)
 ```
 
 Each individual runner exits with code `2` and a `BLOCKED:` message when
@@ -79,7 +115,8 @@ required env vars are missing so it never fakes a pass.
 
 ### Local grant parity (`supabase/seed.sql`)
 
-`supabase db reset` applies `supabase/seed.sql` after migrations. It exists
+The prepared-workdir `supabase db reset` applies `supabase/seed.sql` after
+migrations. It exists
 because the hosted project (created 2026-05) is grandfathered on Supabase's
 **legacy default privileges** — anon/authenticated/service_role receive DML
 grants on new public tables automatically, and RLS is the real guard — while
@@ -97,7 +134,7 @@ applied to the hosted project. If a table is deliberately locked down at the
 GRANT layer in a migration, add it to the deny-list in the seed as well.
 
 Verified end-to-end 2026-07-09: with the seed in place, both profiles
-harness suites pass 14/14 against a fresh `supabase start` + `db reset`
+harness suites pass 14/14 against a fresh prepared-workdir start + reset
 (write-protection 10/10 including trigger and RPC paths; entitlement
 resolution 4/4 with zero `public.profiles` queries).
 

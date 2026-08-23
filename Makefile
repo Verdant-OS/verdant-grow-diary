@@ -17,9 +17,12 @@ PROJECT_REF       ?= knkwiiywfkbqznbxwqfh
 SUPABASE_URL      ?= https://$(PROJECT_REF).supabase.co
 TYPES_OUT         ?= src/integrations/supabase/types.ts
 MIGRATION_NAME    ?= new_migration
+REPLAY_OUTPUT     ?=
+SUPABASE_REPLAY_WORKDIR ?=
 
-.PHONY: help check-cli login init link pull push types types-local diff \
-        functions-serve functions-deploy reset verify db-url status
+.PHONY: help check-cli check-replay-workdir check-replay-cleanup-workdir prepare-replay login init link pull push \
+        types types-local diff functions-serve functions-deploy start stop reset verify \
+        db-url status
 
 help:
 	@echo "Supabase workflows (project ref: $(PROJECT_REF))"
@@ -32,6 +35,30 @@ check-cli: ## Verify supabase CLI is installed
 		exit 1; \
 	}
 	@supabase --version
+
+check-replay-workdir: ## Fail unless SUPABASE_REPLAY_WORKDIR is a prepared disposable project
+	@test -n "$(SUPABASE_REPLAY_WORKDIR)" || { \
+		echo "SUPABASE_REPLAY_WORKDIR is required. Run make prepare-replay REPLAY_OUTPUT=<new-temp-child> first."; \
+		exit 2; \
+	}
+	node scripts/prepare-local-supabase-replay.mjs \
+		--verify-workdir="$(SUPABASE_REPLAY_WORKDIR)" --json >/dev/null
+
+check-replay-cleanup-workdir: ## Bound a prepared workdir for cleanup after source advances
+	@test -n "$(SUPABASE_REPLAY_WORKDIR)" || { \
+		echo "SUPABASE_REPLAY_WORKDIR is required for cleanup."; \
+		exit 2; \
+	}
+	node scripts/prepare-local-supabase-replay.mjs \
+		--verify-cleanup-workdir="$(SUPABASE_REPLAY_WORKDIR)" --json >/dev/null
+
+prepare-replay: check-cli ## Build a new SHA-pinned disposable replay project at REPLAY_OUTPUT
+	@test -n "$(REPLAY_OUTPUT)" || { \
+		echo "REPLAY_OUTPUT must be a new child path under an OS temporary directory."; \
+		exit 2; \
+	}
+	node scripts/prepare-local-supabase-replay.mjs --output="$(REPLAY_OUTPUT)" --json
+	@echo "Prepared. Export SUPABASE_REPLAY_WORKDIR=$(REPLAY_OUTPUT) before start/status/reset/stop."
 
 login: check-cli ## Log in to Supabase (opens browser)
 	supabase login
@@ -46,8 +73,32 @@ init: check-cli ## Initialize supabase/ folder (skip if already present)
 link: check-cli ## Link local repo to this Cloud project
 	supabase link --project-ref $(PROJECT_REF)
 
-status: check-cli ## Show local Supabase stack status
-	supabase status
+status: check-cli check-replay-workdir ## Show the prepared local Supabase stack status
+	@if supabase status --workdir "$(SUPABASE_REPLAY_WORKDIR)" >/dev/null 2>&1; then \
+		echo "Prepared local Supabase stack is running."; \
+	else \
+		echo "Local Supabase status failed; credential-bearing output was suppressed."; \
+		exit 1; \
+	fi
+
+start: check-cli check-replay-workdir ## Start the prepared local Supabase stack
+	@if supabase start --workdir "$(SUPABASE_REPLAY_WORKDIR)" >/dev/null 2>&1; then \
+		echo "Prepared local Supabase stack started."; \
+	else \
+		echo "Local Supabase failed to start; credential-bearing output was suppressed."; \
+		if ! supabase stop --workdir "$(SUPABASE_REPLAY_WORKDIR)" --no-backup >/dev/null 2>&1; then \
+			echo "Partial-start cleanup also failed; the prepared workdir was preserved."; \
+		fi; \
+		exit 1; \
+	fi
+
+stop: check-cli check-replay-cleanup-workdir ## Stop a bounded prepared local Supabase stack
+	@if supabase stop --workdir "$(SUPABASE_REPLAY_WORKDIR)" --no-backup >/dev/null 2>&1; then \
+		echo "Prepared local Supabase stack stopped."; \
+	else \
+		echo "Local Supabase cleanup failed; credential-bearing output was suppressed."; \
+		exit 1; \
+	fi
 
 pull: check-cli ## Pull remote schema into supabase/migrations
 	supabase db pull
@@ -77,8 +128,8 @@ functions-serve: check-cli ## Serve edge functions locally with .env.local
 functions-deploy: check-cli ## Deploy all edge functions (Lovable does this automatically)
 	supabase functions deploy
 
-reset: check-cli ## Reset local DB (destructive — local only)
-	supabase db reset
+reset: check-cli check-replay-workdir ## Reset the prepared local DB (destructive — local only)
+	supabase db reset --workdir "$(SUPABASE_REPLAY_WORKDIR)" --local
 
 db-url: ## Print the remote database URL template
 	@echo "postgresql://postgres:<DB_PASSWORD>@db.$(PROJECT_REF).supabase.co:5432/postgres"

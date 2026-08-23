@@ -55,6 +55,11 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // authoritative service-spend definition and closes the checkout-to-
   // settlement race for completed credit-pack purchases.
   "20260728090736_ai_credit_pack_portability.sql",
+  // Restored hosted-sandbox history is intentionally immutable, but applying
+  // missing historical version ids after later hardening can overwrite the
+  // retired five-argument spend RPC and the final Pheno entitlement oracle.
+  // Every deploy target must carry this additive convergence repair.
+  "20260823120000_restored_history_ai_credit_pheno_quicklog_repair.sql",
 ];
 
 /**

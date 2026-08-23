@@ -85,36 +85,131 @@ accounts are never deleted by the orchestrator.
 
 ```bash
 # From the Verdant repo root
-supabase start
-supabase db reset
-supabase status
+(
+set -euo pipefail
+replay_parent="$(mktemp -d)"
+export SUPABASE_REPLAY_WORKDIR="${replay_parent}/workspace"
+stack_start_attempted=0
+cleanup_replay() {
+  local primary_status=$?
+  trap - EXIT
+  unset STATUS_ENV API_URL DB_URL ANON_KEY SERVICE_ROLE_KEY
+  if [ "${stack_start_attempted}" -eq 0 ]; then
+    rm -rf -- "${replay_parent}"
+  elif supabase stop --workdir "${SUPABASE_REPLAY_WORKDIR}" --no-backup >/dev/null 2>&1; then
+    rm -rf -- "${replay_parent}"
+  else
+    echo "Local Supabase cleanup failed; preserved ${replay_parent}." >&2
+    if [ "${primary_status}" -eq 0 ]; then primary_status=1; fi
+  fi
+  exit "${primary_status}"
+}
+trap cleanup_replay EXIT
+
+node scripts/prepare-local-supabase-replay.mjs \
+  --output="${SUPABASE_REPLAY_WORKDIR}" --json
+stack_start_attempted=1
+if ! supabase start --workdir "${SUPABASE_REPLAY_WORKDIR}" >/dev/null 2>&1; then
+  echo "Local Supabase failed to start; credential-bearing output was suppressed." >&2
+  exit 1
+fi
+supabase db reset --workdir "${SUPABASE_REPLAY_WORKDIR}" --local
+if ! STATUS_ENV="$(supabase status --workdir "${SUPABASE_REPLAY_WORKDIR}" -o env 2>/dev/null)"; then
+  echo "Local Supabase status failed; credential-bearing output was suppressed." >&2
+  exit 1
+fi
+eval "${STATUS_ENV}"
+unset STATUS_ENV
+export API_URL DB_URL ANON_KEY SERVICE_ROLE_KEY
+node -e 'const ok=new Set(["localhost","127.0.0.1","[::1]"]); for (const n of ["API_URL","DB_URL","ANON_KEY","SERVICE_ROLE_KEY"]) { const v=process.env[n]; if (!v) throw new Error(`${n} is missing`); if (n.endsWith("_URL") && !ok.has(new URL(v).hostname.toLowerCase())) throw new Error(`${n} is not loopback`); }'
 
 mkdir -p e2e/.fixtures
 rm -f e2e/.fixtures/pheno-paid-smoke.env
 
-export SUPABASE_URL="http://127.0.0.1:54321"
-export SUPABASE_ANON_KEY="<local anon key from supabase status>"
-export SUPABASE_SERVICE_ROLE_KEY="<local service-role key from supabase status>"
+export SUPABASE_URL="${API_URL}"
+export SUPABASE_ANON_KEY="${ANON_KEY}"
+export SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
 
 bun run test:pheno-paid-smoke:local
+)
 ```
 
 ### Windows PowerShell
 
 ```powershell
 # From the Verdant repo root
-supabase start
-supabase db reset
-supabase status
+function Assert-NativeSuccess {
+  param([Parameter(Mandatory)][string]$Step)
+  if ($LASTEXITCODE -ne 0) {
+    throw "$Step failed with exit $LASTEXITCODE"
+  }
+}
 
-New-Item -ItemType Directory -Force "e2e/.fixtures" | Out-Null
-Remove-Item "e2e/.fixtures/pheno-paid-smoke.env" -ErrorAction SilentlyContinue
+$replayParent = Join-Path ([IO.Path]::GetTempPath()) ("verdant-replay-" + [guid]::NewGuid())
+New-Item -ItemType Directory -Path $replayParent | Out-Null
+$env:SUPABASE_REPLAY_WORKDIR = Join-Path $replayParent "workspace"
+$stackStartAttempted = $false
 
-$env:SUPABASE_URL="http://127.0.0.1:54321"
-$env:SUPABASE_ANON_KEY="<local anon key from supabase status>"
-$env:SUPABASE_SERVICE_ROLE_KEY="<local service-role key from supabase status>"
+try {
+  & node scripts/prepare-local-supabase-replay.mjs `
+    --output="$env:SUPABASE_REPLAY_WORKDIR" --json
+  Assert-NativeSuccess "prepare replay workspace"
 
-bun run test:pheno-paid-smoke:local
+  $stackStartAttempted = $true
+  & supabase start --workdir "$env:SUPABASE_REPLAY_WORKDIR" *> $null
+  Assert-NativeSuccess "supabase start"
+  & supabase db reset --workdir "$env:SUPABASE_REPLAY_WORKDIR" --local
+  Assert-NativeSuccess "supabase db reset"
+
+  $statusLines = & supabase status --workdir "$env:SUPABASE_REPLAY_WORKDIR" -o env 2>$null
+  Assert-NativeSuccess "supabase status"
+  $statusLines | ForEach-Object {
+    if ($_ -match '^([A-Z0-9_]+)="?(.*?)"?$') {
+      Set-Item -Path "Env:$($Matches[1])" -Value $Matches[2]
+    }
+  }
+
+  foreach ($name in @("API_URL", "DB_URL", "ANON_KEY", "SERVICE_ROLE_KEY")) {
+    $value = (Get-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue).Value
+    if ([string]::IsNullOrWhiteSpace($value)) { throw "$name is missing" }
+    if ($name.EndsWith("_URL")) {
+      $hostName = ([Uri]$value).Host.ToLowerInvariant()
+      if ($hostName -notin @("localhost", "127.0.0.1", "[::1]", "::1")) {
+        throw "$name is not loopback"
+      }
+    }
+  }
+
+  New-Item -ItemType Directory -Force "e2e/.fixtures" | Out-Null
+  Remove-Item "e2e/.fixtures/pheno-paid-smoke.env" -ErrorAction SilentlyContinue
+
+  $env:SUPABASE_URL=$env:API_URL
+  $env:SUPABASE_ANON_KEY=$env:ANON_KEY
+  $env:SUPABASE_SERVICE_ROLE_KEY=$env:SERVICE_ROLE_KEY
+
+  & bun run test:pheno-paid-smoke:local
+  Assert-NativeSuccess "pheno paid smoke"
+} finally {
+  foreach ($name in @(
+    "API_URL", "DB_URL", "ANON_KEY", "SERVICE_ROLE_KEY",
+    "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"
+  )) {
+    Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+  }
+
+  $stopExit = 0
+  if ($stackStartAttempted) {
+    & supabase stop --workdir "$env:SUPABASE_REPLAY_WORKDIR" --no-backup *> $null
+    $stopExit = $LASTEXITCODE
+  }
+  if ($stopExit -eq 0) {
+    Remove-Item -LiteralPath $replayParent -Recurse -Force -ErrorAction Stop
+    Remove-Item -LiteralPath "Env:SUPABASE_REPLAY_WORKDIR" -ErrorAction SilentlyContinue
+  } else {
+    Write-Warning "Local Supabase cleanup failed; preserved $replayParent."
+    throw "supabase stop failed with exit $stopExit"
+  }
+}
 ```
 
 The orchestrator provisions disposable roles when needed, then runs seven

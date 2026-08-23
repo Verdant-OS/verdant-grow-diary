@@ -337,6 +337,20 @@ describe("prefix-diff-sarif workflow trust boundary", () => {
     expect(PREFIX_LIVE_JOB).not.toContain("pull_request");
   });
 
+  it("treats live tooling error (exit 2) as BLOCKED, not drift failure", () => {
+    // Exit 1 = drift detected → hard job failure
+    expect(PREFIX_LIVE_JOB).toMatch(/if:.*diff-json\.outputs\.exit == '1'/);
+    expect(PREFIX_LIVE_JOB).toMatch(/if:.*diff-sarif\.outputs\.exit == '1'/);
+    // Exit 2 = tooling/connection error → BLOCKED warning, not a hard failure.
+    // The "Block on live tooling error" step must exist and must NOT call `exit 1`.
+    expect(PREFIX_LIVE_JOB).toContain("Block on live tooling error");
+    expect(PREFIX_LIVE_JOB).toMatch(/if:.*diff-json\.outputs\.exit == '2'/);
+    // The live job must NOT hard-fail on `!= '0'` (which would conflate exit 1 and 2).
+    expect(PREFIX_LIVE_JOB).not.toMatch(
+      /if:\s*steps\.diff-json\.outputs\.exit != '0'/,
+    );
+  });
+
   it("has no combined or cross-environment secret fallback", () => {
     expect(PREFIX_WORKFLOW).not.toMatch(
       /secrets\.SUPABASE_DB_URL\s*\}\}[\s\S]{0,120}\|\|[\s\S]{0,120}secrets\.SUPABASE_DB_URL_SANDBOX/,

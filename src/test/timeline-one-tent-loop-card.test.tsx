@@ -60,6 +60,25 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
     ).not.toContain(tentId);
   });
 
+  it("carries a selected Timeline plant UUID into the Sensors href without showing it", () => {
+    const tentId = "00000000-0000-4000-8000-00000000000a";
+    const plantId = "00000000-0000-4000-8000-00000000000b";
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="timeline"
+        ids={{ growId: "g1", tentId, plantId }}
+        testId="timeline-one-tent-loop-next-step-card"
+      />,
+    );
+
+    const cta = screen.getByTestId("timeline-one-tent-loop-next-step-card-cta");
+    const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
+    expect(anchor?.getAttribute("href")).toBe(`/sensors?tentId=${tentId}&plantId=${plantId}`);
+    const text = screen.getByTestId("timeline-one-tent-loop-next-step-card").textContent ?? "";
+    expect(text).not.toContain(plantId);
+    expect(text).not.toContain(tentId);
+  });
+
   it("renders the Sensor Snapshot helper copy", () => {
     renderCard(
       <OneTentLoopNextStepCard current="timeline" testId="timeline-one-tent-loop-next-step-card" />,
@@ -106,6 +125,8 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
     );
     expect(src).toContain('current="timeline"');
     expect(src).toContain("tentId: tentFilter || null");
+    // Doctor-says-so: #1102 left this inert by omitting plantId. Must stay wired.
+    expect(src).toContain("plantId: plantFilter || null");
     expect(src).toContain('testId="timeline-one-tent-loop-next-step-card"');
   });
 });

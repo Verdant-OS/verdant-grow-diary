@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY,
   partitionDoctorEntryOptionsByTent,
   resolveDoctorStartScope,
 } from "@/lib/doctorStartContextRules";
@@ -225,6 +226,7 @@ describe("partitionDoctorEntryOptionsByTent — annotate, never remove", () => {
     });
     expect(out.inScope).toEqual([]);
     expect(out.others).toEqual([]);
+    expect(out.hasUnavailableCarriedPlant).toBe(false);
   });
 
   it("is deterministic", () => {
@@ -257,12 +259,13 @@ describe("partitionDoctorEntryOptionsByTent — carried plant (D-B6 / B6)", () =
       carriedPlantId: "p2",
     });
     expect(r.carriedPlantOptionId).toBe("p2");
+    expect(r.hasUnavailableCarriedPlant).toBe(false);
     expect(r.inScope.map((o) => o.id)).toEqual(["p2", "p1"]);
     // Lossless: inScope ∪ others is still exactly the input.
     expect([...r.inScope, ...r.others].map((o) => o.id).sort()).toEqual(["p1", "p2", "p3"]);
   });
 
-  it("fails closed for a plant in ANOTHER tent — never surfaces it as carried", () => {
+  it("fails closed for a plant in ANOTHER tent — and flags unavailable (never silent drop)", () => {
     const r = partitionDoctorEntryOptionsByTent({
       options,
       plants,
@@ -270,10 +273,11 @@ describe("partitionDoctorEntryOptionsByTent — carried plant (D-B6 / B6)", () =
       carriedPlantId: "p3",
     });
     expect(r.carriedPlantOptionId).toBeNull();
+    expect(r.hasUnavailableCarriedPlant).toBe(true);
     expect(r.inScope.map((o) => o.id)).toEqual(["p1", "p2"]);
   });
 
-  it("fails closed for a plant the grower does not own, or an absent one", () => {
+  it("fails closed for a plant the grower does not own, or an absent one — flagged unavailable when requested", () => {
     for (const bad of ["p9", "", "   ", null, undefined]) {
       const r = partitionDoctorEntryOptionsByTent({
         options,
@@ -282,27 +286,50 @@ describe("partitionDoctorEntryOptionsByTent — carried plant (D-B6 / B6)", () =
         carriedPlantId: bad,
       });
       expect(r.carriedPlantOptionId).toBeNull();
+      // Blank/absent intent is not a cue; only a non-empty rejected id is.
+      const requested = typeof bad === "string" && bad.trim().length > 0;
+      expect(r.hasUnavailableCarriedPlant).toBe(requested);
       expect(r.inScope.map((o) => o.id)).toEqual(["p1", "p2"]);
     }
   });
 
-  it("carries nothing when there is no tent scope at all", () => {
+  it("flags unavailable when a plant was carried but tent scope is missing", () => {
     const r = partitionDoctorEntryOptionsByTent({ options, plants, carriedPlantId: "p1" });
     expect(r.carriedPlantOptionId).toBeNull();
+    expect(r.hasUnavailableCarriedPlant).toBe(true);
     expect(r.inScope).toEqual([]);
     expect(r.others.map((o) => o.id)).toEqual(["p1", "p2", "p3"]);
   });
 
   it("is a LABEL, not a selection — the result exposes no selected/applied field", () => {
-    // The whole safety property of B6: a carried plant may be ordered and
-    // badged, never applied. If a future edit adds a selection field here,
-    // this fails and forces the decision back through review.
+    // The whole safety property of B6 / Doctor-says-so: a carried plant may be
+    // ordered and badged, never applied. If a future edit adds a selection
+    // field here, this fails and forces the decision back through review.
     const r = partitionDoctorEntryOptionsByTent({
       options,
       plants,
       tentId: TENT,
       carriedPlantId: "p1",
     });
-    expect(Object.keys(r).sort()).toEqual(["carriedPlantOptionId", "inScope", "others"]);
+    expect(Object.keys(r).sort()).toEqual([
+      "carriedPlantOptionId",
+      "hasUnavailableCarriedPlant",
+      "inScope",
+      "others",
+    ]);
+    expect(r).not.toHaveProperty("selected");
+    expect(r).not.toHaveProperty("selectedPlantId");
+    expect(r).not.toHaveProperty("appliedPlantId");
+    expect(r).not.toHaveProperty("autoSelectedPlantId");
+  });
+});
+
+describe("DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY", () => {
+  it("is pinned grower-facing copy that never invents a plant name from a UUID", () => {
+    expect(DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY).toMatch(/couldn't offer for review/i);
+    expect(DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY).toMatch(/No plant was selected/i);
+    expect(DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY).not.toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+    );
   });
 });

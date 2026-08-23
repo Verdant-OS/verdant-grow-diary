@@ -2081,8 +2081,10 @@ test.describe("core link and form census", () => {
     page,
   }) => {
     // This exhaustive lane now proves a fresh quiet window after every route,
-    // click-source revisit, and destination; keep that work below the 40m job ceiling.
-    test.setTimeout(420_000);
+    // click-source revisit, and destination. Hosted runners have crossed the
+    // former seven-minute ceiling while the same zero-retry census remained
+    // hermetic and passed locally, so retain a bounded margin below the 40m job.
+    test.setTimeout(600_000);
     const report = await runLaneCensus(page, "public", PUBLIC_CORE_CENSUS_ROUTES);
     expect(report.routeAudits).toHaveLength(PUBLIC_CORE_CENSUS_ROUTES.length);
     expect(report.linkAudits.length).toBeGreaterThan(0);

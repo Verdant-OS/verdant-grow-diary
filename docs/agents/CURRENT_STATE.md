@@ -702,10 +702,18 @@ incidents: `service_role` already holds broad direct table access on this
 project by design (`supabase/seed.sql`'s own documented legacy-grant
 posture), so function-level `service_role` EXECUTE is mostly consistent with
 the platform's existing accepted trust model, not a new class of exposure.
-The two functions individually hardened so far (Action Queue guard, signup)
-were judged sensitive enough to warrant the extra step on a case-by-case
-basis — that pattern, not a blanket revoke across all 66, is what this
-file's precedent supports.
+**Corrected 2026-08-23 (Codex review, this PR) — "two functions" undercounted
+the precedent.** The two hardening efforts so far are the Action Queue guard
+(1 function) and the signup migration — but the signup migration,
+`20260821064300_signup_acquisition_service_role_hardening.sql:71-75`, revokes
+`service_role` from the table **and all four** signup functions
+(`handle_new_user`, `record_signup_acquisition_first_touch`,
+`signup_acquisition_operator_snapshot`, `signup_to_paid_operator_snapshot`),
+not one. So the actual precedent is **two hardening slices covering five
+functions** (plus one table), not two functions — a materially stronger
+case-by-case track record than the original count implied. Judged sensitive
+enough to warrant the extra step each time — that pattern, not a blanket
+revoke across all 66, is what this file's precedent supports.
 
 **"By default" is this section's own headline word, and it overclaims — see
 point 3 of the 2026-08-23 correction above.** `has_function_privilege` proves

@@ -135,6 +135,13 @@
       "duplicate_path": "supabase/migrations/20260722165149_922e7389-1a95-4bc4-8efb-12f3a98e33f7.sql",
       "duplicate_sha256": "fc45b6dacbbc81acae220026f5bb151a0664d9c7f94c82276e081ddbda1a4e82",
       "reason": "The later immutable Lovable export repeats the earlier staged Quick Log manual RPC and fails fresh replay because the 12-argument signature already exists."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260725023000_core_schema_forward_repair.sql",
+      "canonical_sha256": "dfe198408f6cc99b1f31f7927486ebf13766aa2f2ad9b4a6696eb829288965cf",
+      "duplicate_path": "supabase/migrations/20260725033124_core_schema_forward_repair.sql",
+      "duplicate_sha256": "c1c9fde7176c1e60b044a9d83a9f4ccfc4745163d5ab2d218fbd080ece40e36b",
+      "reason": "The restored hosted-ledger row is the earlier core-schema repair plus the official CLI serialization suffix; replaying it after 20260725024026 overwrites the newer Quick Log dual-timestamp wrapper and caused 10 of 40 runtime assertions to fail, so only the disposable replay copy is no-op'd."
     }
   ],
   "compatibility_patches": [

@@ -270,11 +270,40 @@ describe("local Supabase replay compatibility workspace", () => {
     };
     expect(report).toMatchObject({
       mode: "verify_only",
-      compatibility_entry_count: 18,
+      compatibility_entry_count: 19,
       compatibility_patch_count: 4,
       compatibility_injection_count: 2,
       source_migrations_unchanged: true,
     });
+  });
+
+  it("no-ops the restored core-schema export after the newer dual-timestamp wrapper", () => {
+    const manifest = JSON.parse(readFileSync(REAL_MANIFEST, "utf8")) as {
+      compatibility_noops: Array<{
+        canonical_path: string;
+        canonical_sha256: string;
+        duplicate_path: string;
+        duplicate_sha256: string;
+        reason: string;
+      }>;
+    };
+    const entry = manifest.compatibility_noops.find((candidate) =>
+      candidate.duplicate_path.endsWith("20260725033124_core_schema_forward_repair.sql"),
+    );
+
+    expect(entry).toMatchObject({
+      canonical_path: "supabase/migrations/20260725023000_core_schema_forward_repair.sql",
+      canonical_sha256: "dfe198408f6cc99b1f31f7927486ebf13766aa2f2ad9b4a6696eb829288965cf",
+      duplicate_path: "supabase/migrations/20260725033124_core_schema_forward_repair.sql",
+      duplicate_sha256: "c1c9fde7176c1e60b044a9d83a9f4ccfc4745163d5ab2d218fbd080ece40e36b",
+    });
+    expect(entry?.reason).toContain("20260725024026");
+
+    const normalize = (path: string) =>
+      readFileSync(resolve(path), "utf8").replace(/\r\n?/g, "\n");
+    const canonical = normalize(entry?.canonical_path ?? "missing");
+    const duplicate = normalize(entry?.duplicate_path ?? "missing");
+    expect(duplicate).toBe(`${canonical}\n;\n`);
   });
 
   it("pins the immutable default-privilege replay repair to global and schema revokes", () => {

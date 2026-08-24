@@ -89,7 +89,7 @@
     "src/lib/sensorProvenanceFenceRules.ts": "180a0980fa1b014d2138ab0714318dd39fcb2d786d32853fa9d34bfab4f56d0b",
     "src/lib/sensorReadingNormalizationRules.ts": "2f6170e16813b8f5a15a942abc945620289674eadc71b2539e317b00b92b19f2",
     "src/lib/sensorReadingVendorLineage.ts": "8465d6817f4a005fcff688ff38fe93842979bc3cd857bc0f2f419b38d07e1dd5",
-    "src/lib/sensorSnapshot.ts": "70ed23a7907897cf3db64abeb292f6ba3eb6dfdcab6ddcf2b7afa5b55fc7c1e5",
+    "src/lib/sensorSnapshot.ts": "016428eb28a85a1203adfd123327c0a894e26886a784b23d7686baa87900a8f3",
     "src/lib/sensorSnapshotStatusContract.ts": "78ad2a6fba2614a0d7cdb18d4a73d6b3c79d53777b0b63c08ce978031f822f91",
     "src/lib/sensorSourceDisplayLabel.ts": "2c18d0b286841d6b39dd06d2c09a4d8750bba8bd518c539859c53f1fb8713ebc",
     "src/lib/sensorTestbenchIndicatorRules.ts": "68e48e22664c625002623d4c170cc6038f5db4620dbaae35718b82512d0433ca",

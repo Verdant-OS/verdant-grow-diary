@@ -292,6 +292,13 @@ function expectNoTimelineContinuation() {
   expect(screen.queryByTestId("timeline-one-tent-loop-next-step-card")).not.toBeInTheDocument();
 }
 
+function expectNoTimelineDirectoryReads() {
+  const directoryReads = harness.executeQuery.mock.calls
+    .map(([spec]) => spec as QuerySpec)
+    .filter((spec) => spec.table === "plants" || spec.table === "tents");
+  expect(directoryReads).toHaveLength(0);
+}
+
 function expectNoFalseEmptyOrResults() {
   expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
   expect(screen.queryByText("No matching entries")).not.toBeInTheDocument();
@@ -344,6 +351,16 @@ describe("Timeline mounted read-state boundary", () => {
     expectNoTimelineContinuation();
   });
 
+  it("does not read the owner directory while grow ownership proof is pending", async () => {
+    harness.growsState.loading = true;
+
+    renderTimeline();
+
+    expect(await screen.findByTestId("timeline-read-loading")).toBeInTheDocument();
+    await waitFor(() => expectNoTimelineDirectoryReads());
+    expectNoTimelineContinuation();
+  });
+
   it("labels plant/tent filter options from the archived-inclusive name directory", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {
@@ -366,16 +383,31 @@ describe("Timeline mounted read-state boundary", () => {
         // otherwise return every grower's rows on this owner-facing page.
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
         expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
+        expect(spec.columns).toBe("id,name,tent_id,grow_id");
         return {
-          data: [{ id: "5d7206aa-0000-4000-8000-000000000001", name: "Project McDonald #3" }],
+          data: [
+            {
+              id: "5d7206aa-0000-4000-8000-000000000001",
+              name: "Project McDonald #3",
+              tent_id: "6b1faabb-0000-4000-8000-000000000002",
+              grow_id: GROW_A.id,
+            },
+          ],
           error: null,
         };
       }
       if (spec.table === "tents") {
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
         expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
+        expect(spec.columns).toBe("id,name,grow_id");
         return {
-          data: [{ id: "6b1faabb-0000-4000-8000-000000000002", name: "Retired 4x4" }],
+          data: [
+            {
+              id: "6b1faabb-0000-4000-8000-000000000002",
+              name: "Retired 4x4",
+              grow_id: GROW_A.id,
+            },
+          ],
           error: null,
         };
       }
@@ -428,6 +460,7 @@ describe("Timeline mounted read-state boundary", () => {
     expect(document.body).not.toHaveTextContent("provider-secret");
     expect(screen.queryByText("Start your first grow")).not.toBeInTheDocument();
     expect(screen.queryByText("Create grow")).not.toBeInTheDocument();
+    expectNoTimelineDirectoryReads();
     expectNoTimelineContinuation();
 
     fireEvent.click(screen.getByTestId("timeline-grow-data-error-retry"));

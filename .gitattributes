@@ -4,3 +4,11 @@ docs/artifacts/*.csv text eol=lf
 docs/artifacts/*.md text eol=lf
 docs/artifacts/*.json text eol=lf
 docs/artifacts/*.xlsx -text
+
+# The Edge shared-library mirror is generated with LF delimiters. Keep its
+# committed artifacts LF even when a Windows checkout uses core.autocrlf.
+supabase/functions/_shared/lib/** text eol=lf
+
+# TanStack's generated route tree is rewritten by the build tooling. Keep it
+# LF so a persistent Windows publisher does not see EOL-only source drift.
+src/routeTree.gen.ts text eol=lf

@@ -116,6 +116,14 @@ export interface SensorSnapshot {
    */
   diary_evidence_ref?: SensorSnapshotDiaryEvidenceRef;
   /**
+   * Whether this evidence may back an automatically persisted environment
+   * alert. Omitted preserves the existing eligibility contract; only the
+   * Plant Quick Log manual snapshot adapter sets this to false because its
+   * diary payload is display evidence, not a sensor row or an Environment
+   * Check observation.
+   */
+  alert_persistence_eligible?: boolean;
+  /**
    * Tent the contributing rows came from, when they UNAMBIGUOUSLY share
    * one. Environment alerts persist this so tent-scoped surfaces (e.g.
    * Plant Detail's assigned-tent alerts panel) can attribute a breach to
@@ -545,6 +553,7 @@ export function snapshotFromManualSensorSnapshot(
   const diary_evidence_ref = buildDiaryEvidenceRef(entryAt, options?.diaryEntryId);
   return {
     source: "manual",
+    alert_persistence_eligible: false,
     ts: entryAt,
     temp,
     rh,

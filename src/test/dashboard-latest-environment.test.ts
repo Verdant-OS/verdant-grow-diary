@@ -130,6 +130,7 @@ describe("sensorSnapshot pure helpers", () => {
       source: "manual",
       ts: entryAt,
       rh: 48,
+      alert_persistence_eligible: false,
       vpd: null,
       co2: null,
       soil: null,

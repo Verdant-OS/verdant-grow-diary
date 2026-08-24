@@ -19,12 +19,9 @@ const SYNC = join(REPO_ROOT, "scripts/sync-edge-shared.mjs");
 const VERIFY = join(REPO_ROOT, "scripts/verify-edge-shared-in-sync.mjs");
 const STAMPER = join(REPO_ROOT, "scripts/stamp-version.mjs");
 const TREE_HASH = join(REPO_ROOT, "scripts/lib/tree-hash.mjs");
-const WINDOWS_FIXTURE_ATTRIBUTES = [
-  "# Fixture mirrors the generated-artifact rules from release hygiene.",
-  "supabase/functions/_shared/lib/** text eol=lf",
-  "src/routeTree.gen.ts text eol=lf",
-  "",
-].join("\n");
+const ATTRIBUTES = join(REPO_ROOT, ".gitattributes");
+const MIRROR_ARTIFACT_PATH = "supabase/functions/_shared/lib/lib/edgeShared.ts";
+const ROUTE_TREE_ARTIFACT_PATH = "src/routeTree.gen.ts";
 
 const temporaryRoots: string[] = [];
 afterAll(() => {
@@ -76,10 +73,19 @@ function writeFile(root: string, relativePath: string, contents: string): void {
   writeFileSync(target, contents);
 }
 
+function expectReleaseHygieneAttributes(cwd: string): void {
+  expect(git(cwd, ["check-attr", "eol", "--", MIRROR_ARTIFACT_PATH])).toBe(
+    `${MIRROR_ARTIFACT_PATH}: eol: lf`,
+  );
+  expect(git(cwd, ["check-attr", "eol", "--", ROUTE_TREE_ARTIFACT_PATH])).toBe(
+    `${ROUTE_TREE_ARTIFACT_PATH}: eol: lf`,
+  );
+}
+
 function makeWindowsStyleCheckout(): string {
   const seed = makeTempRoot();
   mkdirSync(join(seed, "scripts/lib"), { recursive: true });
-  writeFile(seed, ".gitattributes", WINDOWS_FIXTURE_ATTRIBUTES);
+  cpSync(ATTRIBUTES, join(seed, ".gitattributes"));
   cpSync(SYNC, join(seed, "scripts/sync-edge-shared.mjs"));
   cpSync(VERIFY, join(seed, "scripts/verify-edge-shared-in-sync.mjs"));
   cpSync(STAMPER, join(seed, "scripts/stamp-version.mjs"));
@@ -116,21 +122,22 @@ function makeWindowsStyleCheckout(): string {
 }
 
 describe("Edge shared mirror Windows EOL hygiene", () => {
+  it("requires the repository's resolved release-hygiene attributes", () => {
+    expectReleaseHygieneAttributes(REPO_ROOT);
+  });
+
   it("pins generated mirror artifacts to LF even when source files are checked out as CRLF", () => {
     const checkout = makeWindowsStyleCheckout();
     const source = readFileSync(join(checkout, "src/lib/edgeShared.ts"), "utf8");
-    const mirrorPath = "supabase/functions/_shared/lib/lib/edgeShared.ts";
+    const mirrorPath = MIRROR_ARTIFACT_PATH;
     const mirror = readFileSync(join(checkout, mirrorPath), "utf8");
-    const routeTreePath = "src/routeTree.gen.ts";
+    const routeTreePath = ROUTE_TREE_ARTIFACT_PATH;
     const routeTree = readFileSync(join(checkout, routeTreePath), "utf8");
 
     expect(source).toContain("\r\n");
     expect(mirror).not.toContain("\r\n");
     expect(routeTree).not.toContain("\r\n");
-    expect(git(checkout, ["check-attr", "eol", "--", mirrorPath])).toBe(`${mirrorPath}: eol: lf`);
-    expect(git(checkout, ["check-attr", "eol", "--", routeTreePath])).toBe(
-      `${routeTreePath}: eol: lf`,
-    );
+    expectReleaseHygieneAttributes(checkout);
   });
 
   it("does not report false drift or taint the stamp in a Windows-style checkout", () => {

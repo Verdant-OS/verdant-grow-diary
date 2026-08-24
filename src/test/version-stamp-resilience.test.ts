@@ -40,6 +40,7 @@ const REPO_ROOT = resolve(__dirname, "../..");
 const STAMPER = resolve(REPO_ROOT, "scripts/stamp-version.mjs");
 const TREE_HASH_LIB = resolve(REPO_ROOT, "scripts/lib/tree-hash.mjs");
 const AUTO_TAG_WORKFLOW = resolve(REPO_ROOT, ".github/workflows/auto-tag-release.yml");
+const ROOT_GITIGNORE = resolve(REPO_ROOT, ".gitignore");
 
 const temporaryRoots: string[] = [];
 afterAll(() => {
@@ -68,6 +69,7 @@ function makeSandbox(): string {
   mkdirSync(join(box, "src/components"), { recursive: true });
   cpSync(STAMPER, join(box, "scripts/stamp-version.mjs"));
   cpSync(TREE_HASH_LIB, join(box, "scripts/lib/tree-hash.mjs"));
+  cpSync(ROOT_GITIGNORE, join(box, ".gitignore"));
   writeFileSync(join(box, "package.json"), '{ "name": "sandbox", "version": "0.0.0" }\n');
   writeFileSync(join(box, "index.html"), "<html></html>\n");
   writeFileSync(join(box, "src/components/App.tsx"), "export const x = 1;\n");
@@ -118,6 +120,9 @@ function makeCommittedSandbox(additionalFiles: Record<string, string> = {}): {
   }
   git(box, ["init", "-q"]);
   git(box, ["add", "-A"]);
+  // The real repository tracks these legacy generated outputs even though its
+  // ignore rules prevent a fresh sandbox from adding them by default.
+  git(box, ["add", "-f", "public/version.json", "src/generated/buildInfo.ts"]);
   git(box, ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "init"]);
   return { box, sha: git(box, ["rev-parse", "HEAD"]) };
 }
@@ -356,6 +361,31 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
       expect(runStamper(box).record.dirty, relativePath).toBe(true);
       git(box, ["checkout", "--", relativePath]);
     }
+  });
+
+  it("keeps ignored generated build residue clean while surfacing real source drift", () => {
+    const { box } = makeCommittedSandbox();
+    const ignoredResidue: Array<[string, string]> = [
+      [".output/server/index.mjs", "export default {};\n"],
+      [".wrangler/deploy/config.json", '{"configPath":"../../dist/server/wrangler.json"}\n'],
+    ];
+    for (const [relativePath, contents] of ignoredResidue) {
+      const target = join(box, relativePath);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, contents);
+    }
+
+    // This is an effective-git-ignore contract, not a source-text check: generated
+    // publisher residue must not become a false dirty stamp in a persistent workspace.
+    expect(git(box, ["status", "--porcelain"])).toBe("");
+    expect(runStamper(box).record.dirty).toBe(false);
+
+    writeFileSync(join(box, "src/components/Untracked.tsx"), "export const untracked = true;\n");
+    expect(runStamper(box).record.dirty).toBe(true);
+    rmSync(join(box, "src/components/Untracked.tsx"));
+
+    writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
+    expect(runStamper(box).record.dirty).toBe(true);
   });
 
   it("uses the matching canonical origin default for detached and orphan refs", () => {

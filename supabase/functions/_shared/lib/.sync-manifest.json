@@ -20,7 +20,7 @@
     "src/lib/aiDoctorPromptAssembly.ts": "d1c7a5a0472ad910a10a0a6438887ae1f6acaf929b231e1da591cbd1f6c1a37c",
     "src/lib/aiDoctorPromptVocabularyRules.ts": "8ae5730352434fed3caabfbfb938ef81e444654b37abe7a21ef93a11c2b60b07",
     "src/lib/aiDoctorReviewEvidenceReceiptRules.ts": "0bc47bc4d88c01ac966f92ec1d0fb41858ee34b916800b1f4b1a1f12c185b4ca",
-    "src/lib/aiDoctorReviewGroundingRules.ts": "1e379d51d260797f419952a11c9c58f32deb0f6b6898ff425b5df1c2866c3ef6",
+    "src/lib/aiDoctorReviewGroundingRules.ts": "636cd1e8e30b05087b8fe7fd2dd56661ab1243cb28ca394aa1613d881cc73d78",
     "src/lib/aiDoctorReviewRequestPacket.ts": "ba18d2fc3f1bb532a19b70525428e41ec51efc01c8070216295b1e548f3ed374",
     "src/lib/aiDoctorReviewRequestPacketValidationRules.ts": "3642286ce97d592749afe1f7c1a0e4ff81d9ae7b1c3a60d92976f3d4eacd0fa9",
     "src/lib/aiDoctorReviewRequestTransportRules.ts": "1dbc57788ccbd642efc95c241adb4081c3cab68661f514657ffc73772a2d2424",

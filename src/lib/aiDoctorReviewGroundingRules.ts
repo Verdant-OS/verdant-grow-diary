@@ -32,7 +32,7 @@ const CAUTIOUS_DIRECTIVE_PREFIX_RE =
   /^\s*(?:(?:caution|note)\s*:\s*)?(?:do\s+not|do\s*n['’]t|don['’]t|never|avoid|should\s*not|shouldn['’]t|must\s*not|mustn['’]t|refrain\s+from)\b/i;
 
 const AUTOMATION_RE =
-  /\b(?:automatically|autonomously|autopilot|automatic(?:ally)?|auto[-\s]?(?:adjust|control|operate|dose|water|irrigate|execute|approve|apply|run)|self[-\s]?(?:adjust|control|operate|dose|water|irrigate))\b/i;
+  /\b(?:automatic(?:ally)?|autonomously|auto[-\s]?(?:pilot|adjust|control|operate|dose|water|irrigate|execute|approve|apply|run)|self[-\s]?(?:adjust|control|operate|dose|water|irrigate))\b/i;
 
 const DEVICE_NOUN_RE =
   /\b(?:fan|fans|light|lights|pump|pumps|heater|heaters|humidifier|humidifiers|dehumidifier|dehumidifiers|valve|valves|relay|actuator|outlet|socket|controller|controllers|hvac|exhaust|intake|dosing|injector|irrigation|sprinkler|device|devices|equipment)\b/i;
@@ -41,7 +41,7 @@ const CONTROL_ACTION_RE =
   /\b(?:turn|switch|enable|disable|activate|deactivate|toggle|trigger|power|adjust|control|operate|dose|water|irrigate|execute|dispatch)\b/i;
 
 const ENVIRONMENT_NOUN_RE =
-  /\b(?:environment(?:al)?|room|tent|conditions?|temperature|temp|humidity|rh|vpd|air)\b/i;
+  /\b(?:environment(?:al)?|room|tent|conditions?|temperature|temp|humidity|rh|vpd|co2|air)\b/i;
 
 const STABLE_OR_HEALTHY_RE =
   /\b(?:stable|healthy|optimal|ideal|balanced|normal|within\s+(?:a\s+)?healthy\s+range)\b/i;
@@ -51,6 +51,10 @@ const NON_AFFIRMATIVE_EVIDENCE_RE =
 
 type MetricKey =
   "temperature" | "humidity" | "vpd" | "ph" | "ec" | "ppm" | "moisture" | "co2" | "ppfd";
+
+const ENVIRONMENT_METRICS = ["temperature", "humidity", "vpd", "co2"] as const;
+
+type EnvironmentMetric = (typeof ENVIRONMENT_METRICS)[number];
 
 const METRIC_ALIASES: Readonly<Record<MetricKey, readonly string[]>> = Object.freeze({
   temperature: ["temperature", "temp"],
@@ -66,6 +70,8 @@ const METRIC_ALIASES: Readonly<Record<MetricKey, readonly string[]>> = Object.fr
 
 const NUMBER_RE = /-?\d+(?:\.\d+)?/;
 
+const NUMERIC_RANGE_RE = /\b\d+(?:\.\d+)?\s*(?:[-–—]\s*|(?:to|through)\s+)\d+(?:\.\d+)?\b/i;
+
 type CanonicalMetricUnit =
   "temperature_c" | "percent" | "kpa" | "ph" | "ec_ms_per_cm" | "ppm" | "ppfd";
 
@@ -73,6 +79,39 @@ interface CanonicalMetricValue {
   value: number;
   unit: CanonicalMetricUnit;
 }
+
+type RootZoneNumericField =
+  "inputPh" | "inputEcMsCm" | "outputEcMsCm" | "runoffPh" | "runoffEcMsCm" | "waterTempC";
+
+const ROOT_ZONE_NUMERIC_FIELDS: readonly RootZoneNumericField[] = [
+  "inputPh",
+  "inputEcMsCm",
+  "outputEcMsCm",
+  "runoffPh",
+  "runoffEcMsCm",
+  "waterTempC",
+];
+
+type HistoricalAggregate = "min" | "max" | "avg";
+
+const ASSERTION_CONNECTOR_SOURCE =
+  "(?:is|are|was|were|reads?|reading|measured(?:\\s+at)?|shows?|showed|remains\\s+at|sits\\s+at|averages?|at|of|:|=)";
+
+const ROOT_ZONE_CONTEXT_RE = /\b(?:root[-\s]?zone|input|output|runoff)\b/i;
+
+const HISTORICAL_EVIDENCE_LABEL_RE = /\b(?:historical|csv)\b/i;
+
+const CURRENT_LIVE_LATEST_CLAIM_RE = /\b(?:current|live|latest)\b/i;
+
+const MAX_ROUNDING_TOLERANCE: Readonly<Record<CanonicalMetricUnit, number>> = Object.freeze({
+  temperature_c: 0.5,
+  percent: 0.5,
+  kpa: 0.05,
+  ph: 0.05,
+  ec_ms_per_cm: 0.05,
+  ppm: 5,
+  ppfd: 5,
+});
 
 const METRIC_CLAIM_UNIT_SOURCES: Readonly<Record<MetricKey, string | null>> = Object.freeze({
   // A slash after a temperature token (for example, "C/F") is ambiguous;
@@ -140,6 +179,9 @@ const LEADING_CONTEXT_UNCERTAINTY_RE = new RegExp(
   "i",
 );
 
+const PASSIVE_WATERING_UNCERTAINTY_RE =
+  /^\s*(?:cannot|can['’]t|unable\s+to)\s+confirm\s+when\s+(?:the\s+)?plant\s+was\s+last\s+(?:watered|irrigated)\b\s*(?:(?:is|remains)\s+)?(?:unknown|unavailable|not\s+(?:known|available|recorded))?\s*$/i;
+
 function outputTexts(result: AiDoctorReviewResult): readonly string[] {
   return [
     result.summary,
@@ -184,9 +226,20 @@ function directClaimTexts(result: AiDoctorReviewResult): readonly string[] {
   return [...contextClaimTexts(result), ...result.missing_information];
 }
 
-function splitClauses(text: string): readonly string[] {
+function splitSafetyClauses(text: string): readonly string[] {
   // A decimal point is part of a numeric measurement, not a clause boundary.
+  // Safety scanners must isolate all dash-delimited claims before applying a
+  // cautious-directive exemption.
   return text.split(/\.(?!\d)|[!?;\n,]+|[\u2014\u2013]|\s-\s|\b(?:but|however|instead|then)\b/i);
+}
+
+function splitNumericClaimClauses(text: string): readonly string[] {
+  // A decimal point is part of a numeric measurement, not a clause boundary.
+  // Keep only a true numeric range intact so its trailing time unit can
+  // prevent a follow-up interval from being interpreted as telemetry.
+  return text.split(
+    /\.(?!\d)|[!?;\n,]+|(?<!\d)(?<!\d\s)[\u2014\u2013]|[\u2014\u2013](?!\s*\d)|(?<!\d)(?<!\d\s)\s-\s|\s-\s(?!\d)|\b(?:but|however|instead|then)\b/i,
+  );
 }
 
 function isCautiousDirective(clause: string): boolean {
@@ -215,7 +268,8 @@ function isNonAffirmativeContextDisclosure(clause: string): boolean {
   return (
     LEADING_CONTEXT_ABSENCE_RE.test(clause) ||
     SUBJECT_CONTEXT_ABSENCE_RE.test(clause) ||
-    LEADING_CONTEXT_UNCERTAINTY_RE.test(clause)
+    LEADING_CONTEXT_UNCERTAINTY_RE.test(clause) ||
+    PASSIVE_WATERING_UNCERTAINTY_RE.test(clause)
   );
 }
 
@@ -248,11 +302,21 @@ function packetNeedsMissingInformation(packet: AiDoctorReviewRequestPacket): boo
   );
 }
 
+function hasTrustworthyRootZoneEvidence(packet: AiDoctorReviewRequestPacket): boolean {
+  return (packet.recentRootZoneObservations ?? []).some(
+    (observation) =>
+      (observation.source === "manual" || observation.source === "csv") &&
+      ROOT_ZONE_NUMERIC_FIELDS.some(
+        (field) => observation[field] !== null && !observation.invalidFields?.includes(field),
+      ),
+  );
+}
+
 function packetHasAffirmativeEvidence(packet: AiDoctorReviewRequestPacket): boolean {
   return (
     packet.readiness.evidence.some((item) => !NON_AFFIRMATIVE_EVIDENCE_RE.test(item)) ||
     packet.recentEvents.length > 0 ||
-    (packet.recentRootZoneObservations?.length ?? 0) > 0 ||
+    hasTrustworthyRootZoneEvidence(packet) ||
     hasTrustworthyAnnotatedSnapshot(packet)
   );
 }
@@ -263,7 +327,7 @@ function resultHasAffirmativeEvidence(result: AiDoctorReviewResult): boolean {
 
 function hasUnsafeAutomationOrDeviceLanguage(result: AiDoctorReviewResult): boolean {
   for (const text of outputTexts(result)) {
-    for (const rawClause of splitClauses(text)) {
+    for (const rawClause of splitSafetyClauses(text)) {
       const clause = rawClause.trim();
       if (!clause || isCautiousDirective(clause)) continue;
       const hasAutomation = AUTOMATION_RE.test(clause);
@@ -277,30 +341,48 @@ function hasUnsafeAutomationOrDeviceLanguage(result: AiDoctorReviewResult): bool
 
 function hasAbsoluteCertainty(result: AiDoctorReviewResult): boolean {
   return directClaimTexts(result).some((text) =>
-    splitClauses(text).some(
+    splitSafetyClauses(text).some(
       (clause) => !isCautiousDirective(clause) && ABSOLUTE_CERTAINTY_RE.test(clause),
     ),
   );
 }
 
-function hasTrustworthyEnvironmentSnapshot(packet: AiDoctorReviewRequestPacket): boolean {
+function hasTrustworthyEnvironmentSnapshot(
+  packet: AiDoctorReviewRequestPacket,
+  metric?: EnvironmentMetric,
+): boolean {
   if (!hasTrustworthyAnnotatedSnapshot(packet) || packet.recentSensorSnapshot?.severity !== "ok") {
     return false;
   }
-  return ["temperature", "humidity", "vpd", "co2"].some(
-    (metric) => packetValuesForMetric(packet, metric as MetricKey).length > 0,
+  const metrics = metric ? [metric] : ENVIRONMENT_METRICS;
+  return metrics.some(
+    (environmentMetric) => trustworthySnapshotValuesForMetric(packet, environmentMetric).length > 0,
   );
 }
 
-function claimsStableOrHealthyEnvironment(result: AiDoctorReviewResult): boolean {
+function environmentMetricsInClause(clause: string): readonly EnvironmentMetric[] {
+  return ENVIRONMENT_METRICS.filter((metric) => metricFieldMatches(metric, clause));
+}
+
+function hasUnsupportedStableOrHealthyEnvironmentClaim(
+  result: AiDoctorReviewResult,
+  packet: AiDoctorReviewRequestPacket,
+): boolean {
   return directClaimTexts(result).some((text) => {
-    return splitClauses(text).some(
-      (clause) =>
-        !isCautiousDirective(clause) &&
-        !isNonAffirmativeStabilityClause(clause) &&
-        ENVIRONMENT_NOUN_RE.test(clause) &&
-        STABLE_OR_HEALTHY_RE.test(clause),
-    );
+    return splitSafetyClauses(text).some((clause) => {
+      if (
+        isCautiousDirective(clause) ||
+        isNonAffirmativeStabilityClause(clause) ||
+        !ENVIRONMENT_NOUN_RE.test(clause) ||
+        !STABLE_OR_HEALTHY_RE.test(clause)
+      ) {
+        return false;
+      }
+      const metrics = environmentMetricsInClause(clause);
+      return metrics.length === 0
+        ? !hasTrustworthyEnvironmentSnapshot(packet)
+        : metrics.some((metric) => !hasTrustworthyEnvironmentSnapshot(packet, metric));
+    });
   });
 }
 
@@ -362,27 +444,186 @@ function toCanonicalMetricValue(
   }
 }
 
-function packetValuesForMetric(
+function metricFieldMatches(metric: MetricKey, field: string): boolean {
+  const normalized = normalizedMetricField(field);
+  return METRIC_ALIASES[metric].some((alias) => new RegExp(`\\b${alias}\\b`, "i").test(normalized));
+}
+
+function trustworthySnapshotValuesForMetric(
   packet: AiDoctorReviewRequestPacket,
   metric: MetricKey,
 ): readonly CanonicalMetricValue[] {
+  if (!hasTrustworthyAnnotatedSnapshot(packet)) return [];
   const readings = packet.recentSensorSnapshot?.readings ?? [];
-  const aliases = METRIC_ALIASES[metric];
   return readings
-    .filter((reading) => {
-      const field = normalizedMetricField(reading.field);
-      return aliases.some((alias) => new RegExp(`\\b${alias}\\b`, "i").test(field));
-    })
+    .filter((reading) => metricFieldMatches(metric, reading.field))
     .map((reading) => toCanonicalMetricValue(metric, reading.value, reading.unit))
     .filter((reading): reading is CanonicalMetricValue => reading !== null);
+}
+
+function rootZoneFieldsForClaim(
+  metric: MetricKey,
+  clause: string,
+): readonly RootZoneNumericField[] {
+  switch (metric) {
+    case "ph":
+      if (/\binput\s+ph\b|\bph\s+(?:of|in)\s+(?:the\s+)?input\b/i.test(clause)) {
+        return ["inputPh"];
+      }
+      if (/\brunoff\s+ph\b|\bph\s+(?:of|in)\s+(?:the\s+)?runoff\b/i.test(clause)) {
+        return ["runoffPh"];
+      }
+      return [];
+    case "ec":
+      if (/\binput\s+ec\b|\bec\s+(?:of|in)\s+(?:the\s+)?input\b/i.test(clause)) {
+        return ["inputEcMsCm"];
+      }
+      if (/\boutput\s+ec\b|\bec\s+(?:of|in)\s+(?:the\s+)?output\b/i.test(clause)) {
+        return ["outputEcMsCm"];
+      }
+      if (/\brunoff\s+ec\b|\bec\s+(?:of|in)\s+(?:the\s+)?runoff\b/i.test(clause)) {
+        return ["runoffEcMsCm"];
+      }
+      return [];
+    case "temperature":
+      return /\b(?:water|nutrient(?:\s+solution)?|feed(?:ing)?\s+solution)\s+(?:temperature|temp)\b|\b(?:temperature|temp)\s+(?:of|in)\s+(?:the\s+)?(?:water|nutrient(?:\s+solution)?|feed(?:ing)?\s+solution)\b/i.test(
+        clause,
+      )
+        ? ["waterTempC"]
+        : [];
+    default:
+      return [];
+  }
+}
+
+function rootZoneCanonicalValue(
+  field: RootZoneNumericField,
+  value: number,
+): CanonicalMetricValue | null {
+  switch (field) {
+    case "inputPh":
+    case "runoffPh":
+      return toCanonicalMetricValue("ph", value, undefined);
+    case "inputEcMsCm":
+    case "outputEcMsCm":
+    case "runoffEcMsCm":
+      return toCanonicalMetricValue("ec", value, "mS/cm");
+    case "waterTempC":
+      return toCanonicalMetricValue("temperature", value, "C");
+  }
+}
+
+function rootZoneValuesForClaim(
+  packet: AiDoctorReviewRequestPacket,
+  metric: MetricKey,
+  clause: string,
+): readonly CanonicalMetricValue[] {
+  const fields = rootZoneFieldsForClaim(metric, clause);
+  if (fields.length === 0) return [];
+
+  const values: CanonicalMetricValue[] = [];
+  const claimsCsvRootZone = /\bcsv\b/i.test(clause);
+  for (const observation of packet.recentRootZoneObservations ?? []) {
+    if (observation.source !== "manual" && observation.source !== "csv") continue;
+    if (claimsCsvRootZone && observation.source !== "csv") continue;
+    if (observation.source === "csv" && !HISTORICAL_EVIDENCE_LABEL_RE.test(clause)) continue;
+    for (const field of fields) {
+      if (observation.invalidFields?.includes(field)) continue;
+      const rawValue = observation[field];
+      if (rawValue === null) continue;
+      const canonical = rootZoneCanonicalValue(field, rawValue);
+      if (canonical) values.push(canonical);
+    }
+  }
+  return values;
+}
+
+function historicalAggregateForClause(clause: string): HistoricalAggregate | null {
+  if (!HISTORICAL_EVIDENCE_LABEL_RE.test(clause)) return null;
+  const aggregates: HistoricalAggregate[] = [];
+  if (/\b(?:averages?|avg|mean)\b/i.test(clause)) aggregates.push("avg");
+  if (/\b(?:minimum|min)\b/i.test(clause)) aggregates.push("min");
+  if (/\b(?:maximum|max)\b/i.test(clause)) aggregates.push("max");
+  return aggregates.length === 1 ? aggregates[0] : null;
+}
+
+function historicalAggregateValuesForClaim(
+  packet: AiDoctorReviewRequestPacket,
+  metric: MetricKey,
+  clause: string,
+): readonly CanonicalMetricValue[] {
+  const aggregate = historicalAggregateForClause(clause);
+  const history = packet.imported_sensor_history;
+  if (!aggregate || !history || history.suspiciousFlagCount !== 0) return [];
+
+  return history.metrics
+    .filter((summary) => metricFieldMatches(metric, summary.metric))
+    .map((summary) => toCanonicalMetricValue(metric, summary[aggregate], summary.unit ?? undefined))
+    .filter((value): value is CanonicalMetricValue => value !== null);
+}
+
+function packetValuesForClaim(
+  packet: AiDoctorReviewRequestPacket,
+  metric: MetricKey,
+  clause: string,
+): readonly CanonicalMetricValue[] {
+  const claimsCurrentProvenance = CURRENT_LIVE_LATEST_CLAIM_RE.test(clause);
+  const rootZoneValues = rootZoneValuesForClaim(packet, metric, clause);
+  if (rootZoneValues.length > 0) return claimsCurrentProvenance ? [] : rootZoneValues;
+  if (ROOT_ZONE_CONTEXT_RE.test(clause)) return [];
+  if (HISTORICAL_EVIDENCE_LABEL_RE.test(clause)) {
+    return claimsCurrentProvenance ? [] : historicalAggregateValuesForClaim(packet, metric, clause);
+  }
+  return trustworthySnapshotValuesForMetric(packet, metric);
+}
+
+function decimalResolution(rawNumber: string): number {
+  const decimalIndex = rawNumber.indexOf(".");
+  return decimalIndex === -1 ? 1 : 10 ** -(rawNumber.length - decimalIndex - 1);
+}
+
+function isImmediateTemporalUnit(clause: string, match: RegExpMatchArray): boolean {
+  const end = (match.index ?? 0) + match[0].length;
+  return /^\s*(?:(?:[-–—]\s*|(?:to|through)\s+)\d+(?:\.\d+)?\s*)?(?:minutes?|hours?|days?|weeks?)\b/i.test(
+    clause.slice(end),
+  );
+}
+
+function canonicalClaimResolution(
+  claimed: CanonicalMetricValue,
+  rawNumber: string,
+  rawUnit: string | undefined,
+): number {
+  const resolution = decimalResolution(rawNumber);
+  const unit = rawUnit === undefined ? null : normalizedMetricUnit(rawUnit);
+  if (claimed.unit === "temperature_c" && (unit === "f" || unit === "fahrenheit")) {
+    return (resolution * 5) / 9;
+  }
+  if (
+    claimed.unit === "ec_ms_per_cm" &&
+    (unit === "us/cm" || unit === "uscm" || unit === "microsiemens/cm")
+  ) {
+    return resolution / 1000;
+  }
+  return resolution;
 }
 
 function hasApproximatePacketValue(
   values: readonly CanonicalMetricValue[],
   claimed: CanonicalMetricValue,
+  rawNumber: string,
+  rawUnit: string | undefined,
 ): boolean {
+  const roundingTolerance = Math.min(
+    canonicalClaimResolution(claimed, rawNumber, rawUnit) / 2,
+    MAX_ROUNDING_TOLERANCE[claimed.unit],
+  );
   return values.some(
-    (value) => value.unit === claimed.unit && Math.abs(value.value - claimed.value) <= 0.001,
+    (value) =>
+      value.unit === claimed.unit &&
+      Math.abs(value.value - claimed.value) <=
+        roundingTolerance +
+          Number.EPSILON * Math.max(1, Math.abs(value.value), Math.abs(claimed.value)) * 8,
   );
 }
 
@@ -391,7 +632,7 @@ function hasUnsupportedLoggedEventClaim(
   packet: AiDoctorReviewRequestPacket,
 ): boolean {
   for (const text of directClaimTexts(result)) {
-    for (const clause of splitClauses(text)) {
+    for (const clause of splitSafetyClauses(text)) {
       if (isCautiousDirective(clause) || isNonAffirmativeContextDisclosure(clause)) continue;
       for (const claim of LOGGED_EVENT_CLAIMS) {
         if (
@@ -411,7 +652,7 @@ function hasUnsupportedSnapshotClaim(
   packet: AiDoctorReviewRequestPacket,
 ): boolean {
   for (const text of directClaimTexts(result)) {
-    for (const clause of splitClauses(text)) {
+    for (const clause of splitSafetyClauses(text)) {
       if (isCautiousDirective(clause) || isNonAffirmativeContextDisclosure(clause)) continue;
       if (DIRECT_SNAPSHOT_CLAIM_RE.test(clause) && !packet.recentSensorSnapshot) return true;
       if (SOURCE_LABELED_SNAPSHOT_CLAIM_RE.test(clause) && !packet.recentSensorSnapshotAnnotation) {
@@ -432,21 +673,38 @@ function hasDirectUnsupportedPacketClaim(
   packet: AiDoctorReviewRequestPacket,
 ): boolean {
   for (const text of directClaimTexts(result)) {
-    for (const clause of splitClauses(text)) {
-      if (isCautiousDirective(clause)) continue;
+    for (const clause of splitNumericClaimClauses(text)) {
+      // A cautious directive can legitimately contain a timed follow-up, but
+      // it must not suppress a separate assertion after a numeric range.
+      if (isCautiousDirective(clause) && !NUMERIC_RANGE_RE.test(clause)) continue;
       for (const [metric, aliases] of Object.entries(METRIC_ALIASES) as Array<
         [MetricKey, readonly string[]]
       >) {
         const metricAlternation = aliases
           .map((alias) => alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
           .join("|");
-        // Require an assertion connector (or an immediately adjacent table-like
-        // value) so "check temperature in 24 hours" is not mistaken for a
-        // fabricated reading.
+        // A bare metric-number adjacency must carry an unambiguous unit. This
+        // leaves follow-up timing such as "recheck temperature 24 hours" out
+        // of the numeric assertion fence while retaining table-like readings.
         const unitSource = METRIC_CLAIM_UNIT_SOURCES[metric];
         const metricFirstUnitCapture = unitSource ? `\\s*(${unitSource})?` : "";
-        const metricFirst = new RegExp(
-          `\\b(?:${metricAlternation})\\b\\s*(?:(?:is|are|was|were|reads?|reading|measured(?:\\s+at)?|shows?|showed|at|of|:|=)\\s*)?(${NUMBER_RE.source})${metricFirstUnitCapture}`,
+        const metricFirstWithConnector = new RegExp(
+          `\\b(?:${metricAlternation})\\b\\s*${ASSERTION_CONNECTOR_SOURCE}\\s*(${NUMBER_RE.source})${metricFirstUnitCapture}`,
+          "gi",
+        );
+        // pH is conventionally unitless, so its metric label itself supplies
+        // the unambiguous unit. Immediate temporal units remain excluded
+        // below before any bare adjacency is treated as an assertion.
+        const metricFirstWithUnit = new RegExp(
+          unitSource
+            ? `\\b(?:${metricAlternation})\\b\\s*(${NUMBER_RE.source})\\s*(${unitSource})`
+            : `\\b(?:${metricAlternation})\\b\\s*(${NUMBER_RE.source})`,
+          "gi",
+        );
+        const metricFirstHistoricalAggregate = new RegExp(
+          unitSource
+            ? `\\b(?:${metricAlternation})\\b\\s+(?:has|had)\\s+(?:an?\\s+)?(?:historical|csv)\\s+(?:averages?|avg|mean|minimum|min|maximum|max)\\s+(?:of\\s+)?(${NUMBER_RE.source})\\s*(${unitSource})`
+            : `\\b(?:${metricAlternation})\\b\\s+(?:has|had)\\s+(?:an?\\s+)?(?:historical|csv)\\s+(?:averages?|avg|mean|minimum|min|maximum|max)\\s+(?:of\\s+)?(${NUMBER_RE.source})`,
           "gi",
         );
         const valueFirst = new RegExp(
@@ -455,20 +713,20 @@ function hasDirectUnsupportedPacketClaim(
             : `(${NUMBER_RE.source})\\s+\\b(?:${metricAlternation})\\b`,
           "gi",
         );
-        const values = packetValuesForMetric(packet, metric);
 
-        for (const matcher of [metricFirst, valueFirst]) {
+        for (const matcher of [
+          metricFirstWithConnector,
+          metricFirstWithUnit,
+          metricFirstHistoricalAggregate,
+          valueFirst,
+        ]) {
+          if (!matcher) continue;
           for (const match of clause.matchAll(matcher)) {
-            const claimed = toCanonicalMetricValue(
-              metric,
-              Number(match[1]),
-              metric === "ph" ? undefined : match[2],
-            );
-            if (
-              !claimed ||
-              !hasTrustworthyAnnotatedSnapshot(packet) ||
-              !hasApproximatePacketValue(values, claimed)
-            ) {
+            const rawUnit = metric === "ph" ? undefined : match[2];
+            if (!rawUnit && isImmediateTemporalUnit(clause, match)) continue;
+            const claimed = toCanonicalMetricValue(metric, Number(match[1]), rawUnit);
+            const values = packetValuesForClaim(packet, metric, clause);
+            if (!claimed || !hasApproximatePacketValue(values, claimed, match[1], rawUnit)) {
               return true;
             }
           }
@@ -505,7 +763,7 @@ export function validateAiDoctorReviewGrounding(
   if (packetNeedsMissingInformation(packet) && result.missing_information.length === 0) {
     return { ok: false, reason: "missing_information_required" };
   }
-  if (claimsStableOrHealthyEnvironment(result) && !hasTrustworthyEnvironmentSnapshot(packet)) {
+  if (hasUnsupportedStableOrHealthyEnvironmentClaim(result, packet)) {
     return { ok: false, reason: "healthy_environment_without_trustworthy_snapshot" };
   }
   if (hasDirectUnsupportedPacketClaim(result, packet)) {

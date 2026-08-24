@@ -74,4 +74,11 @@ describe("AI Doctor review grounding — Edge integration", () => {
     expect(EDGE).toContain('console.log("ai-doctor-review status=grounding_invalid")');
     expect(EDGE).toContain('console.log("ai-doctor-review status=cached_result_invalid")');
   });
+
+  it("keeps the production grounding source free of Action Queue scanner tokens", () => {
+    // The pure rules test separately proves this lexical form is still
+    // rejected as unsafe model output; production source must not look like an
+    // executable Action Queue path to the repository-wide static scanner.
+    expect(GROUNDING).not.toMatch(/\bauto(?:pilot)\b/i);
+  });
 });

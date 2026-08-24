@@ -838,7 +838,9 @@ export function runAgreementAcceptanceInsertForwardRepair({
     base.event !== "workflow_dispatch" ||
     base.branch !== "verdant-grow-diary"
   ) {
-    logger.error("Agreement acceptance insert delivery inputs were rejected before database access.");
+    logger.error(
+      "Agreement acceptance insert delivery inputs were rejected before database access.",
+    );
     writeReport("BLOCKED - confirmation rejected", ["No database process was started."]);
     writeAudit("input_rejected", base);
     return EXIT.INPUT_REJECTED;
@@ -1017,7 +1019,10 @@ export function runAgreementAcceptanceInsertForwardRepair({
   }
 
   const temporaryRoot = mkdtempSync(
-    join(env.RUNNER_TEMP || env.TEMP || env.TMP || tmpdir(), "verdant-agreement-acceptance-ledger-"),
+    join(
+      env.RUNNER_TEMP || env.TEMP || env.TMP || tmpdir(),
+      "verdant-agreement-acceptance-ledger-",
+    ),
   );
   const ledgerPath = join(temporaryRoot, `ledger-${PINNED_MIGRATION.version}.sql`);
   try {

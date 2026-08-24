@@ -5,10 +5,7 @@
  * from `auth.uid()` on the server — never from a client-chosen value.
  */
 import type { Json } from "@/integrations/supabase/types";
-import {
-  buildOwnAcceptancePayloads,
-  type OwnAcceptancePayload,
-} from "@/lib/agreementConsent";
+import { buildOwnAcceptancePayloads, type OwnAcceptancePayload } from "@/lib/agreementConsent";
 
 export const RECORD_OWN_AGREEMENT_ACCEPTANCES_RPC = "record_own_agreement_acceptances" as const;
 

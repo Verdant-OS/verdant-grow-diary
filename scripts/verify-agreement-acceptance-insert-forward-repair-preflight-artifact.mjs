@@ -7,7 +7,8 @@ import { inflateRawSync } from "node:zlib";
 import { SOLO_FOUNDER_POLICY } from "./lib/solo-founder-production-authorization.mjs";
 import { downloadArtifactArchive as downloadBoundedArtifactArchive } from "./verify-quicklog-corrections-preflight-artifact.mjs";
 
-export const WORKFLOW_PATH = ".github/workflows/apply-agreement-acceptance-insert-forward-repair.yml";
+export const WORKFLOW_PATH =
+  ".github/workflows/apply-agreement-acceptance-insert-forward-repair.yml";
 export const ARTIFACT_PREFIX = "agreement-acceptance-insert-forward-repair-preflight";
 export const MAX_ARCHIVE_BYTES = 65_536;
 export const MAX_RECEIPT_BYTES = 32_768;

@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "@/lib/react-router-compat";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { computeAgreementGaps, type AcceptanceRow, type AgreementGap } from "@/lib/agreementConsent";
+import {
+  computeAgreementGaps,
+  type AcceptanceRow,
+  type AgreementGap,
+} from "@/lib/agreementConsent";
 import {
   acceptancePayloadsForCurrentAgreements,
   recordOwnAgreementAcceptances,

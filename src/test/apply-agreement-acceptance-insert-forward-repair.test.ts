@@ -9,7 +9,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSupabaseTls.mjs";
 
 const RUNNER_PATH = resolve("scripts/apply-agreement-acceptance-insert-forward-repair.mjs");
-const WORKFLOW_PATH = resolve(".github/workflows/apply-agreement-acceptance-insert-forward-repair.yml");
+const WORKFLOW_PATH = resolve(
+  ".github/workflows/apply-agreement-acceptance-insert-forward-repair.yml",
+);
 const RUNBOOK_PATH = resolve("docs/agreement-acceptance-insert-forward-repair-operator-runbook.md");
 const MIGRATION_PATH = resolve(
   "supabase/migrations/20260824180000_agreement_acceptance_insert_forward_repair.sql",
@@ -189,7 +191,6 @@ describe("Agreement acceptance insert production delivery", () => {
     ).toThrow("hash_mismatch:20260824180000");
   });
 
-
   it("refuses signup acquisition repair filename and pins only the agreement migration file", async () => {
     const runner = await loadRunner();
     const source = readFileSync(RUNNER_PATH, "utf8");
@@ -213,7 +214,9 @@ describe("Agreement acceptance insert production delivery", () => {
       runner.validatePinnedMigrationFile({
         readFile: (path: string) => {
           expect(String(path).endsWith(runner.PINNED_MIGRATION.file)).toBe(true);
-          expect(String(path)).not.toContain("20260813030000_signup_acquisition_forward_repair.sql");
+          expect(String(path)).not.toContain(
+            "20260813030000_signup_acquisition_forward_repair.sql",
+          );
           return readFileSync(MIGRATION_PATH);
         },
       }),
@@ -238,7 +241,9 @@ describe("Agreement acceptance insert production delivery", () => {
       status: "prerequisite_drift",
       reason: "table_contract",
     });
-    expect(runner.classifyPreflight({ ...DEFECTIVE_STATE, migration_ledger_contract: false })).toEqual({
+    expect(
+      runner.classifyPreflight({ ...DEFECTIVE_STATE, migration_ledger_contract: false }),
+    ).toEqual({
       status: "prerequisite_drift",
       reason: "migration_ledger_contract",
     });
@@ -953,7 +958,6 @@ describe("Agreement acceptance insert production delivery", () => {
     expect(runbook).toMatch(/record.*run attempt/i);
     expect(runbook).toMatch(/record[\s\S]{0,100}artifact SHA-256/i);
   });
-
 
   it("documents the no-freeze recovery protocol and exact deletion-free rollback posture", () => {
     expect(existsSync(RUNBOOK_PATH)).toBe(true);

@@ -62,9 +62,7 @@ beforeEach(() => {
   mockAcceptances = [];
   mockReadError = null;
   eqSpy.mockReset();
-  eqSpy.mockImplementation(() =>
-    Promise.resolve({ data: mockAcceptances, error: mockReadError }),
-  );
+  eqSpy.mockImplementation(() => Promise.resolve({ data: mockAcceptances, error: mockReadError }));
   rpcSpy.mockClear();
   signOutSpy.mockClear();
 });

@@ -22,11 +22,15 @@ describe("agreement acceptance insert forward repair migration", () => {
   it("re-asserts authenticated INSERT policy with auth.uid() ownership", () => {
     expect(MIGRATION).toMatch(/CREATE POLICY "Users insert own acceptances"/);
     expect(MIGRATION).toMatch(/WITH CHECK\s*\(\s*auth\.uid\(\)\s*=\s*user_id\s*\)/);
-    expect(MIGRATION).toMatch(/GRANT SELECT, INSERT ON TABLE public\.user_agreement_acceptances TO authenticated/);
+    expect(MIGRATION).toMatch(
+      /GRANT SELECT, INSERT ON TABLE public\.user_agreement_acceptances TO authenticated/,
+    );
   });
 
   it("keeps append-only posture (no authenticated UPDATE/DELETE grants or policies)", () => {
-    expect(MIGRATION).toMatch(/REVOKE UPDATE, DELETE ON TABLE public\.user_agreement_acceptances FROM authenticated/);
+    expect(MIGRATION).toMatch(
+      /REVOKE UPDATE, DELETE ON TABLE public\.user_agreement_acceptances FROM authenticated/,
+    );
     expect(MIGRATION).toMatch(/DROP POLICY IF EXISTS "Users update own acceptances"/);
     expect(MIGRATION).toMatch(/DROP POLICY IF EXISTS "Users delete own acceptances"/);
     expect(MIGRATION).not.toMatch(/FOR UPDATE[\s\S]{0,80}TO authenticated/);
@@ -34,7 +38,9 @@ describe("agreement acceptance insert forward repair migration", () => {
   });
 
   it("RPC forces user_id from auth.uid() and is not anon-executable", () => {
-    expect(MIGRATION).toMatch(/CREATE OR REPLACE FUNCTION public\.record_own_agreement_acceptances/);
+    expect(MIGRATION).toMatch(
+      /CREATE OR REPLACE FUNCTION public\.record_own_agreement_acceptances/,
+    );
     expect(MIGRATION).toMatch(/SECURITY INVOKER/);
     expect(MIGRATION).toMatch(/uid uuid := auth\.uid\(\)/);
     expect(MIGRATION).toMatch(/ON CONFLICT \(user_id, agreement_type, version\) DO NOTHING/);
@@ -46,7 +52,7 @@ describe("agreement acceptance insert forward repair migration", () => {
     );
   });
 
-  it("does not weaken RLS to true / USING\(true\)", () => {
+  it("does not weaken RLS to true / USING(true)", () => {
     expect(MIGRATION).not.toMatch(/USING\s*\(\s*true\s*\)/i);
     expect(MIGRATION).not.toMatch(/WITH CHECK\s*\(\s*true\s*\)/i);
     expect(MIGRATION).not.toMatch(/DISABLE ROW LEVEL SECURITY/i);

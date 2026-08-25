@@ -122,9 +122,10 @@ export function resolveCanonicalPaddleSandboxToken(envText) {
 
 /**
  * Read the single production Paddle client token from dotenv text.
- * Accepts sandbox (test_) or live (live_) client tokens — Lovable Payments
- * Live injects live_ into .env.production at publish time. Still fails closed
- * on missing, multiple, malformed, empty, or non-Paddle values.
+ * Standing production gate: accepts test_ or live_ so publishable builds pass
+ * prebuild (Lovable injects live_ at publish; preview may stay test_ for test
+ * cards). Fails closed only on missing, multiple, malformed, empty, or
+ * non-Paddle values — never because the token is live_.
  */
 export function resolveCanonicalPaddleProductionToken(envText) {
   const parsed = parseCanonicalPaddleClientTokenAssignment(envText);

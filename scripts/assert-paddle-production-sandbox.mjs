@@ -84,9 +84,9 @@ async function loadEffectiveProductionEnv(rootDir) {
 }
 
 /**
- * Verify both committed production source and the exact value Vite will
- * bundle. Accepts sandbox (test_) or live (live_) client tokens. Results
- * contain fixed codes only; token bytes never leave locals.
+ * Standing production client-token gate: verify the committed production
+ * source and the exact value Vite will bundle. Accepts test_ or live_.
+ * Results contain fixed codes only; token bytes never leave locals.
  */
 async function verifyPaddleProductionClientToken(rootDir = process.cwd()) {
   const rawEnv = readCanonicalProductionEnv(rootDir);

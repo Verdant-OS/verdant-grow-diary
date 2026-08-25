@@ -54,6 +54,12 @@ STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 
 Do not continue until the context issue is resolved.`;
 
+const CLAUDE_STATE_READ_INSTRUCTION =
+  "**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file " +
+  "tool before you acknowledge.**";
+const CLAUDE_STATE_READ_STEP =
+  "1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.";
+
 const fixtures = [];
 
 function run(command, args, cwd, extraEnv = {}) {
@@ -86,12 +92,16 @@ function writeGovernanceFile(root, path, version = "2026-08-01.1") {
     return;
   }
 
-  // CLAUDE.md imports two files and reads docs/agents/CURRENT_STATE.md on demand; the
-  // read instruction is asserted by the checker, so the fixture must carry it too.
+  // CLAUDE.md imports two files and reads docs/agents/CURRENT_STATE.md on demand. The
+  // checker pins both read imperatives verbatim, so the fixture must carry them exactly.
+  // The trailing "See also" line is a deliberate incidental mention of the pathname: the
+  // drop-the-instruction test relies on it to prove a leftover reference cannot satisfy
+  // the check.
   const imports =
     path === "CLAUDE.md"
       ? "@AGENTS.md\n@docs/agents/roles/claude.md\n\n" +
-        "Read docs/agents/CURRENT_STATE.md before acknowledging.\n\n"
+        `${CLAUDE_STATE_READ_INSTRUCTION}\n\n${CLAUDE_STATE_READ_STEP}\n\n` +
+        "See also docs/agents/CURRENT_STATE.md for operating state.\n\n"
       : "";
   const core =
     path === "GEMINI.md"
@@ -237,19 +247,38 @@ test("fails when Claude's automatic imports drift", () => {
 // CURRENT_STATE.md stopped being an @import on 2026-08-21 (~27,400 tokens on every turn).
 // The written read instruction replaced it, and a sentence can be deleted without the
 // obvious diff signature that removing an import line has — so it is guarded explicitly.
-test("fails when CLAUDE.md drops the on-demand CURRENT_STATE read instruction", () => {
+test("fails when both read imperatives are dropped even though an incidental mention of the pathname remains", () => {
   const root = makeFixture();
-  replace(
-    root,
-    "CLAUDE.md",
-    "Read docs/agents/CURRENT_STATE.md before acknowledging.",
-    "Operating state is somebody else's problem.",
-  );
+  // Remove the two pinned imperatives but keep the fixture's "See also
+  // docs/agents/CURRENT_STATE.md" line: a bare-pathname check would stay green here,
+  // which is exactly the hole this test pins shut.
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_INSTRUCTION, "Operating state is elsewhere.");
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_STEP, "1. Confirm context files were loaded.");
 
   const result = runChecker(root);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /must still instruct an explicit read of/);
+  assert.match(result.stderr, /exact pre-ack read instruction .* is missing/);
+  assert.match(result.stderr, /exact startup step-1 read .* is missing/);
+});
+
+test("passes when the read instruction is merely re-wrapped across different lines", () => {
+  const root = makeFixture();
+  // Whitespace-normalized comparison: a prose re-wrap must not read as a violation.
+  replace(
+    root,
+    "CLAUDE.md",
+    CLAUDE_STATE_READ_INSTRUCTION,
+    CLAUDE_STATE_READ_INSTRUCTION.replace(" read it with a file ", "\nread it with a file\n"),
+  );
+  // Commit the re-wrap so the BUMP gate sees no drift — this test isolates the
+  // whitespace-normalized pin comparison, not the content-change rule.
+  git(root, "add", ".");
+  git(root, "commit", "-m", "re-wrap the read instruction");
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
 });
 
 // Re-importing it would silently undo the token saving, so the ordered-prefix assertion

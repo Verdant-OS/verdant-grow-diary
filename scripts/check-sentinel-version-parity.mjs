@@ -87,15 +87,31 @@ Do not continue until the context issue is resolved.`;
  * near operating state. CLAUDE.md now instructs an explicit read instead.
  *
  * That trade only holds while the instruction survives, so it is asserted below as
- * CLAUDE_STATE_READ. Deleting an import is visible in a diff; deleting a sentence is not,
+ * CLAUDE_STATE_READ_INSTRUCTION and CLAUDE_STATE_READ_STEP, pinned verbatim. Deleting an import is visible in a diff; deleting a sentence is not,
  * and an agent with no path to operating state reasons from stale production facts —
  * exactly what this file exists to prevent.
  */
 const CLAUDE_IMPORTS = `@AGENTS.md
 @docs/agents/roles/claude.md`;
 
-/** The on-demand read that replaced the CURRENT_STATE.md import. */
-const CLAUDE_STATE_READ = "docs/agents/CURRENT_STATE.md";
+/**
+ * The two imperative sentences that replaced the CURRENT_STATE.md import, pinned verbatim.
+ * A bare pathname match is not enough: CLAUDE.md mentions the path incidentally in several
+ * other places, so an edit could delete every actual read instruction and still satisfy a
+ * substring check — the same source-text-scan failure AGENTS.md records for
+ * playwright-action-timeout-fence. Comparison is whitespace-normalized so a prose re-wrap
+ * is not a violation; any wording or ordering change is.
+ */
+const CLAUDE_STATE_READ_INSTRUCTION =
+  "**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file " +
+  "tool before you acknowledge.**";
+const CLAUDE_STATE_READ_STEP =
+  "1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.";
+
+/** Collapse whitespace runs so line-wrapping differences cannot defeat an exact-copy pin. */
+function normalizeWhitespace(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
 
 const LEGACY_ARCHIVE = "docs/archive/legacy/verdant-master-prompt-legacy.md";
 const LEGACY_HEADER = `> LEGACY — NOT ACTIVE AGENT INSTRUCTIONS
@@ -207,15 +223,25 @@ if (claudeText && !claudeText.startsWith(CLAUDE_IMPORTS)) {
   );
 }
 
-// CURRENT_STATE.md is read on demand rather than imported, so this written instruction is
-// the only thing keeping operating state in front of an agent. Nothing else in the
+// CURRENT_STATE.md is read on demand rather than imported, so these written imperatives
+// are the only thing keeping operating state in front of an agent. Nothing else in the
 // governance set carries branch, production, migration, blocker or assignment facts.
-if (claudeText && !claudeText.includes(CLAUDE_STATE_READ)) {
-  problems.push(
-    "CLAUDE.md: must still instruct an explicit read of docs/agents/CURRENT_STATE.md. " +
-      "It is not imported (too large), so losing the instruction leaves agents with no " +
-      "path to operating state",
-  );
+// Each is required verbatim; an incidental mention of the pathname is not a substitute.
+if (claudeText) {
+  const claudeNormalized = normalizeWhitespace(claudeText);
+  const statePins = [
+    ["pre-ack read instruction", CLAUDE_STATE_READ_INSTRUCTION],
+    ["startup step-1 read", CLAUDE_STATE_READ_STEP],
+  ];
+  for (const [label, pin] of statePins) {
+    if (!claudeNormalized.includes(normalizeWhitespace(pin))) {
+      problems.push(
+        `CLAUDE.md: exact ${label} for docs/agents/CURRENT_STATE.md is missing. The file ` +
+          "is not imported (too large), so this imperative is the only path to operating " +
+          "state; an incidental mention of the pathname does not satisfy it",
+      );
+    }
+  }
 }
 
 if (!existsSync("docs/agents/CURRENT_STATE.md")) {

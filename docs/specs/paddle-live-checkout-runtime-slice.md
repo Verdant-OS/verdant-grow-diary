@@ -7,20 +7,22 @@
 **Slice owner:** unassigned — needs one owner and a **different** peer as independent
 reviewer per `AGENTS.md`. This is a billing surface; the owner cannot review it.
 
-> **Revision 11 (2026-08-25).** Ten review rounds — Copilot (7) and Codex (3, then 3, then 2,
-> then 2, then 2, then 2, then 2, then 1, then 3 more). **All twenty-seven findings were
-> correct. The open-gap count stays at three** (Stage A's isolated-deployment design, the
-> cross-platform cutover mechanism, local/preview dev) **— revision 11 fixed all three of its
-> own findings rather than adding a fourth.** Two corrected an earlier revision's own
-> overclaim: §2.4.1/§6 item 0's "publish-time injection is neutralized" is walked back to
-> `NOT_MEASURED` (a companion document's later measurement shows the publisher may commit an
-> already-injected value before the restore script ever runs); §3.2's proposed build-time
-> guard against server-side `PAYMENTS_ENVIRONMENT` is replaced with what's actually
-> observable — an unchanged standing guard plus a manual verification at the one point that
-> holds both facts, inside §6 item 0. The third found that §3.5.1's SKU/environment split
-> (revision 5) fixed one of three causes behind `blockedReason` and left two unfixed — the
-> fourth named instance of this record's own "fixed the pointed-at instance, not the class"
-> pattern. Full record in §10 — read it before citing any earlier revision.
+> **Revision 12 (2026-08-25).** Eleven review rounds — Copilot (7) and Codex (3, then 3, then
+> 2, then 2, then 2, then 2, then 2, then 1, then 3, then 2 more). **All twenty-nine findings
+> were correct; the open-gap count still stays at three.** Revision 11 fixed all three of its
+> own findings rather than adding a fourth — walking back §2.4.1/§6 item 0's "publish-time
+> injection is neutralized" to `NOT_MEASURED`, replacing §3.2's unbuildable server-state guard
+> with a manual verification inside §6 item 0, and correcting §3.5.1's `blockedReason`
+> scope-derivation. Revision 12 finds two more, same shape as before: §3.3's
+> `getPaddleEnvironment()` defaulted a missing or malformed production token into the
+> `"sandbox"` entitlement bucket, which after Stage C could display a stray sandbox
+> subscriber as entitled while the live server correctly reads them as Free — fixed by
+> inverting the fallback direction. And the companion `CURRENT_STATE.md`'s claim that the
+> publisher "commits its workspace locally" — inferred from one `git fetch` failure that
+> proves only the SHA is unrecognized, not the mechanism — is walked back to `NOT_MEASURED`,
+> including a second, undetected occurrence of the identical overclaim inside this very
+> document's own revision-11 correction-record text. Full record in §10 — read it before
+> citing any earlier revision.
 
 > **Read `docs/paddle-paid-launch-runbook.md` first.** It predates this spec and already
 > governs the live transition. Revision 1 of this document did not cite it — a research
@@ -355,13 +357,39 @@ unforgeable, server-verified dev/preview signal) is new design, not a client run
 Recorded here, next to §1's Stage A and cutover-mechanism gaps, as a third open question for
 whoever owns Stage C — not invented in response to a review comment.
 
-### 3.3 Entitlement environment
+### 3.3 Entitlement environment — fallback direction corrected in revision 11 (Codex P2)
 
-`getPaddleEnvironment()` derives from token class — `live_` → `"live"`, else `"sandbox"` —
-and its return type widens from the literal `"sandbox"` to `LovableBillingEnvironment`.
-Not host-bound, unlike checkout: it only selects which rows the client _displays_, the
-server stays authoritative, and per §2.3 live rows already unlock regardless. Type widening
-is safe — `usePaddleCancelNotice.ts:51` already annotates it as `LovableBillingEnvironment`.
+`getPaddleEnvironment()` derives from token class, and its return type widens from the
+literal `"sandbox"` to `LovableBillingEnvironment`. Not host-bound, unlike checkout: it only
+selects which rows the client _displays_, the server stays authoritative, and per §2.3 live
+rows already unlock regardless. Type widening is safe — `usePaddleCancelNotice.ts:51`
+already annotates it as `LovableBillingEnvironment`.
+
+**The original derivation defaulted the wrong way for a missing or malformed token —
+corrected here rather than left to ship.** `LovableBillingEnvironment`
+(`src/lib/entitlements/lovablePaddleAdapter.ts:28`) is a two-value type — `"sandbox" |
+"live"`, no third "unavailable" bucket — so _something_ must be returned even when the token
+is missing or malformed. The original rule (`live_` → `"live"`, else → `"sandbox"`) put
+every malformed/missing case in the `"sandbox"` bucket.
+
+That bucket is not inert. `useMyEntitlements.ts` and `usePaddleCancelNotice.ts` both gate
+their sandbox-row query on `expectedEnvironment === "sandbox"` — `fetchEntitlementSnapshot`'s
+own comment states the design intent directly: "Live rows are canonical production evidence
+and unlock regardless of a sandbox-configured client. Sandbox rows unlock only when this
+client explicitly expects sandbox." After Stage C, a missing or malformed production token
+would still land in that `"sandbox"` bucket under the original rule, so a grower holding only
+a stray sandbox-era subscription row would display as entitled — while the authoritative
+live server, which now governs real payments, would correctly consider them Free.
+
+**The rule inverts which branch is the explicit match and which is the catch-all:**
+`test_`-class (a validly-shaped sandbox token) → `"sandbox"`; everything else — a genuine
+`live_` token, **or** a missing or malformed one — → `"live"`. The live and genuinely-sandbox
+cases are unchanged; only a broken or absent token's outcome moves, from "treat as sandbox"
+to "treat as live". Under `"live"`, the sandbox-row query is skipped entirely, so a stray
+sandbox row can never surface, and the always-run live-row query (§2.3) still correctly
+resolves a genuine live subscriber, or Free if none exists — never a fabricated "healthy"
+read from an unreadable token. No new "unavailable" state is needed; both consumers already
+behave correctly off the existing two-value type once the fallback direction is corrected.
 
 ---
 
@@ -484,7 +512,9 @@ Every existing fence gets a same-strength replacement. New coverage:
 6. classification never returns or logs the token value (existing pattern, retained)
 7. each of gates 2–6 opens under `"live"` on production and stays closed off-production
 8. `getPaddlePriceId()` sends the resolved environment, never a hardcoded `"sandbox"`
-9. `getPaddleEnvironment()` → `"live"` for live class, `"sandbox"` otherwise
+9. `getPaddleEnvironment()` → `"sandbox"` for a valid `test_`-class token, `"live"` for
+   everything else — **direction corrected in revision 11 (Codex P2)**: a live token,
+   **and** a missing or malformed one, both resolve `"live"`, never `"sandbox"` (§3.3)
 10. bundle attestation accepts the intended live token, rejects a mismatched token class, **and
     rejects a second, distinct live token of the same class** — a class-only check would let a
     valid-looking `live_...` token from the wrong Paddle account pass (§2.4.1, added in
@@ -515,11 +545,17 @@ Every existing fence gets a same-strength replacement. New coverage:
     `pro_monthly`, `pro_annual` and `founder_lifetime` is unaffected by the live-scoped
     variables being set — regression, proving the legacy audit lane survives Stage C
     (§2.1, §6 item 3, added in revision 9, Codex P2) — prove RED before the fix
+17. **with the production server live and the shipped client token missing or malformed, a
+    user holding only a stray sandbox-class `public.subscriptions` row resolves to Free, not
+    entitled** — `getPaddleEnvironment()` returning `"live"` for the broken token must skip
+    the sandbox-row query entirely in both `useMyEntitlements.ts` and
+    `usePaddleCancelNotice.ts` (§3.3, added in revision 11, Codex P2) — prove RED before the
+    fix
 
-Prove 1, 2, 3, 7, 8, 10, 11, 12, 13 and 16 **RED before the fix** and put the failing count
-in the PR body, per `AGENTS.md`. **Test 15 is removed from this list, corrected in revision
-11 (Codex P1)** — it is a manual operator checklist item (§6 item 0), not code, and has no
-RED state to prove. Tests 12, 13 and 16 are the Hard Safety / paid-without-entitlement /
+Prove 1, 2, 3, 7, 8, 10, 11, 12, 13, 16 and 17 **RED before the fix** and put the failing
+count in the PR body, per `AGENTS.md`. **Test 15 is removed from this list, corrected in
+revision 11 (Codex P1)** — it is a manual operator checklist item (§6 item 0), not code, and
+has no RED state to prove. Tests 12, 13, 16 and 17 are the Hard Safety / paid-without-entitlement /
 audit-continuity fences — none may ever be skipped; item 0's manual verification carries the
 same never-skip weight for the same reason, enforced by the release checklist rather than a
 test runner.
@@ -797,3 +833,18 @@ describes: it is the **fourth** named instance of "fixed the pointed-at instance
 class" in this record (finding 13, then 14, then 22, now this one) — revision 5 fixed the one
 genuinely SKU-scoped cause of `blockedReason` and treated it as the whole class, the same
 failure shape three earlier findings already named under this exact heading.
+
+### Revision 12 — Codex, 2 findings, both correct
+
+| #   | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Disposition                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 28  | **P2.** §3.3's original rule (`live_` → `"live"`, else → `"sandbox"`) puts a missing or malformed production token in the `"sandbox"` bucket. `LovableBillingEnvironment` has no third state, and both `useMyEntitlements.ts` and `usePaddleCancelNotice.ts` gate their sandbox-row query on that bucket — so after Stage C, a broken token would let a stray sandbox-era subscription row display a grower as entitled while the authoritative live server correctly considers them Free    | **Fixed.** §3.3 rewritten: the fallback direction inverts — `test_`-class → `"sandbox"`, everything else (live, missing, or malformed) → `"live"` — so a broken token skips the sandbox query entirely rather than defaulting into it; test 9 corrected, new regression test 17                                                                                                                                             |
+| 29  | **P2.** `CURRENT_STATE.md`'s 19:48 UTC block treats "`git fetch origin <sha>` → not our ref" as proof the publisher "commits its workspace locally" — that fetch result proves only the SHA is absent from the remote, not the causal mechanism that put it there, and the same unproven premise is reused two sections later to reason about token-injection ordering, exactly the "inference presented as conclusion" pattern this record already names as recurring across both documents | **Corrected.** Both passages walked back to `NOT_MEASURED` on the causal mechanism; the observation itself (SHA unrecognized by GitHub) is unaffected and stays as measured. Also noted: finding 25's own disposition text, written one revision earlier in this very table, restates the same unproven "commits its workspace locally" framing without hedging — propagation into a correction, not just into the original |
+
+**Twenty-nine findings across eleven rounds, twenty-nine correct.** Both findings this round
+are the same failure shape from opposite directions: 28 is a design defaulting the unsafe way
+on an input nobody enumerated (a broken token, not just the two expected classes); 29 is a
+narrative treating one confirmed observation as license for a broader causal story, then
+reusing that story as a premise elsewhere — including, per finding 29's own disposition, one
+revision back inside this document's own correction record. Neither is conceded; the open-gap
+count stays at three.

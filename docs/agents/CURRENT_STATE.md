@@ -5,8 +5,16 @@
 served commit is not in the GitHub repository at all.** `git fetch origin e8f4e7c2fe05…`
 returns `not our ref`. Two long-standing framings in this file are corrected as a result:
 **publish lag is NOT COMPUTABLE** against this build (every lag figure presumed an ancestry
-that does not hold), and **`ref: "__orphan__"` now has a sufficient explanation** — the
+that does not hold), and **`ref: "__orphan__"` now has a candidate explanation** — the
 publisher commits locally in a workspace that is not GitHub's.
+
+**Overclaimed, corrected below the same day in revision 11 (Codex P2) of the companion
+payments spec (PR #1125):** "now has a _sufficient_ explanation" outran the evidence. A
+remote fetch failure proves the SHA is unrecognized by GitHub; it does not by itself prove
+the causal mechanism (a genuinely disconnected local commit, versus a rebase/squash/re-commit
+of otherwise GitHub-derived content producing the same symptom). See the corrected point 2
+and the corrected "Open question" paragraph in the 19:48 UTC block below — the causal
+mechanism is `NOT_MEASURED`; the observation (SHA unrecognized) stands.
 
 The candidate-1-vs-2 correction is **not** restated here — a parallel session on this same
 branch recorded it more fully; see "#1127 landed while this PR was open" below. This edit
@@ -631,10 +639,17 @@ Two consequences, both correcting long-standing framing in this file:
    presumes the served commit is an ancestor of the tip. It is not. Every lag figure this
    file has carried assumed an ancestry that no longer holds. Do **not** compute or quote a
    lag number against this build.
-2. **`ref: "__orphan__"` finally has a sufficient explanation.** The publisher builds from a
-   workspace whose git history is not GitHub's, committing locally. The provenance defect is
-   not a stamping bug — it is what an orphan workspace commit looks like when stamped
-   faithfully.
+2. **`ref: "__orphan__"` has a candidate explanation, not a proven one — corrected in
+   revision 11 (Codex P2) of the companion payments spec (PR #1125).** `git fetch origin
+<sha>` returning `not our ref` proves the SHA is absent from `origin`; it does not by
+   itself prove _how_ it got that way. "The publisher's workspace commits locally, unmoored
+   from GitHub's history" is one mechanism consistent with that absence — it is not the only
+   one a rebase, squash, or re-commit of otherwise GitHub-derived content, or a build sourced
+   from a different remote, would produce the identical symptom. `stamp-version.mjs:117-122`
+   does stamp whatever `git rev-parse HEAD` reports locally, faithfully — that much is
+   confirmed by source — but "faithfully" describes the _stamping_, not the _cause_ of what
+   HEAD happened to be. Held at `NOT_MEASURED`: the causal mechanism. Unaffected, and still
+   measured: the observation itself — this SHA is unrecognized by GitHub.
 
 ### The build-time token question — see the candidate-2 block above, not here
 
@@ -656,13 +671,18 @@ and `stamp-version.mjs`.
 zero `test_`-class tokens**. Counts only — no token value was printed, logged, or stored.
 
 **Open question, flagged not answered.** The restore reads `git show HEAD:.env.production`.
-If the publisher's workspace commits the injected file — and the served SHA being an orphan
-commit unknown to GitHub shows the publisher does commit locally — then `HEAD` may already
-carry the injected `live_` value, and restoring from it would restore the injection rather
-than the committed sandbox class, making the fix a no-op. Whether Lovable injects before or
-after its local commit is **`NOT_MEASURED`**. Do not record #1127 as proven until a publish
-demonstrates `dirty: false` and a `test_`-class bundle — which is exactly the demonstration
-#1127's own release note asks for.
+**Corrected in revision 11 (Codex P2) of the companion spec:** the sentence originally here
+said "the served SHA being an orphan commit unknown to GitHub shows the publisher does
+commit locally" — restating, as settled, the exact causal claim point 2 above now holds at
+`NOT_MEASURED`. It is not settled. What the fetch failure actually supports is narrower: it
+says nothing about whether the publisher's workspace commits the injected file at all, let
+alone in what order relative to injection. _If_ it does, `HEAD` may already carry the
+injected `live_` value, and restoring from it would restore the injection rather than the
+committed sandbox class, making the fix a no-op — but that "if" is exactly what is not
+established. Whether Lovable injects before or after any such commit is **`NOT_MEASURED`**,
+on narrower grounds than this paragraph originally claimed. Do not record #1127 as proven
+until a publish demonstrates `dirty: false` and a `test_`-class bundle — which is exactly the
+demonstration #1127's own release note asks for.
 
 **Nothing here authorizes a publish.** The stop-order stands; this is measurement only, and
 no agent published — production republished on its own account at 18:05 UTC.

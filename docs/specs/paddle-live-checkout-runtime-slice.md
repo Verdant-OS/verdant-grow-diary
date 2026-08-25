@@ -7,16 +7,18 @@
 **Slice owner:** unassigned — needs one owner and a **different** peer as independent
 reviewer per `AGENTS.md`. This is a billing surface; the owner cannot review it.
 
-> **Revision 6 (2026-08-25).** Five review rounds — Copilot (7) and Codex (3, then 3, then 2,
-> then 2 more). **All seventeen findings were correct.** Revision 5 closed a gap revision 4's
-> own Hard Safety copy fix left open — a SKU-specific catalog failure collapsing into the same
-> "no real charge is possible" copy as a global environment failure — and tightened the
-> bundle-attestation test list against a same-class live token. Revision 6 withdraws §1's
-> unflagged repetition of the runbook's `PADDLE_ENVIRONMENT=live` line, which §6.1 already
-> says not to follow, and corrects a companion `CURRENT_STATE.md` heading on this same PR that
-> called the build-time token question "ANSWERED" — the guard #1124 shipped still requires an
-> exact match between the effective and canonical tokens, which the credited injection
-> mechanism cannot produce. Full record in §10 — read it before citing any earlier revision.
+> **Revision 7 (2026-08-25).** Six review rounds — Copilot (7) and Codex (3, then 3, then 2,
+> then 2, then 2 more). **All nineteen findings were correct.** Revision 6 withdrew §1's
+> unflagged repetition of a superseded runbook line and corrected a companion
+> `CURRENT_STATE.md` heading that overclaimed the build-time token question as settled.
+> Revision 7 corrects two findings this document should have caught itself: §3.2 had treated a
+> `test_` token surviving on production after the Stage C server switch as an optional
+> follow-up, when it is the identical broken hybrid §1 and §7 already forbid, just arriving
+> through the token instead of the server selector — now mandatory within Stage C. And
+> `src/pages/Upgrade.tsx`, added as a "seventh gate" in revision 4, is removed from live scope
+> entirely: it is a retired, unmounted presenter reading a deliberately sandbox-only config
+> module, and mapping it to live would have weakened a legacy fence for no reachable benefit.
+> Full record in §10 — read it before citing any earlier revision.
 
 > **Read `docs/paddle-paid-launch-runbook.md` first.** It predates this spec and already
 > governs the live transition. Revision 1 of this document did not cite it — a research
@@ -99,21 +101,29 @@ billing environment correctly and already support live:
 
 **The spec proposes no server-code change.** The live switch is configuration, not code.
 
-### 2.2 The client has SIX sandbox-only runtime gates, not one
+### 2.2 The client has SIX sandbox-only runtime gates in live scope, not one
 
 **Corrected in revision 2.** Revision 1 listed the resolver and one call site. Each gate
 below fails closed independently, so changing the resolver alone leaves checkout unable to
 open — the resolver would return `"live"` and the very next gate would throw.
 
-| #   | Gate                        | Location                                 | Behaviour                                                                                             |
-| --- | --------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| 1   | resolver                    | `src/lib/paddleEnvironment.ts:87`        | `"sandbox"` only for `test_`; all else `"unavailable"` on every host                                  |
-| 2   | Paddle.js load              | `src/lib/paddle.ts` `initializePaddle()` | throws `PaddleCheckoutUnavailableError` unless `env === "sandbox"`, before loading the script         |
-| 3   | hardcoded SDK env           | `src/lib/paddle.ts`                      | `Paddle.Environment.set("sandbox")` — a literal, not derived                                          |
-| 4   | price lookup                | `src/lib/paddle.ts` `getPaddlePriceId()` | throws unless sandbox, **and** sends `environment: "sandbox"` in its `get-paddle-price` request body  |
-| 5   | checkout hook, presentation | `src/hooks/usePaddleCheckout.ts:124`     | `const unavailable = environment !== "sandbox"`                                                       |
-| 6   | checkout hook, open path    | `src/hooks/usePaddleCheckout.ts:137`     | fail-closed gate before any auth redirect                                                             |
-| 7   | second hardcoded SDK env    | `src/pages/Upgrade.tsx:131`              | `window.Paddle.Environment?.set("sandbox")` — a **separate** hardcoded call site, added in revision 4 |
+**Revision 4 added a would-be seventh row; revision 7 (Codex P2) removes it from live scope.**
+`src/pages/Upgrade.tsx` is a retired presenter — `canonical-checkout-ownership.test.ts` proves
+`/upgrade` redirects to `/pricing` and never mounts it — reading Paddle config through the
+deprecated, deliberately sandbox-only `paddleConfig.ts` (`@deprecated`, refuses live/production
+by design). Kept in the table below for visibility, not as a live-scope gate: it fails closed
+today, stays untouched by this slice, and is excluded from §3.4's SDK-value mapping and from
+test 11.
+
+| #   | Gate                        | Location                                 | Behaviour                                                                                              |
+| --- | --------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 1   | resolver                    | `src/lib/paddleEnvironment.ts:87`        | `"sandbox"` only for `test_`; all else `"unavailable"` on every host                                   |
+| 2   | Paddle.js load              | `src/lib/paddle.ts` `initializePaddle()` | throws `PaddleCheckoutUnavailableError` unless `env === "sandbox"`, before loading the script          |
+| 3   | hardcoded SDK env           | `src/lib/paddle.ts`                      | `Paddle.Environment.set("sandbox")` — a literal, not derived                                           |
+| 4   | price lookup                | `src/lib/paddle.ts` `getPaddlePriceId()` | throws unless sandbox, **and** sends `environment: "sandbox"` in its `get-paddle-price` request body   |
+| 5   | checkout hook, presentation | `src/hooks/usePaddleCheckout.ts:124`     | `const unavailable = environment !== "sandbox"`                                                        |
+| 6   | checkout hook, open path    | `src/hooks/usePaddleCheckout.ts:137`     | fail-closed gate before any auth redirect                                                              |
+| —   | retired, out of live scope  | `src/pages/Upgrade.tsx:131`              | `window.Paddle.Environment?.set("sandbox")` — unreachable BYO sandbox path; left unchanged (see above) |
 
 ### 2.3 `getPaddleEnvironment()` is cleanup, NOT a launch blocker
 
@@ -216,13 +226,32 @@ gives it a real job again.
 Gates 2–6 in §2.2 each adopt the same resolved value rather than comparing to the literal
 `"sandbox"`.
 
-### 3.2 The residual this deliberately does NOT solve
+### 3.2 A `test_` token on production after Stage C IS the broken hybrid — corrected in revision 7 (Codex P1)
 
-A `test_` token on the production host still resolves to `"sandbox"` — production would
-open a sandbox checkout that grants nothing real, silently. Today that is intended. After
-the Stage C switch it becomes a misconfiguration no guard catches. **Recommended follow-up (separate
-slice):** an operator-visible signal — a build-time assertion or admin banner — rather than
-a runtime refusal. Flagged so it is a decision, not an oversight.
+**Revisions 1 through 6 treated this as a deferred residual, safe to leave for a follow-up
+slice. It is not a residual — it is the exact failure §1 and §7 already call unacceptable,
+arriving through the token instead of the environment selector.**
+
+A `test_` token on the canonical production host resolves to `"sandbox"` (§3.1). Before
+Stage C that is correct and safe — the server is still `sandbox` too. **After Stage C**,
+`PAYMENTS_ENVIRONMENT=live` is set server-side, and per §2.1 `get-paddle-price` **ignores
+the client-supplied environment entirely** and returns live catalog price IDs regardless of
+what the client resolved. A build that ships a `test_` token on production after Stage C —
+a bad rollback, a stale artifact, human error — would initialize **sandbox** Paddle while
+receiving **live** price IDs from the server, silently, since nothing currently checks for
+that combination. That is the identical broken hybrid §1 opens with and §7 already treats
+as unacceptable. It is not made safer by arriving through a stale client token instead of a
+stale server selector, and treating it as an optional operator-visible-signal follow-up was
+wrong.
+
+**This must be enforced within the coordinated Stage C release, not deferred.** The
+canonical production origin must require a live-class token whenever the server-side
+`PAYMENTS_ENVIRONMENT` is live — for example, extending
+`scripts/assert-paddle-production-sandbox.mjs`'s existing pattern to also fail the build
+when the server environment is (or is being switched to) live and the shipped production
+token is not, rather than the admin-banner-only treatment this section previously proposed.
+The previously-reviewed sandbox build remains the actual rollback path per §7; nothing here
+changes that.
 
 ### 3.3 Entitlement environment
 
@@ -238,14 +267,18 @@ is safe — `usePaddleCancelNotice.ts:51` already annotates it as `LovableBillin
 
 This repository's label for the production billing environment is **`live`**. Paddle.js's
 `Paddle.Environment.set(...)` takes **`"sandbox"` or `"production"`**. They are not the same
-string, and `src/pages/Upgrade.tsx:76` types the global as
-`Environment?: { set: (env: string) => void }` — plain `string` — so passing `"live"`
-**type-checks cleanly and fails only at runtime**, during the atomic switch, which is the
-worst possible moment to find out. `src/lib/paddleConfig.ts:77` already treats `"live"` and
-`"production"` as distinct strings, so the distinction is real in this codebase.
+string. **Corrected in revision 7** — the original citation for this risk was
+`src/pages/Upgrade.tsx:76`, which §2.2 now excludes from live scope; the actually-relevant
+call site is worse, not better: `src/lib/paddle.ts:174` calls
+`(window as any).Paddle.Environment.set("sandbox")` — an explicit `any` cast, which
+suppresses type checking entirely rather than merely widening it to `string` — so passing
+`"live"` **type-checks cleanly and fails only at runtime**, during the atomic switch, which
+is the worst possible moment to find out. `src/lib/paddleConfig.ts:77` already treats `"live"`
+and `"production"` as distinct strings, so the distinction is real in this codebase.
 
-Introduce one explicit mapping (`live` → `production`, `sandbox` → `sandbox`) used by **both**
-call sites, and assert the exact SDK argument in tests, not just the resolver output.
+Introduce one explicit mapping (`live` → `production`, `sandbox` → `sandbox`) at the single
+live-scope call site in `src/lib/paddle.ts`, and assert the exact SDK argument in tests, not
+just the resolver output.
 
 ### 3.5 Buyer-facing checkout copy is IN scope — Hard Safety, added in revision 4 (Codex P1)
 
@@ -292,16 +325,17 @@ unchanged.
 
 ## 4. File-level plan (Stage B only)
 
-| File                                                          | Change                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/paddleEnvironment.ts`                                | Canonical-production-host predicate; rewrite `resolvePaddleCheckoutEnvironment` per §3.1; replace `CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE`, whose copy asserts the sandbox-only policy and would become false; update module header                                                                                                                                                      |
-| `src/lib/paddle.ts`                                           | Gates 2, 3, 4 of §2.2: `initializePaddle()` accepts the resolved environment; `Paddle.Environment.set(...)` takes the **mapped SDK value** (§3.4), never the raw resolved value; `getPaddlePriceId()` accepts it **and** stops hardcoding `environment: "sandbox"` in its request body. Plus `getPaddleEnvironment()` per §3.3, `getCheckoutUnavailableMessage()`, and the module header |
-| `src/pages/Upgrade.tsx`                                       | Gate 7 — the second hardcoded `Environment?.set("sandbox")` at `:131`, using the same mapping. Its `PaddleGlobal` types `set` as `(env: string) => void`, so a wrong value type-checks and fails only at runtime                                                                                                                                                                         |
-| `src/lib/checkoutTrustCopyRules.ts` + `src/pages/Pricing.tsx` | **Hard Safety — see §3.5 and §3.5.1.** Add a `live` trust state; distinguish a global environment failure from a single blocked SKU so the other SKUs' copy never falls back to "no real charge is possible"; `Pricing.tsx:253` already feeds the resolved environment in                                                                                                                |
-| `src/hooks/usePaddleCheckout.ts`                              | Gates 5 and 6 — `:124` and `:137` stop comparing to the literal `"sandbox"`                                                                                                                                                                                                                                                                                                              |
-| `src/constants/*Copy.ts`                                      | Blocking copy pinned as data per repo convention, not inline in JSX                                                                                                                                                                                                                                                                                                                      |
-| `scripts/e2e/managed-session-materialize-core.mjs`            | **Mandatory** (§2.4): re-point `evaluatePublicPaddleBundle` at the new policy, keeping an equal-strength assertion                                                                                                                                                                                                                                                                       |
-| `.github/workflows/quicklog-smoke.yml`                        | **Mandatory, and the harder half — see §2.4.1.** The workflow, not the evaluator, is where the expected token comes from                                                                                                                                                                                                                                                                 |
+| File                                                          | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/paddleEnvironment.ts`                                | Canonical-production-host predicate; rewrite `resolvePaddleCheckoutEnvironment` per §3.1; replace `CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE`, whose copy asserts the sandbox-only policy and would become false; update module header                                                                                                                                                                                                                                           |
+| `src/lib/paddle.ts`                                           | Gates 2, 3, 4 of §2.2: `initializePaddle()` accepts the resolved environment; `Paddle.Environment.set(...)` takes the **mapped SDK value** (§3.4), never the raw resolved value; `getPaddlePriceId()` accepts it **and** stops hardcoding `environment: "sandbox"` in its request body. Plus `getPaddleEnvironment()` per §3.3, `getCheckoutUnavailableMessage()`, and the module header                                                                                      |
+| `src/pages/Upgrade.tsx`                                       | **NOT in live scope — corrected in revision 7 (Codex P2).** `canonical-checkout-ownership.test.ts` proves `/upgrade` redirects to `/pricing` and never mounts this presenter; `paddleConfig.ts` is the deprecated BYO sandbox path that explicitly refuses live/production configuration by design. Mapping its hardcoded `Environment.set("sandbox")` to live would either weaken a legacy fence meant to stay sandbox-only or create an unreachable branch. Leave unchanged |
+| `src/lib/checkoutTrustCopyRules.ts` + `src/pages/Pricing.tsx` | **Hard Safety — see §3.5 and §3.5.1.** Add a `live` trust state; distinguish a global environment failure from a single blocked SKU so the other SKUs' copy never falls back to "no real charge is possible"; `Pricing.tsx:253` already feeds the resolved environment in                                                                                                                                                                                                     |
+| `src/hooks/usePaddleCheckout.ts`                              | Gates 5 and 6 — `:124` and `:137` stop comparing to the literal `"sandbox"`                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `src/constants/*Copy.ts`                                      | Blocking copy pinned as data per repo convention, not inline in JSX                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `scripts/e2e/managed-session-materialize-core.mjs`            | **Mandatory** (§2.4): re-point `evaluatePublicPaddleBundle` at the new policy, keeping an equal-strength assertion                                                                                                                                                                                                                                                                                                                                                            |
+| `.github/workflows/quicklog-smoke.yml`                        | **Mandatory, and the harder half — see §2.4.1.** The workflow, not the evaluator, is where the expected token comes from                                                                                                                                                                                                                                                                                                                                                      |
+| `scripts/assert-paddle-production-sandbox.mjs`                | **Mandatory — see §3.2, added in revision 7.** Extend to fail the build when the server-side `PAYMENTS_ENVIRONMENT` is (or is being switched to) live and the production client token is not live-class, closing the broken-hybrid gap §3.2 previously deferred                                                                                                                                                                                                               |
 
 No schema. No migration. No RLS. No edge-function code change. No new route.
 
@@ -322,17 +356,25 @@ Every existing fence gets a same-strength replacement. New coverage:
     rejects a second, distinct live token of the same class** — a class-only check would let a
     valid-looking `live_...` token from the wrong Paddle account pass (§2.4.1, added in
     revision 5, Codex P2)
-11. **the exact argument passed to `Paddle.Environment.set` is `"production"` under live and `"sandbox"` under sandbox** — assert the SDK value at both call sites, not just the resolver output (§3.4)
+11. **the exact argument passed to `Paddle.Environment.set` is `"production"` under live and
+    `"sandbox"` under sandbox** — assert the SDK value at the single live-scope call site
+    (`src/lib/paddle.ts`), not just the resolver output (§3.4, corrected in revision 7 — not
+    `Upgrade.tsx`, which stays out of live scope per §2.2)
 12. `buildCheckoutTrustCopy` returns a live state under `"live"` whose copy states a real charge WILL be made, with `canCreateLiveCharge` true (§3.5) — prove RED before the fix
 13. **live environment, one SKU blocked by a runtime catalog failure** → that SKU's copy
     reflects the block while every other, still-chargeable SKU's copy keeps stating a real
     charge will be made — the environment-failure and SKU-failure causes must not collapse to
     one `blocked` boolean (§3.5.1, added in revision 5, Codex P1) — prove RED before the fix
 14. determinism: repeated calls with identical inputs agree
+15. **the production build-time guard fails when the server-side `PAYMENTS_ENVIRONMENT` is
+    live and the shipped client token is not live-class** — the broken-hybrid combination
+    §3.2 identifies (sandbox client, live server catalog) — and still passes for every
+    already-covered combination (§3.2, added in revision 7, Codex P1) — prove RED before the
+    fix
 
-Prove 1, 2, 3, 7, 8, 10, 11, 12 and 13 **RED before the fix** and put the failing count in the
-PR body, per `AGENTS.md`. Tests 12 and 13 are the Hard Safety fences — neither may ever be
-skipped.
+Prove 1, 2, 3, 7, 8, 10, 11, 12, 13 and 15 **RED before the fix** and put the failing count in
+the PR body, per `AGENTS.md`. Tests 12, 13 and 15 are the Hard Safety / paid-without-
+entitlement fences — none may ever be skipped.
 
 ## 6. Owner-gated prerequisites (Stages A and C — none of this is agent work)
 
@@ -438,11 +480,11 @@ it governs.
 
 ### Revision 4 — Codex, 3 findings, all correct, all P1
 
-| #   | Finding                                                                                                                                                            | Disposition                                                                                                           |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| 11  | Passing the resolved `"live"` straight to `Paddle.Environment.set` is invalid — the SDK takes `"production"` — and the loosely typed global hides it until runtime | **Conceded.** New §3.4 mapping; test 11 asserts the SDK argument. Also surfaced a **seventh** gate, `Upgrade.tsx:131` |
-| 12  | Pricing copy cannot be out of scope: `buildCheckoutTrustCopy` has no live state, so a buyer would be told "no real charge is possible" while being charged         | **Conceded — Hard Safety.** New §3.5; removed from §8; test 12 is a mandatory RED-first fence                         |
-| 13  | §6 still said "Stage 0" and "Stage 1", so an operator following it would still switch the server before the client                                                 | **Conceded.** Stage vocabulary swept across §2.1, §3.2, §4 and §6                                                     |
+| #   | Finding                                                                                                                                                            | Disposition                                                                                                                                                                                                 |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 11  | Passing the resolved `"live"` straight to `Paddle.Environment.set` is invalid — the SDK takes `"production"` — and the loosely typed global hides it until runtime | **Conceded.** New §3.4 mapping; test 11 asserts the SDK argument. Also surfaced a would-be **seventh** gate, `Upgrade.tsx:131` — **later removed from live scope in revision 7 (Codex P2); see that table** |
+| 12  | Pricing copy cannot be out of scope: `buildCheckoutTrustCopy` has no live state, so a buyer would be told "no real charge is possible" while being charged         | **Conceded — Hard Safety.** New §3.5; removed from §8; test 12 is a mandatory RED-first fence                                                                                                               |
+| 13  | §6 still said "Stage 0" and "Stage 1", so an operator following it would still switch the server before the client                                                 | **Conceded.** Stage vocabulary swept across §2.1, §3.2, §4 and §6                                                                                                                                           |
 
 **Thirteen findings across three rounds, thirteen correct.** Finding 13 is the sharpest
 lesson: revision 3 fixed the sequencing in §1 and left the same instruction standing in the
@@ -485,3 +527,19 @@ consequential of the five rounds: it does not just find a documentation gap, it 
 confirming the mechanism would reject the mechanism it was credited with confirming. Neither
 this spec nor `CURRENT_STATE.md` re-measured which of the two original candidates is
 correct; the heading correction narrows what was overclaimed, not what is known.
+
+### Revision 7 — Codex, 2 findings, both correct
+
+| #   | Finding                                                                                                                                                                                                                                                                                                                          | Disposition                                                                                                                                                                                                              |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 18  | **P1.** §3.2 treated a `test_` token surviving on production after Stage C as a deferrable residual. It is not — once the server is live, `get-paddle-price` ignores the client environment and returns live catalog IDs regardless, so a stale sandbox client token reproduces the exact broken hybrid §1 and §7 already forbid | **Conceded.** §3.2 rewritten to require enforcement within Stage C, not a follow-up slice; new §4 row for `assert-paddle-production-sandbox.mjs`; new RED-first test 15                                                  |
+| 19  | **P2.** `src/pages/Upgrade.tsx` was scoped into live-mapping work (§2.2 gate 7, §3.4, test 11) even though it is a retired, unmounted presenter reading a deliberately sandbox-only, `@deprecated` config module that refuses live/production by design                                                                          | **Conceded.** Removed from live scope in §2.2 (kept visible, marked excluded), §3.4 (citation corrected to the real call site, `paddle.ts`'s `as any` cast — an even stronger example of the same risk), §4, and test 11 |
+
+**Nineteen findings across six rounds, nineteen correct.** Finding 18 is the second
+"deferred residual is actually the central failure mode" catch in this document (finding 8,
+Stage 0 sequencing, was the first) — this spec's own executive framing in §1 should have
+caught it directly, since §3.2 restates §1's exact hybrid with the roles of client and
+server reversed. Finding 19 shows revision 4 extended a real risk pattern (loosely-typed SDK
+values) to a file that pattern-matched but was never actually reachable — verifying scope
+against the route table, not just the source text, would have caught it before revision 4
+shipped.

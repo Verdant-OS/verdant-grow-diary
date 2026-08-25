@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite dev",
     "dev:lan": "vite --host 0.0.0.0",
-    "prebuild": "node scripts/assert-paddle-production-sandbox.mjs && node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs && node scripts/stamp-version.mjs",
+    "prebuild": "node scripts/assert-paddle-production-sandbox.mjs && node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs && node scripts/stamp-version.mjs && node scripts/verify-publish-provenance.mjs",
     "stamp-version": "node scripts/stamp-version.mjs",
+    "publish:verify": "node scripts/verify-publish-provenance.mjs",
     "build": "vite build",
     "postbuild": "node scripts/run-postbuild-seo.mjs dist",
     "test:postbuild-seo-artifacts": "vitest run src/test/postbuild-seo-artifact-generation.test.ts src/test/assert-twitter-card-images.test.ts src/test/assert-manifest-og-card-filenames.test.ts src/test/og-card-pixel-regression.test.ts --reporter=dot --testTimeout=300000 --hookTimeout=300000",

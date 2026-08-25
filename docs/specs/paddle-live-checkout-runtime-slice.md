@@ -7,19 +7,21 @@
 **Slice owner:** unassigned — needs one owner and a **different** peer as independent
 reviewer per `AGENTS.md`. This is a billing surface; the owner cannot review it.
 
-> **Revision 9 (2026-08-25).** Eight review rounds — Copilot (7) and Codex (3, then 3, then 2,
-> then 2, then 2, then 2, then 2 more). **All twenty-three findings were correct; one (revision
-> 8's cutover-mechanism finding) is conceded as an open gap, not fixed.** Revision 8 responded
-> to parent commit #1127 landing mid-review: the live token must now be committed directly to
-> `.env.production` (§6 item 0), since publish-time injection no longer reaches the shipped
-> bundle. Revision 9 fixes two more, both self-inflicted by earlier revisions' own edits: §8
-> still listed the §3.2 build guard as out of scope after revision 7 made it mandatory two
-> sections earlier, and §2.1's "no server-code change" claim missed that `get-paddle-price`
-> and the legacy `paddle-webhook` read identical flat `PADDLE_PRICE_*` variables for three of
-> seven plans — switching those to live IDs as originally written would have silently broken
-> sandbox audit-event classification for `pro_monthly`, `pro_annual` and `founder_lifetime`.
-> Both closed with environment-scoped variables and a new regression test (16), not a design
-> change. Full record in §10 — read it before citing any earlier revision.
+> **Revision 10 (2026-08-25).** Nine review rounds — Copilot (7) and Codex (3, then 3, then 2,
+> then 2, then 2, then 2, then 2, then 1 more). **All twenty-four findings were correct; three
+> are conceded as open gaps, not fixed.** Revisions 8–9 fixed the live-token delivery
+> mechanism, a stale scope entry, and a shared price-ID variable collision. Revision 10 adds a
+> third conceded gap alongside Stage A's isolated-deployment design and the cross-platform
+> cutover mechanism: §3.2's production build-time guard cannot see local or preview
+> development, which points at production Supabase (`.env`) while running a sandbox Paddle
+> token (`.env.development`) and never runs `prebuild`. Once Stage C goes live, any
+> authenticated local or preview session hits the identical broken hybrid. Not fixed here —
+> every option (an isolated dev Supabase project, or teaching the server to trust a
+> client-signalled environment) is an infrastructure or security decision this spec cannot
+> make unilaterally. §10 now names the pattern across all three concessions explicitly: each
+> is a fresh instance of this document's own stated limit — correctness depends on server
+> configuration it cannot verify — not a new kind of gap. Full record in §10 — read it before
+> citing any earlier revision.
 
 > **Read `docs/paddle-paid-launch-runbook.md` first.** It predates this spec and already
 > governs the live transition. Revision 1 of this document did not cite it — a research
@@ -290,6 +292,29 @@ when the server environment is (or is being switched to) live and the shipped pr
 token is not, rather than the admin-banner-only treatment this section previously proposed.
 The previously-reviewed sandbox build remains the actual rollback path per §7; nothing here
 changes that.
+
+### 3.2.1 A second, unresolved instance — local and preview sandbox clients, added in revision 10 (Codex P2)
+
+**Conceded, not fixed — the same underlying cause as §3.2, reaching a case its build-time
+guard cannot see.** `.env` points the shared Supabase target at **production**
+(`VITE_SUPABASE_URL=https://knkwiiywfkbqznbxwqfh.supabase.co`, verified directly), while
+`.env.development` supplies a `test_`-class token. `bun run dev` never runs `prebuild`, so
+§3.2's new guard — a production **build-time** check — cannot see it. Once Stage C sets
+`PAYMENTS_ENVIRONMENT=live` server-side, `get-paddle-price` still ignores the caller's
+environment (§2.1), so **any** authenticated local or preview session — not just a stale
+production artifact — would initialize sandbox Paddle while receiving live price IDs from
+production Supabase.
+
+**Why this is conceded rather than fixed here, unlike §3.2:** every option changes something
+this document cannot authorize unilaterally. Pointing local/preview development at an
+isolated, non-production Supabase project (the same shape as Stage A's isolated proving
+ground) is an environment/infrastructure decision outside a runtime-client spec. Teaching
+`get-paddle-price` to honor a client-requested sandbox environment would partially reopen the
+exact hazard §2.1 exists to close — **"never derived from request body or query, so a spoofed
+`billing_env` cannot flip it"** — and any safe version of that (e.g. gated on an
+unforgeable, server-verified dev/preview signal) is new design, not a client runtime detail.
+Recorded here, next to §1's Stage A and cutover-mechanism gaps, as a third open question for
+whoever owns Stage C — not invented in response to a review comment.
 
 ### 3.3 Entitlement environment
 
@@ -642,3 +667,20 @@ describes. Finding 23 retracts this document's "no server-code change" claim for
 time — a small, mechanical fix, but a reminder that a blanket scope claim this far into a
 document's own audit is still worth reading skeptically instead of trusting the summary
 line.
+
+### Revision 10 — Codex, 1 finding, correct; conceded as a third open gap, not fixed
+
+| #   | Finding                                                                                                                                                                                                                                                                                                             | Disposition                                                                                                                                                                                                            |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 24  | **P2.** §3.2's build-time guard only covers the production bundle. `.env` targets production Supabase while `.env.development` supplies a sandbox token; local/preview dev never runs `prebuild`, so any authenticated local or preview session would hit the same broken hybrid once Stage C goes live server-side | **Conceded as an open gap — not designed here.** New §3.2.1, alongside §1's Stage A and cutover-mechanism gaps; every fix option is an infrastructure or security-relevant server change outside this spec's authority |
+
+**Twenty-four findings across nine rounds, twenty-four correct.** This is the third
+finding conceded rather than fixed, and the pattern connecting all three is now visible
+rather than incidental: every one of them is a place where closing the gap requires a
+decision — an infrastructure choice, a new cross-system protocol, a change to what the
+server is allowed to trust — that belongs to whoever owns Stage C, not to a docs correction
+answering a review comment. Stopping here rather than continuing to trace every remaining
+consequence of "the server ignores client-supplied environment" (§2.1) is itself a
+judgment call, made explicit rather than left implicit: this spec's own verdict already says
+correctness depends on server configuration it cannot verify, and each of these three gaps
+is a fresh instance of exactly that limit, not a new one.

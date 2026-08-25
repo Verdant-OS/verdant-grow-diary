@@ -7,12 +7,14 @@
 **Slice owner:** unassigned — needs one owner and a **different** peer as independent
 reviewer per `AGENTS.md`. This is a billing surface; the owner cannot review it.
 
-> **Revision 4 (2026-08-25).** Three review rounds — Copilot (7) and Codex (3, then 3 more).
-> **All thirteen findings were correct.** Revision 4 brings buyer-facing checkout copy into
-> scope (revision 3 would have told a buyer "no real charge is possible" while charging their
-> card — a Hard Safety violation), maps the SDK environment value correctly, adds a seventh
-> client gate, and sweeps the stage vocabulary revision 3 fixed in §1 but left stale
-> everywhere else. Full record in §10 — read it before citing any earlier revision.
+> **Revision 5 (2026-08-25).** Four review rounds — Copilot (7) and Codex (3, then 3, then 2
+> more). **All fifteen findings were correct.** Revision 4 brought buyer-facing checkout copy
+> into scope, mapped the SDK environment value correctly, added a seventh client gate, and
+> swept the stage vocabulary. Revision 5 closes a gap revision 4's own Hard Safety copy fix
+> left open — a SKU-specific catalog failure still collapsed into the same "no real charge is
+> possible" copy as a global environment failure, mislabeling a genuinely chargeable SKU — and
+> tightens the bundle-attestation test list to reject a same-class live token, not just a
+> different token class. Full record in §10 — read it before citing any earlier revision.
 
 > **Read `docs/paddle-paid-launch-runbook.md` first.** It predates this spec and already
 > governs the live transition. Revision 1 of this document did not cite it — a research
@@ -255,6 +257,29 @@ taking a real payment is a direct Hard Safety Rules violation** — the fake-dat
 to money. This module, its `Pricing.tsx` wiring, and its tests are mandatory scope in the
 coordinated release, and the live copy must state plainly that a real charge will be made.
 
+### 3.5.1 `blocked` conflates two different failures — added in revision 5 (Codex P1)
+
+**Revision 4 fixed the global case and left the per-SKU case standing — the same "fix the
+pointed-at instance, not the class" failure this document's own §10 already names.**
+
+`Pricing.tsx:253-255` computes `blocked: Boolean(checkoutRecoveryReason)`, where
+`checkoutRecoveryReason = blockedReason ?? unavailableMessage`. Those are not the same
+failure: `unavailableMessage` is a global environment problem, but `blockedReason` is scoped
+to **one SKU** by `isSkuBlocked()`, whose own comment states the other SKUs stay chargeable.
+`buildCheckoutTrustCopy`'s `if (input.blocked) return UNAVAILABLE_COPY` cannot see that
+distinction — it only sees one boolean.
+
+So under a live environment where Pro's catalog call fails but Craft and Founder Lifetime are
+fine, the page-level trust copy would again read "no real charge is possible" beside a Craft
+CTA that genuinely can charge a card. Revision 4 removed this sentence from the pure
+environment-unavailable path and reintroduced it, unfixed, on the SKU-blocked path.
+
+`buildCheckoutTrustCopy` must distinguish the two causes — for example an explicit
+`blockedScope: "environment" | "sku" | null` input rather than one boolean — so a live
+environment with a single blocked SKU never falls through to copy claiming no charge is
+possible anywhere on the page. Global environment failures keep today's `UNAVAILABLE_COPY`
+unchanged.
+
 ## 4. File-level plan (Stage B only)
 
 | File                                                          | Change                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -262,7 +287,7 @@ coordinated release, and the live copy must state plainly that a real charge wil
 | `src/lib/paddleEnvironment.ts`                                | Canonical-production-host predicate; rewrite `resolvePaddleCheckoutEnvironment` per §3.1; replace `CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE`, whose copy asserts the sandbox-only policy and would become false; update module header                                                                                                                                                      |
 | `src/lib/paddle.ts`                                           | Gates 2, 3, 4 of §2.2: `initializePaddle()` accepts the resolved environment; `Paddle.Environment.set(...)` takes the **mapped SDK value** (§3.4), never the raw resolved value; `getPaddlePriceId()` accepts it **and** stops hardcoding `environment: "sandbox"` in its request body. Plus `getPaddleEnvironment()` per §3.3, `getCheckoutUnavailableMessage()`, and the module header |
 | `src/pages/Upgrade.tsx`                                       | Gate 7 — the second hardcoded `Environment?.set("sandbox")` at `:131`, using the same mapping. Its `PaddleGlobal` types `set` as `(env: string) => void`, so a wrong value type-checks and fails only at runtime                                                                                                                                                                         |
-| `src/lib/checkoutTrustCopyRules.ts` + `src/pages/Pricing.tsx` | **Hard Safety — see §3.5.** Add a `live` trust state; `Pricing.tsx:253` already feeds the resolved environment in                                                                                                                                                                                                                                                                        |
+| `src/lib/checkoutTrustCopyRules.ts` + `src/pages/Pricing.tsx` | **Hard Safety — see §3.5 and §3.5.1.** Add a `live` trust state; distinguish a global environment failure from a single blocked SKU so the other SKUs' copy never falls back to "no real charge is possible"; `Pricing.tsx:253` already feeds the resolved environment in                                                                                                                |
 | `src/hooks/usePaddleCheckout.ts`                              | Gates 5 and 6 — `:124` and `:137` stop comparing to the literal `"sandbox"`                                                                                                                                                                                                                                                                                                              |
 | `src/constants/*Copy.ts`                                      | Blocking copy pinned as data per repo convention, not inline in JSX                                                                                                                                                                                                                                                                                                                      |
 | `scripts/e2e/managed-session-materialize-core.mjs`            | **Mandatory** (§2.4): re-point `evaluatePublicPaddleBundle` at the new policy, keeping an equal-strength assertion                                                                                                                                                                                                                                                                       |
@@ -283,13 +308,21 @@ Every existing fence gets a same-strength replacement. New coverage:
 7. each of gates 2–6 opens under `"live"` on production and stays closed off-production
 8. `getPaddlePriceId()` sends the resolved environment, never a hardcoded `"sandbox"`
 9. `getPaddleEnvironment()` → `"live"` for live class, `"sandbox"` otherwise
-10. bundle attestation accepts the intended live token and still rejects a mismatched class
+10. bundle attestation accepts the intended live token, rejects a mismatched token class, **and
+    rejects a second, distinct live token of the same class** — a class-only check would let a
+    valid-looking `live_...` token from the wrong Paddle account pass (§2.4.1, added in
+    revision 5, Codex P2)
 11. **the exact argument passed to `Paddle.Environment.set` is `"production"` under live and `"sandbox"` under sandbox** — assert the SDK value at both call sites, not just the resolver output (§3.4)
 12. `buildCheckoutTrustCopy` returns a live state under `"live"` whose copy states a real charge WILL be made, with `canCreateLiveCharge` true (§3.5) — prove RED before the fix
-13. determinism: repeated calls with identical inputs agree
+13. **live environment, one SKU blocked by a runtime catalog failure** → that SKU's copy
+    reflects the block while every other, still-chargeable SKU's copy keeps stating a real
+    charge will be made — the environment-failure and SKU-failure causes must not collapse to
+    one `blocked` boolean (§3.5.1, added in revision 5, Codex P1) — prove RED before the fix
+14. determinism: repeated calls with identical inputs agree
 
-Prove 1, 2, 3, 7, 8, 10, 11 and 12 **RED before the fix** and put the failing count in the PR
-body, per `AGENTS.md`. Test 12 is the Hard Safety fence — it must never be skipped.
+Prove 1, 2, 3, 7, 8, 10, 11, 12 and 13 **RED before the fix** and put the failing count in the
+PR body, per `AGENTS.md`. Tests 12 and 13 are the Hard Safety fences — neither may ever be
+skipped.
 
 ## 6. Owner-gated prerequisites (Stages A and C — none of this is agent work)
 
@@ -415,3 +448,16 @@ deliverable already names. It also asserted `NOT_MEASURED` for something the wor
 answers directly, and it did not find `docs/paddle-paid-launch-runbook.md`, which already
 governed this transition. A reviewer should weight revision 2's remaining unreviewed claims
 accordingly.
+
+### Revision 5 — Codex, 2 findings, both correct
+
+| #   | Finding                                                                                                                                                                                                                      | Disposition                                                                                                  |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 14  | **P1.** Revision 4's Hard Safety copy fix only covers the global-unavailable case; a single blocked SKU still falls through to the same "no real charge is possible" copy, mislabeling every other, genuinely chargeable SKU | **Conceded.** New §3.5.1; §4 row and test 13 updated; test 13 added to the RED-first list alongside test 12  |
+| 15  | **P2.** Test 10 rejected only a mismatched token _class_; a different valid-looking `live_...` token from another Paddle account would pass and could point checkout at the wrong account                                    | **Conceded.** Test 10 extended to require rejecting a second, distinct live token of the same class (§2.4.1) |
+
+**Fifteen findings across four rounds, fifteen correct.** Finding 14 repeats finding 13's
+lesson one level down: revision 4 fixed the global instance of the trust-copy bug and left a
+second instance of the same bug — a single boolean standing in for two distinct causes —
+in the exact module it had just rewritten. Weight any future revision's coverage claims
+accordingly rather than assuming a Hard Safety fix generalizes on the first pass.

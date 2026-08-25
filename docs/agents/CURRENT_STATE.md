@@ -34,14 +34,16 @@ instruction.
 own second paragraph. The publish stop-order, the `20260813030000` hard stop, and the Hard
 Safety Rules are explicitly carried through unchanged.
 
-Two measured facts gathered while writing it, both new since 2026-08-23 and both
-consequential: **#1124 moved the payments BUILD gate to accept `live_`, while the RUNTIME
-resolver still fails closed on `live_` on every host** — so a publish today would still
-disable checkout, and #1124 must not be read as having enabled live payments. And **#1124's
-body answers the build-time token question this file has carried two candidates for**:
-Lovable injects the token at publish. That retires the token half of the pre-publish env
-read; it does **not** settle the `treeHash` / `dirty: true` provenance question, which
-stays `NOT_MEASURED`.
+Two things gathered while writing it, both new since 2026-08-23 — one measured, one that did
+not survive review: **#1124 moved the payments BUILD gate to accept `live_`, while the
+RUNTIME resolver still fails closed on `live_` on every host** — `established fact` — so a
+publish today would still disable checkout, and #1124 must not be read as having enabled
+live payments. **The second claim — that #1124's body settles the build-time token
+question — is corrected below, on this same PR, after Codex review**: the guard #1124
+shipped still requires the effective and canonical tokens to match exactly, which is
+inconsistent with the injected-value mechanism it was credited with confirming. See "The
+build-time token question" subsection for the full account. The `treeHash` / `dirty: true`
+provenance question stays `NOT_MEASURED` either way.
 
 Touches this file only. Does **not** publish, does **not** apply any migration, does
 **not** change payments code, and re-measures no GA4/GSC, Day 0, sitemap, or
@@ -499,7 +501,37 @@ transition must be **one** independently reviewed release changing client, token
 environment, secrets, price IDs, monitoring and rollback **together**, and that flipping any
 single setting is insufficient and must fail closed.
 
-### The build-time token question is now ANSWERED — by #1124, not by measurement here
+### The build-time token question is NOT answered — corrected 2026-08-25 (Codex review, PR #1125)
+
+**Renamed from "...is now ANSWERED — by #1124, not by measurement here."** That heading
+overclaimed. Raised by Codex review on this PR, verified against the guard's own source
+before accepting: `scripts/assert-paddle-production-sandbox.mjs`, at the head this PR
+carries, widened which token **class** passes (`test_` or `live_`, via
+`resolveCanonicalPaddleProductionToken`, per #1124) but did **not** remove the exact-match
+requirement between the effective (Vite-resolved) token and the canonical token read from
+the committed `.env.production` file —
+`if (effective.token !== canonical.token) return fixedFailure("effective_paddle_token_mismatch")`
+still governs, unchanged by #1124.
+
+**That contradicts candidate 1 as originally stated here.** Candidate 1 is a platform value
+injecting `live_` via the ambient Vite environment while the committed `.env.production`
+stays `test_` — which the file is deliberately kept at, per policy. Effective and canonical
+would then differ by construction, and this guard would **fail the build**, not pass it.
+Read literally, candidate 1 is inconsistent with a successful build under the guard as it
+exists today — the opposite of "answered."
+
+**What this reopens, not closes.** Two explanations are consistent with what's measured and
+neither is confirmed: (a) whatever publish path produced the historically-observed `live_`
+bundle did not run this guard at all — consistent with the still-open `NOT_MEASURED`
+question, recorded in the payments-token section below, of whether the publisher invokes the
+package lifecycle (`prebuild` → this guard) in the first place; or (b) the committed
+`.env.production` itself briefly carried a `live_` value at build time and was restored
+afterwards — candidate 2, which this file has said from the start not to discard. This
+correction does not choose between them.
+
+The body below is left as originally written — it correctly hedged the injection claim as
+`source claim` from #1124's own PR body, not a re-measurement — only the heading's "ANSWERED"
+framing is withdrawn.
 
 This file has carried two live candidates for how a `live_` token reached production JS
 while both `.env.production` files read `test_`. **#1124's own body names the mechanism:
@@ -512,7 +544,8 @@ Two consequences, both worth stating precisely:
 - The standing instruction to **re-read the Lovable `.env.production` before anyone opens
   the publish button** loses its point _as a token check_: the file was never going to
   show an injected value. Reading it was correct while the mechanism was unknown. It was
-  never a clearance, and it is not one now.
+  never a clearance, and it is not one now — and per the correction above, it is now the
+  ONLY check that can still distinguish the two candidates ahead of a publish.
 - **This does not settle the `treeHash` / `dirty: true` provenance question.** Under
   candidate 1 the workspace `.env.production` never differed, so it contributed nothing to
   the tree-hash mismatch — which stays `NOT_MEASURED` and attributable to some other file.
@@ -520,6 +553,41 @@ Two consequences, both worth stating precisely:
   release note is correctly cautious, requiring production to _demonstrate_ `dirty: false`,
   a non-orphan ref, and the merged tip SHA before anyone calls it fixed. That demonstration
   requires a publish, which remains stopped.
+
+### #1127 landed while this PR was open — new evidence for candidate 2, not candidate 1
+
+**Recorded 2026-08-25, merged to base as `75c01e6f8` after this PR's revision 6.**
+`fix(publish): restore .env.production from HEAD before prebuild stamp (#1127)`'s own body
+states the mechanism directly: **"Lovable Payments Live injects a `live_`
+`VITE_PAYMENTS_CLIENT_TOKEN` into tracked `.env.production`"** — into the committed **file**
+on disk, not an ambient environment variable left the file untouched. `source claim` from
+that PR's own account, not independently re-verified in this correction. That is candidate 2
+as this file has named it from the start, not candidate 1 as the "now ANSWERED" heading
+(withdrawn above) had credited.
+
+**This also resolves the contradiction the correction above raised, if #1127's account is
+right.** `assert-paddle-production-sandbox.mjs` reads the canonical token from the
+`.env.production` file on disk, and Vite's `loadEnv` also resolves `.env.production` from
+disk (not only ambient `process.env`). If Lovable rewrites that file in place before the
+guard runs, both reads see the identical rewritten value and the exact-match check passes
+cleanly — no contradiction. Candidate 1 (a pure env-var override that leaves the file
+untouched) would still fail the guard for the reason given above; it is candidate 2 that is
+consistent with a passing build.
+
+**It also gives a first-party account of the `treeHash` / `dirty: true` mechanism this file
+has tracked since 2026-08-21.** `.env.production` sits in `TREE_HASH_ROOTS` precisely because
+`VITE_*` values reach shipped JS (`scripts/lib/tree-hash.mjs`'s own comment says so); a file
+rewritten on disk immediately before the stamp runs goes dirty by the same mechanism any
+other hashed-root file would. #1127 prepends a from-HEAD restore to `prebuild` specifically
+to make that rewrite a no-op for `treeHash`/`dirty` going forward. Its own safety verdict is
+explicit that this does **not** by itself authorize live checkout or claim production
+`dirty: false` — that still requires a fresh publish that actually demonstrates it, and
+publishing remains stopped.
+
+**Status: `source claim` from #1127, carried here because it directly narrows the
+candidate-1-vs-2 question, not independently measured in this correction.** Whether Lovable's
+publish behavior actually matches #1127's account, and whether its fix in fact produces
+`dirty: false` on the next publish, are both open until that publish happens and is read.
 
 ### A dated gate that expires tomorrow
 

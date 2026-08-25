@@ -64,6 +64,8 @@ export interface PhenoHuntCandidateLabEvidence {
   readonly totalCannabinoidsPct: number | null;
   readonly dominantTerpenes: ReadonlyArray<{ name: string; pct: number | null }> | null;
   readonly source: "coa" | "estimate" | "unspecified";
+  /** ISO date the sample was tested, when recorded. Optional (older stubs). */
+  readonly testedAt?: string | null;
 }
 
 export interface AdaptPhenoHuntCandidatesInput {
@@ -184,6 +186,7 @@ function buildExpression(
         totalCannabinoidsPct: finiteOrNull(lab.totalCannabinoidsPct),
         dominantTerpenes: terps,
         source: lab.source,
+        testedAt: cleanLabel(lab.testedAt ?? null),
       };
     }
   }

@@ -17,6 +17,7 @@ import {
 } from "@/lib/phenoHuntCandidateAdapter";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
 import { listLatestSexObservationsForHunt } from "@/lib/phenoSexObservationService";
 import {
   sanitizeBreedingObjectiveTargets,
@@ -170,14 +171,28 @@ export async function loadPhenoHuntCandidates(
   // hunt_id (and the caller owns the hunt), so cross-hunt / cross-user data
   // never reaches this map. Requests are scoped by hunt_id AND plant_id so
   // stray orphan rows from a deleted candidate can't leak either.
-  const [growNameById, tentNameById, scoreByPlantId, smokeTestByPlantId, labResultByPlantId] =
-    await Promise.all([
-      loadNameMap("grows", distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)])),
-      loadNameMap("tents", distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)])),
-      loadCandidateScores(id, plantIds),
-      loadSmokeTests(id, plantIds),
-      loadLabResults(id, plantIds),
-    ]);
+  let scoreByPlantId: Record<string, PhenoHuntCandidateScoreEvidence>;
+  let smokeTestByPlantId: Record<string, PhenoHuntCandidateSmokeEvidence>;
+  let labResultByPlantId: Record<string, PhenoHuntCandidateLabEvidence>;
+  let growNameById: Record<string, string>;
+  let tentNameById: Record<string, string>;
+  try {
+    [growNameById, tentNameById, scoreByPlantId, smokeTestByPlantId, labResultByPlantId] =
+      await Promise.all([
+        loadNameMap("grows", distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)])),
+        loadNameMap("tents", distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)])),
+        loadCandidateScores(id, plantIds),
+        loadSmokeTests(id, plantIds),
+        loadLabResults(id, plantIds),
+      ]);
+  } catch (readError) {
+    // Fail closed: a failed evidence read renders as an error + retry, never
+    // as candidates that look evidence-free.
+    if (readError instanceof PhenoEvidenceReadError) {
+      return { ok: false, error: readError.message };
+    }
+    throw readError;
+  }
 
   const candidates = adaptPhenoHuntCandidates({
     plants,
@@ -255,8 +270,11 @@ async function loadNameMap(
 
 // ---------------------------------------------------------------------------
 // Evidence loaders — RLS-scoped SELECT only, always filtered by hunt_id AND
-// plant_id. Best-effort: any failure returns an empty map and readiness
-// engines simply see "no evidence" (never fake-complete).
+// plant_id. FAIL CLOSED: a failed read throws PhenoEvidenceReadError so the
+// surface renders an honest error + retry. The old {}-on-error behavior made
+// a transport failure indistinguishable from "no evidence recorded", which
+// src/lib/phenoEvidenceReadError.ts explicitly forbids ("callers must never
+// translate one of these failures into an empty evidence map").
 // ---------------------------------------------------------------------------
 
 async function loadCandidateScores(
@@ -269,7 +287,7 @@ async function loadCandidateScores(
     .select("plant_id, traits, note")
     .eq("hunt_id", huntId)
     .in("plant_id", plantIds);
-  if (error || !data) return {};
+  if (error || !data) throw new PhenoEvidenceReadError("candidate_scores");
   const map: Record<string, PhenoHuntCandidateScoreEvidence> = {};
   for (const row of data) {
     if (!row.plant_id || map[row.plant_id]) continue;
@@ -294,7 +312,7 @@ async function loadSmokeTests(
     )
     .eq("hunt_id", huntId)
     .in("plant_id", plantIds);
-  if (error || !data) return {};
+  if (error || !data) throw new PhenoEvidenceReadError("smoke_tests");
   const map: Record<string, PhenoHuntCandidateSmokeEvidence> = {};
   for (const row of data) {
     if (!row.plant_id || map[row.plant_id]) continue;
@@ -326,10 +344,12 @@ async function loadLabResults(
   if (plantIds.length === 0) return {};
   const { data, error } = await phenoDb
     .from("pheno_lab_results")
-    .select("plant_id, source, thc_pct, cbd_pct, total_cannabinoids_pct, dominant_terpenes")
+    .select(
+      "plant_id, source, thc_pct, cbd_pct, total_cannabinoids_pct, dominant_terpenes, tested_at",
+    )
     .eq("hunt_id", huntId)
     .in("plant_id", plantIds);
-  if (error || !data) return {};
+  if (error || !data) throw new PhenoEvidenceReadError("lab_results");
   const map: Record<string, PhenoHuntCandidateLabEvidence> = {};
   for (const row of data) {
     if (!row.plant_id) continue;
@@ -357,6 +377,7 @@ async function loadLabResults(
         typeof row.total_cannabinoids_pct === "number" ? row.total_cannabinoids_pct : null,
       dominantTerpenes: terps,
       source,
+      testedAt: typeof row.tested_at === "string" ? row.tested_at : null,
     };
   }
   return map;
@@ -535,14 +556,27 @@ export async function loadPhenoHuntCandidatePage(
     .map((p) => p.id)
     .filter((v): v is string => typeof v === "string" && v.length > 0);
 
-  const [growNameById, tentNameById, scoreByPlantId, smokeTestByPlantId, labResultByPlantId] =
-    await Promise.all([
-      loadNameMap("grows", distinct(plants.map((p) => p.grow_id))),
-      loadNameMap("tents", distinct(plants.map((p) => p.tent_id))),
-      loadCandidateScores(id, plantIds),
-      loadSmokeTests(id, plantIds),
-      loadLabResults(id, plantIds),
-    ]);
+  let scoreByPlantId: Record<string, PhenoHuntCandidateScoreEvidence>;
+  let smokeTestByPlantId: Record<string, PhenoHuntCandidateSmokeEvidence>;
+  let labResultByPlantId: Record<string, PhenoHuntCandidateLabEvidence>;
+  let growNameById: Record<string, string>;
+  let tentNameById: Record<string, string>;
+  try {
+    [growNameById, tentNameById, scoreByPlantId, smokeTestByPlantId, labResultByPlantId] =
+      await Promise.all([
+        loadNameMap("grows", distinct(plants.map((p) => p.grow_id))),
+        loadNameMap("tents", distinct(plants.map((p) => p.tent_id))),
+        loadCandidateScores(id, plantIds),
+        loadSmokeTests(id, plantIds),
+        loadLabResults(id, plantIds),
+      ]);
+  } catch (readError) {
+    // Fail closed (see the evidence-loader note above).
+    if (readError instanceof PhenoEvidenceReadError) {
+      return { ok: false, error: readError.message };
+    }
+    throw readError;
+  }
 
   const candidates = adaptPhenoHuntCandidates({
     plants,
@@ -607,6 +641,14 @@ export async function loadPhenoHuntComparisonSummary(
       .eq("hunt_id", id)
       .limit(5000),
   ]);
+
+  // Fail closed: a failed read must not resolve to candidateCount 0 /
+  // anyPostHarvest false — unknown is not zero. The workspace mount effect
+  // catches this and renders its honest error state.
+  if (idsRes.error) throw new Error("Could not load hunt candidates.");
+  if (scoresRes.error) throw new PhenoEvidenceReadError("candidate_scores");
+  if (decisionsRes.error) throw new PhenoEvidenceReadError("keeper_decisions");
+  if (smokeRes.error) throw new PhenoEvidenceReadError("smoke_tests");
 
   const candidateIds = new Set(
     (idsRes.data ?? [])

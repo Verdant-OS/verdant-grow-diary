@@ -1,6 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { flushSync } from "react-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -27,10 +26,8 @@ import {
   OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY,
   savePendingOAuthSignupAcquisition,
 } from "@/lib/oauthSignupAcquisitionRules";
-import {
-  clearGlobalSearchPrivateState,
-  GLOBAL_SEARCH_SESSION_STORAGE_KEY,
-} from "@/lib/globalSearchSession";
+import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
+import { GLOBAL_SEARCH_SESSION_STORAGE_KEY } from "@/lib/globalSearchSession";
 
 function Probe() {
   const { user, loading } = useAuth();
@@ -55,6 +52,7 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
   it("clears stale private search state on the first signed-out resolution", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: null } });
     const transitions: Array<[string | null, string | null]> = [];
+    const client = new QueryClient();
     window.sessionStorage.setItem(
       GLOBAL_SEARCH_SESSION_STORAGE_KEY,
       "private query from an expired session",
@@ -64,7 +62,7 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
       <AuthProvider
         onBeforeAuthIdentityChange={(previousUserId, nextUserId) => {
           transitions.push([previousUserId, nextUserId]);
-          flushSync(() => clearGlobalSearchPrivateState());
+          clearPrivateClientStateBeforeAuthIdentityChange(client);
         }}
       >
         <Probe />
@@ -129,8 +127,7 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
       <AuthProvider
         onBeforeAuthIdentityChange={(previousUserId, nextUserId) => {
           transitions.push([previousUserId, nextUserId]);
-          flushSync(() => clearGlobalSearchPrivateState());
-          client.clear();
+          clearPrivateClientStateBeforeAuthIdentityChange(client);
         }}
       >
         <Probe />

@@ -531,6 +531,41 @@ Two consequences, both worth stating precisely:
   a non-orphan ref, and the merged tip SHA before anyone calls it fixed. That demonstration
   requires a publish, which remains stopped.
 
+### #1127 landed while this PR was open — new evidence for candidate 2, not candidate 1
+
+**Recorded 2026-08-25, merged to base as `75c01e6f8` after this PR's revision 6.**
+`fix(publish): restore .env.production from HEAD before prebuild stamp (#1127)`'s own body
+states the mechanism directly: **"Lovable Payments Live injects a `live_`
+`VITE_PAYMENTS_CLIENT_TOKEN` into tracked `.env.production`"** — into the committed **file**
+on disk, not an ambient environment variable left the file untouched. `source claim` from
+that PR's own account, not independently re-verified in this correction. That is candidate 2
+as this file has named it from the start, not candidate 1 as the "now ANSWERED" heading
+(withdrawn above) had credited.
+
+**This also resolves the contradiction the correction above raised, if #1127's account is
+right.** `assert-paddle-production-sandbox.mjs` reads the canonical token from the
+`.env.production` file on disk, and Vite's `loadEnv` also resolves `.env.production` from
+disk (not only ambient `process.env`). If Lovable rewrites that file in place before the
+guard runs, both reads see the identical rewritten value and the exact-match check passes
+cleanly — no contradiction. Candidate 1 (a pure env-var override that leaves the file
+untouched) would still fail the guard for the reason given above; it is candidate 2 that is
+consistent with a passing build.
+
+**It also gives a first-party account of the `treeHash` / `dirty: true` mechanism this file
+has tracked since 2026-08-21.** `.env.production` sits in `TREE_HASH_ROOTS` precisely because
+`VITE_*` values reach shipped JS (`scripts/lib/tree-hash.mjs`'s own comment says so); a file
+rewritten on disk immediately before the stamp runs goes dirty by the same mechanism any
+other hashed-root file would. #1127 prepends a from-HEAD restore to `prebuild` specifically
+to make that rewrite a no-op for `treeHash`/`dirty` going forward. Its own safety verdict is
+explicit that this does **not** by itself authorize live checkout or claim production
+`dirty: false` — that still requires a fresh publish that actually demonstrates it, and
+publishing remains stopped.
+
+**Status: `source claim` from #1127, carried here because it directly narrows the
+candidate-1-vs-2 question, not independently measured in this correction.** Whether Lovable's
+publish behavior actually matches #1127's account, and whether its fix in fact produces
+`dirty: false` on the next publish, are both open until that publish happens and is read.
+
 ### A dated gate that expires tomorrow
 
 `config/dependency-lockfile-transition.json` carries `reviewBy` **2026-08-25** and

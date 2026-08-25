@@ -223,15 +223,34 @@ if (claudeText && !claudeText.startsWith(CLAUDE_IMPORTS)) {
   );
 }
 
-// startsWith alone would accept the CURRENT_STATE import re-added as a third line — or
-// anywhere later in the file — since the required prefix still holds. That would silently
-// restore the ~27,400-token automatic import on every turn. Reject the @-import line
-// outright wherever it appears; the on-demand read (asserted below) replaced it.
-if (claudeText && /^@docs\/agents\/CURRENT_STATE\.md[ \t]*$/m.test(claudeText)) {
+/**
+ * Markdown with fenced code blocks and inline code spans removed. Claude Code does not
+ * evaluate imports inside code spans and blocks, so a backticked mention of the import
+ * token — the natural way to write ABOUT the syntax — is legal and must not be flagged.
+ */
+function stripCodeSpans(text) {
+  return text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
+}
+
+/**
+ * The import token in either spelling Claude Code would resolve from the repo root.
+ * Claude Code resolves @-imports INLINE in prose as well as on standalone lines
+ * ("See @README for project overview" is its documented example), so this must not be
+ * anchored to line boundaries.
+ */
+const CURRENT_STATE_IMPORT_RE = /@(?:\.\/)?docs\/agents\/CURRENT_STATE\.md\b/;
+
+// startsWith alone would accept the CURRENT_STATE import re-added as a third line, later
+// in the file, or inline inside a sentence — the required prefix still holds in every
+// case, while the ~27,400-token automatic import silently returns. Reject the import
+// token anywhere outside code spans; the on-demand read (asserted below) replaced it.
+if (claudeText && CURRENT_STATE_IMPORT_RE.test(stripCodeSpans(claudeText))) {
   problems.push(
     "CLAUDE.md: @docs/agents/CURRENT_STATE.md must not be imported automatically. The " +
-      "import was replaced by an on-demand read (#1094); remove the @ line wherever it " +
-      "appears — appending it after the required two-line prefix is still a violation",
+      "import was replaced by an on-demand read (#1094); remove the @ token wherever it " +
+      "appears — standalone, appended after the required two-line prefix, or inline in " +
+      "prose. Only a code-span mention (backticks) is exempt, matching what Claude Code " +
+      "itself does not evaluate",
   );
 }
 

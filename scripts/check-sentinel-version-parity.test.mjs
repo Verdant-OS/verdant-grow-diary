@@ -101,7 +101,8 @@ function writeGovernanceFile(root, path, version = "2026-08-01.1") {
     path === "CLAUDE.md"
       ? "@AGENTS.md\n@docs/agents/roles/claude.md\n\n" +
         `${CLAUDE_STATE_READ_INSTRUCTION}\n\n${CLAUDE_STATE_READ_STEP}\n\n` +
-        "See also docs/agents/CURRENT_STATE.md for operating state.\n\n"
+        "See also docs/agents/CURRENT_STATE.md for operating state. The old import " +
+        "(`@docs/agents/CURRENT_STATE.md`) was removed in #1094.\n\n"
       : "";
   const core =
     path === "GEMINI.md"
@@ -296,6 +297,23 @@ test("fails when CURRENT_STATE.md is re-added as an automatic import", () => {
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /CLAUDE\.md: the first two lines must import/);
+});
+
+test("fails when CURRENT_STATE.md is imported inline in prose", () => {
+  const root = makeFixture();
+  // Claude Code resolves @-imports inline in a sentence, not only on standalone lines,
+  // and the fixture's backticked mention proves a code-span reference stays legal.
+  replace(
+    root,
+    "CLAUDE.md",
+    "See also docs/agents/CURRENT_STATE.md for operating state.",
+    "See @docs/agents/CURRENT_STATE.md for operating state.",
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /must not be imported automatically/);
 });
 
 test("fails when CURRENT_STATE.md is appended as a third import after the required prefix", () => {

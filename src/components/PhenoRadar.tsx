@@ -17,7 +17,9 @@ const RADAR_AXES: readonly { key: AxisKey; short: string }[] = [
 ];
 
 export interface PhenoRadarProps {
-  readonly values: Record<AxisKey, number>;
+  /** 0–10 per axis; null = never scored (drawn at center, dot omitted,
+   * initial dimmed — a missing trait is visible as missing, not as a 0). */
+  readonly values: Record<AxisKey, number | null>;
   readonly size?: number;
   /** Keeper radars fill emerald; everything else a calm sky. */
   readonly tone?: "keeper" | "muted";
@@ -52,7 +54,9 @@ export default function PhenoRadar({
 }: PhenoRadarProps) {
   const outer = RADAR_AXES.map((_, i) => vertex(i, R));
   const mid = RADAR_AXES.map((_, i) => vertex(i, R * 0.5));
-  const data = RADAR_AXES.map((ax, i) => vertex(i, R * (clamp10(values[ax.key]) / 10)));
+  const scored = RADAR_AXES.map((ax) => values[ax.key] !== null && values[ax.key] !== undefined);
+  const data = RADAR_AXES.map((ax, i) => vertex(i, R * (clamp10(values[ax.key] ?? 0) / 10)));
+  const unscoredCount = scored.filter((s) => !s).length;
 
   const strokeCls = tone === "keeper" ? "stroke-emerald-500" : "stroke-sky-500";
   const fillCls = tone === "keeper" ? "fill-emerald-500/25" : "fill-sky-500/20";
@@ -65,7 +69,11 @@ export default function PhenoRadar({
       height={size}
       className={cn("shrink-0", className)}
       role="img"
-      aria-label="Loud scorecard radar"
+      aria-label={
+        unscoredCount > 0
+          ? `Loud scorecard radar (${unscoredCount} of ${RADAR_AXES.length} axes not yet scored)`
+          : "Loud scorecard radar"
+      }
       data-testid="pheno-radar"
     >
       {/* grid: two rings + spokes */}
@@ -82,11 +90,11 @@ export default function PhenoRadar({
         strokeWidth={1.5}
         strokeLinejoin="round"
       />
-      {data.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r={1.5} className={dotCls} />
-      ))}
+      {data.map(([x, y], i) =>
+        scored[i] ? <circle key={i} cx={x} cy={y} r={1.5} className={dotCls} /> : null,
+      )}
 
-      {/* axis initials */}
+      {/* axis initials — unscored axes render dimmed */}
       {RADAR_AXES.map((ax, i) => {
         const [x, y] = vertex(i, R + 9);
         return (
@@ -94,7 +102,7 @@ export default function PhenoRadar({
             key={ax.key}
             x={x}
             y={y}
-            className="fill-muted-foreground"
+            className={scored[i] ? "fill-muted-foreground" : "fill-muted-foreground/40"}
             fontSize={9}
             textAnchor="middle"
             dominantBaseline="middle"

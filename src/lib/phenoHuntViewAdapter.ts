@@ -19,8 +19,17 @@
  *    flavor / potency / vigor are therefore recorded but NEVER folded into the
  *    composite. Scoring the smoke before the cure is the hype shortcut the
  *    scorecard exists to refuse.
- *  - A missing trait is 0, never invented. `hold` / `undecided` decisions map to
- *    "maybe" (still in triage), never to "keep".
+ *  - A missing trait stays MISSING (null) — never coerced to 0, never invented.
+ *    `hold` / `undecided` decisions map to "maybe" (still in triage), never to
+ *    "keep".
+ *
+ * Trait vocabulary bridge: pheno_candidate_scores.traits is written in the
+ * canonical EXPRESSION vocabulary (phenoExpressionRules.LOUD_TRAIT_AXES —
+ * nose_loudness on 0–10, quality axes on 1–5; the PhenoID ingest's
+ * buildCoreLoudTraits writes the same shape). The shortlist surfaces read five
+ * Loud axes on 0–10, so this adapter is the single place the projection
+ * happens: nose_loudness passes through; 1–5 quality axes project linearly to
+ * 0–10 via (v − 1) × 2.5 (the inverse of the ingest's rescale0to10to1to5).
  *
  * Pure: no I/O, no Supabase, no React.
  */
@@ -59,8 +68,12 @@ export interface HuntCandidateSource {
   readonly name: string;
   /** pheno_keeper_decisions.decision: keep | cull | hold | undecided. */
   readonly decision?: string | null;
-  /** pheno_candidate_scores.traits (0–10 per axis). */
+  /** pheno_candidate_scores.traits in the canonical expression vocabulary
+   * (nose_loudness 0–10; quality axes 1–5). Bridged via traitsToLoudAxes. */
   readonly traits?: Record<string, number> | null;
+  /** Pre-projected 0–10 Loud axes. When present, used verbatim instead of the
+   * traits bridge — the demo fixture path, whose axes are already 0–10. */
+  readonly axes?: Record<AxisKey, number | null> | null;
   /** pheno_smoke_tests.flavor_descriptors, or grower aroma tags. */
   readonly aroma?: readonly string[] | null;
   readonly tags?: readonly string[] | null;
@@ -98,21 +111,51 @@ export function decisionToVerdict(decision: string | null | undefined): Contende
   return "maybe";
 }
 
-/** Read exactly the five Loud axes; clamp to 0–10; a missing trait is 0. */
+/** A finite number, or null. Never coerces absence to 0. */
+function finiteOrNull(v: unknown): number | null {
+  const n = typeof v === "number" ? v : v == null ? NaN : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Project a 1–5 quality score onto 0–10: (v − 1) × 2.5 (1→0, 3→5, 5→10). */
+function quality5To10(v: number | null): number | null {
+  if (v === null) return null;
+  const clamped = Math.max(1, Math.min(5, v));
+  return (clamped - 1) * 2.5;
+}
+
+/**
+ * Bridge the stored trait card (canonical expression vocabulary) onto the five
+ * Loud axes, 0–10 each, null when unscored:
+ *
+ *   nose      ← nose_loudness (0–10, direct; legacy `nose` accepted)
+ *   resin     ← resin | trichome_coverage   (1–5 → 0–10)
+ *   structure ← structure                   (1–5 → 0–10)
+ *   yield     ← yield | yield_impression    (1–5 → 0–10)
+ *   breeding  ← breeding                    (1–5 → 0–10; the workspace card
+ *               has no breeding axis, so workspace-scored candidates carry
+ *               breeding = null — shown as unscored, never as 0)
+ *
+ * A missing trait stays null. The board/fight models keep nulls visible.
+ */
 export function traitsToLoudAxes(
   traits: Record<string, number> | null | undefined,
-): Record<AxisKey, number> {
+): Record<AxisKey, number | null> {
   const t = traits ?? {};
-  const read = (k: AxisKey): number => {
-    const v = Number(t[k]);
-    return Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0;
+  const nose = finiteOrNull(t.nose_loudness) ?? finiteOrNull(t.nose);
+  const firstQuality = (...keys: string[]): number | null => {
+    for (const k of keys) {
+      const v = finiteOrNull(t[k]);
+      if (v !== null) return quality5To10(v);
+    }
+    return null;
   };
   return {
-    nose: read("nose"),
-    resin: read("resin"),
-    structure: read("structure"),
-    yield: read("yield"),
-    breeding: read("breeding"),
+    nose: nose === null ? null : Math.max(0, Math.min(10, nose)),
+    resin: firstQuality("resin", "trichome_coverage"),
+    structure: firstQuality("structure"),
+    yield: firstQuality("yield", "yield_impression"),
+    breeding: firstQuality("breeding"),
   };
 }
 
@@ -135,7 +178,9 @@ export function adaptContenders(
       name: c.name,
       verdict: decisionToVerdict(c.decision),
       aroma: cleanStrings(c.aroma),
-      axes: traitsToLoudAxes(c.traits),
+      // Pre-projected axes (demo fixture, already 0–10) pass through; stored
+      // trait cards go through the canonical vocabulary bridge.
+      axes: c.axes ?? traitsToLoudAxes(c.traits),
       plantType: c.plantType ?? null,
       stage: c.stage ?? null,
     }));

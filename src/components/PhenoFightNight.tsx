@@ -100,7 +100,13 @@ function SidePicker({
         </Badge>
         {showComposite && (
           <span className="text-[11px] text-muted-foreground">
-            Loud <span className="font-semibold text-foreground">{side.score}</span>
+            {side.score === null ? (
+              "Not yet scored"
+            ) : (
+              <>
+                Loud <span className="font-semibold text-foreground">{side.score}</span>
+              </>
+            )}
           </span>
         )}
       </div>
@@ -113,9 +119,13 @@ function AxisRow({ axis, ranked }: { axis: FightAxis; ranked: boolean }) {
   // (values stay visible: they organize notes, they don't rank).
   const aWins = ranked && axis.edge === "a";
   const bWins = ranked && axis.edge === "b";
+  // A missing value shows as a dash with no bar — an unscored trait is
+  // unknown, never a 10–0 loss for the side that hasn't recorded it.
+  const unknown = axis.edge === "unknown";
   return (
     <div
       data-testid={`pheno-fight-axis-${axis.key}`}
+      data-edge={axis.edge}
       className="grid grid-cols-[1fr_5rem_1fr] items-center gap-2 py-1"
     >
       {/* Side A — number then a bar reaching in from the left */}
@@ -127,17 +137,20 @@ function AxisRow({ axis, ranked }: { axis: FightAxis; ranked: boolean }) {
               ? "font-semibold text-emerald-600 dark:text-emerald-400"
               : "text-muted-foreground",
           )}
+          title={axis.aValue === null ? "Not yet scored" : undefined}
         >
-          {axis.aValue}
+          {axis.aValue ?? "—"}
         </span>
         <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-secondary">
-          <div
-            className={cn(
-              "absolute right-0 top-0 h-full rounded-full",
-              aWins ? "bg-emerald-500" : "bg-emerald-500/45",
-            )}
-            style={{ width: `${axis.aValue * 10}%` }}
-          />
+          {axis.aValue !== null && (
+            <div
+              className={cn(
+                "absolute right-0 top-0 h-full rounded-full",
+                aWins ? "bg-emerald-500" : "bg-emerald-500/45",
+              )}
+              style={{ width: `${axis.aValue * 10}%` }}
+            />
+          )}
         </div>
       </div>
 
@@ -146,19 +159,23 @@ function AxisRow({ axis, ranked }: { axis: FightAxis; ranked: boolean }) {
         <div className="text-[10px] uppercase leading-tight tracking-wide text-muted-foreground">
           {axis.label}
         </div>
-        <div className="text-[9px] leading-tight text-muted-foreground/70">{axis.weightPct}%</div>
+        <div className="text-[9px] leading-tight text-muted-foreground/70">
+          {unknown ? "not scored on both sides" : `${axis.weightPct}%`}
+        </div>
       </div>
 
       {/* Side B — a bar reaching in from the right, then the number */}
       <div className="flex items-center gap-1.5">
         <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-secondary">
-          <div
-            className={cn(
-              "absolute left-0 top-0 h-full rounded-full",
-              bWins ? "bg-fuchsia-500" : "bg-fuchsia-500/45",
-            )}
-            style={{ width: `${axis.bValue * 10}%` }}
-          />
+          {axis.bValue !== null && (
+            <div
+              className={cn(
+                "absolute left-0 top-0 h-full rounded-full",
+                bWins ? "bg-fuchsia-500" : "bg-fuchsia-500/45",
+              )}
+              style={{ width: `${axis.bValue * 10}%` }}
+            />
+          )}
         </div>
         <span
           className={cn(
@@ -167,8 +184,9 @@ function AxisRow({ axis, ranked }: { axis: FightAxis; ranked: boolean }) {
               ? "font-semibold text-fuchsia-600 dark:text-fuchsia-400"
               : "text-muted-foreground",
           )}
+          title={axis.bValue === null ? "Not yet scored" : undefined}
         >
-          {axis.bValue}
+          {axis.bValue ?? "—"}
         </span>
       </div>
     </div>
@@ -290,6 +308,15 @@ export default function PhenoFightNight({
           <span className="text-fuchsia-600 dark:text-fuchsia-400">
             {b.name} leads <span className="font-semibold">{b.axisWins}</span>
           </span>
+          {fight.unknownAxes > 0 && (
+            <>
+              <span className="text-muted-foreground/60">·</span>
+              <span data-testid="pheno-fight-unknown-axes" className="text-muted-foreground">
+                {fight.unknownAxes} trait{fight.unknownAxes === 1 ? "" : "s"} not scored on both
+                sides
+              </span>
+            </>
+          )}
         </div>
       ) : (
         <div

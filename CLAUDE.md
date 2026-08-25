@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-09-01.3**
+**Sentinel-Version: 2026-09-01.4**
 
 Claude Code reads this file at the start of every project session. The two `@` imports
 above load the universal constitution and Claude's assigned role. They are imports, not

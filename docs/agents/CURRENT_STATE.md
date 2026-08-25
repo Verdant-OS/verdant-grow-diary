@@ -1,6 +1,31 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-23 UTC (~17:15 UTC)
+**Last updated:** 2026-08-25 UTC (17:11 UTC)
+**Updated by:** Claude (2026-08-25: records a **standing owner directive** — production is
+the target, not sandbox — as its own section immediately below. Scope was confirmed with
+Cheek in session as **full production posture** before writing, because the phrase reads
+three materially different ways and whatever lands here is read by every agent as standing
+instruction.
+
+**It is recorded as a direction, not an authorization**, and the section says so in its
+own second paragraph. The publish stop-order, the `20260813030000` hard stop, and the Hard
+Safety Rules are explicitly carried through unchanged.
+
+Two measured facts gathered while writing it, both new since 2026-08-23 and both
+consequential: **#1124 moved the payments BUILD gate to accept `live_`, while the RUNTIME
+resolver still fails closed on `live_` on every host** — so a publish today would still
+disable checkout, and #1124 must not be read as having enabled live payments. And **#1124's
+body answers the build-time token question this file has carried two candidates for**:
+Lovable injects the token at publish. That retires the token half of the pre-publish env
+read; it does **not** settle the `treeHash` / `dirty: true` provenance question, which
+stays `NOT_MEASURED`.
+
+Touches this file only. Does **not** publish, does **not** apply any migration, does
+**not** change payments code, and re-measures no GA4/GSC, Day 0, sitemap, or
+release-identity row — the release rows below keep their own 2026-08-23 dates and are
+stale by two days. Prior header follows.)
+
+**Prior update:** 2026-08-23 UTC (~17:15 UTC)
 **Updated by:** Claude (2026-08-23, PR #1093 review round: **the 2026-08-22
 project-identity downgrade in the "Function default-privilege exposure"
 section overcorrected, and two further defects in that same section are
@@ -116,7 +141,7 @@ GA4/GSC, Day 0, or migration state, and invents no metric. Prior header follows.
 production write in this edit. Recorded for Grok, who has been actively
 working this exact signup/production surface today (`20260821150000`,
 the RAISE LOG guard, the readiness RPC): before drafting any further
-service_role hardening, measured how widespread the class of gap
+service*role hardening, measured how widespread the class of gap
 `20260821064300` closed for one table actually is across every
 SECURITY DEFINER function in `public`. See the new subsection under
 "Second production drift" below for the full findings and the specific
@@ -128,7 +153,7 @@ counter — `founders_seats_consumed`, `founders_wall_count` — worth one owner
 confirmation, not urgent).
 `uncertainty` — `20260807133000`'s own self-test fails if reproduced today
 against a fresh probe function, but two functions from Grok's own
-`20260821150000` migration do _not_ show the same exposure despite one of
+`20260821150000` migration do \_not* show the same exposure despite one of
 them never receiving an explicit `service_role` revoke. Left unresolved
 rather than guessed at. No fix proposed or applied.
 
@@ -362,6 +387,102 @@ that constitution to record branch, deployment, blocker, or assignment changes.
 Every agent reads this file before acting. If a current owner instruction or verified
 repository state is newer than this snapshot, report the difference and update this file
 inside the active governance handoff.
+
+---
+
+## 🎯 STANDING DIRECTIVE — production is the target, not sandbox (recorded 2026-08-25)
+
+**`source claim`, Cheek, 2026-08-25 in session:** _"from now on we are working towards
+production and not sandboxing."_ Scope confirmed in the same exchange as **full production
+posture** — it sets the direction of all work: targets, data, and payments.
+
+**This is a direction, not a blanket authorization.** Recorded that way deliberately,
+because this file's own history is a catalogue of standing notes later read as licence.
+Every gated action listed below still needs its own explicit release from Cheek. "We are
+working towards production" releases none of them by itself.
+
+### What it does change
+
+| Axis               | From                                    | To                                                     |
+| ------------------ | --------------------------------------- | ------------------------------------------------------ |
+| Reference database | sandbox project `bzatgtgjvuojpoxcknaa`  | production `knkwiiywfkbqznbxwqfh`                      |
+| Reference build    | spikes, previews, local replay          | the deploy branch, and what production actually serves |
+| Payments intent    | sandbox-only checkout as settled policy | live checkout is the goal                              |
+
+Sandbox keeps every use it is actually for — local replay, e2e fixtures, the
+`chromium-mocked` project, the restricted-role harness. What ends is **reasoning about
+production from a sandbox observation**. This file already records why that was never
+safe: sandbox is far behind production on Quick Log, and the 2026-08-19 measurement had
+to say so in as many words.
+
+### What it does NOT change — each needs its own explicit lift
+
+1. **Publishing is still stopped by owner order** (2026-08-22). Not lifted by this row.
+2. **Do NOT GitHub-APPLY `20260813030000_signup_acquisition_forward_repair.sql`.**
+   Unchanged and unconditional — that file re-issues an unguarded `handle_new_user` and
+   would overwrite the live `RAISE LOG` guard from `20260821150000`. That is a production
+   incident before this directive and after it.
+3. **No migration reaches production by merging.** The second-drift section still governs.
+4. **The Hard Safety Rules are not a sandbox artifact.** Approval-required Action Queue,
+   no device control, no fake live data, cautious AI, source-labelled telemetry — none of
+   these were sandbox-only caution, and "production posture" relaxes none of them. If
+   anything they bind harder now, because the blast radius is real growers.
+
+### Payments — measured status at deploy tip `823f4c8f0`, 2026-08-25 17:11 UTC
+
+**Half of the move has landed. The half that decides whether checkout actually works has
+not.** `established fact`, read at that tip:
+
+- **#1124 (`d4b344d3e`, merged 2026-08-25 16:54:25 UTC) changed the BUILD gate only.**
+  `scripts/assert-paddle-production-sandbox.mjs` now accepts a single `test_` **or**
+  `live_` `VITE_PAYMENTS_CLIENT_TOKEN` through `resolveCanonicalPaddleProductionToken`,
+  failing closed only on missing, multiple, malformed, or non-Paddle values.
+- **The RUNTIME still fails closed on `live_`.** `resolvePaddleCheckoutEnvironment`
+  (`src/lib/paddleEnvironment.ts:87`) returns `"sandbox"` only for a `test_` token and
+  `"unavailable"` for every other class **on every host**; the module header still states
+  the sandbox-only policy. `src/lib/paddle.ts:51` is its only non-test consumer.
+
+**So a publish today would still disable checkout.** The build would pass and the grower
+would still meet _"Checkout disabled: Verdant currently supports Paddle sandbox testing
+only."_ **Do not read #1124 as having enabled live payments** — it removed a build-time
+blocker, not the runtime one.
+
+The remaining runtime slice is small and contained: one function, one message constant and
+the module header in `paddleEnvironment.ts`, plus the single call site and header prose in
+`paddle.ts`. It is **not** approved by this row. It is a billing-surface change and needs
+an owner-approved slice with a named independent reviewer, per `AGENTS.md`.
+
+### The build-time token question is now ANSWERED — by #1124, not by measurement here
+
+This file has carried two live candidates for how a `live_` token reached production JS
+while both `.env.production` files read `test_`. **#1124's own body names the mechanism:
+_"Production publish must accept `live_` because Lovable injects it at publish."\_** That
+is candidate 1 — a platform-injected value overriding the file — and it is `source claim`
+from that PR body, not something re-measured here.
+
+Two consequences, both worth stating precisely:
+
+- The standing instruction to **re-read the Lovable `.env.production` before anyone opens
+  the publish button** loses its point _as a token check_: the file was never going to
+  show an injected value. Reading it was correct while the mechanism was unknown. It was
+  never a clearance, and it is not one now.
+- **This does not settle the `treeHash` / `dirty: true` provenance question.** Under
+  candidate 1 the workspace `.env.production` never differed, so it contributed nothing to
+  the tree-hash mismatch — which stays `NOT_MEASURED` and attributable to some other file.
+  #1108 (`3345fbfa5`) ships a candidate remedy in `scripts/stamp-version.mjs`; its own
+  release note is correctly cautious, requiring production to _demonstrate_ `dirty: false`,
+  a non-orphan ref, and the merged tip SHA before anyone calls it fixed. That demonstration
+  requires a publish, which remains stopped.
+
+### A dated gate that expires tomorrow
+
+`config/dependency-lockfile-transition.json` carries `reviewBy` **2026-08-25** and
+`check-bun-lockfile-policy.mjs` compares strictly greater. Verified at this tip: the script
+returns **OK today** (exit 0) and first **fails 2026-08-26 UTC**. Whether a ruleset-required
+context invokes it against the real clock is `NOT_MEASURED` — the policy test is largely
+fixture-driven, and the standing invocation found is `dependency-security-ci.yml`, which is
+not one of the 35 required contexts. Owner-gated decision either way, unchanged by this
+directive; recorded so it is not met as a surprise.
 
 ---
 

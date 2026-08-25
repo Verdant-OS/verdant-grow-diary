@@ -1,18 +1,32 @@
 @AGENTS.md
-@docs/agents/CURRENT_STATE.md
 @docs/agents/roles/claude.md
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-09-01.2**
+**Sentinel-Version: 2026-09-01.3**
 
-Claude Code reads this file at the start of every project session. The three `@` imports
-above load the universal constitution, the current operating state, and Claude's assigned
-role. They are imports, not suggestions.
+Claude Code reads this file at the start of every project session. The two `@` imports
+above load the universal constitution and Claude's assigned role. They are imports, not
+suggestions.
+
+**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file tool
+before you acknowledge.** It is still the third required context file and nothing about
+its authority has changed. Measured 2026-08-21 at 153,142 bytes / ~27,400 tokens, it was
+27.7% of the whole memory chain and 19.1% of every context window, re-sent on every turn
+of every session whether or not that session touched operating state. It is also the
+changing shift report, revised several times a day, so most of what it costs on any given
+turn is history that has already been superseded. Loading it on demand costs the same
+tokens once, in the sessions that actually need it, instead of in all of them.
+
+Nothing else carries what it carries. Every claim about branch state, production, applied
+migrations, blockers, approved slices, and agent assignment lives in that file and nowhere
+else — reasoning about any of them from this file, from `AGENTS.md`, or from memory is how
+an agent ends up confidently wrong about production.
 
 Before planning, writing specifications, using tools, or proposing implementation:
 
-1. Confirm all three files above were loaded.
+1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.
+   `files_read:` must name it truthfully, or state that it was not read and why.
 2. Report any conflicting instructions rather than silently picking one.
 3. Return the `SENTINEL_ACK` block defined in `AGENTS.md`.
 4. Do not implement production code unless the current task explicitly assigns

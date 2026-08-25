@@ -86,9 +86,12 @@ function writeGovernanceFile(root, path, version = "2026-08-01.1") {
     return;
   }
 
+  // CLAUDE.md imports two files and reads docs/agents/CURRENT_STATE.md on demand; the
+  // read instruction is asserted by the checker, so the fixture must carry it too.
   const imports =
     path === "CLAUDE.md"
-      ? "@AGENTS.md\n@docs/agents/CURRENT_STATE.md\n@docs/agents/roles/claude.md\n\n"
+      ? "@AGENTS.md\n@docs/agents/roles/claude.md\n\n" +
+        "Read docs/agents/CURRENT_STATE.md before acknowledging.\n\n"
       : "";
   const core =
     path === "GEMINI.md"
@@ -228,7 +231,42 @@ test("fails when Claude's automatic imports drift", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /CLAUDE\.md: the first three lines must import/);
+  assert.match(result.stderr, /CLAUDE\.md: the first two lines must import/);
+});
+
+// CURRENT_STATE.md stopped being an @import on 2026-08-21 (~27,400 tokens on every turn).
+// The written read instruction replaced it, and a sentence can be deleted without the
+// obvious diff signature that removing an import line has — so it is guarded explicitly.
+test("fails when CLAUDE.md drops the on-demand CURRENT_STATE read instruction", () => {
+  const root = makeFixture();
+  replace(
+    root,
+    "CLAUDE.md",
+    "Read docs/agents/CURRENT_STATE.md before acknowledging.",
+    "Operating state is somebody else's problem.",
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /must still instruct an explicit read of/);
+});
+
+// Re-importing it would silently undo the token saving, so the ordered-prefix assertion
+// has to reject a three-line header as firmly as it rejects a wrong one.
+test("fails when CURRENT_STATE.md is re-added as an automatic import", () => {
+  const root = makeFixture();
+  replace(
+    root,
+    "CLAUDE.md",
+    "@AGENTS.md\n@docs/agents/roles/claude.md",
+    "@AGENTS.md\n@docs/agents/CURRENT_STATE.md\n@docs/agents/roles/claude.md",
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /CLAUDE\.md: the first two lines must import/);
 });
 
 test("fails when the legacy archive loses its inactive header", () => {

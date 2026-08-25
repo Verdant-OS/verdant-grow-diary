@@ -85,6 +85,7 @@ describe("Paddle production prebuild guard", () => {
     const prebuildCommands = packageJson.scripts.prebuild.split(/\s*&&\s*/u);
 
     expect(prebuildCommands).toEqual([
+      "node scripts/restore-env-production-from-head.mjs",
       "node scripts/assert-paddle-production-sandbox.mjs",
       "node scripts/verify-edge-shared-in-sync.mjs",
       "node scripts/check-no-src-lib-imports.mjs",

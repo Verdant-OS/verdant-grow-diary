@@ -3,7 +3,7 @@
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-09-01.4**
+**Sentinel-Version: 2026-09-01.5**
 
 Claude Code reads this file at the start of every project session. The two `@` imports
 above load the universal constitution and Claude's assigned role. They are imports, not
@@ -33,6 +33,19 @@ Before planning, writing specifications, using tools, or proposing implementatio
    implementation to Claude (task ownership, not role rank). Claude's **default
    strength** is a specification precise enough that the slice owner — any peer —
    does not have to guess.
+
+## Check-in cadence — arm at 55 minutes, never "roughly hourly"
+
+`practical observation`, measured 2026-08-25: this harness's prompt cache lives **60
+minutes**, and a self check-in armed "roughly an hour out" lands at 61+ minutes — the
+token-waste audit caught live check-ins at 61.4 and 90.7 minutes, each missing the cache
+by minutes and re-paying a full context cache write (~143k tokens at the time of
+measurement) where a ≤55-minute wake is a cache read at a fraction of the cost.
+
+So: when arming a delayed self check-in (`send_later`, a scheduled wake, a re-armed PR
+watch), arm it at **55 minutes or less**. A deliberately longer gap is fine when the work
+genuinely needs one — take the miss knowingly. What this rule forbids is the accidental
+61-minute near-miss that default "hourly" phrasing produces.
 
 ## Scope reminder
 

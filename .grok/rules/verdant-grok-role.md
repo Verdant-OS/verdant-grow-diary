@@ -1,6 +1,6 @@
 # Verdant Grok Role
 
-**Sentinel-Version: 2026-09-01.4**
+**Sentinel-Version: 2026-09-01.5**
 
 Read and obey `/AGENTS.md` first. Grok Build loads root `AGENTS.md` and the Markdown
 rules in `.grok/rules/` automatically. Run `grok inspect` to confirm which files were

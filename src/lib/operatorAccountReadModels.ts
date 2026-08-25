@@ -11,9 +11,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../integrations/supabase/types";
 import { LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES } from "./liveSourceTruthGateRules";
-import { deriveMcpSensorReadingConfidence } from "./mcpSensorReadingRules";
 import { classifySnapshotFreshness } from "./sensor/sensorSnapshotFreshnessRules";
-import { normalizeSensorSource, rawSensorSourceValuesFor } from "./sensor/sensorSourceRules";
+import {
+  normalizeSensorSource,
+  rawSensorSourceValuesFor,
+  type SensorSource,
+} from "./sensor/sensorSourceRules";
 import { withoutDiagnosticSensorRows } from "./sensorProvenanceFenceRules";
 import { STALE_THRESHOLD_MS } from "./sensorReadingNormalizationRules";
 import { celsiusToFahrenheit } from "./temperatureUnits";
@@ -75,8 +78,57 @@ export interface McpSensorReading {
   captured_at: string | null;
   freshness: McpSensorFreshness;
   current_live: boolean;
-  /** Derived 0–1 confidence. Not a database column. */
-  confidence: number;
+  /**
+   * Derived 0–1 confidence at the MCP publication boundary.
+   * Not a database column. Always set by `selectLatestMcpSensorReadings`;
+   * optional only so non-MCP fixture builders need not invent a value.
+   */
+  confidence?: number;
+}
+
+/** Inputs for in-memory MCP confidence (no DB column). */
+export interface McpSensorConfidenceInput {
+  source: SensorSource;
+  freshness: McpSensorFreshness;
+  quality: string;
+  plausible: boolean;
+}
+
+const MCP_SENSOR_CONFIDENCE = {
+  none: 0,
+  low: 0.35,
+  medium: 0.55,
+  high: 0.9,
+} as const;
+
+/**
+ * Derive MCP `confidence` from constitution source + freshness + quality.
+ * Mapping: invalid/implausible → 0; stale/demo → 0.35; manual/csv → 0.55;
+ * live+fresh+ok+plausible → 0.9. Never promotes vendor tokens.
+ */
+export function deriveMcpSensorReadingConfidence(
+  input: McpSensorConfidenceInput,
+): number {
+  const quality =
+    typeof input.quality === "string" ? input.quality.trim().toLowerCase() : "invalid";
+  if (
+    input.source === "invalid" ||
+    input.freshness === "invalid" ||
+    quality === "invalid" ||
+    !input.plausible
+  ) {
+    return MCP_SENSOR_CONFIDENCE.none;
+  }
+  if (input.source === "stale" || input.source === "demo" || input.freshness === "stale") {
+    return MCP_SENSOR_CONFIDENCE.low;
+  }
+  if (input.source === "manual" || input.source === "csv") {
+    return MCP_SENSOR_CONFIDENCE.medium;
+  }
+  if (input.source === "live" && input.freshness === "fresh" && quality === "ok") {
+    return MCP_SENSOR_CONFIDENCE.high;
+  }
+  return MCP_SENSOR_CONFIDENCE.low;
 }
 
 export type OwnerScopedReadModelResult<T> =

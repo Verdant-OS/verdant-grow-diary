@@ -1,5 +1,5 @@
 /**
- * mcp-sensor-reading-rules.test.ts — constitution source honesty + derived
+ * mcp-sensor-source-confidence.test.ts — constitution source honesty + derived
  * confidence for MCP sensor publication.
  *
  * Asserts resolved mapper behavior (not source-text scans): vendor/transport
@@ -7,8 +7,8 @@
  * confidence on the product 0–1 scale.
  */
 import { describe, expect, it } from "vitest";
-import { deriveMcpSensorReadingConfidence } from "@/lib/mcpSensorReadingRules";
 import {
+  deriveMcpSensorReadingConfidence,
   selectLatestMcpSensorReadings,
   type McpSensorQueryRow,
 } from "@/lib/operatorAccountReadModels";

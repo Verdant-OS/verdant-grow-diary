@@ -7,18 +7,21 @@
 **Slice owner:** unassigned — needs one owner and a **different** peer as independent
 reviewer per `AGENTS.md`. This is a billing surface; the owner cannot review it.
 
-> **Revision 7 (2026-08-25).** Six review rounds — Copilot (7) and Codex (3, then 3, then 2,
-> then 2, then 2 more). **All nineteen findings were correct.** Revision 6 withdrew §1's
-> unflagged repetition of a superseded runbook line and corrected a companion
-> `CURRENT_STATE.md` heading that overclaimed the build-time token question as settled.
-> Revision 7 corrects two findings this document should have caught itself: §3.2 had treated a
-> `test_` token surviving on production after the Stage C server switch as an optional
-> follow-up, when it is the identical broken hybrid §1 and §7 already forbid, just arriving
-> through the token instead of the server selector — now mandatory within Stage C. And
-> `src/pages/Upgrade.tsx`, added as a "seventh gate" in revision 4, is removed from live scope
-> entirely: it is a retired, unmounted presenter reading a deliberately sandbox-only config
-> module, and mapping it to live would have weakened a legacy fence for no reachable benefit.
-> Full record in §10 — read it before citing any earlier revision.
+> **Revision 8 (2026-08-25).** Seven review rounds — Copilot (7) and Codex (3, then 3, then 2,
+> then 2, then 2, then 2 more). **All twenty-one findings were correct; one is conceded as an
+> open gap, not fixed.** Revision 7 made §3.2's deferred residual mandatory within Stage C and
+> removed the retired `Upgrade.tsx` from live scope. Revision 8 responds to parent commit
+> #1127 landing on the base branch mid-review: §2.4.1's premise that Lovable injects the live
+> token at publish is now stale — #1127's `restore-env-production-from-head.mjs` runs first in
+> `prebuild` and unconditionally restores `.env.production` from `HEAD`, so getting a live
+> token into production now requires **committing it directly** (new §6 item 0), not relying on
+> a publish-time injection this fix neutralized. The second revision-8 finding — that "switch
+> ALL of Stage B atomically" names a cross-platform cutover (Lovable, Supabase, Paddle) with no
+> executable mechanism specified anywhere in this repository — is **conceded as a real,
+> unresolved gap**, flagged alongside Stage A's already-acknowledged one rather than designed
+> here; inventing a deployment protocol in response to a review comment would repeat the
+> mistake this document's own §10 record warns against. Full record in §10 — read it before
+> citing any earlier revision.
 
 > **Read `docs/paddle-paid-launch-runbook.md` first.** It predates this spec and already
 > governs the live transition. Revision 1 of this document did not cite it — a research
@@ -82,6 +85,18 @@ Stage B is the only stage this document specifies in file-level detail. **Stage 
 isolated-deployment design is NOT specified here** and is the largest remaining unknown — if
 no isolated path is available, the owner is choosing between a split-environment window and
 an unproven money path, and that choice belongs to Cheek, not to this spec.
+
+**A second unspecified gap, conceded in revision 8 (Codex P1), not resolved:** "switch ALL of
+Stage B atomically" in Stage C names a property this document does not show how to achieve.
+The client build publishes through Lovable, `PAYMENTS_ENVIRONMENT` and function secrets change
+through the Supabase operator surface, and the Paddle-side notification destination is
+configured in Paddle's own dashboard — three independent systems with no shared transaction or
+release wrapper found in this repository. Nothing here defines a deploy-safe handshake or a
+fail-closed compatibility sequence that actually prevents the sandbox-client/live-catalog or
+live-client/sandbox-server windows this document spends §1, §3.2 and §7 arguing against. Like
+Stage A, this is flagged as a real, unresolved gap in the execution mechanism, not designed
+here — it belongs to whoever owns implementing Stage C, with the same owner sign-off as Stage
+A, not assumed away by the word "atomically."
 
 ---
 
@@ -159,10 +174,27 @@ bundle ships, this attestation fails against production.
 
 The workflow reads the **tracked** `.env.production` (`:216-220`) and derives its expected
 value with `resolveCanonicalPaddleSandboxToken` (`:357`), then requires
-`bundle.includes(canonicalToken)`. The tracked file is sandbox-class and stays that way: per
-#1124, **Lovable injects the live token at publish, so it never exists in the repository**.
-Once the live bundle ships the assertion fails twice over — the live-token pattern matches,
-and the sandbox token is absent.
+`bundle.includes(canonicalToken)`. Once the live bundle ships the assertion fails twice over —
+the live-token pattern matches, and the sandbox token is absent.
+
+**Corrected in revision 8 (Codex P1) — the premise that the live token "never exists in the
+repository" is stale, superseded by #1127 landing on the base branch after revision 6.**
+Revision 3's claim rested on #1124's own account: Lovable injects a `live_` token into
+`.env.production` at publish, so the tracked file could stay `test_` while the shipped bundle
+carried `live_`. **#1127 removed that path.** `package.json`'s `prebuild` now runs
+`scripts/restore-env-production-from-head.mjs` **first**, before `assert-paddle-production-
+sandbox.mjs` or the Vite build — and that script unconditionally overwrites the working-tree
+`.env.production` with `HEAD:.env.production`, discarding any publish-time injection before
+the guard or the bundler ever see it. Whatever is committed at `HEAD` is what ships, full
+stop; there is no longer a mechanism by which a live token can reach the bundle without being
+committed to the repository. Getting a live client token into production now requires
+**committing it to `.env.production`** as an ordinary reviewed change — see §6 item 0 — not
+relying on a platform-side injection this fix has neutralized.
+
+No code or file-level-plan change follows from this on `package.json` or the restore script
+themselves: #1127's own scope is deliberately environment-agnostic (it restores from `HEAD`
+regardless of what that commit contains), so it needs no live/sandbox awareness added. It is
+listed here as the mechanism, not as a file this slice touches.
 
 Changing only the evaluator therefore leaves two bad options: keep failing, or accept **any**
 live-prefixed token, which downgrades an exact-value fence to a class check. Neither
@@ -380,11 +412,17 @@ entitlement fences — none may ever be skipped.
 
 Governed by `docs/paddle-paid-launch-runbook.md`; this list is its client-relevant subset.
 
-**Ordering, restated because revision 3 got it wrong in this very section:** items 1–5 are
+**Ordering, restated because revision 3 got it wrong in this very section:** items 0–5 are
 staged in Stage B and applied **only** in the atomic Stage C switch, together with the client
 changes in §4. **Do not apply any of them ahead of the client release** — that recreates the
 sandbox-client / live-catalog hybrid §1 and §7 both reject.
 
+0. **Commit the live-class production client token to `.env.production` — added in revision 8
+   (Codex P1), see §2.4.1.** Publish-time injection no longer reaches the shipped bundle;
+   #1127 restores `.env.production` from `HEAD` before the build runs, so this is now the
+   only path. An ordinary public client token, safe to commit per its own design (§3 — it
+   ships in the browser either way), but it is still a live-launch decision, not a
+   drive-by edit: land it as part of the same coordinated Stage C release, not ahead of it.
 1. `PAYMENTS_ENVIRONMENT=live` and `PADDLE_LIVE_API_KEY`.
    **Do NOT set `PADDLE_ENVIRONMENT=live` — corrected in revision 3 (Codex P2).**
    `supabase/functions/paddle-webhook/index.ts:671-676` returns **403 `sandbox_only`**
@@ -543,3 +581,19 @@ server reversed. Finding 19 shows revision 4 extended a real risk pattern (loose
 values) to a file that pattern-matched but was never actually reachable — verifying scope
 against the route table, not just the source text, would have caught it before revision 4
 shipped.
+
+### Revision 8 — Codex, 2 findings, both correct; one conceded as an unresolved gap, not fixed
+
+| #   | Finding                                                                                                                                                                                                                                                                                                                                                                                      | Disposition                                                                                                                                                                                                       |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 20  | **P1.** §2.4.1 said the live token "never exists in the repository" because Lovable injects it at publish. Parent commit #1127 (merged to base while this PR was open) neutralizes that: `restore-env-production-from-head.mjs` now runs first in `prebuild` and unconditionally restores `.env.production` from `HEAD`, discarding any publish-time injection before the guard or build run | **Conceded.** §2.4.1 corrected; new §6 item 0 requires committing the live token to `.env.production` directly, since injection no longer reaches the shipped bundle                                              |
+| 21  | **P1.** "Switch ALL of Stage B atomically" names a property with no executable mechanism specified: Lovable (client), the Supabase operator surface (server env/secrets), and Paddle's own dashboard (notifications) are three independent systems with no shared transaction found in this repository                                                                                       | **Conceded as a real, unresolved gap — not designed here.** Flagged in §1 alongside Stage A's isolated-deployment gap, with the same "owner decision, not this spec's to invent" framing, not a proposed protocol |
+
+**Twenty-one findings across seven rounds, twenty-one correct.** Finding 20 closes a loop this
+PR opened on itself: merging #1127 in (to clear a `behind` state) surfaced the very
+information that made revision 6's `CURRENT_STATE.md` correction more precise, and now shows
+this spec's own token-delivery premise needed the identical correction. Finding 21 is
+deliberately **not** fixed the way 1–20 were — Codex asked for a specified cutover mechanism,
+and inventing one now would be exactly the kind of design-by-reviewer-comment this document
+warns against elsewhere (§1's own treatment of Stage A). It is recorded as a conceded,
+open gap for whoever owns Stage C's implementation, on the same footing as Stage A.

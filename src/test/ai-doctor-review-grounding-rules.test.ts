@@ -132,7 +132,7 @@ describe("validateAiDoctorReviewGrounding", () => {
     const packet = makePacket();
     const result = makeResult({
       confidence: "high",
-      evidence: ["Temperature is 25 C and a recent watering event are available."],
+      evidence: ["Temperature is 25 C in the current source-labeled snapshot."],
       summary:
         "The tent environment is stable in the source-labeled snapshot, with follow-up still advised.",
     });
@@ -1039,5 +1039,301 @@ describe("validateAiDoctorReviewGrounding", () => {
         );
       }
     }
+  });
+
+  it("requires weak-context disclosures to name a real packet gap", () => {
+    const partialPacket = makePacket({
+      readiness: {
+        state: "partial",
+        evidence: ["A recent watering event is available."],
+        missing: ["A source-labeled current snapshot is not available."],
+      },
+    });
+
+    for (const missingInformation of [
+      ["None."],
+      ["No missing information."],
+      ["Pot size is unknown."],
+      ["A fresh pot-size measurement is needed."],
+      ["Current sensor telemetry is available."],
+      ["The sensor snapshot is healthy."],
+      ["The sensor snapshot is healthy although context is missing."],
+      ["The sensor snapshot is healthy because context is missing."],
+      ["The sensor snapshot is available while evidence is missing."],
+    ]) {
+      expectReason(
+        makeResult({ evidence: [], missing_information: missingInformation }),
+        partialPacket,
+        "missing_information_required",
+      );
+    }
+
+    expect(
+      validateAiDoctorReviewGrounding(
+        makeResult({
+          evidence: [],
+          missing_information: ["A source-labeled current snapshot is missing."],
+        }),
+        partialPacket,
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("does not treat sentence-prefixed evidence disclaimers as affirmative support", () => {
+    expectReason(
+      makeResult({
+        confidence: "high",
+        evidence: ["There is insufficient evidence to identify the issue."],
+      }),
+      makePacket(),
+      "high_confidence_without_affirmative_evidence",
+    );
+  });
+
+  it("rejects device commands hidden after a cautious directive while preserving true prohibitions", () => {
+    for (const command of [
+      "Do not wait and automatically adjust the fan.",
+      "Do not wait: turn on the fan.",
+      "Set the fan to 80%.",
+      "Start the pump.",
+      "Stop the pump.",
+      "Run the pump.",
+      "Open the valve.",
+      "Close the valve.",
+      "Increase the humidifier.",
+      "Decrease the humidifier.",
+    ]) {
+      expectReason(
+        makeResult({ immediate_action: command }),
+        makePacket(),
+        "automation_or_device_language",
+      );
+    }
+
+    expect(
+      validateAiDoctorReviewGrounding(
+        makeResult({ what_not_to_do: "Do not set the fan to 80% from this review." }),
+        makePacket(),
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects device commands embedded inside a leading prohibition", () => {
+    for (const command of [
+      "Do not wait to turn on the fan.",
+      "Don't forget to start the pump.",
+      "Never delay turning on the humidifier.",
+      "Don't avoid turning on the fan.",
+      "Avoid not turning on the fan.",
+    ]) {
+      expectReason(
+        makeResult({ immediate_action: command }),
+        makePacket(),
+        "automation_or_device_language",
+      );
+    }
+  });
+
+  it("accepts a pure snapshot absence disclosure in either safe modifier order", () => {
+    const weakPacketWithoutSnapshot = makePacket({
+      readiness: {
+        state: "partial",
+        evidence: ["A recent watering event is available."],
+        missing: ["A source-labeled current sensor snapshot is not available."],
+      },
+      recentSensorSnapshot: null,
+      recentSensorSnapshotAnnotation: null,
+      missingLiveSensorReadings: true,
+    });
+
+    for (const disclosure of [
+      "No source-labeled current sensor snapshot is available.",
+      "No current source-labeled sensor snapshot is available.",
+    ]) {
+      expect(
+        validateAiDoctorReviewGrounding(
+          makeResult({ evidence: [], missing_information: [disclosure] }),
+          weakPacketWithoutSnapshot,
+        ),
+      ).toEqual({ ok: true });
+    }
+  });
+
+  it("grounds percentage and approximate metric assertions without accepting mismatches", () => {
+    expect(
+      validateAiDoctorReviewGrounding(
+        makeResult({ evidence: ["Humidity is 58 percent in the current snapshot."] }),
+        makePacket(),
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      validateAiDoctorReviewGrounding(
+        makeResult({
+          evidence: ["Humidity is approximately 58 percentage in the current snapshot."],
+        }),
+        makePacket(),
+      ),
+    ).toEqual({ ok: true });
+    expectReason(
+      makeResult({ evidence: ["Humidity is about 72 percent in the current snapshot."] }),
+      makePacket(),
+      "claim_not_supported_by_packet",
+    );
+  });
+
+  it("requires a relative watering claim to match the packet chronology", () => {
+    const referenceSnapshotAt = "2026-08-24T12:00:00.000Z";
+    const packetWithOldWatering = makePacket({
+      recentEvents: [{ at: "2026-07-24T12:00:00.000Z", category: "watering" }],
+      recentSensorSnapshot: {
+        capturedAt: referenceSnapshotAt,
+        severity: "ok",
+        readings: [
+          { field: "temperature_c", value: 25, unit: "C" },
+          { field: "humidity_pct", value: 58, unit: "%" },
+        ],
+      },
+    });
+    expectReason(
+      makeResult({ evidence: ["The plant was watered yesterday."] }),
+      packetWithOldWatering,
+      "claim_not_supported_by_packet",
+    );
+
+    expect(
+      validateAiDoctorReviewGrounding(
+        makeResult({ evidence: ["The plant was watered yesterday."] }),
+        makePacket({
+          recentEvents: [{ at: "2026-08-23T12:00:00.000Z", category: "watering" }],
+          recentSensorSnapshot: {
+            capturedAt: referenceSnapshotAt,
+            severity: "ok",
+            readings: [
+              { field: "temperature_c", value: 25, unit: "C" },
+              { field: "humidity_pct", value: 58, unit: "%" },
+            ],
+          },
+        }),
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("allows a simple undated watering assertion backed by a logged event", () => {
+    expect(
+      validateAiDoctorReviewGrounding(
+        makeResult({ evidence: ["The plant was watered."] }),
+        makePacket(),
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("fails closed for watering assertions with any unverified time modifier", () => {
+    const packetWithOldWatering = makePacket({
+      recentEvents: [{ at: "2026-07-24T12:00:00.000Z", category: "watering" }],
+    });
+
+    for (const claim of [
+      "The plant was watered last week.",
+      "The plant was watered this morning.",
+      "The plant was watered two days ago.",
+      "The plant was recently watered.",
+      "The plant was watered a week ago.",
+      "The plant was watered this week.",
+      "The plant was watered a few days ago.",
+      "The plant was watered over the weekend.",
+      "The plant was watered in the past week.",
+      "The plant was watered the other day.",
+      "The plant was watered last Sunday.",
+      "The plant was watered two weeks back.",
+      "The plant was watered 3 days earlier.",
+      "The plant was watered a day or two ago.",
+      "The plant was watered a fortnight ago.",
+      "The plant was watered on Sunday.",
+      "The plant was watered earlier in the week.",
+      "The plant was watered in recent days.",
+      "A recent watering event is available.",
+      "The plant was freshly watered.",
+      "The plant was newly watered.",
+      "The plant was watered overnight.",
+      "The plant was watered at dawn.",
+      "The plant was watered at noon.",
+      "The plant was watered at sunset.",
+    ]) {
+      expectReason(
+        makeResult({ evidence: [claim] }),
+        packetWithOldWatering,
+        "claim_not_supported_by_packet",
+      );
+    }
+  });
+
+  it("keeps negated certainty as an uncertainty disclosure", () => {
+    for (const disclosure of [
+      "This is not proven from the available context.",
+      "There is no conclusive evidence for a diagnosis.",
+      "The cause is not certain yet.",
+    ]) {
+      expect(
+        validateAiDoctorReviewGrounding(makeResult({ summary: disclosure }), makePacket()),
+      ).toEqual({ ok: true });
+    }
+  });
+
+  it("does not call a metric healthy from invalid snapshot telemetry", () => {
+    expectReason(
+      makeResult({
+        summary: "The source-labeled sensor snapshot shows humidity is in range.",
+        evidence: [],
+        missing_information: ["A source-labeled current snapshot is missing."],
+      }),
+      makePacket({
+        recentSensorSnapshot: {
+          capturedAt: CAPTURED_AT,
+          severity: "invalid",
+          readings: [{ field: "humidity_pct", value: 58, unit: "%" }],
+        },
+        recentSensorSnapshotAnnotation: {
+          line: "LATEST_SENSOR_SNAPSHOT [source=invalid, stale=false, trust=low]",
+          source: "invalid",
+          stale: false,
+          trust: "low",
+          includesValues: true,
+          safetyNotes: ["Invalid telemetry is not reliable."],
+          missingInformationHints: ["Collect a current source-labeled snapshot."],
+        },
+        missingLiveSensorReadings: true,
+      }),
+      "healthy_environment_without_trustworthy_snapshot",
+    );
+  });
+
+  it("does not let a leading absence disclosure hide a factual event continuation", () => {
+    for (const disclosure of [
+      "No watering event exists because the plant was watered yesterday.",
+      "No watering event is documented although the plant was watered yesterday.",
+      "No watering event exists despite the plant being watered yesterday.",
+      "No watering record is available as the plant was watered yesterday.",
+      "No recent watering event is available while the plant was watered yesterday.",
+    ]) {
+      expectReason(
+        makeResult({ evidence: [], missing_information: [disclosure] }),
+        makePacket({ recentEvents: [] }),
+        "claim_not_supported_by_packet",
+      );
+    }
+  });
+
+  it("does not let a cautious prefix hide factual event or numeric claims after a colon", () => {
+    const packetWithoutWatering = makePacket({ recentEvents: [] });
+    expectReason(
+      makeResult({ immediate_action: "Do not wait: the plant was watered yesterday." }),
+      packetWithoutWatering,
+      "claim_not_supported_by_packet",
+    );
+    expectReason(
+      makeResult({ immediate_action: "Do not wait: humidity is 72 percent." }),
+      makePacket(),
+      "claim_not_supported_by_packet",
+    );
   });
 });

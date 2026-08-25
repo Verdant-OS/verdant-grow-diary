@@ -28,6 +28,7 @@ import {
 } from "@/lib/oauthSignupAcquisitionRules";
 import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
 import { GLOBAL_SEARCH_SESSION_STORAGE_KEY } from "@/lib/globalSearchSession";
+import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
 
 function Probe() {
   const { user, loading } = useAuth();
@@ -36,7 +37,7 @@ function Probe() {
 
 beforeEach(() => {
   window.sessionStorage.clear();
-  window.localStorage.clear();
+  clearLocalStorageForTest();
   mocks.getSession.mockReset();
   mocks.onAuthStateChange.mockReset();
   mocks.rpc.mockReset();

@@ -17,12 +17,17 @@ import {
   readRecentSearches,
   RECENT_SEARCHES_STORAGE_KEY,
 } from "@/lib/recentGlobalSearches";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 const PRIVATE_QUERY = "Cheek Tent 4";
 
 beforeEach(() => {
   window.sessionStorage.clear();
-  window.localStorage.clear();
+  clearLocalStorageForTest();
 });
 
 describe("Global Search private storage boundary", () => {
@@ -32,36 +37,36 @@ describe("Global Search private storage boundary", () => {
     expect(
       JSON.parse(window.sessionStorage.getItem(RECENT_SEARCHES_STORAGE_KEY) ?? "null"),
     ).toEqual([PRIVATE_QUERY]);
-    expect(window.localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
     expect(readRecentSearches()).toEqual([PRIVATE_QUERY]);
   });
 
   it("deletes the legacy persistent slot without replaying its private query", () => {
-    window.localStorage.setItem(
+    setLocalStorageItemForTest(
       RECENT_SEARCHES_STORAGE_KEY,
       JSON.stringify(["legacy private plant"]),
     );
 
     expect(readRecentSearches()).toEqual([]);
-    expect(window.localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
   });
 
   it("clears every exact search key while preserving unrelated browser preferences", () => {
     for (const key of GLOBAL_SEARCH_PRIVATE_STORAGE_KEYS) {
       window.sessionStorage.setItem(key, `private:${key}`);
     }
-    window.localStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, "legacy private query");
+    setLocalStorageItemForTest(RECENT_SEARCHES_STORAGE_KEY, "legacy private query");
     window.sessionStorage.setItem("verdant:startScreen:owner-a", "quickLog");
-    window.localStorage.setItem("verdant:unrelated", "preserve-me");
+    setLocalStorageItemForTest("verdant:unrelated", "preserve-me");
 
     clearGlobalSearchPrivateState();
 
     for (const key of GLOBAL_SEARCH_PRIVATE_STORAGE_KEYS) {
       expect(window.sessionStorage.getItem(key)).toBeNull();
     }
-    expect(window.localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
     expect(window.sessionStorage.getItem("verdant:startScreen:owner-a")).toBe("quickLog");
-    expect(window.localStorage.getItem("verdant:unrelated")).toBe("preserve-me");
+    expect(getLocalStorageItemForTest("verdant:unrelated")).toBe("preserve-me");
 
     // These are the same readers used when the public /cultivars palette opens.
     expect(readGlobalSearchSession().query).toBe("");

@@ -8,10 +8,15 @@ import {
   subscribeGlobalSearchPrivateStateClear,
 } from "@/lib/globalSearchSession";
 import { RECENT_SEARCHES_STORAGE_KEY } from "@/lib/recentGlobalSearches";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 beforeEach(() => {
   window.sessionStorage.clear();
-  window.localStorage.clear();
+  clearLocalStorageForTest();
   __growDataFallbacks.count = 0;
   __growDataFallbacks.lastReason = "";
 });
@@ -21,7 +26,7 @@ describe("auth identity query-cache transition fence", () => {
     const client = new QueryClient();
     client.setQueryData(["owner-private", "owner-a"], [{ id: "private-row" }]);
     window.sessionStorage.setItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY, "Owner A Private Tent");
-    window.localStorage.setItem(RECENT_SEARCHES_STORAGE_KEY, '["Owner A Private Tent"]');
+    setLocalStorageItemForTest(RECENT_SEARCHES_STORAGE_KEY, '["Owner A Private Tent"]');
     __growDataFallbacks.count = 2;
     __growDataFallbacks.lastReason = "owner-a-private-reason";
 
@@ -41,7 +46,7 @@ describe("auth identity query-cache transition fence", () => {
     // implementation text that could be commented out or unreachable.
     expect(observations).toEqual([{ cacheRows: 1, searchState: null }]);
     expect(client.getQueryCache().getAll()).toHaveLength(0);
-    expect(window.localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
+    expect(getLocalStorageItemForTest(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
     expect(__growDataFallbacks).toEqual({ count: 0, lastReason: "" });
   });
 });

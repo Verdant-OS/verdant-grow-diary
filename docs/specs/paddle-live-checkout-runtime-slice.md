@@ -196,13 +196,14 @@ or the bundler run.
 
 **That conclusion assumed `HEAD` means the file as committed to GitHub. It might not.**
 `CURRENT_STATE.md`'s 2026-08-25 19:48 UTC re-measurement found the served production commit
-is an **orphan, unknown to GitHub** — proof the publisher commits its workspace **locally**
-before or during publish. If Lovable's injection happens _before_ that local commit, the
-publisher's own `HEAD` already carries the injected `live_` value, and
-`restore-env-production-from-head.mjs` would restore **that** — not the GitHub-tracked
-`test_` value this section assumed. Whether injection happens before or after the local
-commit is `NOT_MEASURED` on both documents; neither this correction nor `CURRENT_STATE.md`'s
-own account settles it.
+is **unrecognized by GitHub** — consistent with the stamp's `ref: "__orphan__"`, but the
+fetch failure does **not** establish why: a publisher-local commit, a rebase, a squash, or
+any other history reconstruction produces the same observation. The publisher mechanism is
+`NOT_MEASURED`. If whatever `HEAD` resolves to in the publisher's build context already
+carries an injected `live_` value, `restore-env-production-from-head.mjs` would restore
+**that** — not the GitHub-tracked `test_` value this section assumed. Whether it does is
+`NOT_MEASURED` on both documents; neither this correction nor `CURRENT_STATE.md`'s own
+account settles it, and an unrecognized SHA is not the evidence that would.
 
 **So: `NOT_MEASURED`, not resolved.** §6 item 0's instruction — commit the live-class token to
 `.env.production` directly — is still the only path this document can currently verify with
@@ -841,7 +842,12 @@ failure shape three earlier findings already named under this exact heading.
 | 28  | **P2.** §3.3's original rule (`live_` → `"live"`, else → `"sandbox"`) puts a missing or malformed production token in the `"sandbox"` bucket. `LovableBillingEnvironment` has no third state, and both `useMyEntitlements.ts` and `usePaddleCancelNotice.ts` gate their sandbox-row query on that bucket — so after Stage C, a broken token would let a stray sandbox-era subscription row display a grower as entitled while the authoritative live server correctly considers them Free    | **Fixed.** §3.3 rewritten: the fallback direction inverts — `test_`-class → `"sandbox"`, everything else (live, missing, or malformed) → `"live"` — so a broken token skips the sandbox query entirely rather than defaulting into it; test 9 corrected, new regression test 17                                                                                                                                             |
 | 29  | **P2.** `CURRENT_STATE.md`'s 19:48 UTC block treats "`git fetch origin <sha>` → not our ref" as proof the publisher "commits its workspace locally" — that fetch result proves only the SHA is absent from the remote, not the causal mechanism that put it there, and the same unproven premise is reused two sections later to reason about token-injection ordering, exactly the "inference presented as conclusion" pattern this record already names as recurring across both documents | **Corrected.** Both passages walked back to `NOT_MEASURED` on the causal mechanism; the observation itself (SHA unrecognized by GitHub) is unaffected and stays as measured. Also noted: finding 25's own disposition text, written one revision earlier in this very table, restates the same unproven "commits its workspace locally" framing without hedging — propagation into a correction, not just into the original |
 
-**Twenty-nine findings across eleven rounds, twenty-nine correct.** Both findings this round
+| 30 | **P2.** §2.4.1's body still called the unrecognized served SHA "proof the publisher commits its workspace locally" — the same causal overclaim findings 25 and 29 walked back in `CURRENT_STATE.md` and in this table, surviving in the one place revision 12's sweep missed. The fetch failure proves only that GitHub lacks the object; it cannot distinguish a publisher-local commit from a rebase, squash, or other reconstruction, so reasoning about injection-vs-`HEAD` ordering from it repeats the pattern this record names as recurring | **Corrected.** §2.4.1 rewritten to the same footing as the finding-29 walkback: the observation (SHA unrecognized) stays measured, the mechanism is `NOT_MEASURED`, and the injection-ordering question is stated conditionally on whatever `HEAD` resolves to in the publisher's build context rather than on an assumed local commit |
+
+**Thirty findings across twelve rounds, thirty correct.** Finding 30 is finding 29's
+shape surviving its own correction sweep — the third consecutive time an overclaim
+propagated into or past a correction, which is itself the strongest argument this record
+makes for labelling inference as inference at first writing. The two revision-12 findings
 are the same failure shape from opposite directions: 28 is a design defaulting the unsafe way
 on an input nobody enumerated (a broken token, not just the two expected classes); 29 is a
 narrative treating one confirmed observation as license for a broader causal story, then

@@ -7,9 +7,11 @@
 **Slice owner:** unassigned — needs one owner and a **different** peer as independent
 reviewer per `AGENTS.md`. This is a billing surface; the owner cannot review it.
 
-> **Revision 2 (2026-08-25).** Copilot's review of PR #1125 raised seven findings and
-> **all seven were correct**; five were substantive and are corrected throughout. The full
-> record is in §10. Read that section before citing revision 1 of this document.
+> **Revision 3 (2026-08-25).** Two review rounds — Copilot (7 findings) and Codex
+> (3 findings, one P1). **All ten were correct.** Revision 3 fixes a P1 sequencing flaw that
+> contradicted this document's own §7, removes a prerequisite that would have 403'd the
+> operator-audit webhook, and records that the bundle attestation cannot be fixed in the
+> evaluator alone. Full record in §10 — read it before citing any earlier revision.
 
 > **Read `docs/paddle-paid-launch-runbook.md` first.** It predates this spec and already
 > governs the live transition. Revision 1 of this document did not cite it — a research
@@ -37,16 +39,34 @@ resolver, presenter copy, live token, `PAYMENTS_ENVIRONMENT=live`, legacy
 destinations, monitoring and a tested rollback **together** — and "flipping any single
 setting or token is insufficient and must fail closed."
 
-**Recommended sequence:**
+**Corrected in revision 3 (Codex P1).** Revision 2 put the server switch in a Stage 0 that
+ran _before_ the client change. That contradicted this document's own §7 and the runbook.
+`get-paddle-price` resolves its catalog from `resolveServerBillingEnvironment()` and
+**ignores any client-supplied environment**
+(`supabase/functions/get-paddle-price/index.ts:249-251`). Flipping `PAYMENTS_ENVIRONMENT=live`
+while the deployed sandbox client is still serving would leave the browser initializing
+**sandbox** Paddle against **live** price IDs — the exact broken hybrid §7 warns about — and
+would **disable the existing working sandbox checkout for the whole of Stages 0–1**, during
+which no real live browser flow could be exercised anyway.
+
+**"Prove the money path before unblocking the button" and "never run a split client/server
+environment in production" are both right, and they conflict.** The resolution is to move
+the proving off production, not to accept a split window:
 
 ```
-Stage 0  Owner configures live server env + live price catalog + live webhook secrets
-Stage 1  Verify write-back end-to-end in live with a real low-value transaction
-Stage 2  Ship the client runtime slice (§4) as part of the single coordinated release
-Stage 3  Publish
+Stage A  Prove payments-webhook in live mode on an ISOLATED deployment
+         (non-production Supabase project, live secrets, live Paddle events).
+         Production's global selectors are NOT touched.
+Stage B  Stage the coordinated release: client gates, production token,
+         PAYMENTS_ENVIRONMENT, live price IDs, live webhook secrets, monitoring.
+Stage C  Switch ALL of Stage B atomically, per docs/paddle-paid-launch-runbook.md.
+Stage D  Immediately verify with one real low-value live transaction, rollback armed.
 ```
 
-Stage 2 is the only stage this document specifies in file-level detail.
+Stage B is the only stage this document specifies in file-level detail. **Stage A's
+isolated-deployment design is NOT specified here** and is the largest remaining unknown — if
+no isolated path is available, the owner is choosing between a split-environment window and
+an unproven money path, and that choice belongs to Cheek, not to this spec.
 
 ---
 
@@ -108,8 +128,30 @@ entry bundle, and calls `evaluatePublicPaddleBundle` (`:381-384`), throwing on
 `!paddle.ok`. `scripts/e2e/managed-session-materialize-core.mjs:323-338` returns
 `public_paddle_live_token_present` whenever a live token appears in the bundle.
 
-**Therefore the scanner update is mandatory Stage-2 scope, not conditional.** The moment a
-live bundle ships, this attestation fails against production.
+**Therefore the scanner update is mandatory scope, not conditional.** The moment a live
+bundle ships, this attestation fails against production.
+
+### 2.4.1 The evaluator alone CANNOT fix it — added in revision 3 (Codex P2)
+
+The workflow reads the **tracked** `.env.production` (`:216-220`) and derives its expected
+value with `resolveCanonicalPaddleSandboxToken` (`:357`), then requires
+`bundle.includes(canonicalToken)`. The tracked file is sandbox-class and stays that way: per
+#1124, **Lovable injects the live token at publish, so it never exists in the repository**.
+Once the live bundle ships the assertion fails twice over — the live-token pattern matches,
+and the sandbox token is absent.
+
+Changing only the evaluator therefore leaves two bad options: keep failing, or accept **any**
+live-prefixed token, which downgrades an exact-value fence to a class check. Neither
+preserves equal strength, and §2.6 forbids weakening a fence to make a build pass.
+
+**A trusted live expectation must be introduced, and it is an owner decision.** Candidates,
+with a recommendation but no authority to choose:
+
+| Option                                                                                                                                                  | Strength                                 | Cost                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **(a) Repository/environment secret holding the expected live token**, compared exactly, workflow failing closed if absent while live — **recommended** | preserves exact-value matching           | one owner-managed secret, rotated with the token                                                           |
+| (b) Commit a SHA-256 of the expected live token and compare hashes                                                                                      | exact-value without committing the token | brittle: needs reliable token extraction from a minified bundle                                            |
+| (c) Accept class-only matching for live                                                                                                                 | weaker than today                        | none — but a real reduction in fence strength, requiring explicit owner acceptance, never a silent default |
 
 ### 2.5 The write-back path, and one gate that must NOT be touched
 
@@ -186,7 +228,8 @@ is safe — `usePaddleCancelNotice.ts:51` already annotates it as `LovableBillin
 | `src/lib/paddle.ts`                                | Gates 2, 3, 4 of §2.2: `initializePaddle()` accepts the resolved environment; `Paddle.Environment.set(...)` takes the resolved value instead of the literal; `getPaddlePriceId()` accepts it **and** stops hardcoding `environment: "sandbox"` in its request body. Plus `getPaddleEnvironment()` per §3.3, `getCheckoutUnavailableMessage()`, and the module header ("Live tokens fail closed on every host" becomes false) |
 | `src/hooks/usePaddleCheckout.ts`                   | Gates 5 and 6 — `:124` and `:137` stop comparing to the literal `"sandbox"`                                                                                                                                                                                                                                                                                                                                                  |
 | `src/constants/*Copy.ts`                           | Blocking copy pinned as data per repo convention, not inline in JSX                                                                                                                                                                                                                                                                                                                                                          |
-| `scripts/e2e/managed-session-materialize-core.mjs` | **Mandatory** (§2.4): re-point `evaluatePublicPaddleBundle` at the new policy, keeping an equal-strength assertion — it must still reject a token class that does not match the intended environment                                                                                                                                                                                                                         |
+| `scripts/e2e/managed-session-materialize-core.mjs` | **Mandatory** (§2.4): re-point `evaluatePublicPaddleBundle` at the new policy, keeping an equal-strength assertion                                                                                                                                                                                                                                                                                                           |
+| `.github/workflows/quicklog-smoke.yml`             | **Mandatory, and the harder half — see §2.4.1.** The workflow, not the evaluator, is where the expected token comes from                                                                                                                                                                                                                                                                                                     |
 
 No schema. No migration. No RLS. No edge-function code change. No new route.
 
@@ -213,7 +256,16 @@ per `AGENTS.md`.
 
 Governed by `docs/paddle-paid-launch-runbook.md`; this list is its client-relevant subset.
 
-1. `PAYMENTS_ENVIRONMENT=live`, legacy `PADDLE_ENVIRONMENT=live`, and `PADDLE_LIVE_API_KEY`.
+1. `PAYMENTS_ENVIRONMENT=live` and `PADDLE_LIVE_API_KEY`.
+   **Do NOT set `PADDLE_ENVIRONMENT=live` — corrected in revision 3 (Codex P2).**
+   `supabase/functions/paddle-webhook/index.ts:671-676` returns **403 `sandbox_only`**
+   whenever `PADDLE_ENVIRONMENT !== "sandbox"`, so setting it live shuts down the
+   operator-audit lane that §2.5 says is correct and must remain. Keep the legacy selector
+   sandbox-scoped and switch only the canonical `payments-webhook` lane.
+   **Conflict flagged, not resolved:** `docs/paddle-paid-launch-runbook.md` lists legacy
+   `PADDLE_ENVIRONMENT=live` among its live-transition settings. That instruction and this
+   code cannot both be followed. Revision 2 propagated the runbook line without checking it
+   against the function. **Owner decision — do not silently pick a side.**
 2. **`PAYMENTS_LIVE_WEBHOOK_SECRET`** — **corrected in revision 2.** `payments-webhook`
    verifies through `_shared/paddle.ts:getWebhookSecret(env)`, which reads
    `PAYMENTS_LIVE_WEBHOOK_SECRET` for `env=live` and `PAYMENTS_SANDBOX_WEBHOOK_SECRET` for
@@ -264,7 +316,7 @@ coordinated release the existing runbook already mandates.
 Would a tired grower trust this? Only if the money path is proven before the button is
 unblocked — never the other way round.
 
-## 10. Correction record (revision 2, 2026-08-25)
+## 10. Correction record
 
 Copilot review on PR #1125 raised seven findings. **All seven verified correct against
 primary sources before acceptance.** Kept visible rather than patched silently, per this
@@ -279,6 +331,19 @@ repository's practice.
 | 5   | Wrong webhook secret — canonical path reads `PAYMENTS_LIVE_WEBHOOK_SECRET`                                               | **Conceded.** §6.2 corrected; this error would have caused the exact failure the spec exists to prevent |
 | 6   | `CURRENT_STATE.md` scope too narrow                                                                                      | **Conceded.** Corrected in that file with its own withdrawal note                                       |
 | 7   | Markdown emphasis corruption (3 sites)                                                                                   | **Conceded.** Fixed; two were prettier mangling pre-existing prose in an unrelated section              |
+
+### Revision 3 — Codex, 3 findings, all correct
+
+| #   | Finding                                                                                                                                                                                    | Disposition                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| 8   | **P1.** Stage 0 switched the server before the client, creating the split environment §7 itself calls a broken hybrid and disabling sandbox checkout for Stages 0–1                        | **Conceded.** §1 restructured: isolated proving (Stage A), then one atomic switch (Stage C)    |
+| 9   | **P2.** `PADDLE_ENVIRONMENT=live` 403s the legacy operator-audit webhook that §2.5 says must remain                                                                                        | **Conceded.** §6.1 corrected; the runbook/code conflict is flagged for the owner, not resolved |
+| 10  | **P2.** The bundle attestation cannot be fixed in the evaluator — the workflow derives its expectation from the tracked sandbox `.env.production`, and the live token is never in the repo | **Conceded.** New §2.4.1; workflow added to §4 with three owner options                        |
+
+**Ten findings across two rounds, ten correct, none against the reviewers.** Two of the three
+Codex findings were internal contradictions — the spec arguing against itself two sections
+apart — and the third propagated a runbook instruction without checking it against the code
+it governs.
 
 **Failure modes worth naming, because they recur in this repository's history.** Revision 1
 scoped a change from the two files it started at instead of tracing every consumer to a

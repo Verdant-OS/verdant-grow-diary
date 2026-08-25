@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { Suspense, useEffect } from "react";
+import { flushSync } from "react-dom";
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -17,6 +18,7 @@ import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
 import { clearGrowDataMeta } from "@/hooks/useGrowData";
+import { clearGlobalSearchPrivateState } from "@/lib/globalSearchSession";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
@@ -127,10 +129,16 @@ function RootErrorComponent({ error }: { error: Error }) {
  * cancels active observers before AuthProvider exposes the next identity.
  * Source-disclosure metadata lives outside React Query and needs the same
  * identity fence so one grower's status cannot flash for the next account.
+ * Global Search query/history/selection state is also identity-scoped because
+ * its text can contain private grow, tent, or plant labels.
  */
 function useClearQueryCacheBeforeAuthIdentityChange() {
   const { queryClient } = Route.useRouteContext();
   return () => {
+    // Commit mounted search observers to their empty/new-epoch state before
+    // clearing QueryClient. Without this ordering, an active old observer can
+    // recreate its private raw-query key immediately after `clear()`.
+    flushSync(() => clearGlobalSearchPrivateState());
     queryClient.clear();
     clearGrowDataMeta();
   };

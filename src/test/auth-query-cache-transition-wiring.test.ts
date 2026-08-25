@@ -19,6 +19,10 @@ describe("auth identity query-cache transition fence", () => {
       /function useClearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,500}clearGrowDataMeta\(\)/,
     );
     expect(APP).toMatch(
+      /function useClearQueryCacheBeforeAuthIdentityChange\(\)[\s\S]{0,500}clearGlobalSearchPrivateState\(\)/,
+    );
+    expect(APP).toMatch(/flushSync\(\(\) => clearGlobalSearchPrivateState\(\)\)/);
+    expect(APP).toMatch(
       /const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange\(\)/,
     );
   });

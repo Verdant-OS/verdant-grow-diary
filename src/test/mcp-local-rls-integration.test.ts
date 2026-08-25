@@ -225,53 +225,39 @@ function assertNoSecretLeakage(payload: unknown) {
 }
 
 /**
- * Real vocabularies from the live schema (long-format sensor_readings).
- * Mirrors the validate_sensor_reading() allow-list in
- * supabase/migrations/20260617164759_*.sql — NOT the historical
- * manual/pi_bridge/sim trio.
+ * Constitution Sensor Truth sources allowed on the MCP publication
+ * boundary. Vendor/transport tokens must never appear here.
+ * (DB may still store transport labels; the tool normalizes before return.)
  */
 const ALLOWED_SENSOR_SOURCES = new Set([
-  // Canonical Verdant V0 source labels
   "live",
   "manual",
   "csv",
   "demo",
   "stale",
   "invalid",
-  // Back-compat + bridge/vendor ingest labels
-  "pi_bridge",
-  "sim",
-  "webhook_generic",
-  "node_red_bridge",
-  "esp32_arduino",
-  "esp32_arduino_sht31",
-  "esp32_esphome",
-  "esp32_mqtt_bridge",
-  "home_assistant_bridge",
-  "ha_forwarded",
-  "ecowitt",
-  "mqtt",
-  "webhook",
 ]);
 const ALLOWED_SENSOR_QUALITIES = new Set(["ok", "degraded", "stale", "invalid"]);
 /**
- * Sources an agent must never treat as live. Everything else is trusted
- * only via the deny-by-default rule the tool description spells out
- * (quality `ok` + known-live source; unrecognized labels are never live).
+ * Sources an agent must never treat as live. Called out by name in the
+ * tool description so connecting assistants inherit the contract.
+ * `sim` remains named as a never-returned transport example.
  */
 const NEVER_LIVE_SOURCES = ["sim", "demo", "stale", "invalid"] as const;
 
 /**
- * Exact source/quality expectations for the rows seedUser() plants on the
- * primary tent. temperature_c omits quality at insert to also cover the
- * column default ('ok').
+ * Exact MCP-published source/quality expectations for the rows seedUser()
+ * plants on the primary tent. DB may still store vendor/sim transport
+ * tokens; the tool normalizes them to constitution labels.
+ * temperature_c omits quality at insert to also cover the column default
+ * ('ok').
  */
 const SEEDED_READING_LABELS: Record<string, { source: string; quality: string }> = {
   temperature_c: { source: "manual", quality: "ok" },
   humidity_pct: { source: "live", quality: "ok" },
   vpd_kpa: { source: "csv", quality: "ok" },
-  co2_ppm: { source: "ecowitt", quality: "ok" },
-  ph: { source: "sim", quality: "degraded" },
+  co2_ppm: { source: "invalid", quality: "ok" }, // stored transport: ecowitt
+  ph: { source: "demo", quality: "degraded" }, // stored transport: sim
 };
 
 function isIsoTimestamp(v: unknown): boolean {
@@ -464,8 +450,8 @@ describeIfHarness("MCP local RLS integration", () => {
 
     // Live schema: sensor_readings is long-format (one row per metric).
     // Sources cover representative canonical (live/csv), human (manual),
-    // vendor-bridge (ecowitt), and simulated (sim) labels — the tool must
-    // hand every label through verbatim (see SEEDED_READING_LABELS).
+    // vendor-bridge (ecowitt), and simulated (sim) stored labels — the tool
+    // must normalize each to a constitution source (see SEEDED_READING_LABELS).
     const { data: readings, error: readingsErr } = await admin
       .from("sensor_readings")
       .insert([
@@ -785,8 +771,8 @@ describeIfHarness("MCP local RLS integration", () => {
       expect(snap.tentId).toBe(userA.tentId);
       const readings = snap.readings as Record<string, any>;
       expect(readings).toBeTruthy();
-      // Every seeded metric survives; canonical, vendor, and simulated
-      // source labels (and a non-ok quality) all pass through verbatim.
+      // Every seeded metric survives; vendor/sim stored labels normalize to
+      // constitution sources (and non-ok quality is preserved).
       expect(Object.keys(readings).sort()).toEqual(Object.keys(SEEDED_READING_LABELS).sort());
       for (const [metric, row] of Object.entries(readings)) {
         expect(row.metric).toBe(metric);
@@ -796,6 +782,9 @@ describeIfHarness("MCP local RLS integration", () => {
         expect(ALLOWED_SENSOR_QUALITIES.has(row.quality)).toBe(true);
         expect(row.source).toBe(SEEDED_READING_LABELS[metric].source);
         expect(row.quality).toBe(SEEDED_READING_LABELS[metric].quality);
+        expect(typeof row.confidence).toBe("number");
+        expect(row.confidence).toBeGreaterThanOrEqual(0);
+        expect(row.confidence).toBeLessThanOrEqual(1);
         expect(isIsoTimestamp(row.ts)).toBe(true);
         expect(userA.readingIds).toContain(row.id);
         // Contract: never exposes raw_payload.

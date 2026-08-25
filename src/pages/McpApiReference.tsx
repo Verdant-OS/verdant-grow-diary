@@ -218,11 +218,15 @@ Content-Type: application/json`}</Code>
               another grower's diary through the wider <code>diary_entries</code> policy.
             </li>
             <li>
-              <strong>Sensor truth preserved.</strong> <code>source</code> and <code>quality</code>{" "}
-              labels are returned verbatim. A reading is only current live telemetry when{" "}
+              <strong>Sensor truth at the publication boundary.</strong> <code>source</code> is
+              always one of the six constitution labels (
+              <code>live</code>/<code>manual</code>/<code>csv</code>/<code>demo</code>/
+              <code>stale</code>/<code>invalid</code>). Vendor/transport tokens (ecowitt, mqtt, sim,
+              …) are never returned as <code>source</code>. Each reading also carries derived{" "}
+              <code>confidence</code> (0–1). A reading is only current live telemetry when{" "}
               <code>current_live: true</code> (quality <code>ok</code> + source <code>live</code> +
-              freshness <code>fresh</code>). Manual, csv, demo, sim, stale, and invalid rows keep
-              their labels and are never re-labeled as live.
+              freshness <code>fresh</code>). Manual, csv, demo, stale, and invalid rows keep their
+              labels and are never re-labeled as live.
             </li>
             <li>
               <strong>No raw provenance leakage.</strong> <code>raw_payload</code> is selected long
@@ -361,7 +365,8 @@ Content-Type: application/json`}</Code>
         "ts": "2026-07-19T09:12:00Z",
         "captured_at": "2026-07-19T09:11:58Z",
         "freshness": "fresh",
-        "current_live": true
+        "current_live": true,
+        "confidence": 0.9
       },
       "vpd_kpa": {
         "metric": "vpd_kpa",
@@ -371,7 +376,8 @@ Content-Type: application/json`}</Code>
         "ts": "2026-07-19T08:55:00Z",
         "captured_at": null,
         "freshness": "fresh",
-        "current_live": false
+        "current_live": false,
+        "confidence": 0.55
       }
     }
   }

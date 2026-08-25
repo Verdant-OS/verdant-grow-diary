@@ -11,6 +11,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../integrations/supabase/types";
 import { LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES } from "./liveSourceTruthGateRules";
+import { deriveMcpSensorReadingConfidence } from "./mcpSensorReadingRules";
 import { classifySnapshotFreshness } from "./sensor/sensorSnapshotFreshnessRules";
 import { normalizeSensorSource, rawSensorSourceValuesFor } from "./sensor/sensorSourceRules";
 import { withoutDiagnosticSensorRows } from "./sensorProvenanceFenceRules";
@@ -64,11 +65,18 @@ export interface McpSensorReading {
   metric: string;
   value: number;
   quality: string;
+  /**
+   * Constitution Sensor Truth source only:
+   * live | manual | csv | demo | stale | invalid.
+   * Transport/vendor tokens (ecowitt, mqtt, sim, …) are never returned here.
+   */
   source: string;
   ts: string;
   captured_at: string | null;
   freshness: McpSensorFreshness;
   current_live: boolean;
+  /** Derived 0–1 confidence. Not a database column. */
+  confidence: number;
 }
 
 export type OwnerScopedReadModelResult<T> =
@@ -299,7 +307,8 @@ function deriveMcpFreshness(
   nowMs: number,
   staleAfterMs: number,
 ): McpSensorFreshness {
-  const source = normalizedLabel(row.source);
+  // Constitution source first — vendor/transport tokens are never "fresh live".
+  const source = normalizeSensorSource(row.source);
   const quality = normalizedLabel(row.quality);
   if (source === "invalid" || quality === "invalid") return "invalid";
   if (source === "stale" || quality === "stale") return "stale";
@@ -489,6 +498,9 @@ export function selectLatestMcpSensorReadings(
   return Object.fromEntries(
     Object.entries(selected).map(([metric, row]) => {
       const freshness = deriveMcpFreshness(row, nowMs, staleAfterMs);
+      const source = normalizeSensorSource(row.source);
+      const quality = normalizedLabel(row.quality);
+      const plausible = isPlausibleMcpSensorValue(row);
       return [
         metric,
         {
@@ -497,14 +509,17 @@ export function selectLatestMcpSensorReadings(
           metric: row.metric,
           value: row.value,
           quality: row.quality,
-          source: row.source,
+          source,
           ts: row.ts,
           captured_at: row.captured_at,
           freshness,
-          current_live:
-            freshness === "fresh" &&
-            normalizedLabel(row.source) === "live" &&
-            normalizedLabel(row.quality) === "ok",
+          current_live: freshness === "fresh" && source === "live" && quality === "ok",
+          confidence: deriveMcpSensorReadingConfidence({
+            source,
+            freshness,
+            quality: row.quality,
+            plausible,
+          }),
         } satisfies McpSensorReading,
       ];
     }),

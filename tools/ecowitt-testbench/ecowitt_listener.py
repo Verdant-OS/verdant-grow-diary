@@ -80,7 +80,8 @@ except Exception:
 VENDOR = "ecowitt_windows_testbench"
 LOG_PATH = Path(__file__).with_name("ecowitt_raw_log.jsonl")
 PORT = int(os.environ.get("VERDANT_TESTBENCH_PORT", "8787"))
-ECOWITT_LIVE_FRESHNESS = timedelta(minutes=30)
+# Constitution Sensor Truth: dateutc ≤ 15 min → live; older → stale.
+ECOWITT_LIVE_FRESHNESS = timedelta(minutes=15)
 
 app = Flask(__name__)
 
@@ -89,10 +90,52 @@ app = Flask(__name__)
 # Normalization
 # ---------------------------------------------------------------------------
 
+# Keep existing FIELD_MAP names, then accept extra grow channels onto those
+# same canonical metric names (first parseable candidate wins). Do not invent
+# columns. leafwetness* / tf_ch* / WH52 EC stay in metadata.raw_payload only.
 FIELD_MAP = {
-    "temp_f": ("temp1f", "tempf", "tempinf"),
-    "humidity_percent": ("humidity1", "humidity", "humidityin"),
-    "soil_moisture_pct": ("soilmoisture1", "soilmoisture2"),
+    "temp_f": (
+        "temp1f",
+        "tempf",
+        "tempinf",
+        "temp2f",
+        "temp3f",
+        "temp4f",
+        "temp5f",
+        "temp6f",
+        "temp7f",
+        "temp8f",
+    ),
+    "humidity_percent": (
+        "humidity1",
+        "humidity",
+        "humidityin",
+        "humidity2",
+        "humidity3",
+        "humidity4",
+        "humidity5",
+        "humidity6",
+        "humidity7",
+        "humidity8",
+    ),
+    "soil_moisture_pct": (
+        "soilmoisture1",
+        "soilmoisture2",
+        "soilmoisture3",
+        "soilmoisture4",
+        "soilmoisture5",
+        "soilmoisture6",
+        "soilmoisture7",
+        "soilmoisture8",
+        "soilmoisture9",
+        "soilmoisture10",
+        "soilmoisture11",
+        "soilmoisture12",
+        "soilmoisture13",
+        "soilmoisture14",
+        "soilmoisture15",
+        "soilmoisture16",
+    ),
     "co2_ppm": ("co2", "co2in", "co2_ppm"),
 }
 
@@ -114,18 +157,34 @@ def normalize_metrics(payload: Dict[str, Any]) -> Dict[str, Optional[float]]:
     """Map known EcoWitt fields into Verdant canonical metric names.
 
     Unknown / missing / malformed values become ``None`` so downstream
-    code can flag them — they are never treated as healthy.
+    code can flag them — they are never treated as healthy. Extra grow
+    channels (temp2f…temp8f, humidity2…8, soilmoisture3+) are accepted
+    onto the same canonical names when earlier candidates are absent.
     """
     metrics: Dict[str, Optional[float]] = {}
+    # Case-insensitive key lookup so gateway firmware casing variants still map.
+    lower_payload = {str(k).lower(): v for k, v in payload.items()} if isinstance(payload, dict) else {}
     for canonical, candidates in FIELD_MAP.items():
         value: Optional[float] = None
         for key in candidates:
-            if key in payload:
-                value = _coerce_float(payload[key])
+            if key.lower() in lower_payload:
+                value = _coerce_float(lower_payload[key.lower()])
                 if value is not None:
                     break
         metrics[canonical] = value
     return metrics
+
+
+def is_stuck_zero_or_hundred_pct(value: Optional[float]) -> bool:
+    """True when RH/soil is stuck at the impossible healthy extremes."""
+    return value is not None and value in (0.0, 100.0)
+
+
+def metrics_force_invalid_source(metrics: Dict[str, Optional[float]]) -> bool:
+    """Stuck humidity/soil at 0 or 100 must not remain a healthy source."""
+    return is_stuck_zero_or_hundred_pct(
+        metrics.get("humidity_percent")
+    ) or is_stuck_zero_or_hundred_pct(metrics.get("soil_moisture_pct"))
 
 
 def parse_ecowitt_dateutc(value: Any) -> Optional[str]:
@@ -1017,6 +1076,9 @@ def ecowitt() -> Any:
         env_mode=None,
         now=request_now,
     )
+    # Stuck RH/soil at 0 or 100 must never remain healthy live/demo/stale.
+    if metrics_force_invalid_source(metrics):
+        source = "invalid"
     physical_gateway_evidence = _has_physical_gateway_evidence_from_validated(
         raw, request.remote_addr, gateway_captured_at
     )

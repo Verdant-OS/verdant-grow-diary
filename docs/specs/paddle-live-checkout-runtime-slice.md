@@ -7,21 +7,19 @@
 **Slice owner:** unassigned — needs one owner and a **different** peer as independent
 reviewer per `AGENTS.md`. This is a billing surface; the owner cannot review it.
 
-> **Revision 8 (2026-08-25).** Seven review rounds — Copilot (7) and Codex (3, then 3, then 2,
-> then 2, then 2, then 2 more). **All twenty-one findings were correct; one is conceded as an
-> open gap, not fixed.** Revision 7 made §3.2's deferred residual mandatory within Stage C and
-> removed the retired `Upgrade.tsx` from live scope. Revision 8 responds to parent commit
-> #1127 landing on the base branch mid-review: §2.4.1's premise that Lovable injects the live
-> token at publish is now stale — #1127's `restore-env-production-from-head.mjs` runs first in
-> `prebuild` and unconditionally restores `.env.production` from `HEAD`, so getting a live
-> token into production now requires **committing it directly** (new §6 item 0), not relying on
-> a publish-time injection this fix neutralized. The second revision-8 finding — that "switch
-> ALL of Stage B atomically" names a cross-platform cutover (Lovable, Supabase, Paddle) with no
-> executable mechanism specified anywhere in this repository — is **conceded as a real,
-> unresolved gap**, flagged alongside Stage A's already-acknowledged one rather than designed
-> here; inventing a deployment protocol in response to a review comment would repeat the
-> mistake this document's own §10 record warns against. Full record in §10 — read it before
-> citing any earlier revision.
+> **Revision 9 (2026-08-25).** Eight review rounds — Copilot (7) and Codex (3, then 3, then 2,
+> then 2, then 2, then 2, then 2 more). **All twenty-three findings were correct; one (revision
+> 8's cutover-mechanism finding) is conceded as an open gap, not fixed.** Revision 8 responded
+> to parent commit #1127 landing mid-review: the live token must now be committed directly to
+> `.env.production` (§6 item 0), since publish-time injection no longer reaches the shipped
+> bundle. Revision 9 fixes two more, both self-inflicted by earlier revisions' own edits: §8
+> still listed the §3.2 build guard as out of scope after revision 7 made it mandatory two
+> sections earlier, and §2.1's "no server-code change" claim missed that `get-paddle-price`
+> and the legacy `paddle-webhook` read identical flat `PADDLE_PRICE_*` variables for three of
+> seven plans — switching those to live IDs as originally written would have silently broken
+> sandbox audit-event classification for `pro_monthly`, `pro_annual` and `founder_lifetime`.
+> Both closed with environment-scoped variables and a new regression test (16), not a design
+> change. Full record in §10 — read it before citing any earlier revision.
 
 > **Read `docs/paddle-paid-launch-runbook.md` first.** It predates this spec and already
 > governs the live transition. Revision 1 of this document did not cite it — a research
@@ -104,7 +102,7 @@ A, not assumed away by the word "atomically."
 
 `established fact` unless labelled. Every line reference verified at `823f4c8f0`.
 
-### 2.1 The server is already live-capable — no change needed
+### 2.1 The authorization server is already live-capable — corrected in revision 9 (Codex P2)
 
 `supabase/functions/_shared/unionEntitlementLookup.ts:52-63` and `:84-97` resolve the
 billing environment correctly and already support live:
@@ -114,7 +112,15 @@ billing environment correctly and already support live:
 - Ambiguous or absent config fails closed to `sandbox` — never overgrants live.
 - Never derived from request body or query, so a spoofed `billing_env` cannot flip it.
 
-**The spec proposes no server-code change.** The live switch is configuration, not code.
+**"No server-code change" was too broad and is narrowed here — the entitlement
+authorization logic above needs none, but the price-ID catalog does; see §6 item 3.**
+`get-paddle-price/index.ts` and the legacy `paddle-webhook/index.ts` currently read the
+**identical** `PADDLE_PRICE_PRO_MONTHLY` / `PADDLE_PRICE_PRO_ANNUAL` /
+`PADDLE_PRICE_FOUNDER_LIFETIME` variables from one flat, environment-unaware config object
+each. Repointing those three variables at live IDs for `get-paddle-price` would silently
+break `paddle-webhook`'s sandbox price-ID classification for the same three plans, since it
+reads the same names. Closing that gap needs a small, mechanical edge-function change —
+environment-scoped variable names, not new business logic — detailed in §4 and §6.
 
 ### 2.2 The client has SIX sandbox-only runtime gates in live scope, not one
 
@@ -368,8 +374,9 @@ unchanged.
 | `scripts/e2e/managed-session-materialize-core.mjs`            | **Mandatory** (§2.4): re-point `evaluatePublicPaddleBundle` at the new policy, keeping an equal-strength assertion                                                                                                                                                                                                                                                                                                                                                            |
 | `.github/workflows/quicklog-smoke.yml`                        | **Mandatory, and the harder half — see §2.4.1.** The workflow, not the evaluator, is where the expected token comes from                                                                                                                                                                                                                                                                                                                                                      |
 | `scripts/assert-paddle-production-sandbox.mjs`                | **Mandatory — see §3.2, added in revision 7.** Extend to fail the build when the server-side `PAYMENTS_ENVIRONMENT` is (or is being switched to) live and the production client token is not live-class, closing the broken-hybrid gap §3.2 previously deferred                                                                                                                                                                                                               |
+| `supabase/functions/get-paddle-price/index.ts`                | **Mandatory — added in revision 9 (Codex P2), see §2.1 and §6 item 3.** Read environment-scoped price-ID variables (new live-scoped names) instead of the flat `PADDLE_PRICE_*` set `paddle-webhook` also reads, so switching `get-paddle-price` to live catalog IDs cannot silently break the legacy sandbox audit lane's price-ID classification. Mechanical: no authorization-logic change                                                                                 |
 
-No schema. No migration. No RLS. No edge-function code change. No new route.
+No schema. No migration. No RLS. **One small, mechanical edge-function change (§2.1, §6 item 3)** — no new business logic. No new route.
 
 ## 5. Tests
 
@@ -403,10 +410,15 @@ Every existing fence gets a same-strength replacement. New coverage:
     §3.2 identifies (sandbox client, live server catalog) — and still passes for every
     already-covered combination (§3.2, added in revision 7, Codex P1) — prove RED before the
     fix
+16. **`get-paddle-price` reads its live-scoped price-ID variables independently of the flat
+    `PADDLE_PRICE_*` names** — and `paddle-webhook`'s sandbox price-ID classification for
+    `pro_monthly`, `pro_annual` and `founder_lifetime` is unaffected by the live-scoped
+    variables being set — regression, proving the legacy audit lane survives Stage C
+    (§2.1, §6 item 3, added in revision 9, Codex P2) — prove RED before the fix
 
-Prove 1, 2, 3, 7, 8, 10, 11, 12, 13 and 15 **RED before the fix** and put the failing count in
-the PR body, per `AGENTS.md`. Tests 12, 13 and 15 are the Hard Safety / paid-without-
-entitlement fences — none may ever be skipped.
+Prove 1, 2, 3, 7, 8, 10, 11, 12, 13, 15 and 16 **RED before the fix** and put the failing
+count in the PR body, per `AGENTS.md`. Tests 12, 13, 15 and 16 are the Hard Safety /
+paid-without-entitlement / audit-continuity fences — none may ever be skipped.
 
 ## 6. Owner-gated prerequisites (Stages A and C — none of this is agent work)
 
@@ -440,10 +452,22 @@ sandbox-client / live-catalog hybrid §1 and §7 both reject.
    used by `paddle-webhook`. Configuring only that leaves the write-back endpoint returning
    `webhook_secret_not_configured` — recreating the paid-without-entitlement failure this
    whole sequence exists to prevent.
-3. Live price IDs: `PADDLE_PRICE_PRO_MONTHLY`, `PRO_ANNUAL`, `CRAFT_MONTHLY`,
-   `CRAFT_ANNUAL`, `FOUNDER_LIFETIME`, `CREDIT_PACK_50`, `CREDIT_PACK_150`
-   (`supabase/functions/get-paddle-price/index.ts:49-55`). Live catalog IDs differ from
-   sandbox; unset values return `price_not_configured` and checkout blocks calmly.
+3. Live price IDs. **Corrected in revision 9 (Codex P2) — not the same flat variable names
+   used today.** `get-paddle-price/index.ts:49-55` currently reads `PADDLE_PRICE_PRO_MONTHLY`,
+   `PRO_ANNUAL`, `CRAFT_MONTHLY`, `CRAFT_ANNUAL`, `FOUNDER_LIFETIME`, `CREDIT_PACK_50`,
+   `CREDIT_PACK_150` — one flat, environment-unaware set. The legacy `paddle-webhook`
+   (`index.ts:63-67`) reads the **identical names** for three of the seven
+   (`PADDLE_PRICE_PRO_MONTHLY`, `_PRO_ANNUAL`, `_FOUNDER_LIFETIME`) to classify **incoming
+   sandbox** events by price ID (`index.ts:266-288`). Repointing those three at live IDs, as
+   originally written here, would make every legitimate sandbox audit event for those three
+   plans resolve to `unknown_price_id` and be dropped — silently breaking the operator-audit
+   lane §2.5 and §6.1 both say must remain functional, while `craft_monthly`, `craft_annual`
+   and the two credit packs have no such collision (`paddle-webhook` never reads those four).
+   **Introduce environment-scoped variable names** (e.g. a dedicated live-scoped set) for
+   `get-paddle-price`'s Stage C configuration; the existing flat names keep their current
+   values, so `paddle-webhook`'s sandbox mappings are untouched. See §2.1 and the new §4 row
+   for `get-paddle-price/index.ts`. Unset live values return `price_not_configured` and
+   checkout blocks calmly, unchanged from today.
 4. `payments-webhook` endpoint registered in the **live** Paddle dashboard with `?env=live`.
 5. Notification destinations and monitoring, per the runbook.
 6. **Stage D** (after the atomic Stage C switch, never before it): one real low-value
@@ -469,11 +493,14 @@ the code half.
 ## 8. Out of scope
 
 `PaywallCta`; new plan gates in JSX; `profiles.tier` (never
-billing); `paddle-webhook`'s sandbox-only gate (§2.5 — correct, leave it); the §3.2
-production-with-sandbox-token signal; schema, RLS, migrations; publishing.
+billing); `paddle-webhook`'s sandbox-only gate (§2.5 — correct, leave it); schema, RLS,
+migrations; publishing.
 
-**No longer out of scope:** buyer-facing checkout trust copy. Revision 3 excluded it; §3.5
-brings it in as Hard Safety scope.
+**No longer out of scope:** buyer-facing checkout trust copy — revision 3 excluded it, §3.5
+brings it in as Hard Safety scope. **The §3.2 production-with-sandbox-token signal —
+corrected in revision 9 (Codex P2), it was left listed here after revision 7 made it
+mandatory scope**, contradicting the new §4 row and RED-first test 15 two sections earlier
+in the same document. Removed from this list.
 
 ## 9. Verdict
 
@@ -597,3 +624,21 @@ deliberately **not** fixed the way 1–20 were — Codex asked for a specified c
 and inventing one now would be exactly the kind of design-by-reviewer-comment this document
 warns against elsewhere (§1's own treatment of Stage A). It is recorded as a conceded,
 open gap for whoever owns Stage C's implementation, on the same footing as Stage A.
+
+### Revision 9 — Codex, 2 findings, both correct
+
+| #   | Finding                                                                                                                                                                                                                                                                                                                             | Disposition                                                                                                                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 22  | **P2.** §8 still listed "the §3.2 production-with-sandbox-token signal" as out of scope, contradicting revision 7's own change two sections earlier — a mandatory §4 file-level-plan row and RED-first test 15 for the exact same case                                                                                              | **Conceded.** Removed from §8's out-of-scope list; the two sections now agree                                                                                 |
+| 23  | **P2.** §6 item 3 and §2.1's "no server-code change" claim missed that `get-paddle-price` and the legacy `paddle-webhook` read the identical flat `PADDLE_PRICE_PRO_MONTHLY`/`_PRO_ANNUAL`/`_FOUNDER_LIFETIME` variables; repointing them at live IDs would silently break sandbox audit-event classification for those three plans | **Conceded.** §2.1 narrowed; §6 item 3 requires environment-scoped variable names instead; new §4 row for `get-paddle-price/index.ts`; new regression test 16 |
+
+**Twenty-three findings across eight rounds, twenty-three correct.** Finding 22 is
+self-inflicted — a direct consequence of fixing §3.2 in revision 7 without checking every
+place that referenced the old framing. Counted precisely rather than asserted: this is the
+**third** named instance of "fixed the pointed-at instance, not the class" in this record
+(finding 13, then finding 14 citing it explicitly, now this one) — worth naming as a count
+rather than a round number, since an approximate one would repeat the exact failure mode it
+describes. Finding 23 retracts this document's "no server-code change" claim for the first
+time — a small, mechanical fix, but a reminder that a blanket scope claim this far into a
+document's own audit is still worth reading skeptically instead of trusting the summary
+line.

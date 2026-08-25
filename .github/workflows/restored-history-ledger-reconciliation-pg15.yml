@@ -1,0 +1,84 @@
+name: Restored history ledger reconciliation PG15
+
+on:
+  pull_request:
+    paths: &restored_history_ledger_reconciliation_paths
+      - "scripts/run-restored-history-ledger-reconciliation-pg15-harness.mjs"
+      - "scripts/reconcile-restored-history-ledger.mjs"
+      - "config/restored-history-ledger-reconciliation.json"
+      - "supabase/tests/restored_history_ledger_reconciliation.sql"
+      - ".github/workflows/restored-history-ledger-reconciliation-pg15.yml"
+      - ".github/workflows/reconcile-restored-history-ledger.yml"
+      - "src/test/restored-history-ledger-reconciliation-pg15-harness.test.ts"
+      - "src/test/reconcile-restored-history-ledger.test.ts"
+  push:
+    branches:
+      - verdant-grow-diary
+    paths: *restored_history_ledger_reconciliation_paths
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  pg15_runtime:
+    name: PostgreSQL 15 ledger reconciliation runtime contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: verdant-runtime-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RESTORED_HISTORY_LEDGER_RECONCILIATION_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/postgres
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+
+      - name: Create disposable PostgreSQL harness sentinel
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i \
+            -e PGHOST=127.0.0.1 \
+            -e PGPORT=5432 \
+            -e PGUSER=postgres \
+            -e PGPASSWORD=verdant-runtime-only \
+            -e PGDATABASE=postgres \
+            "$POSTGRES_CONTAINER" \
+            psql -X -q -v ON_ERROR_STOP=1 --single-transaction --file=- <<'SQL'
+          create schema verdant_restored_history_ledger_reconciliation_harness
+            authorization postgres;
+          revoke all on schema verdant_restored_history_ledger_reconciliation_harness
+            from public;
+          create table
+            verdant_restored_history_ledger_reconciliation_harness.runtime_sentinel (
+              sentinel text primary key
+            );
+          revoke all on table
+            verdant_restored_history_ledger_reconciliation_harness.runtime_sentinel
+            from public;
+          insert into
+            verdant_restored_history_ledger_reconciliation_harness.runtime_sentinel(sentinel)
+          values ('verdant_restored_history_ledger_reconciliation_pg15_disposable_v2');
+          SQL
+
+      - name: Run isolated PostgreSQL 15 harness
+        env:
+          RESTORED_HISTORY_LEDGER_RECONCILIATION_PG15_CONTAINER: ${{ job.services.postgres.id }}
+        run: node scripts/run-restored-history-ledger-reconciliation-pg15-harness.mjs

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "tool": "reconcile-restored-history-ledger",
+  "target": {
+    "environment": "production",
+    "project_ref": "knkwiiywfkbqznbxwqfh",
+    "database": "postgres"
+  },
+  "candidate": {
+    "repository": "Verdant-OS/verdant-grow-diary",
+    "pr_number": 1113
+  },
+  "access_contract": {
+    "read_relations": ["pg_catalog.*", "supabase_migrations.schema_migrations"],
+    "write_relations": ["supabase_migrations.schema_migrations"],
+    "application_row_access": "forbidden"
+  },
+  "reconciliations": [
+    {
+      "version": "20260710003638",
+      "name": "pheno_hunt_setup_backfill",
+      "source_path": "supabase/migrations/20260710003638_pheno_hunt_setup_backfill.sql",
+      "source_sha256": "8945dbff9369d88ecad8d9a19c19cbb30d7c5a415107662e6b9203dfb84c5c4e",
+      "proof": "catalog_only",
+      "reason": "The live Pheno constraint and setup-completed comment already match the safe final catalog. Recording this restored version prevents its unsafe late UPDATE from overwriting grower-cleared setup state; it does not claim that the historical backfill ran."
+    },
+    {
+      "version": "20260710013255",
+      "name": "staff_role_grant_trigger_and_backfill",
+      "source_path": "supabase/migrations/20260710013255_staff_role_grant_trigger_and_backfill.sql",
+      "source_sha256": "8b443cc919ba4a74f02059e98d0c8f5743ba5a3bb97569a1e16d046ed7f90850",
+      "proof": "shifted_ledger_and_catalog",
+      "canonical_ledger_witness": {
+        "version": "20260709015800",
+        "name": "20260709015758_d49efeac-492c-4f7b-9746-3638f44fa287"
+      },
+      "reason": "Production records the canonical allowlist migration under a shifted ledger identity and the live function and triggers match that canonical catalog. Recording this restored version prevents its unsafe late staff backfill from resurrecting deliberately revoked roles."
+    },
+    {
+      "version": "20260725033124",
+      "name": "core_schema_forward_repair",
+      "source_path": "supabase/migrations/20260725033124_core_schema_forward_repair.sql",
+      "source_sha256": "c1c9fde7176c1e60b044a9d83a9f4ccfc4745163d5ab2d218fbd080ece40e36b",
+      "proof": "catalog_only",
+      "reason": "The live twelve-argument Quick Log writer matches the canonical dual-timestamp catalog. Recording this restored version prevents the older repair body from replacing that function before the forward convergence migration runs; it does not claim a missing canonical ledger version exists."
+    }
+  ]
+}

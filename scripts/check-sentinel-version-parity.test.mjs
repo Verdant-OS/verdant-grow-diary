@@ -298,6 +298,23 @@ test("fails when CURRENT_STATE.md is re-added as an automatic import", () => {
   assert.match(result.stderr, /CLAUDE\.md: the first two lines must import/);
 });
 
+test("fails when CURRENT_STATE.md is appended as a third import after the required prefix", () => {
+  const root = makeFixture();
+  // The two required lines stay first, so startsWith still holds — only the explicit
+  // reject-anywhere rule can catch this placement.
+  replace(
+    root,
+    "CLAUDE.md",
+    "@AGENTS.md\n@docs/agents/roles/claude.md",
+    "@AGENTS.md\n@docs/agents/roles/claude.md\n@docs/agents/CURRENT_STATE.md",
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /must not be imported automatically/);
+});
+
 test("fails when the legacy archive loses its inactive header", () => {
   const root = makeFixture();
   replace(

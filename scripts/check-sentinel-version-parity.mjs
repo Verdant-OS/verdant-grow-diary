@@ -223,6 +223,18 @@ if (claudeText && !claudeText.startsWith(CLAUDE_IMPORTS)) {
   );
 }
 
+// startsWith alone would accept the CURRENT_STATE import re-added as a third line — or
+// anywhere later in the file — since the required prefix still holds. That would silently
+// restore the ~27,400-token automatic import on every turn. Reject the @-import line
+// outright wherever it appears; the on-demand read (asserted below) replaced it.
+if (claudeText && /^@docs\/agents\/CURRENT_STATE\.md[ \t]*$/m.test(claudeText)) {
+  problems.push(
+    "CLAUDE.md: @docs/agents/CURRENT_STATE.md must not be imported automatically. The " +
+      "import was replaced by an on-demand read (#1094); remove the @ line wherever it " +
+      "appears — appending it after the required two-line prefix is still a violation",
+  );
+}
+
 // CURRENT_STATE.md is read on demand rather than imported, so these written imperatives
 // are the only thing keeping operating state in front of an agent. Nothing else in the
 // governance set carries branch, production, migration, blocker or assignment facts.

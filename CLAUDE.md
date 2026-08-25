@@ -12,7 +12,7 @@ suggestions.
 **`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file tool
 before you acknowledge.** It is still the third required context file and nothing about
 its authority has changed. Measured 2026-08-21 at 153,142 bytes / ~27,400 tokens, it was
-27.7% of the whole memory chain and 19.1% of every context window, re-sent on every turn
+68.9% of the whole memory chain and 19.1% of every context window, re-sent on every turn
 of every session whether or not that session touched operating state. It is also the
 changing shift report, revised several times a day, so most of what it costs on any given
 turn is history that has already been superseded. Loading it on demand costs the same

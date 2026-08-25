@@ -1,6 +1,8 @@
 # Spec — resolving the `PADDLE_ENVIRONMENT` live-transition conflict
 
-**Status:** `PROPOSED — NOT APPROVED`. Specification only. No code in this slice.
+**Status:** **DECIDED AND IMPLEMENTED IN THIS PR.** Cheek chose **Option A (decouple the
+names)** on 2026-08-25. Both parts are implemented here; the spec is retained as the
+rationale of record.
 **Author:** Claude (specification architect)
 **Requested by:** Cheek, 2026-08-25, after #1125 flagged the conflict without resolving it.
 **Measured at:** deploy tip `5e75a3a3a`, 2026-08-25 ~21:35 UTC.
@@ -126,9 +128,21 @@ code path, not observed in a live transition, because none has occurred.
 | B     | Retire the BYO stack                                                                                                                                                                                          | Removes the whole class of conflict permanently              | Large: three operator pages, their tables, migrations, and their tests. Its own slice                                                                                      |
 | C     | Accept the degradation                                                                                                                                                                                        | No work now                                                  | The audit lane silently loses plan classification at live. Requires **explicit** owner acceptance and a recorded `NOT_MEASURED` → known-loss entry; never a silent default |
 
-A is recommended because it is small, reversible, and preserves a surface the header says
-is still actively read. **This spec does not choose** — B and C are legitimate if you intend
-to retire the BYO stack anyway.
+**Cheek chose Option A on 2026-08-25 and it is implemented in this PR.** B and C remain
+legitimate later: if the BYO stack is retired, `paddleSandboxPriceConfig.ts` and its
+sandbox-scoped secrets go with it.
+
+**As built.** `supabase/functions/_shared/paddleSandboxPriceConfig.ts` is a pure resolver
+taking `getEnv`. Resolution is **all-or-nothing**: if any `PADDLE_SANDBOX_PRICE_*` name is
+set, that set is used exclusively and unset keys resolve to `""` rather than borrowing the
+legacy value; otherwise it falls back wholly to `PADDLE_PRICE_*`, so nothing changes before
+the new secrets exist. All-or-nothing was chosen over per-key fallback because a partly
+configured sandbox set would otherwise silently mix live ids into the unset keys — the exact
+failure this slice removes. An unmatched price id still yields `null` downstream, which is
+the pre-existing safe behaviour for an unknown price.
+
+The `PADDLE_ENVIRONMENT` gate and its three static fence tests were **not touched**; all
+three were re-run green after the change.
 
 ---
 
@@ -175,7 +189,7 @@ The `PADDLE_ENVIRONMENT` gate itself and its three static tests; `payments-webho
 `PAYMENTS_ENVIRONMENT`; the client resolver and the live-checkout slice
 (`docs/specs/paddle-live-checkout-runtime-slice.md`); schema, RLS, migrations; publishing.
 
-## 8. Verdict
+## 8. Verdict — as decided
 
 **The conflict as reported is a documentation defect with a one-line fix, and reporting it
 that way would be incomplete.** The runbook line is stale and provably so from the runbook's

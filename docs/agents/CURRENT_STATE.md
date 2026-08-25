@@ -2840,6 +2840,22 @@ bind, and are repeated here so this row is not safe to quote alone:
 
 ---
 
+### PR #1125 — owner and independent reviewer (assigned 2026-08-25 by Cheek)
+
+| Role                      | Agent                                                   |
+| ------------------------- | ------------------------------------------------------- |
+| Owner                     | **Claude** (`claude/verdant-architecture-audit-6qe80x`) |
+| Independent peer reviewer | **Grok**                                                |
+
+Cheek named Grok as the independent reviewer for this slice on 2026-08-25 and authorized
+merge once the required checks are green. Recorded here because **there is no Grok GitHub
+account on this repository** — `cheekhimself` is its only collaborator, so a GitHub
+`requested_reviewers` entry cannot be created and Grok's reviews reach the PR relayed by
+Cheek, as they did on #1092. This row, not a GitHub field, is the `AGENTS.md` reviewer seat.
+
+The owner did not review their own slice: the fourteen findings corrected on this branch came
+from Copilot and Codex, and are recorded in the spec's §10 correction record.
+
 ## Agents currently assigned
 
 | Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |

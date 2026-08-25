@@ -289,6 +289,29 @@ test("fails when the imperatives survive only inside a fenced example and a bloc
   assert.match(result.stderr, /exact startup step-1 read .* is missing/);
 });
 
+test("fails when the imperatives survive only inside a tilde fence and an HTML comment", () => {
+  const root = makeFixture();
+  // Same bypass class as the backtick-fence test, via the other CommonMark fence
+  // delimiter and an HTML comment — both non-operative contexts the parser must strip.
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_INSTRUCTION, "Operating state is optional now.");
+  replace(
+    root,
+    "CLAUDE.md",
+    CLAUDE_STATE_READ_STEP,
+    "1. Skip straight to acknowledging.\n\n" +
+      "~~~text\n" +
+      `${CLAUDE_STATE_READ_INSTRUCTION}\n` +
+      "~~~\n\n" +
+      `<!-- ${CLAUDE_STATE_READ_STEP} -->`,
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /exact pre-ack read instruction .* is missing/);
+  assert.match(result.stderr, /exact startup step-1 read .* is missing/);
+});
+
 test("passes when the read instruction is merely re-wrapped across different lines", () => {
   const root = makeFixture();
   // Whitespace-normalized comparison: a prose re-wrap must not read as a violation.

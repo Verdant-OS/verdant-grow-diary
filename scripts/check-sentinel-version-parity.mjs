@@ -114,7 +114,8 @@ function normalizeWhitespace(text) {
 }
 
 /**
- * Operative prose only: fenced code blocks and blockquoted lines removed. A pinned
+ * Operative prose only: fenced code blocks (backtick and tilde), HTML comments, and
+ * blockquoted lines removed. A pinned
  * imperative retained solely inside a fenced "obsolete example" or a quoted historical
  * copy is not an instruction to the reader, so the pins must appear in what remains.
  * Inline code spans stay — the operative sentences themselves carry the pathname in
@@ -123,10 +124,23 @@ function normalizeWhitespace(text) {
 function operativeProse(text) {
   return text
     .replace(/```[\s\S]*?```/g, "")
+    .replace(/~~~[\s\S]*?~~~/g, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
     .split("\n")
     .filter((line) => !/^\s*>/.test(line))
     .join("\n");
 }
+
+/*
+ * Known residual, accepted deliberately: a copy inside a 4-space-indented code block
+ * (outside a list) or after an unclosed fence would still read as operative here.
+ * Stripping indented lines is not safe — CLAUDE.md's own operative step list uses
+ * indented continuation lines, and in list context 4-space indentation is prose, not
+ * code; a regex cannot tell the two apart without a real Markdown parser. The
+ * compensating control is unchanged: any such edit to CLAUDE.md still trips BUMP and
+ * lands in front of a human reviewer as a diff. This gate is a tripwire, not the only
+ * defense.
+ */
 
 const LEGACY_ARCHIVE = "docs/archive/legacy/verdant-master-prompt-legacy.md";
 const LEGACY_HEADER = `> LEGACY — NOT ACTIVE AGENT INSTRUCTIONS

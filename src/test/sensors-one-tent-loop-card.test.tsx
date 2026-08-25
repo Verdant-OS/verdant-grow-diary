@@ -104,6 +104,9 @@ describe("Sensors One-Tent Loop next-step card wiring", () => {
     );
     expect(src).toContain('current="sensor-snapshot"');
     expect(src).toContain('testId="sensors-one-tent-loop-next-step-card"');
+    // Re-emit UUID intent only — no plant-row resolution on Sensors.
+    expect(src).toContain("plantId: carriedPlantIntentId");
+    expect(src).toContain("readSensorsPlantRouteIntent");
     // Page must not silently classify unknown telemetry as healthy.
     expect(src.toLowerCase()).not.toMatch(/unknown.*healthy|invalid.*healthy|stale.*healthy/);
   });

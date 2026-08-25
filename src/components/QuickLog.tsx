@@ -1559,7 +1559,7 @@ export default function QuickLog({
             useQuickLogActivitySave and dispatches
             verdant:entry-created only on confirmed success. */}
         <QuickLogAllActivitiesSection
-          growId={resolvedTarget?.growId ?? null}
+          growId={resolvedTarget?.growId ?? activeGrow?.id ?? null}
           tentId={resolvedTarget?.tentId ?? null}
           plantId={resolvedTarget?.plantId ?? null}
           externalPersistenceBlockReason={

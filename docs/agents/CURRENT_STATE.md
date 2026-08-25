@@ -1,6 +1,164 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-21 UTC (~15:23 UTC / 10:23 AM CT)
+**Last updated:** 2026-08-23 UTC (~17:15 UTC)
+**Updated by:** Claude (2026-08-23, PR #1093 review round: **the 2026-08-22
+project-identity downgrade in the "Function default-privilege exposure"
+section overcorrected, and two further defects in that same section are
+fixed.** Raised by Codex review on PR #1093, verified against primary
+sources before accepting.
+
+The 2026-08-22 correction said this file "has never recorded a checked
+mapping" from Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db` to
+Supabase ref `knkwiiywfkbqznbxwqfh` — false. `docs/LOCAL_SUPABASE_SETUP.md`
+and `docs/signup-attribution-outage-operator-runbook.md:61-64` both record
+that exact mapping, dated 2026-08-13, attributed, and operationally
+confirmed by the signup-attribution fix this file's own RESOLVED section
+verified worked in production. The 66/76 and 3/76 counts are restored to
+`established fact` about production. Full account:
+"Correction (2026-08-23)" under "Function default-privilege exposure."
+
+Also fixed in the same pass: a self-contradiction (this file's own ~15:23
+UTC entry already said the signup readiness RPC has `service_role=X`, while
+a later paragraph in the same section claimed it did not — only
+`handle_new_user` actually lacks the exposure, and it has a mundane
+explanation: an already-hardened function survived a later body replacement,
+which `CREATE OR REPLACE FUNCTION` is expected to do); and an unproven "by
+default" attribution (`has_function_privilege` cannot distinguish a default
+grant from an explicit one, and 2 of the 66 are proven explicit grants from
+their own defining migrations). Neither finding changes any table, function,
+grant, or default privilege — docs-only, same as the section it corrects.
+Prior header follows.)
+
+**Prior update:** 2026-08-23 UTC (02:09 UTC)
+**Updated by:** Claude (2026-08-22, review round: **the payments-token severity was
+INVERTED and is corrected.** An earlier revision said production "is running **live**
+payments". It is not. At the served SHA a `live_` token resolves to `unavailable`
+(`src/lib/paddleEnvironment.ts`; confirmed in the shipped bundle's minified resolver),
+so checkout is **disabled** — a checkout-blocking configuration and provenance defect,
+not an unnoticed live billing surface. The publish risk flips with it: a live → test
+swap **restores** sandbox checkout rather than breaking anything. Raised by Copilot,
+verified in source and bundle before conceding.
+
+Also withdrawn the same round, after a further P2: **"the shipped bundle came from
+neither `.env.production` file"** — both files were read AFTER deployment, so a
+workspace file carrying a `live_` value at build time and restored afterwards is
+excluded by nothing measured. Two build-time candidates are now recorded, with a
+direction not to discard the second.
+
+**Sixth review finding of the round, and the sixth correct one.** #1092 merged at
+17:55:57 UTC from head `fcf400ec7` while a fix for it was queue-locked (`GH006`), so
+this follow-up carries it: the over-claim "the file demonstrably is not what produced
+the current bundle" **survived the earlier correction in a second sentence of the same
+section**, contradicting candidate 2 that the section itself says not to discard. That
+is the failure mode named two corrections earlier — fixing the pointed-at instance
+rather than the class — so this pass swept the whole file, and the only remaining
+occurrences are inside withdrawal notes quoting the withdrawn text.
+
+Tip and lag re-measured 2026-08-23 02:09 UTC: tip `a3ae36765` (#1105), publish lag
+**12**; production still serves `faea6e9c59ad`, **unchanged since 2026-08-22 16:16
+UTC — nearly ten hours with no republish**, while the tip advanced seven times in the
+same span. Read which half moved before drawing any conclusion from the widening
+number.
+
+Same round, from Codex and Copilot findings: the hand-maintained publish count
+(four → **five**), the #1076 gate row (**re-queried**, not carried forward), the
+`/version.json` row's own date (was 2026-08-21 while neighbouring rows quoted
+2026-08-22 readings of the same endpoint), and a malformed markdown quotation.
+Prior header follows.)
+
+**Prior update:** 2026-08-22 UTC (17:10 UTC)
+**Updated by:** Claude (2026-08-22, later edit: records the **#1092 owner/reviewer
+pairing** in the architecture-audit section, per `HANDOFF_PROTOCOL.md:25` — Cheek
+named **Grok (GDP)** as independent peer reviewer on the PR at 17:09 UTC and marked
+it ready for review in the same minute. No agent performed either transition, and a
+_named_ seat is not a _discharged_ one. Also flags that the MACAE row lower in this
+file names Grok for a **different** slice; do not collapse the two.
+
+Re-measured at 17:09–17:10 UTC because the base moved again while this was open:
+tip is now `fd2d3e3f7553` (#1100) and publish lag is **7** — production still serves
+`faea6e9c59ad`, unchanged since the 16:16 UTC reading. Prior header follows.)
+
+**Prior update:** 2026-08-22 UTC (16:16 UTC)
+**Updated by:** Claude (2026-08-22: **docs-only re-measurement.** Production
+republished overnight and the deploy tip moved six commits, so every perishable
+release row this file carries was stale in the same direction. Re-read first-hand at
+16:16 UTC: tip `93d8ea23ff58` (#1097); production serves `faea6e9c59ad` (#1087),
+`buildTime 2026-08-21T20:51:46.584Z`, `dirty: true`, `ref: "__orphan__"`,
+`treeHash 7d9cc8a12898`; ancestor of tip; publish lag **6**.
+
+**The post-#1090 provenance test finally had a build to run against, and it returned
+no information — which is the correct reading, not a disappointment.** `faea6e9c59ad`
+contains #1090, and its recomputed tree `436eede41e4b` still mismatches the stamped
+`7d9cc8a12898`. The record's own one-directional rule says persistence neither
+confirms nor refutes the #1090 candidate, because a workspace already dirtied stays
+dirty until reset. Do not report this as a refutation. The publisher's build log
+remains the only route that settles it, and stays owner-gated.
+
+**The live-class payments token survives the republish — and it FAILS CLOSED.**
+Severity corrected 2026-08-22 after review: a `live_` token resolves to
+`unavailable` in the served code, so production is taking **no** payments rather
+than live ones, and checkout is disabled. See the severity-correction block in the
+payments-token section. Re-measured against the new
+bundle `/assets/index-C-R0_Bat.js` (the path changed from `index-aTS7aKMk.js`, so
+this is a rebuild, not a cache): still `live_` class, body length 27, one distinct
+value, two occurrences — while the Lovable project `.env.production`, re-read in the
+same window per the owner's standing pre-publish instruction, still says `test_`. A
+build cycle did not reconcile them. **Publishing remains stopped by owner order**,
+and reading the env file is not a clearance: it said `test_` yesterday too, while
+production shipped `live_`.
+
+Touches this file only. Does **not** publish, does **not** apply
+`20260813030000` (the hard stop below is unchanged), does **not** re-measure
+GA4/GSC, Day 0, or migration state, and invents no metric. Prior header follows.)
+
+**Prior update:** 2026-08-21 UTC (function default-privilege investigation)
+**Updated by:** Claude (2026-08-21: investigation only — no code, migration, or
+production write in this edit. Recorded for Grok, who has been actively
+working this exact signup/production surface today (`20260821150000`,
+the RAISE LOG guard, the readiness RPC): before drafting any further
+service_role hardening, measured how widespread the class of gap
+`20260821064300` closed for one table actually is across every
+SECURITY DEFINER function in `public`. See the new subsection under
+"Second production drift" below for the full findings and the specific
+open question. Headline, evidence-labeled: `established fact` — 66 of 76
+SECURITY DEFINER functions in `public` currently grant `service_role`
+EXECUTE by default, and 3 grant `anon` EXECUTE (one an uninvokable trigger
+function; the other two look like an intentional public "founders wall"
+counter — `founders_seats_consumed`, `founders_wall_count` — worth one owner
+confirmation, not urgent).
+`uncertainty` — `20260807133000`'s own self-test fails if reproduced today
+against a fresh probe function, but two functions from Grok's own
+`20260821150000` migration do _not_ show the same exposure despite one of
+them never receiving an explicit `service_role` revoke. Left unresolved
+rather than guessed at. No fix proposed or applied.
+
+**2026-08-22 correction, added on PR #1093 in response to Grok's independent
+review:** the "production" attribution above is disputed, not confirmed — the
+measurement was against Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db`,
+which Grok's review says is a different, non-production project, contradicting
+two of Grok's own same-day entries elsewhere in this file that call the same
+id "production, not sandbox." See the correction under "Function
+default-privilege exposure" below for the full account. Every count above
+holds only as a claim about whichever database that id actually is; whether
+that is production is now `NOT_MEASURED`, downgraded from the `established
+fact` framing this block originally used.
+
+**Superseded 2026-08-23 — see the top of this file.** This downgrade
+overcorrected: two in-repo documents already record a checked, dated,
+attributed mapping from this Lovable project id to production Supabase ref
+`knkwiiywfkbqznbxwqfh`, which this paragraph should have found and cited
+instead of downgrading to `NOT_MEASURED`. The 66/76 and 3/76 counts are
+`established fact` about production again — but "by default" in the
+headline just above is not: `has_function_privilege` proves effective
+access, not provenance, and 2 of the 66 are proven explicit grants. Also
+flagged: the committed migration for `founders_guard_immutables()` (one of
+the 3 in the `anon` set) does not declare `SECURITY DEFINER`, so it should
+not satisfy the query's own `p.prosecdef = true` filter — either the live
+function differs from its migration (unrecorded drift) or this list has an
+error; not resolved. See "Function default-privilege exposure" below for
+the full account of all three. Prior header follows.)
+
+**Prior update:** 2026-08-21 UTC (~15:23 UTC / 10:23 AM CT)
 **Updated by:** Grok (2026-08-21: **docs-only correction** — #1077 pinned
 production at `1400a7e77eff` and leftover Action Queue prose still said
 `20260813030000` was unapplied; both are now false on a fresh point-in-time
@@ -354,6 +512,381 @@ this migration and its predecessor define. No RLS, auth, or edge-function
 change. The frontend attribution code (`Landing.tsx` and the signup URL
 builder) was already deployed ahead of the repo per the original diagnosis
 above, and was not touched by this repair.
+
+---
+
+## 🔶 Function default-privilege exposure — measured, not yet actioned (2026-08-21)
+
+`practical observation`, measured 2026-08-21 by Claude via the same Lovable
+`query_database` read-only channel used elsewhere in this file, against
+Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db` — the same id two of
+Grok's own same-day entries above label "production, not sandbox," and the
+same id `docs/LOCAL_SUPABASE_SETUP.md` and
+`docs/signup-attribution-outage-operator-runbook.md:61-64` independently map
+to production Supabase ref `knkwiiywfkbqznbxwqfh`. **That identification was
+disputed by a 2026-08-22 review comment and briefly downgraded here; the
+2026-08-23 correction below restores it against the sourced mapping — read
+that correction, not the 2026-08-22 one, before citing any count in this
+section.** This is a coordination note, not a fix. Nothing here was changed,
+drafted, or applied — see "What this does and does not license" at the end.
+
+### Correction (2026-08-22) — the project-identity claim is disputed, not resolved
+
+Grok (GDP)'s independent review of this section, posted on
+[PR #1093](https://github.com/Verdant-OS/verdant-grow-diary/pull/1093), states
+that Lovable project `66255e7b-892c-4be5-8686-ab1cfc3666db` is **not** the
+production host — it names `knkwiiywfkbqznbxwqfh` as production instead (the
+same ref this file's "Second production drift" section and
+`scripts/lib/supabaseDatabaseTargetIdentity.mjs` use) — and says that id was
+previously "a sandbox / yield-analytics Lovable project."
+
+That contradicts, without reconciling, two of Grok's own entries earlier in
+this file dated the same day: the ~15:23 UTC block above ("production project
+`66255e7b-892c-4be5-8686-ab1cfc3666db` (not the sandbox)") and the "failure-safe
+guard live" block a few lines below it ("via Lovable `query_database` on
+production project `66255e7b-892c-4be5-8686-ab1cfc3666db` (production, not
+sandbox)"). This note followed that same, already-established convention
+rather than introducing a new claim.
+
+Neither side is verified here. **This file has never recorded a checked
+mapping between the Lovable _project_ id and the Supabase _database_ ref**
+`knkwiiywfkbqznbxwqfh` — every "production, not sandbox" label to date,
+including this note's, is a Lovable-UI-level assertion (which project the tool
+was pointed at), never cross-checked against the codebase's own
+identity source. Two attempts to resolve it via a metadata-only Lovable call
+(`get_project`, not `query_database` — chosen specifically to avoid the
+access question below) both timed out; not retried further.
+
+**Separately, the same review asserts a standing owner lock: "production
+`query_database` / enable_database on `knkwiiywfkbqznbxwqfh` is forbidden
+(Cheek / GDP 2026-08-21)."** That restriction does not otherwise appear
+recorded anywhere in this file. It is not disputed here, and no further
+Lovable production query was attempted while writing this correction — but it
+is also not yet independently corroborated in-repo. Whoever can confirm it
+(Cheek, or Grok citing where it was set) should record it directly in this
+file so it is citable on its own rather than through one review comment.
+
+**Net effect: every count in this section is `established fact` about
+whatever database `66255e7b-892c-4be5-8686-ab1cfc3666db` actually is, and
+`NOT_MEASURED` — not `established fact` — as a claim about production
+specifically**, until the project-id mapping above is actually checked and
+recorded. Read every "production" reference below with that downgrade
+applied; the text is left otherwise unchanged rather than silently rewritten,
+per this file's own practice of keeping withdrawn or disputed claims visible.
+
+### Correction (2026-08-23) — the 2026-08-22 correction overcorrected, and two further defects are fixed
+
+Raised by Codex review on this same PR (#1093); verified against primary sources
+before accepting rather than taken on the bot's word.
+
+**1. The project-identity `NOT_MEASURED` downgrade above was itself wrong.** It
+said "this file has never recorded a checked mapping between the Lovable
+project id and the Supabase database ref" — false.
+`docs/LOCAL_SUPABASE_SETUP.md`'s "Project identifiers" table (line 14) and
+`docs/signup-attribution-outage-operator-runbook.md`'s "Provenance" section
+(lines 61–64) both record exactly that mapping: Lovable project id
+`66255e7b-892c-4be5-8686-ab1cfc3666db` = Supabase ref
+`knkwiiywfkbqznbxwqfh`, because `query_database` "takes the Lovable UUID, not
+the host ref." The runbook's record is dated 2026-08-13, attributed ("Run by:
+Claude, during the pre-merge audit of #969"), and was the operational basis
+for the signup-attribution fix this file's own RESOLVED section later
+confirmed worked in production — this mapping has been acted on and its
+consequences independently verified, not merely asserted once.
+
+Grok's review comment that prompted the 2026-08-22 downgrade cites neither
+document. It rests on "GDP previously used `66255e7b…` as a sandbox /
+yield-analytics Lovable project," with no date or source given. Weighed
+against a dated, attributed, operationally-confirmed in-repo record, an
+uncited recollection does not carry it. **Restoring the 66/76 and 3/76
+counts to `established fact` about production**, per the mapping above. If
+Grok holds evidence this specific project was repointed or repurposed after
+2026-08-13 — the one theory that would reconcile both claims — that needs its
+own dated citation in this file, not a second uncited assertion; until then
+this is the governing record.
+
+**2. The "two functions... do not show the same exposure" uncertainty
+(in the default-privilege-mechanism subsection below, later renamed — see
+its own note) was a self-contradiction, not a
+discrepancy.** It named both `handle_new_user()` and
+`signup_acquisition_readiness_operator_snapshot()` as not showing
+`service_role` EXECUTE. But this file's own ~15:23 UTC measurement, recorded
+earlier in this same section, already says the opposite for the second
+function: "Readiness RPC **does** have `service_role=X` (default privileges
+leftover)" — which is not a discrepancy at all, it is exactly what the
+default-ACL theory predicts for a newly created function. Only
+`handle_new_user` actually lacks the exposure, and it has a mundane
+explanation the original text missed: it is a `CREATE OR REPLACE` of a
+function whose `service_role` EXECUTE was already explicitly revoked by the
+2026-08-21 ad-hoc supplement (captured afterward as `20260821064300`)
+_before_ `20260821150000` replaced its body — and `CREATE OR REPLACE
+FUNCTION` does not reset an existing grant back to the default ACL. There is
+no unexplained gap in the default-privilege mechanism; there is one
+already-hardened function whose hardening survived a later body replacement,
+exactly as expected.
+
+**3. The "66... grant `service_role` EXECUTE by default" headline conflates
+effective privilege with provenance — and this point's own first pass
+overclaimed too, corrected on a second Codex review round on this same PR
+before it even merged.** `has_function_privilege(role, function, 'EXECUTE')`
+reports only whether a role currently has the privilege, by any path — an
+explicit `GRANT`, `PUBLIC`, role inheritance, or an unrevoked default ACL —
+never which one. At least 2 of the 66,
+`supabase/migrations/20260719044601_4a9e443b-d980-4890-b85e-5ae6549a907f.sql:134`
+and
+`supabase/migrations/20260719052812_c25ba6a6-dcdb-40c7-9dbf-292b35af9150.sql:43-44`
+(`founders_wall_count()` and `founders_seats_consumed()`), have migrations
+that **explicitly, intentionally** `GRANT EXECUTE ... TO anon, authenticated,
+service_role` — that much is established fact about the migration source,
+and it does distinguish these two from a function whose access was never
+deliberately authored at all.
+
+**What that does not establish, on the corrected re-read: that the resulting
+ACL entry actually originated from the grant rather than already being
+present.** Both migrations `CREATE FUNCTION` first and `GRANT` several
+statements later (verified: line 125 then 134 in the `founders_wall_count`
+file). If the permissive default-ACL regime this section's own self-test
+shows is live today was already in effect on 2026-07-19 when these functions
+were created, `service_role` (and `anon`) EXECUTE would have landed on them
+automatically at `CREATE` time, before the explicit `GRANT` ever ran —
+making that `GRANT` a redundant restatement, not the origin. The final ACL
+cannot tell the two paths apart once both converge on the same entry, and
+whether that regime held as far back as July — three weeks before
+`20260807133000` even attempted to harden it — is itself unmeasured. So:
+**intentional authorization is established fact for these two; default-vs-
+explicit origin for them is `NOT_MEASURED`, same as the other 64.** The
+self-test still proves the default-ACL mechanism itself is live today; it
+proves nothing about how many of the 66 — these two included — actually got
+their `service_role` EXECUTE through it versus a grant that may have been
+redundant. That per-function provenance check (`aclexplode`/`pg_default_acl`,
+with creation-time evidence this repo does not have) was not done and stays
+open for all 66, no exceptions.
+
+**4. The third `anon`-set member does not check out against its own
+migration, raised by a separate Copilot review comment on this same PR.**
+`founders_guard_immutables()`'s only committed definition
+(`supabase/migrations/20260719044601_4a9e443b-d980-4890-b85e-5ae6549a907f.sql:74-78`)
+declares `RETURNS trigger LANGUAGE plpgsql` — no `SECURITY DEFINER` — and no
+later migration redefines it (grepped, zero other matches). The catalog query
+above filters on `p.prosecdef = true`, so this function should not have been
+in its result set at all. Two explanations are consistent with what's
+recorded and neither is confirmed: the live function differs from its
+migration (unrecorded drift, the same class of gap this whole file tracks
+elsewhere), or the original 3-function list is simply wrong about which
+function is the trigger. Left open rather than guessed at — this also means
+the "3 of 76" `anon` count itself, not just the "by default" framing, now
+has an unresolved question mark on one of its three members.
+
+**Why this was measured now.** `20260821064300` (this file's RESOLVED
+signup-attribution section above) closed one specific instance of a pattern
+— a function whose migration revoked PUBLIC/anon/authenticated but not
+`service_role`. The Action Queue guard forward repair closed the same class
+of gap for one other function. Two individually-found instances raised the
+obvious question: how many more are there, and is the pattern actually
+still live for newly-created functions, or purely historical?
+
+### Confirmed: the scale of service_role exposure
+
+```sql
+SELECT count(*) FILTER (WHERE has_function_privilege('service_role', p.oid, 'EXECUTE')) AS service_exec_count,
+       count(*) FILTER (WHERE has_function_privilege('anon', p.oid, 'EXECUTE')) AS anon_exec_count,
+       count(*) AS total
+FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public' AND p.prokind = 'f' AND p.prosecdef = true;
+```
+
+Returns **66 of 76** SECURITY DEFINER functions in `public` currently have
+effective `service_role` EXECUTE, and **3 of 76** have effective `anon`
+EXECUTE. The count itself is `established fact` — a direct count, not an
+inference — against production, per the 2026-08-23 correction above
+(restoring the 2026-08-22 downgrade). Read it in context, not as 66 new
+incidents: `service_role` already holds broad direct table access on this
+project by design (`supabase/seed.sql`'s own documented legacy-grant
+posture), so function-level `service_role` EXECUTE is mostly consistent with
+the platform's existing accepted trust model, not a new class of exposure.
+**Corrected 2026-08-23, four times now on this one claim. The fourth
+correction is not another number — it is the conclusion that counting by
+text search does not converge, so this file stops trying.** In order: "two
+functions" → "two slices, five functions" (the signup migration alone
+revokes a table and four functions, not one —
+`20260821064300_signup_acquisition_service_role_hardening.sql:71-75`) → a
+Codex round found three more migrations doing the same thing → an
+exhaustive-feeling `grep -rl "FROM service_role"` returned 11 files, six of
+which turned out to be table revokes, not function revokes, once each was
+read directly, leaving 5 verified function-hardening migrations (Action
+Queue guard, Action Queue transition, signup's four, quicklog, and AI
+credit pack's conditional legacy-signature cleanup) → a further round found
+a sixth, `20260728103000_schema_audit_trust_hardening.sql:351-354` —
+`REVOKE ALL ON FUNCTION public.admin_schema_audit(...) FROM PUBLIC, anon,
+authenticated, service_role;` — a **multi-role REVOKE on one line**, the
+exact blind spot the previous correction had already named as unchecked.
+Verified directly, and it is real.
+
+**Four passes, four different SQL shapes each missed by the pass before it**
+(a bare single-role REVOKE, a table REVOKE misread as a function REVOKE, a
+multi-role REVOKE, and — per the previous correction's own still-unchecked
+caveat — a schema-wide `ON ALL FUNCTIONS`/`ON ALL ROUTINES IN SCHEMA` form
+that remains unchecked now too. This repo's own migrations elsewhere
+document that PostgreSQL 11+ accepts `ROUTINE` as an alias for `FUNCTION`
+in these grants, which a search for the literal word `FUNCTION` alone would
+also miss). That pattern is itself the finding: a grep-based census of
+`service_role` REVOKEs across free-form SQL migration text is not a method
+that terminates at a trustworthy number, no matter how many more rounds it
+runs for.
+
+**So this file drops the enumerated count and states only what is actually
+supportable: individual function-level `service_role` hardening is
+demonstrated, by direct citation, in at least six migrations spanning
+2026-07-28 through 2026-08-21** (`schema_audit_trust_hardening`,
+`ai_credit_pack_portability`, `quicklog_manual_delegate_forward_repair`,
+both Action Queue forward repairs, and `signup_acquisition_service_role_hardening`),
+**using at least three distinct REVOKE forms** (single-role, multi-role, and
+conditional/legacy-signature). Whether the true total is 6, 10, or 20 is
+`NOT_MEASURED` and this file will not guess at it again by grep; a
+trustworthy census would need to query the live catalog (`pg_proc` /
+`aclexplode`) or parse SQL properly, not pattern-match migration text. What
+six independently-verified instances across three SQL shapes do establish:
+this is not "two exceptional cases" and it is not a settled small number
+either — it is routine enough, and varied enough in how it is written, that
+"case-by-case, judged individually" is well supported without needing an
+exact count. It still does not, by itself, license a blanket revoke across
+all 66 — that remains a separate decision this note does not make.
+
+**"By default" is this section's own headline word, and it overclaims — see
+point 3 of the 2026-08-23 correction above.** `has_function_privilege` proves
+current effective access, never its provenance. At least 2 of the 66
+(`founders_wall_count`, `founders_seats_consumed`, immediately below) are
+confirmed to have **deliberate, explicit grant statements** in their
+defining migrations — but per point 3's own correction, whether that grant
+is what actually produced their current ACL entry, versus the default-ACL
+mechanism already having done so at `CREATE` time, is itself unmeasured, no
+different from the other 64. The self-test in "Uncertain," below, proves the
+default-ACL mechanism is live; it does not prove how many of the 66 actually
+came from it versus a grant. Read "66... grant `service_role` EXECUTE" as
+the accurate headline; "by default" is unproven per-function, for all 66.
+
+**The `anon` set is the one worth an owner's eyes** — and, per correction
+point 4 below, one of the three is now flagged, not confirmed. All 3 are
+recorded as `founders_guard_immutables()` (returns `trigger`, not callable
+as an RPC — Postgres refuses to invoke a trigger-typed function outside
+trigger context regardless of its grants; **but see correction point 4: its
+committed migration doesn't declare `SECURITY DEFINER`, so its presence in
+this `prosecdef = true`-filtered list is itself unresolved**),
+`founders_seats_consumed()`, and `founders_wall_count()` — the latter two are
+`SELECT COUNT(*)::int FROM public.founders [WHERE status = 'confirmed']`, no
+PII, and read like a deliberate public "X founders joined" counter, now
+confirmed to have **deliberate, explicit grant statements** in their
+migrations (correction point 3) — though whether those statements, versus
+the default ACL already in effect at creation, are what actually produced
+the current grant stays unmeasured, per the same correction. `inference`:
+probably intentional either way. Not verified with Cheek.
+
+### The default-privilege mechanism is confirmed live; migration provenance is not
+
+**Renamed 2026-08-23 (Codex review, this PR).** This subsection's own
+self-test below (a fresh throwaway function receiving `anon`/`service_role`
+EXECUTE, and both `pg_default_acl` entries retaining those grants today)
+directly confirms the mechanism is live — that was never actually in doubt
+once the self-test ran. The heading previously said otherwise. What genuinely
+stays open, narrower than the old heading implied: whether
+`20260807133000` applied as committed, and which role executed its
+unqualified statements and `20260821150000` — both already carried below,
+neither about whether the mechanism itself exists.
+
+`20260807133000_global_default_privilege_hardening.sql` REVOKEs
+`EXECUTE ON FUNCTIONS` and `ALL ON TABLES` from `PUBLIC, anon` at the
+default-privilege level, in four statements each for functions and tables.
+**Corrected 2026-08-23 (Copilot review, this PR) — only two of the four
+function statements explicitly say `FOR ROLE postgres`; the other two carry
+no `FOR ROLE` clause at all**, so per Postgres semantics they target
+whichever role executes the migration — which this same subsection says,
+two paragraphs down, is unconfirmed. The original wording ("all of them FOR
+ROLE postgres, explicitly or via the executing role") asserted the
+executing role equals `postgres`; that is not established. Its own
+postflight self-test creates a throwaway function and asserts `anon` gets no
+EXECUTE.
+
+Reproducing that exact self-test today, in a rolled-back transaction via
+the Lovable SQL channel, **it fails** — a fresh throwaway function gets
+`anon` **and** `service_role` EXECUTE. `pg_default_acl` shows two separate
+default-ACL entries for functions in `public`: one owned by `postgres`,
+which still lists `anon=X` and `service_role=X`, and a second owned by
+`supabase_admin`. **Corrected 2026-08-23 — the claims that the `postgres`
+entry was "unchanged by that migration" and that `supabase_admin` was
+"never targeted at all" both overclaimed.** Whether the migration actually
+applied as committed, and which role executed its two unqualified
+statements, are exactly the open questions this subsection already carries;
+neither can be assumed to answer itself. What's directly observed, and
+stands: both default-ACL entries currently grant EXECUTE to
+`anon`/`authenticated`/`service_role`. The identical two-bucket split exists
+for tables too.
+
+**Corrected 2026-08-23 (see the correction above, point 2) — this was a
+self-contradiction, not a discrepancy, for one of the two functions.** This
+subsection originally claimed both `handle_new_user()` and the new
+`signup_acquisition_readiness_operator_snapshot()`, from Grok's own
+`20260821150000`, failed to show `service_role` EXECUTE. This file's own
+~15:23 UTC measurement, recorded earlier in this same section, already says
+the readiness RPC **does** have `service_role=X` ("default privileges
+leftover") — exactly what the default-ACL bucket predicts for a newly
+created function, not an exception to it.
+
+Only `handle_new_user()` actually lacks the exposure, and it has a mundane
+explanation rather than an open question: it is a `CREATE OR REPLACE` of a
+function whose `service_role` EXECUTE was already explicitly revoked by the
+2026-08-21 ad-hoc supplement (captured afterward as `20260821064300`)
+_before_ `20260821150000` replaced its body. `CREATE OR REPLACE FUNCTION`
+does not reset an existing grant back to the default ACL, so a
+previously-hardened function stays hardened across a later body replacement.
+That is expected behavior, not a gap in the mechanism.
+
+**Corrected 2026-08-23 (Codex review, this PR) — the sentence below
+attributed this to the `postgres`-owned bucket specifically, silently
+reverting to the assumption already disputed two paragraphs up.** Which
+default-ACL entry actually applied to the readiness RPC at creation time
+depends on `20260821150000`'s executing role — `postgres` and
+`supabase_admin` each own a separate entry, and only the one matching the
+object's creator governs it. That executor is unconfirmed, same as before;
+`proowner` on the function itself was not checked either. Since both
+entries currently show the identical `anon=X`/`service_role=X` pattern
+(lines 764–766 above), either would explain what was observed, so the
+observation cannot be used to name which one. Corrected: the applicable
+default-ACL bucket — `postgres`'s or `supabase_admin`'s, still
+`NOT_MEASURED` which — is consistent with both real migrations measured
+here once each function's own grant history is accounted for: a brand-new
+function (the readiness RPC) inherits whichever default ACL governs its
+creator; a replaced function (`handle_new_user`) keeps whatever was already
+explicitly granted or revoked on it. No corrective migration is implied by
+either case.
+
+### What this does and does not license
+
+Confirmed: the 66/76 and 3/76 counts (effective privilege, not proven
+per-function provenance — see correction point 3; and one member of the 3
+is itself unresolved, correction point 4), against production
+`66255e7b-892c-4be5-8686-ab1cfc3666db` / `knkwiiywfkbqznbxwqfh` (the
+2026-08-23 correction above restores this after the 2026-08-22 downgrade),
+and the self-test-fails-via-this-probe-channel result. Not confirmed: how
+many of the 66 — all of them, no exceptions, including the 2 with deliberate
+grant statements in their migrations (correction point 3, itself corrected
+on re-review: intentional authorization is established for those 2, but
+default-vs-explicit _origin_ is not) — came from the default-ACL mechanism
+versus a grant; whether `founders_guard_immutables()` genuinely belongs in a
+`prosecdef = true` population given its committed definition says otherwise
+(correction point 4); or
+whether any corrective migration is actually needed — the "real migrations
+don't show the same exposure" question is resolved as of correction point 2,
+not open. **No migration was drafted or applied.** No table, function,
+grant, or default privilege was changed. This does not authorize anyone to
+apply `20260807133000`-style `ALTER DEFAULT PRIVILEGES` changes on the
+strength of this note alone — per-function grant provenance across all 66 is
+still unchecked. Do not run a further production `query_database` /
+`enable_database` call to settle this — Grok's review claims that surface is
+owner-locked on `knkwiiywfkbqznbxwqfh` (2026-08-21), a claim this file does
+not yet independently corroborate but that this note does not attempt to
+test. Grok: if your migration-apply path can confirm which role actually
+executes committed migrations against production, that fact is still open
+and would resolve it — independent of the identity and exposure questions
+above, both now settled.
 
 ---
 
@@ -825,10 +1358,10 @@ guard from `20260821150000_signup_acquisition_failure_safe_attribution.sql`.
 
 ## Branch topology
 
-| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| -------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | `ea31fbdfb934` (#1086), verified 2026-08-21 **16:15 UTC** by direct fetch. **Live production was fetched at the same moment and serves `ea31fbdfb934` too — publish lag is `0` first-parent commits right now, the first 0 recorded here.** Production republished at least four times on 2026-08-21; treat any lag figure as perishable and re-measure. Superseded, in order: `5a13d0b47cb7` (#1089, live 15:39:34Z), `39935889fe02` (#1080, live 15:23 UTC), `999b6da93` (#1077), `ac973ed9f` (#1074), `9b6445653` (#1042). Prior text for this row follows: `999b6da93` (#1077), verified 2026-08-21 ~15:23 UTC with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `39935889f` (#1080) as tip and earlier buffers (`ac973ed9f` / #1074, `9b6445653` / #1042). **Live production WAS re-fetched at this verification** and serves `39935889fe02` (#1080), confirmed an ancestor of this tip (`git merge-base --is-ancestor`) — publish lags git by **1** first-parent commit (the #1077 docs-only CURRENT_STATE refresh). That lag figure is perishable: it read "four" on 2026-08-20, **17** / **2** earlier on 2026-08-21 under #1077's 12:57 UTC pin of live `1400a7e77eff`, and **1** now with live on `39935889fe02`. Re-measure it; never carry it forward. The 2026-08-18 note that a `/version.json` fetch from an agent session is `BLOCKED` (network policy 403) was session-specific and does not hold generally — see `docs/agent-session-network-reachability.md`. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers showing live `1400a7e77eff`, tip `39935889f`, `9b6445653` (#1042), `87ae05e5b` (#1026), `3f2bfe2db` (#1021) or `1c094a2a3` (#970) are earlier snapshots; discard them |
-| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Branch               | Role                                             | Verified head                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verdant-grow-diary` | **Deploy branch. Production ships from here.**   | **`a3ae36765` (#1105), verified 2026-08-23 02:09 UTC by direct fetch. Live production re-fetched in the same window and still serves `faea6e9c59ad` (#1087, `buildTime 2026-08-21T20:51:46.584Z`, `dirty: true`, `ref: "__orphan__"`, `treeHash` short `7d9cc8a12898`) — unchanged since 2026-08-22 16:16 UTC, so publish lag is now **`12`** and has widened seven times by the tip advancing, never by a republish. Re-measure before citing; never carry a lag figure forward.** Prior row text follows: `8181f5a60` (#1107), verified 2026-08-23 00:02 UTC by direct fetch. Live production re-fetched in the same window and still serves `faea6e9c59ad` (#1087, `buildTime 2026-08-21T20:51:46.584Z`, `dirty: true`, `ref: "__orphan__"`, `treeHash` short `7d9cc8a12898`) — unchanged since 2026-08-22 16:16 UTC, so publish lag is now **`11`** and has widened six times by the tip advancing, never by a republish. Re-measure before citing; never carry a lag figure forward.** Prior row text follows: `70ba566cdb11` (#1092), verified 2026-08-22 18:22 UTC by direct fetch. Live production re-fetched in the same window and still serves `faea6e9c59ad` (#1087, `buildTime 2026-08-21T20:51:46.584Z`, `dirty: true`, `ref: "__orphan__"`, `treeHash` short `7d9cc8a12898`) — unchanged since 16:16 UTC, so publish lag is now **`10`** and has widened five times today by the tip advancing, not by any republish. Re-measure before citing; never carry a lag figure forward.** Prior row text follows: `8e6750e87aff` (#1101), verified 2026-08-22 17:32 UTC by direct fetch. Live production re-fetched in the same window and still serves `faea6e9c59ad` (#1087, `buildTime 2026-08-21T20:51:46.584Z`, `dirty: true`, `ref: "__orphan__"`, `treeHash` short `7d9cc8a12898`) — unchanged since 16:16 UTC, so publish lag is now **`8`** and has widened three times today by the tip advancing, not by any republish. Re-measure before citing; never carry a lag figure forward.** Prior row text follows: `fd2d3e3f7553` (#1100), verified 2026-08-22 17:09 UTC by direct fetch. Live production was re-fetched in the same window and still serves `faea6e9c59ad` (#1087, `buildTime 2026-08-21T20:51:46.584Z`, `dirty: true`, `ref: "__orphan__"`, `treeHash` short `7d9cc8a12898`) — unchanged from the 16:16 UTC reading, so publish lag widened from `6` to **`7`** purely by the tip advancing, not by a republish. Re-measure before citing; never carry a lag figure forward.** Prior row text follows: `93d8ea23ff58` (#1097), verified 2026-08-22 16:16 UTC by direct fetch. Live production was re-fetched in the same window and now serves `faea6e9c59ad` (#1087, `buildTime 2026-08-21T20:51:46.584Z`, `commitTime 2026-08-21T20:43:26Z`, `dirty: true`, `ref: "__orphan__"`, `treeHash` short `7d9cc8a12898`), confirmed an ancestor of this tip — publish lag is `6` first-parent commits (#1095, #1096, #1098, #1091, #1099, then #1097). Production has republished since the 2026-08-21 readings; the previously-live `ea31fbdfb934` is historical. Every prior caution stands: this row moved three times inside one hour on 2026-08-21 and has moved again overnight. Re-measure before citing; never carry a lag figure forward.** Prior row text follows: `faea6e9c59ad` (#1087), verified 2026-08-21 21:05 UTC by direct fetch. Live production was re-fetched in the same window and still serves `ea31fbdfb934` (`buildTime 2026-08-21T15:53:46.096Z`, `dirty: true`, `ref: "__orphan__"`), confirmed an ancestor of this tip — publish lag is `2` first-parent commits (#1090, then #1087). This row moved three times inside one hour: `ea31fbdfb934`/lag `0` at 16:15Z, `9133a4c45b7f`/lag `1` at 20:43Z, this at 21:05Z. Each was correct when taken. Re-measure before citing; never carry a lag figure forward.** Prior row text follows: `ea31fbdfb934` (#1086), verified 2026-08-21 **16:15 UTC** by direct fetch. **Live production was fetched at the same moment and serves `ea31fbdfb934` too — publish lag was `0` first-parent commits at that reading, the first 0 recorded here.** Production republished at least four times on 2026-08-21; treat any lag figure as perishable and re-measure. Superseded, in order: `5a13d0b47cb7` (#1089, live 15:39:34Z), `39935889fe02` (#1080, live 15:23 UTC), `999b6da93` (#1077), `ac973ed9f` (#1074), `9b6445653` (#1042). Prior text for this row follows: `999b6da93` (#1077), verified 2026-08-21 ~15:23 UTC with `git fetch origin verdant-grow-diary && git rev-parse origin/verdant-grow-diary`. Supersedes `39935889f` (#1080) as tip and earlier buffers (`ac973ed9f` / #1074, `9b6445653` / #1042). **Live production WAS re-fetched at this verification** and serves `39935889fe02` (#1080), confirmed an ancestor of this tip (`git merge-base --is-ancestor`) — publish lags git by **1** first-parent commit (the #1077 docs-only CURRENT_STATE refresh). That lag figure is perishable: it read "four" on 2026-08-20, \*\*17\*\* / \*\*2\*\* earlier on 2026-08-21 under #1077's 12:57 UTC pin of live `1400a7e77eff`, and \*\*1\*\* now with live on `39935889fe02`. Re-measure it; never carry it forward. The 2026-08-18 note that a `/version.json` fetch from an agent session is `BLOCKED` (network policy 403) was session-specific and does not hold generally — see `docs/agent-session-network-reachability.md`. Merging is not a publish. PR numbers on this branch do not order by merge time — order commits with `git log`, never by PR number. Do not carry older validation tables forward. Older buffers showing live `1400a7e77eff`, tip `39935889f`, `9b6445653` (#1042), `87ae05e5b` (#1026), `3f2bfe2db` (#1021) or `1c094a2a3` (#970) are earlier snapshots; discard them |
+| `main`               | Integration branch. It is not production parity. | `b6d747941948ce68157185a2b0847acea6970d44` (#779), verified 2026-08-07                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 `main` and `verdant-grow-diary` are divergent. Do not infer production behavior from
 `main`, and do not backport deploy-only governance or data rules without a scoped branch
@@ -895,26 +1428,30 @@ were re-measured **2026-08-21 ~15:23 UTC** over live HTTPS (Grok). Sitemap and
 the six previously-unsitemapped indexable routes keep their 2026-08-21T12:57 UTC
 (#1077) readings — not re-opened this turn. Public root and robots.txt keep
 their 2026-08-20 dates; GA4 lighting / singleton rows keep their 2026-08-02 dates.
-**Latest release measurement is 2026-08-21 16:15 UTC** (release identity, build time and
-branch topology, fetched first-hand); rows not named there keep their own earlier dates.
+**Latest release measurement is 2026-08-23 02:09 UTC** for tip and lag only
+(tip `a3ae36765` / #1105; live `faea6e9c59ad` / #1087; lag **`12`**). The served
+commit, build time, provenance flags and payments-bundle rows keep their **16:16 UTC**
+readings — production has not republished between the two, and only the tip moved. That
+16:16 UTC pass superseded the 2026-08-21 21:05 UTC and 16:15 UTC readings. Rows not
+named keep their own earlier dates.
 Each row carries its own verification date:
 
-| Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200 (re-verified first-hand 2026-08-21 **16:15 UTC**; supersedes the ~15:23 UTC reading). The 2026-08-18 `BLOCKED` (network policy 403) was a property of that session, not of this endpoint — re-test rather than carrying it forward                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Production commit                           | Identity `PASS`, provenance **not** `PASS` — **re-measured first-hand 2026-08-21 16:15 UTC.** Production serves `ea31fbdfb934b5a4e70b882dc62465b73c4a5f72` / `ea31fbdfb934` (#1086), `buildTime 2026-08-21T15:53:46.096Z`, `commitTime 2026-08-21T15:29:03Z`, **`dirty: true`**, `ref: "__orphan__"`, `ciRunId: null`, `treeHash` short `831bd3b4f230`, `version: "0.0.0+20260821.ea31fbdfb934-dirty"`. **Provenance is now measured, not merely flagged, across four OBSERVED publishes — and all four mismatch.** They are four point-in-time `/version.json` readings, **not** a proven-consecutive run: whether other publishes fell between them is `NOT_MEASURED` without the publisher's history, and production republished repeatedly inside one hour. Recomputing each published commit's tree with `scripts/lib/tree-hash.mjs` against what the build stamped: `4b1c4867e685` stamped `8773f6b2c0ed` vs `1f0eb7b4e6cd`; `39935889fe02` stamped `1fe0606c134a` vs `8e117dc65711`; `5a13d0b47cb7` stamped `1fe0606c134a` vs `8e117dc65711`; `ea31fbdfb934` stamped `831bd3b4f230` vs `2cee190ff72b`. Note the middle pair differ only in `docs/agents/CURRENT_STATE.md` — outside `TREE_HASH_ROOTS` — and recompute identically, which is the mechanism working correctly. **The bound: `TREE_HASH_ROOTS` covers inputs that never ship, so this establishes build-workspace drift at stamp time; whether any shipped byte differs stays `NOT_MEASURED`.** Do not upgrade provenance to `PASS`. Supersedes the ~15:23 UTC pin `39935889fe02` and the earlier `1400a7e77eff` / `92a983b4832e`. Prior row text follows: re-measured 2026-08-21 ~15:23 UTC. Production serves real SHA `39935889fe022efd441dc5ab86bfbf636d284739` / short `39935889fe02` (#1080 merge), with `commitSource: "git"`, `treeHash: 1fe0606c134a0b8aa3887d17b966ef0b95e9876d72ee987ad8a601b42d1ef346`, **`dirty: true`**, `ref: "__orphan__"`, `ciRunId: null`, `version: "0.0.0+20260821.39935889fe02-dirty"`. Record identity and provenance separately: identity is the #1080 SHA; provenance flags stay as measured — do **not** upgrade provenance to `PASS`. Cause of dirty/orphan remains `NOT_MEASURED`. Note for whoever checks this next: `treeHash` is Verdant's SHA-256 over the allowlisted `TREE_HASH_ROOTS` manifest (`scripts/lib/tree-hash.mjs`), **not** a Git tree object ID. Do not "confirm" a mismatch by diffing it against `git rev-parse <commit>^{tree}` — those are different hash functions over different inputs and never match, on healthy builds included (#1077 already removed that false corroboration). Supersedes the earlier same-day #1077 pin `1400a7e77eff` (#1083) and the still-earlier `92a983b4832e` (#1061). Publish lags git — see the branch topology row. Single observations remain point-in-time |
-| Production build time                       | **`2026-08-21T15:53:46.096Z`** (fetched first-hand 16:15 UTC, commit `ea31fbdfb934`). Prior live stamps `2026-08-21T15:39:34.211Z` (`5a13d0b47cb7`) and `2026-08-21T12:53:03.024Z` (`39935889fe02`) are historical. Prior row text follows: `2026-08-21T12:53:03.024Z` (from the same ~15:23 UTC `/version.json`; the served commit was authored `2026-08-21T07:51:31-05:00`). Prior live stamps `2026-08-21T12:11:38.661Z` (`1400a7e77eff`), `2026-08-21T00:59:52.370Z` (`92a983b4832e`), `2026-08-21T00:27:10.316Z` and `2026-08-20T18:49:50.600Z` are historical. Production republished multiple times inside 2026-08-21 — treat any single reading here as perishable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Public sitemap                              | `PASS` — HTTP 200, **61** `<loc>` entries live (re-count 2026-08-21). **Live and in-repo now agree**: the 2026-08-20 adjudication published, moving live from 56 → 61. The earlier note that a 56 reading was "expected, not a regression" is spent — from 2026-08-21 a 56 reading would be a real regression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Public root route `/`                       | `PASS` — re-measured 2026-08-20. HTTP 200; `<h1>` “See what changed. Decide what to do next.”; `<link rel="canonical" href="https://verdantgrowdiary.com/"/>`; `<meta name="robots" content="index, follow">`; one JSON-LD block; no loading skeleton. Visible body words measured **845–1034** depending on tokenization — the 2026-08-15 figure of 1141 recorded no method, so the two are **not comparable and this is not evidence of content loss**. `www.` host `302`s to the apex. Slice 2 (`/welcome` → `/` consolidation) remains unapproved — see blocker 7                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Indexable routes outside the sitemap        | `PASS` — **resolved live**, re-measured 2026-08-21. Was `FAIL` while the fix sat unpublished. Five of the six are now advertised in the live `sitemap.xml` (`/glossary`, `/docs/mcp-api`, `/pheno-expression-showcase`, `/pheno-comparison`, `/creator-beta`), each self-canonical. `/breeder-beta` is correctly absent **by design**: it serves `<link rel="canonical" href="https://verdantgrowdiary.com/creator-beta">` and stays `index, follow`, so advertising it would push a URL that disclaims itself. Verified live, not inferred from the merge — the cross-canonical survived hydration, which was the silent failure mode. Closes blocker 8’s sibling item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| robots.txt                                  | `PASS` — re-measured 2026-08-20: HTTP 200, declares `Sitemap: https://verdantgrowdiary.com/sitemap.xml`, and carries no global `Disallow: /`. Authenticated surfaces (`/dashboard`, `/tents`, `/plants`, `/sensors`, `/timeline`, `/doctor`, `/actions`, `/auth`, …) are disallowed as intended; neither lighting route is disallowed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified (not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Axis                                        | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://verdantgrowdiary.com/version.json` | `PASS` — HTTP 200, **re-verified first-hand 2026-08-22 17:09 UTC** (and at 16:16 UTC the same day). This row previously carried a 2026-08-21 date while rows beside it quoted 2026-08-22 readings fetched from this same endpoint — an internal contradiction in a file that promises each row carries its own date. Prior text: re-verified 2026-08-21 **16:15 UTC**, superseding the ~15:23 UTC reading. The 2026-08-18 `BLOCKED` (network policy 403) was a property of that session, not of this endpoint — re-test rather than carrying it forward                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Production commit                           | Identity `PASS`, provenance **not** `PASS` — **re-measured first-hand 2026-08-22 16:16 UTC.** Production serves `faea6e9c59adf42a3028a2f0d9eba2b8ac2ef688` / `faea6e9c59ad` (#1087), `buildTime 2026-08-21T20:51:46.584Z`, `commitTime 2026-08-21T20:43:26Z`, **`dirty: true`**, `ref: "__orphan__"`, `ciRunId: null`, `commitSource: "git"`, `treeHash` short `7d9cc8a12898`, `version: "0.0.0+20260821.faea6e9c59ad-dirty"`. **This is the post-#1090 build the record said to watch for, and the mismatch PERSISTS:** `faea6e9c59ad` contains #1090 (verified by `git merge-base --is-ancestor`), and recomputing its tree with `scripts/lib/tree-hash.mjs` over a clean worktree gives `436eede41e4b` (5,856 files) against the stamped `7d9cc8a12898`. **Per the one-directional rule recorded below, persistence does NOT refute the #1090 candidate** — a workspace already dirtied by an earlier cycle stays dirty until something resets it — and it does not confirm it either. It returns the question to the owner-gated publisher's build log. That makes **five** OBSERVED publishes measured, all five mismatching, all five `dirty: true`. Still not a proven-consecutive run: whether other publishes fell between any two readings is `NOT_MEASURED`. **The `TREE_HASH_ROOTS` bound is UNCHANGED.** An earlier version of this row said it "is now narrower than it was" on the strength of the payments-token finding; that inference was **withdrawn 2026-08-22** after a review P2 — a platform env var overrides `.env.production` without altering the file, so it need not have drifted in the workspace and need not have contributed to this mismatch. Whether the workspace drift behind `treeHash` reached shipped bytes stays `NOT_MEASURED`. See the withdrawal in the payments-token section below. Do not upgrade provenance to `PASS`. Supersedes the 16:15 UTC pin `ea31fbdfb934` and every earlier same-day pin. Prior row text follows: re-measured first-hand 2026-08-21 16:15 UTC. Production serves `ea31fbdfb934b5a4e70b882dc62465b73c4a5f72` / `ea31fbdfb934` (#1086), `buildTime 2026-08-21T15:53:46.096Z`, `commitTime 2026-08-21T15:29:03Z`, **`dirty: true`**, `ref: "__orphan__"`, `ciRunId: null`, `treeHash` short `831bd3b4f230`, `version: "0.0.0+20260821.ea31fbdfb934-dirty"`. **Provenance is now measured, not merely flagged, across four OBSERVED publishes — and all four mismatch.** They are four point-in-time `/version.json` readings, **not** a proven-consecutive run: whether other publishes fell between them is `NOT_MEASURED` without the publisher's history, and production republished repeatedly inside one hour. Recomputing each published commit's tree with `scripts/lib/tree-hash.mjs` against what the build stamped: `4b1c4867e685` stamped `8773f6b2c0ed` vs `1f0eb7b4e6cd`; `39935889fe02` stamped `1fe0606c134a` vs `8e117dc65711`; `5a13d0b47cb7` stamped `1fe0606c134a` vs `8e117dc65711`; `ea31fbdfb934` stamped `831bd3b4f230` vs `2cee190ff72b`. Note the middle pair differ only in `docs/agents/CURRENT_STATE.md` — outside `TREE_HASH_ROOTS` — and recompute identically, which is the mechanism working correctly. **The bound: `TREE_HASH_ROOTS` covers inputs that never ship, so this establishes build-workspace drift at stamp time; whether any shipped byte differs stays `NOT_MEASURED`.** Do not upgrade provenance to `PASS`. Supersedes the ~15:23 UTC pin `39935889fe02` and the earlier `1400a7e77eff` / `92a983b4832e`. Prior row text follows: re-measured 2026-08-21 ~15:23 UTC. Production serves real SHA `39935889fe022efd441dc5ab86bfbf636d284739` / short `39935889fe02` (#1080 merge), with `commitSource: "git"`, `treeHash: 1fe0606c134a0b8aa3887d17b966ef0b95e9876d72ee987ad8a601b42d1ef346`, **`dirty: true`**, `ref: "__orphan__"`, `ciRunId: null`, `version: "0.0.0+20260821.39935889fe02-dirty"`. Record identity and provenance separately: identity is the #1080 SHA; provenance flags stay as measured — do **not** upgrade provenance to `PASS`. Cause of dirty/orphan remains `NOT_MEASURED`. Note for whoever checks this next: `treeHash` is Verdant's SHA-256 over the allowlisted `TREE_HASH_ROOTS` manifest (`scripts/lib/tree-hash.mjs`), **not** a Git tree object ID. Do not "confirm" a mismatch by diffing it against `git rev-parse <commit>^{tree}` — those are different hash functions over different inputs and never match, on healthy builds included (#1077 already removed that false corroboration). Supersedes the earlier same-day #1077 pin `1400a7e77eff` (#1083) and the still-earlier `92a983b4832e` (#1061). Publish lags git — see the branch topology row. Single observations remain point-in-time |
+| Production build time                       | **`2026-08-21T20:51:46.584Z`** (fetched first-hand 2026-08-22 16:16 UTC, commit `faea6e9c59ad`). Note the shape: a build stamped 2026-08-21 evening was still the served build ~20 hours later, so the republish cadence that churned this row four times inside 2026-08-21 did **not** continue overnight. Do not read that as stability — re-measure. Prior row text follows: `2026-08-21T15:53:46.096Z` (fetched first-hand 16:15 UTC, commit `ea31fbdfb934`). Prior live stamps `2026-08-21T15:39:34.211Z` (`5a13d0b47cb7`) and `2026-08-21T12:53:03.024Z` (`39935889fe02`) are historical. Prior row text follows: `2026-08-21T12:53:03.024Z` (from the same ~15:23 UTC `/version.json`; the served commit was authored `2026-08-21T07:51:31-05:00`). Prior live stamps `2026-08-21T12:11:38.661Z` (`1400a7e77eff`), `2026-08-21T00:59:52.370Z` (`92a983b4832e`), `2026-08-21T00:27:10.316Z` and `2026-08-20T18:49:50.600Z` are historical. Production republished multiple times inside 2026-08-21 — treat any single reading here as perishable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Public sitemap                              | `PASS` — HTTP 200, **61** `<loc>` entries live (re-count 2026-08-21). **Live and in-repo now agree**: the 2026-08-20 adjudication published, moving live from 56 → 61. The earlier note that a 56 reading was "expected, not a regression" is spent — from 2026-08-21 a 56 reading would be a real regression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Public root route `/`                       | `PASS` — re-measured 2026-08-20. HTTP 200; `<h1>` “See what changed. Decide what to do next.”; `<link rel="canonical" href="https://verdantgrowdiary.com/"/>`; `<meta name="robots" content="index, follow">`; one JSON-LD block; no loading skeleton. Visible body words measured **845–1034** depending on tokenization — the 2026-08-15 figure of 1141 recorded no method, so the two are **not comparable and this is not evidence of content loss**. `www.` host `302`s to the apex. Slice 2 (`/welcome` → `/` consolidation) remains unapproved — see blocker 7                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Indexable routes outside the sitemap        | `PASS` — **resolved live**, re-measured 2026-08-21. Was `FAIL` while the fix sat unpublished. Five of the six are now advertised in the live `sitemap.xml` (`/glossary`, `/docs/mcp-api`, `/pheno-expression-showcase`, `/pheno-comparison`, `/creator-beta`), each self-canonical. `/breeder-beta` is correctly absent **by design**: it serves `<link rel="canonical" href="https://verdantgrowdiary.com/creator-beta">` and stays `index, follow`, so advertising it would push a URL that disclaims itself. Verified live, not inferred from the merge — the cross-canonical survived hydration, which was the silent failure mode. Closes blocker 8’s sibling item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| robots.txt                                  | `PASS` — re-measured 2026-08-20: HTTP 200, declares `Sitemap: https://verdantgrowdiary.com/sitemap.xml`, and carries no global `Disallow: /`. Authenticated surfaces (`/dashboard`, `/tents`, `/plants`, `/sensors`, `/timeline`, `/doctor`, `/actions`, `/auth`, …) are disallowed as intended; neither lighting route is disallowed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Lighting route technical SEO                | `PASS` — two HTTP 200 routes; page metadata and route-scoped JSON-LD verified (not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| GA4 explicit lighting-page identity         | `PASS` — nine exact intercepted SPA page-view events; no test traffic transmitted (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| GA4 page-view singleton contract            | `FAIL` — five automatic tag-generated events observed beside explicit application events (2026-08-02; not re-measured 2026-08-15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| GA4 authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| GSC authenticated baseline                  | `BLOCKED` — authenticated access unavailable                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Measurement Day 0                           | `UNSET`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Four-week measurement clock                 | `NOT_STARTED`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 No page-level traffic, impression, click, position, or CTR claim is authorized while the
 authenticated GA4/GSC baseline remains blocked. Stream identity alone is not an
@@ -1427,28 +1964,53 @@ Recorded per `docs/agents/HANDOFF_PROTOCOL.md`, which requires the pairing in
 **both** the handoff block and this file. Raised in review of the PR below when
 the pairing existed only in the handoff.
 
-| Field                    | Value                                                                                                            |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Slice                    | Adjudication of an owner-supplied architecture audit against measured deploy-branch state                        |
-| **Slice owner**          | **Claude**                                                                                                       |
-| **Independent reviewer** | **Codex** — performed, not merely nominated                                                                      |
-| PR / branch              | [#1087](https://github.com/Verdant-OS/verdant-grow-diary/pull/1087) · `claude/verdant-architecture-audit-6qe80x` |
-| Deliverable              | `docs/audits/architecture-audit-adjudication-2026-08-21.md` — documentation only                                 |
-| Measurements pinned at   | `28c01a017`                                                                                                      |
+| Field                             | Value                                                                                                                                                                                                                                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Slice                             | Adjudication of an owner-supplied architecture audit against measured deploy-branch state                                                                                                                                                                                                        |
+| **Slice owner**                   | **Claude**                                                                                                                                                                                                                                                                                       |
+| **Independent reviewer**          | **#1087 — Codex**, performed, not merely nominated. **#1092 — Grok (GDP)**, named by Cheek on the PR 2026-08-22 17:09 UTC; review in progress at that time, no verdict yet. Two PRs on one branch, two separate seats — do not read Codex's completed #1087 review as covering #1092             |
+| PR / branch                       | [#1087](https://github.com/Verdant-OS/verdant-grow-diary/pull/1087) **merged** `faea6e9c59ad` · follow-on [#1092](https://github.com/Verdant-OS/verdant-grow-diary/pull/1092) **open** · both on `claude/verdant-architecture-audit-6qe80x`                                                      |
+| Deliverable                       | `docs/audits/architecture-audit-adjudication-2026-08-21.md` — documentation only                                                                                                                                                                                                                 |
+| Repository measurements pinned at | `28c01a017`. **Repository inventories only.** The deliverable's live HTTP probes and provenance comparisons use other commits — `4b1c4867e685`, `39935889fe02`, `5a13d0b47cb7`, `ea31fbdfb934` — and its §6.1 rows carry their own timestamps. Do not attribute production evidence to this tree |
 
-**Read the deliverable's own withdrawal record before citing it.** Review
-produced seven substantive corrections — four claims withdrawn outright, one
-conclusion reversed, one retraction that was itself wrong and withdrawn in turn,
-and one relapse into an already-withdrawn inference, caught and re-measured. The
-document keeps every one visible rather than patching silently, and names three
-recurring failure modes behind them: inference presented as conclusion,
-propagation after change, and bounded reads presented as complete. Its labelled
-bounds are the load-bearing part, not its headlines.
+**Why the reviewer row now names two seats.** #1087 merged on 2026-08-21 while its
+branch was queue-locked, so two verified Codex findings could not land in it; #1092
+is the follow-on that carries them, on the same branch. It is its own slice under
+`AGENTS.md`'s "no code ships without peer review", so it needs its own named
+independent reviewer rather than inheriting #1087's. Cheek named **Grok (GDP)** for
+it on the PR at 17:09 UTC ("Review in progress. Will post PASS/FAIL/BLOCKED with
+P0/P1 on this PR. No merge from this comment."), and marked #1092 ready for review
+in the same minute. **No agent performed either transition.** The seat is _named_,
+not _discharged_ — recording it here satisfies `HANDOFF_PROTOCOL.md:25`, which is
+the requirement this whole section exists to meet, and satisfies nothing else. Do
+not read a named seat as a completed review.
 
-**The provenance finding is now measured across four publishes**, not one — see
+**Note the Grok naming that is NOT this one.** The MACAE reference-ingest row lower
+in this file also names Grok (GDP) as its protocol peer-review seat (filled by Cheek
+the same day, via #1100). Different slice, different seat, same reviewer — do not
+collapse the two or treat a verdict on one as a verdict on the other.
+
+**Read the deliverable's own withdrawal record before citing it — and read it
+there, not here.** Review produced **nine** substantive corrections as of
+`3ba7264f2`: claims withdrawn outright, one conclusion reversed, one retraction
+that was itself wrong and withdrawn in turn, one relapse into an
+already-withdrawn inference, and — added on `3ba7264f2` — a same-build ordering
+claim refuted from `package.json`'s `prebuild`/`build` sequence, plus a
+follow-up test wrongly described as able to refute as well as confirm. **This
+count is maintained by hand and goes stale on every new review round; the
+document's own record is authoritative.** It keeps every correction visible
+rather than patching silently, and names three recurring failure modes:
+inference presented as conclusion, propagation after change, and bounded reads
+presented as complete. Its labelled bounds are the load-bearing part, not its
+headlines.
+
+**The provenance finding is now measured across FIVE publishes**, not one — see
 the Production commit row above for the full comparison. `4b1c4867e685`,
-`39935889fe02` (#1080), `5a13d0b47cb7` (#1089) and `ea31fbdfb934` (#1086) all
-mismatch, all `dirty: true`. The middle pair differ only in
+`39935889fe02` (#1080), `5a13d0b47cb7` (#1089), `ea31fbdfb934` (#1086) and
+`faea6e9c59ad` (#1087) all mismatch, all `dirty: true`. **This count is
+hand-maintained and has already gone stale once** — it read "four" here while the
+Production commit row said five. Treat that row as authoritative and re-derive from
+it rather than trusting this sentence. The middle pair differ only in
 `docs/agents/CURRENT_STATE.md` — outside `TREE_HASH_ROOTS` — and recompute
 identically, which is the mechanism behaving correctly. **Do not
 "confirm" any of this against a `git rev-parse` tree id:** `treeHash` is
@@ -1514,15 +2076,439 @@ occurring **before** `stamp-version.mjs`.
 `/version.json` and recompute that commit's tree. Mismatch and `dirty: true`
 _stopping_ supports the candidate; _persisting_ does **not** refute it, since a
 workspace already dirtied by an earlier cycle stays dirty until something resets it.
-**Not yet available:** at 2026-08-21 20:35Z production still served the pre-#1090
-`ea31fbdfb934` (`buildTime 15:53:46.096Z`). #1090 puts the stamp / `dirty` /
-`__orphan__` diagnosis outside its own scope and explains nothing about
-`ref: "__orphan__"`, so the publisher's build log remains the route that settles it.
+**RUN 2026-08-22 16:16 UTC — the result is "no information", exactly as the rule
+predicts.** Production now serves `faea6e9c59ad`, which contains #1090 (verified by
+`git merge-base --is-ancestor`), so this is a post-#1090 build. Recomputed tree
+`436eede41e4b` (5,856 files) vs stamped `7d9cc8a12898`: **mismatch persists**, and
+`dirty: true` / `ref: "__orphan__"` persist with it. Under the one-directional rule
+stated in the preceding paragraph that **neither confirms nor refutes** the candidate.
+Do not report it as a refutation, and do not report it as confirmation of some other
+mechanism — the persistence is precisely the outcome the rule says carries no signal.
+#1090 puts the stamp / `dirty` / `__orphan__` diagnosis outside its own scope and
+explains nothing about `ref: "__orphan__"`, so **the publisher's build log remains the
+only route that settles it**, and it stays owner-gated. Prior text follows. **Not yet
+available:** at 2026-08-21 20:35Z production still served the pre-#1090
+`ea31fbdfb934` (`buildTime 15:53:46.096Z`).
 
 One caution that is independent of all the above — the named path is an
 edge-function source that publishing deploys, so the "hashed roots include inputs
 that never ship" reassurance does **not** cover it. Whether any shipped byte
 differed stays `NOT_MEASURED`.
+
+---
+
+## One-Tent goal — blocked on external gates, not code work (recorded 2026-08-21)
+
+Recorded by Claude 2026-08-21 ~22:00 UTC; **all four gate states were re-checked
+2026-08-22 — the first three at 17:12 UTC and #1076 re-queried at 17:24 UTC**, after
+review flagged that a blanket "re-checked" claim sat above a row still dated
+2026-08-21. At that measurement, **no agent performed any of the external transitions
+named below**, and none was authorized by this entry.
+
+**Two of the four have since closed: #1091 merged on 2026-08-22, and #1076 is now
+closed unmerged.** The table below now records two active gates and two closed records,
+not four open gates. The public attestation and disposable authenticated proof remain
+the active blockers.
+
+### Two active gates and two resolved records
+
+| Gate                                | State                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #1091 ready-state / reviewer action | **CLOSED 2026-08-22.** #1091 is **merged** — `merged: true`, closed 12:38:29 UTC by `cheekhimself`, final head `c432f9836f74`. It is no longer a draft and no longer waiting on anyone. Superseded row text: "Owner-only. Draft at `74e1ad4`; review automation cannot engage until the transition happens. Not performed by any agent" |
+| Public attestation                  | **STILL INVALID** (tip/lag re-measured 2026-08-23 02:09 UTC). Canonical `a3ae36765`, production `faea6e9c59ad` `dirty: true`, lag **`12`** — see below                                                                                                                                                                                  |
+| Disposable authenticated proof      | **Must remain UNDISPATCHED** while attestation is invalid                                                                                                                                                                                                                                                                               |
+| #1076 CI runner migration proposal  | **CLOSED UNMERGED.** Retained as a resolved record for traceability; it no longer blocks or authorizes a workflow migration.                                                                                                                                                                                                            |
+
+### #1091 — 35/35 required is true; "clean head" is not (superseded head)
+
+> **#1091 MERGED 2026-08-22 12:38:29 UTC** as `72e766314` on the deploy branch,
+> from final head `c432f9836f74` — **not** `74e1ad4`. Everything below was measured
+> against `74e1ad4` and describes that head only. The branch advanced past it before
+> merging (`c432f983`, "fix: withhold paused One-Tent proof reads", 11:59:28 UTC,
+> touching five files under `src/`), so **do not read the smoke failure below as a
+> statement about the merged code.** Whether that check was re-run, and with what
+> result, on `c432f983` is `NOT_MEASURED` here. The finding is kept because the
+> _lesson_ survives the merge — "35/35 green" summarised away a red check — while
+> the _measurement_ does not.
+
+`established fact`, measured 2026-08-21 ~21:50 UTC against head `74e1ad4`
+(branch `codex/one-tent-polish-ea31`, **behind the deploy tip by 1 at that time**):
+
+**All 35 ruleset-required contexts are green** — enumerated, not assumed: the 32
+`Full test suite (shard n/32)` jobs, `Lint, typecheck, test, build`,
+`Preflight — edge shared-lib mirror in sync`, and `test:legal-seo`. The ruleset is
+genuinely satisfied.
+
+**A non-required check is red on that same head, and it is not a test failure.**
+`Quick Log Playwright smoke` concluded `failure` (job `96919203284`, run
+`32529735698`). Its own step outputs:
+
+- `FIXTURE_STEP_OUTCOME: failure`
+- `SMOKE_STEP_OUTCOME: skipped` — the smoke never executed
+- `REPORT_JSON_PRESENT: false`, `SMOKE_COUNTS_AVAILABLE: false` — no report produced
+
+It ran **authenticated against the live Lovable host** (`E2E_FIXTURE_MODE: true`)
+with three fixture variables empty: expected grow name, second plant name, and
+account hint. In the **same run**, `Authenticated One-Tent branch proof` concluded
+`skipped`. `Browser census (authenticated)` was still `in_progress` at read time.
+
+**Root cause is `NOT_MEASURED`**, and the distinction matters before anyone
+resequences work around it: a failed _fixture/config_ step is not the same finding
+as a failed assertion, and only the second would implicate product code. Nobody
+should conclude either way from the summary line.
+
+**Why this is recorded rather than acted on.** `codex/one-tent-polish-ea31` is
+Codex's owned slice; adopting it would violate the collision fences in this file.
+This entry is a handoff, not a claim on the work. But **"35/35 green" is the
+summary that hides this**, so a ready-state transition taken on that summary alone
+would carry an unexamined red into review.
+
+**That warning is now retrospective, not actionable.** #1091 merged on 2026-08-22
+from a later head. The point stands as a reading rule for the next PR summarised as
+"all required green"; it is no longer advice about #1091.
+
+### Attestation — re-measured 2026-08-22, still invalid
+
+`established fact`, tip and lag measured 2026-08-23 **02:09 UTC**; the served-commit
+rows measured 2026-08-22 **16:16 UTC** and re-confirmed unchanged at 17:09, 17:32,
+17:51, 18:22, 00:02 and 02:09:
+
+| Axis                 | Value                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Canonical deploy tip | `a3ae36765` (#1105)                                                                                              |
+| Production serves    | `faea6e9c59ad`, `buildTime 2026-08-21T20:51:46.584Z`, `treeHash 7d9cc8a12898`                                    |
+| Provenance flags     | `dirty: true`, `ref: "__orphan__"`                                                                               |
+| Ancestry             | live **is** an ancestor of the tip                                                                               |
+| Publish lag          | **12** first-parent commits (#1095, #1096, #1098, #1091, #1099, #1097, #1100, #1101, #1102, #1092, #1107, #1105) |
+
+**The gap has now widened twice for two different reasons, and the distinction
+matters.** Between 2026-08-21 and the 16:16 UTC reading, production republished _and_
+the tip moved six commits — both halves changed, and the lag went 2 → 6. Between
+2026-08-22 16:16 UTC and 2026-08-23 02:09 UTC, production did **not** republish at
+all; only the tip advanced (#1100, #1101, #1102, #1092, #1107, #1105), taking the lag
+6 → 7 → 8 → 9 → 10 → 11 → **12** across nearly ten hours. A widening lag is not by itself evidence of a stalled
+publish, nor of a fresh one; read which half moved. `dirty: true` and
+`ref: "__orphan__"` survived the republish, so the provenance defect is not a
+one-build artifact. Prior reading, superseded: 2026-08-21 21:58:32 UTC — tip
+`faea6e9c59ad`, live `ea31fbdfb934`, lag `2`, which itself re-confirmed the 21:05 UTC
+row 53 minutes later. That pair is exactly why a lag figure is never carried forward:
+two readings agreeing 53 minutes apart said nothing about the next 18 hours.
+
+### `20260813030000` — "unapplied" carries two meanings, and one is dangerous
+
+**This is the entry most likely to be misread, so state which sense is meant every
+time.**
+
+- **The GitHub apply lane never succeeded** — the apply-signup workflow still shows
+  only its failed PREFLIGHT. True.
+- **The production objects are live.** Per the measurement already recorded in the
+  signup-attribution section above (2026-08-21 ~15:23 UTC, Lovable `query_database`
+  against the production project): the table, all four helper functions, the
+  readiness RPC, and a `handle_new_user` carrying the `RAISE LOG` guard from
+  `20260821150000` all exist. Ledger name-rows for `20260813030000` are present via
+  the founder backfill.
+
+**The hard stop is unchanged and this entry does not soften it: do NOT GitHub-APPLY
+`20260813030000_signup_acquisition_forward_repair.sql`.** That file re-issues an
+**unguarded** `handle_new_user` and would overwrite the live guard — a production
+incident. A reader who takes a bare "remains unapplied" as licence to apply it has
+inverted the finding.
+
+---
+
+## ⚠️ Production JS ships a LIVE payments token — which FAILS CLOSED, disabling checkout (recorded 2026-08-21, severity corrected 2026-08-22)
+
+Recorded by Claude 2026-08-21 ~23:03 UTC at Cheek's instruction, after Cheek
+raised it; **re-measured 2026-08-22 16:16 UTC against a newer production build and
+still true.** **Publishing is stopped by owner order while this stands.** Nothing
+here authorizes a publish, an env edit, or a token rotation.
+
+> ### ⚠️ SEVERITY CORRECTED 2026-08-22 — read this before quoting anything below
+>
+> **An earlier revision of this section said "production is running **live** payments."
+> That was wrong, and the correction inverts the risk.** Raised by Copilot in review of
+> #1092, verified in the served source **and** in the shipped bundle before conceding.
+>
+> At the served SHA `faea6e9c59ad`, `src/lib/paddleEnvironment.ts` classifies a `live_`
+> token as `"live"` and `resolvePaddleCheckoutEnvironment` returns `"sandbox"` **only**
+> for a `test_` token — every other class resolves to `"unavailable"`, on every host.
+> `src/lib/paddle.ts`'s own header states the policy: _"Live tokens fail closed on every
+> host."_ Confirmed empirically in the shipped bundle rather than inferred from source:
+> the minified resolver reads
+> ``iv(e){return rv(e.token)===`sandbox`?`sandbox`:`unavailable`}``, and the blocking
+> copy `Checkout disabled: Verdant currently supports Paddle sandbox testing only.`
+> ships alongside it.
+>
+> **So production is not taking live payments. Production is taking NO payments.** The
+> live-class token disables checkout entirely; a grower who tries to upgrade sees the
+> blocking message. That is a different defect from the one first recorded — a
+> **checkout-blocking configuration and provenance defect**, not an unnoticed live
+> billing surface.
+>
+> **The direction of the publish risk flips with it.** A file-sourced `live → test`
+> swap would **restore** the intended sandbox checkout, not "break live payments".
+> The corrected outcome list is below.
+>
+> The measurements in this section are unchanged and still stand — what a `live_`
+> token _means_ is what was wrong. This is the "inference presented as conclusion"
+> failure mode again: token class was read as billing state without checking the code
+> that consumes it.
+
+**Never reproduce a live token body** — in this file, a commit message, a PR, or
+chat. Class prefix, length and redacted context are sufficient and are all that
+appears below.
+
+### What is measured
+
+`established fact`, **re-measured over live HTTPS 2026-08-22 16:16 UTC** against a
+DIFFERENT, newer production build than the one first recorded. The finding survives
+the republish unchanged:
+
+| Axis                                         | Value                                                                                    |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Production bundle                            | `/assets/index-C-R0_Bat.js` (820,070 bytes)                                              |
+| Inlined key                                  | `VITE_PAYMENTS_CLIENT_TOKEN`                                                             |
+| Shipped class                                | **`live_`**, body length 27, one distinct value, two occurrences in that bundle          |
+| `test_`-shaped payments token in that bundle | **zero**                                                                                 |
+| Repo `.env.production`                       | **`test_`** class (sha256 `1a79e29c…`)                                                   |
+| Lovable project `.env.production`            | **`test_`** class, byte-identical to the repo file — **re-read 2026-08-22 16:16 UTC**    |
+| `.env.development`                           | byte-identical to both (sha256 `1a79e29c…`)                                              |
+| Serving commit at measurement                | `faea6e9c59ad`, `buildTime 2026-08-21T20:51:46.584Z`, `dirty: true`, `ref: "__orphan__"` |
+
+**Still the live build at 2026-08-23 02:09 UTC.** `/version.json` was re-fetched at
+17:09, 17:32, 17:51, 18:22, 00:02 and 02:09, returning the same commit and the same
+`buildTime` every time, so the bundle measured at 16:16 is
+still what production serves. **The bundle itself was not re-fetched at 17:09** — this
+row is a 16:16 UTC measurement carried forward on an unchanged serving commit, which is
+the one case where carrying forward is legitimate. If `buildTime` moves, re-fetch the
+bundle rather than trusting this row.
+
+**The republish is itself evidence.** The asset filename changed
+(`index-aTS7aKMk.js` → `index-C-R0_Bat.js`) across a build that also moved the served
+commit `ea31fbdfb934` → `faea6e9c59ad` — so this is a rebuild, not a cached artifact —
+and the shipped token is still `live_`, still 27 characters, still one distinct value
+appearing twice, while both `.env.production` files still say `test_`. **A build cycle
+did not reconcile the two.** The 2026-08-21 23:03:25 UTC reading of
+`/assets/index-aTS7aKMk.js` is superseded only in its bundle path; every other row held.
+
+**The shipped value does not match what either `.env.production` says NOW.** State it
+that way and no further — an earlier revision said the bundle "came from neither
+`.env.production` file", which is a categorical attribution the evidence does not
+support, withdrawn 2026-08-22 after a review P2.
+
+**Which source supplied the value at build time is `NOT_MEASURED`**, and two candidates
+remain live:
+
+1. **A platform environment variable** overriding the files at resolution time — the
+   obvious candidate, and the one the §6.1 withdrawal below leans on.
+2. **The workspace `.env.production` itself carrying a `live_` value at build time and
+   being restored afterwards.** Both files were read _after_ deployment, so this is not
+   excluded by anything measured here. It is the more interesting candidate, because it
+   would explain the shipped token **and** the `treeHash` mismatch with one mechanism,
+   on a build already stamped `dirty: true`.
+
+**Do not discard candidate 2.** The §6.1 withdrawal argues candidate 1 is _likeliest_;
+it does not establish candidate 1 and does not exonerate the file. Only the
+owner-gated build log separates them. One bound tightened and one did not:
+the earlier scan covered all 20 production bundles for `test_`-shaped tokens and found
+none; **this re-measure scanned the main bundle only**, so the other nineteen are
+`NOT_MEASURED` at the 2026-08-22 reading rather than re-confirmed.
+
+### Pre-publish read, performed 2026-08-22 16:16 UTC
+
+The owner's standing instruction is to re-read the Lovable `.env.production` before
+anyone opens the publish button. **Done, and the answer is unchanged: it still reads
+`test_`.**
+
+Read that result correctly — it is the _reason_ the hazard is unresolved, not a
+clearance. The file said `test_` on 2026-08-21 while production shipped `live_`, and it
+says `test_` today while production still ships `live_`. **Reading the file cannot tell
+you what a publish will produce**, because its contents _now_ are not evidence about
+what was resolved at the earlier build — whether a platform variable overrode it, or the
+file itself briefly differed and was restored. **Note what this does NOT say:** an
+earlier revision said "the file demonstrably is not what produced the current bundle",
+which contradicts candidate 2 recorded above and is **withdrawn 2026-08-22** after a
+sixth review P2. The build-time source stays `NOT_MEASURED`. Only the platform env panel
+and the publisher's build log can settle it, and both are owner-gated. A publish taken on the strength of this read alone is exactly the
+sloppy publish the owner warned against.
+
+### Why this is not merely an env-file discrepancy
+
+`scripts/lib/tree-hash.mjs` lists the committed `.env` files in
+`TREE_HASH_ROOTS`, and its own comment gives the reason: _"Committed Vite env
+files: `VITE_\*` values are inlined into shipped JS, so an env-only commit
+produces different app bytes and must move the hash."\_
+
+So `.env.production` is a hashed root **precisely because** its values reach
+shipped JS — and its shipped value differs from its committed value.
+
+**WITHDRAWN 2026-08-22 — this did NOT close the audit's §6.1 `NOT_MEASURED`, and
+saying it did was an error.** Raised as a P2 by `chatgpt-codex-connector` on #1092
+and verified before conceding. The withdrawn claim read: "**A shipped byte does
+differ**, and it is a hashed root ... The workspace-drift finding is no longer
+confined to inputs that never reach users."
+
+**Why it was wrong.** §6.1's open question is whether _the workspace content
+responsible for the `treeHash` mismatch_ reached shipped bytes. What is measured
+here is different: shipped JS diverges from what the **committed** `.env.production`
+prescribes. Those coincide only if the **workspace file on disk** differed at build
+time — and there is a mechanism that produces the measurement without any such
+difference. Vite's `loadEnv` resolves `VITE_*` from platform environment variables as
+well as from `.env` files, and a platform variable overrides the file **without
+altering the file**. Under that mechanism the workspace `.env.production` is
+byte-identical to the committed one, contributes **nothing** to the tree-hash
+mismatch, and the mismatch is caused by some other, still-unidentified file.
+
+**That mechanism is sufficient to break the inference; it is not established as what
+happened.** The workspace file may equally have carried a `live_` value at build time
+and been restored afterwards — see the two candidates recorded above — in which case it
+_would_ have both moved the hash and shipped. Either way the §6.1 bound holds, because
+neither candidate is measured. Do not read this withdrawal as clearing the file.
+
+So two separate claims were conflated:
+
+| Claim                                                                    | Status                                                  |
+| ------------------------------------------------------------------------ | ------------------------------------------------------- |
+| Shipped bytes differ from what the committed env file prescribes         | **measured** — that is the finding above, and it stands |
+| The workspace drift behind the `treeHash` mismatch reached shipped bytes | **`NOT_MEASURED`** — unchanged; §6.1's bound is intact  |
+
+**The audit's §6.1 bound therefore stands as written and needs no correction** —
+which also retires the standing offer to amend that document on this point. This is
+the "inference presented as conclusion" failure mode the deliverable itself names,
+committed here while writing about it.
+
+What survives, and is worth keeping: `.env.production` **is** in `TREE_HASH_ROOTS`
+precisely because `VITE_*` values reach shipped JS, so _if_ that file ever drifts in
+the workspace it would both move the hash and change shipped bytes. That is a reason
+to keep watching it — not evidence that it happened.
+
+### The publish hazard — THREE outcomes, not two (corrected 2026-08-22)
+
+**The two-outcome model recorded here was incomplete.** Raised as a P2 by
+`chatgpt-codex-connector` on #1092 and verified at source. #1091 merged
+`scripts/assert-paddle-production-sandbox.mjs` into `package.json`'s **`prebuild`**,
+where it now runs _first_, ahead of `stamp-version.mjs`. Read directly: it requires
+the committed `.env.production` to resolve as the canonical sandbox token, then calls
+Vite's own `loadEnv("production", rootDir, "VITE_PAYMENTS_")` — the **effective**
+resolution, platform environment variables included — and fails unless that effective
+value is itself a sandbox token _and_ equals the canonical one
+(`effective_paddle_token_not_sandbox` / `effective_paddle_token_mismatch`, `exitCode 1`).
+
+So the outcomes are:
+
+1. **The build fails closed** — a live platform value now trips the guard before any
+   output is generated. On the current deploy branch, via the repo's own build script,
+   this is the expected outcome.
+2. **A publish keeps the live token** — only if the publisher bypasses the package
+   lifecycle (invoking `vite build` directly rather than `run build`, so `prebuild`
+   never fires).
+3. **A publish swaps live → test and RESTORES sandbox checkout** — if the file wins
+   and the guard passes. Note the direction: because a live token already fails
+   closed, this outcome **fixes** checkout rather than breaking it. An earlier
+   revision called this "breaks live payments", which was backwards.
+
+**Two bounds, both load-bearing:**
+
+- **Whether the publisher runs the package lifecycle at all is `NOT_MEASURED`.** The
+  guard only protects the paths that invoke `prebuild`. This is the same gap the
+  bot named, and it is not closed here.
+- **The guard does NOT explain the token already in production.** It is absent from
+  the live build: `scripts/assert-paddle-production-sandbox.mjs` does not exist at
+  `faea6e9c59ad`, whose `prebuild` is only `verify-edge-shared-in-sync` →
+  `check-no-src-lib-imports` → `stamp-version`. It was added by `72e766314` (#1091),
+  merged 2026-08-22 12:38:29 UTC — **after** the live build was stamped
+  (2026-08-21T20:51:46.584Z). It changes what the _next_ publish does; it says nothing
+  about how the current one shipped `live_`.
+
+Nobody can predict the outcome from the repository alone. That is still why the env
+surface must be read immediately before any publish — and why reading the **file alone
+does not answer it**: the file said `test_` while production shipped `live_`.
+
+### Severity, stated precisely
+
+`inference, high confidence`, not verified against Paddle: a Paddle **client-side
+token** is designed to be public, ships in the browser by intent, and cannot
+authorize server-side operations. On that reading this is **not** an API-key leak.
+
+What it **is**, corrected: a **checkout-blocking** configuration and provenance
+defect. Production is running **no** payments — the live-class token fails closed and
+disables checkout on every host — while every committed env file in the repository
+says test, and the mismatch is invisible to CI. The earlier wording "production is
+running **live** payments" is **withdrawn**; see the severity-correction block at the
+top of this section.
+
+### What else was checked, and came back clean
+
+All 20 production bundles were scanned for secret-class markers **on 2026-08-21**;
+the 2026-08-22 re-measure re-read only the main bundle, so this subsection is a
+2026-08-21 result and is `NOT_MEASURED` against the current build. One hit:
+`BRIDGE_TOKEN` in `sensorTestbenchIndicatorRules-BYI81Sq2.js`, which is a
+PowerShell **variable name** inside a copy-paste snippet template carrying the
+literal placeholder `<vbt_… mint a token to reveal>`. No token value.
+`VITE_SUPABASE_PUBLISHABLE_KEY` is the anon key — public by design and already
+committed in `.env`. No `service_role`, `SECRET`, or `PRIVATE_KEY` marker appears
+in any bundle.
+
+### Method note for whoever re-measures
+
+The landing HTML contains NUL bytes, so plain `grep` reports **no matches and no
+error** against it — the same trap `docs/agent-session-network-reachability.md`
+records. Use `grep -a`. A bundle scan that silently returns nothing is the failure
+mode to expect here.
+
+---
+
+## External reference scope — MACAE accelerator (recorded 2026-08-22)
+
+**Status: `REFERENCE_ONLY`. Owner: Claude.** This row records that the scope exists; it
+authorises no build, no slice, and no port. Recorded as its own timestamped row rather
+than as a new Last-updated block — it supersedes no measurement above.
+
+**Scope (`source claim`):** relayed by Cheek as "Grok has scoped this demo for all agents
+to read and ingest for future builds", authorised 2026-08-22 as a docs-only slice.
+
+| Field                              | Value                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Repository                         | `Verdant-OS/multi-agent-custom-automation-engine-solution-accelerator` (public)                                                                  |
+| Read at                            | `b4a4a00` on `main`, `2026-06-26T20:50:10Z` — shallow clone, read 2026-08-22                                                                     |
+| Digest                             | [`docs/knowledge-library/macae-reference-ingest.md`](../knowledge-library/macae-reference-ingest.md)                                             |
+| Clone path (ephemeral)             | `/home/user/verdant-os/multi-agent-custom-automation-engine-solution-accelerator` — does not survive the container; re-clone from the public URL |
+| Runtime behaviour                  | `NOT_MEASURED` — never deployed or executed                                                                                                      |
+| Applicability to any Verdant slice | `NOT_MEASURED` — no slice assigned                                                                                                               |
+| Slice owner                        | **Claude**                                                                                                                                       |
+| Owner-designated reviewer          | **Blue Dream**, in Cursor — not a GitHub handle (Cheek, 2026-08-22)                                                                              |
+| Protocol peer-review seat          | **Grok (GDP)** — filled by Cheek 2026-08-22; `HANDOFF_PROTOCOL.md:24` allows Grok, Claude or Codex                                               |
+| Owner acknowledgement              | **cheekhimself**, given out-of-band, outside the GitHub review-request mechanism                                                                 |
+
+Pairing recorded here per `docs/agents/HANDOFF_PROTOCOL.md:25`, which requires both names
+in this file and not only in the handoff block. **Read the two reviewer rows together —
+neither alone is the whole picture.**
+
+Blue Dream remains the owner's designated reviewer and reviews in Cursor, not on GitHub,
+so an empty GitHub reviewer list on these PRs is by design and not an oversight. The
+protocol peer-review seat is now filled by **Grok (GDP)** as the independent peer
+reviewer (Cheek, 2026-08-22). Blue Dream is **not** one of the three peers (Grok,
+Claude, Codex) that `HANDOFF_PROTOCOL.md:24` and `AGENTS.md:582-584` permit in that
+seat; Grok (GDP) is. Do **not** leave or restate `NOT FILLED` / "cannot infer" as the
+live claim for this seat.
+
+**Read the digest before acting on anything in that repository.** Its do-not-port rules
+bind, and are repeated here so this row is not safe to quote alone:
+
+1. **The in-memory approval store is an anti-pattern for Verdant.**
+   `OrchestrationConfig` (`src/backend/v4/config/settings.py`) owns
+   `approvals: Dict[str, bool]` coordinated by `asyncio.Event`, with
+   `default_timeout: float = 300.0`; `HumanApprovalMagenticManager`
+   (`human_approval_manager.py`) uses that config. A restart, a second replica, or a
+   slow human loses the decision, and that path keeps no audit record. Do not
+   reproduce that shape.
+2. **The Action Queue stays durable** — `reason`, risk level, `status`, and an append-only
+   audit trail, enforced with RLS. Approval is a persisted row, never process memory.
+3. **Read the approval-gate shape and the tools-as-services separation. Port nothing
+   else** — not the Azure runtime, not Cosmos DB, not Container Apps, not the in-memory
+   approval store.
+4. **Automation last.** Diary first, sensors second, AI third. This accelerator is an
+   automation-orchestration engine; it does not move up that order.
 
 ---
 

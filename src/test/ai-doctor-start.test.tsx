@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   data: [] as Array<Record<string, unknown>>,
   isLoading: false,
+  isPending: false,
   isError: false,
   refetch: vi.fn(async () => undefined),
   invoke: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock("@/hooks/useGrowData", () => ({
   useGrowPlants: () => ({
     data: state.data,
     isLoading: state.isLoading,
+    isPending: state.isPending,
     isError: state.isError,
     refetch: state.refetch,
   }),
@@ -85,6 +87,7 @@ describe("AiDoctorStart", () => {
   beforeEach(() => {
     state.data = [];
     state.isLoading = false;
+    state.isPending = false;
     state.isError = false;
     state.refetch.mockClear();
     state.invoke.mockClear();
@@ -104,10 +107,27 @@ describe("AiDoctorStart", () => {
 
   it("renders a distinct loading state without implying an empty plant list", () => {
     state.isLoading = true;
+    state.isPending = true;
     renderPage();
 
     expect(screen.getByTestId("ai-doctor-start-loading")).toHaveAttribute("role", "status");
     expect(screen.queryByText("No active plants to review")).toBeNull();
+  });
+
+  it("treats an offline-paused plant read as unknown instead of an empty or unavailable list", () => {
+    state.isPending = true;
+    state.isLoading = false;
+    state.isError = false;
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_MISSING}`);
+
+    expect(screen.getByTestId("ai-doctor-start-loading")).toHaveAttribute("role", "status");
+    expect(screen.queryByText("No active plants to review")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-start-carried-plant-unavailable")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-start-options")).toBeNull();
+    expect(screen.queryByTestId("plant-detail")).toBeNull();
+    expect(state.invoke).not.toHaveBeenCalled();
   });
 
   it("renders the failed-read state and retries without inventing plant choices", () => {
@@ -519,5 +539,80 @@ describe("AiDoctorStart", () => {
     // The action name is unchanged — the badge describes, it does not rename.
     expect(promoted).toHaveAccessibleName("Review Alpha with AI Doctor");
     expect(document.getElementById(badgeId)).toHaveTextContent("In this tent");
+  });
+
+  // ---- Doctor-says-so plant carry (closed #1104; thin follow-up to inert #1102) ----
+
+  const PLANT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const PLANT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const PLANT_MISSING = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+  it("badges a validated carried plant without auto-selecting it", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = [
+      { id: PLANT_B, name: "Beta", tentId: "tent-b" },
+      { id: PLANT_A, name: "Alpha", tentId: "tent-a" },
+    ];
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_A}`);
+
+    const option = screen.getAllByRole("link", { name: /with AI Doctor/i })[0];
+    const carriedBadgeId = "ai-doctor-start-option-0-carried";
+    const inTentBadgeId = "ai-doctor-start-option-0-in-tent";
+    expect(option).toHaveAttribute("aria-describedby", `${carriedBadgeId} ${inTentBadgeId}`);
+    expect(option).toHaveAccessibleName("Review Alpha with AI Doctor");
+    expect(document.getElementById(carriedBadgeId)).toHaveTextContent("You came from here");
+    expect(document.getElementById(inTentBadgeId)).toHaveTextContent("In this tent");
+    expect(screen.queryByTestId("ai-doctor-start-carried-plant-unavailable")).toBeNull();
+    // Still on /doctor — never navigated / never applied selection.
+    expect(screen.getByTestId("location")).toHaveTextContent("/doctor");
+    expect(screen.queryByTestId("plant-detail")).toBeNull();
+    expect(state.invoke).not.toHaveBeenCalled();
+    // UUID must not appear as visible copy.
+    expect(screen.getByTestId("ai-doctor-start").textContent ?? "").not.toContain(PLANT_A);
+  });
+
+  it("shows an unavailable message when the carried plant is not in the carried tent", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = [
+      { id: PLANT_B, name: "Beta", tentId: "tent-b" },
+      { id: PLANT_A, name: "Alpha", tentId: "tent-a" },
+    ];
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_B}`);
+
+    const message = screen.getByTestId("ai-doctor-start-carried-plant-unavailable");
+    expect(message).toHaveAttribute("role", "status");
+    expect(message).toHaveTextContent(/couldn't offer for review/i);
+    expect(message).toHaveTextContent(/No plant was selected/i);
+    expect(message.textContent ?? "").not.toContain(PLANT_B);
+    expect(screen.queryByTestId("ai-doctor-start-option-0-carried")).toBeNull();
+    expect(screen.getByTestId("location")).toHaveTextContent("/doctor");
+    expect(screen.queryByTestId("plant-detail")).toBeNull();
+  });
+
+  it("shows unavailable when the carried plant is outside the loaded active options", () => {
+    state.grows = SCOPED.grows;
+    state.tents = SCOPED.tents;
+    state.data = [
+      { id: PLANT_B, name: "Beta", tentId: "tent-b" },
+      { id: PLANT_A, name: "Alpha", tentId: "tent-a" },
+    ];
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_MISSING}`);
+
+    expect(screen.getByTestId("ai-doctor-start-carried-plant-unavailable")).toBeInTheDocument();
+    expect(screen.queryByTestId("ai-doctor-start-option-0-carried")).toBeNull();
+  });
+
+  it("does not flash carried-plant unavailable while ownership reads are still loading", () => {
+    state.growsLoading = true;
+    state.tentsLoading = true;
+    state.data = [
+      { id: PLANT_B, name: "Beta", tentId: "tent-b" },
+      { id: PLANT_A, name: "Alpha", tentId: "tent-a" },
+    ];
+    renderPage(`/doctor?growId=grow-1&tentId=tent-a&plantId=${PLANT_B}`);
+
+    expect(screen.queryByTestId("ai-doctor-start-carried-plant-unavailable")).toBeNull();
   });
 });

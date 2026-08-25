@@ -292,6 +292,13 @@ function expectNoTimelineContinuation() {
   expect(screen.queryByTestId("timeline-one-tent-loop-next-step-card")).not.toBeInTheDocument();
 }
 
+function expectNoTimelineDirectoryReads() {
+  const directoryReads = harness.executeQuery.mock.calls
+    .map(([spec]) => spec as QuerySpec)
+    .filter((spec) => spec.table === "plants" || spec.table === "tents");
+  expect(directoryReads).toHaveLength(0);
+}
+
 function expectNoFalseEmptyOrResults() {
   expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
   expect(screen.queryByText("No matching entries")).not.toBeInTheDocument();
@@ -344,6 +351,16 @@ describe("Timeline mounted read-state boundary", () => {
     expectNoTimelineContinuation();
   });
 
+  it("does not read the owner directory while grow ownership proof is pending", async () => {
+    harness.growsState.loading = true;
+
+    renderTimeline();
+
+    expect(await screen.findByTestId("timeline-read-loading")).toBeInTheDocument();
+    await waitFor(() => expectNoTimelineDirectoryReads());
+    expectNoTimelineContinuation();
+  });
+
   it("labels plant/tent filter options from the archived-inclusive name directory", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {
@@ -366,16 +383,31 @@ describe("Timeline mounted read-state boundary", () => {
         // otherwise return every grower's rows on this owner-facing page.
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
         expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
+        expect(spec.columns).toBe("id,name,tent_id,grow_id");
         return {
-          data: [{ id: "5d7206aa-0000-4000-8000-000000000001", name: "Project McDonald #3" }],
+          data: [
+            {
+              id: "5d7206aa-0000-4000-8000-000000000001",
+              name: "Project McDonald #3",
+              tent_id: "6b1faabb-0000-4000-8000-000000000002",
+              grow_id: GROW_A.id,
+            },
+          ],
           error: null,
         };
       }
       if (spec.table === "tents") {
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
         expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
+        expect(spec.columns).toBe("id,name,grow_id");
         return {
-          data: [{ id: "6b1faabb-0000-4000-8000-000000000002", name: "Retired 4x4" }],
+          data: [
+            {
+              id: "6b1faabb-0000-4000-8000-000000000002",
+              name: "Retired 4x4",
+              grow_id: GROW_A.id,
+            },
+          ],
           error: null,
         };
       }
@@ -428,6 +460,7 @@ describe("Timeline mounted read-state boundary", () => {
     expect(document.body).not.toHaveTextContent("provider-secret");
     expect(screen.queryByText("Start your first grow")).not.toBeInTheDocument();
     expect(screen.queryByText("Create grow")).not.toBeInTheDocument();
+    expectNoTimelineDirectoryReads();
     expectNoTimelineContinuation();
 
     fireEvent.click(screen.getByTestId("timeline-grow-data-error-retry"));
@@ -1149,7 +1182,7 @@ describe("Timeline mounted read-state boundary", () => {
                 "Older text survives photo failure",
                 "2026-07-19T12:00:00.000Z",
               ),
-              photo_url: "owner/private-photo.jpg",
+              photo_url: "owner-1/grow-a/private-photo.jpg",
             },
           ],
           error: null,
@@ -1168,5 +1201,147 @@ describe("Timeline mounted read-state boundary", () => {
     expect(await screen.findByText("Older text survives photo failure")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-partial-read-warning")).toBeInTheDocument();
     expect(screen.queryByTestId("timeline-load-older-error")).not.toBeInTheDocument();
+  });
+
+  it("uses the owner-validated nested photo fallback on the initial page without overriding a usable top-level reference", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-nested-photo", "Nested photo fallback"),
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/nested-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry("entry-top-level-photo", "Top-level photo wins"),
+              photo_url: "owner-1/grow-a/canonical-top-level.jpg",
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/ignored-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry("entry-external-photo", "Trusted external photo wins"),
+              photo_url: "https://images.example.test/canonical.jpg",
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/ignored-external-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry("entry-foreign-photo", "Foreign photo is unavailable"),
+              photo_url: "other-owner/grow-a/foreign.jpg",
+              details: {
+                event_type: "photo",
+                photo_url: "other-owner/grow-a/foreign-fallback.jpg",
+              },
+            },
+          ],
+          error: null,
+          count: 4,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    await waitFor(() => {
+      expect(harness.createSignedUrls).toHaveBeenCalledWith([
+        "owner-1/grow-a/nested-fallback.jpg",
+        "owner-1/grow-a/canonical-top-level.jpg",
+      ]);
+    });
+    expect(harness.createSignedUrls).toHaveBeenCalledTimes(1);
+    expect(
+      document.querySelector('img[src="https://signed.test/owner-1/grow-a/nested-fallback.jpg"]'),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector(
+        'img[src="https://signed.test/owner-1/grow-a/canonical-top-level.jpg"]',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('img[src="https://images.example.test/canonical.jpg"]'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('img[src*="foreign"]')).not.toBeInTheDocument();
+  });
+
+  it("applies the same owner-aware nested-photo projection to older pages", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries" && isOlderPage(spec)) {
+        return {
+          data: [
+            {
+              ...diaryEntry(
+                "entry-older-nested-photo",
+                "Older nested photo fallback",
+                "2026-07-19T12:00:00.000Z",
+              ),
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/older-nested-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry(
+                "entry-older-top-level-photo",
+                "Older top-level photo wins",
+                "2026-07-19T11:00:00.000Z",
+              ),
+              photo_url: "https://images.example.test/older-canonical.jpg",
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/ignored-older-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry(
+                "entry-older-foreign-photo",
+                "Older foreign photo is unavailable",
+                "2026-07-19T10:00:00.000Z",
+              ),
+              details: {
+                event_type: "photo",
+                photo_url: "other-owner/grow-a/older-foreign.jpg",
+              },
+            },
+          ],
+          error: null,
+        };
+      }
+      if (spec.table === "diary_entries") {
+        return {
+          data: [diaryEntry("entry-newest", "Newest entry")],
+          error: null,
+          count: 4,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+    expect(await screen.findByText("Newest entry")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("timeline-load-older"));
+
+    await waitFor(() => {
+      expect(harness.createSignedUrls).toHaveBeenCalledWith([
+        "owner-1/grow-a/older-nested-fallback.jpg",
+      ]);
+    });
+    expect(harness.createSignedUrls).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Older nested photo fallback")).toBeInTheDocument();
+    expect(
+      document.querySelector(
+        'img[src="https://signed.test/owner-1/grow-a/older-nested-fallback.jpg"]',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('img[src="https://images.example.test/older-canonical.jpg"]'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('img[src*="older-foreign"]')).not.toBeInTheDocument();
   });
 });

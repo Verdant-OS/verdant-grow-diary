@@ -10,7 +10,12 @@
 
 const STORAGE_PREFIX = "verdant.mcp.lastValidInputs.v1";
 
-export type ToolName = "list_grows" | "list_recent_diary_entries" | "get_latest_sensor_snapshot";
+export type ToolName =
+  | "list_grows"
+  | "list_recent_diary_entries"
+  | "get_latest_sensor_snapshot"
+  | "list_grow_walk_targets"
+  | "get_grow_walk_context";
 
 function storageKey(tool: ToolName) {
   return `${STORAGE_PREFIX}.${tool}`;

@@ -110,6 +110,10 @@ Open pull requests against `verdant-grow-diary`, classified:
 | [#1068](https://github.com/Verdant-OS/verdant-grow-diary/pull/1068)                                                                                                                                           | `cheekhimself-patch-1`                             | CodeQL workflow                                 | `OPEN — REVIEW ONLY`                                            |
 | [#1028](https://github.com/Verdant-OS/verdant-grow-diary/pull/1028), [#1018](https://github.com/Verdant-OS/verdant-grow-diary/pull/1018), [#719](https://github.com/Verdant-OS/verdant-grow-diary/pull/719)   | env / e2e / plantuml                               | Older, unrelated                                | `OPEN — REVIEW ONLY`                                            |
 
+> **Current-status annotation (2026-08-22):** This table is a frozen collision-audit
+> snapshot. Since it was recorded, #1076, #1079, and #1081 have each closed unmerged;
+> this does not revise their historical classifications above.
+
 ### 3.1 The blocking collision, stated precisely
 
 **#1051 was open, non-draft, `mergeable_state: clean`, 15 files, +823/−57, with all twelve

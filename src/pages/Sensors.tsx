@@ -31,6 +31,7 @@ import SensorSourceSummaryWidget from "@/components/SensorSourceSummaryWidget";
 import SensorSourceLegendTooltip from "@/components/SensorSourceLegendTooltip";
 import SensorSourceInlineLegend from "@/components/SensorSourceInlineLegend";
 import { useLocation, useSearchParams } from "@/lib/react-router-compat";
+import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { SENSOR_SOURCES_PARAM, parseSensorSourcesParam } from "@/lib/sensorSourceUrlRules";
 import { classifySensorMetricState, type SensorMetricKey } from "@/lib/sensorMetricStateRules";
 import {
@@ -81,6 +82,14 @@ export default function Sensors() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sensorsTentRouteIntent = useMemo(
     () => readSensorsTentRouteIntent(searchParams),
+    [searchParams],
+  );
+  // D-B6 handoff. Sensors carries this plant onward WITHOUT resolving it:
+  // the page holds no plant rows, so it can neither check ownership nor name
+  // the plant honestly, and a raw UUID must never reach the screen. The
+  // consuming AI Doctor page revalidates it against the grower's own rows.
+  const carriedPlantIntentId = useMemo(
+    () => readSensorsPlantRouteIntent(searchParams),
     [searchParams],
   );
   const sensorsTentRouteIntentKey = useMemo(
@@ -336,7 +345,11 @@ export default function Sensors() {
       />
       <OneTentLoopNextStepCard
         current="sensor-snapshot"
-        ids={{ growId: selectedGrowId ?? null, tentId: activeTentId }}
+        ids={{
+          growId: selectedGrowId ?? null,
+          tentId: activeTentId,
+          plantId: carriedPlantIntentId,
+        }}
         testId="sensors-one-tent-loop-next-step-card"
         className="mb-3"
       />

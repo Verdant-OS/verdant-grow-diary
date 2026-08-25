@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import { buildDemoProofWalkthroughViewModel } from "@/lib/demoProofWalkthroughViewModel";
+import { Route as DemoProofWalkthroughRoute } from "@/routes/internal.demo-proof-walkthrough";
 import { extractMountedAppRoutePaths } from "./helpers/routeManifestSyncHarness";
 
 function loadAppRoutePaths(): Set<string> {
@@ -23,6 +24,15 @@ function stripQuery(href: string): string {
 describe("Demo Proof Walkthrough — route snapshot", () => {
   const appPaths = loadAppRoutePaths();
   const vm = buildDemoProofWalkthroughViewModel();
+
+  it("resolves exactly one noindex, nofollow robots directive", async () => {
+    const head = await DemoProofWalkthroughRoute.options.head?.({} as never);
+    const robotsMeta =
+      head?.meta?.filter((entry) => entry != null && "name" in entry && entry.name === "robots") ??
+      [];
+
+    expect(robotsMeta).toEqual([{ name: "robots", content: "noindex, nofollow" }]);
+  });
 
   it("file routes exposes the expected real routes the walkthrough relies on", () => {
     const required = [

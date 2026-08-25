@@ -87,15 +87,69 @@ Do not continue until the context issue is resolved.`;
  * near operating state. CLAUDE.md now instructs an explicit read instead.
  *
  * That trade only holds while the instruction survives, so it is asserted below as
- * CLAUDE_STATE_READ. Deleting an import is visible in a diff; deleting a sentence is not,
+ * CLAUDE_STATE_READ_INSTRUCTION and CLAUDE_STATE_READ_STEP, pinned verbatim. Deleting an import is visible in a diff; deleting a sentence is not,
  * and an agent with no path to operating state reasons from stale production facts —
  * exactly what this file exists to prevent.
  */
 const CLAUDE_IMPORTS = `@AGENTS.md
 @docs/agents/roles/claude.md`;
 
-/** The on-demand read that replaced the CURRENT_STATE.md import. */
-const CLAUDE_STATE_READ = "docs/agents/CURRENT_STATE.md";
+/**
+ * The two imperative sentences that replaced the CURRENT_STATE.md import, pinned verbatim.
+ * A bare pathname match is not enough: CLAUDE.md mentions the path incidentally in several
+ * other places, so an edit could delete every actual read instruction and still satisfy a
+ * substring check — the same source-text-scan failure AGENTS.md records for
+ * playwright-action-timeout-fence. Comparison is whitespace-normalized so a prose re-wrap
+ * is not a violation; any wording or ordering change is.
+ */
+const CLAUDE_STATE_READ_INSTRUCTION =
+  "**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file " +
+  "tool before you acknowledge.**";
+const CLAUDE_STATE_READ_STEP =
+  "1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.";
+
+/** Collapse whitespace runs so line-wrapping differences cannot defeat an exact-copy pin. */
+function normalizeWhitespace(text) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Operative prose only: fenced code blocks (backtick and tilde), HTML comments, and
+ * blockquoted lines removed. A pinned
+ * imperative retained solely inside a fenced "obsolete example" or a quoted historical
+ * copy is not an instruction to the reader, so the pins must appear in what remains.
+ * Inline code spans stay — the operative sentences themselves carry the pathname in
+ * backticks, and an inline span is still read as prose.
+ */
+function operativeProse(text) {
+  // Strip to a fixpoint: a single pass can leave a recombined delimiter (removing
+  // "<!-- x -->" from "<!<!-- x -->-- pin -->" leaves "<!-- pin -->" intact), which
+  // CodeQL flags as incomplete sanitization and which here would let a pin survive
+  // inside a comment. Every replacement only deletes, so the loop terminates.
+  let previous;
+  do {
+    previous = text;
+    text = text
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/~~~[\s\S]*?~~~/g, "")
+      .replace(/<!--[\s\S]*?-->/g, "");
+  } while (text !== previous);
+  return text
+    .split("\n")
+    .filter((line) => !/^\s*>/.test(line))
+    .join("\n");
+}
+
+/*
+ * Known residual, accepted deliberately: a copy inside a 4-space-indented code block
+ * (outside a list) or after an unclosed fence would still read as operative here.
+ * Stripping indented lines is not safe — CLAUDE.md's own operative step list uses
+ * indented continuation lines, and in list context 4-space indentation is prose, not
+ * code; a regex cannot tell the two apart without a real Markdown parser. The
+ * compensating control is unchanged: any such edit to CLAUDE.md still trips BUMP and
+ * lands in front of a human reviewer as a diff. This gate is a tripwire, not the only
+ * defense.
+ */
 
 const LEGACY_ARCHIVE = "docs/archive/legacy/verdant-master-prompt-legacy.md";
 const LEGACY_HEADER = `> LEGACY — NOT ACTIVE AGENT INSTRUCTIONS
@@ -207,15 +261,57 @@ if (claudeText && !claudeText.startsWith(CLAUDE_IMPORTS)) {
   );
 }
 
-// CURRENT_STATE.md is read on demand rather than imported, so this written instruction is
-// the only thing keeping operating state in front of an agent. Nothing else in the
-// governance set carries branch, production, migration, blocker or assignment facts.
-if (claudeText && !claudeText.includes(CLAUDE_STATE_READ)) {
+/**
+ * Markdown with fenced code blocks and inline code spans removed. Claude Code does not
+ * evaluate imports inside code spans and blocks, so a backticked mention of the import
+ * token — the natural way to write ABOUT the syntax — is legal and must not be flagged.
+ */
+function stripCodeSpans(text) {
+  return text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
+}
+
+/**
+ * The import token in either spelling Claude Code would resolve from the repo root.
+ * Claude Code resolves @-imports INLINE in prose as well as on standalone lines
+ * ("See @README for project overview" is its documented example), so this must not be
+ * anchored to line boundaries.
+ */
+const CURRENT_STATE_IMPORT_RE = /@(?:\.\/)?docs\/agents\/CURRENT_STATE\.md\b/;
+
+// startsWith alone would accept the CURRENT_STATE import re-added as a third line, later
+// in the file, or inline inside a sentence — the required prefix still holds in every
+// case, while the ~27,400-token automatic import silently returns. Reject the import
+// token anywhere outside code spans; the on-demand read (asserted below) replaced it.
+if (claudeText && CURRENT_STATE_IMPORT_RE.test(stripCodeSpans(claudeText))) {
   problems.push(
-    "CLAUDE.md: must still instruct an explicit read of docs/agents/CURRENT_STATE.md. " +
-      "It is not imported (too large), so losing the instruction leaves agents with no " +
-      "path to operating state",
+    "CLAUDE.md: @docs/agents/CURRENT_STATE.md must not be imported automatically. The " +
+      "import was replaced by an on-demand read (#1094); remove the @ token wherever it " +
+      "appears — standalone, appended after the required two-line prefix, or inline in " +
+      "prose. Only a code-span mention (backticks) is exempt, matching what Claude Code " +
+      "itself does not evaluate",
   );
+}
+
+// CURRENT_STATE.md is read on demand rather than imported, so these written imperatives
+// are the only thing keeping operating state in front of an agent. Nothing else in the
+// governance set carries branch, production, migration, blocker or assignment facts.
+// Each is required verbatim; an incidental mention of the pathname is not a substitute.
+if (claudeText) {
+  const claudeNormalized = normalizeWhitespace(operativeProse(claudeText));
+  const statePins = [
+    ["pre-ack read instruction", CLAUDE_STATE_READ_INSTRUCTION],
+    ["startup step-1 read", CLAUDE_STATE_READ_STEP],
+  ];
+  for (const [label, pin] of statePins) {
+    if (!claudeNormalized.includes(normalizeWhitespace(pin))) {
+      problems.push(
+        `CLAUDE.md: exact ${label} for docs/agents/CURRENT_STATE.md is missing. The file ` +
+          "is not imported (too large), so this imperative is the only path to operating " +
+          "state; an incidental mention of the pathname does not satisfy it, and neither " +
+          "does a copy inside a fenced code block or blockquote",
+      );
+    }
+  }
 }
 
 if (!existsSync("docs/agents/CURRENT_STATE.md")) {

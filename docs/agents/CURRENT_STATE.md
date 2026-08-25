@@ -8,10 +8,9 @@ returns `not our ref`. Two long-standing framings in this file are corrected as 
 that does not hold), and **`ref: "__orphan__"` now has a sufficient explanation** — the
 publisher commits locally in a workspace that is not GitHub's.
 
-Also corrects a claim I made in the 17:11 UTC edit: the build-time token question resolves to
-**candidate 2**, not candidate 1. #1127's shipped script states that Lovable injects `live_`
-into the **tracked** `.env.production`, which both explains the `treeHash` / `dirty: true`
-mismatch and refutes my "it contributed nothing" conclusion.
+The candidate-1-vs-2 correction is **not** restated here — a parallel session on this same
+branch recorded it more fully; see "#1127 landed while this PR was open" below. This edit
+merged that work rather than competing with it, and trimmed its own duplicate.
 
 #1127 is **not in the live build** (merged 19:16 UTC, build stamped 18:05 UTC), and the
 re-measured bundle still carries a `live_`-class token and zero `test_` — counts only, no
@@ -637,23 +636,13 @@ Two consequences, both correcting long-standing framing in this file:
    not a stamping bug — it is what an orphan workspace commit looks like when stamped
    faithfully.
 
-### The build-time token question — candidate 2 was right; my earlier record said candidate 1
+### The build-time token question — see the candidate-2 block above, not here
 
-**Corrected.** The 2026-08-25 entry above says #1124's body resolved this to candidate 1 (a
-platform environment variable overriding `.env.production` without altering it), and drew
-the further conclusion that "the workspace `.env.production` never differed, so it
-contributed nothing to the tree-hash mismatch — which stays `NOT_MEASURED`."
-
-**Both halves are wrong.** #1127 (`75c01e6f8`) ships
-`scripts/restore-env-production-from-head.mjs`, whose header states the mechanism directly:
-
-> _"Lovable Payments Live injects a `live_` `VITE*PAYMENTS_CLIENT_TOKEN`into the tracked
-working-tree file at publish.`.env.production` is in TREE_HASH_ROOTS, so stamp-version
-> marks dirty."*
-
-That is **candidate 2** — the tracked file itself is rewritten — and it **explains the
-`treeHash` / `dirty: true` mismatch** rather than leaving it unattributed. `source claim`
-from the repository's own shipped code and its documented rationale, not re-derived here.
+**Deliberately not restated.** A parallel session recorded the candidate-1-vs-2 resolution
+at "#1127 landed while this PR was open" above, in more depth than this block did — it also
+explains why candidate 1 would have failed `assert-paddle-production-sandbox.mjs` while
+candidate 2 is consistent with a passing build. That account governs. An earlier draft of
+this block duplicated it and was trimmed on merge rather than left to contradict it.
 
 ### #1127's effect is PROSPECTIVE, and one question about it is open
 

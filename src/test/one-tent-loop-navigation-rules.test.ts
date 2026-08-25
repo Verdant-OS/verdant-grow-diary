@@ -8,6 +8,7 @@ import {
   ONE_TENT_LOOP_SENSOR_SOURCES,
   getNextLoopStep,
   resolveOneTentLoopNextStep,
+  resolveTimelineSensorHandoffIds,
 } from "@/lib/oneTentLoopNavigationRules";
 
 describe("oneTentLoopNavigationRules", () => {
@@ -157,25 +158,87 @@ describe("oneTentLoopNavigationRules", () => {
     // A malformed local filter must not become an untrusted route query.
     expect(resolveOneTentLoopNextStep("timeline", { tentId: "tent-a" }).href).toBe("/sensors");
 
-    // D-B6 handoff: Timeline hands its plant to Sensors so it can survive
-    // Timeline -> Sensors -> Doctor. UUID-only, and the same malformed-value
-    // rule applies to the plant as to the tent.
+    // Timeline carries a plant only alongside a complete tent, with exact
+    // matching required so Sensors cannot silently substitute another tent.
     const TENT = "00000000-0000-4000-8000-00000000000a";
     const PLANT = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
     expect(resolveOneTentLoopNextStep("timeline", { tentId: TENT, plantId: PLANT }).href).toBe(
-      `/sensors?tentId=${TENT}&plantId=${PLANT}`,
+      `/sensors?tentId=${TENT}&tentIntent=required&plantId=${PLANT}`,
     );
-    // A plant with no tent still carries — Sensors resolves its own tent, and
-    // dropping the plant here would silently defeat the handoff.
-    expect(resolveOneTentLoopNextStep("timeline", { plantId: PLANT }).href).toBe(
-      `/sensors?plantId=${PLANT}`,
-    );
+    // Plant-only intent is unsafe: Sensors may otherwise choose its first tent.
+    expect(resolveOneTentLoopNextStep("timeline", { plantId: PLANT }).href).toBe("/sensors");
     // Malformed plant never becomes a route query.
     for (const bad of ["plant-a", "", "   ", null, undefined]) {
       expect(resolveOneTentLoopNextStep("timeline", { tentId: TENT, plantId: bad }).href).toBe(
         `/sensors?tentId=${TENT}`,
       );
     }
+  });
+
+  it("resolves Timeline plant/tent handoff only from owner-scoped relationship evidence", () => {
+    const TENT_A = "00000000-0000-4000-8000-00000000000a";
+    const TENT_B = "00000000-0000-4000-8000-00000000000b";
+    const PLANT_B = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+    const ownership = new Map([[PLANT_B, TENT_B]]);
+
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: PLANT_B,
+        plantTentIdsById: ownership,
+      }),
+    ).toEqual({ tentId: TENT_B, plantId: PLANT_B });
+
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: PLANT_B,
+        tentId: TENT_B,
+        plantTentIdsById: ownership,
+      }),
+    ).toEqual({ tentId: TENT_B, plantId: PLANT_B });
+
+    // A conscious but conflicting tent filter is preserved; the plant is not.
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: PLANT_B,
+        tentId: TENT_A,
+        plantTentIdsById: ownership,
+      }),
+    ).toEqual({ tentId: TENT_A, plantId: null });
+  });
+
+  it("fails closed when Timeline cannot prove a selected plant's current tent", () => {
+    const TENT_A = "00000000-0000-4000-8000-00000000000a";
+    const PLANT = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+
+    for (const plantTentIdsById of [null, new Map<string, string>()]) {
+      expect(
+        resolveTimelineSensorHandoffIds({
+          plantId: PLANT,
+          tentId: TENT_A,
+          plantTentIdsById,
+        }),
+      ).toEqual({ tentId: TENT_A, plantId: null });
+    }
+
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: PLANT,
+        plantTentIdsById: new Map([[PLANT, "tent-placeholder"]]),
+      }),
+    ).toEqual({ tentId: null, plantId: null });
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: "plant-placeholder",
+        tentId: TENT_A,
+        plantTentIdsById: new Map([[PLANT, TENT_A]]),
+      }),
+    ).toEqual({ tentId: TENT_A, plantId: null });
+    expect(
+      resolveTimelineSensorHandoffIds({
+        tentId: TENT_A,
+        plantTentIdsById: new Map([[PLANT, TENT_A]]),
+      }),
+    ).toEqual({ tentId: TENT_A, plantId: null });
   });
 
   it("routes sensor-snapshot → ai doctor with only a complete normalized grow/tent scope", () => {

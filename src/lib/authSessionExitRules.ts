@@ -5,12 +5,14 @@
 //  - Never clears grow / diary / sensor data.
 //  - Never clears user-scoped start-screen preference
 //    (verdant:startScreen:<userId>).
-//  - Only clears a small allowlist of transient auth-only UI keys.
+//  - Clears only a small allowlist of transient auth/identity-scoped UI keys,
+//    including private Global Search query memory.
 //  - Always resolves the post-signout redirect through sanitizeAuthRedirect
 //    so an external value can never escape this app's origin.
 //  - On Supabase signOut failure: returns a friendly non-sensitive message
 //    and STILL redirects to a safe internal page.
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { clearGlobalSearchPrivateState } from "@/lib/globalSearchSession";
 
 export const SAFE_SIGN_OUT_REDIRECT = "/welcome";
 export const SIGN_OUT_FALLBACK_REDIRECT = "/auth";
@@ -34,11 +36,28 @@ export const AUTH_TRANSIENT_SESSION_PREFIXES: ReadonlyArray<string> = [
 
 export interface ClearAuthUiStateDeps {
   sessionStorage?: Storage | null;
+  /** Used only to remove the legacy persistent Global Search recent-query key. */
+  localStorage?: Storage | null;
   onClearQueryCache?: () => void;
 }
 
+function resolveSessionStorage(provided?: Storage | null): Storage | null {
+  if (provided !== undefined) return provided;
+  try {
+    return typeof window !== "undefined" ? window.sessionStorage : null;
+  } catch {
+    return null;
+  }
+}
+
 export function clearAuthTransientUiState(deps: ClearAuthUiStateDeps = {}): void {
-  const ss = deps.sessionStorage ?? (typeof window !== "undefined" ? window.sessionStorage : null);
+  // Search text and selected private entity IDs are identity-scoped. `recent`
+  // also used to live in localStorage, so the helper removes that legacy copy.
+  clearGlobalSearchPrivateState({
+    sessionStorage: deps.sessionStorage,
+    localStorage: deps.localStorage,
+  });
+  const ss = resolveSessionStorage(deps.sessionStorage);
   if (ss) {
     try {
       const toRemove: string[] = [];

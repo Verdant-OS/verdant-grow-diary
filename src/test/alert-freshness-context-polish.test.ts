@@ -62,6 +62,24 @@ describe("buildSourceChip", () => {
     expect(c.tone).toBe("eligible");
     expect(c.canPersist).toBe(true);
   });
+  it("Plant Quick Log manual evidence stays visibly Manual but is not eligible", () => {
+    const snapshot = snap({
+      source: "manual",
+      ts: FRESH_TS,
+      alert_persistence_eligible: false,
+    });
+    const c = buildSourceChip({ status: "ok", snapshot, now: NOW });
+
+    expect(c.label).toBe("Manual");
+    expect(c.tone).toBe("context");
+    expect(c.qualifier).toBe("manual evidence");
+    expect(c.canPersist).toBe(false);
+
+    const cta = emptyStateSnapshotCta({ status: "ok", snapshot, now: NOW });
+    expect(cta?.kind).toBe("context-only");
+    expect(cta?.message).toMatch(/manual evidence/i);
+    expect(cta?.showAddManualSnapshot).toBe(true);
+  });
   it("stale manual/live → warning tone, never eligible", () => {
     for (const source of ["manual", "live"] as const) {
       const c = buildSourceChip({

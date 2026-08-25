@@ -5,6 +5,11 @@ import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
+import {
+  clearGlobalSearchPrivateState,
+  readGlobalSearchSession,
+  writeGlobalSearchSession,
+} from "@/lib/globalSearchSession";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
 
@@ -21,6 +26,7 @@ const globalSearchMock = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
   retry: vi.fn(),
+  queries: [] as string[],
 }));
 
 vi.mock("@/store/auth", () => ({
@@ -33,7 +39,10 @@ vi.mock("@/store/auth", () => ({
 }));
 
 vi.mock("@/hooks/useGlobalSearch", () => ({
-  useGlobalSearch: () => globalSearchMock,
+  useGlobalSearch: (query: string) => {
+    globalSearchMock.queries.push(query);
+    return globalSearchMock;
+  },
 }));
 
 const visitedLocations: Array<{ key: string; value: string }> = [];
@@ -123,15 +132,47 @@ beforeEach(() => {
   visitedLocations.length = 0;
   window.sessionStorage.clear();
   clearLocalStorageForTest();
+  globalSearchMock.queries.length = 0;
   vi.clearAllMocks();
 });
 
 afterEach(cleanup);
 
 describe("GlobalSearchDialog auth-resolution intent", () => {
+  it("does not hydrate or query stale private state before auth resolves", () => {
+    writeGlobalSearchSession({
+      query: "Cheek Tent 4",
+      filters: { grow: true, tent: true, plant: true, cultivar: true },
+    });
+
+    render(dialogTree(createClient(), 0));
+
+    expect(screen.getByTestId("global-search-input")).toHaveValue("");
+    expect(globalSearchMock.queries.at(-1)).toBe("");
+  });
+
+  it("clears a mounted private query in the synchronous identity fence", () => {
+    authMock.loading = false;
+    authMock.user = { id: "owner-a" };
+    const client = createClient();
+    render(dialogTree(client, 0));
+
+    fireEvent.change(screen.getByTestId("global-search-input"), {
+      target: { value: "Cheek Tent 4" },
+    });
+    expect(screen.getByTestId("global-search-input")).toHaveValue("Cheek Tent 4");
+    expect(readGlobalSearchSession().query).toBe("Cheek Tent 4");
+
+    act(() => clearGlobalSearchPrivateState());
+
+    expect(screen.getByTestId("global-search-input")).toHaveValue("");
+    expect(readGlobalSearchSession().query).toBe("");
+  });
+
   it("waits with the dialog open, then routes a signed-in grower exactly once", async () => {
     const { client, view } = startWhileAuthLoads();
 
+    act(() => clearGlobalSearchPrivateState());
     await settleAuth(client, view, 1, { id: "grower-1" });
 
     const expected = "/dashboard?open=quick-log&type=watering";
@@ -148,6 +189,7 @@ describe("GlobalSearchDialog auth-resolution intent", () => {
   it("waits with the dialog open, then preserves the signed-out public fallback", async () => {
     const { client, view } = startWhileAuthLoads();
 
+    act(() => clearGlobalSearchPrivateState());
     await settleAuth(client, view, 1, null);
 
     const expected = "/quick-log?type=watering";

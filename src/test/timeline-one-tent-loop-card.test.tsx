@@ -73,7 +73,9 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
 
     const cta = screen.getByTestId("timeline-one-tent-loop-next-step-card-cta");
     const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
-    expect(anchor?.getAttribute("href")).toBe(`/sensors?tentId=${tentId}&plantId=${plantId}`);
+    expect(anchor?.getAttribute("href")).toBe(
+      `/sensors?tentId=${tentId}&tentIntent=required&plantId=${plantId}`,
+    );
     const text = screen.getByTestId("timeline-one-tent-loop-next-step-card").textContent ?? "";
     expect(text).not.toContain(plantId);
     expect(text).not.toContain(tentId);
@@ -123,10 +125,36 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
     expect(src).toContain(
       'import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard"',
     );
+    expect(src).toContain(
+      'import { resolveTimelineSensorHandoffIds } from "@/lib/oneTentLoopNavigationRules"',
+    );
     expect(src).toContain('current="timeline"');
-    expect(src).toContain("tentId: tentFilter || null");
-    // Doctor-says-so: #1102 left this inert by omitting plantId. Must stay wired.
-    expect(src).toContain("plantId: plantFilter || null");
+    expect(src).toContain("plantTentIdsById,");
+    expect(src).toContain("tentId: timelineSensorHandoffIds.tentId");
+    expect(src).toContain("plantId: timelineSensorHandoffIds.plantId");
     expect(src).toContain('testId="timeline-one-tent-loop-next-step-card"');
+
+    const cardStart = src.indexOf('<OneTentLoopNextStepCard\n          current="timeline"');
+    const cardEnd = src.indexOf("/>", cardStart);
+    expect(cardStart).toBeGreaterThanOrEqual(0);
+    expect(cardEnd).toBeGreaterThan(cardStart);
+    const cardSource = src.slice(cardStart, cardEnd);
+    // Never regress this handoff to independently forwarding a plant with no
+    // proven tent. The Timeline fast-add context is intentionally separate.
+    expect(cardSource).not.toContain("plantId: plantFilter || null");
+  });
+
+  it("Timeline directory proves plant tent relationships against the active grow", async () => {
+    const fs = await import("node:fs/promises");
+    const hookSrc = await fs.readFile("src/hooks/useTimelineNameDirectory.ts", "utf8");
+    const pageSrc = await fs.readFile("src/pages/Timeline.tsx", "utf8");
+
+    expect(hookSrc).toContain('.select("id,name,tent_id,grow_id").eq("user_id", userId)');
+    expect(hookSrc).toContain('.select("id,name,grow_id").eq("user_id", userId)');
+    expect(hookSrc).toContain(
+      "buildTimelinePlantTentLookup(plantsResult?.data, tentsResult?.data, growId)",
+    );
+    expect(pageSrc).toContain("grows.some((grow) => grow.id === activeGrowId)");
+    expect(pageSrc).toContain("useTimelineNameDirectory(\n    user,\n    directoryGrowId,");
   });
 });

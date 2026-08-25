@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH,
+  getHierarchyCreateOutcomeRecoveryRuntimeEpoch,
   adoptLegacyHierarchyCreateOutcomeRecoveryAttempts,
   clearHierarchyCreateOutcomeRecoveryAttempt,
   getHierarchyCreateOutcomeRecoveryAttempts,
@@ -213,7 +213,7 @@ export function HierarchyCreateOutcomeRecoveryCoordinator({
       // remain locked. Only an earlier page runtime is eligible to reconcile.
       if (
         record.runtimeEpoch === null ||
-        record.runtimeEpoch === HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH ||
+        record.runtimeEpoch === getHierarchyCreateOutcomeRecoveryRuntimeEpoch() ||
         !markHierarchyCreateOutcomeRecoveryAttemptReconciled(record.attempt)
       ) {
         continue;

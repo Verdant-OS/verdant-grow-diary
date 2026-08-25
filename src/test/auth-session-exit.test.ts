@@ -9,6 +9,12 @@ import {
   performSafeSignOut,
   resolveSignOutRedirect,
 } from "@/lib/authSessionExitRules";
+import {
+  GLOBAL_SEARCH_HISTORY_STORAGE_KEY,
+  GLOBAL_SEARCH_LAST_SELECTED_STORAGE_KEY,
+  GLOBAL_SEARCH_SESSION_STORAGE_KEY,
+} from "@/lib/globalSearchSession";
+import { RECENT_SEARCHES_STORAGE_KEY } from "@/lib/recentGlobalSearches";
 
 function makeStorage(seed: Record<string, string> = {}): Storage {
   const map = new Map(Object.entries(seed));
@@ -47,23 +53,40 @@ describe("resolveSignOutRedirect", () => {
 });
 
 describe("clearAuthTransientUiState", () => {
-  it("removes only allowlisted prefixes; preserves start-screen + grow data + sb-* keys", () => {
+  it("removes identity-scoped search/auth state; preserves grow data and Supabase auth", () => {
     const ss = makeStorage({
       "verdant:auth:redirect": "/sensors",
       "verdant:authRedirect:last": "/x",
       "verdant:onboarding:session:open": "1",
+      [GLOBAL_SEARCH_SESSION_STORAGE_KEY]: JSON.stringify({ query: "private plant" }),
+      [GLOBAL_SEARCH_HISTORY_STORAGE_KEY]: JSON.stringify([{ query: "private tent" }]),
+      [GLOBAL_SEARCH_LAST_SELECTED_STORAGE_KEY]: JSON.stringify({
+        entity_type: "plant",
+        id: "private-plant-id",
+      }),
+      [RECENT_SEARCHES_STORAGE_KEY]: JSON.stringify(["private grow"]),
       "verdant:startScreen:user-1": "quickLog",
       "verdant:grows:cache": JSON.stringify([{ id: "g1" }]),
       "sb-knkwiiywfkbqznbxwqfh-auth-token": "token-blob",
     });
-    clearAuthTransientUiState({ sessionStorage: ss });
+    const ls = makeStorage({
+      [RECENT_SEARCHES_STORAGE_KEY]: JSON.stringify(["legacy private grow"]),
+      "verdant:unrelated": "preserve-me",
+    });
+    clearAuthTransientUiState({ sessionStorage: ss, localStorage: ls });
     expect(ss.getItem("verdant:auth:redirect")).toBeNull();
     expect(ss.getItem("verdant:authRedirect:last")).toBeNull();
     expect(ss.getItem("verdant:onboarding:session:open")).toBeNull();
+    expect(ss.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBeNull();
+    expect(ss.getItem(GLOBAL_SEARCH_HISTORY_STORAGE_KEY)).toBeNull();
+    expect(ss.getItem(GLOBAL_SEARCH_LAST_SELECTED_STORAGE_KEY)).toBeNull();
+    expect(ss.getItem(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
+    expect(ls.getItem(RECENT_SEARCHES_STORAGE_KEY)).toBeNull();
     // Preserved:
     expect(ss.getItem("verdant:startScreen:user-1")).toBe("quickLog");
     expect(ss.getItem("verdant:grows:cache")).not.toBeNull();
     expect(ss.getItem("sb-knkwiiywfkbqznbxwqfh-auth-token")).toBe("token-blob");
+    expect(ls.getItem("verdant:unrelated")).toBe("preserve-me");
   });
   it("calls onClearQueryCache and never throws when storage is unavailable", () => {
     const cb = vi.fn();

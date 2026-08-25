@@ -263,6 +263,32 @@ test("fails when both read imperatives are dropped even though an incidental men
   assert.match(result.stderr, /exact startup step-1 read .* is missing/);
 });
 
+test("fails when the imperatives survive only inside a fenced example and a blockquote", () => {
+  const root = makeFixture();
+  // Codex's reproduced bypass: replace both operative imperatives with contradictory
+  // prose while their exact wording is retained in non-operative contexts — one inside
+  // an "obsolete example" fence, one as a blockquoted historical copy. A full-text
+  // includes() stays green here; the operative-prose check must not.
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_INSTRUCTION, "Operating state is optional now.");
+  replace(
+    root,
+    "CLAUDE.md",
+    CLAUDE_STATE_READ_STEP,
+    "1. Skip straight to acknowledging.\n\n" +
+      "Obsolete example, do not follow:\n\n" +
+      "\u0060\u0060\u0060text\n" +
+      `${CLAUDE_STATE_READ_INSTRUCTION}\n` +
+      "\u0060\u0060\u0060\n\n" +
+      `> ${CLAUDE_STATE_READ_STEP}`,
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /exact pre-ack read instruction .* is missing/);
+  assert.match(result.stderr, /exact startup step-1 read .* is missing/);
+});
+
 test("passes when the read instruction is merely re-wrapped across different lines", () => {
   const root = makeFixture();
   // Whitespace-normalized comparison: a prose re-wrap must not read as a violation.

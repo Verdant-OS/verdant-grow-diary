@@ -113,6 +113,21 @@ function normalizeWhitespace(text) {
   return text.replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Operative prose only: fenced code blocks and blockquoted lines removed. A pinned
+ * imperative retained solely inside a fenced "obsolete example" or a quoted historical
+ * copy is not an instruction to the reader, so the pins must appear in what remains.
+ * Inline code spans stay — the operative sentences themselves carry the pathname in
+ * backticks, and an inline span is still read as prose.
+ */
+function operativeProse(text) {
+  return text
+    .replace(/```[\s\S]*?```/g, "")
+    .split("\n")
+    .filter((line) => !/^\s*>/.test(line))
+    .join("\n");
+}
+
 const LEGACY_ARCHIVE = "docs/archive/legacy/verdant-master-prompt-legacy.md";
 const LEGACY_HEADER = `> LEGACY — NOT ACTIVE AGENT INSTRUCTIONS
 >
@@ -259,7 +274,7 @@ if (claudeText && CURRENT_STATE_IMPORT_RE.test(stripCodeSpans(claudeText))) {
 // governance set carries branch, production, migration, blocker or assignment facts.
 // Each is required verbatim; an incidental mention of the pathname is not a substitute.
 if (claudeText) {
-  const claudeNormalized = normalizeWhitespace(claudeText);
+  const claudeNormalized = normalizeWhitespace(operativeProse(claudeText));
   const statePins = [
     ["pre-ack read instruction", CLAUDE_STATE_READ_INSTRUCTION],
     ["startup step-1 read", CLAUDE_STATE_READ_STEP],
@@ -269,7 +284,8 @@ if (claudeText) {
       problems.push(
         `CLAUDE.md: exact ${label} for docs/agents/CURRENT_STATE.md is missing. The file ` +
           "is not imported (too large), so this imperative is the only path to operating " +
-          "state; an incidental mention of the pathname does not satisfy it",
+          "state; an incidental mention of the pathname does not satisfy it, and neither " +
+          "does a copy inside a fenced code block or blockquote",
       );
     }
   }

@@ -141,7 +141,7 @@ GA4/GSC, Day 0, or migration state, and invents no metric. Prior header follows.
 production write in this edit. Recorded for Grok, who has been actively
 working this exact signup/production surface today (`20260821150000`,
 the RAISE LOG guard, the readiness RPC): before drafting any further
-service*role hardening, measured how widespread the class of gap
+`service_role` hardening, measured how widespread the class of gap
 `20260821064300` closed for one table actually is across every
 SECURITY DEFINER function in `public`. See the new subsection under
 "Second production drift" below for the full findings and the specific
@@ -153,7 +153,7 @@ counter — `founders_seats_consumed`, `founders_wall_count` — worth one owner
 confirmation, not urgent).
 `uncertainty` — `20260807133000`'s own self-test fails if reproduced today
 against a fresh probe function, but two functions from Grok's own
-`20260821150000` migration do \_not* show the same exposure despite one of
+`20260821150000` migration do _not_ show the same exposure despite one of
 them never receiving an explicit `service_role` revoke. Left unresolved
 rather than guessed at. No fix proposed or applied.
 
@@ -440,23 +440,47 @@ not.** `established fact`, read at that tip:
 - **The RUNTIME still fails closed on `live_`.** `resolvePaddleCheckoutEnvironment`
   (`src/lib/paddleEnvironment.ts:87`) returns `"sandbox"` only for a `test_` token and
   `"unavailable"` for every other class **on every host**; the module header still states
-  the sandbox-only policy. `src/lib/paddle.ts:51` is its only non-test consumer.
+  the sandbox-only policy.
 
 **So a publish today would still disable checkout.** The build would pass and the grower
 would still meet _"Checkout disabled: Verdant currently supports Paddle sandbox testing
 only."_ **Do not read #1124 as having enabled live payments** — it removed a build-time
 blocker, not the runtime one.
 
-The remaining runtime slice is small and contained: one function, one message constant and
-the module header in `paddleEnvironment.ts`, plus the single call site and header prose in
-`paddle.ts`. It is **not** approved by this row. It is a billing-surface change and needs
-an owner-approved slice with a named independent reviewer, per `AGENTS.md`.
+**Corrected 2026-08-25 on PR #1125, after Copilot review — an earlier draft of this row
+called the remaining work "small and contained: one function, one message constant and the
+module header ... plus the single call site". That was measured too narrowly and is
+withdrawn.** The resolver is one of **six** independent sandbox-only runtime gates, and the
+five others each fail closed on their own, so changing the resolver alone would leave
+checkout still unable to open:
+
+| Gate                        | Location                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| resolver                    | `src/lib/paddleEnvironment.ts:87`                                                                                        |
+| Paddle.js load              | `src/lib/paddle.ts` `initializePaddle()` — throws unless `env === "sandbox"`                                             |
+| hardcoded SDK env           | `src/lib/paddle.ts` — `Paddle.Environment.set("sandbox")`                                                                |
+| price lookup                | `src/lib/paddle.ts` `getPaddlePriceId()` — throws unless sandbox, and sends `environment: "sandbox"` in its request body |
+| checkout hook, presentation | `src/hooks/usePaddleCheckout.ts:124`                                                                                     |
+| checkout hook, open path    | `src/hooks/usePaddleCheckout.ts:137`                                                                                     |
+
+A seventh fence sits outside the client: the production bundle attestation in
+`.github/workflows/quicklog-smoke.yml` fetches the hardcoded production origin and rejects a
+live token in the shipped bundle, so it fails the moment a live build ships.
+
+None of this is approved by this row. It is a billing-surface change needing an
+owner-approved slice with a named independent reviewer, per `AGENTS.md`. The full audit,
+the sequencing argument, and the prerequisites are specified in
+`docs/specs/paddle-live-checkout-runtime-slice.md`, which must be read together with the
+pre-existing `docs/paddle-paid-launch-runbook.md` — that runbook already states the live
+transition must be **one** independently reviewed release changing client, token, server
+environment, secrets, price IDs, monitoring and rollback **together**, and that flipping any
+single setting is insufficient and must fail closed.
 
 ### The build-time token question is now ANSWERED — by #1124, not by measurement here
 
 This file has carried two live candidates for how a `live_` token reached production JS
 while both `.env.production` files read `test_`. **#1124's own body names the mechanism:
-_"Production publish must accept `live_` because Lovable injects it at publish."\_** That
+"Production publish must accept `live_` because Lovable injects it at publish."** That
 is candidate 1 — a platform-injected value overriding the file — and it is `source claim`
 from that PR body, not something re-measured here.
 

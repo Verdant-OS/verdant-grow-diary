@@ -5,8 +5,9 @@
 served commit is not in the GitHub repository at all.** `git fetch origin e8f4e7c2fe05…`
 returns `not our ref`. Two long-standing framings in this file are corrected as a result:
 **publish lag is NOT COMPUTABLE** against this build (every lag figure presumed an ancestry
-that does not hold), and **`ref: "__orphan__"` now has a candidate explanation** — the
-publisher commits locally in a workspace that is not GitHub's.
+that does not hold), and **the served SHA is unrecognized by GitHub**, which is consistent
+with `ref: "__orphan__"` but does **not** establish why. The causal mechanism is
+`NOT_MEASURED` — see the correction immediately below, and do not restate it as settled.
 
 **Overclaimed, corrected below the same day in revision 11 (Codex P2) of the companion
 payments spec (PR #1125):** "now has a _sufficient_ explanation" outran the evidence. A
@@ -22,9 +23,12 @@ merged that work rather than competing with it, and trimmed its own duplicate.
 
 #1127 is **not in the live build** (merged 19:16 UTC, build stamped 18:05 UTC), and the
 re-measured bundle still carries a `live_`-class token and zero `test_` — counts only, no
-value printed. One open question about #1127 is flagged rather than answered: if the
-publisher's local `HEAD` already carries the injected file, restoring from `HEAD` restores
-the injection.
+value printed. One open question about #1127 is flagged rather than answered, and stated
+**without** assuming any publisher mechanism: it restores from `git show HEAD:.env.production`,
+so if whatever `HEAD` resolves to in the publisher's build context already carries the
+injected value, the restore would restore the injection rather than the committed class.
+Whether it does is `NOT_MEASURED`. Establishing it needs publisher build/history evidence —
+an unrecognized SHA is not that evidence.
 
 Full detail in the re-measure block below, which supersedes every release-identity,
 publish-lag and payments-bundle row beneath it. **No agent published**; the stop-order

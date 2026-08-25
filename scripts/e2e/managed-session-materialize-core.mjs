@@ -77,14 +77,15 @@ export function evaluatePublicDeploymentIdentity({ version, expectedSha, expecte
 }
 
 const PADDLE_SANDBOX_TOKEN_PATTERN = /^test_[A-Za-z0-9_-]+$/;
+const PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN = /^(?:test_|live_)[A-Za-z0-9_-]+$/;
 const PADDLE_LIVE_TOKEN_PATTERN = /(?:^|[^A-Za-z0-9_])live_[A-Za-z0-9_-]+/;
 
 /**
- * Read the single committed Paddle client token from production dotenv text.
- * The token remains an internal return value for byte comparison; failures
- * use fixed codes and never reflect dotenv content or credential bytes.
+ * Parse the single VITE_PAYMENTS_CLIENT_TOKEN assignment from dotenv text.
+ * Returns the raw token for caller classification; failures use fixed codes
+ * and never reflect dotenv content or credential bytes.
  */
-export function resolveCanonicalPaddleSandboxToken(envText) {
+function parseCanonicalPaddleClientTokenAssignment(envText) {
   if (typeof envText !== "string") {
     return { ok: false, reason: "canonical_paddle_env_invalid" };
   }
@@ -103,10 +104,35 @@ export function resolveCanonicalPaddleSandboxToken(envText) {
     }
     token = token.slice(1, -1);
   }
-  if (!PADDLE_SANDBOX_TOKEN_PATTERN.test(token)) {
+  return { ok: true, token };
+}
+
+/**
+ * Read the single committed Paddle *sandbox* client token from dotenv text.
+ * Sandbox-only callers (e2e / public-bundle checks) must keep rejecting live_.
+ */
+export function resolveCanonicalPaddleSandboxToken(envText) {
+  const parsed = parseCanonicalPaddleClientTokenAssignment(envText);
+  if (!parsed.ok) return parsed;
+  if (!PADDLE_SANDBOX_TOKEN_PATTERN.test(parsed.token)) {
     return { ok: false, reason: "canonical_paddle_token_not_sandbox" };
   }
-  return { ok: true, token };
+  return { ok: true, token: parsed.token };
+}
+
+/**
+ * Read the single production Paddle client token from dotenv text.
+ * Accepts sandbox (test_) or live (live_) client tokens — Lovable Payments
+ * Live injects live_ into .env.production at publish time. Still fails closed
+ * on missing, multiple, malformed, empty, or non-Paddle values.
+ */
+export function resolveCanonicalPaddleProductionToken(envText) {
+  const parsed = parseCanonicalPaddleClientTokenAssignment(envText);
+  if (!parsed.ok) return parsed;
+  if (!PADDLE_PRODUCTION_CLIENT_TOKEN_PATTERN.test(parsed.token)) {
+    return { ok: false, reason: "canonical_paddle_token_invalid" };
+  }
+  return { ok: true, token: parsed.token };
 }
 
 /** Validate public HTML/JS response metadata before buffering any body bytes. */

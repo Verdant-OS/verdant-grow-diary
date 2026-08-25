@@ -8,11 +8,19 @@
  * surface can render a REAL hunt instead of demo fixtures.
  *
  * Pure. No I/O, no Supabase, no React. Evidence arrays (quick logs, timeline,
- * sensor snapshots) are intentionally left unset here — the comparison
- * view-model already flags their absence honestly, and a later slice enriches
- * them. Archived plants are excluded. Nothing is inferred or fabricated.
+ * photos, sensor snapshots) attach from CANONICAL records via the optional
+ * per-plant evidence inputs (see phenoCandidateEvidenceEnrichmentRules) —
+ * linked, never copied into a pheno-specific store. When a caller supplies no
+ * evidence maps the arrays stay empty and the view-model flags the absence
+ * honestly. Archived plants are excluded. Nothing is inferred or fabricated.
  */
-import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+import type {
+  PhenoCandidateInput,
+  PhenoPhotoInput,
+  PhenoQuickLogEntryInput,
+  PhenoSensorSnapshotInput,
+  PhenoTimelineEventInput,
+} from "@/lib/phenoComparisonViewModel";
 import { comparePhenoCandidateIdentity } from "@/lib/phenoCandidateIdentity";
 import type {
   PhenoExpressionInput,
@@ -80,6 +88,20 @@ export interface AdaptPhenoHuntCandidatesInput {
   readonly smokeTestByPlantId?: Readonly<Record<string, PhenoHuntCandidateSmokeEvidence>> | null;
   /** plantId → best available lab result row (coa > estimate > unspecified). */
   readonly labResultByPlantId?: Readonly<Record<string, PhenoHuntCandidateLabEvidence>> | null;
+  /** plantId → recent canonical diary/Quick Log entries (bounded, newest first). */
+  readonly quickLogEntriesByPlantId?: Readonly<
+    Record<string, readonly PhenoQuickLogEntryInput[]>
+  > | null;
+  /** plantId → recent canonical timeline events (bounded, newest first). */
+  readonly timelineEventsByPlantId?: Readonly<
+    Record<string, readonly PhenoTimelineEventInput[]>
+  > | null;
+  /** plantId → recent canonical diary photos (bounded, newest first). */
+  readonly photosByPlantId?: Readonly<Record<string, readonly PhenoPhotoInput[]>> | null;
+  /** plantId → the plant's tent's latest sensor snapshot (source-labeled). */
+  readonly sensorSnapshotByPlantId?: Readonly<
+    Record<string, PhenoSensorSnapshotInput | null>
+  > | null;
   /**
    * When true, keep the INPUT row order instead of re-sorting by the identity
    * comparator. The bounded server-paginated read is already ordered by the
@@ -218,6 +240,10 @@ export function adaptPhenoHuntCandidates(
   const scores = input.scoreByPlantId ?? {};
   const smokes = input.smokeTestByPlantId ?? {};
   const labs = input.labResultByPlantId ?? {};
+  const quickLogs = input.quickLogEntriesByPlantId ?? {};
+  const timelines = input.timelineEventsByPlantId ?? {};
+  const photosByPlant = input.photosByPlantId ?? {};
+  const snapshots = input.sensorSnapshotByPlantId ?? {};
 
   const candidates: PhenoCandidateInput[] = [];
   for (const p of plants) {
@@ -228,6 +254,14 @@ export function adaptPhenoHuntCandidates(
     const requireFull = stageRequiresFullMetrics(stage);
     const photoUrl = cleanLabel(p.photo_url);
     const expression = buildExpression(p.id, scores[p.id], smokes[p.id], labs[p.id]);
+
+    // Canonical diary photos first (dated, captioned); the plants.photo_url
+    // profile photo appends as a fallback when not already among them.
+    const diaryPhotos = [...(photosByPlant[p.id] ?? [])];
+    if (photoUrl && !diaryPhotos.some((ph) => ph.url === photoUrl)) {
+      diaryPhotos.push({ id: `${p.id}-plant-photo`, url: photoUrl });
+    }
+    const snapshot = snapshots[p.id] ?? null;
 
     candidates.push({
       candidateId: p.id,
@@ -241,7 +275,10 @@ export function adaptPhenoHuntCandidates(
       tentLabel: p.tent_id ? (tentNames[p.tent_id] ?? null) : null,
       requireEcPh: requireFull,
       requirePpfd: requireFull,
-      photos: photoUrl ? [{ id: `${p.id}-plant-photo`, url: photoUrl }] : [],
+      quickLogEntries: [...(quickLogs[p.id] ?? [])],
+      timelineEvents: [...(timelines[p.id] ?? [])],
+      photos: diaryPhotos,
+      sensorSnapshots: snapshot ? [snapshot] : [],
       expression,
     });
   }

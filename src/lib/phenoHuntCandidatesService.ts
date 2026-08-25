@@ -16,8 +16,14 @@ import {
   type PhenoHuntCandidateSmokeEvidence,
 } from "@/lib/phenoHuntCandidateAdapter";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
-import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
+import type { PhenoCandidateInput, PhenoSensorSnapshotInput } from "@/lib/phenoComparisonViewModel";
 import { PhenoEvidenceReadError } from "@/lib/phenoEvidenceReadError";
+import {
+  mapDiaryRowsToCandidateEvidence,
+  tentSnapshotToComparisonInput,
+  type PhenoCandidateDiaryEvidence,
+} from "@/lib/phenoCandidateEvidenceEnrichmentRules";
+import { fetchLatestSensorSnapshot } from "@/lib/quick-log/fetchLatestSensorSnapshot";
 import { listLatestSexObservationsForHunt } from "@/lib/phenoSexObservationService";
 import {
   sanitizeBreedingObjectiveTargets,
@@ -176,15 +182,26 @@ export async function loadPhenoHuntCandidates(
   let labResultByPlantId: Record<string, PhenoHuntCandidateLabEvidence>;
   let growNameById: Record<string, string>;
   let tentNameById: Record<string, string>;
+  let diaryEvidence: PhenoCandidateDiaryEvidence;
+  let tentSnapshots: Record<string, PhenoSensorSnapshotInput | null>;
   try {
-    [growNameById, tentNameById, scoreByPlantId, smokeTestByPlantId, labResultByPlantId] =
-      await Promise.all([
-        loadNameMap("grows", distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)])),
-        loadNameMap("tents", distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)])),
-        loadCandidateScores(id, plantIds),
-        loadSmokeTests(id, plantIds),
-        loadLabResults(id, plantIds),
-      ]);
+    [
+      growNameById,
+      tentNameById,
+      scoreByPlantId,
+      smokeTestByPlantId,
+      labResultByPlantId,
+      diaryEvidence,
+      tentSnapshots,
+    ] = await Promise.all([
+      loadNameMap("grows", distinct([huntRow.grow_id, ...plants.map((p) => p.grow_id)])),
+      loadNameMap("tents", distinct([huntRow.tent_id, ...plants.map((p) => p.tent_id)])),
+      loadCandidateScores(id, plantIds),
+      loadSmokeTests(id, plantIds),
+      loadLabResults(id, plantIds),
+      loadCandidateDiaryEvidence(plantIds),
+      loadTentSnapshots([huntRow.tent_id, ...plants.map((p) => p.tent_id)]),
+    ]);
   } catch (readError) {
     // Fail closed: a failed evidence read renders as an error + retry, never
     // as candidates that look evidence-free.
@@ -194,6 +211,14 @@ export async function loadPhenoHuntCandidates(
     throw readError;
   }
 
+  // Each candidate carries its own tent's latest snapshot (hunt tent as the
+  // fallback context when a plant has no tent of its own).
+  const sensorSnapshotByPlantId: Record<string, PhenoSensorSnapshotInput | null> = {};
+  for (const p of plants) {
+    const tentId = p.tent_id ?? huntRow.tent_id ?? null;
+    sensorSnapshotByPlantId[p.id] = tentId ? (tentSnapshots[tentId] ?? null) : null;
+  }
+
   const candidates = adaptPhenoHuntCandidates({
     plants,
     growNameById,
@@ -201,6 +226,10 @@ export async function loadPhenoHuntCandidates(
     scoreByPlantId,
     smokeTestByPlantId,
     labResultByPlantId,
+    quickLogEntriesByPlantId: diaryEvidence.quickLogEntriesByPlantId,
+    timelineEventsByPlantId: diaryEvidence.timelineEventsByPlantId,
+    photosByPlantId: diaryEvidence.photosByPlantId,
+    sensorSnapshotByPlantId,
   });
 
   return { ok: true, hunt: mapHuntSummary(huntRow), candidates };
@@ -251,6 +280,51 @@ function distinct(ids: readonly (string | null | undefined)[]): string[] {
   const out = new Set<string>();
   for (const v of ids) if (typeof v === "string" && v.length > 0) out.add(v);
   return Array.from(out);
+}
+
+/** Bounded canonical diary read for the candidates' own plants — the Pheno
+ * Hunt links to plant memory, it never copies it. Newest first; per-plant
+ * caps applied by the pure mapper. Fails closed (never "no entries" on a
+ * failed read). Retracted entries are excluded. */
+const DIARY_EVIDENCE_ROW_LIMIT = 600;
+async function loadCandidateDiaryEvidence(
+  plantIds: string[],
+): Promise<PhenoCandidateDiaryEvidence> {
+  if (plantIds.length === 0) {
+    return { quickLogEntriesByPlantId: {}, timelineEventsByPlantId: {}, photosByPlantId: {} };
+  }
+  const { data, error } = await supabase
+    .from("diary_entries")
+    .select("id, plant_id, entry_at, note, photo_url, details")
+    .in("plant_id", plantIds)
+    .is("retracted_at", null)
+    .order("entry_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(DIARY_EVIDENCE_ROW_LIMIT);
+  if (error || !data) throw new PhenoEvidenceReadError("diary_entries");
+  return mapDiaryRowsToCandidateEvidence(data);
+}
+
+/** Latest source-labeled sensor snapshot per tent (bounded to the first 8
+ * distinct tents). Best-effort by design: the underlying RPC gates on a
+ * four-hour freshness window and resolves to null when no recent snapshot
+ * exists — absence renders as "No sensor snapshot", never as a fake value. */
+const SENSOR_SNAPSHOT_TENT_CAP = 8;
+async function loadTentSnapshots(
+  tentIds: readonly (string | null | undefined)[],
+): Promise<Record<string, PhenoSensorSnapshotInput | null>> {
+  const tents = distinct(tentIds).slice(0, SENSOR_SNAPSHOT_TENT_CAP);
+  const entries = await Promise.all(
+    tents.map(async (tentId) => {
+      try {
+        const snapshot = await fetchLatestSensorSnapshot(tentId);
+        return [tentId, tentSnapshotToComparisonInput(tentId, snapshot)] as const;
+      } catch {
+        return [tentId, null] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(entries);
 }
 
 /** Load an id → name map for a table with `id` + `name` columns. Best-effort. */
@@ -561,15 +635,26 @@ export async function loadPhenoHuntCandidatePage(
   let labResultByPlantId: Record<string, PhenoHuntCandidateLabEvidence>;
   let growNameById: Record<string, string>;
   let tentNameById: Record<string, string>;
+  let diaryEvidence: PhenoCandidateDiaryEvidence;
   try {
-    [growNameById, tentNameById, scoreByPlantId, smokeTestByPlantId, labResultByPlantId] =
-      await Promise.all([
-        loadNameMap("grows", distinct(plants.map((p) => p.grow_id))),
-        loadNameMap("tents", distinct(plants.map((p) => p.tent_id))),
-        loadCandidateScores(id, plantIds),
-        loadSmokeTests(id, plantIds),
-        loadLabResults(id, plantIds),
-      ]);
+    [
+      growNameById,
+      tentNameById,
+      scoreByPlantId,
+      smokeTestByPlantId,
+      labResultByPlantId,
+      diaryEvidence,
+    ] = await Promise.all([
+      loadNameMap("grows", distinct(plants.map((p) => p.grow_id))),
+      loadNameMap("tents", distinct(plants.map((p) => p.tent_id))),
+      loadCandidateScores(id, plantIds),
+      loadSmokeTests(id, plantIds),
+      loadLabResults(id, plantIds),
+      // Canonical diary evidence for THIS page's plants — satisfies the
+      // "Diary / Quick Log observation" readiness goal from real entries.
+      // (Sensor snapshots stay on the compare path, whose UI renders them.)
+      loadCandidateDiaryEvidence(plantIds),
+    ]);
   } catch (readError) {
     // Fail closed (see the evidence-loader note above).
     if (readError instanceof PhenoEvidenceReadError) {
@@ -585,6 +670,9 @@ export async function loadPhenoHuntCandidatePage(
     scoreByPlantId,
     smokeTestByPlantId,
     labResultByPlantId,
+    quickLogEntriesByPlantId: diaryEvidence.quickLogEntriesByPlantId,
+    timelineEventsByPlantId: diaryEvidence.timelineEventsByPlantId,
+    photosByPlantId: diaryEvidence.photosByPlantId,
     preserveOrder: true,
   });
 

@@ -18,14 +18,17 @@
  * convention, src/hooks/useLatestSensorSnapshot.ts), then id DESC so
  * equal timestamps can never flip the snapshot between calls.
  *
- * Preserves `source` and `quality` labels verbatim, then derives response-time
- * freshness from the effective capture timestamp. Raw provenance is selected
- * only long enough to exclude diagnostic-only Windows testbench rows, then is
- * stripped before tool content is assembled. Trust follows the
- * canonical SENSOR TRUTH contract: only quality `ok` + source `live` +
- * response-time freshness `fresh` counts as current live data;
- * manual stays manual, csv stays csv, demo stays demo, and
- * sim/stale/invalid/unknown labels are never live.
+ * Publication boundary: `source` is normalized to the six Sensor Truth
+ * labels (live|manual|csv|demo|stale|invalid) via `normalizeSensorSource`.
+ * Vendor/transport tokens (ecowitt, mqtt, sim, …) never pass through.
+ * Freshness alone never promotes an unrecognized token to live.
+ * Each reading also carries derived `confidence` (0–1); there is no
+ * confidence database column. Raw provenance is selected only long enough
+ * to exclude diagnostic-only Windows testbench rows, then is stripped
+ * before tool content is assembled. Trust follows the canonical SENSOR
+ * TRUTH contract: only quality `ok` + source `live` + response-time
+ * freshness `fresh` counts as current live data; manual stays manual,
+ * csv stays csv, demo stays demo, and stale/invalid are never live.
  * Never returns `raw_payload`.
  *
  * Verifies tent ownership first: tents policies are strictly owner-scoped,
@@ -53,19 +56,18 @@ export default defineTool({
     "humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, " +
     "ec, ppfd) for one of the signed-in grower's own tents, ordered by " +
     "capture time (captured_at, falling back to ingest time). Every " +
-    "reading keeps its `source` and `quality` labels verbatim and adds a " +
-    "response-time `freshness` field (`fresh`, `stale`, or `invalid`) plus " +
-    "`current_live`. `quality` " +
-    "is one of ok/degraded/stale/invalid. Canonical `source` labels are " +
-    "exactly live/manual/csv/demo/stale/invalid, where `live` means " +
-    "fresh validated connected telemetry; legacy rows may carry other " +
-    "ingest labels such as sim or vendor bridge names. Treat a reading " +
-    "as current live telemetry ONLY when `current_live` is true: quality " +
-    "must be `ok`, source must be `live`, and freshness must be `fresh`. " +
-    "Every other source, quality, or freshness state keeps its label " +
-    "and is never live: manual stays manual, csv stays csv, demo stays " +
-    "demo, and sim, stale, invalid, or unknown labels are never current " +
-    "or healthy. Read-only.",
+    "reading includes constitution `source` (exactly live/manual/csv/" +
+    "demo/stale/invalid — vendor/transport tokens such as ecowitt, mqtt, " +
+    "or sim, and any unrecognized label, are never returned as source), " +
+    "`quality`, derived `confidence` (0–1), response-time `freshness` " +
+    "(`fresh`, `stale`, or `invalid`), and `current_live`. `quality` is " +
+    "one of ok/degraded/stale/invalid. `live` means fresh validated " +
+    "connected telemetry. Treat a reading as current live telemetry ONLY " +
+    "when `current_live` is true: quality must be `ok`, source must be " +
+    "`live`, and freshness must be `fresh`. Every other source, quality, " +
+    "or freshness state keeps its label and is never live: manual stays " +
+    "manual, csv stays csv, demo stays demo, and stale or invalid are " +
+    "never current or healthy. Read-only.",
   inputSchema: {
     tentId: z.string().uuid().describe("Tent id to fetch the latest readings for."),
   },
@@ -95,7 +97,7 @@ export default defineTool({
     const summary = Object.values(readings)
       .map(
         (r) =>
-          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, freshness: ${r.freshness}, current_live: ${r.current_live}, at: ${r.captured_at ?? r.ts})`,
+          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, freshness: ${r.freshness}, confidence: ${r.confidence}, current_live: ${r.current_live}, at: ${r.captured_at ?? r.ts})`,
       )
       .join("\n");
     return {

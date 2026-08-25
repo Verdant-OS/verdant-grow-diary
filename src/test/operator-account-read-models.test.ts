@@ -782,7 +782,7 @@ describe("owner-scoped Operator account read models", () => {
       {
         name: "legacy provider source",
         overrides: { source: "ecowitt" },
-        freshness: "fresh",
+        freshness: "invalid",
         currentLive: false,
       },
       {
@@ -834,6 +834,14 @@ describe("owner-scoped Operator account read models", () => {
           freshness,
           current_live: currentLive,
         });
+        expect(typeof readings.temperature_c?.confidence).toBe("number");
+        expect(readings.temperature_c!.confidence).toBeGreaterThanOrEqual(0);
+        expect(readings.temperature_c!.confidence).toBeLessThanOrEqual(1);
+        // Constitution source only — never vendor/transport tokens.
+        expect(["live", "manual", "csv", "demo", "stale", "invalid"]).toContain(
+          readings.temperature_c!.source,
+        );
+        expect(readings.temperature_c!.source).not.toMatch(/ecowitt|sim|mqtt/i);
       },
     );
 

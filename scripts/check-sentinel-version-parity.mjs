@@ -122,10 +122,19 @@ function normalizeWhitespace(text) {
  * backticks, and an inline span is still read as prose.
  */
 function operativeProse(text) {
+  // Strip to a fixpoint: a single pass can leave a recombined delimiter (removing
+  // "<!-- x -->" from "<!<!-- x -->-- pin -->" leaves "<!-- pin -->" intact), which
+  // CodeQL flags as incomplete sanitization and which here would let a pin survive
+  // inside a comment. Every replacement only deletes, so the loop terminates.
+  let previous;
+  do {
+    previous = text;
+    text = text
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/~~~[\s\S]*?~~~/g, "")
+      .replace(/<!--[\s\S]*?-->/g, "");
+  } while (text !== previous);
   return text
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/~~~[\s\S]*?~~~/g, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
     .split("\n")
     .filter((line) => !/^\s*>/.test(line))
     .join("\n");

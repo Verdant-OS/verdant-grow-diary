@@ -312,6 +312,25 @@ test("fails when the imperatives survive only inside a tilde fence and an HTML c
   assert.match(result.stderr, /exact startup step-1 read .* is missing/);
 });
 
+test("fails when a pin survives inside a comment left behind by delimiter recombination", () => {
+  const root = makeFixture();
+  // CodeQL's incomplete-sanitization pattern, pointed at this gate: one strip pass over
+  // "<!<!-- x -->-- pin -->" removes the inner comment and leaves "<!-- pin -->" intact,
+  // so a single-pass parser counts the pin as operative. The fixpoint loop must not.
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_STEP, "1. Skip straight to acknowledging.");
+  replace(
+    root,
+    "CLAUDE.md",
+    "See also docs/agents/CURRENT_STATE.md for operating state.",
+    `See also docs/agents/CURRENT_STATE.md for operating state.\n\n<!<!-- x -->-- ${CLAUDE_STATE_READ_STEP} -->`,
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /exact startup step-1 read .* is missing/);
+});
+
 test("passes when the read instruction is merely re-wrapped across different lines", () => {
   const root = makeFixture();
   // Whitespace-normalized comparison: a prose re-wrap must not read as a violation.

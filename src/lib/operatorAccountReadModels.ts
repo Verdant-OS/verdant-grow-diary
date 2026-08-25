@@ -80,10 +80,9 @@ export interface McpSensorReading {
   current_live: boolean;
   /**
    * Derived 0–1 confidence at the MCP publication boundary.
-   * Not a database column. Always set by `selectLatestMcpSensorReadings`;
-   * optional only so non-MCP fixture builders need not invent a value.
+   * Not a database column. Always set by `selectLatestMcpSensorReadings`.
    */
-  confidence?: number;
+  confidence: number;
 }
 
 /** Inputs for in-memory MCP confidence (no DB column). */

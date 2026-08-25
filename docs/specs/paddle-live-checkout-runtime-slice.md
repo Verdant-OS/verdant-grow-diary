@@ -7,14 +7,16 @@
 **Slice owner:** unassigned — needs one owner and a **different** peer as independent
 reviewer per `AGENTS.md`. This is a billing surface; the owner cannot review it.
 
-> **Revision 5 (2026-08-25).** Four review rounds — Copilot (7) and Codex (3, then 3, then 2
-> more). **All fifteen findings were correct.** Revision 4 brought buyer-facing checkout copy
-> into scope, mapped the SDK environment value correctly, added a seventh client gate, and
-> swept the stage vocabulary. Revision 5 closes a gap revision 4's own Hard Safety copy fix
-> left open — a SKU-specific catalog failure still collapsed into the same "no real charge is
-> possible" copy as a global environment failure, mislabeling a genuinely chargeable SKU — and
-> tightens the bundle-attestation test list to reject a same-class live token, not just a
-> different token class. Full record in §10 — read it before citing any earlier revision.
+> **Revision 6 (2026-08-25).** Five review rounds — Copilot (7) and Codex (3, then 3, then 2,
+> then 2 more). **All seventeen findings were correct.** Revision 5 closed a gap revision 4's
+> own Hard Safety copy fix left open — a SKU-specific catalog failure collapsing into the same
+> "no real charge is possible" copy as a global environment failure — and tightened the
+> bundle-attestation test list against a same-class live token. Revision 6 withdraws §1's
+> unflagged repetition of the runbook's `PADDLE_ENVIRONMENT=live` line, which §6.1 already
+> says not to follow, and corrects a companion `CURRENT_STATE.md` heading on this same PR that
+> called the build-time token question "ANSWERED" — the guard #1124 shipped still requires an
+> exact match between the effective and canonical tokens, which the credited injection
+> mechanism cannot produce. Full record in §10 — read it before citing any earlier revision.
 
 > **Read `docs/paddle-paid-launch-runbook.md` first.** It predates this spec and already
 > governs the live transition. Revision 1 of this document did not cite it — a research
@@ -41,6 +43,14 @@ resolver, presenter copy, live token, `PAYMENTS_ENVIRONMENT=live`, legacy
 `PADDLE_ENVIRONMENT=live`, live API and webhook secrets, live price IDs, notification
 destinations, monitoring and a tested rollback **together** — and "flipping any single
 setting or token is insufficient and must fail closed."
+
+**Corrected in revision 5 (Codex P2) — the runbook line quoted above is wrong on one item,
+and repeating it here without a flag would mislead a reader who stops at §1.** Do **not**
+include legacy `PADDLE_ENVIRONMENT=live` in the coordinated release; §6.1 explains why
+(`paddle-webhook` 403s the operator-audit lane whenever it is not `sandbox`) and the
+runbook/code conflict is flagged there for the owner, not resolved. Read that quoted list as
+the runbook's own words, not this spec's recommendation — the coordinated release this spec
+actually proposes excludes that one item.
 
 **Corrected in revision 3 (Codex P1).** Revision 2 put the server switch in a Stage 0 that
 ran _before_ the client change. That contradicted this document's own §7 and the runbook.
@@ -461,3 +471,17 @@ lesson one level down: revision 4 fixed the global instance of the trust-copy bu
 second instance of the same bug — a single boolean standing in for two distinct causes —
 in the exact module it had just rewritten. Weight any future revision's coverage claims
 accordingly rather than assuming a Hard Safety fix generalizes on the first pass.
+
+### Revision 6 — Codex, 2 findings, both correct
+
+| #   | Finding                                                                                                                                                                                                                                                                                                                                                        | Disposition                                                                                                                                                                   |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 16  | **P1** (on the companion `CURRENT_STATE.md`, same PR). "Lovable injects the live token at publish" was credited as answering the build-time token question, but `assert-paddle-production-sandbox.mjs` still requires the effective token to exactly match the canonical file token — an injected value overriding the file would fail that check, not pass it | **Conceded.** `CURRENT_STATE.md` heading renamed from "is now ANSWERED" to "is NOT answered"; correction added explaining the guard's exact-match logic and what remains open |
+| 17  | **P2.** §1 repeats the runbook's `PADDLE_ENVIRONMENT=live` instruction without a flag, even though the corrected §6.1 says never to set it — an operator reading only §1 would still shut down the legacy operator-audit webhook                                                                                                                               | **Conceded.** §1 now flags the runbook quote as superseded on that one item and points to §6.1                                                                                |
+
+**Seventeen findings across five rounds, seventeen correct.** Finding 16 is the most
+consequential of the five rounds: it does not just find a documentation gap, it shows the
+"question is answered" framing was wrong on its own terms — the very guard credited with
+confirming the mechanism would reject the mechanism it was credited with confirming. Neither
+this spec nor `CURRENT_STATE.md` re-measured which of the two original candidates is
+correct; the heading correction narrows what was overclaimed, not what is known.

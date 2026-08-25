@@ -6,10 +6,14 @@
  *
  * Source of truth: extractMountedAppRoutePaths() over src/routes.
  */
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { JSDOM } from "jsdom";
+import { createMemoryHistory, HeadContent, RouterContextProvider } from "@tanstack/react-router";
 import { describe, it, expect } from "vitest";
 import { APP_ROUTES } from "@/lib/appRouteManifest";
 import { buildDemoProofWalkthroughViewModel } from "@/lib/demoProofWalkthroughViewModel";
-import { Route as DemoProofWalkthroughRoute } from "@/routes/internal.demo-proof-walkthrough";
+import { getRouter } from "@/router";
 import { extractMountedAppRoutePaths } from "./helpers/routeManifestSyncHarness";
 
 function loadAppRoutePaths(): Set<string> {
@@ -21,17 +25,39 @@ function stripQuery(href: string): string {
   return q === -1 ? href : href.slice(0, q);
 }
 
+async function resolvedRobotsHead(pathname: string) {
+  const router = getRouter();
+  router.update({
+    ...router.options,
+    history: createMemoryHistory({ initialEntries: [pathname] }),
+  });
+  await router.load();
+
+  const html = renderToStaticMarkup(
+    React.createElement(RouterContextProvider, {
+      router,
+      children: React.createElement(HeadContent),
+    }),
+  );
+  const fragment = JSDOM.fragment(html);
+
+  return {
+    routeIds: router.state.matches.map((match) => match.routeId),
+    robots: [...fragment.querySelectorAll<HTMLMetaElement>('meta[name="robots"]')].map((meta) =>
+      meta.getAttribute("content"),
+    ),
+  };
+}
+
 describe("Demo Proof Walkthrough — route snapshot", () => {
   const appPaths = loadAppRoutePaths();
   const vm = buildDemoProofWalkthroughViewModel();
 
-  it("resolves exactly one noindex, nofollow robots directive", async () => {
-    const head = await DemoProofWalkthroughRoute.options.head?.({} as never);
-    const robotsMeta =
-      head?.meta?.filter((entry) => entry != null && "name" in entry && entry.name === "robots") ??
-      [];
+  it("resolves exactly one composed noindex, nofollow robots directive", async () => {
+    const head = await resolvedRobotsHead("/internal/demo-proof-walkthrough");
 
-    expect(robotsMeta).toEqual([{ name: "robots", content: "noindex, nofollow" }]);
+    expect(head.routeIds).toEqual(["__root__", "/internal/demo-proof-walkthrough"]);
+    expect(head.robots).toEqual(["noindex, nofollow"]);
   });
 
   it("file routes exposes the expected real routes the walkthrough relies on", () => {

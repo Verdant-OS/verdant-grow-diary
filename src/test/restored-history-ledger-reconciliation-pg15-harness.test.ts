@@ -174,6 +174,8 @@ describe("restored-history ledger exact-production PostgreSQL 15 runtime harness
       'name: "plant_type_comment_missing"',
       'name: "staff_update_trigger_condition_one_sided"',
       'name: "staff_update_trigger_condition_inverted"',
+      'name: "staff_execute_grant_option"',
+      'name: "quicklog_execute_grant_option"',
       'name: "legacy_helper_acl"',
       'name: "extra_legacy_trigger"',
       'name: "canonical_helper_external_trigger"',

@@ -486,7 +486,7 @@ select pg_catalog.json_build_object(
   'staff_source_md5',coalesce((select source_md5 from staff_function),''),
   'staff_function_contract',coalesce((select prosecdef and owner='postgres' and result_type='trigger'
     and proconfig=array['search_path=public, pg_temp']::text[] from staff_function),false),
-  'staff_acl_contract',(select grants=array['postgres:EXECUTE:true','service_role:EXECUTE:false']::text[] from staff_acl),
+  'staff_acl_contract',(select grants=array['postgres:EXECUTE:false','service_role:EXECUTE:false']::text[] from staff_acl),
   'staff_legacy_function_contract',(select staff_legacy_function_contract from legacy_staff_safety),
   'staff_legacy_acl_contract',(select staff_legacy_acl_contract from legacy_staff_safety),
   'staff_no_legacy_trigger_contract',(select staff_no_legacy_trigger_contract from legacy_staff_safety),
@@ -505,7 +505,7 @@ select pg_catalog.json_build_object(
     and arg_types='text, uuid, text, uuid, uuid, text, text, jsonb, timestamp with time zone, jsonb, jsonb, jsonb'
     and proargnames=array['p_idempotency_key','p_grow_id','p_event_type','p_tent_id','p_plant_id','p_note','p_photo_url','p_sensor_snapshot','p_occurred_at','p_details','p_water','p_feed']::text[]
     from quicklog_function),false),
-  'quicklog_acl_contract',(select grants=array['authenticated:EXECUTE:false','postgres:EXECUTE:true','service_role:EXECUTE:false']::text[] from quicklog_acl),
+  'quicklog_acl_contract',(select grants=array['authenticated:EXECUTE:false','postgres:EXECUTE:false','service_role:EXECUTE:false']::text[] from quicklog_acl),
   'quicklog_comment_contract',coalesce((select pg_catalog.obj_description(f.oid,'pg_proc')=
     'Authenticated Quick Log event writer. Persists canonical Captured logged_at separately from occurred_at and preserves atomic per-user idempotency.' from quicklog_function f),false)
 )`;

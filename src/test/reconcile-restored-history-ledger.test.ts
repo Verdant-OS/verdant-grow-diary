@@ -341,6 +341,13 @@ describe("restored-history ledger reconciliation", () => {
     );
     expect(CATALOG_STATE_QUERY_SQL).toContain("t.tgnargs=0");
     expect(CATALOG_STATE_QUERY_SQL).not.toContain("x.is_grantable order by 1");
+    expect(CATALOG_STATE_QUERY_SQL).toContain(
+      "grants=array['postgres:EXECUTE:false','service_role:EXECUTE:false']::text[]",
+    );
+    expect(CATALOG_STATE_QUERY_SQL).toContain(
+      "grants=array['authenticated:EXECUTE:false','postgres:EXECUTE:false','service_role:EXECUTE:false']::text[]",
+    );
+    expect(CATALOG_STATE_QUERY_SQL).not.toContain("postgres:EXECUTE:true");
     expect(
       CATALOG_STATE_QUERY_SQL.match(
         /order by pg_catalog\.pg_get_userbyid\(x\.grantee\),x\.privilege_type,x\.is_grantable/g,

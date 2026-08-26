@@ -948,6 +948,22 @@ const ADVERSARIAL_CATALOG_CASES = Object.freeze([
     reason: "staff_trigger_contract",
   }),
   Object.freeze({
+    name: "staff_execute_grant_option",
+    sql: `grant execute on function public.grant_staff_role_for_verified_allowlist()
+      to service_role with grant option;`,
+    status: "catalog_drift",
+    reason: "staff_acl_contract",
+  }),
+  Object.freeze({
+    name: "quicklog_execute_grant_option",
+    sql: `grant execute on function public.quicklog_save_event(
+        text, uuid, text, uuid, uuid, text, text, jsonb,
+        timestamptz, jsonb, jsonb, jsonb
+      ) to authenticated with grant option;`,
+    status: "catalog_drift",
+    reason: "quicklog_acl_contract",
+  }),
+  Object.freeze({
     name: "legacy_helper_acl",
     sql: `grant execute on function public.grant_staff_role_for_verified_email()
       to authenticated;`,

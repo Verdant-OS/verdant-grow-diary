@@ -124,6 +124,10 @@ describe("diary evidence — one RPC, not N queries", () => {
       p_plant_ids: ["p1", "p2", "p3"],
       p_limit_per_plant: 40,
     });
+    // Retraction exclusion lives SERVER-side on this path (pinned by the SQL
+    // contract in pheno-candidate-diary-topn-rpc-migration.test.ts); the
+    // zero-diary-queries assertion proves no unfiltered table read can
+    // reintroduce retracted rows around it.
     expect(diaryQueries()).toHaveLength(0);
 
     // Starvation regression: every sibling keeps its OWN entries even though
@@ -174,6 +178,14 @@ describe("diary evidence — fail closed", () => {
   it("a null RPC payload with no error also fails closed", async () => {
     huntFixture(["p1"]);
     rpcResult = { data: null, error: null };
+
+    const res = await loadPhenoHuntCandidates("h1");
+    expect(res).toEqual({ ok: false, error: "Could not load diary evidence." });
+  });
+
+  it("a non-array RPC payload fails closed instead of rendering empty evidence", async () => {
+    huntFixture(["p1"]);
+    rpcResult = { data: { unexpected: "shape" }, error: null };
 
     const res = await loadPhenoHuntCandidates("h1");
     expect(res).toEqual({ ok: false, error: "Could not load diary evidence." });

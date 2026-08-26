@@ -14,6 +14,14 @@ on:
       - "src/test/pheno-comparison-*"
       - "src/test/pheno-expression-showcase.test.tsx"
       - "e2e/pheno-comparison-*.spec.ts"
+      - "e2e/pheno-hunts-compare-*.spec.ts"
+      # The live deep-link implementation the specs above protect: page,
+      # route, loading hook, and the candidates service (whose RPC change
+      # was exactly the regression class this gate exists to catch).
+      - "src/pages/PhenoHuntCompare.tsx"
+      - "src/routes/pheno-hunts.$id.compare.tsx"
+      - "src/hooks/usePhenoHuntCandidates.ts"
+      - "src/lib/phenoHuntCandidatesService.ts"
       - "src/App.tsx"
       - "src/lib/appRouteManifest.ts"
       - ".github/workflows/pheno-comparison-v0.yml"
@@ -100,7 +108,9 @@ jobs:
             src/test/pheno-comparison-static-safety.test.ts \
             e2e/pheno-comparison-public-accessibility.spec.ts \
             e2e/pheno-comparison-visual-style.spec.ts \
-            e2e/pheno-comparison-readonly.spec.ts
+            e2e/pheno-comparison-readonly.spec.ts \
+            e2e/pheno-hunts-compare-deep-link.spec.ts \
+            e2e/pheno-hunts-compare-invalid-id.spec.ts
 
       # Playwright — Pheno Comparison specs only. Route is mounted outside
       # AppShell + providers (fixture-only), so no auth secrets are required and
@@ -115,7 +125,9 @@ jobs:
             --reporter=list,html \
             e2e/pheno-comparison-readonly.spec.ts \
             e2e/pheno-comparison-visual-style.spec.ts \
-            e2e/pheno-comparison-public-accessibility.spec.ts
+            e2e/pheno-comparison-public-accessibility.spec.ts \
+            e2e/pheno-hunts-compare-deep-link.spec.ts \
+            e2e/pheno-hunts-compare-invalid-id.spec.ts
 
       # On failure, upload Playwright debugging artifacts for triage:
       # HTML report, traces/videos/screenshots (test-results/), and the

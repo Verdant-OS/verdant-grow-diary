@@ -20,6 +20,7 @@ import {
 } from "@playwright/test";
 import { APP_ROUTES } from "../src/lib/appRouteManifest";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
+import { dashboardPath } from "../src/lib/routes";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
   PUBLIC_CORE_CENSUS_ROUTES,
@@ -378,6 +379,44 @@ type NetworkAudit = {
   mockedReadRequests: number;
 };
 
+type RouteReadTrackerState = {
+  pending: number;
+  lastActivityAt: number;
+};
+
+const ROUTE_READ_QUIET_WINDOW_MS = 500;
+const trackedRouteReadContexts = new WeakSet<BrowserContext>();
+
+async function installRouteReadTracking(context: BrowserContext) {
+  if (trackedRouteReadContexts.has(context)) return;
+  trackedRouteReadContexts.add(context);
+  await context.addInitScript(() => {
+    const scopedWindow = window as typeof window & {
+      __verdantCoreCensusRouteReads?: RouteReadTrackerState;
+    };
+    if (scopedWindow.__verdantCoreCensusRouteReads) return;
+
+    const state: RouteReadTrackerState = { pending: 0, lastActivityAt: performance.now() };
+    Object.defineProperty(scopedWindow, "__verdantCoreCensusRouteReads", {
+      value: state,
+      configurable: false,
+      enumerable: false,
+      writable: false,
+    });
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+      state.pending += 1;
+      state.lastActivityAt = performance.now();
+      try {
+        return await originalFetch(...args);
+      } finally {
+        state.pending = Math.max(0, state.pending - 1);
+        state.lastActivityAt = performance.now();
+      }
+    };
+  });
+}
+
 type FieldAudit = {
   route: string;
   name: string;
@@ -557,6 +596,7 @@ async function installNetworkFence(
   signedIn: boolean,
   network: NetworkAudit,
 ) {
+  await installRouteReadTracking(context);
   // Register the broad external fence first. Playwright runs the most recently
   // registered matching route first, so the explicit safe mocks below win.
   await context.route("**/*", async (route, request) => {
@@ -1565,6 +1605,55 @@ async function assertExpectedRouteContent(page: Page, route: CoreCensusRoute) {
   }
 }
 
+async function settleRouteReadsBeforeLinkAudit(page: Page, sourcePath: string) {
+  // The census records links for a later revisit/click sweep, so the snapshot
+  // must describe the route's settled read model rather than an intermediate
+  // loading render. In particular, Dashboard's connected-loop evidence can
+  // briefly expose the "Log your first plant memory" CTA before the mocked
+  // diary read proves that step complete; recording that transient href makes
+  // the later revisit fail even though the product reached the correct state.
+  //
+  // Every external request in this lane is hermetically intercepted above.
+  // Playwright's built-in `networkidle` load state can remain latched after the
+  // initial document, so it does not reliably re-arm for client-navigation
+  // reads. Require a fresh quiet window over the fetch lifecycle observed by
+  // the app itself. The unchanged app-shell timeout keeps the wait bounded.
+  const readState = () =>
+    page.evaluate(() => {
+      const state = (
+        window as typeof window & {
+          __verdantCoreCensusRouteReads?: RouteReadTrackerState;
+        }
+      ).__verdantCoreCensusRouteReads;
+      return state ? { ...state, now: performance.now() } : null;
+    });
+  let state = await readState();
+  if (!state) {
+    throw new Error(`${sourcePath} is missing the mocked-read lifecycle tracker`);
+  }
+  const deadline = Date.now() + APP_SHELL_READY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    state = await readState();
+    if (!state) {
+      throw new Error(`${sourcePath} lost the mocked-read lifecycle tracker`);
+    }
+    if (
+      state.pending === 0 &&
+      state.now - state.lastActivityAt >= ROUTE_READ_QUIET_WINDOW_MS
+    ) {
+      expect(
+        new URL(page.url()).pathname,
+        `${sourcePath} changed routes while its mocked reads were settling`,
+      ).toBe(new URL(sourcePath, APP_ORIGIN).pathname);
+      return;
+    }
+    await page.waitForTimeout(25);
+  }
+  throw new Error(
+    `${sourcePath} did not reach a mocked-read quiet window within ${APP_SHELL_READY_TIMEOUT_MS}ms (${state.pending} pending)`,
+  );
+}
+
 async function navigateForAudit(page: Page, route: CoreCensusRoute) {
   const response = await page.goto(route.path, { waitUntil: "domcontentloaded" });
   expect(response?.status() ?? 200, `${route.path} document response`).toBeLessThan(400);
@@ -1592,6 +1681,7 @@ async function clickEverySafeInternalHref(
     await test.step(`click ${link.href} from ${link.sourcePath}`, async () => {
       await page.goto(link.sourcePath, { waitUntil: "domcontentloaded" });
       await assertMeaningfulPage(page, link.sourcePath);
+      await settleRouteReadsBeforeLinkAudit(page, link.sourcePath);
       const anchor = page.locator(visibleLinkByHrefSelector(link.href)).first();
       // A data-dependent link can render on one visit and miss on the next
       // while its page's queries settle (observed: the dashboard's grow link
@@ -1605,6 +1695,7 @@ async function clickEverySafeInternalHref(
       if (!anchorVisibleOnFirstRender) {
         await page.goto(link.sourcePath, { waitUntil: "domcontentloaded" });
         await assertMeaningfulPage(page, link.sourcePath);
+        await settleRouteReadsBeforeLinkAudit(page, link.sourcePath);
       }
       await expect(anchor, `${link.href} must remain visible on ${link.sourcePath}`).toBeVisible({
         timeout: 10_000,
@@ -1627,6 +1718,7 @@ async function clickEverySafeInternalHref(
           })
           .toBe(expectedPathname);
         await assertMeaningfulPage(popup, expectedPathname);
+        await settleRouteReadsBeforeLinkAudit(popup, expectedPathname);
         await popup.close();
       } else {
         // Captured from the BROWSER, not from the census route spec: a route's
@@ -1669,6 +1761,7 @@ async function clickEverySafeInternalHref(
             .toBe(`#${expectedHash}`);
         }
         await assertMeaningfulPage(page, expectedPathname);
+        await settleRouteReadsBeforeLinkAudit(page, expectedPathname);
       }
       clicked.push(link.href);
     });
@@ -1708,7 +1801,18 @@ async function runLaneCensus(
     await test.step(`audit ${route.label} (${route.path})`, async () => {
       const pageErrorsBefore = report.pageErrors.length;
       const finalPath = await navigateForAudit(page, route);
+      const auditedUrl = page.url();
       const fields = await auditAndExerciseFields(page, route);
+      // Exercising a navigation-backed select may legitimately change the
+      // location. Link provenance must still come from the exact route that
+      // was audited, never from the destination mislabeled as route.path.
+      if (page.url() !== auditedUrl) {
+        const response = await page.goto(auditedUrl, { waitUntil: "domcontentloaded" });
+        expect(response?.status() ?? 200, `${route.path} document response`).toBeLessThan(400);
+        await assertMeaningfulPage(page, route.path);
+        await assertExpectedRouteContent(page, route);
+      }
+      await settleRouteReadsBeforeLinkAudit(page, route.path);
       const links = await visibleLinkAudits(page, route.path);
       report.fieldAudits.push(...fields);
       report.linkAudits.push(...links);
@@ -1755,10 +1859,230 @@ test.describe("core link and form census", () => {
     await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);
   });
 
+  test("scheduled authenticated Dashboard evidence settles before recording revisit links", async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const network: NetworkAudit = {
+      blockedMutations: [],
+      unexpectedExternalFetches: [],
+      mockedReadRequests: 0,
+    };
+    await seedFakeSession(page.context());
+    await seedDeniedAnalyticsConsent(page.context());
+    await installNetworkFence(page.context(), true, network);
+
+    let releaseDiaryRead = () => {};
+    const diaryReadGate = new Promise<void>((resolve) => {
+      releaseDiaryRead = resolve;
+    });
+    await page.context().route(/\/rest\/v1\/diary_entries(?:\?|$)/, async (route) => {
+      await diaryReadGate;
+      await route.fallback();
+    });
+
+    const dashboardRoute = AUTHENTICATED_CORE_CENSUS_ROUTES[0];
+    expect(dashboardRoute.path).toBe("/dashboard");
+    await navigateForAudit(page, dashboardRoute);
+
+    const pendingHrefs = (await visibleLinkAudits(page, dashboardRoute.path)).map(
+      (link) => link.href,
+    );
+    expect(
+      pendingHrefs,
+      "the delayed diary read must expose the Dashboard's transient first-log CTA",
+    ).toContain(dashboardPath(GROW_ID));
+
+    const settlePromise = settleRouteReadsBeforeLinkAudit(page, dashboardRoute.path);
+    const settledBeforeRelease = await Promise.race([
+      settlePromise.then(() => true),
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), 100)),
+    ]);
+    releaseDiaryRead();
+    expect(
+      settledBeforeRelease,
+      "the settling helper must wait for the delayed diary evidence read",
+    ).toBe(false);
+    await settlePromise;
+
+    const links = await visibleLinkAudits(page, dashboardRoute.path);
+    const firstLogComplete = await page
+      .getByTestId("onboarding-step-first_log")
+      .getAttribute("data-complete");
+    const hrefs = links.map((link) => link.href);
+
+    expect(firstLogComplete).toBe("true");
+    expect(
+      hrefs,
+      "the completed first-log step must not leave its loading-state CTA in the settled link set",
+    ).not.toContain(dashboardPath(GROW_ID));
+    expect(network.blockedMutations, "the focused regression must remain read-only").toEqual([]);
+    expect(
+      network.unexpectedExternalFetches,
+      "the focused regression must remain hermetic",
+    ).toEqual([]);
+  });
+
+  test("scheduled authenticated click sweep settles source and destination reads", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    const context = page.context();
+    const network: NetworkAudit = {
+      blockedMutations: [],
+      unexpectedExternalFetches: [],
+      mockedReadRequests: 0,
+    };
+    const report: LaneReport = {
+      lane: "authenticated",
+      routeAudits: [],
+      fieldAudits: [],
+      linkAudits: [],
+      clickedInternalHrefs: [],
+      consoleErrors: [],
+      pageErrors: [],
+      network,
+    };
+    installContextErrorAudit(context, report);
+    await seedFakeSession(context);
+    await seedDeniedAnalyticsConsent(context);
+    await installNetworkFence(context, true, network);
+
+    const plantPath = `/plants/${PLANT_ID}`;
+    const tentPath = `/tents/${TENT_ID}`;
+    await page.goto(plantPath, { waitUntil: "domcontentloaded" });
+    await assertMeaningfulPage(page, plantPath);
+    await settleRouteReadsBeforeLinkAudit(page, plantPath);
+    const plantLink = (await visibleLinkAudits(page, plantPath)).find(
+      ({ href }) =>
+        href.startsWith("/daily-check?") &&
+        href.includes(`plantId=${PLANT_ID}`) &&
+        href.includes("from=plant-detail") &&
+        href.includes("method=note"),
+    );
+
+    await page.goto(tentPath, { waitUntil: "domcontentloaded" });
+    await assertMeaningfulPage(page, tentPath);
+    await settleRouteReadsBeforeLinkAudit(page, tentPath);
+    const tentLink = (await visibleLinkAudits(page, tentPath)).find(({ href }) =>
+      href.startsWith(`/plants/${PLANT_ID}`),
+    );
+    if (!plantLink || !tentLink) {
+      throw new Error("the fixture must expose Plant Daily Check and Tent Plant links");
+    }
+
+    const sourceProbePath = "/__core-census-source-settle-probe";
+    const destinationProbePath = "/__core-census-destination-settle-probe";
+    const createProbeGate = () => {
+      let release = () => {};
+      let markSeen = () => {};
+      const pending = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const seen = new Promise<void>((resolve) => {
+        markSeen = resolve;
+      });
+      return { pending, release, seen, markSeen };
+    };
+    const sourceGate = createProbeGate();
+    const destinationGate = createProbeGate();
+    const fulfillAfter = async (
+      route: Parameters<Parameters<BrowserContext["route"]>[1]>[0],
+      gate: ReturnType<typeof createProbeGate>,
+    ) => {
+      gate.markSeen();
+      await gate.pending;
+      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+    };
+    await context.route(`**${sourceProbePath}`, (route) => fulfillAfter(route, sourceGate));
+    await context.route(`**${destinationProbePath}`, (route) =>
+      fulfillAfter(route, destinationGate),
+    );
+    await page.addInitScript(
+      ({ sourcePath, destinationPath, sourceProbe, destinationProbe }) => {
+        window.addEventListener("DOMContentLoaded", () => {
+          if (window.location.pathname === sourcePath) {
+            void window.fetch(sourceProbe).catch(() => undefined);
+          }
+        });
+        const pushState = window.history.pushState;
+        window.history.pushState = function (...args) {
+          pushState.apply(this, args);
+          if (window.location.pathname === destinationPath) {
+            void window.fetch(destinationProbe).catch(() => undefined);
+          }
+        };
+      },
+      {
+        sourcePath: plantPath,
+        destinationPath: "/daily-check",
+        sourceProbe: sourceProbePath,
+        destinationProbe: destinationProbePath,
+      },
+    );
+
+    const failedReads: string[] = [];
+    context.on("requestfailed", (request) => {
+      const pathname = new URL(request.url()).pathname;
+      if (
+        pathname.startsWith("/auth/v1/") ||
+        pathname.startsWith("/rest/v1/") ||
+        pathname === sourceProbePath ||
+        pathname === destinationProbePath
+      ) {
+        failedReads.push(pathname);
+      }
+    });
+
+    const sweepPromise = clickEverySafeInternalHref(page, [plantLink, tentLink], true);
+    try {
+      await sourceGate.seen;
+      await assertMeaningfulPage(page, plantPath);
+      const leftSourceBeforeRelease = await page
+        .waitForURL((url) => url.pathname === "/daily-check", { timeout: 1_000 })
+        .then(() => true)
+        .catch(() => false);
+      expect(
+        leftSourceBeforeRelease,
+        "the click sweep must drain source reads before following its link",
+      ).toBe(false);
+
+      sourceGate.release();
+      await destinationGate.seen;
+      await assertMeaningfulPage(page, "/daily-check");
+      const beganNextSourceBeforeRelease = await page
+        .waitForURL((url) => url.pathname === tentPath, { timeout: 1_000 })
+        .then(() => true)
+        .catch(() => false);
+      expect(
+        beganNextSourceBeforeRelease,
+        "the click sweep must drain destination reads before loading its next source",
+      ).toBe(false);
+
+      destinationGate.release();
+      await expect(sweepPromise).resolves.toEqual([plantLink.href, tentLink.href]);
+    } finally {
+      sourceGate.release();
+      destinationGate.release();
+      await sweepPromise.catch(() => undefined);
+    }
+
+    expect(failedReads, "the settled click sweep must not abort mocked reads").toEqual([]);
+    expect(report.consoleErrors, "the settled click sweep must not log console errors").toEqual([]);
+    expect(report.pageErrors, "the settled click sweep must not emit page errors").toEqual([]);
+    expect(network.blockedMutations, "the focused click sweep must remain read-only").toEqual([]);
+    expect(
+      network.unexpectedExternalFetches,
+      "the focused click sweep must remain hermetic",
+    ).toEqual([]);
+  });
+
   test("audits every scheduled public page, visible field, and safe internal link", async ({
     page,
   }) => {
-    test.setTimeout(300_000);
+    // This exhaustive lane now proves a fresh quiet window after every route,
+    // click-source revisit, and destination; keep that work below the 40m job ceiling.
+    test.setTimeout(420_000);
     const report = await runLaneCensus(page, "public", PUBLIC_CORE_CENSUS_ROUTES);
     expect(report.routeAudits).toHaveLength(PUBLIC_CORE_CENSUS_ROUTES.length);
     expect(report.linkAudits.length).toBeGreaterThan(0);

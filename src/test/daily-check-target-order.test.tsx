@@ -10,6 +10,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { MemoryRouter, useNavigate } from "@/lib/react-router-compat";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 const useSensorReadingsMock = vi.hoisted(() =>
   vi.fn((_tentId?: string | null, _limit?: number) => ({ data: [] })),
@@ -102,6 +106,12 @@ vi.mock("@/hooks/use-plants", () => ({
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadings: useSensorReadingsMock,
 }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "user-1" } }),
+}));
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ activeGrowId: "g1" }),
+}));
 
 vi.mock("@/components/QuickLogAllActivitiesSection", () => ({
   default: ({
@@ -109,11 +119,17 @@ vi.mock("@/components/QuickLogAllActivitiesSection", () => ({
     tentId,
     plantId,
     testIdPrefix,
+    onSaveSuccess,
   }: {
     growId: string | null;
     tentId: string | null;
     plantId: string | null;
     testIdPrefix: string;
+    onSaveSuccess?: (result: {
+      activityId: "note";
+      target: { growId: string; tentId: string | null; plantId: string | null };
+      growEventId: string;
+    }) => void;
   }) => (
     activityRenderMock({ growId, tentId, plantId }),
     (
@@ -122,7 +138,21 @@ vi.mock("@/components/QuickLogAllActivitiesSection", () => ({
         data-grow-id={growId ?? ""}
         data-tent-id={tentId ?? ""}
         data-plant-id={plantId ?? ""}
-      />
+      >
+        <button
+          type="button"
+          data-testid="mock-activity-save-success"
+          onClick={() =>
+            onSaveSuccess?.({
+              activityId: "note",
+              target: { growId: growId ?? "", tentId, plantId },
+              growEventId: "event-1",
+            })
+          }
+        >
+          Confirm mocked activity save
+        </button>
+      </div>
     )
   ),
 }));
@@ -315,6 +345,7 @@ beforeAll(() => {
 
 describe("DailyCheck target selector order and exact-target truth", () => {
   beforeEach(() => {
+    clearLocalStorageForTest();
     mockUrlGrowId = null;
     mockPlants = baseMockPlants.map((plant) => ({ ...plant }));
     mockTents = baseMockTents.map((tent) => ({ ...tent }));
@@ -369,6 +400,35 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expect(screen.getByTestId("mock-quicklog")).toHaveAttribute("data-prefill-tent-id", "t2");
     expect(screen.getByTestId("daily-grow-check-tent-select")).toBeDisabled();
     expect(useSensorReadingsMock).toHaveBeenLastCalledWith("t2", 50);
+  });
+
+  it("remembers the exact plant after Daily Check receives confirmed save success", async () => {
+    renderRoute("/daily-check?plantId=p-assigned");
+    await waitFor(() =>
+      expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute(
+        "data-plant-id",
+        "p-assigned",
+      ),
+    );
+
+    fireEvent.click(screen.getByTestId("mock-activity-save-success"));
+
+    const record = JSON.parse(
+      getLocalStorageItemForTest("verdant.quickLog.lastTarget.v2.user-1") ?? "{}",
+    ) as { plantId?: string; growId?: string | null; tentId?: string | null; savedAt?: string };
+    expect(record).toMatchObject({ plantId: "p-assigned", growId: "g1", tentId: "t2" });
+    expect(Number.isFinite(Date.parse(record.savedAt ?? ""))).toBe(true);
+  });
+
+  it("does not invent a remembered plant after a tent-only Daily Check save", async () => {
+    renderRoute("/daily-check");
+    await waitFor(() =>
+      expect(screen.getByTestId("daily-check-all-activities")).toHaveAttribute("data-plant-id", ""),
+    );
+
+    fireEvent.click(screen.getByTestId("mock-activity-save-success"));
+
+    expect(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v2.user-1")).toBeNull();
   });
 
   it("clears the default tent for an untented route plant and keeps sensor entry disabled", async () => {

@@ -16,7 +16,7 @@ import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
 import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
-import { clearGrowDataMeta } from "@/hooks/useGrowData";
+import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
@@ -127,13 +127,12 @@ function RootErrorComponent({ error }: { error: Error }) {
  * cancels active observers before AuthProvider exposes the next identity.
  * Source-disclosure metadata lives outside React Query and needs the same
  * identity fence so one grower's status cannot flash for the next account.
+ * Global Search query/history/selection state is also identity-scoped because
+ * its text can contain private grow, tent, or plant labels.
  */
 function useClearQueryCacheBeforeAuthIdentityChange() {
   const { queryClient } = Route.useRouteContext();
-  return () => {
-    queryClient.clear();
-    clearGrowDataMeta();
-  };
+  return () => clearPrivateClientStateBeforeAuthIdentityChange(queryClient);
 }
 
 function AnalyticsShell() {

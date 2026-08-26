@@ -23,15 +23,27 @@ export function useRequireAuth(redirectTo: string = "/auth"): {
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getUser().then(({ data, error }) => {
+    const redirectUnauthenticated = () => {
       if (cancelled) return;
-      if (error || !data?.user) {
-        setStatus("unauthenticated");
-        nav(redirectTo, { replace: true });
-        return;
-      }
-      setStatus("authenticated");
-    });
+      setStatus("unauthenticated");
+      nav(redirectTo, { replace: true });
+    };
+
+    void supabase.auth.getUser().then(
+      ({ data, error }) => {
+        if (error || !data?.user) {
+          redirectUnauthenticated();
+          return;
+        }
+        if (cancelled) return;
+        setStatus("authenticated");
+      },
+      () => {
+        // A transport/runtime rejection cannot be trusted as authenticated.
+        // Fail closed without exposing the underlying error or user data.
+        redirectUnauthenticated();
+      },
+    );
     return () => {
       cancelled = true;
     };

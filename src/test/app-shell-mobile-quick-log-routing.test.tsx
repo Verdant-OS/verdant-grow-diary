@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
   Link,
@@ -8,11 +8,12 @@ import {
   useLocation,
   useNavigate,
 } from "@/lib/react-router-compat";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const TENT_ID = "30000000-0000-4000-8000-000000000001";
 const SECOND_TENT_ID = "30000000-0000-4000-8000-000000000002";
 const PLANT_ID = "40000000-0000-4000-8000-000000000001";
+const { tentTargetEvidenceMock } = vi.hoisted(() => ({ tentTargetEvidenceMock: vi.fn() }));
 
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({
@@ -74,7 +75,7 @@ vi.mock("@/components/QuickLog", () => ({
     ) : null,
 }));
 vi.mock("@/components/QuickLogV2Sheet", () => ({
-  default: ({
+  default: function MockQuickLogV2Sheet({
     open,
     defaultTargetKey,
     defaultAction,
@@ -84,41 +85,60 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({
     defaultTargetKey: string | null;
     defaultAction?: string;
     onOpenChange: (open: boolean) => void;
-  }) => (
-    <>
-      <output
-        data-testid="scoped-quick-log-state"
-        data-open={String(open)}
-        data-target-key={defaultTargetKey ?? ""}
-        data-action={defaultAction ?? "note"}
-      />
-      {open ? (
-        <div
-          data-testid="scoped-quick-log"
+  }) {
+    const [draft, setDraft] = useState("");
+    useEffect(() => setDraft(""), [defaultTargetKey]);
+
+    return (
+      <>
+        <output
+          data-testid="scoped-quick-log-state"
+          data-open={String(open)}
           data-target-key={defaultTargetKey ?? ""}
           data-action={defaultAction ?? "note"}
-        >
-          Scoped Quick Log
-          <button
-            type="button"
-            data-testid="close-scoped-quick-log"
-            onClick={() => onOpenChange(false)}
+        />
+        {open ? (
+          <div
+            data-testid="scoped-quick-log"
+            data-target-key={defaultTargetKey ?? ""}
+            data-action={defaultAction ?? "note"}
           >
-            Close scoped Quick Log
-          </button>
-        </div>
-      ) : null}
-    </>
-  ),
+            Scoped Quick Log
+            <input
+              aria-label="Scoped Quick Log note"
+              value={draft}
+              onChange={(event) => setDraft(event.currentTarget.value)}
+            />
+            <button
+              type="button"
+              data-testid="close-scoped-quick-log"
+              onClick={() => onOpenChange(false)}
+            >
+              Close scoped Quick Log
+            </button>
+          </div>
+        ) : null}
+      </>
+    );
+  },
 }));
 
 import AppShell from "@/components/AppShell";
+import { useTentQuickLogTargetEvidence } from "@/context/TentQuickLogTargetContext";
 import { QUICK_LOG_V2_OPEN_EVENT } from "@/lib/quickLogV2OpenIntent";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 function TestContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const targetEvidence = tentTargetEvidenceMock() as {
+    tentId: string;
+    soleActivePlantId: string | null;
+  } | null;
+  useTentQuickLogTargetEvidence(
+    targetEvidence?.tentId ?? null,
+    targetEvidence?.soleActivePlantId ?? null,
+  );
   return (
     <div>
       <span data-testid="current-path">{location.pathname}</span>
@@ -142,8 +162,8 @@ function TestContent() {
   );
 }
 
-function renderAt(pathname: string) {
-  return render(
+function shellAt(pathname: string) {
+  return (
     <MemoryRouter initialEntries={[pathname]}>
       <Routes>
         <Route
@@ -155,8 +175,12 @@ function renderAt(pathname: string) {
           }
         />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderAt(pathname: string) {
+  return render(shellAt(pathname));
 }
 
 function dispatchRuntimeEvent(event: Event) {
@@ -166,6 +190,11 @@ function dispatchRuntimeEvent(event: Event) {
 }
 
 describe("AppShell mobile Quick Log routing", () => {
+  beforeEach(() => {
+    tentTargetEvidenceMock.mockReset();
+    tentTargetEvidenceMock.mockReturnValue(null);
+  });
+
   it("closes legacy Quick Log before opening one global V2 sheet for a valid typed Water intent", async () => {
     renderAt("/settings");
     dispatchRuntimeEvent(
@@ -379,12 +408,95 @@ describe("AppShell mobile Quick Log routing", () => {
     expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
+  it("opens plant-scoped V2 logging when Tent Detail proves one active plant", () => {
+    tentTargetEvidenceMock.mockReturnValue({
+      tentId: TENT_ID,
+      soleActivePlantId: PLANT_ID,
+    });
+    renderAt(`/tents/${TENT_ID}`);
+
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `plant:${PLANT_ID}`,
+    );
+  });
+
+  it("keeps tent scope when Tent Detail reports multiple active plants", () => {
+    tentTargetEvidenceMock.mockReturnValue({
+      tentId: TENT_ID,
+      soleActivePlantId: null,
+    });
+    renderAt(`/tents/${TENT_ID}`);
+
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+  });
+
+  it("freezes the mobile launch target while open and adopts late sole-plant evidence next time", () => {
+    const view = renderAt(`/tents/${TENT_ID}`);
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Scoped Quick Log note" }), {
+      target: { value: "Grower draft must survive" },
+    });
+
+    tentTargetEvidenceMock.mockReturnValue({
+      tentId: TENT_ID,
+      soleActivePlantId: PLANT_ID,
+    });
+    view.rerender(shellAt(`/tents/${TENT_ID}`));
+
+    // The target prop stays stable for this open draft, so QuickLogV2Sheet's
+    // prop-change reset cannot erase input when the plant query settles.
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+    expect(screen.getByRole("textbox", { name: "Scoped Quick Log note" })).toHaveValue(
+      "Grower draft must survive",
+    );
+
+    fireEvent.click(screen.getByTestId("close-scoped-quick-log"));
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `plant:${PLANT_ID}`,
+    );
+  });
+
   it("preserves the existing unscoped Quick Log fallback away from Tent Detail", () => {
     renderAt("/settings");
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
     expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument();
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("binds the Plant Detail mobile FAB to the valid plant UUID in the route", () => {
+    renderAt(`/plants/${PLANT_ID}`);
+
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+
+    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-plant-id", PLANT_ID);
+    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("fails closed to unscoped Quick Log for an invalid Plant Detail id", () => {
+    renderAt("/plants/not-a-uuid");
+
+    fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
+
+    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-plant-id", "");
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
   });
 

@@ -54,10 +54,11 @@ export type LatestSnapshotFreshness = "fresh" | "stale" | "missing" | "unavailab
 export const ALERT_SAVE_BLOCK_MESSAGE: Record<PersistenceBlockReason, string> = {
   demo_data: "This is demo data, so it cannot create a saved alert.",
   no_snapshot: "There is no sensor reading yet. Enter a manual snapshot to save alerts.",
+  provenance_ineligible:
+    "This Quick Log entry is recorded as manual diary evidence, so it cannot create a saved alert. Add a manual sensor reading to check alerts.",
   context_only_source:
     "This reading is context only. Saved alerts come from manual or live readings.",
-  quality_unavailable:
-    "This reading has no usable values, so it cannot create a saved alert.",
+  quality_unavailable: "This reading has no usable values, so it cannot create a saved alert.",
   outside_live_window: `This reading is outside the ${FRESHNESS_WINDOW_LABEL}, so it cannot raise a new alert. Enter a fresh manual snapshot.`,
 };
 
@@ -115,6 +116,7 @@ export function hasRecentManualSnapshot(args: ClassifyLatestSnapshotArgs): boole
   if (args.status !== "ok") return false;
   const snap = args.snapshot;
   if (!snap || snap.source !== "manual" || !snap.ts) return false;
+  if (snap.alert_persistence_eligible === false) return false;
   const now = args.now ?? Date.now();
   return !isStale(snap.ts, now);
 }
@@ -122,12 +124,14 @@ export function hasRecentManualSnapshot(args: ClassifyLatestSnapshotArgs): boole
 /**
  * Computes the exact same gate the alert persistence pipeline uses: a
  * snapshot can persist alerts only when status is loaded, source is
- * `live` or `manual`, and timestamp is inside the freshness window.
+ * `live` or `manual`, it has not explicitly opted out, and its timestamp is
+ * inside the freshness window.
  */
 export function snapshotAlertsCanPersist(args: ClassifyLatestSnapshotArgs): boolean {
   if (args.status !== "ok") return false;
   const snap = args.snapshot;
   if (!snap || !snap.ts) return false;
+  if (snap.alert_persistence_eligible === false) return false;
   if (snap.source !== "live" && snap.source !== "manual") return false;
   const now = args.now ?? Date.now();
   return !isStale(snap.ts, now);
@@ -150,6 +154,9 @@ export function describeLatestSnapshotForAlerts(args: ClassifyLatestSnapshotArgs
   }
   const now = args.now ?? Date.now();
   const sourceWord = snap.source === "live" ? "live" : "manual";
+  if (snap.alert_persistence_eligible === false) {
+    return "Latest manual snapshot is Quick Log diary evidence, so it cannot create saved alerts. Add a manual sensor reading to check alerts.";
+  }
   // Two independent questions, reported separately so the copy never calls a
   // reading "stale" when display surfaces still consider it current:
   //   displayStale   — source-aware; is the telemetry itself out of date?
@@ -355,12 +362,15 @@ export function buildLatestSnapshotDetail(
   const stale = isStale(snap.ts, now);
   const insideWindow = !stale;
   const persistableSource = snap.source === "live" || snap.source === "manual";
-  const canPersist = persistableSource && insideWindow;
+  const provenanceIneligible = snap.alert_persistence_eligible === false;
+  const canPersist = persistableSource && !provenanceIneligible && insideWindow;
   const sourceLabel = SOURCE_LABELS[snap.source] ?? "Unknown";
   const captured = capturedAgoText ? `captured ${capturedAgoText}` : "captured time unknown";
   let detailLine: string;
   if (!persistableSource) {
     detailLine = `Latest snapshot: ${sourceLabel} · ${captured} · context only. Alerts persist only from fresh manual or live readings.`;
+  } else if (provenanceIneligible) {
+    detailLine = `Latest snapshot: ${sourceLabel} · ${captured} · Quick Log diary evidence; it cannot create persisted alerts.`;
   } else if (!insideWindow) {
     detailLine = `Latest snapshot: ${sourceLabel} · ${captured} · outside ${FRESHNESS_WINDOW_LABEL}. Enter a fresh manual snapshot to persist alerts.`;
   } else {
@@ -470,8 +480,8 @@ function toSelection(
 /* -------------------------------------------------------------------------- */
 
 /** Tone categories for the latest-snapshot source chip. Only `eligible`
- * represents a fresh manual/live snapshot the alert engine can persist
- * from. Presenter maps these to semantic tokens. */
+ * represents a fresh manual sensor/live snapshot the alert engine can
+ * persist from. Presenter maps these to semantic tokens. */
 export type SourceChipTone = "eligible" | "warning" | "context" | "caution";
 
 export interface SourceChipViewModel {
@@ -501,6 +511,9 @@ export function buildSourceChip(args: ClassifyLatestSnapshotArgs): SourceChipVie
   }
   const stale = isStale(snap.ts, args.now ?? Date.now());
   const label = SOURCE_LABELS[snap.source] ?? "Unknown";
+  if (snap.alert_persistence_eligible === false) {
+    return { label, tone: "context", qualifier: "manual evidence", canPersist: false };
+  }
   if (snap.source === "manual" || snap.source === "live") {
     if (stale) {
       return { label, tone: "warning", qualifier: "stale", canPersist: false };
@@ -516,11 +529,11 @@ export function buildSourceChip(args: ClassifyLatestSnapshotArgs): SourceChipVie
 
 export const SOURCE_ELIGIBILITY_HELP = {
   title: "Source rules",
-  eligible: "Eligible for persisted alerts: fresh manual or live readings.",
+  eligible: "Eligible for persisted alerts: fresh manual sensor readings or live readings.",
   contextOnly:
-    "Context only: CSV, demo, diary, simulated, stale, invalid, unavailable, or unknown readings.",
+    "Context only: Quick Log manual evidence, CSV, demo, diary, simulated, stale, invalid, unavailable, or unknown readings.",
   summary:
-    "Alerts persist only from fresh manual or live readings. CSV, demo, diary, simulated, stale, invalid, unavailable, or unknown readings are shown for context only.",
+    "Alerts persist only from fresh manual sensor readings or live readings. Quick Log manual evidence, CSV, demo, diary, simulated, stale, invalid, unavailable, or unknown readings are shown for context only.",
   why: "This prevents stale or untrusted telemetry from creating misleading alerts.",
 } as const;
 
@@ -551,6 +564,14 @@ export function emptyStateSnapshotCta(
       message: "No snapshot available. Enter a fresh manual snapshot to check alerts.",
       showAddManualSnapshot: true,
       kind: "missing",
+    };
+  }
+  if (snap.alert_persistence_eligible === false) {
+    return {
+      message:
+        "Latest manual evidence is Quick Log diary evidence and cannot create persisted alerts. Add a manual sensor reading to check alerts.",
+      showAddManualSnapshot: true,
+      kind: "context-only",
     };
   }
   const persistable = snap.source === "manual" || snap.source === "live";

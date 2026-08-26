@@ -7,9 +7,10 @@
  * auto-linking plants.strain to a cultivar.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { flushSync } from "react-dom";
 
 import GlobalSearchDialog from "@/components/GlobalSearchDialog";
 import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
@@ -19,6 +20,7 @@ import {
   type GlobalSearchResult,
   type PrivateSearchRow,
 } from "@/lib/globalSearchResults";
+import { clearGlobalSearchPrivateState } from "@/lib/globalSearchSession";
 import { growDetailPath, plantDetailPath, tentDetailPath } from "@/lib/routes";
 
 // ---- supabase RPC mock (private owner-scoped verdant_search) ----------------
@@ -27,6 +29,18 @@ const rpcSpy = vi.fn((name: string, args: unknown) => rpcImpl(name, args));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: (name: string, args: unknown) => rpcSpy(name, args) },
+}));
+
+// This suite exercises merged private/public results, not auth resolution.
+// Model a resolved owner explicitly; the dedicated auth suite owns loading,
+// signed-out fallback, and identity-transition behavior.
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({
+    loading: false,
+    user: { id: "owner-a" },
+    session: { user: { id: "owner-a" } },
+    signOut: vi.fn(),
+  }),
 }));
 
 function privateOk(rows: PrivateSearchRow[]) {
@@ -51,7 +65,7 @@ function renderDialog() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={["/"]}>
         <GlobalSearchDialog open onOpenChange={() => {}} />
@@ -59,6 +73,7 @@ function renderDialog() {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { client, view };
 }
 
 function type(value: string) {
@@ -198,6 +213,44 @@ describe("mergeGlobalSearchResults", () => {
 // Dialog integration — one palette, private via RPC, public cultivars merged
 // ============================================================================
 describe("GlobalSearchDialog integration", () => {
+  it("does not reissue the previous owner's debounced query after the identity fence", async () => {
+    privateOk([
+      {
+        entity_type: "tent",
+        id: "owner-a-tent",
+        label: "Owner A Private Tent",
+        sublabel: "flower",
+        match_kind: "exact",
+        rank: 0,
+        score: 1,
+      },
+    ]);
+    const { client } = renderDialog();
+    type("Owner A Private Tent");
+    await screen.findByTestId("global-search-item-tent-owner-a-tent");
+    rpcSpy.mockClear();
+
+    act(() => {
+      flushSync(() => clearGlobalSearchPrivateState());
+      client.clear();
+    });
+
+    expect(screen.getByTestId("global-search-input")).toHaveValue("");
+    expect(
+      JSON.stringify(
+        client
+          .getQueryCache()
+          .getAll()
+          .map((query) => query.queryKey),
+      ),
+    ).not.toContain("Owner A Private Tent");
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+    expect(rpcSpy).not.toHaveBeenCalled();
+  });
+
   it("shows an exact grow from the RPC and navigates to its detail route", async () => {
     privateOk([
       {

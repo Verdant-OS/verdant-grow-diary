@@ -8,49 +8,133 @@
  *  - Contains zero write controls (button/form/input/select/textarea)
  *  - Renders approval-required + no-device-command copy for Action Queue
  */
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "@/lib/react-router-compat";
+
+const fixtures = vi.hoisted(() => ({
+  activeGrow: null as Record<string, unknown> | null,
+  growsLoading: false,
+  tents: [] as Array<Record<string, unknown>>,
+  tentsIsFetching: false,
+  tentsIsError: false,
+  tentsIsPaused: false,
+  plants: [] as Array<Record<string, unknown>>,
+  plantsIsFetching: false,
+  plantsIsError: false,
+  plantsIsPaused: false,
+  diary: [] as Array<Record<string, unknown>>,
+  diaryIsFetching: false,
+  diaryIsError: false,
+  diaryIsPaused: false,
+  sensorSnapshot: {
+    source: "unavailable",
+    ts: null,
+    temp: null,
+    rh: null,
+    vpd: null,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
+  } as Record<string, unknown>,
+  sensorIsFetching: false,
+  sensorIsPaused: false,
+  alerts: [] as Array<Record<string, unknown>>,
+  alertsStatus: "ok" as "idle" | "loading" | "ok" | "unavailable",
+  aiSessions: [] as Array<Record<string, unknown>>,
+  aiSessionsIsFetching: false,
+  aiSessionsIsError: false,
+  aiSessionsIsPaused: false,
+  actions: [] as Array<Record<string, unknown>>,
+  actionQueueIsLoading: false,
+  actionQueueIsError: false,
+  actionQueueIsPaused: false,
+  proofSelectedPlantAiCoachRow: null as Record<string, unknown> | null,
+  proofSelectedAlertActionRow: null as Record<string, unknown> | null,
+  proofSelectedAiDoctorActionRow: null as Record<string, unknown> | null,
+  actionHookCalls: [] as unknown[][],
+}));
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
-    activeGrow: null,
-    activeGrowId: null,
-    grows: [],
+    activeGrow: fixtures.activeGrow,
+    activeGrowId: fixtures.activeGrow?.id ?? null,
+    grows: fixtures.activeGrow ? [fixtures.activeGrow] : [],
     setActiveGrowId: () => {},
     refresh: async () => {},
-    loading: false,
+    loading: fixtures.growsLoading,
     error: null,
   }),
 }));
-vi.mock("@/hooks/use-tents", () => ({ useTents: () => ({ data: [] }) }));
-vi.mock("@/hooks/use-plants", () => ({ usePlants: () => ({ data: [] }) }));
-vi.mock("@/hooks/use-diary-entries", () => ({ useDiaryEntries: () => ({ data: [] }) }));
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({
+    data: fixtures.tents,
+    isFetching: fixtures.tentsIsFetching,
+    isError: fixtures.tentsIsError,
+    isPaused: fixtures.tentsIsPaused,
+  }),
+}));
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({
+    data: fixtures.plants,
+    isFetching: fixtures.plantsIsFetching,
+    isError: fixtures.plantsIsError,
+    isPaused: fixtures.plantsIsPaused,
+  }),
+}));
+vi.mock("@/hooks/use-diary-entries", () => ({
+  useDiaryEntries: () => ({
+    data: fixtures.diary,
+    isFetching: fixtures.diaryIsFetching,
+    isError: fixtures.diaryIsError,
+    isPaused: fixtures.diaryIsPaused,
+  }),
+}));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
   useLatestSensorSnapshot: () => ({
     status: "ok",
-    snapshot: {
-      source: "unavailable",
-      ts: null,
-      temp: null,
-      rh: null,
-      vpd: null,
-      co2: null,
-      soil: null,
-      soil_ec: null,
-      soil_temp: null,
-      ppfd: null,
-    },
+    snapshot: fixtures.sensorSnapshot,
+    isFetching: fixtures.sensorIsFetching,
+    isPaused: fixtures.sensorIsPaused,
   }),
 }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "owner-current" }, loading: false }),
+}));
 vi.mock("@/hooks/useAlertsList", () => ({
-  useAlertsList: () => ({ status: "ok", alerts: [], error: null, reload: () => {} }),
+  useAlertsList: () => ({
+    status: fixtures.alertsStatus,
+    alerts: fixtures.alerts,
+    error: null,
+    reload: () => {},
+  }),
 }));
 vi.mock("@/hooks/use-ai-doctor-sessions", () => ({
-  useAiDoctorSessions: () => ({ data: [] }),
+  useAiDoctorSessions: () => ({
+    data: fixtures.aiSessions,
+    isFetching: fixtures.aiSessionsIsFetching,
+    isError: fixtures.aiSessionsIsError,
+    isPaused: fixtures.aiSessionsIsPaused,
+  }),
 }));
 vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
-  usePlantAssignedTentActions: () => ({ rows: [], isLoading: false, isError: false, error: null }),
+  usePlantAssignedTentActions: (...args: unknown[]) => {
+    fixtures.actionHookCalls.push(args);
+    return {
+      rows: fixtures.actions,
+      proofSelectedPlantAiCoachRow: fixtures.proofSelectedPlantAiCoachRow,
+      proofSelectedAlertActionRow: fixtures.proofSelectedAlertActionRow,
+      proofSelectedAiDoctorActionRow: fixtures.proofSelectedAiDoctorActionRow,
+      // The real hook surfaces a paused proof read through isLoading so this
+      // presenter only needs its existing proof-read boundary.
+      isLoading: fixtures.actionQueueIsLoading || fixtures.actionQueueIsPaused,
+      isError: fixtures.actionQueueIsError,
+      isPaused: fixtures.actionQueueIsPaused,
+      error: null,
+    };
+  },
 }));
 
 import OneTentLoopLiveProof from "@/pages/OneTentLoopLiveProof";
@@ -63,6 +147,208 @@ function renderPage() {
         <Route path="/one-tent-loop-proof" element={<OneTentLoopLiveProof />} />
       </Routes>
     </MemoryRouter>,
+  );
+}
+
+beforeEach(() => {
+  fixtures.activeGrow = null;
+  fixtures.growsLoading = false;
+  fixtures.tents = [];
+  fixtures.tentsIsFetching = false;
+  fixtures.tentsIsError = false;
+  fixtures.tentsIsPaused = false;
+  fixtures.plants = [];
+  fixtures.plantsIsFetching = false;
+  fixtures.plantsIsError = false;
+  fixtures.plantsIsPaused = false;
+  fixtures.diary = [];
+  fixtures.diaryIsFetching = false;
+  fixtures.diaryIsError = false;
+  fixtures.diaryIsPaused = false;
+  fixtures.sensorSnapshot = {
+    source: "unavailable",
+    ts: null,
+    temp: null,
+    rh: null,
+    vpd: null,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
+  };
+  fixtures.sensorIsFetching = false;
+  fixtures.sensorIsPaused = false;
+  fixtures.alerts = [];
+  fixtures.alertsStatus = "ok";
+  fixtures.aiSessions = [];
+  fixtures.aiSessionsIsFetching = false;
+  fixtures.aiSessionsIsError = false;
+  fixtures.aiSessionsIsPaused = false;
+  fixtures.actions = [];
+  fixtures.actionQueueIsLoading = false;
+  fixtures.actionQueueIsError = false;
+  fixtures.actionQueueIsPaused = false;
+  fixtures.proofSelectedPlantAiCoachRow = null;
+  fixtures.proofSelectedAlertActionRow = null;
+  fixtures.proofSelectedAiDoctorActionRow = null;
+  fixtures.actionHookCalls = [];
+});
+
+function setCurrentTentPlantScope() {
+  fixtures.activeGrow = { id: "grow-current", name: "Current grow", status: "active" };
+  fixtures.tents = [{ id: "tent-current", name: "Current tent", grow_id: "grow-current" }];
+  fixtures.plants = [
+    {
+      id: "plant-current",
+      name: "Current plant",
+      grow_id: "grow-current",
+      tent_id: "tent-current",
+    },
+  ];
+}
+
+function setSettledCurrentProofEvidence() {
+  setCurrentTentPlantScope();
+  fixtures.tents = [
+    {
+      id: "tent-current",
+      name: "Current tent",
+      grow_id: "grow-current",
+      target_temp_c: 24,
+    },
+  ];
+  fixtures.plants = [
+    {
+      id: "plant-current",
+      name: "Current plant",
+      grow_id: "grow-current",
+      tent_id: "tent-current",
+      stage: "veg",
+      medium: "coco",
+      pot_size: "3 gal",
+    },
+  ];
+  fixtures.diary = [
+    {
+      id: "diary-current",
+      plant_id: "plant-current",
+      tent_id: "tent-current",
+      entry_at: "2026-06-09T10:50:00.000Z",
+      note: "Observed leaves.",
+      details: { event_type: "observation" },
+    },
+  ];
+  fixtures.sensorSnapshot = {
+    source: "live",
+    ts: "2026-06-09T10:55:00.000Z",
+    temp: 24,
+    rh: 58,
+    vpd: null,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
+    tent_id: "tent-current",
+    metric_refs: {
+      rh: {
+        id: "event-current",
+        captured_at: "2026-06-09T10:55:00.000Z",
+        source: "live",
+      },
+    },
+  };
+  fixtures.alerts = [
+    {
+      id: "alert-current",
+      grow_id: "grow-current",
+      tent_id: "tent-current",
+      plant_id: "plant-current",
+      metric: "humidity_pct",
+      severity: "warning",
+      reason: "Current tent humidity",
+      status: "open",
+      created_at: "2026-06-09T11:00:00.000Z",
+      source: "environment_alerts",
+      originating_timeline_events: [
+        {
+          id: "event-current",
+          type: "sensor_snapshot",
+          source: "live",
+          occurred_at: "2026-06-09T10:55:00.000Z",
+        },
+      ],
+    },
+  ];
+  fixtures.aiSessions = [
+    {
+      id: "session-current",
+      grow_id: "grow-current",
+      tent_id: "tent-current",
+      plant_id: "plant-current",
+      created_at: "2026-06-09T10:58:00.000Z",
+    },
+  ];
+  fixtures.actions = [
+    {
+      id: "aq-current",
+      growId: "grow-current",
+      tentId: "tent-current",
+      status: "pending_approval",
+      source: "environment_alert",
+      reason: "Review humidity [alert:alert-current]",
+      riskLevel: "low",
+      alertBackPointerId: "alert-current",
+      hasTargetDevice: false,
+    },
+  ];
+}
+
+const PROOF_REFRESH_CASES: [string, () => void][] = [
+  ["the grow read", () => (fixtures.growsLoading = true)],
+  ["the tents query", () => (fixtures.tentsIsFetching = true)],
+  ["the plants query", () => (fixtures.plantsIsFetching = true)],
+  ["the diary query", () => (fixtures.diaryIsFetching = true)],
+  ["the sensor snapshot query", () => (fixtures.sensorIsFetching = true)],
+  ["the alerts read", () => (fixtures.alertsStatus = "loading")],
+  ["the AI Doctor sessions query", () => (fixtures.aiSessionsIsFetching = true)],
+  ["the Action Queue proof read", () => (fixtures.actionQueueIsLoading = true)],
+];
+
+const PROOF_CACHED_ERROR_CASES: [string, () => void][] = [
+  ["the tents query", () => (fixtures.tentsIsError = true)],
+  ["the plants query", () => (fixtures.plantsIsError = true)],
+  ["the diary query", () => (fixtures.diaryIsError = true)],
+  ["the AI Doctor sessions query", () => (fixtures.aiSessionsIsError = true)],
+  ["the Action Queue proof read", () => (fixtures.actionQueueIsError = true)],
+];
+
+const PROOF_PAUSED_CASES: [string, () => void][] = [
+  ["the tents query", () => (fixtures.tentsIsPaused = true)],
+  ["the plants query", () => (fixtures.plantsIsPaused = true)],
+  ["the diary query", () => (fixtures.diaryIsPaused = true)],
+  ["the sensor snapshot query", () => (fixtures.sensorIsPaused = true)],
+  ["the AI Doctor sessions query", () => (fixtures.aiSessionsIsPaused = true)],
+  ["the Action Queue proof read", () => (fixtures.actionQueueIsPaused = true)],
+];
+
+const ACTIVE_SCOPE_ALERTS_INCOMPLETE_STATUSES: ("idle" | "unavailable")[] = ["idle", "unavailable"];
+
+function expectProofEvidenceWithheld() {
+  expect(screen.getByTestId("one-tent-loop-live-proof-refreshing").textContent).toMatch(
+    /cached proof evidence is withheld.*scoped reads complete/i,
+  );
+  for (const id of LOOP_STEP_IDS) {
+    expect(screen.getByTestId(`loop-live-proof-step-${id}`).getAttribute("data-status")).not.toBe(
+      "passed",
+    );
+  }
+  expect(screen.getByTestId("loop-live-proof-step-alert").textContent).not.toMatch(
+    /current tent humidity/i,
+  );
+  expect(screen.getByTestId("loop-live-proof-step-action-queue").textContent).not.toMatch(
+    /alert-derived advisory/i,
   );
 }
 
@@ -139,6 +425,745 @@ describe("OneTentLoopLiveProof page", () => {
     renderPage();
     const pre = screen.getByTestId("one-tent-loop-live-proof-report-text");
     expect((pre.textContent ?? "").toLowerCase()).toMatch(/one-tent loop/);
+  });
+
+  it("uses only the selected grow/tent/plant alert when proving an alert-derived action", () => {
+    setCurrentTentPlantScope();
+    fixtures.sensorSnapshot = {
+      source: "live",
+      ts: "2026-06-09T10:55:00.000Z",
+      temp: 24,
+      rh: 58,
+      vpd: null,
+      co2: null,
+      soil: null,
+      soil_ec: null,
+      soil_temp: null,
+      ppfd: null,
+      tent_id: "tent-current",
+      metric_refs: {
+        rh: {
+          id: "event-current",
+          captured_at: "2026-06-09T10:55:00.000Z",
+          source: "live",
+        },
+      },
+    };
+    fixtures.alerts = [
+      {
+        id: "alert-other",
+        grow_id: "grow-current",
+        tent_id: "tent-other",
+        plant_id: "plant-other",
+        metric: "temperature_c",
+        severity: "warning",
+        reason: "Other tent temperature",
+        status: "open",
+        created_at: "2026-06-09T12:00:00.000Z",
+      },
+      {
+        id: "alert-current",
+        grow_id: "grow-current",
+        tent_id: "tent-current",
+        plant_id: "plant-current",
+        metric: "humidity_pct",
+        severity: "warning",
+        reason: "Current tent humidity",
+        status: "open",
+        created_at: "2026-06-09T11:00:00.000Z",
+        source: "environment_alerts",
+        originating_timeline_events: [
+          {
+            id: "event-current",
+            type: "sensor_snapshot",
+            source: "live",
+            occurred_at: "2026-06-09T10:55:00.000Z",
+          },
+        ],
+      },
+    ];
+    fixtures.actions = [
+      {
+        id: "aq-current",
+        growId: "grow-current",
+        tentId: "tent-current",
+        status: "pending_approval",
+        source: "environment_alert",
+        reason: "Review humidity [alert:alert-current]",
+        riskLevel: "low",
+        alertBackPointerId: "alert-current",
+        hasTargetDevice: false,
+      },
+    ];
+    // A valid direct Coach candidate must not displace the stronger passed
+    // alert-derived action that is already inside the ordinary bounded list.
+    fixtures.proofSelectedPlantAiCoachRow = {
+      id: "aq-coach-selected",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: "plant-current",
+      status: "pending_approval",
+      source: "ai_coach",
+      reason: "Review the selected plant.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    };
+
+    renderPage();
+
+    const alert = screen.getByTestId("loop-live-proof-step-alert");
+    expect(alert.textContent).toMatch(/humidity_pct/);
+    expect(alert.textContent).not.toMatch(/temperature_c/);
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("passed");
+    expect(action.textContent).toMatch(/Alert-derived advisory/);
+  });
+
+  it("keeps settled scoped proof inputs available", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+    try {
+      setSettledCurrentProofEvidence();
+
+      renderPage();
+
+      for (const id of [
+        "grow",
+        "tent",
+        "plant",
+        "quick-log",
+        "timeline",
+        "sensor-snapshot",
+        "alert",
+        "action-queue",
+      ]) {
+        expect(screen.getByTestId(`loop-live-proof-step-${id}`).getAttribute("data-status")).toBe(
+          "passed",
+        );
+      }
+      expect(screen.queryByTestId("one-tent-loop-live-proof-refreshing")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each(PROOF_REFRESH_CASES)(
+    "withholds all cached proof evidence while %s is refreshing",
+    (_label, markRefreshing) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+      try {
+        setSettledCurrentProofEvidence();
+        markRefreshing();
+
+        renderPage();
+
+        expectProofEvidenceWithheld();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(PROOF_CACHED_ERROR_CASES)(
+    "withholds cached proof evidence when %s retains rows after an error",
+    (_label, markCachedError) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+      try {
+        setSettledCurrentProofEvidence();
+        markCachedError();
+
+        renderPage();
+
+        expectProofEvidenceWithheld();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(PROOF_PAUSED_CASES)(
+    "withholds all cached proof evidence while %s is paused",
+    (_label, markPaused) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+      try {
+        setSettledCurrentProofEvidence();
+        markPaused();
+
+        renderPage();
+
+        expectProofEvidenceWithheld();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each(ACTIVE_SCOPE_ALERTS_INCOMPLETE_STATUSES)(
+    "withholds cached proof evidence while an active-scope alerts read is %s",
+    (alertsStatus) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-09T11:00:00.000Z"));
+      try {
+        setSettledCurrentProofEvidence();
+        fixtures.alertsStatus = alertsStatus;
+
+        renderPage();
+
+        expectProofEvidenceWithheld();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("does not report an in-flight proof read when no scope is selected", () => {
+    fixtures.alertsStatus = "idle";
+    renderPage();
+
+    expect(screen.queryByTestId("one-tent-loop-live-proof-refreshing")).toBeNull();
+    for (const id of LOOP_STEP_IDS) {
+      expect(screen.getByTestId(`loop-live-proof-step-${id}`).getAttribute("data-status")).not.toBe(
+        "passed",
+      );
+    }
+  });
+
+  it("does not let a newer AI Coach action for another plant pass this plant's proof", () => {
+    setCurrentTentPlantScope();
+    fixtures.actions = [
+      {
+        id: "aq-coach-other-plant",
+        growId: "grow-current",
+        tentId: "tent-current",
+        plantId: "plant-other",
+        status: "pending_approval",
+        source: "ai_coach",
+        reason: "Review leaves.",
+        riskLevel: "low",
+        alertBackPointerId: null,
+        aiDoctorSessionBackPointerId: null,
+        hasTargetDevice: false,
+      },
+    ];
+
+    renderPage();
+
+    expect(
+      screen.getByTestId("loop-live-proof-step-action-queue").getAttribute("data-status"),
+    ).not.toBe("passed");
+  });
+
+  it("requests pre-cap selected-plant filtering for AI Coach proof evidence", () => {
+    setCurrentTentPlantScope();
+
+    renderPage();
+
+    expect(fixtures.actionHookCalls).toContainEqual([
+      "tent-current",
+      "grow-current",
+      {
+        selectedPlantIdForAiCoach: "plant-current",
+        selectedAlertIdForProof: null,
+        selectedAiDoctorSessionIdForProof: null,
+      },
+    ]);
+  });
+
+  it("prefers older exact current-alert evidence over Coach when newer unrelated actions fill the generic cap", () => {
+    setCurrentTentPlantScope();
+    fixtures.sensorSnapshot = {
+      source: "live",
+      ts: "2026-06-09T10:55:00.000Z",
+      temp: 24,
+      rh: 58,
+      vpd: null,
+      co2: null,
+      soil: null,
+      soil_ec: null,
+      soil_temp: null,
+      ppfd: null,
+      tent_id: "tent-current",
+      metric_refs: {
+        rh: {
+          id: "event-current",
+          captured_at: "2026-06-09T10:55:00.000Z",
+          source: "live",
+        },
+      },
+    };
+    fixtures.alerts = [
+      {
+        id: "alert-current",
+        grow_id: "grow-current",
+        tent_id: "tent-current",
+        plant_id: "plant-current",
+        metric: "humidity_pct",
+        severity: "warning",
+        reason: "Current tent humidity",
+        status: "open",
+        created_at: "2026-06-09T11:00:00.000Z",
+        source: "environment_alerts",
+        originating_timeline_events: [
+          {
+            id: "event-current",
+            type: "sensor_snapshot",
+            source: "live",
+            occurred_at: "2026-06-09T10:55:00.000Z",
+          },
+        ],
+      },
+    ];
+    fixtures.aiSessions = [
+      {
+        id: "session-current",
+        grow_id: "grow-current",
+        tent_id: "tent-current",
+        plant_id: "plant-current",
+        created_at: "2026-06-09T11:45:00.000Z",
+      },
+    ];
+    fixtures.actions = Array.from({ length: 6 }, (_, index) => ({
+      id: `newer-unrelated-${index + 1}`,
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: null,
+      status: "pending_approval",
+      source: "manual",
+      reason: "Manual action without a proof back-pointer.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    }));
+    fixtures.proofSelectedAlertActionRow = {
+      id: "older-current-alert-action",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: null,
+      status: "pending_approval",
+      source: "environment_alert",
+      reason: "Review humidity [alert:alert-current]",
+      riskLevel: "low",
+      alertBackPointerId: "alert-current",
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    };
+    fixtures.proofSelectedAiDoctorActionRow = {
+      id: "older-current-ai-doctor-action",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: null,
+      status: "pending_approval",
+      source: "ai_doctor",
+      reason: "Review leaf context [session:session-current]",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: "session-current",
+      hasTargetDevice: false,
+    };
+    fixtures.proofSelectedPlantAiCoachRow = {
+      id: "selected-plant-coach",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: "plant-current",
+      status: "pending_approval",
+      source: "ai_coach",
+      reason: "Review the selected plant.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    };
+
+    renderPage();
+
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("passed");
+    expect(action.textContent).toMatch(/Alert-derived advisory/);
+    expect(action.textContent).not.toMatch(/AI Coach advisory/);
+    expect(fixtures.actionHookCalls).toContainEqual([
+      "tent-current",
+      "grow-current",
+      {
+        selectedPlantIdForAiCoach: "plant-current",
+        selectedAlertIdForProof: "alert-current",
+        selectedAiDoctorSessionIdForProof: "session-current",
+      },
+    ]);
+  });
+
+  it("allows an exact selected-plant AI Coach action to remain advisory evidence", () => {
+    setCurrentTentPlantScope();
+    fixtures.actions = [
+      {
+        id: "aq-coach-current-plant",
+        growId: "grow-current",
+        tentId: "tent-current",
+        plantId: "plant-current",
+        status: "pending_approval",
+        source: "ai_coach",
+        reason: "Review leaves.",
+        riskLevel: "low",
+        alertBackPointerId: null,
+        aiDoctorSessionBackPointerId: null,
+        hasTargetDevice: false,
+      },
+    ];
+
+    renderPage();
+
+    expect(
+      screen.getByTestId("loop-live-proof-step-action-queue").getAttribute("data-status"),
+    ).toBe("passed");
+  });
+
+  it("uses the bounded exact selected-plant AI Coach proof row when newer non-causal actions fill the shared display cap", () => {
+    setCurrentTentPlantScope();
+    fixtures.actions = Array.from({ length: 6 }, (_, index) => ({
+      id: `aq-manual-${index + 1}`,
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: null,
+      status: "pending_approval",
+      source: "manual",
+      reason: "Manual action without a proof back-pointer.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    }));
+    fixtures.proofSelectedPlantAiCoachRow = {
+      id: "aq-coach-selected-beyond-display-cap",
+      growId: "grow-current",
+      tentId: "tent-current",
+      plantId: "plant-current",
+      status: "pending_approval",
+      source: "ai_coach",
+      reason: "Review the selected plant.",
+      riskLevel: "low",
+      alertBackPointerId: null,
+      aiDoctorSessionBackPointerId: null,
+      hasTargetDevice: false,
+    };
+
+    renderPage();
+
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("passed");
+    expect(action.textContent).toMatch(/AI Coach advisory/);
+  });
+
+  it("uses the page's current clock instead of the fixed proof fallback for live freshness", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T12:20:00.000Z"));
+    try {
+      setCurrentTentPlantScope();
+      fixtures.sensorSnapshot = {
+        source: "live",
+        ts: "2026-06-09T12:00:00.000Z",
+        temp: 24,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+      };
+
+      renderPage();
+
+      const sensor = screen.getByTestId("loop-live-proof-step-sensor-snapshot");
+      expect(sensor.getAttribute("data-status")).toBe("stale");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("re-evaluates a live snapshot after it ages past the freshness limit while the page stays open", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T12:00:00.000Z"));
+    try {
+      setCurrentTentPlantScope();
+      fixtures.sensorSnapshot = {
+        source: "live",
+        ts: "2026-06-09T11:50:00.000Z",
+        temp: 24,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+      };
+
+      const page = renderPage();
+      const sensor = screen.getByTestId("loop-live-proof-step-sensor-snapshot");
+      expect(sensor.getAttribute("data-status")).toBe("passed");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6 * 60_000);
+      });
+
+      expect(sensor.getAttribute("data-status")).toBe("stale");
+      page.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("counts a trusted top-level diary photo reference without accepting a foreign storage path", () => {
+    setCurrentTentPlantScope();
+    fixtures.diary = [
+      {
+        id: "diary-photo-current",
+        plant_id: "plant-current",
+        tent_id: "tent-current",
+        entry_at: "2026-06-09T11:30:00.000Z",
+        note: "",
+        photo_url: "owner-current/grow-current/quick-log.jpg",
+        details: {},
+      },
+    ];
+
+    const trusted = renderPage();
+    expect(screen.getByTestId("loop-live-proof-step-quick-log").textContent).toMatch(
+      /includes:\s*photo/i,
+    );
+    trusted.unmount();
+
+    fixtures.diary = [
+      {
+        id: "diary-photo-foreign",
+        plant_id: "plant-current",
+        tent_id: "tent-current",
+        entry_at: "2026-06-09T11:30:00.000Z",
+        note: "",
+        photo_url: "other-owner/grow-current/quick-log.jpg",
+        details: {},
+      },
+    ];
+
+    renderPage();
+    expect(screen.getByTestId("loop-live-proof-step-quick-log").textContent).toMatch(
+      /no note\/photo\/action context/i,
+    );
+  });
+
+  it("marks a fresh live snapshot with no finite recognized metric as needs review", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T12:05:00.000Z"));
+    try {
+      setCurrentTentPlantScope();
+      fixtures.sensorSnapshot = {
+        source: "live",
+        ts: "2026-06-09T12:00:00.000Z",
+        temp: null,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+      };
+
+      renderPage();
+
+      const sensor = screen.getByTestId("loop-live-proof-step-sensor-snapshot");
+      expect(sensor.getAttribute("data-status")).toBe("needs_review");
+      expect(sensor.textContent).toMatch(/finite recognized metric/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not label current-state reconstruction as frozen AI Doctor session evidence", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T12:00:00.000Z"));
+    try {
+      setCurrentTentPlantScope();
+      fixtures.plants = [
+        {
+          id: "plant-current",
+          name: "Current plant",
+          grow_id: "grow-current",
+          tent_id: "tent-current",
+          stage: "veg",
+          medium: "coco",
+          pot_size: "3 gal",
+        },
+      ];
+      fixtures.diary = [
+        {
+          id: "diary-current",
+          plant_id: "plant-current",
+          tent_id: "tent-current",
+          entry_at: "2026-06-09T11:30:00.000Z",
+          note: "Observed leaves.",
+          photos: [{ id: "photo-current" }],
+        },
+      ];
+      fixtures.sensorSnapshot = {
+        source: "live",
+        ts: "2026-06-09T11:55:00.000Z",
+        temp: 24,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+      };
+      fixtures.alerts = [
+        {
+          id: "alert-current",
+          grow_id: "grow-current",
+          tent_id: "tent-current",
+          plant_id: "plant-current",
+          metric: "humidity_pct",
+          severity: "warning",
+          reason: "Current tent humidity",
+          status: "open",
+          created_at: "2026-06-09T11:00:00.000Z",
+          source: "environment_alerts",
+          originating_timeline_events: [
+            {
+              id: "event-current",
+              type: "sensor_snapshot",
+              source: "live",
+              occurred_at: "2026-06-09T10:55:00.000Z",
+            },
+          ],
+        },
+      ];
+      fixtures.aiSessions = [
+        {
+          id: "session-current",
+          grow_id: "grow-current",
+          tent_id: "tent-current",
+          plant_id: "plant-current",
+          created_at: "2026-06-09T11:45:00.000Z",
+        },
+      ];
+      // Exercise the separately bounded direct candidate, not the generic
+      // display list: current-state reconstruction must still fail closed.
+      fixtures.proofSelectedAiDoctorActionRow = {
+        id: "aq-ai-current",
+        growId: "grow-current",
+        tentId: "tent-current",
+        status: "pending_approval",
+        source: "ai_doctor",
+        reason: "Review humidity [session:session-current]",
+        riskLevel: "low",
+        alertBackPointerId: null,
+        aiDoctorSessionBackPointerId: "session-current",
+        hasTargetDevice: false,
+      };
+
+      renderPage();
+
+      const aiDoctor = screen.getByTestId("loop-live-proof-step-ai-doctor");
+      expect(aiDoctor.getAttribute("data-status")).toBe("needs_review");
+      expect(aiDoctor.textContent).toMatch(/reconstructed.*current app state/i);
+      expect(aiDoctor.textContent).toMatch(/not frozen/i);
+      const action = screen.getByTestId("loop-live-proof-step-action-queue");
+      expect(action.getAttribute("data-status")).toBe("needs_review");
+      expect(action.textContent).toMatch(/selected ai doctor session.*not eligible/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not pass a resolved alert as current alert evidence", () => {
+    setCurrentTentPlantScope();
+    fixtures.alerts = [
+      {
+        id: "alert-current",
+        grow_id: "grow-current",
+        tent_id: "tent-current",
+        plant_id: "plant-current",
+        metric: "humidity_pct",
+        severity: "warning",
+        reason: "Resolved humidity alert",
+        status: "resolved",
+        created_at: "2026-06-09T11:00:00.000Z",
+        source: "environment_alerts",
+        originating_timeline_events: [
+          {
+            id: "event-current",
+            type: "sensor_snapshot",
+            source: "live",
+            occurred_at: "2026-06-09T10:55:00.000Z",
+          },
+        ],
+      },
+    ];
+    fixtures.actions = [
+      {
+        id: "aq-current",
+        growId: "grow-current",
+        tentId: "tent-current",
+        status: "pending_approval",
+        source: "environment_alert",
+        reason: "Review humidity [alert:alert-current]",
+        riskLevel: "low",
+        alertBackPointerId: "alert-current",
+        hasTargetDevice: false,
+      },
+    ];
+
+    renderPage();
+
+    const alert = screen.getByTestId("loop-live-proof-step-alert");
+    expect(alert.getAttribute("data-status")).toBe("needs_review");
+    expect(alert.textContent).toMatch(/not open|resolved/i);
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("needs_review");
+    expect(action.textContent).toMatch(/selected alert.*not eligible/i);
+  });
+
+  it("does not pass an alert-derived action when no scoped matching alert exists", () => {
+    setCurrentTentPlantScope();
+    fixtures.alerts = [
+      {
+        id: "alert-other",
+        grow_id: "grow-current",
+        tent_id: "tent-other",
+        plant_id: "plant-other",
+        metric: "temperature_c",
+        severity: "warning",
+        reason: "Other tent temperature",
+        status: "open",
+        created_at: "2026-06-09T12:00:00.000Z",
+      },
+    ];
+    fixtures.actions = [
+      {
+        id: "aq-current",
+        growId: "grow-current",
+        tentId: "tent-current",
+        status: "pending_approval",
+        source: "environment_alert",
+        reason: "Review humidity",
+        riskLevel: "low",
+        alertBackPointerId: "alert-current",
+        hasTargetDevice: false,
+      },
+    ];
+
+    renderPage();
+
+    const action = screen.getByTestId("loop-live-proof-step-action-queue");
+    expect(action.getAttribute("data-status")).toBe("needs_review");
+    expect(action.textContent).toMatch(/matching.*alert/i);
   });
 });
 

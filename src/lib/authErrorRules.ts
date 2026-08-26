@@ -52,6 +52,10 @@ export const FORBIDDEN_AUTH_ERROR_FRAGMENTS: RegExp[] = [
   /recovery/i,
   /auth ?hash/i,
   /AuthApiError/i,
+  // GoTrue wraps trigger failures (including historical attribution 42P01) as
+  // this message. Never surface it — sanitizeAuthError maps signup to the
+  // approved friendly copy for residual/unexpected failures.
+  /database error saving new user/i,
 ];
 
 export type AuthErrorClass = "emailNotConfirmed" | "unknown";

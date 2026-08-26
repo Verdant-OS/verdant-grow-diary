@@ -70,6 +70,32 @@ export function getGrowDataMeta(
   return metaStore.get(metaKey(privateMetaKey(ownerId, key))) ?? DEFAULT_GROW_DATA_META;
 }
 
+/**
+ * Mark only a grow-plant cache backed by a server-confirmed insert. The
+ * React Query error state still reports any subsequent refresh failure; this
+ * metadata records that the retained row itself is real Supabase evidence.
+ */
+export function recordConfirmedGrowPlantMeta(
+  ownerId: string | null | undefined,
+  key: readonly unknown[],
+): boolean {
+  if (
+    typeof ownerId !== "string" ||
+    ownerId.trim().length === 0 ||
+    key[0] !== "grow" ||
+    key[1] !== "plants" ||
+    key.includes("owner")
+  ) {
+    return false;
+  }
+  recordMeta(ownerId, key, {
+    isDemoData: false,
+    dataSource: "supabase",
+    sourceReason: "supabase:rows",
+  });
+  return true;
+}
+
 /** Combine multiple section metas into a single status. Pure + deterministic. */
 export function combineGrowDataMeta(metas: readonly GrowDataSourceMeta[]): GrowDataSourceMeta {
   if (metas.length === 0) return DEFAULT_GROW_DATA_META;

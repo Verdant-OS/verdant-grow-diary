@@ -20,12 +20,18 @@ import { resolve } from "node:path";
 import {
   isSnapshotPersistable,
   selectPersistableAlerts,
+  snapshotPersistenceBlockReason,
   derivedAlertKey,
   persistedAlertKey,
   dedupeAgainstOpen,
 } from "@/lib/environmentAlertPersistence";
 import { buildEnvironmentAlerts, type EnvironmentAlert } from "@/lib/environmentAlerts";
-import type { SensorSnapshot } from "@/lib/sensorSnapshot";
+import {
+  snapshotFromEnvironmentCheck,
+  snapshotFromManualSensorSnapshot,
+  snapshotFromReadings,
+  type SensorSnapshot,
+} from "@/lib/sensorSnapshot";
 import type { TargetComparisonResult } from "@/lib/environmentTargetComparison";
 import type { SensorQualityResult } from "@/lib/sensorQuality";
 
@@ -105,6 +111,47 @@ describe("environmentAlertPersistence — pure rules", () => {
         now: NOW,
       }),
     ).toBe(false);
+  });
+
+  it("rejects a fresh Plant Quick Log manual snapshot before the generic manual-source allowlist", () => {
+    const snapshot = snapshotFromManualSensorSnapshot(
+      FRESH_TS,
+      { source: "manual", temp_f: 95, humidity_percent: 48 },
+      { diaryEntryId: "quick-log-diary-1" },
+    );
+
+    expect(snapshot).toMatchObject({
+      source: "manual",
+      alert_persistence_eligible: false,
+    });
+    expect(snapshotPersistenceBlockReason({ snapshot, quality: "good", now: NOW })).toBe(
+      "provenance_ineligible",
+    );
+    expect(isSnapshotPersistable({ snapshot, quality: "good", now: NOW })).toBe(false);
+  });
+
+  it("keeps generic manual sensor rows and Environment Check diary evidence eligible", () => {
+    const manualSensorRow = snapshotFromReadings([
+      { ts: FRESH_TS, metric: "temperature_c", value: 35, source: "manual" },
+    ]);
+    const environmentCheck = snapshotFromEnvironmentCheck(
+      FRESH_TS,
+      { temp_c: 35, humidity_pct: 48 },
+      { diaryEntryId: "environment-check-diary-1" },
+    );
+
+    expect(manualSensorRow).toMatchObject({ source: "manual", temp: 35 });
+    expect(manualSensorRow).not.toHaveProperty("alert_persistence_eligible");
+    expect(
+      isSnapshotPersistable({
+        snapshot: manualSensorRow,
+        quality: "good",
+        now: NOW,
+      }),
+    ).toBe(true);
+    expect(isSnapshotPersistable({ snapshot: environmentCheck, quality: "good", now: NOW })).toBe(
+      true,
+    );
   });
 
   it("rejects stale snapshots", () => {

@@ -1,10 +1,10 @@
 /**
  * McpApiReference — public API reference for the Verdant Grow OS MCP server.
  *
- * Presenter only. No Supabase, no AI, no writes. Describes the three
- * currently advertised MCP tools (list_grows, list_recent_diary_entries,
- * get_latest_sensor_snapshot), their parameters, response shapes, and the
- * safety invariants baked into the server itself. Copy is derived from
+ * Presenter only. No Supabase, no AI, no writes. Describes the five
+ * currently advertised MCP tools, including bounded Grow Walk target and
+ * context reads, their parameters, response shapes, and the safety invariants
+ * baked into the server itself. Copy is derived from
  * the tool source of truth in src/lib/mcp/tools/* — keep in sync when
  * tool contracts change.
  */
@@ -85,7 +85,7 @@ export default function McpApiReference() {
   usePageSeo({
     title: "Verdant Grow OS MCP API Reference | Tools, Parameters, Safety",
     description:
-      "Reference for the Verdant Grow OS MCP server: list_grows, list_recent_diary_entries, and get_latest_sensor_snapshot — parameters, response examples, and safety invariants.",
+      "Reference for the Verdant Grow OS MCP server: grows, diary, sensor, and bounded Grow Walk context reads — parameters, response examples, and safety invariants.",
     path: "/docs/mcp-api",
   });
 
@@ -114,8 +114,9 @@ export default function McpApiReference() {
           <h1 className="text-4xl font-bold tracking-tight">Verdant Grow OS MCP</h1>
           <p className="text-muted-foreground text-lg">
             A read-only Model Context Protocol server that lets an OAuth-signed-in grower's
-            assistant read their own grows, diary entries, and latest sensor snapshot. No writes. No
-            AI. No device control.
+            assistant read their own grows, diary entries, latest sensor snapshot, and bounded Grow
+            Walk target/context evidence, including existing AI Doctor metadata and Action Queue
+            summaries. No writes. No AI invocation. No device control.
           </p>
         </div>
 
@@ -169,7 +170,7 @@ Content-Type: application/json`}</Code>
           <p className="text-sm text-muted-foreground">
             The app advertises an OAuth issuer that matches the expected pattern (this is a check of
             the app's own configuration, not a live probe of the issuer). Point your assistant at
-            the endpoint above, complete the consent screen, then confirm the three read-only tools
+            the endpoint above, complete the consent screen, then confirm the five read-only tools
             appear. In this browser you can also run the built-in probe from the status page.
           </p>
 
@@ -383,6 +384,80 @@ Content-Type: application/json`}</Code>
           <p className="text-xs text-muted-foreground">
             When a tent has no non-diagnostic readings, the response is{" "}
             <code>{`{ "snapshot": null }`}</code>.
+          </p>
+        </Section>
+
+        <Section id="list_grow_walk_targets" title="list_grow_walk_targets">
+          <p className="text-sm text-muted-foreground">
+            List the caller&apos;s own tents and plants within one owned grow for an in-person Grow
+            Walk. Priority preserves missing evidence and source limits; the list intentionally
+            omits per-target sensor snapshots, so use <code>get_grow_walk_context</code> for exact
+            source-labeled sensor evidence. It is not a diagnosis or treatment plan.
+          </p>
+          <h3 className="text-sm font-semibold">Parameters</h3>
+          <ul className="text-sm list-disc pl-6 space-y-1">
+            <li>
+              <code>growId</code> — uuid, required. Must belong to the caller.
+            </li>
+            <li>
+              <code>includeInactivePlants</code> — boolean, optional. Defaults to <code>false</code>
+              . An archived selection stays explicitly labeled as historical in the Grow Walk
+              context.
+            </li>
+            <li>
+              <code>limit</code> — integer 1–100, optional. Defaults to <code>50</code>.
+            </li>
+          </ul>
+          <h3 className="text-sm font-semibold">Request</h3>
+          <Code>{`{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "list_grow_walk_targets",
+    "arguments": { "growId": "3f9a1f7c-…", "limit": 20 }
+  }
+}`}</Code>
+          <p className="text-xs text-muted-foreground">
+            Returns presenter-safe target summaries plus an explicit bounded-summary receipt. It
+            never exposes photo URLs, raw payloads, hidden detail JSON, or writes anything.
+          </p>
+        </Section>
+
+        <Section id="get_grow_walk_context" title="get_grow_walk_context">
+          <p className="text-sm text-muted-foreground">
+            Fetch bounded, source-labeled evidence for one tent or plant the caller owns. Results
+            name partial or unavailable evidence lanes rather than inventing context; archived
+            targets stay labeled as historical.
+          </p>
+          <h3 className="text-sm font-semibold">Parameters</h3>
+          <ul className="text-sm list-disc pl-6 space-y-1">
+            <li>
+              <code>targetType</code> — <code>tent</code> or <code>plant</code>, required.
+            </li>
+            <li>
+              <code>targetId</code> — uuid, required. Must belong to the caller.
+            </li>
+            <li>
+              <code>lookbackHours</code> — integer 24–168, optional. Defaults to <code>72</code>.
+            </li>
+          </ul>
+          <h3 className="text-sm font-semibold">Request</h3>
+          <Code>{`{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tools/call",
+  "params": {
+    "name": "get_grow_walk_context",
+    "arguments": { "targetType": "plant", "targetId": "b7ce…", "lookbackHours": 72 }
+  }
+}`}</Code>
+          <p className="text-xs text-muted-foreground">
+            Photo evidence is metadata only; sensor evidence retains source, quality, and freshness
+            labels. The bounded Action Queue lane reports current nonterminal items even when they
+            predate the selected history window; inspect its truncation receipt before treating its
+            returned count as complete. This tool does not diagnose, invoke AI, approve actions, or
+            control equipment.
           </p>
         </Section>
 

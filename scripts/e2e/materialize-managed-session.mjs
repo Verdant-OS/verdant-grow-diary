@@ -27,6 +27,7 @@ import {
   buildManagedSessionEnv,
   deriveSupabaseStorageKey,
   extractSessionFromStorageSnapshot,
+  resolveExactSupabaseProjectOrigin,
   serializeEnvFile,
   validateFullSession,
 } from "./managed-session-materialize-core.mjs";
@@ -64,16 +65,13 @@ async function fromSnapshot() {
   return { source: "snapshot", ...extracted, session };
 }
 
-async function fromLogin() {
+async function fromLogin({ supabaseOrigin, anon }) {
   const email = (process.env.E2E_TEST_EMAIL ?? "").trim();
   const password = (process.env.E2E_TEST_PASSWORD ?? "").trim();
-  const url = (process.env.VITE_SUPABASE_URL ?? "").trim().replace(/^"|"$/g, "");
-  const anon = (process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "").trim().replace(/^"|"$/g, "");
   if (!email || !password) return { blocked: "missing_credentials" };
-  if (!url || !anon) return { blocked: "missing_supabase_config" };
 
   const { createClient } = await import("@supabase/supabase-js");
-  const client = createClient(url, anon, {
+  const client = createClient(supabaseOrigin, anon, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data, error } = await client.auth.signInWithPassword({ email, password });
@@ -82,7 +80,7 @@ async function fromLogin() {
   }
   const session = data.session;
   const storageKey = deriveSupabaseStorageKey({
-    supabaseUrl: url,
+    supabaseUrl: supabaseOrigin,
     projectId: (process.env.VITE_SUPABASE_PROJECT_ID ?? "").trim().replace(/^"|"$/g, ""),
   });
   if (!storageKey) return { blocked: "cannot_derive_storage_key" };
@@ -90,10 +88,21 @@ async function fromLogin() {
 }
 
 async function main() {
+  const configuredUrl = (process.env.VITE_SUPABASE_URL ?? "").trim().replace(/^"|"$/g, "");
+  const anon = (process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "").trim().replace(/^"|"$/g, "");
+  const targetRef = (process.env.LOVABLE_E2E_TARGET_PROJECT_REF ?? "").trim();
+  if (!configuredUrl || !anon) blocked("missing_supabase_config");
+  if (!targetRef) blocked("missing_target_project_ref");
+  const exactSupabaseOrigin = resolveExactSupabaseProjectOrigin({
+    supabaseUrl: configuredUrl,
+    targetProjectRef: targetRef,
+  });
+  if (!exactSupabaseOrigin) blocked("target_project_mismatch");
+
   // Prefer a pre-generated real snapshot; else attempt a live fixture login.
   let materialized = await fromSnapshot();
   if (!materialized) {
-    const login = await fromLogin();
+    const login = await fromLogin({ supabaseOrigin: exactSupabaseOrigin, anon });
     if (login?.blocked) {
       if (login.blocked === "missing_credentials") {
         blocked(
@@ -116,18 +125,15 @@ async function main() {
     );
   }
 
-  const projectRef =
-    deriveSupabaseStorageKey({
-      supabaseUrl: (process.env.VITE_SUPABASE_URL ?? "").trim().replace(/^"|"$/g, ""),
-      projectId: (process.env.VITE_SUPABASE_PROJECT_ID ?? "").trim().replace(/^"|"$/g, ""),
-    }) === materialized.storageKey
-      ? materialized.storageKey.replace(/^sb-/, "").replace(/-auth-token$/, "")
-      : "";
+  const expectedStorageKey = deriveSupabaseStorageKey({ projectId: targetRef });
+  if (materialized.storageKey !== expectedStorageKey) {
+    blocked("target_project_mismatch");
+  }
 
   const env = buildManagedSessionEnv({
     sessionJson: materialized.sessionJson,
     storageKey: materialized.storageKey,
-    projectRef,
+    projectRef: targetRef,
   });
 
   fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });

@@ -26,6 +26,19 @@ export interface PageSeo {
   description: string;
   /** Path (e.g. "/pricing") or absolute URL for the self-canonical + og:url. */
   path: string;
+  /**
+   * Cross-canonical target for an audience variant that must concede its
+   * ranking URL to another page. Defaults to `path` (self-canonical), which is
+   * what every ordinary route wants — set this ONLY when two routes serve
+   * near-identical copy and would otherwise compete on the same queries.
+   *
+   * Drives `<link rel="canonical">` AND `og:url` together, because a page whose
+   * og:url disagrees with its canonical sends crawlers two different answers to
+   * the same question. The build-time half of this contract lives in
+   * `staticPublicSeoDocuments.ts`; both must name the same target or the
+   * hydrated head silently overwrites the pre-rendered one.
+   */
+  canonicalPath?: string;
   /** Absolute og:image URL. Otherwise preserves route-owned head metadata, then uses the brand. */
   ogImage?: string;
   /** Open Graph type. Defaults to "website"; use "article" for guides/posts. */
@@ -65,11 +78,24 @@ function upsertLink(rel: string, href: string) {
 }
 
 export function usePageSeo(seo: PageSeo): void {
-  const { title, description, path, ogImage, ogType = "website", noindex = false } = seo;
+  const {
+    title,
+    description,
+    path,
+    canonicalPath,
+    ogImage,
+    ogType = "website",
+    noindex = false,
+  } = seo;
   const routeImageRef = useRef<{ path: string; image: string | null } | null>(null);
 
   useEffect(() => {
-    const url = path.startsWith("http") ? path : `${SITE_ORIGIN}${path}`;
+    // `path` still keys the route-owned og:image below; only the canonical
+    // identity moves when a variant concedes its ranking URL.
+    const canonicalTarget = canonicalPath ?? path;
+    const url = canonicalTarget.startsWith("http")
+      ? canonicalTarget
+      : `${SITE_ORIGIN}${canonicalTarget}`;
     const prevTitle = document.title;
     if (routeImageRef.current?.path !== path) {
       const routeOwnedImage =
@@ -143,5 +169,5 @@ export function usePageSeo(seo: PageSeo): void {
       upsertMeta('meta[name="twitter:image"]', "name", "twitter:image", DEFAULT_OG_IMAGE);
       void prevTitle;
     };
-  }, [title, description, path, ogImage, ogType, noindex]);
+  }, [title, description, path, canonicalPath, ogImage, ogType, noindex]);
 }

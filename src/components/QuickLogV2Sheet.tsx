@@ -36,6 +36,13 @@ import {
   type QuickLogV2Action,
   type ResolvedQuickLogV2Target,
 } from "@/lib/quickLogV2Rules";
+import {
+  RESPONSE_CHECK_STATUSES,
+  applyResponseCheck,
+  readResponseCheckStatus,
+  removeChipAuthoredResponseLine,
+  type ResponseCheckStatus,
+} from "@/lib/tenSecondQuickCheckRules";
 import { buildQuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { applyQuickLogV2Refresh } from "@/lib/quickLogV2RefreshRules";
 import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
@@ -104,6 +111,13 @@ import {
   type QuickLogPostSaveSuccess,
 } from "@/lib/quickLogSaveGuardRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
+import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
+import {
+  buildRecentTargetStorageKey,
+  getRecentTargetSuggestionWakeDelayMs,
+  parseRecentTargetRecord,
+  resolveRecentTargetSuggestion,
+} from "@/lib/quickLogRecentTargetSuggestion";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   fahrenheitToCelsius,
@@ -158,6 +172,34 @@ interface LockedWateringSubmission {
 }
 
 const NOTE_LIMIT = 500;
+
+function rememberConfirmedPlantTarget(
+  resolved: ResolvedQuickLogV2Target,
+  userId: string | null | undefined,
+): void {
+  if (!resolved.ok || !resolved.plantId) return;
+  rememberRecentQuickLogTarget(
+    {
+      plantId: resolved.plantId,
+      growId: resolved.growId ?? null,
+      tentId: resolved.tentId ?? null,
+      savedAt: new Date().toISOString(),
+    },
+    userId,
+  );
+}
+
+/** Read the account-scoped recent target. Never throws and never falls back. */
+function loadRecentTargetRecord(userId: string | null | undefined) {
+  if (typeof window === "undefined") return null;
+  const scopedKey = buildRecentTargetStorageKey(userId ?? null);
+  if (!scopedKey) return null;
+  try {
+    return parseRecentTargetRecord(window.localStorage.getItem(scopedKey));
+  } catch {
+    return null;
+  }
+}
 
 export default function QuickLogV2Sheet({
   open,
@@ -323,6 +365,87 @@ export default function QuickLogV2Sheet({
     [options, form.selectedKey],
   );
   const { grows } = useGrows();
+  // A remembered plant is an offer on a genuinely global/null-target open,
+  // never an implicit default. Pair the record with the account key that
+  // produced it so an account switch fails closed during the effect boundary.
+  const launcherNamesTarget =
+    typeof defaultTargetKey === "string" && defaultTargetKey.trim().length > 0;
+  const recentTargetStorageKey = buildRecentTargetStorageKey(user?.id ?? null);
+  const [recentTargetSnapshot, setRecentTargetSnapshot] = useState(() => ({
+    storageKey: recentTargetStorageKey,
+    record: open && !launcherNamesTarget ? loadRecentTargetRecord(user?.id ?? null) : null,
+  }));
+  const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
+  // Advanced at eligibility boundaries. This is not a polling clock and
+  // cannot select, save, or mutate storage.
+  const [recentSuggestionClockMs, setRecentSuggestionClockMs] = useState(() => Date.now());
+  const recentTargetRecord =
+    open && !launcherNamesTarget && recentTargetSnapshot.storageKey === recentTargetStorageKey
+      ? recentTargetSnapshot.record
+      : null;
+
+  useEffect(() => {
+    if (!open || launcherNamesTarget || !recentTargetStorageKey) {
+      setRecentTargetSnapshot({ storageKey: recentTargetStorageKey, record: null });
+      return;
+    }
+
+    setRecentTargetSnapshot({
+      storageKey: recentTargetStorageKey,
+      record: loadRecentTargetRecord(user?.id ?? null),
+    });
+
+    // Storage events arrive in other documents. Re-read the current value
+    // instead of trusting event.newValue, because an older event can arrive
+    // after storage already contains a newer target.
+    const handleRecentTargetStorage = (event: StorageEvent) => {
+      if (event.storageArea && event.storageArea !== window.localStorage) return;
+      if (event.key !== null && event.key !== recentTargetStorageKey) return;
+      setRecentTargetSnapshot({
+        storageKey: recentTargetStorageKey,
+        record: loadRecentTargetRecord(user?.id ?? null),
+      });
+    };
+    window.addEventListener("storage", handleRecentTargetStorage);
+    return () => window.removeEventListener("storage", handleRecentTargetStorage);
+  }, [open, launcherNamesTarget, recentTargetStorageKey, user?.id]);
+
+  // Dismissal belongs to one account/session. A fresh open or account starts
+  // with an empty target and may render that account's independently scoped
+  // offer again; neither transition applies it.
+  useEffect(() => {
+    if (open) setRecentSuggestionDismissed(false);
+  }, [open, recentTargetStorageKey]);
+
+  const recentTargetSuggestion = useMemo(
+    () =>
+      resolveRecentTargetSuggestion({
+        record: recentTargetRecord,
+        now: Math.max(Date.now(), recentSuggestionClockMs),
+        visiblePlants: plants,
+        visibleGrows: grows,
+        visibleTents: tents,
+      }),
+    [recentTargetRecord, plants, grows, tents, recentSuggestionClockMs],
+  );
+
+  useEffect(() => {
+    if (!open || !recentTargetRecord) return;
+    const wakeDelayMs = getRecentTargetSuggestionWakeDelayMs(
+      recentTargetRecord,
+      Math.max(Date.now(), recentSuggestionClockMs),
+    );
+    if (wakeDelayMs === null) return;
+
+    // Future records use safe checkpoints until savedAt. That boundary tick
+    // re-runs this effect and arms the later strict-expiry wake. Close/record
+    // changes clear the active timer.
+    const boundaryTimer = window.setTimeout(
+      () => setRecentSuggestionClockMs(Date.now()),
+      wakeDelayMs,
+    );
+    return () => window.clearTimeout(boundaryTimer);
+  }, [open, recentTargetRecord, recentSuggestionClockMs]);
   const targetPanel = useMemo(
     () =>
       buildQuickLogTargetPanel({
@@ -371,6 +494,12 @@ export default function QuickLogV2Sheet({
   const hasFetchError = Boolean(plantsQ.isError || tentsQ.isError);
   const hasNoTargets = !isLoadingContext && !hasFetchError && options.length === 0;
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
+  const showRecentTargetSuggestion =
+    !launcherNamesTarget &&
+    !contextBlocked &&
+    !recentSuggestionDismissed &&
+    !form.selectedKey &&
+    recentTargetSuggestion !== null;
 
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
@@ -378,6 +507,33 @@ export default function QuickLogV2Sheet({
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
   const showMaturityEvidence =
     form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
+  // Better/Same/Worse records the PLANT's response, so it is offered only
+  // when the resolved target is a plant. Tent-scoped logs keep today's shape.
+  const showResponseCheck =
+    form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
+  const selectedResponseStatus = readResponseCheckStatus(form.note);
+  /** The status a CHIP last wrote, or null. Provenance for the cleanup below. */
+  const chipAuthoredStatusRef = useRef<ResponseCheckStatus | null>(null);
+  // `maxLength` constrains TYPING only — it does not bound a programmatic
+  // setState. Prepending the response line to an already-long note could push
+  // the note past NOTE_LIMIT, and the watering write rejects >500, after which
+  // the sheet locks the retry record and the grower loses the draft. So the
+  // chip is refused BEFORE it mutates state rather than failing at save.
+  //
+  // PER STATUS, not across all of them: the three lines are different lengths
+  // ("Better." 7, "Same." 5, "Worse." 6), so near the limit one status can
+  // overflow while the others still fit. An aggregate `some(...)` disabled
+  // every chip as soon as the longest one failed, taking two valid choices
+  // away from the grower.
+  const responseCheckOverflowByStatus = new Map<ResponseCheckStatus, boolean>(
+    RESPONSE_CHECK_STATUSES.map((status) => [
+      status,
+      applyResponseCheck(form.note, status).length > NOTE_LIMIT,
+    ]),
+  );
+  const everyResponseCheckOverflows = RESPONSE_CHECK_STATUSES.every((status) =>
+    responseCheckOverflowByStatus.get(status),
+  );
   const saveHelper = wateringRetryPending
     ? "Retry sends the exact same watering record. Close and reopen Quick Log to make changes."
     : getSaveHelperMessage({
@@ -425,6 +581,10 @@ export default function QuickLogV2Sheet({
         action: defaultAction,
       });
       manualTempEntryUnitRef.current = null;
+      // A new draft has no chip-authored marker, so the provenance record must
+      // not survive from the previous one. A stale status would let the
+      // cleanup strip prose this draft's grower typed.
+      chipAuthoredStatusRef.current = null;
       setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
       feedingTempEntryUnitRef.current = null;
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
@@ -442,6 +602,7 @@ export default function QuickLogV2Sheet({
       saveInFlightRef.current = false;
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      setRecentSuggestionDismissed(false);
       resetPhotoSelection();
     }
   }, [open, defaultTargetKey, defaultAction]);
@@ -454,9 +615,14 @@ export default function QuickLogV2Sheet({
     if (form.action !== "feed") return;
     if (feedingDefaultsApplied) return;
     if (!feedingDefaults.defaults) return;
-    // Only prefill if the user has not started typing — preserves manual input.
-    if (!isFeedingFormPristine(feedingForm)) return;
-    setFeedingForm(applyFeedingDefaultsToForm(feedingDefaults));
+    // Defaults affect only the recipe. A note handed off from Note/Water (for
+    // example a selected Better/Same/Worse response) must neither block those
+    // defaults nor be overwritten by them.
+    if (!isFeedingFormPristine({ ...feedingForm, note: "" })) return;
+    setFeedingForm((previous) => ({
+      ...applyFeedingDefaultsToForm(feedingDefaults),
+      note: previous.note,
+    }));
     setFeedingDefaultsApplied(true);
   }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
 
@@ -469,6 +635,53 @@ export default function QuickLogV2Sheet({
     if (wateringSubmissionLockedRef.current) return;
     setForm((prev) => (prev[k] === v ? prev : { ...prev, [k]: v }));
   };
+
+  // A response marker describes a PLANT. If the grower switches the target to
+  // a tent after picking Better/Same/Worse, the chips disappear but the line
+  // stays in the note and would persist a plant-response marker against a tent
+  // entry — mislabeling the row for every downstream response parser. Strip it
+  // when the target stops being a plant, preserving any action prose.
+  // The plant the resolved target names, independent of whether the chips are
+  // currently offered. Switching the ACTION to Feed hides the chips without
+  // changing which plant the entry is about, and must not be treated as a
+  // retarget — the grower would lose a status they deliberately chose.
+  const responseTargetPlantId =
+    resolvedTarget.ok && resolvedTarget.targetType === "plant"
+      ? (resolvedTarget.plantId ?? null)
+      : null;
+  const responseTargetPlantIdRef = useRef(responseTargetPlantId);
+  useEffect(() => {
+    const previousPlantId = responseTargetPlantIdRef.current;
+    responseTargetPlantIdRef.current = responseTargetPlantId;
+    // Fire when the plant the marker DESCRIBES changes — to a different plant,
+    // or to no plant at all. Both leak: retargeting plant A -> tent leaves a
+    // plant marker on a tent row, and plant A -> plant B silently reattributes
+    // A's response to B.
+    if (previousPlantId === null || previousPlantId === responseTargetPlantId) return;
+
+    // PROVENANCE. `readResponseCheckStatus` matches anywhere in the note, so a
+    // grower who writes "Previous response check: better after watering" reads
+    // as having a marker. Only ever undo what a CHIP wrote: remember that a
+    // chip owns the head slot, then strip any canonical response marker still
+    // occupying that slot. The grower may re-word Better/Same/Worse without
+    // transferring that plant response to a new target. Noncanonical prose is
+    // never touched.
+    const authored = chipAuthoredStatusRef.current;
+    // provenance does not follow a new plant
+    chipAuthoredStatusRef.current = null;
+    if (!authored) return;
+    // Remove the chip's own line and nothing else. A whole-note strip would
+    // also delete a grower's later sentence that merely reads like a marker.
+    const next = removeChipAuthoredResponseLine(form.note, authored);
+    if (next !== form.note) setField("note", next);
+    // Feed has its own visible note field. If the selected response was handed
+    // into it before this retarget, remove the same exact chip-owned line so a
+    // plant response cannot persist on a different plant or a tent entry.
+    setFeedingForm((previous) => {
+      const nextFeedingNote = removeChipAuthoredResponseLine(previous.note, authored);
+      return nextFeedingNote === previous.note ? previous : { ...previous, note: nextFeedingNote };
+    });
+  }, [responseTargetPlantId, form.note, setField]);
 
   const handleAction = (a: QuickLogV2Action) => {
     if (wateringSubmissionLockedRef.current) return;
@@ -492,9 +705,14 @@ export default function QuickLogV2Sheet({
       wateringTempEntryUnitRef.current = null;
     }
     // Entering feed → maturity evidence surface hides; clear its draft
-    // so stale plant-maturity notes don't get retained under the hood.
+    // so stale plant-maturity notes don't get retained under the hood. Feed
+    // writes through its own visible note field, so hand the current note into
+    // that field instead of retaining an unsavable hidden response/status.
     if (a === "feed") {
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
+      setFeedingForm((previous) =>
+        previous.note === form.note ? previous : { ...previous, note: form.note },
+      );
     }
   };
 
@@ -654,9 +872,11 @@ export default function QuickLogV2Sheet({
     if (photoDiaryInFlightRef.current) {
       return { ok: false, message: "Photo diary entry already in progress." };
     }
+    if (!user) return { ok: false, message: "Sign in to attach photos." };
     photoDiaryInFlightRef.current = true;
     try {
       return await createQuickLogPhotoDiaryEntry({
+        ownerId: user.id,
         growId: input.growId,
         tentId: input.tentId,
         plantId: input.plantId,
@@ -760,6 +980,7 @@ export default function QuickLogV2Sheet({
         return;
       }
       const growEventId = result.eventId;
+      rememberConfirmedPlantTarget(resolved, user?.id ?? null);
       trackQuickLogSuccess("feed", { reused: result.reused });
       // The logical feeding save is complete. Rotate only now so a retry
       // after a failed/unknown response reuses the original server key.
@@ -975,6 +1196,8 @@ export default function QuickLogV2Sheet({
       return;
     }
 
+    rememberConfirmedPlantTarget(resolved, user?.id ?? null);
+
     // The core grow event is committed. Rotate immediately, before any
     // best-effort attachment work, so a rejected media promise can never
     // leave the committed server key attached to a new editable draft.
@@ -1127,6 +1350,9 @@ export default function QuickLogV2Sheet({
       selectedKey: prev.selectedKey,
     }));
     manualTempEntryUnitRef.current = null;
+    // Same reason as the open reset: "Log another" begins a new draft, and its
+    // note is empty, so no chip has authored anything in it yet.
+    chipAuthoredStatusRef.current = null;
     setFeedingForm(EMPTY_QUICKLOG_FEEDING_FORM);
     feedingTempEntryUnitRef.current = null;
     setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
@@ -1304,6 +1530,71 @@ export default function QuickLogV2Sheet({
               >
                 Start by choosing a plant or tent above.
               </p>
+            )}
+            {showRecentTargetSuggestion && recentTargetSuggestion && (
+              <div
+                data-testid="qlv2-recent-target-suggestion"
+                className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-secondary/20 p-2.5 text-sm"
+              >
+                <span className="text-muted-foreground">
+                  Continue with {recentTargetSuggestion.plantName}?
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  data-testid="qlv2-recent-target-accept"
+                  onClick={() => {
+                    if (contextBlocked || wateringSubmissionLockedRef.current) return;
+                    // Revalidate storage and all live relationships at click
+                    // time. Opening the sheet is not consent, and consent for
+                    // rendered plant A must never be reinterpreted for B.
+                    const latestRecord = loadRecentTargetRecord(user?.id ?? null);
+                    const current = resolveRecentTargetSuggestion({
+                      record: latestRecord,
+                      now: Date.now(),
+                      visiblePlants: plants,
+                      visibleGrows: grows,
+                      visibleTents: tents,
+                    });
+                    if (!current) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
+                      setRecentSuggestionDismissed(true);
+                      return;
+                    }
+                    if (current.plantId !== recentTargetSuggestion.plantId) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
+                      return;
+                    }
+                    const selectedKey = `plant:${current.plantId}`;
+                    if (!options.some((option) => `${option.type}:${option.id}` === selectedKey)) {
+                      setRecentSuggestionDismissed(true);
+                      return;
+                    }
+                    setField("selectedKey", selectedKey);
+                    setLocalError(null);
+                    setSaveStatus("");
+                    setRecentSuggestionDismissed(true);
+                  }}
+                >
+                  Continue
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  data-testid="qlv2-recent-target-dismiss"
+                  onClick={() => setRecentSuggestionDismissed(true)}
+                >
+                  Choose another
+                </Button>
+              </div>
             )}
             <QuickLogTargetPanel panel={targetPanel} />
           </div>
@@ -1557,6 +1848,50 @@ export default function QuickLogV2Sheet({
                   Checking video before save…
                 </p>
               )}
+            </div>
+          )}
+
+          {showResponseCheck && (
+            <div
+              role="group"
+              aria-label="Plant response check"
+              data-testid="qlv2-response-chips"
+              className="grid gap-2"
+            >
+              <p className="text-sm font-medium">How did the plant respond?</p>
+              <div className="flex flex-wrap gap-2">
+                {RESPONSE_CHECK_STATUSES.map((status) => (
+                  <Button
+                    key={status}
+                    type="button"
+                    variant={selectedResponseStatus === status ? "default" : "outline"}
+                    size="sm"
+                    disabled={
+                      wateringSubmissionLocked ||
+                      (responseCheckOverflowByStatus.get(status) === true &&
+                        selectedResponseStatus !== status)
+                    }
+                    aria-pressed={selectedResponseStatus === status}
+                    data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
+                    onClick={() => {
+                      const next = applyResponseCheck(form.note, status);
+                      // Belt and braces: the chip is already disabled in this
+                      // case, but never let a programmatic write exceed the
+                      // limit the save path enforces.
+                      if (next.length > NOTE_LIMIT) return;
+                      chipAuthoredStatusRef.current = status;
+                      setField("note", next);
+                    }}
+                  >
+                    {status}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {everyResponseCheckOverflows
+                  ? "Your note is too long to add a response line. Shorten it first."
+                  : "Better/Same/Worse records the plant response, not the grow action."}
+              </p>
             </div>
           )}
 

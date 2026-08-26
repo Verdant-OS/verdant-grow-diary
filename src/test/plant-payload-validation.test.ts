@@ -9,9 +9,11 @@ import {
 const UUID_A = "11111111-1111-1111-1111-111111111111";
 const UUID_B = "22222222-2222-2222-2222-222222222222";
 const UUID_G = "33333333-3333-4333-8333-333333333333";
+const UUID_P = "44444444-4444-4444-8444-444444444444";
 
 describe("validatePlantInsertPayload", () => {
   const base = {
+    id: UUID_P,
     user_id: UUID_A,
     name: "Blue Dream #1",
     strain: "Blue Dream",
@@ -26,6 +28,14 @@ describe("validatePlantInsertPayload", () => {
     expect(r.ok).toBe(true);
     expect(r.value?.plant_type).toBe("unknown");
     expect(r.value?.grow_id).toBe(UUID_G);
+    expect(r.value?.id).toBe(UUID_P);
+  });
+
+  it("rejects a missing client-generated id so ambiguous saves remain reconcilable", () => {
+    const { id: _id, ...rest } = base;
+    const r = validatePlantInsertPayload(rest);
+    expect(r.ok).toBe(false);
+    expect(r.errors.join()).toMatch(/id/i);
   });
 
   it("rejects missing grow_id for client create", () => {
@@ -44,6 +54,11 @@ describe("validatePlantInsertPayload", () => {
   it("schema requires grow_id (not optional)", () => {
     const shape = PlantInsertPayloadSchema.shape.grow_id;
     // Zod optional wrappers expose isOptional(); required UUID field is not optional.
+    expect((shape as { isOptional?: () => boolean }).isOptional?.() ?? false).toBe(false);
+  });
+
+  it("schema requires a client-generated id", () => {
+    const shape = PlantInsertPayloadSchema.shape.id;
     expect((shape as { isOptional?: () => boolean }).isOptional?.() ?? false).toBe(false);
   });
 

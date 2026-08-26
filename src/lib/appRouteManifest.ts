@@ -152,6 +152,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
       "Operator diagnostics: whether seo-manifest.json and generated static route documents exist in the current build output.",
   },
   {
+    path: "/diagnostics/quicklog",
+    access: "operator",
+    description:
+      "Operator diagnostics: Quick Log manual-save health — server parse results, diary mirror links, dual-timestamp parity, private-helper access probes, and a diary↔grow-event consistency check.",
+  },
+  {
     path: "/diary/environment-summary",
     access: "auth",
     description: "Environment summary report (diary).",

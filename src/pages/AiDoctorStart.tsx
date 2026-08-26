@@ -7,19 +7,155 @@
  */
 import { useMemo } from "react";
 import { ArrowRight, History, Sprout, Stethoscope } from "lucide-react";
-import { Link } from "@/lib/react-router-compat";
+import { Link, useSearchParams } from "@/lib/react-router-compat";
 
 import EmptyState from "@/components/EmptyState";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
+import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { useGrowPlants } from "@/hooks/useGrowData";
+import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { buildAiDoctorEntryOptions } from "@/lib/aiDoctorEntryRules";
+import {
+  DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY,
+  partitionDoctorEntryOptionsByTent,
+  resolveDoctorStartScope,
+} from "@/lib/doctorStartContextRules";
+import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { plantsPath } from "@/lib/routes";
+import { useGrows } from "@/store/grows";
 
 export default function AiDoctorStart() {
   const plantsQuery = useGrowPlants();
   const options = useMemo(() => buildAiDoctorEntryOptions(plantsQuery.data), [plantsQuery.data]);
+
+  // Back-half context carry (D-B6 / Doctor-says-so). Sensors may re-emit a
+  // UUID-only plant intent alongside grow/tent. Grow and tent are validated
+  // here against rows the grower owns; the plant is validated only against
+  // the grower's loaded options + carried tent. An id in a URL is a request,
+  // not a grant — and an unacceptable plant is messaged, never silently dropped.
+  const [searchParams] = useSearchParams();
+  const { grows, loading: growsLoading, error: growsError, refresh: refreshGrows } = useGrows();
+  const tentsQuery = useGrowTents();
+
+  // Ownership reads start EMPTY, not absent: `grows` is `[]` while loading and
+  // `tentsQuery.data` is undefined. Resolving against them before they settle
+  // would classify a perfectly valid carried scope as unowned and tell the
+  // grower it "couldn't be matched to your account" — an unknown answer
+  // presented as a negative one. Worse, a failed read would make that false
+  // statement permanent. So scope messaging waits for both reads, and a read
+  // FAILURE is reported as a failure to verify, never as invalid ownership.
+  const requestedGrowId = (searchParams.get("growId") ?? "").trim();
+  const requestedTentId = (searchParams.get("tentId") ?? "").trim();
+  const carriedPlantIntentId = useMemo(
+    () => readSensorsPlantRouteIntent(searchParams),
+    [searchParams],
+  );
+  // Settling is per-parameter for the same reason failing is: a read the URL
+  // does not depend on must not gate it. On a tent-only URL the grows read
+  // only enriches the derived owning grow — it cannot change the ordering,
+  // which keys off the resolved tent alone — so waiting on it would hide a
+  // verified tent and a loaded plant list behind an unrelated request.
+  //
+  // `isPending`, not `isLoading`: in TanStack Query v5 `isLoading` is
+  // `isPending && isFetching`, so a query PAUSED by an offline browser reports
+  // `isLoading: false` while holding no data and no error. Treating that as
+  // settled resolves the scope against `undefined` and tells the grower their
+  // valid tent "couldn't be matched to your account" — an unavailable read
+  // presented as an ownership mismatch, the exact failure this whole block
+  // exists to prevent. `useGrowTents` sets no `enabled`, so `isPending` cannot
+  // get stuck true on a disabled query.
+  const scopeReadsSettled =
+    (!requestedGrowId || !growsLoading) && (!requestedTentId || !tentsQuery.isPending);
+  // FAILING is narrower than SETTLING, and conflating them discarded verified
+  // context. A read may only invalidate the scope it was needed to validate:
+  // on a tent-only URL — supported, since a legacy tent may carry a null
+  // grow_id — the grows read merely enriches the tent's owning grow, so its
+  // failure must not throw away a tent `tentsQuery` confirmed the grower owns.
+  const scopeReadFailed =
+    (!!requestedGrowId && !!growsError) || (!!requestedTentId && tentsQuery.isError);
+  const carriedScopeRequested = !!requestedGrowId || !!requestedTentId;
+  // Ordering and badges depend on the ownership reads. Rendering the list
+  // before they settle shows the unscoped alphabetical order, then reorders
+  // and re-badges under the grower's pointer — a link can move mid-click, and
+  // a choice made in that window bypasses the carried context entirely.
+  const scopeOrderingPending = carriedScopeRequested && !scopeReadsSettled;
+  // Neither read retries on its own: `useGrowTents` sets `retry: false` and
+  // the grows store refreshes only on mount. Without an explicit affordance a
+  // single transient failure would disable valid carried context for the whole
+  // life of the page, and the grower's only recovery would be a full reload.
+  //
+  // Per-parameter for the same reason as settled/failed: both reads always
+  // mount, so a global rule left the button disabled and labelled "Checking…"
+  // while an UNRELATED slow request was in flight and the failed required read
+  // was not being retried at all.
+  const scopeRetrying =
+    (!!requestedGrowId && growsLoading) || (!!requestedTentId && tentsQuery.isFetching);
+  // Both scope messages used to end with "Every active plant is listed below."
+  // unconditionally — but the list is only actually on screen when the plants
+  // read produced one AND scope ordering is not holding it behind a loading
+  // panel. The retry path makes that second condition reachable: clicking
+  // retry sets the scope read loading again while its error still stands, so
+  // the failure paragraph would otherwise describe a list the page has just
+  // replaced.
+  const plantsAreListed =
+    !plantsQuery.isPending && !plantsQuery.isError && !scopeOrderingPending && options.length > 0;
+  const everyPlantListedSuffix = plantsAreListed ? " Every active plant is listed below." : "";
+  const retryScopeReads = () => {
+    if (requestedGrowId && growsError) void refreshGrows();
+    if (requestedTentId && tentsQuery.isError) void tentsQuery.refetch();
+  };
+
+  const scope = useMemo(
+    () =>
+      resolveDoctorStartScope({
+        urlGrowId: searchParams.get("growId"),
+        urlTentId: searchParams.get("tentId"),
+        visibleGrows: grows,
+        visibleTents: tentsQuery.data,
+      }),
+    [searchParams, grows, tentsQuery.data],
+  );
+  // Only trust a resolved scope once the rows it was checked against are real.
+  const resolvedScope =
+    scopeReadsSettled && !scopeReadFailed
+      ? scope
+      : { growId: null, growName: null, tentId: null, tentName: null, hasInvalidScope: false };
+
+  // Carried tent scope reorders and labels the choices. It never removes one:
+  // the explicit plant choice below is doctrine, and a shorter list is a
+  // softer way of guessing. A carried plant may be ordered/badged; it is
+  // NEVER applied as a selection.
+  const partitioned = useMemo(
+    () =>
+      partitionDoctorEntryOptionsByTent({
+        options,
+        plants: plantsQuery.data,
+        tentId: resolvedScope.tentId,
+        // Doctor-says-so: Timeline → Sensors re-emitted UUID intent. Untrusted
+        // until checked against the grower's own in-tent options.
+        carriedPlantId: carriedPlantIntentId,
+      }),
+    [options, plantsQuery.data, resolvedScope.tentId, carriedPlantIntentId],
+  );
+  const orderedOptions = useMemo(
+    () => [...partitioned.inScope, ...partitioned.others],
+    [partitioned],
+  );
+  const inScopeIds = useMemo(
+    () => new Set(partitioned.inScope.map((option) => option.id)),
+    [partitioned],
+  );
+  // Do not flash "unavailable" while plants or ownership reads are still
+  // settling — that would present an unknown answer as a negative one.
+  const showUnavailableCarriedPlant =
+    !!carriedPlantIntentId &&
+    partitioned.hasUnavailableCarriedPlant &&
+    !plantsQuery.isPending &&
+    !plantsQuery.isError &&
+    !scopeOrderingPending &&
+    scopeReadsSettled &&
+    !scopeReadFailed;
 
   return (
     <div className="mx-auto w-full max-w-4xl">
@@ -37,6 +173,13 @@ export default function AiDoctorStart() {
         }
       />
 
+      <OneTentLoopNextStepCard
+        current="ai-doctor"
+        ids={{ growId: resolvedScope.growId, tentId: resolvedScope.tentId }}
+        testId="ai-doctor-start-one-tent-loop-next-step-card"
+        className="mb-3"
+      />
+
       <section
         className="glass rounded-2xl p-4 sm:p-6"
         aria-labelledby="ai-doctor-start-plant-heading"
@@ -50,9 +193,60 @@ export default function AiDoctorStart() {
             Verdant will not guess which plant you mean. Opening a plant prepares its existing
             context; AI Doctor runs only after you press the review button there.
           </p>
+          {resolvedScope.tentName ? (
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              data-testid="ai-doctor-start-tent-context"
+            >
+              This link carried tent context:{" "}
+              <span className="font-medium text-foreground">{resolvedScope.tentName}</span>.
+              {plantsAreListed
+                ? " Its plants are listed first — you can still choose any plant."
+                : ""}
+            </p>
+          ) : null}
+          {scopeReadFailed && carriedScopeRequested ? (
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              data-testid="ai-doctor-start-scope-unverified"
+            >
+              Verdant couldn&apos;t check the grow or tent this link carried, so no tent context is
+              applied.{everyPlantListedSuffix}{" "}
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-sm align-baseline"
+                onClick={retryScopeReads}
+                disabled={scopeRetrying}
+                data-testid="ai-doctor-start-scope-retry"
+              >
+                {scopeRetrying ? "Checking…" : "Try the check again"}
+              </Button>
+            </p>
+          ) : null}
+          {resolvedScope.hasInvalidScope ? (
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              data-testid="ai-doctor-start-invalid-scope"
+            >
+              That link carried a grow or tent Verdant couldn't match to your account, so no tent
+              context is applied.{everyPlantListedSuffix}
+            </p>
+          ) : null}
+          {showUnavailableCarriedPlant ? (
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              role="status"
+              data-testid="ai-doctor-start-carried-plant-unavailable"
+            >
+              {DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY}
+              {everyPlantListedSuffix}
+            </p>
+          ) : null}
         </div>
 
-        {plantsQuery.isLoading ? (
+        {plantsQuery.isPending || scopeOrderingPending ? (
           <GrowDataLoadingState resource="Active plants" testId="ai-doctor-start-loading" />
         ) : plantsQuery.isError ? (
           <GrowDataLoadError
@@ -77,16 +271,48 @@ export default function AiDoctorStart() {
           />
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2" data-testid="ai-doctor-start-options">
-            {options.map((option, index) => (
+            {orderedOptions.map((option, index) => (
               <li key={option.id}>
                 <Link
                   to={option.href}
                   className="group flex h-full items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/45 p-4 transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                   data-testid={`ai-doctor-start-option-${index}`}
                   aria-label={`Review ${option.name} with AI Doctor`}
+                  // The explicit aria-label replaces ALL descendant text in the
+                  // accessible name, so the "In this tent" badge below would be
+                  // silent to screen readers. Expose it as the DESCRIPTION
+                  // instead: same scope cue, action name unchanged.
+                  aria-describedby={
+                    [
+                      partitioned.carriedPlantOptionId === option.id
+                        ? `ai-doctor-start-option-${index}-carried`
+                        : null,
+                      inScopeIds.has(option.id) ? `ai-doctor-start-option-${index}-in-tent` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
+                  }
                 >
                   <span className="min-w-0">
                     <span className="block break-words font-semibold">{option.name}</span>
+                    {partitioned.carriedPlantOptionId === option.id ? (
+                      <span
+                        className="mt-1 mr-1 inline-block rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary"
+                        id={`ai-doctor-start-option-${index}-carried`}
+                        data-testid={`ai-doctor-start-option-${index}-carried`}
+                      >
+                        You came from here
+                      </span>
+                    ) : null}
+                    {inScopeIds.has(option.id) ? (
+                      <span
+                        className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+                        id={`ai-doctor-start-option-${index}-in-tent`}
+                        data-testid={`ai-doctor-start-option-${index}-in-tent`}
+                      >
+                        In this tent
+                      </span>
+                    ) : null}
                     <span className="mt-1 block break-words text-xs text-muted-foreground">
                       {option.details ?? "Plant context available"}
                     </span>

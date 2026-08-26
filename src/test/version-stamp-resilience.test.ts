@@ -33,13 +33,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { computeTreeHash, isBinary, normalizeCrlf } from "../../scripts/lib/tree-hash.mjs";
 
 const REPO_ROOT = resolve(__dirname, "../..");
 const STAMPER = resolve(REPO_ROOT, "scripts/stamp-version.mjs");
 const TREE_HASH_LIB = resolve(REPO_ROOT, "scripts/lib/tree-hash.mjs");
 const AUTO_TAG_WORKFLOW = resolve(REPO_ROOT, ".github/workflows/auto-tag-release.yml");
+const ROOT_GITIGNORE = resolve(REPO_ROOT, ".gitignore");
 
 const temporaryRoots: string[] = [];
 afterAll(() => {
@@ -68,6 +69,7 @@ function makeSandbox(): string {
   mkdirSync(join(box, "src/components"), { recursive: true });
   cpSync(STAMPER, join(box, "scripts/stamp-version.mjs"));
   cpSync(TREE_HASH_LIB, join(box, "scripts/lib/tree-hash.mjs"));
+  cpSync(ROOT_GITIGNORE, join(box, ".gitignore"));
   writeFileSync(join(box, "package.json"), '{ "name": "sandbox", "version": "0.0.0" }\n');
   writeFileSync(join(box, "index.html"), "<html></html>\n");
   writeFileSync(join(box, "src/components/App.tsx"), "export const x = 1;\n");
@@ -101,6 +103,40 @@ function runStamper(
   });
   const record = JSON.parse(readFileSync(join(cwd, "public/version.json"), "utf8"));
   return { record, stdout };
+}
+
+function makeCommittedSandbox(additionalFiles: Record<string, string> = {}): {
+  box: string;
+  sha: string;
+} {
+  const box = makeSandbox();
+  mkdirSync(join(box, "src/generated"), { recursive: true });
+  writeFileSync(join(box, "public/version.json"), '{"tracked":"before-stamp"}\n');
+  writeFileSync(join(box, "src/generated/buildInfo.ts"), "export const beforeStamp = true;\n");
+  for (const [relativePath, contents] of Object.entries(additionalFiles)) {
+    const target = join(box, relativePath);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, contents);
+  }
+  git(box, ["init", "-q"]);
+  git(box, ["add", "-A"]);
+  // The real repository tracks these legacy generated outputs even though its
+  // ignore rules prevent a fresh sandbox from adding them by default.
+  git(box, ["add", "-f", "public/version.json", "src/generated/buildInfo.ts"]);
+  git(box, ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "init"]);
+  return { box, sha: git(box, ["rev-parse", "HEAD"]) };
+}
+
+function attachOriginDefault(box: string, branch: string): string {
+  const remote = makeTempRoot();
+  git(remote, ["init", "--bare", "-q"]);
+  git(box, ["branch", "-M", branch]);
+  git(box, ["remote", "add", "origin", remote]);
+  git(box, ["push", "-u", "origin", branch]);
+  git(remote, ["symbolic-ref", "HEAD", `refs/heads/${branch}`]);
+  git(box, ["fetch", "origin"]);
+  git(box, ["symbolic-ref", "refs/remotes/origin/HEAD", `refs/remotes/origin/${branch}`]);
+  return remote;
 }
 
 const LEGACY_FIELDS = [
@@ -301,6 +337,130 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
     expect(record.version).toMatch(new RegExp(`^0\\.0\\.0\\+\\d{8}\\.${sha.slice(0, 12)}`));
     expect(record.treeHash).toMatch(/^[0-9a-f]{64}$/);
     expect(record.inherited).toBeNull();
+  });
+
+  it("ignores only persistent generated stamp outputs when reporting dirty", () => {
+    const { box } = makeCommittedSandbox({
+      "config/publisher.json": '{"mode":"clean"}\n',
+      "supabase/functions/example/index.ts": "export const edge = true;\n",
+    });
+
+    expect(runStamper(box).record.dirty).toBe(false);
+    const generatedResidue = git(box, ["status", "--porcelain"]);
+    expect(generatedResidue).toMatch(/public[\\/]version\.json/);
+    expect(generatedResidue).toMatch(/src[\\/]generated[\\/]buildInfo\.ts/);
+    expect(runStamper(box).record.dirty).toBe(false);
+
+    const meaningfulMutations: Array<[string, string]> = [
+      ["src/components/App.tsx", "export const x = 2;\n"],
+      ["config/publisher.json", '{"mode":"changed"}\n'],
+      ["supabase/functions/example/index.ts", "export const edge = false;\n"],
+    ];
+    for (const [relativePath, contents] of meaningfulMutations) {
+      writeFileSync(join(box, relativePath), contents);
+      expect(runStamper(box).record.dirty, relativePath).toBe(true);
+      git(box, ["checkout", "--", relativePath]);
+    }
+  });
+
+  it("keeps ignored generated build residue clean while surfacing real source drift", () => {
+    const { box } = makeCommittedSandbox();
+    const ignoredResidue: Array<[string, string]> = [
+      [".output/server/index.mjs", "export default {};\n"],
+      [".wrangler/deploy/config.json", '{"configPath":"../../dist/server/wrangler.json"}\n'],
+    ];
+    for (const [relativePath, contents] of ignoredResidue) {
+      const target = join(box, relativePath);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, contents);
+    }
+
+    // This is an effective-git-ignore contract, not a source-text check: generated
+    // publisher residue must not become a false dirty stamp in a persistent workspace.
+    expect(git(box, ["status", "--porcelain"])).toBe("");
+    expect(runStamper(box).record.dirty).toBe(false);
+
+    writeFileSync(join(box, "src/components/Untracked.tsx"), "export const untracked = true;\n");
+    expect(runStamper(box).record.dirty).toBe(true);
+    rmSync(join(box, "src/components/Untracked.tsx"));
+
+    writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
+    expect(runStamper(box).record.dirty).toBe(true);
+  });
+
+  it("uses the matching canonical origin default for detached and orphan refs", () => {
+    for (const rawRef of ["HEAD", "__orphan__"] as const) {
+      const { box, sha } = makeCommittedSandbox();
+      attachOriginDefault(box, "main");
+      if (rawRef === "HEAD") {
+        git(box, ["checkout", "--detach", sha]);
+      } else {
+        git(box, ["branch", rawRef, sha]);
+        git(box, ["checkout", rawRef]);
+      }
+
+      const { record } = runStamper(box);
+      expect(record.commit).toBe(sha);
+      expect(record.ref).toBe("main");
+    }
+  });
+
+  it("preserves a raw ref when origin default is unavailable or does not describe this checkout", () => {
+    const withoutOrigin = makeCommittedSandbox();
+    git(withoutOrigin.box, ["checkout", "--detach", withoutOrigin.sha]);
+    expect(runStamper(withoutOrigin.box).record.ref).toBe("HEAD");
+
+    const unsynced = makeCommittedSandbox();
+    attachOriginDefault(unsynced.box, "main");
+    const originDefaultSha = unsynced.sha;
+    writeFileSync(join(unsynced.box, "src/components/App.tsx"), "export const x = 2;\n");
+    git(unsynced.box, ["add", "src/components/App.tsx"]);
+    git(unsynced.box, [
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "commit",
+      "-qm",
+      "ahead",
+    ]);
+    const aheadSha = git(unsynced.box, ["rev-parse", "HEAD"]);
+    git(unsynced.box, ["checkout", "--detach", aheadSha]);
+
+    const { record } = runStamper(unsynced.box, { GITHUB_SHA: originDefaultSha });
+    expect(record.commit).toBe(originDefaultSha);
+    expect(record.ref).toBe("HEAD");
+
+    const originMismatch = makeCommittedSandbox();
+    const mismatchRemote = attachOriginDefault(originMismatch.box, "main");
+    const matchingSha = originMismatch.sha;
+    git(originMismatch.box, ["checkout", "-b", "later-default"]);
+    writeFileSync(join(originMismatch.box, "src/components/App.tsx"), "export const x = 2;\n");
+    git(originMismatch.box, ["add", "src/components/App.tsx"]);
+    git(originMismatch.box, [
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "commit",
+      "-qm",
+      "later default",
+    ]);
+    git(originMismatch.box, ["push", "origin", "later-default"]);
+    git(mismatchRemote, ["symbolic-ref", "HEAD", "refs/heads/later-default"]);
+    git(originMismatch.box, ["remote", "set-head", "origin", "-a"]);
+    git(originMismatch.box, ["checkout", "--detach", matchingSha]);
+
+    const originMismatchRecord = runStamper(originMismatch.box).record;
+    expect(originMismatchRecord.commit).toBe(matchingSha);
+    expect(originMismatchRecord.ref).toBe("HEAD");
+
+    const withExplicitRef = makeCommittedSandbox();
+    attachOriginDefault(withExplicitRef.box, "main");
+    git(withExplicitRef.box, ["checkout", "--detach", withExplicitRef.sha]);
+    expect(runStamper(withExplicitRef.box, { GITHUB_REF_NAME: "__orphan__" }).record.ref).toBe(
+      "__orphan__",
+    );
   });
 
   it("treats a set-but-empty or malformed GITHUB_SHA as absent (forgery regression)", () => {

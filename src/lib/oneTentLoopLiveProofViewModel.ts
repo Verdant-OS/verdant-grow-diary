@@ -85,7 +85,13 @@ export function buildOneTentLoopLiveProofView(
   evidence: LoopEvidence,
   now?: string | Date | number,
 ): LiveProofView {
-  const steps = evaluateLoop(evidence);
+  const generated_at = normalizeGeneratedAt(now);
+  const injectedNowMs = Date.parse(generated_at);
+  const hasExplicitEvidenceClock =
+    typeof evidence.now_ms === "number" && Number.isFinite(evidence.now_ms);
+  const steps = evaluateLoop(
+    hasExplicitEvidenceClock ? evidence : { ...evidence, now_ms: injectedNowMs },
+  );
   const top_gap = resolveTopOneTentLoopGap(steps);
   return {
     title: "One-Tent Loop — Live Proof",
@@ -94,7 +100,7 @@ export function buildOneTentLoopLiveProofView(
     steps,
     step_ids: LOOP_STEP_IDS,
     counts: countStatuses(steps),
-    generated_at: normalizeGeneratedAt(now),
+    generated_at,
     top_gap,
   };
 }

@@ -64,6 +64,48 @@ function run(cmd) {
   return execSync(cmd, { stdio: ["ignore", "pipe", "ignore"] });
 }
 
+const GENERATED_STAMP_OUTPUTS = ["public/version.json", "src/generated/buildInfo.ts"];
+
+/**
+ * Detached/headless publishers can legitimately build the exact commit that
+ * origin/HEAD names. Surface that canonical branch only when both the local
+ * checkout and selected stamp SHA agree with origin's advertised default.
+ * Otherwise preserve the raw ref: provenance must not paper over a checkout
+ * whose source differs from the stamp identity.
+ */
+function canonicalOriginDefaultRef(rawRef, stampSha, currentGitSha) {
+  if (rawRef !== "HEAD" && rawRef !== "__orphan__") return rawRef;
+  if (stampSha === "unknown" || currentGitSha !== stampSha) return rawRef;
+
+  const originHeadSha = safe(() => run("git rev-parse refs/remotes/origin/HEAD").toString().trim());
+  if (originHeadSha !== stampSha) return rawRef;
+
+  const originHeadRef = safe(() =>
+    run("git symbolic-ref --quiet --short refs/remotes/origin/HEAD").toString().trim(),
+  );
+  return originHeadRef.startsWith("origin/") && originHeadRef.length > "origin/".length
+    ? originHeadRef.slice("origin/".length)
+    : rawRef;
+}
+
+/**
+ * Generated stamp outputs are build residue, not a source mutation. Exclude
+ * only those two exact tracked paths; untracked and changed source/config/Edge
+ * files must remain visible as dirty provenance.
+ */
+function hasMeaningfulWorktreeChanges() {
+  const excludedOutputs = GENERATED_STAMP_OUTPUTS.map((path) => `":(exclude)${path}"`).join(" ");
+  return (
+    safe(
+      () =>
+        run(`git status --porcelain --untracked-files=all -- . ${excludedOutputs}`)
+          .toString()
+          .trim(),
+      "",
+    ) !== ""
+  );
+}
+
 const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
 const pkgVersion = String(pkg.version ?? "0.0.0");
 
@@ -76,20 +118,21 @@ const gitSha = safe(() => run("git rev-parse HEAD").toString().trim());
 const sha = envSha ?? gitSha;
 const shortSha = sha === "unknown" ? "unknown" : sha.slice(0, 12);
 const commitSource = envSha ? "github-env" : gitSha !== "unknown" ? "git" : "none";
-const ref =
-  process.env.GITHUB_REF_NAME ??
-  safe(() => run("git rev-parse --abbrev-ref HEAD").toString().trim());
+const rawRef = safe(() => run("git rev-parse --abbrev-ref HEAD").toString().trim());
+const ref = process.env.GITHUB_REF_NAME ?? canonicalOriginDefaultRef(rawRef, sha, gitSha);
 const commitTime = safe(() =>
   run(`git show -s --format=%cI ${sha === "unknown" ? "HEAD" : sha}`)
     .toString()
     .trim(),
 );
 
-// Dirty flag: unstaged/uncommitted changes at build time. Never
-// suppress — a dirty CI build is always a bug worth surfacing. (In a
-// history-less snapshot everything is "untracked", so dirty:true plus
-// commitSource:"none" together read as "identity from treeHash".)
-const dirty = safe(() => run("git status --porcelain").toString().trim(), "") !== "";
+// Dirty flag: meaningful unstaged/uncommitted changes at build time. Prior
+// stamp outputs are ignored so a persistent publisher does not taint its next
+// build solely by retaining them. Everything else remains surfaced. (In a
+// history-less snapshot everything besides those outputs is "untracked", so
+// dirty:true plus commitSource:"none" together read as "identity from
+// treeHash".)
+const dirty = hasMeaningfulWorktreeChanges();
 
 // Content identity that needs no git. Guarded: stamping must never fail
 // a build over a hashing error — degrade to null instead.

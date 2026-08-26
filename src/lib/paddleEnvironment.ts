@@ -1,8 +1,8 @@
 /**
  * Pure, null-safe helpers that decide whether Paddle checkout may run in the
- * current browser context. Fail-closed: unknown or unsafe combinations
- * resolve to `"unavailable"` so callers cannot accidentally open a live
- * Paddle overlay against a localhost preview.
+ * current browser context. Verdant's current product policy is sandbox-only:
+ * only a well-formed `test_` token resolves to `"sandbox"`; every other
+ * token class resolves to `"unavailable"` on every host.
  *
  * SAFETY:
  *  - Never logs, returns, or embeds the token value.
@@ -39,9 +39,9 @@ export function classifyPaddleToken(token: string | null | undefined): PaddleTok
 }
 
 /**
- * Detect loopback / local-development hostnames. Treats missing/empty input
- * as NOT loopback so server-render contexts (no window) don't accidentally
- * mark a real host as loopback.
+ * Detect loopback / local-development hostnames. Retained for callers that
+ * need hostname diagnostics; checkout authorization no longer depends on
+ * hostname because live tokens are unavailable everywhere.
  *
  * Matches:
  *   - "localhost" and any "*.localhost" subdomain
@@ -80,33 +80,28 @@ export interface ResolvePaddleCheckoutEnvironmentInput {
  * Deterministically resolve whether checkout may open in the current context.
  *
  * Rules:
- *   1. Malformed / missing token       → "unavailable"
- *   2. Sandbox token                   → "sandbox"        (loopback OK)
- *   3. Live token on loopback host     → "unavailable"    (fail closed)
- *   4. Live token on non-loopback host → "live"
+ *   1. Sandbox token             → "sandbox" (all hosts)
+ *   2. Live token                → "unavailable" (all hosts)
+ *   3. Malformed / missing token → "unavailable"
  */
 export function resolvePaddleCheckoutEnvironment(
   input: ResolvePaddleCheckoutEnvironmentInput,
 ): PaddleCheckoutEnvironment {
   const cls = classifyPaddleToken(input.token);
-  if (cls === "unavailable") return "unavailable";
   if (cls === "sandbox") return "sandbox";
-  // cls === "live"
-  if (isLoopbackHostname(input.hostname)) return "unavailable";
-  return "live";
+  return "unavailable";
 }
 
 /**
- * Fixed, safe copy for the loopback+live blocking banner. Kept as an
- * exported constant so the banner and its test read the same string.
+ * Fixed, safe copy for a blocked live token. The legacy export name is kept
+ * to avoid widening this policy slice; the message applies on every host.
  */
 export const CHECKOUT_UNAVAILABLE_LOCALHOST_MESSAGE =
-  "Checkout disabled: localhost requires a Paddle sandbox token.";
+  "Checkout disabled: Verdant currently supports Paddle sandbox testing only.";
 
 /**
- * Fixed, safe copy for the generic unavailable case (missing/malformed
- * token on a non-loopback host — e.g. a production build shipped without
- * a token). Never reveals which case applied.
+ * Fixed, safe copy for a missing or malformed token. Never reveals which
+ * token class or value was present.
  */
 export const CHECKOUT_UNAVAILABLE_GENERIC_MESSAGE =
   "Checkout is currently unavailable. Please try again later.";

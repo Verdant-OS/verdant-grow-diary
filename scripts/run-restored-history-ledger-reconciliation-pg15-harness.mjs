@@ -423,7 +423,9 @@ function ledgerDigest(env, spawnImpl) {
 function assertClassification(state, status, reason) {
   const classification = classifyPreflight(state);
   if (classification.status !== status || (reason && classification.reason !== reason)) {
-    throw new Error(`classification:${status}:${reason ?? "none"}`);
+    throw new Error(
+      `classification:${status}:${reason ?? "none"}:actual:${classification.status}:${classification.reason ?? "none"}`,
+    );
   }
   return classification;
 }

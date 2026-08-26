@@ -72,9 +72,14 @@ Server-only secrets (configured via Lovable Cloud → Secrets, never in
   caller JWT verification to invoke protected credit spend/refund RPCs. The
   browser never receives this key and cannot provide `user_id`, plan, model
   tier, weight, or billing environment.
-- (Legacy, still read by the BYO audit sink) `PADDLE_ENVIRONMENT`,
-  `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_PRO_MONTHLY`/`_PRO_ANNUAL`/
-  `_FOUNDER_LIFETIME`
+- (Legacy, still read by the BYO audit sink) `PADDLE_ENVIRONMENT` — permanently
+  `sandbox`; `paddle-webhook` 403s on anything else and no live endpoint routes
+  into it — plus `PADDLE_WEBHOOK_SECRET`, and `PADDLE_PRICE_PRO_MONTHLY`/
+  `_PRO_ANNUAL`/`_FOUNDER_LIFETIME` as a fallback only
+- `PADDLE_SANDBOX_PRICE_PRO_MONTHLY`/`_PRO_ANNUAL`/`_FOUNDER_LIFETIME` —
+  sandbox-scoped price ids for `paddle-webhook`'s plan mapping. Preferred over
+  the legacy names, which `get-paddle-price` also reads and which hold LIVE ids
+  once `PAYMENTS_ENVIRONMENT=live`
 
 ## Webhook
 

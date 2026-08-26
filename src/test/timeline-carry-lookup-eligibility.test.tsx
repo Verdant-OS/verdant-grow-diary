@@ -38,17 +38,38 @@ const state = vi.hoisted(() => ({
   selects: [] as Array<{ table: string; columns: string }>,
 }));
 
+/**
+ * Project each row through the requested column list, the way PostgREST does.
+ *
+ * Returning the full fixture regardless of `.select(...)` would let the two
+ * halves of this contract drift apart silently: trimming a column out of the
+ * query would break production while every map assertion here stayed green,
+ * because the fixture would keep supplying a field the real read never asked
+ * for.
+ */
+function project(row: Record<string, unknown>, columns: string): Record<string, unknown> {
+  const wanted = selectedColumns(columns);
+  return Object.fromEntries(Object.entries(row).filter(([key]) => wanted.includes(key)));
+}
+
+/** The `.select(...)` argument as exact column tokens, never as a substring. */
+function selectedColumns(columns: string): string[] {
+  return columns.split(",").map((column) => column.trim());
+}
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from(table: string) {
       return {
         select(columns: string) {
           state.selects.push({ table, columns });
+          const rows = table === "plants" ? state.plants : state.tents;
+          const error = table === "plants" ? state.plantsError : state.tentsError;
           return {
-            eq: async () =>
-              table === "plants"
-                ? { data: state.plantsError ? null : state.plants, error: state.plantsError }
-                : { data: state.tentsError ? null : state.tents, error: state.tentsError },
+            eq: async () => ({
+              data: error ? null : rows.map((row) => project(row, columns)),
+              error,
+            }),
           };
         },
       };
@@ -126,17 +147,19 @@ describe("useTimelineNameDirectory · carry lookup eligibility", () => {
     const { result } = renderDirectory();
     await waitFor(() => expect(result.current.plantTentIdsById).not.toBeNull());
 
-    // Pins the read, not the source text: trimming `tent_id` or `grow_id`
-    // out of the select would leave the lookup unable to scope a plant to a
-    // grow, and every map-level assertion above would still be green.
+    // Pins the read, not the source text. Asserted as EXACT comma-separated
+    // tokens rather than with `toContain`: a substring check passes for "id"
+    // even after the id column is dropped, because "tent_id" contains it, so
+    // the assertion that matters most would be the one that never fails.
     const plantsSelect = state.selects.find((entry) => entry.table === "plants");
     expect(plantsSelect).toBeDefined();
+    const plantColumns = selectedColumns(plantsSelect!.columns);
     for (const column of ["id", "tent_id", "grow_id"]) {
-      expect(plantsSelect!.columns).toContain(column);
+      expect(plantColumns).toContain(column);
     }
     const tentsSelect = state.selects.find((entry) => entry.table === "tents");
     expect(tentsSelect).toBeDefined();
-    expect(tentsSelect!.columns).toContain("grow_id");
+    expect(selectedColumns(tentsSelect!.columns)).toContain("grow_id");
   });
 });
 

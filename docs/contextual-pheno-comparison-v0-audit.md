@@ -1,5 +1,12 @@
 # Contextual Pheno Comparison — V0 Audit (read-only foundation)
 
+> **Historical (annotated 2026-08-26):** this audit predates later slices.
+> Items it lists as not-yet-built future work have since shipped — notably the
+> formal trait scoring system (`pheno_candidate_scores` + `pheno_score_rounds`
+> with RLS) and hunt-level comparison surfaces. Read it as the V0 design
+> record, not the current inventory; the current inventory is
+> `docs/pheno-hunt-lab-territory-2026-08-26.md`.
+
 ## Summary
 
 This document records a read-only feasibility audit for the proposed

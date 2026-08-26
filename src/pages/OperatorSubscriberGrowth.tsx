@@ -25,6 +25,11 @@ import {
   type SignupToPaidSnapshot,
 } from "@/lib/signupToPaidSnapshotRules";
 import { parsePaidReturnSnapshot, type PaidReturnSnapshot } from "@/lib/paidReturnSnapshotRules";
+import {
+  parseFunnelOpportunitySnapshot,
+  type FunnelOpportunitySnapshot,
+} from "@/lib/conversionOpportunityRules";
+import ConversionOpportunityLab from "@/components/ConversionOpportunityLab";
 
 type SubscriberGrowthRpcClient = {
   rpc(
@@ -32,7 +37,8 @@ type SubscriberGrowthRpcClient = {
       | "subscriber_growth_operator_snapshot"
       | "signup_acquisition_operator_snapshot"
       | "signup_to_paid_operator_snapshot"
-      | "paid_return_operator_snapshot",
+      | "paid_return_operator_snapshot"
+      | "funnel_events_operator_summary",
   ): Promise<{ data: unknown; error: { message?: string } | null }>;
 };
 
@@ -44,6 +50,14 @@ async function fetchSubscriberGrowth(): Promise<SubscriberGrowthSnapshot> {
     throw new Error(error.message ?? "subscriber_growth_snapshot_failed");
   }
   return parseSubscriberGrowthSnapshot(data);
+}
+
+async function fetchFunnelOpportunities(): Promise<FunnelOpportunitySnapshot> {
+  const { data, error } = await (supabase as unknown as SubscriberGrowthRpcClient).rpc(
+    "funnel_events_operator_summary",
+  );
+  if (error) throw new Error(error.message ?? "funnel_opportunity_snapshot_failed");
+  return parseFunnelOpportunitySnapshot(data);
 }
 
 async function fetchSignupAcquisition(): Promise<SignupAcquisitionSnapshot> {
@@ -124,6 +138,12 @@ export default function OperatorSubscriberGrowth() {
     enabled: role.granted,
     staleTime: 30_000,
   });
+  const opportunityQuery = useQuery({
+    queryKey: ["operator", "conversion-opportunities"],
+    queryFn: fetchFunnelOpportunities,
+    enabled: role.granted,
+    staleTime: 30_000,
+  });
 
   const snapshot = snapshotQuery.data;
   const acquisition = acquisitionQuery.data;
@@ -133,7 +153,9 @@ export default function OperatorSubscriberGrowth() {
     snapshotQuery.isFetching ||
     acquisitionQuery.isFetching ||
     conversionQuery.isFetching ||
-    paidReturnQuery.isFetching;
+    paidReturnQuery.isFetching ||
+    opportunityQuery.isFetching;
+  const opportunities = opportunityQuery.data;
   const progress = useMemo(
     () => buildSubscriberGrowthProgress(snapshot?.counts.activePaid ?? 0, Date.now()),
     [snapshot?.counts.activePaid],
@@ -168,6 +190,7 @@ export default function OperatorSubscriberGrowth() {
                 void acquisitionQuery.refetch();
                 void conversionQuery.refetch();
                 void paidReturnQuery.refetch();
+                void opportunityQuery.refetch();
               }}
               disabled={!role.granted || refreshing}
             >
@@ -276,6 +299,18 @@ export default function OperatorSubscriberGrowth() {
         </Card>
       )}
 
+      {role.granted && (opportunityQuery.isError || (opportunities && !opportunities.ok)) && (
+        <Card data-testid="conversion-opportunity-error">
+          <CardHeader>
+            <CardTitle>Conversion opportunities unavailable.</CardTitle>
+            <CardDescription>
+              {opportunities?.reasonLabel ??
+                "The authenticated funnel summary could not be read. Existing subscriber reports remain available."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       {role.granted && snapshot?.ok && (
         <>
           <section
@@ -308,6 +343,8 @@ export default function OperatorSubscriberGrowth() {
           />
 
           <SubscriberActivationCard counts={snapshot.counts} />
+
+          {opportunities?.ok && <ConversionOpportunityLab snapshot={opportunities} />}
 
           {conversion?.ok && (
             <SignupToPaidConversionCard
@@ -387,7 +424,10 @@ export default function OperatorSubscriberGrowth() {
                   value={acquisition.counts.vpdCalculator}
                 />
                 <MetricCard label="CSV history signup" value={acquisition.counts.csvHistory} />
-                <MetricCard label="Target bands signup" value={acquisition.counts.blueprintTargets} />
+                <MetricCard
+                  label="Target bands signup"
+                  value={acquisition.counts.blueprintTargets}
+                />
               </CardContent>
             </Card>
           )}

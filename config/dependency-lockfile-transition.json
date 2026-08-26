@@ -21,7 +21,7 @@
     },
     {
       "path": "README.md",
-      "markers": ["npm install", "npm run dev", "npm run build"]
+      "markers": ["npm run build"]
     },
     {
       "path": ".claude/skills/run-verdant-grow-diary/SKILL.md",

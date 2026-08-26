@@ -1,6 +1,22 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-26 UTC (01:30 UTC)
+**Last updated:** 2026-08-26 UTC (03:14 UTC)
+**Updated by:** Claude (2026-08-26: records **one new section only** — the `Supabase Preview`
+42P07 replay failure and the four constraints on it, at Cheek's instruction. Nothing else in
+this file is touched, and no status below is restated, corrected or superseded by this edit.
+
+The section exists to stop a specific wasted loop: the check is red on every PR, the cause is
+already declared in `config/local-supabase-replay-compatibility.json`, and the fixes that look
+obvious — a dashboard create/Pull/Migrate sequence, a late `PATCH /v1/branches/{id}`, closing
+and reopening the PR — each fail for a different reason. The vendor-behaviour half is labelled
+`source claim` from Cheek and is **not** independently verified from inside this repository;
+the repository-side half is `established fact` and reproducible here.
+
+It licenses nothing. The publish stop-order, the `20260813030000` hard stop, and migration
+immutability are all unchanged, and the section says so in its own terms. Prior header
+follows.)
+
+**Prior update:** 2026-08-26 UTC (01:30 UTC)
 **Updated by:** Claude (2026-08-26: **Pheno Hunt + LAB territory delivered as one draft PR**
 from branch `claude/verdant-pheno-hunt-lab-vq6pd9` (base `verdant-grow-diary`, cut from
 deploy tip `5e75a3a` / #1129). Scope: repo-wide territory audit with per-feature
@@ -708,6 +724,92 @@ demonstration #1127's own release note asks for.
 
 **Nothing here authorizes a publish.** The stop-order stands; this is measurement only, and
 no agent published — production republished on its own account at 18:05 UTC.
+
+---
+
+## 🔒 Supabase Preview — the 42P07 replay failure has NO PR-side workaround (recorded 2026-08-26)
+
+**Why this is here:** the `Supabase Preview` check fails on every PR branch with the same
+error, and the fixes that look obvious are each wrong in a way that is not obvious. Recorded
+so the next agent does not re-derive a dashboard workaround that cannot work, or reach for a
+published migration.
+
+### What is observed — `established fact`
+
+`Supabase Preview` fails on preview-branch creation with:
+
+```text
+ERROR: relation "ai_credit_grants" already exists (SQLSTATE 42P07)
+At statement: 0
+CREATE TABLE public.ai_credit_grants (…)
+```
+
+Seen on PR #1135 at 02:04:28 UTC and again at 03:10:49 UTC on a later head, and on PR #1131.
+It is not branch-specific and not diff-specific: neither PR contains a migration.
+
+**Cause.** Two committed migrations create the same table:
+
+| File                                                      | Role                                        |
+| --------------------------------------------------------- | ------------------------------------------- |
+| `supabase/migrations/20260721103000_ai_credit_grants.sql` | canonical — the one production records      |
+| `supabase/migrations/20260721182752_4fc51714-…sql`        | a later Lovable export repeating the ledger |
+
+**The repository already declares this.** `config/local-supabase-replay-compatibility.json`
+carries a `compatibility_noops` entry naming both files by path and SHA-256, whose `reason`
+field names this exact SQLSTATE. A sibling entry covers `20260721105000` vs `20260721194154`.
+
+**The gap.** That mechanism rewrites a _disposable copy_ in a local workdir. Supabase's
+hosted preview pipeline replays the committed files directly and never reads that config, so
+the declaration cannot help it. The sanctioned mechanism is working exactly as designed and
+still does not cover this surface.
+
+### What does NOT work — `source claim`, Cheek, 2026-08-26 in session
+
+Recorded as the owner relaying vendor behaviour. Not independently verified from inside this
+repository, and not verifiable from here — no agent should re-test it by trial against a live
+project.
+
+1. **The dashboard 3-step path (create → Pull → Migrate) is `NO`.** Dashboard create still
+   "replays the migration history from your main branch against a fresh database." Pull
+   initialises the table, then Migrate runs the same files. Same `ai_credit_grants` 42P07.
+2. **`PATCH /v1/branches/{id}` can set `git_branch` later**, but the docs do **not** say that
+   writes the `Supabase Preview` check on a PR, and do **not** say it skips first-create
+   replay. Do not assume either.
+3. **The supported GitHub Preview flow is: open or reopen the PR → empty DB → full file
+   replay.** Incremental "new files only" begins **only after that first create succeeds** —
+   which is the step that fails here.
+4. **Next leverage is Supabase Support**, for an undocumented ledger-inherit. Not a dashboard
+   workaround, and not editing published migrations.
+
+**Corollary — the bot's own advice is the trap.** The `supabase[bot]` comment on every PR
+reads _"Close and reopen this PR if you want to apply changes from existing seed or migration
+files."_ That is precisely the path in (3): it re-runs the full replay and fails again.
+Closing and reopening a PR is not a remedy here.
+
+### What this does not license
+
+**Do not edit, gut, or no-op either migration.** Merged migrations are permanent history
+(`AGENTS.md`, Migration Immutability). The `Published migration integrity` gate compares
+SHA-256 against the base branch and will fail the PR. "This migration is broken and could
+never have succeeded anywhere" is named in the constitution as the specific reasoning that is
+seductive and wrong.
+
+`20260813030000_signup_acquisition_forward_repair.sql` is **unrelated** to `ai_credit_grants`
+and its hard stop is untouched by anything in this section.
+
+### Merge impact — `established fact`
+
+`Supabase Preview` is **not** a required context. It appears in neither `required` (35
+contexts) nor `mustBeGreen` (1) in `config/required-status-checks.json`. A red
+`Supabase Preview` does not block the merge queue and is not grounds for holding a PR.
+
+| Axis                                    | Status         |
+| --------------------------------------- | -------------- |
+| Preview-branch creation on any PR       | `FAIL`         |
+| Cause identified                        | `PASS`         |
+| Repo-side remedy available              | `BLOCKED`      |
+| Vendor behaviour independently verified | `NOT_MEASURED` |
+| Support request raised                  | `NO_DATA`      |
 
 ---
 

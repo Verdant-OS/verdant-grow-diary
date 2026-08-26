@@ -24,6 +24,7 @@ import {
   type PhenoCandidateDiaryEvidence,
 } from "@/lib/phenoCandidateEvidenceEnrichmentRules";
 import { fetchLatestSensorSnapshot } from "@/lib/quick-log/fetchLatestSensorSnapshot";
+import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { listLatestSexObservationsForHunt } from "@/lib/phenoSexObservationService";
 import {
   sanitizeBreedingObjectiveTargets,
@@ -293,14 +294,17 @@ async function loadCandidateDiaryEvidence(
   if (plantIds.length === 0) {
     return { quickLogEntriesByPlantId: {}, timelineEventsByPlantId: {}, photosByPlantId: {} };
   }
-  const { data, error } = await supabase
-    .from("diary_entries")
-    .select("id, plant_id, entry_at, note, photo_url, details")
-    .in("plant_id", plantIds)
-    .is("retracted_at", null)
-    .order("entry_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(DIARY_EVIDENCE_ROW_LIMIT);
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = supabase
+      .from("diary_entries")
+      .select("id, plant_id, entry_at, note, photo_url, details")
+      .in("plant_id", plantIds);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query
+      .order("entry_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(DIARY_EVIDENCE_ROW_LIMIT);
+  });
   if (error || !data) throw new PhenoEvidenceReadError("diary_entries");
   return mapDiaryRowsToCandidateEvidence(data);
 }

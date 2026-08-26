@@ -113,7 +113,9 @@ export async function listKeepersForHunt(huntId: string): Promise<KeeperRow[]> {
     .select("id, hunt_id, source_plant_id, keeper_name, note, created_at, stability_runs")
     .eq("hunt_id", id)
     .order("created_at", { ascending: true });
-  if (error || !data) return [];
+  // Fail closed: a failed read must surface as an error state, never render
+  // as "no keepers yet" (missing data shown as empty).
+  if (error || !data) throw new Error("Could not load keepers.");
   return data.map((r) => ({
     id: r.id,
     huntId: r.hunt_id,
@@ -234,7 +236,8 @@ export async function listClonesForKeepers(keeperIds: readonly string[]): Promis
     // configured ceiling in whatever order Postgres returns.
     .order("taken_at", { ascending: true })
     .limit(2000);
-  if (error || !data) return [];
+  // Fail closed (see listKeepersForHunt).
+  if (error || !data) throw new Error("Could not load keeper clones.");
   return data.map((r) => ({
     id: r.id,
     keeperId: r.keeper_id,
@@ -434,24 +437,84 @@ export async function recordCross(input: {
     })
     .select("id")
     .single();
+  if (isCrossTaxonomyColumnUnavailable(error)) {
+    // The hosted schema is still on the 3-type contract (taxonomy columns not
+    // applied). When the grower entered NO explicit taxonomy, retry with the
+    // legacy row so the basic auto-classified cross still records. Explicit
+    // taxonomy is grower-authored data and is NEVER silently dropped — the
+    // save fails honestly instead.
+    if (channel !== null || generation !== null || recurrentParentId !== null) {
+      return {
+        ok: false,
+        error:
+          "This cross uses the extended breeding taxonomy, which this project's database does not support yet. Record it without channel/generation for now.",
+      };
+    }
+    const legacy = await phenoDb
+      .from("pheno_crosses")
+      .insert({
+        user_id: userId,
+        hunt_id: input.huntId ?? null,
+        female_keeper_id: female,
+        male_keeper_id: dbMale,
+        cross_type: crossType,
+        cross_name: input.crossName ?? null,
+        note: input.note ?? null,
+      })
+      .select("id")
+      .single();
+    if (legacy.error || !legacy.data?.id) {
+      return { ok: false, error: "Could not record this cross." };
+    }
+    return { ok: true, id: legacy.data.id };
+  }
   if (error || !data?.id) return { ok: false, error: "Could not record this cross." };
   return { ok: true, id: data.id };
 }
 
+/**
+ * Deploy-window tolerance for the full-taxonomy columns (channel / generation /
+ * recurrent_parent_id, added by 20260707210000 + reconciled by 20260728090000):
+ * the generated types show the HOSTED project has not applied them, so a
+ * full-taxonomy select or insert fails with 42703 there. Only that exact
+ * failure falls back to the 3-type legacy contract; permission, RLS, network,
+ * and unrelated schema failures stay visible.
+ */
+function isCrossTaxonomyColumnUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+  const code = typeof record.code === "string" ? record.code.toUpperCase() : "";
+  if (code !== "PGRST204" && code !== "42703") return false;
+  const detail = [record.message, record.details, record.hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+  return /\b(channel|generation|recurrent_parent_id)\b/i.test(detail);
+}
+
+const CROSS_COLUMNS_FULL =
+  "id, female_keeper_id, male_keeper_id, cross_type, channel, generation, recurrent_parent_id, cross_name, note, crossed_at, created_at";
+const CROSS_COLUMNS_LEGACY =
+  "id, female_keeper_id, male_keeper_id, cross_type, cross_name, note, crossed_at, created_at";
+
 export async function listCrossesForHunt(huntId: string): Promise<CrossRow[]> {
   const id = typeof huntId === "string" ? huntId.trim() : "";
   if (!id) return [];
-  const { data, error } = await phenoDb
-    .from("pheno_crosses")
-    .select(
-      "id, female_keeper_id, male_keeper_id, cross_type, channel, generation, recurrent_parent_id, cross_name, note, crossed_at, created_at",
-    )
-    .eq("hunt_id", id)
-    .order("created_at", { ascending: false })
-    // Newest 500 crosses: breeding history is append-only and unbounded over
-    // seasons; the page labels the list when the cap is reached.
-    .limit(500);
-  if (error || !data) return [];
+  const runQuery = (columns: string) =>
+    phenoDb
+      .from("pheno_crosses")
+      .select(columns as typeof CROSS_COLUMNS_FULL)
+      .eq("hunt_id", id)
+      .order("created_at", { ascending: false })
+      // Newest 500 crosses: breeding history is append-only and unbounded over
+      // seasons; the page labels the list when the cap is reached.
+      .limit(500);
+  let { data, error } = await runQuery(CROSS_COLUMNS_FULL);
+  if (isCrossTaxonomyColumnUnavailable(error)) {
+    ({ data, error } = await runQuery(CROSS_COLUMNS_LEGACY));
+  }
+  // Fail closed: a failed read surfaces as an error, never as "no crosses"
+  // (a silently empty breeding history is missing data shown as absence).
+  if (error || !data) throw new Error("Could not load crosses.");
   return data.map((r) => ({
     id: r.id,
     femaleKeeperId: r.female_keeper_id,

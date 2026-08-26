@@ -402,10 +402,18 @@ describe("evaluatePolicy", () => {
       writeFileSync(join(root, "package.json"), JSON.stringify(manifest), "utf8");
       writeFileSync(join(root, "bun.lock"), bunLock(manifest), "utf8");
       writeFileSync(join(root, "package-lock.json"), JSON.stringify(packageLock(manifest)), "utf8");
+      // This test spawns the real CLI, so no `today` can be injected across the
+      // process boundary - the script reads the ambient clock. Pin the fixture's
+      // review date into the future so the assertion below tests "a healthy,
+      // in-review repo exits 0" rather than silently expiring on a calendar date.
+      // A literal here is a time bomb: the shared fixture's 2026-08-25 date went
+      // red across every branch on 2026-08-26.
+      const notYetDue = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       writeFileSync(
         join(root, "config/dependency-lockfile-transition.json"),
         JSON.stringify(
           transition({
+            reviewBy: notYetDue,
             consumerContracts: [{ path: "README.md", markers: [reviewedMarker] }],
           }),
         ),

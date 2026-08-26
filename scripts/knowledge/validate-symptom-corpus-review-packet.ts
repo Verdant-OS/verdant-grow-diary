@@ -6,6 +6,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
 import { VERDANT_SEO_GUIDES } from "../../src/constants/verdantSeoContent";
+import { evaluateCorpusPromotion } from "./evaluate-corpus-promotion.mjs";
 import { projectResolvedGuide } from "./validate-corpus.mjs";
 import { validateCorpusReviewPacket } from "./validate-corpus-review-packet.mjs";
 
@@ -18,7 +19,7 @@ const packetPath = path.join(
   "corpus",
   "pv1-symptom-evidence-guides",
   "revisions",
-  "draft-001.json",
+  "draft-002.json",
 );
 const cohortRegistryPath = path.join(
   root,
@@ -50,6 +51,18 @@ function main() {
   const packet = readJson(packetPath, "review packet");
   const cohortRegistry = readJson(cohortRegistryPath, "cohort registry");
   const schema = readJson(schemaPath, "review-packet schema");
+  const revision = packet as {
+    revisionId?: string;
+    supersedesRevisionId?: string;
+  };
+  if (
+    revision.revisionId !== "pv1-symptom-evidence-guides:draft-002" ||
+    revision.supersedesRevisionId !== "pv1-symptom-evidence-guides:draft-001"
+  ) {
+    throw new Error(
+      "Knowledge corpus review packet blocked: active symptom revision must be immutable draft-002 superseding draft-001",
+    );
+  }
 
   const ajv = new Ajv2020({ allErrors: true, strict: true });
   addFormats(ajv);
@@ -73,12 +86,21 @@ function main() {
     );
   }
   const wanted = new Set(cohort.paths);
-  const resolvedGuides = VERDANT_SEO_GUIDES.filter((guide) =>
-    wanted.has(`/guides/${guide.slug}`),
-  ).map((guide) => projectResolvedGuide(guide));
+  const runtimeGuides = VERDANT_SEO_GUIDES.filter((guide) => wanted.has(`/guides/${guide.slug}`));
+  const resolvedGuides = runtimeGuides.map((guide) => projectResolvedGuide(guide));
 
-  const result = validateCorpusReviewPacket({ packet, cohortRegistry, resolvedGuides });
-  console.log(JSON.stringify(result, null, 2));
+  const review = validateCorpusReviewPacket({ packet, cohortRegistry, resolvedGuides });
+  const promotionAdmission = evaluateCorpusPromotion({
+    packet,
+    reviewResult: review,
+    decision: null,
+    candidateCorpus: null,
+    cohortRegistry,
+    resolvedGuides,
+    runtimeGuides,
+    registryPaths: cohort.paths,
+  });
+  console.log(JSON.stringify({ review, promotionAdmission }, null, 2));
 }
 
 try {

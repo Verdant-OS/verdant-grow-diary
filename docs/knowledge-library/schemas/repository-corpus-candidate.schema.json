@@ -1,0 +1,549 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdantgrowdiary.com/schemas/knowledge/repository-corpus-candidate.schema.json",
+  "title": "Verdant Knowledge Library repository corpus candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "artifactType",
+    "artifactScope",
+    "rootNodeId",
+    "sourceRevisionId",
+    "sourcePacketCanonicalSha256",
+    "successorRevisionId",
+    "successorPacketCanonicalSha256",
+    "reviewerRegistryId",
+    "reviewerRegistryCanonicalSha256",
+    "decisionId",
+    "deliveryEvidence",
+    "nodes",
+    "sources",
+    "cohorts",
+    "claims",
+    "pages",
+    "applicabilityReceipts",
+    "edges"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "artifactType": { "const": "knowledge_repository_corpus_candidate" },
+    "artifactScope": { "type": "string", "minLength": 20 },
+    "rootNodeId": { "const": "topic:guides" },
+    "sourceRevisionId": { "type": "string", "minLength": 12 },
+    "sourcePacketCanonicalSha256": { "$ref": "#/$defs/sha256" },
+    "successorRevisionId": { "type": "string", "minLength": 12 },
+    "successorPacketCanonicalSha256": { "$ref": "#/$defs/sha256" },
+    "reviewerRegistryId": { "type": "string", "minLength": 12 },
+    "reviewerRegistryCanonicalSha256": { "$ref": "#/$defs/sha256" },
+    "decisionId": { "type": "string", "minLength": 12 },
+    "deliveryEvidence": { "$ref": "#/$defs/deliveryEvidence" },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "cohorts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/cohort" }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/page" }
+    },
+    "applicabilityReceipts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/applicabilityReceipt" }
+    },
+    "edges": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/edge" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "date": { "type": "string", "format": "date" },
+    "nullableDate": {
+      "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }]
+    },
+    "nodeId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*:[a-z0-9][a-z0-9._:-]*$"
+    },
+    "edgeId": {
+      "type": "string",
+      "pattern": "^edge:[a-z0-9][a-z0-9._:-]*$"
+    },
+    "receiptId": {
+      "type": "string",
+      "pattern": "^receipt:[a-z0-9][a-z0-9._:-]*$"
+    },
+    "stringList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "possiblyEmptyStringList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "riskDomainList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "standard",
+          "pathogen",
+          "biosecurity",
+          "pesticide",
+          "electrical",
+          "fire_safety",
+          "hvac_safety",
+          "co2_safety",
+          "chemical_safety"
+        ]
+      }
+    },
+    "deliveryEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "publicationStatus",
+        "renderedCrawlStatus",
+        "productionStatus",
+        "releaseAuthorization"
+      ],
+      "properties": {
+        "publicationStatus": { "const": "NOT_MEASURED" },
+        "renderedCrawlStatus": { "const": "NOT_MEASURED" },
+        "productionStatus": { "const": "NOT_MEASURED" },
+        "releaseAuthorization": { "const": "NOT_AUTHORIZED" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "publicationStatus", "indexingIntent"],
+      "properties": {
+        "path": {
+          "oneOf": [
+            { "const": "/guides" },
+            {
+              "type": "string",
+              "pattern": "^/(?:guides|cultivars)/[a-z0-9]+(?:-[a-z0-9]+)*$"
+            }
+          ]
+        },
+        "publicationStatus": { "const": "NOT_MEASURED" },
+        "indexingIntent": { "const": "index" }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "label", "description", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nodeId" },
+        "type": { "$ref": "#/$defs/nodeType" },
+        "label": { "type": "string", "minLength": 2 },
+        "description": { "type": "string", "minLength": 8 },
+        "status": { "const": "active" },
+        "route": { "$ref": "#/$defs/route" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeId",
+        "url",
+        "evidenceTier",
+        "accessedOn",
+        "stableIdentifier",
+        "limitations"
+      ],
+      "properties": {
+        "nodeId": { "type": "string", "pattern": "^source:[a-z0-9][a-z0-9._:-]*$" },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "evidenceTier": { "enum": ["A", "B", "C", "D"] },
+        "accessedOn": { "$ref": "#/$defs/date" },
+        "stableIdentifier": { "type": "string", "minLength": 3 },
+        "limitations": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sourcePullRequest", "paths", "sourceIds", "materialClaimIds"],
+      "properties": {
+        "id": { "type": "string", "minLength": 3 },
+        "sourcePullRequest": { "type": "integer", "minimum": 1 },
+        "paths": { "$ref": "#/$defs/stringList" },
+        "sourceIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^source:[a-z0-9][a-z0-9._:-]*$" }
+        },
+        "materialClaimIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^claim:[a-z0-9][a-z0-9._:-]*$" }
+        }
+      }
+    },
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "sha256"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeId",
+        "scope",
+        "summary",
+        "riskClass",
+        "riskDomains",
+        "evidenceState",
+        "sourceIds",
+        "limitations",
+        "material"
+      ],
+      "properties": {
+        "nodeId": { "type": "string", "pattern": "^claim:[a-z0-9][a-z0-9._:-]*$" },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": { "enum": ["page", "cohort"] },
+            "id": { "type": "string", "minLength": 1 }
+          }
+        },
+        "summary": { "type": "string", "minLength": 12 },
+        "riskClass": { "$ref": "#/$defs/riskClass" },
+        "riskDomains": { "$ref": "#/$defs/riskDomainList" },
+        "evidenceState": {
+          "enum": [
+            "measured",
+            "supported",
+            "source_reported",
+            "field_tendency",
+            "hypothesis",
+            "unknown",
+            "disputed"
+          ]
+        },
+        "sourceIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^source:[a-z0-9][a-z0-9._:-]*$" }
+        },
+        "limitations": { "$ref": "#/$defs/stringList" },
+        "material": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/material" }
+        }
+      }
+    },
+    "slot": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "edgeIds", "receiptId"],
+          "properties": {
+            "status": { "const": "required" },
+            "edgeIds": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/edgeId" }
+            },
+            "receiptId": { "type": "null" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "edgeIds", "receiptId"],
+          "properties": {
+            "status": { "const": "not_applicable" },
+            "edgeIds": { "type": "array", "maxItems": 0 },
+            "receiptId": { "$ref": "#/$defs/receiptId" }
+          }
+        }
+      ]
+    },
+    "slots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "breadcrumb",
+        "collectionChild",
+        "prerequisite",
+        "contextualLateral",
+        "nextStep",
+        "differential"
+      ],
+      "properties": {
+        "breadcrumb": { "$ref": "#/$defs/slot" },
+        "collectionChild": { "$ref": "#/$defs/slot" },
+        "prerequisite": { "$ref": "#/$defs/slot" },
+        "contextualLateral": { "$ref": "#/$defs/slot" },
+        "nextStep": { "$ref": "#/$defs/slot" },
+        "differential": { "$ref": "#/$defs/slot" }
+      }
+    },
+    "linkDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "path", "edgeId", "slot"],
+      "properties": {
+        "location": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/" },
+        "edgeId": { "$ref": "#/$defs/edgeId" },
+        "slot": {
+          "enum": [
+            "collection_child",
+            "prerequisite",
+            "contextual_lateral",
+            "next_step",
+            "differential",
+            "supplemental"
+          ]
+        }
+      }
+    },
+    "sourceDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "href", "sourceId", "claimIds"],
+      "properties": {
+        "location": { "type": "string", "minLength": 1 },
+        "href": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "sourceId": { "$ref": "#/$defs/nodeId" },
+        "claimIds": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeId",
+        "cohortId",
+        "path",
+        "slug",
+        "pageFamily",
+        "riskClass",
+        "riskDomains",
+        "publishedOn",
+        "modifiedOn",
+        "slots",
+        "claimIds",
+        "linkDecisions",
+        "sourceDecisions"
+      ],
+      "properties": {
+        "nodeId": { "$ref": "#/$defs/nodeId" },
+        "cohortId": { "type": "string", "minLength": 3 },
+        "path": { "type": "string", "pattern": "^/guides/" },
+        "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "pageFamily": { "enum": ["cluster", "reference", "diagnostic"] },
+        "riskClass": { "$ref": "#/$defs/riskClass" },
+        "riskDomains": { "$ref": "#/$defs/riskDomainList" },
+        "publishedOn": { "$ref": "#/$defs/date" },
+        "modifiedOn": { "$ref": "#/$defs/date" },
+        "slots": { "$ref": "#/$defs/slots" },
+        "claimIds": { "$ref": "#/$defs/stringList" },
+        "linkDecisions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/linkDecision" }
+        },
+        "sourceDecisions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/sourceDecision" }
+        }
+      }
+    },
+    "applicabilityReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "pageId", "slot", "reason", "reviewerId", "reviewedOn"],
+      "properties": {
+        "id": { "$ref": "#/$defs/receiptId" },
+        "pageId": { "$ref": "#/$defs/nodeId" },
+        "slot": {
+          "enum": [
+            "breadcrumb",
+            "collectionChild",
+            "prerequisite",
+            "contextualLateral",
+            "nextStep",
+            "differential"
+          ]
+        },
+        "reason": { "type": "string", "minLength": 12 },
+        "reviewerId": {
+          "type": "string",
+          "pattern": "^reviewer:[a-z0-9][a-z0-9._:-]*$"
+        },
+        "reviewedOn": { "$ref": "#/$defs/date" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "sourceId",
+        "sourceType",
+        "targetId",
+        "targetType",
+        "cardinality",
+        "symmetric",
+        "status",
+        "effectiveFrom",
+        "effectiveThrough",
+        "provenance"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/edgeId" },
+        "type": {
+          "enum": [
+            "parent_of",
+            "requires",
+            "next_step",
+            "measured_by",
+            "uses_unit",
+            "derived_from",
+            "observed_as",
+            "mimics",
+            "differential_of",
+            "confirmed_by",
+            "disconfirmed_by",
+            "managed_by",
+            "occurs_during",
+            "affects",
+            "applies_to",
+            "has_lineage_claim",
+            "has_observed_trait",
+            "supported_by",
+            "authored_by",
+            "reviewed_by",
+            "uses_method",
+            "observed_in",
+            "observes",
+            "has_phenotype",
+            "grown_in",
+            "produced_outcome",
+            "has_capability",
+            "exposes_capability",
+            "integrates_with",
+            "valid_in",
+            "logged_as",
+            "next_action",
+            "supersedes",
+            "related_to"
+          ]
+        },
+        "sourceId": { "$ref": "#/$defs/nodeId" },
+        "sourceType": {
+          "$ref": "#/$defs/nodeType"
+        },
+        "targetId": { "$ref": "#/$defs/nodeId" },
+        "targetType": {
+          "$ref": "#/$defs/nodeType"
+        },
+        "cardinality": {
+          "enum": ["one_to_one", "one_to_many", "many_to_one", "many_to_many"]
+        },
+        "symmetric": { "type": "boolean" },
+        "status": { "const": "active" },
+        "effectiveFrom": { "$ref": "#/$defs/nullableDate" },
+        "effectiveThrough": { "$ref": "#/$defs/nullableDate" },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["claimIds", "sourceIds", "reviewerIds", "limitations"],
+          "properties": {
+            "claimIds": { "$ref": "#/$defs/possiblyEmptyStringList" },
+            "sourceIds": { "$ref": "#/$defs/possiblyEmptyStringList" },
+            "reviewerIds": { "$ref": "#/$defs/possiblyEmptyStringList" },
+            "limitations": { "$ref": "#/$defs/stringList" }
+          }
+        }
+      }
+    },
+    "nodeType": {
+      "enum": [
+        "Topic",
+        "Cultivar",
+        "Stage",
+        "Metric",
+        "Sensor",
+        "Symptom",
+        "Condition",
+        "Protocol",
+        "Equipment",
+        "EvidenceSource",
+        "ProductAction",
+        "Claim",
+        "Author",
+        "Reviewer",
+        "Method",
+        "Observation",
+        "Run",
+        "Phenotype",
+        "Trait",
+        "Medium",
+        "Facility",
+        "Unit",
+        "Outcome",
+        "Jurisdiction",
+        "Capability",
+        "Integration"
+      ]
+    },
+    "riskClass": {
+      "enum": ["R0", "R1", "R2", "R3"]
+    }
+  }
+}

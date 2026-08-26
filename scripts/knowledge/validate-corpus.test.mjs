@@ -217,6 +217,11 @@ function makeFixture() {
             edgeIds: ["edge:root-alpha-parent"],
             receiptId: null,
           },
+          collectionChild: {
+            status: "not_applicable",
+            edgeIds: [],
+            receiptId: "receipt:alpha-collection-child",
+          },
           prerequisite: {
             status: "required",
             edgeIds: ["edge:alpha-guides-requires"],
@@ -277,6 +282,14 @@ function makeFixture() {
     ],
     applicabilityReceipts: [
       {
+        id: "receipt:alpha-collection-child",
+        pageId: "topic:alpha",
+        slot: "collectionChild",
+        reason: "This reference fixture is not a collection parent.",
+        reviewerId: REVIEWER_ID,
+        reviewedOn: "2026-08-26",
+      },
+      {
         id: "receipt:alpha-differential",
         pageId: "topic:alpha",
         slot: "differential",
@@ -325,7 +338,9 @@ function makeAllRequiredFixture() {
     edgeIds: differentials.map(([id]) => `edge:alpha-${id.split(":")[1]}-differential`),
     receiptId: null,
   };
-  corpus.applicabilityReceipts = [];
+  corpus.applicabilityReceipts = corpus.applicabilityReceipts.filter(
+    (receipt) => receipt.id === "receipt:alpha-collection-child",
+  );
 
   for (const [index, [nodeId, path, label]] of differentials.entries()) {
     corpus.nodes.push({ ...routeNode(nodeId, path, label), type: "Condition" });
@@ -372,6 +387,66 @@ function refreshPageMaterial(fixture) {
   pageClaim.material = projectedGuide.material.map(({ key, sha256 }) => ({ key, sha256 }));
 }
 
+function makeEditorialCandidateFixture() {
+  const fixture = makeFixture();
+  fixture.mode = "editorial_candidate";
+  fixture.publishedPaths = [];
+  fixture.corpus.artifactType = "knowledge_repository_corpus_candidate";
+  fixture.corpus.deliveryEvidence = {
+    publicationStatus: "NOT_MEASURED",
+    renderedCrawlStatus: "NOT_MEASURED",
+    productionStatus: "NOT_MEASURED",
+    releaseAuthorization: "NOT_AUTHORIZED",
+  };
+  for (const node of fixture.corpus.nodes) {
+    if (!node.route) continue;
+    node.route.publicationStatus = "NOT_MEASURED";
+    node.route.indexingIntent = "index";
+    delete node.route.indexing;
+  }
+  return fixture;
+}
+
+function makeClusterFixture() {
+  const fixture = makeFixture();
+  const page = fixture.corpus.pages[0];
+  page.pageFamily = "cluster";
+  page.slots.collectionChild = {
+    status: "required",
+    edgeIds: ["edge:alpha-beta-parent", "edge:alpha-gamma-parent"],
+    receiptId: null,
+  };
+  page.slots.contextualLateral = {
+    status: "not_applicable",
+    edgeIds: [],
+    receiptId: "receipt:alpha-contextual-lateral",
+  };
+  fixture.corpus.applicabilityReceipts = fixture.corpus.applicabilityReceipts.filter(
+    (receipt) => receipt.id !== "receipt:alpha-collection-child",
+  );
+  addApplicabilityReceipt(fixture, "contextualLateral", "contextual-lateral");
+  fixture.corpus.edges = fixture.corpus.edges.filter(
+    (candidate) =>
+      candidate.id !== "edge:alpha-beta-related" && candidate.id !== "edge:alpha-gamma-related",
+  );
+  fixture.corpus.edges.push(
+    editorialEdge("edge:alpha-beta-parent", "parent_of", "topic:alpha", "topic:beta"),
+    editorialEdge("edge:alpha-gamma-parent", "parent_of", "topic:alpha", "topic:gamma"),
+  );
+  for (const decision of page.linkDecisions) {
+    if (decision.path === "/guides/beta") {
+      decision.edgeId = "edge:alpha-beta-parent";
+      decision.slot = "collection_child";
+    }
+    if (decision.path === "/guides/gamma") {
+      decision.edgeId = "edge:alpha-gamma-parent";
+      decision.slot = "collection_child";
+    }
+  }
+  sortFixture(fixture);
+  return fixture;
+}
+
 function sortFixture(fixture) {
   fixture.corpus.nodes.sort((left, right) =>
     left.id < right.id ? -1 : left.id > right.id ? 1 : 0,
@@ -380,6 +455,9 @@ function sortFixture(fixture) {
     left.nodeId < right.nodeId ? -1 : left.nodeId > right.nodeId ? 1 : 0,
   );
   fixture.corpus.edges.sort((left, right) =>
+    left.id < right.id ? -1 : left.id > right.id ? 1 : 0,
+  );
+  fixture.corpus.applicabilityReceipts.sort((left, right) =>
     left.id < right.id ? -1 : left.id > right.id ? 1 : 0,
   );
   fixture.registryPaths.sort();
@@ -536,6 +614,82 @@ test("accepts one connected nonempty synthetic corpus", () => {
     renderedExternalSourceCount: 1,
     maximumRootDepth: 1,
   });
+});
+
+test("accepts an editorial candidate without manufacturing publication evidence", () => {
+  const result = validateRepositoryCorpus(makeEditorialCandidateFixture());
+  assert.equal(result.status, "pass");
+  assert.equal(result.validationMode, "editorial_candidate");
+  assert.equal(result.publicationStatus, "NOT_MEASURED");
+  assert.equal(result.renderedCrawlStatus, "NOT_MEASURED");
+  assert.equal(result.productionStatus, "NOT_MEASURED");
+  assert.equal(result.releaseAuthorization, "NOT_AUTHORIZED");
+});
+
+test("rejects candidate artifacts that assert delivery or effective indexing", () => {
+  const deliveryFixture = makeEditorialCandidateFixture();
+  deliveryFixture.corpus.deliveryEvidence.publicationStatus = "published";
+  assert.throws(
+    () => validateRepositoryCorpus(deliveryFixture),
+    /delivery evidence must remain NOT_MEASURED and NOT_AUTHORIZED/,
+  );
+
+  const indexingFixture = makeEditorialCandidateFixture();
+  const pageNode = indexingFixture.corpus.nodes.find((node) => node.id === "topic:alpha");
+  pageNode.route.indexing = "index";
+  assert.throws(
+    () => validateRepositoryCorpus(indexingFixture),
+    /cannot assert effective indexing/,
+  );
+
+  const measurementFixture = makeEditorialCandidateFixture();
+  measurementFixture.corpus.measurementStatus = "PASS";
+  assert.throws(
+    () => validateRepositoryCorpus(measurementFixture),
+    /cannot assert top-level measurementStatus/,
+  );
+});
+
+test("models cluster children separately from the single next step", () => {
+  const fixture = makeClusterFixture();
+  const result = validateRepositoryCorpus(fixture);
+  assert.equal(result.status, "pass");
+  assert.deepEqual(fixture.corpus.pages[0].slots.collectionChild.edgeIds, [
+    "edge:alpha-beta-parent",
+    "edge:alpha-gamma-parent",
+  ]);
+  assert.equal(
+    fixture.corpus.pages[0].linkDecisions.filter((decision) => decision.slot === "collection_child")
+      .length,
+    2,
+  );
+  assert.equal(
+    fixture.corpus.pages[0].linkDecisions.filter((decision) => decision.slot === "next_step")
+      .length,
+    1,
+  );
+});
+
+test("rejects reversed collection children and child links masquerading as next steps", () => {
+  const reversed = makeClusterFixture();
+  const childEdge = reversed.corpus.edges.find(
+    (candidate) => candidate.id === "edge:alpha-beta-parent",
+  );
+  [childEdge.sourceId, childEdge.targetId] = [childEdge.targetId, childEdge.sourceId];
+  assert.throws(
+    () => validateRepositoryCorpus(reversed),
+    /collection-child edge .* must start at the page|parent_of (?:graph|target)/,
+  );
+
+  const masquerading = makeClusterFixture();
+  const childDecision = masquerading.corpus.pages[0].linkDecisions.find(
+    (decision) => decision.slot === "collection_child",
+  );
+  childDecision.slot = "next_step";
+  assert.throws(
+    () => validateRepositoryCorpus(masquerading),
+    /next_step link .* outside its selected nextStep slot|requires exactly one rendered collection_child decision/,
+  );
 });
 
 test("projects every dynamic visible guide field into deterministic material receipts", () => {
@@ -1009,11 +1163,12 @@ test("rejects rendered links without exact decisions and edges", () => {
   }, /supplemental link .* cannot substitute for selected/);
 });
 
-test("accepts an all-required corpus with zero applicability receipts", () => {
+test("accepts a diagnostic corpus with its reviewed collection-child waiver", () => {
   const fixture = makeAllRequiredFixture();
   const result = validateRepositoryCorpus(fixture);
   assert.equal(result.status, "pass");
-  assert.equal(fixture.corpus.applicabilityReceipts.length, 0);
+  assert.equal(fixture.corpus.applicabilityReceipts.length, 1);
+  assert.equal(fixture.corpus.applicabilityReceipts[0].slot, "collectionChild");
   assert.equal(result.renderedInternalLinkCount, 7);
 });
 

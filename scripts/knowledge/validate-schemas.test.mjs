@@ -65,6 +65,291 @@ function freshDocuments() {
   );
 }
 
+function promotionDecisionSchemaFixture() {
+  const digest = "a".repeat(64);
+  const people = ["author", "cultivation", "editor", "evidence"].map((role) => ({
+    id: `person:${role}`,
+    displayName: `${role} reviewer`,
+    qualifications: ["Synthetic schema-validation qualification."],
+    conflictStatus: "none",
+    conflictDisclosure: "No conflict disclosed for this synthetic schema fixture.",
+  }));
+  return {
+    version: 1,
+    artifactType: "knowledge_corpus_promotion_decision",
+    decisionId: "decision:synthetic:1",
+    reviewerRegistryId: "registry:synthetic-reviewers-v1",
+    reviewerRegistryCanonicalSha256: digest,
+    sourceRevisionId: "revision:source:1",
+    sourcePacketCanonicalSha256: digest,
+    successorRevisionId: "revision:successor:2",
+    successorPacketCanonicalSha256: digest,
+    supersedesRevisionId: "revision:source:1",
+    candidateCorpusCanonicalSha256: digest,
+    decisionStatus: "approved_for_candidate_admission",
+    decidedOn: "2026-08-26",
+    people,
+    roleAssignments: {
+      managingEditorId: "person:editor",
+      authorIds: ["person:author"],
+      evidenceReviewerIds: ["person:evidence"],
+      cultivationReviewerIds: ["person:cultivation"],
+    },
+    aiVerification: {
+      verifierId: "person:evidence",
+      decision: "verified",
+      verifiedOn: "2026-08-26",
+      nextReviewOn: "2027-08-26",
+      limitations: ["Synthetic schema fixture only."],
+    },
+    claimApprovals: [
+      {
+        claimId: "claim:synthetic:1",
+        claimCanonicalSha256: digest,
+        decision: "approved",
+        evidenceReviewerId: "person:evidence",
+        cultivationReviewerId: "person:cultivation",
+        approvedOn: "2026-08-26",
+        nextReviewOn: "2027-08-26",
+        limitations: ["Synthetic schema fixture only."],
+      },
+    ],
+    sourceVerifications: [
+      {
+        sourceId: "source:synthetic:1",
+        sourceCanonicalSha256: digest,
+        reviewerId: "person:evidence",
+        verifiedOn: "2026-08-26",
+        nextReviewOn: "2027-08-26",
+        authorshipStatus: "verified",
+        publicationDateStatus: "verified",
+        licenseDisposition: "link_only",
+        correctionStatus: "checked_current",
+        retractionStatus: "not_retracted",
+        limitations: ["Synthetic schema fixture only."],
+      },
+    ],
+    pageReviews: [
+      {
+        path: "/guides/synthetic",
+        ownerId: "person:author",
+        runtimeGuideSha256: digest,
+        visibleSourceIds: ["source:synthetic:1"],
+        linkManifest: [
+          {
+            location: "sections.0.links.0",
+            path: "/guides/synthetic-child",
+            slot: "collection_child",
+            decision: "approved",
+            reviewerId: "person:editor",
+            reviewedOn: "2026-08-26",
+            limitations: ["Synthetic schema fixture only."],
+          },
+        ],
+        searchResearch: {
+          receiptId: "search:synthetic:1",
+          querySetSha256: digest,
+          capturedOn: "2026-08-26",
+          reviewerId: "person:evidence",
+          source: "Authenticated search-research export",
+          limitations: ["Synthetic schema fixture only."],
+        },
+        originalAsset: {
+          receiptId: "asset:synthetic:1",
+          artifactSha256: digest,
+          creatorId: "person:author",
+          reviewerId: "person:evidence",
+          method: "Synthetic original asset method.",
+          provenance: "Synthetic original asset provenance.",
+          licenseDisposition: "owned",
+          reviewedOn: "2026-08-26",
+        },
+        reviewedOn: "2026-08-26",
+        nextReviewOn: "2027-08-26",
+      },
+    ],
+  };
+}
+
+function repositoryCandidateSchemaFixture() {
+  const digest = "a".repeat(64);
+  const reviewerId = "reviewer:synthetic-editor";
+  const makeReceipt = (slot) => ({
+    id: `receipt:synthetic-${slot.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`,
+    pageId: "topic:synthetic",
+    slot,
+    reason: `The synthetic schema fixture does not use the ${slot} slot.`,
+    reviewerId,
+    reviewedOn: "2026-08-26",
+  });
+  const receipts = ["collectionChild", "prerequisite", "contextualLateral", "differential"].map(
+    makeReceipt,
+  );
+  const receiptBySlot = new Map(receipts.map((receipt) => [receipt.slot, receipt]));
+  const requiredSlot = (edgeId) => ({ status: "required", edgeIds: [edgeId], receiptId: null });
+  const notApplicableSlot = (slot) => ({
+    status: "not_applicable",
+    edgeIds: [],
+    receiptId: receiptBySlot.get(slot).id,
+  });
+  const makeEdge = (id, type, sourceId, targetId) => ({
+    id,
+    type,
+    sourceId,
+    sourceType: "Topic",
+    targetId,
+    targetType: "Topic",
+    cardinality: type === "parent_of" ? "one_to_many" : "many_to_many",
+    symmetric: false,
+    status: "active",
+    effectiveFrom: null,
+    effectiveThrough: null,
+    provenance: {
+      claimIds: [],
+      sourceIds: [],
+      reviewerIds: [reviewerId],
+      limitations: ["Synthetic schema fixture only."],
+    },
+  });
+  return {
+    version: 1,
+    artifactType: "knowledge_repository_corpus_candidate",
+    artifactScope: "Synthetic prepublication candidate schema fixture.",
+    rootNodeId: "topic:guides",
+    sourceRevisionId: "revision:source:1",
+    sourcePacketCanonicalSha256: digest,
+    successorRevisionId: "revision:successor:2",
+    successorPacketCanonicalSha256: digest,
+    reviewerRegistryId: "registry:synthetic-reviewers-v1",
+    reviewerRegistryCanonicalSha256: digest,
+    decisionId: "decision:synthetic:1",
+    deliveryEvidence: {
+      publicationStatus: "NOT_MEASURED",
+      renderedCrawlStatus: "NOT_MEASURED",
+      productionStatus: "NOT_MEASURED",
+      releaseAuthorization: "NOT_AUTHORIZED",
+    },
+    nodes: [
+      {
+        id: "topic:guides",
+        type: "Topic",
+        label: "Guides",
+        description: "Synthetic guide collection root.",
+        status: "active",
+        route: { path: "/guides", publicationStatus: "NOT_MEASURED", indexingIntent: "index" },
+      },
+      {
+        id: "topic:synthetic",
+        type: "Topic",
+        label: "Synthetic guide",
+        description: "Synthetic candidate page node.",
+        status: "active",
+        route: {
+          path: "/guides/synthetic",
+          publicationStatus: "NOT_MEASURED",
+          indexingIntent: "index",
+        },
+      },
+      {
+        id: "topic:daily-log",
+        type: "Topic",
+        label: "Daily log",
+        description: "Synthetic next-step destination.",
+        status: "active",
+      },
+      {
+        id: "source:synthetic:1",
+        type: "EvidenceSource",
+        label: "Synthetic source",
+        description: "Synthetic evidence-source node.",
+        status: "active",
+      },
+      {
+        id: "claim:synthetic:1",
+        type: "Claim",
+        label: "Synthetic claim",
+        description: "Synthetic material claim node.",
+        status: "active",
+      },
+    ],
+    sources: [
+      {
+        nodeId: "source:synthetic:1",
+        url: "https://example.com/synthetic-source",
+        evidenceTier: "A",
+        accessedOn: "2026-08-26",
+        stableIdentifier: "example:synthetic-source",
+        limitations: ["Synthetic schema fixture only."],
+      },
+    ],
+    cohorts: [
+      {
+        id: "cohort:synthetic:1",
+        sourcePullRequest: 1,
+        paths: ["/guides/synthetic"],
+        sourceIds: ["source:synthetic:1"],
+        materialClaimIds: ["claim:synthetic:1"],
+      },
+    ],
+    claims: [
+      {
+        nodeId: "claim:synthetic:1",
+        scope: { type: "page", id: "topic:synthetic" },
+        summary: "Synthetic material claim for schema validation.",
+        riskClass: "R2",
+        riskDomains: ["standard"],
+        evidenceState: "supported",
+        sourceIds: ["source:synthetic:1"],
+        limitations: ["Synthetic schema fixture only."],
+        material: [{ key: "body", sha256: digest }],
+      },
+    ],
+    pages: [
+      {
+        nodeId: "topic:synthetic",
+        cohortId: "cohort:synthetic:1",
+        path: "/guides/synthetic",
+        slug: "synthetic",
+        pageFamily: "cluster",
+        riskClass: "R2",
+        riskDomains: ["standard"],
+        publishedOn: "2026-08-26",
+        modifiedOn: "2026-08-26",
+        slots: {
+          breadcrumb: requiredSlot("edge:guides-synthetic"),
+          collectionChild: notApplicableSlot("collectionChild"),
+          prerequisite: notApplicableSlot("prerequisite"),
+          contextualLateral: notApplicableSlot("contextualLateral"),
+          nextStep: requiredSlot("edge:synthetic-daily-log"),
+          differential: notApplicableSlot("differential"),
+        },
+        claimIds: ["claim:synthetic:1"],
+        linkDecisions: [
+          {
+            location: "nextStep.path",
+            path: "/daily-log",
+            edgeId: "edge:synthetic-daily-log",
+            slot: "next_step",
+          },
+        ],
+        sourceDecisions: [
+          {
+            location: "externalSources.0.href",
+            href: "https://example.com/synthetic-source",
+            sourceId: "source:synthetic:1",
+            claimIds: ["claim:synthetic:1"],
+          },
+        ],
+      },
+    ],
+    applicabilityReceipts: receipts,
+    edges: [
+      makeEdge("edge:guides-synthetic", "parent_of", "topic:guides", "topic:synthetic"),
+      makeEdge("edge:synthetic-daily-log", "next_step", "topic:synthetic", "topic:daily-log"),
+    ],
+  };
+}
+
 function markdownTableRows(section) {
   return section
     .split(/\r?\n/)
@@ -1642,9 +1927,9 @@ test("rejects an equipment source contract that permits an empty subset", () => 
   );
 });
 
-test("strictly compiles all six Draft 2020-12 schemas with formats", () => {
+test("strictly compiles all eight Draft 2020-12 schemas with formats", () => {
   const compiled = compileSchemaDocuments(freshDocuments());
-  assert.equal(compiled.validators.size, 6);
+  assert.equal(compiled.validators.size, 8);
   for (const [fileName, validator] of compiled.validators) {
     assert.equal(typeof validator, "function", `${fileName} must compile to a validator`);
   }
@@ -3116,4 +3401,55 @@ test("requires ProductAction graph identity for next_action reciprocity", () => 
     () => validateSchemaDocuments(documents),
     /common productAction must require nodeId/,
   );
+});
+
+test("compiles strict promotion-decision receipts and rejects invented delivery state", () => {
+  const validator = getValidator("corpus-promotion-decision.schema.json");
+  const decision = promotionDecisionSchemaFixture();
+  assert.equal(validator(decision), true, JSON.stringify(validator.errors));
+
+  const unknownField = structuredClone(decision);
+  unknownField.publicationStatus = "PASS";
+  assert.equal(validator(unknownField), false);
+
+  const unsafeSource = structuredClone(decision);
+  unsafeSource.sourceVerifications[0].retractionStatus = "unchecked";
+  assert.equal(validator(unsafeSource), false);
+
+  const weakLink = structuredClone(decision);
+  weakLink.pageReviews[0].linkManifest[0].slot = "next_step";
+  weakLink.pageReviews[0].linkManifest.push({
+    ...weakLink.pageReviews[0].linkManifest[0],
+    location: "sections.0.links.1",
+  });
+  assert.equal(validator(weakLink), true, JSON.stringify(validator.errors));
+});
+
+test("keeps repository candidates prepublication and release-unauthorized", () => {
+  const validator = getValidator("repository-corpus-candidate.schema.json");
+  const candidate = repositoryCandidateSchemaFixture();
+  assert.equal(validator(candidate), true, JSON.stringify(validator.errors));
+
+  const published = structuredClone(candidate);
+  published.deliveryEvidence.publicationStatus = "published";
+  assert.equal(validator(published), false);
+
+  const authorized = structuredClone(candidate);
+  authorized.deliveryEvidence.releaseAuthorization = "AUTHORIZED";
+  assert.equal(validator(authorized), false);
+
+  const inventedReceipt = structuredClone(candidate);
+  inventedReceipt.measurementStatus = "PASS";
+  assert.equal(validator(inventedReceipt), false);
+});
+
+test("keeps strict candidate vocabularies aligned with the canonical common schema", () => {
+  const documents = freshDocuments();
+  const common = documents.get("common.schema.json");
+  const candidate = documents.get("repository-corpus-candidate.schema.json");
+
+  assert.deepEqual(candidate.$defs.nodeType.enum, common.$defs.nodeType.enum);
+  assert.deepEqual(candidate.$defs.riskClass.enum, common.$defs.riskClass.enum);
+  assert.deepEqual(candidate.$defs.riskDomainList.items.enum, common.$defs.riskDomain.enum);
+  assert.deepEqual(candidate.$defs.edge.properties.type.enum, common.$defs.edgeType.enum);
 });

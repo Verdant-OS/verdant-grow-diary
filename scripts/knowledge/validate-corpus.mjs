@@ -43,8 +43,9 @@ const PAGE_FAMILIES = new Set([
   "profile",
   "governance",
 ]);
-const SUPPORTED_FOUNDATION_PAGE_FAMILIES = new Set(["reference", "diagnostic"]);
+const SUPPORTED_FOUNDATION_PAGE_FAMILIES = new Set(["cluster", "reference", "diagnostic"]);
 const FOUNDATION_REQUIRED_SLOTS = Object.freeze({
+  cluster: new Set(["breadcrumb", "collectionChild", "nextStep"]),
   reference: new Set(["breadcrumb", "contextualLateral", "nextStep"]),
   diagnostic: new Set(["breadcrumb", "contextualLateral", "nextStep", "differential"]),
 });
@@ -87,6 +88,7 @@ const NODE_TYPE_PREFIX = Object.freeze({
 });
 const SLOT_NAMES = Object.freeze([
   "breadcrumb",
+  "collectionChild",
   "prerequisite",
   "contextualLateral",
   "nextStep",
@@ -94,6 +96,7 @@ const SLOT_NAMES = Object.freeze([
 ]);
 const SLOT_EDGE_TYPES = Object.freeze({
   breadcrumb: new Set(["parent_of"]),
+  collectionChild: new Set(["parent_of"]),
   prerequisite: new Set(["requires"]),
   contextualLateral: new Set([
     "measured_by",
@@ -122,6 +125,7 @@ const SLOT_EDGE_TYPES = Object.freeze({
   differential: new Set(["differential_of", "mimics"]),
 });
 const LINK_DECISION_TO_PAGE_SLOT = Object.freeze({
+  collection_child: "collectionChild",
   prerequisite: "prerequisite",
   contextual_lateral: "contextualLateral",
   next_step: "nextStep",
@@ -355,16 +359,53 @@ export function projectResolvedGuide(guide) {
   };
 }
 
-function validateCorpusHeader(corpus) {
+function validateCorpusHeader(corpus, mode) {
   requireRecord(corpus, "repository corpus");
-  if (corpus.version !== 1 || corpus.artifactType !== "knowledge_repository_corpus") {
-    fail("repository corpus must declare version 1 and artifactType knowledge_repository_corpus");
+  const expectedArtifactType =
+    mode === "editorial_candidate"
+      ? "knowledge_repository_corpus_candidate"
+      : "knowledge_repository_corpus";
+  if (corpus.version !== 1 || corpus.artifactType !== expectedArtifactType) {
+    fail(`repository corpus must declare version 1 and artifactType ${expectedArtifactType}`);
   }
   requireString(corpus.artifactScope, "repository corpus artifactScope", { minLength: 20 });
   requireNodeId(corpus.rootNodeId, "repository corpus rootNodeId");
+  if (mode === "editorial_candidate") {
+    for (const forbiddenField of [
+      "publicationStatus",
+      "renderedCrawlStatus",
+      "productionStatus",
+      "deploymentStatus",
+      "measurementStatus",
+      "releaseAuthorization",
+    ]) {
+      if (forbiddenField in corpus) {
+        fail(`candidate corpus cannot assert top-level ${forbiddenField}`);
+      }
+    }
+    const delivery = requireRecord(corpus.deliveryEvidence, "candidate corpus deliveryEvidence");
+    const deliveryKeys = Object.keys(delivery).sort(compareBytes);
+    const expectedDeliveryKeys = [
+      "productionStatus",
+      "publicationStatus",
+      "releaseAuthorization",
+      "renderedCrawlStatus",
+    ];
+    if (!sameSet(deliveryKeys, new Set(expectedDeliveryKeys))) {
+      fail("candidate corpus deliveryEvidence must contain only the four unmeasured gate fields");
+    }
+    if (
+      delivery.publicationStatus !== "NOT_MEASURED" ||
+      delivery.renderedCrawlStatus !== "NOT_MEASURED" ||
+      delivery.productionStatus !== "NOT_MEASURED" ||
+      delivery.releaseAuthorization !== "NOT_AUTHORIZED"
+    ) {
+      fail("candidate corpus delivery evidence must remain NOT_MEASURED and NOT_AUTHORIZED");
+    }
+  }
 }
 
-function validateNodeRegistry(corpus, publishedPaths) {
+function validateNodeRegistry(corpus, eligiblePaths, mode) {
   const nodes = requireArray(corpus.nodes, "repository corpus nodes", { minItems: 1 });
   const nodeById = new Map();
   const nodeByPath = new Map();
@@ -387,11 +428,25 @@ function validateNodeRegistry(corpus, publishedPaths) {
       if (routePath !== "/guides" && !PUBLIC_KNOWLEDGE_PATH_PATTERN.test(routePath)) {
         fail(`node ${id} has a non-canonical public knowledge path`);
       }
-      if (node.route.publicationStatus !== "published" || node.route.indexing !== "index") {
+      if (mode === "editorial_candidate") {
+        if (
+          node.route.publicationStatus !== "NOT_MEASURED" ||
+          node.route.indexingIntent !== "index"
+        ) {
+          fail(`candidate node ${id} route must retain NOT_MEASURED publication and index intent`);
+        }
+        if ("indexing" in node.route) {
+          fail(`candidate node ${id} route cannot assert effective indexing`);
+        }
+      } else if (node.route.publicationStatus !== "published" || node.route.indexing !== "index") {
         fail(`node ${id} route must be published and indexable`);
       }
-      if (routePath !== "/guides" && !publishedPaths.has(routePath)) {
-        fail(`node ${id} route ${routePath} is not an approved published path`);
+      if (routePath !== "/guides" && !eligiblePaths.has(routePath)) {
+        fail(
+          mode === "editorial_candidate"
+            ? `node ${id} route ${routePath} is absent from the current registry`
+            : `node ${id} route ${routePath} is not an approved published path`,
+        );
       }
       if (nodeByPath.has(routePath)) {
         fail(`repository corpus repeats route path ${routePath}`);
@@ -1012,6 +1067,7 @@ function validateSlotAndLinkReciprocity({
         const forbidden = [...edgeById.values()].filter((edge) => {
           if (!SLOT_EDGE_TYPES[slotName].has(edge.type)) return false;
           if (slotName === "breadcrumb") return edge.targetId === page.nodeId;
+          if (slotName === "collectionChild") return edge.sourceId === page.nodeId;
           return edge.sourceId === page.nodeId || (edge.symmetric && edge.targetId === page.nodeId);
         });
         if (forbidden.length) {
@@ -1029,12 +1085,20 @@ function validateSlotAndLinkReciprocity({
           if (edge.targetId !== page.nodeId) {
             fail(`page ${page.nodeId} breadcrumb edge ${edgeId} must target the page`);
           }
+        } else if (slotName === "collectionChild") {
+          if (edge.sourceId !== page.nodeId) {
+            fail(`page ${page.nodeId} collection-child edge ${edgeId} must start at the page`);
+          }
         } else if (otherEndpoint(edge, page.nodeId) === null) {
           fail(`page ${page.nodeId} slot ${slotName} edge ${edgeId} is not incident to the page`);
         }
         usedEdges.add(edgeId);
         const destination =
-          slotName === "breadcrumb" ? edge.sourceId : otherEndpoint(edge, page.nodeId);
+          slotName === "breadcrumb"
+            ? edge.sourceId
+            : slotName === "collectionChild"
+              ? edge.targetId
+              : otherEndpoint(edge, page.nodeId);
         if (destination) {
           usedRouteNodeIds.add(destination);
           if (slotName !== "breadcrumb") {
@@ -1048,6 +1112,9 @@ function validateSlotAndLinkReciprocity({
       });
       if (slotName === "breadcrumb" && selectedEdges.length !== 1) {
         fail(`page ${page.nodeId} requires exactly one breadcrumb edge`);
+      }
+      if (slotName === "collectionChild" && selectedEdges.length < 1) {
+        fail(`page ${page.nodeId} requires at least one collection-child edge`);
       }
       if (slotName === "prerequisite" && selectedEdges.length !== 1) {
         fail(`page ${page.nodeId} requires exactly one prerequisite edge`);
@@ -1280,12 +1347,20 @@ export function validateRepositoryCorpus({
   resolvedGuides,
   registryPaths,
   publishedPaths,
+  mode = "published",
 }) {
-  validateCorpusHeader(corpus);
+  if (!new Set(["published", "editorial_candidate"]).has(mode)) {
+    fail(`repository corpus validation mode ${String(mode)} is unsupported`);
+  }
+  validateCorpusHeader(corpus, mode);
   const registryPathSet = new Set(registryPaths ?? []);
   const publishedPathSet = new Set(publishedPaths ?? []);
-  if (registryPathSet.size === 0 || publishedPathSet.size === 0) {
-    fail("repository corpus validation requires nonempty current and published path registries");
+  if (registryPathSet.size === 0 || (mode === "published" && publishedPathSet.size === 0)) {
+    fail(
+      mode === "editorial_candidate"
+        ? "candidate corpus validation requires a nonempty current path registry"
+        : "repository corpus validation requires nonempty current and published path registries",
+    );
   }
   for (const path of publishedPathSet) {
     if (!registryPathSet.has(path))
@@ -1300,7 +1375,8 @@ export function validateRepositoryCorpus({
     resolvedGuideByPath.set(guide.path, guide);
   }
 
-  const { nodeById, nodeByPath } = validateNodeRegistry(corpus, publishedPathSet);
+  const routeEligibilityPaths = mode === "editorial_candidate" ? registryPathSet : publishedPathSet;
+  const { nodeById, nodeByPath } = validateNodeRegistry(corpus, routeEligibilityPaths, mode);
   const sourceById = validateSources(corpus, nodeById);
   const cohortById = validateCohorts(corpus, cohortRegistry, sourceById);
   const claimById = validateClaims(corpus, nodeById, sourceById, cohortById);
@@ -1330,7 +1406,7 @@ export function validateRepositoryCorpus({
     resolvedGuideByPath,
   });
 
-  return {
+  const result = {
     status: "pass",
     evidenceScope: "semantic_contract_only",
     publicationStatus: "NOT_MEASURED",
@@ -1355,4 +1431,13 @@ export function validateRepositoryCorpus({
     ),
     maximumRootDepth: graph.maximumRootDepth,
   };
+  if (mode === "editorial_candidate") {
+    return {
+      ...result,
+      validationMode: "editorial_candidate",
+      productionStatus: "NOT_MEASURED",
+      releaseAuthorization: "NOT_AUTHORIZED",
+    };
+  }
+  return result;
 }

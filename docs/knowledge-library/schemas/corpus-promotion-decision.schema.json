@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdantgrowdiary.com/schemas/knowledge/corpus-promotion-decision.schema.json",
+  "title": "Verdant Knowledge Library corpus promotion decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "artifactType",
+    "decisionId",
+    "reviewerRegistryId",
+    "reviewerRegistryCanonicalSha256",
+    "sourceRevisionId",
+    "sourcePacketCanonicalSha256",
+    "successorRevisionId",
+    "successorPacketCanonicalSha256",
+    "supersedesRevisionId",
+    "candidateCorpusCanonicalSha256",
+    "decisionStatus",
+    "decidedOn",
+    "people",
+    "roleAssignments",
+    "aiVerification",
+    "claimApprovals",
+    "sourceVerifications",
+    "pageReviews"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "artifactType": { "const": "knowledge_corpus_promotion_decision" },
+    "decisionId": { "type": "string", "minLength": 12 },
+    "reviewerRegistryId": { "type": "string", "minLength": 12 },
+    "reviewerRegistryCanonicalSha256": { "$ref": "#/$defs/sha256" },
+    "sourceRevisionId": { "type": "string", "minLength": 12 },
+    "sourcePacketCanonicalSha256": { "$ref": "#/$defs/sha256" },
+    "successorRevisionId": { "type": "string", "minLength": 12 },
+    "successorPacketCanonicalSha256": { "$ref": "#/$defs/sha256" },
+    "supersedesRevisionId": { "type": "string", "minLength": 12 },
+    "candidateCorpusCanonicalSha256": { "$ref": "#/$defs/sha256" },
+    "decisionStatus": { "const": "approved_for_candidate_admission" },
+    "decidedOn": { "$ref": "#/$defs/date" },
+    "people": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/person" }
+    },
+    "roleAssignments": { "$ref": "#/$defs/roleAssignments" },
+    "aiVerification": { "$ref": "#/$defs/aiVerification" },
+    "claimApprovals": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/claimApproval" }
+    },
+    "sourceVerifications": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/sourceVerification" }
+    },
+    "pageReviews": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/pageReview" }
+    }
+  },
+  "$defs": {
+    "date": { "type": "string", "format": "date" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "stringList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "person": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "displayName", "qualifications", "conflictStatus", "conflictDisclosure"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string", "minLength": 2 },
+        "qualifications": { "$ref": "#/$defs/stringList" },
+        "conflictStatus": { "enum": ["none", "disclosed"] },
+        "conflictDisclosure": { "type": "string", "minLength": 8 }
+      }
+    },
+    "roleAssignments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "managingEditorId",
+        "authorIds",
+        "evidenceReviewerIds",
+        "cultivationReviewerIds"
+      ],
+      "properties": {
+        "managingEditorId": { "type": "string", "minLength": 1 },
+        "authorIds": { "$ref": "#/$defs/stringList" },
+        "evidenceReviewerIds": { "$ref": "#/$defs/stringList" },
+        "cultivationReviewerIds": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "aiVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verifierId", "decision", "verifiedOn", "nextReviewOn", "limitations"],
+      "properties": {
+        "verifierId": { "type": "string", "minLength": 1 },
+        "decision": { "const": "verified" },
+        "verifiedOn": { "$ref": "#/$defs/date" },
+        "nextReviewOn": { "$ref": "#/$defs/date" },
+        "limitations": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "claimApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claimId",
+        "claimCanonicalSha256",
+        "decision",
+        "evidenceReviewerId",
+        "cultivationReviewerId",
+        "approvedOn",
+        "nextReviewOn",
+        "limitations"
+      ],
+      "properties": {
+        "claimId": { "type": "string", "minLength": 1 },
+        "claimCanonicalSha256": { "$ref": "#/$defs/sha256" },
+        "decision": { "const": "approved" },
+        "evidenceReviewerId": { "type": "string", "minLength": 1 },
+        "cultivationReviewerId": { "type": "string", "minLength": 1 },
+        "approvedOn": { "$ref": "#/$defs/date" },
+        "nextReviewOn": { "$ref": "#/$defs/date" },
+        "limitations": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "sourceVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "sourceCanonicalSha256",
+        "reviewerId",
+        "verifiedOn",
+        "nextReviewOn",
+        "authorshipStatus",
+        "publicationDateStatus",
+        "licenseDisposition",
+        "correctionStatus",
+        "retractionStatus",
+        "limitations"
+      ],
+      "properties": {
+        "sourceId": { "type": "string", "minLength": 1 },
+        "sourceCanonicalSha256": { "$ref": "#/$defs/sha256" },
+        "reviewerId": { "type": "string", "minLength": 1 },
+        "verifiedOn": { "$ref": "#/$defs/date" },
+        "nextReviewOn": { "$ref": "#/$defs/date" },
+        "authorshipStatus": { "const": "verified" },
+        "publicationDateStatus": { "const": "verified" },
+        "licenseDisposition": { "enum": ["link_only", "licensed", "public_domain"] },
+        "correctionStatus": { "const": "checked_current" },
+        "retractionStatus": { "const": "not_retracted" },
+        "limitations": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "linkReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "location",
+        "path",
+        "slot",
+        "decision",
+        "reviewerId",
+        "reviewedOn",
+        "limitations"
+      ],
+      "properties": {
+        "location": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/" },
+        "slot": {
+          "enum": [
+            "breadcrumb",
+            "collection_child",
+            "contextual_lateral",
+            "differential",
+            "next_step",
+            "prerequisite",
+            "supplemental"
+          ]
+        },
+        "decision": { "const": "approved" },
+        "reviewerId": { "type": "string", "minLength": 1 },
+        "reviewedOn": { "$ref": "#/$defs/date" },
+        "limitations": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "searchResearch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receiptId",
+        "querySetSha256",
+        "capturedOn",
+        "reviewerId",
+        "source",
+        "limitations"
+      ],
+      "properties": {
+        "receiptId": { "type": "string", "minLength": 1 },
+        "querySetSha256": { "$ref": "#/$defs/sha256" },
+        "capturedOn": { "$ref": "#/$defs/date" },
+        "reviewerId": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 4 },
+        "limitations": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "originalAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receiptId",
+        "artifactSha256",
+        "creatorId",
+        "reviewerId",
+        "method",
+        "provenance",
+        "licenseDisposition",
+        "reviewedOn"
+      ],
+      "properties": {
+        "receiptId": { "type": "string", "minLength": 1 },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "creatorId": { "type": "string", "minLength": 1 },
+        "reviewerId": { "type": "string", "minLength": 1 },
+        "method": { "type": "string", "minLength": 8 },
+        "provenance": { "type": "string", "minLength": 8 },
+        "licenseDisposition": { "type": "string", "minLength": 4 },
+        "reviewedOn": { "$ref": "#/$defs/date" }
+      }
+    },
+    "pageReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "ownerId",
+        "runtimeGuideSha256",
+        "visibleSourceIds",
+        "linkManifest",
+        "searchResearch",
+        "originalAsset",
+        "reviewedOn",
+        "nextReviewOn"
+      ],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/guides/" },
+        "ownerId": { "type": "string", "minLength": 1 },
+        "runtimeGuideSha256": { "$ref": "#/$defs/sha256" },
+        "visibleSourceIds": { "$ref": "#/$defs/stringList" },
+        "linkManifest": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/linkReview" }
+        },
+        "searchResearch": { "$ref": "#/$defs/searchResearch" },
+        "originalAsset": { "$ref": "#/$defs/originalAsset" },
+        "reviewedOn": { "$ref": "#/$defs/date" },
+        "nextReviewOn": { "$ref": "#/$defs/date" }
+      }
+    }
+  }
+}

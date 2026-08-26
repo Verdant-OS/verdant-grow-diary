@@ -16,6 +16,7 @@ const EVIDENCE_TIERS = new Set(["A", "B", "C", "D"]);
 const SOURCE_TYPES = new Set(["cohort_provenance", "evidence"]);
 const PROPOSED_LINK_SLOTS = new Set([
   "breadcrumb",
+  "collection_child",
   "contextual_lateral",
   "differential",
   "next_step",
@@ -133,6 +134,12 @@ function validateHeader(packet) {
     fail("packet must declare version 1 and artifactType knowledge_corpus_review_packet");
   }
   requireString(packet.revisionId, "revisionId", { minLength: 12 });
+  if ("supersedesRevisionId" in packet) {
+    requireString(packet.supersedesRevisionId, "supersedesRevisionId", { minLength: 12 });
+    if (packet.supersedesRevisionId === packet.revisionId) {
+      fail("supersedesRevisionId must identify an earlier immutable revision");
+    }
+  }
   requireDate(packet.createdOn, "createdOn");
   if (packet.evidenceScope !== "resolved_runtime_material_and_draft_claim_map") {
     fail("evidenceScope must be resolved_runtime_material_and_draft_claim_map");
@@ -251,6 +258,24 @@ function validateSources(packet, cohort) {
   );
   if (provenanceSources.length !== 1) fail("packet requires exactly one cohort provenance source");
   return sourceById;
+}
+
+function validatePacketChronology(packet, assistance, sourceById) {
+  if (assistance.usedOn > packet.createdOn) {
+    fail(`aiAssistance.usedOn cannot be after packet createdOn ${packet.createdOn}`);
+  }
+
+  for (const source of sourceById.values()) {
+    if (source.accessedOn > packet.createdOn) {
+      fail(`source ${source.id} accessedOn cannot be after packet createdOn ${packet.createdOn}`);
+    }
+    for (const field of ["publishedOn", "versionDate"]) {
+      const value = source[field];
+      if (value !== null && value > source.accessedOn) {
+        fail(`source ${source.id} ${field} cannot be after accessedOn ${source.accessedOn}`);
+      }
+    }
+  }
 }
 
 function validateApplicability(claim) {
@@ -508,23 +533,70 @@ function validatePages(packet, paths, resolvedGuides, claimById, sourceById) {
       });
     }
 
+    const renderedLinkByLocation = new Map();
+    for (const [linkIndex, link] of requireArray(
+      resolved.internalLinks,
+      `resolved guide ${pagePath} internalLinks`,
+    ).entries()) {
+      requireRecord(link, `resolved guide ${pagePath} internalLinks[${linkIndex}]`);
+      const location = requireString(
+        link.location,
+        `resolved guide ${pagePath} internalLinks[${linkIndex}].location`,
+      );
+      const renderedPath = requireString(
+        link.path,
+        `resolved guide ${pagePath} internalLinks[${linkIndex}].path`,
+      );
+      if (renderedLinkByLocation.has(location)) {
+        fail(`resolved guide ${pagePath} repeats internal-link location ${location}`);
+      }
+      renderedLinkByLocation.set(location, renderedPath);
+    }
+
     const links = requireArray(page.proposedLinks, `page ${pagePath} proposedLinks`, {
       minItems: 1,
     });
+    const proposedLocations = new Set();
+    let collectionChildCount = 0;
     let differentialCount = 0;
+    let nextStepCount = 0;
     for (const [linkIndex, link] of links.entries()) {
       requireRecord(link, `page ${pagePath} proposedLinks[${linkIndex}]`);
-      requireString(link.location, `page ${pagePath} proposedLinks[${linkIndex}].location`);
-      requireString(link.path, `page ${pagePath} proposedLinks[${linkIndex}].path`);
+      const location = requireString(
+        link.location,
+        `page ${pagePath} proposedLinks[${linkIndex}].location`,
+      );
+      const proposedPath = requireString(
+        link.path,
+        `page ${pagePath} proposedLinks[${linkIndex}].path`,
+      );
+      if (proposedLocations.has(location)) {
+        fail(`page ${pagePath} repeats proposed-link location ${location}`);
+      }
+      proposedLocations.add(location);
+      if (!renderedLinkByLocation.has(location)) {
+        fail(`page ${pagePath} proposed-link location ${location} is not rendered`);
+      }
+      const renderedPath = renderedLinkByLocation.get(location);
+      if (renderedPath !== proposedPath) {
+        fail(
+          `page ${pagePath} proposed-link location ${location} path ${proposedPath} does not match rendered path ${renderedPath}`,
+        );
+      }
       if (!PROPOSED_LINK_SLOTS.has(link.slot))
         fail(`page ${pagePath} has invalid proposed-link slot`);
       if (link.status !== "proposed")
         fail(`page ${pagePath} review-packet links must remain proposed`);
+      if (link.slot === "collection_child") collectionChildCount += 1;
       if (link.slot === "differential") differentialCount += 1;
+      if (link.slot === "next_step") nextStepCount += 1;
     }
     if (page.pageFamily === "cluster") {
-      if (!links.some((link) => link.slot === "next_step")) {
-        fail(`cluster page ${pagePath} needs at least one proposed next-step decision`);
+      if (collectionChildCount < 1) {
+        fail(`cluster page ${pagePath} needs at least one proposed collection child`);
+      }
+      if (nextStepCount !== 1) {
+        fail(`cluster page ${pagePath} needs exactly one proposed next-step decision`);
       }
       blockers.push({
         code: "CLUSTER_NEXT_STEP_REVIEW_PENDING",
@@ -534,11 +606,7 @@ function validatePages(packet, paths, resolvedGuides, claimById, sourceById) {
     }
     if (page.pageFamily === "diagnostic") {
       if (differentialCount < 3) {
-        blockers.push({
-          code: "DIFFERENTIAL_CANDIDATES_INCOMPLETE",
-          scopeId: pagePath,
-          reason: "Diagnostic page has fewer than three proposed differential candidates.",
-        });
+        fail(`diagnostic page ${pagePath} needs at least three proposed differential links`);
       }
       blockers.push({
         code: "DIFFERENTIAL_LINKS_UNREVIEWED",
@@ -644,6 +712,7 @@ export function validateCorpusReviewPacket({ packet, cohortRegistry, resolvedGui
   const assignments = validateAssignments(packet);
   const assistance = validateAiAssistance(packet);
   const sourceById = validateSources(packet, cohort);
+  validatePacketChronology(packet, assistance, sourceById);
   const claimById = validateClaims(packet, sourceById, new Set(paths));
   const blockers = [
     ...assignmentBlockers(assignments, assistance),

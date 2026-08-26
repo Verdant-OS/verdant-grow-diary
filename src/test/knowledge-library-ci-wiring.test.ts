@@ -24,6 +24,8 @@ describe("Knowledge Library required CI wiring", () => {
       "scripts/knowledge/validate-schemas.mjs",
       "scripts/knowledge/validate-corpus.test.mjs",
       "scripts/knowledge/validate-corpus-review-packet.test.mjs",
+      "scripts/knowledge/validate-reviewer-authority.mjs",
+      "scripts/knowledge/validate-reviewer-authority.test.mjs",
       "scripts/knowledge/validate-symptom-corpus-review-packet.ts",
       "node --test",
     ]) {

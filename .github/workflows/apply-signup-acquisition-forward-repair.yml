@@ -29,14 +29,29 @@ on:
         required: false
         type: string
         default: ""
+      expected_preflight_run_attempt:
+        description: "APPLY only — exact successful PREFLIGHT run attempt (must be 1)"
+        required: false
+        type: string
+        default: ""
+      expected_preflight_artifact_sha256:
+        description: "APPLY only — lowercase SHA-256 of the reviewed PREFLIGHT artifact ZIP"
+        required: false
+        type: string
+        default: ""
+      solo_founder_acknowledgement:
+        description: "Exact solo-founder production authorization statement"
+        required: true
+        type: string
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: signup-acquisition-forward-repair
+  group: verdant-production-migration-writer
   cancel-in-progress: false
+  queue: max
 
 jobs:
   validate:
@@ -49,6 +64,9 @@ jobs:
       CONFIRM_PROJECT_REF: ${{ inputs.confirm_project_ref }}
       CONFIRM_APPLY: ${{ inputs.confirm_apply }}
       PREFLIGHT_RUN_ID: ${{ inputs.preflight_run_id }}
+      EXPECTED_PREFLIGHT_RUN_ATTEMPT: ${{ inputs.expected_preflight_run_attempt }}
+      EXPECTED_PREFLIGHT_ARTIFACT_SHA256: ${{ inputs.expected_preflight_artifact_sha256 }}
+      SOLO_FOUNDER_ACKNOWLEDGEMENT: ${{ inputs.solo_founder_acknowledgement }}
 
     steps:
       - name: Refuse every branch except the production branch
@@ -80,6 +98,18 @@ jobs:
             echo "::error::The production project confirmation did not match."
             exit 1
           fi
+          if [ "$SOLO_FOUNDER_ACKNOWLEDGEMENT" != "I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN" ]; then
+            echo "::error::The solo-founder acknowledgement did not match."
+            exit 1
+          fi
+          if [ "$GITHUB_ACTOR_ID" != "72639960" ] || [ "$GITHUB_ACTOR" != "cheekhimself" ] || [ "$GITHUB_TRIGGERING_ACTOR" != "cheekhimself" ]; then
+            echo "::error::The production dispatch identity did not match the founder."
+            exit 1
+          fi
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ]; then
+            echo "::error::Protected workflow reruns are forbidden; use a fresh dispatch."
+            exit 1
+          fi
           if [ "$OPERATION" = "APPLY" ]; then
             if [ "$CONFIRM_APPLY" != "APPLY SIGNUP ACQUISITION FORWARD REPAIR" ]; then
               echo "::error::The production apply confirmation phrase did not match."
@@ -89,6 +119,17 @@ jobs:
               echo "::error::APPLY requires a positive successful PREFLIGHT run ID."
               exit 1
             fi
+            if [ "$EXPECTED_PREFLIGHT_RUN_ATTEMPT" != "1" ]; then
+              echo "::error::APPLY requires the exact successful PREFLIGHT run attempt 1."
+              exit 1
+            fi
+            if ! [[ "$EXPECTED_PREFLIGHT_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "::error::APPLY requires the lowercase SHA-256 of the reviewed PREFLIGHT artifact."
+              exit 1
+            fi
+          elif [ -n "$PREFLIGHT_RUN_ID" ] || [ -n "$EXPECTED_PREFLIGHT_RUN_ATTEMPT" ] || [ -n "$EXPECTED_PREFLIGHT_ARTIFACT_SHA256" ]; then
+            echo "::error::PREFLIGHT rejects prior run ID, attempt, and artifact digest inputs."
+            exit 1
           fi
 
   apply:
@@ -96,7 +137,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: verdant-production
+    environment: verdant-production-solo-founder
     env:
       OPERATION: ${{ inputs.operation }}
       TARGET_ENV: production
@@ -104,6 +145,9 @@ jobs:
       CONFIRM_PROJECT_REF: ${{ inputs.confirm_project_ref }}
       CONFIRM_APPLY: ${{ inputs.confirm_apply }}
       PREFLIGHT_RUN_ID: ${{ inputs.preflight_run_id }}
+      EXPECTED_PREFLIGHT_RUN_ATTEMPT: ${{ inputs.expected_preflight_run_attempt }}
+      EXPECTED_PREFLIGHT_ARTIFACT_SHA256: ${{ inputs.expected_preflight_artifact_sha256 }}
+      SOLO_FOUNDER_ACKNOWLEDGEMENT: ${{ inputs.solo_founder_acknowledgement }}
       REPORT_PATH: ${{ github.workspace }}/audit/signup-acquisition-forward-repair/report.md
       AUDIT_PATH: ${{ github.workspace }}/audit/signup-acquisition-forward-repair/audit.json
       PREFLIGHT_RECEIPT_PATH: ${{ github.workspace }}/audit/signup-acquisition-forward-repair/preflight-receipt.json
@@ -121,6 +165,47 @@ jobs:
 
       - name: Prepare sanitized audit directory
         run: mkdir -p "${{ github.workspace }}/audit/signup-acquisition-forward-repair"
+
+      - name: Verify solo-founder production authorization
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_RUN_JSON: ${{ runner.temp }}/signup-repair-solo-founder/current-run.json
+          CURRENT_RUN_APPROVALS_JSON: ${{ runner.temp }}/signup-repair-solo-founder/approvals.json
+          SOLO_FOUNDER_ENVIRONMENT_JSON: ${{ runner.temp }}/signup-repair-solo-founder/environment.json
+          SOLO_FOUNDER_BRANCH_POLICIES_JSON: ${{ runner.temp }}/signup-repair-solo-founder/branch-policies.json
+          SOLO_FOUNDER_EXPECTED_WORKFLOW_PATH: .github/workflows/apply-signup-acquisition-forward-repair.yml
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$(dirname "$CURRENT_RUN_JSON")"
+          authorization_failure() {
+            printf '%s\n' \
+              '### Signup-acquisition forward-repair delivery' \
+              '' \
+              '**Status:** BLOCKED - solo-founder authorization rejected' \
+              '' \
+              'Reason code: solo_founder_authorization_rejected' \
+              'No database process was started. No raw API response or credential is included.' \
+              > "$REPORT_PATH"
+            printf '%s\n' \
+              '{"schema_version":1,"tool":"apply-signup-acquisition-forward-repair","target_env":"production","outcome":"authorization_rejected","reason_code":"solo_founder_authorization_rejected"}' \
+              > "$AUDIT_PATH"
+          }
+          trap authorization_failure ERR
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --jq '{id,run_attempt,event,path,head_branch,head_sha,repository:{id:.repository.id,full_name:.repository.full_name},head_repository:{id:.head_repository.id,full_name:.head_repository.full_name},actor:{id:.actor.id,login:.actor.login},triggering_actor:{id:.triggering_actor.id,login:.triggering_actor.login}}' \
+            > "$CURRENT_RUN_JSON" 2>/dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+            --jq 'map({state,environments:(.environments | map({name})),user:{id:.user.id,login:.user.login}})' \
+            > "$CURRENT_RUN_APPROVALS_JSON" 2>/dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/environments/verdant-production-solo-founder" \
+            --jq '{name,can_admins_bypass,deployment_branch_policy:{protected_branches:.deployment_branch_policy.protected_branches,custom_branch_policies:.deployment_branch_policy.custom_branch_policies},protection_rules:[.protection_rules[] | if .type == "required_reviewers" then {type,prevent_self_review,reviewers:[.reviewers[] | {type,reviewer:{id:.reviewer.id,login:.reviewer.login}}]} else {type} end]}' \
+            > "$SOLO_FOUNDER_ENVIRONMENT_JSON" 2>/dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/environments/verdant-production-solo-founder/deployment-branch-policies?per_page=100" \
+            --jq '{total_count,branch_policies:[.branch_policies[] | {name,type}]}' \
+            > "$SOLO_FOUNDER_BRANCH_POLICIES_JSON" 2>/dev/null
+          node scripts/verify-solo-founder-production-authorization.mjs
+          trap - ERR
 
       - name: Validate the authenticated PREFLIGHT artifact
         if: inputs.operation == 'APPLY'
@@ -164,9 +249,9 @@ jobs:
           report-path: ${{ github.workspace }}/audit/signup-acquisition-forward-repair/report.md
           log-prefix: signup-acquisition-forward-repair
           fix-steps-json: >-
-            ["1. Open Settings → Environments → verdant-production.",
+            ["1. Open Settings → Environments → verdant-production-solo-founder.",
              "2. Add environment secret SUPABASE_DB_URL using the pooled Postgres URL for project knkwiiywfkbqznbxwqfh.",
-             "3. Keep a required reviewer on verdant-production, then dispatch again from verdant-grow-diary."]
+             "3. Keep the founder as the sole required reviewer, then dispatch again from verdant-grow-diary."]
           reason-lines-json: >-
             ["The exact production target cannot be proven or reached without the protected database URL.",
              "No preflight or migration SQL is allowed to run when this secret is absent."]
@@ -182,7 +267,7 @@ jobs:
           fix-steps-json: >-
             ["1. Download the Server root certificate from the production Supabase project Dashboard.",
              "2. Base64-encode the certificate without changing its bytes.",
-             "3. Save it as the verdant-production environment secret SUPABASE_DB_CA_CERT_B64, then run PREFLIGHT again."]
+             "3. Save it as the verdant-production-solo-founder environment secret SUPABASE_DB_CA_CERT_B64, then run PREFLIGHT again."]
           reason-lines-json: >-
             ["PostgreSQL 15 requires an explicit trusted root for sslmode=verify-full.",
              "No production database process is allowed to run without certificate and hostname verification."]
@@ -231,10 +316,23 @@ jobs:
 
       - name: Publish sanitized summary
         if: always() && hashFiles('audit/signup-acquisition-forward-repair/report.md') != ''
+        continue-on-error: true
         run: cat audit/signup-acquisition-forward-repair/report.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload sanitized evidence
-        if: always()
+      - name: Upload sanitized evidence after successful delivery
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signup-acquisition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            audit/signup-acquisition-forward-repair/report.md
+            audit/signup-acquisition-forward-repair/audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload sanitized evidence after failed or cancelled delivery
+        if: failure() || cancelled()
+        continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: signup-acquisition-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}

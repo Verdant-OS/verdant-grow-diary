@@ -63,8 +63,7 @@ const QUICK_LOG_V2_SAVE_CALLERS = [
   { file: "src/pages/EcowittIngestAudit.tsx", telemetryIntent: null },
   {
     file: "src/components/PlantQuickLog.tsx",
-    telemetryIntent:
-      /save\(built\.payload,\s*\{\s*telemetryIntent:\s*"plant_quick_log"\s*\}\)/,
+    telemetryIntent: /save\(built\.payload,\s*\{\s*telemetryIntent:\s*"plant_quick_log"\s*\}\)/,
   },
 ] as const;
 
@@ -383,12 +382,19 @@ describe("ordering and safety constraints at the seams", () => {
 
   it("grow_created fires only after a successful insert", () => {
     const src = read("src/pages/Grows.tsx");
-    const insert = src.search(/supabase\s*\.\s*from\("grows"\)\s*\.\s*insert/);
-    const errorGate = src.indexOf("if (error)", insert);
-    const track = src.indexOf('trackFunnelEvent("grow_created")', errorGate);
-    expect(insert).toBeGreaterThan(-1);
-    expect(errorGate).toBeGreaterThan(insert);
-    expect(track).toBeGreaterThan(errorGate);
+    const persistence = read("src/lib/hierarchyCreatePersistence.ts");
+    const persist = src.indexOf("persistHierarchyCreateAttempt");
+    const unknownGate = src.indexOf('if (result.status === "unknown")', persist);
+    const definitiveErrorGate = src.indexOf(
+      'if (result.status === "definitive_error")',
+      unknownGate,
+    );
+    const track = src.indexOf('trackFunnelEvent("grow_created")', definitiveErrorGate);
+    expect(persistence).toMatch(/\.insert\(payload as never\)/);
+    expect(persist).toBeGreaterThan(-1);
+    expect(unknownGate).toBeGreaterThan(persist);
+    expect(definitiveErrorGate).toBeGreaterThan(unknownGate);
+    expect(track).toBeGreaterThan(definitiveErrorGate);
   });
 
   it("starter setup records every durable create even if a later step fails", () => {

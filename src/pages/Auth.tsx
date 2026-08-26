@@ -41,7 +41,11 @@ import {
 import { trackPricingEvent } from "@/lib/pricingAnalytics";
 import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { getStartScreenChoice, routeForStartScreen } from "@/lib/startScreenPreferences";
-import { buildAcceptanceRows } from "@/lib/agreementConsent";
+import {
+  acceptancePayloadsForCurrentAgreements,
+  recordOwnAgreementAcceptances,
+  type AgreementAcceptanceRpcClient,
+} from "@/lib/agreementAcceptanceService";
 import { resolveSignupCompletionDisposition } from "@/lib/signupCompletionRules";
 import {
   DEFAULT_VERIFICATION_COOLDOWN_MS,
@@ -385,15 +389,14 @@ export default function Auth() {
     // marketing choice from metadata; the write below is a session-path backup.
     if (data?.user?.id && data.session) {
       try {
-        const rows = buildAcceptanceRows(data.user.id).map((r) => ({
-          ...r,
-          user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
-        }));
-        await supabase
-          .from("user_agreement_acceptances")
-          // Append-only: ON CONFLICT DO NOTHING so only INSERT is needed (there is
-          // no UPDATE policy); an existing row must not drive the RLS-denied UPDATE.
-          .upsert(rows, { onConflict: "user_id,agreement_type,version", ignoreDuplicates: true });
+        const payloads = acceptancePayloadsForCurrentAgreements(
+          typeof navigator !== "undefined" ? navigator.userAgent : null,
+        );
+        // Server sets user_id from auth.uid(); never client-trusted user_id.
+        await recordOwnAgreementAcceptances(
+          supabase as unknown as AgreementAcceptanceRpcClient,
+          payloads,
+        );
       } catch {
         // Non-fatal — re-consent gate will catch missing acceptance later.
       }

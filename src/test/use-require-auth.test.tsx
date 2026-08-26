@@ -51,4 +51,15 @@ describe("useRequireAuth", () => {
     await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
     expect(navMock).toHaveBeenCalledWith("/auth", { replace: true });
   });
+
+  it("fails closed when getUser rejects", async () => {
+    navMock.mockClear();
+    getUserMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    const { result } = renderHook(() => useRequireAuth("/auth"), { wrapper });
+
+    await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
+    expect(navMock).toHaveBeenCalledTimes(1);
+    expect(navMock).toHaveBeenCalledWith("/auth", { replace: true });
+  });
 });

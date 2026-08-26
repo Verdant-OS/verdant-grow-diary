@@ -34,6 +34,11 @@ const ALERT = {
   updated_at: "2026-05-30T10:30:00Z",
 };
 
+// AlertDetail performs several asynchronous evidence reads before it can render
+// the saved-session affordance. Keep this per-test timeout explicit so a slow
+// isolated CI worker does not turn a successful render into a false failure.
+const ALERT_DETAIL_ASYNC_RENDER_TIMEOUT_MS = 5_000;
+
 // Mutable per-test fixtures.
 let actionQueueRows: Array<Record<string, unknown>> = [];
 
@@ -137,6 +142,14 @@ function renderDetail() {
   );
 }
 
+function findSavedAiDoctorSessionLink(): Promise<HTMLElement> {
+  return screen.findByTestId(
+    "alert-detail-ai-doctor-saved-session-link",
+    {},
+    { timeout: ALERT_DETAIL_ASYNC_RENDER_TIMEOUT_MS },
+  );
+}
+
 describe("AlertDetail — View saved AI Doctor session link", () => {
   it("renders the chip and link when a linked AI Doctor action carries a safe session id", async () => {
     actionQueueRows = [
@@ -148,9 +161,7 @@ describe("AlertDetail — View saved AI Doctor session link", () => {
       },
     ];
     renderDetail();
-    const link = (await screen.findByTestId(
-      "alert-detail-ai-doctor-saved-session-link",
-    )) as HTMLAnchorElement;
+    const link = (await findSavedAiDoctorSessionLink()) as HTMLAnchorElement;
     expect(link.textContent).toBe("View saved AI Doctor session");
     expect(link.getAttribute("href")).toBe(aiDoctorSessionDetailPath("sess-xyz"));
     const chip = await screen.findByTestId("alert-detail-ai-doctor-review-chip");
@@ -198,7 +209,7 @@ describe("AlertDetail — View saved AI Doctor session link", () => {
       },
     ];
     const { container } = renderDetail();
-    await screen.findByTestId("alert-detail-ai-doctor-saved-session-link");
+    await findSavedAiDoctorSessionLink();
     const text = container.textContent ?? "";
     expect(text).not.toContain("[session:");
     expect(text).not.toContain("[alert:");
@@ -215,7 +226,7 @@ describe("AlertDetail — View saved AI Doctor session link", () => {
       },
     ];
     renderDetail();
-    const link = await screen.findByTestId("alert-detail-ai-doctor-saved-session-link");
+    const link = await findSavedAiDoctorSessionLink();
     const lower = (link.textContent ?? "").toLowerCase();
     for (const tok of [
       "auto-execute",

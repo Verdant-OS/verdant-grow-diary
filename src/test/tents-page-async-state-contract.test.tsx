@@ -60,6 +60,11 @@ const mocks = vi.hoisted(() => {
       >,
       retryTent: vi.fn().mockResolvedValue(undefined),
     },
+    manualSnapshots: {
+      hookCalls: 0,
+      legacyHookCalls: 0,
+      tentIdSets: [] as string[][],
+    },
   };
 });
 
@@ -76,6 +81,24 @@ vi.mock("@/hooks/useGrowData", () => ({
 
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadingsByTents: () => mocks.sensors,
+}));
+
+vi.mock("@/hooks/useManualSnapshotTimelineCards", () => ({
+  useManualSnapshotTimelineCards: (scope: unknown) => {
+    void scope;
+    mocks.manualSnapshots.legacyHookCalls += 1;
+    return { cards: [], isLoading: false, isError: false, error: null };
+  },
+  useTentManualSnapshotBatch: (_ownerId: string | null, tentIds: string[]) => {
+    mocks.manualSnapshots.hookCalls += 1;
+    mocks.manualSnapshots.tentIdSets.push(tentIds);
+    return {
+      byTent: Object.fromEntries(
+        tentIds.map((tentId) => [tentId, { cards: [], status: "success" }]),
+      ),
+      error: null,
+    };
+  },
 }));
 
 vi.mock("@/hooks/useScopedGrow", () => ({
@@ -140,6 +163,9 @@ beforeEach(() => {
   mocks.sensors.byTent = { [mocks.tentId]: [] };
   mocks.sensors.statusByTent = { [mocks.tentId]: "success" };
   mocks.sensors.retryTent = vi.fn().mockResolvedValue(undefined);
+  mocks.manualSnapshots.hookCalls = 0;
+  mocks.manualSnapshots.legacyHookCalls = 0;
+  mocks.manualSnapshots.tentIdSets = [];
 });
 
 describe("Tents page async-state contract", () => {
@@ -347,6 +373,8 @@ describe("Tents page async-state contract", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Retry Verified Tent sensor readings" }));
     expect(mocks.sensors.retryTent).toHaveBeenCalledWith(mocks.tentId);
+    expect(mocks.manualSnapshots.hookCalls).toBe(0);
+    expect(mocks.manualSnapshots.legacyHookCalls).toBe(0);
     expect(mocks.queries.tents.refetch).not.toHaveBeenCalled();
     expect(mocks.queries.plants.refetch).not.toHaveBeenCalled();
   });
@@ -374,6 +402,8 @@ describe("Tents page async-state contract", () => {
       "showing last loaded readings",
     );
     expect(screen.getByTestId(`tents-list-metric-${mocks.tentId}-temp`)).toBeInTheDocument();
+    expect(mocks.manualSnapshots.hookCalls).toBe(0);
+    expect(mocks.manualSnapshots.legacyHookCalls).toBe(0);
     fireEvent.click(screen.getByRole("button", { name: "Retry Verified Tent sensor readings" }));
     expect(mocks.sensors.retryTent).toHaveBeenCalledWith(mocks.tentId);
   });
@@ -390,6 +420,16 @@ describe("Tents page async-state contract", () => {
     expect(screen.getByTestId(`tents-sensor-refresh-error-${mocks.tentId}`)).toHaveTextContent(
       "last loaded result had no readings",
     );
+    expect(mocks.manualSnapshots.hookCalls).toBe(0);
+    expect(mocks.manualSnapshots.legacyHookCalls).toBe(0);
+  });
+
+  it("instantiates one parent manual batch only for successful-empty sensor evidence", () => {
+    renderTents();
+
+    expect(mocks.manualSnapshots.hookCalls).toBe(1);
+    expect(mocks.manualSnapshots.legacyHookCalls).toBe(0);
+    expect(mocks.manualSnapshots.tentIdSets).toEqual([[mocks.tentId]]);
   });
 });
 

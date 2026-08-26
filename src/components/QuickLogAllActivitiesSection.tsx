@@ -34,7 +34,17 @@ import QuickLogSymptomCheckFields from "@/components/QuickLogSymptomCheckFields"
 import { useQuickLogActivitySave } from "@/hooks/useQuickLogActivitySave";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { createQuickLogPhotoDiaryEntry } from "@/lib/quickLogPhotoDiaryEntry";
+import {
+  createQuickLogPhotoDiaryEntry,
+  hasConfirmedQuickLogPhotoDiaryEntryForOwner,
+} from "@/lib/quickLogPhotoDiaryEntry";
+import {
+  buildQuickLogPhotoAttachmentRecoveryKey,
+  clearQuickLogPhotoAttachmentRecoveryLock,
+  getQuickLogPhotoAttachmentRecoveryRecord,
+  hasQuickLogPhotoAttachmentRecoveryLock,
+  recordQuickLogPhotoAttachmentRecoveryLock,
+} from "@/lib/quickLogPhotoAttachmentRecovery";
 import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules";
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
@@ -159,6 +169,11 @@ function newIdempotencyKey(activityId: QuickLogActivityId): string {
   return `qla-${activityId}-${Date.now()}-${rand}`;
 }
 
+function newPhotoDiaryEntryId(): string | null {
+  const id = globalThis.crypto?.randomUUID?.();
+  return typeof id === "string" && id.trim() !== "" ? id : null;
+}
+
 interface SavedRecord {
   id: string;
   activityId: QuickLogActivityId;
@@ -204,12 +219,88 @@ export default function QuickLogAllActivitiesSection({
   const [guidedSymptomCheck, setGuidedSymptomCheck] = useState(false);
   const [guidedSymptomStage, setGuidedSymptomStage] = useState<CanonicalQuickLogStage | null>(null);
   const [guidedSymptomStageConfirmed, setGuidedSymptomStageConfirmed] = useState(false);
+  const { user } = useAuth();
   // Photo activity: a real image is REQUIRED before Save — a photo entry with
   // no image must never be confirmable. Uploaded to the private diary-photos
   // bucket; the diary row's photo_url column carries the bare storage path.
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  // A lost diary-insert response cannot prove the uploaded object is orphaned.
+  // Keep the object and lock only the exact grow/tent/plant target that owns
+  // the uncertain write. A target switch must not disable a different plant's
+  // editor, while returning to the original target must still prevent a blind
+  // duplicate retry.
+  const currentPhotoAttachmentRecoveryScope = useMemo(
+    () => ({
+      ownerId: user?.id ?? null,
+      growId: currentTarget.growId,
+      tentId: currentTarget.tentId,
+      plantId: currentTarget.plantId,
+    }),
+    [currentTarget, user?.id],
+  );
+  const currentPhotoAttachmentRecoveryKey = useMemo(
+    () => buildQuickLogPhotoAttachmentRecoveryKey(currentPhotoAttachmentRecoveryScope),
+    [currentPhotoAttachmentRecoveryScope],
+  );
+  const [photoAttachmentUncertainRecoveryKeys, setPhotoAttachmentUncertainRecoveryKeys] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const photoAttachmentUncertain =
+    currentPhotoAttachmentRecoveryKey !== null &&
+    (photoAttachmentUncertainRecoveryKeys.has(currentPhotoAttachmentRecoveryKey) ||
+      hasQuickLogPhotoAttachmentRecoveryLock(currentPhotoAttachmentRecoveryScope));
+  const markPhotoAttachmentUncertain = useCallback(
+    (ownerId: string, target: QuickLogAllActivitiesSaveTarget, diaryEntryId: string) => {
+      const recoveryKey = recordQuickLogPhotoAttachmentRecoveryLock(
+        { ownerId, ...target },
+        diaryEntryId,
+      );
+      if (!recoveryKey) return;
+      setPhotoAttachmentUncertainRecoveryKeys((previous) => {
+        if (previous.has(recoveryKey)) return previous;
+        const next = new Set(previous);
+        next.add(recoveryKey);
+        return next;
+      });
+    },
+    [],
+  );
+  // Re-check a remounted exact attempt through the signed-in owner's RLS
+  // view. A no-row/error result deliberately leaves the fence in place; only
+  // a confirmed exact diary row can re-enable this target's photo editor.
+  useEffect(() => {
+    const recovery = getQuickLogPhotoAttachmentRecoveryRecord(currentPhotoAttachmentRecoveryScope);
+    const ownerId = currentPhotoAttachmentRecoveryScope.ownerId;
+    if (!recovery?.diaryEntryId || typeof ownerId !== "string" || ownerId.trim() === "") return;
+
+    let active = true;
+    void hasConfirmedQuickLogPhotoDiaryEntryForOwner(ownerId, recovery.diaryEntryId).then(
+      (confirmed) => {
+        if (!active || !confirmed) return;
+        clearQuickLogPhotoAttachmentRecoveryLock(currentPhotoAttachmentRecoveryScope);
+        setPhotoAttachmentUncertainRecoveryKeys((previous) => {
+          const recoveryKey = currentPhotoAttachmentRecoveryKey;
+          if (!recoveryKey) return previous;
+          const next = new Set(previous);
+          next.delete(recoveryKey);
+          return next;
+        });
+        dispatchQuickLogV2EntryCreated({
+          createdAt: new Date().toISOString(),
+          growEventId: null,
+          source: "quick_log_v2",
+        });
+        // The original response was lost, so the normal success branch never
+        // emitted its privacy-safe funnel event. This exact owner-scoped
+        // reconciliation is the first confirmed save outcome for the attempt.
+        trackQuickLogSuccess("photo", { reused: false });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [currentPhotoAttachmentRecoveryKey, currentPhotoAttachmentRecoveryScope]);
   const photoDiaryInFlightRef = useRef(false);
-  const { user } = useAuth();
   const [saved, setSaved] = useState<SavedRecord[]>([]);
   const [errorReason, setErrorReason] = useState<string | null>(null);
   const [errorForActivity, setErrorForActivity] = useState<QuickLogActivityId | null>(null);
@@ -406,6 +497,13 @@ export default function QuickLogAllActivitiesSection({
 
   const handleSave = useCallback(async () => {
     if (isMutationBlocked()) return;
+    if (selected?.id === "photo" && photoAttachmentUncertain) {
+      setErrorReason(
+        "Photo attachment status is uncertain. Check Timeline before adding another photo.",
+      );
+      setErrorForActivity("photo");
+      return;
+    }
     if (externalPersistenceBlockReason) {
       setErrorReason(externalPersistenceBlockReason);
       setErrorForActivity(selected?.id ?? null);
@@ -546,8 +644,17 @@ export default function QuickLogAllActivitiesSection({
           setErrorForActivity(selected.id);
           return;
         }
+        const capturedOwnerId = user.id;
         if (!photoFile) {
           setErrorReason("Choose a photo before saving.");
+          setErrorForActivity(selected.id);
+          return;
+        }
+        const photoDiaryEntryId = newPhotoDiaryEntryId();
+        if (!photoDiaryEntryId) {
+          setErrorReason(
+            "Verdant could not prepare a safe photo attachment. Refresh and try again.",
+          );
           setErrorForActivity(selected.id);
           return;
         }
@@ -575,6 +682,7 @@ export default function QuickLogAllActivitiesSection({
             if (typeof v === "string") photoExtraDetails[k] = v;
           }
           const entryResult = await createQuickLogPhotoDiaryEntry({
+            ownerId: capturedOwnerId,
             growId: capturedTarget.growId,
             tentId: capturedTarget.tentId,
             plantId: capturedTarget.plantId,
@@ -586,16 +694,24 @@ export default function QuickLogAllActivitiesSection({
             // attachment marker the plant-memory episodes key on.
             eventType: "photo",
             extraDetails: Object.keys(photoExtraDetails).length > 0 ? photoExtraDetails : null,
+            entryId: photoDiaryEntryId,
           });
           if (!entryResult.ok) {
             // (strictNullChecks is off in this app config, so cast the failure
             // branch explicitly rather than relying on discriminant narrowing.)
-            const failure = entryResult as { ok: false; message: string };
-            // Best-effort orphan cleanup; the entry is the source of truth.
-            try {
-              await supabase.storage.from("diary-photos").remove([path]);
-            } catch {
-              // Swallow — an orphaned object is harmless next to a false receipt.
+            const failure = entryResult as { ok: false; message: string; ambiguous?: boolean };
+            // A returned database rejection proves no diary row committed, so
+            // cleanup is safe. An unresolved response loss does not: retain the
+            // object and lock only this captured target's photo writes.
+            if (failure.ambiguous) {
+              markPhotoAttachmentUncertain(capturedOwnerId, capturedTarget, photoDiaryEntryId);
+              return;
+            } else {
+              try {
+                await supabase.storage.from("diary-photos").remove([path]);
+              } catch {
+                // Best-effort only after a definitive non-commit.
+              }
             }
             setErrorReason(failure.message);
             setErrorForActivity(selected.id);
@@ -610,15 +726,12 @@ export default function QuickLogAllActivitiesSection({
           });
           trackQuickLogSuccess("photo", { reused: false });
         } catch {
-          // A REJECTED promise (network interruption) must never escape the
-          // click handler as a silent nothing: surface the failure and clean
-          // up an already-uploaded object so no orphan is left behind.
+          // Any unexpected failure after upload remains unconfirmed. Retain
+          // the object rather than risking a committed diary row pointing to a
+          // deleted photo, and lock only this captured target's photo save.
           if (uploadedPath) {
-            try {
-              await supabase.storage.from("diary-photos").remove([uploadedPath]);
-            } catch {
-              // Best-effort only.
-            }
+            markPhotoAttachmentUncertain(capturedOwnerId, capturedTarget, photoDiaryEntryId);
+            return;
           }
           setErrorReason("Photo save failed. Nothing was saved.");
           setErrorForActivity(selected.id);
@@ -722,6 +835,8 @@ export default function QuickLogAllActivitiesSection({
     firstDetailNumberError,
     user,
     photoFile,
+    photoAttachmentUncertain,
+    markPhotoAttachmentUncertain,
     onSaveStart,
     onSaveEnd,
     isMutationBlocked,
@@ -734,6 +849,11 @@ export default function QuickLogAllActivitiesSection({
   ]);
 
   const noContext = !growId;
+  // A named target can be temporarily unresolved while its authoritative
+  // selector query is pending or unavailable. Keep the existing no-context
+  // guards intact, but do not pair their generic prompt with the stronger
+  // verification block that already explains why saving is disabled.
+  const showNoContextNotice = noContext && !externalPersistenceBlockReason;
 
   return (
     <section
@@ -751,7 +871,7 @@ export default function QuickLogAllActivitiesSection({
         </p>
       </div>
 
-      {noContext && (
+      {showNoContextNotice && (
         <p
           role="note"
           className="text-xs text-muted-foreground"
@@ -1024,6 +1144,16 @@ export default function QuickLogAllActivitiesSection({
                   A photo entry needs an actual image — Save stays disabled until one is chosen.
                 </p>
               )}
+              {photoAttachmentUncertain && (
+                <p
+                  role="alert"
+                  className="text-[11px] text-destructive"
+                  data-testid={`${testIdPrefix}-photo-uncertain-recovery`}
+                >
+                  Could not confirm the photo attachment for this selected target. Check Timeline
+                  before adding another photo.
+                </p>
+              )}
             </div>
           )}
 
@@ -1182,6 +1312,7 @@ export default function QuickLogAllActivitiesSection({
                 mutationBlocked ||
                 !!externalPersistenceBlockReason ||
                 noContext ||
+                (selected.id === "photo" && photoAttachmentUncertain) ||
                 selectedAvailability?.disabled ||
                 selected.id === "manual_sensor_snapshot" ||
                 (requiresNote && note.trim().length === 0) ||

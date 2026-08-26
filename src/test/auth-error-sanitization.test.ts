@@ -26,6 +26,7 @@ const SENSITIVE_ERRORS: Array<{ message: string }> = [
   { message: "Session missing" },
   { message: "Recovery flow failed" },
   { message: "AuthApiError: bad request" },
+  { message: "Database error saving new user" },
 ];
 
 describe("sanitizeAuthError", () => {
@@ -34,10 +35,14 @@ describe("sanitizeAuthError", () => {
       expect(sanitizeAuthError("signIn", e)).toBe(SIGN_IN_FRIENDLY_ERROR);
     }
   });
-  it("returns the signUp-context friendly copy for every sensitive error", () => {
-    for (const e of SENSITIVE_ERRORS) {
-      expect(sanitizeAuthError("signUp", e)).toBe(SIGN_UP_FRIENDLY_ERROR);
-    }
+  it("never surfaces GoTrue database-error signup copy", () => {
+    const out = sanitizeAuthError("signUp", {
+      message: "Database error saving new user",
+      status: 500,
+    });
+    expect(out).toBe(SIGN_UP_FRIENDLY_ERROR);
+    expect(out).not.toMatch(/database error/i);
+    expect(out).not.toMatch(/500/);
   });
   it("returns the forgotPassword-context friendly copy for every sensitive error", () => {
     for (const e of SENSITIVE_ERRORS) {

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -165,7 +165,20 @@ vi.mock("@/components/WateringHistoryPanel", () => ({ default: () => null }));
 vi.mock("@/components/FeedingHistoryPanel", () => ({ default: () => null }));
 vi.mock("@/components/PhotoHistoryPanel", () => ({ default: () => null }));
 vi.mock("@/components/QuickLogHistoryPanels", () => ({
-  RecentQuickLogActivityPanel: () => null,
+  RecentQuickLogActivityPanel: ({
+    rawEntries = [],
+  }: {
+    rawEntries?: Array<{ id?: string; details?: Record<string, unknown> }>;
+  }) => (
+    <output
+      data-testid="timeline-recent-raw-entries-probe"
+      data-entry-count={rawEntries.length}
+      data-entry-ids={rawEntries.map((entry) => entry.id ?? "").join(",")}
+      data-manual-snapshot-count={
+        rawEntries.filter((entry) => entry.details?.manual_sensor_snapshot != null).length
+      }
+    />
+  ),
   PestDiseaseHistoryPanel: () => null,
   TrainingHistoryPanel: () => null,
   MeasurementHistoryPanel: () => null,
@@ -175,7 +188,6 @@ vi.mock("@/components/TimelineCsvContextPanel", () => ({ default: () => null }))
 vi.mock("@/components/PhenoHuntTimelineSection", () => ({ default: () => null }));
 vi.mock("@/components/TimelinePhotoLightbox", () => ({ default: () => null }));
 vi.mock("@/components/TimelineEvidenceDetailDrawer", () => ({ default: () => null }));
-vi.mock("@/components/TimelineSensorSourceBadge", () => ({ default: () => null }));
 vi.mock("@/components/SensorSourceLegendTooltip", () => ({ default: () => null }));
 vi.mock("@/components/DiaryEntryRemoveButton", () => ({ default: () => null }));
 vi.mock("@/components/CopyTraceLinkButton", () => ({ default: () => null }));
@@ -280,6 +292,13 @@ function expectNoTimelineContinuation() {
   expect(screen.queryByTestId("timeline-one-tent-loop-next-step-card")).not.toBeInTheDocument();
 }
 
+function expectNoTimelineDirectoryReads() {
+  const directoryReads = harness.executeQuery.mock.calls
+    .map(([spec]) => spec as QuerySpec)
+    .filter((spec) => spec.table === "plants" || spec.table === "tents");
+  expect(directoryReads).toHaveLength(0);
+}
+
 function expectNoFalseEmptyOrResults() {
   expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
   expect(screen.queryByText("No matching entries")).not.toBeInTheDocument();
@@ -332,6 +351,16 @@ describe("Timeline mounted read-state boundary", () => {
     expectNoTimelineContinuation();
   });
 
+  it("does not read the owner directory while grow ownership proof is pending", async () => {
+    harness.growsState.loading = true;
+
+    renderTimeline();
+
+    expect(await screen.findByTestId("timeline-read-loading")).toBeInTheDocument();
+    await waitFor(() => expectNoTimelineDirectoryReads());
+    expectNoTimelineContinuation();
+  });
+
   it("labels plant/tent filter options from the archived-inclusive name directory", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {
@@ -354,16 +383,31 @@ describe("Timeline mounted read-state boundary", () => {
         // otherwise return every grower's rows on this owner-facing page.
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
         expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
+        expect(spec.columns).toBe("id,name,tent_id,grow_id");
         return {
-          data: [{ id: "5d7206aa-0000-4000-8000-000000000001", name: "Project McDonald #3" }],
+          data: [
+            {
+              id: "5d7206aa-0000-4000-8000-000000000001",
+              name: "Project McDonald #3",
+              tent_id: "6b1faabb-0000-4000-8000-000000000002",
+              grow_id: GROW_A.id,
+            },
+          ],
           error: null,
         };
       }
       if (spec.table === "tents") {
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
         expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
+        expect(spec.columns).toBe("id,name,grow_id");
         return {
-          data: [{ id: "6b1faabb-0000-4000-8000-000000000002", name: "Retired 4x4" }],
+          data: [
+            {
+              id: "6b1faabb-0000-4000-8000-000000000002",
+              name: "Retired 4x4",
+              grow_id: GROW_A.id,
+            },
+          ],
           error: null,
         };
       }
@@ -416,6 +460,7 @@ describe("Timeline mounted read-state boundary", () => {
     expect(document.body).not.toHaveTextContent("provider-secret");
     expect(screen.queryByText("Start your first grow")).not.toBeInTheDocument();
     expect(screen.queryByText("Create grow")).not.toBeInTheDocument();
+    expectNoTimelineDirectoryReads();
     expectNoTimelineContinuation();
 
     fireEvent.click(screen.getByTestId("timeline-grow-data-error-retry"));
@@ -492,6 +537,290 @@ describe("Timeline mounted read-state boundary", () => {
       "1 stage-tagged log",
     );
     expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+  });
+
+  it("renders a Plant Quick Log manual snapshot once with its persisted values and source truth", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry(
+                "entry-manual-snapshot",
+                "Manual room check",
+                "2026-07-20T13:00:00.000Z",
+              ),
+              plant_id: "plant-manual",
+              tent_id: "tent-manual",
+              details: {
+                event_type: "quick_log",
+                source: "manual",
+                linked_grow_event_id: "grow-event-manual",
+                manual_sensor_snapshot: {
+                  temp_f: 82,
+                  humidity_percent: 48,
+                  ph: 6.2,
+                  ec: 1.65,
+                  source: "manual",
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      if (spec.table === "grow_events") {
+        return {
+          data: [
+            {
+              ...growEvent("grow-event-manual"),
+              plant_id: "plant-manual",
+              tent_id: "tent-manual",
+              event_type: "observation",
+              occurred_at: "2026-07-20T13:00:00.000Z",
+              note: "Manual room check",
+            },
+          ],
+          error: null,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline("/timeline?sensorSources=manual");
+
+    const entry = (await screen.findByText("Manual room check")).closest(
+      '[data-testid="timeline-entry"]',
+    );
+    expect(entry).not.toBeNull();
+    const snapshot = within(entry as HTMLElement).getByTestId("timeline-manual-snapshot");
+    expect(snapshot).toHaveTextContent("Manual snapshot");
+    expect(snapshot).toHaveTextContent("82°F");
+    expect(snapshot).toHaveTextContent("48%");
+    expect(snapshot).toHaveTextContent("pH 6.2");
+    expect(snapshot).toHaveTextContent("EC 1.65 mS/cm");
+    expect(within(snapshot).getByTestId("timeline-sensor-source-badge-manual")).toHaveTextContent(
+      "Source: manual",
+    );
+    expect(within(snapshot).queryByTestId("timeline-sensor-source-badge-live")).toBeNull();
+    expect(screen.getAllByTestId("timeline-manual-snapshot")).toHaveLength(1);
+    expect(screen.getAllByText("Manual room check")).toHaveLength(1);
+    expect(entry).not.toHaveTextContent("[object Object]");
+    expect(screen.getByTestId("timeline-recent-raw-entries-probe")).toHaveAttribute(
+      "data-entry-count",
+      "1",
+    );
+    expect(screen.getByTestId("timeline-recent-raw-entries-probe")).toHaveAttribute(
+      "data-entry-ids",
+      "grow-event-manual",
+    );
+    expect(screen.getByTestId("timeline-recent-raw-entries-probe")).toHaveAttribute(
+      "data-manual-snapshot-count",
+      "1",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^Measurements/ }));
+    expect(screen.getByText("Manual room check")).toBeInTheDocument();
+  });
+
+  it("preserves canonical and legacy snapshot precedence, aliases, and formatting", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-canonical-snapshot", "Canonical snapshot"),
+              details: {
+                event_type: "observation",
+                sensor_snapshot: { temp: 27.78, rh: 55, soil: 42, source: "manual" },
+                sensor: { temp: 10, rh: 10, soil: 10, source: "manual" },
+                manual_sensor_snapshot: { temp_f: 100, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-legacy-snapshot", "Legacy snapshot"),
+              details: {
+                event_type: "observation",
+                sensor: {
+                  temp: 27.78,
+                  rh: 55,
+                  vpd: 1.234,
+                  co2: 850.6,
+                  soil: 42,
+                  source: "manual",
+                },
+                manual_sensor_snapshot: { temp_f: 100, source: "manual" },
+              },
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    const canonical = (await screen.findByText("Canonical snapshot")).closest(
+      '[data-testid="timeline-entry"]',
+    );
+    const legacy = screen.getByText("Legacy snapshot").closest('[data-testid="timeline-entry"]');
+    expect(canonical).not.toBeNull();
+    expect(legacy).not.toBeNull();
+    expect(canonical).toHaveTextContent("82.0°F");
+    expect(canonical).toHaveTextContent("55% RH");
+    expect(canonical).toHaveTextContent("Soil 42%");
+    expect(canonical).not.toHaveTextContent("100°F");
+    expect(legacy).toHaveTextContent("82.0°F");
+    expect(legacy).toHaveTextContent("VPD 1.234");
+    expect(legacy).toHaveTextContent("CO₂ 850.6");
+    expect(legacy).toHaveTextContent("Soil 42%");
+    expect(legacy).not.toHaveTextContent("100°F");
+  });
+
+  it("labels impossible and suspicious manual snapshot values for review", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-invalid-manual-snapshot", "Impossible manual snapshot"),
+              details: {
+                event_type: "quick_log",
+                manual_sensor_snapshot: {
+                  humidity_percent: 150,
+                  ph: 99,
+                  ec: -2,
+                  source: "manual",
+                },
+              },
+            },
+            {
+              ...diaryEntry("entry-warning-manual-snapshot", "Suspicious manual snapshot"),
+              details: {
+                event_type: "quick_log",
+                manual_sensor_snapshot: { ph: 4.2, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-invalid-manual-temperature", "Impossible manual temperature"),
+              details: {
+                event_type: "quick_log",
+                manual_sensor_snapshot: {
+                  temp_f: 500,
+                  humidity_percent: 48,
+                  source: "manual",
+                },
+              },
+            },
+            {
+              ...diaryEntry("entry-stuck-manual-humidity", "Stuck manual humidity"),
+              details: {
+                event_type: "quick_log",
+                manual_sensor_snapshot: { humidity_percent: 0, source: "manual" },
+              },
+            },
+            {
+              ...diaryEntry("entry-ec-unit-mismatch", "Suspicious manual EC"),
+              details: {
+                event_type: "quick_log",
+                manual_sensor_snapshot: {
+                  ec: 20,
+                  humidity_percent: 48,
+                  source: "manual",
+                },
+              },
+            },
+          ],
+          error: null,
+          count: 5,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    const invalidEntry = (await screen.findByText("Impossible manual snapshot")).closest(
+      '[data-testid="timeline-entry"]',
+    );
+    const warningEntry = screen
+      .getByText("Suspicious manual snapshot")
+      .closest('[data-testid="timeline-entry"]');
+    expect(invalidEntry).not.toBeNull();
+    expect(warningEntry).not.toBeNull();
+    expect(
+      within(invalidEntry as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(invalidEntry).not.toHaveTextContent("150% RH");
+    expect(invalidEntry).not.toHaveTextContent("pH 99");
+    expect(invalidEntry).not.toHaveTextContent("EC -2");
+    expect(
+      within(warningEntry as HTMLElement).getByTestId("timeline-manual-snapshot-warning"),
+    ).toHaveTextContent("Check manual snapshot");
+    expect(warningEntry).toHaveTextContent("pH 4.2");
+
+    const invalidTemperatureEntry = screen
+      .getByText("Impossible manual temperature")
+      .closest('[data-testid="timeline-entry"]');
+    expect(
+      within(invalidTemperatureEntry as HTMLElement).getByTestId(
+        "timeline-manual-snapshot-invalid",
+      ),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(invalidTemperatureEntry).not.toHaveTextContent("500°F");
+    expect(invalidTemperatureEntry).toHaveTextContent("48% RH");
+
+    const stuckHumidityEntry = screen
+      .getByText("Stuck manual humidity")
+      .closest('[data-testid="timeline-entry"]');
+    expect(
+      within(stuckHumidityEntry as HTMLElement).getByTestId("timeline-manual-snapshot-warning"),
+    ).toHaveTextContent("Check manual snapshot");
+    expect(stuckHumidityEntry).toHaveTextContent("0% RH");
+
+    const ecMismatchEntry = screen
+      .getByText("Suspicious manual EC")
+      .closest('[data-testid="timeline-entry"]');
+    expect(
+      within(ecMismatchEntry as HTMLElement).getByTestId("timeline-manual-snapshot-invalid"),
+    ).toHaveTextContent("Review manual snapshot");
+    expect(ecMismatchEntry).not.toHaveTextContent("EC 20 mS/cm");
+    expect(ecMismatchEntry).toHaveTextContent("48% RH");
+  });
+
+  it("renders a pH-and-EC-only Plant Quick Log snapshot without inventing room metrics", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-root-zone-only", "Root-zone manual snapshot"),
+              details: {
+                event_type: "quick_log",
+                manual_sensor_snapshot: { ph: 6.2, ec: 1.65, source: "manual" },
+              },
+            },
+          ],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    const entry = (await screen.findByText("Root-zone manual snapshot")).closest(
+      '[data-testid="timeline-entry"]',
+    );
+    expect(entry).not.toBeNull();
+    expect(entry).toHaveTextContent("pH 6.2");
+    expect(entry).toHaveTextContent("EC 1.65 mS/cm");
+    expect(entry).not.toHaveTextContent("°F");
+    expect(entry).not.toHaveTextContent("% RH");
   });
 
   it("renders measured legacy Environment details from the nested envelope and entry timestamp", async () => {
@@ -853,7 +1182,7 @@ describe("Timeline mounted read-state boundary", () => {
                 "Older text survives photo failure",
                 "2026-07-19T12:00:00.000Z",
               ),
-              photo_url: "owner/private-photo.jpg",
+              photo_url: "owner-1/grow-a/private-photo.jpg",
             },
           ],
           error: null,
@@ -872,5 +1201,147 @@ describe("Timeline mounted read-state boundary", () => {
     expect(await screen.findByText("Older text survives photo failure")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-partial-read-warning")).toBeInTheDocument();
     expect(screen.queryByTestId("timeline-load-older-error")).not.toBeInTheDocument();
+  });
+
+  it("uses the owner-validated nested photo fallback on the initial page without overriding a usable top-level reference", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-nested-photo", "Nested photo fallback"),
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/nested-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry("entry-top-level-photo", "Top-level photo wins"),
+              photo_url: "owner-1/grow-a/canonical-top-level.jpg",
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/ignored-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry("entry-external-photo", "Trusted external photo wins"),
+              photo_url: "https://images.example.test/canonical.jpg",
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/ignored-external-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry("entry-foreign-photo", "Foreign photo is unavailable"),
+              photo_url: "other-owner/grow-a/foreign.jpg",
+              details: {
+                event_type: "photo",
+                photo_url: "other-owner/grow-a/foreign-fallback.jpg",
+              },
+            },
+          ],
+          error: null,
+          count: 4,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    await waitFor(() => {
+      expect(harness.createSignedUrls).toHaveBeenCalledWith([
+        "owner-1/grow-a/nested-fallback.jpg",
+        "owner-1/grow-a/canonical-top-level.jpg",
+      ]);
+    });
+    expect(harness.createSignedUrls).toHaveBeenCalledTimes(1);
+    expect(
+      document.querySelector('img[src="https://signed.test/owner-1/grow-a/nested-fallback.jpg"]'),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector(
+        'img[src="https://signed.test/owner-1/grow-a/canonical-top-level.jpg"]',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('img[src="https://images.example.test/canonical.jpg"]'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('img[src*="foreign"]')).not.toBeInTheDocument();
+  });
+
+  it("applies the same owner-aware nested-photo projection to older pages", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries" && isOlderPage(spec)) {
+        return {
+          data: [
+            {
+              ...diaryEntry(
+                "entry-older-nested-photo",
+                "Older nested photo fallback",
+                "2026-07-19T12:00:00.000Z",
+              ),
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/older-nested-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry(
+                "entry-older-top-level-photo",
+                "Older top-level photo wins",
+                "2026-07-19T11:00:00.000Z",
+              ),
+              photo_url: "https://images.example.test/older-canonical.jpg",
+              details: {
+                event_type: "photo",
+                photo_url: "owner-1/grow-a/ignored-older-fallback.jpg",
+              },
+            },
+            {
+              ...diaryEntry(
+                "entry-older-foreign-photo",
+                "Older foreign photo is unavailable",
+                "2026-07-19T10:00:00.000Z",
+              ),
+              details: {
+                event_type: "photo",
+                photo_url: "other-owner/grow-a/older-foreign.jpg",
+              },
+            },
+          ],
+          error: null,
+        };
+      }
+      if (spec.table === "diary_entries") {
+        return {
+          data: [diaryEntry("entry-newest", "Newest entry")],
+          error: null,
+          count: 4,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+    expect(await screen.findByText("Newest entry")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("timeline-load-older"));
+
+    await waitFor(() => {
+      expect(harness.createSignedUrls).toHaveBeenCalledWith([
+        "owner-1/grow-a/older-nested-fallback.jpg",
+      ]);
+    });
+    expect(harness.createSignedUrls).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Older nested photo fallback")).toBeInTheDocument();
+    expect(
+      document.querySelector(
+        'img[src="https://signed.test/owner-1/grow-a/older-nested-fallback.jpg"]',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('img[src="https://images.example.test/older-canonical.jpg"]'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('img[src*="older-foreign"]')).not.toBeInTheDocument();
   });
 });

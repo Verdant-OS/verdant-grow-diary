@@ -3,11 +3,15 @@ import { Link, useLocation } from "@/lib/react-router-compat";
 import { useAuth } from "@/store/auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  buildAcceptanceRows,
   computeAgreementGaps,
   type AcceptanceRow,
   type AgreementGap,
 } from "@/lib/agreementConsent";
+import {
+  acceptancePayloadsForCurrentAgreements,
+  recordOwnAgreementAcceptances,
+  type AgreementAcceptanceRpcClient,
+} from "@/lib/agreementAcceptanceService";
 import { CURRENT_AGREEMENT_LIST } from "@/constants/agreements";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -102,17 +106,14 @@ export function AgreementReconsentGate() {
     }
     setError(null);
     setSubmitting(true);
-    const rows = buildAcceptanceRows(user.id).map((r) => ({
-      ...r,
-      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
-    }));
-    const { error: err } = await supabase
-      .from("user_agreement_acceptances")
-      // Append-only write: ON CONFLICT DO NOTHING (ignoreDuplicates) so recording
-      // acceptance needs only the INSERT privilege. There is intentionally no
-      // UPDATE policy on this table; an already-present row must never drive the
-      // (RLS-denied) DO UPDATE branch, which previously locked users in this modal.
-      .upsert(rows, { onConflict: "user_id,agreement_type,version", ignoreDuplicates: true });
+    // Server sets user_id from auth.uid() — never send a client-chosen user_id.
+    const payloads = acceptancePayloadsForCurrentAgreements(
+      typeof navigator !== "undefined" ? navigator.userAgent : null,
+    );
+    const { error: err } = await recordOwnAgreementAcceptances(
+      supabase as unknown as AgreementAcceptanceRpcClient,
+      payloads,
+    );
     setSubmitting(false);
     if (err) {
       setError("Couldn't record your acceptance. Please try again.");
@@ -168,7 +169,7 @@ export function AgreementReconsentGate() {
   return (
     <Dialog open={open}>
       <DialogContent
-        className="sm:max-w-lg"
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg"
         onEscapeKeyDown={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}

@@ -1,9 +1,8 @@
-import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { AlertTriangle, Box, Lightbulb, LoaderCircle } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StageBadge from "@/components/StageBadge";
-import MetricChip from "@/components/MetricChip";
+import TentEnvironmentSnapshotStrip from "@/components/TentEnvironmentSnapshotStrip";
 import { Button } from "@/components/ui/button";
 import EmptyState from "@/components/EmptyState";
 import CreateTentDialog from "@/components/CreateTentDialog";
@@ -15,7 +14,12 @@ import { useGrowPlants } from "@/hooks/useGrowData";
 import { useGrowTents, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useNowTick } from "@/hooks/useNowTick";
+import {
+  useTentManualSnapshotBatch,
+  type TentManualSnapshotBatchDisplay,
+} from "@/hooks/useManualSnapshotTimelineCards";
 import { useAuth } from "@/store/auth";
+import type { ReactNode } from "react";
 
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
@@ -24,11 +28,6 @@ import { isUuid } from "@/lib/isUuid";
 import { loadTemperatureUnitPreference } from "@/lib/temperatureUnitPreference";
 import { formatTentLightStatus } from "@/lib/lightScheduleFormat";
 import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
-import { normalizeVpdStage } from "@/lib/vpdStageTargetRules";
-import {
-  buildTentSnapshotView,
-  type BuildTentSnapshotInput,
-} from "@/lib/dashboardEnvironmentSnapshotViewModel";
 import { classifyRequestedGrowScopeState } from "@/lib/growScopeAsyncStateRules";
 import {
   classifyTentsPageAsyncState,
@@ -39,12 +38,54 @@ import {
   buildConnectedActivationRoutes,
   isOneTentActivationIntent,
 } from "@/lib/connectedOneTentActivationRules";
-import {
-  readFastAddParam,
-  fastAddPickerBannerCopy,
-} from "@/lib/fastAddActionRules";
+import { readFastAddParam, fastAddPickerBannerCopy } from "@/lib/fastAddActionRules";
 
 const EMPTY_QUERY_ROWS: never[] = [];
+const EMPTY_MANUAL_SNAPSHOT_BATCH: Record<string, TentManualSnapshotBatchDisplay> = {};
+const ESTABLISHED_EMPTY_MANUAL_SNAPSHOT: TentManualSnapshotBatchDisplay = {
+  cards: [],
+  status: "success",
+  unavailableReason: null,
+};
+const UNAVAILABLE_MANUAL_SNAPSHOT: TentManualSnapshotBatchDisplay = {
+  cards: [],
+  status: "error",
+  unavailableReason: null,
+};
+const LOADING_MANUAL_SNAPSHOT: TentManualSnapshotBatchDisplay = {
+  cards: [],
+  status: "loading",
+  unavailableReason: null,
+};
+
+interface TentManualSnapshotBatchBoundaryProps {
+  ownerId: string | null;
+  tentIds: readonly string[];
+  children: (byTent: Record<string, TentManualSnapshotBatchDisplay>) => ReactNode;
+}
+
+function TentManualSnapshotBatchBoundary({
+  ownerId,
+  tentIds,
+  children,
+}: TentManualSnapshotBatchBoundaryProps) {
+  return tentIds.length === 0 ? (
+    <>{children(EMPTY_MANUAL_SNAPSHOT_BATCH)}</>
+  ) : (
+    <ActiveTentManualSnapshotBatch ownerId={ownerId} tentIds={tentIds}>
+      {children}
+    </ActiveTentManualSnapshotBatch>
+  );
+}
+
+function ActiveTentManualSnapshotBatch({
+  ownerId,
+  tentIds,
+  children,
+}: TentManualSnapshotBatchBoundaryProps) {
+  const { byTent } = useTentManualSnapshotBatch(ownerId, tentIds);
+  return <>{children(byTent)}</>;
+}
 
 function formatPlantCount(count: number): string {
   return `${count} ${count === 1 ? "plant" : "plants"}`;
@@ -80,11 +121,34 @@ export default function Tents() {
   // Mock-fallback tent ids ("t1"…) would 400 against the uuid tent_id
   // column and mislabel every demo card "unavailable" — only query real
   // UUIDs; a non-UUID id cannot have rows, so its absence is established.
+  const sensorTentIds = tents
+    .map((tent) => tent.id)
+    .filter((id) => isUuid(id))
+    .sort((a, b) => a.localeCompare(b));
   const {
     byTent: readingsByTent,
     statusByTent: sensorStatusByTent,
+    refreshingByTent: sensorRefreshingByTent = {},
     retryTent: retrySensorTent,
-  } = useSensorReadingsByTents(tents.map((t) => t.id).filter((id) => isUuid(id)));
+  } = useSensorReadingsByTents(sensorTentIds);
+  const emptySensorRefreshTentIdSet = new Set(
+    sensorTentIds.filter(
+      (tentId) => sensorRefreshingByTent[tentId] && (readingsByTent[tentId]?.length ?? 0) === 0,
+    ),
+  );
+  const sensorSetSettled = sensorTentIds.every(
+    (tentId) =>
+      (sensorStatusByTent[tentId] ?? "loading") !== "loading" &&
+      !emptySensorRefreshTentIdSet.has(tentId),
+  );
+  const manualFallbackCandidateTentIds = sensorTentIds.filter(
+    (tentId) =>
+      sensorStatusByTent[tentId] === "success" &&
+      !emptySensorRefreshTentIdSet.has(tentId) &&
+      (readingsByTent[tentId]?.length ?? 0) === 0,
+  );
+  const manualFallbackTentIds = sensorSetSettled ? manualFallbackCandidateTentIds : [];
+  const manualFallbackTentIdSet = new Set(manualFallbackCandidateTentIds);
   const temperatureUnit = loadTemperatureUnitPreference();
   // Freshness is time-relative: re-evaluate the presenter's clock every
   // minute so an open tab cannot keep a fresh label past the stale boundary.
@@ -106,7 +170,7 @@ export default function Tents() {
     plants: snapshotTentsQuery(plantsQuery),
     assignments: snapshotTentsQuery(assignmentPlantsQuery),
     sensorStatusByTent: sensorStatusByTent,
-    primaryTentIds: tents.map((tent) => tent.id).filter((id) => isUuid(id)),
+    primaryTentIds: sensorTentIds,
   });
   const canCreateTent =
     (scopeState === "unscoped" || scopeState === "valid") &&
@@ -487,189 +551,118 @@ export default function Tents() {
           description="Set up your first tent to start tracking."
         />
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tents.map((t) => {
-            // Same presenter as the Dashboard Environment Snapshot strip:
-            // newest reading only, missing metrics stay "—" (never a
-            // fabricated 0, which C→F conversion would render as a fake
-            // 32.0°F), stale/invalid labeled per metric.
-            const snapView = buildTentSnapshotView(
-              (readingsByTent[t.id] ?? []) as BuildTentSnapshotInput[],
-              t.stage,
-              nowTick,
-              { temperatureUnit },
-            );
-            // Pending/failed reads must not masquerade as established
-            // absence ("No sensor data yet") or as data. Non-UUID ids
-            // (mock-fallback tents) are never queried — a uuid column
-            // cannot hold them, so their absence is established.
-            const sensorReadStatus = isUuid(t.id)
-              ? (sensorStatusByTent[t.id] ?? "loading")
-              : "success";
-            const vpdMetric = snapView.metrics.find((m) => m.key === "vpd");
-            const hasVpdValue = !!vpdMetric && vpdMetric.status !== "unknown";
-            const plantCount = plants.filter((p) => p.tentId === t.id).length;
-            const plantCountCopy =
-              tentsAsyncState.plantsStatus === "ready"
-                ? formatPlantCount(plantCount)
-                : tentsAsyncState.plantsStatus === "stale"
-                  ? `${formatPlantCount(plantCount)} (last loaded)`
-                  : tentsAsyncState.plantsStatus === "refreshing"
-                    ? `${formatPlantCount(plantCount)} (refreshing)`
-                    : tentsAsyncState.plantsStatus === "loading"
-                      ? "Plant count loading"
-                      : "Plant count unavailable";
-            const assignedPlantCount = resolveVerifiedAssignedPlantCount(
-              assignmentPlantsQuery,
-              (plant) => plant.tentId === t.id,
-            );
-            return (
-              <div
-                key={t.id}
-                data-testid={`tents-card-${t.id}`}
-                className="relative min-w-0 animate-fade-in"
-              >
-                <Link
-                  to={tentDetailPath(t.id)}
-                  className="glass min-w-0 rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3"
-                >
-                  <div className="flex min-w-0 items-start justify-between gap-2 pr-8">
-                    <div className="min-w-0 flex-1">
-                      <h2 className="break-words [overflow-wrap:anywhere] font-display text-lg font-semibold group-hover:text-primary transition">
-                        {t.name}
-                      </h2>
-                      <p className="break-words [overflow-wrap:anywhere] text-xs text-muted-foreground">
-                        {t.brand} · {t.size}
-                      </p>
-                    </div>
-                    <div className="shrink-0">
-                      <StageBadge stage={t.stage} />
-                    </div>
-                  </div>
-
-                  {sensorReadStatus === "loading" ? (
-                    <p
-                      className="text-xs text-muted-foreground animate-pulse"
-                      data-testid={`tents-list-sensor-loading-${t.id}`}
+        <TentManualSnapshotBatchBoundary ownerId={user?.id ?? null} tentIds={manualFallbackTentIds}>
+          {(manualSnapshotsByTent) => (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tents.map((t) => {
+                // Pending/failed reads must not masquerade as established
+                // absence ("No sensor data yet") or as data. Non-UUID ids
+                // (mock-fallback tents) are never queried — a uuid column
+                // cannot hold them, so their absence is established.
+                const sensorReadStatus = isUuid(t.id)
+                  ? emptySensorRefreshTentIdSet.has(t.id)
+                    ? "loading"
+                    : (sensorStatusByTent[t.id] ?? "loading")
+                  : "success";
+                const manualFallbackEligible = manualFallbackTentIdSet.has(t.id);
+                const manualSnapshot = manualFallbackEligible
+                  ? sensorSetSettled
+                    ? (manualSnapshotsByTent[t.id] ?? UNAVAILABLE_MANUAL_SNAPSHOT)
+                    : LOADING_MANUAL_SNAPSHOT
+                  : ESTABLISHED_EMPTY_MANUAL_SNAPSHOT;
+                const plantCount = plants.filter((p) => p.tentId === t.id).length;
+                const plantCountCopy =
+                  tentsAsyncState.plantsStatus === "ready"
+                    ? formatPlantCount(plantCount)
+                    : tentsAsyncState.plantsStatus === "stale"
+                      ? `${formatPlantCount(plantCount)} (last loaded)`
+                      : tentsAsyncState.plantsStatus === "refreshing"
+                        ? `${formatPlantCount(plantCount)} (refreshing)`
+                        : tentsAsyncState.plantsStatus === "loading"
+                          ? "Plant count loading"
+                          : "Plant count unavailable";
+                const assignedPlantCount = resolveVerifiedAssignedPlantCount(
+                  assignmentPlantsQuery,
+                  (plant) => plant.tentId === t.id,
+                );
+                return (
+                  <div
+                    key={t.id}
+                    data-testid={`tents-card-${t.id}`}
+                    className="relative min-w-0 animate-fade-in"
+                  >
+                    <Link
+                      to={tentDetailPath(t.id)}
+                      className="glass min-w-0 rounded-2xl p-5 hover:border-primary/50 transition group flex flex-col gap-3"
                     >
-                      Loading sensor data…
-                    </p>
-                  ) : sensorReadStatus === "error" ? (
-                    <p
-                      className="text-xs text-muted-foreground"
-                      data-testid={`tents-list-sensor-unavailable-${t.id}`}
-                    >
-                      Sensor data unavailable — readings couldn't be loaded.
-                    </p>
-                  ) : snapView.hasReading ? (
-                    <>
-                      {sensorReadStatus === "refresh_error" && (
-                        <p
-                          className="text-xs text-amber-600"
-                          data-testid={`tents-list-sensor-refresh-stale-${t.id}`}
-                        >
-                          Refresh unavailable — last loaded readings shown.
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-1.5">
-                        {snapView.metrics.map((m) => (
-                          <div
-                            key={m.key}
-                            data-testid={`tents-list-metric-${t.id}-${m.key}`}
-                            data-status={m.status}
-                            className="inline-flex items-center gap-1"
-                          >
-                            <MetricChip
-                              label={m.key === "temp" ? "T" : m.key === "rh" ? "RH" : "VPD"}
-                              value={m.display}
-                              unit={m.unit}
-                              status={m.chipStatus}
-                            />
-                            {m.statusLabel && (
-                              <span
-                                data-testid={`tents-list-metric-status-${t.id}-${m.key}`}
-                                className={
-                                  m.status === "invalid"
-                                    ? "text-[10px] uppercase tracking-wide text-destructive"
-                                    : m.status === "stale"
-                                      ? "text-[10px] uppercase tracking-wide text-amber-600"
-                                      : "text-[10px] uppercase tracking-wide text-muted-foreground"
-                                }
-                              >
-                                {m.statusLabel}
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                      <div className="flex min-w-0 items-start justify-between gap-2 pr-8">
+                        <div className="min-w-0 flex-1">
+                          <h2 className="break-words [overflow-wrap:anywhere] font-display text-lg font-semibold group-hover:text-primary transition">
+                            {t.name}
+                          </h2>
+                          <p className="break-words [overflow-wrap:anywhere] text-xs text-muted-foreground">
+                            {t.brand} · {t.size}
+                          </p>
+                        </div>
+                        <div className="shrink-0">
+                          <StageBadge stage={t.stage} />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
-                        <span
-                          data-testid={`tents-list-sensor-source-${t.id}`}
-                          data-source-label={snapView.sourceLabel}
-                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide border-border/50 bg-secondary/40"
-                        >
-                          {snapView.sourceLabel}
-                        </span>
-                        <span data-testid={`tents-list-sensor-last-updated-${t.id}`}>
-                          Last updated {snapView.lastUpdatedDisplay}
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <p
-                      className="text-xs text-muted-foreground"
-                      data-testid={`tents-list-sensor-empty-${t.id}`}
-                    >
-                      {sensorReadStatus === "refresh_error"
-                        ? "Last loaded result had no readings; refresh unavailable."
-                        : "No sensor data yet"}
-                    </p>
-                  )}
 
-                  {hasVpdValue &&
-                    snapView.canAssessStage &&
-                    normalizeVpdStage(t.stage) === "unknown" && (
-                      <VpdStageMissingBadge testId="tents-list-vpd-stage-missing-badge" />
-                    )}
-
-                  <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground pt-2 border-t border-border/40">
-                    <span data-testid={`tent-plant-count-status-${t.id}`}>{plantCountCopy}</span>
-                    <span className="ml-auto inline-flex min-w-0 items-center gap-1 break-words [overflow-wrap:anywhere]">
-                      <Lightbulb
-                        className={`h-3 w-3 shrink-0 ${t.light.on ? "text-[hsl(var(--warning))]" : "text-muted-foreground"}`}
+                      <TentEnvironmentSnapshotStrip
+                        tentId={t.id}
+                        stage={t.stage}
+                        sensorRows={readingsByTent[t.id] ?? []}
+                        sensorStatus={sensorReadStatus}
+                        now={nowTick}
+                        temperatureUnit={temperatureUnit}
+                        manualCards={manualSnapshot.cards}
+                        manualStatus={manualSnapshot.status}
+                        manualUnavailableReason={manualSnapshot.unavailableReason}
                       />
-                      {formatTentLightStatus({ on: t.light.on, schedule: t.light.schedule })}
-                    </span>
-                    <span
-                      className="basis-full min-w-0"
-                      data-testid={`tent-card-plant-health-status-${t.id}`}
-                      aria-label="Plant health not assessed. Sensor status is shown separately."
-                      title="No alert assessment is loaded for this card. Sensor status is shown separately."
-                    >
-                      {tentsAsyncState.plantsStatus === "ready"
-                        ? "Plant health not assessed"
-                        : "Plant health unavailable"}
-                    </span>
+
+                      <div className="mt-auto flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground pt-2 border-t border-border/40">
+                        <span data-testid={`tent-plant-count-status-${t.id}`}>
+                          {plantCountCopy}
+                        </span>
+                        <span className="ml-auto inline-flex min-w-0 items-center gap-1 break-words [overflow-wrap:anywhere]">
+                          <Lightbulb
+                            className={`h-3 w-3 shrink-0 ${t.light.on ? "text-[hsl(var(--warning))]" : "text-muted-foreground"}`}
+                          />
+                          {formatTentLightStatus({ on: t.light.on, schedule: t.light.schedule })}
+                        </span>
+                        <span
+                          className="basis-full min-w-0"
+                          data-testid={`tent-card-plant-health-status-${t.id}`}
+                          aria-label="Plant health not assessed. Sensor status is shown separately."
+                          title="No alert assessment is loaded for this card. Sensor status is shown separately."
+                        >
+                          {tentsAsyncState.plantsStatus === "ready"
+                            ? "Plant health not assessed"
+                            : "Plant health unavailable"}
+                        </span>
+                      </div>
+                    </Link>
+                    <div className="absolute top-3 right-3 z-10">
+                      <TentCardActionsMenu
+                        tent={{
+                          id: t.id,
+                          name: t.name,
+                          brand: t.brand,
+                          size: t.size,
+                          stage: t.stage,
+                          light: t.light,
+                        }}
+                        assignedPlantCount={assignedPlantCount}
+                        onRetryAssignments={() => void assignmentPlantsQuery.refetch()}
+                      />
+                    </div>
                   </div>
-                </Link>
-                <div className="absolute top-3 right-3 z-10">
-                  <TentCardActionsMenu
-                    tent={{
-                      id: t.id,
-                      name: t.name,
-                      brand: t.brand,
-                      size: t.size,
-                      stage: t.stage,
-                      light: t.light,
-                    }}
-                    assignedPlantCount={assignedPlantCount}
-                    onRetryAssignments={() => void assignmentPlantsQuery.refetch()}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </TentManualSnapshotBatchBoundary>
       )}
     </div>
   );

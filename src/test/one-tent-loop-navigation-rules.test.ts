@@ -8,6 +8,7 @@ import {
   ONE_TENT_LOOP_SENSOR_SOURCES,
   getNextLoopStep,
   resolveOneTentLoopNextStep,
+  resolveTimelineSensorHandoffIds,
 } from "@/lib/oneTentLoopNavigationRules";
 
 describe("oneTentLoopNavigationRules", () => {
@@ -75,8 +76,26 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r2.href ?? "").not.toMatch(/^\/grows\//);
   });
 
-  it("enables the tent route when its id is present", () => {
-    expect(resolveOneTentLoopNextStep("tent", { tentId: "t1" }).href).toBe("/tents/t1");
+  it("keeps tent → plant disabled until a plant is selected and never self-links to the tent", () => {
+    const tentOnly = resolveOneTentLoopNextStep("tent", { tentId: "t1" });
+    expect(tentOnly).toMatchObject({
+      ctaLabel: "Open plant",
+      disabled: true,
+      disabledReason: ONE_TENT_LOOP_DISABLED_COPY,
+      href: null,
+    });
+    expect(tentOnly.href ?? "").not.toMatch(/^\/tents\//);
+
+    const withPlant = resolveOneTentLoopNextStep("tent", {
+      tentId: "t1",
+      plantId: "p1",
+    });
+    expect(withPlant).toMatchObject({
+      ctaLabel: "Open plant",
+      disabled: false,
+      href: "/plants/p1",
+    });
+    expect(withPlant.href ?? "").not.toMatch(/^\/tents\//);
   });
 
   it("opens an exact Quick Log intent from a fully assigned plant", () => {
@@ -138,10 +157,142 @@ describe("oneTentLoopNavigationRules", () => {
     ).toBe("/sensors?tentId=00000000-0000-4000-8000-00000000000a");
     // A malformed local filter must not become an untrusted route query.
     expect(resolveOneTentLoopNextStep("timeline", { tentId: "tent-a" }).href).toBe("/sensors");
+
+    // Timeline carries a plant only alongside a complete tent, with exact
+    // matching required so Sensors cannot silently substitute another tent.
+    const TENT = "00000000-0000-4000-8000-00000000000a";
+    const PLANT = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+    expect(resolveOneTentLoopNextStep("timeline", { tentId: TENT, plantId: PLANT }).href).toBe(
+      `/sensors?tentId=${TENT}&tentIntent=required&plantId=${PLANT}`,
+    );
+    // Plant-only intent is unsafe: Sensors may otherwise choose its first tent.
+    expect(resolveOneTentLoopNextStep("timeline", { plantId: PLANT }).href).toBe("/sensors");
+    // Malformed plant never becomes a route query.
+    for (const bad of ["plant-a", "", "   ", null, undefined]) {
+      expect(resolveOneTentLoopNextStep("timeline", { tentId: TENT, plantId: bad }).href).toBe(
+        `/sensors?tentId=${TENT}`,
+      );
+    }
   });
 
-  it("routes sensor-snapshot → ai doctor entry", () => {
-    expect(resolveOneTentLoopNextStep("sensor-snapshot").href).toBe("/doctor");
+  it("resolves Timeline plant/tent handoff only from owner-scoped relationship evidence", () => {
+    const TENT_A = "00000000-0000-4000-8000-00000000000a";
+    const TENT_B = "00000000-0000-4000-8000-00000000000b";
+    const PLANT_B = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+    const ownership = new Map([[PLANT_B, TENT_B]]);
+
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: PLANT_B,
+        plantTentIdsById: ownership,
+      }),
+    ).toEqual({ tentId: TENT_B, plantId: PLANT_B });
+
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: PLANT_B,
+        tentId: TENT_B,
+        plantTentIdsById: ownership,
+      }),
+    ).toEqual({ tentId: TENT_B, plantId: PLANT_B });
+
+    // A conscious but conflicting tent filter is preserved; the plant is not.
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: PLANT_B,
+        tentId: TENT_A,
+        plantTentIdsById: ownership,
+      }),
+    ).toEqual({ tentId: TENT_A, plantId: null });
+  });
+
+  it("fails closed when Timeline cannot prove a selected plant's current tent", () => {
+    const TENT_A = "00000000-0000-4000-8000-00000000000a";
+    const PLANT = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+
+    for (const plantTentIdsById of [null, new Map<string, string>()]) {
+      expect(
+        resolveTimelineSensorHandoffIds({
+          plantId: PLANT,
+          tentId: TENT_A,
+          plantTentIdsById,
+        }),
+      ).toEqual({ tentId: TENT_A, plantId: null });
+    }
+
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: PLANT,
+        plantTentIdsById: new Map([[PLANT, "tent-placeholder"]]),
+      }),
+    ).toEqual({ tentId: null, plantId: null });
+    expect(
+      resolveTimelineSensorHandoffIds({
+        plantId: "plant-placeholder",
+        tentId: TENT_A,
+        plantTentIdsById: new Map([[PLANT, TENT_A]]),
+      }),
+    ).toEqual({ tentId: TENT_A, plantId: null });
+    expect(
+      resolveTimelineSensorHandoffIds({
+        tentId: TENT_A,
+        plantTentIdsById: new Map([[PLANT, TENT_A]]),
+      }),
+    ).toEqual({ tentId: TENT_A, plantId: null });
+  });
+
+  it("routes sensor-snapshot → ai doctor with only a complete normalized grow/tent scope", () => {
+    // RENEGOTIATED for the D-B6 plant handoff, not loosened. Before this
+    // slice the producer could hold no plant at all, so the pin asserted a
+    // plant NEVER carries. Timeline can now hand one to Sensors, so the rule
+    // is narrower and stated exactly: a plant carries if and only if it is a
+    // real UUID AND the grow/tent scope is complete.
+    //
+    // The malformed case below is why the old assertion stayed green through
+    // this change on its own — "plant-must-not-carry" is not a UUID, so it
+    // never carried and still does not. Keeping it and adding the positive
+    // case is what makes the test describe the new contract rather than
+    // accidentally agreeing with it.
+    expect(
+      resolveOneTentLoopNextStep("sensor-snapshot", {
+        growId: " grow / one ",
+        tentId: " tent ? one ",
+        plantId: "plant-must-not-carry",
+      }).href,
+    ).toBe("/doctor?growId=grow%20%2F%20one&tentId=tent%20%3F%20one");
+
+    // A real UUID inside a complete scope now carries.
+    const PLANT = "3f7a1e2c-9b04-4d51-8a6e-2c5f70b81d93";
+    const carried = resolveOneTentLoopNextStep("sensor-snapshot", {
+      growId: "g1",
+      tentId: "t1",
+      plantId: PLANT,
+    }).href;
+    expect(carried).toBe(`/doctor?growId=g1&tentId=t1&plantId=${PLANT}`);
+
+    // A plant NEVER carries without a complete grow/tent scope — it must not
+    // smuggle a target past the fail-closed scope gate.
+    for (const partial of [
+      { plantId: PLANT },
+      { growId: "g1", plantId: PLANT },
+      { tentId: "t1", plantId: PLANT },
+      { growId: "   ", tentId: "t1", plantId: PLANT },
+      { growId: "g1", tentId: "   ", plantId: PLANT },
+    ]) {
+      const href = resolveOneTentLoopNextStep("sensor-snapshot", partial).href;
+      expect(href).toBe("/doctor");
+      expect(href).not.toContain("plantId");
+    }
+
+    for (const ids of [
+      {},
+      { growId: "g1" },
+      { tentId: "t1" },
+      { growId: "   ", tentId: "t1" },
+      { growId: "g1", tentId: "   " },
+    ]) {
+      expect(resolveOneTentLoopNextStep("sensor-snapshot", ids).href).toBe("/doctor");
+    }
   });
 
   it("ai-doctor with alertId deep-links; without alertId falls back to /alerts with a clarifying CTA label", () => {
@@ -150,6 +301,17 @@ describe("oneTentLoopNavigationRules", () => {
     expect(fallback.href).toBe("/alerts");
     // Fallback must NOT imply opening a specific alert.
     expect(fallback.ctaLabel).toBe("Review alerts");
+
+    const scopedFallback = resolveOneTentLoopNextStep("ai-doctor", { growId: "g1" });
+    expect(scopedFallback.href).toBe("/alerts?growId=g1");
+    expect(scopedFallback.ctaLabel).toBe("Review alerts");
+    expect(resolveOneTentLoopNextStep("ai-doctor", { growId: " g1 " }).href).toBe(
+      "/alerts?growId=g1",
+    );
+    expect(resolveOneTentLoopNextStep("ai-doctor", { growId: "   " }).href).toBe("/alerts");
+    expect(resolveOneTentLoopNextStep("ai-doctor", { growId: "g1", alertId: "a1" }).href).toBe(
+      "/alerts/a1",
+    );
   });
 
   it("alert → Action Queue routes to the existing /actions surface, never back to /alerts", () => {
@@ -159,6 +321,14 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r.href).toBe("/actions");
     expect(resolveOneTentLoopNextStep("alert").href).toBe("/actions");
     expect(resolveOneTentLoopNextStep("alert", { actionId: "x1" }).href).toBe("/actions/x1");
+    const scoped = resolveOneTentLoopNextStep("alert", { growId: "g1" });
+    expect(scoped.href).toBe("/actions?growId=g1");
+    expect(scoped.ctaLabel).toBe("Add to Action Queue");
+    expect(scoped.href).not.toMatch(/^\/alerts/);
+    expect(resolveOneTentLoopNextStep("alert", { growId: "   " }).href).toBe("/actions");
+    expect(resolveOneTentLoopNextStep("alert", { growId: "g1", actionId: "x1" }).href).toBe(
+      "/actions/x1",
+    );
     // Regression guard against the previous /alerts misrouting.
     expect(r.href).not.toMatch(/^\/alerts/);
   });

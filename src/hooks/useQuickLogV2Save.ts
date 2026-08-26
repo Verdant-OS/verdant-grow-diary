@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { classifyQuickLogThrownSaveError } from "@/lib/quickLogSaveErrorMessage";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { trackQuickLogSuccess, type QuickLogSuccessInput } from "@/lib/quickLogSuccessTelemetry";
 
@@ -41,13 +42,16 @@ export function useQuickLogV2Save() {
       setError(null);
       try {
         const { data, error: rpcError } = await supabase.rpc(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           "quicklog_save_manual" as any,
           payload as unknown as Record<string, unknown>,
         );
         if (rpcError) {
-          setError("save_failed");
-          return { ok: false, reason: "save_failed" };
+          // Transport/Postgres-level failure (malformed uuid literal, missing
+          // function, revoked EXECUTE, offline) — classify so surfaces can
+          // show a specific message instead of a blanket "save failed".
+          const reason = classifyQuickLogThrownSaveError(rpcError);
+          setError(reason);
+          return { ok: false, reason };
         }
         const r = (data ?? {}) as RpcResponse;
         if (!r.ok) {
@@ -64,9 +68,10 @@ export function useQuickLogV2Save() {
           environmentEventId: r.environment_event_id ?? null,
           reused: r.reused === true,
         };
-      } catch {
-        setError("save_failed");
-        return { ok: false, reason: "save_failed" };
+      } catch (thrown) {
+        const reason = classifyQuickLogThrownSaveError(thrown);
+        setError(reason);
+        return { ok: false, reason };
       } finally {
         setSaving(false);
       }

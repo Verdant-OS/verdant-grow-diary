@@ -13,6 +13,13 @@ import {
 const rpcMock = vi.fn();
 const uploadCalls: Array<{ bucket: string; path: string; file: File }> = [];
 const insertCalls: Array<{ table: string; payload: Record<string, unknown> }> = [];
+const storageUploadMock = vi.fn();
+const storageRemoveMock = vi.fn();
+const diaryInsertMock = vi.fn();
+const diaryMaybeSingleMock = vi.fn();
+const diaryOwnerEqMock = vi.fn((..._args: unknown[]) => ({ maybeSingle: diaryMaybeSingleMock }));
+const diaryIdEqMock = vi.fn((..._args: unknown[]) => ({ eq: diaryOwnerEqMock }));
+const diarySelectMock = vi.fn((..._args: unknown[]) => ({ eq: diaryIdEqMock }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -21,16 +28,17 @@ vi.mock("@/integrations/supabase/client", () => ({
       from: (bucket: string) => ({
         upload: (path: string, file: File) => {
           uploadCalls.push({ bucket, path, file });
-          return Promise.resolve({ data: { path }, error: null });
+          return storageUploadMock(bucket, path, file);
         },
-        remove: () => Promise.resolve({ data: null, error: null }),
+        remove: (...args: unknown[]) => storageRemoveMock(bucket, ...args),
       }),
     },
     from: (table: string) => ({
       insert: (payload: Record<string, unknown>) => {
         insertCalls.push({ table, payload });
-        return Promise.resolve({ data: null, error: null });
+        return diaryInsertMock(table, payload);
       },
+      select: (...args: unknown[]) => diarySelectMock(table, ...args),
     }),
   },
 }));
@@ -79,11 +87,24 @@ async function pickFile(input: HTMLInputElement, file: File) {
 
 beforeEach(() => {
   rpcMock.mockReset();
+  storageUploadMock.mockReset();
+  storageRemoveMock.mockReset();
+  diaryInsertMock.mockReset();
+  diaryMaybeSingleMock.mockReset();
+  diaryOwnerEqMock.mockClear();
+  diaryIdEqMock.mockClear();
+  diarySelectMock.mockClear();
   uploadCalls.length = 0;
   insertCalls.length = 0;
   rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "event-1" }, error: null });
+  storageUploadMock.mockImplementation(async (_bucket: unknown, path: unknown) => ({
+    data: { path: String(path) },
+    error: null,
+  }));
+  storageRemoveMock.mockResolvedValue({ data: null, error: null });
+  diaryInsertMock.mockResolvedValue({ data: null, error: null });
+  diaryMaybeSingleMock.mockResolvedValue({ data: null, error: null });
   if (typeof URL.createObjectURL !== "function") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (URL as any).createObjectURL = vi.fn(() => "blob:quicklog-v2-preview");
   } else {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:quicklog-v2-preview");
@@ -150,5 +171,47 @@ describe("QuickLogV2Sheet — photo attachment", () => {
     expect(insertCalls[0].payload.grow_id).toBe("grow-1");
     expect(insertCalls[0].payload.plant_id).toBe("plant-1");
     expect(insertCalls[0].payload.tent_id).toBe("tent-1");
+  });
+
+  it("marks a reconciled response loss as a saved photo instead of partial failure", async () => {
+    diaryInsertMock.mockRejectedValueOnce(new Error("response lost"));
+    diaryMaybeSingleMock.mockImplementationOnce(async () => ({
+      data: { id: insertCalls[0]?.payload.id as string },
+      error: null,
+    }));
+
+    renderSheet();
+    const library = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;
+    await pickFile(library, makeImage("reconciled.jpg"));
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Response reconciliation" },
+    });
+    fireEvent.click(screen.getByTestId("qlv2-save"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("qlv2-save-status")).toHaveTextContent("Log and photo saved");
+    });
+    expect(diaryOwnerEqMock).toHaveBeenCalledWith("user_id", "user-test-1");
+    expect(storageRemoveMock).not.toHaveBeenCalled();
+    expect(screen.queryByText(/attachment status uncertain/i)).toBeNull();
+  });
+
+  it("keeps the committed log as partial success and retains the photo when reconciliation is unconfirmed", async () => {
+    diaryInsertMock.mockRejectedValueOnce(new Error("response lost"));
+
+    renderSheet();
+    const library = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;
+    await pickFile(library, makeImage("uncertain.jpg"));
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Unconfirmed response" },
+    });
+    fireEvent.click(screen.getByTestId("qlv2-save"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("qlv2-save-status")).toHaveTextContent("Log saved");
+      expect(screen.getByText(/Log saved — attachment status uncertain/i)).toBeTruthy();
+    });
+    expect(diaryOwnerEqMock).toHaveBeenCalledWith("user_id", "user-test-1");
+    expect(storageRemoveMock).not.toHaveBeenCalled();
   });
 });

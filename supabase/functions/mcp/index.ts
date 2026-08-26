@@ -19,13 +19,13 @@ function supabaseForUser(ctx) {
   }
   return createClient(url, anon, {
     global: { headers: { Authorization: `Bearer ${ctx.getToken()}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: { persistSession: false, autoRefreshToken: false }
   });
 }
 function unauthenticated() {
   return {
     content: [{ type: "text", text: "Not authenticated." }],
-    isError: true,
+    isError: true
   };
 }
 
@@ -33,34 +33,22 @@ function unauthenticated() {
 var list_grows_default = defineTool({
   name: "list_grows",
   title: "List grows",
-  description:
-    "List the signed-in Verdant grower's own grows (id, name, stage, grow_type, archived flag, timestamps). Read-only.",
+  description: "List the signed-in Verdant grower's own grows (id, name, stage, grow_type, archived flag, timestamps). Read-only.",
   inputSchema: {
     includeArchived: z.boolean().optional().describe("Include archived grows. Defaults to false."),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .optional()
-      .describe("Maximum rows to return (1\u2013100). Defaults to 25."),
+    limit: z.number().int().min(1).max(100).optional().describe("Maximum rows to return (1\u2013100). Defaults to 25.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ includeArchived, limit }, ctx) => {
     if (!ctx.isAuthenticated()) return unauthenticated();
     const supabase = supabaseForUser(ctx);
-    let query = supabase
-      .from("grows")
-      .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at")
-      .order("updated_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(limit ?? 25);
+    let query = supabase.from("grows").select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at").order("updated_at", { ascending: false }).order("id", { ascending: false }).limit(limit ?? 25);
     if (!includeArchived) query = query.eq("is_archived", false);
     const { data, error } = await query;
     if (error) {
       return {
         content: [{ type: "text", text: `Error: ${error.message}` }],
-        isError: true,
+        isError: true
       };
     }
     const rows = data ?? [];
@@ -68,41 +56,125 @@ var list_grows_default = defineTool({
       content: [
         {
           type: "text",
-          text:
-            rows.length === 0
-              ? "No grows found."
-              : `Found ${rows.length} grow(s):
-${JSON.stringify(rows, null, 2)}`,
-        },
+          text: rows.length === 0 ? "No grows found." : `Found ${rows.length} grow(s):
+${JSON.stringify(rows, null, 2)}`
+        }
       ],
-      structuredContent: { grows: rows },
+      structuredContent: { grows: rows }
     };
-  },
+  }
 });
 
 // src/lib/mcp/tools/list-recent-diary-entries.ts
 import { defineTool as defineTool2 } from "npm:@lovable.dev/mcp-js@0.24.0";
 import { z as z2 } from "npm:zod@^3.24.2";
 
+// src/lib/liveSourceTruthGateRules.ts
+var LIVE_SOURCE_TRUTH_STALE_AFTER_MS = 15 * 60 * 1e3;
+var LIVE_SOURCE_TRUTH_FUTURE_SKEW_MS = 5 * 60 * 1e3;
+var LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES = Object.freeze({
+  temp_f: 1.5,
+  humidity_pct: 3,
+  vpd_kpa: 0.2,
+  co2_ppm: 100,
+  soil_moisture_pct: 5,
+  soil_ec_ms_cm: 0.2,
+  soil_ec_us_cm: 200,
+  soil_temp_f: 1.5,
+  ph: 0.2
+});
+var SUSPICIOUS_RANGES = Object.freeze({
+  temp_f: { min: 32, max: 120 },
+  humidity_pct: { min: 1, max: 99, forbid_exact: [0, 100] },
+  vpd_kpa: { min: 0, max: 5 },
+  co2_ppm: { min: 250, max: 5e3 },
+  soil_moisture_pct: { min: 1, max: 99, forbid_exact: [0, 100] },
+  soil_ec_ms_cm: { min: 0, max: 10 },
+  soil_ec_us_cm: { min: 0, max: 1e4 },
+  soil_temp_f: { min: 32, max: 120 },
+  ph: { min: 3, max: 10 }
+});
+var SUMMARY_COPY = Object.freeze({
+  verified_live: "Live proof verified from recent device evidence and controller comparison.",
+  unverified_live: "Recent live-source evidence exists, but controller comparison is missing or incomplete.",
+  not_live_proof: "This evidence can support review, but it cannot prove live sensor truth.",
+  stale: "Sensor evidence is too old to prove current live conditions.",
+  invalid: "Sensor evidence is missing, malformed, or suspicious and cannot be trusted.",
+  mismatch: "Backend values and controller/app values disagree beyond tolerance."
+});
+var CONFIDENCE_BY_VERDICT = Object.freeze({
+  verified_live: "high",
+  unverified_live: "medium",
+  not_live_proof: "low",
+  stale: "low",
+  invalid: "none",
+  mismatch: "none"
+});
+
+// src/lib/mcpSensorReadingRules.ts
+var CONFIDENCE = {
+  none: 0,
+  low: 0.35,
+  medium: 0.55,
+  high: 0.9
+};
+function normalizedQuality(quality) {
+  return typeof quality === "string" ? quality.trim().toLowerCase() : "invalid";
+}
+function deriveMcpSensorReadingConfidence(input) {
+  const quality = normalizedQuality(input.quality);
+  if (input.source === "invalid" || input.freshness === "invalid" || quality === "invalid" || !input.plausible) {
+    return CONFIDENCE.none;
+  }
+  if (input.source === "stale" || input.source === "demo" || input.freshness === "stale") {
+    return CONFIDENCE.low;
+  }
+  if (input.source === "manual" || input.source === "csv") {
+    return CONFIDENCE.medium;
+  }
+  if (input.source === "live" && input.freshness === "fresh" && quality === "ok") {
+    return CONFIDENCE.high;
+  }
+  return CONFIDENCE.low;
+}
+
+// src/lib/sensorLiveMembership.ts
+var TRUST_LIVE_ALIASES = /* @__PURE__ */ new Set(["live", "sensor", "realtime"]);
+
 // src/lib/sensor/sensorSourceRules.ts
 var ALIAS = {
   live: "live",
   sensor: "live",
   realtime: "live",
+  // First-party bridge is trust-live for badge purposes (matches
+  // VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES reservation in sensorSnapshot).
+  pi_bridge: "live",
   manual: "manual",
   user: "manual",
   entry: "manual",
   log: "manual",
+  diary: "manual",
+  manual_snapshot: "manual",
   csv: "csv",
   import: "csv",
+  imported: "csv",
   demo: "demo",
   mock: "demo",
   sample: "demo",
   fixture: "demo",
+  sim: "demo",
   stale: "stale",
   invalid: "invalid",
-  unknown: "invalid",
+  unknown: "invalid"
 };
+for (const alias of TRUST_LIVE_ALIASES) {
+  if (ALIAS[alias] === void 0) {
+    ALIAS[alias] = "live";
+  }
+}
+function rawSensorSourceValuesFor(targets) {
+  return Object.entries(ALIAS).filter(([, canonical]) => targets.includes(canonical)).map(([raw]) => raw).sort();
+}
 function normalizeSensorSource(input) {
   if (typeof input !== "string") return "invalid";
   const v = input.trim().toLowerCase();
@@ -110,8 +182,32 @@ function normalizeSensorSource(input) {
   return ALIAS[v] ?? "invalid";
 }
 
+// src/constants/sensorTiming.ts
+var SENSOR_FRESH_WINDOW_MINUTES = 15;
+var ECOWITT_LIVE_SOIL_STALE_MS = 15 * 60 * 1e3;
+var ECOWITT_MQTT_STALE_MS = 15 * 60 * 1e3;
+var GROW_DATA_SOURCE_LABEL_STALE_MS = 15 * 60 * 1e3;
+var ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS = 15 * 60 * 1e3;
+var SENSOR_TESTBENCH_LIVE_WINDOW_MS = 15 * 60 * 1e3;
+var SENSOR_SNAPSHOT_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
+var SENSOR_READING_NORMALIZATION_STALE_MS = 15 * 60 * 1e3;
+var DEFAULT_AI_COACH_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
+var DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
+var ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS = 60 * 60 * 1e3;
+var MANUAL_SNAPSHOT_CURRENT_STALE_HOURS = 24;
+var DEFAULT_SENSOR_STALE_MS = 24 * 60 * 60 * 1e3;
+var DEFAULT_STALE_WINDOW_MS = 24 * 60 * 60 * 1e3;
+var ECOWITT_INGEST_VALIDATION_STALE_AFTER_MS = 24 * 60 * 60 * 1e3;
+
+// src/lib/sensorTruthCanon.ts
+var LIVE_CURRENT_STATE_STALE_MS = SENSOR_SNAPSHOT_STALE_THRESHOLD_MS;
+var MANUAL_CURRENT_STATE_STALE_MS = MANUAL_SNAPSHOT_CURRENT_STALE_HOURS * 60 * 60 * 1e3;
+var LIVE_CURRENT_STATE_STALE_MINUTES = SENSOR_FRESH_WINDOW_MINUTES;
+var MANUAL_CURRENT_STATE_STALE_HOURS = MANUAL_SNAPSHOT_CURRENT_STALE_HOURS;
+var CURRENT_STATE_FRESHNESS_WINDOW_LABEL = `${LIVE_CURRENT_STATE_STALE_MINUTES}-minute live / ${MANUAL_CURRENT_STATE_STALE_HOURS}-hour manual`;
+
 // src/lib/sensor/sensorSnapshotFreshnessRules.ts
-var DEFAULT_FRESH_MS = 30 * 60 * 1e3;
+var DEFAULT_FRESH_MS = LIVE_CURRENT_STATE_STALE_MS;
 var DEFAULT_FUTURE_TOL = 2 * 60 * 1e3;
 function formatAge(ms) {
   if (ms < 6e4) return "just now";
@@ -133,7 +229,7 @@ function classifySnapshotFreshness(snapshot, options = {}) {
       freshness: "invalid",
       ageMs: null,
       ageLabel: "unknown age",
-      isDegraded: true,
+      isDegraded: true
     };
   }
   const captured = snapshot.captured_at;
@@ -143,7 +239,7 @@ function classifySnapshotFreshness(snapshot, options = {}) {
       freshness: "invalid",
       ageMs: null,
       ageLabel: "no timestamp",
-      isDegraded: true,
+      isDegraded: true
     };
   }
   const ts = Date.parse(captured);
@@ -153,7 +249,7 @@ function classifySnapshotFreshness(snapshot, options = {}) {
       freshness: "invalid",
       ageMs: null,
       ageLabel: "bad timestamp",
-      isDegraded: true,
+      isDegraded: true
     };
   }
   const ageMs = now - ts;
@@ -163,7 +259,7 @@ function classifySnapshotFreshness(snapshot, options = {}) {
       freshness: "invalid",
       ageMs,
       ageLabel: "future timestamp",
-      isDegraded: true,
+      isDegraded: true
     };
   }
   if (source === "demo") {
@@ -173,7 +269,7 @@ function classifySnapshotFreshness(snapshot, options = {}) {
       // demo can be "current" in the demo set, but is degraded
       ageMs: Math.max(ageMs, 0),
       ageLabel: formatAge(Math.max(ageMs, 0)),
-      isDegraded: true,
+      isDegraded: true
     };
   }
   if (source === "stale") {
@@ -182,7 +278,7 @@ function classifySnapshotFreshness(snapshot, options = {}) {
       freshness: "stale",
       ageMs: Math.max(ageMs, 0),
       ageLabel: formatAge(Math.max(ageMs, 0)),
-      isDegraded: true,
+      isDegraded: true
     };
   }
   const effectiveAge = Math.max(ageMs, 0);
@@ -192,24 +288,9 @@ function classifySnapshotFreshness(snapshot, options = {}) {
     freshness: isStale ? "stale" : "fresh",
     ageMs: effectiveAge,
     ageLabel: formatAge(effectiveAge),
-    isDegraded: isStale || source !== "live",
+    isDegraded: isStale || source !== "live"
   };
 }
-
-// src/constants/sensorTiming.ts
-var ECOWITT_LIVE_SOIL_STALE_MS = 15 * 60 * 1e3;
-var ECOWITT_MQTT_STALE_MS = 15 * 60 * 1e3;
-var GROW_DATA_SOURCE_LABEL_STALE_MS = 15 * 60 * 1e3;
-var ECOWITT_BRIDGE_TROUBLESHOOTING_STALE_MS = 15 * 60 * 1e3;
-var SENSOR_TESTBENCH_LIVE_WINDOW_MS = 15 * 60 * 1e3;
-var SENSOR_SNAPSHOT_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
-var SENSOR_READING_NORMALIZATION_STALE_MS = 15 * 60 * 1e3;
-var DEFAULT_AI_COACH_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
-var DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS = 15 * 60 * 1e3;
-var ECOWITT_CHANNEL_LABELING_STALE_AFTER_MS = 60 * 60 * 1e3;
-var DEFAULT_SENSOR_STALE_MS = 24 * 60 * 60 * 1e3;
-var DEFAULT_STALE_WINDOW_MS = 24 * 60 * 60 * 1e3;
-var ECOWITT_INGEST_VALIDATION_STALE_AFTER_MS = 24 * 60 * 60 * 1e3;
 
 // src/lib/sensorTestbenchIndicatorRules.ts
 function readString(obj, key) {
@@ -231,37 +312,30 @@ function extractTestbenchFields(row) {
     "freq",
     "runtime",
     "wh65batt",
-    "wh25batt",
+    "wh25batt"
   ]);
-  const markerCount =
-    nestedRaw && typeof nestedRaw === "object"
-      ? Object.keys(nestedRaw).filter((key) => gatewayMarkers.has(key.trim().toLowerCase())).length
-      : 0;
+  const markerCount = nestedRaw && typeof nestedRaw === "object" ? Object.keys(nestedRaw).filter(
+    (key) => gatewayMarkers.has(key.trim().toLowerCase())
+  ).length : 0;
   return {
     vendor,
     confidence,
     verdantSource,
-    physicalGatewayEvidence: verdantSource?.trim().toLowerCase() === "live" && markerCount >= 2,
+    physicalGatewayEvidence: verdantSource?.trim().toLowerCase() === "live" && markerCount >= 2
   };
 }
 function isSensorTestbenchProvenance(input) {
   const vendor = typeof input.vendor === "string" ? input.vendor.trim().toLowerCase() : "";
-  const confidence =
-    typeof input.confidence === "string" ? input.confidence.trim().toLowerCase() : "";
-  const verdantSource =
-    typeof input.verdantSource === "string" ? input.verdantSource.trim().toLowerCase() : "";
+  const confidence = typeof input.confidence === "string" ? input.confidence.trim().toLowerCase() : "";
+  const verdantSource = typeof input.verdantSource === "string" ? input.verdantSource.trim().toLowerCase() : "";
   if (confidence === "test" || confidence === "demo") return true;
-  if (
-    vendor === "ecowitt_windows_testbench" &&
-    !(verdantSource === "live" && input.physicalGatewayEvidence === true)
-  ) {
+  if (vendor === "ecowitt_windows_testbench" && !(verdantSource === "live" && input.physicalGatewayEvidence === true)) {
     return true;
   }
   return false;
 }
 function isSensorTestbenchRow(row) {
-  const { vendor, confidence, verdantSource, physicalGatewayEvidence } =
-    extractTestbenchFields(row);
+  const { vendor, confidence, verdantSource, physicalGatewayEvidence } = extractTestbenchFields(row);
   const source = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
   const normalizedVendor = vendor?.trim().toLowerCase() ?? "";
   if (source === "ecowitt_windows_testbench" && normalizedVendor !== source) {
@@ -271,7 +345,7 @@ function isSensorTestbenchRow(row) {
     vendor,
     confidence,
     verdantSource,
-    physicalGatewayEvidence,
+    physicalGatewayEvidence
   });
 }
 
@@ -287,12 +361,17 @@ function withoutDiagnosticSensorRows(rows) {
 // src/lib/sensorReadingNormalizationRules.ts
 var STALE_THRESHOLD_MS = SENSOR_READING_NORMALIZATION_STALE_MS;
 
+// src/lib/temperatureUnits.ts
+function celsiusToFahrenheit(c) {
+  return c * (9 / 5) + 32;
+}
+
 // src/lib/ecUnits.ts
 var EC_PLAUSIBLE_MAX = {
   "mS/cm": 5,
   "\xB5S/cm": 5e3,
   "PPM-500": 2500,
-  "PPM-700": 3500,
+  "PPM-700": 3500
 };
 
 // src/lib/sensorValidation.ts
@@ -308,7 +387,7 @@ function validatePh(value) {
     return {
       code: "ph:implausible",
       message: "Check pH: outside realistic 3.0\u20139.0 range.",
-      severity: "warning",
+      severity: "warning"
     };
   }
   return null;
@@ -324,7 +403,7 @@ function validateEcWithUnit(value, unit) {
     return {
       code: "ec:implausible",
       message: "Check EC unit/value \u2014 looks too high for the selected unit.",
-      severity: "warning",
+      severity: "warning"
     };
   }
   return null;
@@ -336,7 +415,7 @@ function validateTempC(value) {
     return {
       code: "temp:implausible",
       message: "Check temperature: outside realistic grow range.",
-      severity: "warning",
+      severity: "warning"
     };
   }
   return null;
@@ -348,10 +427,22 @@ function validateHumidity(value) {
     return {
       code: "rh:stuck",
       message: "Humidity looks stuck at 0% or 100% \u2014 check sensor.",
-      severity: "warning",
+      severity: "warning"
     };
   }
   return null;
+}
+
+// src/lib/quick-log/retractionFilterCompat.ts
+function isMissingRetractedColumnError(error) {
+  if (!error) return false;
+  const message = typeof error.message === "string" ? error.message : "";
+  return error.code === "42703" && message.includes("retracted_at");
+}
+async function selectWithRetractionCompat(build) {
+  const filtered = await build(true);
+  if (!isMissingRetractedColumnError(filtered.error)) return filtered;
+  return await build(false);
 }
 
 // src/lib/operatorAccountReadModels.ts
@@ -364,22 +455,33 @@ var OPERATOR_SENSOR_METRICS = [
   "soil_temp_c",
   "ph",
   "ec",
-  "ppfd",
+  "ppfd"
 ];
 var DIARY_COLUMNS = "id,grow_id,plant_id,tent_id,stage,note,entry_at,created_at";
 var SENSOR_COLUMNS = "id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload";
 var SENSOR_CANDIDATE_LIMIT = 25;
+var SENSOR_CANDIDATE_LOOKAHEAD_LIMIT = SENSOR_CANDIDATE_LIMIT + 1;
+var MCP_SENSOR_CONFLICT_SOURCE_CLASSES = ["live", "manual", "csv"];
 var KNOWN_METRIC_SET = new Set(OPERATOR_SENSOR_METRICS);
+var SENSOR_SOURCE_CONTRADICTION_WINDOW_MS = 5 * 60 * 1e3;
+var PPFD_SOURCE_CONTRADICTION_TOLERANCE = 50;
+var MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE = Object.freeze({
+  temperature_c: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.temp_f,
+  humidity_pct: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.humidity_pct,
+  vpd_kpa: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.vpd_kpa,
+  co2_ppm: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.co2_ppm,
+  soil_moisture_pct: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_moisture_pct,
+  soil_temp_c: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_temp_f,
+  ph: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.ph,
+  ec: LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES.soil_ec_ms_cm,
+  ppfd: PPFD_SOURCE_CONTRADICTION_TOLERANCE
+});
 function normalizeDiaryLimit(limit) {
   if (!Number.isFinite(limit)) return 10;
   return Math.min(50, Math.max(1, Math.trunc(limit)));
 }
 async function listRecentDiaryEntriesForOwnedGrow(client, growId, limit) {
-  const { data: grow, error: growError } = await client
-    .from("grows")
-    .select("id")
-    .eq("id", growId)
-    .maybeSingle();
+  const { data: grow, error: growError } = await client.from("grows").select("id").eq("id", growId).maybeSingle();
   if (growError) {
     return { ok: false, reason: "unavailable", message: growError.message };
   }
@@ -387,24 +489,20 @@ async function listRecentDiaryEntriesForOwnedGrow(client, growId, limit) {
     return {
       ok: false,
       reason: "not_found",
-      message: "Grow not found for the signed-in grower.",
+      message: "Grow not found for the signed-in grower."
     };
   }
-  const { data, error } = await client
-    .from("diary_entries")
-    .select(DIARY_COLUMNS)
-    .eq("grow_id", growId)
-    .is("retracted_at", null)
-    .order("entry_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(normalizeDiaryLimit(limit));
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
+    let query = client.from("diary_entries").select(DIARY_COLUMNS).eq("grow_id", growId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.order("entry_at", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(normalizeDiaryLimit(limit));
+  });
   if (error) {
     return { ok: false, reason: "unavailable", message: error.message };
   }
   return {
     ok: true,
-    data: { entries: data ?? [] },
+    data: { entries: data ?? [] }
   };
 }
 function parseTimestamp(value) {
@@ -443,7 +541,7 @@ function isPlausibleMcpSensorValue(row) {
   }
 }
 function deriveMcpFreshness(row, nowMs, staleAfterMs) {
-  const source = normalizedLabel(row.source);
+  const source = normalizeSensorSource(row.source);
   const quality = normalizedLabel(row.quality);
   if (source === "invalid" || quality === "invalid") return "invalid";
   if (source === "stale" || quality === "stale") return "stale";
@@ -459,29 +557,80 @@ function deriveMcpFreshness(row, nowMs, staleAfterMs) {
       source: "manual",
       captured_at: capturedAt,
       tent_id: row.tent_id,
-      metrics: {},
+      metrics: {}
     },
-    { now: nowMs, freshnessMs: staleAfterMs },
+    { now: nowMs, freshnessMs: staleAfterMs }
   ).freshness;
 }
 function newerReading(a, b) {
   const comparisons = [
     [effectiveCaptureMs(a), effectiveCaptureMs(b)],
     [parseTimestamp(a.ts), parseTimestamp(b.ts)],
-    [parseTimestamp(a.created_at), parseTimestamp(b.created_at)],
+    [parseTimestamp(a.created_at), parseTimestamp(b.created_at)]
   ];
   for (const [left, right] of comparisons) {
     if (left !== right) return left > right ? a : b;
   }
   return a.id >= b.id ? a : b;
 }
-function selectLatestMcpSensorReadings(rows, options = {}) {
+function sensorSelectionClock(options) {
   const nowMs = (options.now ?? /* @__PURE__ */ new Date()).getTime();
   const requestedStaleAfterMs = options.staleAfterMs ?? STALE_THRESHOLD_MS;
-  const staleAfterMs =
-    Number.isFinite(requestedStaleAfterMs) && requestedStaleAfterMs >= 0
-      ? requestedStaleAfterMs
-      : STALE_THRESHOLD_MS;
+  return {
+    nowMs,
+    staleAfterMs: Number.isFinite(requestedStaleAfterMs) && requestedStaleAfterMs >= 0 ? requestedStaleAfterMs : STALE_THRESHOLD_MS
+  };
+}
+function comparableMcpSensorValue(metric, value) {
+  return metric === "temperature_c" || metric === "soil_temp_c" ? celsiusToFahrenheit(value) : value;
+}
+function hasMaterialMcpSensorSourceConflict(metric, candidates) {
+  const values = candidates.map((candidate) => comparableMcpSensorValue(metric, candidate.value));
+  const spread = Math.max(...values) - Math.min(...values);
+  return spread > MCP_SENSOR_SOURCE_CONTRADICTION_TOLERANCE[metric];
+}
+function sensorCandidateQuery(client, tentId, metric, branch, sources, limit = SENSOR_CANDIDATE_LIMIT) {
+  const base = client.from("sensor_readings").select(SENSOR_COLUMNS).eq("tent_id", tentId).eq("metric", metric);
+  const sourceScoped = sources && sources.length > 0 ? base.in("source", sources) : base;
+  const timestampScoped = branch === "captured" ? sourceScoped.not("captured_at", "is", null) : sourceScoped.is("captured_at", null);
+  return timestampScoped.order("captured_at", { ascending: false }).order("ts", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(limit);
+}
+function rowsFromSensorCandidateResult(result) {
+  return Array.isArray(result.data) ? result.data : [];
+}
+function usableMcpSensorConflictSource(row, nowMs, staleAfterMs) {
+  if (!KNOWN_METRIC_SET.has(row.metric) || !isPlausibleMcpSensorValue(row)) return null;
+  const source = normalizeSensorSource(row.source);
+  if (source !== "live" && source !== "manual" && source !== "csv") return null;
+  if (deriveMcpFreshness(row, nowMs, staleAfterMs) !== "fresh") return null;
+  return Number.isFinite(effectiveCaptureMs(row)) ? source : null;
+}
+function findMcpSensorSourceContradictionMetrics(rows, options = {}) {
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
+  const latestByMetricAndSource = /* @__PURE__ */ new Map();
+  for (const row of withoutDiagnosticSensorRows(rows)) {
+    const source = usableMcpSensorConflictSource(row, nowMs, staleAfterMs);
+    if (!source) continue;
+    const bySource = latestByMetricAndSource.get(row.metric) ?? /* @__PURE__ */ new Map();
+    const existing = bySource.get(source);
+    bySource.set(source, existing ? newerReading(existing, row) : row);
+    latestByMetricAndSource.set(row.metric, bySource);
+  }
+  return Object.freeze(
+    OPERATOR_SENSOR_METRICS.filter((metric) => {
+      const bySource = latestByMetricAndSource.get(metric);
+      if (!bySource || bySource.size < 2) return false;
+      const candidates = [...bySource.values()];
+      const newestAt = Math.max(...candidates.map(effectiveCaptureMs));
+      const coeval = candidates.filter(
+        (candidate) => newestAt - effectiveCaptureMs(candidate) <= SENSOR_SOURCE_CONTRADICTION_WINDOW_MS
+      );
+      return coeval.length >= 2 && hasMaterialMcpSensorSourceConflict(metric, coeval);
+    })
+  );
+}
+function selectLatestMcpSensorReadings(rows, options = {}) {
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
   const selected = {};
   for (const row of withoutDiagnosticSensorRows(rows)) {
     if (!row || !KNOWN_METRIC_SET.has(row.metric)) continue;
@@ -491,6 +640,9 @@ function selectLatestMcpSensorReadings(rows, options = {}) {
   return Object.fromEntries(
     Object.entries(selected).map(([metric, row]) => {
       const freshness = deriveMcpFreshness(row, nowMs, staleAfterMs);
+      const source = normalizeSensorSource(row.source);
+      const quality = normalizedLabel(row.quality);
+      const plausible = isPlausibleMcpSensorValue(row);
       return [
         metric,
         {
@@ -499,25 +651,24 @@ function selectLatestMcpSensorReadings(rows, options = {}) {
           metric: row.metric,
           value: row.value,
           quality: row.quality,
-          source: row.source,
+          source,
           ts: row.ts,
           captured_at: row.captured_at,
           freshness,
-          current_live:
-            freshness === "fresh" &&
-            normalizedLabel(row.source) === "live" &&
-            normalizedLabel(row.quality) === "ok",
-        },
+          current_live: freshness === "fresh" && source === "live" && quality === "ok",
+          confidence: deriveMcpSensorReadingConfidence({
+            source,
+            freshness,
+            quality: row.quality,
+            plausible
+          })
+        }
       ];
-    }),
+    })
   );
 }
 async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {}) {
-  const { data: tent, error: tentError } = await client
-    .from("tents")
-    .select("id,name,grow_id")
-    .eq("id", tentId)
-    .maybeSingle();
+  const { data: tent, error: tentError } = await client.from("tents").select("id,name,grow_id").eq("id", tentId).maybeSingle();
   if (tentError) {
     return { ok: false, reason: "unavailable", message: tentError.message };
   }
@@ -525,57 +676,77 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
     return {
       ok: false,
       reason: "not_found",
-      message: "Tent not found for the signed-in grower.",
+      message: "Tent not found for the signed-in grower."
     };
   }
-  const results = await Promise.all(
-    OPERATOR_SENSOR_METRICS.flatMap((metric) => [
-      client
-        .from("sensor_readings")
-        .select(SENSOR_COLUMNS)
-        .eq("tent_id", tentId)
-        .eq("metric", metric)
-        .not("captured_at", "is", null)
-        .order("captured_at", { ascending: false })
-        .order("ts", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(SENSOR_CANDIDATE_LIMIT),
-      client
-        .from("sensor_readings")
-        .select(SENSOR_COLUMNS)
-        .eq("tent_id", tentId)
-        .eq("metric", metric)
-        .is("captured_at", null)
-        .order("ts", { ascending: false })
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(SENSOR_CANDIDATE_LIMIT),
-    ]),
+  const primaryQueries = OPERATOR_SENSOR_METRICS.flatMap(
+    (metric) => ["captured", "legacy"].map((branch) => ({
+      metric,
+      branch,
+      query: sensorCandidateQuery(
+        client,
+        tentId,
+        metric,
+        branch,
+        void 0,
+        SENSOR_CANDIDATE_LOOKAHEAD_LIMIT
+      )
+    }))
   );
-  const failed = results.find((result) => result.error);
-  if (failed?.error) {
-    return { ok: false, reason: "unavailable", message: failed.error.message };
+  const primaryResults = await Promise.all(primaryQueries.map(({ query }) => query));
+  const primaryFailure = primaryResults.find((result) => result.error);
+  if (primaryFailure?.error) {
+    return { ok: false, reason: "unavailable", message: primaryFailure.error.message };
   }
-  const candidates = results.flatMap((result) => (Array.isArray(result.data) ? result.data : []));
+  const primaryRows = primaryResults.map(rowsFromSensorCandidateResult);
+  const primaryCandidates = primaryRows.map((rows) => rows.slice(0, SENSOR_CANDIDATE_LIMIT));
+  const { nowMs, staleAfterMs } = sensorSelectionClock(options);
+  const supplementalQueries = primaryQueries.flatMap((candidate, index) => {
+    if (primaryRows[index].length <= SENSOR_CANDIDATE_LIMIT) return [];
+    const representedSources = new Set(
+      withoutDiagnosticSensorRows(primaryCandidates[index]).map((row) => usableMcpSensorConflictSource(row, nowMs, staleAfterMs)).filter((source) => source !== null)
+    );
+    return MCP_SENSOR_CONFLICT_SOURCE_CLASSES.filter(
+      (source) => !representedSources.has(source)
+    ).map((source) => ({
+      metric: candidate.metric,
+      branch: candidate.branch,
+      query: sensorCandidateQuery(
+        client,
+        tentId,
+        candidate.metric,
+        candidate.branch,
+        rawSensorSourceValuesFor([source]),
+        SENSOR_CANDIDATE_LIMIT
+      )
+    }));
+  });
+  const supplementalResults = await Promise.all(supplementalQueries.map(({ query }) => query));
+  const supplementalFailure = supplementalResults.find((result) => result.error);
+  if (supplementalFailure?.error) {
+    return { ok: false, reason: "unavailable", message: supplementalFailure.error.message };
+  }
+  const candidates = [
+    ...primaryCandidates.flatMap((rows) => rows),
+    ...supplementalResults.flatMap(rowsFromSensorCandidateResult)
+  ];
   const readings = selectLatestMcpSensorReadings(candidates, options);
+  const contradictionMetrics = findMcpSensorSourceContradictionMetrics(candidates, options);
   const ownedTent = {
     id: tent.id,
     name: tent.name,
-    grow_id: tent.grow_id,
+    grow_id: tent.grow_id
   };
   return {
     ok: true,
     data: {
       tent: ownedTent,
-      snapshot:
-        Object.keys(readings).length === 0
-          ? null
-          : {
-              tentId,
-              readings,
-            },
-    },
+      snapshot: Object.keys(readings).length === 0 ? null : {
+        tentId,
+        readings
+      },
+      ...contradictionMetrics.length > 0 ? { contradictionMetrics } : {}
+    }
   };
 }
 
@@ -583,17 +754,10 @@ async function getLatestSensorSnapshotForOwnedTent(client, tentId, options = {})
 var list_recent_diary_entries_default = defineTool2({
   name: "list_recent_diary_entries",
   title: "List recent diary entries",
-  description:
-    "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
+  description: "List recent diary entries for one of the signed-in grower's own grows. The grow must belong to the caller. Read-only.",
   inputSchema: {
     growId: z2.string().uuid().describe("Grow id to fetch diary entries for."),
-    limit: z2
-      .number()
-      .int()
-      .min(1)
-      .max(50)
-      .optional()
-      .describe("Maximum entries to return (1\u201350). Defaults to 10."),
+    limit: z2.number().int().min(1).max(50).optional().describe("Maximum entries to return (1\u201350). Defaults to 10.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ growId, limit }, ctx) => {
@@ -605,10 +769,10 @@ var list_recent_diary_entries_default = defineTool2({
         content: [
           {
             type: "text",
-            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message,
-          },
+            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message
+          }
         ],
-        isError: true,
+        isError: true
       };
     }
     const rows = result.data.entries;
@@ -616,16 +780,13 @@ var list_recent_diary_entries_default = defineTool2({
       content: [
         {
           type: "text",
-          text:
-            rows.length === 0
-              ? "No diary entries found for that grow."
-              : `Found ${rows.length} entry(ies):
-${JSON.stringify(rows, null, 2)}`,
-        },
+          text: rows.length === 0 ? "No diary entries found for that grow." : `Found ${rows.length} entry(ies):
+${JSON.stringify(rows, null, 2)}`
+        }
       ],
-      structuredContent: { entries: rows },
+      structuredContent: { entries: rows }
     };
-  },
+  }
 });
 
 // src/lib/mcp/tools/get-latest-sensor-snapshot.ts
@@ -634,10 +795,9 @@ import { z as z3 } from "npm:zod@^3.24.2";
 var get_latest_sensor_snapshot_default = defineTool3({
   name: "get_latest_sensor_snapshot",
   title: "Get latest sensor snapshot",
-  description:
-    "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim and adds a response-time `freshness` field (`fresh`, `stale`, or `invalid`) plus `current_live`. `quality` is one of ok/degraded/stale/invalid. Canonical `source` labels are exactly live/manual/csv/demo/stale/invalid, where `live` means fresh validated connected telemetry; legacy rows may carry other ingest labels such as sim or vendor bridge names. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. Read-only.",
+  description: "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading includes constitution `source` (exactly live/manual/csv/demo/stale/invalid \u2014 vendor/transport tokens such as ecowitt, mqtt, or sim, and any unrecognized label, are never returned as source), `quality`, derived `confidence` (0\u20131), response-time `freshness` (`fresh`, `stale`, or `invalid`), and `current_live`. `quality` is one of ok/degraded/stale/invalid. `live` means fresh validated connected telemetry. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and stale or invalid are never current or healthy. Read-only.",
   inputSchema: {
-    tentId: z3.string().uuid().describe("Tent id to fetch the latest readings for."),
+    tentId: z3.string().uuid().describe("Tent id to fetch the latest readings for.")
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ tentId }, ctx) => {
@@ -649,36 +809,1472 @@ var get_latest_sensor_snapshot_default = defineTool3({
         content: [
           {
             type: "text",
-            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message,
-          },
+            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message
+          }
         ],
-        isError: true,
+        isError: true
       };
     }
     if (!result.data.snapshot) {
       return {
         content: [{ type: "text", text: "No sensor readings found for that tent." }],
-        structuredContent: { snapshot: null },
+        structuredContent: { snapshot: null }
       };
     }
     const { readings } = result.data.snapshot;
-    const summary = Object.values(readings)
-      .map(
-        (r) =>
-          `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, freshness: ${r.freshness}, current_live: ${r.current_live}, at: ${r.captured_at ?? r.ts})`,
-      )
-      .join("\n");
+    const summary = Object.values(readings).map(
+      (r) => `${r.metric}=${r.value} (source: ${r.source}, quality: ${r.quality}, freshness: ${r.freshness}, confidence: ${r.confidence}, current_live: ${r.current_live}, at: ${r.captured_at ?? r.ts})`
+    ).join("\n");
     return {
       content: [
         {
           type: "text",
           text: `Latest readings for tent "${result.data.tent.name}":
-${summary}`,
-        },
+${summary}`
+        }
       ],
-      structuredContent: { snapshot: result.data.snapshot },
+      structuredContent: { snapshot: result.data.snapshot }
     };
+  }
+});
+
+// src/lib/mcp/tools/list-grow-walk-targets.ts
+import { defineTool as defineTool4 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { z as z4 } from "npm:zod@^3.24.2";
+
+// src/lib/growAttributionRules.ts
+function buildGrowScopedPlantsOrFilter(growId, tentIds) {
+  const clean3 = (tentIds ?? []).filter((t) => typeof t === "string" && t.length > 0);
+  if (clean3.length === 0) return `grow_id.eq.${growId}`;
+  return `grow_id.eq.${growId},tent_id.in.(${clean3.join(",")})`;
+}
+
+// src/lib/growWalkAttentionRules.ts
+var ATTENTION_RANK = {
+  immediate_physical_verification: 0,
+  watch_today: 1,
+  routine_observation: 2,
+  insufficient_evidence: 3
+};
+var ALERT_SEVERITY_RANK = {
+  high: 0,
+  medium: 1,
+  low: 2
+};
+function hasReason(input, reason) {
+  return input.reasonCodes.includes(reason);
+}
+function deriveGrowWalkAttentionBand(input) {
+  if (input.contradictionCodes.includes("scope_relationship_invalid")) {
+    return "insufficient_evidence";
+  }
+  const corroboratedAdverse = hasReason(input, "multiple_adverse_evidence_lanes");
+  const highAlert = hasReason(input, "active_high_alert_needs_confirmation");
+  const worsening = hasReason(input, "worsening_observation");
+  if (corroboratedAdverse && (highAlert || worsening)) {
+    return "immediate_physical_verification";
+  }
+  if (input.reasonCodes.length > 0) return "watch_today";
+  if (input.evidenceConfidence === "low") return "insufficient_evidence";
+  return "routine_observation";
+}
+function alertRank(severity) {
+  return severity === null ? 3 : ALERT_SEVERITY_RANK[severity];
+}
+function timestampMs(value) {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function compareAdverseRecency(left, right) {
+  const leftMs = timestampMs(left);
+  const rightMs = timestampMs(right);
+  if (leftMs === null && rightMs === null) return 0;
+  if (leftMs === null) return 1;
+  if (rightMs === null) return -1;
+  return rightMs - leftMs;
+}
+function sortGrowWalkTargets(targets) {
+  return Object.freeze(
+    [...targets].sort((left, right) => {
+      const attention = ATTENTION_RANK[left.attentionBand] - ATTENTION_RANK[right.attentionBand];
+      if (attention !== 0) return attention;
+      const severity = alertRank(left.highestAlertSeverity) - alertRank(right.highestAlertSeverity);
+      if (severity !== 0) return severity;
+      const recency = compareAdverseRecency(
+        left.latestAdverseEvidenceAt,
+        right.latestAdverseEvidenceAt
+      );
+      if (recency !== 0) return recency;
+      const name = left.displayName.localeCompare(right.displayName, "en", { sensitivity: "base" });
+      if (name !== 0) return name;
+      return left.targetId.localeCompare(right.targetId, "en", { sensitivity: "base" });
+    })
+  );
+}
+
+// src/lib/growWalkContracts.ts
+var GROW_WALK_CONTEXT_VERSION = "grow-walk-v0.1";
+var GROW_WALK_REASON_CODES = [
+  "active_high_alert_needs_confirmation",
+  "active_medium_alert_needs_review",
+  "active_low_alert_needs_review",
+  "multiple_adverse_evidence_lanes",
+  "stacked_major_changes_48h",
+  "stale_or_invalid_sensor_during_problem",
+  "missing_post_intervention_observation",
+  "flower_humidity_alert_needs_inspection",
+  "stressed_or_recovering_with_adverse_change",
+  "contradictory_evidence",
+  "worsening_observation"
+];
+var GROW_WALK_MISSING_EVIDENCE_CODES = [
+  "no_recent_grower_log",
+  "no_current_visual_evidence",
+  "photo_predates_latest_major_change",
+  "sensor_lane_unavailable",
+  "sensor_lane_not_current_live",
+  "plant_profile_incomplete",
+  "no_post_intervention_observation"
+];
+var GROW_WALK_CONTRADICTION_CODES = [
+  "sensor_sources_disagree",
+  "sensor_and_observation_disagree",
+  "scope_relationship_invalid",
+  "future_or_malformed_timestamp"
+];
+
+// src/lib/growWalkEvidenceRules.ts
+var HOUR_MS = 60 * 60 * 1e3;
+var RECENT_LOG_WINDOW_MS = 36 * HOUR_MS;
+var MAJOR_CHANGE_WINDOW_MS = 48 * HOUR_MS;
+var GROW_WALK_EVENT_EVIDENCE_HISTORY_HOURS = 48;
+var FUTURE_TOLERANCE_MS = 2 * 60 * 1e3;
+function toMs(value) {
+  if (value === null || value === void 0) return null;
+  if (value instanceof Date) {
+    const ms2 = value.getTime();
+    return Number.isFinite(ms2) ? ms2 : null;
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+function isUsableTimestamp(ms, nowMs) {
+  return ms !== null && ms <= nowMs + FUTURE_TOLERANCE_MS;
+}
+function latestIso(values) {
+  if (values.length === 0) return null;
+  return values.reduce((latest, current) => current.ms > latest.ms ? current : latest).iso;
+}
+function normalize(value) {
+  return (value ?? "").trim().toLowerCase();
+}
+function isObservationEvent(event) {
+  const type = normalize(event.eventType);
+  return type === "observation" || type === "response" || event.response !== null;
+}
+function orderedCodes(allowed, found) {
+  return Object.freeze(allowed.filter((code) => found.has(code)));
+}
+function hasText(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+function isActiveAlert(alert) {
+  const status = normalize(alert.status);
+  return status === "open" || status === "acknowledged";
+}
+function isHumidityAlert(alert) {
+  if (normalize(alert.metric) === "humidity_pct") return true;
+  return `${alert.title} ${alert.reasonExcerpt}`.toLowerCase().includes("humidity");
+}
+function isStaleOrInvalidReading(reading) {
+  const source = normalize(reading.source);
+  const quality = normalize(reading.quality);
+  return reading.freshness === "stale" || reading.freshness === "invalid" || source === "stale" || source === "invalid" || quality === "stale" || quality === "invalid";
+}
+function readingTimestamp(reading) {
+  return reading.captured_at ?? reading.ts;
+}
+function deriveConfidence(input) {
+  if (input.sensorUnavailable || input.contradictionCount > 0 || !input.hasCurrentLive && !input.hasRecentLog || input.missingCount >= 5) {
+    return "low";
+  }
+  if (input.hasCurrentLive && input.hasRecentLog && !input.profileIncomplete && input.highAlertCount === 0) {
+    return "high";
+  }
+  return "medium";
+}
+function deriveGrowWalkEvidence(input) {
+  const nowMs = toMs(input.now) ?? 0;
+  const reasons = /* @__PURE__ */ new Set();
+  const missing = /* @__PURE__ */ new Set();
+  const contradictions = /* @__PURE__ */ new Set();
+  const validEventsFor = (events) => {
+    const validEvents2 = [];
+    for (const event of events) {
+      const ms = toMs(event.occurredAt);
+      if (!isUsableTimestamp(ms, nowMs)) {
+        contradictions.add("future_or_malformed_timestamp");
+        continue;
+      }
+      validEvents2.push({ event, iso: event.occurredAt, ms });
+    }
+    return validEvents2;
+  };
+  const validEvents = validEventsFor(input.recentEvents);
+  const validFixedWindowEvents = input.fixedWindowEvents ? validEventsFor(input.fixedWindowEvents) : validEvents;
+  const validPhotos = [];
+  for (const photo of input.photos) {
+    const ms = toMs(photo.capturedAt);
+    if (!isUsableTimestamp(ms, nowMs)) {
+      contradictions.add("future_or_malformed_timestamp");
+      continue;
+    }
+    validPhotos.push({ photo, iso: photo.capturedAt, ms });
+  }
+  const validAlerts = [];
+  for (const alert of input.alerts) {
+    const ms = toMs(alert.lastSeenAt);
+    if (!isUsableTimestamp(ms, nowMs)) {
+      contradictions.add("future_or_malformed_timestamp");
+      continue;
+    }
+    validAlerts.push({ alert, iso: alert.lastSeenAt, ms });
+  }
+  if (input.aiDoctor && !isUsableTimestamp(toMs(input.aiDoctor.completedAt), nowMs)) {
+    contradictions.add("future_or_malformed_timestamp");
+  }
+  const readings = Object.values(input.sensors.readings);
+  for (const reading of readings) {
+    if (!isUsableTimestamp(toMs(readingTimestamp(reading)), nowMs)) {
+      contradictions.add("future_or_malformed_timestamp");
+    }
+  }
+  if ((input.sensors.contradictionMetrics?.length ?? 0) > 0) {
+    contradictions.add("sensor_sources_disagree");
+  }
+  const recentLogEvents = validFixedWindowEvents.filter(
+    ({ ms }) => ms <= nowMs && nowMs - ms <= RECENT_LOG_WINDOW_MS
+  );
+  const hasRecentLog = recentLogEvents.length > 0;
+  if (!hasRecentLog) missing.add("no_recent_grower_log");
+  const fixedWindowMajorChanges = validFixedWindowEvents.filter(
+    ({ event, ms }) => event.isMajorChange && ms <= nowMs && nowMs - ms <= MAJOR_CHANGE_WINDOW_MS
+  );
+  const recentMajorChangeCount48h = fixedWindowMajorChanges.length;
+  const latestMajorChangeAt = latestIso(fixedWindowMajorChanges);
+  const latestFixedWindowMajorChangeMs = fixedWindowMajorChanges.reduce(
+    (latest, current) => latest === null || current.ms > latest ? current.ms : latest,
+    null
+  );
+  if (recentMajorChangeCount48h >= 3) reasons.add("stacked_major_changes_48h");
+  const observations = validEvents.filter(({ event }) => isObservationEvent(event));
+  const latestObservationAt = latestIso(observations);
+  const fixedWindowObservations = validFixedWindowEvents.filter(
+    ({ event }) => isObservationEvent(event)
+  );
+  const hasPostInterventionObservation = latestFixedWindowMajorChangeMs === null || fixedWindowObservations.some(({ ms }) => ms > latestFixedWindowMajorChangeMs);
+  if (!hasPostInterventionObservation) {
+    reasons.add("missing_post_intervention_observation");
+    missing.add("no_post_intervention_observation");
+  }
+  const worsening = validEvents.filter(({ event }) => event.response === "worse");
+  if (worsening.length > 0) reasons.add("worsening_observation");
+  missing.add("no_current_visual_evidence");
+  if (latestFixedWindowMajorChangeMs !== null && validPhotos.length > 0 && validPhotos.every(({ ms }) => ms < latestFixedWindowMajorChangeMs)) {
+    missing.add("photo_predates_latest_major_change");
+  }
+  const hasCurrentLive = readings.some((reading) => reading.current_live === true);
+  if (!input.sensors.available) {
+    missing.add("sensor_lane_unavailable");
+  } else if (!hasCurrentLive) {
+    missing.add("sensor_lane_not_current_live");
+  }
+  const profileIncomplete = !hasText(input.stage) || normalize(input.plantType) === "unknown" || hasText(input.plantType) && (!hasText(input.medium) || !hasText(input.potSize));
+  if (profileIncomplete) missing.add("plant_profile_incomplete");
+  const activeHighAlerts = validAlerts.filter(
+    ({ alert }) => alert.severity === "high" && isActiveAlert(alert)
+  );
+  const activeMediumAlerts = validAlerts.filter(
+    ({ alert }) => alert.severity === "medium" && isActiveAlert(alert)
+  );
+  const activeLowAlerts = validAlerts.filter(
+    ({ alert }) => alert.severity === "low" && isActiveAlert(alert)
+  );
+  if (activeHighAlerts.length > 0) reasons.add("active_high_alert_needs_confirmation");
+  if (activeMediumAlerts.length > 0) reasons.add("active_medium_alert_needs_review");
+  if (activeLowAlerts.length > 0) reasons.add("active_low_alert_needs_review");
+  if (normalize(input.stage).includes("flower") && activeHighAlerts.some(({ alert }) => isHumidityAlert(alert))) {
+    reasons.add("flower_humidity_alert_needs_inspection");
+  }
+  const hasProblemPeriod = activeHighAlerts.length > 0 || recentMajorChangeCount48h > 0 || worsening.length > 0;
+  const staleOrInvalidSensor = readings.some(isStaleOrInvalidReading);
+  if (hasProblemPeriod && staleOrInvalidSensor) {
+    reasons.add("stale_or_invalid_sensor_during_problem");
+  }
+  if (contradictions.size > 0) reasons.add("contradictory_evidence");
+  const adverseLaneCount = [
+    activeHighAlerts.length > 0,
+    worsening.length > 0,
+    hasProblemPeriod && staleOrInvalidSensor,
+    contradictions.size > 0
+  ].filter(Boolean).length;
+  if (adverseLaneCount >= 2) reasons.add("multiple_adverse_evidence_lanes");
+  const plantStatus = normalize(input.plantStatus);
+  const recoveringOrStressed = plantStatus.includes("recover") || plantStatus.includes("stress") || plantStatus.includes("issue") || plantStatus.includes("damage");
+  if (recoveringOrStressed && adverseLaneCount > 0) {
+    reasons.add("stressed_or_recovering_with_adverse_change");
+  }
+  const latestAdverseEvidenceAt = latestIso(
+    [...worsening, ...activeHighAlerts].map(({ iso, ms }) => ({ iso, ms }))
+  );
+  const reasonCodes = orderedCodes(GROW_WALK_REASON_CODES, reasons);
+  const missingEvidenceCodes = orderedCodes(GROW_WALK_MISSING_EVIDENCE_CODES, missing);
+  const contradictionCodes = orderedCodes(GROW_WALK_CONTRADICTION_CODES, contradictions);
+  return Object.freeze({
+    reasonCodes,
+    missingEvidenceCodes,
+    contradictionCodes,
+    recentMajorChangeCount48h,
+    latestMajorChangeAt,
+    latestObservationAt,
+    latestAdverseEvidenceAt,
+    evidenceConfidence: deriveConfidence({
+      hasCurrentLive,
+      hasRecentLog,
+      profileIncomplete,
+      sensorUnavailable: !input.sensors.available,
+      contradictionCount: contradictionCodes.length,
+      highAlertCount: activeHighAlerts.length,
+      missingCount: missingEvidenceCodes.length
+    })
+  });
+}
+
+// src/lib/tenSecondQuickCheckRules.ts
+var RESPONSE_CHECK_TOKEN = /(?:response:\s*)?(?:response check|quick check):\s*(better|same|worse)(?=$|[.!]|\s)(?:[.!]+)?/i;
+function readResponseCheckStatus(existingNote) {
+  const match = RESPONSE_CHECK_TOKEN.exec(existingNote);
+  if (!match) return null;
+  const normalized = match[1].toLowerCase();
+  if (normalized === "better") return "Better";
+  if (normalized === "same") return "Same";
+  if (normalized === "worse") return "Worse";
+  return null;
+}
+
+// src/lib/growWalkTargetReadModels.ts
+var GROW_COLUMNS = "id,name,is_archived";
+var TENT_COLUMNS = "id,name,grow_id,stage,is_archived";
+var PLANT_COLUMNS = "id,name,strain,tent_id,grow_id,stage,health,is_archived,medium,pot_size,plant_type,started_at";
+var EVENT_COLUMNS = "id,grow_id,tent_id,plant_id,event_type,source,occurred_at,note,created_at,is_deleted";
+var DIARY_PHOTO_COLUMNS = "id,grow_id,tent_id,plant_id,entry_at,photo_url,details,retracted_at";
+var LEGACY_DIARY_PHOTO_COLUMNS = "id,grow_id,tent_id,plant_id,entry_at,photo_url,details";
+var ALERT_COLUMNS = "id,grow_id,tent_id,plant_id,title,reason,severity,status,metric,source,last_seen_at";
+var TARGET_SUMMARY_LOOKBACK_HOURS = 72;
+var TARGET_SUMMARY_ROW_LIMIT = 500;
+var TARGET_SUMMARY_FETCH_LIMIT = TARGET_SUMMARY_ROW_LIMIT + 1;
+var TARGET_CANDIDATE_LIMIT = 100;
+var HOUR_MS2 = 60 * 60 * 1e3;
+var MAJOR_CHANGE_EVENT_TYPES = /* @__PURE__ */ new Set([
+  "watering",
+  "feeding",
+  "training",
+  "transplant",
+  "treatment",
+  "flush",
+  "environment_change",
+  "light_change",
+  "irrigation_change"
+]);
+function normalize2(value) {
+  return (value ?? "").trim().toLowerCase();
+}
+function clean(value) {
+  if (typeof value !== "string") return null;
+  const result = value.trim();
+  return result.length > 0 ? result : null;
+}
+function normalizeLimit(value) {
+  if (!Number.isFinite(value)) return 50;
+  return Math.min(100, Math.max(1, Math.trunc(value)));
+}
+function toMs2(value) {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function latestIso2(values) {
+  let latestValue = null;
+  let latestMs = Number.NEGATIVE_INFINITY;
+  for (const value of values) {
+    const ms = toMs2(value);
+    if (ms !== null && ms > latestMs) {
+      latestMs = ms;
+      latestValue = value ?? null;
+    }
+  }
+  return latestValue;
+}
+function excerpt(value) {
+  const normalized = value?.replace(/\s+/g, " ").trim() ?? "";
+  return normalized ? normalized.slice(0, 240) : null;
+}
+function eventResponse(eventType, note) {
+  const type = normalize2(eventType);
+  if (type === "better" || type.endsWith("_better")) return "better";
+  if (type === "same" || type.endsWith("_same")) return "same";
+  if (type === "worse" || type.endsWith("_worse")) return "worse";
+  const response = readResponseCheckStatus(note ?? "");
+  if (response === "Better") return "better";
+  if (response === "Same") return "same";
+  if (response === "Worse") return "worse";
+  return null;
+}
+function toEventEvidence(row) {
+  const type = normalize2(row.event_type);
+  return {
+    id: row.id,
+    eventType: row.event_type,
+    occurredAt: row.occurred_at,
+    source: row.source,
+    noteExcerpt: excerpt(row.note),
+    isMajorChange: MAJOR_CHANGE_EVENT_TYPES.has(type),
+    response: eventResponse(type, row.note)
+  };
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function hasNonBlankString(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+function hasDiaryPhotoReference(row) {
+  if (hasNonBlankString(row.photo_url)) return true;
+  return isRecord(row.details) && hasNonBlankString(row.details.photo_url);
+}
+function isRetracted(row) {
+  return hasNonBlankString(row.retracted_at);
+}
+function toDiaryPhotoMetadata(row) {
+  return {
+    id: row.id,
+    capturedAt: row.entry_at,
+    // diary_entries does not carry a trustworthy origin field. Preserve that
+    // limitation rather than copying untrusted metadata into the receipt.
+    source: "diary",
+    inspectedInThisRun: false
+  };
+}
+function normalizeSeverity(value) {
+  const severity = normalize2(value);
+  if (severity === "critical" || severity === "high") return "high";
+  if (severity === "warning" || severity === "medium") return "medium";
+  return "low";
+}
+function activeAlertStatus(value) {
+  const status = normalize2(value);
+  return status === "open" || status === "acknowledged" ? status : null;
+}
+function toAlertEvidence(row) {
+  const status = activeAlertStatus(row.status);
+  if (!status) return null;
+  return {
+    id: row.id,
+    title: excerpt(row.title) ?? "Alert",
+    reasonExcerpt: excerpt(row.reason) ?? "Alert requires review.",
+    severity: normalizeSeverity(row.severity),
+    status,
+    metric: row.metric,
+    source: row.source,
+    lastSeenAt: row.last_seen_at
+  };
+}
+function highestSeverity(alerts) {
+  if (alerts.some((alert) => alert.severity === "high")) return "high";
+  if (alerts.some((alert) => alert.severity === "medium")) return "medium";
+  if (alerts.some((alert) => alert.severity === "low")) return "low";
+  return null;
+}
+function emptySensorEvidence() {
+  return { available: false, readings: {}, contradictionMetrics: [] };
+}
+function latestSensorTime(sensors) {
+  return latestIso2(
+    Object.values(sensors.readings).map((reading) => reading.captured_at ?? reading.ts)
+  );
+}
+function orderedMissing(codes) {
+  return Object.freeze(GROW_WALK_MISSING_EVIDENCE_CODES.filter((code) => codes.has(code)));
+}
+function orderedContradictions(codes) {
+  return Object.freeze(GROW_WALK_CONTRADICTION_CODES.filter((code) => codes.has(code)));
+}
+function augmentDerivation(source, options) {
+  const missing = new Set(source.missingEvidenceCodes);
+  for (const code of options.missing ?? []) missing.add(code);
+  const contradictions = new Set(source.contradictionCodes);
+  for (const code of options.contradictions ?? []) contradictions.add(code);
+  return {
+    ...source,
+    missingEvidenceCodes: orderedMissing(missing),
+    contradictionCodes: orderedContradictions(contradictions),
+    evidenceConfidence: contradictions.size > 0 || source.evidenceConfidence === "low" ? "low" : source.evidenceConfidence
+  };
+}
+function plantEvents(rows, plantId, tentId) {
+  return rows.filter(
+    (row) => !row.is_deleted && (row.plant_id === plantId || tentId !== null && row.plant_id === null && row.tent_id === tentId && normalize2(row.event_type) === "environment")
+  );
+}
+function tentEvents(rows, tentId, plantIds) {
+  return rows.filter(
+    (row) => !row.is_deleted && (row.tent_id === tentId || row.plant_id !== null && plantIds.has(row.plant_id))
+  );
+}
+function plantPhotos(rows, plantId) {
+  return rows.filter(
+    (row) => row.plant_id === plantId && !isRetracted(row) && hasDiaryPhotoReference(row)
+  );
+}
+function tentPhotos(rows, tentId, plantIds) {
+  return rows.filter(
+    (row) => !isRetracted(row) && hasDiaryPhotoReference(row) && (row.tent_id === tentId || row.plant_id !== null && plantIds.has(row.plant_id))
+  );
+}
+function plantAlerts(rows, plantId, tentId) {
+  return rows.filter(
+    (row) => activeAlertStatus(row.status) !== null && (row.plant_id === plantId || row.plant_id === null && row.tent_id === tentId)
+  );
+}
+function tentAlerts(rows, tentId, plantIds) {
+  return rows.filter(
+    (row) => activeAlertStatus(row.status) !== null && (row.tent_id === tentId || row.plant_id !== null && plantIds.has(row.plant_id))
+  );
+}
+function buildTarget(input) {
+  const events = input.events.map(toEventEvidence);
+  const photos = input.photos.map(toDiaryPhotoMetadata);
+  const alerts = input.alerts.flatMap((row) => {
+    const evidence = toAlertEvidence(row);
+    return evidence ? [evidence] : [];
+  });
+  const derived = augmentDerivation(
+    deriveGrowWalkEvidence({
+      now: input.now,
+      stage: input.stage,
+      plantStatus: input.status,
+      plantType: input.plantType,
+      medium: input.medium,
+      potSize: input.potSize,
+      recentEvents: events,
+      sensors: input.sensors,
+      photos,
+      alerts,
+      aiDoctor: null
+    }),
+    { missing: input.extraMissing, contradictions: input.extraContradictions }
+  );
+  return {
+    targetType: input.targetType,
+    targetId: input.targetId,
+    growId: input.growId,
+    targetArchived: input.targetArchived,
+    tentId: input.tentId,
+    displayName: input.displayName,
+    strain: input.strain,
+    stage: input.stage,
+    status: input.status,
+    plantCount: input.plantCount,
+    lastLogAt: latestIso2(input.events.map((event) => event.occurred_at)),
+    lastPhotoEventAt: latestIso2(input.photos.map((photo) => photo.entry_at)),
+    latestSensorCapturedAt: latestSensorTime(input.sensors),
+    activeAlertCount: alerts.length,
+    highestAlertSeverity: highestSeverity(alerts),
+    recentMajorChangeCount48h: derived.recentMajorChangeCount48h,
+    attentionBand: deriveGrowWalkAttentionBand(derived),
+    reasonCodes: derived.reasonCodes,
+    missingEvidenceCodes: derived.missingEvidenceCodes,
+    latestAdverseEvidenceAt: derived.latestAdverseEvidenceAt,
+    summaryComplete: false
+  };
+}
+function targetEvidenceUnavailable() {
+  return { ok: false, reason: "unavailable", message: "Grow Walk target evidence unavailable." };
+}
+async function listGrowWalkTargetsForOwnedGrow(client, growId, options = {}) {
+  const now = options.now ?? /* @__PURE__ */ new Date();
+  const generatedAt = now.toISOString();
+  const limit = normalizeLimit(options.limit);
+  const includeInactivePlants = options.includeInactivePlants === true;
+  const cutoff = new Date(now.getTime() - TARGET_SUMMARY_LOOKBACK_HOURS * HOUR_MS2).toISOString();
+  const { data: growData, error: growError } = await client.from("grows").select(GROW_COLUMNS).eq("id", growId).maybeSingle();
+  if (growError) return targetEvidenceUnavailable();
+  if (!growData) {
+    return { ok: false, reason: "not_found", message: "Grow not found for the signed-in grower." };
+  }
+  const grow = growData;
+  const tentsResult = await client.from("tents").select(TENT_COLUMNS).eq("grow_id", growId).eq("is_archived", false).order("name", { ascending: true }).order("id", { ascending: true }).limit(TARGET_CANDIDATE_LIMIT + 1);
+  if (tentsResult.error) return targetEvidenceUnavailable();
+  const tentRows = tentsResult.data ?? [];
+  const tentsTruncated = tentRows.length > TARGET_CANDIDATE_LIMIT;
+  const tents = tentRows.slice(0, TARGET_CANDIDATE_LIMIT);
+  const tentIds = tents.map((tent) => tent.id);
+  const targetTentById = new Map(tents.map((tent) => [tent.id, tent]));
+  let plantQuery = client.from("plants").select(PLANT_COLUMNS).or(buildGrowScopedPlantsOrFilter(growId, tentIds));
+  if (!includeInactivePlants) plantQuery = plantQuery.eq("is_archived", false);
+  const plantsResult = await plantQuery.order("name", { ascending: true }).order("id", { ascending: true }).limit(TARGET_CANDIDATE_LIMIT + 1);
+  if (plantsResult.error) return targetEvidenceUnavailable();
+  const candidatePlantRows = plantsResult.data ?? [];
+  const plantsTruncated = candidatePlantRows.length > TARGET_CANDIDATE_LIMIT;
+  const candidatePlants = candidatePlantRows.slice(0, TARGET_CANDIDATE_LIMIT);
+  const candidateTentIds = [
+    ...new Set(candidatePlants.flatMap((plant) => plant.tent_id ? [plant.tent_id] : []))
+  ];
+  let relationTentRows = [];
+  if (candidateTentIds.length > 0) {
+    const relationTentsResult = await client.from("tents").select(TENT_COLUMNS).eq("grow_id", growId).in("id", candidateTentIds).order("id", { ascending: true }).limit(TARGET_CANDIDATE_LIMIT);
+    if (relationTentsResult.error) return targetEvidenceUnavailable();
+    relationTentRows = relationTentsResult.data ?? [];
+  }
+  const ownedTentById = new Map(
+    relationTentRows.filter((tent) => candidateTentIds.includes(tent.id) && tent.grow_id === growId).map((tent) => [tent.id, tent])
+  );
+  const plants = candidatePlants.filter((plant) => {
+    if (!includeInactivePlants && plant.is_archived) return false;
+    const plantGrowId = clean(plant.grow_id);
+    const tentId = plant.tent_id;
+    const ownedTent = tentId ? ownedTentById.get(tentId) ?? null : null;
+    if (plantGrowId) return plantGrowId === growId && (tentId === null || ownedTent !== null);
+    return ownedTent !== null;
+  });
+  const eventsQuery = client.from("grow_events").select(EVENT_COLUMNS).eq("grow_id", growId).eq("source", "manual").eq("is_deleted", false).gte("occurred_at", cutoff).order("occurred_at", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(TARGET_SUMMARY_FETCH_LIMIT);
+  const diaryPhotoQuery = selectWithRetractionCompat((withRetractionFilter) => {
+    let query = client.from("diary_entries").select(withRetractionFilter ? DIARY_PHOTO_COLUMNS : LEGACY_DIARY_PHOTO_COLUMNS).eq("grow_id", growId);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return query.gte("entry_at", cutoff).order("entry_at", { ascending: false }).order("id", { ascending: false }).limit(TARGET_SUMMARY_FETCH_LIMIT);
+  });
+  const alertsQuery = client.from("alerts").select(ALERT_COLUMNS).eq("grow_id", growId).in("status", ["open", "acknowledged"]).order("last_seen_at", { ascending: false }).order("id", { ascending: false }).limit(TARGET_SUMMARY_FETCH_LIMIT);
+  let eventsResult;
+  let diaryPhotoResult;
+  let alertsResult;
+  try {
+    [eventsResult, diaryPhotoResult, alertsResult] = await Promise.all([
+      eventsQuery,
+      diaryPhotoQuery,
+      alertsQuery
+    ]);
+  } catch {
+    return targetEvidenceUnavailable();
+  }
+  if (eventsResult.error || diaryPhotoResult.error || alertsResult.error)
+    return targetEvidenceUnavailable();
+  const eventRows = eventsResult.data ?? [];
+  const diaryPhotoRows = diaryPhotoResult.data ?? [];
+  const alertRows = alertsResult.data ?? [];
+  const eventsTruncated = eventRows.length > TARGET_SUMMARY_ROW_LIMIT;
+  const photosTruncated = diaryPhotoRows.length > TARGET_SUMMARY_ROW_LIMIT;
+  const alertsTruncated = alertRows.length > TARGET_SUMMARY_ROW_LIMIT;
+  const events = eventRows.slice(0, TARGET_SUMMARY_ROW_LIMIT);
+  const diaryPhotos = diaryPhotoRows.slice(0, TARGET_SUMMARY_ROW_LIMIT);
+  const alerts = alertRows.slice(0, TARGET_SUMMARY_ROW_LIMIT);
+  const truncatedLanes = [
+    ...eventsTruncated ? ["events"] : [],
+    ...photosTruncated ? ["photos"] : [],
+    ...alertsTruncated ? ["alerts"] : []
+  ];
+  const candidateTargetsTruncated = tentsTruncated || plantsTruncated;
+  const summaryComplete = false;
+  const plantsByTent = /* @__PURE__ */ new Map();
+  for (const plant of plants) {
+    if (!plant.tent_id || !targetTentById.has(plant.tent_id)) continue;
+    const rows = plantsByTent.get(plant.tent_id) ?? [];
+    rows.push(plant);
+    plantsByTent.set(plant.tent_id, rows);
+  }
+  const targets = [];
+  for (const tent of tents) {
+    const tentPlants = plantsByTent.get(tent.id) ?? [];
+    const tentPlantIds = new Set(tentPlants.map((plant) => plant.id));
+    targets.push(
+      buildTarget({
+        targetType: "tent",
+        targetId: tent.id,
+        growId,
+        targetArchived: grow.is_archived === true || tent.is_archived === true,
+        tentId: tent.id,
+        displayName: tent.name,
+        strain: null,
+        stage: tent.stage,
+        status: null,
+        plantCount: tentPlants.length,
+        plantType: null,
+        medium: null,
+        potSize: null,
+        events: tentEvents(events, tent.id, tentPlantIds),
+        photos: tentPhotos(diaryPhotos, tent.id, tentPlantIds),
+        alerts: tentAlerts(alerts, tent.id, tentPlantIds),
+        // Target lists deliberately skip per-tent sensor snapshots so a large
+        // grow cannot turn one list request into an unbounded sensor fan-out.
+        // The exact context endpoint owns the detailed source-labeled read.
+        sensors: emptySensorEvidence(),
+        now
+      })
+    );
+  }
+  for (const plant of plants) {
+    const ownedTent = plant.tent_id ? ownedTentById.get(plant.tent_id) ?? null : null;
+    const legacyTentAttribution = plant.grow_id === null && ownedTent?.grow_id === growId;
+    targets.push(
+      buildTarget({
+        targetType: "plant",
+        targetId: plant.id,
+        growId,
+        targetArchived: grow.is_archived === true || plant.is_archived === true || ownedTent?.is_archived === true,
+        tentId: ownedTent?.id ?? null,
+        displayName: plant.name,
+        strain: clean(plant.strain),
+        stage: clean(plant.stage),
+        status: clean(plant.health),
+        plantCount: null,
+        plantType: clean(plant.plant_type),
+        medium: clean(plant.medium),
+        potSize: clean(plant.pot_size),
+        events: plantEvents(events, plant.id, ownedTent?.id ?? null),
+        photos: plantPhotos(diaryPhotos, plant.id),
+        alerts: plantAlerts(alerts, plant.id, ownedTent?.id ?? null),
+        sensors: emptySensorEvidence(),
+        now,
+        extraMissing: legacyTentAttribution ? ["plant_profile_incomplete"] : []
+      })
+    );
+  }
+  const sortedTargets = sortGrowWalkTargets(targets);
+  const returnedTargetsTruncated = sortedTargets.length > limit;
+  const rankedTargets = sortedTargets.slice(0, limit).map((target) => ({ ...target, summaryComplete }));
+  return {
+    ok: true,
+    data: {
+      grow: { id: grow.id, name: grow.name },
+      targets: Object.freeze(rankedTargets),
+      generatedAt,
+      receipt: {
+        candidateTargetLimit: TARGET_CANDIDATE_LIMIT,
+        candidateTargetsTruncated,
+        returnedTargetsTruncated,
+        truncatedLanes: Object.freeze(truncatedLanes),
+        omittedLanes: Object.freeze(["sensors"])
+      }
+    }
+  };
+}
+
+// src/lib/mcp/tools/list-grow-walk-targets.ts
+var list_grow_walk_targets_default = defineTool4({
+  name: "list_grow_walk_targets",
+  title: "List Grow Walk targets",
+  description: "List the signed-in Verdant grower's own tents and plants within one owned grow, ordered by deterministic physical-inspection priority. Results preserve missing evidence and source limits; archived targets are labeled historical; exact sensor evidence is loaded only by get_grow_walk_context. Priority is scouting guidance, not a diagnosis. Read-only.",
+  inputSchema: {
+    growId: z4.string().uuid().describe("Owned grow id whose tents and plants should be listed."),
+    includeInactivePlants: z4.boolean().optional().describe("Include archived or inactive plant records. Defaults to false."),
+    limit: z4.number().int().min(1).max(100).optional().describe("Maximum targets to return (1\u2013100). Defaults to 50.")
   },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ growId, includeInactivePlants, limit }, ctx) => {
+    if (!ctx.isAuthenticated()) return unauthenticated();
+    const result = await listGrowWalkTargetsForOwnedGrow(supabaseForUser(ctx), growId, {
+      includeInactivePlants,
+      limit
+    });
+    if (!result.ok) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message
+          }
+        ],
+        isError: true
+      };
+    }
+    const { grow, targets, generatedAt, receipt } = result.data;
+    const summaryIsPartial = receipt.candidateTargetsTruncated || receipt.returnedTargetsTruncated || receipt.truncatedLanes.length > 0 || receipt.omittedLanes.length > 0;
+    return {
+      content: [
+        {
+          type: "text",
+          text: targets.length === 0 ? `No Grow Walk targets found in "${grow.name}".` : `Found ${targets.length} Grow Walk target(s) in "${grow.name}", ordered for physical inspection${summaryIsPartial ? " with explicit bounded-summary limits" : ""}.`
+        }
+      ],
+      structuredContent: { grow, targets, generatedAt, receipt }
+    };
+  }
+});
+
+// src/lib/mcp/tools/get-grow-walk-context.ts
+import { defineTool as defineTool5 } from "npm:@lovable.dev/mcp-js@0.24.0";
+import { z as z5 } from "npm:zod@^3.24.2";
+
+// src/lib/actionQueueProvenanceRules.ts
+var ALERT_TOKEN_RE = /\[alert:([A-Za-z0-9_-]{1,64})\]/;
+function extractSourceAlertId(reason) {
+  if (typeof reason !== "string") return null;
+  const m = reason.match(ALERT_TOKEN_RE);
+  if (!m) return null;
+  const id = m[1];
+  if (!id || id.length < 1 || id.length > 64) return null;
+  return id;
+}
+function stripBackPointerTokens(reason) {
+  if (typeof reason !== "string" || !reason) return "";
+  return reason.replace(/\s*\[session:[^\]]+\]\s*/g, " ").replace(/\s*\[alert:[^\]]+\]\s*/g, " ").replace(/\s*\[event:[^\]]+\]\s*/g, " ").replace(/\s+/g, " ").trim();
+}
+function getActionQueueSourceKind(action) {
+  const s = (action?.source ?? "").trim().toLowerCase();
+  if (s === "environment_alert") return "environment_alert";
+  if (s === "ai_coach") return "ai_coach";
+  if (s === "ai_doctor") return "ai_doctor";
+  if (s === "manual") return "manual";
+  return "unknown";
+}
+function isAlertDerived(action) {
+  return getActionQueueSourceKind(action) === "environment_alert";
+}
+function isActionDerivedFromAlert(action, alertId) {
+  if (!action || typeof alertId !== "string" || !alertId) return false;
+  if (!isAlertDerived(action)) return false;
+  return extractSourceAlertId(action.reason) === alertId;
+}
+
+// src/lib/growWalkContextReadModels.ts
+var GROW_COLUMNS2 = "id,name,grow_type,stage,is_archived";
+var TENT_COLUMNS2 = "id,name,grow_id,stage,is_archived";
+var PLANT_COLUMNS2 = "id,name,strain,tent_id,grow_id,stage,health,is_archived,medium,pot_size,plant_type";
+var EVENT_COLUMNS2 = "id,grow_id,tent_id,plant_id,event_type,source,occurred_at,note,created_at,is_deleted";
+var DIARY_PHOTO_COLUMNS2 = "id,grow_id,tent_id,plant_id,entry_at,photo_url,details,retracted_at";
+var LEGACY_DIARY_PHOTO_COLUMNS2 = "id,grow_id,tent_id,plant_id,entry_at,photo_url,details";
+var ALERT_COLUMNS2 = "id,grow_id,tent_id,plant_id,title,reason,severity,status,metric,source,last_seen_at";
+var AI_DOCTOR_COLUMNS = "id,grow_id,tent_id,plant_id,created_at,diagnosis,displayed_confidence,context_confidence_ceiling,context_sufficiency,sensor_snapshot_status,sensor_snapshot_reason_code";
+var ACTION_QUEUE_COLUMNS = "id,grow_id,tent_id,plant_id,source,status,risk_level,reason,created_at";
+var ACTION_QUEUE_AUDIT_COLUMNS = "id,action_queue_id,grow_id,event_type,previous_status,new_status,note,created_at";
+var TENT_RELATION_PLANT_COLUMNS = "id,grow_id,tent_id";
+var DEFAULT_LOOKBACK_HOURS = 72;
+var MIN_LOOKBACK_HOURS = 24;
+var MAX_LOOKBACK_HOURS = 168;
+var EVENT_LIMIT = 100;
+var EVENT_FETCH_LIMIT = EVENT_LIMIT + 1;
+var PHOTO_LIMIT = 100;
+var PHOTO_FETCH_LIMIT = PHOTO_LIMIT + 1;
+var ALERT_LIMIT = 50;
+var ALERT_FETCH_LIMIT = ALERT_LIMIT + 1;
+var AI_DOCTOR_LIMIT = 1;
+var AI_DOCTOR_FETCH_LIMIT = AI_DOCTOR_LIMIT + 1;
+var ACTION_QUEUE_LIMIT = 20;
+var ACTION_QUEUE_FETCH_LIMIT = ACTION_QUEUE_LIMIT + 1;
+var ACTION_QUEUE_AUDIT_LIMIT = 100;
+var ACTION_QUEUE_AUDIT_FETCH_LIMIT = ACTION_QUEUE_AUDIT_LIMIT + 1;
+var TENT_RELATION_PLANT_LIMIT = 100;
+var TENT_RELATION_PLANT_FETCH_LIMIT = TENT_RELATION_PLANT_LIMIT + 1;
+var HOUR_MS3 = 60 * 60 * 1e3;
+var MAJOR_CHANGE_EVENT_TYPES2 = /* @__PURE__ */ new Set([
+  "watering",
+  "feeding",
+  "training",
+  "transplant",
+  "treatment",
+  "flush",
+  "environment_change",
+  "light_change",
+  "irrigation_change"
+]);
+function normalize3(value) {
+  return (value ?? "").trim().toLowerCase();
+}
+function clean2(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+function normalizeLookback(value) {
+  if (!Number.isFinite(value)) return DEFAULT_LOOKBACK_HOURS;
+  return Math.min(MAX_LOOKBACK_HOURS, Math.max(MIN_LOOKBACK_HOURS, Math.trunc(value)));
+}
+function excerpt2(value) {
+  const normalized = value?.replace(/\s+/g, " ").trim() ?? "";
+  return normalized ? normalized.slice(0, 240) : null;
+}
+function eventResponse2(eventType, note) {
+  const type = normalize3(eventType);
+  if (type === "better" || type.endsWith("_better")) return "better";
+  if (type === "same" || type.endsWith("_same")) return "same";
+  if (type === "worse" || type.endsWith("_worse")) return "worse";
+  const storedResponse = readResponseCheckStatus(note ?? "");
+  if (storedResponse === "Better") return "better";
+  if (storedResponse === "Same") return "same";
+  if (storedResponse === "Worse") return "worse";
+  return null;
+}
+function toEventEvidence2(row) {
+  const type = normalize3(row.event_type);
+  return {
+    id: row.id,
+    eventType: row.event_type,
+    occurredAt: row.occurred_at,
+    source: row.source,
+    noteExcerpt: excerpt2(row.note),
+    isMajorChange: MAJOR_CHANGE_EVENT_TYPES2.has(type),
+    response: eventResponse2(type, row.note)
+  };
+}
+function isRecord2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function hasNonBlankString2(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+function hasDiaryPhotoReference2(row) {
+  if (hasNonBlankString2(row.photo_url)) return true;
+  return isRecord2(row.details) && hasNonBlankString2(row.details.photo_url);
+}
+function isRetracted2(row) {
+  return hasNonBlankString2(row.retracted_at);
+}
+function toDiaryPhotoMetadata2(row) {
+  return {
+    id: row.id,
+    capturedAt: row.entry_at,
+    source: "diary",
+    inspectedInThisRun: false
+  };
+}
+function normalizeSeverity2(value) {
+  const severity = normalize3(value);
+  if (severity === "critical" || severity === "high") return "high";
+  if (severity === "warning" || severity === "medium") return "medium";
+  return "low";
+}
+function activeAlertStatus2(value) {
+  const status = normalize3(value);
+  return status === "open" || status === "acknowledged" ? status : null;
+}
+function toAlertEvidence2(row) {
+  const status = activeAlertStatus2(row.status);
+  if (!status) return null;
+  return {
+    id: row.id,
+    title: excerpt2(row.title) ?? "Alert",
+    reasonExcerpt: excerpt2(row.reason) ?? "Alert requires review.",
+    severity: normalizeSeverity2(row.severity),
+    status,
+    metric: row.metric,
+    source: row.source,
+    lastSeenAt: row.last_seen_at
+  };
+}
+function confidenceBand(row) {
+  if (typeof row.displayed_confidence !== "number" || !Number.isFinite(row.displayed_confidence) || row.displayed_confidence < 0 || row.displayed_confidence > 1) {
+    return "unknown";
+  }
+  const displayed = row.displayed_confidence < 0.4 ? "low" : row.displayed_confidence < 0.75 ? "medium" : "high";
+  const ceiling = normalize3(row.context_confidence_ceiling);
+  if (ceiling !== "low" && ceiling !== "medium" && ceiling !== "high") return displayed;
+  const rank = { low: 0, medium: 1, high: 2 };
+  return rank[displayed] > rank[ceiling] ? ceiling : displayed;
+}
+function missingInformationCount(value) {
+  if (!isRecord2(value)) return 0;
+  for (const key of ["missing_information", "missingInformation", "missing"]) {
+    const candidate = value[key];
+    if (Array.isArray(candidate)) return candidate.length;
+  }
+  return 0;
+}
+function diagnosisRiskLevel(value) {
+  if (!isRecord2(value)) return "unknown";
+  const riskLevel = normalize3(typeof value.riskLevel === "string" ? value.riskLevel : null);
+  return riskLevel === "low" || riskLevel === "medium" || riskLevel === "high" ? riskLevel : "unknown";
+}
+function diagnosisSummaryExcerpt(value) {
+  return isRecord2(value) && typeof value.summary === "string" ? excerpt2(value.summary) : null;
+}
+function diagnosisMissingInformationCount(value) {
+  if (!isRecord2(value) || !Array.isArray(value.missingInformation)) return null;
+  return value.missingInformation.filter((item) => hasNonBlankString2(item)).length;
+}
+function toAiDoctorEvidence(row) {
+  if (!row) return null;
+  const diagnosisMissingCount = diagnosisMissingInformationCount(row.diagnosis);
+  return {
+    sessionId: row.id,
+    completedAt: row.created_at,
+    confidenceBand: confidenceBand(row),
+    riskLevel: diagnosisRiskLevel(row.diagnosis),
+    missingInformationCount: diagnosisMissingCount ?? missingInformationCount(row.context_sufficiency),
+    summaryExcerpt: diagnosisSummaryExcerpt(row.diagnosis)
+  };
+}
+function openActionStatus(value) {
+  const status = normalize3(value);
+  return status === "pending_approval" || status === "approved" || status === "simulated" ? status : null;
+}
+function relatedAlertId(row) {
+  const alertId = extractSourceAlertId(row.reason);
+  return isActionDerivedFromAlert(row, alertId) ? alertId : null;
+}
+function toActionQueueEvidence(rows, auditRows) {
+  const auditByActionId = /* @__PURE__ */ new Map();
+  for (const audit of auditRows) {
+    const existing = auditByActionId.get(audit.action_queue_id) ?? [];
+    existing.push(audit);
+    auditByActionId.set(audit.action_queue_id, existing);
+  }
+  const items = rows.flatMap((row) => {
+    const status = openActionStatus(row.status);
+    if (!status) return [];
+    return [
+      {
+        id: row.id,
+        growId: row.grow_id,
+        tentId: row.tent_id,
+        plantId: row.plant_id,
+        relatedAlertId: relatedAlertId(row),
+        status,
+        riskLevel: row.risk_level,
+        reasonExcerpt: excerpt2(stripBackPointerTokens(row.reason)) ?? "Existing item requires review.",
+        createdAt: row.created_at,
+        auditTrail: Object.freeze(
+          (auditByActionId.get(row.id) ?? []).map((audit) => ({
+            id: audit.id,
+            eventType: audit.event_type,
+            previousStatus: clean2(audit.previous_status),
+            newStatus: clean2(audit.new_status),
+            noteExcerpt: excerpt2(stripBackPointerTokens(audit.note)),
+            createdAt: audit.created_at
+          }))
+        )
+      }
+    ];
+  });
+  return { openCount: items.length, items: Object.freeze(items) };
+}
+async function settleRows(operation, limit) {
+  try {
+    const result = await operation();
+    if (result.error) return { rows: [], failed: true, truncated: false };
+    const rows = Array.isArray(result.data) ? result.data : [];
+    return { rows, failed: false, truncated: rows.length >= limit };
+  } catch {
+    return { rows: [], failed: true, truncated: false };
+  }
+}
+function trimLookahead(lane, rowLimit) {
+  return {
+    rows: Object.freeze(lane.rows.slice(0, rowLimit)),
+    failed: lane.failed,
+    truncated: lane.truncated
+  };
+}
+function notFound() {
+  return {
+    ok: false,
+    reason: "not_found",
+    message: "Grow Walk target not found for the signed-in grower."
+  };
+}
+function unavailable() {
+  return { ok: false, reason: "unavailable", message: "Grow Walk context unavailable." };
+}
+async function fetchGrow(client, growId) {
+  const { data, error } = await client.from("grows").select(GROW_COLUMNS2).eq("id", growId).maybeSingle();
+  if (error) return "error";
+  return data ? data : null;
+}
+async function resolvePlantScope(client, targetId) {
+  const { data: plantData, error: plantError } = await client.from("plants").select(PLANT_COLUMNS2).eq("id", targetId).maybeSingle();
+  if (plantError) return unavailable();
+  if (!plantData) return notFound();
+  const plant = plantData;
+  let tent = null;
+  if (plant.tent_id) {
+    const { data: tentData, error: tentError } = await client.from("tents").select(TENT_COLUMNS2).eq("id", plant.tent_id).maybeSingle();
+    if (tentError) return unavailable();
+    if (!tentData) return notFound();
+    tent = tentData;
+  }
+  const growId = clean2(plant.grow_id) ?? clean2(tent?.grow_id);
+  if (!growId) return notFound();
+  if (tent && tent.grow_id !== growId) return notFound();
+  const grow = await fetchGrow(client, growId);
+  if (grow === "error") return unavailable();
+  if (!grow) return notFound();
+  return { ok: true, data: { grow, tent, plant } };
+}
+async function resolveTentScope(client, targetId) {
+  const { data: tentData, error: tentError } = await client.from("tents").select(TENT_COLUMNS2).eq("id", targetId).maybeSingle();
+  if (tentError) return unavailable();
+  if (!tentData) return notFound();
+  const tent = tentData;
+  if (!tent.grow_id) return notFound();
+  const grow = await fetchGrow(client, tent.grow_id);
+  if (grow === "error") return unavailable();
+  if (!grow) return notFound();
+  return { ok: true, data: { grow, tent, plant: null } };
+}
+function resolveScope(client, input) {
+  return input.targetType === "plant" ? resolvePlantScope(client, input.targetId) : resolveTentScope(client, input.targetId);
+}
+function scopeQuery(query, scope) {
+  const chain = query;
+  if (scope.plant) return chain.eq("plant_id", scope.plant.id);
+  if (scope.tent) return chain.eq("tent_id", scope.tent.id);
+  return query;
+}
+function relatedTentPlantIds(rows, scope) {
+  const tentId = scope.tent?.id;
+  if (!tentId) return [];
+  return Object.freeze(
+    [
+      ...new Set(
+        rows.flatMap(
+          (row) => (row.grow_id === scope.grow.id || row.grow_id === null) && row.tent_id === tentId && clean2(row.id) ? [row.id] : []
+        )
+      )
+    ].sort((left, right) => left.localeCompare(right))
+  );
+}
+async function loadTentRelationPlants(client, scope) {
+  const tentId = scope.tent?.id;
+  if (scope.plant || !tentId) return { rows: [], failed: false, truncated: false };
+  const lane = await settleRows(
+    () => client.from("plants").select(TENT_RELATION_PLANT_COLUMNS).or(`grow_id.eq.${scope.grow.id},grow_id.is.null`).eq("tent_id", tentId).order("id", { ascending: true }).limit(TENT_RELATION_PLANT_FETCH_LIMIT),
+    TENT_RELATION_PLANT_FETCH_LIMIT
+  );
+  return trimLookahead(lane, TENT_RELATION_PLANT_LIMIT);
+}
+function tentAttributionScopeQuery(query, scope, tentPlantIds) {
+  const chain = query;
+  if (scope.plant) return chain.eq("plant_id", scope.plant.id);
+  const tentId = scope.tent?.id;
+  if (!tentId) return query;
+  if (tentPlantIds.length === 0) return chain.eq("tent_id", tentId);
+  return chain.or(`tent_id.eq.${tentId},plant_id.in.(${tentPlantIds.join(",")})`);
+}
+function eventAttributionScopeQuery(query, scope, tentPlantIds) {
+  const chain = query;
+  if (!scope.plant) return tentAttributionScopeQuery(query, scope, tentPlantIds);
+  const tentId = scope.tent?.id;
+  if (!tentId) return chain.eq("plant_id", scope.plant.id);
+  return chain.or(
+    `plant_id.eq.${scope.plant.id},and(plant_id.is.null,tent_id.eq.${tentId},event_type.eq.environment)`
+  );
+}
+function alertAttributionScopeQuery(query, scope, tentPlantIds) {
+  const chain = query;
+  if (!scope.plant) return tentAttributionScopeQuery(query, scope, tentPlantIds);
+  const tentId = scope.tent?.id;
+  if (!tentId) {
+    return chain.or(`plant_id.eq.${scope.plant.id},and(plant_id.is.null,tent_id.is.null)`);
+  }
+  return chain.or(`plant_id.eq.${scope.plant.id},and(plant_id.is.null,tent_id.eq.${tentId})`);
+}
+function actionAttributionScopeQuery(query, scope, tentPlantIds) {
+  const chain = query;
+  if (!scope.plant) {
+    const tentId2 = scope.tent?.id;
+    if (!tentId2) return query;
+    if (tentPlantIds.length === 0) return chain.eq("tent_id", tentId2);
+    return chain.or(
+      `tent_id.eq.${tentId2},and(tent_id.is.null,plant_id.in.(${tentPlantIds.join(",")}))`
+    );
+  }
+  const tentId = scope.tent?.id;
+  if (!tentId) return chain.eq("plant_id", scope.plant.id);
+  return chain.or(`plant_id.eq.${scope.plant.id},and(plant_id.is.null,tent_id.eq.${tentId})`);
+}
+function belongsToTentAttributedScope(row, scope, tentPlantIds) {
+  if (scope.plant) return row.plant_id === scope.plant.id;
+  const tentId = scope.tent?.id;
+  return tentId !== void 0 && (row.tent_id === tentId || row.plant_id !== null && tentPlantIds.has(row.plant_id));
+}
+function belongsToEventScope(row, scope, tentPlantIds) {
+  if (!scope.plant) return belongsToTentAttributedScope(row, scope, tentPlantIds);
+  const tentId = scope.tent?.id;
+  return row.plant_id === scope.plant.id || tentId !== void 0 && row.plant_id === null && row.tent_id === tentId && normalize3(row.event_type) === "environment";
+}
+function belongsToAlertScope(row, scope, tentPlantIds) {
+  if (!scope.plant) return belongsToTentAttributedScope(row, scope, tentPlantIds);
+  return row.plant_id === scope.plant.id || row.plant_id === null && row.tent_id === (scope.tent?.id ?? null);
+}
+function belongsToActionQueueScope(row, scope, tentPlantIds) {
+  if (row.grow_id !== scope.grow.id) return false;
+  if (!scope.plant) {
+    return row.tent_id === (scope.tent?.id ?? null) || row.tent_id === null && row.plant_id !== null && tentPlantIds.has(row.plant_id);
+  }
+  if (row.plant_id === scope.plant.id) return true;
+  const tentId = scope.tent?.id;
+  return tentId !== void 0 && row.plant_id === null && row.tent_id === tentId;
+}
+async function loadActionQueueAudits(client, scope, actionRows) {
+  const actionIds = Object.freeze([
+    ...new Set(actionRows.flatMap((row) => openActionStatus(row.status) ? [row.id] : []))
+  ]);
+  if (actionIds.length === 0) return { rows: [], failed: false, truncated: false };
+  const lane = await settleRows(
+    () => client.from("action_queue_events").select(ACTION_QUEUE_AUDIT_COLUMNS).eq("grow_id", scope.grow.id).in("action_queue_id", actionIds).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(ACTION_QUEUE_AUDIT_FETCH_LIMIT),
+    ACTION_QUEUE_AUDIT_FETCH_LIMIT
+  );
+  return trimLookahead(lane, ACTION_QUEUE_AUDIT_LIMIT);
+}
+function orderedLanes(found) {
+  const order = [
+    "profile",
+    "events",
+    "sensors",
+    "photos",
+    "alerts",
+    "ai_doctor",
+    "action_queue"
+  ];
+  return Object.freeze(order.filter((lane) => found.has(lane)));
+}
+function addMissing(current, code) {
+  const found = new Set(current);
+  found.add(code);
+  return Object.freeze(
+    GROW_WALK_MISSING_EVIDENCE_CODES.filter((candidate) => found.has(candidate))
+  );
+}
+async function getGrowWalkContextForOwnedTarget(client, input, options = {}) {
+  const now = options.now ?? /* @__PURE__ */ new Date();
+  const generatedAt = now.toISOString();
+  const lookbackHours = normalizeLookback(input.lookbackHours);
+  const cutoffMs = now.getTime() - lookbackHours * HOUR_MS3;
+  const cutoff = new Date(cutoffMs).toISOString();
+  const evidenceEventCutoff = new Date(
+    now.getTime() - Math.max(lookbackHours, GROW_WALK_EVENT_EVIDENCE_HISTORY_HOURS) * HOUR_MS3
+  ).toISOString();
+  const scopeResult = await resolveScope(client, input);
+  if (!scopeResult.ok) return scopeResult;
+  const scope = scopeResult.data;
+  const tentRelationLane = await loadTentRelationPlants(client, scope);
+  const tentPlantIds = relatedTentPlantIds(tentRelationLane.rows, scope);
+  const tentPlantIdSet = new Set(tentPlantIds);
+  const eventsBase = client.from("grow_events").select(EVENT_COLUMNS2).eq("grow_id", scope.grow.id).eq("source", "manual").eq("is_deleted", false).gte("occurred_at", evidenceEventCutoff).order("occurred_at", { ascending: false }).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(EVENT_FETCH_LIMIT);
+  const diaryPhotoQuery = selectWithRetractionCompat((withRetractionFilter) => {
+    let query = client.from("diary_entries").select(withRetractionFilter ? DIARY_PHOTO_COLUMNS2 : LEGACY_DIARY_PHOTO_COLUMNS2).eq("grow_id", scope.grow.id);
+    if (withRetractionFilter) query = query.is("retracted_at", null);
+    return tentAttributionScopeQuery(query, scope, tentPlantIds).gte("entry_at", cutoff).order("entry_at", { ascending: false }).order("id", { ascending: false }).limit(PHOTO_FETCH_LIMIT);
+  });
+  const alertsBase = client.from("alerts").select(ALERT_COLUMNS2).eq("grow_id", scope.grow.id).in("status", ["open", "acknowledged"]).order("last_seen_at", { ascending: false }).order("id", { ascending: false }).limit(ALERT_FETCH_LIMIT);
+  const aiBase = client.from("ai_doctor_sessions").select(AI_DOCTOR_COLUMNS).eq("grow_id", scope.grow.id).gte("created_at", cutoff).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(AI_DOCTOR_FETCH_LIMIT);
+  const actionBase = client.from("action_queue").select(ACTION_QUEUE_COLUMNS).eq("grow_id", scope.grow.id).in("status", ["pending_approval", "approved", "simulated"]).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(ACTION_QUEUE_FETCH_LIMIT);
+  const [eventFetchLane, photoFetchLane, alertFetchLane, aiFetchLane, actionFetchLane, sensorLane] = await Promise.all([
+    settleRows(
+      () => eventAttributionScopeQuery(eventsBase, scope, tentPlantIds),
+      EVENT_FETCH_LIMIT
+    ),
+    settleRows(() => diaryPhotoQuery, PHOTO_FETCH_LIMIT),
+    settleRows(
+      () => alertAttributionScopeQuery(alertsBase, scope, tentPlantIds),
+      ALERT_FETCH_LIMIT
+    ),
+    settleRows(
+      () => scopeQuery(aiBase, scope),
+      AI_DOCTOR_FETCH_LIMIT
+    ),
+    settleRows(
+      () => actionAttributionScopeQuery(actionBase, scope, tentPlantIds),
+      ACTION_QUEUE_FETCH_LIMIT
+    ),
+    (async () => {
+      if (!scope.tent)
+        return {
+          evidence: { available: false, readings: {}, contradictionMetrics: [] },
+          failed: true
+        };
+      try {
+        const result = await getLatestSensorSnapshotForOwnedTent(client, scope.tent.id, { now });
+        if (!result.ok) {
+          return {
+            evidence: { available: false, readings: {}, contradictionMetrics: [] },
+            failed: true
+          };
+        }
+        return {
+          evidence: {
+            available: true,
+            readings: result.data.snapshot?.readings ?? {},
+            contradictionMetrics: result.data.contradictionMetrics ?? []
+          },
+          failed: false
+        };
+      } catch {
+        return {
+          evidence: { available: false, readings: {}, contradictionMetrics: [] },
+          failed: true
+        };
+      }
+    })()
+  ]);
+  const eventLane = trimLookahead(eventFetchLane, EVENT_LIMIT);
+  const photoLane = trimLookahead(photoFetchLane, PHOTO_LIMIT);
+  const alertLane = trimLookahead(alertFetchLane, ALERT_LIMIT);
+  const aiLane = trimLookahead(aiFetchLane, AI_DOCTOR_LIMIT);
+  const actionLane = trimLookahead(actionFetchLane, ACTION_QUEUE_LIMIT);
+  const actionRows = actionLane.rows.filter(
+    (row) => belongsToActionQueueScope(row, scope, tentPlantIdSet)
+  );
+  const actionAuditLane = await loadActionQueueAudits(client, scope, actionRows);
+  const partial = /* @__PURE__ */ new Set();
+  const truncated = /* @__PURE__ */ new Set();
+  if (tentRelationLane.failed) {
+    partial.add("events");
+    partial.add("photos");
+    partial.add("alerts");
+    partial.add("action_queue");
+  }
+  if (eventLane.failed) partial.add("events");
+  if (photoLane.failed) partial.add("photos");
+  if (alertLane.failed) partial.add("alerts");
+  if (aiLane.failed) partial.add("ai_doctor");
+  if (actionLane.failed) partial.add("action_queue");
+  if (actionAuditLane.failed) partial.add("action_queue");
+  if (sensorLane.failed) partial.add("sensors");
+  if (tentRelationLane.truncated) {
+    truncated.add("events");
+    truncated.add("photos");
+    truncated.add("alerts");
+    truncated.add("action_queue");
+  }
+  if (eventLane.truncated) truncated.add("events");
+  if (photoLane.truncated) truncated.add("photos");
+  if (alertLane.truncated) truncated.add("alerts");
+  if (aiLane.truncated) truncated.add("ai_doctor");
+  if (actionLane.truncated) truncated.add("action_queue");
+  if (actionAuditLane.truncated) truncated.add("action_queue");
+  const evidenceEvents = eventLane.rows.filter((row) => !row.is_deleted && belongsToEventScope(row, scope, tentPlantIdSet)).map(toEventEvidence2);
+  const events = evidenceEvents.filter((event) => {
+    const occurredAtMs = Date.parse(event.occurredAt);
+    return !Number.isFinite(occurredAtMs) || occurredAtMs >= cutoffMs;
+  });
+  const photos = photoLane.rows.filter(
+    (row) => belongsToTentAttributedScope(row, scope, tentPlantIdSet) && !isRetracted2(row) && hasDiaryPhotoReference2(row)
+  ).map(toDiaryPhotoMetadata2);
+  const alerts = alertLane.rows.flatMap((row) => {
+    if (!belongsToAlertScope(row, scope, tentPlantIdSet)) return [];
+    const evidence = toAlertEvidence2(row);
+    return evidence ? [evidence] : [];
+  });
+  const aiDoctor = toAiDoctorEvidence(aiLane.rows[0]);
+  const actionQueue = toActionQueueEvidence(actionRows, actionAuditLane.rows);
+  let derived = deriveGrowWalkEvidence({
+    now,
+    stage: clean2(scope.plant?.stage) ?? clean2(scope.tent?.stage) ?? clean2(scope.grow.stage),
+    plantStatus: clean2(scope.plant?.health),
+    plantType: clean2(scope.plant?.plant_type),
+    medium: clean2(scope.plant?.medium),
+    potSize: clean2(scope.plant?.pot_size),
+    recentEvents: events,
+    fixedWindowEvents: evidenceEvents,
+    sensors: sensorLane.evidence,
+    photos,
+    alerts,
+    aiDoctor
+  });
+  if (scope.plant?.grow_id === null) {
+    derived = {
+      ...derived,
+      missingEvidenceCodes: addMissing(derived.missingEvidenceCodes, "plant_profile_incomplete")
+    };
+  }
+  if (partial.has("events") || partial.has("alerts") || truncated.has("events") || truncated.has("alerts")) {
+    derived = { ...derived, evidenceConfidence: "low" };
+  } else if (partial.size > 0 && derived.evidenceConfidence === "high") {
+    derived = { ...derived, evidenceConfidence: "medium" };
+  }
+  const context = {
+    scope: {
+      growId: scope.grow.id,
+      growName: scope.grow.name,
+      tentId: scope.tent?.id ?? null,
+      tentName: scope.tent?.name ?? null,
+      plantId: scope.plant?.id ?? null,
+      plantName: scope.plant?.name ?? null,
+      targetArchived: scope.grow.is_archived === true || scope.plant?.is_archived === true || scope.tent?.is_archived === true
+    },
+    profile: {
+      stage: clean2(scope.plant?.stage) ?? clean2(scope.tent?.stage) ?? clean2(scope.grow.stage),
+      strain: clean2(scope.plant?.strain),
+      medium: clean2(scope.plant?.medium),
+      potSize: clean2(scope.plant?.pot_size),
+      growType: clean2(scope.grow.grow_type),
+      plantType: clean2(scope.plant?.plant_type),
+      plantStatus: clean2(scope.plant?.health)
+    },
+    evidence: {
+      recentEvents: Object.freeze(events),
+      sensors: sensorLane.evidence,
+      photos: Object.freeze(photos),
+      alerts: Object.freeze(alerts),
+      aiDoctor,
+      actionQueue
+    },
+    derived: { ...derived, attentionBand: deriveGrowWalkAttentionBand(derived) },
+    receipt: {
+      generatedAt,
+      lookbackHours,
+      contextVersion: GROW_WALK_CONTEXT_VERSION,
+      partialLanes: orderedLanes(partial),
+      truncatedLanes: orderedLanes(truncated)
+    }
+  };
+  return { ok: true, data: { context } };
+}
+
+// src/lib/mcp/tools/get-grow-walk-context.ts
+var get_grow_walk_context_default = defineTool5({
+  name: "get_grow_walk_context",
+  title: "Get Grow Walk context",
+  description: "Fetch bounded, source-labeled evidence for one tent or plant the signed-in grower owns. Photo rows are metadata only, sensor evidence keeps source/quality/freshness labels, and partial lanes are named explicitly. Archived targets are labeled as historical. The result supports physical inspection and does not diagnose, approve actions, or control equipment. Read-only.",
+  inputSchema: {
+    targetType: z5.enum(["tent", "plant"]).describe("Whether the owned target is a tent or plant."),
+    targetId: z5.string().uuid().describe("Owned tent or plant id to review."),
+    lookbackHours: z5.number().int().min(24).max(168).optional().describe("Bounded history window in hours (24\u2013168). Defaults to 72.")
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async ({ targetType, targetId, lookbackHours }, ctx) => {
+    if (!ctx.isAuthenticated()) return unauthenticated();
+    const result = await getGrowWalkContextForOwnedTarget(supabaseForUser(ctx), {
+      targetType,
+      targetId,
+      lookbackHours
+    });
+    if (!result.ok) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: result.reason === "unavailable" ? `Error: ${result.message}` : result.message
+          }
+        ],
+        isError: true
+      };
+    }
+    const { context } = result.data;
+    const scope = context.scope.plantName ?? context.scope.tentName ?? context.scope.growName;
+    const partial = context.receipt.partialLanes.length;
+    const archived = context.scope.targetArchived ? "historical " : "";
+    return {
+      content: [
+        {
+          type: "text",
+          text: partial === 0 ? `Grow Walk context ready for ${archived}"${scope}".` : `Grow Walk context ready for ${archived}"${scope}" with ${partial} explicit partial evidence lane(s).`
+        }
+      ],
+      structuredContent: { context }
+    };
+  }
 });
 
 // src/lib/mcp/index.ts
@@ -687,17 +2283,18 @@ var mcp_default = defineMcp({
   name: "verdant-grow-os-mcp",
   title: "Verdant Grow OS",
   version: "0.1.0",
-  instructions:
-    "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Sensor readings always include their `source` and `quality` labels verbatim. Trust is deny-by-default: a reading is current live telemetry ONLY when its quality is `ok` AND its source is `live` (fresh validated connected telemetry). Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. This server never writes, never approves Action Queue items, and never controls devices.",
+  instructions: "Read-only access to the signed-in Verdant grower's own data. Use `list_grows` to enumerate grows, `list_recent_diary_entries` for recent log entries in a grow the caller owns, and `get_latest_sensor_snapshot` for the most recent reading per metric in a tent the caller owns. Use `list_grow_walk_targets` to rank owned tents and plants for physical inspection, then `get_grow_walk_context` to retrieve bounded, source-labeled evidence for one exact owned target. Grow Walk priority is scouting guidance, not diagnosis. Photo rows are metadata only unless an image is separately supplied and inspected. Sensor readings publish constitution `source` labels only (live|manual|csv|demo|stale|invalid), never vendor/transport tokens, plus `quality`, derived `confidence` (0\u20131), and freshness. Trust is deny-by-default: a reading is current live telemetry ONLY when its quality is `ok` AND its source is `live` (fresh validated connected telemetry). Every other source or quality keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and stale or invalid labels are never current or healthy. This server never writes, never starts AI Doctor, never spends AI credits, never approves Action Queue items, and never controls devices.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
-    acceptedAudiences: "authenticated",
+    acceptedAudiences: "authenticated"
   }),
   tools: [
     list_grows_default,
     list_recent_diary_entries_default,
     get_latest_sensor_snapshot_default,
-  ],
+    list_grow_walk_targets_default,
+    get_grow_walk_context_default
+  ]
 });
 
 // lovable-mcp-supabase-entry.ts

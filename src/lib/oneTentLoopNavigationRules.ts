@@ -9,11 +9,14 @@
  */
 
 import { buildSensorsTentRouteHref } from "@/lib/sensorRouteTentIntentRules";
+import { withSensorsPlantIntent } from "@/lib/sensorRoutePlantIntentRules";
+import { normalizePersistedPlantId } from "@/lib/sensorRoutePlantIntentRules";
+import { normalizePersistedGrowTentId } from "@/lib/growTentSelectionRules";
 import {
   buildPlantQuickLogPrefill,
   type PlantQuickLogPrefill,
 } from "@/lib/plantQuickLogPrefillRules";
-import { timelinePath } from "@/lib/routes";
+import { actionsPath, alertsPath, timelinePath } from "@/lib/routes";
 
 export type OneTentLoopStep =
   | "grow"
@@ -113,6 +116,42 @@ export interface OneTentLoopNextStep {
   disabledReason: string | null;
 }
 
+export interface ResolveTimelineSensorHandoffIdsInput {
+  plantId?: unknown;
+  tentId?: unknown;
+  /** Owner-scoped plant → current tent directory. Null means the read is unavailable. */
+  plantTentIdsById?: ReadonlyMap<string, string> | null;
+}
+
+/**
+ * Resolve only a compatible Timeline plant/tent pair for the Sensors handoff.
+ *
+ * The grower's explicit tent filter wins when it conflicts with the selected
+ * plant's current assignment, but the plant is then omitted. Missing directory
+ * evidence also omits the plant. This is deliberately conservative: no plant
+ * route intent is ever paired with a guessed or independently defaulted tent.
+ */
+export function resolveTimelineSensorHandoffIds(
+  input: ResolveTimelineSensorHandoffIdsInput,
+): Pick<OneTentLoopIds, "tentId" | "plantId"> {
+  const selectedTentId = normalizePersistedGrowTentId(input.tentId);
+  const selectedPlantId = normalizePersistedPlantId(input.plantId);
+
+  if (!selectedPlantId) {
+    return { tentId: selectedTentId, plantId: null };
+  }
+
+  const ownerTentId = normalizePersistedGrowTentId(input.plantTentIdsById?.get(selectedPlantId));
+  if (!ownerTentId) {
+    return { tentId: selectedTentId, plantId: null };
+  }
+  if (selectedTentId && selectedTentId !== ownerTentId) {
+    return { tentId: selectedTentId, plantId: null };
+  }
+
+  return { tentId: ownerTentId, plantId: selectedPlantId };
+}
+
 export function getNextLoopStep(current: OneTentLoopStep): OneTentLoopStep | null {
   const idx = ONE_TENT_LOOP_ORDER.indexOf(current);
   if (idx < 0) return null;
@@ -142,6 +181,15 @@ export function resolveOneTentLoopNextStep(
   };
 
   const { growId, tentId, plantId, alertId, actionId } = ids;
+  // Normalization only: blank becomes null for a bare index path. Consuming
+  // pages still validate the requested grow against their authenticated rows.
+  const normalizedGrowId =
+    typeof growId === "string" && growId.trim().length > 0 ? growId.trim() : null;
+  const normalizedTentId =
+    typeof tentId === "string" && tentId.trim().length > 0 ? tentId.trim() : null;
+  // UUID-only. A malformed plant degrades to "no plant carried" rather than
+  // travelling onward as a filter nobody validated (D-B6 handoff).
+  const normalizedPlantId = normalizePersistedPlantId(plantId);
 
   switch (current) {
     case "grow":
@@ -151,8 +199,9 @@ export function resolveOneTentLoopNextStep(
       if (tentId) return enable(base, `/tents/${tentId}`);
       return base;
     case "tent":
+      // CTA is "Open plant" — must route to an actual plant, never self-link
+      // back to Tent Detail. Without a selected plant, stay disabled.
       if (plantId) return enable(base, `/plants/${plantId}`);
-      if (tentId) return enable(base, `/tents/${tentId}`);
       return base;
     case "plant":
       {
@@ -173,26 +222,43 @@ export function resolveOneTentLoopNextStep(
       }
       return base;
     case "timeline":
-      // Carry an explicitly selected timeline tent into Sensors as a
-      // UUID-only intent. Sensors still validates it against authenticated
-      // tent rows before selecting it, so this never grants access or turns
-      // an arbitrary query value into a sensor query.
-      return enable(base, buildSensorsTentRouteHref(tentId));
+      // A plant may travel only with a complete, compatible tent selected by
+      // the owner-scoped Timeline resolver. Required intent prevents Sensors
+      // from pairing that plant with a first-available fallback if its tent
+      // disappears before the destination resolves. Direct callers that pass
+      // a plant without a tent fail closed to a generic Sensors route.
+      if (normalizedTentId && normalizedPlantId) {
+        return enable(
+          base,
+          withSensorsPlantIntent(
+            buildSensorsTentRouteHref(normalizedTentId, { requireExactMatch: true }),
+            normalizedPlantId,
+          ),
+        );
+      }
+      return enable(base, buildSensorsTentRouteHref(normalizedTentId));
     case "sensor-snapshot":
+      if (normalizedGrowId && normalizedTentId) {
+        const scopedHref = `/doctor?growId=${encodeURIComponent(normalizedGrowId)}&tentId=${encodeURIComponent(normalizedTentId)}`;
+        // A plant rides along ONLY as a validated UUID and ONLY inside a
+        // complete grow/tent scope. AiDoctorStart orders and labels it; it
+        // never auto-selects — "Verdant will not guess which plant you mean".
+        return enable(base, withSensorsPlantIntent(scopedHref, normalizedPlantId));
+      }
       return enable(base, "/doctor");
     case "ai-doctor":
       // When a specific alertId is available, deep-link to that alert.
       // Otherwise fall back to the alerts index AND relabel the CTA so
       // the operator knows they are reviewing alerts, not opening one.
       if (alertId) return enable(base, `/alerts/${alertId}`);
-      return { ...enable(base, "/alerts"), ctaLabel: "Review alerts" };
+      return { ...enable(base, alertsPath(normalizedGrowId)), ctaLabel: "Review alerts" };
     case "alert":
       // CTA is "Add to Action Queue" — must route to the Action Queue
       // surface (/actions), not back to alerts. Action Queue items
       // remain approval-required; this CTA does NOT create or approve
       // anything automatically — it only navigates the operator there.
       if (actionId) return enable(base, `/actions/${actionId}`);
-      return enable(base, "/actions");
+      return enable(base, actionsPath(normalizedGrowId));
     case "action-queue":
       if (actionId) return enable(base, `/actions/${actionId}`);
       return enable(base, "/actions");

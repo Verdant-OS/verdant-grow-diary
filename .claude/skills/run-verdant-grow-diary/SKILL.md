@@ -5,7 +5,8 @@ description: Run, build, screenshot, or test the verdant-grow-diary Grow OS web 
 
 # run-verdant-grow-diary
 
-Verdant Grow Diary is a **React + Vite + TypeScript SPA** backed by Supabase.
+Verdant Grow Diary is a **TanStack Start (SSR) app on TanStack Router file routes**,
+written in React + Vite + TypeScript and backed by a hosted Supabase project.
 The dev server runs on port **8080**. There is no off-the-shelf `chromium-cli`,
 so the agent handle for screenshots and browser navigation is the committed
 driver **`.claude/skills/run-verdant-grow-diary/driver.mjs`** (a thin Playwright
@@ -49,7 +50,7 @@ git checkout -- package-lock.json   # npm rewrites resolved URLs; restore it
 ## Build
 
 ```bash
-bun run typecheck     # tsc -p tsconfig.app.json --noEmit   → exit 0
+bun run typecheck     # tsc -p tsconfig.json --noEmit       → exit 0
 bun run build         # vite build                          → "✓ built in ~31s"
 ```
 
@@ -143,7 +144,7 @@ Useless headless on its own; use the driver above to observe it.
 
 ```bash
 bun run lint           # eslint .
-bun run typecheck      # tsc -p tsconfig.app.json --noEmit
+bun run typecheck      # tsc -p tsconfig.json --noEmit
 bunx vitest run        # full suite — large; runs as parallel shards in CI
 ```
 
@@ -163,15 +164,18 @@ Targeted sub-suites exist (`bun run test:payments-security`,
 - **Port 8080, not 5173.** `vite.config.ts` hardcodes `port: 8080`. When reusing
   a running server for Playwright, set `E2E_BASE_URL=http://127.0.0.1:8080` so it
   doesn't spawn its own server on 5173.
-- **`/` is session-aware.** Signed-out visitors render the public Landing directly;
-  signed-in growers retain the Dashboard inside `AppShell`. The HTTP status remains
-  200 because this is an SPA route. Deep links like `/dashboard` still require the
+- **`/` is session-aware, but SSR only ever proves the landing.** The server has no
+  trusted session, so SSR _and the first client pass_ always render the public Landing
+  (`RootEntry.tsx`); the signed-in Dashboard resolves only after hydration and auth
+  settle. A 200 on `/` therefore proves the landing rendered — never that the
+  authenticated surface did. Do not assert dashboard HTML from a server response; wait
+  for the hydrated surface. Deep links like `/dashboard` still require the
   authenticated application shell.
 - **No local Supabase stack.** The app points at the hosted project; the mocked
   Playwright project intercepts all Supabase traffic so e2e works without
   staging credentials.
 - **Root `<title>` vs rendered title.** The static HTML `<title>` is "Verdant
-  Grow Diary", but after the SPA boots a signed-out root renders Landing with
+  Grow Diary", but once the app hydrates a signed-out root renders Landing with
   "Grow Diary & Grow Room Tracking App | Verdant Grow Diary". Assert on the
   rendered title for the surface under test.
 - **Driver Chromium fallback.** Plain `chromium.launch()` works here, but the

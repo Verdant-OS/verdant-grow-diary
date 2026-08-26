@@ -1,6 +1,6 @@
 import type { PaddleCheckoutEnvironment } from "@/lib/paddleEnvironment";
 
-export type CheckoutTrustState = "live" | "sandbox" | "unavailable";
+export type CheckoutTrustState = "sandbox" | "unavailable";
 
 export interface CheckoutTrustCopy {
   state: CheckoutTrustState;
@@ -18,23 +18,12 @@ export interface CheckoutTrustCopyInput {
 }
 
 export const CHECKOUT_MECHANISM_FAQ_ANSWER =
-  "Checkout opens a secure Paddle overlay. A charge happens only when Paddle confirms a real payment, and your plan activates only after Verdant verifies that payment server-side — this page can never charge you or grant access by itself. If billing is not enabled in the current environment, checkout simply will not complete and nothing is charged.";
-
-const LIVE_COPY: CheckoutTrustCopy = Object.freeze({
-  state: "live",
-  label: "Secure live checkout",
-  summary:
-    "Payments are processed by Paddle. You will review the plan, price, and total before confirming your purchase.",
-  faqQuestion: "Is checkout live?",
-  faqAnswer: CHECKOUT_MECHANISM_FAQ_ANSWER,
-  canCreateLiveCharge: true,
-});
+  "Verdant currently opens Paddle's sandbox for checkout testing only. Sandbox checkout cannot create a real charge. This page can never charge you or grant access by itself; sandbox entitlements require server-side verification and remain test data, not proof of a paid production plan. Live checkout is intentionally disabled, so outside a successful sandbox test nothing is charged.";
 
 const SANDBOX_COPY: CheckoutTrustCopy = Object.freeze({
   state: "sandbox",
-  label: "Sandbox checkout",
-  summary:
-    "This environment uses Paddle's sandbox for checkout testing. It cannot create a live charge.",
+  label: "Paddle sandbox — Test only",
+  summary: "No real charges can be made. This app uses Paddle's sandbox for checkout testing.",
   faqQuestion: "Is checkout live?",
   faqAnswer: CHECKOUT_MECHANISM_FAQ_ANSWER,
   canCreateLiveCharge: false,
@@ -42,9 +31,9 @@ const SANDBOX_COPY: CheckoutTrustCopy = Object.freeze({
 
 const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
   state: "unavailable",
-  label: "Checkout unavailable here",
+  label: "Sandbox test checkout unavailable",
   summary:
-    "Checkout cannot open in this environment right now. You can request one availability notice instead; no charge is created.",
+    "Live checkout is disabled. Sandbox test checkout cannot open in this environment right now; no charge is created and no real charge is possible.",
   faqQuestion: "Is checkout live?",
   faqAnswer: CHECKOUT_MECHANISM_FAQ_ANSWER,
   canCreateLiveCharge: false,
@@ -56,7 +45,6 @@ const UNAVAILABLE_COPY: CheckoutTrustCopy = Object.freeze({
  */
 export function buildCheckoutTrustCopy(input: CheckoutTrustCopyInput): CheckoutTrustCopy {
   if (input.blocked) return UNAVAILABLE_COPY;
-  if (input.environment === "live") return LIVE_COPY;
   if (input.environment === "sandbox") return SANDBOX_COPY;
   return UNAVAILABLE_COPY;
 }

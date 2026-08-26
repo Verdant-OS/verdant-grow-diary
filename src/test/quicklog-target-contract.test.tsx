@@ -146,6 +146,10 @@ function renderQuickLog(prefill?: QuickLogPrefill) {
 beforeEach(() => {
   clearLocalStorageForTest();
   harness.activeGrowId = "g1";
+  harness.grows = [
+    { id: "g1", name: "Grow One", stage: "veg" },
+    { id: "g2", name: "Grow Two", stage: "flower" },
+  ];
   harness.plants = [
     { id: "p1", name: "Plant One", grow_id: "g1", tent_id: "t1", stage: "veg" },
     { id: "p2", name: "Plant Two", grow_id: "g2", tent_id: "t2", stage: "flower" },
@@ -176,6 +180,36 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("Quick Log canonical target contract", () => {
+  it("passes a verified active grow to activities while keeping plant and tent writes blocked", () => {
+    harness.plants = [];
+    harness.tents = [];
+
+    renderQuickLog();
+
+    expect(screen.getByTestId("all-activities-target")).toMatchObject({
+      dataset: expect.objectContaining({ plantId: "", growId: "g1", tentId: "" }),
+    });
+    expect(screen.getByTestId("quick-log-plant-error")).toHaveTextContent(
+      "Choose a plant before saving this entry.",
+    );
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not promote a stale active grow id that is absent from the loaded grow list", () => {
+    harness.activeGrowId = "missing-grow";
+    harness.plants = [];
+    harness.tents = [];
+
+    renderQuickLog();
+
+    expect(screen.getByTestId("all-activities-target")).toMatchObject({
+      dataset: expect.objectContaining({ plantId: "", growId: "", tentId: "" }),
+    });
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
   it("holds a cross-grow route prefill until the exact grow/tent/plant target resolves", async () => {
     const view = renderQuickLog({
       plantId: "p2",
@@ -295,8 +329,10 @@ describe("Quick Log canonical target contract", () => {
   });
 
   it("holds an unknown route prefill instead of falling through to a remembered target", async () => {
+    // Seeded under the account-scoped key that IS readable, so the fence is
+    // real: a prefill hold must win over an offerable remembered target.
     setLocalStorageItemForTest(
-      "verdant.quickLog.lastTarget.v1",
+      "verdant.quickLog.lastTarget.v2.u1",
       JSON.stringify({
         plantId: "p1",
         growId: "g1",
@@ -564,8 +600,16 @@ describe("Quick Log canonical target contract", () => {
       "p1",
     );
     expect(
-      JSON.parse(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v1") ?? "{}"),
+      // Pin renegotiated with slice D5, which retires the unscoped `.v1`
+      // write (the approved map: "v1 write retired"; measured: it had zero
+      // readers, and writing it before the user check meant an anonymous
+      // session stored a plant id). The account-scoped record is now the
+      // observable for this contract. The assertion itself is unchanged —
+      // same frozen target, read from the key that actually gets written.
+      JSON.parse(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v2.u1") ?? "{}"),
     ).toEqual(expect.objectContaining({ plantId: "p1", growId: "g1", tentId: "t1" }));
+    // And the retired key must stay unwritten.
+    expect(getLocalStorageItemForTest("verdant.quickLog.lastTarget.v1")).toBeNull();
     const invalidatedKeys = invalidateSpy.mock.calls.map(([options]) =>
       JSON.stringify(options!.queryKey),
     );

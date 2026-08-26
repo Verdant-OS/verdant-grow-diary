@@ -37,7 +37,9 @@ const SESSION = JSON.stringify({
 const READY_ENV: ManagedSessionEnvSnapshot = {
   authStatus: "signed_in",
   sessionJson: SESSION,
-  storageKey: "sb-key",
+  storageKey: "sb-abcdefghijklmnopqrst-auth-token",
+  supabaseUrl: "https://abcdefghijklmnopqrst.supabase.co",
+  targetProjectRef: "abcdefghijklmnopqrst",
 };
 
 describe("parseManagedCookies — sources and precedence", () => {

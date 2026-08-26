@@ -18,6 +18,7 @@ import { isTimelineSymptomEvidenceWindowComplete } from "@/lib/timelineSymptomEv
 import type { FastAddSelectionContext } from "@/lib/fastAddActionRules";
 import PageHeader from "@/components/PageHeader";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import { resolveTimelineSensorHandoffIds } from "@/lib/oneTentLoopNavigationRules";
 import { supabase } from "@/integrations/supabase/client";
 import { useGrows } from "@/store/grows";
 import { useAuth } from "@/store/auth";
@@ -110,6 +111,7 @@ import {
   buildGrowDiaryTimeline,
   resolveTimelineDiaryEntryStage,
 } from "@/lib/growDiaryTimelineRules";
+import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import { MEASUREMENT_DETAIL_KEYS } from "@/lib/timelineEntryClassification";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
@@ -160,6 +162,7 @@ import {
 import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
 import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
+import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -231,6 +234,38 @@ interface Entry {
   entry_at: string;
   plant_id: string | null;
   tent_id: string | null;
+}
+
+interface TimelineDiaryPhotoDisplayRows {
+  rows: Entry[];
+  privatePhotoPathById: Map<string, string>;
+}
+
+/**
+ * Projects persisted diary photo references into Timeline-safe display rows.
+ * Only the shared owner-aware parser may nominate a private object for
+ * signing; historical `details.photo_url` remains a fallback for rows whose
+ * canonical top-level reference is unusable.
+ */
+function buildTimelineDiaryPhotoDisplayRows(
+  rows: Entry[],
+  viewerUserId: string | null,
+): TimelineDiaryPhotoDisplayRows {
+  const privatePhotoPathById = new Map<string, string>();
+  const displayRows = rows.map((row) => {
+    const reference = parseDiaryPhotoDisplayReferenceFromRow(row, { viewerUserId });
+
+    if (reference.kind === "external") {
+      return { ...row, photo_url: reference.url };
+    }
+    if (reference.kind === "storage") {
+      privatePhotoPathById.set(row.id, reference.path);
+    }
+
+    return { ...row, photo_url: null };
+  });
+
+  return { rows: displayRows, privatePhotoPathById };
 }
 
 type ActionEventType =
@@ -631,12 +666,10 @@ export default function Timeline() {
       if (hasTimelineRequiredReadError(entriesResult)) throw entriesResult.error;
 
       const rows = (entriesResult.data as Entry[]).map((row) => ({ ...row }));
-      const privatePhotoPathById = new Map<string, string>();
-      const coreRows = rows.map((row) => {
-        if (!row.photo_url || row.photo_url.startsWith("http")) return row;
-        privatePhotoPathById.set(row.id, row.photo_url);
-        return { ...row, photo_url: null };
-      });
+      const { rows: coreRows, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
+        rows,
+        user,
+      );
       const paths = [...new Set(privatePhotoPathById.values())];
 
       // Filtered by is_deleted here so the visible-event page (its 100-row
@@ -845,10 +878,12 @@ export default function Timeline() {
       });
       if (!isCurrentPage()) return;
       if (hasTimelineRequiredReadError(olderResult)) throw olderResult.error;
-      const older = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
-      const paths = older
-        .map((r) => r.photo_url)
-        .filter((p): p is string => !!p && !p.startsWith("http"));
+      const rawOlder = ((olderResult.data as Entry[] | null) ?? []).map((row) => ({ ...row }));
+      const { rows: older, privatePhotoPathById } = buildTimelineDiaryPhotoDisplayRows(
+        rawOlder,
+        user,
+      );
+      const paths = [...new Set(privatePhotoPathById.values())];
       if (paths.length) {
         try {
           const signedResult = await supabase.storage
@@ -866,17 +901,14 @@ export default function Timeline() {
             );
           }
           older.forEach((row) => {
-            if (!row.photo_url || row.photo_url.startsWith("http")) return;
-            row.photo_url = signedMap.get(row.photo_url) ?? null;
+            const privatePath = privatePhotoPathById.get(row.id);
+            if (privatePath) row.photo_url = signedMap.get(privatePath) ?? null;
           });
         } catch {
           if (!isCurrentPage()) return;
           setPartialReadSources((current) =>
             mergeTimelinePartialSources(current, ["diary_photos"]),
           );
-          older.forEach((row) => {
-            if (row.photo_url && !row.photo_url.startsWith("http")) row.photo_url = null;
-          });
         }
       }
       if (isCurrentPage() && older.length) {
@@ -988,8 +1020,16 @@ export default function Timeline() {
   // (includes is_archived rows) keeps filter labels on real names.
   // Gated on a resolved grow scope so a rejected/invalid scope issues
   // no reads at all, matching the page's fail-closed read policy.
-  const { plantNamesById, tentNamesById } = useTimelineNameDirectory(
-    user && activeGrowId ? user : null,
+  const directoryGrowId =
+    !growsLoading &&
+    !growsError &&
+    activeGrowId &&
+    grows.some((grow) => grow.id === activeGrowId)
+      ? activeGrowId
+      : null;
+  const { plantNamesById, plantTentIdsById, tentNamesById } = useTimelineNameDirectory(
+    user,
+    directoryGrowId,
   );
   const plantOptions = useMemo(
     () => deriveTimelinePlantOptions(entries, plantNamesById),
@@ -1000,6 +1040,15 @@ export default function Timeline() {
     [entries, tentNamesById],
   );
   const eventTypeOptions = useMemo(() => deriveTimelineEventTypeOptions(entries), [entries]);
+  const timelineSensorHandoffIds = useMemo(
+    () =>
+      resolveTimelineSensorHandoffIds({
+        plantId: plantFilter,
+        tentId: tentFilter,
+        plantTentIdsById,
+      }),
+    [plantFilter, tentFilter, plantTentIdsById],
+  );
 
   const evidenceFilterInput = {
     query: searchQuery,
@@ -1425,7 +1474,11 @@ export default function Timeline() {
       {pageReadView.showSensorsNextStep && (
         <OneTentLoopNextStepCard
           current="timeline"
-          ids={{ growId: activeGrowId ?? null, tentId: tentFilter || null }}
+          ids={{
+            growId: activeGrowId ?? null,
+            tentId: timelineSensorHandoffIds.tentId,
+            plantId: timelineSensorHandoffIds.plantId,
+          }}
           testId="timeline-one-tent-loop-next-step-card"
           className="mb-3"
         />
@@ -1592,7 +1645,7 @@ export default function Timeline() {
               onChange={(e) => setPlantFilter(e.target.value)}
               aria-label="Filter by plant"
               data-testid="timeline-plant-filter"
-              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+              className="min-w-0 max-w-full rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
             >
               <option value="">All plants</option>
               {plantOptions.map((o) => (
@@ -1608,7 +1661,7 @@ export default function Timeline() {
               onChange={(e) => setTentFilter(e.target.value)}
               aria-label="Filter by tent"
               data-testid="timeline-tent-filter"
-              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+              className="min-w-0 max-w-full rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
             >
               <option value="">All tents</option>
               {tentOptions.map((o) => (
@@ -1624,7 +1677,7 @@ export default function Timeline() {
               onChange={(e) => setEventTypeFilter(e.target.value)}
               aria-label="Filter by log type"
               data-testid="timeline-event-type-filter"
-              className="rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+              className="min-w-0 max-w-full rounded-md border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
             >
               <option value="">All log types</option>
               {eventTypeOptions.map((o) => (
@@ -2222,17 +2275,18 @@ export default function Timeline() {
                           const et = getEventType(effectiveCareType);
                           const Icon = et.icon;
                           const plantName = e.details?.plant_name as string | undefined;
-                          // QuickLog writes `sensor_snapshot`; older entries may still use `sensor`.
-                          const sensor = (e.details?.sensor_snapshot ?? e.details?.sensor) as
-                            | {
-                                ts?: string;
-                                temp?: number;
-                                rh?: number;
-                                vpd?: number;
-                                co2?: number;
-                                soil?: number;
-                              }
-                            | undefined;
+                          // Canonical snapshots win, followed by the legacy
+                          // `sensor` shape and Plant Quick Log's compatibility
+                          // envelope. No persisted row is rewritten.
+                          const canonicalSensor = e.details?.sensor_snapshot;
+                          const legacySensor = e.details?.sensor;
+                          const manualCompatSensor = e.details?.manual_sensor_snapshot;
+                          const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
+                            Record<string, unknown> | undefined;
+                          const usesManualCompatSensor =
+                            canonicalSensor == null &&
+                            legacySensor == null &&
+                            manualCompatSensor != null;
                           const remindAt = e.details?.remind_at as string | undefined;
                           const eventTypeValue = effectiveCareType;
                           // Learning-loop rows (follow-up / outcome / decision) carry join
@@ -2452,25 +2506,44 @@ export default function Timeline() {
                               )}
                               {sensor &&
                                 (() => {
-                                  const snapTs = sensor.ts ?? e.entry_at;
+                                  const sensorViewModel = usesManualCompatSensor
+                                    ? buildTimelineSensorSnapshotViewModel(sensor, {
+                                        preferUnit: "F",
+                                        validateManualCompatibility: true,
+                                      })
+                                    : null;
+                                  const legacyDisplaySensor = sensor as {
+                                    temp?: number;
+                                    rh?: number;
+                                    vpd?: number;
+                                    co2?: number;
+                                    soil?: number;
+                                  };
+                                  const snapTs =
+                                    typeof sensor.ts === "string" ? sensor.ts : e.entry_at;
                                   const snapAgeMs = snapTs
                                     ? Date.now() - new Date(snapTs).getTime()
                                     : Number.POSITIVE_INFINITY;
                                   const snapStale =
                                     !Number.isFinite(snapAgeMs) ||
                                     snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
+                                  const rawVpd =
+                                    typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
+                                      ? sensor.vpd
+                                      : null;
                                   const vpdClassification = classifyVpdAgainstStage({
-                                    value: sensor.vpd ?? null,
+                                    value: rawVpd,
                                     stage: resolveTimelineDiaryEntryStage(e),
                                     stale: snapStale,
                                   });
                                   const rawSource =
-                                    (sensor as { source?: string | null }).source ?? null;
+                                    typeof sensor.source === "string" ? sensor.source : null;
                                   const sourceBadge = classifyTimelineSensorSource({
                                     rawSource,
                                     capturedAt: snapTs ?? null,
                                     staleMs: TIMELINE_SNAPSHOT_STALE_MS,
-                                    // Quick Log sensor_snapshot is intrinsically grower-entered.
+                                    // Persisted Quick Log snapshots are
+                                    // intrinsically grower-entered.
                                     fallback: "manual",
                                     context: "persisted_snapshot",
                                   });
@@ -2484,18 +2557,75 @@ export default function Timeline() {
                                         Manual snapshot
                                       </span>
                                       <TimelineSensorSourceBadge badge={sourceBadge} />
-                                      {sensor.temp != null && (
-                                        <SnapChip>
-                                          {((sensor.temp * 9) / 5 + 32).toFixed(1)}°F
-                                        </SnapChip>
+                                      {sensorViewModel?.kind === "invalid" && (
+                                        <span
+                                          className="text-[11px] text-destructive"
+                                          data-testid="timeline-manual-snapshot-invalid"
+                                        >
+                                          Review manual snapshot — invalid readings were not shown.
+                                        </span>
                                       )}
-                                      {sensor.rh != null && <SnapChip>{sensor.rh}% RH</SnapChip>}
-                                      {sensor.vpd != null && <SnapChip>VPD {sensor.vpd}</SnapChip>}
-                                      {sensor.co2 != null && <SnapChip>CO₂ {sensor.co2}</SnapChip>}
-                                      {sensor.soil != null && (
-                                        <SnapChip>Soil {sensor.soil}%</SnapChip>
-                                      )}
-                                      {sensor.vpd != null && sourceBadge.canAssessStage && (
+                                      {sensorViewModel?.kind === "chips" &&
+                                        sensorViewModel.errors.length > 0 && (
+                                          <span
+                                            className="text-[11px] text-destructive"
+                                            data-testid="timeline-manual-snapshot-invalid"
+                                          >
+                                            Review manual snapshot — invalid readings were not
+                                            shown.
+                                          </span>
+                                        )}
+                                      {sensorViewModel?.kind === "chips" &&
+                                        sensorViewModel.errors.length === 0 &&
+                                        sensorViewModel.warnings.length > 0 && (
+                                          <span
+                                            className="text-[11px] text-warning-foreground"
+                                            data-testid="timeline-manual-snapshot-warning"
+                                          >
+                                            Check manual snapshot — a reading may need confirmation.
+                                          </span>
+                                        )}
+                                      {sensorViewModel?.kind === "chips" &&
+                                        sensorViewModel.chips.map((chip) => (
+                                          <SnapChip key={chip.metric}>
+                                            {chip.metric === "rh"
+                                              ? `${chip.value}% RH`
+                                              : chip.metric === "ph"
+                                                ? `pH ${chip.value}`
+                                                : chip.metric === "ec"
+                                                  ? `EC ${chip.value} mS/cm`
+                                                  : chip.metric === "vpd"
+                                                    ? `VPD ${chip.value}`
+                                                    : chip.metric === "co2"
+                                                      ? `CO₂ ${chip.value}`
+                                                      : chip.metric === "soil_moisture"
+                                                        ? `Soil ${chip.value}%`
+                                                        : chip.display}
+                                          </SnapChip>
+                                        ))}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.temp != null && (
+                                          <SnapChip>
+                                            {((legacyDisplaySensor.temp * 9) / 5 + 32).toFixed(1)}°F
+                                          </SnapChip>
+                                        )}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.rh != null && (
+                                          <SnapChip>{legacyDisplaySensor.rh}% RH</SnapChip>
+                                        )}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.vpd != null && (
+                                          <SnapChip>VPD {legacyDisplaySensor.vpd}</SnapChip>
+                                        )}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.co2 != null && (
+                                          <SnapChip>CO₂ {legacyDisplaySensor.co2}</SnapChip>
+                                        )}
+                                      {!usesManualCompatSensor &&
+                                        legacyDisplaySensor.soil != null && (
+                                          <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
+                                        )}
+                                      {rawVpd != null && sourceBadge.canAssessStage && (
                                         <span
                                           className="text-[11px] text-muted-foreground"
                                           data-testid="timeline-vpd-stage-hint"

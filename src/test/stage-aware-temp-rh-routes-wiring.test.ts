@@ -3,6 +3,10 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const TENTS = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8");
+const TENT_SNAPSHOT_STRIP = readFileSync(
+  resolve(__dirname, "../components/TentEnvironmentSnapshotStrip.tsx"),
+  "utf8",
+);
 const DETAIL = readFileSync(resolve(__dirname, "../pages/TentDetail.tsx"), "utf8");
 const SENSORS = readFileSync(resolve(__dirname, "../pages/Sensors.tsx"), "utf8");
 
@@ -23,9 +27,10 @@ const SNAPSHOT_VM = readFileSync(
 
 describe("Tents list — stage-aware Temp/RH wiring", () => {
   it("renders chips from the shared truth-filtered presenter", () => {
-    expect(TENTS).toMatch(/buildTentSnapshotView/);
-    expect(TENTS).toMatch(/value=\{m\.display\}/);
-    expect(TENTS).toMatch(/status=\{m\.chipStatus\}/);
+    expect(TENTS).toMatch(/<TentEnvironmentSnapshotStrip[\s\S]*?stage=\{t\.stage\}/);
+    expect(TENT_SNAPSHOT_STRIP).toMatch(/buildTentSnapshotView/);
+    expect(TENT_SNAPSHOT_STRIP).toMatch(/value=\{metric\.display\}/);
+    expect(TENT_SNAPSHOT_STRIP).toMatch(/status=\{metric\.chipStatus\}/);
   });
   it("presenter wires Temp/RH through the canonical stage-aware helpers", () => {
     expect(SNAPSHOT_VM).toMatch(/from\s+["']@\/lib\/environmentStageTargetRules["']/);
@@ -35,10 +40,14 @@ describe("Tents list — stage-aware Temp/RH wiring", () => {
   it("removes hardcoded temp threshold expressions", () => {
     expect(TENTS).not.toMatch(/last\.temp\s*>\s*28/);
     expect(TENTS).not.toMatch(/last\.temp\s*<\s*19/);
+    expect(TENT_SNAPSHOT_STRIP).not.toMatch(/last\.temp\s*>\s*28/);
+    expect(TENT_SNAPSHOT_STRIP).not.toMatch(/last\.temp\s*<\s*19/);
   });
   it("removes hardcoded RH threshold expressions", () => {
     expect(TENTS).not.toMatch(/last\.rh\s*>\s*65/);
     expect(TENTS).not.toMatch(/last\.rh\s*<\s*35/);
+    expect(TENT_SNAPSHOT_STRIP).not.toMatch(/last\.rh\s*>\s*65/);
+    expect(TENT_SNAPSHOT_STRIP).not.toMatch(/last\.rh\s*<\s*35/);
   });
 });
 
@@ -91,6 +100,7 @@ describe("Sensors — stage-aware Temp/RH wiring", () => {
 describe("Static safety", () => {
   it("Tents introduces no alert/queue/automation/device-control surfaces in changed region", () => {
     expect(TENTS).not.toMatch(FORBIDDEN);
+    expect(TENT_SNAPSHOT_STRIP).not.toMatch(FORBIDDEN);
   });
   it("Tent Detail introduces no alert/queue/automation/device-control surfaces", () => {
     expect(DETAIL).not.toMatch(FORBIDDEN);

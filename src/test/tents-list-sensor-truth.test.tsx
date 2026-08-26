@@ -27,6 +27,7 @@ import {
   buildTentSnapshotView,
   type BuildTentSnapshotInput,
 } from "@/lib/dashboardEnvironmentSnapshotViewModel";
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 
 // ---- Page render fixtures (hoisted: vi.mock factories run before imports) --
@@ -54,6 +55,27 @@ const H = vi.hoisted(() => {
     raw(oldestTs, "humidity_pct", 58),
     raw(oldestTs, "vpd_kpa", 0.9),
   ];
+  const manualCapturedAt = new Date(Date.now() - 5 * 60_000).toISOString();
+  const manualCard = (overrides: Record<string, unknown> = {}) => ({
+    id: "manual-diary-entry",
+    title: "Manual sensor snapshot",
+    capturedAt: manualCapturedAt,
+    sourceLabel: "Manual",
+    source: "manual",
+    tentId: TENT_ID,
+    plantId: null,
+    isTentLevel: true,
+    notes: null,
+    readings: [
+      { field: "air_temp_c", value: 22, unit: "°C", derived: false },
+      { field: "humidity_pct", value: 55, unit: "%", derived: false },
+      { field: "vpd_kpa", value: 1.19, unit: "kPa", derived: true },
+    ],
+    severity: "ok",
+    warnings: [],
+    errors: [],
+    ...overrides,
+  });
   const makeTent = (id: string, name: string) => ({
     id,
     name,
@@ -70,10 +92,19 @@ const H = vi.hoisted(() => {
     tents: [makeTent(TENT_ID, "Walkthrough Tent")] as ReturnType<typeof makeTent>[],
     byTent: { [TENT_ID]: ROWS } as Record<string, unknown[]>,
     statusByTent: { [TENT_ID]: "success" } as Record<string, string>,
+    refreshingByTent: { [TENT_ID]: false } as Record<string, boolean>,
     isLoading: false,
     isError: false,
     growIsLoading: false,
     growIsError: false,
+    manualCards: [] as ReturnType<typeof manualCard>[],
+    manualIsLoading: false,
+    manualIsFetching: false,
+    manualIsError: false,
+    manualUnavailableReason: null as null | "cap_exhausted" | "concurrency_ambiguous",
+    manualHookCalls: 0,
+    legacyManualHookCalls: 0,
+    lastManualTentIds: [] as string[],
     /** Tent ids the sensor hook was last called with (for UUID-guard pins). */
     lastRequestedIds: [] as string[],
   };
@@ -81,13 +112,33 @@ const H = vi.hoisted(() => {
     hookState.tents = [makeTent(TENT_ID, "Walkthrough Tent")];
     hookState.byTent = { [TENT_ID]: ROWS };
     hookState.statusByTent = { [TENT_ID]: "success" };
+    hookState.refreshingByTent = { [TENT_ID]: false };
     hookState.isLoading = false;
     hookState.isError = false;
     hookState.growIsLoading = false;
     hookState.growIsError = false;
+    hookState.manualCards = [];
+    hookState.manualIsLoading = false;
+    hookState.manualIsFetching = false;
+    hookState.manualIsError = false;
+    hookState.manualUnavailableReason = null;
+    hookState.manualHookCalls = 0;
+    hookState.legacyManualHookCalls = 0;
+    hookState.lastManualTentIds = [];
     hookState.lastRequestedIds = [];
   };
-  return { TENT_ID, newestTs, oldestTs, ROWS, raw, makeTent, hookState, resetHookState };
+  return {
+    TENT_ID,
+    newestTs,
+    oldestTs,
+    ROWS,
+    raw,
+    makeTent,
+    manualCapturedAt,
+    manualCard,
+    hookState,
+    resetHookState,
+  };
 });
 
 vi.mock("@/hooks/useGrowData", async (importOriginal) => {
@@ -120,8 +171,50 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
     return {
       byTent: H.hookState.byTent,
       statusByTent: H.hookState.statusByTent,
+      refreshingByTent: H.hookState.refreshingByTent,
       isLoading: H.hookState.isLoading,
       isError: H.hookState.isError,
+    };
+  },
+}));
+
+vi.mock("@/hooks/useManualSnapshotTimelineCards", () => ({
+  useManualSnapshotTimelineCards: (scope: unknown) => {
+    void scope;
+    H.hookState.legacyManualHookCalls += 1;
+    return {
+      cards: H.hookState.manualCards,
+      isLoading: H.hookState.manualIsLoading,
+      isError: H.hookState.manualIsError,
+      error: H.hookState.manualIsError ? new Error("manual snapshot read failed") : null,
+    };
+  },
+  useTentManualSnapshotBatch: (_ownerId: string | null, tentIds: string[]) => {
+    H.hookState.manualHookCalls += 1;
+    H.hookState.lastManualTentIds = tentIds;
+    const status = H.hookState.manualIsLoading
+      ? "loading"
+      : H.hookState.manualIsError || H.hookState.manualUnavailableReason
+        ? H.hookState.manualCards.length > 0
+          ? "refresh_error"
+          : "error"
+        : H.hookState.manualIsFetching
+          ? H.hookState.manualCards.length > 0
+            ? "refreshing"
+            : "loading"
+          : "success";
+    return {
+      byTent: Object.fromEntries(
+        tentIds.map((tentId) => [
+          tentId,
+          {
+            cards: H.hookState.manualCards,
+            status,
+            unavailableReason: H.hookState.manualUnavailableReason,
+          },
+        ]),
+      ),
+      error: H.hookState.manualIsError ? new Error("manual snapshot read failed") : null,
     };
   },
 }));
@@ -144,6 +237,10 @@ vi.mock("@/components/GrowBreadcrumbs", () => ({ default: () => null }));
 import Tents from "@/pages/Tents";
 
 const TENTS_SRC = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8");
+const SNAPSHOT_STRIP_SRC = readFileSync(
+  resolve(__dirname, "../components/TentEnvironmentSnapshotStrip.tsx"),
+  "utf8",
+);
 
 const NOW = new Date("2026-07-16T12:00:00Z").getTime();
 const FRESH_TS = "2026-07-16T11:55:00Z";
@@ -559,6 +656,9 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     );
     // The sensor hook must not receive the non-UUID id at all.
     expect(H.hookState.lastRequestedIds).toEqual([]);
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(H.hookState.legacyManualHookCalls).toBe(0);
+    expect(H.hookState.lastManualTentIds).toEqual([]);
     // Absence is established by construction — no loading, no error state.
     expect(screen.getByTestId("tents-list-sensor-empty-t1")).toHaveTextContent(
       /No sensor data yet/,
@@ -578,6 +678,357 @@ describe("Tents list sensor truth — rendered page (walkthrough regression)", (
     expect(screen.getByTestId(`tents-list-sensor-empty-${H.TENT_ID}`)).toHaveTextContent(
       /No sensor data yet/,
     );
+  });
+
+  it("renders a persisted Quick Log manual snapshot when sensor_readings is established empty", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualCards = [H.manualCard()];
+
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("71.6");
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-rh`)).toHaveTextContent("55.0");
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-vpd`)).toHaveTextContent("—");
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
+    expect(screen.getByTestId(`tents-list-sensor-last-updated-${H.TENT_ID}`)).toHaveAttribute(
+      "data-captured-at",
+      H.manualCapturedAt,
+    );
+    expect(screen.queryByTestId(`tents-list-sensor-empty-${H.TENT_ID}`)).toBeNull();
+    expect(H.hookState.manualHookCalls).toBe(1);
+    expect(H.hookState.legacyManualHookCalls).toBe(0);
+    expect(H.hookState.lastManualTentIds).toEqual([H.TENT_ID]);
+  });
+
+  it("preserves a manual snapshot at the exact allowed future-skew boundary", () => {
+    vi.useFakeTimers();
+    const now = Date.parse("2026-08-21T12:00:00.000Z");
+    vi.setSystemTime(now);
+    const capturedAt = new Date(now + LIVE_CURRENT_STATE_STALE_MS).toISOString();
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualCards = [H.manualCard({ capturedAt })];
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveAttribute(
+      "data-status",
+      "ok",
+    );
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-rh`)).toHaveAttribute(
+      "data-status",
+      "ok",
+    );
+    expect(view.container.querySelectorAll('[data-status="invalid"]')).toHaveLength(0);
+  });
+
+  it("shows beyond-boundary future manual readings as Invalid with no healthy chips", () => {
+    vi.useFakeTimers();
+    const now = Date.parse("2026-08-21T12:00:00.000Z");
+    vi.setSystemTime(now);
+    const capturedAt = new Date(now + LIVE_CURRENT_STATE_STALE_MS + 1).toISOString();
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualCards = [
+      H.manualCard({
+        capturedAt,
+        readings: [
+          { field: "air_temp_c", value: 22, unit: "°C", derived: false },
+          { field: "humidity_pct", value: 55, unit: "%", derived: false },
+          { field: "vpd_kpa", value: 1.08, unit: "kPa", derived: false },
+        ],
+      }),
+    ];
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent(
+      "Invalid",
+    );
+    expect(screen.getByTestId(`tents-list-sensor-last-updated-${H.TENT_ID}`)).toHaveAttribute(
+      "data-captured-at",
+      capturedAt,
+    );
+    const metrics = ["temp", "rh", "vpd"].map((key) =>
+      screen.getByTestId(`tents-list-metric-${H.TENT_ID}-${key}`),
+    );
+    expect(metrics.every((item) => item.getAttribute("data-status") === "invalid")).toBe(true);
+    expect(view.container.querySelectorAll('[data-status="ok"]')).toHaveLength(0);
+    expect(screen.queryByTestId("tents-list-vpd-stage-missing-badge")).toBeNull();
+  });
+
+  it("never flashes Manual while cached-empty sensors refresh before fresh rows arrive", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.refreshingByTent = { [H.TENT_ID]: true };
+    H.hookState.manualCards = [H.manualCard()];
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(screen.getByTestId(`tents-list-sensor-loading-${H.TENT_ID}`)).toHaveTextContent(
+      /Loading sensor data/,
+    );
+    expect(screen.queryByText("Manual")).toBeNull();
+
+    const freshSensorTs = new Date().toISOString();
+    H.hookState.byTent = {
+      [H.TENT_ID]: [
+        { ...H.raw(freshSensorTs, "temperature_c", 23), source: "live" },
+        { ...H.raw(freshSensorTs, "humidity_pct", 54), source: "live" },
+      ],
+    };
+    H.hookState.refreshingByTent = { [H.TENT_ID]: false };
+    view.rerender(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("73.4");
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Live");
+  });
+
+  it("enables Manual only after a cached-empty sensor refresh settles empty", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.refreshingByTent = { [H.TENT_ID]: true };
+    H.hookState.manualCards = [H.manualCard()];
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(screen.getByTestId(`tents-list-sensor-loading-${H.TENT_ID}`)).toBeInTheDocument();
+    expect(screen.queryByText("Manual")).toBeNull();
+
+    H.hookState.refreshingByTent = { [H.TENT_ID]: false };
+    view.rerender(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(1);
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
+  });
+
+  it("keeps real sensor rows ahead of a persisted manual snapshot and skips its diary query", () => {
+    H.hookState.manualCards = [H.manualCard()];
+
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(H.hookState.legacyManualHookCalls).toBe(0);
+    expect(H.hookState.lastManualTentIds).toEqual([]);
+    expect(screen.getByTestId(`tents-list-metric-${H.TENT_ID}-temp`)).toHaveTextContent("71.2");
+  });
+
+  it.each([
+    ["loading", "tents-list-sensor-loading"],
+    ["error", "tents-list-sensor-unavailable"],
+  ])("sensor %s suppresses the manual fallback", (status, testId) => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: status };
+    H.hookState.manualCards = [H.manualCard()];
+
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(H.hookState.legacyManualHookCalls).toBe(0);
+    expect(H.hookState.lastManualTentIds).toEqual([]);
+    expect(screen.getByTestId(`${testId}-${H.TENT_ID}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toBeNull();
+  });
+
+  it.each([
+    [true, false, "tents-list-manual-loading", /Loading saved manual snapshot/],
+    [false, true, "tents-list-manual-unavailable", /Manual snapshot unavailable/],
+  ])(
+    "manual loading=%s error=%s is explicit instead of established empty",
+    (isLoading, isError, testId, copy) => {
+      H.hookState.byTent = { [H.TENT_ID]: [] };
+      H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+      H.hookState.manualIsLoading = isLoading;
+      H.hookState.manualIsError = isError;
+
+      render(
+        <MemoryRouter>
+          <Tents />
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByTestId(`${testId}-${H.TENT_ID}`)).toHaveTextContent(copy);
+      expect(screen.queryByText(/No sensor data yet/)).toBeNull();
+    },
+  );
+
+  it("uses one parent batch hook for multiple eligible tents", () => {
+    const secondTentId = "6b2d7f10-3c4e-4d5f-9a01-2b3c4d5e6f70";
+    H.hookState.tents = [
+      H.makeTent(H.TENT_ID, "Walkthrough Tent"),
+      H.makeTent(secondTentId, "Second Tent"),
+    ];
+    H.hookState.byTent = { [H.TENT_ID]: [], [secondTentId]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success", [secondTentId]: "success" };
+
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(1);
+    expect(H.hookState.legacyManualHookCalls).toBe(0);
+    expect(H.hookState.lastManualTentIds).toEqual([H.TENT_ID, secondTentId].sort());
+  });
+
+  it("waits for the full sensor set to settle before starting one final manual batch", () => {
+    const secondTentId = "6b2d7f10-3c4e-4d5f-9a01-2b3c4d5e6f70";
+    H.hookState.tents = [
+      H.makeTent(H.TENT_ID, "Walkthrough Tent"),
+      H.makeTent(secondTentId, "Second Tent"),
+    ];
+    H.hookState.byTent = { [H.TENT_ID]: [], [secondTentId]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success", [secondTentId]: "loading" };
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(0);
+    expect(screen.getByTestId(`tents-list-manual-loading-${H.TENT_ID}`)).toHaveTextContent(
+      "Loading saved manual snapshot",
+    );
+    expect(screen.getByTestId(`tents-list-sensor-loading-${secondTentId}`)).toBeInTheDocument();
+
+    H.hookState.statusByTent = { [H.TENT_ID]: "success", [secondTentId]: "success" };
+    view.rerender(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(H.hookState.manualHookCalls).toBe(1);
+    expect(H.hookState.lastManualTentIds).toEqual([H.TENT_ID, secondTentId].sort());
+  });
+
+  it("keeps a cached manual card visible with an explicit refresh warning", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualCards = [H.manualCard()];
+    H.hookState.manualIsError = true;
+
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-manual-refresh-stale-${H.TENT_ID}`)).toHaveTextContent(
+      "last loaded manual snapshot shown",
+    );
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
+  });
+
+  it("does not claim no sensor data while cached-empty manual evidence refreshes", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualIsFetching = true;
+
+    const view = render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-manual-loading-${H.TENT_ID}`)).toHaveTextContent(
+      "Loading saved manual snapshot",
+    );
+    expect(screen.queryByText("No sensor data yet")).not.toBeInTheDocument();
+
+    H.hookState.manualIsFetching = false;
+    view.rerender(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-sensor-empty-${H.TENT_ID}`)).toHaveTextContent(
+      "No sensor data yet",
+    );
+  });
+
+  it("keeps a cached manual snapshot visible while labeling its refresh in progress", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualCards = [H.manualCard()];
+    H.hookState.manualIsFetching = true;
+
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-manual-refreshing-${H.TENT_ID}`)).toHaveTextContent(
+      "Refreshing saved manual snapshot",
+    );
+    expect(screen.getByTestId(`tents-list-sensor-source-${H.TENT_ID}`)).toHaveTextContent("Manual");
+    expect(screen.queryByTestId(`tents-list-manual-refresh-stale-${H.TENT_ID}`)).toBeNull();
+  });
+
+  it("renders a capped manual scan as unavailable rather than established empty", () => {
+    H.hookState.byTent = { [H.TENT_ID]: [] };
+    H.hookState.statusByTent = { [H.TENT_ID]: "success" };
+    H.hookState.manualUnavailableReason = "cap_exhausted";
+
+    render(
+      <MemoryRouter>
+        <Tents />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId(`tents-list-manual-unavailable-${H.TENT_ID}`)).toHaveAttribute(
+      "data-unavailable-reason",
+      "cap_exhausted",
+    );
+    expect(screen.getByTestId(`tents-list-manual-unavailable-${H.TENT_ID}`)).toHaveTextContent(
+      "safe limit",
+    );
+    expect(screen.queryByText("No sensor data yet")).not.toBeInTheDocument();
   });
 
   it("an open tab flips fresh live labels to Stale once the 15-minute boundary passes", () => {
@@ -688,28 +1139,37 @@ describe("Tents list sensor truth — static wiring", () => {
 
   it("uses the shared per-tent hook + Dashboard-strip presenter", () => {
     expect(TENTS_SRC).toMatch(/useSensorReadingsByTents/);
-    expect(TENTS_SRC).toMatch(/buildTentSnapshotView/);
+    expect(TENTS_SRC).toMatch(/TentEnvironmentSnapshotStrip/);
+    expect(TENTS_SRC).toMatch(/useTentManualSnapshotBatch/);
+    expect(TENTS_SRC).toMatch(/new Set\(manualFallbackCandidateTentIds\)/);
+    expect(TENTS_SRC).toMatch(/manualFallbackTentIdSet\.has\(t\.id\)/);
+    expect(TENTS_SRC).not.toMatch(/manualFallbackTentIds\.includes\(t\.id\)/);
     expect(TENTS_SRC).toMatch(
-      /buildTentSnapshotView\(\s*\(readingsByTent\[t\.id\]\s*\?\?\s*\[\]\)[\s\S]*?t\.stage/,
+      /manualFallbackTentIds = sensorSetSettled \? manualFallbackCandidateTentIds : \[\]/,
+    );
+    expect(TENTS_SRC).toMatch(/sensorRows=\{readingsByTent\[t\.id\] \?\? \[\]\}/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(selection\.rows, stage, now/);
+    expect(SNAPSHOT_STRIP_SRC).not.toMatch(
+      /useManualSnapshotTimelineCards|useTentManualSnapshotBatch/,
     );
   });
 
   it("renders honest freshness/source context on the card", () => {
-    expect(TENTS_SRC).toMatch(/tents-list-sensor-source-/);
-    expect(TENTS_SRC).toMatch(/tents-list-sensor-last-updated-/);
-    expect(TENTS_SRC).toMatch(/Last updated \{snapView\.lastUpdatedDisplay\}/);
-    expect(TENTS_SRC).toMatch(/tents-list-metric-status-/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/tents-list-sensor-source-/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/tents-list-sensor-last-updated-/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/Last updated \{snapView\.lastUpdatedDisplay\}/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/tents-list-metric-status-/);
   });
 
   it("renders an honest no-data state instead of silence or zeros", () => {
-    expect(TENTS_SRC).toMatch(/tents-list-sensor-empty-/);
-    expect(TENTS_SRC).toMatch(/No sensor data yet/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/tents-list-sensor-empty-/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/No sensor data yet/);
   });
 
   it("distinguishes pending/failed reads from established absence", () => {
     expect(TENTS_SRC).toMatch(/statusByTent/);
-    expect(TENTS_SRC).toMatch(/tents-list-sensor-loading-/);
-    expect(TENTS_SRC).toMatch(/tents-list-sensor-unavailable-/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/tents-list-sensor-loading-/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/tents-list-sensor-unavailable-/);
   });
 
   it("only queries real UUID tent ids (mock-fallback ids short-circuit)", () => {
@@ -722,11 +1182,14 @@ describe("Tents list sensor truth — static wiring", () => {
     // The interval lives in the shared useNowTick hook (used by the
     // Dashboard strip too); the page must consume it and feed the presenter.
     expect(TENTS_SRC).toMatch(/useNowTick/);
-    expect(TENTS_SRC).toMatch(/buildTentSnapshotView\(\s*\(readingsByTent\[t\.id\][\s\S]*?nowTick/);
+    expect(TENTS_SRC).toMatch(/now=\{nowTick\}/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView\(selection\.rows, stage, now/);
   });
 
   it("introduces no alert/queue/automation/device-control surfaces", () => {
     expect(TENTS_SRC).not.toMatch(/service_role|action_queue/);
     expect(TENTS_SRC).not.toMatch(/saveAlert\(|logAlertEvent\(/);
+    expect(SNAPSHOT_STRIP_SRC).not.toMatch(/service_role|action_queue/);
+    expect(SNAPSHOT_STRIP_SRC).not.toMatch(/saveAlert\(|logAlertEvent\(/);
   });
 });

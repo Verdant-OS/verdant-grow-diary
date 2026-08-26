@@ -51,11 +51,11 @@ const COOKIE = JSON.stringify([
 const READY_BASE: ManagedSessionEnvSnapshot = {
   authStatus: "signed_in",
   sessionJson: SESSION,
-  storageKey: "sb-project-auth-token",
+  storageKey: "sb-abcdefghijklmnopqrst-auth-token",
   cookiesJson: null,
   cookiesJsonCanonical: null,
-  supabaseUrl: "https://abcdefproject.supabase.co",
-  targetProjectRef: "abcdefproject",
+  supabaseUrl: "https://abcdefghijklmnopqrst.supabase.co",
+  targetProjectRef: "abcdefghijklmnopqrst",
 };
 
 function receiptFor(env: ManagedSessionEnvSnapshot) {
@@ -188,16 +188,49 @@ describe("preflight receipt — status/reason matrix", () => {
   });
 
   it("declared target project mismatch ⇒ blocked target_project_mismatch", () => {
-    const r = receiptFor({ ...READY_BASE, targetProjectRef: "someotherref" });
+    const r = receiptFor({ ...READY_BASE, targetProjectRef: "bcdefghijklmnopqrstu" });
     expect(r.status).toBe("blocked");
     expect(r.reason).toBe("target_project_mismatch");
     expect(r.target_project_verified).toBe(false);
   });
 
-  it("undeclared target project ref does not block but is not verified", () => {
-    const r = receiptFor({ ...READY_BASE, targetProjectRef: null });
-    expect(r.status).toBe("ready");
-    expect(r.target_project_verified).toBe(false);
+  it.each([
+    "https://abcdefghijklmnopqrst.supabase.co.attacker.invalid",
+    "https://abcdefghijklmnopqrst.attacker.invalid",
+    "http://abcdefghijklmnopqrst.supabase.co",
+    "https://abcdefghijklmnopqrst.supabase.co:444",
+    "https://abcdefghijklmnopqrst.supabase.co/rest/v1",
+  ])("lookalike or noncanonical target %s fails closed in both implementations", (supabaseUrl) => {
+    const env = { ...READY_BASE, supabaseUrl };
+    const ts = evaluateManagedSession(env);
+    const js = evaluateJs(env);
+    expect(ts.status).toBe("blocked");
+    expect(js.status).toBe("blocked");
+    if (ts.status === "blocked") expect(ts.reason).toBe("target_project_mismatch");
+    if (js.status === "blocked") expect(js.reason).toBe("target_project_mismatch");
+    expect(receiptFor(env).target_project_verified).toBe(false);
+  });
+
+  it("missing target project ref blocks both implementations before session restore", () => {
+    const env = { ...READY_BASE, targetProjectRef: null };
+    const ts = evaluateManagedSession(env);
+    const js = evaluateJs(env);
+    expect(ts.status).toBe("blocked");
+    expect(js.status).toBe("blocked");
+    if (ts.status === "blocked") expect(ts.reason).toBe("missing_target_project_ref");
+    if (js.status === "blocked") expect(js.reason).toBe("missing_target_project_ref");
+    expect(receiptFor(env).target_project_verified).toBe(false);
+  });
+
+  it("missing Supabase URL blocks both implementations before session restore", () => {
+    const env = { ...READY_BASE, supabaseUrl: null };
+    const ts = evaluateManagedSession(env);
+    const js = evaluateJs(env);
+    expect(ts.status).toBe("blocked");
+    expect(js.status).toBe("blocked");
+    if (ts.status === "blocked") expect(ts.reason).toBe("target_project_mismatch");
+    if (js.status === "blocked") expect(js.reason).toBe("target_project_mismatch");
+    expect(receiptFor(env).target_project_verified).toBe(false);
   });
 });
 
@@ -216,7 +249,7 @@ describe("preflight receipt — determinism + hygiene", () => {
     ["bad-session", { ...READY_BASE, sessionJson: "{" }],
     ["no-token", { ...READY_BASE, sessionJson: JSON.stringify({ user: { id: "u" } }) }],
     ["no-user", { ...READY_BASE, sessionJson: JSON.stringify({ access_token: "t" }) }],
-    ["mismatch", { ...READY_BASE, targetProjectRef: "nope" }],
+    ["mismatch", { ...READY_BASE, targetProjectRef: "bcdefghijklmnopqrstu" }],
   ];
 
   it.each(SNAPSHOTS)("%s: same snapshot renders byte-identical receipts", (_label, env) => {

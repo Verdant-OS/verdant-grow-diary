@@ -323,7 +323,9 @@ async function loadCandidateDiaryEvidence(
       }
       throw new PhenoEvidenceReadError("diary_entries");
     }
-    if (!data) throw new PhenoEvidenceReadError("diary_entries");
+    // Fail closed on a null OR non-array payload (review P2): a malformed
+    // response must never be mistaken for "no diary evidence".
+    if (!Array.isArray(data)) throw new PhenoEvidenceReadError("diary_entries");
     rows.push(...data);
   }
   return mapDiaryRowsToCandidateEvidence(rows);

@@ -5,7 +5,7 @@
   "compatibilityLockfile": "package-lock.json",
   "owner": "Verdant dependency security",
   "reason": "package-lock.json remains synchronized while live Vercel, SEO, local setup, and preview verification entrypoints still invoke npm.",
-  "reviewBy": "2026-08-25",
+  "reviewBy": "2026-09-25",
   "consumerContracts": [
     {
       "path": "vercel.json",

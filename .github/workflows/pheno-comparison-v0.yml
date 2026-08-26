@@ -22,6 +22,8 @@ on:
       - "src/routes/pheno-hunts.$id.compare.tsx"
       - "src/hooks/usePhenoHuntCandidates.ts"
       - "src/lib/phenoHuntCandidatesService.ts"
+      - "src/hooks/usePhenoEvidencePackets.ts"
+      - "src/lib/phenoEvidenceReceiptService.ts"
       - "src/App.tsx"
       - "src/lib/appRouteManifest.ts"
       - ".github/workflows/pheno-comparison-v0.yml"

@@ -354,7 +354,11 @@ describe("restored-history ledger reconciliation", () => {
     );
     expect(CATALOG_STATE_QUERY_SQL).toContain("t.tgattr::text=(select a.attnum::text");
     expect(CATALOG_STATE_QUERY_SQL).toContain(
-      "((old.email_confirmed_atisnull)and(new.email_confirmed_atisnotnull))",
+      "pg_catalog.lower(pg_catalog.pg_get_triggerdef(t.oid,false))",
+    );
+    expect(CATALOG_STATE_QUERY_SQL).not.toContain("pg_get_expr(t.tgqual");
+    expect(CATALOG_STATE_QUERY_SQL).toContain(
+      "old.email_confirmed_atisnullandnew.email_confirmed_atisnotnull",
     );
   });
 

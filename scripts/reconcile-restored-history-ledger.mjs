@@ -445,9 +445,16 @@ export const CATALOG_STATE_QUERY_SQL = `with expected(version,name,source_sha256
           and t.tgattr::text=(select a.attnum::text from pg_catalog.pg_attribute a
             where a.attrelid=t.tgrelid and a.attname='email_confirmed_at'
               and a.attnum>0 and not a.attisdropped)
-          and lower(pg_catalog.regexp_replace(
-            pg_catalog.pg_get_expr(t.tgqual,t.tgrelid),'\\s+','','g'
-          ))='((old.email_confirmed_atisnull)and(new.email_confirmed_atisnotnull))'))),false) as contract
+          and pg_catalog.regexp_replace(
+            pg_catalog.split_part(
+              pg_catalog.split_part(
+                pg_catalog.lower(pg_catalog.pg_get_triggerdef(t.oid,false)),
+                ' when ',2
+              ),
+              ' execute ',1
+            ),
+            '[[:space:]()]','','g'
+          )='old.email_confirmed_atisnullandnew.email_confirmed_atisnotnull'))),false) as contract
   from pg_catalog.pg_trigger t where not t.tgisinternal
     and (t.tgname in('on_auth_user_created_grant_staff','on_auth_user_confirmed_grant_staff')
       or t.tgfoid in(

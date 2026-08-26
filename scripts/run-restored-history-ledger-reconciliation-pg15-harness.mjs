@@ -926,6 +926,26 @@ const ADVERSARIAL_CATALOG_CASES = Object.freeze([
     reason: "plant_type_comment_contract",
   }),
   Object.freeze({
+    name: "staff_update_trigger_condition_one_sided",
+    sql: `drop trigger on_auth_user_confirmed_grant_staff on auth.users;
+      create trigger on_auth_user_confirmed_grant_staff
+        after update of email_confirmed_at on auth.users for each row
+        when (old.email_confirmed_at is null)
+        execute function public.grant_staff_role_for_verified_allowlist();`,
+    status: "catalog_drift",
+    reason: "staff_trigger_contract",
+  }),
+  Object.freeze({
+    name: "staff_update_trigger_condition_inverted",
+    sql: `drop trigger on_auth_user_confirmed_grant_staff on auth.users;
+      create trigger on_auth_user_confirmed_grant_staff
+        after update of email_confirmed_at on auth.users for each row
+        when (old.email_confirmed_at is not null and new.email_confirmed_at is null)
+        execute function public.grant_staff_role_for_verified_allowlist();`,
+    status: "catalog_drift",
+    reason: "staff_trigger_contract",
+  }),
+  Object.freeze({
     name: "legacy_helper_acl",
     sql: `grant execute on function public.grant_staff_role_for_verified_email()
       to authenticated;`,

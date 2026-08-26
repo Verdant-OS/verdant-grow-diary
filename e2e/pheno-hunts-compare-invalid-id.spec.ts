@@ -67,7 +67,7 @@ test(`invalid deep-link ${INVALID_ROUTE} renders a safe read-only error state`, 
   );
   // Third-party font CSS is not part of the app's network surface; fulfilling
   // it keeps the spec hermetic where fonts.googleapis.com is unreachable.
-  await page.route(/fonts\.(googleapis|gstatic)\.com/i, (route) =>
+  await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//i, (route) =>
     route.fulfill({ status: 200, contentType: "text/css", body: "" }),
   );
 

@@ -7,7 +7,7 @@ import { denyAnalyticsConsent } from "./utils/analyticsConsent";
  * where fonts.googleapis.com is unreachable (a reset there is a console error).
  */
 async function mockThirdPartyFonts(page: Page) {
-  await page.route(/fonts\.(googleapis|gstatic)\.com/i, (route) =>
+  await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//i, (route) =>
     route.fulfill({ status: 200, contentType: "text/css", body: "" }),
   );
 }

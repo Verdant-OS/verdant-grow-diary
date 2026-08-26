@@ -83,7 +83,7 @@ test.describe("Grow Help Toolkit local-only public flow", () => {
       expect(network.dataOrAnalyticsRequests).toEqual([]);
       expect(
         network.blockedExternalRequests.every((url) =>
-          /fonts\.(googleapis|gstatic)\.com/.test(url),
+          ["fonts.googleapis.com", "fonts.gstatic.com"].includes(new URL(url).hostname),
         ),
       ).toBe(true);
     });

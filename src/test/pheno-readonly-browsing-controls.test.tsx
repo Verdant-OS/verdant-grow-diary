@@ -128,6 +128,8 @@ function keeper(id: string, name: string) {
 const promoteToKeeper = vi.fn().mockResolvedValue(true);
 const saveCross = vi.fn().mockResolvedValue(true);
 const addKeeperClone = vi.fn().mockResolvedValue(true);
+const markReversed = vi.fn().mockResolvedValue(true);
+const saveStabilityRuns = vi.fn().mockResolvedValue(true);
 
 function keepersState(): UsePhenoKeepersState {
   return {
@@ -136,7 +138,22 @@ function keepersState(): UsePhenoKeepersState {
     candidates: [{ candidateId: "p1", candidateLabel: "GMO #1" }],
     // 9 keepers so the browse filter (lineage > 8) renders.
     keepers: Array.from({ length: 9 }, (_, i) => keeper(`k${i + 1}`, `Keeper ${i + 1}`)),
-    clonesByKeeper: {},
+    // k1 carries a plant-linked clone with recorded traits so the grow-out
+    // handoff renders its accept button — the accept path is a mutation
+    // (appends a stability run) and must be pinned in read-only mode.
+    clonesByKeeper: {
+      k1: [
+        {
+          id: "c1",
+          keeperId: "k1",
+          parentCloneId: null,
+          clonePlantId: "p9",
+          cloneLabel: "cut #2",
+          note: null,
+          takenAt: "2026-07-01",
+        },
+      ],
+    },
     crosses: [],
     reversals: [],
     reversedKeeperIds: [],
@@ -147,10 +164,17 @@ function keepersState(): UsePhenoKeepersState {
     reload: vi.fn(),
     promoteToKeeper,
     addKeeperClone,
-    markReversed: vi.fn().mockResolvedValue(true),
+    markReversed,
     saveCross,
-    saveStabilityRuns: vi.fn().mockResolvedValue(true),
-    growOutPlantsById: {},
+    saveStabilityRuns,
+    growOutPlantsById: {
+      p9: {
+        plantId: "p9",
+        plantName: "Gas cut #2",
+        growName: null,
+        traits: { nose_loudness: 9 },
+      },
+    },
     linkGrowOutPlant: vi.fn().mockResolvedValue(true),
   };
 }
@@ -261,9 +285,35 @@ describe("PhenoKeepersPage — read-only keeps browsing live", () => {
     // synthetic click reaches the handler — only the inert substitution
     // passed to KeeperCard keeps the hook mutation out.
     fireEvent.change(screen.getByTestId("keepers-clone-label-k1"), {
-      target: { value: "cut #2" },
+      target: { value: "cut #3" },
     });
     fireEvent.click(screen.getByTestId("keepers-clone-add-k1"));
     expect(addKeeperClone).not.toHaveBeenCalled();
+  });
+
+  it("the reversal arm→confirm flow never reaches markReversed in read-only mode", () => {
+    markReversed.mockClear();
+    renderKeepers();
+    // Both clicks fire (synthetic events ignore fieldset-disabled); the
+    // confirm handler runs against the inert substitution, so the permanent
+    // reversal record can never be written from a read-only session.
+    fireEvent.click(screen.getByTestId("keeper-reverse-k1"));
+    fireEvent.click(screen.getByTestId("keeper-reverse-confirm-k1"));
+    expect(markReversed).not.toHaveBeenCalled();
+  });
+
+  it("stability add-run and grow-out accept never reach saveStabilityRuns in read-only mode", () => {
+    saveStabilityRuns.mockClear();
+    renderKeepers();
+    // Add-run path: fill the run label so the add button's own disabled
+    // condition is false, then click.
+    fireEvent.change(screen.getByTestId("pheno-stability-label-k1"), {
+      target: { value: "Run 2" },
+    });
+    fireEvent.click(screen.getByTestId("pheno-stability-add-k1"));
+    // Grow-out accept path: k1's linked clone with recorded traits renders
+    // the handoff; accepting would APPEND a run to the ledger.
+    fireEvent.click(screen.getByTestId("pheno-grow-out-accept-c1"));
+    expect(saveStabilityRuns).not.toHaveBeenCalled();
   });
 });

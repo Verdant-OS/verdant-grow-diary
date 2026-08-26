@@ -84,21 +84,27 @@ records paid events with `missing_user_id` and grants no entitlement.
 
 Edge function secrets on the production project:
 
-| Secret                                                                                          | Used by                                                | Presence check                         |
-| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------- |
-| `PADDLE_WEBHOOK_SECRET`                                                                         | paddle-webhook                                         | `supabase secrets list` shows the NAME |
-| `PADDLE_ENVIRONMENT`                                                                            | paddle-webhook (must be `sandbox` until live approval) | same                                   |
-| `PADDLE_PRICE_PRO_MONTHLY` / `PADDLE_PRICE_PRO_ANNUAL` / `PADDLE_PRICE_FOUNDER_LIFETIME`        | paddle-webhook plan mapping                            | same                                   |
-| `PAYMENTS_ENVIRONMENT`                                                                          | get-paddle-price env selection (server-controlled)     | same                                   |
-| `PADDLE_SANDBOX_API_KEY` (+ `PADDLE_LIVE_API_KEY` only at live approval)                        | gateway price lookups                                  | same                                   |
-| `LOVABLE_API_KEY`, `PAYMENTS_SANDBOX_WEBHOOK_SECRET` (+ `PAYMENTS_LIVE_WEBHOOK_SECRET` at live) | Lovable lane                                           | same                                   |
+| Secret                                                                                          | Used by                                                                                                     | Presence check                         |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `PADDLE_WEBHOOK_SECRET`                                                                         | paddle-webhook                                                                                              | `supabase secrets list` shows the NAME |
+| `PADDLE_ENVIRONMENT`                                                                            | paddle-webhook — **permanently `sandbox`**, never `live` (see "Propose a future live transition")           | same                                   |
+| `PADDLE_SANDBOX_PRICE_PRO_MONTHLY` / `_PRO_ANNUAL` / `_FOUNDER_LIFETIME`                        | paddle-webhook plan mapping (sandbox-scoped; preferred)                                                     | same                                   |
+| `PADDLE_PRICE_PRO_MONTHLY` / `PADDLE_PRICE_PRO_ANNUAL` / `PADDLE_PRICE_FOUNDER_LIFETIME`        | legacy fallback for paddle-webhook when the sandbox-scoped names are unset; also read by `get-paddle-price` | same                                   |
+| `PAYMENTS_ENVIRONMENT`                                                                          | get-paddle-price env selection (server-controlled)                                                          | same                                   |
+| `PADDLE_SANDBOX_API_KEY` (+ `PADDLE_LIVE_API_KEY` only at live approval)                        | gateway price lookups                                                                                       | same                                   |
+| `LOVABLE_API_KEY`, `PAYMENTS_SANDBOX_WEBHOOK_SECRET` (+ `PAYMENTS_LIVE_WEBHOOK_SECRET` at live) | Lovable lane                                                                                                | same                                   |
 
 JWT posture (now pinned in `supabase/config.toml`): `get-paddle-price`
 verify_jwt=true; `paddle-webhook` and `payments-webhook` verify_jwt=false
 (signature is the auth; they grant nothing unverified).
 
-All three Paddle price IDs must belong to the SAME Paddle environment as the
-webhook secret and `PADDLE_ENVIRONMENT`.
+`paddle-webhook`'s three price IDs must belong to the SAME Paddle environment as
+its webhook secret and `PADDLE_ENVIRONMENT` — i.e. **sandbox, permanently**. Set
+them in the `PADDLE_SANDBOX_PRICE_*` names so they stay sandbox-correct even
+after `PADDLE_PRICE_*` is repointed at a live catalog: those legacy names are
+shared with `get-paddle-price`, which selects from the server's
+`PAYMENTS_ENVIRONMENT`, and a live transition would otherwise leave every
+sandbox event classified as `null` with no error raised.
 
 ## Release gate — every box must be green before "ready"
 
@@ -133,9 +139,17 @@ webhook secret and `PADDLE_ENVIRONMENT`.
 A future live launch requires a new explicit owner authorization. It must be
 one independently reviewed release that changes the client resolver and
 presenter copy together with the live-class production token,
-`PAYMENTS_ENVIRONMENT=live`, legacy `PADDLE_ENVIRONMENT=live`, live API and
-webhook secrets, live price IDs, notification destinations, monitoring, and a
-tested rollback. Flipping any single setting or token is insufficient and
+`PAYMENTS_ENVIRONMENT=live`, live API and webhook secrets, live price IDs,
+notification destinations, monitoring, and a tested rollback.
+
+**`PADDLE_ENVIRONMENT` is NOT part of that list and must stay `sandbox`.** An
+earlier revision of this runbook said to set it live; that was wrong.
+`paddle-webhook` returns 403 `sandbox_only` unless it is exactly `sandbox`, and
+per the release gate above **both** `env=sandbox` and `env=live` route to
+`payments-webhook` — so no live traffic ever reaches `paddle-webhook`. Setting it
+live enables nothing and silently starves the operator audit surfaces. Keep
+`paddle-webhook`'s price IDs in the `PADDLE_SANDBOX_PRICE_*` names for the same
+reason. Flipping any single setting or token is insufficient and
 must fail closed. On rollback, restore the reviewed sandbox build and all
 sandbox selectors/catalog bindings as one coordinated operation.
 

@@ -395,6 +395,7 @@ const READ_ONLY_RPCS = new Set([
   "genetics_trace_resolve",
   "get_latest_tent_sensor_snapshot",
   "has_role",
+  "pheno_candidate_diary_entries_top_n",
   "verdant_search",
 ]);
 

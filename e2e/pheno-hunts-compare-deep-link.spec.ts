@@ -95,6 +95,13 @@ async function mockLiveHunt(page: Page, capture: RestBoundaryCapture) {
       return;
     }
 
+    // Diary evidence rides the read-only top-N-per-plant RPC (also POST by
+    // PostgREST transport); an empty set matches the diary_entries fixture.
+    if (/\/rpc\/pheno_candidate_diary_entries_top_n$/i.test(new URL(request.url()).pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+      return;
+    }
+
     if (request.method() !== "GET") {
       capture.mutations.push(requestLabel);
       await route.abort("blockedbyclient");

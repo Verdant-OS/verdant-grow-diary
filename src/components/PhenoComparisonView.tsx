@@ -356,7 +356,12 @@ function CandidateColumn({
                 data-testid={`photo-${p.id}`}
                 className="overflow-hidden rounded border border-border bg-muted/40 text-[11px] text-muted-foreground"
               >
-                {p.url ? (
+                {/* Only browser-loadable URLs render inline. Canonical diary
+                    photos are often private `storage://diary-photos/...`
+                    references that need the owner-scoped signing path — until
+                    that is wired here, they list as recorded evidence (caption
+                    + date) instead of rendering as a broken image. */}
+                {p.url && /^https?:\/\//i.test(p.url) ? (
                   <img
                     src={p.url}
                     alt={p.caption ?? `Photo of ${c.candidateLabel}`}

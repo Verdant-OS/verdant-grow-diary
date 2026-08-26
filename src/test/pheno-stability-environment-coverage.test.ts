@@ -54,6 +54,31 @@ describe("summarizeEnvironmentCoverage", () => {
     expect(gate.environments).toEqual(["indoor coco", "outdoor"]);
   });
 
+  it("case/whitespace variants of one tag count as ONE environment and never unlock the gate", () => {
+    // "Tent A", "tent a" and "tent  A" describe the same environment; the
+    // comparison gate needs two genuinely different ones.
+    const coverage = summarizeEnvironmentCoverage([
+      run("r1", "Tent A", { nose_loudness: 8 }),
+      run("r2", "tent a", { nose_loudness: 7 }),
+      run("r3", "tent  A", { nose_loudness: 6 }),
+    ]);
+    expect(coverage.taggedRunCount).toBe(3);
+    expect(coverage.environments).toEqual(["Tent A"]); // first-seen display spelling
+    expect(coverage.comparisonAvailable).toBe(false);
+  });
+
+  it("comparison pools case-variant tags under one environment", () => {
+    const comparisons = buildEnvironmentComparison([
+      run("r1", "Tent A", { nose_loudness: 8 }),
+      run("r2", "tent a", { nose_loudness: 7 }),
+      run("r3", "Tent B", { nose_loudness: 5 }),
+    ]);
+    const nose = comparisons.find((c) => c.axisKey === "nose_loudness");
+    expect(nose).toBeDefined();
+    expect(nose!.byEnvironment.map((e) => e.environment)).toEqual(["Tent A", "Tent B"]);
+    expect(nose!.byEnvironment[0].values).toEqual([8, 7]);
+  });
+
   it("insufficient-data copy names exactly what is missing", () => {
     const untagged = summarizeEnvironmentCoverage([run("r1", null, {}), run("r2", null, {})]);
     expect(environmentCoverageCopy(untagged)).toMatch(/0 of 2 grow-outs/);

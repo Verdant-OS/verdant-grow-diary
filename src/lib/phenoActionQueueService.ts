@@ -1,21 +1,35 @@
 /**
  * phenoActionQueueService — the ONLY pheno write path into the approval-required
  * Action Queue. Used for the herm → "consider removing" suggestion: when the
- * grower confirms removing a hermaphrodite, this inserts ONE
+ * grower confirms removing a hermaphrodite, this creates ONE
  * status="pending_approval" Action Queue row. It never removes a plant, never
  * targets a device, and never auto-approves.
  *
- * Safety envelope (mirrors useAddAiDoctorSessionSuggestionToActionQueue):
- *  - INSERT-only into public.action_queue. No update/upsert/delete/rpc.
- *  - Never sends user_id (DB default auth.uid() + RLS ownership).
- *  - Never sends target_device.
- *  - status pinned to "pending_approval"; source "manual".
+ * Safety envelope:
+ *  - Creates through public.action_queue_create (the #586 atomic path), so the
+ *    queue row and its 'created' audit event commit or roll back together.
+ *  - Server-side idempotency via a stable observation-scoped dedupe key: the
+ *    RPC's non-terminal dedupe reuses the pending row, which also closes the
+ *    cross-tab race a client-side pre-select could not. (A previous
+ *    client-side select filtered suggested_change with a JSON operator, but
+ *    the column is text — the filter errored and the dedupe never ran.)
+ *  - Never sends user_id (server derives auth.uid()). Never sends
+ *    target_device. Status is pinned server-side to pending_approval.
  *  - Payload shaped by the pure, tested buildPhenoKeeperActionQueuePayloads.
  */
-import { supabase } from "@/integrations/supabase/client";
 import { buildPhenoKeeperActionQueuePayloads } from "@/lib/phenoKeeperActionQueue";
+import { createActionQueueItem } from "@/lib/actionQueueCreateService";
 
 export type QueueResult = { ok: true; id: string } | { ok: false; error: string };
+
+/** Stable server-side idempotency key, scoped to one herm observation. */
+export function buildPhenoHermCullDedupeKey(
+  observationId: string | null | undefined,
+): string | null {
+  const id = typeof observationId === "string" ? observationId.trim() : "";
+  if (!id) return null;
+  return `pheno_herm_cull:${id}`;
+}
 
 /**
  * Queue a suggest-only "confirm removal" for a hermaphrodite the grower chose
@@ -43,30 +57,33 @@ export async function queueHermCullSuggestion(input: {
     input.tentId ?? null,
   );
   if (payloads.length === 0) return { ok: false, error: "Nothing to queue." };
-
-  // Idempotency across reloads: the observation id travels in
-  // suggested_change.source_decision_id, so an existing pending row for the
-  // SAME observation is reused instead of minting a duplicate. (The hook's
-  // session-local dedupe forgets on reload; this read survives it. Each row
-  // still requires explicit grower approval either way.)
-  const { data: existing } = await supabase
-    .from("action_queue")
-    .select("id")
-    .eq("plant_id", input.plantId)
-    .eq("status", "pending_approval")
-    .eq("suggested_change->>source_decision_id", input.observationId)
-    .limit(1);
-  if (Array.isArray(existing) && existing[0]?.id) {
-    return { ok: true, id: existing[0].id };
+  const payload = payloads[0];
+  // The builder always sets these; the type keeps them loose. Fail closed
+  // rather than queueing a row with a blank reason, risk level, or change.
+  if (
+    typeof payload.reason !== "string" ||
+    typeof payload.risk_level !== "string" ||
+    typeof payload.suggested_change !== "string" ||
+    typeof payload.source !== "string"
+  ) {
+    return { ok: false, error: "Nothing to queue." };
   }
 
-  // INSERT-only. Never send user_id (DB default auth.uid()). Never target_device.
-  const { data, error } = await supabase
-    .from("action_queue")
-    .insert(payloads)
-    .select("id")
-    .limit(1);
-  if (error) return { ok: false, error: "Could not queue the removal for approval." };
-  const id = Array.isArray(data) && data[0]?.id ? data[0].id : "";
-  return { ok: true, id };
+  const result = await createActionQueueItem({
+    grow_id: payload.grow_id,
+    tent_id: payload.tent_id ?? null,
+    plant_id: payload.plant_id ?? null,
+    action_type: payload.action_type,
+    target_metric: payload.target_metric ?? null,
+    suggested_change: payload.suggested_change,
+    reason: payload.reason,
+    risk_level: payload.risk_level,
+    source: payload.source,
+    dedupe_key: buildPhenoHermCullDedupeKey(input.observationId),
+    originating_timeline_events:
+      (payload.originating_timeline_events as unknown as readonly unknown[]) ?? null,
+  });
+
+  if (!result.ok) return { ok: false, error: "Could not queue the removal for approval." };
+  return { ok: true, id: result.action_queue_id };
 }

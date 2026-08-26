@@ -88,6 +88,22 @@ describe("paddle-webhook sandbox price config — decoupling from the live catal
     expect(cfg.founder_lifetime).toBe("");
   });
 
+  it("whitespace-only sandbox name must NOT resolve to a live/legacy id", () => {
+    // Presence is raw env presence, not trimmed length. A whitespace-only
+    // PADDLE_SANDBOX_PRICE_* key still selects the sandbox set exclusively;
+    // trimmed values become "" and must never fall through to PADDLE_PRICE_*.
+    const cfg = resolvePaddleSandboxPriceConfig(
+      envFrom({
+        ...legacyEnv(LIVE_IDS),
+        [PADDLE_SANDBOX_PRICE_ENV_NAMES.pro_monthly]: "   ",
+      }),
+    );
+    expect(cfg).toEqual({ pro_monthly: "", pro_annual: "", founder_lifetime: "" });
+    expect(Object.values(cfg)).not.toContain(LIVE_IDS.pro_monthly);
+    expect(Object.values(cfg)).not.toContain(LIVE_IDS.pro_annual);
+    expect(Object.values(cfg)).not.toContain(LIVE_IDS.founder_lifetime);
+  });
+
   it("is deterministic across repeated calls", () => {
     const env = envFrom({ ...legacyEnv(LIVE_IDS), ...sandboxEnv(SANDBOX_IDS) });
     expect(resolvePaddleSandboxPriceConfig(env)).toEqual(resolvePaddleSandboxPriceConfig(env));

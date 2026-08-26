@@ -11,10 +11,12 @@
  * no alert, just an operator audit lane quietly full of unclassified rows.
  *
  * Resolution order, all-or-nothing by design:
- *   1. If ANY `PADDLE_SANDBOX_PRICE_*` name is set, use that set EXCLUSIVELY.
- *      Unset keys resolve to "" rather than borrowing the legacy value.
- *   2. Otherwise fall back to the legacy `PADDLE_PRICE_*` names, so nothing
- *      changes before the new secrets are configured.
+ *   1. If ANY `PADDLE_SANDBOX_PRICE_*` key is present in the environment
+ *      (including empty or whitespace-only), use that set EXCLUSIVELY.
+ *      Absent or whitespace values resolve to "" — never to `PADDLE_PRICE_*`.
+ *   2. Only when no `PADDLE_SANDBOX_PRICE_*` key is present at all, fall back
+ *      to the legacy `PADDLE_PRICE_*` names, so nothing changes before the
+ *      new secrets exist.
  *
  * All-or-nothing matters: a per-key fallback would let a partly configured
  * sandbox set silently mix live ids into the unset keys, which is the failure
@@ -47,12 +49,14 @@ const PLAN_KEYS: readonly PlanKey[] = ["pro_monthly", "pro_annual", "founder_lif
 export function resolvePaddleSandboxPriceConfig(
   getEnv: (name: string) => string | undefined,
 ): PaddleSandboxPriceConfig {
-  const read = (name: string) => (getEnv(name) ?? "").trim();
-
+  // Presence is raw: the key exists in the environment. Do not trim before
+  // this check — whitespace-only must still select the sandbox set, or a
+  // mis-set secret would silently fall through to live/legacy price ids.
   const sandboxScoped = PLAN_KEYS.some(
-    (key) => read(PADDLE_SANDBOX_PRICE_ENV_NAMES[key]).length > 0,
+    (key) => getEnv(PADDLE_SANDBOX_PRICE_ENV_NAMES[key]) !== undefined,
   );
   const names = sandboxScoped ? PADDLE_SANDBOX_PRICE_ENV_NAMES : PADDLE_LEGACY_PRICE_ENV_NAMES;
+  const read = (name: string) => (getEnv(name) ?? "").trim();
 
   return {
     pro_monthly: read(names.pro_monthly),

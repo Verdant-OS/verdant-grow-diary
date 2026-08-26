@@ -87,17 +87,23 @@ async function mockLiveHunt(page: Page, capture: RestBoundaryCapture) {
     const table = new URL(request.url()).pathname.match(/\/rest\/v1\/([^/]+)/i)?.[1] ?? "";
 
     // The tent-context enrichment calls the read-only snapshot RPC. PostgREST
-    // invokes RPCs over POST regardless of whether they write, so this one
-    // read is allowed through the non-GET fence; "no snapshot" keeps the
-    // fixture deterministic.
-    if (/\/rpc\/get_latest_tent_sensor_snapshot$/i.test(new URL(request.url()).pathname)) {
+    // invokes RPCs over POST — and ONLY POST — so each exception requires it:
+    // a PUT/PATCH/DELETE to the same path must still fall through to the
+    // mutation fence below instead of being silently fulfilled.
+    if (
+      request.method() === "POST" &&
+      /\/rpc\/get_latest_tent_sensor_snapshot$/i.test(new URL(request.url()).pathname)
+    ) {
       await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
       return;
     }
 
-    // Diary evidence rides the read-only top-N-per-plant RPC (also POST by
-    // PostgREST transport); an empty set matches the diary_entries fixture.
-    if (/\/rpc\/pheno_candidate_diary_entries_top_n$/i.test(new URL(request.url()).pathname)) {
+    // Diary evidence rides the read-only top-N-per-plant RPC (same POST-only
+    // transport rule); an empty set matches the diary_entries fixture.
+    if (
+      request.method() === "POST" &&
+      /\/rpc\/pheno_candidate_diary_entries_top_n$/i.test(new URL(request.url()).pathname)
+    ) {
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
       return;
     }

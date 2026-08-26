@@ -1,6 +1,40 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-25 UTC (19:48 UTC)
+**Last updated:** 2026-08-26 UTC (03:14 UTC)
+**Updated by:** Claude (2026-08-26: records **one new section only** — the `Supabase Preview`
+42P07 replay failure and the four constraints on it, at Cheek's instruction. Nothing else in
+this file is touched, and no status below is restated, corrected or superseded by this edit.
+
+The section exists to stop a specific wasted loop: the check is red on every PR, the cause is
+already declared in `config/local-supabase-replay-compatibility.json`, and the fixes that look
+obvious — a dashboard create/Pull/Migrate sequence, a late `PATCH /v1/branches/{id}`, closing
+and reopening the PR — each fail for a different reason. The vendor-behaviour half is labelled
+`source claim` from Cheek and is **not** independently verified from inside this repository;
+the repository-side half is `established fact` and reproducible here.
+
+It licenses nothing. The publish stop-order, the `20260813030000` hard stop, and migration
+immutability are all unchanged, and the section says so in its own terms. Prior header
+follows.)
+
+**Prior update:** 2026-08-26 UTC (01:30 UTC)
+**Updated by:** Claude (2026-08-26: **Pheno Hunt + LAB territory delivered as one draft PR**
+from branch `claude/verdant-pheno-hunt-lab-vq6pd9` (base `verdant-grow-diary`, cut from
+deploy tip `5e75a3a` / #1129). Scope: repo-wide territory audit with per-feature
+dispositions (`docs/pheno-hunt-lab-territory-2026-08-26.md`), source-of-truth decision,
+implementation of the hunt → evidence → comparison → scorecard → cure-gated flavor →
+grower keeper decision → lab results → stability/GxE → breeder-mode workflow, and the
+validation ladder (targeted vitest, lint 0 errors, typecheck clean, build + SEO gates,
+six mocked pheno Playwright specs 14/14). One additive migration
+(`20260825233000_pheno_hunts_ownership_check_restore.sql`) ships **in-branch only — NOT
+applied to production**; the publish stop-order and the `20260813030000` hard stop are
+untouched. No publish, no production SQL, no production data modification. Keeper
+contract intact: no winner selection anywhere; James Loud weighting remains an opt-in
+preset only. Independent-reviewer seat for this slice is **unassigned — Cheek names the
+peer on the PR**. This edit touches this file only; every release-identity, publish-lag
+and payments claim in the 2026-08-25 19:48 UTC block below stands unmodified. Prior
+header follows.)
+
+**Prior update:** 2026-08-25 UTC (19:48 UTC)
 **Updated by:** Claude (2026-08-25, later edit: **production republished at 18:05 UTC and the
 served commit is not in the GitHub repository at all.** `git fetch origin e8f4e7c2fe05…`
 returns `not our ref`. Two long-standing framings in this file are corrected as a result:
@@ -690,6 +724,92 @@ demonstration #1127's own release note asks for.
 
 **Nothing here authorizes a publish.** The stop-order stands; this is measurement only, and
 no agent published — production republished on its own account at 18:05 UTC.
+
+---
+
+## 🔒 Supabase Preview — the 42P07 replay failure has NO PR-side workaround (recorded 2026-08-26)
+
+**Why this is here:** the `Supabase Preview` check fails on every PR branch with the same
+error, and the fixes that look obvious are each wrong in a way that is not obvious. Recorded
+so the next agent does not re-derive a dashboard workaround that cannot work, or reach for a
+published migration.
+
+### What is observed — `established fact`
+
+`Supabase Preview` fails on preview-branch creation with:
+
+```text
+ERROR: relation "ai_credit_grants" already exists (SQLSTATE 42P07)
+At statement: 0
+CREATE TABLE public.ai_credit_grants (…)
+```
+
+Seen on PR #1135 at 02:04:28 UTC and again at 03:10:49 UTC on a later head, and on PR #1131.
+It is not branch-specific and not diff-specific: neither PR contains a migration.
+
+**Cause.** Two committed migrations create the same table:
+
+| File                                                      | Role                                        |
+| --------------------------------------------------------- | ------------------------------------------- |
+| `supabase/migrations/20260721103000_ai_credit_grants.sql` | canonical — the one production records      |
+| `supabase/migrations/20260721182752_4fc51714-…sql`        | a later Lovable export repeating the ledger |
+
+**The repository already declares this.** `config/local-supabase-replay-compatibility.json`
+carries a `compatibility_noops` entry naming both files by path and SHA-256, whose `reason`
+field names this exact SQLSTATE. A sibling entry covers `20260721105000` vs `20260721194154`.
+
+**The gap.** That mechanism rewrites a _disposable copy_ in a local workdir. Supabase's
+hosted preview pipeline replays the committed files directly and never reads that config, so
+the declaration cannot help it. The sanctioned mechanism is working exactly as designed and
+still does not cover this surface.
+
+### What does NOT work — `source claim`, Cheek, 2026-08-26 in session
+
+Recorded as the owner relaying vendor behaviour. Not independently verified from inside this
+repository, and not verifiable from here — no agent should re-test it by trial against a live
+project.
+
+1. **The dashboard 3-step path (create → Pull → Migrate) is `NO`.** Dashboard create still
+   "replays the migration history from your main branch against a fresh database." Pull
+   initialises the table, then Migrate runs the same files. Same `ai_credit_grants` 42P07.
+2. **`PATCH /v1/branches/{id}` can set `git_branch` later**, but the docs do **not** say that
+   writes the `Supabase Preview` check on a PR, and do **not** say it skips first-create
+   replay. Do not assume either.
+3. **The supported GitHub Preview flow is: open or reopen the PR → empty DB → full file
+   replay.** Incremental "new files only" begins **only after that first create succeeds** —
+   which is the step that fails here.
+4. **Next leverage is Supabase Support**, for an undocumented ledger-inherit. Not a dashboard
+   workaround, and not editing published migrations.
+
+**Corollary — the bot's own advice is the trap.** The `supabase[bot]` comment on every PR
+reads _"Close and reopen this PR if you want to apply changes from existing seed or migration
+files."_ That is precisely the path in (3): it re-runs the full replay and fails again.
+Closing and reopening a PR is not a remedy here.
+
+### What this does not license
+
+**Do not edit, gut, or no-op either migration.** Merged migrations are permanent history
+(`AGENTS.md`, Migration Immutability). The `Published migration integrity` gate compares
+SHA-256 against the base branch and will fail the PR. "This migration is broken and could
+never have succeeded anywhere" is named in the constitution as the specific reasoning that is
+seductive and wrong.
+
+`20260813030000_signup_acquisition_forward_repair.sql` is **unrelated** to `ai_credit_grants`
+and its hard stop is untouched by anything in this section.
+
+### Merge impact — `established fact`
+
+`Supabase Preview` is **not** a required context. It appears in neither `required` (35
+contexts) nor `mustBeGreen` (1) in `config/required-status-checks.json`. A red
+`Supabase Preview` does not block the merge queue and is not grounds for holding a PR.
+
+| Axis                                    | Status         |
+| --------------------------------------- | -------------- |
+| Preview-branch creation on any PR       | `FAIL`         |
+| Cause identified                        | `PASS`         |
+| Repo-side remedy available              | `BLOCKED`      |
+| Vendor behaviour independently verified | `NOT_MEASURED` |
+| Support request raised                  | `NO_DATA`      |
 
 ---
 
@@ -2858,11 +2978,11 @@ from Copilot and Codex, and are recorded in the spec's §10 correction record.
 
 ## Agents currently assigned
 
-| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                                                                                                                                                                                                                                                                                                       |
-| Claude            | **One-Tent Loop Tranche B+ — architect and implementer (Cheek, 2026-08-19). Substantially delivered as of 2026-08-21:** B0a (#1039), B1 (#1040), B3a (#1042), B2a (#1049), B4a (#1047) and D7 (#1041) merged; D5 (#1043) **merged** `e9e5ec5`; B2b/B5 blocked on unopened Tranche A slices A5/A3; **B4b has no remaining scope** — A2 landed and B4a already covers all of it, so do not open a B4b slice (see the Tranche B+ table note). Also delivered #1062, the routed `CURRENT_STATE` refresh specification (`docs/specs/current-state-refresh-2026-08-20.md`). `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged |
-| Grok              | **Product Intelligence, Adversarial Audit, and Implementation Lead** (Cheek 2026-08-20, refined). Equally empowered to research, audit the live app, implement assigned slices, test, and independently review. Peer with Claude and Codex — **none outranks the others**; explicit task ownership controls. SEO/market/backlink strength retained (not a fence). Map: `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Does **not** take Tranche A remaining edit points (Codex) or Tranche B+ product code (Claude) unless done and unassigned. Prior delivered work unchanged: `ONE_TENT_LOOP_OPERATING_ORDER` repo slices 0/2/3/4; Slices 1 and 5 owner-`BLOCKED`; Cursor SDK spike gates on #985 / `CURSOR_API_KEY`. Reuse of the dispatcher not approved. Convex/Postgres spikes not paused. Production Convex HOLD. Not Unassigned                                                                                                                      |
-| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Claude            | **One-Tent Loop Tranche B+ — architect and implementer (Cheek, 2026-08-19). Substantially delivered as of 2026-08-21:** B0a (#1039), B1 (#1040), B3a (#1042), B2a (#1049), B4a (#1047) and D7 (#1041) merged; D5 (#1043) **merged** `e9e5ec5`; B2b/B5 blocked on unopened Tranche A slices A5/A3; **B4b has no remaining scope** — A2 landed and B4a already covers all of it, so do not open a B4b slice (see the Tranche B+ table note). Also delivered #1062, the routed `CURRENT_STATE` refresh specification (`docs/specs/current-state-refresh-2026-08-20.md`). `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged. **Pheno Hunt + LAB territory (Cheek, 2026-08-25): delivered 2026-08-26 as one draft PR from `claude/verdant-pheno-hunt-lab-vq6pd9` — audit + dispositions (`docs/pheno-hunt-lab-territory-2026-08-26.md`), implementation, tests; in-branch additive migration NOT applied to production; independent-reviewer seat unassigned, Cheek to name the peer on the PR** |
+| Grok              | **Product Intelligence, Adversarial Audit, and Implementation Lead** (Cheek 2026-08-20, refined). Equally empowered to research, audit the live app, implement assigned slices, test, and independently review. Peer with Claude and Codex — **none outranks the others**; explicit task ownership controls. SEO/market/backlink strength retained (not a fence). Map: `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Does **not** take Tranche A remaining edit points (Codex) or Tranche B+ product code (Claude) unless done and unassigned. Prior delivered work unchanged: `ONE_TENT_LOOP_OPERATING_ORDER` repo slices 0/2/3/4; Slices 1 and 5 owner-`BLOCKED`; Cursor SDK spike gates on #985 / `CURSOR_API_KEY`. Reuse of the dispatcher not approved. Convex/Postgres spikes not paused. Production Convex HOLD. Not Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |

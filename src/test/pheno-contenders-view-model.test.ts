@@ -28,7 +28,8 @@ describe("phenoContendersViewModel", () => {
   it("sorts contenders by composite score, descending, with 1-based ranks", () => {
     const board = buildContenders(DEMO_INPUT);
     const scores = board.contenders.map((r) => r.score);
-    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+    expect(scores.every((s) => s !== null)).toBe(true);
+    expect(scores).toEqual([...scores].sort((a, b) => (b ?? 0) - (a ?? 0)));
     expect(board.contenders.map((r) => r.rank)).toEqual(board.contenders.map((_, i) => i + 1));
     // Both keepers should surface at the top of the shortlist.
     expect(board.contenders[0].name).toBe("Gas Runtz");

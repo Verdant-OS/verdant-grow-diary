@@ -195,14 +195,22 @@ export function computePhenoHuntOnboardingViewModel(
   const anyPhenotypeNote = draft.candidateIds.some((id) => evidenceMap.get(id)?.hasPhenotypeNote);
   const allHavePhenotypeNote =
     candidateCount > 0 && draft.candidateIds.every((id) => evidenceMap.get(id)?.hasPhenotypeNote);
+  // "Per candidate" items complete only when EVERY candidate carries the
+  // evidence — an any-candidate check would overstate coverage under a
+  // per-candidate label (one photographed plant is not "photo per candidate").
   const anyPhoto = draft.candidateIds.some((id) => evidenceMap.get(id)?.hasPhotoOrObservation);
+  const allHavePhoto =
+    candidateCount > 0 &&
+    draft.candidateIds.every((id) => evidenceMap.get(id)?.hasPhotoOrObservation);
   const anyLabel = draft.candidateIds.some((id) => evidenceMap.get(id)?.hasLabel);
+  const allHaveLabel =
+    candidateCount > 0 && draft.candidateIds.every((id) => evidenceMap.get(id)?.hasLabel);
 
   const checklist: PhenoChecklistItem[] = [
     {
       id: "candidate_count",
       label: "2+ candidates selected",
-      status: candidateCount >= 2 ? "ok" : candidateCount === 1 ? "missing" : "missing",
+      status: candidateCount >= 2 ? "ok" : "missing",
       detail:
         candidateCount >= 2
           ? `${candidateCount} candidates`
@@ -213,7 +221,7 @@ export function computePhenoHuntOnboardingViewModel(
     {
       id: "phenotype_notes",
       label: "Phenotype note per candidate",
-      status: allHavePhenotypeNote ? "ok" : anyPhenotypeNote ? "missing" : "missing",
+      status: allHavePhenotypeNote ? "ok" : "missing",
       detail: allHavePhenotypeNote
         ? "Every candidate has a phenotype note"
         : anyPhenotypeNote
@@ -223,16 +231,22 @@ export function computePhenoHuntOnboardingViewModel(
     {
       id: "photo_or_observation",
       label: "Photo or observation per candidate",
-      status: anyPhoto ? "ok" : "missing",
-      detail: anyPhoto
-        ? "At least one candidate has a photo or observation"
-        : "No photos or observations yet",
+      status: allHavePhoto ? "ok" : "missing",
+      detail: allHavePhoto
+        ? "Every candidate has a photo or observation"
+        : anyPhoto
+          ? "Some candidates are missing a photo or observation"
+          : "No photos or observations yet",
     },
     {
       id: "labels",
       label: "Candidate labels / status",
-      status: anyLabel ? "ok" : "missing",
-      detail: anyLabel ? "Labels captured" : "No labels captured yet",
+      status: allHaveLabel ? "ok" : "missing",
+      detail: allHaveLabel
+        ? "Every candidate is labeled"
+        : anyLabel
+          ? "Some candidates are missing a label"
+          : "No labels captured yet",
     },
     {
       id: "post_harvest",

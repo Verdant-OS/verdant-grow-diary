@@ -89,7 +89,9 @@ function tagTone(tag: string): string {
 }
 
 function CandidateCard({ c }: { c: DemoCandidate }) {
-  const score = contenderScore(c.loud);
+  // Demo fixture cards always carry all five axes, so the composite is never
+  // null; the fallback keeps the meter's a11y contract type-sound regardless.
+  const score = contenderScore(c.loud) ?? 0;
   const cured = c.rounds.includes("post_cure");
   const isKeeper = c.verdict === "keep";
   return (

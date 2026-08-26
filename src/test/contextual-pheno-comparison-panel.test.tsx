@@ -9,7 +9,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 
 import ContextualPhenoComparisonPanel from "@/components/ContextualPhenoComparisonPanel";
 import { buildContextualPhenoComparisonView } from "@/lib/contextualPhenoComparisonViewModel";
-import { CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS } from "@/test/fixtures/contextualPhenoComparisonFixtures";
+import { CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS } from "@/lib/demo/contextualPhenoComparisonFixtures";
 
 afterEach(() => {
   cleanup();

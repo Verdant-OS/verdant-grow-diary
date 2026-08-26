@@ -87,6 +87,24 @@ function AxisCell({ axis, id, ranked }: { axis: ContenderAxis; id: string; ranke
   const hue = AXIS_HUE[axis.key];
   // Leads styling is a cross-candidate comparison — struck when not ranked.
   const showLeader = ranked && axis.leader;
+  // A missing value renders as a visible dash, never as an empty (0-width)
+  // bar — an unscored trait must not read as a scored 0.
+  if (axis.value === null) {
+    return (
+      <td
+        className="px-2 py-1.5 align-middle"
+        data-testid={`pheno-contenders-axis-${id}-${axis.key}`}
+      >
+        <span
+          className="text-[11px] text-muted-foreground/70"
+          title="Not yet scored"
+          aria-label={`${axis.label}: not yet scored`}
+        >
+          —
+        </span>
+      </td>
+    );
+  }
   return (
     <td
       className="px-2 py-1.5 align-middle"
@@ -187,7 +205,7 @@ export default function PhenoContendersBoard({ board, className }: PhenoContende
                     <td className="px-2 py-1.5 align-middle">
                       <div className="flex items-center gap-1.5">
                         <span className="w-4 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
-                          {ranked ? r.rank : "—"}
+                          {ranked && r.rank !== null ? r.rank : "—"}
                         </span>
                         <span className="truncate text-sm font-medium text-foreground">
                           {r.name}
@@ -216,8 +234,33 @@ export default function PhenoContendersBoard({ board, className }: PhenoContende
                       <AxisCell key={axis.key} axis={axis} id={r.id} ranked={ranked} />
                     ))}
                     <td className="px-2 py-1.5 text-right align-middle">
-                      {ranked ? (
+                      {!ranked ? (
+                        <span
+                          data-testid={`pheno-contenders-score-hidden-${r.id}`}
+                          className="text-[11px] text-muted-foreground"
+                        >
+                          hidden
+                        </span>
+                      ) : r.score === null ? (
+                        <span
+                          data-testid={`pheno-contenders-unscored-${r.id}`}
+                          className="text-[11px] text-muted-foreground"
+                        >
+                          not yet scored
+                        </span>
+                      ) : (
                         <div className="flex items-center justify-end gap-1.5">
+                          {r.scoredAxisCount < axes.length && (
+                            <span
+                              data-testid={`pheno-contenders-partial-${r.id}`}
+                              className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] text-muted-foreground"
+                              title={`Composite covers only the ${r.scoredAxisCount} scored ${
+                                r.scoredAxisCount === 1 ? "axis" : "axes"
+                              }`}
+                            >
+                              {r.scoredAxisCount}/{axes.length} axes
+                            </span>
+                          )}
                           <div className="hidden h-1.5 w-12 overflow-hidden rounded-full bg-secondary sm:block">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-sky-400 via-teal-400 to-emerald-400"
@@ -228,13 +271,6 @@ export default function PhenoContendersBoard({ board, className }: PhenoContende
                             {r.score}
                           </span>
                         </div>
-                      ) : (
-                        <span
-                          data-testid={`pheno-contenders-score-hidden-${r.id}`}
-                          className="text-[11px] text-muted-foreground"
-                        >
-                          hidden
-                        </span>
                       )}
                     </td>
                   </tr>

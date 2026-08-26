@@ -169,7 +169,14 @@ export async function createBreedingProgram(
     .from("breeding_program_steps")
     .insert(stepRows)
     .select("id, step_index");
-  if (stepsErr) throw stepsErr;
+  if (stepsErr) {
+    // Compensate for the non-transactional sequence: a program row with no
+    // steps is unusable (the detail page renders an empty SOP), so remove it
+    // rather than stranding it. Best-effort — if the cleanup itself fails,
+    // the original error still surfaces.
+    await supabase.from("breeding_programs").delete().eq("id", program.id);
+    throw stepsErr;
+  }
 
   const first = (inserted ?? []).find((r) => r.step_index === 0);
   if (first) {

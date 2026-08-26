@@ -44,6 +44,22 @@ export async function queueHermCullSuggestion(input: {
   );
   if (payloads.length === 0) return { ok: false, error: "Nothing to queue." };
 
+  // Idempotency across reloads: the observation id travels in
+  // suggested_change.source_decision_id, so an existing pending row for the
+  // SAME observation is reused instead of minting a duplicate. (The hook's
+  // session-local dedupe forgets on reload; this read survives it. Each row
+  // still requires explicit grower approval either way.)
+  const { data: existing } = await supabase
+    .from("action_queue")
+    .select("id")
+    .eq("plant_id", input.plantId)
+    .eq("status", "pending_approval")
+    .eq("suggested_change->>source_decision_id", input.observationId)
+    .limit(1);
+  if (Array.isArray(existing) && existing[0]?.id) {
+    return { ok: true, id: existing[0].id };
+  }
+
   // INSERT-only. Never send user_id (DB default auth.uid()). Never target_device.
   const { data, error } = await supabase
     .from("action_queue")

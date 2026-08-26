@@ -19,6 +19,7 @@ import {
   type BreedingStepRecord,
 } from "@/lib/breeding/breedingProgramApi";
 import { evaluateStepReadiness } from "@/lib/breeding/breedingProgramProgress";
+import { breedingTemplateStepTitle } from "@/constants/breedingProgramTemplate";
 import type { BreedingCriterionKey } from "@/constants/breedingProgramTemplate";
 
 interface DiaryEntry {
@@ -214,13 +215,11 @@ export default function BreedingProgramDetail() {
             >
               <CardHeader className="gap-3 border-b border-border/60 p-4 sm:p-5">
                 <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
-                  <CardTitle className="min-w-0 break-words font-display text-lg capitalize">
+                  <CardTitle className="min-w-0 break-words font-display text-lg">
                     <span className="mr-2 text-xs font-medium normal-case text-muted-foreground">
                       Step {step.step_index + 1} · {step.generation_label}
                     </span>
-                    {(step.required_criteria as unknown as { key: string }[]).length > 0
-                      ? step.step_key.replace(/_/g, " ")
-                      : step.step_key}
+                    {breedingTemplateStepTitle(step.step_key)}
                   </CardTitle>
                   <Badge
                     variant={

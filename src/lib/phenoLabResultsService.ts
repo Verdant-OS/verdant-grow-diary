@@ -1,11 +1,13 @@
 /**
  * phenoLabResultsService — RLS-scoped read/write for COA lab numbers
- * (pheno_lab_results): cannabinoids + dominant terpenes, source-tagged.
+ * (pheno_lab_results): cannabinoids + dominant terpenes, source-tagged, with
+ * the test date and a free note.
  *
  * HONEST: source is required and never defaulted to 'coa' (only what the grower
  * enters); "lab verified" is true only when source = 'coa'; absent numbers are
- * flagged, never fabricated. RLS: owner + owns hunt + owns plant + candidate
- * consistency. No service_role, no AI, no automation.
+ * flagged, never fabricated; percentages are validated to 0–100 before a write
+ * (an impossible potency is rejected, not stored). RLS: owner + owns hunt +
+ * owns plant + candidate consistency. No service_role, no AI, no automation.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { phenoDb } from "@/integrations/supabase/phenoTables";
@@ -27,6 +29,9 @@ export interface LabResultRow {
   readonly cbdPct: number | null;
   readonly totalCannabinoidsPct: number | null;
   readonly dominantTerpenes: readonly TerpeneReading[];
+  /** ISO date the sample was tested, when the grower recorded it. */
+  readonly testedAt: string | null;
+  readonly note: string | null;
   readonly labVerified: boolean;
 }
 
@@ -59,6 +64,52 @@ function terpenes(v: unknown): TerpeneReading[] {
   return out;
 }
 
+/**
+ * True when the row carries at least one real value (a cannabinoid number, a
+ * terpene, a test date, or a note). An all-empty row is NOT lab evidence and
+ * must never satisfy an evidence goal — missing data stays missing.
+ */
+export function labResultHasAnyValue(
+  row:
+    | Pick<
+        LabResultRow,
+        "thcPct" | "cbdPct" | "totalCannabinoidsPct" | "dominantTerpenes" | "testedAt" | "note"
+      >
+    | null
+    | undefined,
+): boolean {
+  if (!row) return false;
+  return (
+    row.thcPct !== null ||
+    row.cbdPct !== null ||
+    row.totalCannabinoidsPct !== null ||
+    (row.dominantTerpenes?.length ?? 0) > 0 ||
+    (typeof row.testedAt === "string" && row.testedAt.length > 0) ||
+    (typeof row.note === "string" && row.note.trim().length > 0)
+  );
+}
+
+/**
+ * Best available lab row for a plant from a "plantId:source"-keyed map:
+ * coa > estimate > unspecified. Presenters must still label the row's OWN
+ * source — "best available" never upgrades an estimate to lab-verified.
+ */
+export function bestLabResultForPlant(
+  labByKey: Readonly<Record<string, LabResultRow>>,
+  plantId: string,
+): LabResultRow | undefined {
+  return (
+    labByKey[`${plantId}:coa`] ??
+    labByKey[`${plantId}:estimate`] ??
+    labByKey[`${plantId}:unspecified`]
+  );
+}
+
+/** A percentage is 0–100 or absent. Anything else is invalid, never stored. */
+function invalidPct(v: number | null | undefined): boolean {
+  return v != null && (!Number.isFinite(v) || v < 0 || v > 100);
+}
+
 /** Upsert one COA/estimate row for a candidate (one per hunt+plant+source). */
 export async function upsertLabResult(input: {
   huntId: string;
@@ -68,10 +119,23 @@ export async function upsertLabResult(input: {
   cbdPct?: number | null;
   totalCannabinoidsPct?: number | null;
   dominantTerpenes?: readonly TerpeneReading[];
+  testedAt?: string | null;
+  note?: string | null;
 }): Promise<SaveResult> {
   const userId = await currentUserId();
   if (!userId) return { ok: false, error: "Sign in to save lab results." };
+  if (
+    invalidPct(input.thcPct) ||
+    invalidPct(input.cbdPct) ||
+    invalidPct(input.totalCannabinoidsPct) ||
+    (input.dominantTerpenes ?? []).some((t) => invalidPct(t.pct))
+  ) {
+    return { ok: false, error: "Percentages must be between 0 and 100." };
+  }
   const source = normalizeSource(input.source);
+  const testedAt =
+    typeof input.testedAt === "string" && input.testedAt.trim() ? input.testedAt.trim() : null;
+  const note = typeof input.note === "string" && input.note.trim() ? input.note.trim() : null;
   const { error } = await phenoDb.from("pheno_lab_results").upsert(
     {
       user_id: userId,
@@ -85,10 +149,34 @@ export async function upsertLabResult(input: {
         name: t.name,
         pct: t.pct,
       })) as unknown as Json,
+      tested_at: testedAt,
+      note,
     },
     { onConflict: "hunt_id,plant_id,source" },
   );
   if (error) return { ok: false, error: "Could not save lab results." };
+  return { ok: true };
+}
+
+/**
+ * Delete one lab row (hunt+plant+source). The undo path for an accidental
+ * save — without it an empty row would sit forever on the candidate's record.
+ * RLS scopes the delete to the owner's own rows.
+ */
+export async function deleteLabResult(input: {
+  huntId: string;
+  plantId: string;
+  source: PhenoLabSource;
+}): Promise<SaveResult> {
+  const userId = await currentUserId();
+  if (!userId) return { ok: false, error: "Sign in to change lab results." };
+  const { error } = await phenoDb
+    .from("pheno_lab_results")
+    .delete()
+    .eq("hunt_id", input.huntId)
+    .eq("plant_id", input.plantId)
+    .eq("source", normalizeSource(input.source));
+  if (error) return { ok: false, error: "Could not remove this lab row." };
   return { ok: true };
 }
 
@@ -101,7 +189,9 @@ export async function listLabResultsForHunt(
   if (!id) return {};
   let query = phenoDb
     .from("pheno_lab_results")
-    .select("plant_id, source, thc_pct, cbd_pct, total_cannabinoids_pct, dominant_terpenes")
+    .select(
+      "plant_id, source, thc_pct, cbd_pct, total_cannabinoids_pct, dominant_terpenes, tested_at, note",
+    )
     .eq("hunt_id", id);
   // Page-scoped read: fetch only the visible candidates' lab results at scale.
   if (plantIds && plantIds.length > 0) query = query.in("plant_id", plantIds as string[]);
@@ -121,6 +211,8 @@ export async function listLabResultsForHunt(
       cbdPct: finiteOrNull(row.cbd_pct),
       totalCannabinoidsPct: finiteOrNull(row.total_cannabinoids_pct),
       dominantTerpenes: terpenes(row.dominant_terpenes),
+      testedAt: typeof row.tested_at === "string" ? row.tested_at : null,
+      note: typeof row.note === "string" ? row.note : null,
       labVerified: source === "coa",
     };
   }

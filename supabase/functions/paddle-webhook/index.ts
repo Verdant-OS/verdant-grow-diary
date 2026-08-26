@@ -60,11 +60,12 @@ const PADDLE_ENVIRONMENT = (Deno.env.get("PADDLE_ENVIRONMENT") ?? "").toLowerCas
 const SIGNATURE_MAX_AGE_SECONDS = 300;
 const SIGNATURE_MAX_FUTURE_SKEW_SECONDS = 60;
 
-const PADDLE_PRICE_CONFIG = {
-  pro_monthly: Deno.env.get("PADDLE_PRICE_PRO_MONTHLY") ?? "",
-  pro_annual: Deno.env.get("PADDLE_PRICE_PRO_ANNUAL") ?? "",
-  founder_lifetime: Deno.env.get("PADDLE_PRICE_FOUNDER_LIFETIME") ?? "",
-};
+// Sandbox-scoped when PADDLE_SANDBOX_PRICE_* is configured, else the legacy
+// PADDLE_PRICE_* names. See ../_shared/paddleSandboxPriceConfig.ts: those legacy
+// names are shared with get-paddle-price, which selects its catalog from the
+// SERVER's PAYMENTS_ENVIRONMENT — so at a live transition they hold live ids and
+// every sandbox event here silently classified as null.
+const PADDLE_PRICE_CONFIG = resolvePaddleSandboxPriceConfig((name) => Deno.env.get(name));
 
 const PROCESSABLE_EVENTS = new Set([
   "transaction.completed",
@@ -151,6 +152,7 @@ function jsonResponse(body: unknown, status: number): Response {
 // Signature verifier helpers live in a shared module so the exact same
 // implementation is exercised by supabase/functions/paddle-webhook/security.test.ts.
 import { verifyPaddleWebhookSignature } from "./verifyPaddleSignature.ts";
+import { resolvePaddleSandboxPriceConfig } from "../_shared/paddleSandboxPriceConfig.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);

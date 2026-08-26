@@ -23,7 +23,7 @@ function makeBuilder(table: string) {
   const result = () =>
     resultQueues[table]?.shift() ?? results[table] ?? { data: [], error: null, count: 0 };
   const builder: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "in", "or", "ilike", "not", "order", "range", "limit"]) {
+  for (const m of ["select", "eq", "in", "is", "or", "ilike", "not", "order", "range", "limit"]) {
     builder[m] = (...args: unknown[]) => {
       rec.calls.push([m, ...args]);
       return builder;

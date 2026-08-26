@@ -21,7 +21,11 @@ import type { CandidateScoreRow } from "@/lib/phenoCandidateScoresService";
 import type { KeeperDecisionRow } from "@/lib/phenoKeeperDecisionService";
 import type { SexObservationRow } from "@/lib/phenoSexObservationService";
 import type { SmokeTestRow } from "@/lib/phenoSmokeTestService";
-import type { LabResultRow } from "@/lib/phenoLabResultsService";
+import {
+  bestLabResultForPlant,
+  labResultHasAnyValue,
+  type LabResultRow,
+} from "@/lib/phenoLabResultsService";
 import type { PhenoCandidateEvidencePacket } from "@/lib/phenoEvidencePacket";
 import { phenoCandidateDisplayLabel } from "@/lib/phenoCandidateIdentity";
 import {
@@ -46,7 +50,9 @@ export interface PhenoHuntCsvInput {
   readonly decisionsByPlant: Record<string, KeeperDecisionRow>;
   readonly sexByPlant: Record<string, SexObservationRow>;
   readonly smokeByPlant: Record<string, SmokeTestRow>;
-  /** Lab results keyed "plantId:source"; the COA row is exported. */
+  /** Lab results keyed "plantId:source". The coa_* columns export strictly
+   * the COA row; the lab_* columns export the best available row (coa >
+   * estimate > unspecified) labeled with its own source. */
   readonly labByKey: Record<string, LabResultRow>;
   /**
    * Optional precomputed readiness per plant. When present it wins over the
@@ -122,14 +128,16 @@ function deriveReadiness(input: PhenoHuntCsvInput, c: PhenoCandidateInput): Phen
   const decision = input.decisionsByPlant[id];
   const sex = input.sexByPlant[id];
   const smoke = input.smokeByPlant[id];
-  const lab = input.labByKey[`${id}:coa`];
+  // Best available row (coa > estimate > unspecified); an all-empty row is
+  // not evidence — matching the workspace readiness contract.
+  const lab = bestLabResultForPlant(input.labByKey, id);
   const evidence = readinessEvidenceFromCandidateInput(c, {
     hasTraitScore: !!score && Object.keys(score.traits ?? {}).length > 0,
     sexObserved: !!sex,
     keeperDecision: decision?.decision ?? null,
     keeperRationale: decision?.note ?? null,
     hasPostCureSmokeTest: hasSmokeContent(smoke),
-    hasLabResult: !!lab,
+    hasLabResult: !!lab && labResultHasAnyValue(lab),
     labSource: lab?.source ?? null,
   });
   const r = evaluatePhenoCandidateReadiness(evidence);
@@ -188,6 +196,15 @@ export function buildPhenoHuntCsv(input: PhenoHuntCsvInput): string {
     "export_scope",
     "loaded_candidate_count",
     "total_candidate_count",
+    // Best-available lab row (coa > estimate > unspecified) with its OWN
+    // source label — the coa_* columns above stay strictly the COA row, so
+    // estimate data is exported honestly instead of silently dropped.
+    "lab_best_source",
+    "lab_thc_pct",
+    "lab_cbd_pct",
+    "lab_total_cannabinoids_pct",
+    "lab_dominant_terpenes",
+    "lab_tested_at",
   ];
   const lines = [header.map(csvField).join(",")];
 
@@ -198,6 +215,7 @@ export function buildPhenoHuntCsv(input: PhenoHuntCsvInput): string {
     const sex = input.sexByPlant[id];
     const smoke = input.smokeByPlant[id];
     const lab = input.labByKey[`${id}:coa`];
+    const bestLab = bestLabResultForPlant(input.labByKey, id);
     const packet = input.evidencePacketsByPlant?.get(id) ?? null;
     // "unavailable" = the receipt read failed; its zeroed counts are defaults,
     // not facts, so they must not reach the export as evidence.
@@ -250,6 +268,16 @@ export function buildPhenoHuntCsv(input: PhenoHuntCsvInput): string {
         csvField(exportScope),
         csvField(loadedCount ?? ""),
         csvField(input.totalCandidateCount ?? ""),
+        csvField(bestLab?.source ?? ""),
+        csvField(bestLab?.thcPct ?? ""),
+        csvField(bestLab?.cbdPct ?? ""),
+        csvField(bestLab?.totalCannabinoidsPct ?? ""),
+        csvField(
+          (bestLab?.dominantTerpenes ?? [])
+            .map((t) => (t.pct != null ? `${t.name} ${t.pct}%` : t.name))
+            .join("; "),
+        ),
+        csvField(bestLab?.testedAt ?? ""),
       ].join(","),
     );
   }

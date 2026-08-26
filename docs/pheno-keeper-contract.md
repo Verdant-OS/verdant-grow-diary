@@ -48,11 +48,17 @@ markers, and top-2 fight seeding — under ALL of these conditions:
 Rationale: the shortlist is the grower's own scores played back in a
 comparable order — organization of evidence, not a verdict — and it stays
 behind its own entitlement. The distinction the contract protects is between
-*Verdant deciding* and *Verdant arranging*; the conditions above hold that
+_Verdant deciding_ and _Verdant arranging_; the conditions above hold that
 line and are enforced by test.
 
 ## Known open items (audit 2026-07-21, not blockers)
 
-- No mismatched-**stage** comparability warning (grow/tent warnings exist).
-- Autoflower vs photoperiod not distinguished in pheno comparison.
+- ~~No mismatched-**stage** comparability warning (grow/tent warnings exist).~~
+  **Implemented since** — the locked stage-distance tolerance and plant-type
+  comparability fences ship in `plantTypeRules` and are test-pinned
+  (`src/test/pheno-plant-type-comparability.test.tsx`). (Updated 2026-08-26.)
+- ~~Autoflower vs photoperiod not distinguished in pheno comparison.~~
+  **Implemented since** — same fence set; mixed/unknown types mark boards and
+  fights not-comparable. (Updated 2026-08-26.)
 - `phenoid_*` entitlement plan_ids are placeholders pending SKU sign-off.
+  (Still true as of 2026-08-26.)

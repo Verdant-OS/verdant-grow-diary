@@ -25,8 +25,10 @@
 // 3. Deploy this function, then publish the client with optional session/collection metadata.
 // Reopen traffic only after the new finalizer smoke passes; do not roll back to
 // a pre-receipt Edge build without a deliberate compatibility procedure.
-// Legacy cache-only replays remain valid, but this function never backfills
-// them with new context because idempotency does not bind the old packet.
+// Cached replays are immutable original responses. They are never re-grounded
+// against a newer client packet and never refunded from the cached branch:
+// idempotency does not bind the old packet. A future receipt/cache schema
+// marker is required before legacy cache rows can be distinguished as grounded.
 
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -40,6 +42,7 @@ import { validateAiDoctorReviewResult } from "./contract.ts";
 import { buildAiDoctorPromptMessages } from "../_shared/aiDoctorPromptAssembly.ts";
 import { parseAiDoctorReviewRequestEnvelope } from "../_shared/aiDoctorReviewRequestTransportRules.ts";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";
+import { validateAiDoctorReviewGrounding } from "../_shared/aiDoctorReviewGroundingRules.ts";
 import {
   buildAiDoctorReviewEvidenceReceiptSnapshot,
   isAiDoctorReviewEvidenceAcceptanceCoherentWithPacket,
@@ -470,16 +473,15 @@ Deno.serve(async (req) => {
     }
     if (spendDecision.kind === "cached") {
       const cached = validateAiDoctorReviewResult(spendDecision.result);
-      if (cached.ok) {
-        console.log("ai-doctor-review status=ok_replayed");
-        return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true));
+      if (cached.ok === false) {
+        console.log("ai-doctor-review status=cached_result_invalid");
+        return calmFailure("invalid");
       }
-      console.log("ai-doctor-review status=cached_result_invalid");
-      return failureAfterRefund(
-        spendDecision.spendId,
-        "cached_result_invalid",
-        "result_recording_failed",
-      );
+      // A replay key is not packet-bound. Never evaluate a persisted result
+      // against a newer packet or mutate the original spend/refund ledger here.
+      // Fresh responses pass the grounding gate before this cache can exist.
+      console.log("ai-doctor-review status=ok_replayed");
+      return safeOk(cached.result, buildAiCreditReceiptContext(spendObj, true));
     }
 
     const spendId = spendDecision.spendId;
@@ -580,6 +582,11 @@ Deno.serve(async (req) => {
     if (v.ok === false) {
       console.log("ai-doctor-review status=invalid");
       return failureAfterRefund(spendId, `invalid_${v.reason}`, "invalid");
+    }
+    const grounding = validateAiDoctorReviewGrounding(v.result, validatedPacket);
+    if (grounding.ok === false) {
+      console.log("ai-doctor-review status=grounding_invalid");
+      return failureAfterRefund(spendId, `grounding_${grounding.reason}`, "invalid");
     }
 
     let finalization: ReturnType<typeof parseAiDoctorResultAttachment> = "ambiguous";

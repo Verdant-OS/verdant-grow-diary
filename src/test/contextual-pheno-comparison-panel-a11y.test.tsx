@@ -15,7 +15,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ContextualPhenoComparisonPanel from "@/components/ContextualPhenoComparisonPanel";
 import { buildContextualPhenoComparisonView } from "@/lib/contextualPhenoComparisonViewModel";
-import { CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS } from "@/test/fixtures/contextualPhenoComparisonFixtures";
+import { CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS } from "@/lib/demo/contextualPhenoComparisonFixtures";
 
 function renderPanel() {
   const view = buildContextualPhenoComparisonView(CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS);

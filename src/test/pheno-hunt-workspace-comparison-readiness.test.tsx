@@ -126,6 +126,7 @@ function mountAt(input: ScenarioInput) {
     saveSex: vi.fn().mockResolvedValue(true),
     saveSmokeTest: vi.fn().mockResolvedValue(true),
     saveLabResult: vi.fn().mockResolvedValue(true),
+    deleteLabResult: vi.fn().mockResolvedValue(true),
   });
   return render(
     <MemoryRouter initialEntries={[`/pheno-hunts/${HUNT_ID}/workspace`]}>

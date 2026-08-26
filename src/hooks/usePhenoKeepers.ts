@@ -4,7 +4,7 @@
  * RLS-scoped save functions. Data/record-only: nothing here acts on a plant or
  * device.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { loadPhenoHuntCandidates, type PhenoHuntSummary } from "@/lib/phenoHuntCandidatesService";
 import type { PhenoCandidateInput } from "@/lib/phenoComparisonViewModel";
 import {
@@ -116,6 +116,21 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
+  // Synchronous in-flight guard: clones, reversals, and crosses are plain
+  // append-only inserts with no idempotency key, so a double-click before
+  // React state settles would mint duplicate rows. The ref refuses the
+  // second call; the saving state remains the presentation signal.
+  const savingRef = useRef(false);
+  const beginSave = (): boolean => {
+    if (savingRef.current) return false;
+    savingRef.current = true;
+    setSaving(true);
+    return true;
+  };
+  const endSave = (): void => {
+    savingRef.current = false;
+    setSaving(false);
+  };
 
   useEffect(() => {
     if (!id) {
@@ -187,9 +202,9 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
   const promoteToKeeper = useCallback(
     async (sourcePlantId: string, keeperName: string) => {
       if (!id) return false;
-      setSaving(true);
+      if (!beginSave()) return false;
       const res = await nameKeeper({ huntId: id, sourcePlantId, keeperName });
-      setSaving(false);
+      endSave();
       if (res.ok === true) {
         reload();
         return true;
@@ -202,9 +217,9 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
 
   const addKeeperClone = useCallback(
     async (keeperId: string, cloneLabel: string) => {
-      setSaving(true);
+      if (!beginSave()) return false;
       const res = await addClone({ keeperId, cloneLabel });
-      setSaving(false);
+      endSave();
       if (res.ok === true) {
         reload();
         return true;
@@ -217,9 +232,9 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
 
   const markReversed = useCallback(
     async (keeperId: string, method: string) => {
-      setSaving(true);
+      if (!beginSave()) return false;
       const res = await recordReversal({ keeperId, method });
-      setSaving(false);
+      endSave();
       if (res.ok === true) {
         reload();
         return true;
@@ -232,9 +247,9 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
 
   const linkGrowOutPlant = useCallback(
     async (cloneId: string, plantId: string | null) => {
-      setSaving(true);
+      if (!beginSave()) return false;
       const res = await linkClonePlant({ cloneId, plantId });
-      setSaving(false);
+      endSave();
       if (res.ok === true) {
         reload();
         return true;
@@ -247,9 +262,9 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
 
   const saveStabilityRuns = useCallback(
     async (keeperId: string, runs: readonly StabilityRun[]) => {
-      setSaving(true);
+      if (!beginSave()) return false;
       const res = await updateKeeperStabilityRuns({ keeperId, runs });
-      setSaving(false);
+      endSave();
       if (res.ok === true) {
         reload();
         return true;
@@ -268,7 +283,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
       options?: SaveCrossOptions,
     ) => {
       if (!id) return false;
-      setSaving(true);
+      if (!beginSave()) return false;
       const res = await recordCross({
         huntId: id,
         femaleKeeperId,
@@ -279,7 +294,7 @@ export function usePhenoKeepers(huntId: string | null | undefined): UsePhenoKeep
         generation: options?.generation ?? null,
         recurrentParentId: options?.recurrentParentId ?? null,
       });
-      setSaving(false);
+      endSave();
       if (res.ok === true) {
         reload();
         return true;

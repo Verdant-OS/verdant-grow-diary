@@ -4,6 +4,14 @@
 > breeding planning material. No code, schema, RLS, RPC, Edge Function, UI, AI
 > call, alert, Action Queue automation, or device control is introduced by this
 > document.
+>
+> **Status annotation (2026-08-26):** several features this workbook framed as
+> spreadsheet-only have since shipped in-app under their own approvals — male
+> evaluation schema (`pheno_male_evaluations`, migration-only; not yet in the
+> hosted project), pollen viability tests, crosses + reversals, stress
+> testing, and keeper stability-run logging. This document remains the
+> planning source for what has NOT shipped; where it disagrees with shipped
+> code, the code and its tests are authoritative.
 
 Source of truth: **Verdant Advanced Phenotype Hunter Workbook v1.0**. All
 principles below inherit from v1.0 — diary primacy, sensor truth, cautious AI,
@@ -65,14 +73,14 @@ is created.
 
 Added to the existing v1.0 pheno comparison sheet:
 
-| Column                  | Meaning                                                                |
-| ----------------------- | ---------------------------------------------------------------------- |
-| Backcross Generation    | BC1 / BC2 / BC3 (or blank for non-BC rows).                            |
-| Recurrent Parent        | The parent the line is being recovered toward.                         |
-| Estimated Recurrent %   | Operator-estimated recurrent-parent contribution (50 / 75 / 87.5 / …). |
-| Backcross Trait Focus   | Which trait(s) the BC is intended to fix or recover.                   |
-| BC Selection Score      | Operator score combining trait match + vigor + stability.              |
-| BC Stability Index      | Qualitative index for phenotype consistency within the BC cohort.      |
+| Column                | Meaning                                                                |
+| --------------------- | ---------------------------------------------------------------------- |
+| Backcross Generation  | BC1 / BC2 / BC3 (or blank for non-BC rows).                            |
+| Recurrent Parent      | The parent the line is being recovered toward.                         |
+| Estimated Recurrent % | Operator-estimated recurrent-parent contribution (50 / 75 / 87.5 / …). |
+| Backcross Trait Focus | Which trait(s) the BC is intended to fix or recover.                   |
+| BC Selection Score    | Operator score combining trait match + vigor + stability.              |
+| BC Stability Index    | Qualitative index for phenotype consistency within the BC cohort.      |
 
 All values are operator-entered. No automatic scoring.
 
@@ -80,25 +88,25 @@ All values are operator-entered. No automatic scoring.
 
 ## 5. Male_Evaluation_Tracker
 
-| Column                                  | Notes                                              |
-| --------------------------------------- | -------------------------------------------------- |
-| Male ID                                 | Workbook ID; should map 1:1 to a Verdant Plant ID. |
-| Strain / Lineage                        | Free text.                                         |
-| Veg Start Date                          | Date.                                              |
-| Pre-Flower Sex Date                     | Date sex was confirmed.                            |
-| Vegetative Vigor & Structure            | 1–10 operator rubric.                              |
-| Early Terp Projection                   | Stem-rub / leaf-rub aroma rubric.                  |
-| Pollen Sac Density & Timing             | Density + days-to-pack rubric.                     |
-| Pollen Viability Test 1                 | Germination % or operator-confirmed viability.     |
-| Pollen Viability Test 2                 | Repeat test (independent sample).                  |
-| Glandular Expression on Male Flowers    | Trichome / resin notes.                            |
-| Environmental Robustness                | Stress tolerance rubric (heat, RH, light shifts).  |
-| Progeny Potential                       | Operator projection from test crosses.             |
-| Overall Male Score                      | Weighted operator score.                           |
-| Pass Threshold Met?                     | Yes / No.                                          |
-| Promotion Decision                      | Keep / Cull / Hold.                                |
-| Action Queue Item                       | See safety copy below.                             |
-| Notes / Photo Refs                      | Diary + photo references.                          |
+| Column                               | Notes                                              |
+| ------------------------------------ | -------------------------------------------------- |
+| Male ID                              | Workbook ID; should map 1:1 to a Verdant Plant ID. |
+| Strain / Lineage                     | Free text.                                         |
+| Veg Start Date                       | Date.                                              |
+| Pre-Flower Sex Date                  | Date sex was confirmed.                            |
+| Vegetative Vigor & Structure         | 1–10 operator rubric.                              |
+| Early Terp Projection                | Stem-rub / leaf-rub aroma rubric.                  |
+| Pollen Sac Density & Timing          | Density + days-to-pack rubric.                     |
+| Pollen Viability Test 1              | Germination % or operator-confirmed viability.     |
+| Pollen Viability Test 2              | Repeat test (independent sample).                  |
+| Glandular Expression on Male Flowers | Trichome / resin notes.                            |
+| Environmental Robustness             | Stress tolerance rubric (heat, RH, light shifts).  |
+| Progeny Potential                    | Operator projection from test crosses.             |
+| Overall Male Score                   | Weighted operator score.                           |
+| Pass Threshold Met?                  | Yes / No.                                          |
+| Promotion Decision                   | Keep / Cull / Hold.                                |
+| Action Queue Item                    | See safety copy below.                             |
+| Notes / Photo Refs                   | Diary + photo references.                          |
 
 **Safety copy (must appear in the workbook header):**
 
@@ -135,25 +143,25 @@ All formulas are spreadsheet formulas, not Verdant logic.
 
 ## 7. Backcross_Line_Development
 
-| Column                              | Notes                                              |
-| ----------------------------------- | -------------------------------------------------- |
-| Backcross Line ID                   | Workbook ID.                                       |
-| Recurrent Parent                    | Strain / plant.                                    |
-| Donor / F1 Source                   | Source population.                                 |
-| Backcross Generation                | BC1 / BC2 / BC3.                                   |
-| Date Started                        | Date.                                              |
-| # Progeny Evaluated                 | Integer.                                           |
-| % Retaining Recurrent Traits        | Operator-evaluated.                                |
-| % Showing Donor Trait Improvement   | Operator-evaluated.                                |
-| Average BC Selection Score          | Mean of BC Selection Score column.                 |
-| TPS Stability                       | Terpene / chemotype stability rubric.              |
-| Stress Test Pass Rate               | % surviving documented stress protocol.            |
-| Top Performing Individuals          | List of plant IDs.                                 |
-| Next Recommended Action             | Operator note (continue, sib-cross, outcross, stop). |
-| Inbreeding Depression Risk          | Low / Medium / High with rationale.                |
-| Linked Pheno Rows                   | References to Pheno_Comparison_v2_Enhanced rows.   |
-| Linked F1 Project                   | Reference to F1_Population_Tracker row.            |
-| Verdant Action Queue Items          | Candidate next steps for grower review (see §5).   |
+| Column                            | Notes                                                |
+| --------------------------------- | ---------------------------------------------------- |
+| Backcross Line ID                 | Workbook ID.                                         |
+| Recurrent Parent                  | Strain / plant.                                      |
+| Donor / F1 Source                 | Source population.                                   |
+| Backcross Generation              | BC1 / BC2 / BC3.                                     |
+| Date Started                      | Date.                                                |
+| # Progeny Evaluated               | Integer.                                             |
+| % Retaining Recurrent Traits      | Operator-evaluated.                                  |
+| % Showing Donor Trait Improvement | Operator-evaluated.                                  |
+| Average BC Selection Score        | Mean of BC Selection Score column.                   |
+| TPS Stability                     | Terpene / chemotype stability rubric.                |
+| Stress Test Pass Rate             | % surviving documented stress protocol.              |
+| Top Performing Individuals        | List of plant IDs.                                   |
+| Next Recommended Action           | Operator note (continue, sib-cross, outcross, stop). |
+| Inbreeding Depression Risk        | Low / Medium / High with rationale.                  |
+| Linked Pheno Rows                 | References to Pheno_Comparison_v2_Enhanced rows.     |
+| Linked F1 Project                 | Reference to F1_Population_Tracker row.              |
+| Verdant Action Queue Items        | Candidate next steps for grower review (see §5).     |
 
 ---
 

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import {
   OREOZ_GELONADE_CULTIVARS,
   OREOZ_GELONADE_GUIDE_PATH,
+  OREOZ_DIARY_PROFILE_PATH,
+  GELONADE_DIARY_PROFILE_PATH,
   type OreozGelonadeCultivarKey,
 } from "@/constants/oreozGelonadeExperience";
 import { useOreozGelonadeDiary } from "@/hooks/useOreozGelonadeDiary";
@@ -157,6 +159,20 @@ export default function OreozGelonadeDiaryComparison() {
           </Link>
           <Link to="/pheno-hunts" className="text-primary underline underline-offset-4">
             Open Pheno Tracker
+          </Link>
+          <Link
+            to={OREOZ_DIARY_PROFILE_PATH}
+            data-testid="oreoz-diary-profile-link"
+            className="text-primary underline underline-offset-4"
+          >
+            Oreoz diary profile
+          </Link>
+          <Link
+            to={GELONADE_DIARY_PROFILE_PATH}
+            data-testid="gelonade-diary-profile-link"
+            className="text-primary underline underline-offset-4"
+          >
+            Gelonade diary profile
           </Link>
         </div>
       </header>

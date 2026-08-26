@@ -1642,9 +1642,9 @@ test("rejects an equipment source contract that permits an empty subset", () => 
   );
 });
 
-test("strictly compiles all five Draft 2020-12 schemas with formats", () => {
+test("strictly compiles all six Draft 2020-12 schemas with formats", () => {
   const compiled = compileSchemaDocuments(freshDocuments());
-  assert.equal(compiled.validators.size, 5);
+  assert.equal(compiled.validators.size, 6);
   for (const [fileName, validator] of compiled.validators) {
     assert.equal(typeof validator, "function", `${fileName} must compile to a validator`);
   }

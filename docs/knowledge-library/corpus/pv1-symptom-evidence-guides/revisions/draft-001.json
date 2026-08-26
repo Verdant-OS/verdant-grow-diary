@@ -1,0 +1,1545 @@
+{
+  "version": 1,
+  "artifactType": "knowledge_corpus_review_packet",
+  "revisionId": "pv1-symptom-evidence-guides:draft-001",
+  "createdOn": "2026-08-26",
+  "evidenceScope": "resolved_runtime_material_and_draft_claim_map",
+  "cohort": {
+    "id": "PV1-SYMPTOM-EVIDENCE-GUIDES",
+    "registrySourcePullRequest": 627,
+    "cohortProvenanceSourceId": "source:pr-627-route-cohort-provenance",
+    "paths": [
+      "/guides/cannabis-burnt-crispy-leaf-tips",
+      "/guides/cannabis-leaf-spots-lesions",
+      "/guides/cannabis-leaf-symptoms",
+      "/guides/cannabis-leaves-turning-yellow"
+    ],
+    "sourceRouteState": "registered_public",
+    "editorialState": "sourced",
+    "publicationReadiness": "BLOCKED"
+  },
+  "statusEvidence": {
+    "publicationStatus": "NOT_MEASURED",
+    "renderedCrawlStatus": "NOT_MEASURED"
+  },
+  "assignments": {
+    "managingEditorId": null,
+    "authorIds": [],
+    "evidenceReviewerIds": [],
+    "cultivationReviewerIds": []
+  },
+  "aiAssistance": {
+    "tool": "Codex",
+    "usedOn": "2026-08-26",
+    "uses": [
+      "claim-map organization",
+      "draft packet assembly",
+      "source discovery and organization",
+      "runtime material receipt calculation"
+    ],
+    "humanVerifierId": null
+  },
+  "sources": [
+    {
+      "id": "source:aps-plant-disease-diagnosis",
+      "sourceType": "evidence",
+      "title": "Plant Disease Diagnosis",
+      "url": "https://www.apsnet.org/edcenter/Pages/PlantDiseaseDiagnosis.aspx",
+      "publisher": "American Phytopathological Society",
+      "authors": ["Melissa B. Riley", "Margaret R. Williamson", "Otis Maloy"],
+      "evidenceTier": "B",
+      "publishedOn": null,
+      "versionDate": null,
+      "accessedOn": "2026-08-26",
+      "stableIdentifier": "doi:10.1094/PHI-I-2002-1021-01",
+      "archiveLocator": null,
+      "license": "not_assessed",
+      "limitations": [
+        "General plant-disease diagnostic guidance; it is not cannabis-specific.",
+        "It supports a hypothesis-testing method and the need for converging evidence, not identification of a particular pest, pathogen, or deficiency from one symptom."
+      ]
+    },
+    {
+      "id": "source:csu-diagnosing-plant-disorders",
+      "sourceType": "evidence",
+      "title": "Diagnosing Plant Disorders",
+      "url": "https://extension.colostate.edu/resource/diagnosing-plant-disorders/",
+      "publisher": "Colorado State University Extension",
+      "authors": ["David Whiting", "Carol O’Meara", "Mary Small"],
+      "evidenceTier": "A",
+      "publishedOn": null,
+      "versionDate": null,
+      "accessedOn": "2026-08-26",
+      "stableIdentifier": "url:https://extension.colostate.edu/resource/diagnosing-plant-disorders/",
+      "archiveLocator": null,
+      "license": "not_assessed",
+      "limitations": [
+        "General extension guidance for diagnosing plant disorders; it is not cannabis-specific.",
+        "Its examples are not evidence that the same cause applies to a cannabis plant, cultivar, medium, facility, or growth stage."
+      ]
+    },
+    {
+      "id": "source:frontiers-2021-cannabis-light-intensity",
+      "sourceType": "evidence",
+      "title": "Cannabis Yield, Potency, and Leaf Photosynthesis Respond Differently to Increasing Light Levels in an Indoor Environment",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8144505/",
+      "publisher": "Frontiers in Plant Science",
+      "authors": ["Victoria Rodriguez-Morrison", "David Llewellyn", "Youbin Zheng"],
+      "evidenceTier": "A",
+      "publishedOn": "2021-05-11",
+      "versionDate": null,
+      "accessedOn": "2026-08-26",
+      "stableIdentifier": "doi:10.3389/fpls.2021.646020",
+      "archiveLocator": "pmc:PMC8144505",
+      "license": "CC BY 4.0",
+      "limitations": [
+        "Controlled indoor flowering study with one cannabis cultivar and study-specific light treatments.",
+        "It provides light-response context but does not diagnose tip damage, prove light burn from appearance, or establish a universal threshold across cultivars and facilities."
+      ]
+    },
+    {
+      "id": "source:frontiers-2025-cannabis-root-zone-nutrients",
+      "sourceType": "evidence",
+      "title": "Elevated root-zone P and nutrient concentration do not increase yield or cannabinoids in medical cannabis",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11882401/",
+      "publisher": "Frontiers in Plant Science",
+      "authors": ["Julie A. Hershkowitz", "F. Mitchell Westmoreland", "Bruce Bugbee"],
+      "evidenceTier": "A",
+      "publishedOn": "2025-02-20",
+      "versionDate": null,
+      "accessedOn": "2026-08-26",
+      "stableIdentifier": "doi:10.3389/fpls.2025.1433985",
+      "archiveLocator": "pmc:PMC11882401",
+      "license": "CC BY 4.0",
+      "limitations": [
+        "Controlled medical-cannabis study with its own cultivar, root-zone, nutrient, and facility conditions.",
+        "Its reported absence of leaf necrosis under the tested higher nutrient conditions limits overgeneralization; it does not rule out salt or nutrient injury under other conditions and does not diagnose a plant from tip appearance."
+      ]
+    },
+    {
+      "id": "source:mdpi-2023-cannabis-single-element-deficiencies",
+      "sourceType": "evidence",
+      "title": "Foliar Symptomology, Nutrient Content, Yield, and Secondary Metabolite Variability of Cannabis Grown Hydroponically with Different Single-Element Nutrient Deficiencies",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9920212/",
+      "publisher": "Plants",
+      "authors": ["David Llewellyn", "Scott Golem", "A. Maxwell P. Jones", "Youbin Zheng"],
+      "evidenceTier": "A",
+      "publishedOn": "2023-01-17",
+      "versionDate": null,
+      "accessedOn": "2026-08-26",
+      "stableIdentifier": "doi:10.3390/plants12030422",
+      "archiveLocator": "pmc:PMC9920212",
+      "license": "CC BY 4.0",
+      "limitations": [
+        "Controlled hydroponic flowering study using one cultivar and induced single-element deficiencies.",
+        "Observed symptom patterns do not establish that appearance alone identifies a deficiency in other cultivars, media, facilities, stages, or multi-factor grow conditions."
+      ]
+    },
+    {
+      "id": "source:penn-state-hydroponic-plant-nutrition",
+      "sourceType": "evidence",
+      "title": "Hydroponics Systems and Principles Of Plant Nutrition: Essential Nutrients, Function, Deficiency, and Excess",
+      "url": "https://extension.psu.edu/hydroponics-systems-and-principles-of-plant-nutrition-essential-nutrients-function-deficiency-and-excess",
+      "publisher": "Penn State Extension",
+      "authors": [
+        "Elsa Sánchez",
+        "Francesco Di Gioia",
+        "Robert Berghage",
+        "Nick Flax",
+        "Thomas Ford"
+      ],
+      "evidenceTier": "A",
+      "publishedOn": null,
+      "versionDate": "2026-02-02",
+      "accessedOn": "2026-08-26",
+      "stableIdentifier": "url:https://extension.psu.edu/hydroponics-systems-and-principles-of-plant-nutrition-essential-nutrients-function-deficiency-and-excess",
+      "archiveLocator": null,
+      "license": "not_assessed",
+      "limitations": [
+        "General hydroponic plant-nutrition guidance with examples from non-cannabis crops.",
+        "It does not establish a cannabis diagnosis, a universal EC or pH target, or a flush prescription from symptom appearance."
+      ]
+    },
+    {
+      "id": "source:pr-627-route-cohort-provenance",
+      "sourceType": "cohort_provenance",
+      "title": "PR #627 route-cohort authorization and lineage",
+      "url": "https://github.com/Verdant-OS/verdant-grow-diary/pull/627",
+      "publisher": "Verdant-OS/verdant-grow-diary",
+      "authors": ["cheekhimself"],
+      "evidenceTier": "D",
+      "publishedOn": null,
+      "versionDate": null,
+      "accessedOn": "2026-08-26",
+      "stableIdentifier": "https://github.com/Verdant-OS/verdant-grow-diary/pull/627",
+      "archiveLocator": null,
+      "license": "not_assessed",
+      "limitations": [
+        "This record establishes only that the four routes were an approved post-v1 implementation cohort and records their repository lineage.",
+        "It is not scientific evidence, evidence review, cultivation review, editorial approval, publication verification, or rendered-crawl verification, and no claim may cite it as support."
+      ]
+    },
+    {
+      "id": "source:umd-excess-fertilizer-salt-damage",
+      "sourceType": "evidence",
+      "title": "Excess Fertilizer or Salt Damage on Flowers",
+      "url": "https://www.extension.umd.edu/resource/excess-fertilizer-or-salt-damage-flowers",
+      "publisher": "University of Maryland Extension",
+      "authors": [],
+      "evidenceTier": "A",
+      "publishedOn": null,
+      "versionDate": "2023-03-07",
+      "accessedOn": "2026-08-26",
+      "stableIdentifier": "url:https://www.extension.umd.edu/resource/excess-fertilizer-or-salt-damage-flowers",
+      "archiveLocator": null,
+      "license": "not_assessed",
+      "limitations": [
+        "General extension guidance for ornamental flowers and garden soils; it is not cannabis-specific.",
+        "Marginal browning and scorch are nonspecific, and this source does not justify diagnosing salt injury or prescribing leaching for cannabis from appearance alone."
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "claim:burnt-crispy-leaf-tips:controlled-follow-up",
+      "path": "/guides/cannabis-burnt-crispy-leaf-tips",
+      "claimType": "cultivation_safety_boundary",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R2",
+      "riskDomains": ["environment", "irrigation", "lighting", "nutrition"],
+      "text": "Avoid stacking feeding, watering, lighting, and airflow corrections; preserve a baseline and record the response to one justified, grower-approved change.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Skills Essential to the Diagnostic Process; Steps in the Diagnostic Process"
+        },
+        {
+          "sourceId": "source:penn-state-hydroponic-plant-nutrition",
+          "roles": ["limits", "supports"],
+          "locator": "Nutrition Problems; detection and source-identification guidance"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "authoritative_synthesis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject; general plants as diagnostic-method context",
+        "cultivarPopulation": "No cultivar population is fixed or universally claimed.",
+        "stageScope": "not fixed; the current stage must be recorded before interpreting a response",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "not fixed; any root-zone or hydroponic transfer requires current medium context",
+        "facilityScope": "not fixed; indoor, greenhouse, and outdoor transfer require facility context",
+        "methodScope": "Change-control and observation workflow; it does not select a treatment or assert a diagnosis.",
+        "unitScope": "No numeric threshold or unit-specific target is claimed.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "No pathogen diagnosis or exclusion is claimed from the visible symptom alone."
+        },
+        "scopeNote": "Record source-labeled environment, irrigation, feed, light, and airflow context before and after a change. No quantitative cross-source synthesis is claimed.",
+        "transferLimits": [
+          "A qualified reviewer must confirm that the proposed one-change wording is proportionate for the current cultivation context.",
+          "The workflow does not authorize pesticide use, a flush, a feed change, equipment control, or any automatic action."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "multiple recent grow changes",
+        "missing or stale records",
+        "measurement or unit error",
+        "progression that began before the selected baseline"
+      ],
+      "uncertainty": [
+        "A response after one change does not by itself prove causation.",
+        "Existing damage may not reverse even when new growth stabilizes."
+      ],
+      "prohibitedConclusions": [
+        "Do not infer that the selected change is a confirmed cure.",
+        "Do not infer that inaction is safe when damage is severe or rapidly progressing."
+      ],
+      "limitations": [
+        "Human evidence and cultivation review are not assigned.",
+        "This claim supplies a conservative workflow, not a treatment recommendation."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "new evidence shows the change-control advice is unsafe or misleading",
+        "a reviewer narrows or rejects applicability"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": ["sections.3.body"]
+    },
+    {
+      "id": "claim:burnt-crispy-leaf-tips:differential-boundary",
+      "path": "/guides/cannabis-burnt-crispy-leaf-tips",
+      "claimType": "diagnostic_boundary",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R2",
+      "riskDomains": ["diagnosis", "lighting", "nutrition", "root_zone"],
+      "text": "Dry or brown cannabis leaf tips are nonspecific: appearance alone does not prove nutrient burn or excess light and does not justify an immediate flush.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Final Diagnosis; Commonly Observed Symptoms and Signs, Leaf or Needle Tip Death"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Skills Essential to the Diagnostic Process; Step 2c, Compare"
+        },
+        {
+          "sourceId": "source:frontiers-2021-cannabis-light-intensity",
+          "roles": ["limits"],
+          "locator": "abstract and study methods for one-cultivar indoor light-intensity treatments"
+        },
+        {
+          "sourceId": "source:frontiers-2025-cannabis-root-zone-nutrients",
+          "roles": ["limits"],
+          "locator": "abstract, plant-health observations, and discussion of study-specific elevated root-zone nutrient conditions"
+        },
+        {
+          "sourceId": "source:penn-state-hydroponic-plant-nutrition",
+          "roles": ["limits", "supports"],
+          "locator": "Nutrition Problems; Soluble Salts Damage"
+        },
+        {
+          "sourceId": "source:umd-excess-fertilizer-salt-damage",
+          "roles": ["limits", "supports"],
+          "locator": "Leaf tip browning from excessive fertilizer; factors influencing damage"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "direct_cannabis",
+        "speciesOrPopulation": "Cannabis sativa L. for the two cited controlled studies; general flowers and plants for extension and diagnostic-method sources",
+        "cultivarPopulation": "study-specific cultivars only where a cited cannabis study reports them",
+        "stageScope": "study-specific flowering conditions where cited; otherwise not established as universal",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "controlled study root zones; general hydroponic and garden contexts as bounded proxies",
+        "facilityScope": "controlled indoor cannabis facilities where cited; extension contexts as non-cannabis proxies",
+        "methodScope": "Differential comparison of symptom distribution, progression, measured inputs, root-zone history, and explicit light and heat context.",
+        "unitScope": "Use only recorded values with verified units; this claim sets no numeric threshold.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "No pathogen diagnosis or exclusion is claimed from the visible symptom alone."
+        },
+        "scopeNote": "Light intensity, canopy position, temperature, humidity, airflow, irrigation, nutrient concentration, and root-zone history can all change interpretation and must be recorded. No pooled sample size or universal quantitative effect is claimed.",
+        "transferLimits": [
+          "The cited cannabis studies do not validate a symptom-only diagnostic rule.",
+          "Extension examples from other plants cannot be transferred as proof of cause in cannabis."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "canopy microclimate",
+        "cultivar and stage",
+        "fertilizer concentration and water quality",
+        "measurement or unit error",
+        "physical or chemical contact",
+        "root-zone moisture and drainage"
+      ],
+      "uncertainty": [
+        "The same visible tip pattern can occur under different causal combinations.",
+        "The current source set does not establish sensitivity or specificity for a cannabis tip-damage diagnosis."
+      ],
+      "prohibitedConclusions": [
+        "Do not diagnose nutrient burn from crispy tips alone.",
+        "Do not diagnose excess light from crispy tips alone.",
+        "Do not prescribe flushing from appearance alone."
+      ],
+      "limitations": [
+        "No evidence or cultivation reviewer has approved the proposed cross-source interpretation.",
+        "No reviewed differential matrix is attached to this draft."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "a cited source is corrected, retracted, materially revised, or loses lawful availability",
+        "new cannabis evidence materially changes the differential boundary"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": [
+        "description",
+        "faq.0.answer",
+        "faq.1.answer",
+        "h1",
+        "intro",
+        "referenceTable.rows.0.doNotAssume",
+        "title"
+      ]
+    },
+    {
+      "id": "claim:burnt-crispy-leaf-tips:evidence-context",
+      "path": "/guides/cannabis-burnt-crispy-leaf-tips",
+      "claimType": "diagnostic_method",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R2",
+      "riskDomains": ["environment", "irrigation", "lighting", "nutrition", "root_zone"],
+      "text": "Compare canopy distribution and progression with recorded feeding, root-zone, irrigation, EC or pH when available, and explicit light, heat, humidity, and airflow context; missing measurements remain missing rather than zero.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Final Diagnosis; diagnostic tests for abiotic causal agents"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Asking Questions and Gathering Information; Step 2a, Look"
+        },
+        {
+          "sourceId": "source:frontiers-2021-cannabis-light-intensity",
+          "roles": ["limits", "supports"],
+          "locator": "study methods and results for explicit indoor light-intensity treatments"
+        },
+        {
+          "sourceId": "source:frontiers-2025-cannabis-root-zone-nutrients",
+          "roles": ["limits", "supports"],
+          "locator": "study methods and results for explicit root-zone nutrient treatments"
+        },
+        {
+          "sourceId": "source:penn-state-hydroponic-plant-nutrition",
+          "roles": ["defines_method", "limits", "supports"],
+          "locator": "Nutrition Problems; monitoring EC and identifying the source before correction"
+        },
+        {
+          "sourceId": "source:umd-excess-fertilizer-salt-damage",
+          "roles": ["limits", "supports"],
+          "locator": "factors influencing damage; soil-analysis confirmation before a salt response"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "direct_cannabis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject; general plants as method and salt-injury proxies",
+        "cultivarPopulation": "not fixed; cultivar sensitivity is an unresolved transfer factor",
+        "stageScope": "not fixed; stage and tissue age must be recorded",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "soil, soilless, or hydroponic only with the current root-zone method recorded",
+        "facilityScope": "indoor, greenhouse, or outdoor only with local canopy and room context recorded",
+        "methodScope": "Structured comparison of affected and unaffected tissue, progression, recorded inputs, root-zone evidence, and explicit light and microclimate changes.",
+        "unitScope": "EC, pH, temperature, humidity, PPFD, distance, and time only when the unit and measurement method are recorded",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "No pathogen diagnosis or exclusion is claimed from the visible symptom alone."
+        },
+        "scopeNote": "Interpretation requires source-labeled, time-bounded observations and explicit canopy context; room temperature alone may not represent a leaf or canopy hot spot. No cross-source numeric threshold or effect size is claimed.",
+        "transferLimits": [
+          "The packet does not establish universal cannabis nutrient, EC, pH, PPFD, temperature, humidity, or airflow targets.",
+          "Association between a change and symptom location is not proof of causation."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "age of damaged tissue",
+        "canopy sensor placement",
+        "cultivar and stage",
+        "mixed or stale telemetry",
+        "multiple simultaneous input changes",
+        "unrecorded foliar or cleaning contact"
+      ],
+      "uncertainty": [
+        "Current evidence may be incomplete or temporally misaligned with symptom onset.",
+        "A documented input can be relevant context without being the cause."
+      ],
+      "prohibitedConclusions": [
+        "Do not convert missing runoff, EC, pH, light, or climate records to zero or healthy.",
+        "Do not treat a room-average reading as proof of canopy conditions.",
+        "Do not claim a measured input caused the symptom without converging evidence."
+      ],
+      "limitations": [
+        "The source set has not received independent evidence or cultivation approval.",
+        "The page does not provide a validated quantitative diagnostic model."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "sensor-quality or unit semantics change",
+        "new evidence changes the applicability of the cited measurements"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": [
+        "referenceTable.rows.0.compareFirst",
+        "referenceTable.rows.0.visibleSign",
+        "referenceTable.rows.0.whatToLogNext",
+        "sections.0.body",
+        "sections.1.body",
+        "sections.2.body"
+      ]
+    },
+    {
+      "id": "claim:leaf-spots-lesions:controlled-follow-up",
+      "path": "/guides/cannabis-leaf-spots-lesions",
+      "claimType": "cultivation_safety_boundary",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R2",
+      "riskDomains": ["diagnosis", "environment", "irrigation", "nutrition"],
+      "text": "Avoid stacking feeding, watering, lighting, and airflow corrections; preserve a baseline and record the response to one justified, grower-approved change.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Final Diagnosis; iterative hypothesis testing"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Skills Essential to the Diagnostic Process; management follows diagnosis"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "authoritative_synthesis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject; general plants as diagnostic-method context",
+        "cultivarPopulation": "No cultivar population is fixed or universally claimed.",
+        "stageScope": "not fixed; stage and symptom progression must be recorded",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "not fixed; the root-zone system must be recorded",
+        "facilityScope": "not fixed; room and outdoor context must be recorded",
+        "methodScope": "Change-control and observation workflow; it neither selects a treatment nor establishes cause.",
+        "unitScope": "No numeric threshold or unit-specific target is claimed.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "Pathogen involvement remains a differential requiring signs or appropriate testing; no symptom-only confirmation is claimed."
+        },
+        "scopeNote": "Preserve the environmental and input baseline before interpreting the response to a change. No quantitative synthesis is claimed.",
+        "transferLimits": [
+          "Cannabis-specific cultivation review is required before this workflow is publication-ready.",
+          "The advice does not authorize pesticide use, disease treatment, equipment control, or automatic action."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "multiple recent changes",
+        "missing history",
+        "pathogen progression independent of the selected change",
+        "physical damage or residue"
+      ],
+      "uncertainty": [
+        "A response after a change does not establish which of several differentials was causal.",
+        "Some suspected diseases require laboratory confirmation."
+      ],
+      "prohibitedConclusions": [
+        "Do not infer that the selected change cured a pest or pathogen.",
+        "Do not delay qualified diagnosis when the pattern is severe or rapidly progressing."
+      ],
+      "limitations": [
+        "Human evidence and cultivation review are not assigned.",
+        "This claim is a workflow boundary, not a pest or disease management instruction."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "new evidence shows the change-control advice is unsafe for a relevant differential",
+        "a reviewer narrows or rejects applicability"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": ["sections.3.body"]
+    },
+    {
+      "id": "claim:leaf-spots-lesions:differential-boundary",
+      "path": "/guides/cannabis-leaf-spots-lesions",
+      "claimType": "diagnostic_boundary",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R2",
+      "riskDomains": ["diagnosis", "pathogen", "pest"],
+      "text": "Cannabis leaf spots and lesions have overlapping abiotic and biotic differentials; a single photograph or spot pattern alone does not identify a pest, pathogen, deficiency, residue, spray response, or physical injury.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Laboratory Tests; Final Diagnosis; Commonly Observed Symptoms and Signs"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Skills Essential to the Diagnostic Process; Step 2a, Look; Step 2c, Compare"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "authoritative_synthesis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject; general plants as diagnostic-method and symptom-pattern proxies",
+        "cultivarPopulation": "No cultivar population is fixed or universally claimed.",
+        "stageScope": "not fixed; stage and affected tissue age must be recorded",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "not fixed; medium and root-zone conditions remain possible confounders",
+        "facilityScope": "indoor, greenhouse, and outdoor only with local environmental and exposure context",
+        "methodScope": "Iterative hypothesis testing from distribution, signs, both leaf surfaces, progression, history, and laboratory confirmation when necessary.",
+        "unitScope": "No numeric threshold or unit-specific target is claimed.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "Pathogen involvement remains a differential requiring signs or appropriate testing; no symptom-only confirmation is claimed."
+        },
+        "scopeNote": "Distribution, moisture, condensation, airflow, contact, scouting, and recent input context must be compared before escalating a hypothesis. No cannabis diagnostic sensitivity, specificity, prevalence, or effect size is claimed.",
+        "transferLimits": [
+          "The current source set contains no direct cannabis validation of a spot-pattern diagnostic rule.",
+          "Examples from other plant species cannot be treated as proof of the same cause in cannabis."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "abiotic injury",
+        "chemical or foliar contact",
+        "environmental condensation or splash",
+        "insect or mite signs",
+        "nutrient or root-zone stress",
+        "secondary colonization of damaged tissue"
+      ],
+      "uncertainty": [
+        "Photographs can preserve pattern but may omit signs needed for diagnosis.",
+        "Some infectious and abiotic causes require laboratory, media, water, or tissue testing."
+      ],
+      "prohibitedConclusions": [
+        "Do not identify a pest, pathogen, or deficiency from spots alone.",
+        "Do not treat residue, odor, webbing, eggs, or rub-off behavior as a confirmed cause without corroboration.",
+        "Do not recommend pesticide use without a confirmed target and controlling label."
+      ],
+      "limitations": [
+        "No direct cannabis pathogen-diagnostic study is included in this draft.",
+        "No evidence or cultivation reviewer has approved the differential boundary."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "a cited source is corrected, materially revised, or loses lawful availability",
+        "new cannabis-specific diagnostic evidence changes a differential"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": [
+        "description",
+        "faq.0.answer",
+        "h1",
+        "intro",
+        "referenceTable.rows.0.doNotAssume",
+        "sections.0.body",
+        "title"
+      ]
+    },
+    {
+      "id": "claim:leaf-spots-lesions:evidence-context",
+      "path": "/guides/cannabis-leaf-spots-lesions",
+      "claimType": "diagnostic_method",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R2",
+      "riskDomains": ["diagnosis", "environment", "recordkeeping"],
+      "text": "Preserve repeatable views of both leaf surfaces and the wider plant, then compare distribution, progression, room context, scouting, and recent watering, feeding, contact, handling, and cleaning history; an absent record remains limited evidence.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Final Diagnosis; compilation of observations, environment, grower information, literature, and tests"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Asking Questions and Gathering Information; Step 2a, Look; photograph guidance"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "authoritative_synthesis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject; general plants as diagnostic-method context",
+        "cultivarPopulation": "No cultivar population is fixed or universally claimed.",
+        "stageScope": "not fixed; stage and affected tissue age must be recorded",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "not fixed; root-zone context must be recorded where relevant",
+        "facilityScope": "not fixed; environment and exposure points must be recorded",
+        "methodScope": "Repeatable visual documentation plus spatial, temporal, environmental, scouting, and input-history comparison.",
+        "unitScope": "Use only source-labeled measurements with recorded units and capture times; this claim sets no threshold.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "Pathogen involvement remains a differential requiring signs or appropriate testing; no symptom-only confirmation is claimed."
+        },
+        "scopeNote": "Same-tent temperature, humidity, condensation, airflow, splash, and contact observations remain source- and freshness-labeled. No quantitative diagnostic performance is claimed.",
+        "transferLimits": [
+          "The method narrows hypotheses but does not confirm a cause.",
+          "Missing records and photographs limit inference and must not be interpreted as negative findings."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "image lighting and angle",
+        "incomplete scouting",
+        "manual or stale sensor observations",
+        "mixed symptoms from more than one cause",
+        "unrecorded contact or cleaning events"
+      ],
+      "uncertainty": [
+        "A photographed pattern can change after capture.",
+        "Observed distribution may reflect exposure or sampling bias rather than cause."
+      ],
+      "prohibitedConclusions": [
+        "Do not convert missing scouting, contact, input, or environment records into evidence that an event did not happen.",
+        "Do not present manual, stale, demo, or invalid readings as healthy live evidence."
+      ],
+      "limitations": [
+        "The packet includes no laboratory result or cannabis-specific differential validation.",
+        "Independent human review remains unassigned."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "evidence-capture or sensor-source semantics change",
+        "a reviewer changes the minimum observation set"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": [
+        "faq.1.answer",
+        "referenceTable.rows.0.compareFirst",
+        "referenceTable.rows.0.visibleSign",
+        "referenceTable.rows.0.whatToLogNext",
+        "sections.1.body",
+        "sections.2.body"
+      ]
+    },
+    {
+      "id": "claim:leaf-symptoms:controlled-follow-up",
+      "path": "/guides/cannabis-leaf-symptoms",
+      "claimType": "cultivation_safety_boundary",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R1",
+      "riskDomains": ["recordkeeping", "risk_reduction"],
+      "text": "Avoid changing feeding, watering, lighting, and airflow at the same time; preserve a baseline, change one justified variable, and record the response.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Final Diagnosis; iterative hypothesis testing"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Skills Essential to the Diagnostic Process; work the diagnostic process before management"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "authoritative_synthesis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject; general plants as diagnostic-method context",
+        "cultivarPopulation": "No cultivar population is fixed or universally claimed.",
+        "stageScope": "not fixed; the current stage must be recorded",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "not fixed; preserve the current medium and root-zone context",
+        "facilityScope": "not fixed; preserve the current facility and environment context",
+        "methodScope": "Low-risk change-control and recordkeeping workflow; no treatment or diagnosis is selected.",
+        "unitScope": "No numeric threshold or unit-specific target is claimed.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "No pathogen diagnosis or exclusion is claimed from the visible symptom alone."
+        },
+        "scopeNote": "Compare the same plant and tent before and after a justified change without erasing source or freshness labels. No quantitative effect is claimed.",
+        "transferLimits": [
+          "A later response is an observation, not proof that the change caused it.",
+          "Consequential interventions remain outside this hub claim and require their own evidence and review."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "delayed symptom progression",
+        "multiple unrecorded changes",
+        "stale or missing baseline evidence"
+      ],
+      "uncertainty": ["One-variable change control reduces ambiguity but does not eliminate it."],
+      "prohibitedConclusions": [
+        "Do not infer a confirmed diagnosis or cure from a response.",
+        "Do not use this workflow as authority for automatic or device-controlled action."
+      ],
+      "limitations": [
+        "Human evidence and cultivation review are not assigned.",
+        "This is a general recordkeeping boundary, not a treatment protocol."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "the page begins recommending a consequential intervention",
+        "a reviewer narrows or rejects the workflow"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": ["sections.2.body"]
+    },
+    {
+      "id": "claim:leaf-symptoms:evidence-history",
+      "path": "/guides/cannabis-leaf-symptoms",
+      "claimType": "recordkeeping_method",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R1",
+      "riskDomains": ["diagnosis", "recordkeeping"],
+      "text": "Record stage, location, progression, repeatable photographs, and recent environment, watering, feeding, and lighting context; a missing record remains limited evidence rather than proof that nothing happened.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Final Diagnosis; observations of plant, environment, and grower information"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Asking Questions and Gathering Information; Step 2a, Look; time development and photograph guidance"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "authoritative_synthesis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject; general plants as diagnostic-method context",
+        "cultivarPopulation": "No cultivar population is fixed or universally claimed.",
+        "stageScope": "all stages only as an observation workflow; stage-specific causal interpretation is not established",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "not fixed; medium and root-zone observations must be included when relevant",
+        "facilityScope": "not fixed; tent, room, greenhouse, and outdoor context must be identified",
+        "methodScope": "Structured observation and history comparison across the same plant and relevant tent or facility.",
+        "unitScope": "Any measurement retains its recorded unit, source, capture time, freshness, and quality state.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "No pathogen diagnosis or exclusion is claimed from the visible symptom alone."
+        },
+        "scopeNote": "Environment, watering, feeding, lighting, location, and timing are context variables rather than assumed causes. No quantitative inference is claimed; repeatable photographs and timeline observations improve comparability.",
+        "transferLimits": [
+          "A fixed 14-day lookback is a workflow window in the runtime copy, not a biologically validated universal causal window.",
+          "Incomplete history limits inference and must remain labeled limited."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "incorrect stage",
+        "missing or stale records",
+        "non-repeatable photography",
+        "symptom onset before the selected history window",
+        "tent context that differs from leaf-level conditions"
+      ],
+      "uncertainty": [
+        "Recorded chronology may not capture the true onset of a symptom.",
+        "Available context can narrow but not necessarily identify a cause."
+      ],
+      "prohibitedConclusions": [
+        "Do not treat missing history as evidence that an event did not occur.",
+        "Do not treat stale, manual, demo, invalid, or unknown telemetry as healthy live evidence."
+      ],
+      "limitations": [
+        "The 14-day workflow window has not received evidence or cultivation approval.",
+        "No search-research or original-asset receipt is attached."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "the timeline or sensor evidence model changes",
+        "a reviewer changes the minimum observation set or lookback boundary"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": [
+        "faq.1.answer",
+        "referenceTable.rows.0.compareFirst",
+        "referenceTable.rows.0.visibleSign",
+        "referenceTable.rows.0.whatToLogNext",
+        "referenceTable.rows.1.compareFirst",
+        "referenceTable.rows.1.visibleSign",
+        "referenceTable.rows.1.whatToLogNext",
+        "referenceTable.rows.2.compareFirst",
+        "referenceTable.rows.2.visibleSign",
+        "referenceTable.rows.2.whatToLogNext",
+        "sections.1.body"
+      ]
+    },
+    {
+      "id": "claim:leaf-symptoms:observation-before-cause",
+      "path": "/guides/cannabis-leaf-symptoms",
+      "claimType": "diagnostic_boundary",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R1",
+      "riskDomains": ["diagnosis", "recordkeeping"],
+      "text": "Yellowing, spots or lesions, and dry tips are observations rather than cause labels; one image rarely establishes cause, so pattern, location, stage, progression, and surrounding evidence must be compared first.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Laboratory Tests; Final Diagnosis; Commonly Observed Symptoms and Signs"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Skills Essential to the Diagnostic Process; Step 2a, Look; Step 2c, Compare"
+        },
+        {
+          "sourceId": "source:mdpi-2023-cannabis-single-element-deficiencies",
+          "roles": ["limits"],
+          "locator": "study methods and discussion for induced single-element deficiencies under controlled hydroponic flowering conditions"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "direct_cannabis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject and controlled-study species; general plants as diagnostic-method context",
+        "cultivarPopulation": "study-specific cultivar only for direct cannabis evidence",
+        "stageScope": "controlled flowering stage where the cannabis study is cited; otherwise stage must be recorded and transfer remains uncertain",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "controlled hydroponic study context where cited; otherwise medium and root-zone must be recorded",
+        "facilityScope": "controlled facility where direct cannabis evidence is cited; otherwise facility context must be recorded",
+        "methodScope": "Describe the sign, compare distribution and chronology, generate multiple hypotheses, and seek confirming or refuting evidence.",
+        "unitScope": "No numeric threshold or unit-specific target is claimed.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "No pathogen diagnosis or exclusion is claimed from the visible symptom alone."
+        },
+        "scopeNote": "Visible signs are interpreted only with plant, root-zone, environment, lighting, input, and progression context. No symptom-only diagnostic performance or pooled quantitative result is claimed.",
+        "transferLimits": [
+          "Controlled deficiency symptoms do not establish uniqueness under real multi-factor grows.",
+          "A photograph can preserve appearance and progression but cannot substitute for context or required testing."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "cultivar and normal aging",
+        "environment and light",
+        "multiple simultaneous stresses",
+        "nutrition and root-zone interactions",
+        "pests, pathogens, contact, or physical injury"
+      ],
+      "uncertainty": [
+        "The same visible sign can be consistent with more than one condition.",
+        "Current sources do not establish symptom-only diagnostic accuracy for cannabis."
+      ],
+      "prohibitedConclusions": [
+        "Do not assign a deficiency from yellowing alone.",
+        "Do not identify a pest or pathogen from spots alone.",
+        "Do not assign nutrient burn or excess light from crispy tips alone."
+      ],
+      "limitations": [
+        "The direct cannabis source covers a controlled nutrient-deficiency context, not every page differential.",
+        "Independent evidence and cultivation review are unassigned."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "a cited source is corrected, retracted, materially revised, or loses lawful availability",
+        "new cannabis diagnostic evidence changes the symptom boundary"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": [
+        "description",
+        "faq.0.answer",
+        "h1",
+        "intro",
+        "referenceTable.rows.0.doNotAssume",
+        "referenceTable.rows.1.doNotAssume",
+        "referenceTable.rows.2.doNotAssume",
+        "sections.0.body",
+        "title"
+      ]
+    },
+    {
+      "id": "claim:leaves-turning-yellow:controlled-follow-up",
+      "path": "/guides/cannabis-leaves-turning-yellow",
+      "claimType": "cultivation_safety_boundary",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R2",
+      "riskDomains": ["environment", "irrigation", "nutrition"],
+      "text": "Avoid stacking feeding, watering, lighting, and airflow corrections; preserve a baseline and record the response to one justified, grower-approved change.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Final Diagnosis; iterative hypothesis testing"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Skills Essential to the Diagnostic Process; management follows diagnosis"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "authoritative_synthesis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject; general plants as diagnostic-method context",
+        "cultivarPopulation": "No cultivar population is fixed or universally claimed.",
+        "stageScope": "not fixed; stage and progression must be recorded",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "not fixed; current root-zone context must be preserved",
+        "facilityScope": "not fixed; current environment context must be preserved",
+        "methodScope": "Change-control and response-recording workflow; no feed or treatment is selected.",
+        "unitScope": "No numeric threshold or unit-specific target is claimed.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "No pathogen diagnosis or exclusion is claimed from the visible symptom alone."
+        },
+        "scopeNote": "Use the same plant and relevant tent baseline before and after a controlled change. No quantitative effect is claimed.",
+        "transferLimits": [
+          "Cannabis-specific evidence and cultivation review are required before publication readiness.",
+          "The workflow does not establish that a nutrient or watering change is appropriate."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "normal stage-related change",
+        "multiple recent inputs",
+        "missing baseline evidence",
+        "delayed symptom progression"
+      ],
+      "uncertainty": ["New growth response after a change does not prove the original cause."],
+      "prohibitedConclusions": [
+        "Do not infer a confirmed nutrient deficiency or cure.",
+        "Do not authorize automatic feed, irrigation, lighting, airflow, or device changes."
+      ],
+      "limitations": [
+        "Human evidence and cultivation review are not assigned.",
+        "This claim supplies a workflow boundary, not a nutrient prescription."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "the page begins recommending a consequential intervention",
+        "a reviewer narrows or rejects the workflow"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": ["sections.3.body"]
+    },
+    {
+      "id": "claim:leaves-turning-yellow:differential-boundary",
+      "path": "/guides/cannabis-leaves-turning-yellow",
+      "claimType": "diagnostic_boundary",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R2",
+      "riskDomains": ["diagnosis", "nutrition", "root_zone"],
+      "text": "Cannabis leaf yellowing is nonspecific: color alone does not identify nitrogen or another nutrient deficiency, pH, irrigation, root, light, or normal-aging cause and does not justify immediate feeding.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Final Diagnosis; hypothesis testing from plant, environment, and grower information"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "general yellow-leaf example; similar symptoms and context requirements"
+        },
+        {
+          "sourceId": "source:mdpi-2023-cannabis-single-element-deficiencies",
+          "roles": ["limits", "supports"],
+          "locator": "study methods, foliar symptomology, and limitations of induced single-element deficiencies"
+        },
+        {
+          "sourceId": "source:penn-state-hydroponic-plant-nutrition",
+          "roles": ["limits"],
+          "locator": "Nutrition Problems; different nutrient and root-zone conditions can overlap in visible symptoms"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "direct_cannabis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject and controlled-study species; general plants as diagnostic and hydroponic method proxies",
+        "cultivarPopulation": "study-specific cultivar only for direct cannabis evidence",
+        "stageScope": "controlled flowering stage where the cannabis study is cited; otherwise stage and tissue age must be recorded",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "controlled hydroponic study context where cited; otherwise current root-zone system must be recorded",
+        "facilityScope": "controlled facility where direct cannabis evidence is cited; otherwise facility context must be recorded",
+        "methodScope": "Pattern and chronology comparison followed by targeted measurement or testing rather than symptom-only assignment.",
+        "unitScope": "EC and pH only when measured with a recorded unit, method, source, and time; no threshold is claimed here.",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "No pathogen diagnosis or exclusion is claimed from the visible symptom alone."
+        },
+        "scopeNote": "Yellowing is interpreted only with stage, tissue age, root-zone, watering, feeding, environment, light, and progression context. No symptom-only diagnostic accuracy or pooled quantitative effect is claimed.",
+        "transferLimits": [
+          "Induced single-element deficiency patterns do not prove the same cause in a multi-factor grow.",
+          "Normal aging and cultivar, stage, media, and facility effects remain possible differentials."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "cultivar and normal aging",
+        "growth stage and leaf age",
+        "light distribution",
+        "nutrient imbalance or availability",
+        "root-zone moisture, oxygen, pH, and EC",
+        "temperature and humidity"
+      ],
+      "uncertainty": [
+        "Yellowing patterns can overlap across more than one condition.",
+        "The source set does not establish symptom-only sensitivity or specificity."
+      ],
+      "prohibitedConclusions": [
+        "Do not diagnose nitrogen deficiency from yellowing alone.",
+        "Do not assume the latest feed caused the change.",
+        "Do not feed immediately from color alone."
+      ],
+      "limitations": [
+        "No evidence or cultivation reviewer has approved the proposed cross-source interpretation.",
+        "No reviewed differential matrix is attached to this draft."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "a cited source is corrected, retracted, materially revised, or loses lawful availability",
+        "new cannabis evidence materially changes the yellowing differential"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": [
+        "description",
+        "faq.0.answer",
+        "faq.1.answer",
+        "h1",
+        "intro",
+        "referenceTable.rows.0.doNotAssume",
+        "title"
+      ]
+    },
+    {
+      "id": "claim:leaves-turning-yellow:evidence-context",
+      "path": "/guides/cannabis-leaves-turning-yellow",
+      "claimType": "diagnostic_method",
+      "wordingState": "bounded",
+      "evidenceState": "sourced_pending_review",
+      "riskClass": "R2",
+      "riskDomains": ["environment", "irrigation", "lighting", "nutrition", "root_zone"],
+      "text": "Map yellowing by tissue age and location, compare affected and unaffected growth, and review recorded watering, root-zone, feed, pH or EC when available, environment, and explicit light context; missing values remain missing and non-live telemetry keeps its source and quality label.",
+      "sourceLinks": [
+        {
+          "sourceId": "source:aps-plant-disease-diagnosis",
+          "roles": ["defines_method", "supports"],
+          "locator": "Final Diagnosis; diagnostic tests for abiotic causal agents"
+        },
+        {
+          "sourceId": "source:csu-diagnosing-plant-disorders",
+          "roles": ["defines_method", "supports"],
+          "locator": "Asking Questions and Gathering Information; Step 2a, Look; time development"
+        },
+        {
+          "sourceId": "source:mdpi-2023-cannabis-single-element-deficiencies",
+          "roles": ["limits", "supports"],
+          "locator": "study methods and foliar symptomology by induced nutrient treatment"
+        },
+        {
+          "sourceId": "source:penn-state-hydroponic-plant-nutrition",
+          "roles": ["defines_method", "limits", "supports"],
+          "locator": "Nutrition Problems; monitoring media, nutrient solution, plant status, EC, and pH"
+        }
+      ],
+      "applicability": {
+        "evidenceBasis": "direct_cannabis",
+        "speciesOrPopulation": "Cannabis sativa L. as the page subject and controlled-study species; general hydroponic crops as method proxies",
+        "cultivarPopulation": "study-specific cultivar only for direct evidence; otherwise cultivar is an unresolved transfer factor",
+        "stageScope": "controlled flowering stage where cited; otherwise current stage and leaf age must be recorded",
+        "propagationMethod": "No propagation method is assumed or established.",
+        "mediumScope": "controlled hydroponic context where cited; soil, soilless, or hydroponic only with current root-zone context recorded",
+        "facilityScope": "controlled facility where cited; otherwise local canopy and room context must be recorded",
+        "methodScope": "Structured pattern, chronology, affected-versus-unaffected, root-zone, input, and environment comparison.",
+        "unitScope": "EC, pH, irrigation volume, temperature, humidity, and light only when measurement units, source, and time are recorded",
+        "evidenceDateScope": "Evidence applies only within the publication or version dates recorded in the cited sources; no universal evidence window is claimed.",
+        "environmentalContext": {
+          "temperature": "Record source-labeled temperature and canopy context; no universal threshold is claimed.",
+          "humidity": "Record source-labeled humidity and condensation context; no universal threshold is claimed.",
+          "light": "Record explicit light changes, intensity, distance, and canopy position when relevant.",
+          "co2": "No CO2 causal conclusion is claimed; record CO2 context when relevant.",
+          "irrigation": "Record watering, feeding, root-zone, and dryback context with source and time labels.",
+          "pathogen": "No pathogen diagnosis or exclusion is claimed from the visible symptom alone."
+        },
+        "scopeNote": "Temperature, humidity, canopy position, explicit light changes, watering, and root-zone evidence are context variables and retain source and freshness labels. No cross-source quantitative threshold is claimed.",
+        "transferLimits": [
+          "Controlled hydroponic findings do not establish the same pattern or cause in another medium or facility.",
+          "A source-labeled observation may be useful context without proving causation."
+        ],
+        "sampleSize": "Source-specific sample sizes are not pooled in this draft and remain subject to claim-level evidence review.",
+        "replication": "Source-specific replication designs are not pooled in this draft and remain subject to claim-level evidence review."
+      },
+      "confounders": [
+        "canopy and leaf-position differences",
+        "cultivar and stage",
+        "measurement or unit error",
+        "missing or stale records",
+        "nutrient interactions",
+        "root-zone and irrigation variation"
+      ],
+      "uncertainty": [
+        "A missing observation limits comparison and cannot be imputed safely.",
+        "The available pattern may reflect more than one simultaneous condition."
+      ],
+      "prohibitedConclusions": [
+        "Do not replace a missing measurement with a guessed value.",
+        "Do not present stale, manual, demo, invalid, or unknown readings as healthy live evidence.",
+        "Do not claim that the latest recorded feed caused the change."
+      ],
+      "limitations": [
+        "The proposed evidence mapping has not been independently reviewed.",
+        "The page sets no validated quantitative target or treatment threshold."
+      ],
+      "authorId": null,
+      "evidenceReviewerIds": [],
+      "cultivationReviewerIds": [],
+      "approvalDecision": "pending",
+      "approvedOn": null,
+      "invalidationTriggers": [
+        "the runtime wording or mapped material keys change",
+        "sensor-source, freshness, or unit semantics change",
+        "new evidence changes the minimum comparison set"
+      ],
+      "nextReviewOn": null,
+      "materialKeys": [
+        "referenceTable.rows.0.compareFirst",
+        "referenceTable.rows.0.visibleSign",
+        "referenceTable.rows.0.whatToLogNext",
+        "sections.0.body",
+        "sections.1.body",
+        "sections.2.body"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "path": "/guides/cannabis-burnt-crispy-leaf-tips",
+      "pageFamily": "diagnostic",
+      "riskClass": "R2",
+      "runtimeMaterialSha256": "2e11865ee3dc9b00e50b9551cf3481d5d48544d8469c063749ded24126f6cd57",
+      "claimIds": [
+        "claim:burnt-crispy-leaf-tips:controlled-follow-up",
+        "claim:burnt-crispy-leaf-tips:differential-boundary",
+        "claim:burnt-crispy-leaf-tips:evidence-context"
+      ],
+      "nonClaimMaterial": [
+        {
+          "keys": [
+            "cta.description",
+            "cta.heading",
+            "cta.label",
+            "referenceTable.caption",
+            "sections.0.heading",
+            "sections.1.heading",
+            "sections.1.links.0.label",
+            "sections.1.links.1.label",
+            "sections.2.heading",
+            "sections.2.links.0.label",
+            "sections.3.heading"
+          ],
+          "classification": "navigation",
+          "reason": "Headings, CTA copy, table caption, and link labels organize or route the reviewed claims; they are not independent factual assertions."
+        },
+        {
+          "keys": ["faq.0.question", "faq.1.question"],
+          "classification": "question",
+          "reason": "FAQ questions frame the mapped answers and do not assert facts on their own."
+        }
+      ],
+      "proposedVisibleSourceIds": [
+        "source:aps-plant-disease-diagnosis",
+        "source:csu-diagnosing-plant-disorders",
+        "source:frontiers-2021-cannabis-light-intensity",
+        "source:frontiers-2025-cannabis-root-zone-nutrients",
+        "source:penn-state-hydroponic-plant-nutrition",
+        "source:umd-excess-fertilizer-salt-damage"
+      ],
+      "proposedLinks": [
+        {
+          "location": "reviewedDifferentials.0",
+          "path": "/guides/cannabis-light-stress-light-burn-bleaching-or-heat",
+          "slot": "differential",
+          "status": "proposed"
+        },
+        {
+          "location": "reviewedDifferentials.1",
+          "path": "/guides/cannabis-nutrient-schedule",
+          "slot": "differential",
+          "status": "proposed"
+        },
+        {
+          "location": "reviewedDifferentials.2",
+          "path": "/guides/plant-watering-log",
+          "slot": "differential",
+          "status": "proposed"
+        }
+      ],
+      "searchResearchReceiptId": null,
+      "originalAssetReviewId": null
+    },
+    {
+      "path": "/guides/cannabis-leaf-spots-lesions",
+      "pageFamily": "diagnostic",
+      "riskClass": "R2",
+      "runtimeMaterialSha256": "baefd8233b77bb50fd6b15521136db18a69a2243ac440b5403779dbbb2f9db82",
+      "claimIds": [
+        "claim:leaf-spots-lesions:controlled-follow-up",
+        "claim:leaf-spots-lesions:differential-boundary",
+        "claim:leaf-spots-lesions:evidence-context"
+      ],
+      "nonClaimMaterial": [
+        {
+          "keys": [
+            "cta.description",
+            "cta.heading",
+            "cta.label",
+            "referenceTable.caption",
+            "sections.0.heading",
+            "sections.1.heading",
+            "sections.1.links.0.label",
+            "sections.1.links.1.label",
+            "sections.2.heading",
+            "sections.3.heading"
+          ],
+          "classification": "navigation",
+          "reason": "Headings, CTA copy, table caption, and link labels organize or route the reviewed claims; they are not independent factual assertions."
+        },
+        {
+          "keys": ["faq.0.question", "faq.1.question"],
+          "classification": "question",
+          "reason": "FAQ questions frame the mapped answers and do not assert facts on their own."
+        }
+      ],
+      "proposedVisibleSourceIds": [
+        "source:aps-plant-disease-diagnosis",
+        "source:csu-diagnosing-plant-disorders"
+      ],
+      "proposedLinks": [
+        {
+          "location": "reviewedDifferentials.0",
+          "path": "/guides/bud-rot-prevention-identification",
+          "slot": "differential",
+          "status": "proposed"
+        },
+        {
+          "location": "reviewedDifferentials.1",
+          "path": "/guides/daily-grow-log-checklist",
+          "slot": "differential",
+          "status": "proposed"
+        },
+        {
+          "location": "reviewedDifferentials.2",
+          "path": "/guides/sensor-truth-grow-room",
+          "slot": "differential",
+          "status": "proposed"
+        }
+      ],
+      "searchResearchReceiptId": null,
+      "originalAssetReviewId": null
+    },
+    {
+      "path": "/guides/cannabis-leaf-symptoms",
+      "pageFamily": "cluster",
+      "riskClass": "R1",
+      "runtimeMaterialSha256": "ff50606ca8a59735ac28a9748b5fa1ff26865503029e53a04e958ee12b33eb63",
+      "claimIds": [
+        "claim:leaf-symptoms:controlled-follow-up",
+        "claim:leaf-symptoms:evidence-history",
+        "claim:leaf-symptoms:observation-before-cause"
+      ],
+      "nonClaimMaterial": [
+        {
+          "keys": [
+            "referenceTable.caption",
+            "sections.0.heading",
+            "sections.0.links.0.label",
+            "sections.0.links.1.label",
+            "sections.0.links.2.label",
+            "sections.1.heading",
+            "sections.2.heading",
+            "sections.2.links.0.label",
+            "sections.2.links.1.label"
+          ],
+          "classification": "navigation",
+          "reason": "Headings, table caption, and link labels organize or route the reviewed claims; they are not independent factual assertions."
+        },
+        {
+          "keys": ["faq.0.question", "faq.1.question"],
+          "classification": "question",
+          "reason": "FAQ questions frame the mapped answers and do not assert facts on their own."
+        }
+      ],
+      "proposedVisibleSourceIds": [
+        "source:aps-plant-disease-diagnosis",
+        "source:csu-diagnosing-plant-disorders",
+        "source:mdpi-2023-cannabis-single-element-deficiencies"
+      ],
+      "proposedLinks": [
+        {
+          "location": "nextSteps.0",
+          "path": "/guides/cannabis-burnt-crispy-leaf-tips",
+          "slot": "next_step",
+          "status": "proposed"
+        },
+        {
+          "location": "nextSteps.1",
+          "path": "/guides/cannabis-leaf-spots-lesions",
+          "slot": "next_step",
+          "status": "proposed"
+        },
+        {
+          "location": "nextSteps.2",
+          "path": "/guides/cannabis-leaves-turning-yellow",
+          "slot": "next_step",
+          "status": "proposed"
+        }
+      ],
+      "searchResearchReceiptId": null,
+      "originalAssetReviewId": null
+    },
+    {
+      "path": "/guides/cannabis-leaves-turning-yellow",
+      "pageFamily": "diagnostic",
+      "riskClass": "R2",
+      "runtimeMaterialSha256": "694d79a59a9d65f1e4ecd3a30e23a672a63091b95eb628b3a054ad4672ee4033",
+      "claimIds": [
+        "claim:leaves-turning-yellow:controlled-follow-up",
+        "claim:leaves-turning-yellow:differential-boundary",
+        "claim:leaves-turning-yellow:evidence-context"
+      ],
+      "nonClaimMaterial": [
+        {
+          "keys": [
+            "cta.description",
+            "cta.heading",
+            "cta.label",
+            "referenceTable.caption",
+            "sections.0.heading",
+            "sections.1.heading",
+            "sections.1.links.0.label",
+            "sections.1.links.1.label",
+            "sections.2.heading",
+            "sections.3.heading"
+          ],
+          "classification": "navigation",
+          "reason": "Headings, CTA copy, table caption, and link labels organize or route the reviewed claims; they are not independent factual assertions."
+        },
+        {
+          "keys": ["faq.0.question", "faq.1.question"],
+          "classification": "question",
+          "reason": "FAQ questions frame the mapped answers and do not assert facts on their own."
+        }
+      ],
+      "proposedVisibleSourceIds": [
+        "source:aps-plant-disease-diagnosis",
+        "source:csu-diagnosing-plant-disorders",
+        "source:mdpi-2023-cannabis-single-element-deficiencies",
+        "source:penn-state-hydroponic-plant-nutrition"
+      ],
+      "proposedLinks": [
+        {
+          "location": "reviewedDifferentials.0",
+          "path": "/guides/cannabis-nutrient-schedule",
+          "slot": "differential",
+          "status": "proposed"
+        },
+        {
+          "location": "reviewedDifferentials.1",
+          "path": "/guides/grow-room-vpd-tracker",
+          "slot": "differential",
+          "status": "proposed"
+        },
+        {
+          "location": "reviewedDifferentials.2",
+          "path": "/guides/plant-watering-log",
+          "slot": "differential",
+          "status": "proposed"
+        }
+      ],
+      "searchResearchReceiptId": null,
+      "originalAssetReviewId": null
+    }
+  ]
+}

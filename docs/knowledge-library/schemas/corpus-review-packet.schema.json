@@ -1,0 +1,368 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://verdantgrowdiary.com/schemas/knowledge/corpus-review-packet.schema.json",
+  "title": "Verdant Knowledge Library corpus review packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "artifactType",
+    "revisionId",
+    "createdOn",
+    "evidenceScope",
+    "cohort",
+    "statusEvidence",
+    "assignments",
+    "aiAssistance",
+    "sources",
+    "claims",
+    "pages"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "artifactType": { "const": "knowledge_corpus_review_packet" },
+    "revisionId": { "type": "string", "minLength": 12 },
+    "createdOn": { "$ref": "#/$defs/date" },
+    "evidenceScope": { "const": "resolved_runtime_material_and_draft_claim_map" },
+    "cohort": { "$ref": "#/$defs/cohort" },
+    "statusEvidence": { "$ref": "#/$defs/statusEvidence" },
+    "assignments": { "$ref": "#/$defs/assignments" },
+    "aiAssistance": { "$ref": "#/$defs/aiAssistance" },
+    "sources": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 4,
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "pages": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/page" }
+    }
+  },
+  "$defs": {
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "nullableDate": {
+      "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }]
+    },
+    "nullableId": {
+      "oneOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+    },
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "nonemptyStringList": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "registrySourcePullRequest",
+        "cohortProvenanceSourceId",
+        "paths",
+        "sourceRouteState",
+        "editorialState",
+        "publicationReadiness"
+      ],
+      "properties": {
+        "id": { "const": "PV1-SYMPTOM-EVIDENCE-GUIDES" },
+        "registrySourcePullRequest": { "const": 627 },
+        "cohortProvenanceSourceId": { "type": "string", "minLength": 1 },
+        "paths": { "$ref": "#/$defs/nonemptyStringList" },
+        "sourceRouteState": { "const": "registered_public" },
+        "editorialState": { "const": "sourced" },
+        "publicationReadiness": { "const": "BLOCKED" }
+      }
+    },
+    "statusEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["publicationStatus", "renderedCrawlStatus"],
+      "properties": {
+        "publicationStatus": { "const": "NOT_MEASURED" },
+        "renderedCrawlStatus": { "const": "NOT_MEASURED" }
+      }
+    },
+    "assignments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "managingEditorId",
+        "authorIds",
+        "evidenceReviewerIds",
+        "cultivationReviewerIds"
+      ],
+      "properties": {
+        "managingEditorId": { "$ref": "#/$defs/nullableId" },
+        "authorIds": { "$ref": "#/$defs/stringList" },
+        "evidenceReviewerIds": { "$ref": "#/$defs/stringList" },
+        "cultivationReviewerIds": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "aiAssistance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "usedOn", "uses", "humanVerifierId"],
+      "properties": {
+        "tool": { "type": "string", "minLength": 1 },
+        "usedOn": { "$ref": "#/$defs/date" },
+        "uses": { "$ref": "#/$defs/nonemptyStringList" },
+        "humanVerifierId": { "$ref": "#/$defs/nullableId" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sourceType",
+        "title",
+        "url",
+        "publisher",
+        "authors",
+        "evidenceTier",
+        "publishedOn",
+        "versionDate",
+        "accessedOn",
+        "stableIdentifier",
+        "archiveLocator",
+        "license",
+        "limitations"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "sourceType": { "enum": ["cohort_provenance", "evidence"] },
+        "title": { "type": "string", "minLength": 4 },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "publisher": { "type": "string", "minLength": 2 },
+        "authors": { "$ref": "#/$defs/stringList" },
+        "evidenceTier": { "enum": ["A", "B", "C", "D"] },
+        "publishedOn": { "$ref": "#/$defs/nullableDate" },
+        "versionDate": { "$ref": "#/$defs/nullableDate" },
+        "accessedOn": { "$ref": "#/$defs/date" },
+        "stableIdentifier": { "type": "string", "minLength": 4 },
+        "archiveLocator": { "$ref": "#/$defs/nullableId" },
+        "license": { "type": "string", "minLength": 3 },
+        "limitations": { "$ref": "#/$defs/nonemptyStringList" }
+      }
+    },
+    "sourceLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "roles", "locator"],
+      "properties": {
+        "sourceId": { "type": "string", "minLength": 1 },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "supports",
+              "limits",
+              "contradicts",
+              "defines_method",
+              "controls_requirement",
+              "documents_product"
+            ]
+          }
+        },
+        "locator": { "type": "string", "minLength": 5 }
+      }
+    },
+    "environmentalContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["temperature", "humidity", "light", "co2", "irrigation", "pathogen"],
+      "properties": {
+        "temperature": { "type": "string", "minLength": 3 },
+        "humidity": { "type": "string", "minLength": 3 },
+        "light": { "type": "string", "minLength": 3 },
+        "co2": { "type": "string", "minLength": 3 },
+        "irrigation": { "type": "string", "minLength": 3 },
+        "pathogen": { "type": "string", "minLength": 3 }
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceBasis",
+        "speciesOrPopulation",
+        "cultivarPopulation",
+        "stageScope",
+        "propagationMethod",
+        "mediumScope",
+        "facilityScope",
+        "methodScope",
+        "unitScope",
+        "evidenceDateScope",
+        "sampleSize",
+        "replication",
+        "environmentalContext",
+        "scopeNote",
+        "transferLimits"
+      ],
+      "properties": {
+        "evidenceBasis": {
+          "enum": [
+            "direct_cannabis",
+            "proxy_crop",
+            "field_observation",
+            "authoritative_synthesis",
+            "editorial_policy"
+          ]
+        },
+        "speciesOrPopulation": { "type": "string", "minLength": 3 },
+        "cultivarPopulation": { "type": "string", "minLength": 3 },
+        "stageScope": { "type": "string", "minLength": 3 },
+        "propagationMethod": { "type": "string", "minLength": 3 },
+        "mediumScope": { "type": "string", "minLength": 3 },
+        "facilityScope": { "type": "string", "minLength": 3 },
+        "methodScope": { "type": "string", "minLength": 3 },
+        "unitScope": { "type": "string", "minLength": 3 },
+        "evidenceDateScope": { "type": "string", "minLength": 3 },
+        "sampleSize": { "type": "string", "minLength": 3 },
+        "replication": { "type": "string", "minLength": 3 },
+        "environmentalContext": { "$ref": "#/$defs/environmentalContext" },
+        "scopeNote": { "type": "string", "minLength": 3 },
+        "transferLimits": { "$ref": "#/$defs/nonemptyStringList" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "claimType",
+        "wordingState",
+        "evidenceState",
+        "riskClass",
+        "riskDomains",
+        "text",
+        "sourceLinks",
+        "applicability",
+        "confounders",
+        "uncertainty",
+        "prohibitedConclusions",
+        "limitations",
+        "authorId",
+        "evidenceReviewerIds",
+        "cultivationReviewerIds",
+        "approvalDecision",
+        "approvedOn",
+        "invalidationTriggers",
+        "nextReviewOn",
+        "materialKeys"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/guides/" },
+        "claimType": { "type": "string", "minLength": 1 },
+        "wordingState": { "const": "bounded" },
+        "evidenceState": { "const": "sourced_pending_review" },
+        "riskClass": { "enum": ["R0", "R1", "R2", "R3"] },
+        "riskDomains": { "$ref": "#/$defs/nonemptyStringList" },
+        "text": { "type": "string", "minLength": 12 },
+        "sourceLinks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/sourceLink" }
+        },
+        "applicability": { "$ref": "#/$defs/applicability" },
+        "confounders": { "$ref": "#/$defs/nonemptyStringList" },
+        "uncertainty": { "$ref": "#/$defs/nonemptyStringList" },
+        "prohibitedConclusions": { "$ref": "#/$defs/nonemptyStringList" },
+        "limitations": { "$ref": "#/$defs/nonemptyStringList" },
+        "authorId": { "type": "null" },
+        "evidenceReviewerIds": { "type": "array", "maxItems": 0 },
+        "cultivationReviewerIds": { "type": "array", "maxItems": 0 },
+        "approvalDecision": { "const": "pending" },
+        "approvedOn": { "type": "null" },
+        "invalidationTriggers": { "$ref": "#/$defs/nonemptyStringList" },
+        "nextReviewOn": { "type": "null" },
+        "materialKeys": { "$ref": "#/$defs/nonemptyStringList" }
+      }
+    },
+    "nonClaimMaterial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keys", "classification", "reason"],
+      "properties": {
+        "keys": { "$ref": "#/$defs/nonemptyStringList" },
+        "classification": { "enum": ["navigation", "heading", "question", "metadata"] },
+        "reason": { "type": "string", "minLength": 8 }
+      }
+    },
+    "proposedLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "path", "slot", "status"],
+      "properties": {
+        "location": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/" },
+        "slot": {
+          "enum": [
+            "breadcrumb",
+            "contextual_lateral",
+            "differential",
+            "next_step",
+            "prerequisite",
+            "supplemental"
+          ]
+        },
+        "status": { "const": "proposed" }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "pageFamily",
+        "riskClass",
+        "runtimeMaterialSha256",
+        "claimIds",
+        "nonClaimMaterial",
+        "proposedVisibleSourceIds",
+        "proposedLinks",
+        "searchResearchReceiptId",
+        "originalAssetReviewId"
+      ],
+      "properties": {
+        "path": { "type": "string", "pattern": "^/guides/" },
+        "pageFamily": { "enum": ["cluster", "diagnostic"] },
+        "riskClass": { "enum": ["R0", "R1", "R2", "R3"] },
+        "runtimeMaterialSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "claimIds": { "$ref": "#/$defs/nonemptyStringList" },
+        "nonClaimMaterial": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonClaimMaterial" }
+        },
+        "proposedVisibleSourceIds": { "$ref": "#/$defs/nonemptyStringList" },
+        "proposedLinks": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/proposedLink" }
+        },
+        "searchResearchReceiptId": { "type": "null" },
+        "originalAssetReviewId": { "type": "null" }
+      }
+    }
+  }
+}

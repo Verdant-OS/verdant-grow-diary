@@ -120,7 +120,10 @@ export default function OAuthConsent() {
   const clientName = details.client?.name ?? "an external app";
   return (
     <main className="min-h-dvh flex items-center justify-center px-6 py-10">
-      <div className="w-full max-w-md space-y-6 rounded-lg border p-6" data-testid="oauth-consent-card">
+      <div
+        className="w-full max-w-md space-y-6 rounded-lg border p-6"
+        data-testid="oauth-consent-card"
+      >
         <div className="space-y-3">
           <h1 className="text-xl font-semibold">Connect {clientName} to your Verdant account?</h1>
           <p className="text-sm text-muted-foreground" data-testid="oauth-consent-client-copy">
@@ -129,16 +132,33 @@ export default function OAuthConsent() {
             the read-only operations listed below, and their queries remain limited by your
             account&apos;s existing access rules.
           </p>
-          <div className="rounded-md bg-muted/50 px-3 py-2 text-sm space-y-2" data-testid="oauth-consent-scope">
+          <div
+            className="rounded-md bg-muted/50 px-3 py-2 text-sm space-y-2"
+            data-testid="oauth-consent-scope"
+          >
             <p className="font-medium text-foreground">What Verdant&apos;s MCP tools can read</p>
             <ul className="list-disc pl-5 text-muted-foreground space-y-1">
               <li>Your grows (names, stage, archive status, timestamps)</li>
               <li>Recent diary entries for grows you own</li>
               <li>Latest sensor snapshots for tents you own</li>
+              <li>
+                Grow Walk target summaries and bounded, source-labeled context for tents or plants
+                you own
+              </li>
+              <li>
+                Within that selected Grow Walk context: recent note excerpts, alert reasons,
+                existing AI Doctor session metadata, and Action Queue summaries with read-only audit
+                history
+              </li>
             </ul>
           </div>
-          <div className="rounded-md border border-border px-3 py-2 text-sm space-y-2" data-testid="oauth-consent-safety">
-            <p className="font-medium text-foreground">What Verdant&apos;s current MCP tools do not expose</p>
+          <div
+            className="rounded-md border border-border px-3 py-2 text-sm space-y-2"
+            data-testid="oauth-consent-safety"
+          >
+            <p className="font-medium text-foreground">
+              What Verdant&apos;s current MCP tools do not expose
+            </p>
             <ul className="list-disc pl-5 text-muted-foreground space-y-1">
               <li>Diary or grow-record write tools</li>
               <li>Action Queue approval, dismissal, or editing tools</li>
@@ -150,15 +170,15 @@ export default function OAuthConsent() {
             className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground"
             data-testid="oauth-consent-credential-boundary"
           >
-            Approval issues an authenticated account credential. Verdant does not currently
-            enforce that credential as usable only at the MCP endpoint. Approve only a client you
-            trust not to reuse it outside Verdant&apos;s MCP tools, where your normal signed-in account
+            Approval issues an authenticated account credential. Verdant does not currently enforce
+            that credential as usable only at the MCP endpoint. Approve only a client you trust not
+            to reuse it outside Verdant&apos;s MCP tools, where your normal signed-in account
             permissions may apply.
           </p>
           <p className="text-xs text-muted-foreground" data-testid="oauth-consent-revoke">
             Choose <strong className="font-medium text-foreground">Deny</strong> to cancel now.
-            Verdant does not yet provide a self-service authorized-app disconnect screen. To
-            request revocation of an approved client, contact {" "}
+            Verdant does not yet provide a self-service authorized-app disconnect screen. To request
+            revocation of an approved client, contact{" "}
             <a
               href="/contact"
               className="font-medium text-foreground underline underline-offset-2"

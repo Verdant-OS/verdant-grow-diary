@@ -60,6 +60,15 @@ function sha256(buf) {
   return createHash("sha256").update(text.replaceAll("\r\n", "\n")).digest("hex");
 }
 
+/**
+ * The generated mirror is pinned to LF in .gitattributes, while its source
+ * files may be CRLF in a Windows checkout. Use one canonical representation
+ * both when comparing generated text and before it reaches the write path.
+ */
+function normalizeTextLineEndings(text) {
+  return text.replaceAll("\r\n", "\n");
+}
+
 async function walk(dir) {
   const out = [];
   let entries;
@@ -344,7 +353,7 @@ async function main() {
     const rewritten = rewriteMirrorSource(srcText, srcAbs);
     const hash = sha256(srcText);
     const srcRel = toPosix(path.relative(ROOT, srcAbs));
-    const withBanner = banner(srcRel, hash) + rewritten;
+    const withBanner = normalizeTextLineEndings(banner(srcRel, hash) + rewritten);
     mirrorFiles.set(outAbs, withBanner);
     sourceHashes[srcRel] = hash;
   }
@@ -390,7 +399,7 @@ async function main() {
         drift.push(`MISSING committed mirror: ${MIRROR_REL}/${rel}`);
         continue;
       }
-      if (committed !== content) {
+      if (normalizeTextLineEndings(committed) !== normalizeTextLineEndings(content)) {
         drift.push(`DRIFT: ${MIRROR_REL}/${rel} differs from generator output`);
       }
     }
@@ -460,8 +469,9 @@ async function main() {
       } catch {}
       const rel = path.relative(ROOT, outAbs);
       if (existing === null) planned.create.push(rel);
-      else if (existing !== content) planned.update.push(rel);
-      else planned.unchanged++;
+      else if (normalizeTextLineEndings(existing) !== normalizeTextLineEndings(content)) {
+        planned.update.push(rel);
+      } else planned.unchanged++;
     }
     try {
       const committedFiles = await walk(MIRROR_ABS);

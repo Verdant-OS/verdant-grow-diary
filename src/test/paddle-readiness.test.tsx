@@ -64,6 +64,24 @@ describe("resolvePaddleConfig", () => {
     if (!cfg.available) expect(cfg.reason).toBe("missing_client_token");
   });
 
+  it("refuses a live-class client token even when the legacy environment says sandbox", () => {
+    const cfg = resolvePaddleConfig({
+      ...SANDBOX_ENV,
+      VITE_PADDLE_CLIENT_TOKEN: "live_policy_fixture",
+    });
+    expect(cfg.available).toBe(false);
+    if (!cfg.available) expect(cfg.reason).toBe("live_not_allowed");
+  });
+
+  it("refuses a malformed client token even when the legacy environment says sandbox", () => {
+    const cfg = resolvePaddleConfig({
+      ...SANDBOX_ENV,
+      VITE_PADDLE_CLIENT_TOKEN: "malformed_policy_fixture",
+    });
+    expect(cfg.available).toBe(false);
+    if (!cfg.available) expect(cfg.reason).toBe("missing_client_token");
+  });
+
   it("returns unavailable when any price id is missing", () => {
     const cfg = resolvePaddleConfig({ ...SANDBOX_ENV, VITE_PADDLE_PRICE_PRO_ANNUAL: "" });
     expect(cfg.available).toBe(false);

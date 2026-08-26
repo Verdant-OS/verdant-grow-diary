@@ -15,9 +15,12 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { axe } from "vitest-axe";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
+import { RECORD_OWN_AGREEMENT_ACCEPTANCES_RPC } from "@/lib/agreementAcceptanceService";
 
-const upsertSpy = vi.fn();
-const signOutSpy = vi.fn();
+const { rpcSpy, signOutSpy } = vi.hoisted(() => ({
+  rpcSpy: vi.fn((_fn: string, _args: unknown) => Promise.resolve({ data: 2, error: null })),
+  signOutSpy: vi.fn(),
+}));
 
 // user_agreement_acceptances: return no acceptances -> gate opens.
 function makeChain() {
@@ -25,16 +28,15 @@ function makeChain() {
   const chain: Record<string, unknown> = {
     select: () => chain,
     eq: () => Promise.resolve(result),
-    upsert: (...args: unknown[]) => {
-      upsertSpy(...args);
-      return Promise.resolve({ data: null, error: null });
-    },
   };
   return chain;
 }
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { from: () => makeChain() },
+  supabase: {
+    from: () => makeChain(),
+    rpc: rpcSpy,
+  },
 }));
 
 const MOCK_USER = { id: "u1", email: "grower@example.com" };
@@ -75,7 +77,7 @@ function getDialogFocusables(dialog: HTMLElement): HTMLElement[] {
 }
 
 beforeEach(() => {
-  upsertSpy.mockClear();
+  rpcSpy.mockClear();
   signOutSpy.mockClear();
 });
 
@@ -139,7 +141,7 @@ describe("AgreementReconsentGate accessibility", () => {
     expect(alert.textContent ?? "").toMatch(/agree|tick|accept/i);
     expect(checkbox).toHaveAttribute("aria-invalid", "true");
     expect(checkbox).toHaveAttribute("aria-required", "true");
-    expect(upsertSpy).not.toHaveBeenCalled();
+    expect(rpcSpy).not.toHaveBeenCalled();
   });
 
   it("moves focus to the checkbox after a failed submission and does not duplicate the alert on repeat", async () => {
@@ -181,7 +183,7 @@ describe("AgreementReconsentGate accessibility", () => {
     expect(checkbox).toHaveAttribute("aria-required", "true");
 
     fireEvent.click(accept);
-    await waitFor(() => expect(upsertSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(rpcSpy).toHaveBeenCalledTimes(1));
   });
 
   it("keeps keyboard focus inside the dialog when tabbing forward and backward (bounded)", async () => {
@@ -216,7 +218,7 @@ describe("AgreementReconsentGate accessibility", () => {
     fireEvent.keyDown(checkbox, { key: "Escape", code: "Escape" });
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(upsertSpy).not.toHaveBeenCalled();
+    expect(rpcSpy).not.toHaveBeenCalled();
     expect(signOutSpy).not.toHaveBeenCalled();
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
@@ -232,7 +234,7 @@ describe("AgreementReconsentGate accessibility", () => {
     fireEvent.click(outside);
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(upsertSpy).not.toHaveBeenCalled();
+    expect(rpcSpy).not.toHaveBeenCalled();
     expect(signOutSpy).not.toHaveBeenCalled();
     // Protected content remains — checkbox still there, still required.
     expect(screen.getByRole("checkbox")).toHaveAttribute("aria-required", "true");
@@ -247,12 +249,15 @@ describe("AgreementReconsentGate accessibility", () => {
     expect(screen.queryByRole("alert")).toBeNull();
 
     fireEvent.click(accept);
-    await waitFor(() => expect(upsertSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(rpcSpy).toHaveBeenCalledTimes(1));
 
-    const [rows] = upsertSpy.mock.calls[0] as [
-      Array<{ user_id: string; agreement_type: string; version: string }>,
+    const [fn, args] = rpcSpy.mock.calls[0] as [
+      string,
+      { p_acceptances: Array<{ agreement_type: string; version: string; user_id?: string }> },
     ];
-    expect(rows.every((r) => r.user_id === "u1")).toBe(true);
+    expect(fn).toBe(RECORD_OWN_AGREEMENT_ACCEPTANCES_RPC);
+    const rows = args.p_acceptances;
+    expect(rows.every((r) => !Object.prototype.hasOwnProperty.call(r, "user_id"))).toBe(true);
     expect(rows.map((r) => r.agreement_type).sort()).toEqual(["privacy", "terms"]);
   });
 

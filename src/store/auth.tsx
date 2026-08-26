@@ -40,18 +40,21 @@ interface AuthProviderProps {
 export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const currentUserIdRef = useRef<string | null>(null);
+  // `undefined` means the initial auth identity has not resolved yet. Keep it
+  // distinct from a resolved signed-out `null` so the first null session still
+  // runs the privacy fence and clears state left by an expired prior session.
+  const currentUserIdRef = useRef<string | null | undefined>(undefined);
   const sessionUserId = session?.user.id ?? null;
 
   const applySession = useCallback(
     (nextSession: Session | null) => {
       const previousUserId = currentUserIdRef.current;
       const nextUserId = nextSession?.user.id ?? null;
-      if (previousUserId !== nextUserId) {
+      if (previousUserId === undefined || previousUserId !== nextUserId) {
         // This callback must remain before both the identity ref and React
         // state update. Query cache removal is synchronous, so no render can
         // expose the next owner while the previous owner's rows remain.
-        onBeforeAuthIdentityChange?.(previousUserId, nextUserId);
+        onBeforeAuthIdentityChange?.(previousUserId ?? null, nextUserId);
       }
       currentUserIdRef.current = nextUserId;
       setSession(nextSession);

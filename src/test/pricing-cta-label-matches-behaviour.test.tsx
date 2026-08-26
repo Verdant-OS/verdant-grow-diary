@@ -41,7 +41,7 @@ const mocks = vi.hoisted(() => ({
     source: "lovable_paddle_subscription",
   },
   checkout: {
-    environment: "live" as "live" | "sandbox" | "unavailable",
+    environment: "sandbox" as "live" | "sandbox" | "unavailable",
     unavailable: false,
     unavailableMessage: null as string | null,
     blockedReason: null as string | null,
@@ -119,7 +119,7 @@ function rerenderAfterFailure(view: ReturnType<typeof renderPricing>) {
 
 beforeEach(() => {
   mocks.openCheckout.mockReset();
-  mocks.checkout.environment = "live";
+  mocks.checkout.environment = "sandbox";
   mocks.checkout.unavailable = false;
   mocks.checkout.unavailableMessage = null;
   mocks.checkout.blockedReason = null;

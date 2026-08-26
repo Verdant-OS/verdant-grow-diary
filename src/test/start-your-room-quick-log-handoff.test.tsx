@@ -5,6 +5,12 @@ import { FREE_CAPABILITIES } from "@/lib/entitlements/capabilities";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLocalStorageForTest } from "./helpers/localStorageTestHelper";
 
+const ATTEMPT_IDS = {
+  grow: "11111111-1111-4111-8111-111111111111",
+  tent: "22222222-2222-4222-8222-222222222222",
+  plant: "33333333-3333-4333-8333-333333333333",
+} as const;
+
 const {
   navMock,
   fromMock,
@@ -71,20 +77,6 @@ vi.mock("sonner", () => ({
 
 import StartYourRoom from "@/pages/StartYourRoom";
 
-const INSERT_RESULTS = {
-  grows: { data: { id: "grow-1", name: "E2E Grow" }, error: null },
-  tents: { data: { id: "tent-1", name: "E2E Tent" }, error: null },
-  plants: {
-    data: {
-      id: "plant / 1",
-      name: "E2E Plant",
-      grow_id: "grow-1",
-      tent_id: "tent-1",
-    },
-    error: null,
-  },
-} as const;
-
 beforeEach(() => {
   navMock.mockClear();
   fromMock.mockReset();
@@ -93,11 +85,27 @@ beforeEach(() => {
   setActiveGrowIdMock.mockClear();
   entitlementState.capabilities = FREE_CAPABILITIES;
   clearLocalStorageForTest();
+  vi.stubGlobal("crypto", {
+    randomUUID: vi
+      .fn()
+      .mockReturnValueOnce(ATTEMPT_IDS.grow)
+      .mockReturnValueOnce(ATTEMPT_IDS.tent)
+      .mockReturnValueOnce(ATTEMPT_IDS.plant),
+  });
 
-  fromMock.mockImplementation((table: keyof typeof INSERT_RESULTS) => ({
-    insert: () => ({
+  fromMock.mockImplementation((table: "grows" | "tents" | "plants") => ({
+    insert: (payload: Record<string, unknown>) => ({
       select: () => ({
-        single: async () => INSERT_RESULTS[table],
+        single: async () => ({
+          data: {
+            id: payload.id,
+            name: payload.name,
+            user_id: payload.user_id,
+            ...(table === "grows" ? {} : { grow_id: payload.grow_id }),
+            ...(table === "plants" ? { tent_id: payload.tent_id } : {}),
+          },
+          error: null,
+        }),
       }),
     }),
   }));
@@ -130,7 +138,7 @@ describe("Start Your Room Quick Log handoff", () => {
     await user.click(screen.getByTestId("start-room-finish"));
 
     expect(navMock).toHaveBeenCalledTimes(1);
-    expect(navMock).toHaveBeenCalledWith("/plants/plant%20%2F%201?open=quick-log", {
+    expect(navMock).toHaveBeenCalledWith(`/plants/${ATTEMPT_IDS.plant}?open=quick-log`, {
       replace: true,
     });
   });

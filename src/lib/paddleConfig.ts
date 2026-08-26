@@ -30,6 +30,8 @@
  * Entitlements (e.g. Pro access) are NEVER granted from the client.
  */
 
+import { classifyPaddleToken } from "@/lib/paddleEnvironment";
+
 export const PADDLE_SANDBOX_ENV = "sandbox" as const;
 
 export type PaddlePlanSlug = "pro-monthly" | "pro-annual" | "founder-lifetime";
@@ -82,7 +84,11 @@ export function resolvePaddleConfig(source: PaddleEnvSource = readImportMetaEnv(
   }
 
   const clientToken = (source.VITE_PADDLE_CLIENT_TOKEN ?? "").trim();
-  if (!clientToken) {
+  const tokenClass = classifyPaddleToken(clientToken);
+  if (tokenClass === "live") {
+    return { available: false, reason: "live_not_allowed", environment: env };
+  }
+  if (tokenClass !== "sandbox") {
     return { available: false, reason: "missing_client_token", environment: env };
   }
 

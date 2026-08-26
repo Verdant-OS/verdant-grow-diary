@@ -17,9 +17,11 @@ import { Button } from "@/components/ui/button";
 import { useGrowPlants, useGrowTents } from "@/hooks/useGrowData";
 import { buildAiDoctorEntryOptions } from "@/lib/aiDoctorEntryRules";
 import {
+  DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY,
   partitionDoctorEntryOptionsByTent,
   resolveDoctorStartScope,
 } from "@/lib/doctorStartContextRules";
+import { readSensorsPlantRouteIntent } from "@/lib/sensorRoutePlantIntentRules";
 import { plantsPath } from "@/lib/routes";
 import { useGrows } from "@/store/grows";
 
@@ -27,10 +29,11 @@ export default function AiDoctorStart() {
   const plantsQuery = useGrowPlants();
   const options = useMemo(() => buildAiDoctorEntryOptions(plantsQuery.data), [plantsQuery.data]);
 
-  // Back-half context carry (D-B6). The Sensors loop card can only ever emit
-  // `{ growId, tentId }`, so that is all this page reads — and it validates
-  // both against rows the grower owns before rendering anything. An id in a
-  // URL is a request, not a grant.
+  // Back-half context carry (D-B6 / Doctor-says-so). Sensors may re-emit a
+  // UUID-only plant intent alongside grow/tent. Grow and tent are validated
+  // here against rows the grower owns; the plant is validated only against
+  // the grower's loaded options + carried tent. An id in a URL is a request,
+  // not a grant — and an unacceptable plant is messaged, never silently dropped.
   const [searchParams] = useSearchParams();
   const { grows, loading: growsLoading, error: growsError, refresh: refreshGrows } = useGrows();
   const tentsQuery = useGrowTents();
@@ -44,6 +47,10 @@ export default function AiDoctorStart() {
   // FAILURE is reported as a failure to verify, never as invalid ownership.
   const requestedGrowId = (searchParams.get("growId") ?? "").trim();
   const requestedTentId = (searchParams.get("tentId") ?? "").trim();
+  const carriedPlantIntentId = useMemo(
+    () => readSensorsPlantRouteIntent(searchParams),
+    [searchParams],
+  );
   // Settling is per-parameter for the same reason failing is: a read the URL
   // does not depend on must not gate it. On a tent-only URL the grows read
   // only enriches the derived owning grow — it cannot change the ordering,
@@ -92,7 +99,7 @@ export default function AiDoctorStart() {
   // the failure paragraph would otherwise describe a list the page has just
   // replaced.
   const plantsAreListed =
-    !plantsQuery.isLoading && !plantsQuery.isError && !scopeOrderingPending && options.length > 0;
+    !plantsQuery.isPending && !plantsQuery.isError && !scopeOrderingPending && options.length > 0;
   const everyPlantListedSuffix = plantsAreListed ? " Every active plant is listed below." : "";
   const retryScopeReads = () => {
     if (requestedGrowId && growsError) void refreshGrows();
@@ -117,15 +124,19 @@ export default function AiDoctorStart() {
 
   // Carried tent scope reorders and labels the choices. It never removes one:
   // the explicit plant choice below is doctrine, and a shorter list is a
-  // softer way of guessing.
+  // softer way of guessing. A carried plant may be ordered/badged; it is
+  // NEVER applied as a selection.
   const partitioned = useMemo(
     () =>
       partitionDoctorEntryOptionsByTent({
         options,
         plants: plantsQuery.data,
         tentId: resolvedScope.tentId,
+        // Doctor-says-so: Timeline → Sensors re-emitted UUID intent. Untrusted
+        // until checked against the grower's own in-tent options.
+        carriedPlantId: carriedPlantIntentId,
       }),
-    [options, plantsQuery.data, resolvedScope.tentId],
+    [options, plantsQuery.data, resolvedScope.tentId, carriedPlantIntentId],
   );
   const orderedOptions = useMemo(
     () => [...partitioned.inScope, ...partitioned.others],
@@ -135,6 +146,16 @@ export default function AiDoctorStart() {
     () => new Set(partitioned.inScope.map((option) => option.id)),
     [partitioned],
   );
+  // Do not flash "unavailable" while plants or ownership reads are still
+  // settling — that would present an unknown answer as a negative one.
+  const showUnavailableCarriedPlant =
+    !!carriedPlantIntentId &&
+    partitioned.hasUnavailableCarriedPlant &&
+    !plantsQuery.isPending &&
+    !plantsQuery.isError &&
+    !scopeOrderingPending &&
+    scopeReadsSettled &&
+    !scopeReadFailed;
 
   return (
     <div className="mx-auto w-full max-w-4xl">
@@ -213,9 +234,19 @@ export default function AiDoctorStart() {
               context is applied.{everyPlantListedSuffix}
             </p>
           ) : null}
+          {showUnavailableCarriedPlant ? (
+            <p
+              className="mt-2 text-sm text-muted-foreground"
+              role="status"
+              data-testid="ai-doctor-start-carried-plant-unavailable"
+            >
+              {DOCTOR_CARRIED_PLANT_UNAVAILABLE_COPY}
+              {everyPlantListedSuffix}
+            </p>
+          ) : null}
         </div>
 
-        {plantsQuery.isLoading || scopeOrderingPending ? (
+        {plantsQuery.isPending || scopeOrderingPending ? (
           <GrowDataLoadingState resource="Active plants" testId="ai-doctor-start-loading" />
         ) : plantsQuery.isError ? (
           <GrowDataLoadError
@@ -252,13 +283,27 @@ export default function AiDoctorStart() {
                   // silent to screen readers. Expose it as the DESCRIPTION
                   // instead: same scope cue, action name unchanged.
                   aria-describedby={
-                    inScopeIds.has(option.id)
-                      ? `ai-doctor-start-option-${index}-in-tent`
-                      : undefined
+                    [
+                      partitioned.carriedPlantOptionId === option.id
+                        ? `ai-doctor-start-option-${index}-carried`
+                        : null,
+                      inScopeIds.has(option.id) ? `ai-doctor-start-option-${index}-in-tent` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
                   }
                 >
                   <span className="min-w-0">
                     <span className="block break-words font-semibold">{option.name}</span>
+                    {partitioned.carriedPlantOptionId === option.id ? (
+                      <span
+                        className="mt-1 mr-1 inline-block rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary"
+                        id={`ai-doctor-start-option-${index}-carried`}
+                        data-testid={`ai-doctor-start-option-${index}-carried`}
+                      >
+                        You came from here
+                      </span>
+                    ) : null}
                     {inScopeIds.has(option.id) ? (
                       <span
                         className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"

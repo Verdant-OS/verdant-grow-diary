@@ -255,6 +255,7 @@ jobs:
             apply-signup-acquisition-forward-repair.yml
             apply-quicklog-manual-delegate-forward-repair.yml
             apply-action-queue-transition-forward-repair.yml
+            apply-agreement-acceptance-insert-forward-repair.yml
           )
           active_statuses=(queued in_progress waiting pending requested)
           guard_root="${RUNNER_TEMP}/quicklog-manual-delegate-writer-guard"

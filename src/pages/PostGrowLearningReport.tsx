@@ -27,6 +27,7 @@ import {
   PostGrowReportTopSummaryPanel,
   PostHarvestPerformanceCard,
 } from "@/components/PostGrowLearningReportCards";
+import YieldEfficiencyCard from "@/components/YieldEfficiencyCard";
 import { usePostGrowLearningReportData } from "@/hooks/usePostGrowLearningReportData";
 import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";
 import { buildPostGrowLearningLoopSummary } from "@/lib/postGrowLearningLoopSummaryRules";
@@ -46,7 +47,7 @@ function resultMessage(result: unknown, fallback: string): string {
 export default function PostGrowLearningReport() {
   const { growId } = useParams<{ growId: string }>();
   const navigate = useNavigate();
-  const { status, report, error, saveLesson, applyLessonToNextGrow } =
+  const { status, report, yieldEfficiency, error, saveLesson, applyLessonToNextGrow } =
     usePostGrowLearningReportData(growId);
   const { state: episodesState } = usePlantMemoryEpisodes({
     growId: growId ?? null,
@@ -282,6 +283,7 @@ export default function PostGrowLearningReport() {
           sensorSourceKinds={report.sensorReadingSources.map((r) => r.source)}
         />
         <PostHarvestPerformanceCard vm={report} />
+        {yieldEfficiency && <YieldEfficiencyCard report={yieldEfficiency} />}
         <ActionEffectivenessCard vm={report} />
         <LessonsCard
           vm={report}

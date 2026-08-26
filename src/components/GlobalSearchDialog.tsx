@@ -73,6 +73,7 @@ import {
   readGlobalSearchLastSelected,
   writeGlobalSearchLastSelected,
   clearGlobalSearchLastSelected,
+  subscribeGlobalSearchPrivateStateClear,
   type GlobalSearchHistoryEntry,
   type GlobalSearchLastSelected,
 } from "@/lib/globalSearchSession";
@@ -134,9 +135,13 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     () => deriveSelectionContextFromPathname(location.pathname),
     [location.pathname],
   );
-  // Lazy initializers hydrate from sessionStorage exactly once so reopening
-  // the palette within the same tab resumes the last query + filter toggles.
-  const [query, setQuery] = useState<string>(() => readGlobalSearchSession().query);
+  // Never hydrate identity-scoped search memory while auth is unresolved. A
+  // prior session may have expired while this tab was suspended, and the
+  // public /cultivars palette must not render or query its private terms before
+  // AuthProvider's initial identity fence runs.
+  const [query, setQuery] = useState<string>(() =>
+    authLoading ? "" : readGlobalSearchSession().query,
+  );
   const [recent, setRecent] = useState<string[]>([]);
   const [history, setHistory] = useState<GlobalSearchHistoryEntry[]>([]);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -144,14 +149,33 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
   const [pendingContextFreeQuickLog, setPendingContextFreeQuickLog] =
     useState<PendingContextFreeQuickLogIntent | null>(null);
   const [lastSelected, setLastSelected] = useState<GlobalSearchLastSelected | null>(() =>
-    readGlobalSearchLastSelected(),
+    authLoading ? null : readGlobalSearchLastSelected(),
   );
-  const [enabledTypes, setEnabledTypes] = useState<Record<GlobalSearchEntityType, boolean>>(
-    () => readGlobalSearchSession().filters,
+  const [enabledTypes, setEnabledTypes] = useState<Record<GlobalSearchEntityType, boolean>>(() =>
+    authLoading ? { ...DEFAULT_FILTERS } : readGlobalSearchSession().filters,
   );
-  const { results, isLoading, isError, retry } = useGlobalSearch(query);
+  const { results, isLoading, isError, retry } = useGlobalSearch(authLoading ? "" : query);
+
+  // AuthProvider's identity fence clears persistence before publishing a new
+  // user. Clear this mounted dialog's React state in the same synchronous
+  // transaction so an old grow/tent/plant query cannot flash for the next
+  // account (or for the signed-out public /cultivars palette).
+  useEffect(
+    () =>
+      subscribeGlobalSearchPrivateStateClear(() => {
+        setQuery("");
+        setRecent([]);
+        setHistory([]);
+        setVisibleCount(INITIAL_VISIBLE);
+        setPreviewRow(null);
+        setLastSelected(null);
+        setEnabledTypes({ ...DEFAULT_FILTERS });
+      }),
+    [],
+  );
 
   useEffect(() => {
+    if (authLoading) return;
     if (open) {
       setRecent(readRecentSearches());
       setHistory(readGlobalSearchHistory());
@@ -168,12 +192,13 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
     setPendingContextFreeQuickLog(null);
     // Intentionally do NOT clear query/filters on close — session memory is
     // the whole point of this hook.
-  }, [open]);
+  }, [authLoading, open]);
 
   // Persist query + filters whenever they change so the next open resumes.
   useEffect(() => {
+    if (authLoading) return;
     writeGlobalSearchSession({ query, filters: enabledTypes });
-  }, [query, enabledTypes]);
+  }, [authLoading, query, enabledTypes]);
 
   // The public /cultivars mount can receive a click while AuthProvider still
   // has { loading: true, user: null }. Hold the grower's complete preset until
@@ -361,7 +386,7 @@ export default function GlobalSearchDialog({ open, onOpenChange }: Props) {
 
   // Nuke everything the palette remembers for this session: resumed
   // query + filter toggles (sessionStorage), replayable history entries,
-  // and the localStorage "recent searches" list. Also resets the live UI
+  // and the session-scoped "recent searches" list. Also resets the live UI
   // state back to defaults so the user sees a clean slate immediately.
   const handleClearAllSearchState = () => {
     clearGlobalSearchSession();

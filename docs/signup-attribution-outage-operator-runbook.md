@@ -1,14 +1,18 @@
 # Signup attribution outage — operator runbook
 
-**Status:** OPEN. The fix is merged but **not applied**. Production is still broken.
-**Verified against live production:** 2026-08-13 UTC.
+**Status:** RESOLVED 2026-08-21. The fix is merged **and applied**. Production is fixed and
+additionally hardened — see "2026-08-21 — apply record" below for evidence.
+**Originally verified against live production:** 2026-08-13 UTC.
 **Fix:** `supabase/migrations/20260813030000_signup_acquisition_forward_repair.sql`, merged in
-[#969](https://github.com/Verdant-OS/verdant-grow-diary/pull/969) as `2197288b`.
+[#969](https://github.com/Verdant-OS/verdant-grow-diary/pull/969) as `2197288b`, applied
+2026-08-21.
 
 This document exists because the migration's own header understates the problem, and that
-header is immutable once merged (`AGENTS.md` → Migration Immutability Rules). It says
+header is immutable once merged (`AGENTS.md` → Migration Immutability Rules). It said
 _"every signup has been unattributed"_, which reads as _signups succeed and lose analytics_.
-They do not succeed.
+They did not succeed, until the 2026-08-21 apply below. The rest of this document is kept
+as-written (present tense, describing the pre-apply state) because it remains the accurate
+diagnosis and apply procedure — only this status block and the new closing section change.
 
 ---
 
@@ -917,3 +921,36 @@ Worth recording, because it is the reusable lesson rather than a detail of this 
   2026-08-05: seven migrations never reached prod for six days, "including an
   `action_queue_create` RPC that shipped client code already calling it. That was a live
   user-facing break. Nothing alerted. CI was green the entire time."
+
+---
+
+## 2026-08-21 — apply record
+
+**The account-creation failure this runbook diagnoses is fixed.** Applied 2026-08-21 by
+Claude through the Lovable SQL channel, at Cheek's in-session authorization. Full evidence
+lives in `docs/agents/CURRENT_STATE.md`'s "2026-08-21 resolution" subsection (under the
+signup-attribution section) rather than duplicated here; summary:
+
+- `20260813030000` applied **verbatim**, md5-guarded against this document's pinned
+  SHA-256 identity above — the guard caught a real transcription slip on the first attempt
+  (zero writes) before the corrected retry succeeded.
+- `public.signup_acquisition_attributions` and all four functions now exist in production.
+- A rolled-back, zero-write functional probe exercised the exact allowlisted-source failure
+  path this document describes and passed.
+- This migration never revoked `service_role` (§ "Ledger hazard" logic does not apply here,
+  but the same legacy-default-privilege class of gap does — see `supabase/seed.sql`'s header).
+  An ad-hoc supplemental revoke was applied at the same time and is now captured as
+  `supabase/migrations/20260821064300_signup_acquisition_service_role_hardening.sql`, a new
+  additive migration (this file's own migration is untouched, per Migration Immutability
+  Rules), validated on a local replay and covered by
+  `src/test/signup-acquisition-service-role-hardening-migration.test.ts`.
+- No `schema_migrations` ledger row was written, per this document's own "Safe disposition"
+  guidance that a ledger write is a founder decision. Object presence is the verified ground
+  truth, using the same compact verification query given above.
+
+**What this apply record does NOT resolve.** The `signup_failed` funnel-event telemetry gaps
+documented in the section above this one — the uncatalogued event, the unapplied
+`20260813020000` / `public.funnel_events` sink, and the signed-out ingestion design question
+— are a separate migration and a separate concern. This apply touched
+`signup_acquisition_attributions` and its four functions only. Do not read "the outage is
+resolved" as "every gap this document records is resolved."

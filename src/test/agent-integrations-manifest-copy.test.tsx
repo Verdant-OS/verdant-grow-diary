@@ -100,12 +100,14 @@ describe("Manifest summary modal — Copy button payload", () => {
     expect(payload).toContain(`Tools advertised: ${MCP_MANIFEST.tools.length}`);
   });
 
-  it("copies exactly the three shipped tool names with their required/optional parameter summary", async () => {
+  it("copies exactly the five shipped tool names with their required/optional parameter summary", async () => {
     // Guard the manifest shape itself so a tool rename fails loudly here too.
     expect(MCP_MANIFEST.tools.map((t) => t.name)).toEqual([
       "list_grows",
       "list_recent_diary_entries",
       "get_latest_sensor_snapshot",
+      "list_grow_walk_targets",
+      "get_grow_walk_context",
     ]);
 
     const payload = await openModalAndCopy();

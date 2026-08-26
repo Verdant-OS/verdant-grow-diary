@@ -9,9 +9,14 @@ import {
   buildLatestSnapshotDetail,
   formatCapturedAgo,
   snapshotAlertsCanPersist,
+  describeAlertSaveBlock,
   pickAlertsGrowContext,
 } from "@/lib/alertFreshnessContext";
-import { STALE_THRESHOLD_MS, type SensorSnapshot } from "@/lib/sensorSnapshot";
+import {
+  STALE_THRESHOLD_MS,
+  snapshotFromManualSensorSnapshot,
+  type SensorSnapshot,
+} from "@/lib/sensorSnapshot";
 
 const NOW = Date.parse("2026-06-23T12:00:00Z");
 
@@ -166,6 +171,53 @@ describe("snapshotAlertsCanPersist", () => {
       ).toBe(false);
     }
     expect(snapshotAlertsCanPersist({ status: "loading", snapshot: null, now: NOW })).toBe(false);
+  });
+
+  it("blocks Plant Quick Log diary evidence from every alert-persistence affordance", () => {
+    const recent = new Date(NOW - 60_000).toISOString();
+    const snapshot = snapshotFromManualSensorSnapshot(
+      recent,
+      { source: "manual", temp_f: 77, humidity_percent: 48 },
+      { diaryEntryId: "quick-log-diary-1" },
+    );
+    const args = { status: "ok" as const, snapshot, now: NOW };
+
+    expect(snapshot).toMatchObject({
+      source: "manual",
+      alert_persistence_eligible: false,
+      diary_evidence_ref: { id: "quick-log-diary-1", entry_at: recent },
+    });
+    expect(snapshotAlertsCanPersist(args)).toBe(false);
+    expect(hasRecentManualSnapshot(args)).toBe(false);
+    expect(describeLatestSnapshotForAlerts(args)).toMatch(/quick log diary evidence/i);
+    expect(describeLatestSnapshotForAlerts(args)).toMatch(/cannot create saved alerts/i);
+
+    const header = buildAlertsHeaderContext({
+      growName: null,
+      stage: null,
+      targets: null,
+      ...args,
+    });
+    expect(header.alertsCanPersist).toBe(false);
+    expect(header.latestDetail?.sourceLabel).toBe("Manual");
+    expect(header.latestDetail?.canPersist).toBe(false);
+    expect(header.latestDetail?.detailLine).toMatch(/quick log diary evidence/i);
+    expect(header.latestDetail?.detailLine).not.toMatch(/eligible for alert persistence/i);
+    expect(describeAlertSaveBlock({ snapshot, quality: "good", now: NOW })).toBe(
+      "This Quick Log entry is recorded as manual diary evidence, so it cannot create a saved alert. Add a manual sensor reading to check alerts.",
+    );
+  });
+
+  it("keeps Environment Check diary provenance eligible when it did not opt out", () => {
+    const recent = new Date(NOW - 60_000).toISOString();
+    const snapshot = snap({
+      source: "manual",
+      ts: recent,
+      diary_evidence_ref: { id: "environment-check-diary-1", entry_at: recent },
+    });
+
+    expect(snapshot.alert_persistence_eligible).toBeUndefined();
+    expect(snapshotAlertsCanPersist({ status: "ok", snapshot, now: NOW })).toBe(true);
   });
 });
 

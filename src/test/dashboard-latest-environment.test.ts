@@ -22,6 +22,7 @@ import {
   isStale,
   snapshotFromDiary,
   snapshotFromReadings,
+  snapshotFromManualSensorSnapshot,
   toFiniteNumber,
 } from "@/lib/sensorSnapshot";
 
@@ -111,6 +112,66 @@ describe("sensorSnapshot pure helpers", () => {
     expect(snapshotFromDiary(null, undefined)).toBeNull();
   });
 
+  it("projects Plant Quick Log manual snapshots as scoped manual evidence", () => {
+    const entryAt = "2026-05-20T11:00:00.000Z";
+    const snap = snapshotFromManualSensorSnapshot(
+      entryAt,
+      {
+        source: "manual",
+        temp_f: 82,
+        humidity_percent: 48,
+        ph: 6.2,
+        ec: 1.4,
+      },
+      { diaryEntryId: "diary-quick-log-1" },
+    );
+
+    expect(snap).toMatchObject({
+      source: "manual",
+      ts: entryAt,
+      rh: 48,
+      alert_persistence_eligible: false,
+      vpd: null,
+      co2: null,
+      soil: null,
+      diary_evidence_ref: { id: "diary-quick-log-1", entry_at: entryAt },
+    });
+    expect(snap?.temp).toBeCloseTo((82 - 32) * (5 / 9), 8);
+    expect(snap?.metric_refs).toBeUndefined();
+  });
+
+  it("rejects missing, malformed, non-manual, and invalid Quick Log snapshot payloads", () => {
+    const entryAt = "2026-05-20T11:00:00.000Z";
+    expect(snapshotFromManualSensorSnapshot(entryAt, null)).toBeNull();
+    expect(
+      snapshotFromManualSensorSnapshot(entryAt, {
+        source: "live",
+        temp_f: 82,
+        humidity_percent: 48,
+      }),
+    ).toBeNull();
+    expect(
+      snapshotFromManualSensorSnapshot(entryAt, {
+        source: "manual",
+        temp_f: "82",
+        humidity_percent: "48",
+      }),
+    ).toBeNull();
+    expect(
+      snapshotFromManualSensorSnapshot(entryAt, {
+        source: "manual",
+        temp_f: 999,
+        humidity_percent: 101,
+      }),
+    ).toBeNull();
+    expect(
+      snapshotFromManualSensorSnapshot("not-a-date", {
+        source: "manual",
+        temp_f: 82,
+      }),
+    ).toBeNull();
+  });
+
   it("EMPTY_SNAPSHOT and SOURCE_LABEL cover the unavailable case", () => {
     expect(EMPTY_SNAPSHOT.source).toBe("unavailable");
     expect(SOURCE_LABEL.unavailable).toBe("Unavailable");
@@ -135,10 +196,15 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     expect(HOOK).toMatch(/sensor_snapshot/);
   });
 
-  it("consults environment_check as manual evidence only after sensor_snapshot (#596)", () => {
-    // Within a diary row the richer sensor_snapshot blob wins; the env-check
-    // envelope is a manual-evidence fallback, never a replacement.
-    expect(HOOK).toMatch(/snapshotFromDiary\([\s\S]*?snapshotFromEnvironmentCheck\(/);
+  it("consults Quick Log manual snapshots and environment checks after sensor_snapshot", () => {
+    // Within a diary row the richer sensor_snapshot blob wins. Plant Quick
+    // Log's explicit manual payload follows it, then the Environment Check
+    // fallback; each stays manual rather than becoming a live sensor row.
+    expect(HOOK).toMatch(/snapshotFromDiary\([\s\S]*?snapshotFromManualSensorSnapshot\(/);
+    expect(HOOK).toMatch(
+      /snapshotFromManualSensorSnapshot\([\s\S]*?snapshotFromEnvironmentCheck\(/,
+    );
+    expect(HOOK).toMatch(/details\.manual_sensor_snapshot/);
     expect(HOOK).toMatch(/details\.environment_check/);
   });
 
@@ -168,7 +234,8 @@ describe("useLatestSensorSnapshot hook — source priority and safety", () => {
     }
     // #602: shared pure helper (same fail-closed gate as sensor_snapshot).
     expect(HOOK).toMatch(/isDiaryRowInTentScope\(row\.tent_id,\s*tentIds\)/);
-    // The scope gate must sit before the env-check fallback returns.
+    // The scope gate must sit before both manual diary payload paths return.
+    expect(HOOK).toMatch(/isDiaryRowInTentScope[\s\S]*?snapshotFromManualSensorSnapshot\(/);
     expect(HOOK).toMatch(/isDiaryRowInTentScope[\s\S]*?snapshotFromEnvironmentCheck\(/);
   });
 

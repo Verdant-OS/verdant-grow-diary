@@ -83,7 +83,7 @@ are excluded from uploaded evidence.
 
 ## Mandatory active-writer gate
 
-All seven registered production migration writers share the workflow-level group
+All eight registered production migration writers share the workflow-level group
 `verdant-production-migration-writer` with `cancel-in-progress: false` and
 `queue: max`. This serializes their complete workflow lifetimes and retains a
 durable queue of pending writers instead of replacing an earlier pending run.
@@ -98,6 +98,7 @@ workflows to have no `queued`, `in_progress`, `waiting`, `pending`, or
 - `apply-signup-acquisition-forward-repair.yml`
 - `apply-quicklog-manual-delegate-forward-repair.yml`
 - `apply-action-queue-transition-forward-repair.yml`
+- `apply-agreement-acceptance-insert-forward-repair.yml`
 
 Run this read-only check from an authenticated GitHub CLI session:
 
@@ -111,6 +112,7 @@ writers=(
   apply-signup-acquisition-forward-repair.yml
   apply-quicklog-manual-delegate-forward-repair.yml
   apply-action-queue-transition-forward-repair.yml
+  apply-agreement-acceptance-insert-forward-repair.yml
 )
 for workflow in "${writers[@]}"; do
   for status in queued in_progress waiting pending requested; do

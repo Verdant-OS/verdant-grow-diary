@@ -1,0 +1,455 @@
+name: Apply Agreement acceptance insert forward repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Run read-only PREFLIGHT first; use APPLY only with its reviewed receipt"
+        required: true
+        type: choice
+        default: PREFLIGHT
+        options:
+          - PREFLIGHT
+          - APPLY
+      expected_head_sha:
+        description: "Exact 40-character verdant-grow-diary commit to apply from"
+        required: true
+        type: string
+      confirm_project_ref:
+        description: "Type the pinned production project ref"
+        required: true
+        type: string
+      confirm_apply:
+        description: "APPLY only — type: APPLY AGREEMENT ACCEPTANCE INSERT FORWARD REPAIR"
+        required: false
+        type: string
+        default: ""
+      preflight_run_id:
+        description: "APPLY only — successful reviewed PREFLIGHT workflow run ID"
+        required: false
+        type: string
+        default: ""
+      expected_preflight_run_attempt:
+        description: "APPLY only — exact reviewed PREFLIGHT run attempt"
+        required: false
+        type: string
+        default: ""
+      expected_preflight_artifact_sha256:
+        description: "APPLY only — exact reviewed PREFLIGHT artifact SHA-256"
+        required: false
+        type: string
+        default: ""
+      solo_founder_acknowledgement:
+        description: "Exact solo-founder production authorization statement"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: verdant-production-migration-writer
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  validate:
+    name: Validate the production dispatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OPERATION: ${{ inputs.operation }}
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      CONFIRM_PROJECT_REF: ${{ inputs.confirm_project_ref }}
+      CONFIRM_APPLY: ${{ inputs.confirm_apply }}
+      PREFLIGHT_RUN_ID: ${{ inputs.preflight_run_id }}
+      EXPECTED_PREFLIGHT_RUN_ATTEMPT: ${{ inputs.expected_preflight_run_attempt }}
+      EXPECTED_PREFLIGHT_ARTIFACT_SHA256: ${{ inputs.expected_preflight_artifact_sha256 }}
+      SOLO_FOUNDER_ACKNOWLEDGEMENT: ${{ inputs.solo_founder_acknowledgement }}
+
+    steps:
+      - name: Refuse every branch except the production branch
+        env:
+          OBSERVED_REF: ${{ github.ref }}
+        run: |
+          if [ "$OBSERVED_REF" != "refs/heads/verdant-grow-diary" ]; then
+            echo "::error::This workflow only runs from refs/heads/verdant-grow-diary."
+            exit 1
+          fi
+
+      - name: Verify dispatch confirmations
+        env:
+          OBSERVED_SHA: ${{ github.sha }}
+        run: |
+          if [ "$OPERATION" != "PREFLIGHT" ] && [ "$OPERATION" != "APPLY" ]; then
+            echo "::error::operation must be exactly PREFLIGHT or APPLY."
+            exit 1
+          fi
+          if ! [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::expected_head_sha must be exactly 40 lowercase hexadecimal characters."
+            exit 1
+          fi
+          if [ "$EXPECTED_HEAD_SHA" != "$OBSERVED_SHA" ]; then
+            echo "::error::expected_head_sha does not match the checked-out commit."
+            exit 1
+          fi
+          if [ "$CONFIRM_PROJECT_REF" != "knkwiiywfkbqznbxwqfh" ]; then
+            echo "::error::The production project confirmation did not match."
+            exit 1
+          fi
+          if [ "$SOLO_FOUNDER_ACKNOWLEDGEMENT" != "I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN" ]; then
+            echo "::error::The solo-founder acknowledgement did not match."
+            exit 1
+          fi
+          if [ "$GITHUB_ACTOR_ID" != "72639960" ] || [ "$GITHUB_ACTOR" != "cheekhimself" ] || [ "$GITHUB_TRIGGERING_ACTOR" != "cheekhimself" ]; then
+            echo "::error::The production dispatch identity did not match the founder."
+            exit 1
+          fi
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ]; then
+            echo "::error::Protected workflow reruns are forbidden; use a fresh dispatch."
+            exit 1
+          fi
+          if [ "$OPERATION" = "APPLY" ]; then
+            if [ "$CONFIRM_APPLY" != "APPLY AGREEMENT ACCEPTANCE INSERT FORWARD REPAIR" ]; then
+              echo "::error::The production apply confirmation phrase did not match."
+              exit 1
+            fi
+            if ! [[ "$PREFLIGHT_RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::APPLY requires a positive successful PREFLIGHT run ID."
+              exit 1
+            fi
+            if ! [[ "$EXPECTED_PREFLIGHT_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]; then
+              echo "::error::APPLY requires the exact positive reviewed PREFLIGHT run attempt."
+              exit 1
+            fi
+            if ! [[ "$EXPECTED_PREFLIGHT_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+              echo "::error::APPLY requires the exact lowercase reviewed PREFLIGHT artifact SHA-256."
+              exit 1
+            fi
+          elif [ -n "$PREFLIGHT_RUN_ID" ] || [ -n "$EXPECTED_PREFLIGHT_RUN_ATTEMPT" ] || [ -n "$EXPECTED_PREFLIGHT_ARTIFACT_SHA256" ]; then
+            echo "::error::PREFLIGHT must leave all reviewed PREFLIGHT provenance inputs empty."
+            exit 1
+          fi
+
+  apply:
+    name: Run protected preflight or recoverable apply
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: verdant-production-solo-founder
+    env:
+      OPERATION: ${{ inputs.operation }}
+      TARGET_ENV: production
+      EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      CONFIRM_PROJECT_REF: ${{ inputs.confirm_project_ref }}
+      CONFIRM_APPLY: ${{ inputs.confirm_apply }}
+      PREFLIGHT_RUN_ID: ${{ inputs.preflight_run_id }}
+      EXPECTED_PREFLIGHT_RUN_ATTEMPT: ${{ inputs.expected_preflight_run_attempt }}
+      EXPECTED_PREFLIGHT_ARTIFACT_SHA256: ${{ inputs.expected_preflight_artifact_sha256 }}
+      SOLO_FOUNDER_ACKNOWLEDGEMENT: ${{ inputs.solo_founder_acknowledgement }}
+      REPORT_PATH: ${{ github.workspace }}/audit/agreement-acceptance-insert-forward-repair/report.md
+      AUDIT_PATH: ${{ github.workspace }}/audit/agreement-acceptance-insert-forward-repair/audit.json
+      PREFLIGHT_RECEIPT_PATH: ${{ github.workspace }}/audit/agreement-acceptance-insert-forward-repair/preflight-receipt.json
+
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up pinned Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+
+      - name: Prepare sanitized audit directory
+        run: mkdir -p "${{ github.workspace }}/audit/agreement-acceptance-insert-forward-repair"
+
+      - name: Verify solo-founder production authorization
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURRENT_RUN_JSON: ${{ runner.temp }}/agreement-acceptance-insert-solo-founder/current-run.json
+          CURRENT_RUN_APPROVALS_JSON: ${{ runner.temp }}/agreement-acceptance-insert-solo-founder/approvals.json
+          SOLO_FOUNDER_ENVIRONMENT_JSON: ${{ runner.temp }}/agreement-acceptance-insert-solo-founder/environment.json
+          SOLO_FOUNDER_BRANCH_POLICIES_JSON: ${{ runner.temp }}/agreement-acceptance-insert-solo-founder/branch-policies.json
+          SOLO_FOUNDER_EXPECTED_WORKFLOW_PATH: .github/workflows/apply-agreement-acceptance-insert-forward-repair.yml
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$(dirname "$CURRENT_RUN_JSON")"
+          authorization_failure() {
+            printf '%s\n' \
+              '### Agreement acceptance insert forward repair' \
+              '' \
+              '**Status:** BLOCKED - solo-founder authorization rejected' \
+              '' \
+              'Reason code: solo_founder_authorization_rejected' \
+              'No database process was started. No raw API response or credential is included.' \
+              > "$REPORT_PATH"
+            printf '%s\n' \
+              '{"schema_version":1,"tool":"apply-agreement-acceptance-insert-forward-repair","target_env":"production","outcome":"authorization_rejected","reason_code":"solo_founder_authorization_rejected"}' \
+              > "$AUDIT_PATH"
+          }
+          trap authorization_failure ERR
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --jq '{id,run_attempt,event,path,head_branch,head_sha,repository:{id:.repository.id,full_name:.repository.full_name},head_repository:{id:.head_repository.id,full_name:.head_repository.full_name},actor:{id:.actor.id,login:.actor.login},triggering_actor:{id:.triggering_actor.id,login:.triggering_actor.login}}' \
+            > "$CURRENT_RUN_JSON" 2>/dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" \
+            --jq 'map({state,environments:(.environments | map({name})),user:{id:.user.id,login:.user.login}})' \
+            > "$CURRENT_RUN_APPROVALS_JSON" 2>/dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/environments/verdant-production-solo-founder" \
+            --jq '{name,can_admins_bypass,deployment_branch_policy:{protected_branches:.deployment_branch_policy.protected_branches,custom_branch_policies:.deployment_branch_policy.custom_branch_policies},protection_rules:[.protection_rules[] | if .type == "required_reviewers" then {type,prevent_self_review,reviewers:[.reviewers[] | {type,reviewer:{id:.reviewer.id,login:.reviewer.login}}]} else {type} end]}' \
+            > "$SOLO_FOUNDER_ENVIRONMENT_JSON" 2>/dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/environments/verdant-production-solo-founder/deployment-branch-policies?per_page=100" \
+            --jq '{total_count,branch_policies:[.branch_policies[] | {name,type}]}' \
+            > "$SOLO_FOUNDER_BRANCH_POLICIES_JSON" 2>/dev/null
+          node scripts/verify-solo-founder-production-authorization.mjs
+          trap - ERR
+
+      - name: Validate the authenticated PREFLIGHT artifact
+        if: inputs.operation == 'APPLY'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PREFLIGHT_RUN_JSON: ${{ runner.temp }}/agreement-acceptance-insert-artifact/prior-run.json
+          CURRENT_RUN_JSON: ${{ runner.temp }}/agreement-acceptance-insert-artifact/current-run.json
+          WORKFLOW_JSON: ${{ runner.temp }}/agreement-acceptance-insert-artifact/workflow.json
+          PREFLIGHT_ARTIFACTS_JSON: ${{ runner.temp }}/agreement-acceptance-insert-artifact/artifacts.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$PREFLIGHT_RUN_JSON")"
+          artifact_failure() {
+            printf '%s\n' \
+              '### Agreement acceptance insert forward repair' \
+              '' \
+              '**Status:** BLOCKED - authenticated PREFLIGHT artifact rejected' \
+              '' \
+              'No database process was started. No raw API response or credential is included.' \
+              > "$REPORT_PATH"
+            printf '%s\n' \
+              '{"schema_version":1,"tool":"apply-agreement-acceptance-insert-forward-repair","target_env":"production","operation":"APPLY","outcome":"artifact_rejected"}' \
+              > "$AUDIT_PATH"
+          }
+          trap artifact_failure ERR
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PREFLIGHT_RUN_ID}" > "$PREFLIGHT_RUN_JSON" 2>/dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" > "$CURRENT_RUN_JSON" 2>/dev/null
+          WORKFLOW_ID="$(node -e 'const fs=require("fs");const v=JSON.parse(fs.readFileSync(process.env.PREFLIGHT_RUN_JSON,"utf8"));if(!Number.isSafeInteger(v.workflow_id)||v.workflow_id<1)process.exit(1);process.stdout.write(String(v.workflow_id));')"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${WORKFLOW_ID}" > "$WORKFLOW_JSON" 2>/dev/null
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PREFLIGHT_RUN_ID}/artifacts?per_page=100" > "$PREFLIGHT_ARTIFACTS_JSON" 2>/dev/null
+          node scripts/verify-agreement-acceptance-insert-forward-repair-preflight-artifact.mjs
+          trap - ERR
+
+      - name: Require every production migration writer to be idle
+        if: inputs.operation == 'APPLY'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          writer_workflows=(
+            apply-candidate-number-maintenance-migrations.yml
+            apply-pinned-breeding-reconciliation.yml
+            apply-pinned-production-migrations.yml
+            apply-quicklog-corrections-retractions.yml
+            apply-signup-acquisition-forward-repair.yml
+            apply-quicklog-manual-delegate-forward-repair.yml
+            apply-action-queue-transition-forward-repair.yml
+            apply-agreement-acceptance-insert-forward-repair.yml
+          )
+          active_statuses=(queued in_progress waiting pending requested)
+          guard_root="${RUNNER_TEMP}/agreement-acceptance-insert-writer-guard"
+          mkdir -p "$guard_root"
+          for workflow in "${writer_workflows[@]}"; do
+            for status in "${active_statuses[@]}"; do
+              payload="$guard_root/${workflow}.${status}.json"
+              gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?status=${status}&per_page=100" > "$payload" 2>/dev/null
+              PAYLOAD="$payload" EXPECTED_STATUS="$status" node <<'NODE'
+          const fs = require("node:fs");
+          const value = JSON.parse(fs.readFileSync(process.env.PAYLOAD, "utf8"));
+          const currentRunId = Number(process.env.GITHUB_RUN_ID);
+          if (
+            !Number.isSafeInteger(currentRunId) ||
+            currentRunId < 1 ||
+            !Number.isSafeInteger(value.total_count) ||
+            !Array.isArray(value.workflow_runs) ||
+            value.total_count !== value.workflow_runs.length ||
+            value.workflow_runs.some(
+              (run) =>
+                !Number.isSafeInteger(run?.id) ||
+                run.id < 1 ||
+                run.status !== process.env.EXPECTED_STATUS,
+            )
+          ) {
+            console.error("::error::Production migration writer state could not be proven idle.");
+            process.exit(1);
+          }
+          if (value.workflow_runs.some((run) => run.id !== currentRunId)) {
+            console.error("::error::Another production migration writer is active.");
+            process.exit(1);
+          }
+          NODE
+            done
+          done
+
+      - name: Require the protected production database secret
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_URL
+          secret-value: ${{ secrets.SUPABASE_DB_URL }}
+          guard-heading: "Agreement acceptance insert forward-repair gate"
+          report-path: ${{ github.workspace }}/audit/agreement-acceptance-insert-forward-repair/report.md
+          log-prefix: agreement-acceptance-insert-forward-repair
+          fix-steps-json: >-
+            ["1. Open Settings → Environments → verdant-production-solo-founder.",
+             "2. Add or repair environment secret SUPABASE_DB_URL for project knkwiiywfkbqznbxwqfh.",
+             "3. Keep the founder as the sole required reviewer, then dispatch again from verdant-grow-diary."]
+          reason-lines-json: >-
+            ["The exact production target cannot be proven or reached without the protected database URL.",
+             "No preflight or migration SQL is allowed to run when this secret is absent."]
+
+      - name: Require the protected Supabase production CA
+        uses: ./.github/actions/require-ci-secret
+        with:
+          secret-name: SUPABASE_DB_CA_CERT_B64
+          secret-value: ${{ secrets.SUPABASE_DB_CA_CERT_B64 }}
+          guard-heading: "Agreement acceptance insert forward-repair gate"
+          report-path: ${{ github.workspace }}/audit/agreement-acceptance-insert-forward-repair/report.md
+          log-prefix: agreement-acceptance-insert-forward-repair-ca
+          fix-steps-json: >-
+            ["1. Download the Server root certificate from the production Supabase project Dashboard.",
+             "2. Base64-encode the certificate without changing its bytes.",
+             "3. Save it as verdant-production-solo-founder secret SUPABASE_DB_CA_CERT_B64, then run PREFLIGHT again."]
+          reason-lines-json: >-
+            ["PostgreSQL requires an explicit trusted root for sslmode=verify-full.",
+             "No production database process is allowed without certificate and hostname verification."]
+
+      - name: Materialize verified Supabase production CA
+        env:
+          SUPABASE_DB_CA_CERT_B64: ${{ secrets.SUPABASE_DB_CA_CERT_B64 }}
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$SUPABASE_DB_CA_CERT_B64" | base64 --decode > "$SUPABASE_DB_CA_CERT_PATH"
+          chmod 600 "$SUPABASE_DB_CA_CERT_PATH"
+          openssl x509 -in "$SUPABASE_DB_CA_CERT_PATH" -noout
+
+      - name: Install PostgreSQL client wrapper (pinned)
+        run: |
+          set -euo pipefail
+          client_root="${RUNNER_TEMP}/verdant-pinned-postgres-client"
+          client_path="${client_root}/psql"
+          image="postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e"
+          mkdir -p "$client_root"
+          docker pull "$image" >/dev/null
+          cat > "$client_path" <<'PSQL_WRAPPER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          image="postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e"
+          if [ ! -f "${PGSSLROOTCERT:-}" ]; then
+            exit 64
+          fi
+          mounts=(-v "${PGSSLROOTCERT}:/verdant/production-root.crt:ro")
+          psql_args=()
+          mounted_input=""
+          while [ "$#" -gt 0 ]; do
+            case "$1" in
+              --file|-f)
+                flag="$1"
+                shift
+                [ "$#" -gt 0 ] || exit 64
+                if [ "$1" = "-" ]; then
+                  psql_args+=("$flag" "-")
+                else
+                  [ -z "$mounted_input" ] && [ -f "$1" ] || exit 64
+                  mounted_input="$1"
+                  mounts+=(-v "${mounted_input}:/verdant/input.sql:ro")
+                  psql_args+=("$flag" "/verdant/input.sql")
+                fi
+                ;;
+              --file=*)
+                input_path="${1#--file=}"
+                if [ "$input_path" = "-" ]; then
+                  psql_args+=("--file=-")
+                else
+                  [ -z "$mounted_input" ] && [ -f "$input_path" ] || exit 64
+                  mounted_input="$input_path"
+                  mounts+=(-v "${mounted_input}:/verdant/input.sql:ro")
+                  psql_args+=("--file=/verdant/input.sql")
+                fi
+                ;;
+              *) psql_args+=("$1") ;;
+            esac
+            shift
+          done
+          exec docker run --rm -i "${mounts[@]}" \
+            -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE \
+            -e PGCONNECT_TIMEOUT -e PGAPPNAME -e PGSSLMODE=verify-full \
+            -e PGSSLROOTCERT=/verdant/production-root.crt \
+            "$image" psql "${psql_args[@]}"
+          PSQL_WRAPPER
+          chmod 700 "$client_path"
+          printf '%s\n' "$client_root" >> "$GITHUB_PATH"
+
+      - name: Re-resolve current deploy branch head before database access
+        if: inputs.operation == 'APPLY'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DEPLOY_REF="refs/heads/verdant-grow-diary"
+          CURRENT_DEPLOY_HEAD_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/${DEPLOY_REF#refs/}" --jq '.object.sha' 2>/dev/null || true)"
+          if ! [[ "$CURRENT_DEPLOY_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            CURRENT_DEPLOY_HEAD_SHA="unresolved"
+          fi
+          printf 'CURRENT_DEPLOY_HEAD_SHA=%s\n' "$CURRENT_DEPLOY_HEAD_SHA" >> "$GITHUB_ENV"
+
+      - name: Run the environment-gated Agreement acceptance insert repair
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
+        run: node scripts/apply-agreement-acceptance-insert-forward-repair.mjs
+
+      - name: Upload immutable PREFLIGHT receipt
+        if: success() && inputs.operation == 'PREFLIGHT' && hashFiles('audit/agreement-acceptance-insert-forward-repair/preflight-receipt.json') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agreement-acceptance-insert-forward-repair-preflight-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: audit/agreement-acceptance-insert-forward-repair/preflight-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish sanitized summary
+        if: always() && hashFiles('audit/agreement-acceptance-insert-forward-repair/report.md') != ''
+        continue-on-error: true
+        run: cat audit/agreement-acceptance-insert-forward-repair/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sanitized evidence after successful delivery
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agreement-acceptance-insert-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            audit/agreement-acceptance-insert-forward-repair/report.md
+            audit/agreement-acceptance-insert-forward-repair/audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload sanitized evidence after failed or cancelled delivery
+        if: failure() || cancelled()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agreement-acceptance-insert-forward-repair-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            audit/agreement-acceptance-insert-forward-repair/report.md
+            audit/agreement-acceptance-insert-forward-repair/audit.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove Supabase production CA
+        if: always()
+        env:
+          SUPABASE_DB_CA_CERT_PATH: ${{ runner.temp }}/verdant-production-supabase-root.crt
+        run: rm -f -- "$SUPABASE_DB_CA_CERT_PATH"

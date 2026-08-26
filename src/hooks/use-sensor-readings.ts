@@ -65,6 +65,7 @@ export function useSensorReadingsByTents(
 ): {
   byTent: Record<string, SensorReadingRow[]>;
   statusByTent: Record<string, TentSensorReadStatus>;
+  refreshingByTent: Record<string, boolean>;
   isLoading: boolean;
   isError: boolean;
   refetch: () => Promise<void>;
@@ -106,9 +107,11 @@ export function useSensorReadingsByTents(
   });
   const byTent: Record<string, SensorReadingRow[]> = {};
   const statusByTent: Record<string, TentSensorReadStatus> = {};
+  const refreshingByTent: Record<string, boolean> = {};
   ids.forEach((id, i) => {
     const result = results[i];
     byTent[id] = (result?.data as SensorReadingRow[] | undefined) ?? [];
+    refreshingByTent[id] = Boolean(result?.isFetching && !result.isLoading);
     statusByTent[id] = result?.isLoading
       ? "loading"
       : result?.isError
@@ -120,6 +123,7 @@ export function useSensorReadingsByTents(
   return {
     byTent,
     statusByTent,
+    refreshingByTent,
     isLoading: results.some((r) => r.isLoading),
     isError: results.some((r) => r.isError),
     refetch: async () => {

@@ -7,8 +7,8 @@
  *   - does NOT block when the user is current,
  *   - is suppressed on /auth (and other read-first routes),
  *   - fails CLOSED on a read error (shows a retry/sign-out block, not access),
- *   - records acceptance append-only (ON CONFLICT DO NOTHING via ignoreDuplicates),
- *     which is the fix for the RLS-lockout bug (no UPDATE policy exists).
+ *   - records acceptance via record_own_agreement_acceptances (auth.uid() only;
+ *     no client-trusted user_id on the write path).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -16,6 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { CURRENT_AGREEMENT_LIST } from "@/constants/agreements";
+import { RECORD_OWN_AGREEMENT_ACCEPTANCES_RPC } from "@/lib/agreementAcceptanceService";
 
 const CURRENT_ROWS = CURRENT_AGREEMENT_LIST.map((a) => ({
   agreement_type: a.type,
@@ -24,12 +25,13 @@ const CURRENT_ROWS = CURRENT_AGREEMENT_LIST.map((a) => ({
 
 let mockAcceptances: Array<{ agreement_type: string; version: string }> = [];
 let mockReadError: unknown = null;
-const eqSpy = vi.fn(() => Promise.resolve({ data: mockAcceptances, error: mockReadError }));
-const upsertSpy = vi.fn(
-  (_rows: unknown[], _opts: { onConflict: string; ignoreDuplicates?: boolean }) =>
-    Promise.resolve({ error: null }),
-);
-const signOutSpy = vi.fn();
+const { eqSpy, rpcSpy, signOutSpy } = vi.hoisted(() => ({
+  eqSpy: vi.fn((_column?: string, _value?: string) =>
+    Promise.resolve({ data: [] as unknown[], error: null as unknown }),
+  ),
+  rpcSpy: vi.fn((_fn: string, _args: unknown) => Promise.resolve({ data: 2, error: null })),
+  signOutSpy: vi.fn(),
+}));
 // STABLE reference: useAuth must return the same object (and same nested `user`)
 // on every render. A fresh object literal per call would give the gate's effect a
 // new `user` identity each render → unbounded re-render/re-query loop that hangs
@@ -44,9 +46,11 @@ const authValue = {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
-      select: () => ({ eq: eqSpy }),
-      upsert: upsertSpy,
+      select: () => ({
+        eq: (column: string, value: string) => eqSpy(column, value),
+      }),
     }),
+    rpc: rpcSpy,
   },
 }));
 
@@ -57,8 +61,9 @@ vi.mock("@/store/auth", () => ({
 beforeEach(() => {
   mockAcceptances = [];
   mockReadError = null;
-  eqSpy.mockClear();
-  upsertSpy.mockClear();
+  eqSpy.mockReset();
+  eqSpy.mockImplementation(() => Promise.resolve({ data: mockAcceptances, error: mockReadError }));
+  rpcSpy.mockClear();
   signOutSpy.mockClear();
 });
 
@@ -113,16 +118,29 @@ describe("AgreementReconsentGate", () => {
     expect(signOutSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("records acceptance append-only (ignoreDuplicates) — the RLS-lockout fix", async () => {
+  it("records acceptance via auth.uid() RPC — no client-trusted user_id", async () => {
     mockAcceptances = [];
     renderGate();
     await screen.findByTestId("agreement-reconsent-gate");
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(screen.getByRole("button", { name: /accept and continue/i }));
-    await waitFor(() => expect(upsertSpy).toHaveBeenCalledTimes(1));
-    const [rows, opts] = upsertSpy.mock.calls[0];
-    expect(Array.isArray(rows)).toBe(true);
-    expect(opts.onConflict).toBe("user_id,agreement_type,version");
-    expect(opts.ignoreDuplicates).toBe(true);
+    await waitFor(() => expect(rpcSpy).toHaveBeenCalledTimes(1));
+    const [fn, args] = rpcSpy.mock.calls[0];
+    expect(fn).toBe(RECORD_OWN_AGREEMENT_ACCEPTANCES_RPC);
+    expect(args).toEqual({
+      p_acceptances: expect.any(Array),
+    });
+    const payloads = (args as { p_acceptances: unknown[] }).p_acceptances;
+    expect(payloads).toHaveLength(CURRENT_AGREEMENT_LIST.length);
+    for (const row of payloads) {
+      expect(row).not.toHaveProperty("user_id");
+      expect(row).toEqual(
+        expect.objectContaining({
+          agreement_type: expect.any(String),
+          version: expect.any(String),
+          effective_date: expect.any(String),
+        }),
+      );
+    }
   });
 });

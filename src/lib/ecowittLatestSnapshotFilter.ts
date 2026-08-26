@@ -108,10 +108,11 @@ function resolveCandidateSource(row: EcowittSensorReadingRow): SensorReadingSour
     return src;
   }
 
-  // `source="ecowitt"` is the legacy bridge contract still emitted by the
-  // existing EcoWitt adapters and ingest proof paths. It is accepted as live
-  // only because the row already passed the EcoWitt-lineage filter above.
-  if (src === "live" || src === "ecowitt") return "live";
+  // Constitution Sensor Truth sources only. Vendor/transport string
+  // `ecowitt` is never a trust label and must never promote to live —
+  // freshness alone cannot rescue it. Legacy rows still carrying
+  // source="ecowitt" fail closed as invalid until remapped at ingest.
+  if (src === "live") return "live";
 
   // Missing and unrecognized provenance fails closed. Raw payload vendor
   // metadata may establish EcoWitt lineage, but it cannot establish live

@@ -22,6 +22,7 @@ describe("Knowledge Library required CI wiring", () => {
       "scripts/knowledge/validate-roadmap.mjs",
       "scripts/knowledge/validate-governance.mjs",
       "scripts/knowledge/validate-schemas.mjs",
+      "scripts/knowledge/validate-corpus.test.mjs",
       "node --test",
     ]) {
       expect(command).toContain(requiredScript);

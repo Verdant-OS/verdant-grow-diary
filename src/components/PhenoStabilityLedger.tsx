@@ -17,6 +17,10 @@ import { LOUD_TRAIT_AXES } from "@/lib/phenoExpressionRules";
 import {
   evaluateStability,
   stabilityVerdictCopy,
+  summarizeEnvironmentCoverage,
+  environmentCoverageCopy,
+  buildEnvironmentComparison,
+  ENVIRONMENT_COMPARISON_CAVEAT,
   MAX_STABILITY_RUNS,
   STABILITY_VERDICT_LABELS,
   STABILITY_LEDGER_CAVEAT,
@@ -37,8 +41,8 @@ export interface PhenoStabilityLedgerProps {
 const VERDICT_TONE: Record<string, string> = {
   no_runs: "bg-secondary text-muted-foreground",
   unconfirmed: "bg-secondary text-muted-foreground",
-  holding: "bg-emerald-500/15 text-emerald-700",
-  drifting: "bg-amber-500/15 text-amber-700",
+  holding: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+  drifting: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 };
 
 export default function PhenoStabilityLedger({
@@ -49,18 +53,25 @@ export default function PhenoStabilityLedger({
 }: PhenoStabilityLedgerProps) {
   const [runLabel, setRunLabel] = useState("");
   const [observedAt, setObservedAt] = useState("");
+  const [environment, setEnvironment] = useState("");
   const [note, setNote] = useState("");
   // Per-axis raw input strings; "" means the grower did not score that axis
   // this run (omitted, never guessed).
   const [traitInputs, setTraitInputs] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  // Deleting the BASELINE silently re-baselines every hold/drift read-out on
+  // the next run — arm-then-confirm so that never happens on a mis-tap.
+  const [pendingBaselineRemoval, setPendingBaselineRemoval] = useState(false);
 
   const evaluation = evaluateStability(runs);
+  const environmentCoverage = summarizeEnvironmentCoverage(runs);
+  const environmentComparison = buildEnvironmentComparison(runs);
   const atCap = runs.length >= MAX_STABILITY_RUNS;
 
   function resetForm() {
     setRunLabel("");
     setObservedAt("");
+    setEnvironment("");
     setNote("");
     setTraitInputs({});
   }
@@ -83,11 +94,13 @@ export default function PhenoStabilityLedger({
       traits[axis.key] = n;
     }
     const date = observedAt.trim();
+    const env = environment.trim();
     const nextRun: StabilityRun = {
       runLabel: label,
       observedAt: ISO_DATE_RE.test(date) ? date : null,
       traits,
       note: note.trim() === "" ? null : note.trim(),
+      ...(env === "" ? {} : { environment: env }),
     };
     setError(null);
     const ok = await onSave([...runs, nextRun]);
@@ -96,6 +109,14 @@ export default function PhenoStabilityLedger({
   }
 
   async function removeRun(index: number) {
+    // Removing the baseline is a re-baselining event, not a plain delete:
+    // the next run silently becomes the comparison anchor for every verdict.
+    // First tap arms; the explicit confirm below executes.
+    if (index === 0 && runs.length > 1 && !pendingBaselineRemoval) {
+      setPendingBaselineRemoval(true);
+      return;
+    }
+    setPendingBaselineRemoval(false);
     setError(null);
     const ok = await onSave(runs.filter((_, i) => i !== index));
     if (!ok) setError("Could not remove this grow-out. You can try again.");
@@ -144,7 +165,9 @@ export default function PhenoStabilityLedger({
               </span>
               <span
                 className={`rounded px-1 py-0.5 text-[10px] font-medium ${
-                  t.held ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700"
+                  t.held
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
                 }`}
               >
                 {t.held ? "held" : `drifted ±${t.maxDrift}`}
@@ -178,6 +201,24 @@ export default function PhenoStabilityLedger({
                     {r.runLabel}
                   </span>
                   {r.observedAt && <span className="text-muted-foreground"> · {r.observedAt}</span>}
+                  {r.environment && (
+                    <span
+                      data-testid={`pheno-stability-run-env-${keeperId}-${i}`}
+                      className="ml-1 rounded bg-secondary px-1 py-0.5 text-[10px] text-muted-foreground"
+                      title="Environment tag (grower-entered)"
+                    >
+                      {r.environment}
+                    </span>
+                  )}
+                  {r.sourcePlantId && (
+                    <span
+                      data-testid={`pheno-stability-run-imported-${keeperId}-${i}`}
+                      className="ml-1 rounded bg-sky-500/10 px-1 py-0.5 text-[10px] text-sky-700 dark:text-sky-300"
+                      title="Trait values imported from the linked plant's recorded scores at accept time"
+                    >
+                      imported from linked plant
+                    </span>
+                  )}
                   {scored.length > 0 && (
                     <span className="text-muted-foreground">
                       {" "}
@@ -201,6 +242,68 @@ export default function PhenoStabilityLedger({
           })}
         </ul>
       )}
+
+      {pendingBaselineRemoval && (
+        <div
+          data-testid={`pheno-stability-baseline-confirm-${keeperId}`}
+          role="alert"
+          className="flex flex-wrap items-center gap-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-300"
+        >
+          <span>
+            Removing the baseline makes the next run the new comparison anchor — every hold/drift
+            read-out is recomputed against it.
+          </span>
+          <button
+            type="button"
+            data-testid={`pheno-stability-baseline-confirm-remove-${keeperId}`}
+            disabled={saving}
+            onClick={() => void removeRun(0)}
+            className="rounded border border-amber-500/60 px-1.5 py-0.5 font-medium disabled:opacity-50"
+          >
+            Remove baseline
+          </button>
+          <button
+            type="button"
+            data-testid={`pheno-stability-baseline-cancel-${keeperId}`}
+            onClick={() => setPendingBaselineRemoval(false)}
+            className="rounded border border-border px-1.5 py-0.5 font-medium"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Environment comparison — gated on >=3 environment-tagged grow-outs
+          across >=2 environments; below that, an explicit insufficient-data
+          state naming what is missing. Descriptive only, never a verdict. */}
+      {environmentComparison.length > 0 ? (
+        <div
+          data-testid={`pheno-stability-env-comparison-${keeperId}`}
+          className="space-y-1 rounded border border-border/50 bg-background/40 p-2"
+        >
+          <h5 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Observed by environment
+          </h5>
+          <ul className="space-y-0.5 text-[11px]">
+            {environmentComparison.map((axis) => (
+              <li key={axis.axisKey} data-testid={`pheno-stability-env-axis-${axis.axisKey}`}>
+                <span className="font-medium">{axis.axisLabel}:</span>{" "}
+                {axis.byEnvironment
+                  .map((e) => `${e.environment} → ${e.values.join(", ")}`)
+                  .join(" · ")}
+              </li>
+            ))}
+          </ul>
+          <p className="text-[10px] text-muted-foreground">{ENVIRONMENT_COMPARISON_CAVEAT}</p>
+        </div>
+      ) : runs.length > 0 ? (
+        <p
+          data-testid={`pheno-stability-env-insufficient-${keeperId}`}
+          className="text-[10px] text-muted-foreground"
+        >
+          {environmentCoverageCopy(environmentCoverage)}
+        </p>
+      ) : null}
 
       {/* Add-a-grow-out form (hidden at the cap). */}
       {atCap ? (
@@ -228,6 +331,15 @@ export default function PhenoStabilityLedger({
               onChange={(e) => setObservedAt(e.target.value)}
               aria-label="Grow-out date"
               data-testid={`pheno-stability-date-${keeperId}`}
+              className="rounded border border-border bg-background px-2 py-1 text-[11px]"
+            />
+            <input
+              type="text"
+              value={environment}
+              onChange={(e) => setEnvironment(e.target.value)}
+              placeholder="Environment (e.g. indoor coco, summer tent)"
+              aria-label="Environment tag for this grow-out"
+              data-testid={`pheno-stability-env-${keeperId}`}
               className="rounded border border-border bg-background px-2 py-1 text-[11px]"
             />
           </div>

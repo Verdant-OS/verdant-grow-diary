@@ -432,7 +432,11 @@ function normalizeLabSource(v: unknown): "coa" | "estimate" | "unspecified" {
 }
 
 /** A raw lab row with no measurement at all — legacy empty saves exist, and
- * an empty higher-provenance row must not shadow a populated lower one. */
+ * an empty higher-provenance row must not shadow a populated lower one.
+ * Deliberately narrower than labResultHasAnyValue: this evidence packet
+ * neither selects nor renders `note`, so a note-only row counting as
+ * "value-bearing" here would shadow displayable numbers with a blank cell —
+ * the exact defect this predicate exists to prevent. */
 function rawLabRowHasAnyValue(row: {
   thc_pct?: unknown;
   cbd_pct?: unknown;

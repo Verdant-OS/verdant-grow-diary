@@ -69,6 +69,13 @@ export async function queueHermCullSuggestion(input: {
     return { ok: false, error: "Nothing to queue." };
   }
 
+  // Real runtime guard, not a cast: anything non-array from the builder
+  // degrades to null instead of reaching the RPC as an invalid value.
+  const rawEvents: unknown = payload.originating_timeline_events;
+  const originatingTimelineEvents = Array.isArray(rawEvents)
+    ? (rawEvents as readonly unknown[])
+    : null;
+
   const result = await createActionQueueItem({
     grow_id: payload.grow_id,
     tent_id: payload.tent_id ?? null,
@@ -80,8 +87,7 @@ export async function queueHermCullSuggestion(input: {
     risk_level: payload.risk_level,
     source: payload.source,
     dedupe_key: buildPhenoHermCullDedupeKey(input.observationId),
-    originating_timeline_events:
-      (payload.originating_timeline_events as unknown as readonly unknown[]) ?? null,
+    originating_timeline_events: originatingTimelineEvents,
   });
 
   if (!result.ok) return { ok: false, error: "Could not queue the removal for approval." };

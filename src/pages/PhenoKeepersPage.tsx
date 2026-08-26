@@ -442,67 +442,73 @@ export default function PhenoKeepersPage() {
         </p>
       )}
 
-      {/* Every mutation control (promote, clone, cross, reversal, stability
-          runs) sits inside this fieldset so the allowReadOnly route path is
-          genuinely view-only for lapsed-Pro growers. */}
-      <fieldset disabled={!canWrite} className="m-0 min-w-0 space-y-6 border-0 p-0">
+      {/* Mutation controls (promote, clone, cross, reversal, stability runs)
+          sit inside disabled fieldsets so the allowReadOnly route path is
+          genuinely view-only for lapsed-Pro growers. Read-only browsing —
+          the keeper filter, crosses list, activity timeline — stays OUTSIDE
+          the fences so records remain reachable, as the banner promises. */}
+      <div className="min-w-0 space-y-6">
         {/* Promote a candidate to keeper */}
-        <section className="space-y-2 rounded-lg border border-border bg-card p-4">
-          <h2 className="text-lg font-semibold">Name a keeper</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              data-testid="keepers-promote-plant"
-              aria-label="Candidate to name as keeper"
-              value={promotePlant}
-              onChange={(e) => setPromotePlant(e.target.value)}
-              className="rounded border border-border bg-background px-2 py-1 text-sm"
-            >
-              <option value="">Choose a candidate…</option>
-              {ks.candidates.map((c) => (
-                <option key={c.candidateId} value={c.candidateId}>
-                  {phenoCandidateDisplayLabel(c)}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              data-testid="keepers-promote-name"
-              value={promoteName}
-              onChange={(e) => setPromoteName(e.target.value)}
-              placeholder="Keeper name"
-              aria-label="Keeper name"
-              className="rounded border border-border bg-background px-2 py-1 text-sm"
-            />
-            <button
-              type="button"
-              data-testid="keepers-promote-save"
-              disabled={ks.saving || !promotePlant || !promoteName.trim()}
-              onClick={async () => {
-                setActionError(null);
-                if (await ks.promoteToKeeper(promotePlant, promoteName)) {
-                  setPromotePlant("");
-                  setPromoteName("");
-                } else {
-                  setActionError("Could not name this keeper — try again.");
-                }
-              }}
-              className="rounded-md border border-border bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
-            >
-              Name keeper
-            </button>
-            {actionError && (
-              <span
-                role="alert"
-                data-testid="pheno-keepers-action-error"
-                className="text-xs font-medium text-red-600 dark:text-red-400"
+        <fieldset disabled={!canWrite} className="m-0 min-w-0 border-0 p-0">
+          <section className="space-y-2 rounded-lg border border-border bg-card p-4">
+            <h2 className="text-lg font-semibold">Name a keeper</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                data-testid="keepers-promote-plant"
+                aria-label="Candidate to name as keeper"
+                value={promotePlant}
+                onChange={(e) => setPromotePlant(e.target.value)}
+                className="rounded border border-border bg-background px-2 py-1 text-sm"
               >
-                {actionError}
-              </span>
-            )}
-          </div>
-        </section>
+                <option value="">Choose a candidate…</option>
+                {ks.candidates.map((c) => (
+                  <option key={c.candidateId} value={c.candidateId}>
+                    {phenoCandidateDisplayLabel(c)}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                data-testid="keepers-promote-name"
+                value={promoteName}
+                onChange={(e) => setPromoteName(e.target.value)}
+                placeholder="Keeper name"
+                aria-label="Keeper name"
+                className="rounded border border-border bg-background px-2 py-1 text-sm"
+              />
+              <button
+                type="button"
+                data-testid="keepers-promote-save"
+                disabled={ks.saving || !promotePlant || !promoteName.trim()}
+                onClick={async () => {
+                  setActionError(null);
+                  if (await ks.promoteToKeeper(promotePlant, promoteName)) {
+                    setPromotePlant("");
+                    setPromoteName("");
+                  } else {
+                    setActionError("Could not name this keeper — try again.");
+                  }
+                }}
+                className="rounded-md border border-border bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                Name keeper
+              </button>
+              {actionError && (
+                <span
+                  role="alert"
+                  data-testid="pheno-keepers-action-error"
+                  className="text-xs font-medium text-red-600 dark:text-red-400"
+                >
+                  {actionError}
+                </span>
+              )}
+            </div>
+          </section>
+        </fieldset>
 
-        {/* Keepers + clone lineage */}
+        {/* Keepers + clone lineage. The filter is read-only browsing and stays
+            enabled for lapsed-Pro growers; the cards carry editors, so the
+            list itself is fenced. */}
         <section className="space-y-2">
           <h2 className="text-lg font-semibold">Keepers</h2>
           {ks.keepers.length === 0 ? (
@@ -521,22 +527,24 @@ export default function PhenoKeepersPage() {
                   className="w-56 rounded border border-border bg-background px-2 py-1 text-sm"
                 />
               )}
-              <ul className="space-y-3">
-                {visibleLineage.map((view) => (
-                  <KeeperCard
-                    key={view.keeperId}
-                    view={view}
-                    clones={ks.clonesByKeeper[view.keeperId] ?? EMPTY_CLONES}
-                    stabilityRuns={stabilityRunsByKeeper[view.keeperId] ?? EMPTY_STABILITY_RUNS}
-                    growOutPlantsById={ks.growOutPlantsById}
-                    reversed={reversedSet.has(view.keeperId)}
-                    saving={ks.saving}
-                    onAddClone={ks.addKeeperClone}
-                    onMarkReversed={ks.markReversed}
-                    onSaveStabilityRuns={ks.saveStabilityRuns}
-                  />
-                ))}
-              </ul>
+              <fieldset disabled={!canWrite} className="m-0 min-w-0 border-0 p-0">
+                <ul className="space-y-3">
+                  {visibleLineage.map((view) => (
+                    <KeeperCard
+                      key={view.keeperId}
+                      view={view}
+                      clones={ks.clonesByKeeper[view.keeperId] ?? EMPTY_CLONES}
+                      stabilityRuns={stabilityRunsByKeeper[view.keeperId] ?? EMPTY_STABILITY_RUNS}
+                      growOutPlantsById={ks.growOutPlantsById}
+                      reversed={reversedSet.has(view.keeperId)}
+                      saving={ks.saving}
+                      onAddClone={ks.addKeeperClone}
+                      onMarkReversed={ks.markReversed}
+                      onSaveStabilityRuns={ks.saveStabilityRuns}
+                    />
+                  ))}
+                </ul>
+              </fieldset>
             </>
           )}
         </section>
@@ -546,108 +554,110 @@ export default function PhenoKeepersPage() {
           it, and the service classifies on save. Shown with a single keeper so
           a reversed keeper can self. */}
         {ks.keepers.length >= 1 && (
-          <section className="space-y-2 rounded-lg border border-border bg-card p-4">
-            <h2 className="text-lg font-semibold">Record a cross</h2>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <label className="flex items-center gap-1">
-                ♀
-                <select
-                  data-testid="keepers-cross-female"
-                  aria-label="Seed (female) keeper"
-                  value={female}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setFemale(next);
-                    // A donor equal to the new seed is dropped from the options
-                    // below and would otherwise linger in state as an accidental
-                    // self-cross — clear it so the selection stays consistent.
-                    if (donor === next) setDonor("");
-                  }}
-                  className="rounded border border-border bg-background px-2 py-1"
-                >
-                  <option value="">Seed (female) keeper…</option>
-                  {ks.keepers.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.keeperName}
-                      {reversedSet.has(k.id) ? " (reversed)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <span>×</span>
-              <label className="flex items-center gap-1">
-                pollen
-                <select
-                  data-testid="keepers-cross-donor"
-                  aria-label="Pollen donor"
-                  value={donor}
-                  onChange={(e) => setDonor(e.target.value)}
-                  className="rounded border border-border bg-background px-2 py-1"
-                >
-                  <option value="">Pollen donor…</option>
-                  <option value={SELF_DONOR_VALUE}>Self (S1) — same keeper</option>
-                  {ks.keepers
-                    .filter((k) => k.id !== female)
-                    .map((k) => (
+          <fieldset disabled={!canWrite} className="m-0 min-w-0 border-0 p-0">
+            <section className="space-y-2 rounded-lg border border-border bg-card p-4">
+              <h2 className="text-lg font-semibold">Record a cross</h2>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <label className="flex items-center gap-1">
+                  ♀
+                  <select
+                    data-testid="keepers-cross-female"
+                    aria-label="Seed (female) keeper"
+                    value={female}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setFemale(next);
+                      // A donor equal to the new seed is dropped from the options
+                      // below and would otherwise linger in state as an accidental
+                      // self-cross — clear it so the selection stays consistent.
+                      if (donor === next) setDonor("");
+                    }}
+                    className="rounded border border-border bg-background px-2 py-1"
+                  >
+                    <option value="">Seed (female) keeper…</option>
+                    {ks.keepers.map((k) => (
                       <option key={k.id} value={k.id}>
                         {k.keeperName}
                         {reversedSet.has(k.id) ? " (reversed)" : ""}
                       </option>
                     ))}
-                </select>
-              </label>
-              <input
-                type="text"
-                data-testid="keepers-cross-name"
-                value={crossName}
-                onChange={(e) => setCrossName(e.target.value)}
-                placeholder="Cross name (optional)"
-                aria-label="Cross name (optional)"
-                className="rounded border border-border bg-background px-2 py-1"
-              />
-              <button
-                type="button"
-                data-testid="keepers-cross-save"
-                disabled={ks.saving || !crossForm.canSubmit}
-                onClick={async () => {
-                  setCrossError(null);
-                  if (await ks.saveCross(female, crossForm.pollenKeeperId, crossName)) {
-                    setFemale("");
-                    setDonor("");
-                    setCrossName("");
-                  } else {
-                    setCrossError(ks.error ?? "Could not record this cross — try again.");
-                  }
-                }}
-                className="rounded-md border border-border bg-primary px-3 py-1.5 font-medium text-primary-foreground disabled:opacity-50"
-              >
-                Record cross
-              </button>
-              {crossError && (
-                <span
-                  role="alert"
-                  data-testid="keepers-cross-error"
-                  className="text-xs font-medium text-red-600 dark:text-red-400"
+                  </select>
+                </label>
+                <span>×</span>
+                <label className="flex items-center gap-1">
+                  pollen
+                  <select
+                    data-testid="keepers-cross-donor"
+                    aria-label="Pollen donor"
+                    value={donor}
+                    onChange={(e) => setDonor(e.target.value)}
+                    className="rounded border border-border bg-background px-2 py-1"
+                  >
+                    <option value="">Pollen donor…</option>
+                    <option value={SELF_DONOR_VALUE}>Self (S1) — same keeper</option>
+                    {ks.keepers
+                      .filter((k) => k.id !== female)
+                      .map((k) => (
+                        <option key={k.id} value={k.id}>
+                          {k.keeperName}
+                          {reversedSet.has(k.id) ? " (reversed)" : ""}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <input
+                  type="text"
+                  data-testid="keepers-cross-name"
+                  value={crossName}
+                  onChange={(e) => setCrossName(e.target.value)}
+                  placeholder="Cross name (optional)"
+                  aria-label="Cross name (optional)"
+                  className="rounded border border-border bg-background px-2 py-1"
+                />
+                <button
+                  type="button"
+                  data-testid="keepers-cross-save"
+                  disabled={ks.saving || !crossForm.canSubmit}
+                  onClick={async () => {
+                    setCrossError(null);
+                    if (await ks.saveCross(female, crossForm.pollenKeeperId, crossName)) {
+                      setFemale("");
+                      setDonor("");
+                      setCrossName("");
+                    } else {
+                      setCrossError(ks.error ?? "Could not record this cross — try again.");
+                    }
+                  }}
+                  className="rounded-md border border-border bg-primary px-3 py-1.5 font-medium text-primary-foreground disabled:opacity-50"
                 >
-                  {crossError}
-                </span>
+                  Record cross
+                </button>
+                {crossError && (
+                  <span
+                    role="alert"
+                    data-testid="keepers-cross-error"
+                    className="text-xs font-medium text-red-600 dark:text-red-400"
+                  >
+                    {crossError}
+                  </span>
+                )}
+              </div>
+              {crossForm.canSubmit ? (
+                <p data-testid="keepers-cross-preview" className="text-xs text-muted-foreground">
+                  Will be recorded as{" "}
+                  <span className="font-medium text-foreground">{crossForm.previewBadge}</span>.
+                </p>
+              ) : (
+                <p
+                  data-testid="keepers-cross-disabled-reason"
+                  className="text-xs text-muted-foreground"
+                  role="status"
+                >
+                  {crossForm.disabledReason}
+                </p>
               )}
-            </div>
-            {crossForm.canSubmit ? (
-              <p data-testid="keepers-cross-preview" className="text-xs text-muted-foreground">
-                Will be recorded as{" "}
-                <span className="font-medium text-foreground">{crossForm.previewBadge}</span>.
-              </p>
-            ) : (
-              <p
-                data-testid="keepers-cross-disabled-reason"
-                className="text-xs text-muted-foreground"
-                role="status"
-              >
-                {crossForm.disabledReason}
-              </p>
-            )}
-          </section>
+            </section>
+          </fieldset>
         )}
 
         {/* Crosses list */}
@@ -690,7 +700,7 @@ export default function PhenoKeepersPage() {
             <PhenoTimelineEntries entries={timelineEntries} />
           </section>
         )}
-      </fieldset>
+      </div>
     </section>
   );
 }

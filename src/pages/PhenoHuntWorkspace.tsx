@@ -1796,42 +1796,47 @@ export default function PhenoHuntWorkspace() {
           </p>
         )}
 
-        {/* Every mutation control on this surface lives inside this fieldset:
-            a lapsed-Pro (allowReadOnly) visitor gets a fully disabled form
-            tree, not just a gated candidate-number control. Evidence stays
-            viewable — details/summary expansion is unaffected. */}
-        <fieldset disabled={!canWrite} className="m-0 min-w-0 space-y-4 border-0 p-0">
-          {ws.hunt ? (
-            <div id="evidence-goals" data-testid="workspace-anchor-evidence-goals">
-              <PhenoHuntSetupProgressCard
-                hunt={{
-                  ...ws.hunt,
-                  setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
-                }}
-                candidateCount={ws.totalCandidateCount ?? candidates.length}
-                comparisonReadiness={comparisonState.readiness}
-                onMarkComplete={handleMarkSetupComplete}
-                saving={setupSaving}
-              />
-              {setupError && (
-                <p
-                  role="alert"
-                  data-testid="workspace-setup-error"
-                  className="mt-1 text-xs font-medium text-red-600 dark:text-red-400"
-                >
-                  {setupError}
-                </p>
-              )}
-            </div>
-          ) : null}
+        {/* Mutation controls live inside disabled fieldsets so a lapsed-Pro
+            (allowReadOnly) visitor gets genuinely inert editors. Read-only
+            browsing — search/filters, the cohort bar, CSV export, pagination
+            and retry — stays OUTSIDE the fences: the workspace pages 30
+            candidates at a time, so disabling "show more" would make older
+            records unreachable even though the banner promises they stay
+            visible. */}
+        <div className="min-w-0 space-y-4">
+          <fieldset disabled={!canWrite} className="m-0 min-w-0 space-y-4 border-0 p-0">
+            {ws.hunt ? (
+              <div id="evidence-goals" data-testid="workspace-anchor-evidence-goals">
+                <PhenoHuntSetupProgressCard
+                  hunt={{
+                    ...ws.hunt,
+                    setupCompletedAt: setupCompletedLocal ?? ws.hunt.setupCompletedAt ?? null,
+                  }}
+                  candidateCount={ws.totalCandidateCount ?? candidates.length}
+                  comparisonReadiness={comparisonState.readiness}
+                  onMarkComplete={handleMarkSetupComplete}
+                  saving={setupSaving}
+                />
+                {setupError && (
+                  <p
+                    role="alert"
+                    data-testid="workspace-setup-error"
+                    className="mt-1 text-xs font-medium text-red-600 dark:text-red-400"
+                  >
+                    {setupError}
+                  </p>
+                )}
+              </div>
+            ) : null}
 
-          {ws.hunt ? (
-            <PhenoBreedingObjectiveEditor
-              targets={effectiveBreedingObjective}
-              onSave={handleSaveBreedingObjective}
-              saving={objectiveSaving}
-            />
-          ) : null}
+            {ws.hunt ? (
+              <PhenoBreedingObjectiveEditor
+                targets={effectiveBreedingObjective}
+                onSave={handleSaveBreedingObjective}
+                saving={objectiveSaving}
+              />
+            ) : null}
+          </fieldset>
 
           {ws.hunt && generationProgress.generations.length > 1 ? (
             <PhenoGenerationProgress model={generationProgress} />
@@ -2115,7 +2120,13 @@ export default function PhenoHuntWorkspace() {
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2">
+                // The cards are dense with editors (scores, decisions, sex,
+                // herm queue, smoke, lab), so the whole grid is fenced; the
+                // browsing chrome around it stays live.
+                <fieldset
+                  disabled={!canWrite}
+                  className="m-0 grid min-w-0 gap-4 border-0 p-0 md:grid-cols-2"
+                >
                   {visibleCandidates.map((c) => (
                     <CandidateEditor
                       // Re-mount on round change so prefill state re-initializes.
@@ -2159,7 +2170,7 @@ export default function PhenoHuntWorkspace() {
                       onDeleteLabResult={ws.deleteLabResult}
                     />
                   ))}
-                </div>
+                </fieldset>
               )}
 
               {ws.hasMore &&
@@ -2197,33 +2208,35 @@ export default function PhenoHuntWorkspace() {
             </>
           )}
 
-          <PhenoStressTestingSection
-            candidates={candidates.map((c) => ({
-              candidateId: c.candidateId,
-              candidateLabel: c.candidateLabel,
-            }))}
-            diaryOptions={stress.diaryOptions}
-            onPersist={canWrite ? stress.save : async () => false}
-            summaries={stressSummaries}
-          />
-          <PhenoStressObservationsList
-            rows={stress.rows}
-            candidates={candidates.map((c) => ({
-              candidateId: c.candidateId,
-              candidateLabel: c.candidateLabel,
-            }))}
-            diaryOptions={stress.diaryOptions}
-            onUpdate={canWrite ? stress.update : async () => false}
-            onDelete={canWrite ? stress.remove : async () => false}
-          />
-          <PhenoProductSamplingSection />
-          <PhenoSamplingWorkspaceTools
-            candidates={candidates.map((c) => ({
-              candidateId: c.candidateId,
-              candidateLabel: c.candidateLabel,
-            }))}
-          />
-        </fieldset>
+          <fieldset disabled={!canWrite} className="m-0 min-w-0 space-y-4 border-0 p-0">
+            <PhenoStressTestingSection
+              candidates={candidates.map((c) => ({
+                candidateId: c.candidateId,
+                candidateLabel: c.candidateLabel,
+              }))}
+              diaryOptions={stress.diaryOptions}
+              onPersist={canWrite ? stress.save : async () => false}
+              summaries={stressSummaries}
+            />
+            <PhenoStressObservationsList
+              rows={stress.rows}
+              candidates={candidates.map((c) => ({
+                candidateId: c.candidateId,
+                candidateLabel: c.candidateLabel,
+              }))}
+              diaryOptions={stress.diaryOptions}
+              onUpdate={canWrite ? stress.update : async () => false}
+              onDelete={canWrite ? stress.remove : async () => false}
+            />
+            <PhenoProductSamplingSection />
+            <PhenoSamplingWorkspaceTools
+              candidates={candidates.map((c) => ({
+                candidateId: c.candidateId,
+                candidateLabel: c.candidateLabel,
+              }))}
+            />
+          </fieldset>
+        </div>
       </section>
     </PhenoSamplingProvider>
   );

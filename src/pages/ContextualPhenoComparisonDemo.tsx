@@ -15,7 +15,7 @@ import { buildContextualPhenoComparisonView } from "@/lib/contextualPhenoCompari
 import {
   CONTEXTUAL_PHENO_COMPARISON_DEMO_BANNER,
   CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS,
-} from "@/test/fixtures/contextualPhenoComparisonFixtures";
+} from "@/lib/demo/contextualPhenoComparisonFixtures";
 
 export default function ContextualPhenoComparisonDemo() {
   const view = useMemo(

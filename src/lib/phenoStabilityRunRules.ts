@@ -9,7 +9,8 @@
  *
  * DELIBERATELY DISTINCT VOCABULARY: the word "replication" is already
  * spoken for elsewhere in the pheno code with two OTHER meanings —
- * within-run specimen count (phenoSelectionRules.assessReplication) and
+ * within-run specimen count (formerly phenoSelectionRules.assessReplication;
+ * that orphaned module has since been removed) and
  * "a backup clone is preserved" (the `replication_readiness` / clone
  * insurance evidence goal). This module is a THIRD, sequential concept:
  * re-grow across cycles and see if traits hold. It uses "stability run"

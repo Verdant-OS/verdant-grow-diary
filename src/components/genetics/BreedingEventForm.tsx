@@ -117,6 +117,10 @@ export function BreedingEventForm({ plants, busy, onSubmit, onCancel }: Props) {
             <SelectContent>
               <SelectItem value="sts_spray">STS spray</SelectItem>
               <SelectItem value="colloidal_silver">Colloidal silver</SelectItem>
+              {/* GA3 exists in the pheno reversal vocabulary
+                  (breedingReproductionRules); without it here a GA3 reversal
+                  had to be mis-filed as "Other". */}
+              <SelectItem value="ga3">Gibberellic acid (GA3)</SelectItem>
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>

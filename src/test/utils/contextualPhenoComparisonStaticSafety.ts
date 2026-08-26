@@ -41,7 +41,7 @@ export const CONTEXTUAL_PHENO_COMPARISON_SAFETY_FILES: readonly string[] = [
   "src/lib/contextualPhenoComparisonViewModel.ts",
   "src/components/ContextualPhenoComparisonPanel.tsx",
   "src/pages/ContextualPhenoComparisonDemo.tsx",
-  "src/test/fixtures/contextualPhenoComparisonFixtures.ts",
+  "src/lib/demo/contextualPhenoComparisonFixtures.ts",
 ];
 
 /**

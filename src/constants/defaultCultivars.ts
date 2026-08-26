@@ -45,19 +45,22 @@ export const DEFAULT_CULTIVARS: readonly DefaultCultivar[] = [
 
 /**
  * Serialize the descriptive (non-primary) fields as a stable, human-readable
- * block that can be appended to `breeding_programs.notes`. Blank fields are
- * preserved as blank — never invented.
+ * block that can be appended to `breeding_programs.notes`. A field with no
+ * value is OMITTED — persisting "Lineage: " boilerplate into user notes
+ * records nothing and reads as data that was never there.
  */
 export function formatCultivarNotes(cultivar: DefaultCultivar): string {
   const lines = [
-    `Cultivar: ${cultivar.cultivarName}`,
-    `Lineage: ${cultivar.lineage}`,
-    `CBD:THC ratio: ${cultivar.cbdThcRatio}`,
-    `Total maximum cannabinoid range: ${cultivar.totalMaxCannabinoidRange}`,
-    `Plant size and structure: ${cultivar.plantSizeAndStructure}`,
-    `Flower response: ${cultivar.flowerResponse}`,
-    `Harvest window: ${cultivar.harvestWindow}`,
-    `Flower description: ${cultivar.flowerDescription}`,
-  ];
+    [`Cultivar`, cultivar.cultivarName],
+    [`Lineage`, cultivar.lineage],
+    [`CBD:THC ratio`, cultivar.cbdThcRatio],
+    [`Total maximum cannabinoid range`, cultivar.totalMaxCannabinoidRange],
+    [`Plant size and structure`, cultivar.plantSizeAndStructure],
+    [`Flower response`, cultivar.flowerResponse],
+    [`Harvest window`, cultivar.harvestWindow],
+    [`Flower description`, cultivar.flowerDescription],
+  ]
+    .filter(([, value]) => typeof value === "string" && value.trim() !== "")
+    .map(([label, value]) => `${label}: ${value}`);
   return lines.join("\n");
 }

@@ -236,8 +236,14 @@ describe("PhenoHuntNew onboarding flow", () => {
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
     fireEvent.click(screen.getByTestId("ph-toggle-p1"));
     fireEvent.click(screen.getByTestId("ph-toggle-p2"));
-    // Save from any step.
-    fireEvent.click(screen.getByTestId("ph-save-btn"));
+    const save = screen.getByTestId("ph-save-btn") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
+    const confirmation = screen.getByTestId("pheno-setup-confirm-toggle");
+    expect(confirmation).toBeDefined();
+    fireEvent.click(confirmation);
+    expect(save.disabled).toBe(false);
+    fireEvent.click(save);
     await waitFor(() => expect(createPhenoHuntMock).toHaveBeenCalledTimes(1));
     const call = createPhenoHuntMock.mock.calls[0]?.[0] as
       { growId: string; plantIds: string[]; name: string } | undefined;
@@ -267,6 +273,8 @@ describe("PhenoHuntNew onboarding flow", () => {
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
     fireEvent.click(screen.getByTestId("ph-toggle-p1"));
     fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
+    fireEvent.click(screen.getByTestId("pheno-setup-confirm-toggle"));
 
     entMode.current = "canceled";
     // Force a re-render by clicking a stepper button so vm/entitlement refresh.
@@ -285,6 +293,8 @@ describe("PhenoHuntNew onboarding flow", () => {
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-candidates"));
     fireEvent.click(screen.getByTestId("ph-toggle-p1"));
     fireEvent.click(screen.getByTestId("ph-toggle-p2"));
+    fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-confirmation"));
+    fireEvent.click(screen.getByTestId("pheno-setup-confirm-toggle"));
 
     entMode.current = "error";
     fireEvent.click(screen.getByTestId("pheno-onboarding-stepper-step-checklist"));

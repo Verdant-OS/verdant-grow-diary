@@ -481,6 +481,10 @@ export default function PhenoKeepersPage() {
                 data-testid="keepers-promote-save"
                 disabled={ks.saving || !promotePlant || !promoteName.trim()}
                 onClick={async () => {
+                  // Belt-and-braces with the fieldset disable: jsdom (and any
+                  // synthetic click) does not honour fieldset-disabled, so the
+                  // handler itself refuses read-only writes too.
+                  if (!canWrite) return;
                   setActionError(null);
                   if (await ks.promoteToKeeper(promotePlant, promoteName)) {
                     setPromotePlant("");
@@ -538,9 +542,9 @@ export default function PhenoKeepersPage() {
                       growOutPlantsById={ks.growOutPlantsById}
                       reversed={reversedSet.has(view.keeperId)}
                       saving={ks.saving}
-                      onAddClone={ks.addKeeperClone}
-                      onMarkReversed={ks.markReversed}
-                      onSaveStabilityRuns={ks.saveStabilityRuns}
+                      onAddClone={canWrite ? ks.addKeeperClone : async () => false}
+                      onMarkReversed={canWrite ? ks.markReversed : async () => false}
+                      onSaveStabilityRuns={canWrite ? ks.saveStabilityRuns : async () => false}
                     />
                   ))}
                 </ul>
@@ -619,6 +623,7 @@ export default function PhenoKeepersPage() {
                   data-testid="keepers-cross-save"
                   disabled={ks.saving || !crossForm.canSubmit}
                   onClick={async () => {
+                    if (!canWrite) return;
                     setCrossError(null);
                     if (await ks.saveCross(female, crossForm.pollenKeeperId, crossName)) {
                       setFemale("");

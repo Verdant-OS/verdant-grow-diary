@@ -12,7 +12,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../integrations/supabase/types";
 import { LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES } from "./liveSourceTruthGateRules";
 import { classifySnapshotFreshness } from "./sensor/sensorSnapshotFreshnessRules";
-import { normalizeSensorSource, rawSensorSourceValuesFor } from "./sensor/sensorSourceRules";
+import {
+  normalizeSensorSource,
+  rawSensorSourceValuesFor,
+  type SensorSource,
+} from "./sensor/sensorSourceRules";
 import { withoutDiagnosticSensorRows } from "./sensorProvenanceFenceRules";
 import { STALE_THRESHOLD_MS } from "./sensorReadingNormalizationRules";
 import { celsiusToFahrenheit } from "./temperatureUnits";
@@ -64,11 +68,66 @@ export interface McpSensorReading {
   metric: string;
   value: number;
   quality: string;
+  /**
+   * Constitution Sensor Truth source only:
+   * live | manual | csv | demo | stale | invalid.
+   * Transport/vendor tokens (ecowitt, mqtt, sim, …) are never returned here.
+   */
   source: string;
   ts: string;
   captured_at: string | null;
   freshness: McpSensorFreshness;
   current_live: boolean;
+  /**
+   * Derived 0–1 confidence at the MCP publication boundary.
+   * Not a database column. Always set by `selectLatestMcpSensorReadings`.
+   */
+  confidence: number;
+}
+
+/** Inputs for in-memory MCP confidence (no DB column). */
+export interface McpSensorConfidenceInput {
+  source: SensorSource;
+  freshness: McpSensorFreshness;
+  quality: string;
+  plausible: boolean;
+}
+
+const MCP_SENSOR_CONFIDENCE = {
+  none: 0,
+  low: 0.35,
+  medium: 0.55,
+  high: 0.9,
+} as const;
+
+/**
+ * Derive MCP `confidence` from constitution source + freshness + quality.
+ * Mapping: invalid/implausible → 0; stale/demo → 0.35; manual/csv → 0.55;
+ * live+fresh+ok+plausible → 0.9. Never promotes vendor tokens.
+ */
+export function deriveMcpSensorReadingConfidence(
+  input: McpSensorConfidenceInput,
+): number {
+  const quality =
+    typeof input.quality === "string" ? input.quality.trim().toLowerCase() : "invalid";
+  if (
+    input.source === "invalid" ||
+    input.freshness === "invalid" ||
+    quality === "invalid" ||
+    !input.plausible
+  ) {
+    return MCP_SENSOR_CONFIDENCE.none;
+  }
+  if (input.source === "stale" || input.source === "demo" || input.freshness === "stale") {
+    return MCP_SENSOR_CONFIDENCE.low;
+  }
+  if (input.source === "manual" || input.source === "csv") {
+    return MCP_SENSOR_CONFIDENCE.medium;
+  }
+  if (input.source === "live" && input.freshness === "fresh" && quality === "ok") {
+    return MCP_SENSOR_CONFIDENCE.high;
+  }
+  return MCP_SENSOR_CONFIDENCE.low;
 }
 
 export type OwnerScopedReadModelResult<T> =
@@ -299,7 +358,8 @@ function deriveMcpFreshness(
   nowMs: number,
   staleAfterMs: number,
 ): McpSensorFreshness {
-  const source = normalizedLabel(row.source);
+  // Constitution source first — vendor/transport tokens are never "fresh live".
+  const source = normalizeSensorSource(row.source);
   const quality = normalizedLabel(row.quality);
   if (source === "invalid" || quality === "invalid") return "invalid";
   if (source === "stale" || quality === "stale") return "stale";
@@ -489,6 +549,9 @@ export function selectLatestMcpSensorReadings(
   return Object.fromEntries(
     Object.entries(selected).map(([metric, row]) => {
       const freshness = deriveMcpFreshness(row, nowMs, staleAfterMs);
+      const source = normalizeSensorSource(row.source);
+      const quality = normalizedLabel(row.quality);
+      const plausible = isPlausibleMcpSensorValue(row);
       return [
         metric,
         {
@@ -497,14 +560,17 @@ export function selectLatestMcpSensorReadings(
           metric: row.metric,
           value: row.value,
           quality: row.quality,
-          source: row.source,
+          source,
           ts: row.ts,
           captured_at: row.captured_at,
           freshness,
-          current_live:
-            freshness === "fresh" &&
-            normalizedLabel(row.source) === "live" &&
-            normalizedLabel(row.quality) === "ok",
+          current_live: freshness === "fresh" && source === "live" && quality === "ok",
+          confidence: deriveMcpSensorReadingConfidence({
+            source,
+            freshness,
+            quality: row.quality,
+            plausible,
+          }),
         } satisfies McpSensorReading,
       ];
     }),

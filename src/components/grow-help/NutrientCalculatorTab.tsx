@@ -213,9 +213,14 @@ export default function NutrientCalculatorTab({
         inputs.injectorEnabled &&
           volumeReady &&
           inputs.stockGramsPerGallon !== null &&
+          inputs.injectorRatio !== null &&
           inputs.injectorRatio > 0,
         () =>
-          calculateInjectorPlan(inputs.stockGramsPerGallon as number, inputs.injectorRatio, volume),
+          calculateInjectorPlan(
+            inputs.stockGramsPerGallon as number,
+            inputs.injectorRatio as number,
+            volume,
+          ),
       ),
     [inputs.injectorEnabled, inputs.injectorRatio, inputs.stockGramsPerGallon, volume, volumeReady],
   );
@@ -537,7 +542,7 @@ export default function NutrientCalculatorTab({
                 max={10}
                 step={0.01}
                 unit="mS/cm"
-                help="Optional. Shows remaining or overshoot versus target."
+                help="Optional grower-entered reading stored only in this browser. Manual data — not a live sensor or telemetry feed. Shows remaining or overshoot versus target."
               />
             </div>
             <div>
@@ -988,12 +993,11 @@ export default function NutrientCalculatorTab({
                   id="injector-ratio"
                   label="Injector ratio 1 :"
                   value={inputs.injectorRatio}
-                  onChange={(injectorRatio) =>
-                    onChange({ ...inputs, injectorRatio: injectorRatio ?? 100 })
-                  }
+                  onChange={(injectorRatio) => onChange({ ...inputs, injectorRatio })}
                   min={1}
                   max={10000}
                   step={1}
+                  integer
                   required
                 />
               </div>
@@ -1114,6 +1118,11 @@ export default function NutrientCalculatorTab({
                 {remainingEc.value >= 0
                   ? `${fmt(remainingEc.value)} mS/cm remaining`
                   : `${fmt(Math.abs(remainingEc.value))} mS/cm over target`}
+              </Badge>
+            ) : null}
+            {inputs.measuredMixedEc !== null ? (
+              <Badge variant="outline" data-testid="measured-mixed-ec-source" data-source="manual">
+                Measured EC · grower-entered manual (not live sensor)
               </Badge>
             ) : null}
           </div>

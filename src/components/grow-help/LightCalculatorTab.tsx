@@ -27,6 +27,12 @@ import {
   solveInverseSquareHeight,
   type FivePointPpfd,
 } from "@/lib/lightCalc";
+import {
+  cyclePhotoperiodReadiness,
+  lightCanopyDimensionsReadiness,
+  lightFixturePlanningReadiness,
+  lightFixturePpfReadiness,
+} from "@/lib/growHelpToolkitReadiness";
 import { M2_PER_FT2, areaM2, areaM2FromFeet } from "@/lib/unitsCalc";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";
@@ -64,86 +70,106 @@ export default function LightCalculatorTab({
   onChange,
   onPushLight,
 }: LightCalculatorTabProps) {
-  const dimensionsReady =
-    inputs.canopyLength !== null &&
-    inputs.canopyLength > 0 &&
-    inputs.canopyWidth !== null &&
-    inputs.canopyWidth > 0;
+  const dimensionsReady = lightCanopyDimensionsReadiness(inputs).ready;
+  const fixturePlanningReady = lightFixturePlanningReadiness(inputs).ready;
+  const fixturePpfReady = lightFixturePpfReadiness(inputs).ready;
+  const photoperiodReady = cyclePhotoperiodReadiness(cycle).ready;
   const canopyAreaM2 = useMemo(
     () =>
       attempt(dimensionsReady, () =>
         unitSystem === "us"
-          ? areaM2FromFeet(inputs.canopyLength ?? 0, inputs.canopyWidth ?? 0)
-          : areaM2(inputs.canopyLength ?? 0, inputs.canopyWidth ?? 0),
+          ? areaM2FromFeet(inputs.canopyLength as number, inputs.canopyWidth as number)
+          : areaM2(inputs.canopyLength as number, inputs.canopyWidth as number),
       ),
     [dimensionsReady, inputs.canopyLength, inputs.canopyWidth, unitSystem],
   );
 
   const fixturePpf = useMemo(
     () =>
-      attempt(
-        inputs.ppfMode === "ppf"
-          ? inputs.ppfPerFixture !== null
-          : inputs.actualWattsPerFixture !== null && inputs.efficacy !== null,
-        () =>
-          resolveFixturePpf({
-            mode: inputs.ppfMode,
-            ppfMicromolesPerSecond: inputs.ppfPerFixture ?? 0,
-            actualWatts: inputs.actualWattsPerFixture ?? 0,
-            efficacyMicromolesPerJoule: inputs.efficacy ?? 0,
-          }),
+      attempt(fixturePpfReady, () =>
+        resolveFixturePpf({
+          mode: inputs.ppfMode,
+          ppfMicromolesPerSecond: inputs.ppfPerFixture as number,
+          actualWatts: inputs.actualWattsPerFixture as number,
+          efficacyMicromolesPerJoule: inputs.efficacy as number,
+        }),
       ),
-    [inputs.actualWattsPerFixture, inputs.efficacy, inputs.ppfMode, inputs.ppfPerFixture],
+    [
+      fixturePpfReady,
+      inputs.actualWattsPerFixture,
+      inputs.efficacy,
+      inputs.ppfMode,
+      inputs.ppfPerFixture,
+    ],
   );
 
   const planningPpfd = useMemo(
     () =>
-      attempt(canopyAreaM2.value !== null && fixturePpf.value !== null, () =>
-        planningAveragePpfd(
-          fixturePpf.value?.ppf ?? 0,
-          inputs.fixtureCount,
-          canopyAreaM2.value ?? 0,
-          inputs.canopyEfficiencyPercent / 100,
-        ),
+      attempt(
+        canopyAreaM2.value !== null && fixturePpf.value !== null && fixturePlanningReady,
+        () =>
+          planningAveragePpfd(
+            fixturePpf.value!.ppf,
+            inputs.fixtureCount as number,
+            canopyAreaM2.value!,
+            (inputs.canopyEfficiencyPercent as number) / 100,
+          ),
       ),
-    [canopyAreaM2.value, fixturePpf.value, inputs.canopyEfficiencyPercent, inputs.fixtureCount],
+    [
+      canopyAreaM2.value,
+      fixturePlanningReady,
+      fixturePpf.value,
+      inputs.canopyEfficiencyPercent,
+      inputs.fixtureCount,
+    ],
   );
 
   const photoperiod =
     inputs.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours;
   const planningDli = useMemo(
     () =>
-      attempt(planningPpfd.value !== null, () =>
-        calculateDliFromPlanningPpfd(planningPpfd.value ?? 0, photoperiod),
+      attempt(planningPpfd.value !== null && photoperiodReady && photoperiod !== null, () =>
+        calculateDliFromPlanningPpfd(planningPpfd.value!, photoperiod as number),
       ),
-    [photoperiod, planningPpfd.value],
+    [photoperiod, photoperiodReady, planningPpfd.value],
   );
 
   const targetPpfd = useMemo(
     () =>
       attempt(
-        inputs.targetMode === "ppfd" ? inputs.targetPpfd !== null : inputs.targetDli !== null,
+        (inputs.targetMode === "ppfd" ? inputs.targetPpfd !== null : inputs.targetDli !== null) &&
+          photoperiodReady &&
+          photoperiod !== null,
         () =>
           inputs.targetMode === "ppfd"
-            ? (inputs.targetPpfd ?? 0)
-            : ppfdForTargetDli(inputs.targetDli ?? 0, photoperiod),
+            ? (inputs.targetPpfd as number)
+            : ppfdForTargetDli(inputs.targetDli as number, photoperiod as number),
       ),
-    [inputs.targetDli, inputs.targetMode, inputs.targetPpfd, photoperiod],
+    [inputs.targetDli, inputs.targetMode, inputs.targetPpfd, photoperiod, photoperiodReady],
   );
 
   const fixturePlan = useMemo(
     () =>
       attempt(
-        targetPpfd.value !== null && canopyAreaM2.value !== null && fixturePpf.value !== null,
+        targetPpfd.value !== null &&
+          canopyAreaM2.value !== null &&
+          fixturePpf.value !== null &&
+          fixturePlanningReady,
         () =>
           fixturesNeeded(
-            targetPpfd.value ?? 0,
-            canopyAreaM2.value ?? 0,
-            fixturePpf.value?.ppf ?? 0,
-            inputs.canopyEfficiencyPercent / 100,
+            targetPpfd.value!,
+            canopyAreaM2.value!,
+            fixturePpf.value!.ppf,
+            (inputs.canopyEfficiencyPercent as number) / 100,
           ),
       ),
-    [canopyAreaM2.value, fixturePpf.value, inputs.canopyEfficiencyPercent, targetPpfd.value],
+    [
+      canopyAreaM2.value,
+      fixturePlanningReady,
+      fixturePpf.value,
+      inputs.canopyEfficiencyPercent,
+      targetPpfd.value,
+    ],
   );
 
   const inverseSquare = useMemo(
@@ -151,7 +177,11 @@ export default function LightCalculatorTab({
       attempt(
         inputs.chartPpfd !== null && inputs.chartHeight !== null && inputs.newHeight !== null,
         () =>
-          inverseSquarePpfd(inputs.chartPpfd ?? 0, inputs.chartHeight ?? 0, inputs.newHeight ?? 0),
+          inverseSquarePpfd(
+            inputs.chartPpfd as number,
+            inputs.chartHeight as number,
+            inputs.newHeight as number,
+          ),
       ),
     [inputs.chartHeight, inputs.chartPpfd, inputs.newHeight],
   );
@@ -161,9 +191,9 @@ export default function LightCalculatorTab({
         inputs.chartPpfd !== null && inputs.chartHeight !== null && targetPpfd.value !== null,
         () =>
           solveInverseSquareHeight(
-            inputs.chartPpfd ?? 0,
-            inputs.chartHeight ?? 0,
-            targetPpfd.value ?? 0,
+            inputs.chartPpfd as number,
+            inputs.chartHeight as number,
+            targetPpfd.value!,
           ),
       ),
     [inputs.chartHeight, inputs.chartPpfd, targetPpfd.value],
@@ -172,11 +202,11 @@ export default function LightCalculatorTab({
   const pointsReady = Object.values(inputs.fivePoint).every((value) => value !== null);
   const points: FivePointPpfd = useMemo(
     () => ({
-      center: inputs.fivePoint.center ?? 0,
-      frontLeft: inputs.fivePoint.frontLeft ?? 0,
-      frontRight: inputs.fivePoint.frontRight ?? 0,
-      backLeft: inputs.fivePoint.backLeft ?? 0,
-      backRight: inputs.fivePoint.backRight ?? 0,
+      center: inputs.fivePoint.center as number,
+      frontLeft: inputs.fivePoint.frontLeft as number,
+      frontRight: inputs.fivePoint.frontRight as number,
+      backLeft: inputs.fivePoint.backLeft as number,
+      backRight: inputs.fivePoint.backRight as number,
     }),
     [inputs.fivePoint],
   );
@@ -193,18 +223,20 @@ export default function LightCalculatorTab({
     () =>
       attempt(
         inputs.actualWattsPerFixture !== null &&
+          fixturePlanningReady &&
+          photoperiodReady &&
           cycle.vegDays !== null &&
           cycle.flowerDays !== null &&
           cycle.electricityRate !== null,
         () =>
           calculateLightCycleEnergy({
-            actualWattsPerFixture: inputs.actualWattsPerFixture ?? 0,
-            fixtureCount: inputs.fixtureCount,
-            vegHoursPerDay: cycle.vegPhotoperiodHours,
-            vegDays: cycle.vegDays ?? 0,
-            flowerHoursPerDay: cycle.flowerPhotoperiodHours,
-            flowerDays: cycle.flowerDays ?? 0,
-            ratePerKwh: cycle.electricityRate ?? 0,
+            actualWattsPerFixture: inputs.actualWattsPerFixture as number,
+            fixtureCount: inputs.fixtureCount as number,
+            vegHoursPerDay: cycle.vegPhotoperiodHours as number,
+            vegDays: cycle.vegDays as number,
+            flowerHoursPerDay: cycle.flowerPhotoperiodHours as number,
+            flowerDays: cycle.flowerDays as number,
+            ratePerKwh: cycle.electricityRate as number,
           }),
       ),
     [
@@ -213,8 +245,10 @@ export default function LightCalculatorTab({
       cycle.flowerPhotoperiodHours,
       cycle.vegDays,
       cycle.vegPhotoperiodHours,
+      fixturePlanningReady,
       inputs.actualWattsPerFixture,
       inputs.fixtureCount,
+      photoperiodReady,
     ],
   );
 
@@ -223,17 +257,19 @@ export default function LightCalculatorTab({
       attempt(
         fixturePpf.value !== null &&
           energy.value !== null &&
+          fixturePlanningReady &&
+          photoperiodReady &&
           cycle.vegDays !== null &&
           cycle.flowerDays !== null,
         () =>
           calculateEnergyCostPerMol({
-            ppfPerFixture: fixturePpf.value?.ppf ?? 0,
-            fixtureCount: inputs.fixtureCount,
-            vegHoursPerDay: cycle.vegPhotoperiodHours,
-            vegDays: cycle.vegDays ?? 0,
-            flowerHoursPerDay: cycle.flowerPhotoperiodHours,
-            flowerDays: cycle.flowerDays ?? 0,
-            cycleElectricityCost: energy.value?.cycleCost ?? 0,
+            ppfPerFixture: fixturePpf.value!.ppf,
+            fixtureCount: inputs.fixtureCount as number,
+            vegHoursPerDay: cycle.vegPhotoperiodHours as number,
+            vegDays: cycle.vegDays as number,
+            flowerHoursPerDay: cycle.flowerPhotoperiodHours as number,
+            flowerDays: cycle.flowerDays as number,
+            cycleElectricityCost: energy.value!.cycleCost,
           }),
       ),
     [
@@ -242,8 +278,10 @@ export default function LightCalculatorTab({
       cycle.vegDays,
       cycle.vegPhotoperiodHours,
       energy.value,
+      fixturePlanningReady,
       fixturePpf.value,
       inputs.fixtureCount,
+      photoperiodReady,
     ],
   );
 
@@ -256,6 +294,7 @@ export default function LightCalculatorTab({
     inputs.stage === "flower" &&
     flowerBand &&
     planningDli.value !== null &&
+    photoperiod !== null &&
     photoperiod > 0 &&
     photoperiod <= 24
       ? {
@@ -272,6 +311,9 @@ export default function LightCalculatorTab({
   const canPush =
     inputs.actualWattsPerFixture !== null &&
     inputs.actualWattsPerFixture >= 0 &&
+    inputs.fixtureCount !== null &&
+    inputs.fixtureCount >= 1 &&
+    Number.isInteger(inputs.fixtureCount) &&
     cycle.vegDays !== null &&
     cycle.flowerDays !== null;
 
@@ -345,9 +387,7 @@ export default function LightCalculatorTab({
                 id="light-fixture-count"
                 label="Fixture count"
                 value={inputs.fixtureCount}
-                onChange={(fixtureCount) =>
-                  onChange({ ...inputs, fixtureCount: fixtureCount ?? 1 })
-                }
+                onChange={(fixtureCount) => onChange({ ...inputs, fixtureCount })}
                 min={1}
                 max={1000}
                 step={1}
@@ -360,14 +400,14 @@ export default function LightCalculatorTab({
                 label="Canopy efficiency"
                 value={inputs.canopyEfficiencyPercent}
                 onChange={(canopyEfficiencyPercent) =>
-                  onChange({ ...inputs, canopyEfficiencyPercent: canopyEfficiencyPercent ?? 80 })
+                  onChange({ ...inputs, canopyEfficiencyPercent })
                 }
                 min={50}
                 max={100}
                 step={1}
                 unit="%"
                 required
-                help="Walls / reflectivity planning fudge. Default 80%; use 50–100%."
+                help="Walls / reflectivity planning fudge. Starting reference 80%; use 50–100%."
               />
             </div>
             <div className="space-y-1.5">

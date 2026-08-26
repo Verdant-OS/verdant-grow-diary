@@ -22,6 +22,7 @@ import {
   mapDiaryRowsToCandidateEvidence,
   tentSnapshotToComparisonInput,
   type PhenoCandidateDiaryEvidence,
+  type PhenoDiaryEvidenceRow,
 } from "@/lib/phenoCandidateEvidenceEnrichmentRules";
 import { fetchLatestSensorSnapshot } from "@/lib/quick-log/fetchLatestSensorSnapshot";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
@@ -284,29 +285,44 @@ function distinct(ids: readonly (string | null | undefined)[]): string[] {
 }
 
 /** Bounded canonical diary read for the candidates' own plants — the Pheno
- * Hunt links to plant memory, it never copies it. Newest first; per-plant
- * caps applied by the pure mapper. Fails closed (never "no entries" on a
- * failed read). Retracted entries are excluded. */
-const DIARY_EVIDENCE_ROW_LIMIT = 600;
+ * Hunt links to plant memory, it never copies it. One PER-PLANT limited
+ * query (batched for concurrency): a single global limit let one prolific
+ * candidate consume the whole budget and render its siblings as having no
+ * diary evidence at all. Newest first; the pure mapper applies the 5-entry /
+ * 4-photo presentation caps. Fails closed (never "no entries" on a failed
+ * read). Retracted entries are excluded. */
+const DIARY_EVIDENCE_ROWS_PER_PLANT = 40;
+const DIARY_EVIDENCE_QUERY_BATCH = 8;
 async function loadCandidateDiaryEvidence(
   plantIds: string[],
 ): Promise<PhenoCandidateDiaryEvidence> {
   if (plantIds.length === 0) {
     return { quickLogEntriesByPlantId: {}, timelineEventsByPlantId: {}, photosByPlantId: {} };
   }
-  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
-    let query = supabase
-      .from("diary_entries")
-      .select("id, plant_id, entry_at, note, photo_url, details")
-      .in("plant_id", plantIds);
-    if (withRetractionFilter) query = query.is("retracted_at", null);
-    return query
-      .order("entry_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(DIARY_EVIDENCE_ROW_LIMIT);
-  });
-  if (error || !data) throw new PhenoEvidenceReadError("diary_entries");
-  return mapDiaryRowsToCandidateEvidence(data);
+  const rows: PhenoDiaryEvidenceRow[] = [];
+  for (let i = 0; i < plantIds.length; i += DIARY_EVIDENCE_QUERY_BATCH) {
+    const batch = plantIds.slice(i, i + DIARY_EVIDENCE_QUERY_BATCH);
+    const results = await Promise.all(
+      batch.map((plantId) =>
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let query = supabase
+            .from("diary_entries")
+            .select("id, plant_id, entry_at, note, photo_url, details")
+            .eq("plant_id", plantId);
+          if (withRetractionFilter) query = query.is("retracted_at", null);
+          return query
+            .order("entry_at", { ascending: false })
+            .order("id", { ascending: false })
+            .limit(DIARY_EVIDENCE_ROWS_PER_PLANT);
+        }),
+      ),
+    );
+    for (const { data, error } of results) {
+      if (error || !data) throw new PhenoEvidenceReadError("diary_entries");
+      rows.push(...(data as typeof rows));
+    }
+  }
+  return mapDiaryRowsToCandidateEvidence(rows);
 }
 
 /** Latest source-labeled sensor snapshot per tent (bounded to the first 8
@@ -415,6 +431,24 @@ function normalizeLabSource(v: unknown): "coa" | "estimate" | "unspecified" {
   return v === "coa" || v === "estimate" ? v : "unspecified";
 }
 
+/** A raw lab row with no measurement at all — legacy empty saves exist, and
+ * an empty higher-provenance row must not shadow a populated lower one. */
+function rawLabRowHasAnyValue(row: {
+  thc_pct?: unknown;
+  cbd_pct?: unknown;
+  total_cannabinoids_pct?: unknown;
+  dominant_terpenes?: unknown;
+  tested_at?: unknown;
+}): boolean {
+  return (
+    typeof row.thc_pct === "number" ||
+    typeof row.cbd_pct === "number" ||
+    typeof row.total_cannabinoids_pct === "number" ||
+    (Array.isArray(row.dominant_terpenes) && row.dominant_terpenes.length > 0) ||
+    (typeof row.tested_at === "string" && row.tested_at.length > 0)
+  );
+}
+
 async function loadLabResults(
   huntId: string,
   plantIds: string[],
@@ -433,7 +467,21 @@ async function loadLabResults(
     if (!row.plant_id) continue;
     const source = normalizeLabSource(row.source);
     const existing = map[row.plant_id];
-    if (existing && LAB_SOURCE_RANK[existing.source] >= LAB_SOURCE_RANK[source]) continue;
+    if (existing) {
+      // Value-bearing rows outrank empty rows; provenance breaks ties.
+      const existingHasValue =
+        existing.thcPct !== null ||
+        existing.cbdPct !== null ||
+        existing.totalCannabinoidsPct !== null ||
+        (existing.dominantTerpenes?.length ?? 0) > 0 ||
+        existing.testedAt !== null;
+      const rowHasValue = rawLabRowHasAnyValue(row);
+      const keepExisting =
+        existingHasValue !== rowHasValue
+          ? existingHasValue
+          : LAB_SOURCE_RANK[existing.source] >= LAB_SOURCE_RANK[source];
+      if (keepExisting) continue;
+    }
     const terps = Array.isArray(row.dominant_terpenes)
       ? (row.dominant_terpenes
           .filter(

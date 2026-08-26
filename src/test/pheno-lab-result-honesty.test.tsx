@@ -20,6 +20,19 @@ import type { LabResultRow } from "@/lib/phenoLabResultsService";
 import { labResultHasAnyValue, bestLabResultForPlant } from "@/lib/phenoLabResultsService";
 
 const hookMock = vi.fn<() => UsePhenoHuntWorkspaceState>();
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: {
+      effectivePlanId: "pro_monthly",
+      isActive: true,
+      source: "subscription",
+      hadProAccess: true,
+    },
+    refetch: () => {},
+  }),
+}));
+
 vi.mock("@/hooks/usePhenoHuntWorkspace", () => ({
   usePhenoHuntWorkspace: () => hookMock(),
 }));
@@ -181,6 +194,23 @@ describe("empty lab rows are not evidence", () => {
     const withCoa = { ...map, "p1:coa": labRow({ plantId: "p1", source: "coa" }) };
     expect(bestLabResultForPlant(withCoa, "p1")?.source).toBe("coa");
     expect(bestLabResultForPlant(map, "p2")).toBeUndefined();
+  });
+
+  it("bestLabResultForPlant skips an all-empty coa row when a lower-provenance row has values", () => {
+    // Legacy data: the old editor allowed empty saves and defaulted to coa.
+    // An empty coa row must not shadow the populated estimate beneath it.
+    const map = {
+      "p1:coa": labRow({ plantId: "p1", source: "coa" }),
+      "p1:estimate": labRow({ plantId: "p1", source: "estimate", thcPct: 21.5 }),
+    };
+    expect(bestLabResultForPlant(map, "p1")?.source).toBe("estimate");
+    // When every row is empty, provenance order still decides (row identity
+    // stays visible to presenters that render "recorded but empty").
+    const allEmpty = {
+      "p1:coa": labRow({ plantId: "p1", source: "coa" }),
+      "p1:estimate": labRow({ plantId: "p1", source: "estimate", labVerified: false }),
+    };
+    expect(bestLabResultForPlant(allEmpty, "p1")?.source).toBe("coa");
   });
 
   it("an all-empty stored coa row does not tick the lab readiness goal", () => {

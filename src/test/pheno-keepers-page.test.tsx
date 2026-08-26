@@ -487,9 +487,34 @@ describe("PhenoKeepersPage — stability ledger wiring", () => {
       ],
       saveStabilityRuns,
     });
+    // Removing the BASELINE re-anchors every hold/drift verdict, so the
+    // first tap only ARMS the removal; the explicit confirm executes it.
     fireEvent.click(screen.getByTestId("pheno-stability-run-remove-k1-0"));
+    expect(saveStabilityRuns).not.toHaveBeenCalled();
+    expect(screen.getByTestId("pheno-stability-baseline-confirm-k1")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("pheno-stability-baseline-confirm-remove-k1"));
     expect(saveStabilityRuns).toHaveBeenCalledWith("k1", [
       { runLabel: "Run 2", observedAt: null, traits: { vigor: 4 }, note: null },
+    ]);
+  });
+
+  it("removing a NON-baseline grow-out saves immediately (no confirm needed)", () => {
+    const saveStabilityRuns = vi.fn().mockResolvedValue(true);
+    renderAt({
+      keepers: [
+        {
+          ...keeper("k1", "Gas"),
+          stabilityRuns: [
+            { runLabel: "Run 1", observedAt: null, traits: { vigor: 4 }, note: null },
+            { runLabel: "Run 2", observedAt: null, traits: { vigor: 4 }, note: null },
+          ],
+        },
+      ],
+      saveStabilityRuns,
+    });
+    fireEvent.click(screen.getByTestId("pheno-stability-run-remove-k1-1"));
+    expect(saveStabilityRuns).toHaveBeenCalledWith("k1", [
+      { runLabel: "Run 1", observedAt: null, traits: { vigor: 4 }, note: null },
     ]);
   });
 });

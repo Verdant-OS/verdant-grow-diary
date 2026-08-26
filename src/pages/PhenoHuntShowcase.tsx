@@ -252,13 +252,13 @@ export default function PhenoHuntShowcase() {
             Back to your pheno hunts
           </Link>{" "}
           <span className="text-muted-foreground">
-            (Pheno hunts are a Pro feature — the{" "}
+            (Hunts are plan-gated — the{" "}
             <Link
               to="/pheno-comparison"
               className="font-medium underline underline-offset-2"
-              data-testid="pheno-hunt-showcase-demo-link"
+              data-testid="pheno-hunt-showcase-preview-link"
             >
-              public demo comparison
+              public comparison preview
             </Link>{" "}
             needs no plan.)
           </span>

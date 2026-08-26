@@ -1,6 +1,25 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-26 UTC (~22:00 UTC)
+**Last updated:** 2026-08-26 UTC (~23:15 UTC)
+**Updated by:** Claude (2026-08-26: **#1158 MERGED — deploy tip is now `b294b64`** (squash of
+the Gate Zero Day-0 SEO baseline slice at head `72a9a7e`). Timeline: Blue Dream's independent
+review returned PASS-with-P2 (the condition-1 cell fix, pushed as `72a9a7e`); the owner marked
+the PR ready and Cheek enqueued it at ~22:58 UTC; the merge queue landed it at ~23:04 UTC with
+**all 35 required checks green** — the only red was the known non-required `Supabase Preview`
+42P07 (inherited, per the section below). `docs/seo/seo-baseline-2026-08-26.md` is therefore
+now ON the deploy branch, with its Gate Zero verdicts: 1 FAIL (orphan / no provenance),
+2 PASS-at-timestamp, 3 FAIL (dual-home), 4 FAIL (soft-200 shells), 5 PASS (bounded),
+6 FAIL (GSC/GA4 NO_BASELINE) — Gate Zero is not all true; the file authorizes no content
+cohort and no publish. Codex and Copilot bot reviews landed two minutes AFTER enqueue
+(2 P2 + 5 findings, all verified real); per the #1092 queue-locked precedent the five accepted
+label-precision fixes ship as follow-up draft [PR #1159](https://github.com/Verdant-OS/verdant-grow-diary/pull/1159)
+from the restarted `claude/gate-zero-seo-baseline-dqbp46`, and all seven review threads on
+#1158 are resolved against it. No measurement value changes in the follow-up. The publish
+stop-order and migration posture are untouched: `20260826100000`, `20260825233000`, and
+`20260813030000` remain **NOT applied**. This edit touches this file only, on the #1159
+branch. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (~22:00 UTC)
 **Updated by:** Claude (2026-08-26: **Gate Zero Day-0 SEO baseline captured** as
 `docs/seo/seo-baseline-2026-08-26.md` (draft PR from `claude/gate-zero-seo-baseline-dqbp46`;
 the 2026-07-30 `docs/seo/seo-baseline.md` is preserved unchanged with a one-line pointer).

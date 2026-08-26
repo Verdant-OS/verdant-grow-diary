@@ -250,7 +250,18 @@ export default function PhenoHuntShowcase() {
             data-testid="pheno-hunt-showcase-not-found-link"
           >
             Back to your pheno hunts
-          </Link>
+          </Link>{" "}
+          <span className="text-muted-foreground">
+            (Pheno hunts are a Pro feature — the{" "}
+            <Link
+              to="/pheno-comparison"
+              className="font-medium underline underline-offset-2"
+              data-testid="pheno-hunt-showcase-demo-link"
+            >
+              public demo comparison
+            </Link>{" "}
+            needs no plan.)
+          </span>
         </p>
       </main>
     );

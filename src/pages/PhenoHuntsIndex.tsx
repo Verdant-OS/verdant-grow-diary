@@ -7,8 +7,9 @@
  * empty-state CTA routes to My Grows rather than a new-hunt wizard that
  * would dead-end without a grow.
  *
- * Read-only presenter. The route is wrapped in PhenoTrackerUpgradeGate at
- * the App.tsx level, so this component never re-checks entitlement.
+ * Read-only presenter. The route file (src/routes/_app/pheno-hunts.tsx)
+ * wraps this page in PhenoTrackerUpgradeGate (allowReadOnly for lapsed-Pro
+ * viewing), so this component never re-checks entitlement.
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@/lib/react-router-compat";
@@ -35,15 +36,24 @@ export default function PhenoHuntsIndex() {
   const [status, setStatus] = useState<Status>("loading");
   const [hunts, setHunts] = useState<PhenoHuntListItem[]>([]);
   const [keepers, setKeepers] = useState<KeeperStabilityRow[]>([]);
+  const [rollupUnavailable, setRollupUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
+    setRollupUnavailable(false);
     // Hunts drive the page's load status; the keeper roll-up is best-effort.
     // Hunt-list and candidate-count query failures reject so this page shows
     // an honest error state. A keeper-roll-up failure remains isolated because
-    // it is optional context and must not hide an otherwise valid hunts list.
-    Promise.all([listPhenoHuntsForOwner(), listKeeperStabilityForOwner().catch(() => [])])
+    // it is optional context and must not hide an otherwise valid hunts list —
+    // but it is FLAGGED, so a failed read never renders as "no stability data".
+    Promise.all([
+      listPhenoHuntsForOwner(),
+      listKeeperStabilityForOwner().catch(() => {
+        if (!cancelled) setRollupUnavailable(true);
+        return [] as KeeperStabilityRow[];
+      }),
+    ])
       .then(([huntRows, keeperRows]) => {
         if (cancelled) return;
         setHunts(huntRows);
@@ -82,7 +92,19 @@ export default function PhenoHuntsIndex() {
         icon={<Sprout className="size-5" />}
       />
 
-      {status === "ready" && <PhenoStabilityDashboard model={stabilityModel} />}
+      {status === "ready" && rollupUnavailable && (
+        <p
+          data-testid="pheno-hunts-index-stability-unavailable"
+          role="status"
+          className="mb-4 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+        >
+          The keeper stability roll-up could not be loaded right now — its absence below is a failed
+          read, not an empty ledger. Reload to retry.
+        </p>
+      )}
+      {status === "ready" && !rollupUnavailable && (
+        <PhenoStabilityDashboard model={stabilityModel} />
+      )}
 
       {status === "loading" ? (
         <div
@@ -152,6 +174,28 @@ export default function PhenoHuntsIndex() {
           ))}
         </ul>
       )}
+
+      {/* Related pheno surfaces — previously reachable only by typing the URL. */}
+      <nav
+        aria-label="More pheno surfaces"
+        data-testid="pheno-hunts-index-more"
+        className="mt-6 flex flex-wrap gap-4 text-xs text-muted-foreground"
+      >
+        <Link
+          to="/diary/pheno-expression-comparison"
+          data-testid="pheno-hunts-index-expression-link"
+          className="font-medium text-primary hover:underline"
+        >
+          Cultivar expression diary (Oreoz vs Gelonade)
+        </Link>
+        <Link
+          to="/pheno-comparison"
+          data-testid="pheno-hunts-index-public-demo-link"
+          className="font-medium text-primary hover:underline"
+        >
+          Public demo comparison
+        </Link>
+      </nav>
     </div>
   );
 }

@@ -847,6 +847,85 @@ const ADVERSARIAL_CATALOG_CASES = Object.freeze([
     reason: "staff_shifted_witness_contract",
   }),
   Object.freeze({
+    name: "quicklog_request_hash_missing",
+    sql: `alter table public.quicklog_idempotency drop column request_hash;`,
+    status: "catalog_drift",
+    reason: "quicklog_request_hash_column_contract",
+  }),
+  Object.freeze({
+    name: "quicklog_request_hash_default",
+    sql: `alter table public.quicklog_idempotency
+      alter column request_hash set default 'unexpected';`,
+    status: "catalog_drift",
+    reason: "quicklog_request_hash_column_contract",
+  }),
+  Object.freeze({
+    name: "quicklog_request_hash_type",
+    sql: `alter table public.quicklog_idempotency
+      alter column request_hash type varchar(64);`,
+    status: "catalog_drift",
+    reason: "quicklog_request_hash_column_contract",
+  }),
+  Object.freeze({
+    name: "quicklog_request_hash_not_null",
+    sql: `alter table public.quicklog_idempotency
+      alter column request_hash set not null;`,
+    status: "catalog_drift",
+    reason: "quicklog_request_hash_column_contract",
+  }),
+  Object.freeze({
+    name: "plant_type_nullable",
+    sql: `alter table public.plants alter column plant_type drop not null;`,
+    status: "catalog_drift",
+    reason: "plant_type_column_contract",
+  }),
+  Object.freeze({
+    name: "plant_type_missing",
+    sql: `alter table public.plants drop column plant_type cascade;`,
+    status: "catalog_drift",
+    reason: "plant_type_column_contract",
+  }),
+  Object.freeze({
+    name: "plant_type_default_drift",
+    sql: `alter table public.plants alter column plant_type set default 'photoperiod';`,
+    status: "catalog_drift",
+    reason: "plant_type_column_contract",
+  }),
+  Object.freeze({
+    name: "plant_type_constraint_missing",
+    sql: `alter table public.plants drop constraint plants_plant_type_check;`,
+    status: "catalog_drift",
+    reason: "plant_type_constraint_contract",
+  }),
+  Object.freeze({
+    name: "plant_type_constraint_not_valid",
+    sql: `alter table public.plants drop constraint plants_plant_type_check;
+      alter table public.plants add constraint plants_plant_type_check
+        check (plant_type in ('autoflower', 'photoperiod', 'unknown')) not valid;`,
+    status: "catalog_drift",
+    reason: "plant_type_constraint_contract",
+  }),
+  Object.freeze({
+    name: "plant_type_constraint_widened",
+    sql: `alter table public.plants drop constraint plants_plant_type_check;
+      alter table public.plants add constraint plants_plant_type_check
+        check (plant_type in ('autoflower', 'photoperiod', 'unknown', 'hybrid'));`,
+    status: "catalog_drift",
+    reason: "plant_type_constraint_contract",
+  }),
+  Object.freeze({
+    name: "plant_type_comment_drift",
+    sql: `comment on column public.plants.plant_type is 'unexpected';`,
+    status: "catalog_drift",
+    reason: "plant_type_comment_contract",
+  }),
+  Object.freeze({
+    name: "plant_type_comment_missing",
+    sql: `comment on column public.plants.plant_type is null;`,
+    status: "catalog_drift",
+    reason: "plant_type_comment_contract",
+  }),
+  Object.freeze({
     name: "legacy_helper_acl",
     sql: `grant execute on function public.grant_staff_role_for_verified_email()
       to authenticated;`,

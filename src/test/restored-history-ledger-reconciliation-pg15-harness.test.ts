@@ -44,6 +44,9 @@ describe("restored-history ledger exact-production PostgreSQL 15 runtime harness
     expect(fixture).toContain("on_auth_user_created_grant_staff");
     expect(fixture).toContain("on_auth_user_confirmed_grant_staff");
     expect(fixture).toContain("pheno_hunts_notes_length");
+    expect(fixture).toContain("quicklog_idempotency");
+    expect(fixture).toContain("request_hash text");
+    expect(fixture).toContain("plants_plant_type_check");
     expect(fixture).toContain("20260709015800");
     expect(fixture).toContain("catalog_fixture_ready");
   });
@@ -152,6 +155,18 @@ describe("restored-history ledger exact-production PostgreSQL 15 runtime harness
       'name: "incoming_foreign_key_noninsert_triggers"',
       'name: "relation_trigger"',
       'name: "shifted_witness_duplicate"',
+      'name: "quicklog_request_hash_missing"',
+      'name: "quicklog_request_hash_default"',
+      'name: "quicklog_request_hash_type"',
+      'name: "quicklog_request_hash_not_null"',
+      'name: "plant_type_nullable"',
+      'name: "plant_type_missing"',
+      'name: "plant_type_default_drift"',
+      'name: "plant_type_constraint_missing"',
+      'name: "plant_type_constraint_not_valid"',
+      'name: "plant_type_constraint_widened"',
+      'name: "plant_type_comment_drift"',
+      'name: "plant_type_comment_missing"',
       'name: "legacy_helper_acl"',
       'name: "extra_legacy_trigger"',
       'name: "canonical_helper_external_trigger"',
@@ -169,6 +184,10 @@ describe("restored-history ledger exact-production PostgreSQL 15 runtime harness
     }
     expect(source).toContain('reason: "ledger_contract"');
     expect(source).toContain('reason: "staff_shifted_witness_contract"');
+    expect(source).toContain('reason: "quicklog_request_hash_column_contract"');
+    expect(source).toContain('reason: "plant_type_column_contract"');
+    expect(source).toContain('reason: "plant_type_constraint_contract"');
+    expect(source).toContain('reason: "plant_type_comment_contract"');
     expect(source).toContain('reason: "staff_legacy_acl_contract"');
     expect(source).toContain('reason: "staff_no_legacy_trigger_contract"');
     expect(source).toContain('reason: "staff_trigger_contract"');

@@ -42,7 +42,7 @@
       "source_path": "supabase/migrations/20260725033124_core_schema_forward_repair.sql",
       "source_sha256": "c1c9fde7176c1e60b044a9d83a9f4ccfc4745163d5ab2d218fbd080ece40e36b",
       "proof": "catalog_only",
-      "reason": "The live twelve-argument Quick Log writer matches the canonical dual-timestamp catalog. Recording this restored version prevents the older repair body from replacing that function before the forward convergence migration runs; it does not claim a missing canonical ledger version exists."
+      "reason": "The live request_hash and plant_type schema contracts and the twelve-argument Quick Log writer match the safe final catalog. Recording this restored version prevents the older repair body from replacing that function before the forward convergence migration runs; it does not claim a missing canonical ledger version exists."
     }
   ]
 }

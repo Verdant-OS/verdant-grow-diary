@@ -104,6 +104,20 @@ create table public.pheno_hunts (
 comment on column public.pheno_hunts.setup_completed_at is
   'When guided setup was completed. NULL = setup in progress (workspace shows the setup progress card). Legacy hunts backfilled to created_at.';
 
+create table public.quicklog_idempotency (
+  id bigint primary key,
+  request_hash text
+);
+
+create table public.plants (
+  id bigint primary key,
+  plant_type text not null default 'unknown',
+  constraint plants_plant_type_check
+    check (plant_type in ('autoflower', 'photoperiod', 'unknown'))
+);
+comment on column public.plants.plant_type is
+  'Declared plant type: autoflower | photoperiod | unknown. Grower-entered only, never inferred. unknown blocks cross-plant ranking and strong AI readiness.';
+
 create function public.grant_staff_role_for_verified_email()
 returns trigger
 language plpgsql

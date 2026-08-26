@@ -251,6 +251,10 @@ export const RESULT_KEYS = Object.freeze([
   "staff_trigger_contract",
   "quicklog_source_length",
   "quicklog_source_md5",
+  "quicklog_request_hash_column_contract",
+  "plant_type_column_contract",
+  "plant_type_constraint_contract",
+  "plant_type_comment_contract",
   "quicklog_function_contract",
   "quicklog_acl_contract",
   "quicklog_comment_contract",
@@ -379,6 +383,44 @@ export const CATALOG_STATE_QUERY_SQL = `with expected(version,name,source_sha256
     pg_catalog.pg_get_userbyid(p.proowner) as owner,pg_catalog.pg_get_function_result(p.oid) as result_type
   from pg_catalog.pg_proc p where p.oid=pg_catalog.to_regprocedure(
     'public.quicklog_save_event(text,uuid,text,uuid,uuid,text,text,jsonb,timestamp with time zone,jsonb,jsonb,jsonb)')
+), quicklog_request_hash_column as (
+  select count(*)::int as count,coalesce(bool_and(
+    a.atttypid=pg_catalog.to_regtype('pg_catalog.text') and a.atttypmod=(-1)
+    and a.attndims=0 and not a.attnotnull and not a.atthasdef
+    and a.attgenerated='' and a.attidentity='' and a.attacl is null
+    and a.attcollation=t.typcollation and d.oid is null
+  ),false) as contract
+  from pg_catalog.pg_attribute a
+  join pg_catalog.pg_type t on t.oid=a.atttypid
+  left join pg_catalog.pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+  where a.attrelid=pg_catalog.to_regclass('public.quicklog_idempotency')
+    and a.attname='request_hash' and a.attnum>0 and not a.attisdropped
+), plant_type_column as (
+  select count(*)::int as count,coalesce(bool_and(
+    a.atttypid=pg_catalog.to_regtype('pg_catalog.text') and a.atttypmod=(-1)
+    and a.attndims=0 and a.attnotnull and a.atthasdef
+    and a.attgenerated='' and a.attidentity='' and a.attacl is null
+    and a.attcollation=t.typcollation and d.oid is not null
+    and pg_catalog.pg_get_expr(d.adbin,d.adrelid,true)='''unknown''::text'
+  ),false) as contract
+  from pg_catalog.pg_attribute a
+  join pg_catalog.pg_type t on t.oid=a.atttypid
+  left join pg_catalog.pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum
+  where a.attrelid=pg_catalog.to_regclass('public.plants')
+    and a.attname='plant_type' and a.attnum>0 and not a.attisdropped
+), plant_type_constraint as (
+  select count(*)::int as count,coalesce(bool_and(
+    c.contype='c' and c.convalidated and not c.condeferrable and not c.condeferred
+    and not c.connoinherit and c.conislocal and c.coninhcount=0 and c.conparentid=0
+    and c.conkey=array[(select a.attnum from pg_catalog.pg_attribute a
+      where a.attrelid=c.conrelid and a.attname='plant_type'
+        and a.attnum>0 and not a.attisdropped)]::smallint[]
+    and pg_catalog.pg_get_constraintdef(c.oid,true)=
+      'CHECK (plant_type = ANY (ARRAY[''autoflower''::text, ''photoperiod''::text, ''unknown''::text]))'
+  ),false) as contract
+  from pg_catalog.pg_constraint c
+  where c.conrelid=pg_catalog.to_regclass('public.plants')
+    and c.conname='plants_plant_type_check'
 ), staff_acl as (
   select coalesce((select array_agg(pg_catalog.pg_get_userbyid(x.grantee)||':'||x.privilege_type||':'||x.is_grantable
       order by pg_catalog.pg_get_userbyid(x.grantee),x.privilege_type,x.is_grantable)
@@ -444,6 +486,13 @@ select pg_catalog.json_build_object(
   'staff_trigger_contract',(select count=2 and contract from staff_triggers),
   'quicklog_source_length',coalesce((select source_length from quicklog_function),0),
   'quicklog_source_md5',coalesce((select source_md5 from quicklog_function),''),
+  'quicklog_request_hash_column_contract',(select count=1 and contract from quicklog_request_hash_column),
+  'plant_type_column_contract',(select count=1 and contract from plant_type_column),
+  'plant_type_constraint_contract',(select count=1 and contract from plant_type_constraint),
+  'plant_type_comment_contract',coalesce((select pg_catalog.col_description(a.attrelid,a.attnum)=
+    'Declared plant type: autoflower | photoperiod | unknown. Grower-entered only, never inferred. unknown blocks cross-plant ranking and strong AI readiness.'
+    from pg_catalog.pg_attribute a where a.attrelid=pg_catalog.to_regclass('public.plants')
+      and a.attname='plant_type' and a.attnum>0 and not a.attisdropped),false),
   'quicklog_function_contract',coalesce((select prosecdef and owner='postgres' and result_type='jsonb'
     and proconfig=array['search_path=public, pg_temp']::text[] and pronargs=12 and pronargdefaults=9
     and arg_types='text, uuid, text, uuid, uuid, text, text, jsonb, timestamp with time zone, jsonb, jsonb, jsonb'

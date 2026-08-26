@@ -50,8 +50,11 @@ the protected `verdant-production-solo-founder` environment.
 5. Review the sanitized report and receipt. A safe receipt must prove the
    exact repository/workflow/run identities, exact deploy and PR heads, exact
    candidate hashes, all three target ledger identities absent with no
-   collisions, the exact ledger contract, and the expected Pheno, staff, and
-   Quick Log system-catalog fingerprints. The cross-run state digest excludes
+   collisions, the exact ledger contract, and the expected Pheno, staff, Quick
+   Log, nullable `quicklog_idempotency.request_hash`, and complete
+   `plants.plant_type` system-catalog contracts. The validated `plant_type`
+   check plus `NOT NULL` proves the normalization postcondition without reading
+   grower rows. The cross-run state digest excludes
    `run_id` and `run_attempt` because PREFLIGHT and APPLY are separate runs;
    the artifact verifier authenticates those provenance fields independently.
 6. Wait the policy review interval. Separately dispatch `APPLY` from the same
@@ -88,6 +91,11 @@ Stop without a write when any of these occurs:
   the canonical helper ACL differs from its exact owner/service-role contract,
   any noncanonical trigger invokes either staff helper, or any Pheno, staff,
   or Quick Log catalog fingerprint differs;
+- `quicklog_idempotency.request_hash` is missing or differs from the exact
+  nullable, default-free, non-generated text-column contract;
+- `plants.plant_type` is missing or differs in type, default, nullability,
+  generated/identity state, exact validated allowed-value constraint, or exact
+  grower-entered-only comment;
 - another production migration writer is running;
 - the reviewed PREFLIGHT artifact is missing, stale, unauthenticated, or does
   not match the fresh preflight state digest;

@@ -64,6 +64,10 @@ function safeState({ present = 0 }: { present?: 0 | 1 | 2 | 3 } = {}) {
     staff_trigger_contract: true,
     quicklog_source_length: EXPECTED_FUNCTION_FINGERPRINTS.quicklog.bytes,
     quicklog_source_md5: EXPECTED_FUNCTION_FINGERPRINTS.quicklog.md5,
+    quicklog_request_hash_column_contract: true,
+    plant_type_column_contract: true,
+    plant_type_constraint_contract: true,
+    plant_type_comment_contract: true,
     quicklog_function_contract: true,
     quicklog_acl_contract: true,
     quicklog_comment_contract: true,
@@ -133,6 +137,10 @@ describe("restored-history ledger reconciliation", () => {
       "staff_legacy_function_contract",
       "staff_legacy_acl_contract",
       "staff_no_legacy_trigger_contract",
+      "quicklog_request_hash_column_contract",
+      "plant_type_column_contract",
+      "plant_type_constraint_contract",
+      "plant_type_comment_contract",
     ]) {
       expect(classifyPreflight({ ...safeState(), [key]: false })).toEqual({
         status: "catalog_drift",
@@ -153,6 +161,15 @@ describe("restored-history ledger reconciliation", () => {
       "preflight_row_count",
     );
     expect(parsePreflightStdout(`${JSON.stringify(safeState())}\n`)).toEqual(safeState());
+    const { plant_type_comment_contract: _missing, ...missingContract } = safeState();
+    expect(() => parsePreflightStdout(JSON.stringify(missingContract))).toThrow(
+      "preflight_result_shape",
+    );
+    expect(() =>
+      parsePreflightStdout(
+        JSON.stringify({ ...safeState(), quicklog_request_hash_column_contract: "true" }),
+      ),
+    ).toThrow("preflight_result_shape");
   });
 
   it("binds receipts to both heads, all candidate hashes, authorization, and full state", () => {
@@ -178,6 +195,16 @@ describe("restored-history ledger reconciliation", () => {
     expect(
       buildStateReceipt({ ...args, state: { ...safeState(), ledger_total_count: 197 } }).digest,
     ).not.toBe(receipt.digest);
+    for (const key of [
+      "quicklog_request_hash_column_contract",
+      "plant_type_column_contract",
+      "plant_type_constraint_contract",
+      "plant_type_comment_contract",
+    ]) {
+      expect(
+        buildStateReceipt({ ...args, state: { ...safeState(), [key]: false } }).digest,
+      ).not.toBe(receipt.digest);
+    }
     expect(buildStateReceipt({ ...args, candidateHeadSha: "4".repeat(40) }).digest).not.toBe(
       receipt.digest,
     );
@@ -272,6 +299,24 @@ describe("restored-history ledger reconciliation", () => {
     expect(CATALOG_STATE_QUERY_SQL).not.toMatch(/\b(?:from|join)\s+auth\./i);
     expect(CATALOG_STATE_QUERY_SQL).not.toMatch(
       /\b(?:insert\s+into|update|delete\s+from)\s+(?:public|auth)\./i,
+    );
+  });
+
+  it("attests every persistent schema effect of the core forward repair", () => {
+    expect(CATALOG_STATE_QUERY_SQL).toContain("public.quicklog_idempotency");
+    expect(CATALOG_STATE_QUERY_SQL).toContain("a.attname='request_hash'");
+    expect(CATALOG_STATE_QUERY_SQL).toContain("not a.attnotnull and not a.atthasdef");
+    expect(CATALOG_STATE_QUERY_SQL).toContain("a.attname='plant_type'");
+    expect(CATALOG_STATE_QUERY_SQL).toContain(
+      "pg_catalog.pg_get_expr(d.adbin,d.adrelid,true)='''unknown''::text'",
+    );
+    expect(CATALOG_STATE_QUERY_SQL).toContain("c.conname='plants_plant_type_check'");
+    expect(CATALOG_STATE_QUERY_SQL).toContain(
+      "c.contype='c' and c.convalidated and not c.condeferrable and not c.condeferred",
+    );
+    expect(CATALOG_STATE_QUERY_SQL).toContain("c.conkey=array[(select a.attnum");
+    expect(CATALOG_STATE_QUERY_SQL).toContain(
+      "Declared plant type: autoflower | photoperiod | unknown. Grower-entered only, never inferred. unknown blocks cross-plant ranking and strong AI readiness.",
     );
   });
 

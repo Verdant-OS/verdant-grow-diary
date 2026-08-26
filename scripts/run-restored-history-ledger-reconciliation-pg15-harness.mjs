@@ -888,6 +888,12 @@ const ADVERSARIAL_CATALOG_CASES = Object.freeze([
     reason: "plant_type_column_contract",
   }),
   Object.freeze({
+    name: "plant_type_type",
+    sql: `alter table public.plants alter column plant_type type varchar(32);`,
+    status: "catalog_drift",
+    reason: "plant_type_column_contract",
+  }),
+  Object.freeze({
     name: "plant_type_default_drift",
     sql: `alter table public.plants alter column plant_type set default 'photoperiod';`,
     status: "catalog_drift",

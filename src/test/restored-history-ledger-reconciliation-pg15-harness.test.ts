@@ -166,6 +166,7 @@ describe("restored-history ledger exact-production PostgreSQL 15 runtime harness
       'name: "quicklog_request_hash_not_null"',
       'name: "plant_type_nullable"',
       'name: "plant_type_missing"',
+      'name: "plant_type_type"',
       'name: "plant_type_default_drift"',
       'name: "plant_type_constraint_missing"',
       'name: "plant_type_constraint_not_valid"',

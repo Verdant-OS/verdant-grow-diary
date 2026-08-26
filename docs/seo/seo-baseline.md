@@ -1,6 +1,6 @@
 # Verdant SEO baseline
 
-> **Superseded as Day 0:** the current dated baseline is [`docs/seo/seo-baseline-2026-08-26.md`](seo-baseline-2026-08-26.md) (2026-08-26). This 2026-07-30 file is preserved unchanged as the historical snapshot.
+> **Superseded:** the current dated baseline is [`docs/seo/seo-baseline-2026-08-26.md`](seo-baseline-2026-08-26.md) (2026-08-26). The 2026-07-30 snapshot below is preserved unchanged; this pointer is the only later addition.
 
 **Audit date:** 2026-07-30<br>
 **Repository baseline:** `1c40c21f2` on `origin/verdant-grow-diary`<br>

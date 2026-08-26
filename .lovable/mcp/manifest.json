@@ -5,7 +5,9 @@
   "auth": {
     "type": "oauth",
     "issuer": "https://knkwiiywfkbqznbxwqfh.supabase.co/auth/v1",
-    "accepted_audiences": ["authenticated"]
+    "accepted_audiences": [
+      "authenticated"
+    ]
   },
   "mcp": {
     "server": {
@@ -34,7 +36,7 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 100,
-              "description": "Maximum rows to return (1–100). Defaults to 25."
+              "description": "Maximum rows to return (1\u2013100). Defaults to 25."
             }
           },
           "additionalProperties": false,
@@ -63,10 +65,12 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 50,
-              "description": "Maximum entries to return (1–50). Defaults to 10."
+              "description": "Maximum entries to return (1\u201350). Defaults to 10."
             }
           },
-          "required": ["growId"],
+          "required": [
+            "growId"
+          ],
           "additionalProperties": false,
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
@@ -75,7 +79,7 @@
       {
         "name": "get_latest_sensor_snapshot",
         "title": "Get latest sensor snapshot",
-        "description": "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim and adds a response-time `freshness` field (`fresh`, `stale`, or `invalid`) plus `current_live`. `quality` is one of ok/degraded/stale/invalid. Canonical `source` labels are exactly live/manual/csv/demo/stale/invalid, where `live` means fresh validated connected telemetry; legacy rows may carry other ingest labels such as sim or vendor bridge names. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. Read-only.",
+        "description": "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading includes constitution `source` (exactly live/manual/csv/demo/stale/invalid \u2014 vendor/transport tokens such as ecowitt, mqtt, or sim, and any unrecognized label, are never returned as source), `quality`, derived `confidence` (0\u20131), response-time `freshness` (`fresh`, `stale`, or `invalid`), and `current_live`. `quality` is one of ok/degraded/stale/invalid. `live` means fresh validated connected telemetry. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and stale or invalid are never current or healthy. Read-only.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
@@ -90,7 +94,9 @@
               "description": "Tent id to fetch the latest readings for."
             }
           },
-          "required": ["tentId"],
+          "required": [
+            "tentId"
+          ],
           "additionalProperties": false,
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
@@ -121,10 +127,12 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 100,
-              "description": "Maximum targets to return (1–100). Defaults to 50."
+              "description": "Maximum targets to return (1\u2013100). Defaults to 50."
             }
           },
-          "required": ["growId"],
+          "required": [
+            "growId"
+          ],
           "additionalProperties": false,
           "$schema": "http://json-schema.org/draft-07/schema#"
         },
@@ -144,7 +152,10 @@
           "properties": {
             "targetType": {
               "type": "string",
-              "enum": ["tent", "plant"],
+              "enum": [
+                "tent",
+                "plant"
+              ],
               "description": "Whether the owned target is a tent or plant."
             },
             "targetId": {
@@ -156,10 +167,13 @@
               "type": "integer",
               "minimum": 24,
               "maximum": 168,
-              "description": "Bounded history window in hours (24–168). Defaults to 72."
+              "description": "Bounded history window in hours (24\u2013168). Defaults to 72."
             }
           },
-          "required": ["targetType", "targetId"],
+          "required": [
+            "targetType",
+            "targetId"
+          ],
           "additionalProperties": false,
           "$schema": "http://json-schema.org/draft-07/schema#"
         },

@@ -1,0 +1,3 @@
+{
+  "install": "bun install --frozen-lockfile\nnpx --yes playwright install chromium"
+}

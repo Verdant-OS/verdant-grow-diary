@@ -146,6 +146,10 @@ function renderQuickLog(prefill?: QuickLogPrefill) {
 beforeEach(() => {
   clearLocalStorageForTest();
   harness.activeGrowId = "g1";
+  harness.grows = [
+    { id: "g1", name: "Grow One", stage: "veg" },
+    { id: "g2", name: "Grow Two", stage: "flower" },
+  ];
   harness.plants = [
     { id: "p1", name: "Plant One", grow_id: "g1", tent_id: "t1", stage: "veg" },
     { id: "p2", name: "Plant Two", grow_id: "g2", tent_id: "t2", stage: "flower" },
@@ -176,6 +180,36 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("Quick Log canonical target contract", () => {
+  it("passes a verified active grow to activities while keeping plant and tent writes blocked", () => {
+    harness.plants = [];
+    harness.tents = [];
+
+    renderQuickLog();
+
+    expect(screen.getByTestId("all-activities-target")).toMatchObject({
+      dataset: expect.objectContaining({ plantId: "", growId: "g1", tentId: "" }),
+    });
+    expect(screen.getByTestId("quick-log-plant-error")).toHaveTextContent(
+      "Choose a plant before saving this entry.",
+    );
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not promote a stale active grow id that is absent from the loaded grow list", () => {
+    harness.activeGrowId = "missing-grow";
+    harness.plants = [];
+    harness.tents = [];
+
+    renderQuickLog();
+
+    expect(screen.getByTestId("all-activities-target")).toMatchObject({
+      dataset: expect.objectContaining({ plantId: "", growId: "", tentId: "" }),
+    });
+    expect(screen.getByTestId("quick-log-save")).toBeDisabled();
+    expect(harness.rpc).not.toHaveBeenCalled();
+  });
+
   it("holds a cross-grow route prefill until the exact grow/tent/plant target resolves", async () => {
     const view = renderQuickLog({
       plantId: "p2",

@@ -1,6 +1,6 @@
 # Role — Grok: Product Intelligence, Adversarial Audit, and Implementation Lead
 
-**Sentinel-Version: 2026-09-01.1**
+**Sentinel-Version: 2026-09-01.5**
 **Source:** Verdant Multi-Agent Prompt Pack 2026-07-31, section 1 (complete), plus
 Cheek peer-elevation approvals 2026-08-20 (refined charter: equal powers; no role rank;
 explicit task ownership).

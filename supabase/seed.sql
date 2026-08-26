@@ -218,3 +218,17 @@ BEGIN
     TO service_role;
   END IF;
 END $$;
+
+-- Signup acquisition attributions are written only by handle_new_user() and
+-- read only through its SECURITY DEFINER snapshot/reporting functions
+-- (20260813030000). No role -- not even service_role -- holds direct table
+-- DML in production (20260821064300 closed the service_role gap). Reapply
+-- that after the blanket local parity grant so runtime lanes test
+-- production-equivalent ACLs.
+DO $$
+BEGIN
+  IF to_regclass('public.signup_acquisition_attributions') IS NOT NULL THEN
+    REVOKE ALL ON TABLE public.signup_acquisition_attributions
+      FROM PUBLIC, anon, authenticated, service_role;
+  END IF;
+END $$;

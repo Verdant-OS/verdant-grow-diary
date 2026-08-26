@@ -58,6 +58,7 @@ describe("applyQuickLogV2Refresh — conditional Dashboard scoping", () => {
     const out = calls(invalidate);
     expect(out).toContain(JSON.stringify(["quick_log_grouped_timeline"]));
     expect(out).toContain(JSON.stringify(["timeline_memory"]));
+    expect(out).toContain(JSON.stringify(["latest-sensor-snapshot"]));
     expect(out).toContain(JSON.stringify(["plant_recent_activity", "plant-1"]));
     expect(out).toContain(JSON.stringify(["ai_doctor_readiness", "plant-1"]));
     expect(out).toContain(JSON.stringify(["ai_doctor_context", "plant-1"]));

@@ -19,8 +19,14 @@ function allPassStages(): Partial<Record<OneTentProofStage, StageOutcome>> {
   return out;
 }
 
+const retainedCleanup = {
+  status: "completed_with_retained_history" as const,
+  active_rows_removed: true,
+  retained_history: true,
+};
+
 describe("blocked receipt", () => {
-  const receipt = buildBlockedOneTentBrowserProofReceipt("managed session unavailable");
+  const receipt = buildBlockedOneTentBrowserProofReceipt("managed_session_unavailable");
 
   it("status blocked, seed blocked, every stage blocked or not_run", () => {
     expect(receipt.status).toBe("blocked");
@@ -28,16 +34,14 @@ describe("blocked receipt", () => {
     for (const key of ONE_TENT_PROOF_STAGES) {
       expect(["blocked", "not_run"]).toContain(receipt.stages[key]);
     }
-    expect(receipt.stages.auto_diary_follow_up).toBe("not_run");
   });
 
   it("carries the blocker reason and null duplicate fences", () => {
-    expect(receipt.blocker_reason).toBe("managed session unavailable");
+    expect(receipt.blocker_reason).toBe("managed_session_unavailable");
     expect(receipt.duplicate_fences).toEqual({
       quick_log_count: null,
       alert_count: null,
       action_queue_count: null,
-      follow_up_marker_count: null,
     });
   });
 
@@ -46,7 +50,7 @@ describe("blocked receipt", () => {
     expect(line.startsWith(ONE_TENT_BROWSER_PROOF_JSON_PREFIX)).toBe(true);
     expect(line).not.toContain("\n");
     const parsed = JSON.parse(line.slice(ONE_TENT_BROWSER_PROOF_JSON_PREFIX.length));
-    expect(parsed.schema_version).toBe("1");
+    expect(parsed.schema_version).toBe("4");
     expect(parsed.proof).toBe("one-tent-loop-authenticated-ui");
   });
 
@@ -54,6 +58,7 @@ describe("blocked receipt", () => {
     const r = buildOneTentBrowserProofReceipt({
       restoreStrategy: "none",
       seedStatus: "blocked",
+      cleanupRequired: false,
       blockerReason: "x",
       stages: { auth_restored: "pass", grow_resolved: "blocked" },
     });
@@ -68,13 +73,14 @@ describe("pass receipt", () => {
   const receipt = buildOneTentBrowserProofReceipt({
     restoreStrategy: "storage_session",
     seedStatus: "completed",
+    cleanupRequired: true,
     stages: allPassStages(),
     duplicateFences: {
       quick_log_count: 1,
       alert_count: 1,
       action_queue_count: 1,
-      follow_up_marker_count: 1,
     },
+    cleanup: retainedCleanup,
   });
 
   it("status pass, all stages pass, duplicate counts 1", () => {
@@ -84,8 +90,17 @@ describe("pass receipt", () => {
     expect(receipt.blocker_reason).toBeNull();
   });
 
-  it("auto_diary_follow_up is intentionally_unsupported (honest gap)", () => {
-    expect(receipt.stages.auto_diary_follow_up).toBe("intentionally_unsupported");
+  it("ends at the approval boundary without an execution or follow-up stage", () => {
+    expect(receipt.stages.approval_boundary_verified).toBe("pass");
+    expect(receipt.stages).not.toHaveProperty("grower_decision_verified");
+    expect(receipt.stages).not.toHaveProperty("follow_up_marker_verified");
+    expect(receipt.stages).not.toHaveProperty("auto_diary_follow_up");
+  });
+
+  it("composites the honest retained-history cleanup outcome without row details", () => {
+    expect(receipt.cleanup).toEqual(retainedCleanup);
+    expect(receipt).not.toHaveProperty("ids");
+    expect(receipt).not.toHaveProperty("marker");
   });
 
   it("safety booleans default false and fabricated_login_used is unrepresentable as true", () => {
@@ -94,7 +109,59 @@ describe("pass receipt", () => {
       paid_ai_request_observed: false,
       device_control_request_observed: false,
       service_role_in_browser_observed: false,
+      action_queue_approval_request_observed: false,
+      paddle_checkout_request_observed: false,
     });
+  });
+
+  it("allows an honest manual pass when optional cleanup was not requested", () => {
+    const manualReceipt = buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      stages: allPassStages(),
+      cleanupRequired: false,
+      cleanup: {
+        status: "not_run",
+        active_rows_removed: false,
+        retained_history: false,
+      },
+    });
+
+    expect(manualReceipt.status).toBe("pass");
+    expect(manualReceipt.blocker_reason).toBeNull();
+    expect(manualReceipt.cleanup).toEqual({
+      status: "not_run",
+      active_rows_removed: false,
+      retained_history: false,
+    });
+  });
+
+  it("keeps workflow-required cleanup fail-closed", () => {
+    const requiredReceipt = buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      stages: allPassStages(),
+      cleanupRequired: true,
+      cleanup: {
+        status: "not_run",
+        active_rows_removed: false,
+        retained_history: false,
+      },
+    });
+    expect(requiredReceipt.status).toBe("fail");
+
+    const failedOptionalCleanup = buildOneTentBrowserProofReceipt({
+      restoreStrategy: "storage_session",
+      seedStatus: "completed",
+      stages: allPassStages(),
+      cleanupRequired: false,
+      cleanup: {
+        status: "failed",
+        active_rows_removed: false,
+        retained_history: false,
+      },
+    });
+    expect(failedOptionalCleanup.status).toBe("fail");
   });
 });
 
@@ -105,6 +172,7 @@ describe("fail receipt", () => {
   const receipt = buildOneTentBrowserProofReceipt({
     restoreStrategy: "storage_plus_cookies",
     seedStatus: "completed",
+    cleanupRequired: false,
     blockerReason: "quick_log_save_failed",
     stages,
   });
@@ -115,8 +183,7 @@ describe("fail receipt", () => {
     expect(receipt.stages.plant_resolved).toBe("pass");
     expect(receipt.stages.quick_log_persisted).toBe("fail");
     expect(receipt.stages.timeline_visible).toBe("not_run");
-    expect(receipt.stages.follow_up_marker_verified).toBe("not_run");
-    expect(receipt.stages.auto_diary_follow_up).toBe("not_run");
+    expect(receipt.stages.approval_boundary_verified).toBe("not_run");
   });
 });
 
@@ -125,24 +192,40 @@ describe("safety violations force fail", () => {
     const r = buildOneTentBrowserProofReceipt({
       restoreStrategy: "storage_session",
       seedStatus: "completed",
+      cleanupRequired: false,
       stages: allPassStages(),
       safety: { paid_ai_request_observed: true },
     });
     expect(r.status).toBe("fail");
     expect(r.safety.paid_ai_request_observed).toBe(true);
-    expect(r.stages.auto_diary_follow_up).toBe("not_run");
   });
 
   it("safetyViolationReason (e.g. password auth observed) forces fail and lands in blocker_reason", () => {
     const r = buildOneTentBrowserProofReceipt({
       restoreStrategy: "storage_session",
       seedStatus: "completed",
+      cleanupRequired: false,
       stages: allPassStages(),
       safetyViolationReason: "password_auth_request_observed",
     });
     expect(r.status).toBe("fail");
     expect(r.blocker_reason).toBe("password_auth_request_observed");
   });
+
+  it.each(["action_queue_approval_request_observed", "paddle_checkout_request_observed"] as const)(
+    "%s forbids a pass receipt",
+    (flag) => {
+      const r = buildOneTentBrowserProofReceipt({
+        restoreStrategy: "storage_session",
+        seedStatus: "completed",
+        cleanupRequired: false,
+        stages: allPassStages(),
+        safety: { [flag]: true },
+      });
+      expect(r.status).toBe("fail");
+      expect(r.safety[flag]).toBe(true);
+    },
+  );
 });
 
 describe("determinism + hygiene", () => {
@@ -150,6 +233,7 @@ describe("determinism + hygiene", () => {
     const staged = {
       restoreStrategy: "storage_session" as const,
       seedStatus: "completed" as const,
+      cleanupRequired: false,
       stages: allPassStages(),
       duplicateFences: { quick_log_count: 1 },
     };
@@ -168,8 +252,35 @@ describe("determinism + hygiene", () => {
     expect(line).not.toMatch(/\/home\/|\/tmp\/|[A-Z]:\\/);
   });
 
+  it.each([
+    "https://attacker.invalid/?token=secret",
+    "C:\\Users\\runner\\proof.log",
+    "[GOLDEN-PATH-FIXTURE-RUN-123-ATTEMPT-1]",
+    "2026-08-21T12:34:56Z",
+    "raw failure: credential=secret",
+  ])("normalizes unsafe blocker detail instead of serializing %s", (unsafeReason) => {
+    const line = renderOneTentBrowserProofReceipt(
+      buildBlockedOneTentBrowserProofReceipt(unsafeReason),
+    );
+    expect(line).not.toContain(unsafeReason);
+    expect(JSON.parse(line.slice(ONE_TENT_BROWSER_PROOF_JSON_PREFIX.length)).blocker_reason).toBe(
+      "proof_blocked",
+    );
+  });
+
   it("stage key order is the documented contract order", () => {
     const receipt = buildBlockedOneTentBrowserProofReceipt("x");
-    expect(Object.keys(receipt.stages)).toEqual([...ONE_TENT_PROOF_STAGES, "auto_diary_follow_up"]);
+    expect(Object.keys(receipt.stages)).toEqual([...ONE_TENT_PROOF_STAGES]);
+    expect(ONE_TENT_PROOF_STAGES.slice(0, 7)).toEqual([
+      "auth_restored",
+      "deployment_sha_verified",
+      "hierarchy_created_via_ui",
+      "grow_resolved",
+      "tent_resolved",
+      "plant_resolved",
+      "quick_log_context_verified",
+    ]);
+    expect(ONE_TENT_PROOF_STAGES).toContain("quick_log_manual_tent_snapshot_verified");
+    expect(ONE_TENT_PROOF_STAGES).toContain("operator_sensor_evidence_seeded");
   });
 });

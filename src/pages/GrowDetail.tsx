@@ -40,6 +40,7 @@ import StartBreedingLogButton from "@/components/StartBreedingLogButton";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
+import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
@@ -298,6 +299,15 @@ export default function GrowDetail() {
             View full Timeline →
           </Link>
         </div>
+        {/* Recovery prompt only on a successful read: "unavailable" is
+            unknown, and unknown must never render as measured absence. */}
+        {recent.status === "ok" && !grow.is_archived && (
+          <GrowRecoveryPrompt
+            growId={growId ?? null}
+            items={recent.items}
+            testId="grow-detail-no-recent-check-in-recovery"
+          />
+        )}
         {recent.status === "loading" ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : recent.status === "unavailable" ? (

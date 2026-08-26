@@ -367,7 +367,12 @@ describe("assertTelemetryNotClean helper — self-checks", () => {
     // job of the fuzz table above; here we prove the helper isn't a
     // blanket "always fail" trap.
     const row = evaluateSensorSnapshot(
-      { source: "live", captured_at: FRESH_ISO, confidence: 0.9 },
+      {
+        source: "live",
+        captured_at: FRESH_ISO,
+        confidence: 0.9,
+        has_usable_metric: true,
+      },
       NOW_MS,
     );
     expect(row.status).toBe("passed");
@@ -377,6 +382,7 @@ describe("assertTelemetryNotClean helper — self-checks", () => {
       baseEvidence({
         source: "live",
         captured_at: FRESH_ISO,
+        has_usable_metric: true,
       }),
     );
     expect(enriched.provenance).toBe("direct");

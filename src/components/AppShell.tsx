@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import LegalFooterLinks from "@/components/LegalFooterLinks";
 import { Outlet, useLocation, useNavigate } from "@/lib/react-router-compat";
 import { Bell, LogOut, Plus, Search } from "lucide-react";
@@ -31,6 +31,9 @@ import {
 import { consumeQuickLogStartIntent } from "@/lib/startScreenPreferences";
 import { useCheckoutReturnCompletionTracking } from "@/hooks/useCheckoutReturnCompletionTracking";
 import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { TentQuickLogTargetScope } from "@/components/TentQuickLogTargetScope";
+import type { TentQuickLogTargetRegistration } from "@/context/TentQuickLogTargetContext";
+import type { TentQuickLogTargetEvidence } from "@/lib/quickLogRouteTargetRules";
 import {
   QUICK_LOG_V2_OPEN_EVENT,
   isQuickLogV2OpenIntent,
@@ -66,13 +69,30 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
   const [openScopedLog, setOpenScopedLog] = useState(false);
+  const [mobileLaunchTargetKey, setMobileLaunchTargetKey] = useState<string | null>(null);
+  const [tentQuickLogTargetEvidence, setTentQuickLogTargetEvidence] =
+    useState<TentQuickLogTargetEvidence | null>(null);
   const [structuredOpenIntent, setStructuredOpenIntent] = useState<QuickLogV2OpenIntent | null>(
     null,
   );
   const [legacyQuickLogSession, setLegacyQuickLogSession] = useState(0);
   const [prefill, setPrefill] = useState<QuickLogPrefill | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
-  const mobileQuickLogTarget = resolveMobileQuickLogTarget(location.pathname);
+  const registerTentQuickLogTarget = useCallback((registration: TentQuickLogTargetRegistration) => {
+    setTentQuickLogTargetEvidence((current) => {
+      if (registration.clear) {
+        return current?.tentId === registration.tentId ? null : current;
+      }
+      return {
+        tentId: registration.tentId,
+        soleActivePlantId: registration.soleActivePlantId,
+      };
+    });
+  }, []);
+  const mobileQuickLogTarget = resolveMobileQuickLogTarget(
+    location.pathname,
+    tentQuickLogTargetEvidence,
+  );
 
   // This shell lives inside the route-level Suspense boundary. Tracking here
   // waits for server-auth revalidation and the paid entitlement read as well
@@ -119,6 +139,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       setOpenLog(false);
       setPrefill(null);
       setLegacyQuickLogSession((session) => session + 1);
+      setMobileLaunchTargetKey(null);
       setStructuredOpenIntent(detail);
       setOpenScopedLog(true);
     }
@@ -130,6 +151,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     function onOpen(e: Event) {
       const detail = (e as CustomEvent<QuickLogPrefill>).detail ?? null;
       setOpenScopedLog(false);
+      setMobileLaunchTargetKey(null);
       setStructuredOpenIntent(null);
       setPrefill(detail);
       setOpenLog(true);
@@ -157,6 +179,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       ? { ...(routePrefill ?? {}), eventType: startEventType }
       : routePrefill;
     setOpenScopedLog(false);
+    setMobileLaunchTargetKey(null);
     setStructuredOpenIntent(null);
     setPrefill(guidePrefill ?? startPrefill);
     setOpenLog(true);
@@ -185,6 +208,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
 
     previousNavigationKeyRef.current = location.key;
     setOpenScopedLog(false);
+    setMobileLaunchTargetKey(null);
     setStructuredOpenIntent(null);
   }, [location.key]);
 
@@ -306,7 +330,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
             {isEmailVerificationPending(user) ? (
               <VerificationPendingBanner email={user.email ?? ""} />
             ) : (
-              pageContent
+              <TentQuickLogTargetScope register={registerTentQuickLogTarget}>
+                {pageContent}
+              </TentQuickLogTargetScope>
             )}
             {/* In-flow legal footer: stays at the end of scrolled content
                 (never fixed), so the mobile FAB cannot clip it. */}
@@ -327,11 +353,17 @@ export default function AppShell({ children }: { children?: ReactNode }) {
               setPrefill(null);
               setLegacyQuickLogSession((session) => session + 1);
               setStructuredOpenIntent(null);
+              // Freeze the evidence available at the grower's tap. A plant
+              // query that settles later may improve the NEXT launch, but it
+              // cannot retarget this open sheet and erase its draft.
+              setMobileLaunchTargetKey(mobileQuickLogTarget);
               setOpenScopedLog(true);
             } else {
               setOpenScopedLog(false);
+              setMobileLaunchTargetKey(null);
               setStructuredOpenIntent(null);
-              setPrefill(null);
+              const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
+              setPrefill(routePlantId ? { plantId: routePlantId } : null);
               setOpenLog(true);
             }
           }}
@@ -362,9 +394,12 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           open={openScopedLog}
           onOpenChange={(nextOpen) => {
             setOpenScopedLog(nextOpen);
-            if (!nextOpen) setStructuredOpenIntent(null);
+            if (!nextOpen) {
+              setMobileLaunchTargetKey(null);
+              setStructuredOpenIntent(null);
+            }
           }}
-          defaultTargetKey={structuredOpenIntent?.targetKey ?? mobileQuickLogTarget}
+          defaultTargetKey={structuredOpenIntent?.targetKey ?? mobileLaunchTargetKey}
           defaultAction={structuredOpenIntent?.action ?? "note"}
         />
 

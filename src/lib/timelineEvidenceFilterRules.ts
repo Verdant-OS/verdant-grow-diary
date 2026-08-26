@@ -14,6 +14,8 @@
  *  - Case-insensitive, trimmed. Empty query returns all rows.
  */
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { normalizePersistedGrowTentId } from "@/lib/growTentSelectionRules";
+import { normalizePersistedPlantId } from "@/lib/sensorRoutePlantIntentRules";
 import {
   classifyTimelineSensorSource,
   type TimelineSensorSourceKind,
@@ -72,7 +74,7 @@ export function deriveTimelineRowSensorSource(
   options: { now?: number; staleMs?: number } = {},
 ): TimelineSensorSourceKind | null {
   const details = (row?.details ?? {}) as Record<string, unknown>;
-  const raw = details.sensor_snapshot ?? details.sensor;
+  const raw = details.sensor_snapshot ?? details.sensor ?? details.manual_sensor_snapshot;
   if (!raw || typeof raw !== "object") return null;
   const snap = raw as { source?: unknown; ts?: unknown };
   const rawSource = typeof snap.source === "string" ? snap.source : null;
@@ -253,6 +255,61 @@ export function buildTimelineNameLookup(rows: unknown): ReadonlyMap<string, stri
     if (!m.has(id.trim())) m.set(id.trim(), name.trim());
   }
   return m;
+}
+
+/**
+ * Build the owner-and-grow-scoped plant → current tent relationship used only
+ * for the Timeline handoff to Sensors. A direct plant grow attribution wins;
+ * legacy null plant attribution may roll up through a tent in the active grow.
+ * Conflicting, invalid, unassigned, or placeholder ids are omitted so callers
+ * cannot turn an unresolved relationship into route intent or switch grows.
+ * As with the name directory, `null` means the read itself was unavailable;
+ * an empty map means the read succeeded but supplied no usable relationship.
+ */
+export function buildTimelinePlantTentLookup(
+  plantRows: unknown,
+  ownerTentRows: unknown,
+  growId: unknown,
+): ReadonlyMap<string, string> | null {
+  if (!Array.isArray(plantRows) || !Array.isArray(ownerTentRows)) return null;
+  const activeGrowId = normalizePersistedGrowTentId(growId);
+  if (!activeGrowId) return null;
+
+  const ownerTentGrowIds = new Map<string, string>();
+  for (const row of ownerTentRows) {
+    if (!row || typeof row !== "object") continue;
+    const record = row as Record<string, unknown>;
+    const tentId = normalizePersistedGrowTentId(record.id);
+    const tentGrowId = normalizePersistedGrowTentId(record.grow_id);
+    if (tentId && tentGrowId && !ownerTentGrowIds.has(tentId)) {
+      ownerTentGrowIds.set(tentId, tentGrowId);
+    }
+  }
+
+  const lookup = new Map<string, string>();
+  for (const row of plantRows) {
+    if (!row || typeof row !== "object") continue;
+    const record = row as Record<string, unknown>;
+    const plantId = normalizePersistedPlantId(record.id);
+    const tentId = normalizePersistedGrowTentId(record.tent_id);
+    const tentGrowId = tentId ? ownerTentGrowIds.get(tentId) : null;
+    const directPlantGrowId = normalizePersistedGrowTentId(record.grow_id);
+    const hasMalformedDirectGrowId = record.grow_id != null && !directPlantGrowId;
+    const effectivePlantGrowId = directPlantGrowId ?? tentGrowId;
+    if (
+      !plantId ||
+      !tentId ||
+      !tentGrowId ||
+      hasMalformedDirectGrowId ||
+      tentGrowId !== activeGrowId ||
+      effectivePlantGrowId !== activeGrowId ||
+      lookup.has(plantId)
+    ) {
+      continue;
+    }
+    lookup.set(plantId, tentId);
+  }
+  return lookup;
 }
 
 /**

@@ -15,6 +15,10 @@ import { resolve } from "node:path";
 import { classifyVpdAgainstStage, vpdMetricChipStatus } from "@/lib/vpdStageTargetRules";
 
 const TENTS_SRC = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8");
+const SNAPSHOT_STRIP_SRC = readFileSync(
+  resolve(__dirname, "../components/TentEnvironmentSnapshotStrip.tsx"),
+  "utf8",
+);
 
 const SNAPSHOT_VM_SRC = readFileSync(
   resolve(__dirname, "../lib/dashboardEnvironmentSnapshotViewModel.ts"),
@@ -25,12 +29,15 @@ describe("Tents list — VPD threshold cleanup", () => {
   it("no longer hardcodes 0.6 / 1.6 VPD thresholds in JSX", () => {
     expect(TENTS_SRC).not.toMatch(/vpd\s*>\s*1\.6/);
     expect(TENTS_SRC).not.toMatch(/vpd\s*<\s*0\.6/);
+    expect(SNAPSHOT_STRIP_SRC).not.toMatch(/vpd\s*>\s*1\.6/);
+    expect(SNAPSHOT_STRIP_SRC).not.toMatch(/vpd\s*<\s*0\.6/);
   });
 
   it("classifies VPD through the shared presenter, keeping the canonical stage helper", () => {
-    expect(TENTS_SRC).toMatch(/buildTentSnapshotView/);
-    expect(TENTS_SRC).toMatch(/normalizeVpdStage/);
-    expect(TENTS_SRC).toMatch(/from\s+["']@\/lib\/vpdStageTargetRules["']/);
+    expect(TENTS_SRC).toMatch(/TentEnvironmentSnapshotStrip/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/buildTentSnapshotView/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/normalizeVpdStage/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(/from\s+["']@\/lib\/vpdStageTargetRules["']/);
     // The presenter itself must route VPD through the canonical classifier
     // (stageAwareVpdTargets is the deprecated re-export shim of
     // vpdStageTargetRules).
@@ -42,8 +49,9 @@ describe("Tents list — VPD threshold cleanup", () => {
   });
 
   it("passes the tent's stage into the presenter", () => {
-    expect(TENTS_SRC).toMatch(
-      /buildTentSnapshotView\(\s*\(readingsByTent\[t\.id\][\s\S]*?t\.stage/,
+    expect(TENTS_SRC).toMatch(/<TentEnvironmentSnapshotStrip[\s\S]*?stage=\{t\.stage\}/);
+    expect(SNAPSHOT_STRIP_SRC).toMatch(
+      /buildTentSnapshotView\(selection\.rows, stage, now, \{ temperatureUnit \}\)/,
     );
     expect(SNAPSHOT_VM_SRC).toMatch(/classifyVpdAgainstStage\(\s*\{[^}]*stage/);
   });
@@ -78,16 +86,20 @@ describe("Tents list — classifier behavior (via shared helper)", () => {
 
 describe("Tents list — safety contract", () => {
   it("contains no automation / device-control / service_role strings", () => {
-    expect(TENTS_SRC).not.toMatch(/service_role/);
-    expect(TENTS_SRC).not.toMatch(
-      /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b|device_command|autopilot/i,
-    );
-    expect(TENTS_SRC).not.toMatch(/ai[\s_-]?coach|ai_doctor/i);
+    for (const source of [TENTS_SRC, SNAPSHOT_STRIP_SRC]) {
+      expect(source).not.toMatch(/service_role/);
+      expect(source).not.toMatch(
+        /mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|\brelay\b|\bactuator\b|device_command|autopilot/i,
+      );
+      expect(source).not.toMatch(/ai[\s_-]?coach|ai_doctor/i);
+    }
   });
 
   it("does not write to alerts / action_queue / sensor_readings", () => {
-    expect(TENTS_SRC).not.toMatch(
-      /\.from\(["'](alerts|action_queue|sensor_readings)["']\)\s*\.(insert|update|delete|upsert)/,
-    );
+    for (const source of [TENTS_SRC, SNAPSHOT_STRIP_SRC]) {
+      expect(source).not.toMatch(
+        /\.from\(["'](alerts|action_queue|sensor_readings)["']\)\s*\.(insert|update|delete|upsert)/,
+      );
+    }
   });
 });

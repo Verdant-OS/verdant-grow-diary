@@ -7,12 +7,14 @@
  *  2. latest diary_entries evidence for the scoped grow, tent-scoped when
  *     tentIds is non-empty:
  *       a. details.sensor_snapshot
- *       b. details.environment_check (manual envelope; #596)
+ *       b. details.manual_sensor_snapshot (Plant Quick Log manual envelope)
+ *       c. details.environment_check (manual envelope; #596)
  *  3. otherwise EMPTY_SNAPSHOT (rendered as "No sensor data yet.")
  *
  * Tent scope (#602): when the view is tent-scoped, diary rows with null or
  * foreign tent_id never surface as that tent's environment evidence — same
- * fail-closed gate for sensor_snapshot and environment_check.
+ * fail-closed gate for sensor_snapshot, manual_sensor_snapshot, and
+ * environment_check.
  *
  * Backed by TanStack Query so manual sensor inserts that invalidate
  * `["latest-sensor-snapshot"]` (or `["sensor_readings"]`) trigger a refetch
@@ -32,6 +34,7 @@ import {
   type SensorSnapshot,
   snapshotFromDiary,
   snapshotFromEnvironmentCheck,
+  snapshotFromManualSensorSnapshot,
   snapshotFromReadings,
 } from "@/lib/sensorSnapshot";
 import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
@@ -58,10 +61,10 @@ function preferNewer(
 }
 
 export type SnapshotState =
-  | { status: "idle"; snapshot: SensorSnapshot }
-  | { status: "loading"; snapshot: SensorSnapshot }
-  | { status: "ok"; snapshot: SensorSnapshot }
-  | { status: "unavailable"; snapshot: SensorSnapshot };
+  | { status: "idle"; snapshot: SensorSnapshot; isFetching?: boolean; isPaused?: boolean }
+  | { status: "loading"; snapshot: SensorSnapshot; isFetching?: boolean; isPaused?: boolean }
+  | { status: "ok"; snapshot: SensorSnapshot; isFetching?: boolean; isPaused?: boolean }
+  | { status: "unavailable"; snapshot: SensorSnapshot; isFetching?: boolean; isPaused?: boolean };
 
 export function useLatestSensorSnapshot(
   growId: string | null | undefined,
@@ -130,7 +133,7 @@ export function useLatestSensorSnapshot(
           if (!details || typeof details !== "object") continue;
           // #602 / #601: tent-scoped views only accept diary rows attributed
           // to one of those tents — null/foreign tent_id is not this tent's
-          // evidence (sensor_snapshot and environment_check share the gate).
+          // evidence (every diary snapshot envelope shares this gate).
           if (!isDiaryRowInTentScope(row.tent_id, tentIds)) continue;
           // Past that gate the row is proven in scope, so its own tent is the
           // honest attribution for whichever snapshot this row yields. (This
@@ -146,13 +149,26 @@ export function useLatestSensorSnapshot(
             snap.tent_id = rowTentInScope;
             return preferNewer(staleSensorCandidate, snap);
           }
-          // #596: a Quick Log Environment Check is grower-entered manual
-          // evidence; within the same row a full sensor_snapshot blob wins,
-          // and rows are already newest-first.
+          // Plant Quick Log stores its manual sensor payload directly on the
+          // companion diary row. It is manual evidence, not a synthetic
+          // sensor_readings row: preserve its source and only surface it
+          // after the shared tent-scope gate above has proved attribution.
           const diaryEntryId =
             typeof (row as { id?: string | null }).id === "string"
               ? (row as { id: string }).id
               : null;
+          const manualSnap = snapshotFromManualSensorSnapshot(
+            row.entry_at,
+            details.manual_sensor_snapshot as Record<string, unknown> | undefined,
+            { diaryEntryId },
+          );
+          if (manualSnap) {
+            manualSnap.tent_id = rowTentInScope;
+            return preferNewer(staleSensorCandidate, manualSnap);
+          }
+          // #596: a Quick Log Environment Check is grower-entered manual
+          // evidence; within the same row a full sensor_snapshot blob wins,
+          // and rows are already newest-first.
           const envSnap = snapshotFromEnvironmentCheck(
             row.entry_at,
             details.environment_check as Record<string, unknown> | undefined,
@@ -174,15 +190,36 @@ export function useLatestSensorSnapshot(
   });
 
   if (!user || !growId) {
-    return { status: "idle", snapshot: EMPTY_SNAPSHOT };
+    return { status: "idle", snapshot: EMPTY_SNAPSHOT, isFetching: false, isPaused: false };
   }
   if (query.isLoading || (query.isFetching && !query.data)) {
-    return { status: "loading", snapshot: EMPTY_SNAPSHOT };
+    return {
+      status: "loading",
+      snapshot: EMPTY_SNAPSHOT,
+      isFetching: true,
+      isPaused: query.isPaused,
+    };
   }
   if (query.isError) {
-    return { status: "unavailable", snapshot: EMPTY_SNAPSHOT };
+    return {
+      status: "unavailable",
+      snapshot: EMPTY_SNAPSHOT,
+      isFetching: query.isFetching,
+      isPaused: query.isPaused,
+    };
   }
-  return { status: "ok", snapshot: query.data ?? EMPTY_SNAPSHOT };
+  return {
+    status: "ok",
+    snapshot: query.data ?? EMPTY_SNAPSHOT,
+    // TanStack Query preserves cached data during a background refetch. The
+    // status remains "ok", so consumers that need current proof evidence
+    // must be able to withhold that cached snapshot until the read settles.
+    isFetching: query.isFetching,
+    // An offline/paused fetch also leaves cached data in place while
+    // `isFetching` is false. Expose that state for proof-only consumers;
+    // generic snapshot users preserve their normal cache behavior.
+    isPaused: query.isPaused,
+  };
 }
 
 export default useLatestSensorSnapshot;

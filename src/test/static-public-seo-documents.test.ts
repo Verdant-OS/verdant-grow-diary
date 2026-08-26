@@ -125,7 +125,17 @@ describe("static public SEO documents", () => {
       expect(outputPaths.has(document.fileName)).toBe(false);
       outputPaths.add(document.fileName);
       expect(document.fileName).toBe(expectedFileName(document.path));
-      expect(document.metadata.url).toBe(`${VERDANT_SITE_ORIGIN}${document.path}`);
+      // Self-canonical is the rule. The single sanctioned exception is a
+      // document that DECLARES a `canonicalPath` — an indexable audience
+      // variant conceding its ranking URL to another route (see
+      // crossCanonicalDocument and src/test/breeder-beta-cross-canonical.test.ts).
+      // The fence is not loosened, only redirected: such a document must match
+      // its declared target exactly, so a wrong URL still fails here and can
+      // only be introduced deliberately.
+      const declaredCanonical = (document as { canonicalPath?: string }).canonicalPath;
+      expect(document.metadata.url).toBe(
+        `${VERDANT_SITE_ORIGIN}${declaredCanonical ?? document.path}`,
+      );
       expect(document.metadata.url).not.toMatch(/[?#]/);
       expect(document.metadata.title).toBeTruthy();
       expect(document.metadata.description).toBeTruthy();

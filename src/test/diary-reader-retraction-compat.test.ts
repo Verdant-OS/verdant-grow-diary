@@ -24,6 +24,9 @@ const harness = vi.hoisted(() => ({
     growId?: string;
     plantId?: string;
     tentId?: string;
+    snapshotExists: boolean;
+    manualSnapshotSource: boolean;
+    orders: Array<{ column: string; ascending?: boolean }>;
   }>,
 }));
 
@@ -33,13 +36,26 @@ function builder() {
     growId: undefined as string | undefined,
     plantId: undefined as string | undefined,
     tentId: undefined as string | undefined,
+    snapshotExists: false,
+    manualSnapshotSource: false,
+    orders: [] as Array<{ column: string; ascending?: boolean }>,
   };
   const chain = {
     select: () => chain,
+    in: () => chain,
     eq: (column: string, value: unknown) => {
       if (column === "grow_id" && typeof value === "string") state.growId = value;
       if (column === "plant_id" && typeof value === "string") state.plantId = value;
       if (column === "tent_id" && typeof value === "string") state.tentId = value;
+      if (column === "details->manual_sensor_snapshot->>source" && value === "manual") {
+        state.manualSnapshotSource = true;
+      }
+      return chain;
+    },
+    not: (column: string, operator: string, value: unknown) => {
+      if (column === "details->manual_sensor_snapshot" && operator === "is" && value === null) {
+        state.snapshotExists = true;
+      }
       return chain;
     },
     is: (column: string) => {
@@ -48,14 +64,21 @@ function builder() {
     },
     gte: () => chain,
     lte: () => chain,
-    order: () => chain,
+    order: (column: string, options?: { ascending?: boolean }) => {
+      state.orders.push({ column, ascending: options?.ascending });
+      return chain;
+    },
     limit: () => chain,
+    range: () => chain,
     then: (resolve: (value: QueryResult) => unknown) => {
       harness.calls.push({
         filtered: state.filtered,
         growId: state.growId,
         plantId: state.plantId,
         tentId: state.tentId,
+        snapshotExists: state.snapshotExists,
+        manualSnapshotSource: state.manualSnapshotSource,
+        orders: state.orders,
       });
       return Promise.resolve(harness.results.shift() ?? { data: [], error: null }).then(resolve);
     },
@@ -69,6 +92,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import {
   fetchPlantManualSnapshotRows,
+  fetchTentManualSnapshotBatchPage,
   fetchTentManualSnapshotRows,
 } from "@/hooks/useManualSnapshotTimelineCards";
 import { fetchPlantManualSensorDiaryRows } from "@/hooks/usePlantManualSensorHistory";
@@ -102,8 +126,30 @@ describe("manual diary readers retraction compatibility", () => {
       { id: "legacy", plant_id: "plant-1" },
     ]);
     expect(harness.calls).toEqual([
-      { filtered: true, growId: undefined, plantId: "plant-1", tentId: undefined },
-      { filtered: false, growId: undefined, plantId: "plant-1", tentId: undefined },
+      {
+        filtered: true,
+        growId: undefined,
+        plantId: "plant-1",
+        tentId: undefined,
+        snapshotExists: true,
+        manualSnapshotSource: true,
+        orders: [
+          { column: "entry_at", ascending: false },
+          { column: "id", ascending: true },
+        ],
+      },
+      {
+        filtered: false,
+        growId: undefined,
+        plantId: "plant-1",
+        tentId: undefined,
+        snapshotExists: true,
+        manualSnapshotSource: true,
+        orders: [
+          { column: "entry_at", ascending: false },
+          { column: "id", ascending: true },
+        ],
+      },
     ]);
   });
 
@@ -117,6 +163,39 @@ describe("manual diary readers retraction compatibility", () => {
       { id: "legacy", tent_id: "tent-1" },
     ]);
     expect(harness.calls.map((call) => call.filtered)).toEqual([true, false]);
+    expect(
+      harness.calls.every(
+        (call) => call.snapshotExists && call.manualSnapshotSource && call.orders.length === 2,
+      ),
+    ).toBe(true);
+  });
+
+  it("preserves JSON predicates when a batch page retries without retracted_at", async () => {
+    harness.results = [
+      { data: null, error: MISSING_COLUMN },
+      {
+        data: [{ id: "legacy", tent_id: "00000000-0000-4000-8000-000000000001" }],
+        error: null,
+      },
+    ];
+
+    await expect(
+      fetchTentManualSnapshotBatchPage({
+        chunkIndex: 0,
+        pageIndex: 0,
+        tentIds: ["00000000-0000-4000-8000-000000000001"],
+        from: 0,
+        to: 199,
+        upperBoundEntryAt: null,
+        expectedBoundaryRowId: null,
+      }),
+    ).resolves.toEqual([{ id: "legacy", tent_id: "00000000-0000-4000-8000-000000000001" }]);
+    expect(harness.calls.map((call) => call.filtered)).toEqual([true, false]);
+    expect(
+      harness.calls.every(
+        (call) => call.snapshotExists && call.manualSnapshotSource && call.orders.length === 2,
+      ),
+    ).toBe(true);
   });
 
   it("keeps manual sensor history available before the migration", async () => {

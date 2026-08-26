@@ -127,6 +127,7 @@ const TENTS_PAGE = read("src/pages/Tents.tsx");
 const PLANTS_PAGE = read("src/pages/Plants.tsx");
 const CREATE_TENT = read("src/components/CreateTentDialog.tsx");
 const CREATE_PLANT = read("src/components/CreatePlantDialog.tsx");
+const HIERARCHY_CREATE_PERSISTENCE = read("src/lib/hierarchyCreatePersistence.ts");
 const QUICK_LOG = read("src/components/QuickLog.tsx");
 
 describe("AssignTentDialog · movement timeline event", () => {
@@ -209,13 +210,12 @@ describe("Add Tent / Add Plant flows exist and are grow-scoped", () => {
   it("Plants page renders CreatePlantDialog", () => {
     expect(PLANTS_PAGE).toContain("CreatePlantDialog");
   });
-  it("CreateTentDialog inserts grow-scoped tents and never injects user_id", () => {
-    expect(CREATE_TENT).toMatch(/\.from\(["']tents["']\)/);
-    expect(CREATE_TENT).toMatch(/\.insert\(/);
-    const inserts = [...CREATE_TENT.matchAll(/\.insert\(\s*\{([^}]*)\}\s*\)/g)];
-    for (const m of inserts) {
-      expect(m[1]).not.toMatch(/\buser_id\b/);
-    }
+  it("CreateTentDialog inserts an authenticated, grow-scoped tent through the safe persistence seam", () => {
+    expect(CREATE_TENT).toMatch(/persistHierarchyCreateAttempt/);
+    expect(CREATE_TENT).toMatch(/user_id:\s*user\.id/);
+    expect(CREATE_TENT).toMatch(/grow_id:\s*targetGrowId/);
+    expect(HIERARCHY_CREATE_PERSISTENCE).toMatch(/return "tents"/);
+    expect(HIERARCHY_CREATE_PERSISTENCE).toMatch(/\.insert\(payload as never\)/);
   });
   it("CreatePlantDialog inserts grow-scoped plants and never injects user_id", () => {
     expect(CREATE_PLANT).toMatch(/\.from\(["']plants["']\)/);

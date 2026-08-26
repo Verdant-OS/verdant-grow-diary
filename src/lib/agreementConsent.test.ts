@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { computeAgreementGaps, buildAcceptanceRows } from "./agreementConsent";
+import {
+  computeAgreementGaps,
+  buildAcceptanceRows,
+  buildOwnAcceptancePayloads,
+} from "./agreementConsent";
 import type { AgreementVersion } from "@/constants/agreements";
 
 const AGREEMENTS: AgreementVersion[] = [
@@ -48,8 +52,31 @@ describe("computeAgreementGaps", () => {
   });
 });
 
+describe("buildOwnAcceptancePayloads", () => {
+  it("returns one row per agreement with no client user_id", () => {
+    const rows = buildOwnAcceptancePayloads(AGREEMENTS, "ua");
+    expect(rows).toEqual([
+      {
+        agreement_type: "terms",
+        version: "v2",
+        effective_date: "2026-07-13",
+        user_agent: "ua",
+      },
+      {
+        agreement_type: "privacy",
+        version: "v2",
+        effective_date: "2026-07-13",
+        user_agent: "ua",
+      },
+    ]);
+    for (const row of rows) {
+      expect(row).not.toHaveProperty("user_id");
+    }
+  });
+});
+
 describe("buildAcceptanceRows", () => {
-  it("returns one row per agreement scoped to user", () => {
+  it("returns one row per agreement scoped to user (legacy direct-table shape)", () => {
     const rows = buildAcceptanceRows("user-1", AGREEMENTS);
     expect(rows).toEqual([
       { user_id: "user-1", agreement_type: "terms", version: "v2", effective_date: "2026-07-13" },

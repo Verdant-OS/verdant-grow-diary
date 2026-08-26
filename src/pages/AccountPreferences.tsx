@@ -10,11 +10,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { CURRENT_AGREEMENTS, CURRENT_AGREEMENT_LIST } from "@/constants/agreements";
 import {
-  buildAcceptanceRows,
   computeAgreementGaps,
   type AcceptanceRow,
   type AgreementGap,
 } from "@/lib/agreementConsent";
+import {
+  acceptancePayloadsForCurrentAgreements,
+  recordOwnAgreementAcceptances,
+  type AgreementAcceptanceRpcClient,
+} from "@/lib/agreementAcceptanceService";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 
@@ -115,15 +119,13 @@ export default function AccountPreferences() {
     setAccepting(true);
     setReconsentError(null);
     setReconsentStatus(null);
-    const rows = buildAcceptanceRows(user.id).map((r) => ({
-      ...r,
-      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
-    }));
-    const { error: err } = await supabase
-      .from("user_agreement_acceptances")
-      // Append-only: ON CONFLICT DO NOTHING so only INSERT is needed (there is
-      // no UPDATE policy); an existing row must not drive the RLS-denied UPDATE.
-      .upsert(rows, { onConflict: "user_id,agreement_type,version", ignoreDuplicates: true });
+    const payloads = acceptancePayloadsForCurrentAgreements(
+      typeof navigator !== "undefined" ? navigator.userAgent : null,
+    );
+    const { error: err } = await recordOwnAgreementAcceptances(
+      supabase as unknown as AgreementAcceptanceRpcClient,
+      payloads,
+    );
     if (err) {
       setAccepting(false);
       setReconsentError("Couldn't record your acceptance. Please try again.");

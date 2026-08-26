@@ -274,9 +274,9 @@ export default function AgentIntegrations({
             <ShieldCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden />
             <p className="text-sm leading-relaxed">
               Verdant agent integrations are <strong>read-only</strong> in this release. Agents can
-              list grows, recent diary entries, and latest sensor snapshots for the signed-in grower
-              only. They cannot write logs, create Action Queue items, run AI Doctor, control
-              equipment, or automate grow-room devices.
+              list grows, recent diary entries, latest sensor snapshots, and bounded Grow Walk
+              target/context evidence for the signed-in grower only. They cannot write logs, create
+              Action Queue items, run AI Doctor, control equipment, or automate grow-room devices.
             </p>
           </div>
         </section>
@@ -495,7 +495,9 @@ export default function AgentIntegrations({
             <li>
               Run a read-only test like <code className="font-mono">list_grows</code>.
             </li>
-            <li>Use diary entries and sensor snapshots as context, not automation.</li>
+            <li>
+              Use diary, sensor, and Grow Walk context as inspection evidence, not automation.
+            </li>
           </ol>
           <div className="flex flex-wrap gap-2 pt-2">
             <Button asChild size="sm" variant="outline">
@@ -555,9 +557,9 @@ export default function AgentIntegrations({
 
           <p className="text-xs text-muted-foreground" data-testid="connect-agent-safety-copy">
             Verdant agent access is read-only in this release. Agents can list grows, recent diary
-            entries, and latest sensor snapshots for the signed-in grower only. They cannot write
-            logs, create Action Queue items, run AI Doctor, control equipment, or automate grow-room
-            devices.
+            entries, latest sensor snapshots, and bounded Grow Walk evidence for the signed-in
+            grower only. They cannot write logs, create Action Queue items, run AI Doctor, control
+            equipment, or automate grow-room devices.
           </p>
         </section>
 

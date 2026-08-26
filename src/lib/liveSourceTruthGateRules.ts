@@ -90,7 +90,14 @@ export const LIVE_SOURCE_TRUTH_STALE_AFTER_MS = 15 * 60 * 1000;
 /** Captured_at more than this far in the future is invalid. */
 export const LIVE_SOURCE_TRUTH_FUTURE_SKEW_MS = 5 * 60 * 1000;
 
-const DEFAULT_TOLERANCES: Readonly<Record<LiveSourceTruthMetricKey, number>> = Object.freeze({
+/**
+ * Shared per-metric source-comparison tolerance in the metric's canonical
+ * unit. A difference at or below the tolerance is ordinary sensor/rounding
+ * variation, not source disagreement.
+ */
+export const LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES: Readonly<
+  Record<LiveSourceTruthMetricKey, number>
+> = Object.freeze({
   temp_f: 1.5,
   humidity_pct: 3,
   vpd_kpa: 0.2,
@@ -212,7 +219,9 @@ function evaluateMetric(m: LiveSourceTruthMetricEvidence): MetricEval {
 
   const backend = isFiniteNumber(m.backend_value) ? m.backend_value : null;
   const controller = isFiniteNumber(m.controller_value) ? m.controller_value : null;
-  const tolerance = isFiniteNumber(m.tolerance) ? Math.abs(m.tolerance) : DEFAULT_TOLERANCES[key];
+  const tolerance = isFiniteNumber(m.tolerance)
+    ? Math.abs(m.tolerance)
+    : LIVE_SOURCE_TRUTH_DEFAULT_TOLERANCES[key];
 
   // Suspicious-value check on backend value
   if (backend !== null) {

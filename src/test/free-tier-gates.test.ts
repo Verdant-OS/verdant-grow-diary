@@ -118,7 +118,7 @@ describe("static wiring — the gates are actually read at the creation seams", 
   it("Grows.tsx evaluates the grow gate, guards create(), and gates the CTA", () => {
     expect(GROWS).toMatch(/evaluateGrowCreationGate\(/);
     expect(GROWS).toMatch(/if \(!growGate\.allowed\)/);
-    expect(GROWS).toMatch(/disabled=\{!growGate\.allowed\}/);
+    expect(GROWS).toMatch(/disabled=\{!growGate\.allowed \|\| createOutcomeUnknown\}/);
     expect(GROWS).toMatch(/grow-create-gate-notice/);
   });
 
@@ -126,7 +126,9 @@ describe("static wiring — the gates are actually read at the creation seams", 
     expect(TENT_DIALOG).toMatch(/evaluateTentCreationGate\(/);
     expect(TENT_DIALOG).toMatch(/if \(!tentGate\.allowed\)/);
     // formBlocked is the fail-closed binding gate (replaces hardStop.blockSubmit).
-    expect(TENT_DIALOG).toMatch(/disabled=\{busy \|\| !tentGate\.allowed \|\| formBlocked\}/);
+    expect(TENT_DIALOG).toMatch(
+      /disabled=\{busy \|\| createOutcomeUnknown \|\| !tentGate\.allowed \|\| formBlocked\}/,
+    );
     expect(TENT_DIALOG).toMatch(/\bformBlocked\b/);
     expect(TENT_DIALOG).not.toMatch(/hardStop\.blockSubmit/);
     expect(TENT_DIALOG).toMatch(/tent-create-gate-notice/);

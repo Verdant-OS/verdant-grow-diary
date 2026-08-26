@@ -99,6 +99,8 @@ import { toast } from "sonner";
 
 import DailyGrowCheckOnboardingCard from "@/components/DailyGrowCheckOnboardingCard";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
+import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
+import { useAuth } from "@/store/auth";
 import { deriveChangeContextFromReadings } from "@/lib/manualSensorSnapshotChangeContextRules";
 
 import { plantDetailPath, plantsPath, sensorsPath, tentsPath, timelinePath } from "@/lib/routes";
@@ -141,6 +143,7 @@ function resolveCompatibleAssignedTentId(
 
 export default function DailyCheck() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: tents = [], isLoading: tentsLoading } = useTents();
   const { data: plants = [], isLoading: plantsLoading } = usePlants();
   const initialPlantId = useQueryParam("plantId");
@@ -576,6 +579,23 @@ export default function DailyCheck() {
           plantId={selectedPlant?.id ?? null}
           plantStage={(selectedPlant as { stage?: unknown } | null)?.stage ?? null}
           testIdPrefix="daily-check-all-activities"
+          // D5: Daily Check is a real plant-scoped save surface. Without this
+          // the remembered target goes stale here, so an unscoped Quick Log
+          // would offer an OLDER plant than the one just logged. Only a save
+          // that actually named a plant updates the memory; a tent-scoped save
+          // leaves the previous record alone rather than clearing it.
+          onSaveSuccess={(result) => {
+            if (!result.target.plantId) return;
+            rememberRecentQuickLogTarget(
+              {
+                plantId: result.target.plantId,
+                growId: result.target.growId,
+                tentId: result.target.tentId,
+                savedAt: new Date().toISOString(),
+              },
+              user?.id ?? null,
+            );
+          }}
         />
       </div>
 

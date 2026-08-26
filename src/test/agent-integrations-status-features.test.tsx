@@ -364,6 +364,22 @@ describe("last OAuth attempt display", () => {
 });
 
 describe("local tool preference gates the docs-page tool explorer", () => {
+  it("renders first-class forms for both advertised Grow Walk tools", () => {
+    render(
+      <MemoryRouter initialEntries={["/docs/mcp-api"]}>
+        <Routes>
+          <Route path="/docs/mcp-api" element={<McpToolExplorer />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("tool-explorer-list_grow_walk_targets")).toBeTruthy();
+    expect(screen.getByTestId("tool-explorer-get_grow_walk_context")).toBeTruthy();
+    expect(document.getElementById("grow-walk-targets-grow")).toBeTruthy();
+    expect(document.getElementById("grow-walk-context-type")).toBeTruthy();
+    expect(document.getElementById("grow-walk-context-target")).toBeTruthy();
+  });
+
   it("disables only the locally disabled tool's Run button with an honest note", () => {
     setLocalStorageItemForTest(LOCAL_TOOL_PREFS_KEY, JSON.stringify({ list_grows: false }));
     render(

@@ -127,6 +127,7 @@ import {
   groupDashboardSensorReadings,
   selectDashboardSensorEvidenceRows,
 } from "@/lib/dashboardSensorEvidenceRules";
+import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 
 export default function Dashboard() {
   usePageSeo({
@@ -1535,6 +1536,15 @@ export default function Dashboard() {
                   View full Timeline →
                 </Link>
               </div>
+              {/* Recovery prompt only on a successful read: "unavailable" is
+                  unknown, and unknown must never render as measured absence. */}
+              {recent.status === "ok" && (
+                <GrowRecoveryPrompt
+                  growId={scopedGrowId}
+                  items={recent.items}
+                  testId="dashboard-no-recent-check-in-recovery"
+                />
+              )}
               {recent.status === "loading" || recent.status === "idle" ? (
                 <p className="text-sm text-muted-foreground">Loading…</p>
               ) : recent.status === "unavailable" ? (

@@ -12,6 +12,7 @@
  *
  * Only alerts derived from REAL, VALID sensor readings are eligible:
  *   - snapshot must exist
+ *   - snapshot must not explicitly opt out of automatic persistence
  *   - snapshot.source must be "live" or "manual" (never "sim", "diary", "unavailable")
  *   - snapshot must not be stale, measured against the LIVE window for every
  *     source — deliberately tighter than source-aware display freshness
@@ -47,6 +48,7 @@ export interface PersistenceContext {
 export type PersistenceBlockReason =
   | "demo_data"
   | "no_snapshot"
+  | "provenance_ineligible"
   | "context_only_source"
   | "quality_unavailable"
   | "outside_live_window";
@@ -65,6 +67,11 @@ export function snapshotPersistenceBlockReason(
   const { snapshot, quality } = ctx;
   if (ctx.isDemoData === true) return "demo_data";
   if (!snapshot) return "no_snapshot";
+  // Plant Quick Log manual snapshots are readable diary evidence, but their
+  // adapter explicitly opts out before the generic manual-source allowlist.
+  // Existing sensor rows and Environment Check manual snapshots omit this
+  // optional flag and remain eligible under their established contract.
+  if (snapshot.alert_persistence_eligible === false) return "provenance_ineligible";
   if (snapshot.source !== "live" && snapshot.source !== "manual") return "context_only_source";
   if (quality === "unavailable") return "quality_unavailable";
   const now = ctx.now ?? Date.now();

@@ -33,6 +33,7 @@ const uuid = z.string().regex(UUID_RE, "must be a UUID");
  */
 export const PlantInsertPayloadSchema = z
   .object({
+    id: uuid,
     user_id: uuid,
     name: z.string().trim().min(1, "Plant name is required").max(120),
     strain: z.string().trim().max(120).nullish(),

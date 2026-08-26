@@ -1,6 +1,6 @@
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-08-19.1**
+**Sentinel-Version: 2026-09-01.5**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -63,7 +63,7 @@ Use small, scoped changes. Avoid broad rewrites.
 
 ## Multi-Agent Coordination
 
-This repo is worked on by more than one AI agent (Codex, Claude Code, Lovable) at once, sometimes on the same feature independently, without either side knowing.
+This repo is worked on by more than one AI agent (Codex, Claude Code, Grok, Lovable) at once, sometimes on the same feature independently, without either side knowing.
 
 - Before starting substantial new work, check recent merged PRs and open PRs (`gh pr list --state all`, `git log`) for the same or an overlapping feature area. Do not build a second implementation of something that already shipped or is already in review elsewhere.
 - If you discover another agent already has open, unmerged work in your target area, stop and report the collision rather than silently building a competing version.
@@ -110,7 +110,7 @@ Preferred layering:
 | ------------------ | ----------------------------------------- |
 | Constants / config | `src/constants/*`                         |
 | Pure logic / rules | `src/lib/*Rules.ts`                       |
-| Advisors / engines | `src/lib/*Advisor.ts`                     |
+| Services / IO      | `src/lib/*Service.ts`                     |
 | View models        | `src/lib/*ViewModel.ts`                   |
 | React rendering    | `src/pages/*.tsx`, `src/components/*.tsx` |
 | Hooks              | `src/hooks/*`                             |
@@ -574,16 +574,28 @@ assigned role and read its file.
 - Security reviewer must read `docs/agents/roles/security.md`.
 - Council Chair must read `docs/agents/roles/council-chair.md`.
 
-Do not adopt another agent's responsibilities unless Cheek explicitly reassigns them.
+Do not adopt another agent's **owned** slice unless Cheek explicitly reassigns it or
+`CURRENT_STATE.md` marks that work done and unassigned.
 
-Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The default sequence is:
+Codex, Claude, and Grok are **peers**: none outranks the others (Cheek, 2026-08-20,
+refined). Explicit task ownership controls who researches, architects, implements,
+audits, tests, or independently reviews. Default strengths differ; they are preference,
+not exclusivity. Standing collision fences in `CURRENT_STATE.md` still bind (for
+example remaining Tranche A edit points for Codex, Tranche B+ product code for Claude,
+and no competing Timeline / Alerts / Action Queue rewrite).
+
+Every assigned slice names **one owner** and a **different peer** as **independent
+reviewer**. The owner cannot review their own work. **No code ships without peer
+review** — an owned slice without a named independent reviewer is incomplete.
+
+Use `docs/agents/HANDOFF_PROTOCOL.md` for cross-role work. The preferred sequence is:
 
 ```text
 Research -> Architecture -> Build -> Security Review -> QA Audit -> Council -> Cheek approval
 ```
 
-The current task may require only a scoped subset of those roles. Do not create parallel
-implementations of the same slice.
+That sequence is a preferred path, not rank. The current task may require only a scoped
+subset of those stages. Do not create parallel implementations of the same slice.
 
 The only action permitted before the gate below is read-only acquisition of
 `AGENTS.md`, `docs/agents/CURRENT_STATE.md`, and the assigned role file so the
@@ -649,12 +661,12 @@ Cursor Cloud sessions have reported on this environment; where they disagreed, b
 observations are kept below rather than one silently overwriting the other, since VM
 snapshots can differ.
 
-- **Stack & authoritative run guide.** React + Vite + TypeScript SPA (port **8080**)
-  backed by a **hosted** Supabase project — no local Supabase stack is needed to run the
-  app. The public anon key and URL are committed in `.env`. The authoritative
-  run/build/test guide is `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md`
-  has the overview. Read the skill before driving the app — do not duplicate its commands
-  here.
+- **Stack & authoritative run guide.** TanStack Start (SSR) on TanStack Router file
+  routes, written in React + Vite + TypeScript (port **8080**), backed by a **hosted**
+  Supabase project — no local Supabase stack is needed to run the app. The public anon
+  key and URL are committed in `.env`. The authoritative run/build/test guide is
+  `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md` has the overview. Read
+  the skill before driving the app — do not duplicate its commands here.
 - **Package manager — check `node_modules` first; don't blindly retry installs.** Repo
   scripts run under **`bun`** in both observed snapshots. Per
   `.claude/skills/run-verdant-grow-diary/SKILL.md`: if `node_modules` already exists
@@ -681,7 +693,7 @@ snapshots can differ.
   not 5173** explicitly — Vite's default host `::` is unreliable in this container.
   Signed-out `/` renders the public landing directly through `RootEntry`; signed-in growers
   retain Dashboard inside the authenticated `AppShell`. An HTTP 200 on `/` therefore
-  represents the rendered public landing, not merely the SPA shell.
+  represents the rendered public landing, not merely a client-side shell.
 - **Lint / typecheck / test / build.** `bun run lint` (expect 0 errors, many
   pre-existing warnings), `bun run typecheck`, `bun run build` (its postbuild step runs
   the SEO/JSON-LD validators). Unit path is `bunx vitest run <files>` — the full suite

@@ -883,9 +883,31 @@ function proveFunctionAclFences(env, spawnImpl) {
     `select
       not has_function_privilege('anon','public.quicklog_save_manual(${MANUAL_SIGNATURE})','execute')
       and has_function_privilege('authenticated','public.quicklog_save_manual(${MANUAL_SIGNATURE})','execute')
+      and has_function_privilege('service_role','public.quicklog_save_manual(${MANUAL_SIGNATURE})','execute')
       and not has_function_privilege('anon','public.quicklog_save_manual_pre_logged_at(${MANUAL_SIGNATURE})','execute')
       and not has_function_privilege('authenticated','public.quicklog_save_manual_pre_logged_at(${MANUAL_SIGNATURE})','execute')
       and not has_function_privilege('service_role','public.quicklog_save_manual_pre_logged_at(${MANUAL_SIGNATURE})','execute');`,
+    env,
+    spawnImpl,
+  );
+  // Regression matrix for the full private surface: only postgres may
+  // EXECUTE the five helpers beneath the public wrapper.
+  requireSqlTrue(
+    "private_helper_acl_matrix",
+    `select bool_and(
+        not has_function_privilege('anon', sig, 'execute')
+        and not has_function_privilege('authenticated', sig, 'execute')
+        and not has_function_privilege('service_role', sig, 'execute')
+        and not has_function_privilege('quicklog_delegate_probe', sig, 'execute')
+        and has_function_privilege('postgres', sig, 'execute')
+     )
+     from unnest(array[
+       'public.quicklog_save_manual_pre_logged_at(${MANUAL_SIGNATURE})'::regprocedure,
+       'public.quicklog_try_parse_logged_at(text)'::regprocedure,
+       'public.quicklog_try_parse_uuid(text)'::regprocedure,
+       'public.quicklog_stamp_diary_logged_at()'::regprocedure,
+       'public.quicklog_stamp_grow_event_logged_at()'::regprocedure
+     ]) as helpers(sig);`,
     env,
     spawnImpl,
   );
@@ -904,6 +926,43 @@ function proveFunctionAclFences(env, spawnImpl) {
       .includes("permission denied")
   ) {
     throw new Error("anon_public_rpc:wrong_failure");
+  }
+  // Runtime seal: an authenticated session touching a private helper dies
+  // at the permission check, never inside the helper.
+  const helperDenied = spawnPsql({
+    env,
+    input: `begin; set local role authenticated;
+      select public.quicklog_try_parse_uuid('00000000-0000-4000-8000-000000000000');
+      rollback;`,
+    spawnImpl,
+  });
+  if (!helperDenied?.error && helperDenied?.status === 0) {
+    throw new Error("authenticated_helper_probe:unexpected_success");
+  }
+  if (
+    !String(helperDenied?.stderr ?? "")
+      .toLowerCase()
+      .includes("permission denied")
+  ) {
+    throw new Error("authenticated_helper_probe:wrong_failure");
+  }
+  // Runtime service_role EXECUTE on the wrapper: permitted, and answered
+  // with the calm not_authenticated envelope (no JWT in this session).
+  const serviceResult = parseJsonResult(
+    "service_role_wrapper_call",
+    executeSql(
+      `begin;
+       set local role service_role;
+       select public.quicklog_save_manual(
+         'acl_probe','00000000-0000-4000-8000-000000000000'::uuid,'note'
+       );
+       rollback;`,
+      env,
+      { stage: "service_role_wrapper_call", spawnImpl },
+    ),
+  );
+  if (serviceResult.ok !== false || serviceResult.reason !== "not_authenticated") {
+    throw new Error("service_role_wrapper_call:unexpected_result");
   }
 }
 

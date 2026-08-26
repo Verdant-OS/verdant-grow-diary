@@ -360,18 +360,27 @@ export interface StabilityEnvironmentCoverage {
   readonly comparisonAvailable: boolean;
 }
 
+/** Identity key for an environment tag: "Tent A", "tent a" and "tent  A"
+ * all describe one environment and must never unlock the comparison gate as
+ * two. Display keeps the first-seen spelling; identity uses this key. */
+export function canonicalEnvironmentTag(env: string): string {
+  return env.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 export function summarizeEnvironmentCoverage(
   runs: readonly StabilityRun[] | null | undefined,
 ): StabilityEnvironmentCoverage {
   const list = Array.isArray(runs) ? runs : [];
-  const environments: string[] = [];
+  const displayByCanonical = new Map<string, string>();
   let taggedRunCount = 0;
   for (const run of list) {
     const env = typeof run?.environment === "string" ? run.environment.trim() : "";
     if (env === "") continue;
     taggedRunCount += 1;
-    if (!environments.includes(env)) environments.push(env);
+    const key = canonicalEnvironmentTag(env);
+    if (!displayByCanonical.has(key)) displayByCanonical.set(key, env);
   }
+  const environments = [...displayByCanonical.values()];
   return {
     recordedRunCount: list.length,
     taggedRunCount,
@@ -422,12 +431,14 @@ export function buildEnvironmentComparison(
   );
   const out: EnvironmentAxisComparison[] = [];
   for (const axis of LOUD_TRAIT_AXES) {
+    // Grouped by canonical tag so case/whitespace variants pool together;
+    // rendered under the coverage summary's first-seen display spelling.
     const byEnv = new Map<string, number[]>();
     for (const run of list) {
       const value = run.traits?.[axis.key];
       if (typeof value !== "number" || !Number.isFinite(value)) continue;
       if (value < axis.min || value > axis.max) continue;
-      const env = (run.environment as string).trim();
+      const env = canonicalEnvironmentTag(run.environment as string);
       (byEnv.get(env) ?? byEnv.set(env, []).get(env)!).push(value);
     }
     if (byEnv.size < 2) continue;
@@ -435,8 +446,8 @@ export function buildEnvironmentComparison(
       axisKey: axis.key,
       axisLabel: axis.label,
       byEnvironment: coverage.environments
-        .filter((env) => byEnv.has(env))
-        .map((env) => ({ environment: env, values: byEnv.get(env)! })),
+        .filter((env) => byEnv.has(canonicalEnvironmentTag(env)))
+        .map((env) => ({ environment: env, values: byEnv.get(canonicalEnvironmentTag(env))! })),
     });
   }
   return out;

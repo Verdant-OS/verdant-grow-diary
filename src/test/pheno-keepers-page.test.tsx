@@ -13,6 +13,19 @@ import type { UsePhenoKeepersState } from "@/hooks/usePhenoKeepers";
 import { SELF_DONOR_VALUE } from "@/lib/phenoCrossFormViewModel";
 
 const hookMock = vi.fn<() => UsePhenoKeepersState>();
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: {
+      effectivePlanId: "pro_monthly",
+      isActive: true,
+      source: "subscription",
+      hadProAccess: true,
+    },
+    refetch: () => {},
+  }),
+}));
+
 vi.mock("@/hooks/usePhenoKeepers", () => ({
   usePhenoKeepers: () => hookMock(),
 }));

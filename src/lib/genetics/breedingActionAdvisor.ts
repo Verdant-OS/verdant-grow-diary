@@ -161,7 +161,7 @@ export function suggestBreedingFollowUpActions(event: BreedingEventLike): Sugges
     );
 
     const method = normalizeMethod(details.method);
-    if (method === "sts_spray" || method === "colloidal_silver") {
+    if (method === "sts_spray" || method === "colloidal_silver" || method === "ga3") {
       suggestions.push(
         withSource({
           title: "Confirm isolation status of nearby receivers",

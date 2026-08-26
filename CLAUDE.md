@@ -70,6 +70,34 @@ Applies to every deliverable, without exception:
   confidently wrong conclusions.
 - A metric with no applicable cases is `NOT_MEASURED`, never a 100% score.
 
+## Repository operating facts
+
+Verified 2026-08-19 on the deploy branch. Re-verify before citing on another branch.
+
+- Package manager is **bun** (`bun.lockb` authoritative — never npm/yarn/pnpm). On
+  Windows, `bun install` fails under OneDrive paths; use a non-OneDrive checkout.
+- Dev server: `bun run dev` → `http://localhost:8080` (port pinned by the Lovable
+  TanStack config, not Vite's 5173 default).
+- Typecheck gate on this branch: `bun run typecheck` (`tsc -p tsconfig.json --noEmit`,
+  strict). `tsconfig.app.json` exists only on `main`. `bun run typecheck:tsgo` is a
+  faster second opinion that has caught union errors tsc missed.
+- Tests: `bunx vitest run` (full suite, sharded in CI); single file:
+  `bunx vitest run src/test/<file> --reporter=dot`. Windows-local full runs carry
+  roughly twenty known machine-local failures — triage by import overlap with the
+  diff; CI gates.
+- Playwright: the `chromium-mocked` project needs no credentials; the quicklog smoke
+  and golden-path specs run against the deployed app or an owner-managed session —
+  post-deploy signals, never same-commit gates.
+- Many tests read source files and pin exact expressions, copy strings, and occurrence
+  counts. Renegotiate pins in the same commit as the behavior change; never
+  whole-file-format a legacy file (line re-wraps break pins far from the diff).
+- Quick Log persists through the single `quicklog_save_manual` write path (frozen by
+  `docs/specs/one-tent-loop-quicklog-single-write-path.md`); post-save refresh is
+  `applyQuickLogV2Refresh` plus one `verdant:entry-created` dispatch, only after
+  confirmed success.
+- Target selection is explicit or route-derived only; remembered-target and only-plant
+  auto-selection are banned and test-pinned.
+
 ---
 
 # Codebase orientation

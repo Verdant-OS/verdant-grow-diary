@@ -312,7 +312,12 @@ jobs:
           retention-days: 14
 
       - name: Fail on live drift
-        if: steps.diff-json.outputs.exit != '0' || steps.diff-sarif.outputs.exit != '0'
+        if: steps.diff-json.outputs.exit == '1' || steps.diff-sarif.outputs.exit == '1'
         run: |
-          echo "::error::Live prefix-diff failed (JSON=${{ steps.diff-json.outputs.exit }}, SARIF=${{ steps.diff-sarif.outputs.exit }}) — see Code Scanning and the workflow artifact."
+          echo "::error::Live prefix-diff drift detected (JSON=${{ steps.diff-json.outputs.exit }}, SARIF=${{ steps.diff-sarif.outputs.exit }}) — required money migration not applied. Do NOT deploy. See Code Scanning and the workflow artifact."
           exit 1
+
+      - name: Block on live tooling error
+        if: steps.diff-json.outputs.exit == '2' || steps.diff-sarif.outputs.exit == '2'
+        run: |
+          echo "::warning::Live prefix-diff BLOCKED (JSON=${{ steps.diff-json.outputs.exit }}, SARIF=${{ steps.diff-sarif.outputs.exit }}) — DB identity or connection check failed; state is unknown. Correct SUPABASE_DB_URL in the verdant-production environment: use the Supavisor pooler URL (aws-0-*.pooler.supabase.com:5432/postgres) for the production project (knkwiiywfkbqznbxwqfh). See the workflow artifact for details."

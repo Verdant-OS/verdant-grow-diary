@@ -83,6 +83,7 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     saveSex,
     saveSmokeTest: state.saveSmokeTest ?? vi.fn().mockResolvedValue(true),
     saveLabResult: state.saveLabResult ?? vi.fn().mockResolvedValue(true),
+    deleteLabResult: state.deleteLabResult ?? vi.fn().mockResolvedValue(true),
     ...state,
   };
   hookMock.mockImplementation(() => currentState);

@@ -44,6 +44,51 @@ interface GrowInfo {
 }
 
 /**
+ * Unsaved-setup draft, persisted per USER + grow/tent scope so an interrupted
+ * hunt setup survives a reload ("resume an unfinished hunt"). User-scoped key:
+ * on a shared device another signed-in account must never see or resume this
+ * draft. localStorage only holds the grower's own in-progress form values —
+ * a convenience cache, never a data store; the DB write happens on Create.
+ */
+interface PhenoHuntSetupDraft {
+  name: string;
+  notes: string;
+  selected: string[];
+  evidenceGoals: PhenoEvidenceGoalId[];
+  currentStep: PhenoOnboardingStepId;
+}
+
+function huntDraftKey(userId: string, growId: string, tentId: string | null): string {
+  return `verdant:pheno-hunt-draft:${userId}:${growId}:${tentId ?? "all"}`;
+}
+
+function readHuntDraft(key: string): PhenoHuntSetupDraft | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PhenoHuntSetupDraft>;
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      name: typeof parsed.name === "string" ? parsed.name : "",
+      notes: typeof parsed.notes === "string" ? parsed.notes : "",
+      selected: Array.isArray(parsed.selected)
+        ? parsed.selected.filter((v): v is string => typeof v === "string")
+        : [],
+      evidenceGoals: Array.isArray(parsed.evidenceGoals)
+        ? (parsed.evidenceGoals as PhenoEvidenceGoalId[])
+        : [],
+      currentStep:
+        typeof parsed.currentStep === "string" &&
+        (PHENO_ONBOARDING_STEP_ORDER as readonly string[]).includes(parsed.currentStep)
+          ? (parsed.currentStep as PhenoOnboardingStepId)
+          : "basics",
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * PhenoHuntNew — guided Pheno Tracker first-run flow.
  *
  * Steps: basics → candidates → evidence goals → evidence packet map preview
@@ -73,6 +118,8 @@ export default function PhenoHuntNew() {
   const [grow, setGrow] = useState<GrowInfo | null>(null);
   const [plants, setPlants] = useState<PlantOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -81,6 +128,60 @@ export default function PhenoHuntNew() {
   );
   const [currentStep, setCurrentStep] = useState<PhenoOnboardingStepId>("basics");
   const [saving, setSaving] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const draftKey = user?.id && growId ? huntDraftKey(user.id, growId, tentId ?? null) : null;
+
+  // Resume an unfinished setup: restore the user-scoped draft once per mount.
+  // Runs before the grow fetch resolves; the fetch's default-name setter
+  // already respects a non-empty name, so a restored name survives it.
+  useEffect(() => {
+    if (!draftKey) return;
+    const draft = readHuntDraft(draftKey);
+    if (!draft) return;
+    const hasContent =
+      draft.name.trim() !== "" || draft.notes.trim() !== "" || draft.selected.length > 0;
+    if (!hasContent) return;
+    setName((prev) => (prev.trim() !== "" ? prev : draft.name));
+    setNotes((prev) => (prev.trim() !== "" ? prev : draft.notes));
+    setSelected((prev) => (prev.size > 0 ? prev : new Set(draft.selected)));
+    if (draft.evidenceGoals.length > 0) setEvidenceGoals(draft.evidenceGoals);
+    setCurrentStep(draft.currentStep);
+    setDraftRestored(true);
+  }, [draftKey]);
+
+  // Persist the draft as the grower types (a reload must not lose setup).
+  useEffect(() => {
+    if (!draftKey) return;
+    const hasContent = name.trim() !== "" || notes.trim() !== "" || selected.size > 0;
+    try {
+      if (!hasContent) return;
+      const draft: PhenoHuntSetupDraft = {
+        name,
+        notes,
+        selected: Array.from(selected),
+        evidenceGoals,
+        currentStep,
+      };
+      window.localStorage.setItem(draftKey, JSON.stringify(draft));
+    } catch {
+      // Storage unavailable (private mode, quota) — the form still works.
+    }
+  }, [draftKey, name, notes, selected, evidenceGoals, currentStep]);
+
+  const discardDraft = () => {
+    try {
+      if (draftKey) window.localStorage.removeItem(draftKey);
+    } catch {
+      // best-effort
+    }
+    setDraftRestored(false);
+    setName(grow ? defaultHuntName(grow.name) : "");
+    setNotes("");
+    setSelected(new Set());
+    setEvidenceGoals(defaultEvidenceGoalSelection());
+    setCurrentStep("basics");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -89,16 +190,29 @@ export default function PhenoHuntNew() {
         setLoading(false);
         return;
       }
+      setLoading(true);
+      setLoadError(null);
       // Candidate attribution (BUG-A): a plant belongs to this grow when its
       // own grow_id matches OR it lives in one of the grow's tents, so
       // orphan-attributed plants (tent in grow, plant.grow_id null) still
       // appear as candidates. Tent ids are fetched first for the OR filter.
-      const { data: tentRows } = await supabase.from("tents").select("id").eq("grow_id", growId);
+      const { data: tentRows, error: tentsError } = await supabase
+        .from("tents")
+        .select("id")
+        .eq("grow_id", growId);
       if (cancelled) return;
+      if (tentsError) {
+        // A failed read must render as an ERROR, never as "Grow not found" or
+        // an empty plant list — a transport failure is not a fact about the
+        // grow (and a degraded tent list would silently hide orphan plants).
+        setLoadError("Could not load this grow's tents. Check your connection and retry.");
+        setLoading(false);
+        return;
+      }
       const tentIds = ((tentRows ?? []) as { id?: string | null }[])
         .map((t) => t.id ?? "")
         .filter((id) => id.length > 0);
-      const [{ data: growRow }, { data: plantRows }] = await Promise.all([
+      const [growRead, plantsRead] = await Promise.all([
         supabase.from("grows").select("id,name").eq("id", growId).maybeSingle(),
         (() => {
           let q = supabase
@@ -111,13 +225,19 @@ export default function PhenoHuntNew() {
         })(),
       ]);
       if (cancelled) return;
+      if (growRead.error || plantsRead.error) {
+        setLoadError("Could not load this grow's plants. Check your connection and retry.");
+        setLoading(false);
+        return;
+      }
+      const growRow = growRead.data;
       if (growRow) {
         setGrow({ id: growRow.id, name: growRow.name });
         // Do not overwrite a grower-edited name if this effect re-runs (#564).
         setName((prev) => (prev.trim().length > 0 ? prev : defaultHuntName(growRow.name)));
       }
       setPlants(
-        (plantRows ?? []).map((p) => ({
+        (plantsRead.data ?? []).map((p) => ({
           id: p.id,
           name: p.name,
           strain: p.strain ?? null,
@@ -128,7 +248,7 @@ export default function PhenoHuntNew() {
     return () => {
       cancelled = true;
     };
-  }, [growId, tentId]);
+  }, [growId, tentId, reloadTick]);
 
   const [setupConfirmed, setSetupConfirmed] = useState(false);
   const candidateIds = useMemo(() => Array.from(selected), [selected]);
@@ -203,6 +323,12 @@ export default function PhenoHuntNew() {
         notes: notes.trim() || null,
         markSetupComplete: setupConfirmed,
       });
+      // The setup is persisted — the local resume-draft has done its job.
+      try {
+        if (draftKey) window.localStorage.removeItem(draftKey);
+      } catch {
+        // best-effort
+      }
       toast.success("Pheno hunt created");
       // Enter the workspace — grower can continue setup from there.
       navigate(`/pheno-hunts/${res.huntId}/workspace`);
@@ -222,6 +348,36 @@ export default function PhenoHuntNew() {
         aria-label="Loading pheno hunt setup"
       >
         <Loader2 className="size-5 animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto min-w-0 max-w-4xl">
+        <PageHeader
+          title="Start Pheno Hunt"
+          eyebrow="Cultivar selection"
+          description="Create a traceable candidate set and preserve the evidence you record."
+          icon={<Sprout className="size-5" />}
+        />
+        <div
+          className="space-y-3 rounded-3xl border border-border/60 bg-card/65 p-6 text-center shadow-card backdrop-blur-xl sm:p-8"
+          data-testid="ph-load-error"
+        >
+          <h2 className="font-display text-lg font-semibold">Couldn&apos;t load this grow</h2>
+          <p role="alert" className="text-sm leading-relaxed text-muted-foreground">
+            {loadError}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            data-testid="ph-load-retry"
+            onClick={() => setReloadTick((t) => t + 1)}
+          >
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -269,6 +425,23 @@ export default function PhenoHuntNew() {
           </Button>
         }
       />
+
+      {draftRestored && (
+        <p
+          data-testid="ph-draft-restored"
+          className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+        >
+          <span>Resumed your unsaved setup from this device.</span>
+          <button
+            type="button"
+            data-testid="ph-draft-discard"
+            onClick={discardDraft}
+            className="font-medium underline underline-offset-2"
+          >
+            Discard draft and start over
+          </button>
+        </p>
+      )}
 
       <PhenoHuntOnboardingStepper
         steps={vm.steps}
@@ -480,6 +653,11 @@ export default function PhenoHuntNew() {
           </Button>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button variant="ghost" asChild className="w-full sm:w-auto">
+            <Link to="/pheno-hunts" data-testid="ph-back-to-hunts">
+              Back to Pheno Hunts
+            </Link>
+          </Button>
           <Button variant="ghost" asChild className="w-full sm:w-auto">
             <Link to={`/grows/${growId}`}>Cancel</Link>
           </Button>

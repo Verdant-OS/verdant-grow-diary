@@ -181,6 +181,7 @@ describe("adaptPhenoHuntCandidates", () => {
       totalCannabinoidsPct: null,
       dominantTerpenes: [{ name: "limonene", pct: 1.2 }],
       source: "coa",
+      testedAt: null,
     });
   });
 

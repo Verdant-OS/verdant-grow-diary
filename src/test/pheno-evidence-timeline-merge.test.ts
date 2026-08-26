@@ -34,6 +34,23 @@ function receiptRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** The PRODUCTION-stored shape: quicklog_save_manual strips plant_id (and
+ * user/grow/tent ids) from the details blob before persisting, so a stored
+ * receipt's details carry hunt_id but never plant_id — the row's own
+ * plant_id column is the authoritative value. */
+function productionReceiptRow(overrides: Record<string, unknown> = {}) {
+  const details = {
+    ...buildPhenoEvidenceReceiptDetails({
+      huntId: "hunt-1",
+      plantId: "plant-1",
+      evidenceGoal: "structure",
+      stage: "flower",
+    }),
+  } as Record<string, unknown>;
+  delete details.plant_id;
+  return receiptRow({ details, ...overrides });
+}
+
 describe("phenoEvidenceTimelineMerge", () => {
   it("attaches the matching validated receipt without mutating the action", () => {
     const index = buildPhenoEvidenceReceiptIndex([receiptRow()]);
@@ -46,6 +63,26 @@ describe("phenoEvidenceTimelineMerge", () => {
       plantId: "plant-1",
       evidenceGoal: "structure",
     });
+  });
+
+  it("attaches a production-shaped receipt whose details carry NO plant_id (regression)", () => {
+    // quicklog_save_manual strips plant_id from details, so the merge must
+    // derive the candidate from the row's plant_id column — requiring
+    // details.plant_id silently skipped every real saved receipt.
+    const index = buildPhenoEvidenceReceiptIndex([productionReceiptRow()]);
+    expect(index.size).toBe(1);
+    const out = attachPhenoEvidenceReceiptsToActionEvents([action], index);
+    expect(out[0].phenoEvidenceReceipt).toMatchObject({
+      diaryEntryId: "diary-1",
+      huntId: "hunt-1",
+      plantId: "plant-1",
+      evidenceGoal: "structure",
+    });
+  });
+
+  it("still rejects a production-shaped receipt with no row plant_id", () => {
+    const index = buildPhenoEvidenceReceiptIndex([productionReceiptRow({ plant_id: null })]);
+    expect(index.size).toBe(0);
   });
 
   it("does not attach across plant, tent, or timestamp boundaries", () => {

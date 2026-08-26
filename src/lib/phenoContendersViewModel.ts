@@ -28,12 +28,19 @@ import {
 export type AxisKey = "nose" | "resin" | "structure" | "yield" | "breeding";
 export type ContenderVerdict = "keep" | "maybe" | "cull";
 
+/**
+ * Axis values are 0–10, or null when the trait was never scored. Missingness
+ * is load-bearing (keeper contract: "missingness stays visible") — a null must
+ * never be coerced to 0, because the board SORTS by composite and a fabricated
+ * zero would silently rank an unscored plant below a deliberately low-scored
+ * one.
+ */
 export interface ContenderAxisInput {
-  readonly nose: number;
-  readonly resin: number;
-  readonly structure: number;
-  readonly yield: number;
-  readonly breeding: number;
+  readonly nose: number | null;
+  readonly resin: number | null;
+  readonly structure: number | null;
+  readonly yield: number | null;
+  readonly breeding: number | null;
 }
 
 export interface ContenderInput {
@@ -67,9 +74,11 @@ export const CONTENDER_AXES: readonly AxisDef[] = [
 export interface ContenderAxis {
   readonly key: AxisKey;
   readonly label: string;
-  readonly value: number; // 0–10 clamped
+  /** 0–10 clamped, or null when this trait was never scored. */
+  readonly value: number | null;
   readonly weightPct: number;
-  /** Leads this trait among the contenders. Ties are all flagged — honest. */
+  /** Leads this trait among the contenders. Ties are all flagged — honest.
+   * Never true for a missing (null) value. */
   readonly leader: boolean;
 }
 
@@ -78,10 +87,19 @@ export interface ContenderRow {
   readonly name: string;
   readonly verdict: ContenderVerdict;
   readonly aroma: readonly string[];
-  /** 0–100 shortlist composite. Sorts the board; never a verdict on its own. */
-  readonly score: number;
-  /** 1-based shortlist position by score (NOT a ranking of worth). */
-  readonly rank: number;
+  /**
+   * 0–100 shortlist composite over the SCORED axes only, renormalized by the
+   * present axes' weights. Null when no axis is scored — an unscored plant has
+   * no composite, it is not a 0. Sorts the board; never a verdict on its own.
+   */
+  readonly score: number | null;
+  /**
+   * 1-based shortlist position by score among SCORED contenders (NOT a ranking
+   * of worth). Null for unscored contenders, which list after the scored ones.
+   */
+  readonly rank: number | null;
+  /** How many of the five Loud axes carry a real score (0–5). */
+  readonly scoredAxisCount: number;
   readonly axes: readonly ContenderAxis[];
   /** Normalized declared type — presenters render a persistent badge. */
   readonly plantType: PlantType;
@@ -91,7 +109,8 @@ export type BoardComparability = "comparable" | "not_comparable";
 
 export interface ContendersBoard {
   readonly axes: readonly AxisDef[];
-  /** Non-culls, sorted by composite score descending. */
+  /** Non-culls: scored contenders by composite descending, then unscored
+   * contenders (score null) by name — never silently ranked as zeros. */
   readonly contenders: readonly ContenderRow[];
   readonly culledCount: number;
   /** Highest composite on the board, for scaling the score bar. */
@@ -120,9 +139,11 @@ export const COMPARABILITY_REASON_MESSAGES: Readonly<Record<ComparabilityReason,
     "These plants are more than one stage apart — traits don't read the same across stages.",
 };
 
-function clamp10(v: unknown): number {
+/** Clamp a present value to 0–10; a missing/non-finite value stays null. */
+function clamp10OrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
   const n = typeof v === "number" ? v : Number(v);
-  if (!Number.isFinite(n)) return 0;
+  if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(10, n));
 }
 
@@ -136,9 +157,36 @@ function clean(v: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
-/** Composite from clamped axis values, using the shared weights (0–100). */
-export function contenderScore(axes: Record<AxisKey, number>): number {
-  return round1(CONTENDER_AXES.reduce((sum, a) => sum + (axes[a.key] * a.weightPct) / 10, 0));
+/**
+ * Guard, not decoration: the composite math assumes the shared weights total
+ * 100. Throwing on drift keeps a silently mis-scaled composite from ever
+ * rendering; deterministic, and any weight edit that breaks it fails every
+ * board test immediately.
+ */
+function assertWeightsSumTo100(): void {
+  const total = CONTENDER_AXES.reduce((sum, a) => sum + a.weightPct, 0);
+  if (total !== 100) {
+    throw new Error(`CONTENDER_AXES weights must sum to 100 (got ${total}).`);
+  }
+}
+
+/**
+ * Composite over the SCORED axes only (0–100), renormalized by the present
+ * axes' weights so a 4-of-5 card is not depressed by the missing axis. With
+ * all five axes present this equals the original full-weight formula. Returns
+ * null when no axis is scored — an unscored plant has no composite.
+ */
+export function contenderScore(axes: Record<AxisKey, number | null>): number | null {
+  let weighted = 0;
+  let presentWeight = 0;
+  for (const a of CONTENDER_AXES) {
+    const v = clamp10OrNull(axes[a.key]);
+    if (v === null) continue;
+    weighted += v * a.weightPct;
+    presentWeight += a.weightPct;
+  }
+  if (presentWeight === 0) return null;
+  return round1((weighted / presentWeight) * 10);
 }
 
 /**
@@ -149,6 +197,7 @@ export function contenderScore(axes: Record<AxisKey, number>): number {
 export function buildContenders(
   input: readonly ContenderInput[] | null | undefined,
 ): ContendersBoard {
+  assertWeightsSumTo100();
   const list = (Array.isArray(input) ? input : []).filter(
     (c) => c != null && c.id !== undefined && c.id !== null,
   );
@@ -157,48 +206,57 @@ export function buildContenders(
 
   const clamped = inRunning.map((c) => {
     const vals = {
-      nose: clamp10(c.axes?.nose),
-      resin: clamp10(c.axes?.resin),
-      structure: clamp10(c.axes?.structure),
-      yield: clamp10(c.axes?.yield),
-      breeding: clamp10(c.axes?.breeding),
-    } as Record<AxisKey, number>;
+      nose: clamp10OrNull(c.axes?.nose),
+      resin: clamp10OrNull(c.axes?.resin),
+      structure: clamp10OrNull(c.axes?.structure),
+      yield: clamp10OrNull(c.axes?.yield),
+      breeding: clamp10OrNull(c.axes?.breeding),
+    } as Record<AxisKey, number | null>;
     return { raw: c, vals };
   });
 
-  // Per-axis maximum among the contenders — the "leads" threshold.
+  // Per-axis maximum among the SCORED values — the "leads" threshold. A
+  // missing value never competes and never leads.
   const maxByAxis = {} as Record<AxisKey, number>;
   for (const a of CONTENDER_AXES) {
-    maxByAxis[a.key] = clamped.reduce((m, x) => Math.max(m, x.vals[a.key]), 0);
+    maxByAxis[a.key] = clamped.reduce((m, x) => Math.max(m, x.vals[a.key] ?? 0), 0);
   }
 
-  const rows = clamped
-    .map(({ raw, vals }) => {
-      const axes: ContenderAxis[] = CONTENDER_AXES.map((a) => ({
-        key: a.key,
-        label: a.label,
-        value: vals[a.key],
-        weightPct: a.weightPct,
-        leader: maxByAxis[a.key] > 0 && vals[a.key] === maxByAxis[a.key],
-      }));
-      return {
-        id: String(raw.id),
-        name: clean(raw.name) ?? String(raw.id),
-        verdict: raw.verdict,
-        aroma: (raw.aroma ?? []).filter((x): x is string => !!clean(x)),
-        score: contenderScore(vals),
-        axes,
-        plantType: normalizePlantType(raw.plantType),
-      };
-    })
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        (a.name < b.name ? -1 : a.name > b.name ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-    )
-    .map((r, i) => ({ ...r, rank: i + 1 }));
+  const unranked = clamped.map(({ raw, vals }) => {
+    const axes: ContenderAxis[] = CONTENDER_AXES.map((a) => ({
+      key: a.key,
+      label: a.label,
+      value: vals[a.key],
+      weightPct: a.weightPct,
+      leader: vals[a.key] !== null && maxByAxis[a.key] > 0 && vals[a.key] === maxByAxis[a.key],
+    }));
+    return {
+      id: String(raw.id),
+      name: clean(raw.name) ?? String(raw.id),
+      verdict: raw.verdict,
+      aroma: (raw.aroma ?? []).filter((x): x is string => !!clean(x)),
+      score: contenderScore(vals),
+      scoredAxisCount: axes.filter((a) => a.value !== null).length,
+      axes,
+      plantType: normalizePlantType(raw.plantType),
+    };
+  });
 
-  const maxScore = rows.reduce((m, r) => Math.max(m, r.score), 0);
+  // Scored contenders sort by composite (desc) and take 1-based ranks;
+  // unscored contenders follow, unranked — visible, never rank-last-zero.
+  const byNameThenId = (a: { name: string; id: string }, b: { name: string; id: string }) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  const scoredRows = unranked
+    .filter((r) => r.score !== null)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || byNameThenId(a, b))
+    .map((r, i) => ({ ...r, rank: (i + 1) as number | null }));
+  const unscoredRows = unranked
+    .filter((r) => r.score === null)
+    .sort(byNameThenId)
+    .map((r) => ({ ...r, rank: null as number | null }));
+  const rows = [...scoredRows, ...unscoredRows];
+
+  const maxScore = rows.reduce((m, r) => Math.max(m, r.score ?? 0), 0);
 
   // Pairwise comparability over the in-running pack. Every failing pair
   // contributes its reason; reasons are deduped into a fixed precedence

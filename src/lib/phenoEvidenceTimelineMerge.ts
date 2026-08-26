@@ -48,10 +48,16 @@ export function buildPhenoEvidenceReceiptIndex(
   for (const row of orderedRows) {
     const details = record(row.details);
     if (!details || details.kind !== PHENO_EVIDENCE_RECEIPT_KIND) continue;
-    if (typeof details.hunt_id !== "string" || typeof details.plant_id !== "string") continue;
+    if (typeof details.hunt_id !== "string") continue;
+    // The candidate id comes from the row's OWN plant_id column — the
+    // authoritative RLS-scoped value. quicklog_save_manual STRIPS plant_id
+    // from the stored details blob (ownership-spoofing guard), so requiring
+    // details.plant_id here skipped every production receipt; the parser
+    // still cross-checks a legacy details.plant_id when one exists.
+    if (typeof row.plant_id !== "string" || row.plant_id.length === 0) continue;
     const parsed = parsePhenoEvidenceReceiptRow(row, {
       huntId: details.hunt_id,
-      plantId: details.plant_id,
+      plantId: row.plant_id,
     });
     const iso = normalizeIso(row.entry_at);
     if (!parsed || !iso) continue;

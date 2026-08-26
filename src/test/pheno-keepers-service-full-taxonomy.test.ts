@@ -80,10 +80,40 @@ describe("listCrossesForHunt — full taxonomy read-model", () => {
     expect(rows[1].recurrentParentId).toBeNull();
   });
 
-  it("returns [] on error without throwing (safe read)", async () => {
+  it("fails closed on a read error instead of rendering 'no crosses'", async () => {
     limitMock.mockResolvedValue({ data: null, error: { message: "boom" } });
+    await expect(listCrossesForHunt("hunt-1")).rejects.toThrow(/could not load crosses/i);
+  });
+
+  it("falls back to the legacy 3-type columns when the taxonomy columns are unapplied", async () => {
+    // The hosted project may not have channel/generation/recurrent_parent_id
+    // yet (unapplied 20260728090000): a 42703 naming those columns retries
+    // with the legacy column list instead of failing or silently emptying.
+    limitMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: { code: "42703", message: "column pheno_crosses.channel does not exist" },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: "x1",
+            female_keeper_id: "k1",
+            male_keeper_id: null,
+            cross_type: "selfing_s1",
+            cross_name: "Gas S1",
+            note: null,
+            crossed_at: null,
+            created_at: "2026-08-01T00:00:00Z",
+          },
+        ],
+        error: null,
+      });
     const rows = await listCrossesForHunt("hunt-1");
-    expect(rows).toEqual([]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].crossType).toBe("selfing_s1");
+    expect(rows[0].channel).toBeNull();
+    expect(rows[0].generation).toBeNull();
   });
 
   it("empty hunt id short-circuits (no query)", async () => {

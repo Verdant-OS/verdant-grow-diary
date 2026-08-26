@@ -20,33 +20,40 @@ describe("phenoHuntViewAdapter", () => {
     expect(decisionToVerdict("garbage")).toBe("maybe");
   });
 
-  it("reads exactly the five Loud axes and ignores extra live traits", () => {
+  it("bridges the canonical expression vocabulary onto the five Loud axes", () => {
     const axes = traitsToLoudAxes({
-      nose: 9,
-      resin: 8,
-      structure: 7,
-      yield: 7,
-      breeding: 8,
+      nose_loudness: 9, // 0–10, direct
+      resin: 4, // ingest key, 1–5 → 7.5
+      structure: 4, // 1–5 → 7.5
+      yield: 3, // ingest key, 1–5 → 5
+      breeding: 5, // ingest key, 1–5 → 10
       // extra traits the live card also stores — deliberately not folded in:
       flavor: 10,
       potency: 10,
       vigor: 3,
+      bud_density: 5,
+      stretch: 2,
     });
-    expect(axes).toEqual({ nose: 9, resin: 8, structure: 7, yield: 7, breeding: 8 });
+    expect(axes).toEqual({ nose: 9, resin: 7.5, structure: 7.5, yield: 5, breeding: 10 });
     expect(LOUD_AXIS_KEYS).toEqual(["nose", "resin", "structure", "yield", "breeding"]);
   });
 
-  it("treats a missing trait as 0 and clamps out-of-range", () => {
-    const axes = traitsToLoudAxes({ nose: 99, resin: -2 });
+  it("accepts the legacy bare `nose` key when nose_loudness is absent", () => {
+    expect(traitsToLoudAxes({ nose: 8 }).nose).toBe(8);
+    expect(traitsToLoudAxes({ nose_loudness: 6, nose: 8 }).nose).toBe(6);
+  });
+
+  it("keeps missing traits null and clamps out-of-range values", () => {
+    const axes = traitsToLoudAxes({ nose_loudness: 99, resin: -2 });
     expect(axes.nose).toBe(10);
-    expect(axes.resin).toBe(0);
-    expect(axes.structure).toBe(0); // missing → 0, never invented
+    expect(axes.resin).toBe(0); // invalid low clamps to the 1–5 floor → 0
+    expect(axes.structure).toBeNull(); // missing → null, never invented as 0
     expect(traitsToLoudAxes(null)).toEqual({
-      nose: 0,
-      resin: 0,
-      structure: 0,
-      yield: 0,
-      breeding: 0,
+      nose: null,
+      resin: null,
+      structure: null,
+      yield: null,
+      breeding: null,
     });
   });
 
@@ -56,19 +63,33 @@ describe("phenoHuntViewAdapter", () => {
         candidateNumber: 3,
         name: "Gas Runtz",
         decision: "keep",
-        traits: { nose: 9, resin: 8, structure: 7, yield: 7, breeding: 8 },
+        // Workspace-vocabulary card + ingest breeding axis:
+        traits: {
+          nose_loudness: 9,
+          trichome_coverage: 5,
+          structure: 4,
+          yield_impression: 4,
+          breeding: 4,
+        },
         aroma: [" diesel ", "gas", ""],
       },
-      { candidateNumber: 4, name: "Runtz #4", decision: "cull", traits: { nose: 4 } },
-      { candidateNumber: 2, name: "Runtz #2", decision: "hold", traits: { nose: 7 } },
+      { candidateNumber: 4, name: "Runtz #4", decision: "cull", traits: { nose_loudness: 4 } },
+      { candidateNumber: 2, name: "Runtz #2", decision: "hold", traits: { nose_loudness: 7 } },
     ]);
     // aroma is trimmed and empties dropped
     expect(contenders[0].aroma).toEqual(["diesel", "gas"]);
-    // Runs through the canonical board: culls drop, keeper scores 80, sorted.
+    // Runs through the canonical board: culls drop, sorted, keeper on top.
+    // nose 9·30 + resin 10·25 + structure 7.5·15 + yield 7.5·15 + breeding 7.5·15
+    // = 857.5 / 100 weight → 85.8 composite.
     const board = buildContenders(contenders);
     expect(board.culledCount).toBe(1);
     expect(board.contenders[0].name).toBe("Gas Runtz");
-    expect(board.contenders[0].score).toBe(80);
+    expect(board.contenders[0].score).toBe(85.8);
+    expect(board.contenders[0].scoredAxisCount).toBe(5);
+    // The nose-only card is a partial composite (1/5 axes), never zero-filled.
+    const partial = board.contenders.find((c) => c.name === "Runtz #2");
+    expect(partial?.scoredAxisCount).toBe(1);
+    expect(partial?.score).toBe(70);
   });
 
   it("adapts keepers and their cure timelines (rounds filtered to the known set)", () => {

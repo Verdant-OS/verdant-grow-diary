@@ -187,3 +187,14 @@ export function getBreedingProgramTemplate(
   if (version === "v1") return BREEDING_PROGRAM_TEMPLATE_V1;
   return BREEDING_PROGRAM_TEMPLATE_V1;
 }
+
+/**
+ * Authored title for a template step, looked up by step_key. The steps TABLE
+ * deliberately has no title column, so presenters resolve the human title
+ * from the template at render time; an unknown key (a future SOP version)
+ * falls back to the de-underscored key rather than rendering nothing.
+ */
+export function breedingTemplateStepTitle(stepKey: string): string {
+  const step = BREEDING_PROGRAM_TEMPLATE_V1.find((s) => s.stepKey === stepKey);
+  return step?.title ?? stepKey.replace(/_/g, " ");
+}

@@ -41,7 +41,7 @@ export const CONTEXTUAL_PHENO_COMPARISON_SAFETY_FILES: readonly string[] = [
   "src/lib/contextualPhenoComparisonViewModel.ts",
   "src/components/ContextualPhenoComparisonPanel.tsx",
   "src/pages/ContextualPhenoComparisonDemo.tsx",
-  "src/test/fixtures/contextualPhenoComparisonFixtures.ts",
+  "src/lib/demo/contextualPhenoComparisonFixtures.ts",
 ];
 
 /**
@@ -51,6 +51,19 @@ export const CONTEXTUAL_PHENO_COMPARISON_SAFETY_FILES: readonly string[] = [
  * picked up automatically.
  */
 export const CONTEXTUAL_PHENO_COMPARISON_CHANGED_FILE_EXTRA: readonly string[] = [];
+
+/**
+ * Guard files the changed-file scan must skip: the scanner utility, the
+ * test files that assert on it, and the historical v0 audit record all
+ * quote the banned phrases in order to define or forbid them, so scanning
+ * them yields only self-referential findings — any edit to them (even an
+ * import-path change) would fail the scan. Product-surface coverage is
+ * unchanged: CONTEXTUAL_PHENO_COMPARISON_SAFETY_FILES and the path regex
+ * still cover every runtime file, and none of them lives under src/test/
+ * or docs/. Files named in the SAFETY_FILES list are never exempt.
+ */
+export const CONTEXTUAL_PHENO_CHANGED_FILE_EXEMPT_RE =
+  /^(?:src\/test\/|docs\/contextual-pheno-comparison-v0-audit\.md$)/;
 
 export const PHRASE_RULES: readonly PhraseRule[] = [
   // write/API operation
@@ -358,6 +371,7 @@ export function filterChangedContextualPhenoFiles(changed: readonly string[]): s
   for (const raw of changed) {
     const p = normalizePath(raw);
     if (!p) continue;
+    if (!allow.has(p) && CONTEXTUAL_PHENO_CHANGED_FILE_EXEMPT_RE.test(p)) continue;
     if (allow.has(p) || CONTEXTUAL_PHENO_PATH_RE.test(p)) {
       out.add(p);
     }

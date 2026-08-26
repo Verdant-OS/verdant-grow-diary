@@ -81,7 +81,10 @@ function demoBundle(): {
       candidateNumber: c.candidateNumber,
       name: c.name,
       decision: c.verdict, // demo verdicts already read keep/maybe/cull
-      traits: c.loud as unknown as Record<string, number>,
+      // The fixture's loud axes are already on the 0–10 Loud scale, so they
+      // bypass the expression-vocabulary bridge (which expects 1–5 quality
+      // axes as stored in pheno_candidate_scores.traits).
+      axes: c.loud,
       aroma: c.aroma,
       tags: c.tags,
       // Uniform demo pack: same type + stage, so the sample hunt stays a

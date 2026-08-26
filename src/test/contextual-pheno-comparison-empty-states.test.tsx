@@ -16,7 +16,7 @@ import {
   buildContextualPhenoComparisonView,
   type ContextualPhenoPlantInput,
 } from "@/lib/contextualPhenoComparisonViewModel";
-import { CONTEXTUAL_PHENO_COMPARISON_EMPTY_STATE_PLANT_INPUTS } from "@/test/fixtures/contextualPhenoComparisonFixtures";
+import { CONTEXTUAL_PHENO_COMPARISON_EMPTY_STATE_PLANT_INPUTS } from "@/lib/demo/contextualPhenoComparisonFixtures";
 
 const BANNED_TOKENS = [
   "healthy",

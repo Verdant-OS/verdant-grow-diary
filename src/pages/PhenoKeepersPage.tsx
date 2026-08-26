@@ -48,7 +48,7 @@ interface KeeperCardProps {
   reversed: boolean;
   saving: boolean;
   onAddClone: (keeperId: string, label: string) => Promise<boolean>;
-  onMarkReversed: (keeperId: string, method: string) => void;
+  onMarkReversed: (keeperId: string, method: string) => Promise<boolean>;
   onSaveStabilityRuns: (keeperId: string, runs: readonly StabilityRun[]) => Promise<boolean>;
 }
 
@@ -70,7 +70,13 @@ const KeeperCard = memo(function KeeperCard({
   onSaveStabilityRuns,
 }: KeeperCardProps) {
   const [cloneLabel, setCloneLabel] = useState("");
+  const [cloneError, setCloneError] = useState<string | null>(null);
   const [reversalMethod, setReversalMethod] = useState("sts");
+  // Marking a reversal is one-way (append-only) and flips the S1/feminized
+  // classification of every future cross — a mis-tap must not do it silently,
+  // so the button arms first and executes on the explicit confirm.
+  const [reversalArmed, setReversalArmed] = useState(false);
+  const [reversalError, setReversalError] = useState<string | null>(null);
   const cloneRows = useMemo(() => buildCloneTreeRows([...clones]), [clones]);
   const saveStabilityRuns = useCallback(
     (runs: readonly StabilityRun[]) => onSaveStabilityRuns(view.keeperId, runs),
@@ -111,7 +117,7 @@ const KeeperCard = memo(function KeeperCard({
           {reversed && (
             <span
               data-testid={`keeper-reversed-badge-${view.keeperId}`}
-              className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700"
+              className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
               title="Reversed — makes feminized pollen"
             >
               Reversed ♀→pollen
@@ -143,13 +149,17 @@ const KeeperCard = memo(function KeeperCard({
           </ul>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
           data-testid={`keepers-clone-label-${view.keeperId}`}
           value={cloneLabel}
-          onChange={(e) => setCloneLabel(e.target.value)}
+          onChange={(e) => {
+            setCloneError(null);
+            setCloneLabel(e.target.value);
+          }}
           placeholder="Clone label (e.g. mother, cut #2)"
+          aria-label={`New clone label for ${view.keeperName}`}
           className="rounded border border-border bg-background px-2 py-1 text-sm"
         />
         <button
@@ -157,12 +167,23 @@ const KeeperCard = memo(function KeeperCard({
           data-testid={`keepers-clone-add-${view.keeperId}`}
           disabled={saving || !cloneLabel.trim()}
           onClick={async () => {
+            setCloneError(null);
             if (await onAddClone(view.keeperId, cloneLabel)) setCloneLabel("");
+            else setCloneError("Could not record this clone — try again.");
           }}
           className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
         >
           Add clone
         </button>
+        {cloneError && (
+          <span
+            role="alert"
+            data-testid={`keepers-clone-error-${view.keeperId}`}
+            className="text-xs font-medium text-red-600 dark:text-red-400"
+          >
+            {cloneError}
+          </span>
+        )}
       </div>
       {reversed ? (
         <p
@@ -172,7 +193,7 @@ const KeeperCard = memo(function KeeperCard({
           Reversed — its pollen makes feminized (self / S1 or feminized-cross) seed.
         </p>
       ) : (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             data-testid={`keeper-reverse-method-${view.keeperId}`}
             aria-label={`Reversal method for ${view.keeperName}`}
@@ -186,15 +207,54 @@ const KeeperCard = memo(function KeeperCard({
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            data-testid={`keeper-reverse-${view.keeperId}`}
-            disabled={saving}
-            onClick={() => onMarkReversed(view.keeperId, reversalMethod)}
-            className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
-          >
-            Mark as reversed
-          </button>
+          {!reversalArmed ? (
+            <button
+              type="button"
+              data-testid={`keeper-reverse-${view.keeperId}`}
+              disabled={saving}
+              onClick={() => setReversalArmed(true)}
+              className="rounded border border-border bg-secondary px-2 py-1 text-xs font-medium disabled:opacity-50"
+            >
+              Mark as reversed
+            </button>
+          ) : (
+            <>
+              <span className="text-[11px] text-muted-foreground">
+                Permanent record — classifies future crosses from this keeper as feminized/S1.
+              </span>
+              <button
+                type="button"
+                data-testid={`keeper-reverse-confirm-${view.keeperId}`}
+                disabled={saving}
+                onClick={async () => {
+                  setReversalError(null);
+                  const ok = await onMarkReversed(view.keeperId, reversalMethod);
+                  if (!ok) setReversalError("Could not record the reversal — try again.");
+                  setReversalArmed(false);
+                }}
+                className="rounded border border-amber-500/60 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 disabled:opacity-50 dark:text-amber-300"
+              >
+                Confirm reversal
+              </button>
+              <button
+                type="button"
+                data-testid={`keeper-reverse-cancel-${view.keeperId}`}
+                onClick={() => setReversalArmed(false)}
+                className="rounded border border-border px-2 py-1 text-xs font-medium"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+          {reversalError && (
+            <span
+              role="alert"
+              data-testid={`keeper-reverse-error-${view.keeperId}`}
+              className="text-xs font-medium text-red-600 dark:text-red-400"
+            >
+              {reversalError}
+            </span>
+          )}
         </div>
       )}
       <PhenoGrowOutHandoff
@@ -223,6 +283,8 @@ export default function PhenoKeepersPage() {
   const [female, setFemale] = useState("");
   const [donor, setDonor] = useState("");
   const [crossName, setCrossName] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [crossError, setCrossError] = useState<string | null>(null);
 
   const reversedSet = useMemo(() => new Set(ks.reversedKeeperIds), [ks.reversedKeeperIds]);
   const keeperNameById = useMemo(() => {
@@ -386,6 +448,7 @@ export default function PhenoKeepersPage() {
             value={promoteName}
             onChange={(e) => setPromoteName(e.target.value)}
             placeholder="Keeper name"
+            aria-label="Keeper name"
             className="rounded border border-border bg-background px-2 py-1 text-sm"
           />
           <button
@@ -393,15 +456,27 @@ export default function PhenoKeepersPage() {
             data-testid="keepers-promote-save"
             disabled={ks.saving || !promotePlant || !promoteName.trim()}
             onClick={async () => {
+              setActionError(null);
               if (await ks.promoteToKeeper(promotePlant, promoteName)) {
                 setPromotePlant("");
                 setPromoteName("");
+              } else {
+                setActionError("Could not name this keeper — try again.");
               }
             }}
             className="rounded-md border border-border bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
             Name keeper
           </button>
+          {actionError && (
+            <span
+              role="alert"
+              data-testid="pheno-keepers-action-error"
+              className="text-xs font-medium text-red-600 dark:text-red-400"
+            >
+              {actionError}
+            </span>
+          )}
         </div>
       </section>
 
@@ -505,6 +580,7 @@ export default function PhenoKeepersPage() {
               value={crossName}
               onChange={(e) => setCrossName(e.target.value)}
               placeholder="Cross name (optional)"
+              aria-label="Cross name (optional)"
               className="rounded border border-border bg-background px-2 py-1"
             />
             <button
@@ -512,16 +588,28 @@ export default function PhenoKeepersPage() {
               data-testid="keepers-cross-save"
               disabled={ks.saving || !crossForm.canSubmit}
               onClick={async () => {
+                setCrossError(null);
                 if (await ks.saveCross(female, crossForm.pollenKeeperId, crossName)) {
                   setFemale("");
                   setDonor("");
                   setCrossName("");
+                } else {
+                  setCrossError(ks.error ?? "Could not record this cross — try again.");
                 }
               }}
               className="rounded-md border border-border bg-primary px-3 py-1.5 font-medium text-primary-foreground disabled:opacity-50"
             >
               Record cross
             </button>
+            {crossError && (
+              <span
+                role="alert"
+                data-testid="keepers-cross-error"
+                className="text-xs font-medium text-red-600 dark:text-red-400"
+              >
+                {crossError}
+              </span>
+            )}
           </div>
           {crossForm.canSubmit ? (
             <p data-testid="keepers-cross-preview" className="text-xs text-muted-foreground">

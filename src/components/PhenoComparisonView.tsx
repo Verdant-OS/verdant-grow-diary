@@ -310,6 +310,7 @@ function CandidateColumn({
               >
                 <span className="font-medium">{e.kind ?? "note"}</span>
                 {e.note ? ` — ${e.note}` : ""}
+                {e.at ? <span className="ml-1 opacity-70">({e.at.slice(0, 10)})</span> : null}
               </li>
             ))}
           </ul>
@@ -353,9 +354,20 @@ function CandidateColumn({
               <li
                 key={p.id}
                 data-testid={`photo-${p.id}`}
-                className="rounded border border-border bg-muted/40 p-2 text-[11px] text-muted-foreground"
+                className="overflow-hidden rounded border border-border bg-muted/40 text-[11px] text-muted-foreground"
               >
-                {p.caption ?? "Photo (demo)"}
+                {p.url ? (
+                  <img
+                    src={p.url}
+                    alt={p.caption ?? `Photo of ${c.candidateLabel}`}
+                    loading="lazy"
+                    className="aspect-square w-full object-cover"
+                  />
+                ) : null}
+                <span className="block p-2">
+                  {p.caption ?? "Photo"}
+                  {p.at ? <span className="ml-1">({p.at.slice(0, 10)})</span> : null}
+                </span>
               </li>
             ))}
           </ul>

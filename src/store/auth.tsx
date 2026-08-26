@@ -28,6 +28,47 @@ const AuthCtx = createContext<Ctx>({
   signOut: async () => {},
 });
 
+/**
+ * Last auth identity AuthProvider successfully resolved in this tab.
+ * Survives remount / refresh so same-user first resolve does not re-fire the
+ * privacy fence. Missing key = unknown → fail closed (wipe). Empty string =
+ * resolved signed-out. Cleared with other `verdant:auth:` keys on safe sign-out.
+ */
+export const AUTH_LAST_RESOLVED_IDENTITY_STORAGE_KEY =
+  "verdant:auth:last-resolved-identity:v1" as const;
+
+/** Stored value for a resolved signed-out identity (null user id). */
+const SIGNED_OUT_IDENTITY_SENTINEL = "" as const;
+
+function readPersistedLastResolvedIdentity(): string | null {
+  try {
+    if (typeof window === "undefined") return null;
+    return window.sessionStorage.getItem(AUTH_LAST_RESOLVED_IDENTITY_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedLastResolvedIdentity(userId: string | null): void {
+  try {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(
+      AUTH_LAST_RESOLVED_IDENTITY_STORAGE_KEY,
+      userId ?? SIGNED_OUT_IDENTITY_SENTINEL,
+    );
+  } catch {
+    /* fail closed on the next mount if persistence is unavailable */
+  }
+}
+
+/** True only when a persisted key exists and equals the next resolved id. */
+function persistedIdentityMatchesNext(nextUserId: string | null): boolean {
+  const persisted = readPersistedLastResolvedIdentity();
+  if (persisted === null) return false;
+  if (nextUserId === null) return persisted === SIGNED_OUT_IDENTITY_SENTINEL;
+  return persisted === nextUserId;
+}
+
 interface AuthProviderProps {
   children: ReactNode;
   /**
@@ -50,12 +91,16 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
     (nextSession: Session | null) => {
       const previousUserId = currentUserIdRef.current;
       const nextUserId = nextSession?.user.id ?? null;
-      if (previousUserId === undefined || previousUserId !== nextUserId) {
+      const identityChangedInMemory = previousUserId === undefined || previousUserId !== nextUserId;
+      // Skip the fence only when a prior resolve in this tab already recorded
+      // the same id (same-user refresh / remount). No key → fail closed.
+      if (identityChangedInMemory && !persistedIdentityMatchesNext(nextUserId)) {
         // This callback must remain before both the identity ref and React
         // state update. Query cache removal is synchronous, so no render can
         // expose the next owner while the previous owner's rows remain.
         onBeforeAuthIdentityChange?.(previousUserId ?? null, nextUserId);
       }
+      writePersistedLastResolvedIdentity(nextUserId);
       currentUserIdRef.current = nextUserId;
       setSession(nextSession);
     },

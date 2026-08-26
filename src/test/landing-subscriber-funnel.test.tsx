@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -101,6 +101,28 @@ describe("landing subscriber funnel", () => {
         "/auth?mode=signup&utm_source=landing_page&utm_medium=owned&utm_campaign=paid_launch",
       );
     }
+  });
+
+  it("renders crawlable Knowledge resources with an accessible navigation label", () => {
+    render(
+      <MemoryRouter>
+        <Landing />
+      </MemoryRouter>,
+    );
+
+    const resources = screen.getByRole("navigation", { name: "Resources" });
+    expect(within(resources).getByRole("link", { name: "Grower guides" })).toHaveAttribute(
+      "href",
+      "/guides",
+    );
+    expect(within(resources).getByRole("link", { name: "Cultivation glossary" })).toHaveAttribute(
+      "href",
+      "/glossary",
+    );
+    expect(within(resources).getByRole("link", { name: "Grow stage targets" })).toHaveAttribute(
+      "href",
+      "/tools/blueprint-targets",
+    );
   });
 
   it("measures paid-intent and signup clicks without user data", async () => {

@@ -143,6 +143,7 @@ const validators = [
   ["scripts/validate-title-description.mjs", true],
   ["scripts/validate-jsonld-id-canonical-parity.mjs", true],
   ["scripts/validate-static-route-head-fidelity.mjs", true],
+  ["scripts/validate-knowledge-public-link-graph.mjs", true],
   ["scripts/validate-public-image-budget.mjs", true],
 ];
 

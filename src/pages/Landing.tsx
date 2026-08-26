@@ -433,6 +433,17 @@ export default function Landing({
             Refund Policy
           </Link>
         </nav>
+        <nav aria-label="Resources" className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+          <Link to="/guides" className="hover:text-foreground">
+            Grower guides
+          </Link>
+          <Link to="/glossary" className="hover:text-foreground">
+            Cultivation glossary
+          </Link>
+          <Link to="/tools/blueprint-targets" className="hover:text-foreground">
+            Grow stage targets
+          </Link>
+        </nav>
         <p className="text-xs">
           Operated by Matthew Tyler Cheek. Payments processed by Paddle.com as Merchant of Record.
         </p>

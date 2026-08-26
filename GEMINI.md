@@ -474,14 +474,19 @@ Use the repo's actual package manager and scripts.
 
 Prefer existing conventions.
 
-Common commands may include:
+Common commands (verified on the deploy branch, 2026-08-19):
 
 ```bash
-bun run type-check
+bun run typecheck
+bun run typecheck:tsgo
 bunx vitest run --reporter=dot
 bun run scripts/run-billing-rls-harness.ts
 bun run scripts/run-ai-credits-rls-harness.ts
 ```
+
+Branch note: `bun run type-check` and `tsconfig.app.json` are `main`-branch
+conventions and do not exist on `verdant-grow-diary`. Verify scripts against the
+branch you are on before citing them.
 
 If a command is unavailable, report that honestly and use the closest existing command.
 

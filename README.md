@@ -24,11 +24,13 @@ Grow → Tent → Plant → Diary/Logs → Photo → Sensor Snapshot → AI Doct
 ## Local setup
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
-The dev server runs Vite. Open the URL it prints.
+The dev server runs Vite on `http://localhost:8080`. bun is the package manager
+(`bun.lockb` is authoritative) — do not use npm or yarn. On Windows, run
+`bun install` from a checkout outside OneDrive; OneDrive reparse points break it.
 
 ## Environment variables
 

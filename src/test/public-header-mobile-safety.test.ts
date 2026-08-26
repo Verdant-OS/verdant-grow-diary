@@ -21,6 +21,7 @@ const PUBLIC_HEADERS_USING_SHARED_COMPACTION = [
   "src/pages/AiDoctorContextCheck.tsx",
   "src/pages/GuidesIndex.tsx",
   "src/pages/PublicVpdCalculator.tsx",
+  "src/pages/GrowHelpToolkit.tsx",
   "src/pages/Founder.tsx",
   "src/pages/CultivarsIndex.tsx",
   "src/pages/CultivarPage.tsx",

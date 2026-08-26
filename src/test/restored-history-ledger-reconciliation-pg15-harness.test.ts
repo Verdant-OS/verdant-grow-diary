@@ -33,9 +33,14 @@ describe("restored-history ledger exact-production PostgreSQL 15 runtime harness
   it("builds the catalog fixture from pinned immutable function definitions", async () => {
     const { buildCatalogFixtureSql } = await loadHarness();
     const fixture = buildCatalogFixtureSql();
+    const normalizedFixture = fixture.replaceAll("\r\n", "\n");
 
     expect(fixture).toContain(
       "CREATE OR REPLACE FUNCTION public.grant_staff_role_for_verified_allowlist()",
+    );
+    expect(normalizedFixture).toContain("\nAS $$\nDECLARE\n  v_email text;");
+    expect(normalizedFixture).toContain(
+      "\nEND;\n$$;\n\nalter function public.grant_staff_role_for_verified_allowlist()",
     );
     expect(fixture).toContain("CREATE FUNCTION public.quicklog_save_event(");
     expect(fixture).not.toContain("__EXACT_STAFF_ALLOWLIST_FUNCTION__");

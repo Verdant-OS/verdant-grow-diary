@@ -98,8 +98,8 @@ export function buildCatalogFixtureSql() {
     code: "quicklog_definition",
   });
   const fixture = template
-    .replace(STAFF_PLACEHOLDER, staffDefinition)
-    .replace(QUICKLOG_PLACEHOLDER, quicklogDefinition);
+    .replace(STAFF_PLACEHOLDER, () => staffDefinition)
+    .replace(QUICKLOG_PLACEHOLDER, () => quicklogDefinition);
   if (fixture.includes(STAFF_PLACEHOLDER) || fixture.includes(QUICKLOG_PLACEHOLDER)) {
     throw new Error("catalog_fixture_placeholder_remaining");
   }

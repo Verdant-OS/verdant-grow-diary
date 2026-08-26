@@ -1,6 +1,26 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-26 UTC (18:15 UTC)
+**Last updated:** 2026-08-26 UTC (18:55 UTC)
+**Updated by:** Claude (2026-08-26: **#1149 MERGED — deploy tip is now `b9cca9fb1`** (squash of
+the top-N diary RPC slice at head `c353c765`), after Blue Dream's independent review returned
+**PASS-with-P2** and Cheek/GDP merged GitHub-only. The migration apply posture is unchanged:
+`20260826100000`, `20260825233000`, and `20260813030000` are all still **NOT applied**; until
+the operator applies `20260826100000`, production growers ride the missing-RPC fallback and
+behavior is byte-identical to the pre-slice read. **Known red the merge carried:** both
+`Browser census` lanes failed at `c353c765` — root-caused, not a product defect: the mocked
+census fences abort any RPC POST not on their reviewed read-only allowlist, and the new
+`pheno_candidate_diary_entries_top_n` POST was aborted (authenticated lane: workspace success
+test-id never rendered; public lane: the aborted POST recorded as a blocked mutation). The
+deploy branch's census stays red until the follow-up fence fix merges. That fix (census
+`READ_ONLY_RPCS` allowlist + compare-deep-link fence + renegotiated reviewed-RPC pin,
+reproduced red locally on the deep-link spec then green) plus two P2 responses (Array.isArray
+fail-closed guard on the RPC payload with a RED-proven test at 1 failed / 7 passed; the
+retraction-is-server-side contract documented against the SQL pin) ship as a **new follow-up
+draft PR** from the restarted `claude/verdant-pheno-hunt-lab-vq6pd9`. The third P2 — a runtime
+RLS harness for the RPC — remains `BLOCKED` (no credentials in agent sessions) and is recorded
+here rather than silently dropped. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (18:15 UTC)
 **Updated by:** Claude (2026-08-26: **server-side top-N-per-plant diary read for Pheno Hunt
 candidates delivered as draft [PR #1149](https://github.com/Verdant-OS/verdant-grow-diary/pull/1149)**
 from branch `claude/verdant-pheno-hunt-lab-vq6pd9`, restarted from deploy tip `ec8aca7b5`

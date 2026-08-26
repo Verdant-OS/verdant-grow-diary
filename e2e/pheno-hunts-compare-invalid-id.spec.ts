@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { denyAnalyticsConsent } from "./utils/analyticsConsent";
 
 /**
  * /pheno-hunts/:id/compare invalid / unknown id regression (LIVE page).
@@ -34,8 +35,12 @@ test(`invalid deep-link ${INVALID_ROUTE} renders a safe read-only error state`, 
   page.on("requestfailed", (req) =>
     failedRequests.push(`${req.method()} ${req.url()} :: ${req.failure()?.errorText ?? ""}`),
   );
+  // Match on the hostname only: in dev, the app's own route modules are
+  // served as /src/routes/_app/action-queue.tsx from the same origin, and a
+  // full-URL match would misread that module load as an Action Queue call.
   page.on("request", (req) => {
-    if (FORBIDDEN_HOST_RE.test(req.url())) forbiddenRequests.push(`${req.method()} ${req.url()}`);
+    if (FORBIDDEN_HOST_RE.test(new URL(req.url()).hostname))
+      forbiddenRequests.push(`${req.method()} ${req.url()}`);
   });
 
   // Unknown hunt → maybeSingle returns no row. A catch-all owns the REST
@@ -60,7 +65,15 @@ test(`invalid deep-link ${INVALID_ROUTE} renders a safe read-only error state`, 
   await page.route(/\/auth\/v1\//i, (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
   );
+  // Third-party font CSS is not part of the app's network surface; fulfilling
+  // it keeps the spec hermetic where fonts.googleapis.com is unreachable.
+  await page.route(/fonts\.(googleapis|gstatic)\.com/i, (route) =>
+    route.fulfill({ status: 200, contentType: "text/css", body: "" }),
+  );
 
+  // The consent banner is not this spec's subject; a stored refusal keeps the
+  // exactly-one-button (Retry) contract deterministic.
+  await denyAnalyticsConsent(page);
   await page.goto(INVALID_ROUTE, { waitUntil: "domcontentloaded" });
 
   // A clear read-only error/empty state is shown (never a crash, never fixtures).

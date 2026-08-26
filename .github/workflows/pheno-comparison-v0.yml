@@ -11,7 +11,6 @@ on:
       - "src/pages/PhenoComparison.tsx"
       - "src/pages/PhenoExpressionShowcase.tsx"
       - "src/lib/phenoComparison*"
-      - "src/lib/phenoSelectionRules.ts"
       - "src/test/pheno-comparison-*"
       - "src/test/pheno-expression-showcase.test.tsx"
       - "e2e/pheno-comparison-*.spec.ts"
@@ -94,7 +93,6 @@ jobs:
             src/pages/PhenoExpressionShowcase.tsx \
             src/lib/phenoComparisonRules.ts \
             src/lib/phenoComparisonViewModel.ts \
-            src/lib/phenoSelectionRules.ts \
             src/lib/phenoComparisonFixtures.ts \
             src/test/pheno-comparison-a11y.test.tsx \
             src/test/pheno-expression-showcase.test.tsx \

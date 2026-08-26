@@ -1,4 +1,16 @@
 import { test, expect, type Page } from "@playwright/test";
+import { denyAnalyticsConsent } from "./utils/analyticsConsent";
+
+/**
+ * Third-party font CSS is not part of the app's own network surface; fulfilling
+ * it with empty CSS keeps the spec hermetic in offline/proxied environments
+ * where fonts.googleapis.com is unreachable (a reset there is a console error).
+ */
+async function mockThirdPartyFonts(page: Page) {
+  await page.route(/fonts\.(googleapis|gstatic)\.com/i, (route) =>
+    route.fulfill({ status: 200, contentType: "text/css", body: "" }),
+  );
+}
 
 /**
  * Pheno Comparison deep-link browser regression.
@@ -74,6 +86,15 @@ async function mockLiveHunt(page: Page, capture: RestBoundaryCapture) {
     const requestLabel = `${request.method()} ${request.url()}`;
     const table = new URL(request.url()).pathname.match(/\/rest\/v1\/([^/]+)/i)?.[1] ?? "";
 
+    // The tent-context enrichment calls the read-only snapshot RPC. PostgREST
+    // invokes RPCs over POST regardless of whether they write, so this one
+    // read is allowed through the non-GET fence; "no snapshot" keeps the
+    // fixture deterministic.
+    if (/\/rpc\/get_latest_tent_sensor_snapshot$/i.test(new URL(request.url()).pathname)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
+      return;
+    }
+
     if (request.method() !== "GET") {
       capture.mutations.push(requestLabel);
       await route.abort("blockedbyclient");
@@ -108,6 +129,10 @@ test("fixture route /pheno-comparison renders demo panels + legend, zero network
     failedRequests.push(`${r.method()} ${r.url()} :: ${r.failure()?.errorText ?? ""}`),
   );
 
+  // The consent banner is not this spec's subject; a stored refusal keeps the
+  // no-write-controls contract deterministic (and no analytics ever loads).
+  await denyAnalyticsConsent(page);
+  await mockThirdPartyFonts(page);
   await page.goto("/pheno-comparison", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByTestId("pheno-comparison-page")).toHaveAttribute("data-mode", "demo");
@@ -139,11 +164,18 @@ test("live route /pheno-hunts/:id/compare renders a real hunt's candidates (mock
   const restBoundary: RestBoundaryCapture = { unexpected: [], mutations: [] };
   page.on("console", (m) => m.type() === "error" && consoleErrors.push(m.text()));
   page.on("pageerror", (e) => consoleErrors.push(e.message));
+  // Match on the hostname only: in dev, the app's own route modules are
+  // served as /src/routes/_app/action-queue.tsx from the same origin, and a
+  // full-URL match would misread that module load as an Action Queue call.
   page.on(
     "request",
-    (r) => FORBIDDEN_HOST_RE.test(r.url()) && forbidden.push(`${r.method()} ${r.url()}`),
+    (r) =>
+      FORBIDDEN_HOST_RE.test(new URL(r.url()).hostname) &&
+      forbidden.push(`${r.method()} ${r.url()}`),
   );
 
+  await denyAnalyticsConsent(page);
+  await mockThirdPartyFonts(page);
   await mockLiveHunt(page, restBoundary);
   await page.goto(`/pheno-hunts/${HUNT_ID}/compare`, { waitUntil: "domcontentloaded" });
 

@@ -366,7 +366,7 @@ function CandidateColumn({
                 ) : null}
                 <span className="block p-2">
                   {p.caption ?? "Photo"}
-                  {p.at ? <span className="ml-1 opacity-70">({p.at.slice(0, 10)})</span> : null}
+                  {p.at ? <span className="ml-1">({p.at.slice(0, 10)})</span> : null}
                 </span>
               </li>
             ))}

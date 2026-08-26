@@ -1,7 +1,7 @@
 /**
  * MCP tool schema + safety regression tests.
  *
- * Asserts each of the three MCP tools exposed by
+ * Asserts each of the built-in MCP tools exposed by
  * `src/lib/mcp/manifestView.ts` has the expected presenter-safe shape:
  *   - stable name / description / read-only annotation
  *   - required/optional parameters we advertise on the settings page
@@ -75,6 +75,8 @@ describe("MCP connection copy payload — no secrets", () => {
     expect(payload).toContain("list_grows");
     expect(payload).toContain("list_recent_diary_entries");
     expect(payload).toContain("get_latest_sensor_snapshot");
+    expect(payload).toContain("list_grow_walk_targets");
+    expect(payload).toContain("get_grow_walk_context");
   });
 
   it("advertises OAuth 2.1 with the direct supabase.co issuer", () => {

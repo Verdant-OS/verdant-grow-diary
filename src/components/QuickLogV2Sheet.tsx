@@ -111,6 +111,13 @@ import {
   type QuickLogPostSaveSuccess,
 } from "@/lib/quickLogSaveGuardRules";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
+import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
+import {
+  buildRecentTargetStorageKey,
+  getRecentTargetSuggestionWakeDelayMs,
+  parseRecentTargetRecord,
+  resolveRecentTargetSuggestion,
+} from "@/lib/quickLogRecentTargetSuggestion";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 import {
   fahrenheitToCelsius,
@@ -165,6 +172,34 @@ interface LockedWateringSubmission {
 }
 
 const NOTE_LIMIT = 500;
+
+function rememberConfirmedPlantTarget(
+  resolved: ResolvedQuickLogV2Target,
+  userId: string | null | undefined,
+): void {
+  if (!resolved.ok || !resolved.plantId) return;
+  rememberRecentQuickLogTarget(
+    {
+      plantId: resolved.plantId,
+      growId: resolved.growId ?? null,
+      tentId: resolved.tentId ?? null,
+      savedAt: new Date().toISOString(),
+    },
+    userId,
+  );
+}
+
+/** Read the account-scoped recent target. Never throws and never falls back. */
+function loadRecentTargetRecord(userId: string | null | undefined) {
+  if (typeof window === "undefined") return null;
+  const scopedKey = buildRecentTargetStorageKey(userId ?? null);
+  if (!scopedKey) return null;
+  try {
+    return parseRecentTargetRecord(window.localStorage.getItem(scopedKey));
+  } catch {
+    return null;
+  }
+}
 
 export default function QuickLogV2Sheet({
   open,
@@ -330,6 +365,87 @@ export default function QuickLogV2Sheet({
     [options, form.selectedKey],
   );
   const { grows } = useGrows();
+  // A remembered plant is an offer on a genuinely global/null-target open,
+  // never an implicit default. Pair the record with the account key that
+  // produced it so an account switch fails closed during the effect boundary.
+  const launcherNamesTarget =
+    typeof defaultTargetKey === "string" && defaultTargetKey.trim().length > 0;
+  const recentTargetStorageKey = buildRecentTargetStorageKey(user?.id ?? null);
+  const [recentTargetSnapshot, setRecentTargetSnapshot] = useState(() => ({
+    storageKey: recentTargetStorageKey,
+    record: open && !launcherNamesTarget ? loadRecentTargetRecord(user?.id ?? null) : null,
+  }));
+  const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
+  // Advanced at eligibility boundaries. This is not a polling clock and
+  // cannot select, save, or mutate storage.
+  const [recentSuggestionClockMs, setRecentSuggestionClockMs] = useState(() => Date.now());
+  const recentTargetRecord =
+    open && !launcherNamesTarget && recentTargetSnapshot.storageKey === recentTargetStorageKey
+      ? recentTargetSnapshot.record
+      : null;
+
+  useEffect(() => {
+    if (!open || launcherNamesTarget || !recentTargetStorageKey) {
+      setRecentTargetSnapshot({ storageKey: recentTargetStorageKey, record: null });
+      return;
+    }
+
+    setRecentTargetSnapshot({
+      storageKey: recentTargetStorageKey,
+      record: loadRecentTargetRecord(user?.id ?? null),
+    });
+
+    // Storage events arrive in other documents. Re-read the current value
+    // instead of trusting event.newValue, because an older event can arrive
+    // after storage already contains a newer target.
+    const handleRecentTargetStorage = (event: StorageEvent) => {
+      if (event.storageArea && event.storageArea !== window.localStorage) return;
+      if (event.key !== null && event.key !== recentTargetStorageKey) return;
+      setRecentTargetSnapshot({
+        storageKey: recentTargetStorageKey,
+        record: loadRecentTargetRecord(user?.id ?? null),
+      });
+    };
+    window.addEventListener("storage", handleRecentTargetStorage);
+    return () => window.removeEventListener("storage", handleRecentTargetStorage);
+  }, [open, launcherNamesTarget, recentTargetStorageKey, user?.id]);
+
+  // Dismissal belongs to one account/session. A fresh open or account starts
+  // with an empty target and may render that account's independently scoped
+  // offer again; neither transition applies it.
+  useEffect(() => {
+    if (open) setRecentSuggestionDismissed(false);
+  }, [open, recentTargetStorageKey]);
+
+  const recentTargetSuggestion = useMemo(
+    () =>
+      resolveRecentTargetSuggestion({
+        record: recentTargetRecord,
+        now: Math.max(Date.now(), recentSuggestionClockMs),
+        visiblePlants: plants,
+        visibleGrows: grows,
+        visibleTents: tents,
+      }),
+    [recentTargetRecord, plants, grows, tents, recentSuggestionClockMs],
+  );
+
+  useEffect(() => {
+    if (!open || !recentTargetRecord) return;
+    const wakeDelayMs = getRecentTargetSuggestionWakeDelayMs(
+      recentTargetRecord,
+      Math.max(Date.now(), recentSuggestionClockMs),
+    );
+    if (wakeDelayMs === null) return;
+
+    // Future records use safe checkpoints until savedAt. That boundary tick
+    // re-runs this effect and arms the later strict-expiry wake. Close/record
+    // changes clear the active timer.
+    const boundaryTimer = window.setTimeout(
+      () => setRecentSuggestionClockMs(Date.now()),
+      wakeDelayMs,
+    );
+    return () => window.clearTimeout(boundaryTimer);
+  }, [open, recentTargetRecord, recentSuggestionClockMs]);
   const targetPanel = useMemo(
     () =>
       buildQuickLogTargetPanel({
@@ -378,6 +494,12 @@ export default function QuickLogV2Sheet({
   const hasFetchError = Boolean(plantsQ.isError || tentsQ.isError);
   const hasNoTargets = !isLoadingContext && !hasFetchError && options.length === 0;
   const contextBlocked = isLoadingContext || hasFetchError || hasNoTargets;
+  const showRecentTargetSuggestion =
+    !launcherNamesTarget &&
+    !contextBlocked &&
+    !recentSuggestionDismissed &&
+    !form.selectedKey &&
+    recentTargetSuggestion !== null;
 
   const selectedTargetMissing = !contextBlocked && !form.selectedKey;
   const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
@@ -480,6 +602,7 @@ export default function QuickLogV2Sheet({
       saveInFlightRef.current = false;
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
+      setRecentSuggestionDismissed(false);
       resetPhotoSelection();
     }
   }, [open, defaultTargetKey, defaultAction]);
@@ -538,9 +661,11 @@ export default function QuickLogV2Sheet({
 
     // PROVENANCE. `readResponseCheckStatus` matches anywhere in the note, so a
     // grower who writes "Previous response check: better after watering" reads
-    // as having a marker. Only ever undo what a CHIP wrote: remember the status
-    // the chip last authored, and strip only while the note still reads as that
-    // exact status. Prose the grower typed is never touched.
+    // as having a marker. Only ever undo what a CHIP wrote: remember that a
+    // chip owns the head slot, then strip any canonical response marker still
+    // occupying that slot. The grower may re-word Better/Same/Worse without
+    // transferring that plant response to a new target. Noncanonical prose is
+    // never touched.
     const authored = chipAuthoredStatusRef.current;
     // provenance does not follow a new plant
     chipAuthoredStatusRef.current = null;
@@ -747,9 +872,11 @@ export default function QuickLogV2Sheet({
     if (photoDiaryInFlightRef.current) {
       return { ok: false, message: "Photo diary entry already in progress." };
     }
+    if (!user) return { ok: false, message: "Sign in to attach photos." };
     photoDiaryInFlightRef.current = true;
     try {
       return await createQuickLogPhotoDiaryEntry({
+        ownerId: user.id,
         growId: input.growId,
         tentId: input.tentId,
         plantId: input.plantId,
@@ -853,6 +980,7 @@ export default function QuickLogV2Sheet({
         return;
       }
       const growEventId = result.eventId;
+      rememberConfirmedPlantTarget(resolved, user?.id ?? null);
       trackQuickLogSuccess("feed", { reused: result.reused });
       // The logical feeding save is complete. Rotate only now so a retry
       // after a failed/unknown response reuses the original server key.
@@ -1067,6 +1195,8 @@ export default function QuickLogV2Sheet({
       setSaveStatus("");
       return;
     }
+
+    rememberConfirmedPlantTarget(resolved, user?.id ?? null);
 
     // The core grow event is committed. Rotate immediately, before any
     // best-effort attachment work, so a rejected media promise can never
@@ -1400,6 +1530,71 @@ export default function QuickLogV2Sheet({
               >
                 Start by choosing a plant or tent above.
               </p>
+            )}
+            {showRecentTargetSuggestion && recentTargetSuggestion && (
+              <div
+                data-testid="qlv2-recent-target-suggestion"
+                className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-secondary/20 p-2.5 text-sm"
+              >
+                <span className="text-muted-foreground">
+                  Continue with {recentTargetSuggestion.plantName}?
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  data-testid="qlv2-recent-target-accept"
+                  onClick={() => {
+                    if (contextBlocked || wateringSubmissionLockedRef.current) return;
+                    // Revalidate storage and all live relationships at click
+                    // time. Opening the sheet is not consent, and consent for
+                    // rendered plant A must never be reinterpreted for B.
+                    const latestRecord = loadRecentTargetRecord(user?.id ?? null);
+                    const current = resolveRecentTargetSuggestion({
+                      record: latestRecord,
+                      now: Date.now(),
+                      visiblePlants: plants,
+                      visibleGrows: grows,
+                      visibleTents: tents,
+                    });
+                    if (!current) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
+                      setRecentSuggestionDismissed(true);
+                      return;
+                    }
+                    if (current.plantId !== recentTargetSuggestion.plantId) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
+                      return;
+                    }
+                    const selectedKey = `plant:${current.plantId}`;
+                    if (!options.some((option) => `${option.type}:${option.id}` === selectedKey)) {
+                      setRecentSuggestionDismissed(true);
+                      return;
+                    }
+                    setField("selectedKey", selectedKey);
+                    setLocalError(null);
+                    setSaveStatus("");
+                    setRecentSuggestionDismissed(true);
+                  }}
+                >
+                  Continue
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  data-testid="qlv2-recent-target-dismiss"
+                  onClick={() => setRecentSuggestionDismissed(true)}
+                >
+                  Choose another
+                </Button>
+              </div>
             )}
             <QuickLogTargetPanel panel={targetPanel} />
           </div>

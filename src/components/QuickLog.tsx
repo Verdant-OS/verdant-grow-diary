@@ -47,6 +47,7 @@ import {
   shouldBlockQuickLogClose,
 } from "@/lib/quickLogSaveGuardRules";
 import QuickLogAllActivitiesSection, {
+  type QuickLogAllActivitiesSaveSuccess,
   type QuickLogAllActivitiesSaveTarget,
 } from "@/components/QuickLogAllActivitiesSection";
 import { STAGES } from "@/lib/grow";
@@ -106,6 +107,13 @@ import {
   resolveQuickLogWriteTarget,
   type QuickLogResolvedTarget,
 } from "@/lib/quickLogTargetIntegrityRules";
+import {
+  buildRecentTargetStorageKey,
+  getRecentTargetSuggestionWakeDelayMs,
+  parseRecentTargetRecord,
+  resolveRecentTargetSuggestion,
+} from "@/lib/quickLogRecentTargetSuggestion";
+import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { resolveQuickLogTargetPlan } from "@/lib/quickLogTargetResolutionRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
@@ -246,8 +254,6 @@ interface Props {
   successMessage?: string;
 }
 
-const LAST_TARGET_STORAGE_KEY = "verdant.quickLog.lastTarget.v1";
-
 const QUICK_OBSERVATION_CHIPS = [
   { label: "Watered", text: "Watered today." },
   { label: "Fed", text: "Fed today." },
@@ -284,12 +290,32 @@ type InFlightSaveContext = Readonly<{
   stageWasUserTouched: boolean;
 }>;
 
-function rememberLastTarget(target: LastQuickLogTarget) {
-  if (typeof window === "undefined") return;
+function rememberLastTarget(target: LastQuickLogTarget, userId?: string | null) {
+  // ACCOUNT-SCOPED ONLY (slice D5, per the approved map: "v1 write retired").
+  //
+  // An earlier revision also wrote the unscoped `…lastTarget.v1` key "for
+  // existing readers". Measured: there are NO readers — the only other
+  // reference in the repo is the diagnostics inventory entry. Worse, that
+  // write happened BEFORE the user check, so an anonymous session stored a
+  // plant id after all, contradicting this slice's own account-scoped
+  // boundary. Retired here.
+  //
+  // Only the scoped record may ever be offered back, and only as a visible
+  // suggestion the grower chooses. A shared browser cannot surface another
+  // account's plant because the key carries the user id, and with no user
+  // there is no key and nothing is written at all.
+  rememberRecentQuickLogTarget(target, userId ?? null);
+}
+
+/** Read the account-scoped recent target. Never throws; never falls back. */
+function loadRecentTargetRecord(userId: string | null | undefined) {
+  if (typeof window === "undefined") return null;
+  const scopedKey = buildRecentTargetStorageKey(userId ?? null);
+  if (!scopedKey) return null;
   try {
-    window.localStorage.setItem(LAST_TARGET_STORAGE_KEY, JSON.stringify(target));
+    return parseRecentTargetRecord(window.localStorage.getItem(scopedKey));
   } catch {
-    // Non-critical speed preference. Never block saving if storage is unavailable.
+    return null;
   }
 }
 
@@ -511,6 +537,100 @@ export default function QuickLog({
   const prefillHoldActive = targetPlan.holdActive;
   const editorPlantId = targetPlan.editorPlantId;
 
+  // Slice D5 — remembered target as a VISIBLE suggestion, never a default.
+  // Offered only while the launcher has not already named a plant and the
+  // grower has not chosen one. An unscoped open may offer any valid remembered
+  // plant; a grow/tent recovery may offer it only when the live row matches
+  // that named scope. In every case the grower must explicitly accept.
+  //
+  // AppShell sends an activity-only prefill (`{ eventType: "feeding" }`) for a
+  // context-free Fast Add; it names no target and remains eligible. A plant
+  // prefill is authoritative and suppresses the memory read entirely.
+  const [recentSuggestionDismissed, setRecentSuggestionDismissed] = useState(false);
+  // Scheduled boundary ticks re-evaluate a future record when it becomes
+  // current, then retire it when its 14-day window closes. This is not a
+  // polling clock and never changes selection or storage.
+  const [recentSuggestionClockMs, setRecentSuggestionClockMs] = useState(() => Date.now());
+  const prefillNamesPlant = prefillRequestKey !== null;
+  const recentTargetStorageKey = buildRecentTargetStorageKey(user?.id ?? null);
+  const [recentTargetSnapshot, setRecentTargetSnapshot] = useState(() => ({
+    storageKey: recentTargetStorageKey,
+    record: open && !prefillNamesPlant ? loadRecentTargetRecord(user?.id ?? null) : null,
+  }));
+  // Keep the snapshot paired with the account key that produced it. On an
+  // account change this makes the old account's record ineligible during the
+  // render before the effect below loads the new key.
+  const recentTargetRecord =
+    open && !prefillNamesPlant && recentTargetSnapshot.storageKey === recentTargetStorageKey
+      ? recentTargetSnapshot.record
+      : null;
+  useEffect(() => {
+    if (!open || prefillNamesPlant || !recentTargetStorageKey) {
+      setRecentTargetSnapshot({ storageKey: recentTargetStorageKey, record: null });
+      return;
+    }
+
+    setRecentTargetSnapshot({
+      storageKey: recentTargetStorageKey,
+      record: loadRecentTargetRecord(user?.id ?? null),
+    });
+
+    // `storage` fires in the other document, not the tab that performed the
+    // write. Follow only this signed-in account's key. Always re-read current
+    // storage instead of trusting event.newValue: if an older event arrives
+    // after a newer write, the rendered offer must not regress.
+    const handleRecentTargetStorage = (event: StorageEvent) => {
+      if (event.storageArea && event.storageArea !== window.localStorage) return;
+      if (event.key !== null && event.key !== recentTargetStorageKey) return;
+      const record = loadRecentTargetRecord(user?.id ?? null);
+      setRecentTargetSnapshot({ storageKey: recentTargetStorageKey, record });
+    };
+    window.addEventListener("storage", handleRecentTargetStorage);
+    return () => window.removeEventListener("storage", handleRecentTargetStorage);
+  }, [open, prefillNamesPlant, recentTargetStorageKey, user?.id]);
+  const recentTargetSuggestion = useMemo(
+    () =>
+      resolveRecentTargetSuggestion({
+        record: recentTargetRecord,
+        // Date.now() revalidates on ordinary renders; the state timestamp is
+        // advanced by boundary timers to guarantee a render at each boundary.
+        now: Math.max(Date.now(), recentSuggestionClockMs),
+        visiblePlants: plants,
+        visibleGrows: grows,
+        visibleTents: activeTents,
+        requiredGrowId: prefill?.growId,
+        requiredTentId: prefill?.tentId,
+      }),
+    [
+      recentTargetRecord,
+      plants,
+      grows,
+      activeTents,
+      recentSuggestionClockMs,
+      prefill?.growId,
+      prefill?.tentId,
+    ],
+  );
+  useEffect(() => {
+    if (!open || !recentTargetRecord) return;
+    const wakeDelayMs = getRecentTargetSuggestionWakeDelayMs(
+      recentTargetRecord,
+      Math.max(Date.now(), recentSuggestionClockMs),
+    );
+    if (wakeDelayMs === null) return;
+
+    // Future records use safe checkpoints until savedAt. That boundary tick
+    // re-runs this effect and arms the later strict-expiry wake. Close/record
+    // changes clear the active timer.
+    const boundaryTimer = window.setTimeout(
+      () => setRecentSuggestionClockMs(Date.now()),
+      wakeDelayMs,
+    );
+    return () => window.clearTimeout(boundaryTimer);
+  }, [open, recentTargetRecord, recentSuggestionClockMs]);
+  const showRecentTargetSuggestion =
+    !prefillNamesPlant && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;
+
   useEffect(() => {
     if (!open || saveLocked) return;
     if (targetPlan.step === "apply-named") {
@@ -697,6 +817,34 @@ export default function QuickLog({
     }
   }, [prefill?.publicStarterDraftId, prefill?.publicStarterDraftUpdatedAt]);
 
+  /**
+   * Every successful save must refresh the remembered target, not only the
+   * legacy form's. The "All activity types" section has its own save path, and
+   * wiring only the draft-consume to it left a grower who logs that way being
+   * offered an OLDER plant — or nothing — on their next unscoped open, even
+   * though they had just used a target.
+   *
+   * A grow- or tent-scoped save carries no plantId; there is nothing to
+   * remember, and inventing one is exactly what this slice forbids.
+   */
+  const handleAllActivitiesSaveSuccess = useCallback(
+    (result: QuickLogAllActivitiesSaveSuccess) => {
+      consumeReviewedPublicStarterDraft();
+      const plantId = result.target.plantId;
+      if (!plantId) return;
+      rememberLastTarget(
+        {
+          plantId,
+          growId: result.target.growId,
+          tentId: result.target.tentId,
+          savedAt: new Date().toISOString(),
+        },
+        user?.id ?? null,
+      );
+    },
+    [consumeReviewedPublicStarterDraft, user?.id],
+  );
+
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
   // from one already-selected plant to a different one — the new target's stage
   // should win. It must NOT clear the touched flag on the initial ""→P
@@ -868,6 +1016,7 @@ export default function QuickLog({
     setEventType("observation");
     setPlantId("");
     setDismissedBlockedPrefillKey(null);
+    setRecentSuggestionDismissed(false);
     setStage("");
     stageUserTouchedRef.current = false;
     prevPlantIdRef.current = "";
@@ -1263,12 +1412,15 @@ export default function QuickLog({
           : `Saved ${savedVerb(saveEventType)} for ${plantLabel}`;
       toast.success(finalMessage);
 
-      rememberLastTarget({
-        plantId: saveTarget.plantId,
-        growId: saveTarget.growId,
-        tentId: saveTarget.tentId,
-        savedAt: new Date().toISOString(),
-      });
+      rememberLastTarget(
+        {
+          plantId: saveTarget.plantId,
+          growId: saveTarget.growId,
+          tentId: saveTarget.tentId,
+          savedAt: new Date().toISOString(),
+        },
+        user?.id ?? null,
+      );
       setSavedTarget({
         id: savePlant.id,
         name: plantLabel,
@@ -1407,7 +1559,7 @@ export default function QuickLog({
             useQuickLogActivitySave and dispatches
             verdant:entry-created only on confirmed success. */}
         <QuickLogAllActivitiesSection
-          growId={resolvedTarget?.growId ?? null}
+          growId={resolvedTarget?.growId ?? activeGrow?.id ?? null}
           tentId={resolvedTarget?.tentId ?? null}
           plantId={resolvedTarget?.plantId ?? null}
           externalPersistenceBlockReason={
@@ -1424,7 +1576,7 @@ export default function QuickLog({
           testIdPrefix="quick-log-dialog-all-activities"
           requestedActivityId={prefill?.activityId ?? null}
           requestedNote={prefill?.activityId ? (prefill.note ?? null) : null}
-          onSaveSuccess={consumeReviewedPublicStarterDraft}
+          onSaveSuccess={handleAllActivitiesSaveSuccess}
           onSaveStart={beginAllActivitiesSave}
           onSaveEnd={endAllActivitiesSave}
           saveBlocked={saveLocked}
@@ -1849,6 +2001,80 @@ export default function QuickLog({
                 </p>
               )}
             </section>
+
+            {showRecentTargetSuggestion && recentTargetSuggestion && (
+              <div
+                data-testid="quick-log-recent-target-suggestion"
+                className="rounded-lg border border-border/60 bg-secondary/20 p-2.5 text-[12px] flex flex-wrap items-center gap-2"
+              >
+                <span className="text-muted-foreground">
+                  Continue with {recentTargetSuggestion.plantName}?
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  data-testid="quick-log-recent-target-accept"
+                  onClick={() => {
+                    // Exactly the same explicit selection the Select performs.
+                    if (targetSelectionLocked || isMainDraftMutationLocked()) return;
+                    // Freshness is revalidated AT ACCEPTANCE, not at open. The
+                    // dialog can sit open across the 14-day boundary (or the
+                    // plant can stop being visible), and a value captured when
+                    // it opened would let an expired target through on a click
+                    // made minutes or hours later. Re-run the same pure rule
+                    // against the current clock; if it no longer holds, retire
+                    // the offer instead of applying it.
+                    const latestRecord = loadRecentTargetRecord(user?.id ?? null);
+                    const current = resolveRecentTargetSuggestion({
+                      record: latestRecord,
+                      now: Date.now(),
+                      visiblePlants: plants,
+                      visibleGrows: grows,
+                      visibleTents: activeTents,
+                      requiredGrowId: prefill?.growId,
+                      requiredTentId: prefill?.tentId,
+                    });
+                    if (!current) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
+                      setRecentSuggestionDismissed(true);
+                      return;
+                    }
+                    // The click belongs to the plant named on the rendered
+                    // button. If another tab replaced A with B before its
+                    // storage event arrived, redraw B and require a new click;
+                    // never reinterpret consent for A as consent for B.
+                    if (current.plantId !== recentTargetSuggestion.plantId) {
+                      setRecentTargetSnapshot({
+                        storageKey: recentTargetStorageKey,
+                        record: latestRecord,
+                      });
+                      return;
+                    }
+                    if (current.growId && current.growId !== activeGrowId) {
+                      setActiveGrowId(current.growId);
+                    }
+                    setPlantId(current.plantId);
+                    setSaveError(null);
+                    setRecentSuggestionDismissed(true);
+                  }}
+                >
+                  Continue
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  data-testid="quick-log-recent-target-dismiss"
+                  onClick={() => setRecentSuggestionDismissed(true)}
+                >
+                  Choose another
+                </Button>
+              </div>
+            )}
 
             {prefill?.plantId && selectedPlant && selectedPlant.id !== prefill.plantId && (
               <div

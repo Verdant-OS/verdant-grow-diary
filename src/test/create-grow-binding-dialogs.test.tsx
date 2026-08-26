@@ -66,11 +66,18 @@ vi.mock("@/integrations/supabase/client", () => ({
               data:
                 table === "tents"
                   ? {
-                      id: mocks.nestedTentId,
+                      id: payload.id,
                       name: payload.name,
+                      user_id: payload.user_id,
                       grow_id: payload.grow_id,
                     }
-                  : { id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", name: payload.name },
+                  : {
+                      id: payload.id,
+                      name: payload.name,
+                      user_id: payload.user_id,
+                      grow_id: payload.grow_id,
+                      tent_id: payload.tent_id,
+                    },
               error: null,
             }),
           }),
@@ -397,7 +404,7 @@ describe("create dialogs — remaining fail-closed behavior", () => {
         name: "Keeps Name",
         strain: "Keeps Strain",
         grow_id: mocks.growId,
-        tent_id: mocks.nestedTentId,
+        tent_id: mocks.inserts.find((call) => call.table === "tents")?.payload.id,
       }),
     );
   });

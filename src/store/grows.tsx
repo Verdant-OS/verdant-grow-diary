@@ -1,8 +1,24 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+  useCallback,
+  useRef,
+} from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./auth";
 import type { GrowRow } from "@/lib/db";
 import type { User } from "@supabase/supabase-js";
+import {
+  confirmHierarchyCreateAttemptRow,
+  type HierarchyCreateAttempt,
+} from "@/lib/hierarchyCreatePersistence";
+import {
+  HierarchyCreateOutcomeRecoveryCoordinator,
+  type HierarchyCreateVisibleListReceipt,
+} from "@/hooks/useHierarchyCreateOutcomeRecoveryCoordinator";
 
 export type Grow = GrowRow;
 
@@ -16,6 +32,9 @@ interface Ctx {
   error: string | null;
 }
 const GrowsCtx = createContext<Ctx>({} as Ctx);
+
+type PublishedGrowRead =
+  { status: "published"; rows: Grow[] } | { status: "stale" | "unavailable" };
 
 /**
  * Active-grow selection is private per authenticated account. The legacy
@@ -53,6 +72,7 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
   const [activeGrowId, _setActive] = useState<string | null>(() => readActiveGrowId(ownerId));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const growReadGenerationRef = useRef(0);
 
   const setActiveGrowId = (id: string | null) => {
     _setActive(id);
@@ -61,29 +81,78 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
     else localStorage.removeItem(storageKey);
   };
 
+  /**
+   * Only the latest all-grow request may publish state. A prior route's empty
+   * read must never overwrite the post-confirmation recovery receipt.
+   */
+  const readAndPublishGrows = useCallback(
+    async (canPublish: () => boolean = () => true): Promise<PublishedGrowRead> => {
+      const requestGeneration = ++growReadGenerationRef.current;
+      if (!user) {
+        setGrows([]);
+        setLoading(false);
+        setError(null);
+        return { status: "unavailable" };
+      }
+      if (!canPublish()) return { status: "stale" };
+
+      setLoading(true);
+      try {
+        const { data, error: qErr } = await supabase
+          .from("grows")
+          .select("*")
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false });
+        if (!canPublish() || requestGeneration !== growReadGenerationRef.current) {
+          return { status: "stale" };
+        }
+
+        if (qErr) {
+          console.error("GrowsProvider.refresh error:", qErr.message);
+          setGrows([]);
+          setError(qErr.message);
+          return { status: "unavailable" };
+        }
+
+        const rows = (data as Grow[] | null) ?? [];
+        setGrows(rows);
+        setError(null);
+        return { status: "published", rows };
+      } catch (caught) {
+        if (!canPublish() || requestGeneration !== growReadGenerationRef.current) {
+          return { status: "stale" };
+        }
+        const message = caught instanceof Error ? caught.message : "Unable to load grows";
+        console.error("GrowsProvider.refresh error:", message);
+        setGrows([]);
+        setError(message);
+        return { status: "unavailable" };
+      } finally {
+        if (canPublish() && requestGeneration === growReadGenerationRef.current) setLoading(false);
+      }
+    },
+    [user],
+  );
+
   const refresh = useCallback(async () => {
-    if (!user) {
-      setGrows([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    setLoading(true);
-    const { data, error: qErr } = await supabase
-      .from("grows")
-      .select("*")
-      .eq("is_archived", false)
-      .order("created_at", { ascending: false });
-    if (qErr) {
-      console.error("GrowsProvider.refresh error:", qErr.message);
-      setGrows([]);
-      setError(qErr.message);
-    } else {
-      setGrows(data ?? []);
-      setError(null);
-    }
-    setLoading(false);
-  }, [user]);
+    await readAndPublishGrows();
+  }, [readAndPublishGrows]);
+
+  const refreshGrowsForRecovery = useCallback(
+    async (
+      attempt: Extract<HierarchyCreateAttempt, { entity: "grow" }>,
+      isCurrentOwner: () => boolean,
+    ): Promise<HierarchyCreateVisibleListReceipt> => {
+      if (!user || attempt.ownerId !== user.id || !isCurrentOwner())
+        return { status: "unavailable" };
+      const result = await readAndPublishGrows(isCurrentOwner);
+      if (!isCurrentOwner() || result.status !== "published") return { status: "unavailable" };
+      return result.rows.some((row) => confirmHierarchyCreateAttemptRow(row, attempt))
+        ? { status: "visible" }
+        : { status: "not_visible" };
+    },
+    [readAndPublishGrows, user],
+  );
 
   useEffect(() => {
     refresh();
@@ -102,6 +171,10 @@ function GrowsProviderForOwner({ children, user }: { children: ReactNode; user: 
     <GrowsCtx.Provider
       value={{ grows, activeGrowId, setActiveGrowId, activeGrow, refresh, loading, error }}
     >
+      <HierarchyCreateOutcomeRecoveryCoordinator
+        ownerId={ownerId}
+        refreshGrowsForRecovery={refreshGrowsForRecovery}
+      />
       {children}
     </GrowsCtx.Provider>
   );

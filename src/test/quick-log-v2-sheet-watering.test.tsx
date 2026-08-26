@@ -7,6 +7,11 @@ import {
   clearTemperatureUnitPreference,
   saveTemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import {
+  clearLocalStorageForTest,
+  getLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 
 // This integration-heavy sheet suite mounts the full Quick Log editor.
 // Keep its assertions strict while allowing for controlled-runner contention.
@@ -20,6 +25,7 @@ const diaryInsert = vi.fn();
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
 const videoValidationMock = vi.fn();
+const RECENT_TARGET_KEY = "verdant.quickLog.lastTarget.v2.user-1";
 const plantContextState = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
@@ -132,6 +138,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  clearLocalStorageForTest();
   clearTemperatureUnitPreference();
   rpcMock.mockReset();
   wateringWriterMock.mockReset();
@@ -296,6 +303,82 @@ describe("QuickLogV2Sheet — structured watering", () => {
       }),
     ]);
     window.removeEventListener("verdant:entry-created", listener);
+  });
+
+  it("remembers the confirmed plant after structured Water succeeds", async () => {
+    renderSheet("plant:plant-1", "water");
+    enterVolume();
+    clickSave();
+
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getLocalStorageItemForTest(RECENT_TARGET_KEY)).not.toBeNull());
+
+    const stored = JSON.parse(getLocalStorageItemForTest(RECENT_TARGET_KEY) ?? "null") as Record<
+      string,
+      unknown
+    >;
+    expect(stored).toEqual({
+      plantId: "plant-1",
+      growId: "grow-1",
+      tentId: "tent-1",
+      savedAt: expect.any(String),
+    });
+    expect(Number.isFinite(Date.parse(String(stored.savedAt)))).toBe(true);
+  });
+
+  it("remembers the confirmed plant after a V2 Note succeeds", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "note-event-1", environment_event_id: null },
+      error: null,
+    });
+    renderSheet("plant:plant-1", "note");
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Checked leaf posture." },
+    });
+    clickSave();
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getLocalStorageItemForTest(RECENT_TARGET_KEY)).not.toBeNull());
+
+    expect(JSON.parse(getLocalStorageItemForTest(RECENT_TARGET_KEY) ?? "null")).toEqual({
+      plantId: "plant-1",
+      growId: "grow-1",
+      tentId: "tent-1",
+      savedAt: expect.any(String),
+    });
+  });
+
+  it("does not refresh the remembered target when structured Water fails", async () => {
+    const previous = JSON.stringify({
+      plantId: "plant-previous",
+      growId: "grow-previous",
+      tentId: "tent-previous",
+      savedAt: "2026-08-19T12:00:00.000Z",
+    });
+    setLocalStorageItemForTest(RECENT_TARGET_KEY, previous);
+    wateringWriterMock.mockResolvedValueOnce({ ok: false, reason: "rpc:error" });
+    renderSheet("plant:plant-1", "water");
+    enterVolume();
+    clickSave();
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledTimes(1));
+    expect(getLocalStorageItemForTest(RECENT_TARGET_KEY)).toBe(previous);
+  });
+
+  it("does not invent a remembered plant after a tent-scoped Water succeeds", async () => {
+    renderSheet("tent:tent-1", "water");
+    enterVolume();
+    clickSave();
+
+    await waitFor(() => expect(wateringWriterMock).toHaveBeenCalledTimes(1));
+    expect(wateringWriterMock.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: null,
+      }),
+    );
+    expect(getLocalStorageItemForTest(RECENT_TARGET_KEY)).toBeNull();
   });
 
   it("freezes and retries the exact logical payload after an uncertain write", async () => {

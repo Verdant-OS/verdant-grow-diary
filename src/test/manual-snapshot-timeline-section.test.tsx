@@ -87,9 +87,10 @@ vi.mock("@/integrations/supabase/client", () => {
     const q: Record<string, unknown> = {};
     q.select = () => q;
     q.eq = (column: string, value: string) => {
-      lastFilter = { column, value };
+      if (column === "plant_id" || column === "tent_id") lastFilter = { column, value };
       return q;
     };
+    q.not = () => q;
     q.is = () => q;
     q.order = () => q;
     q.limit = () => Promise.resolve(nextResponse);

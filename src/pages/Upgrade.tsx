@@ -128,7 +128,7 @@ function usePaddle(config: PaddleConfig): {
     const init = () => {
       try {
         if (!window.Paddle) throw new Error("Paddle global missing after load");
-        window.Paddle.Environment?.set(config.environment ?? "sandbox");
+        window.Paddle.Environment?.set("sandbox");
         window.Paddle.Initialize?.({
           token: config.clientToken!,
           eventCallback: (ev) => {

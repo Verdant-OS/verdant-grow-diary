@@ -2,7 +2,11 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-const SRC = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8");
+const TENTS_SRC = readFileSync(resolve(__dirname, "../pages/Tents.tsx"), "utf8");
+const SRC = readFileSync(
+  resolve(__dirname, "../components/TentEnvironmentSnapshotStrip.tsx"),
+  "utf8",
+);
 
 describe("Tents list VPD stage-missing info badge", () => {
   it("still imports the canonical stage-aware VPD helper", () => {
@@ -10,6 +14,7 @@ describe("Tents list VPD stage-missing info badge", () => {
   });
 
   it("uses the shared VpdStageMissingBadge component", () => {
+    expect(TENTS_SRC).toMatch(/TentEnvironmentSnapshotStrip/);
     expect(SRC).toMatch(
       /import\s+VpdStageMissingBadge\s+from\s+["']@\/components\/VpdStageMissingBadge["']/,
     );
@@ -23,12 +28,14 @@ describe("Tents list VPD stage-missing info badge", () => {
     // metric exists and is not status "unknown" (i.e. a real value).
     expect(SRC).toMatch(/const hasVpdValue = !!vpdMetric && vpdMetric\.status !== "unknown"/);
     expect(SRC).toMatch(
-      /hasVpdValue\s*&&\s*snapView\.canAssessStage\s*&&\s*normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(\s*<VpdStageMissingBadge[\s\S]*?tents-list-vpd-stage-missing-badge/,
+      /hasVpdValue\s*&&\s*snapView\.canAssessStage\s*&&\s*normalizeVpdStage\(stage\)\s*===\s*"unknown"\s*\?\s*\(\s*<VpdStageMissingBadge[\s\S]*?tents-list-vpd-stage-missing-badge/,
     );
   });
 
   it("badge branch performs no alert/queue/automation writes", () => {
-    const m = SRC.match(/normalizeVpdStage\(t\.stage\)\s*===\s*"unknown"\s*&&\s*\(([\s\S]*?)\)\}/);
+    const m = SRC.match(
+      /normalizeVpdStage\(stage\)\s*===\s*"unknown"\s*\?\s*\(([\s\S]*?)\)\s*:\s*null/,
+    );
     expect(m).toBeTruthy();
     expect(m![1]).not.toMatch(
       /saveAlert|logAlertEvent|action_queue|service_role|automation|device.control|from\(['"]alerts['"]\)/i,
@@ -38,10 +45,14 @@ describe("Tents list VPD stage-missing info badge", () => {
   it("does not introduce service_role or action_queue strings to the file", () => {
     expect(SRC).not.toMatch(/service_role/);
     expect(SRC).not.toMatch(/action_queue/);
+    expect(TENTS_SRC).not.toMatch(/service_role/);
+    expect(TENTS_SRC).not.toMatch(/action_queue/);
   });
 
   it("preserves the stage-aware VPD MetricChip wiring via the shared presenter", () => {
     expect(SRC).toMatch(/buildTentSnapshotView/);
-    expect(SRC).toMatch(/const vpdMetric = snapView\.metrics\.find\(\(m\) => m\.key === "vpd"\)/);
+    expect(SRC).toMatch(
+      /const vpdMetric = snapView\.metrics\.find\(\(metric\) => metric\.key === "vpd"\)/,
+    );
   });
 });

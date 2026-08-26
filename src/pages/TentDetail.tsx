@@ -1,5 +1,5 @@
 import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
-import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
+import EcowittTentSnapshotV0Card from "@/components/EcowittTentSnapshotV0Card";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import WateringCadenceHistoryStrip from "@/components/WateringCadenceHistoryStrip";
 import DrybackMonitoringStrip from "@/components/DrybackMonitoringStrip";
@@ -469,22 +469,10 @@ export default function TentDetail() {
 
       <section
         className="glass rounded-2xl p-4 mb-6"
-        aria-label="Latest EcoWitt Snapshot"
+        aria-label="EcoWitt tent sensor snapshot"
         data-testid="tent-detail-ecowitt-section"
       >
-        <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
-          <div>
-            <h2 className="font-display font-semibold">Latest EcoWitt Snapshot</h2>
-            <p className="text-xs text-muted-foreground">
-              Most recent EcoWitt reading for this tent. Not live device control.
-            </p>
-          </div>
-        </div>
-        <EcowittLatestSnapshotCard
-          tentId={id ?? null}
-          tentName={tent?.name}
-          title="Latest EcoWitt Snapshot"
-        />
+        <EcowittTentSnapshotV0Card tentId={id ?? null} />
       </section>
 
       <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />

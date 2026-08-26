@@ -230,9 +230,16 @@ describe("removeChipAuthoredResponseLine", () => {
     expect(removeChipAuthoredResponseLine(note, "Better")).toBe(note);
   });
 
-  it("leaves the note alone when the status does not match what the chip wrote", () => {
-    const note = "Response check: Worse.\nRunoff clear.";
-    expect(removeChipAuthoredResponseLine(note, "Better")).toBe(note);
+  it("removes the chip's slot even when its status no longer matches provenance", () => {
+    // INVERTED DELIBERATELY. This previously asserted the note came back
+    // unchanged, encoding "the current status must equal the authored one".
+    // That assumption is the leak: the grower can re-word the generated line,
+    // and refusing to remove it carries a response onto a plant that never
+    // showed it. Provenance proves the SLOT is the chip's; the word in it is
+    // the grower's to change.
+    expect(removeChipAuthoredResponseLine("Response check: Worse.\nRunoff clear.", "Better")).toBe(
+      "Runoff clear.",
+    );
   });
 
   it("is null-safe and deterministic", () => {
@@ -241,6 +248,31 @@ describe("removeChipAuthoredResponseLine", () => {
     expect(removeChipAuthoredResponseLine(note, "Better")).toBe(
       removeChipAuthoredResponseLine(note, "Better"),
     );
+  });
+
+  it("removes a chip-slot marker the grower re-worded, so no status rides a retarget", () => {
+    // Click Better, then edit the generated word to Worse. The provenance ref
+    // still says Better. Matching on the AUTHORED status would find nothing to
+    // remove and carry a Worse marker onto the next plant — the same
+    // misattribution the whole cleanup exists to prevent.
+    expect(removeChipAuthoredResponseLine("Response check: Worse.", "Better")).toBe("");
+    expect(removeChipAuthoredResponseLine("Response check: Worse.\nRunoff clear.", "Better")).toBe(
+      "Runoff clear.",
+    );
+    expect(removeChipAuthoredResponseLine("Response check: Same. after watering", "Better")).toBe(
+      "after watering",
+    );
+  });
+
+  it("still refuses a head line that is not a canonical marker at all", () => {
+    // Provenance alone must not license removing grower prose: the head slot
+    // has to actually hold a canonical marker.
+    expect(removeChipAuthoredResponseLine("Watered 1L.\nResponse check: Better.", "Better")).toBe(
+      "Watered 1L.\nResponse check: Better.",
+    );
+    expect(
+      removeChipAuthoredResponseLine("Previous response check: better after watering", "Worse"),
+    ).toBe("Previous response check: better after watering");
   });
 
   it("round-trips with applyResponseCheck: apply then remove restores the note", () => {

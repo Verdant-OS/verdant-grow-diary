@@ -47,6 +47,16 @@ describe("deriveTimelineRowSensorSource", () => {
     );
   });
 
+  it("classifies Plant Quick Log's compatibility envelope as manual", () => {
+    expect(
+      deriveTimelineRowSensorSource(
+        row("a", {
+          manual_sensor_snapshot: { temp_f: 82, humidity_percent: 48, source: "manual" },
+        }),
+      ),
+    ).toBe("manual");
+  });
+
   it("keeps an old uncorroborated live snapshot invalid rather than stale-live", () => {
     expect(
       deriveTimelineRowSensorSource(
@@ -64,6 +74,9 @@ describe("filterTimelineEvidenceRows + sensorSources", () => {
   const rows = [
     row("live", { sensor_snapshot: { source: "live", ts: recent } }),
     row("manual", { sensor_snapshot: { temp: 22 } }),
+    row("plant-quick-log-manual", {
+      manual_sensor_snapshot: { ph: 6.2, source: "manual" },
+    }),
     row("csv", { sensor_snapshot: { source: "csv" } }),
     row("demo", { sensor_snapshot: { source: "demo" } }),
     row("invalid", { sensor_snapshot: { source: "invalid" } }),
@@ -82,7 +95,7 @@ describe("filterTimelineEvidenceRows + sensorSources", () => {
 
   it("supports multi-select OR semantics across selected kinds", () => {
     const out = filterTimelineEvidenceRows(rows, { sensorSources: ["csv", "manual"] });
-    expect(out.map((r) => r.id).sort()).toEqual(["csv", "manual"]);
+    expect(out.map((r) => r.id).sort()).toEqual(["csv", "manual", "plant-quick-log-manual"]);
   });
 
   it("invalid filter matches explicit invalid source", () => {

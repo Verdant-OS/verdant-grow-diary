@@ -11,6 +11,12 @@
  * already stored on the row render.
  */
 
+import {
+  extractSourceAiDoctorSessionId,
+  extractSourceAlertId,
+  getActionQueueSourceKind,
+} from "@/lib/actionQueueProvenanceRules";
+
 export type AssignedTentActionStatus =
   "pending_approval" | "approved" | "rejected" | "completed" | "cancelled" | "simulated" | string;
 
@@ -28,6 +34,7 @@ export interface AssignedTentActionInputRow {
   suggested_change?: string | null;
   reason?: string | null;
   risk_level?: AssignedTentActionRisk | null;
+  target_device?: string | null;
   created_at?: string | null;
 }
 
@@ -35,6 +42,8 @@ export interface PlantAssignedTentActionRow {
   id: string;
   growId: string;
   tentId: string | null;
+  /** Persisted plant scope. Null means tent-wide, never a selected-plant claim. */
+  plantId: string | null;
   status: "pending_approval";
   source: string | null;
   actionType: string | null;
@@ -45,22 +54,28 @@ export interface PlantAssignedTentActionRow {
   createdAt: string | null;
   /** Parsed alert id from `[alert:<id>]` back-pointer in `reason`, if any. */
   alertBackPointerId: string | null;
+  /** Parsed AI Doctor session id from `[session:<id>]`, if any. Never render raw. */
+  aiDoctorSessionBackPointerId: string | null;
+  /** Whether a persisted action names a target device. Never exposes the identifier. */
+  hasTargetDevice: boolean;
 }
 
 export const ASSIGNED_TENT_ACTIONS_DEFAULT_LIMIT = 5;
 
-const ALERT_BACK_POINTER_RE = /\[alert:([a-zA-Z0-9_-]+)\]/;
-
 export function extractAlertBackPointerId(reason: string | null | undefined): string | null {
-  if (!reason) return null;
-  const m = ALERT_BACK_POINTER_RE.exec(reason);
-  return m ? m[1] : null;
+  return extractSourceAlertId(reason);
 }
 
 export interface BuildAssignedTentActionsOptions {
   tentId: string | null | undefined;
   growId?: string | null | undefined;
   limit?: number;
+  /**
+   * Live Proof-only selector. When supplied, other-plant/tent-wide AI Coach
+   * rows are excluded before the normal display cap. All other source kinds
+   * preserve the shared assigned-tent panel semantics.
+   */
+  selectedPlantIdForAiCoach?: string | null | undefined;
 }
 
 function toRow(r: AssignedTentActionInputRow): PlantAssignedTentActionRow {
@@ -68,6 +83,7 @@ function toRow(r: AssignedTentActionInputRow): PlantAssignedTentActionRow {
     id: r.id,
     growId: r.grow_id as string,
     tentId: r.tent_id ?? null,
+    plantId: r.plant_id ?? null,
     status: "pending_approval",
     source: r.source ?? null,
     actionType: r.action_type ?? null,
@@ -77,6 +93,8 @@ function toRow(r: AssignedTentActionInputRow): PlantAssignedTentActionRow {
     riskLevel: r.risk_level ?? null,
     createdAt: r.created_at ?? null,
     alertBackPointerId: extractAlertBackPointerId(r.reason),
+    aiDoctorSessionBackPointerId: extractSourceAiDoctorSessionId(r.reason),
+    hasTargetDevice: r.target_device !== null && r.target_device !== undefined,
   };
 }
 
@@ -96,6 +114,10 @@ export function buildAssignedTentActions(
   if (!rows || rows.length === 0) return [];
   const growId = opts.growId ?? null;
   const limit = Math.max(1, opts.limit ?? ASSIGNED_TENT_ACTIONS_DEFAULT_LIMIT);
+  const selectedPlantIdForAiCoach =
+    typeof opts.selectedPlantIdForAiCoach === "string" && opts.selectedPlantIdForAiCoach.trim()
+      ? opts.selectedPlantIdForAiCoach
+      : null;
 
   const scoped = rows.filter((r) => {
     if (!r) return false;
@@ -106,7 +128,15 @@ export function buildAssignedTentActions(
     return true;
   });
 
-  const mapped = scoped.map(toRow);
+  const proofScoped = selectedPlantIdForAiCoach
+    ? scoped.filter(
+        (row) =>
+          getActionQueueSourceKind(row) !== "ai_coach" ||
+          row.plant_id === selectedPlantIdForAiCoach,
+      )
+    : scoped;
+
+  const mapped = proofScoped.map(toRow);
   mapped.sort((a, b) => {
     const at = a.createdAt ? Date.parse(a.createdAt) : 0;
     const bt = b.createdAt ? Date.parse(b.createdAt) : 0;

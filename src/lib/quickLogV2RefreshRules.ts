@@ -44,6 +44,7 @@ export type QuickLogV2RefreshKey = readonly unknown[];
  *  - manual_snapshot_timeline_cards → manual snapshot timeline section
  *  - diary_entries               → dashboards and panels reading diary rows
  *  - grow_events                 → any panel reading grow_events directly
+ *  - latest-sensor-snapshot      → mounted Dashboard current environment
  *  - timeline                    → legacy/generic timeline consumers
  *
  * Dashboard prefixes (`dashboard_recent_activity`, `dashboard_memory`) are
@@ -58,6 +59,7 @@ const ALWAYS_KEYS: ReadonlyArray<QuickLogV2RefreshKey> = [
   ["diary_entries"],
   ["pheno_evidence_receipts"],
   ["grow_events"],
+  ["latest-sensor-snapshot"],
   ["timeline"],
   // Dashboard recent activity / memory surfaces. Conditional at apply time.
   ["dashboard_recent_activity"],

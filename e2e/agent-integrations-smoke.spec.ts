@@ -134,10 +134,16 @@ test.describe("Agent Integrations settings smoke (mocked, 1280x800)", () => {
     await expect(page.getByTestId("manifest-identity")).toBeVisible();
     await expect(page.getByTestId("manifest-version")).toBeVisible();
     await expect(page.getByTestId("manifest-fingerprint")).toBeVisible();
-    await expect(page.getByTestId("manifest-tool-count")).toContainText("Tools advertised: 3");
+    await expect(page.getByTestId("manifest-tool-count")).toContainText("Tools advertised: 5");
 
     // Exact tool names present.
-    for (const name of ["list_grows", "list_recent_diary_entries", "get_latest_sensor_snapshot"]) {
+    for (const name of [
+      "list_grows",
+      "list_recent_diary_entries",
+      "get_latest_sensor_snapshot",
+      "list_grow_walk_targets",
+      "get_grow_walk_context",
+    ]) {
       await expect(page.getByTestId(`mcp-tool-${name}`)).toBeVisible();
     }
 

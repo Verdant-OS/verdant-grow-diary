@@ -26,6 +26,7 @@ import {
 } from "@/lib/phenoCandidateEvidenceEnrichmentRules";
 import { fetchLatestSensorSnapshot } from "@/lib/quick-log/fetchLatestSensorSnapshot";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
+import { isMissingRpcError } from "@/lib/rpcAvailability/missingRpcError";
 import { listLatestSexObservationsForHunt } from "@/lib/phenoSexObservationService";
 import {
   sanitizeBreedingObjectiveTargets,
@@ -285,20 +286,56 @@ function distinct(ids: readonly (string | null | undefined)[]): string[] {
 }
 
 /** Bounded canonical diary read for the candidates' own plants — the Pheno
- * Hunt links to plant memory, it never copies it. One PER-PLANT limited
- * query (batched for concurrency): a single global limit let one prolific
- * candidate consume the whole budget and render its siblings as having no
- * diary evidence at all. Newest first; the pure mapper applies the 5-entry /
+ * Hunt links to plant memory, it never copies it. ONE server-side
+ * top-N-per-plant RPC call per ≤100-id chunk (100 = the workspace page
+ * bound, so the page path is always a single request): row_number()
+ * partitioned by plant_id gives every candidate its OWN newest 40 rows, so a
+ * prolific sibling can never starve the others of diary evidence (#1144's
+ * deferred end-state). Newest first; the pure mapper applies the 5-entry /
  * 4-photo presentation caps. Fails closed (never "no entries" on a failed
- * read). Retracted entries are excluded. */
+ * read). Retracted entries are excluded server-side. Deploy-window compat:
+ * migrations reach production out of band, so a missing-RPC error — and only
+ * that error — falls back once to the previous per-plant batched read. */
 const DIARY_EVIDENCE_ROWS_PER_PLANT = 40;
 const DIARY_EVIDENCE_QUERY_BATCH = 8;
+const DIARY_EVIDENCE_RPC = "pheno_candidate_diary_entries_top_n";
+/** Mirrors the RPC's server-side p_plant_ids cap (= MAX_PAGE_SIZE). The
+ * server REJECTS oversized calls rather than clamping — a silently dropped
+ * plant would render as evidence-free, the exact starvation defect — so the
+ * client never sends more than this per call. */
+const DIARY_EVIDENCE_RPC_MAX_PLANT_IDS = 100;
 async function loadCandidateDiaryEvidence(
   plantIds: string[],
 ): Promise<PhenoCandidateDiaryEvidence> {
   if (plantIds.length === 0) {
     return { quickLogEntriesByPlantId: {}, timelineEventsByPlantId: {}, photosByPlantId: {} };
   }
+  const rows: PhenoDiaryEvidenceRow[] = [];
+  for (let i = 0; i < plantIds.length; i += DIARY_EVIDENCE_RPC_MAX_PLANT_IDS) {
+    const chunk = plantIds.slice(i, i + DIARY_EVIDENCE_RPC_MAX_PLANT_IDS);
+    const { data, error } = await phenoDb.rpc(DIARY_EVIDENCE_RPC, {
+      p_plant_ids: chunk,
+      p_limit_per_plant: DIARY_EVIDENCE_ROWS_PER_PLANT,
+    });
+    if (error) {
+      if (isMissingRpcError(error, DIARY_EVIDENCE_RPC)) {
+        return loadCandidateDiaryEvidenceLegacy(plantIds);
+      }
+      throw new PhenoEvidenceReadError("diary_entries");
+    }
+    if (!data) throw new PhenoEvidenceReadError("diary_entries");
+    rows.push(...data);
+  }
+  return mapDiaryRowsToCandidateEvidence(rows);
+}
+
+/** Pre-RPC read path — one PER-PLANT limited query (batched for
+ * concurrency), which was itself the fix for one global limit starving
+ * siblings. Kept verbatim as the deploy-window fallback above; remove once
+ * 20260826100000 is applied to production. */
+async function loadCandidateDiaryEvidenceLegacy(
+  plantIds: string[],
+): Promise<PhenoCandidateDiaryEvidence> {
   const rows: PhenoDiaryEvidenceRow[] = [];
   for (let i = 0; i < plantIds.length; i += DIARY_EVIDENCE_QUERY_BATCH) {
     const batch = plantIds.slice(i, i + DIARY_EVIDENCE_QUERY_BATCH);

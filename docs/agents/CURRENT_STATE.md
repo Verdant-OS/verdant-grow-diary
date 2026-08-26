@@ -1,6 +1,32 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-26 UTC
+**Last updated:** 2026-08-26 UTC (18:15 UTC)
+**Updated by:** Claude (2026-08-26: **server-side top-N-per-plant diary read for Pheno Hunt
+candidates delivered as draft [PR #1149](https://github.com/Verdant-OS/verdant-grow-diary/pull/1149)**
+from branch `claude/verdant-pheno-hunt-lab-vq6pd9`, restarted from deploy tip `ec8aca7b5`
+(#1148) — the branch was byte-identical to tip before this slice, per the task order. Scope:
+`loadCandidateDiaryEvidence`'s one-`diary_entries`-query-per-plant fan-out (the #1139 fix for
+global-limit sibling starvation) is replaced by **one** `SECURITY INVOKER` RPC,
+`pheno_candidate_diary_entries_top_n` (`row_number()` partitioned by `plant_id`, ordered
+`entry_at DESC, id DESC`, `rn <=` a server-clamped hard-max-40 limit; `p_plant_ids` capped at
+100 = the workspace `MAX_PAGE_SIZE`, oversized calls rejected not clamped; EXECUTE to
+`authenticated` only, PUBLIC/anon/service_role revoked). Client chunks at 100 and keeps a
+missing-RPC-only fallback to the old per-plant read, so production behavior is byte-identical
+until the operator applies the migration. One additive migration
+(`20260826100000_pheno_candidate_diary_entries_top_n_rpc.sql`) ships **in-branch only — NOT
+applied to production**; `20260825233000` and `20260813030000` also remain unapplied, and the
+publish stop-order and migration immutability are untouched. Validation, exact: new tests
+18/18 (11 SQL contract + 7 client behavior; client suite proven RED pre-fix at 6 failed /
+1 passed), `src/test/pheno-*` + `use-pheno-*` sweep 1479/1479 across 151 files, migration
+gates + adjacent 265/265, typecheck clean, scoped eslint 0/0, `bun run build` + SEO gates
+green. Known-red on the PR: `Supabase Preview` 42P07 on `ai_credit_grants` — inherited, per
+the 03:14 UTC section below, not this diff. Owner: Claude; independent reviewer for THIS
+slice: **Blue Dream** (named in the task — distinct from the still-Cheek-named seat on the
+earlier Pheno Hunt + LAB territory PR recorded at 01:30 UTC). Draft until that review passes;
+GDP merges GitHub-only after PASS. No publish, no production SQL, no production data
+modification. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC
 **Updated by:** Codex (2026-08-26: records the Grow Help Toolkit owner/reviewer assignment
 and Cheek's current operational boundary for the separate drift-probe lane. This edit adds the
 toolkit section and updates the Codex/Grok assignment rows; it does not independently re-probe

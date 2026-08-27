@@ -57,7 +57,10 @@ import {
 import QuickLogEntryIntegrityControls, {
   QuickLogEditedBadge,
 } from "@/components/QuickLogEntryIntegrityControls";
-import { useQuickLogRevisionBadges } from "@/hooks/useQuickLogRevisionBadges";
+import {
+  QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE,
+  useQuickLogRevisionBadges,
+} from "@/hooks/useQuickLogRevisionBadges";
 
 export interface DemoQuickLogTimelineEntry {
   entry: QuickLogTimelineEntry;
@@ -504,14 +507,20 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
         .filter((id) => id.length > 0),
     [entries],
   );
-  const { badges: revisionBadges } = useQuickLogRevisionBadges(actionRootIds);
+  const { badges: revisionBadges, status: revisionBadgesStatus } =
+    useQuickLogRevisionBadges(actionRootIds);
+  const revisionLedgerUnread = revisionBadgesStatus === "unavailable";
 
   const hasAnyEntries = wrapped.length > 0;
   const aiDoctorResultsHref = aiDoctorResultsHrefFor(props);
   const isAiDoctorEvidenceFilter = filter === "ai-doctor-evidence";
 
   return (
-    <Card data-testid="quick-log-grouped-timeline-section" data-scope={props.scope}>
+    <Card
+      data-testid="quick-log-grouped-timeline-section"
+      data-scope={props.scope}
+      data-revision-badges-status={revisionBadgesStatus}
+    >
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           <History className="h-4 w-4" aria-hidden /> QuickLog memory
@@ -637,29 +646,41 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
             {QUICK_LOG_GROUPED_TIMELINE_EMPTY_FILTERED_TEXT}
           </p>
         ) : (
-          <ul className="space-y-3" data-testid="quick-log-grouped-timeline-list">
-            {filteredWrapped.map((w, i) => {
-              const entry = w.entry;
-              const key =
-                entry.kind === "environment"
-                  ? `env:${entry.environment.id}:${i}`
-                  : `act:${entry.action.id}:${i}`;
-              const actionId =
-                entry.kind === "action" || entry.kind === "grouped" ? entry.action.id : null;
-              const correctionCount = actionId
-                ? (revisionBadges.get(actionId)?.correctionCount ?? 0)
-                : 0;
-              return (
-                <li key={key}>
-                  <EntryItem
-                    entry={entry}
-                    demoVariant={w.demoVariant}
-                    correctionCount={correctionCount}
-                  />
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            {revisionLedgerUnread ? (
+              <p
+                className="text-xs text-muted-foreground"
+                role="status"
+                data-testid="quicklog-revision-badges-unavailable"
+              >
+                {QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE}
+              </p>
+            ) : null}
+            <ul className="space-y-3" data-testid="quick-log-grouped-timeline-list">
+              {filteredWrapped.map((w, i) => {
+                const entry = w.entry;
+                const key =
+                  entry.kind === "environment"
+                    ? `env:${entry.environment.id}:${i}`
+                    : `act:${entry.action.id}:${i}`;
+                const actionId =
+                  entry.kind === "action" || entry.kind === "grouped" ? entry.action.id : null;
+                const correctionCount =
+                  revisionLedgerUnread || !actionId
+                    ? 0
+                    : (revisionBadges.get(actionId)?.correctionCount ?? 0);
+                return (
+                  <li key={key}>
+                    <EntryItem
+                      entry={entry}
+                      demoVariant={w.demoVariant}
+                      correctionCount={correctionCount}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
       </CardContent>
       <QuickLogV2Sheet

@@ -175,6 +175,19 @@ describe("Quick Log revision client contract", () => {
 
     expect(supabaseMock.from).toHaveBeenCalledWith("quicklog_entry_revisions");
     expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("ok");
+  });
+
+  it("marks empty-success badge reads as ok, not unavailable", async () => {
+    supabaseMock.revisionResult = { data: [], error: null };
+
+    const { result } = renderHook(() => useQuickLogRevisionBadges(["diary-1"]), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("ok");
   });
 
   it.each([
@@ -226,7 +239,30 @@ describe("Quick Log revision client contract", () => {
     });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
+    // Fail-soft: never crash the timeline surface.
     expect(result.current.badges.size).toBe(0);
+    // Honesty: unread ledger must not look like "truly no edits."
+    expect(result.current.status).toBe("unavailable");
+  });
+
+  it("marks network/query throws as unavailable without throwing to the surface", async () => {
+    const revisionBuilder = {
+      select: vi.fn(),
+      in: vi.fn(),
+      order: vi.fn(),
+    };
+    revisionBuilder.select.mockReturnValue(revisionBuilder);
+    revisionBuilder.in.mockReturnValue(revisionBuilder);
+    revisionBuilder.order.mockRejectedValue(new Error("network down"));
+    supabaseMock.from.mockReturnValue(revisionBuilder);
+
+    const { result } = renderHook(() => useQuickLogRevisionBadges(["diary-1"]), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("unavailable");
   });
 
   it("keeps retained entries visible without revision metadata when that lookup fails", async () => {

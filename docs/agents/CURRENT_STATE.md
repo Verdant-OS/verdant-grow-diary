@@ -1,6 +1,38 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-26 UTC (~23:15 UTC)
+**Last updated:** 2026-08-27 UTC (~07:40 UTC)
+**Updated by:** Claude (2026-08-27: **issue #1003 (sensor provenance fail-close + forwarding-report
+export allowlist) delivered as draft [PR #1163](https://github.com/Verdant-OS/verdant-grow-diary/pull/1163)**
+from branch `claude/sentinel-ack-1157-hold-neyqah`, cut from deploy tip `11b0ca6` (#1160), head
+`460973b`. The task's NOT_APPLICABLE gate did not fire — both holes were proven live on tip
+(`established fact`, by reading and executing the modules): `quickLogSensorSnapshotViewModelAdapter`
+promoted any unknown provider string to canonical `live` when upstream freshness was `fresh`
+(producing an attachable payload stamped `source: "live"`), and `ecowittForwardingReportExport`'s
+status-fallback envelope exported `captured_at`/`source`/`vendor` unsanitized while
+`SECRET_PATTERNS` matched credential labels, not values. Fix: adapter delegates to the sanctioned
+`normalizeSensorSource` alias table (unknown → `invalid`, freshness never consulted; first-party
+`pi_bridge` → live is preserved — it is the one active production writer of a provider-string
+source, per the ingest audit); export gains shape/value-allowlists on BOTH latest_metrics paths, a
+recursive output-allowlist serializer, and credential-VALUE redaction (MACs incl. bare 12-hex,
+32+-hex with lookarounds so `0x`/`PASSKEY_`/`sbp_` prefixes cannot evade, UUIDs, `sk-` keys, env
+`NAME=value`); the Quick Log strip suppresses the one contradictory Usable-pill-plus-invalid-advisory
+combination for legacy transport-labeled rows. Validation, exact: new suites RED-proven against the
+pre-fix tree with the final files (adapter 4 failed / 8 passed; export 7 failed / 10 passed; strip
+coherence 1 failed / 11 passed against the mid-state it guards), 41/41 green post-fix; broad
+targeted sweep 6298 passed / 3 skipped across all `ecowitt-*`/`quicklog-*`/`quick-log-*`/`sensor-*`
+suites + v0 contract 26/26; typecheck, scoped eslint, and `bun run build` (with SEO gates) clean.
+Three independent adversarial verify passes ran pre-push; both security findings they raised
+(vendor shape-regex bypass via station ids / bare MACs; `\b`-anchored hex evasion) are fixed and
+probe-tested in the diff. Recorded follow-ups, deliberately NOT in this slice: widget `metric_keys`
+key-name rendering, `safeSourceDetail` shape gate, the validation-panel `redacted_raw_payload`
+key-only redaction, and `sensorDiagnosticsExportRules`' vbt_-only body redaction. Owner: Claude;
+independent reviewer: **unassigned** — draft until Cheek/GDP names the reviewing peer. No merge, no
+publish, no sandbox APPLY, no Preview action; #1151, #1153, #1157, #1162, #576 untouched; #1157
+remains unqueued pending Blue Dream's re-review of `5791639b`. The publish stop-order and migration
+posture are untouched: `20260826100000`, `20260825233000`, `20260813030000` remain **NOT applied**.
+This edit touches this file only, on the #1163 branch. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (~23:15 UTC)
 **Updated by:** Claude (2026-08-26: **#1158 MERGED — deploy tip is now `b294b64`** (squash of
 the Gate Zero Day-0 SEO baseline slice at head `72a9a7e`). Timeline: Blue Dream's independent
 review returned PASS-with-P2 (the condition-1 cell fix, pushed as `72a9a7e`); the owner marked

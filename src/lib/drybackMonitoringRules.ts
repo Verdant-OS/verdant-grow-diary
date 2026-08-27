@@ -22,12 +22,12 @@ import {
   type SoilMoistureCalibrationCandidate,
   type SoilMoistureCalibrationContext,
 } from "@/lib/soilMoistureCalibrationSelectionRules";
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 
 export const DRYBACK_MONITORING_TITLE = "Dryback monitoring";
 export const DRYBACK_MONITORING_CAVEAT =
   "Evidence only — dryback is arithmetic VWC change between waterings (calibrated when a dry/wet baseline is active; otherwise raw). Not a schedule, not plant health, not a watering recommendation." as const;
-export const DRYBACK_EMPTY_NO_SAMPLES =
-  "No usable soil moisture samples for this tent yet.";
+export const DRYBACK_EMPTY_NO_SAMPLES = "No usable soil moisture samples for this tent yet.";
 export const DRYBACK_EMPTY_NO_WATERINGS =
   "No dated watering markers yet — log waterings to open dryback windows.";
 export const DRYBACK_INSUFFICIENT_COPY =
@@ -43,14 +43,7 @@ export const DRYBACK_MIN_DELTA_PCT_POINTS = 2;
 export const DRYBACK_RECENT_WINDOW_CAP = 5;
 
 export type DrybackSourceClass =
-  | "live"
-  | "manual"
-  | "csv"
-  | "imported"
-  | "demo"
-  | "stale"
-  | "invalid"
-  | "unknown";
+  "live" | "manual" | "csv" | "imported" | "demo" | "stale" | "invalid" | "unknown";
 
 export type DrybackWindowKind = "closed" | "open";
 export type DrybackWindowQuality = "usable" | "weak" | "unusable";
@@ -194,13 +187,11 @@ function parseIso(raw: string | null | undefined): { iso: string; ms: number } |
 export function classifyDrybackSource(source: string | null | undefined): DrybackSourceClass {
   const s = (source ?? "").trim().toLowerCase();
   if (!s) return "unknown";
-  if (s === "live" || s === "pi_bridge" || s === "bridge" || s.startsWith("live")) return "live";
-  if (s === "manual") return "manual";
-  if (s === "csv" || s === "import" || s === "imported") return "csv";
-  if (s === "demo" || s === "sample" || s === "synthetic") return "demo";
-  if (s === "stale") return "stale";
-  if (s === "invalid" || s === "error" || s === "diagnostic") return "invalid";
-  return "unknown";
+  // #592 fold: delegate to the sanctioned #1003 canon table. The old
+  // private branches promoted "bridge" and any "live*" prefix to live;
+  // the canon keeps pi_bridge live and fails everything unrecognized
+  // closed to invalid. "unknown" remains only for a missing label.
+  return normalizeSensorSource(s);
 }
 
 export function drybackSourceLabel(sourceClass: DrybackSourceClass): string {
@@ -289,9 +280,7 @@ function normalizeSamples(samples: readonly DrybackVwcSampleInput[]): Normalized
   return out;
 }
 
-function normalizeWaterings(
-  markers: readonly DrybackWateringMarkerInput[],
-): NormalizedWatering[] {
+function normalizeWaterings(markers: readonly DrybackWateringMarkerInput[]): NormalizedWatering[] {
   const out: NormalizedWatering[] = [];
   for (const m of markers) {
     const id = trim(m.id);
@@ -528,10 +517,7 @@ export function projectDrybackSamplesForMonitoring(
     };
   }
 
-  const selection = selectSoilMoistureCalibration(
-    calibration.context,
-    calibration.calibrations,
-  );
+  const selection = selectSoilMoistureCalibration(calibration.context, calibration.calibrations);
 
   if (selection.status === "unavailable") {
     return {

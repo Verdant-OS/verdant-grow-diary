@@ -10,15 +10,18 @@
  *  - Never emits device-control language.
  *  - Deterministic for the same (snapshot, options.now).
  *
- * Canonical single source of truth. Consumed by the ai-coach edge
- * function via the generated `_shared/lib/lib/` mirror produced by
- * `scripts/sync-edge-shared.mjs`.
+ * Canonical single source of truth. (Note: no edge function consumes
+ * this module today — the `_shared/lib/lib/` mirror carries
+ * `aiCoachLatestSensorSnapshot.ts`, not this file; verified against the
+ * mirror sync gate at the #592 fold.)
  */
 
 import { DEFAULT_AI_COACH_STALE_THRESHOLD_MS } from "../constants/sensorTiming";
 import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
-export type AiCoachSnapshotSource =
-  "live" | "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
+// #592 fold: canonical vocabulary only — missing or unrecognized
+// provenance fails closed to "invalid"; there is no "unknown".
+export type AiCoachSnapshotSource = "live" | "manual" | "csv" | "demo" | "stale" | "invalid";
 
 export type AiCoachSnapshotTrust = "low" | "medium" | "high";
 
@@ -41,16 +44,6 @@ export interface AiCoachSensorSnapshotContext {
 }
 
 export { DEFAULT_AI_COACH_STALE_THRESHOLD_MS };
-
-const KNOWN_SOURCES: ReadonlySet<AiCoachSnapshotSource> = new Set([
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-  "unknown",
-]);
 
 /** Reading keys we will summarize when values are trusted. */
 const READING_KEYS = [
@@ -85,15 +78,9 @@ function pickString(o: Record<string, unknown>, keys: readonly string[]): string
 }
 
 function normalizeSource(raw: string | undefined): AiCoachSnapshotSource {
-  if (!raw) return "unknown";
-  const lower = raw.toLowerCase();
-  if (lower === "imported") return "csv";
-  if (lower === "import") return "csv";
-  if (lower === "mock" || lower === "fixture") return "demo";
-  if ((KNOWN_SOURCES as ReadonlySet<string>).has(lower)) {
-    return lower as AiCoachSnapshotSource;
-  }
-  return "unknown";
+  // #592 fold: delegate to the sanctioned #1003 canon table — pi_bridge
+  // is live, diary is manual, everything unrecognized is invalid.
+  return normalizeSensorSource(raw ?? null);
 }
 
 function summarizeReadings(snap: Record<string, unknown>): string {
@@ -142,7 +129,7 @@ export function buildAiCoachSensorSnapshotContext(
   if (snapshot === null || snapshot === undefined) {
     return {
       line: "LATEST_SENSOR_SNAPSHOT: none",
-      source: "unknown",
+      source: "invalid",
       stale: false,
       trust: "low",
       includesValues: false,
@@ -215,23 +202,24 @@ export function buildAiCoachSensorSnapshotContext(
     case "invalid": {
       trust = "low";
       includesValues = false;
-      safetyNotes.push("Sensor telemetry was flagged invalid; do not rely on these values.");
-      missingInformationHints.push(
-        "A valid sensor snapshot (manual or live) is needed before environmental diagnosis.",
-      );
-      valuesSummary = "values omitted; snapshot was flagged invalid";
-      break;
-    }
-    case "unknown": {
-      trust = "low";
-      includesValues = false;
-      safetyNotes.push(
-        "Snapshot source is unlabeled; provenance cannot be verified — treat as untrusted.",
-      );
-      missingInformationHints.push(
-        "Source-labeled (live, manual, csv) snapshot is needed for trustworthy diagnosis.",
-      );
-      valuesSummary = "values omitted; unlabeled source";
+      // Distinguish telemetry explicitly flagged invalid from a missing
+      // or unrecognized label — both normalize to "invalid" under the
+      // canon, but the grower-facing hint differs.
+      if ((rawSourceStr ?? "").trim().toLowerCase() === "invalid") {
+        safetyNotes.push("Sensor telemetry was flagged invalid; do not rely on these values.");
+        missingInformationHints.push(
+          "A valid sensor snapshot (manual or live) is needed before environmental diagnosis.",
+        );
+        valuesSummary = "values omitted; snapshot was flagged invalid";
+      } else {
+        safetyNotes.push(
+          "Snapshot source is unlabeled; provenance cannot be verified — treat as untrusted.",
+        );
+        missingInformationHints.push(
+          "Source-labeled (live, manual, csv) snapshot is needed for trustworthy diagnosis.",
+        );
+        valuesSummary = "values omitted; unlabeled source";
+      }
       break;
     }
     case "stale": {

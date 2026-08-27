@@ -8,9 +8,13 @@
  * pH) used by non-chart surfaces and null/NaN safety.
  */
 
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  clearLocalStorageForTest,
+  setLocalStorageItemForTest,
+} from "./helpers/localStorageTestHelper";
 import {
   getSensorMetricUnit,
   formatSensorMetricLabel,
@@ -22,6 +26,10 @@ import {
   SENSOR_CHART_METRIC_META,
 } from "@/lib/sensorChartAxisRules";
 
+beforeEach(() => {
+  clearLocalStorageForTest();
+});
+
 describe("getSensorMetricUnit", () => {
   it("returns canonical units for chart metrics", () => {
     expect(getSensorMetricUnit("temp")).toBe("°F");
@@ -29,6 +37,17 @@ describe("getSensorMetricUnit", () => {
     expect(getSensorMetricUnit("vpd")).toBe("kPa");
     expect(getSensorMetricUnit("co2")).toBe("ppm");
     expect(getSensorMetricUnit("soil")).toBe("%");
+  });
+
+  it("honors explicit and saved Celsius preferences for temperature only", () => {
+    expect(getSensorMetricUnit("temp", "celsius")).toBe("°C");
+    expect(getSensorMetricUnit("rh", "celsius")).toBe("%");
+
+    setLocalStorageItemForTest("verdant:temperatureUnit", "celsius");
+    expect(getSensorMetricUnit("temp")).toBe("°C");
+    expect(getSensorMetricUnit("vpd")).toBe("kPa");
+
+    expect(getSensorMetricUnit("temp", "fahrenheit")).toBe("°F");
   });
 
   it("returns extended units for non-chart metrics", () => {
@@ -48,6 +67,14 @@ describe("formatSensorMetricLabel", () => {
     expect(formatSensorMetricLabel("soil_ec")).toBe("Soil EC (mS/cm)");
   });
 
+  it("uses Celsius for temperature when explicitly requested or saved", () => {
+    expect(formatSensorMetricLabel("temp", "celsius")).toBe("Temperature (°C)");
+
+    setLocalStorageItemForTest("verdant:temperatureUnit", "celsius");
+    expect(formatSensorMetricLabel("temp")).toBe("Temperature (°C)");
+    expect(formatSensorMetricLabel("temp", "fahrenheit")).toBe("Temperature (°F)");
+  });
+
   it("renders unit-less metrics as the plain label", () => {
     expect(formatSensorMetricLabel("ph")).toBe("pH");
     expect(formatSensorMetricLabel("res_ph")).toBe("Reservoir pH");
@@ -60,6 +87,15 @@ describe("formatSensorMetricValue", () => {
     expect(formatSensorMetricValue("vpd", 1.1)).toBe("1.1 kPa");
     expect(formatSensorMetricValue("co2", 800)).toBe("800 ppm");
     expect(formatSensorMetricValue("soil_ec", 2.4)).toBe("2.4 mS/cm");
+  });
+
+  it("uses the Celsius suffix without converting the numeric value", () => {
+    expect(formatSensorMetricValue("temp", 72, "celsius")).toBe("72°C");
+
+    setLocalStorageItemForTest("verdant:temperatureUnit", "celsius");
+    expect(formatSensorMetricValue("temp", 72)).toBe("72°C");
+    expect(formatSensorMetricValue("temp", 72, "fahrenheit")).toBe("72°F");
+    expect(formatSensorMetricValue("vpd", 1.1, "celsius")).toBe("1.1 kPa");
   });
 
   it("returns plain number string for unit-less metrics", () => {
@@ -90,6 +126,14 @@ describe("legend / tooltip unit consistency", () => {
         expect(getSensorMetricUnit(m)).toBe(unit);
       },
     );
+  });
+
+  it("uses the same explicit Celsius override across chart and extended helpers", () => {
+    const unit = getSensorMetricUnit("temp", "celsius");
+    expect(unit).toBe("°C");
+    expect(sensorChartLegendLabel("temp", "celsius")).toContain(unit);
+    expect(formatSensorChartTooltipValue(72, "temp", "celsius")).toBe("72°C");
+    expect(formatSensorMetricValue("temp", 72, "celsius")).toBe("72°C");
   });
 });
 

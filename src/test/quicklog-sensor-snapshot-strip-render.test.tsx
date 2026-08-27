@@ -144,6 +144,28 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     expect(strip).not.toHaveTextContent(/Live/i);
   });
 
+  it("usable — provider source renders no contradictory invalid advisory on the Usable card (#1003)", () => {
+    // The fail-closed view-model normalizes an unknown transport label to
+    // "invalid", but the canonical resolver classifies this legacy row
+    // usable/fresh_non_live. The card must not say "Usable" and "invalid"
+    // in the same breath: the advisory is suppressed for exactly this
+    // combination, while the Usable pill and never-Live rule still hold.
+    mockUseLatestTentSensorSnapshot.mockReturnValue(
+      stateReady(
+        fullSnapshot({
+          source: "ecowitt",
+          status: "fresh_non_live" as SensorSnapshotStatus,
+          badge_label: "ecowitt • as of 5 min ago",
+        }),
+      ),
+    );
+    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
+
+    expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Usable");
+    expect(screen.queryByTestId("quicklog-sensor-snapshot-advisory")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quicklog-sensor-snapshot-strip")).not.toHaveTextContent(/Live/i);
+  });
+
   it("stale — resolver-stale snapshot renders Stale pill + refresh action", () => {
     mockUseLatestTentSensorSnapshot.mockReturnValue(
       stateReady(

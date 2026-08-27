@@ -1,7 +1,7 @@
 /**
- * Quiet honesty for Quick Log revision-badge reads: empty-success must not look
- * like an unread ledger. Consumers show a quiet unavailable note and hide
- * edited chrome when status is "unavailable".
+ * Quiet honesty for Quick Log revision-badge reads: pending / empty-success /
+ * unread must not share chrome. Consumers use status (not isLoading) as the
+ * confidence signal.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -14,7 +14,7 @@ import { QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE } from "@/hooks/useQuickLogR
 
 const badgeHookMock = vi.hoisted(() => ({
   badges: new Map<string, { correctionCount: number }>(),
-  status: "ok" as "ok" | "unavailable",
+  status: "ok" as "pending" | "ok" | "unavailable",
   isLoading: false,
 }));
 
@@ -67,6 +67,14 @@ function makeWrapper() {
   };
 }
 
+const HISTORY_ENTRY = {
+  id: "diary-1",
+  entry_type: "watering",
+  entry_at: "2026-08-15T12:00:00.000Z",
+  note: "Watered.",
+  details: { event_type: "watering" },
+} as const;
+
 describe("Quick Log revision badge unread honesty", () => {
   beforeEach(() => {
     badgeHookMock.badges = new Map();
@@ -76,20 +84,9 @@ describe("Quick Log revision badge unread honesty", () => {
 
   it("history panel: empty-success shows no unavailable note", () => {
     badgeHookMock.status = "ok";
-    render(
-      <RecentQuickLogActivityPanel
-        rawEntries={[
-          {
-            id: "diary-1",
-            entry_type: "watering",
-            entry_at: "2026-08-15T12:00:00.000Z",
-            note: "Watered.",
-            details: { event_type: "watering" },
-          },
-        ]}
-      />,
-      { wrapper: makeWrapper() },
-    );
+    render(<RecentQuickLogActivityPanel rawEntries={[HISTORY_ENTRY]} />, {
+      wrapper: makeWrapper(),
+    });
 
     expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();
     expect(screen.getByTestId("quicklog-history-section-recent")).toHaveAttribute(
@@ -98,24 +95,30 @@ describe("Quick Log revision badge unread honesty", () => {
     );
   });
 
+  it("history panel: pending hides edited chrome and does not flash the unavailable note", () => {
+    badgeHookMock.status = "pending";
+    badgeHookMock.isLoading = true;
+    badgeHookMock.badges = new Map([["diary-1", { correctionCount: 2 }]]);
+
+    render(<RecentQuickLogActivityPanel rawEntries={[HISTORY_ENTRY]} />, {
+      wrapper: makeWrapper(),
+    });
+
+    expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quicklog-entry-edited-badge")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quicklog-history-section-recent")).toHaveAttribute(
+      "data-revision-badges-status",
+      "pending",
+    );
+  });
+
   it("history panel: unread ledger shows a quiet unavailable note, not edited chrome", () => {
     badgeHookMock.status = "unavailable";
     badgeHookMock.badges = new Map([["diary-1", { correctionCount: 2 }]]);
 
-    render(
-      <RecentQuickLogActivityPanel
-        rawEntries={[
-          {
-            id: "diary-1",
-            entry_type: "watering",
-            entry_at: "2026-08-15T12:00:00.000Z",
-            note: "Watered.",
-            details: { event_type: "watering" },
-          },
-        ]}
-      />,
-      { wrapper: makeWrapper() },
-    );
+    render(<RecentQuickLogActivityPanel rawEntries={[HISTORY_ENTRY]} />, {
+      wrapper: makeWrapper(),
+    });
 
     const note = screen.getByTestId("quicklog-revision-badges-unavailable");
     expect(note).toHaveTextContent(QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE);
@@ -144,6 +147,25 @@ describe("Quick Log revision badge unread honesty", () => {
     expect(screen.getByTestId("quick-log-grouped-timeline-section")).toHaveAttribute(
       "data-revision-badges-status",
       "unavailable",
+    );
+  });
+
+  it("grouped timeline: pending hides chrome and does not show the unavailable note", async () => {
+    badgeHookMock.status = "pending";
+    badgeHookMock.isLoading = true;
+    badgeHookMock.badges = new Map([["ge-water-1", { correctionCount: 3 }]]);
+
+    render(<QuickLogGroupedTimelineSection scope="plant" plantId="plant-1" tentId="tent-1" />, {
+      wrapper: makeWrapper(),
+    });
+
+    await waitFor(() => screen.getByTestId("quick-log-grouped-timeline-list"));
+
+    expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quicklog-entry-edited-badge")).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-grouped-timeline-section")).toHaveAttribute(
+      "data-revision-badges-status",
+      "pending",
     );
   });
 

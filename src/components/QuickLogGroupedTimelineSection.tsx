@@ -509,6 +509,7 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
   );
   const { badges: revisionBadges, status: revisionBadgesStatus } =
     useQuickLogRevisionBadges(actionRootIds);
+  const revisionBadgesReady = revisionBadgesStatus === "ok";
   const revisionLedgerUnread = revisionBadgesStatus === "unavailable";
 
   const hasAnyEntries = wrapped.length > 0;
@@ -666,9 +667,9 @@ export default function QuickLogGroupedTimelineSection(props: Props) {
                 const actionId =
                   entry.kind === "action" || entry.kind === "grouped" ? entry.action.id : null;
                 const correctionCount =
-                  revisionLedgerUnread || !actionId
-                    ? 0
-                    : (revisionBadges.get(actionId)?.correctionCount ?? 0);
+                  revisionBadgesReady && actionId
+                    ? (revisionBadges.get(actionId)?.correctionCount ?? 0)
+                    : 0;
                 return (
                   <li key={key}>
                     <EntryItem

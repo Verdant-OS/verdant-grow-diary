@@ -4,11 +4,13 @@
  *
  * Safety contract:
  *  - SELECT-only on public.quicklog_entry_revisions (owner-scoped by RLS).
- *  - Errors resolve to an empty map + status "unavailable": a failed badge
- *    read must never break a timeline surface, and must not look like a
- *    confident empty-success ("truly no edits").
- *  - Empty map + status "ok" means the ledger was readable and had no rows
- *    for these roots (legacy entries without ledger rows stay badge-free).
+ *  - Status is the confidence signal: "pending" | "ok" | "unavailable".
+ *  - No resolved query.data → "pending" (never treat first paint / hung reads
+ *    as confident empty-success).
+ *  - "ok" only after a successful resolve (including empty success).
+ *  - Errors / thrown network resolve to an empty map + "unavailable": a
+ *    failed badge read must never break a timeline surface, and must not
+ *    look like "truly no edits."
  *  - No entitlement/plan checks — identical for every plan.
  */
 import { useQuery } from "@tanstack/react-query";
@@ -27,11 +29,11 @@ import {
 export const QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE =
   "Edit history is unavailable right now." as const;
 
-export type QuickLogRevisionBadgesStatus = "ok" | "unavailable";
+export type QuickLogRevisionBadgesStatus = "pending" | "ok" | "unavailable";
 
 type QuickLogRevisionBadgesQueryResult = {
   badges: Map<string, QuickLogRevisionBadge>;
-  status: QuickLogRevisionBadgesStatus;
+  status: Exclude<QuickLogRevisionBadgesStatus, "pending">;
 };
 
 const EMPTY_UNAVAILABLE: QuickLogRevisionBadgesQueryResult = {
@@ -74,7 +76,9 @@ export function useQuickLogRevisionBadges(rootIds: readonly string[]) {
 
   return {
     badges: resolved?.badges ?? new Map<string, QuickLogRevisionBadge>(),
-    status: resolved?.status ?? "ok",
+    // Missing resolved data is pending — never default to "ok" (that made
+    // hung / first-paint reads look like confident "no edits").
+    status: resolved?.status ?? "pending",
     isLoading: query.isLoading,
   };
 }

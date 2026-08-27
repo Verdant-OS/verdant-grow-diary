@@ -301,6 +301,7 @@ function QuickLogHistorySection({
     [rows, handleIndex],
   );
   const { badges, status: revisionBadgesStatus } = useQuickLogRevisionBadges(rootIds);
+  const revisionBadgesReady = revisionBadgesStatus === "ok";
   const revisionLedgerUnread = revisionBadgesStatus === "unavailable";
 
   return (
@@ -346,9 +347,9 @@ function QuickLogHistorySection({
                 key={r.id}
                 row={r}
                 integrityHandle={handle}
-                // Hide edited chrome when the ledger was unread — empty map +
-                // unavailable must not read as "confidently no edits."
-                correctionCount={revisionLedgerUnread ? 0 : (badge?.correctionCount ?? 0)}
+                // Edited chrome only after a successful resolve (status === "ok").
+                // pending and unavailable must not look like confident edits/no-edits.
+                correctionCount={revisionBadgesReady ? (badge?.correctionCount ?? 0) : 0}
                 onEntryChanged={onEntryChanged}
               />
             );

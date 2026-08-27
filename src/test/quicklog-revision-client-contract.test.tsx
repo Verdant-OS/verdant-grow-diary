@@ -190,6 +190,37 @@ describe("Quick Log revision client contract", () => {
     expect(result.current.status).toBe("ok");
   });
 
+  it("marks missing resolved data as pending, not ok", () => {
+    const { result } = renderHook(() => useQuickLogRevisionBadges([]), {
+      wrapper: makeWrapper(),
+    });
+
+    // Disabled query: no query.data yet — must not look like empty-success.
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("pending");
+  });
+
+  it("marks hung/isLoading reads without data as pending, not ok", async () => {
+    const revisionBuilder = {
+      select: vi.fn(),
+      in: vi.fn(),
+      order: vi.fn(),
+    };
+    revisionBuilder.select.mockReturnValue(revisionBuilder);
+    revisionBuilder.in.mockReturnValue(revisionBuilder);
+    // Never resolve — hung network.
+    revisionBuilder.order.mockReturnValue(new Promise(() => {}));
+    supabaseMock.from.mockReturnValue(revisionBuilder);
+
+    const { result } = renderHook(() => useQuickLogRevisionBadges(["diary-1"]), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(true));
+
+    expect(result.current.badges.size).toBe(0);
+    expect(result.current.status).toBe("pending");
+  });
+
   it.each([
     ["undefined array entries", { new_state: [undefined] }],
     ["non-plain JSON objects", { previous_state: new Date("2026-08-15T12:00:00.000Z") }],

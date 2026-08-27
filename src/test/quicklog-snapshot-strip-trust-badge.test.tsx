@@ -142,6 +142,52 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
     expect(v.trustBadge.attachable).toBe(false);
   });
 
+  it("legacy vendor fresh_non_live row fails closed: Invalid, never usable (#1003)", () => {
+    // fresh_non_live proves freshness, not trust. A receiving-transport
+    // label outside the canonical vocabulary and its reviewed aliases
+    // must never present as healthy context.
+    for (const source of ["ecowitt", "ecowitt_mqtt", "mqtt", "webhook", "wat"]) {
+      const v = buildQuickLogStripFromTentState({
+        status: "ready",
+        snapshot: snap({ source, status: "fresh_non_live" }),
+        hasTent: true,
+        now: NOW,
+        temperatureUnit: "celsius",
+      });
+      expect(v.status, `source=${source}`).toBe("invalid");
+      expect(v.trustBadge.badge, `source=${source}`).toBe("invalid");
+      expect(v.trustBadge.attachable, `source=${source}`).toBe(false);
+      expect(v.classification.isHealthyEvidence, `source=${source}`).toBe(false);
+      // Provider identity survives as a chip; it is never a trust label.
+      expect(v.providerLabel, `source=${source}`).not.toBeNull();
+    }
+  });
+
+  it("missing source on a fresh_non_live row also fails closed to Invalid (#1003)", () => {
+    const v = buildQuickLogStripFromTentState({
+      status: "ready",
+      snapshot: snap({ source: null, status: "fresh_non_live" }),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
+    expect(v.status).toBe("invalid");
+    expect(v.trustBadge.attachable).toBe(false);
+  });
+
+  it("reviewed aliases are not over-demoted: pi_bridge and manual fresh_non_live stay usable", () => {
+    for (const source of ["pi_bridge", "manual"]) {
+      const v = buildQuickLogStripFromTentState({
+        status: "ready",
+        snapshot: snap({ source, status: "fresh_non_live" }),
+        hasTent: true,
+        now: NOW,
+        temperatureUnit: "celsius",
+      });
+      expect(v.status, `source=${source}`).toBe("usable");
+    }
+  });
+
   it("empty/no_data trust resolves to invalid (never live)", () => {
     const v = buildQuickLogStripFromTentState({
       status: "empty",

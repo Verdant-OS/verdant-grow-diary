@@ -140,20 +140,12 @@ export default function QuickLogSensorSnapshotStrip({
       attached,
     }),
   );
-  // Coherence rule: the strict resolver behind `view` is the
-  // authoritative trust signal on this card. A legacy transport-labeled
-  // row (pre-canonicalization vendor string in `source`) is classified
-  // usable/fresh_non_live by that canonical path, while the fail-closed
-  // view-model normalizes its unknown label to "invalid"; rendering that
-  // advisory would contradict the Usable pill on the same card. Suppress
-  // the advisory only for that exact combination — every stale, invalid,
-  // demo, and missing advisory on a non-usable card still renders.
-  const vmInvalidOnUsableCard =
-    view.status === "usable" && vm.display?.effectiveSource === "invalid";
+  // Coherence: the strip adapter's provenance fence (#1003) demotes
+  // unknown-provenance rows to an Invalid card, so the invalid advisory
+  // below always agrees with the pill and trust badge — no
+  // usable-vs-invalid contradiction is reachable.
   const advisory =
-    vmInvalidOnUsableCard || (vm.display && vm.display.freshness === "fresh")
-      ? null
-      : (vm.warning ?? vm.emptyCopy);
+    vm.display && vm.display.freshness === "fresh" ? null : (vm.warning ?? vm.emptyCopy);
   const advisoryKind = vm.display ? vm.display.freshness : vm.emptyCopy ? "missing" : null;
   const showTrustBadge = shouldRenderTrustBadge(view.status, view.trustBadge.label);
   const pillIsRedundant = isPillRedundantWithBadge(view.status, view.trustBadge.label);

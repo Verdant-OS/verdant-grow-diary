@@ -287,6 +287,7 @@ export function computePhenoHuntOnboardingViewModel(
   if (!growOk) blockingReasons.push("Linked grow is required");
   if (candidateCount === 0) blockingReasons.push("Select at least one candidate plant");
   if (!goalsOk) blockingReasons.push("Select at least one evidence goal");
+  if (!draft.setupCompleted) blockingReasons.push("Confirm setup to enter the workspace");
 
   return {
     steps,

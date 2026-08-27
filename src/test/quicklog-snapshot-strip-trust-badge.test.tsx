@@ -183,10 +183,11 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
         temperatureUnit: "celsius",
       });
       expect(v.status, `source=${source}`).toBe("usable");
+      expect(v.trustBadge.attachable, `source=${source}`).toBe(false);
     }
   });
 
-  it("pi_bridge fresh_non_live → usable pill, Live badge, providerLabel Pi Bridge", () => {
+  it("pi_bridge fresh_non_live → usable pill, Live badge, attachable false, providerLabel Pi Bridge", () => {
     const v = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: snap({ source: "pi_bridge", status: "fresh_non_live" }),
@@ -197,6 +198,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
     expect(v.status).toBe("usable");
     expect(v.trustBadge.badge).toBe("live");
     expect(v.trustBadge.badge).not.toBe("stale");
+    expect(v.trustBadge.attachable).toBe(false);
     expect(v.providerLabel).toBe("Pi Bridge");
     expect(v.trustBadge.providerLabel).toBe("Pi Bridge");
   });

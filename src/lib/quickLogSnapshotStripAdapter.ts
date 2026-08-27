@@ -531,6 +531,24 @@ export function buildQuickLogStripFromTentState(
     ...(canonicalSource === "demo" ? { isHealthyEvidence: false as const } : {}),
   };
 
+  // Live badge for reviewed aliases may stay (pill/badge coherence), but
+  // attachable must NOT become true unless the resolver status is actually
+  // `fresh_live`. Remapping badgeResolverStatus → fresh_live for display
+  // must not widen ATTACHABLE.live; restamp after classify.
+  const trustBadge = {
+    ...classifySnapshotTrustBadge({
+      resolverStatus: badgeResolverStatus,
+      // Non-live rows pass the canonical source so badge mapping agrees
+      // with the pill (raw transport labels never reach mapNonLiveSource).
+      source: isNonLiveTelemetry ? canonicalSource : snapshot.source,
+    }),
+    // Provider identity always from the RAW label (e.g. pi_bridge → Pi Bridge).
+    providerLabel: deriveProviderLabel(snapshot.source),
+  };
+  if (snapshot.status === "fresh_non_live") {
+    trustBadge.attachable = false;
+  }
+
   return {
     status,
     title,
@@ -542,15 +560,6 @@ export function buildQuickLogStripFromTentState(
     action,
     classification,
     providerLabel: deriveProviderLabel(snapshot.source),
-    trustBadge: {
-      ...classifySnapshotTrustBadge({
-        resolverStatus: badgeResolverStatus,
-        // Non-live rows pass the canonical source so badge mapping agrees
-        // with the pill (raw transport labels never reach mapNonLiveSource).
-        source: isNonLiveTelemetry ? canonicalSource : snapshot.source,
-      }),
-      // Provider identity always from the RAW label (e.g. pi_bridge → Pi Bridge).
-      providerLabel: deriveProviderLabel(snapshot.source),
-    },
+    trustBadge,
   };
 }

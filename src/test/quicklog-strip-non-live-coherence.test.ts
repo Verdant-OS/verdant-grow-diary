@@ -181,7 +181,7 @@ describe("quicklog strip non-live coherence — demo aliases", () => {
 
 describe("quicklog strip non-live coherence — reviewed live aliases", () => {
   for (const source of ["pi_bridge", "sensor", "realtime"]) {
-    it(`${source} fresh_non_live → usable + live badge, fresh advisory`, () => {
+    it(`${source} fresh_non_live → usable + live badge, attachable false`, () => {
       const s = snap({ source, status: "fresh_non_live", freshness: "fresh" });
       const v = buildQuickLogStripFromTentState({
         status: "ready",
@@ -192,6 +192,9 @@ describe("quicklog strip non-live coherence — reviewed live aliases", () => {
       });
       expect(v.status).toBe("usable");
       expect(v.trustBadge.badge).toBe("live");
+      // Live badge OK for coherence; attachable stays false — only real
+      // fresh_live may grant attachable true (GDP / Blue Dream #1168).
+      expect(v.trustBadge.attachable).toBe(false);
       expect(v.trustBadge.helper).not.toMatch(/too old/i);
       const adv = advisoryFor(s);
       expect(adv.kind).toBe("fresh");
@@ -247,7 +250,7 @@ describe("quicklog strip non-live coherence — manual / csv aliases", () => {
 });
 
 describe("quicklog strip non-live coherence — provider identity from RAW label", () => {
-  it("pi_bridge → Pi Bridge on strip and trustBadge", () => {
+  it("pi_bridge → Pi Bridge on strip and trustBadge, attachable false", () => {
     const v = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: snap({ source: "pi_bridge", status: "fresh_non_live" }),
@@ -258,6 +261,7 @@ describe("quicklog strip non-live coherence — provider identity from RAW label
     expect(v.providerLabel).toBe("Pi Bridge");
     expect(v.trustBadge.providerLabel).toBe("Pi Bridge");
     expect(v.trustBadge.badge).toBe("live");
+    expect(v.trustBadge.attachable).toBe(false);
   });
 });
 
@@ -309,7 +313,7 @@ describe("quicklog strip non-live coherence — deterministic + whitespace/casin
     expect(buildQuickLogStripFromTentState(args)).toEqual(buildQuickLogStripFromTentState(args));
   });
 
-  it("whitespace/casing PI_BRIDGE → live; blank → invalid", () => {
+  it("whitespace/casing PI_BRIDGE → live badge attachable false; blank → invalid", () => {
     const liveAlias = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: snap({ source: "  PI_BRIDGE  ", status: "fresh_non_live" }),
@@ -319,6 +323,7 @@ describe("quicklog strip non-live coherence — deterministic + whitespace/casin
     });
     expect(liveAlias.status).toBe("usable");
     expect(liveAlias.trustBadge.badge).toBe("live");
+    expect(liveAlias.trustBadge.attachable).toBe(false);
 
     const blank = buildQuickLogStripFromTentState({
       status: "ready",

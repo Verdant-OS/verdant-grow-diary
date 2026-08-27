@@ -125,7 +125,10 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     expect(screen.queryByTestId("quicklog-sensor-snapshot-action")).not.toBeInTheDocument();
   });
 
-  it("usable — provider source (ecowitt) is fresh_non_live but still usable, never Live", () => {
+  it("provider source (ecowitt) is receiving-transport, not trust — Invalid, never Usable or Live (#1003)", () => {
+    // `fresh_non_live` proves freshness, not provenance. A legacy
+    // transport label outside the canonical vocabulary must never
+    // present as healthy "Usable" context.
     mockUseLatestTentSensorSnapshot.mockReturnValue(
       stateReady(
         fullSnapshot({
@@ -138,10 +141,32 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
 
     const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
-    expect(strip).toHaveAttribute("data-status", "usable");
-    expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Usable");
+    expect(strip).toHaveAttribute("data-status", "invalid");
+    expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Invalid");
     // No "Live" wording from the strip itself
     expect(strip).not.toHaveTextContent(/Live/i);
+  });
+
+  it("provider-source card is coherent: Invalid pill, invalid badge, invalid advisory (#1003)", () => {
+    // Pill, trust badge, and view-model advisory must all agree on the
+    // untrusted verdict — no more "Usable" pill beside an invalid
+    // advisory or a stale badge for the same row.
+    mockUseLatestTentSensorSnapshot.mockReturnValue(
+      stateReady(
+        fullSnapshot({
+          source: "ecowitt",
+          status: "fresh_non_live" as SensorSnapshotStatus,
+          badge_label: "ecowitt • as of 5 min ago",
+        }),
+      ),
+    );
+    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
+
+    expect(screen.getByTestId("quicklog-sensor-snapshot-pill")).toHaveTextContent("Invalid");
+    expect(screen.getByTestId("snapshot-trust-badge")).toHaveAttribute("data-badge", "invalid");
+    const advisory = screen.getByTestId("quicklog-sensor-snapshot-advisory");
+    expect(advisory).toHaveAttribute("data-advisory-kind", "invalid");
+    expect(screen.getByTestId("quicklog-sensor-snapshot-strip")).not.toHaveTextContent(/Live/i);
   });
 
   it("stale — resolver-stale snapshot renders Stale pill + refresh action", () => {

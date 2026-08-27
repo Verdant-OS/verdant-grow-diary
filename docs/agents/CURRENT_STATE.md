@@ -1,6 +1,33 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-27 UTC (~07:40 UTC)
+**Last updated:** 2026-08-27 UTC (~10:20 UTC)
+**Updated by:** Claude (2026-08-27: **Blue Dream P2 on [PR #1163](https://github.com/Verdant-OS/verdant-grow-diary/pull/1163)
+addressed — Quick Log strip provenance fence** pushed as fix commit `a16fec2` on
+`claude/sentinel-ack-1157-hold-neyqah`; the PR head is this state-edit commit, which lands
+immediately after `a16fec2` on the same branch. This supersedes the prior entry's stale
+"head `460973b`" reference (that SHA was the first code commit; Blue Dream's PASS-with-P2
+review was at `1a70689`). The P2: `buildQuickLogStripFromTentState` still mapped
+`fresh_non_live` → `usable` with no provenance check, so a legacy receiving-transport
+label (`ecowitt`, `mqtt`, …) rendered pill "Usable" while the trust badge read "stale"
+(`mapNonLiveSource` default) and the view-model advisory read invalid. Fix: the strip
+adapter gates exactly that branch through the sanctioned `normalizeSensorSource` table
+(called, not edited) — non-normalizing or missing sources demote the card to invalid and
+the trust badge gets the same verdict, so pill, badge, and advisory agree; `fresh_live`
+untouched; `pi_bridge`/`manual`/aliases not over-demoted; unknown stays non-attachable;
+the now-unreachable advisory suppression in `QuickLogSensorSnapshotStrip` is removed.
+Renegotiated pins (same commit): the two tests pinning the Usable pill for ecowitt
+`fresh_non_live` now pin Invalid, plus a coherence test and pure-adapter fence cases.
+Validation, exact, this round only: RED pre-fix 5 failed / 25 passed across the three
+strip suites; 30/30 green post-fix; targeted sweep
+(`ecowitt-*`/`quicklog-*`/`quick-log-*`/`sensor-*` + v0 contract 26/26) **6319 passed /
+3 skipped / 0 failed**; typecheck and scoped eslint clean. Blue Dream re-reviews at the
+new head. Still draft; no merge, no queue, no publish, no sandbox APPLY, no Preview
+action; #1151, #1153, #1162, #576 and the live `version.json` identity FAIL untouched.
+Publish stop-order and migration posture unchanged: `20260826100000`, `20260825233000`,
+`20260813030000` remain **NOT applied**. This edit touches this file only. Prior header
+follows.)
+
+**Prior update:** 2026-08-27 UTC (~07:40 UTC)
 **Updated by:** Claude (2026-08-27: **issue #1003 (sensor provenance fail-close + forwarding-report
 export allowlist) delivered as draft [PR #1163](https://github.com/Verdant-OS/verdant-grow-diary/pull/1163)**
 from branch `claude/sentinel-ack-1157-hold-neyqah`, cut from deploy tip `11b0ca6` (#1160), head

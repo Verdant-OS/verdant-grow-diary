@@ -343,6 +343,7 @@ import type {
   SensorSnapshotStatus as StrictSnapshotStatus,
 } from "@/lib/latestSensorSnapshotRules";
 import type { LatestTentSensorSnapshotStatus } from "@/lib/sensor";
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 
 export interface BuildQuickLogStripFromTentStateArgs {
   status: LatestTentSensorSnapshotStatus;
@@ -460,7 +461,16 @@ export function buildQuickLogStripFromTentState(
     };
   }
 
-  const status = narrowStrict(snapshot.status);
+  // Provenance fence (#1003): `fresh_non_live` proves freshness, not
+  // trust. A source outside the canonical vocabulary and its reviewed
+  // aliases (legacy receiving-transport labels like "ecowitt"/"mqtt",
+  // or a missing label) must never present as healthy "Usable" context —
+  // demote to invalid, and hand the trust badge the same verdict so
+  // pill, badge, and advisory agree. `fresh_live` is untouched: the
+  // strict resolver only emits it for canonical live rows.
+  const provenanceInvalid =
+    snapshot.status === "fresh_non_live" && normalizeSensorSource(snapshot.source) === "invalid";
+  const status = provenanceInvalid ? "invalid" : narrowStrict(snapshot.status);
   // `isEmpty` above already rejected a missing `captured_at`.
   const capturedAtIso = snapshot.captured_at ?? "";
   const capturedMs = Date.parse(capturedAtIso);
@@ -493,7 +503,7 @@ export function buildQuickLogStripFromTentState(
     classification: synthClassification(status, snapshot.badge_label),
     providerLabel: deriveProviderLabel(snapshot.source),
     trustBadge: classifySnapshotTrustBadge({
-      resolverStatus: snapshot.status,
+      resolverStatus: provenanceInvalid ? "invalid" : snapshot.status,
       source: snapshot.source,
     }),
   };

@@ -1,6 +1,45 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-26 UTC (18:55 UTC)
+**Last updated:** 2026-08-26 UTC (~23:15 UTC)
+**Updated by:** Claude (2026-08-26: **#1158 MERGED — deploy tip is now `b294b64`** (squash of
+the Gate Zero Day-0 SEO baseline slice at head `72a9a7e`). Timeline: Blue Dream's independent
+review returned PASS-with-P2 (the condition-1 cell fix, pushed as `72a9a7e`); the owner marked
+the PR ready and Cheek enqueued it at ~22:58 UTC; the merge queue landed it at ~23:04 UTC with
+**all 35 required checks green** — the only red was the known non-required `Supabase Preview`
+42P07 (inherited, per the section below). `docs/seo/seo-baseline-2026-08-26.md` is therefore
+now ON the deploy branch, with its Gate Zero verdicts: 1 FAIL (orphan / no provenance),
+2 PASS-at-timestamp, 3 FAIL (dual-home), 4 FAIL (soft-200 shells), 5 PASS (bounded),
+6 FAIL (GSC/GA4 NO_BASELINE) — Gate Zero is not all true; the file authorizes no content
+cohort and no publish. Codex and Copilot bot reviews landed two minutes AFTER enqueue
+(2 P2 + 5 findings, all verified real); per the #1092 queue-locked precedent the five accepted
+label-precision fixes ship as follow-up draft [PR #1159](https://github.com/Verdant-OS/verdant-grow-diary/pull/1159)
+from the restarted `claude/gate-zero-seo-baseline-dqbp46`, and all seven review threads on
+#1158 are resolved against it. No measurement value changes in the follow-up. The publish
+stop-order and migration posture are untouched: `20260826100000`, `20260825233000`, and
+`20260813030000` remain **NOT applied**. This edit touches this file only, on the #1159
+branch. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (~22:00 UTC)
+**Updated by:** Claude (2026-08-26: **Gate Zero Day-0 SEO baseline captured** as
+`docs/seo/seo-baseline-2026-08-26.md` (draft PR from `claude/gate-zero-seo-baseline-dqbp46`;
+the 2026-07-30 `docs/seo/seo-baseline.md` is preserved unchanged with a one-line pointer).
+Unauth re-fetch 2026-08-26T21:49–21:53Z found **production republished**: live `/version.json`
+now serves `2cc97c0e91aa` = deploy tip #1156 (`buildTime 2026-08-26T21:44:08.140Z`,
+`dirty: false`, `ref: "__orphan__"` persists, cause still NOT_MEASURED — commit identity
+matches tip at that timestamp, publish lag 0; this supersedes the 2026-08-25 `5e75a3a3ae85`
+identity rows below **for identity only**, not provenance). Live sitemap is now **62** locs,
+byte-identical to repo (`/tools/grow-help-toolkit` present, lastmod 2026-08-26; the toolkit
+page serves 767 words — no longer SOFT_200_THIN). Still FAIL: `/` + `/welcome` dual-home
+(identical title/h1, both self-canonical, both sitemapped); `/login`, `/dashboard`,
+`/internal/demo-advanced-nutrients-feeding` remain SOFT_200_THIN soft-200 shells with
+`index, follow`. P0 private-leak PASS on the unauth sweep set. GSC/GA4/Bing/Ahrefs stay
+NO_BASELINE/BLOCKED — Gate Zero condition 6 remains FAIL until an authenticated baseline
+exists. Pheno showcase/comparison indexation record stays OPEN (no noindex shipped). No
+publish, no production SQL, no content cohort authorized; drafts #1151/#1153, Slice 2,
+Paddle runtime slice, and #572 untouched. This edit touches this file plus the two
+`docs/seo/` files named above. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (18:55 UTC)
 **Updated by:** Claude (2026-08-26: **#1149 MERGED — deploy tip is now `b9cca9fb1`** (squash of
 the top-N diary RPC slice at head `c353c765`), after Blue Dream's independent review returned
 **PASS-with-P2** and Cheek/GDP merged GitHub-only. The migration apply posture is unchanged:

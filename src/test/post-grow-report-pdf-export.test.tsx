@@ -144,6 +144,11 @@ describe("postGrowReportRules — filename + sanitization", () => {
     expect(normalizeReportSensorSource("LIVE")).toBe("live");
     expect(normalizeReportSensorSource("bogus")).toBe("invalid");
     expect(normalizeReportSensorSource(null)).toBe("invalid");
+    // #1003 canon aliases (#592 fold): first-party bridge is live,
+    // diary is manual, sim is demo — never invalid.
+    expect(normalizeReportSensorSource("pi_bridge")).toBe("live");
+    expect(normalizeReportSensorSource("diary")).toBe("manual");
+    expect(normalizeReportSensorSource("sim")).toBe("demo");
     expect(isReportSensorSourceHealthy("stale")).toBe(false);
     expect(isReportSensorSourceHealthy("demo")).toBe(false);
     expect(isReportSensorSourceHealthy("invalid")).toBe(false);

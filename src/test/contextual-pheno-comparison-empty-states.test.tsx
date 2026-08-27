@@ -142,11 +142,12 @@ describe("ContextualPhenoComparisonPanel v0.3 empty states", () => {
   it("renders source badges as caution/untrusted for the untrusted plant", () => {
     renderEmptyStatePanel();
     const card = screen.getByTestId("contextual-pheno-comparison-plant-demo-empty-untrusted");
-    // Unknown vendor strings are normalized to "unknown" by the view-model.
+    // #592 fold: unknown vendor strings normalize to "invalid" under the
+    // #1003 canon — there is no "unknown" badge any more.
     const demo = within(card).getByTestId("plant-source-count-demo");
     const invalid = within(card).getByTestId("plant-source-count-invalid");
-    const unknown = within(card).getByTestId("plant-source-count-unknown");
-    for (const badge of [demo, invalid, unknown]) {
+    expect(within(card).queryByTestId("plant-source-count-unknown")).toBeNull();
+    for (const badge of [demo, invalid]) {
       expect(badge.getAttribute("data-untrusted")).toBe("true");
       expect((badge.getAttribute("title") || "").toLowerCase()).toContain("caution");
     }

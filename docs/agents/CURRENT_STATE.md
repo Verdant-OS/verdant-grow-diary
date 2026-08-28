@@ -68,12 +68,30 @@ on this exact commit (edge-shared preflight, typecheck, production build all `su
 `bun install --frozen-lockfile` with `Integrity check failed for tarball: object-assign` — it died
 **before any test body ran**, the one sanctioned re-run case. That single re-run is **spent** (a
 first attempt at 17:41 returned 403 "workflow is already running"; it succeeded at ~17:50) and its
-outcome was still `in_progress` at 18:07 — **NOT_MEASURED**, not a pass. `Supabase Preview` skipped
-(connected project at its concurrent preview-branch limit). **Cursor Bugbot, stated precisely:** the
-PR-body _summary_ for `789294c6` completed ("Medium Risk"), but the bug-_finding_ review posted
-"Bugbot couldn't run — usage limit reached" at 18:05. So **no automated finding-level review has run
-on this head**. That usage/spend withhold is **claimed from the #1169 checks**, not a newly
-measured billing fact; it remains unresolved and is an account issue, not a code defect.
+outcome is now **measured, superseding the earlier `NOT_MEASURED`**: the re-run **PASSED** on the
+same commit and the same code, confirming the failure was the install and not the diff. All 16 batch
+lanes are green. `Supabase Preview` skipped (connected project at its concurrent preview-branch
+limit).
+
+**`Browser census (authenticated)` FAILED** on `789294c6` at `core-link-form-census.spec.ts:2092`:
+`/tents/:tentId` never rendered `<main>` and the 30-minute whole-test timeout blew (1 failed, 2
+passed — the other two authenticated census tests passed in 16s and 26s). Non-required. **Not this
+PR's, established by enumerating the import chain rather than asserted:**
+`sensorDiagnosticsExportRules` has exactly one production importer, `SensorsTestbenchPanel.tsx`,
+which is imported only by `Sensors.tsx` — not on the `/tents/:tentId` render path — and the diff
+touches no route, manifest, link, form, auth redirect, or app-shell code. The sibling lane failed on
+#1169 at line 2080 of the same spec with an unrelated diff, so this spec has now produced
+timeout-class failures on two unrelated PRs. One confirming re-run spent at ~18:21; a second failure
+would be real, and still unattributable to this diff without a mechanism.
+
+**Cursor Bugbot — the signal is inconsistent, and that is the honest state.** A PR-body review for
+`789294c6` is present and was later expanded ("Medium Risk", independently naming the
+shared-sanitizer fencing as its caveat), while **three** separate comments posted "Bugbot couldn't
+run — usage limit reached" (18:05, 18:17, 18:17). Do **not** record either that a finding-level
+review definitely ran or that it definitely did not — this file claimed each in turn and each was
+wrong. What holds: **no Bugbot finding is currently open against `789294c6`**, and the usage/spend
+withhold is a `source claim` read off check and comment output, **never a measured billing fact**.
+Unresolved; an account issue, not a code defect.
 
 **An automation fought the standing draft-only order.** At 18:05 **cursor[bot]** marked #1176 ready
 for review **and enqueued it into the merge queue** on its own — Blue Dream had received the handoff

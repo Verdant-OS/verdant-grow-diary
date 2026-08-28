@@ -140,6 +140,8 @@ describe("useQuickLogActivitySave — routing", () => {
     ["missing", undefined],
     ["null", null],
     ["short (<8)", "short"],
+    ["eight spaces", " ".repeat(8)],
+    ["eight tabs", "\t".repeat(8)],
     ["overlong (>200)", "x".repeat(201)],
   ] as const)(
     "manual route fail-closes %s idempotency key without RPC",

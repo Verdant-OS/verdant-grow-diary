@@ -13,6 +13,8 @@ import {
   lightFixturePlanningReadiness,
   lightTargetReadiness,
   measuredMixedEcSourceLabel,
+  nutrientInjectorReadiness,
+  shouldExportInjectorPlan,
   stagePhotoperiodReadiness,
 } from "@/lib/growHelpToolkitReadiness";
 import {
@@ -119,6 +121,23 @@ describe("Grow Help Toolkit readiness helpers", () => {
     expect(isValidMeasuredMixedEc(-0.1)).toBe(false);
     expect(MEASURED_MIXED_EC_SOURCE_LABEL.toLowerCase()).toContain("manual");
     expect(MEASURED_MIXED_EC_SOURCE_LABEL.toLowerCase()).toContain("not live sensor");
+  });
+
+  it("does not treat a disabled injector as exportable even with leftover stock values", () => {
+    const nutrient = createDefaultGrowHelpToolkitState().nutrient;
+    nutrient.mode = "dry_salt";
+    nutrient.injectorEnabled = false;
+    nutrient.stockGramsPerGallon = 120;
+    nutrient.injectorRatio = 100;
+    expect(nutrientInjectorReadiness(nutrient).ready).toBe(true);
+    expect(shouldExportInjectorPlan(nutrient)).toBe(false);
+
+    nutrient.injectorEnabled = true;
+    expect(shouldExportInjectorPlan(nutrient)).toBe(true);
+
+    nutrient.injectorRatio = null;
+    expect(shouldExportInjectorPlan(nutrient)).toBe(false);
+    expect(nutrientInjectorReadiness(nutrient).missing).toContain("injectorRatio");
   });
 });
 
@@ -308,5 +327,30 @@ describe("Grow Help Toolkit export fail-closed on incomplete required inputs", (
     expect(formula).toContain("source=manual");
     expect(formula.toLowerCase()).toContain("not live sensor");
     expect(formula.toLowerCase().startsWith("live")).toBe(false);
+  });
+
+  it("omits injector stock-draw rows when the injector plan is disabled", () => {
+    const state = completePlanningState();
+    state.nutrient = {
+      ...state.nutrient,
+      mode: "dry_salt",
+      reservoirValue: 20,
+      reservoirUnit: "gal",
+      drySaltRows: [
+        {
+          id: "salt-1",
+          name: "Dry salt A",
+          gramsPerGallon: 2,
+          bagSizeGrams: null,
+          mixOrder: 1,
+        },
+      ],
+      injectorEnabled: false,
+      stockGramsPerGallon: 120,
+      injectorRatio: 100,
+    };
+
+    const snapshot = createGrowHelpExportSnapshot(state, "Fixed label");
+    expect(snapshot.rows.some((row) => String(row.item).includes("stock draw"))).toBe(false);
   });
 });

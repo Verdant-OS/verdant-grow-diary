@@ -266,7 +266,11 @@ export function isManualMeasuredMixedEcSource(source: string | null | undefined)
   return source === MEASURED_MIXED_EC_SOURCE;
 }
 
-/** Injector ratio is a required planning input when the injector plan is enabled. */
+/**
+ * Required injector fields when the plan is enabled.
+ * When disabled, returns ready with no missing fields (vacuous) — callers that
+ * compute or export an injector plan must still require `injectorEnabled`.
+ */
 export function nutrientInjectorReadiness(nutrient: NutrientInputs): GrowHelpReadinessResult {
   if (!nutrient.injectorEnabled) return result([]);
   const missing: string[] = [];
@@ -281,4 +285,9 @@ export function nutrientInjectorReadiness(nutrient: NutrientInputs): GrowHelpRea
     missing.push("injectorRatio");
   }
   return result(missing);
+}
+
+/** True only when the injector is on and its required planning inputs are complete. */
+export function shouldExportInjectorPlan(nutrient: NutrientInputs): boolean {
+  return nutrient.injectorEnabled && nutrientInjectorReadiness(nutrient).ready;
 }

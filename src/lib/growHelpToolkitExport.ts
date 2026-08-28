@@ -11,7 +11,7 @@ import {
   expenseWaterReadiness,
   isValidMeasuredMixedEc,
   lightExportReadiness,
-  nutrientInjectorReadiness,
+  shouldExportInjectorPlan,
 } from "./growHelpToolkitReadiness";
 import {
   calculateDliFromPlanningPpfd,
@@ -271,7 +271,7 @@ export function createGrowHelpExportSnapshot(
         part.formula,
       ),
     );
-    if (nutrientInjectorReadiness(nutrient).ready) {
+    if (shouldExportInjectorPlan(nutrient)) {
       const injector = tryValue(() =>
         calculateInjectorPlan(
           nutrient.stockGramsPerGallon as number,

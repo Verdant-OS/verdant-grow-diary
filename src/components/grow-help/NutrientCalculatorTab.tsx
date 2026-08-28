@@ -29,7 +29,6 @@ import {
 import {
   MEASURED_MIXED_EC_SOURCE,
   MEASURED_MIXED_EC_SOURCE_LABEL,
-  nutrientInjectorReadiness,
   isValidMeasuredMixedEc,
 } from "@/lib/growHelpToolkitReadiness";
 import { ppm500, ppm700 } from "@/lib/unitsCalc";
@@ -215,14 +214,24 @@ export default function NutrientCalculatorTab({
 
   const injector = useMemo(
     () =>
-      attempt(volumeReady && nutrientInjectorReadiness(inputs).ready, () =>
-        calculateInjectorPlan(
-          inputs.stockGramsPerGallon as number,
-          inputs.injectorRatio as number,
-          volume,
-        ),
+      attempt(
+        // Call the formula when both planning fields are present so RangeError
+        // messages (e.g. stock ≤ 0) still surface. Skip only when incomplete
+        // or the ratio fails the integer constraint shown by NumberField.
+        inputs.injectorEnabled &&
+          volumeReady &&
+          inputs.stockGramsPerGallon !== null &&
+          inputs.injectorRatio !== null &&
+          Number.isInteger(inputs.injectorRatio) &&
+          inputs.injectorRatio >= 1,
+        () =>
+          calculateInjectorPlan(
+            inputs.stockGramsPerGallon as number,
+            inputs.injectorRatio as number,
+            volume,
+          ),
       ),
-    [inputs, volume, volumeReady],
+    [inputs.injectorEnabled, inputs.injectorRatio, inputs.stockGramsPerGallon, volume, volumeReady],
   );
 
   const conversion = useMemo(

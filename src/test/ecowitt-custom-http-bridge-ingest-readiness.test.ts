@@ -3,7 +3,8 @@
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildEcowittTentSnapshotV0ViewModel } from "@/lib/ecowittTentSnapshotV0ViewModel";
 import {
@@ -20,6 +21,8 @@ import {
   redactEcowittCustomHttpRawPayload,
   resolveEcowittCustomHttpConstitutionSource,
 } from "@/lib/ecowittCustomHttpBridgeIngestRules";
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 const MULTI_CHANNEL_DEMO = {
   tempinf: "72.0",
@@ -77,7 +80,7 @@ describe("ecowittCustomHttpBridgeIngestRules — FIELD_MAP", () => {
         "-c",
         "import json, sys; sys.path.insert(0, 'tools/ecowitt-testbench'); from ecowitt_listener import FIELD_MAP; print(json.dumps({k: list(v) for k, v in FIELD_MAP.items()}))",
       ],
-      { encoding: "utf-8", cwd: process.cwd() },
+      { encoding: "utf-8", cwd: REPO_ROOT },
     );
     expect(result.status, result.stderr).toBe(0);
     const pyMap = JSON.parse(result.stdout) as Record<string, string[]>;
@@ -356,11 +359,11 @@ describe("extra-channel ingest still feeds Snapshot V0 as T / RH / soil only", (
 
   it("keeps Snapshot V0 / card free of nightDrift, inSpecNow, and extra-channel UI", () => {
     const card = readFileSync(
-      join(process.cwd(), "src/components/EcowittTentSnapshotV0Card.tsx"),
+      join(REPO_ROOT, "src/components/EcowittTentSnapshotV0Card.tsx"),
       "utf-8",
     );
     const viewModel = readFileSync(
-      join(process.cwd(), "src/lib/ecowittTentSnapshotV0ViewModel.ts"),
+      join(REPO_ROOT, "src/lib/ecowittTentSnapshotV0ViewModel.ts"),
       "utf-8",
     );
     for (const body of [card, viewModel]) {

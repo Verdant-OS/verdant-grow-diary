@@ -1,6 +1,79 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~21:45 UTC)
+**Last updated:** 2026-08-28 UTC (~21:55 UTC)
+**Updated by:** Claude (2026-08-28: **`Supabase Preview` FAILED on #1172 with SQLSTATE 42P07 — and
+the repo's own config predicted this failure, in writing, before it happened. The finding is a
+MECHANISM GAP, not a new defect.**
+
+**The failure**, on #1172 head `e7ef85b`:
+
+```text
+ERROR: relation "ai_credit_grants" already exists (SQLSTATE 42P07)
+At statement: 0
+CREATE TABLE public.ai_credit_grants (...)
+```
+
+**Not attributable to #1172.** `git diff --name-only 7fd6a001..HEAD` on that branch returns exactly
+one path: `docs/agents/CURRENT_STATE.md`. **No migration, no SQL, no schema change.** This entry is
+therefore being written _inside the very PR whose preview is failing_, and it still is not that
+PR's failure.
+
+**Root cause — two MERGED migrations create the same table**, both from July, both long predating
+this branch:
+
+```text
+supabase/migrations/20260721103000_ai_credit_grants.sql
+supabase/migrations/20260721182752_4fc51714-bc29-4044-9b91-180c065e997f.sql
+```
+
+**The repo already declares this exact pair.** `config/local-supabase-replay-compatibility.json`
+carries a `compatibility_noops` entry naming both files, and its stated `reason` predicts the error
+verbatim: _"Production records `20260721103000`; the later unrecorded file repeats the AI credit
+grant ledger and **fails fresh replay with SQLSTATE 42P07**."_ This was known and handled, not
+newly discovered.
+
+**THE MECHANISM GAP — record this, it is the transferable part.** That config is consumed by the
+**local** replay preparer, which verifies `source_sha256` and rewrites only a **disposable copy** in
+a scratch workdir, leaving committed migrations untouched so the integrity gate stays green. The
+hosted **`Supabase Preview`** branch is a different path entirely: supabase[bot] pushes migrations
+into a hosted preview project and **does not consult that config at all**. So the same duplication
+is _handled_ locally and _fatal_ on the hosted preview. A green local replay is therefore **not**
+evidence the hosted preview will succeed, and a red hosted preview is **not** evidence the compat
+config is wrong or missing an entry. Check which path produced the verdict before acting on it.
+
+**Deliberately NOT fixed, and the reasons are structural:**
+
+- **`Supabase Preview` is not a required context** — checked against
+  `config/required-status-checks.json` programmatically, not from memory.
+- The only real fixes are **editing a merged migration** — forbidden outright by the migration
+  immutability rule and caught by the `Published migration integrity` SHA-256 gate — or changing
+  hosted-preview behaviour. Neither belongs in a **parked, draft, docs-only** PR.
+- GDP's standing directive is no SQL and no APPLY. Honoured: **no migration file was modified and no
+  SQL was run.**
+
+**NO re-run was spent, and that is a considered distinction from the other live failure.** Two CI
+failures are open right now and they are treated differently on purpose:
+
+| Failure                             | Nature                                                                                                             | Re-run?                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| #1172 `Supabase Preview` 42P07      | **Deterministic.** A duplicate `CREATE TABLE` fails identically every time; a config file predicted it in advance. | **No** — re-running would burn the allowance to observe the same error. Already root-caused. |
+| #1185 `Full suite — batch 6/16` 403 | **Died at install**, before any test body ran. A re-run can genuinely change the outcome.                          | **Yes — owed and still unspent**, blocked only because the workflow was still running.       |
+
+"Flake" is not a diagnosis in either case. The difference is whether a re-run can produce new
+information, not whether the failure is inconvenient.
+
+Recorded on the PR as comment
+[5458108003](https://github.com/Verdant-OS/verdant-grow-diary/pull/1172#issuecomment-5458108003).
+#1172's own PR body already noted an _inherited_ `Supabase Preview` 42P07 from an earlier cycle;
+this entry adds the specific duplicate pair and the local-vs-hosted mechanism gap, which that note
+did not identify.
+
+**Posture unchanged.** #1185 draft at `75a7de9`, #1172 draft at `e7ef85b`, auto-merge off both,
+deploy tip still `7fd6a001`. `20260827010000`, `20260826100000`, `20260825233000` and
+`20260813030000` all remain **NOT applied**. This edit touches this file only. Prior header
+follows.)
+
+**Prior update:** 2026-08-28 UTC (~21:45 UTC)
 **Updated by:** Claude (2026-08-28: **Both PRs are back to DRAFT and auto-merge is OFF. #1172 was
 found READY with auto-merge ARMED — one green CI run from merging itself.** GDP directive at 21:40:
 #1185 head `75a7de9` is **OPEN — REVIEW ONLY**.

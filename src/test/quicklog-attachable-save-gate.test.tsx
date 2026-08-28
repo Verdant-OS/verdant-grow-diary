@@ -12,6 +12,11 @@
  *    payload carries `details.sensor` with `status: "fresh_live"`.
  *  - Canonical manual / csv rows remain attachable with their non-live
  *    provenance. Demo rows remain view-only and never reach the payload.
+ *  - Unknown / receiving-transport provenance (non-canon labels the
+ *    resolver treats as invalid/non-attachable) must never ship
+ *    `details.sensor`. That is the usable-leak fence: if strip status
+ *    ever became usable for such a row, `trustBadge.attachable` stays
+ *    false and the save AND still omits the sensor payload.
  *
  * Renders the REAL QuickLog dialog and the REAL strip (no strip stub) so
  * the toggle, helper copy, strip copy, and RPC payload are all asserted
@@ -299,5 +304,49 @@ describe("attachable gate — demo and csv fresh_non_live", () => {
     const details = payload.p_details as { sensor?: { status?: string; source?: string } };
     expect(details?.sensor?.status).toBe("fresh_non_live");
     expect(details?.sensor?.source).toBe("csv");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Unknown / transport provenance: non-attachable; save omits details.sensor
+// (usable-leak fence — attachable stays false even if status ever leaked)
+// ---------------------------------------------------------------------------
+
+describe("attachable gate — unknown/transport provenance", () => {
+  it("transport label: attachable false; save omits details.sensor", async () => {
+    // Receiving-transport label the resolver treats as invalid/non-attachable.
+    // Today the strip demotes to invalid; the fence that matters for a future
+    // usable leak is attachable=false on the save AND.
+    snapState.snapshot = snap({
+      source: "ecowitt",
+      status: "fresh_non_live",
+      badge_label: "ecowitt • as of 5m ago",
+    });
+    renderQL();
+    const toggle = (await screen.findByTestId("quick-log-snapshot-toggle")) as HTMLButtonElement;
+    expect(toggle.getAttribute("data-snapshot-attachable")).toBe("false");
+    expect(toggle.disabled).toBe(true);
+    expect(toggle.getAttribute("data-snapshot-status")).toBe("invalid");
+    const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
+    expect(strip.getAttribute("data-attachable")).toBe("false");
+    const payload = await saveNoteAndGetPayload();
+    const details = (payload.p_details ?? null) as Record<string, unknown> | null;
+    expect(details === null || !("sensor" in details)).toBe(true);
+  });
+
+  it("unknown label: attachable false; save omits details.sensor", async () => {
+    snapState.snapshot = snap({
+      source: "wat",
+      status: "fresh_non_live",
+      badge_label: "wat • as of 5m ago",
+    });
+    renderQL();
+    const toggle = (await screen.findByTestId("quick-log-snapshot-toggle")) as HTMLButtonElement;
+    expect(toggle.getAttribute("data-snapshot-attachable")).toBe("false");
+    expect(toggle.disabled).toBe(true);
+    expect(toggle.getAttribute("data-snapshot-status")).toBe("invalid");
+    const payload = await saveNoteAndGetPayload();
+    const details = (payload.p_details ?? null) as Record<string, unknown> | null;
+    expect(details === null || !("sensor" in details)).toBe(true);
   });
 });

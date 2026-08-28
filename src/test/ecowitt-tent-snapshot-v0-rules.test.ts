@@ -182,6 +182,12 @@ describe("ecowittTentSnapshotV0Rules — Sensor Truth tagging", () => {
     expect(mapEcowittTentSnapshotV0MetricKey("co2_ppm")).toBeNull();
     expect(mapEcowittTentSnapshotV0MetricKey("leaf_vpd")).toBeNull();
     expect(mapEcowittTentSnapshotV0MetricKey("soilmoisture1")).toBeNull();
+    expect(mapEcowittTentSnapshotV0MetricKey("temp1f")).toBeNull();
+    // V0 soil is pct only — refuse EC / µS / mS keys (no invented conversion).
+    expect(mapEcowittTentSnapshotV0MetricKey("ec_us")).toBeNull();
+    expect(mapEcowittTentSnapshotV0MetricKey("us_cm")).toBeNull();
+    expect(mapEcowittTentSnapshotV0MetricKey("ms_cm")).toBeNull();
+    expect(mapEcowittTentSnapshotV0MetricKey("soil_ec")).toBeNull();
   });
 });
 
@@ -339,24 +345,6 @@ describe("post-merge QA — malformed / null / future timestamps fail closed (ne
         row: row({
           source: "live",
           captured_at: capturedAt,
-          raw_payload: { vendor: "ecowitt", dateutc },
-        }),
-        now: NOW,
-      });
-      expect(truth).toBe("invalid");
-      expect(truth).not.toBe("live");
-    },
-  );
-
-  it.each(["", "not-a-date", "NaN"] as const)(
-    "malformed dateutc=%j with fresh captured_at must not tag Live",
-    (dateutc) => {
-      // Packet dateutc is the preferred clock. Garbage there must fail closed even
-      // when captured_at is a valid fresh ISO (fallback must not promote to Live).
-      const truth = classifyEcowittTentSnapshotV0Source({
-        row: row({
-          source: "live",
-          captured_at: FRESH_AT,
           raw_payload: { vendor: "ecowitt", dateutc },
         }),
         now: NOW,

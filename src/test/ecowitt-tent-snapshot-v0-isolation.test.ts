@@ -115,4 +115,42 @@ describe("buildEcowittTentSnapshotV0ViewModel — tent isolation", () => {
     expect(soil?.value).toBe(40);
     expect(soil?.value).not.toBe(91);
   });
+
+  it("sparkline for tent A never includes tent B history points", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [
+        row({
+          tent_id: TENT_A,
+          metric: "temperature_c",
+          value: 24,
+          captured_at: FRESH_AT,
+        }),
+        row({
+          tent_id: TENT_A,
+          metric: "temperature_c",
+          value: 22,
+          captured_at: "2026-08-20T12:00:00.000Z",
+        }),
+        row({
+          tent_id: TENT_B,
+          metric: "temperature_c",
+          value: 99,
+          captured_at: NEWER_AT,
+        }),
+        row({
+          tent_id: TENT_B,
+          metric: "temperature_c",
+          value: 98,
+          captured_at: "2026-08-20T12:30:00.000Z",
+        }),
+      ],
+      { tentId: TENT_A, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    const values = temp?.sparkline.map((p) => p.value) ?? [];
+    expect(values).toContain(24);
+    expect(values).toContain(22);
+    expect(values).not.toContain(99);
+    expect(values).not.toContain(98);
+  });
 });

@@ -367,6 +367,33 @@ describe("post-merge QA — malformed / null / future timestamps fail closed (ne
     expect(truth).not.toBe("live");
   });
 
+  it("canonical live + null captured_at and garbage dateutc → invalid (observedMs null)", () => {
+    const truth = classifyEcowittTentSnapshotV0Source({
+      row: row({
+        source: "live",
+        captured_at: null,
+        raw_payload: { vendor: "ecowitt", dateutc: "not-a-date" },
+      }),
+      now: NOW,
+    });
+    expect(truth).toBe("invalid");
+    expect(truth).not.toBe("live");
+  });
+
+  it("canonical live + Number.NaN clocks → invalid, never live", () => {
+    const truth = classifyEcowittTentSnapshotV0Source({
+      row: {
+        tent_id: TENT,
+        source: "live",
+        captured_at: Number.NaN as unknown as string,
+        raw_payload: { vendor: "ecowitt", dateutc: Number.NaN },
+      },
+      now: NOW,
+    });
+    expect(truth).toBe("invalid");
+    expect(truth).not.toBe("live");
+  });
+
   it("canonical live + far-future timestamp (>5 min ahead) → invalid, never live", () => {
     const truth = classifyEcowittTentSnapshotV0Source({
       row: row({
@@ -479,6 +506,38 @@ describe("post-merge QA — unit ambiguity (V0 temperature_c displayed as-is)", 
     const temp = vm.metrics.find((m) => m.key === "temp");
     expect(temp?.value).toBeNull();
     expect(temp?.badgeLabel).not.toBe("Live");
+  });
+
+  it("raw_payload temp1f does not replace stored temperature_c as the V0 °C display", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [
+        row({
+          metric: "temperature_c",
+          value: 24,
+          captured_at: FRESH_AT,
+          raw_payload: { vendor: "ecowitt", temp1f: 77, dateutc: FRESH_AT },
+        }),
+      ],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.value).toBe(24);
+    expect(temp?.value).not.toBe(77);
+    expect(temp?.unit).toBe("°C");
+    expect(temp?.unit).not.toBe("°F");
+  });
+
+  it("soil moisture stays pct — V0 has no µS/cm or mS/cm surface", () => {
+    expect(mapEcowittTentSnapshotV0MetricKey("us_cm")).toBeNull();
+    expect(mapEcowittTentSnapshotV0MetricKey("ms_cm")).toBeNull();
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "soil_moisture_pct", value: 40, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const soil = vm.metrics.find((m) => m.key === "soil");
+    expect(soil?.value).toBe(40);
+    expect(soil?.unit).toBe("%");
+    expect(soil?.unit.toLowerCase()).not.toMatch(/µs|us\/cm|ms\/cm|ms_cm/);
   });
 
   it("Celsius temperature_c is displayed as-is in °C, not converted to Fahrenheit", () => {

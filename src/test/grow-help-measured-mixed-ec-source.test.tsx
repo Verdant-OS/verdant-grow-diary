@@ -35,7 +35,8 @@ describe("Nutrient measured mixed EC source labeling", () => {
 
     const badge = screen.getByTestId("measured-mixed-ec-source");
     expect(badge).toHaveAttribute("data-source", "manual");
-    expect(badge).toHaveTextContent(/grower-entered manual/i);
+    expect(badge).toHaveTextContent(/grower-entered/i);
+    expect(badge).toHaveTextContent(/browser-local manual/i);
     expect(badge).toHaveTextContent(/not live sensor/i);
     expect(screen.getByLabelText("Measured mixed EC")).toHaveAccessibleDescription(
       /not a live sensor or telemetry/i,

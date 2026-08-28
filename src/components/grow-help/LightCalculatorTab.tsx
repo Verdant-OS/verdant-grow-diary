@@ -30,8 +30,10 @@ import {
 import {
   cyclePhotoperiodReadiness,
   lightCanopyDimensionsReadiness,
+  lightFixtureCountReadiness,
   lightFixturePlanningReadiness,
   lightFixturePpfReadiness,
+  stagePhotoperiodReadiness,
 } from "@/lib/growHelpToolkitReadiness";
 import { M2_PER_FT2, areaM2, areaM2FromFeet } from "@/lib/unitsCalc";
 import NumberField from "./NumberField";
@@ -71,9 +73,11 @@ export default function LightCalculatorTab({
   onPushLight,
 }: LightCalculatorTabProps) {
   const dimensionsReady = lightCanopyDimensionsReadiness(inputs).ready;
+  const fixtureCountReady = lightFixtureCountReadiness(inputs).ready;
   const fixturePlanningReady = lightFixturePlanningReadiness(inputs).ready;
   const fixturePpfReady = lightFixturePpfReadiness(inputs).ready;
-  const photoperiodReady = cyclePhotoperiodReadiness(cycle).ready;
+  const bothPhotoperiodsReady = cyclePhotoperiodReadiness(cycle).ready;
+  const stagePhotoperiodReady = stagePhotoperiodReadiness(cycle, inputs.stage).ready;
   const canopyAreaM2 = useMemo(
     () =>
       attempt(dimensionsReady, () =>
@@ -128,24 +132,24 @@ export default function LightCalculatorTab({
     inputs.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours;
   const planningDli = useMemo(
     () =>
-      attempt(planningPpfd.value !== null && photoperiodReady && photoperiod !== null, () =>
+      attempt(planningPpfd.value !== null && stagePhotoperiodReady && photoperiod !== null, () =>
         calculateDliFromPlanningPpfd(planningPpfd.value!, photoperiod as number),
       ),
-    [photoperiod, photoperiodReady, planningPpfd.value],
+    [photoperiod, planningPpfd.value, stagePhotoperiodReady],
   );
 
   const targetPpfd = useMemo(
     () =>
       attempt(
-        (inputs.targetMode === "ppfd" ? inputs.targetPpfd !== null : inputs.targetDli !== null) &&
-          photoperiodReady &&
-          photoperiod !== null,
+        inputs.targetMode === "ppfd"
+          ? inputs.targetPpfd !== null
+          : inputs.targetDli !== null && stagePhotoperiodReady && photoperiod !== null,
         () =>
           inputs.targetMode === "ppfd"
             ? (inputs.targetPpfd as number)
             : ppfdForTargetDli(inputs.targetDli as number, photoperiod as number),
       ),
-    [inputs.targetDli, inputs.targetMode, inputs.targetPpfd, photoperiod, photoperiodReady],
+    [inputs.targetDli, inputs.targetMode, inputs.targetPpfd, photoperiod, stagePhotoperiodReady],
   );
 
   const fixturePlan = useMemo(
@@ -223,8 +227,8 @@ export default function LightCalculatorTab({
     () =>
       attempt(
         inputs.actualWattsPerFixture !== null &&
-          fixturePlanningReady &&
-          photoperiodReady &&
+          fixtureCountReady &&
+          bothPhotoperiodsReady &&
           cycle.vegDays !== null &&
           cycle.flowerDays !== null &&
           cycle.electricityRate !== null,
@@ -240,15 +244,15 @@ export default function LightCalculatorTab({
           }),
       ),
     [
+      bothPhotoperiodsReady,
       cycle.electricityRate,
       cycle.flowerDays,
       cycle.flowerPhotoperiodHours,
       cycle.vegDays,
       cycle.vegPhotoperiodHours,
-      fixturePlanningReady,
+      fixtureCountReady,
       inputs.actualWattsPerFixture,
       inputs.fixtureCount,
-      photoperiodReady,
     ],
   );
 
@@ -257,8 +261,8 @@ export default function LightCalculatorTab({
       attempt(
         fixturePpf.value !== null &&
           energy.value !== null &&
-          fixturePlanningReady &&
-          photoperiodReady &&
+          fixtureCountReady &&
+          bothPhotoperiodsReady &&
           cycle.vegDays !== null &&
           cycle.flowerDays !== null,
         () =>
@@ -273,15 +277,15 @@ export default function LightCalculatorTab({
           }),
       ),
     [
+      bothPhotoperiodsReady,
       cycle.flowerDays,
       cycle.flowerPhotoperiodHours,
       cycle.vegDays,
       cycle.vegPhotoperiodHours,
       energy.value,
-      fixturePlanningReady,
+      fixtureCountReady,
       fixturePpf.value,
       inputs.fixtureCount,
-      photoperiodReady,
     ],
   );
 
@@ -492,7 +496,9 @@ export default function LightCalculatorTab({
                   <option value="flower">Flower</option>
                 </select>
                 <p className="text-xs text-muted-foreground">
-                  Uses {photoperiod} h/day from the shared Cycle bar.
+                  {photoperiod === null
+                    ? `Enter the ${inputs.stage} photoperiod in the shared Cycle bar.`
+                    : `Uses ${photoperiod} h/day from the shared Cycle bar.`}
                 </p>
               </div>
               <div className="space-y-1.5">

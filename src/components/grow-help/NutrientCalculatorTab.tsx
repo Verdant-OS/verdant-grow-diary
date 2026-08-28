@@ -26,6 +26,12 @@ import {
   type EcTargetRecipeResult,
   type LabelRateRecipeResult,
 } from "@/lib/nutrientCalc";
+import {
+  MEASURED_MIXED_EC_SOURCE,
+  MEASURED_MIXED_EC_SOURCE_LABEL,
+  nutrientInjectorReadiness,
+  isValidMeasuredMixedEc,
+} from "@/lib/growHelpToolkitReadiness";
 import { ppm500, ppm700 } from "@/lib/unitsCalc";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";
@@ -209,20 +215,14 @@ export default function NutrientCalculatorTab({
 
   const injector = useMemo(
     () =>
-      attempt(
-        inputs.injectorEnabled &&
-          volumeReady &&
-          inputs.stockGramsPerGallon !== null &&
-          inputs.injectorRatio !== null &&
-          inputs.injectorRatio > 0,
-        () =>
-          calculateInjectorPlan(
-            inputs.stockGramsPerGallon as number,
-            inputs.injectorRatio as number,
-            volume,
-          ),
+      attempt(volumeReady && nutrientInjectorReadiness(inputs).ready, () =>
+        calculateInjectorPlan(
+          inputs.stockGramsPerGallon as number,
+          inputs.injectorRatio as number,
+          volume,
+        ),
       ),
-    [inputs.injectorEnabled, inputs.injectorRatio, inputs.stockGramsPerGallon, volume, volumeReady],
+    [inputs, volume, volumeReady],
   );
 
   const conversion = useMemo(
@@ -1120,9 +1120,13 @@ export default function NutrientCalculatorTab({
                   : `${fmt(Math.abs(remainingEc.value))} mS/cm over target`}
               </Badge>
             ) : null}
-            {inputs.measuredMixedEc !== null ? (
-              <Badge variant="outline" data-testid="measured-mixed-ec-source" data-source="manual">
-                Measured EC · grower-entered manual (not live sensor)
+            {isValidMeasuredMixedEc(inputs.measuredMixedEc) ? (
+              <Badge
+                variant="outline"
+                data-testid="measured-mixed-ec-source"
+                data-source={MEASURED_MIXED_EC_SOURCE}
+              >
+                Measured EC · {MEASURED_MIXED_EC_SOURCE_LABEL}
               </Badge>
             ) : null}
           </div>

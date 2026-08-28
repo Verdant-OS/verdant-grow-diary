@@ -9,7 +9,9 @@ import {
   MEASURED_MIXED_EC_SOURCE_LABEL,
   expenseExportReadiness,
   expenseWaterReadiness,
+  isValidMeasuredMixedEc,
   lightExportReadiness,
+  nutrientInjectorReadiness,
 } from "./growHelpToolkitReadiness";
 import {
   calculateDliFromPlanningPpfd,
@@ -226,7 +228,7 @@ export function createGrowHelpExportSnapshot(
         "PPM700 = EC × 700",
       );
     }
-    if (nutrient.measuredMixedEc !== null) {
+    if (isValidMeasuredMixedEc(nutrient.measuredMixedEc)) {
       add(
         "Nutrient recipe",
         "Measured mixed EC",
@@ -269,7 +271,7 @@ export function createGrowHelpExportSnapshot(
         part.formula,
       ),
     );
-    if (nutrient.injectorEnabled && nutrient.injectorRatio !== null) {
+    if (nutrientInjectorReadiness(nutrient).ready) {
       const injector = tryValue(() =>
         calculateInjectorPlan(
           nutrient.stockGramsPerGallon as number,

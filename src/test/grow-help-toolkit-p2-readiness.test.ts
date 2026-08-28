@@ -4,11 +4,16 @@ import {
   MEASURED_MIXED_EC_SOURCE,
   MEASURED_MIXED_EC_SOURCE_LABEL,
   cyclePhotoperiodReadiness,
+  expenseCoreCycleReadiness,
   expenseExportReadiness,
   isManualMeasuredMixedEcSource,
+  isValidMeasuredMixedEc,
   lightExportReadiness,
+  lightFixtureCountReadiness,
   lightFixturePlanningReadiness,
+  lightTargetReadiness,
   measuredMixedEcSourceLabel,
+  stagePhotoperiodReadiness,
 } from "@/lib/growHelpToolkitReadiness";
 import {
   createDefaultGrowHelpToolkitState,
@@ -60,6 +65,7 @@ describe("Grow Help Toolkit readiness helpers", () => {
       ready: false,
       missing: ["fixtureCount", "canopyEfficiencyPercent"],
     });
+    expect(lightFixtureCountReadiness(light).ready).toBe(false);
   });
 
   it("requires photoperiods for light and expense export readiness", () => {
@@ -71,12 +77,46 @@ describe("Grow Help Toolkit readiness helpers", () => {
     expect(expenseExportReadiness(state.expense, state.cycle).ready).toBe(false);
   });
 
+  it("requires the active light target for export readiness", () => {
+    const state = completePlanningState();
+    state.light.targetMode = "ppfd";
+    state.light.targetPpfd = null;
+    expect(lightTargetReadiness(state.light).missing).toEqual(["targetPpfd"]);
+    expect(lightExportReadiness(state.light, state.cycle).ready).toBe(false);
+
+    state.light.targetMode = "dli";
+    state.light.targetDli = null;
+    expect(lightTargetReadiness(state.light).missing).toEqual(["targetDli"]);
+  });
+
+  it("keeps stage photoperiod independent so direct PPFD does not need the other stage", () => {
+    const cycle = createDefaultGrowHelpToolkitState().cycle;
+    cycle.vegPhotoperiodHours = 18;
+    cycle.flowerPhotoperiodHours = null;
+    expect(stagePhotoperiodReadiness(cycle, "veg").ready).toBe(true);
+    expect(stagePhotoperiodReadiness(cycle, "flower").ready).toBe(false);
+    expect(cyclePhotoperiodReadiness(cycle).ready).toBe(false);
+  });
+
+  it("marks a zero-day cycle incomplete for expense readiness", () => {
+    const cycle = createDefaultGrowHelpToolkitState().cycle;
+    cycle.vegDays = 0;
+    cycle.flowerDays = 0;
+    cycle.electricityRate = 0.16;
+    expect(expenseCoreCycleReadiness(cycle).ready).toBe(false);
+    expect(expenseCoreCycleReadiness(cycle).missing).toContain("cycleDays");
+  });
+
   it("labels measured mixed EC as browser-local manual data, never live", () => {
     expect(MEASURED_MIXED_EC_SOURCE).toBe("manual");
     expect(isManualMeasuredMixedEcSource(MEASURED_MIXED_EC_SOURCE)).toBe(true);
     expect(isManualMeasuredMixedEcSource("live")).toBe(false);
     expect(measuredMixedEcSourceLabel(1.4)).toBe(MEASURED_MIXED_EC_SOURCE_LABEL);
     expect(measuredMixedEcSourceLabel(null)).toBeNull();
+    expect(measuredMixedEcSourceLabel(-0.1)).toBeNull();
+    expect(measuredMixedEcSourceLabel(10.1)).toBeNull();
+    expect(isValidMeasuredMixedEc(1.4)).toBe(true);
+    expect(isValidMeasuredMixedEc(-0.1)).toBe(false);
     expect(MEASURED_MIXED_EC_SOURCE_LABEL.toLowerCase()).toContain("manual");
     expect(MEASURED_MIXED_EC_SOURCE_LABEL.toLowerCase()).toContain("not live sensor");
   });
@@ -207,6 +247,40 @@ describe("Grow Help Toolkit export fail-closed on incomplete required inputs", (
         formula: expect.stringContaining("amortizationCycles"),
       }),
     );
+  });
+
+  it("does not emit expense cost-sheet zeros when cycle days sum to zero", () => {
+    const state = completePlanningState();
+    state.cycle.vegDays = 0;
+    state.cycle.flowerDays = 0;
+
+    const snapshot = createGrowHelpExportSnapshot(state, "Fixed label");
+    expect(snapshot.rows.filter((row) => row.section === "Cost sheet")).toEqual([]);
+    expect(snapshot.rows).toContainEqual(
+      expect.objectContaining({
+        section: "Notes",
+        item: "Cost sheet",
+        value: "Incomplete — not exported",
+        formula: expect.stringContaining("cycleDays"),
+      }),
+    );
+  });
+
+  it("does not export out-of-range measured mixed EC as legitimate manual data", () => {
+    const state = completePlanningState();
+    state.nutrient = {
+      ...state.nutrient,
+      mode: "ec_target",
+      reservoirValue: 20,
+      reservoirUnit: "gal",
+      sourceWaterEc: 0.2,
+      targetEc: 1.6,
+      measuredMixedEc: 10.1,
+      ecParts: [{ id: "a", name: "Part A", ecPerMlPerL: 0.2, ratio: 1 }],
+    };
+
+    const snapshot = createGrowHelpExportSnapshot(state, "Fixed label");
+    expect(snapshot.rows.some((row) => row.item === "Measured mixed EC")).toBe(false);
   });
 
   it("exports measured mixed EC with an explicit manual source distinction", () => {

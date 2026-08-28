@@ -40,8 +40,8 @@ export function cyclePhotoperiodReadiness(cycle: CycleInputs): GrowHelpReadiness
   return result(missing);
 }
 
-/** Fixture count and canopy efficiency required for planning PPFD / fixture math. */
-export function lightFixturePlanningReadiness(light: LightInputs): GrowHelpReadinessResult {
+/** Fixture count alone — enough for cycle energy / cost-per-mol (no canopy fudge). */
+export function lightFixtureCountReadiness(light: LightInputs): GrowHelpReadinessResult {
   const missing: string[] = [];
   if (
     !isPresentNumber(light.fixtureCount) ||
@@ -50,6 +50,12 @@ export function lightFixturePlanningReadiness(light: LightInputs): GrowHelpReadi
   ) {
     missing.push("fixtureCount");
   }
+  return result(missing);
+}
+
+/** Canopy efficiency fudge required for planning PPFD / fixtures-needed math. */
+export function lightCanopyEfficiencyReadiness(light: LightInputs): GrowHelpReadinessResult {
+  const missing: string[] = [];
   if (
     !isPresentNumber(light.canopyEfficiencyPercent) ||
     light.canopyEfficiencyPercent < 50 ||
@@ -58,6 +64,40 @@ export function lightFixturePlanningReadiness(light: LightInputs): GrowHelpReadi
     missing.push("canopyEfficiencyPercent");
   }
   return result(missing);
+}
+
+/** Fixture count and canopy efficiency required for planning PPFD / fixture math. */
+export function lightFixturePlanningReadiness(light: LightInputs): GrowHelpReadinessResult {
+  return result([
+    ...lightFixtureCountReadiness(light).missing,
+    ...lightCanopyEfficiencyReadiness(light).missing,
+  ]);
+}
+
+/** Mode-specific target required when the Light tab marks Target PPFD/DLI as required. */
+export function lightTargetReadiness(light: LightInputs): GrowHelpReadinessResult {
+  const missing: string[] = [];
+  if (light.targetMode === "ppfd") {
+    if (!isPresentNumber(light.targetPpfd) || light.targetPpfd < 0) {
+      missing.push("targetPpfd");
+    }
+  } else if (!isPresentNumber(light.targetDli) || light.targetDli <= 0) {
+    missing.push("targetDli");
+  }
+  return result(missing);
+}
+
+/** Selected-stage photoperiod only — direct PPFD targets do not need the other stage. */
+export function stagePhotoperiodReadiness(
+  cycle: CycleInputs,
+  stage: "veg" | "flower",
+): GrowHelpReadinessResult {
+  const key = stage === "veg" ? "vegPhotoperiodHours" : "flowerPhotoperiodHours";
+  const value = stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours;
+  if (!isPresentNumber(value) || value <= 0) {
+    return result([key]);
+  }
+  return result([]);
 }
 
 export function lightCanopyDimensionsReadiness(light: LightInputs): GrowHelpReadinessResult {
@@ -97,6 +137,7 @@ export function lightExportReadiness(
     ...lightCanopyDimensionsReadiness(light).missing,
     ...lightFixturePlanningReadiness(light).missing,
     ...lightFixturePpfReadiness(light).missing,
+    ...lightTargetReadiness(light).missing,
     ...cyclePhotoperiodReadiness(cycle).missing,
   ];
   return result(missing);
@@ -116,9 +157,19 @@ export function expenseAmortizationReadiness(expense: ExpenseInputs): GrowHelpRe
 
 export function expenseCoreCycleReadiness(cycle: CycleInputs): GrowHelpReadinessResult {
   const missing: string[] = [];
-  if (!isPresentNumber(cycle.vegDays)) missing.push("vegDays");
-  if (!isPresentNumber(cycle.flowerDays)) missing.push("flowerDays");
+  if (!isPresentNumber(cycle.vegDays) || cycle.vegDays < 0) missing.push("vegDays");
+  if (!isPresentNumber(cycle.flowerDays) || cycle.flowerDays < 0) missing.push("flowerDays");
   if (!isPresentNumber(cycle.electricityRate)) missing.push("electricityRate");
+  // calculateExpenseSummary requires a positive combined cycle; 0+0 must stay not-ready.
+  if (
+    isPresentNumber(cycle.vegDays) &&
+    cycle.vegDays >= 0 &&
+    isPresentNumber(cycle.flowerDays) &&
+    cycle.flowerDays >= 0 &&
+    cycle.vegDays + cycle.flowerDays <= 0
+  ) {
+    missing.push("cycleDays");
+  }
   return result(missing);
 }
 
@@ -201,8 +252,13 @@ export function expenseSummaryReadiness(
   return expenseExportReadiness(expense, cycle);
 }
 
+/** Same 0–10 finite range the Nutrient tab accepts before treating measured EC as usable. */
+export function isValidMeasuredMixedEc(value: number | null | undefined): value is number {
+  return isPresentNumber(value) && value >= 0 && value <= 10;
+}
+
 export function measuredMixedEcSourceLabel(value: number | null): string | null {
-  if (!isPresentNumber(value)) return null;
+  if (!isValidMeasuredMixedEc(value)) return null;
   return MEASURED_MIXED_EC_SOURCE_LABEL;
 }
 

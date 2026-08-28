@@ -1,6 +1,64 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~22:00 UTC)
+**Last updated:** 2026-08-28 UTC (~22:50 UTC)
+**Updated by:** Claude (2026-08-28: **#1185 MERGED as `f9f4d11`. The sanitizer leak is closed on the
+deploy branch — verified by execution, not inferred. Production exposure is `NOT_MEASURED`.** This
+entry also carries **three corrections to my own earlier entries**, all raised by reviewers on #1172
+and all confirmed.
+
+**#1185 merged — `f9f4d11`.** Deploy tip `9d7b4b4` → **`f9f4d11`**. The original probe was re-run
+against the merged tip in a detached worktree: **all ten inputs that leaked on the untouched parent
+now redact**, including `Bearer SOME_PLAIN_NAME="…"`, the unlabelled case. Pattern order in the
+merged module confirms it — the env `NAME=value` rule at line 99, above `Bearer` (100),
+`Authorization` (101) and `PASSKEY` (102). Both mechanisms, **fragmenting** and **consuming**, are
+closed.
+
+**A merge is not a deployment, and this is exactly where that bites.** `f9f4d11` is the **deploy
+branch**. **Production exposure ends only at a verified publish and is `NOT_MEASURED`** until one is
+confirmed. No publish was performed and none is authorized.
+
+**Review posture at merge**, since this slice existed because #1176 lacked one: the merged head
+`d19c9ec` was reviewed by **Codex with no findings** before it was enqueued. **Copilot** found a real
+second bypass on `5bc6a917` — the header-consuming leak — fixed in `75a7de9`, with both threads
+answered and resolved. **Cursor Bugbot stayed `BLOCKED`** on the usage limit throughout. The head
+that merged was independently reviewed, which is the outcome this slice was for.
+
+**CORRECTION 1 — reviewer identity. `Dream Queen` and `Blue Dream` are the SAME reviewer.**
+Confirmed by Cheek, 2026-08-28. Earlier entries used both names with no alias recorded, which
+Copilot flagged on #1172: a reader could not tell whether one reviewer or two had reviewed, and the
+ambiguity sat directly on a **gate**. Recorded now as an established alias. **This does not change
+seat eligibility:** Blue Dream / Dream Queen is the **owner-designated reviewer**; the **protocol
+peer-review seat** is limited by `AGENTS.md` and `HANDOFF_PROTOCOL.md:24` to Grok, Claude or Codex,
+and is held by **Grok (GDP)**. A PASS from Blue Dream is a real review and is **not** that seat.
+
+**CORRECTION 2 — #1169 DID have a pre-merge independent review.** My #1172 entry claimed it "landed
+with no independent review". **False.** Blue Dream reviewed `c84a8330` in Cursor before auto-merge
+and returned **PASS**. Filed as a **P1 by Codex**, confirmed, and fixed in place at the original
+passage. Source of the error: #1172's PR **body**, which this file had already superseded, copied
+upward without checking the file against itself.
+
+**CORRECTION 3 — the exposure window was wrong at both ends.** Raised by **Copilot**. The old wording
+said the defect was live "from `a76e73ad` (#1176's merge) until #1185 lands". Both halves were wrong:
+#1176's merge marks **discovery**, not the start of exposure — the sanitizer was already vulnerable
+on the untouched parent, proven by execution — so the **start is `NOT_MEASURED`**; and #1185 landing
+closes it on the **deploy branch**, while **production exposure ends at a verified publish**, also
+`NOT_MEASURED`. This is the repo's own "a merge is not a deployment" rule, which the original wording
+broke while this same session was enforcing it on migrations and CI verdicts.
+
+All three corrections were applied **in place at the original passages**, annotated rather than
+silently rewritten, so a reader who scrolls to the old text finds the correction there.
+
+**Why these landed at all, recorded once.** #1172 merged as `9d7b4b4` while all three findings were
+open: the fix could not be pushed because the merge queue **locks the branch**
+(`protected branch hook declined`). The corrections therefore arrive as a follow-up on a fresh branch
+cut from `f9f4d11` — a merged PR cannot carry follow-up work.
+
+**Posture.** Deploy tip **`f9f4d11`**. `20260827010000`, `20260826100000`, `20260825233000` and
+`20260813030000` all remain **NOT applied**. **#1184's rebase is now unblocked** by its own condition
+(parked until #1185 lands) and has **not** been started. No publish, no SQL, no APPLY. This edit
+touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~22:00 UTC)
 **Updated by:** Claude (2026-08-28: **#1185 is GREEN on all 35 required contexts at `75a7de9` — the
 first required verdict the header-bypass fix has had. The prior header recorded this axis as
 `NOT_MEASURED`; it is now measured.** Green is not approval, and the review coverage on this SHA is
@@ -150,9 +208,14 @@ Two claims, separated by evidence grade rather than blended:
   and that is the lesson for next time.
 
 If the inference holds, #1172 would have **merged itself the moment required CI went green** — no
-human step, no review. That is the identical mechanism this file already records for **#1169**,
-which landed with **no independent review** because auto-merge fired while the handoff relay was
-still pending.
+human step, no approval gate. That is the same auto-merge mechanism that landed **#1169**.
+
+**CORRECTED 2026-08-28 ~22:50.** An earlier revision of the sentence above said #1169 "landed with
+**no independent review**". **That was false**, and it contradicted this file's own record further
+down, which states Blue Dream **DID** review #1169 at `c84a8330` pre-merge and returned **PASS**.
+Filed as a **P1 by Codex** on #1172 and confirmed. The false claim came from #1172's PR **body**
+(written 15:54), which this file had already superseded; it was propagated upward without checking
+the file against itself.
 
 #1172 was then converted to `draft=true`. Verified after by fresh read: `draft: true`,
 `auto_merge: None`, head `bdeb058`, base `7fd6a001`. **No attribution is made for who armed it** —
@@ -280,8 +343,14 @@ all queued. **Zero red.** Non-required completed: `docs-safety`, `Config guards`
 `Analyze (python)` all `success`; `CodeQL` `neutral`; `Supabase Preview` and the irrigation/
 stabilization jobs `skipped`. No green may be carried forward from `7be3d73` or `5bc6a917`.
 
-**The leak is LIVE on the deploy branch.** It pre-exists #1185, so `7fd6a001` still leaks today.
-#1185 closes it; if #1185 does not land, the exposure remains.
+**The leak was live on the deploy branch as of this entry.** It pre-exists #1185, so `7fd6a001`
+still leaked at the time of writing.
+
+**CORRECTED 2026-08-28 ~22:50.** #1185 has since merged as **`f9f4d11`** and the deploy branch no
+longer leaks — verified by execution, all ten probe cases redact. But the "exposure remains / #1185
+closes it" framing above was **wrong in kind**, not just stale: a merge closes the defect on the
+**deploy branch**, not in production. **Production exposure ends only at a verified publish**, and
+is `NOT_MEASURED` until one is confirmed.
 
 **Still parked, explicitly not in this slice:** the three handoff questions; the mixed-case /
 spaced `NAME = value` P2 (pattern stays uppercase-only, no `\s*` around `=`); the rest of
@@ -431,9 +500,21 @@ contains no bare `token` rule. `MY_TOKEN_VAR=` and `MY_BEARER_VAR=` were always 
 narrower statement as correct and the earlier wording as superseded.
 
 **Exposure window, stated plainly.** The defect was surfaced by a failing test during #1176 and
-fenced there **for the diagnostics export only**. It has been live on the forwarding-report path
-from `a76e73ad` (#1176's merge) until #1185 lands. That is a production surface, not a pre-merge
-note.
+fenced there **for the diagnostics export only**.
+
+**CORRECTED 2026-08-28 ~22:50, on Copilot's finding on #1172 — the original wording was wrong at
+both ends.** It said the defect "has been live on the forwarding-report path from `a76e73ad`
+(#1176's merge) until #1185 lands."
+
+- **#1176's merge marks DISCOVERY, not the start of exposure.** The sanitizer was already vulnerable
+  on the untouched parent — proven by execution on `7fd6a001`, where all ten probe inputs leaked.
+  The exposure predates #1176 by however long that ordering stood; its **start is `NOT_MEASURED`**.
+- **#1185 landing does not end production exposure.** It updates the **deploy branch**. Exposure
+  ends only after a **publish containing the fix is verified** — also `NOT_MEASURED`.
+
+This file carries "a merge is not a deployment" as a standing rule, and the original wording broke
+it — about a **security** exposure window. Recorded rather than silently rewritten, because the
+failure mode is the transferable part: applying a rule to others' claims and not to one's own.
 
 **Validation at `5f75806`.** RED then GREEN with the final test files, reverting **only** the
 production module: **10 failed / 22 passed → 32/32**. Direct consumers of the module (4 suites)

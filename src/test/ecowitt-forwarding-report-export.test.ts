@@ -23,9 +23,10 @@ import {
   serializeSanitizedForwardingReport,
   type SanitizedForwardingReport,
 } from "@/lib/ecowittForwardingReportExport";
-import type {
-  LocalForwardingLatestMetrics,
-  LocalForwardingStatus,
+import {
+  sanitizeReportText,
+  type LocalForwardingLatestMetrics,
+  type LocalForwardingStatus,
 } from "@/lib/ecowittLocalForwardingStatus";
 
 const NOW_ISO = "2026-08-27T12:00:00.000Z";
@@ -344,6 +345,57 @@ describe("credential values in free-form diagnostics are redacted", () => {
     expect(retry).toContain("1787814291682");
     expect(fwd).toContain("rejected");
     expect(retry).toContain("unauthorized");
+  });
+
+  // Leftover #1163 / #1003: \b-anchored colon/dash MAC + UUID miss when a
+  // word-char prefix (mac_/tent_/0x) abuts the value. Bare forms and bare
+  // hex lookarounds already hold on tip — do not rewrite those paths.
+  it("word-char prefixes cannot evade colon/dash MAC or UUID redaction", () => {
+    const colonMac = "aa:bb:cc:dd:ee:ff";
+    const dashMac = "aa-bb-cc-dd-ee-ff";
+    const report = buildSanitizedForwardingReport({
+      status: status({
+        last_forward_error: `device mac_${colonMac} and 0x${colonMac} rejected`,
+        last_retry_error: `device mac_${dashMac}; tent_${UUID_PRIVATE_ID} missing`,
+      }),
+      nowIso: NOW_ISO,
+    });
+    const fwd = report.bridge_status.last_forward_error ?? "";
+    const retry = report.bridge_status.last_retry_error ?? "";
+    expect(fwd).not.toContain(colonMac);
+    expect(retry).not.toContain(dashMac);
+    expect(retry).not.toContain(UUID_PRIVATE_ID);
+    expect(fwd).toContain("[REDACTED]");
+    expect(retry).toContain("[REDACTED]");
+    expect(fwd).toContain("rejected");
+    expect(retry).toContain("missing");
+  });
+
+  it("quoted env NAME=value pairs redact; unquoted still works; lone words untouched", () => {
+    // Direct sanitizer probe — proves the tip hole (FOO="secretvalue") and
+    // the fence that lone words must not be scrubbed as credentials.
+    expect(sanitizeReportText('FOO="secretvalue"')).not.toContain("secretvalue");
+    expect(sanitizeReportText("FOO='secretvalue'")).not.toContain("secretvalue");
+    expect(sanitizeReportText("FOO=secretvalue")).not.toContain("secretvalue");
+    expect(sanitizeReportText('FOO="secretvalue"')).toContain("[REDACTED]");
+    expect(sanitizeReportText("FOO=secretvalue")).toContain("[REDACTED]");
+    expect(sanitizeReportText("secretvalue")).toBe("secretvalue");
+
+    const report = buildSanitizedForwardingReport({
+      status: status({
+        last_forward_error: "config FOO=\"secretvalue\" and BAR='othersecret' rejected",
+        last_retry_error: "config BAZ=plainsecret ok; lone secretvalue stays",
+      }),
+      nowIso: NOW_ISO,
+    });
+    const fwd = report.bridge_status.last_forward_error ?? "";
+    const retry = report.bridge_status.last_retry_error ?? "";
+    expect(fwd).not.toContain("secretvalue");
+    expect(fwd).not.toContain("othersecret");
+    expect(retry).not.toContain("plainsecret");
+    expect(retry).toContain("secretvalue");
+    expect(fwd).toContain("[REDACTED]");
+    expect(retry).toContain("[REDACTED]");
   });
 
   it("JWT / vbt_ / Bearer / PASSKEY / service-role material stays redacted (regression)", () => {

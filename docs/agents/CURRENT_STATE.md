@@ -1,6 +1,105 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~16:05 UTC)
+**Last updated:** 2026-08-28 UTC (~18:10 UTC)
+**Updated by:** Claude (2026-08-28: **Slice 3 delivered as draft [PR #1176](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176)
+— fail-closed diagnostics export body redaction.** Branch
+`claude/sensor-diagnostics-export-fail-closed-redaction`, cut from deploy tip `52c8abe2` (#1162),
+head **`789294c6`**. Three files: `src/lib/sensorDiagnosticsExportRules.ts` plus its two existing
+suites, +392/-9. **Branch deviation, stated:** the harness-designated branch was
+`claude/trustbadge-attachable-strip-2441l2`, which is #1170's branch and moved remotely to
+`5e40307` mid-session; pushing there would have collided with #1170, so a new branch was cut and
+#1170's pointer was left untouched.
+
+**The hole, proven by execution on the untouched tip — `established fact`, not cited from this
+file.** At `52c8abe2` with the production module unmodified, each shape was placed in
+`latest_test_result.body` and the export read back: **8 of 8 leaked verbatim** — MAC
+`AA:BB:CC:DD:EE:FF`, bare 12-hex `AABBCCDDEEFF`, UUID, 64-char hex digest, `sk-` key, env
+`NAME="value"` pair, JWT, `Bearer` header. All four body paths were affected
+(`diagnosticsExportToJson`, `diagnosticsExportToText`, `redactedResponseBodyJson`,
+`buildRedactedPayloadPreview`), as were run-history item bodies and the `buildSafeResponseInspector`
+string previews. Malformed bodies **threw** rather than degrading: circular and `BigInt` bodies
+crashed both export builders, and `buildRedactedPayloadPreview(undefined)` threw a `TypeError`.
+
+**Fix.** Untrusted bodies now pass through the same secret-VALUE class the forwarding-report export
+uses — `sanitizeReportText` is **called, never re-declared**, so the two paths cannot drift. Cycles,
+nodes past depth 8, and non-serializable values collapse to `EXPORT_BODY_UNAVAILABLE`; serialization
+failures no longer throw. A repeated _sibling_ reference still renders — only a true ancestor cycle
+is unusable. Redaction is deliberately **body-scoped**: the envelope (tent id, endpoints, token
+prefix, `env_match` labels) keeps its existing treatment and a test pins that it survives.
+`sensorSourceRules.ts`, `sensorSnapshotFreshnessRules.ts`, `ecowittLocalForwardingStatus.ts` and the
+QuickLog save hooks are untouched. No new alias table, no SQL, no schema.
+
+**Two defects surfaced, both proven before fixing — and two of the three rounds were Claude's own.**
+(1) `a33d96fa` went red on **three required shards** (1/32, 8/32, 17/32) **and required
+`Lint, typecheck, test, build`**, plus non-required batch lanes 5/16, 12/16, 14/16 — all ONE cause:
+the ordering-fence doc comment spelled a privileged env-var name literally, which the `src/`
+static-safety guards forbid outside test files (they strip quoted string and regex literals, not
+plain comments). Fixed comment-only in `5b2c1cf5`; the repo idiom is to assemble that name at
+runtime, as `sensorIngestTestResultRules.ts` and `ecowittLocalForwardingStatus.ts` already do.
+(2) cursor[bot] raised a **medium-severity secret-leakage** finding on `5b2c1cf5`: the env-pair
+fence was ALL-UPPERCASE only, so `api_key=secretvalue`, `my_secret=…`, `Api_Key=…`, `password=…`,
+`bridge_token=…` inside a response string **VALUE** reached the export intact (object _keys_ were
+already masked; a pair inside a value is what key masking never sees). Verified true by probe — 5 of
+7 cases leaked — then fixed in `789294c6` with case-insensitive credential-pair scrubbing across `=`
+and `:`, scoped to the credential vocabulary so benign telemetry (`temp_f=77.4`, `inserted=1`)
+survives. The vocabulary is now declared once and shared with `SENSITIVE_KEY_RE`. Thread replied to
+and resolved.
+
+**Validation, exact.** RED then GREEN, both measured with the final test files by reverting **only**
+the production module: 13 failed / 19 passed → 32/32 for the first fix; 15 failed / 21 passed →
+36/36 for the case-insensitive work. Twelve related suites 194/194. All 331
+static-safety/security/audit guard suites **4515 passed / 19 skipped / 0 failed**. Targeted sensor
+sweep 329 files **4798 passed / 3 skipped**. v0 operating-loop contract 26/26. `tsc --noEmit` and
+scoped eslint clean. **Not run locally and stated as such:** `bunx vitest run` (full) and
+`bun run build` — CI gates both. One methodology note recorded rather than hidden: a first RED
+attempt stashed the tests along with the fix and proved nothing; it was redone reverting only the
+production file.
+
+**CI at `789294c6`: all 35 required contexts GREEN** — 32 shards, `Lint, typecheck, test, build`,
+`Preflight — edge shared-lib mirror in sync`, `test:legal-seo`. Deployment preview pipeline verified
+on this exact commit (edge-shared preflight, typecheck, production build all `success`).
+
+**Non-required, recorded not laundered.** `Full suite — batch 3/16` FAILED inside
+`bun install --frozen-lockfile` with `Integrity check failed for tarball: object-assign` — it died
+**before any test body ran**, the one sanctioned re-run case. That single re-run is **spent** (a
+first attempt at 17:41 returned 403 "workflow is already running"; it succeeded at ~17:50) and its
+outcome was still `in_progress` at 18:07 — **NOT_MEASURED**, not a pass. `Supabase Preview` skipped
+(connected project at its concurrent preview-branch limit). **Cursor Bugbot, stated precisely:** the
+PR-body _summary_ for `789294c6` completed ("Medium Risk"), but the bug-_finding_ review posted
+"Bugbot couldn't run — usage limit reached" at 18:05. So **no automated finding-level review has run
+on this head**; the Cursor spend limit is unresolved and is an account issue, not a code defect.
+
+**An automation fought the standing draft-only order.** At 18:05 **cursor[bot]** marked #1176 ready
+for review **and enqueued it into the merge queue** on its own — Blue Dream had received the handoff
+three minutes earlier with no verdict. Claude converted it back to draft at 18:06; GitHub's own
+notice confirms the conversion removed auto-merge **and** queue membership and will not restore
+either. The `gh-readonly-queue/verdant-grow-diary/pr-1176-52c8abe2…` ref still exists but is a
+leftover artifact, not live membership — `draft: true` is the authority. A check-in is armed to
+convert it back and escalate if it recurs.
+
+**Review.** Blue Dream handoff for `789294c6` posted 18:02 as
+[PR comment 5456019137](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176#issuecomment-5456019137),
+in `HANDOFF_PROTOCOL` form (slice_owner Claude, independent_reviewer Blue Dream). **No verdict yet.**
+Three questions were put to the reviewer rather than decided unilaterally: whether credential-
+vocabulary scoping is the right breadth (a blanket `name=value` rule fails closed harder but guts
+the export's diagnostic value); whether `buildRedactedPayloadPreview` redacting a UUID-shaped
+`tent_id` is an acceptable trade; and whether the depth-8 ceiling is generous enough — **no
+real-world body was sampled, so that is `NOT_MEASURED`**.
+
+**Deferred, deliberately not in this slice.** The upstream ordering defect in
+`ecowittLocalForwardingStatus.sanitizeReportText`: its credential-LABEL rules run BEFORE its env
+`NAME=value` rule, so a pair whose NAME carries a label has the name fragmented first and the VALUE
+survives (`MY_PASSKEY_VAR="s3cret"` → `MY_[REDACTED]_VAR="s3cret"`; a plain name redacts correctly,
+which is why it went unnoticed). Fenced inside the diagnostics module only — **the same value still
+survives on the forwarding-report path today.** Unassigned.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1176 stays
+draft, out of the queue, pending Blue Dream. #1172 is watched and parked (all 35 required green
+there; only non-required `Supabase Preview` red). #1170, #1171, #1153, #1151 untouched by this
+slice. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~16:05 UTC)
 **Updated by:** Claude (2026-08-28: **#1169 MERGED — deploy tip is now `22c1242c`** (squash of the
 fail-closed manual idempotency slice at head `c84a8330`, prior tip `a53924da` = #1168). Board-fact
 correction on this same block only: Blue Dream DID review `c84a8330` PASS pre-merge; #1170 head

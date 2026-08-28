@@ -20,12 +20,32 @@ const SECRETY_KEY_PATTERNS: RegExp[] = [
   /service_role/i,
   /signature/i,
   /api[_-]?key/i,
+  /passkey/i,
   /secret/i,
   /password/i,
   /^user_id$/i,
 ];
 
 const INTERNAL_ID_KEYS = new Set(["id", "row_id", "internal_id"]);
+const REDACTED = "[redacted]";
+const REDACTED_SECRET_VALUE = "[REDACTED]";
+
+// Keep this value class aligned with the forwarding-report sanitizer:
+// secret-shaped strings must redact even when their containing key looks safe.
+const SECRET_VALUE_PATTERNS: RegExp[] = [
+  /vbt_[A-Za-z0-9_-]{6,}/g,
+  /eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g,
+  /Bearer\s+[A-Za-z0-9._-]{6,}/gi,
+  /Authorization\s*:\s*[^\s",}]+/gi,
+  /PASSKEY/gi,
+  new RegExp(["service", "_", "role"].join(""), "gi"),
+  /(?<![0-9A-Fa-f])[0-9A-Fa-f]{2}(?:[:-][0-9A-Fa-f]{2}){5}(?![0-9A-Fa-f])/g,
+  /(?<![0-9A-Fa-f])[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}(?![0-9A-Fa-f])/g,
+  /(?<![0-9A-Fa-f])[0-9A-Fa-f]{32,}(?![0-9A-Fa-f])/g,
+  /(?<![0-9A-Fa-f])(?=[0-9A-Fa-f]{0,30}[A-Fa-f])[0-9A-Fa-f]{12,31}(?![0-9A-Fa-f])/g,
+  /\bsk-[A-Za-z0-9_-]{16,}/g,
+  /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
+];
 
 function isSecretKey(key: string): boolean {
   if (SECRETY_KEY_PATTERNS.some((p) => p.test(key))) return true;
@@ -37,25 +57,51 @@ function maskInternalId(value: unknown): string {
   return `${value.slice(0, 4)}…(len=${value.length})`;
 }
 
-export function redactEvidenceValue(value: unknown): unknown {
-  if (value === null || value === undefined) return value;
-  if (Array.isArray(value)) return value.map((v) => redactEvidenceValue(v));
-  if (typeof value === "object") {
+function redactSecretValues(value: string): string {
+  let out = value;
+  for (const pattern of SECRET_VALUE_PATTERNS) {
+    out = out.replace(pattern, REDACTED_SECRET_VALUE);
+  }
+  return out;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function redactEvidenceNode(value: unknown): unknown {
+  if (value === null) return null;
+  if (typeof value === "string") return redactSecretValues(value);
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : REDACTED;
+  if (Array.isArray(value)) return value.map((v) => redactEvidenceNode(v));
+  if (isPlainRecord(value)) {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    for (const [k, v] of Object.entries(value)) {
       if (isSecretKey(k)) {
-        out[k] = "[redacted]";
+        out[k] = REDACTED;
         continue;
       }
       if (INTERNAL_ID_KEYS.has(k.toLowerCase())) {
         out[k] = maskInternalId(v);
         continue;
       }
-      out[k] = redactEvidenceValue(v);
+      out[k] = redactEvidenceNode(v);
     }
     return out;
   }
-  return value;
+  return REDACTED;
+}
+
+export function redactEvidenceValue(value: unknown): unknown {
+  try {
+    if (!isPlainRecord(value)) return REDACTED;
+    return redactEvidenceNode(value);
+  } catch {
+    return REDACTED;
+  }
 }
 
 export interface EcowittEvidenceMetricSummary {

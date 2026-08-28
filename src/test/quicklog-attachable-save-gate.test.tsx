@@ -8,11 +8,10 @@
  *    `trustBadge.attachable` is false — so the Attach toggle must stay
  *    OFF + disabled, the strip must not claim the log will include the
  *    snapshot, and the saved payload must NOT carry `details.sensor`.
- *  - Only a real resolver `fresh_live` verdict attaches: toggle auto-ON,
+ *  - A real resolver `fresh_live` verdict attaches: toggle auto-ON,
  *    payload carries `details.sensor` with `status: "fresh_live"`.
- *  - Manual / csv / demo rows on `fresh_non_live` are equally
- *    non-attachable at this head; manual keeps its "Edit manual readings"
- *    affordance on the strip despite the forced-detached state.
+ *  - Canonical manual / csv rows remain attachable with their non-live
+ *    provenance. Demo rows remain view-only and never reach the payload.
  *
  * Renders the REAL QuickLog dialog and the REAL strip (no strip stub) so
  * the toggle, helper copy, strip copy, and RPC payload are all asserted
@@ -165,7 +164,7 @@ describe("attachable gate — reviewed live alias (fresh_non_live)", () => {
     await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"));
     expect(
       screen.getByTestId("quick-log-snapshot-non-attachable-helper").textContent ?? "",
-    ).toMatch(/only verified live readings/i);
+    ).toMatch(/view-only/i);
     expect(screen.getByTestId("quick-log-truth-copy").textContent).toBe(
       "Sensor context is present but not attachable. This will save as a manual log only.",
     );
@@ -221,7 +220,7 @@ describe("attachable gate — real fresh_live still attaches", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Manual / demo / csv on fresh_non_live: non-attachable at this head
+// Manual / csv remain attachable; demo stays view-only
 // ---------------------------------------------------------------------------
 
 describe("attachable gate — manual fresh_non_live", () => {
@@ -233,27 +232,30 @@ describe("attachable gate — manual fresh_non_live", () => {
     });
   });
 
-  it("toggle disabled + OFF; strip keeps the manual edit affordance", async () => {
+  it("toggle auto-attaches and stays labeled Manual", async () => {
     renderQL();
     const toggle = (await screen.findByTestId("quick-log-snapshot-toggle")) as HTMLButtonElement;
-    expect(toggle.getAttribute("data-snapshot-attachable")).toBe("false");
-    expect(toggle.disabled).toBe(true);
-    await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"));
+    expect(toggle.getAttribute("data-snapshot-attachable")).toBe("true");
+    expect(toggle.disabled).toBe(false);
+    await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"));
     const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
-    expect(strip.getAttribute("data-attachable")).toBe("false");
+    expect(strip.getAttribute("data-attachable")).toBe("true");
     expect(screen.getByTestId("snapshot-trust-badge")).toHaveAttribute("data-badge", "manual");
-    expect(strip.textContent).toContain(STRIP_NON_ATTACHABLE_DESCRIPTION);
+    expect(strip.textContent).toMatch(/manual/i);
+    expect(strip.textContent).not.toMatch(/current sensor context/i);
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
     expect(action.getAttribute("data-action-kind")).toBe("edit");
     expect(action.textContent).toContain("Edit manual readings");
   });
 
-  it("saved payload carries NO details.sensor for the manual row", async () => {
+  it("saved payload preserves manual fresh_non_live provenance", async () => {
     renderQL();
-    await screen.findByTestId("quick-log-snapshot-toggle");
+    const toggle = await screen.findByTestId("quick-log-snapshot-toggle");
+    await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"));
     const payload = await saveNoteAndGetPayload();
-    const details = (payload.p_details ?? null) as Record<string, unknown> | null;
-    expect(details === null || !("sensor" in details)).toBe(true);
+    const details = payload.p_details as { sensor?: { status?: string; source?: string } };
+    expect(details?.sensor?.status).toBe("fresh_non_live");
+    expect(details?.sensor?.source).toBe("manual");
   });
 });
 
@@ -272,9 +274,12 @@ describe("attachable gate — demo and csv fresh_non_live", () => {
     expect(strip.getAttribute("data-attachable")).toBe("false");
     expect(screen.getByTestId("snapshot-trust-badge")).toHaveAttribute("data-badge", "demo");
     expect(strip.textContent).toContain(STRIP_NON_ATTACHABLE_DESCRIPTION);
+    const payload = await saveNoteAndGetPayload();
+    const details = (payload.p_details ?? null) as Record<string, unknown> | null;
+    expect(details === null || !("sensor" in details)).toBe(true);
   });
 
-  it("csv row: saved payload carries NO details.sensor", async () => {
+  it("csv row auto-attaches and preserves fresh_non_live provenance", async () => {
     snapState.snapshot = snap({
       source: "csv",
       status: "fresh_non_live",
@@ -282,9 +287,17 @@ describe("attachable gate — demo and csv fresh_non_live", () => {
     });
     renderQL();
     const toggle = (await screen.findByTestId("quick-log-snapshot-toggle")) as HTMLButtonElement;
-    expect(toggle.getAttribute("data-snapshot-attachable")).toBe("false");
+    expect(toggle.getAttribute("data-snapshot-attachable")).toBe("true");
+    expect(toggle.disabled).toBe(false);
+    await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"));
+    const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
+    expect(strip.getAttribute("data-attachable")).toBe("true");
+    expect(screen.getByTestId("snapshot-trust-badge")).toHaveAttribute("data-badge", "csv");
+    expect(strip.textContent).toMatch(/not current conditions/i);
+    expect(strip.textContent).not.toMatch(/will include current sensor context/i);
     const payload = await saveNoteAndGetPayload();
-    const details = (payload.p_details ?? null) as Record<string, unknown> | null;
-    expect(details === null || !("sensor" in details)).toBe(true);
+    const details = payload.p_details as { sensor?: { status?: string; source?: string } };
+    expect(details?.sensor?.status).toBe("fresh_non_live");
+    expect(details?.sensor?.source).toBe("csv");
   });
 });

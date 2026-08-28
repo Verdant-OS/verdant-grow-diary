@@ -506,6 +506,13 @@ export function buildQuickLogStripFromTentState(
   const usableButDetached = status === "usable" && !attached;
   // Detached copy still wins over demo-usable copy.
   const demoUsable = !usableButDetached && status === "usable" && canonicalSource === "demo";
+  const manualContext = snapshot.status === "fresh_non_live" && canonicalSource === "manual";
+  const csvContext = snapshot.status === "fresh_non_live" && canonicalSource === "csv";
+  const usableDescription = manualContext
+    ? "This log will include grower-entered Manual context — not live telemetry."
+    : csvContext
+      ? "This log will include imported CSV history — not current conditions."
+      : DESCRIPTIONS.usable;
   const title = usableButDetached
     ? "Sensor snapshot available"
     : demoUsable
@@ -515,7 +522,9 @@ export function buildQuickLogStripFromTentState(
     ? "Toggle “Attach sensor snapshot” to include it in this log."
     : demoUsable
       ? DEMO_USABLE_DESCRIPTION
-      : DESCRIPTIONS[status];
+      : status === "usable"
+        ? usableDescription
+        : DESCRIPTIONS[status];
   const baseAction: QuickLogSnapshotStripAction = usableButDetached
     ? { kind: "none" }
     : actionFor(status);
@@ -531,10 +540,10 @@ export function buildQuickLogStripFromTentState(
     ...(canonicalSource === "demo" ? { isHealthyEvidence: false as const } : {}),
   };
 
-  // Live badge for reviewed aliases may stay (pill/badge coherence), but
-  // attachable must NOT become true unless the resolver status is actually
-  // `fresh_live`. Remapping badgeResolverStatus → fresh_live for display
-  // must not widen ATTACHABLE.live; restamp after classify.
+  // Live badge for reviewed aliases may stay for display coherence, but
+  // remapping `badgeResolverStatus` to `fresh_live` must not grant a real
+  // `fresh_non_live` row Live attachability. Preserve the canonical resolver's
+  // attachable Manual/CSV verdicts, including its reviewed source aliases.
   const trustBadge = {
     ...classifySnapshotTrustBadge({
       resolverStatus: badgeResolverStatus,
@@ -545,7 +554,7 @@ export function buildQuickLogStripFromTentState(
     // Provider identity always from the RAW label (e.g. pi_bridge → Pi Bridge).
     providerLabel: deriveProviderLabel(snapshot.source),
   };
-  if (snapshot.status === "fresh_non_live") {
+  if (snapshot.status === "fresh_non_live" && badgeResolverStatus === "fresh_live") {
     trustBadge.attachable = false;
   }
 

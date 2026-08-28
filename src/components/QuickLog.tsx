@@ -900,8 +900,8 @@ export default function QuickLog({
     if (!selectedPlant?.tent_id) return;
     // Auto-attach only when the trust verdict says this snapshot may be
     // attached (`trustBadge.attachable`). A usable-but-non-attachable row
-    // (reviewed live alias, manual, csv, demo on fresh_non_live) must never
-    // self-enable the toggle — the save path below will not include it.
+    // must never self-enable the toggle — the save path below will not
+    // include it.
     if (stripView.status === "usable" && stripView.trustBadge.attachable && !snapshot)
       setSnapshot(true);
   }, [open, stripView.status, stripView.trustBadge.attachable, selectedPlant?.tent_id, snapshot]);
@@ -1263,8 +1263,7 @@ export default function QuickLog({
       const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
       // Honor `trustBadge.attachable` on the save path (GDP / Blue Dream
       // #1168 residual): attachable=false means this log must NOT include
-      // the snapshot as sensor context, whatever the toggle says. At this
-      // head only a real resolver `fresh_live` verdict is attachable.
+      // the snapshot as sensor context, whatever the toggle says.
       const sensorAttachPayload =
         snapshot && sensorTentId && stripView.status === "usable" && stripView.trustBadge.attachable
           ? buildSensorSnapshotSavePayload(sensorState.snapshot)
@@ -1477,9 +1476,9 @@ export default function QuickLog({
   }
 
   const snapshotUsable = stripView.status === "usable";
-  // Trust verdict, not toggle state: only a real resolver `fresh_live`
-  // snapshot is attachable at this head. Usable-but-non-attachable rows
-  // render a disabled, unchecked toggle and save as manual logs only.
+  // Trust verdict, not toggle state: only truth-contract-approved context
+  // is attachable. Usable-but-non-attachable rows render a disabled,
+  // unchecked toggle and save as manual logs only.
   const snapshotAttachable = stripView.trustBadge.attachable;
   const attachDisabled = saveLocked || !resolvedTarget || !snapshotUsable || !snapshotAttachable;
   const showMismatch = !!(
@@ -2225,8 +2224,7 @@ export default function QuickLog({
                   >
                     {selectedPlant && snapshotUsable && !snapshotAttachable ? (
                       <span data-testid="quick-log-snapshot-non-attachable-helper">
-                        Only verified live readings can attach as sensor context. This snapshot
-                        stays view-only and will not be included in this log.
+                        This snapshot is view-only and won't be included in this log.
                       </span>
                     ) : selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
                       <span data-testid="quick-log-snapshot-stale-helper">

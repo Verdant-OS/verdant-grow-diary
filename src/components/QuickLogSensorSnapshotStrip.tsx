@@ -84,14 +84,13 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
 
 /**
  * Description shown when the resolved snapshot is usable to LOOK at but
- * `trustBadge.attachable` is false (reviewed live aliases, manual, csv,
- * demo on `fresh_non_live`). The strip must never claim such a snapshot
- * will be included in the log — only a real resolver `fresh_live` verdict
- * is attachable, and the Quick Log save path enforces the same gate.
+ * `trustBadge.attachable` is false. The strip must never claim such a
+ * snapshot will be included in the log; the Quick Log save path enforces
+ * the same gate.
  * Pinned copy; renegotiate tests in the same commit as any change.
  */
 export const STRIP_NON_ATTACHABLE_DESCRIPTION =
-  "This snapshot won't be included in this log — only verified live readings attach as sensor context.";
+  "This snapshot is view-only and won't be included in this log.";
 
 // Canonical-badge contract: the SnapshotTrustBadge is the authoritative
 // sensor-truth signal (Live/Stale/Invalid/Manual/Demo/CSV) and must
@@ -143,10 +142,9 @@ export default function QuickLogSensorSnapshotStrip({
   });
 
   // Honor `trustBadge.attachable` (GDP / Blue Dream #1168 residual): a
-  // usable row whose trust verdict is non-attachable (reviewed live alias,
-  // manual, csv, demo on fresh_non_live) must never read as "will be
-  // included". The parent (QuickLog) enforces the same gate on the toggle
-  // and the save payload; this strip surfaces it.
+  // usable row whose trust verdict is non-attachable must never read as
+  // "will be included". The parent (QuickLog) enforces the same gate on
+  // the toggle and the save payload; this strip surfaces it.
   const attachBlocked = view.status === "usable" && !view.trustBadge.attachable;
   const description = attachBlocked ? STRIP_NON_ATTACHABLE_DESCRIPTION : view.description;
   // Forced-detach must not cost growers the manual edit affordance: the

@@ -1,7 +1,10 @@
 /**
  * EcoWitt custom-HTTP bridge ingest-readiness — extra-channel + constitution tags.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { buildEcowittTentSnapshotV0ViewModel } from "@/lib/ecowittTentSnapshotV0ViewModel";
 import {
   applyEcowittCustomHttpStuckInvalid,
   ECOWITT_CUSTOM_HTTP_CONSTITUTION_SOURCES,
@@ -246,5 +249,89 @@ describe("ecowittCustomHttpBridgeIngestRules — constitution Sensor Truth", () 
         now: new Date("2026-06-17T05:45:30Z"),
       }),
     ).toBe("invalid");
+  });
+});
+
+describe("extra-channel ingest still feeds Snapshot V0 as T / RH / soil only", () => {
+  const TENT = "11111111-1111-4111-8111-111111111111";
+  const NOW = new Date("2026-06-17T05:45:30Z");
+  const CAPTURED = "2026-06-17T05:40:30.000Z";
+
+  it("maps extra-channel-only packet onto V0 temp/rh/soil and hides co2/leaf/EC", () => {
+    const payload = {
+      temp2f: "77",
+      humidity2: "55",
+      soilmoisture3: "41",
+      co2in: "800",
+      leafwetness1: "12",
+      tf_ch1: "70.1",
+      soilad1: "1234",
+      PASSKEY: "secret",
+      dateutc: "2026-06-17 05:40:30",
+    };
+    const metrics = normalizeEcowittCustomHttpMetrics(payload);
+    expect(metrics.temp_f).toBe(77);
+    expect(metrics.humidity_percent).toBe(55);
+    expect(metrics.soil_moisture_pct).toBe(41);
+    expect(metrics.co2_ppm).toBe(800);
+
+    const source = resolveEcowittCustomHttpConstitutionSource({
+      payload,
+      remoteAddr: "127.0.0.1",
+      now: NOW,
+    });
+    expect(source).toBe("demo");
+
+    const raw = redactEcowittCustomHttpRawPayload(payload);
+    expect(raw).not.toHaveProperty("PASSKEY");
+    expect(raw?.temp2f).toBe("77");
+    expect(raw?.leafwetness1).toBe("12");
+    expect(raw?.soilad1).toBe("1234");
+
+    const rows = (
+      [
+        ["temp_f", metrics.temp_f],
+        ["humidity_percent", metrics.humidity_percent],
+        ["soil_moisture_pct", metrics.soil_moisture_pct],
+        ["co2_ppm", metrics.co2_ppm],
+      ] as const
+    ).map(([metric, value]) => ({
+      tent_id: TENT,
+      source,
+      captured_at: CAPTURED,
+      metric,
+      value,
+      raw_payload: raw,
+    }));
+
+    const vm = buildEcowittTentSnapshotV0ViewModel(rows, { tentId: TENT, now: NOW });
+    expect(vm.metrics.map((m) => m.key)).toEqual(["temp", "rh", "soil"]);
+    expect(vm.metrics).toHaveLength(3);
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    // Extra-channel temp2f arrived as temp_f 77 → convert F→C, never Live 77 °C.
+    expect(temp?.value).toBeCloseTo(25, 5);
+    expect(temp?.value).not.toBe(77);
+    expect(temp?.badgeLabel).toBe("Demo");
+    expect(vm.metrics.find((m) => m.key === "rh")?.value).toBe(55);
+    expect(vm.metrics.find((m) => m.key === "soil")?.value).toBe(41);
+    expect(vm.metrics.some((m) => String(m.key).includes("co2"))).toBe(false);
+  });
+
+  it("keeps Snapshot V0 / card free of nightDrift, inSpecNow, and extra-channel UI", () => {
+    const card = readFileSync(
+      join(process.cwd(), "src/components/EcowittTentSnapshotV0Card.tsx"),
+      "utf-8",
+    );
+    const viewModel = readFileSync(
+      join(process.cwd(), "src/lib/ecowittTentSnapshotV0ViewModel.ts"),
+      "utf-8",
+    );
+    for (const body of [card, viewModel]) {
+      expect(body).not.toMatch(/nightDrift/);
+      expect(body).not.toMatch(/inSpecNow/);
+    }
+    expect(card).not.toMatch(/co2/i);
+    expect(card).not.toMatch(/leafwetness/i);
+    expect(card).toMatch(/Air temp, air RH, soil moisture/);
   });
 });

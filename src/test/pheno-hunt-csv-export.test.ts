@@ -46,6 +46,8 @@ function baseInput(overrides: Partial<PhenoHuntCsvInput> = {}): PhenoHuntCsvInpu
         cbdPct: 0.1,
         totalCannabinoidsPct: null,
         dominantTerpenes: [],
+        testedAt: null,
+        note: null,
         labVerified: true,
       },
     },

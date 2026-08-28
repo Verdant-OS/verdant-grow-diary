@@ -1,4 +1,16 @@
 import { test, expect, type Page } from "@playwright/test";
+import { denyAnalyticsConsent } from "./utils/analyticsConsent";
+
+/**
+ * Third-party font CSS is not part of the app's own network surface; fulfilling
+ * it with empty CSS keeps the spec hermetic in offline/proxied environments
+ * where fonts.googleapis.com is unreachable (a reset there is a console error).
+ */
+async function mockThirdPartyFonts(page: Page) {
+  await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//i, (route) =>
+    route.fulfill({ status: 200, contentType: "text/css", body: "" }),
+  );
+}
 
 /**
  * Pheno Comparison deep-link browser regression.
@@ -74,6 +86,28 @@ async function mockLiveHunt(page: Page, capture: RestBoundaryCapture) {
     const requestLabel = `${request.method()} ${request.url()}`;
     const table = new URL(request.url()).pathname.match(/\/rest\/v1\/([^/]+)/i)?.[1] ?? "";
 
+    // The tent-context enrichment calls the read-only snapshot RPC. PostgREST
+    // invokes RPCs over POST — and ONLY POST — so each exception requires it:
+    // a PUT/PATCH/DELETE to the same path must still fall through to the
+    // mutation fence below instead of being silently fulfilled.
+    if (
+      request.method() === "POST" &&
+      /\/rpc\/get_latest_tent_sensor_snapshot$/i.test(new URL(request.url()).pathname)
+    ) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
+      return;
+    }
+
+    // Diary evidence rides the read-only top-N-per-plant RPC (same POST-only
+    // transport rule); an empty set matches the diary_entries fixture.
+    if (
+      request.method() === "POST" &&
+      /\/rpc\/pheno_candidate_diary_entries_top_n$/i.test(new URL(request.url()).pathname)
+    ) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+      return;
+    }
+
     if (request.method() !== "GET") {
       capture.mutations.push(requestLabel);
       await route.abort("blockedbyclient");
@@ -108,6 +142,10 @@ test("fixture route /pheno-comparison renders demo panels + legend, zero network
     failedRequests.push(`${r.method()} ${r.url()} :: ${r.failure()?.errorText ?? ""}`),
   );
 
+  // The consent banner is not this spec's subject; a stored refusal keeps the
+  // no-write-controls contract deterministic (and no analytics ever loads).
+  await denyAnalyticsConsent(page);
+  await mockThirdPartyFonts(page);
   await page.goto("/pheno-comparison", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByTestId("pheno-comparison-page")).toHaveAttribute("data-mode", "demo");
@@ -139,11 +177,18 @@ test("live route /pheno-hunts/:id/compare renders a real hunt's candidates (mock
   const restBoundary: RestBoundaryCapture = { unexpected: [], mutations: [] };
   page.on("console", (m) => m.type() === "error" && consoleErrors.push(m.text()));
   page.on("pageerror", (e) => consoleErrors.push(e.message));
+  // Match on the hostname only: in dev, the app's own route modules are
+  // served as /src/routes/_app/action-queue.tsx from the same origin, and a
+  // full-URL match would misread that module load as an Action Queue call.
   page.on(
     "request",
-    (r) => FORBIDDEN_HOST_RE.test(r.url()) && forbidden.push(`${r.method()} ${r.url()}`),
+    (r) =>
+      FORBIDDEN_HOST_RE.test(new URL(r.url()).hostname) &&
+      forbidden.push(`${r.method()} ${r.url()}`),
   );
 
+  await denyAnalyticsConsent(page);
+  await mockThirdPartyFonts(page);
   await mockLiveHunt(page, restBoundary);
   await page.goto(`/pheno-hunts/${HUNT_ID}/compare`, { waitUntil: "domcontentloaded" });
 
@@ -164,4 +209,61 @@ test("live route /pheno-hunts/:id/compare renders a real hunt's candidates (mock
   expect(restBoundary.unexpected, "unexpected Supabase REST reads must be blocked").toEqual([]);
   expect(restBoundary.mutations, "live comparison must not mutate Supabase REST").toEqual([]);
   expect(forbidden, "live route must not call AI/Action Queue/device hosts").toEqual([]);
+});
+
+test("read-only RPC exceptions admit POST only — other methods hit the mutation fence", async ({
+  page,
+}) => {
+  // Regression pin (Copilot, #1152): the browser flow only ever issues POSTs
+  // to these RPC paths, so without this probe the method guards could be
+  // removed again and no test would notice. Each path must fulfil its one
+  // sanctioned POST read and hand every other method to the mutation fence.
+  const restBoundary: RestBoundaryCapture = { unexpected: [], mutations: [] };
+  await denyAnalyticsConsent(page);
+  await mockThirdPartyFonts(page);
+  await mockLiveHunt(page, restBoundary);
+  // Any same-origin document serves as the fetch context; the fixture route
+  // makes no Supabase REST calls of its own.
+  await page.goto("/pheno-comparison", { waitUntil: "domcontentloaded" });
+
+  const RPC_PATHS = [
+    "/rest/v1/rpc/get_latest_tent_sensor_snapshot",
+    "/rest/v1/rpc/pheno_candidate_diary_entries_top_n",
+  ];
+  const NON_POST_METHODS = ["PUT", "PATCH", "DELETE"];
+
+  for (const path of RPC_PATHS) {
+    const ok = await page.evaluate(async (p) => {
+      const res = await fetch(p, { method: "POST", body: "{}" });
+      return res.ok;
+    }, path);
+    expect(ok, `${path} must fulfil its sanctioned POST read`).toBe(true);
+  }
+
+  for (const path of RPC_PATHS) {
+    for (const method of NON_POST_METHODS) {
+      const blocked = await page.evaluate(
+        async ({ p, m }) => {
+          try {
+            await fetch(p, { method: m, body: "{}" });
+            return false;
+          } catch {
+            return true;
+          }
+        },
+        { p: path, m: method },
+      );
+      expect(blocked, `${method} ${path} must be blocked at the boundary`).toBe(true);
+    }
+  }
+
+  for (const path of RPC_PATHS) {
+    for (const method of NON_POST_METHODS) {
+      expect(
+        restBoundary.mutations.some((l) => l.startsWith(`${method} `) && l.includes(path)),
+        `${method} ${path} must be recorded in capture.mutations`,
+      ).toBe(true);
+    }
+  }
+  expect(restBoundary.mutations).toHaveLength(RPC_PATHS.length * NON_POST_METHODS.length);
 });

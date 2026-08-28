@@ -13,6 +13,19 @@ import type { UsePhenoKeepersState } from "@/hooks/usePhenoKeepers";
 import { SELF_DONOR_VALUE } from "@/lib/phenoCrossFormViewModel";
 
 const hookMock = vi.fn<() => UsePhenoKeepersState>();
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: {
+      effectivePlanId: "pro_monthly",
+      isActive: true,
+      source: "subscription",
+      hadProAccess: true,
+    },
+    refetch: () => {},
+  }),
+}));
+
 vi.mock("@/hooks/usePhenoKeepers", () => ({
   usePhenoKeepers: () => hookMock(),
 }));
@@ -183,13 +196,25 @@ describe("PhenoKeepersPage — B4 reproduction UI", () => {
     expect(screen.queryByTestId("keeper-reverse-k1")).toBeNull(); // append-only: no re-reverse
   });
 
-  it("the reverse action calls the service (markReversed), not a direct write", () => {
+  it("the reverse action arms, then calls the service (markReversed) on explicit confirm", () => {
     const { markReversed } = renderAt({ keepers: [keeper("k1", "Gas")] });
     fireEvent.change(screen.getByTestId("keeper-reverse-method-k1"), {
       target: { value: "colloidal_silver" },
     });
+    // One-way append-only record: the first click only ARMS the action —
+    // nothing is written until the explicit confirm.
     fireEvent.click(screen.getByTestId("keeper-reverse-k1"));
+    expect(markReversed).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("keeper-reverse-confirm-k1"));
     expect(markReversed).toHaveBeenCalledWith("k1", "colloidal_silver");
+  });
+
+  it("cancel disarms the reversal confirm without writing", () => {
+    const { markReversed } = renderAt({ keepers: [keeper("k1", "Gas")] });
+    fireEvent.click(screen.getByTestId("keeper-reverse-k1"));
+    fireEvent.click(screen.getByTestId("keeper-reverse-cancel-k1"));
+    expect(markReversed).not.toHaveBeenCalled();
+    expect(screen.getByTestId("keeper-reverse-k1")).toBeInTheDocument();
   });
 
   it("a reversed keeper can self (S1) with a single keeper", () => {
@@ -475,9 +500,34 @@ describe("PhenoKeepersPage — stability ledger wiring", () => {
       ],
       saveStabilityRuns,
     });
+    // Removing the BASELINE re-anchors every hold/drift verdict, so the
+    // first tap only ARMS the removal; the explicit confirm executes it.
     fireEvent.click(screen.getByTestId("pheno-stability-run-remove-k1-0"));
+    expect(saveStabilityRuns).not.toHaveBeenCalled();
+    expect(screen.getByTestId("pheno-stability-baseline-confirm-k1")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("pheno-stability-baseline-confirm-remove-k1"));
     expect(saveStabilityRuns).toHaveBeenCalledWith("k1", [
       { runLabel: "Run 2", observedAt: null, traits: { vigor: 4 }, note: null },
+    ]);
+  });
+
+  it("removing a NON-baseline grow-out saves immediately (no confirm needed)", () => {
+    const saveStabilityRuns = vi.fn().mockResolvedValue(true);
+    renderAt({
+      keepers: [
+        {
+          ...keeper("k1", "Gas"),
+          stabilityRuns: [
+            { runLabel: "Run 1", observedAt: null, traits: { vigor: 4 }, note: null },
+            { runLabel: "Run 2", observedAt: null, traits: { vigor: 4 }, note: null },
+          ],
+        },
+      ],
+      saveStabilityRuns,
+    });
+    fireEvent.click(screen.getByTestId("pheno-stability-run-remove-k1-1"));
+    expect(saveStabilityRuns).toHaveBeenCalledWith("k1", [
+      { runLabel: "Run 1", observedAt: null, traits: { vigor: 4 }, note: null },
     ]);
   });
 });

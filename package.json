@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "dev:lan": "vite --host 0.0.0.0",
-    "prebuild": "node scripts/assert-paddle-production-sandbox.mjs && node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs && node scripts/stamp-version.mjs && node scripts/verify-publish-provenance.mjs",
+    "prebuild": "node scripts/restore-env-production-from-head.mjs && node scripts/assert-paddle-production-sandbox.mjs && node scripts/verify-edge-shared-in-sync.mjs && node scripts/check-no-src-lib-imports.mjs && node scripts/stamp-version.mjs && node scripts/verify-publish-provenance.mjs",
     "stamp-version": "node scripts/stamp-version.mjs",
     "publish:verify": "node scripts/verify-publish-provenance.mjs",
     "build": "vite build",

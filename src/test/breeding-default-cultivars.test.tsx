@@ -62,8 +62,18 @@ describe("BreedingProgramNew · default cultivars", () => {
       expect(maternal.value).toBe(cv.cultivarName);
       expect(pair.value).toBe(cv.lineage);
       expect(notes.value).toContain(`Cultivar: ${cv.cultivarName}`);
-      expect(notes.value).toContain(`Lineage: ${cv.lineage}`);
-      expect(notes.value).toContain(`CBD:THC ratio: ${cv.cbdThcRatio}`);
+      // Blank descriptive fields are OMITTED from the notes — "Lineage: "
+      // boilerplate with no value must never be persisted into user data.
+      if (cv.lineage.trim() !== "") {
+        expect(notes.value).toContain(`Lineage: ${cv.lineage}`);
+      } else {
+        expect(notes.value).not.toContain("Lineage:");
+      }
+      if (cv.cbdThcRatio.trim() !== "") {
+        expect(notes.value).toContain(`CBD:THC ratio: ${cv.cbdThcRatio}`);
+      } else {
+        expect(notes.value).not.toContain("CBD:THC ratio:");
+      }
     },
   );
 });

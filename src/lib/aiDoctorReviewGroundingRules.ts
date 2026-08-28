@@ -1,0 +1,1067 @@
+/**
+ * aiDoctorReviewGroundingRules — narrow, pure semantic fence for a structurally
+ * valid AI Doctor review and its already-validated request packet.
+ *
+ * This is deliberately a reject-only backstop. It does not rewrite model text,
+ * manufacture missing evidence, promote sensor provenance, or make a diagnosis.
+ * It catches only direct, deterministic safety failures that the structural
+ * result contract cannot relate to the packet that prompted the review.
+ */
+
+import type { AiDoctorReviewRequestPacket } from "./aiDoctorReviewRequestPacket";
+import type { AiDoctorReviewResult } from "./aiDoctorReviewResultContract";
+
+export type AiDoctorReviewGroundingFailureReason =
+  | "high_confidence_without_affirmative_evidence"
+  | "missing_information_required"
+  | "absolute_certainty"
+  | "claim_not_supported_by_packet"
+  | "healthy_environment_without_trustworthy_snapshot"
+  | "automation_or_device_language";
+
+export type AiDoctorReviewGroundingValidation =
+  { ok: true } | { ok: false; reason: AiDoctorReviewGroundingFailureReason };
+
+const ABSOLUTE_CERTAINTY_RE =
+  /\b(?:definitely|absolutely|undeniably|unquestionably|certainly|guaranteed?|proven|conclusive(?:ly)?|obviously)\b|\b(?:no|without)\s+(?:any\s+)?doubt\b|\bwithout\s+question\b|\bno\s+other\s+explanation\b|\b100\s?%\s+(?:certain|sure|confident|positive)\b/i;
+
+const ABSOLUTE_CERTAINTY_UNNEGATABLE_RE =
+  /^(?:no|without)\s+(?:any\s+)?doubt\b|^without\s+question\b|^no\s+other\s+explanation\b|^100\s?%\s+(?:certain|sure|confident|positive)\b/i;
+
+// This is deliberately a directive prefix, not a broad "not"/"without"
+// exemption. A limitation such as "the environment is stable without a
+// snapshot" must still be rejected rather than accidentally treated as safe.
+const CAUTIOUS_DIRECTIVE_PREFIX_RE =
+  /^\s*(?:(?:caution|note)\s*:\s*)?(?:do\s+not|do\s*n['’]t|don['’]t|never|avoid|should\s*not|shouldn['’]t|must\s*not|mustn['’]t|refrain\s+from)\b/i;
+
+const DIRECT_NEGATIVE_CONTROL_SCOPE_PREFIX_RE =
+  /^\s*(?:(?:caution|note)\s*:\s*)?(?:do\s+not|do\s*n['’]t|don['’]t|never|avoid|should\s*not|shouldn['’]t|must\s*not|mustn['’]t|refrain\s+from)\s*(?:(?:[a-z]+ly|ever|again|just|only)\s+)*$/i;
+
+const AUTOMATION_RE =
+  /\b(?:automatic(?:ally)?|autonomously|auto[-\s]?(?:pilot|adjust|control|operate|dose|water|irrigate|execute|approve|apply|run)|self[-\s]?(?:adjust|control|operate|dose|water|irrigate))\b/i;
+
+const DEVICE_NOUN_RE =
+  /\b(?:fan|fans|light|lights|pump|pumps|heater|heaters|humidifier|humidifiers|dehumidifier|dehumidifiers|valve|valves|relay|actuator|outlet|socket|controller|controllers|hvac|exhaust|intake|dosing|injector|irrigation|sprinkler|device|devices|equipment)\b/i;
+
+const CONTROL_ACTION_RE =
+  /\b(?:turn(?:ing)?|switch(?:ing)?|enable(?:d|ing)?|disable(?:d|ing)?|activate(?:d|ing)?|deactivate(?:d|ing)?|toggle(?:d|ing)?|trigger(?:ed|ing)?|power(?:ed|ing)?|adjust(?:ed|ing)?|control(?:led|ling)?|operate(?:d|ing)?|dose(?:d|ing)?|water(?:ed|ing)?|irrigat(?:e|ed|ing|ion)|execute(?:d|ing)?|dispatch(?:ed|ing)?|set|start(?:ed|ing)?|stop(?:ped|ping)?|run(?:ning)?|open(?:ed|ing)?|close(?:d|ing)?|increase(?:d|ing)?|decrease(?:d|ing)?|raise(?:d|ing)?|lower(?:ed|ing)?)\b/i;
+
+const ENVIRONMENT_NOUN_RE =
+  /\b(?:environment(?:al)?|room|tent|conditions?|temperature|temp|humidity|rh|vpd|co2|air)\b/i;
+
+const STABLE_OR_HEALTHY_RE =
+  /\b(?:stable|healthy|optimal|ideal|balanced|normal|(?:in|within)\s+(?:a\s+)?(?:healthy\s+)?range)\b/i;
+
+const NON_AFFIRMATIVE_EVIDENCE_RE =
+  /^\s*(?:(?:there\s+(?:is|are)\s+)?(?:no|none|missing|unavailable|unknown|stale|invalid|demo|insufficient)\b)|\b(?:cannot|can['’]t)\s+(?:confirm|determine|verify|support)\b/i;
+
+type MetricKey =
+  "temperature" | "humidity" | "vpd" | "ph" | "ec" | "ppm" | "moisture" | "co2" | "ppfd";
+
+const ENVIRONMENT_METRICS = ["temperature", "humidity", "vpd", "co2"] as const;
+
+type EnvironmentMetric = (typeof ENVIRONMENT_METRICS)[number];
+
+const METRIC_ALIASES: Readonly<Record<MetricKey, readonly string[]>> = Object.freeze({
+  temperature: ["temperature", "temp"],
+  humidity: ["humidity", "rh"],
+  vpd: ["vpd"],
+  ph: ["ph"],
+  ec: ["ec"],
+  ppm: ["ppm"],
+  moisture: ["moisture"],
+  co2: ["co2"],
+  ppfd: ["ppfd"],
+});
+
+const NUMBER_RE = /-?\d+(?:\.\d+)?/;
+
+const NUMERIC_RANGE_RE = /\b\d+(?:\.\d+)?\s*(?:[-–—]\s*|(?:to|through)\s+)\d+(?:\.\d+)?\b/i;
+
+type CanonicalMetricUnit =
+  "temperature_c" | "percent" | "kpa" | "ph" | "ec_ms_per_cm" | "ppm" | "ppfd";
+
+interface CanonicalMetricValue {
+  value: number;
+  unit: CanonicalMetricUnit;
+}
+
+type RootZoneNumericField =
+  "inputPh" | "inputEcMsCm" | "outputEcMsCm" | "runoffPh" | "runoffEcMsCm" | "waterTempC";
+
+const ROOT_ZONE_NUMERIC_FIELDS: readonly RootZoneNumericField[] = [
+  "inputPh",
+  "inputEcMsCm",
+  "outputEcMsCm",
+  "runoffPh",
+  "runoffEcMsCm",
+  "waterTempC",
+];
+
+type HistoricalAggregate = "min" | "max" | "avg";
+
+const ASSERTION_CONNECTOR_SOURCE =
+  "(?:is|are|was|were|reads?|reading|measured(?:\\s+at)?|shows?|showed|remains\\s+at|sits\\s+at|averages?|at|of|:|=)";
+
+const APPROXIMATE_VALUE_PREFIX_SOURCE = "(?:(?:about|approximately|around|roughly)\\s+)?";
+
+const ROOT_ZONE_CONTEXT_RE = /\b(?:root[-\s]?zone|input|output|runoff)\b/i;
+
+const HISTORICAL_EVIDENCE_LABEL_RE = /\b(?:historical|csv)\b/i;
+
+const CURRENT_LIVE_LATEST_CLAIM_RE = /\b(?:current|live|latest)\b/i;
+
+const MAX_ROUNDING_TOLERANCE: Readonly<Record<CanonicalMetricUnit, number>> = Object.freeze({
+  temperature_c: 0.5,
+  percent: 0.5,
+  kpa: 0.05,
+  ph: 0.05,
+  ec_ms_per_cm: 0.05,
+  ppm: 5,
+  ppfd: 5,
+});
+
+const METRIC_CLAIM_UNIT_SOURCES: Readonly<Record<MetricKey, string | null>> = Object.freeze({
+  // A slash after a temperature token (for example, "C/F") is ambiguous;
+  // reject it instead of accepting the leading C or F fragment.
+  temperature: "(?:°?\\s*[CF]\\b(?!\\s*\\/)|celsius\\b(?!\\s*\\/)|fahrenheit\\b(?!\\s*\\/))",
+  humidity: "(?:%|percent(?:age)?)",
+  vpd: "(?:kpa)",
+  // pH is conventionally unitless; the metric name itself supplies its unit.
+  ph: null,
+  // A slash after a complete conductivity unit (for example, "mS/cm/uS")
+  // makes the claim ambiguous; never accept only its valid leading fragment.
+  ec: "(?:(?:m|[uµμ])\\s*s\\s*(?:\\/|per)\\s*cm|(?:milli|micro)\\s*siemens\\s*(?:\\/|per)\\s*cm)(?!\\s*\\/)",
+  ppm: "(?:ppm)",
+  moisture: "(?:%|percent(?:age)?)",
+  co2: "(?:ppm)",
+  ppfd: "(?:[uµμ]\\s*mol\\s*(?:\\/|per)\\s*m(?:2|²)\\s*(?:\\/|per)\\s*s|[uµμ]mol\\s*m-2\\s*s-1)",
+});
+
+const LOGGED_EVENT_CLAIMS: readonly {
+  category: AiDoctorReviewRequestPacket["recentEvents"][number]["category"];
+  pattern: RegExp;
+}[] = [
+  {
+    category: "watering",
+    pattern:
+      /\b(?:watered|irrigated)\b|\b(?:recent|last)\s+(?:watering|irrigation)\b|\b(?:watering|irrigation)\s+(?:event|log(?:ged)?|record|entry)\b/i,
+  },
+  {
+    category: "feeding",
+    pattern:
+      /\b(?:fed|fertili[sz]ed)\b|\b(?:recent|last)\s+(?:feeding|feed|fertili[sz](?:er|ing))\b|\b(?:feeding|feed|fertili[sz](?:er|ing))\s+(?:event|log(?:ged)?|record|entry)\b/i,
+  },
+  {
+    category: "photos",
+    pattern:
+      /\b(?:recent|attached|provided)\s+photos?\b|\bphotos?\s+(?:show|shows|indicate|indicates|reveal|reveals)\b/i,
+  },
+];
+
+const DIRECT_SNAPSHOT_CLAIM_RE =
+  /\b(?:recent|latest|current)\s+(?:sensor\s+)?snapshot\b|\b(?:sensor\s+)?snapshot\s+(?:shows?|reads?|indicates?)\b/i;
+
+const SOURCE_LABELED_SNAPSHOT_CLAIM_RE = /\bsource[-\s]labeled\s+(?:sensor\s+)?snapshot\b/i;
+
+const CONTEXT_ABSENCE_SUBJECT_SOURCE =
+  "(?:(?:(?:source[-\\s]?labeled|current|recent|latest)\\s+){0,2}(?:sensor\\s+)?snapshot|(?:recent|last)\\s+(?:watering|irrigation|feeding|feed|fertili[sz](?:er|ing)?|photos?)(?:\\s+(?:event|log(?:ged)?|record|entry))?|(?:watering|irrigation|feeding|feed|fertili[sz](?:er|ing)?)(?:\\s+(?:event|log(?:ged)?|record|entry))|(?:recent|attached|provided)\\s+photos?)";
+
+const LEADING_CONTEXT_ABSENCE_RE = new RegExp(
+  `^\\s*(?:there\\s+(?:is|are)\\s+)?(?:no|none)\\s+${CONTEXT_ABSENCE_SUBJECT_SOURCE}\\b(?:\\s+(?:(?:is|are|was|were|remains)\\s+(?:currently\\s+)?(?:available|present|recorded|provided|included)|(?:has|have)\\s+been\\s+(?:recorded|provided|included)|exists?))?\\s*[.!?]*\\s*$`,
+  "i",
+);
+
+const SUBJECT_CONTEXT_ABSENCE_RE = new RegExp(
+  `^\\s*(?:(?:a|an|the)\\s+)?${CONTEXT_ABSENCE_SUBJECT_SOURCE}\\b\\s+(?:is|are|was|were|remains)\\s+(?:missing|unavailable|unknown|insufficient|stale|invalid|not\\s+(?:available|present|recorded|provided|included))\\s*[.!?]*\\s*$`,
+  "i",
+);
+
+const LEADING_CONTEXT_UNCERTAINTY_RE = new RegExp(
+  `^\\s*(?:cannot|can['’]t|unable\\s+to)\\s+(?:confirm|determine|verify|support|establish|find|locate)\\b[^.!?;]{0,120}\\b${CONTEXT_ABSENCE_SUBJECT_SOURCE}\\b\\s*[.!?]*\\s*$`,
+  "i",
+);
+
+const PASSIVE_WATERING_UNCERTAINTY_RE =
+  /^\s*(?:cannot|can['’]t|unable\s+to)\s+confirm\s+when\s+(?:the\s+)?plant\s+was\s+last\s+(?:watered|irrigated)\b\s*(?:(?:is|remains)\s+)?(?:unknown|unavailable|not\s+(?:known|available|recorded))?\s*$/i;
+
+function outputTexts(result: AiDoctorReviewResult): readonly string[] {
+  return [
+    result.summary,
+    result.likely_issue,
+    ...result.evidence,
+    ...result.missing_information,
+    ...result.possible_causes,
+    result.immediate_action,
+    result.what_not_to_do,
+    result.twenty_four_hour_follow_up,
+    result.three_day_recovery_plan,
+    ...(result.action_queue_suggestion
+      ? [result.action_queue_suggestion.title, result.action_queue_suggestion.rationale]
+      : []),
+  ];
+}
+
+/** User-visible fields normally used to make affirmative context assertions. */
+function contextClaimTexts(result: AiDoctorReviewResult): readonly string[] {
+  return [
+    result.summary,
+    result.likely_issue,
+    ...result.evidence,
+    ...result.possible_causes,
+    result.immediate_action,
+    result.what_not_to_do,
+    result.twenty_four_hour_follow_up,
+    result.three_day_recovery_plan,
+    ...(result.action_queue_suggestion
+      ? [result.action_queue_suggestion.title, result.action_queue_suggestion.rationale]
+      : []),
+  ];
+}
+
+/**
+ * Missing-information text is still untrusted model output: it can fabricate
+ * a measurement, certainty, event, or snapshot claim. The event/snapshot
+ * detector separately recognizes explicit absence wording such as "a snapshot
+ * is missing" as a legitimate uncertainty disclosure.
+ */
+function directClaimTexts(result: AiDoctorReviewResult): readonly string[] {
+  return [...contextClaimTexts(result), ...result.missing_information];
+}
+
+function splitSafetyClauses(text: string): readonly string[] {
+  // A decimal point is part of a numeric measurement, not a clause boundary.
+  return text.split(/\.(?!\d)|[!?;\n,]+|[\u2014\u2013]|\s-\s|\b(?:but|however|instead|then)\b/i);
+}
+
+function splitNumericClaimClauses(text: string): readonly string[] {
+  // A decimal point is part of a numeric measurement, not a clause boundary.
+  // Keep only a true numeric range intact so its trailing time unit can
+  // prevent a follow-up interval from being interpreted as telemetry.
+  return text.split(
+    /\.(?!\d)|[!?;\n,]+|(?<!\d)(?<!\d\s)[\u2014\u2013]|[\u2014\u2013](?!\s*\d)|(?<!\d)(?<!\d\s)\s-\s|\s-\s(?!\d)|\b(?:but|however|instead|then)\b/i,
+  );
+}
+
+function isCautiousDirective(clause: string): boolean {
+  if (!CAUTIOUS_DIRECTIVE_PREFIX_RE.test(clause)) return false;
+  if (!DEVICE_NOUN_RE.test(clause)) return true;
+
+  const controlAction = new RegExp(CONTROL_ACTION_RE.source, "i").exec(clause);
+  if (!controlAction) return true;
+
+  // A leading prohibition is safe only when it directly scopes the first
+  // device-control verb. This rejects double negatives and wrappers such as
+  // "Don't avoid turning on the fan" and "Do not wait to turn on the fan."
+  return DIRECT_NEGATIVE_CONTROL_SCOPE_PREFIX_RE.test(clause.slice(0, controlAction.index ?? 0));
+}
+
+function splitCautiousDirectiveClauses(clause: string): readonly string[] {
+  // Keep ordinary factual clauses intact for metric/context matching. Split
+  // coordinated subclauses only when a leading prohibition would otherwise
+  // exempt everything after it (for example, "Do not wait: turn on the fan").
+  return isCautiousDirective(clause)
+    ? clause.split(/[:]|\b(?:and|but|however|instead|then)\b/i)
+    : [clause];
+}
+
+function isNonAffirmativeStabilityClause(clause: string): boolean {
+  return (
+    /\b(?:cannot|can['’]t|unable\s+to)\s+(?:confirm|determine|verify|establish|call|say|know)\b[^.!?;]{0,120}\b(?:stable|healthy|optimal|ideal|balanced|normal)\b/i.test(
+      clause,
+    ) ||
+    /\b(?:stable|healthy|optimal|ideal|balanced|normal)\b[^.!?;]{0,120}\b(?:cannot|can['’]t|unable\s+to)\s+(?:be\s+)?(?:confirmed|determined|verified|established|called|said|known)\b/i.test(
+      clause,
+    ) ||
+    /\b(?:stable|healthy|optimal|ideal|balanced|normal)\b\s+(?:is\s+)?(?:unknown|uncertain|unconfirmed|unverified)\b/i.test(
+      clause,
+    )
+  );
+}
+
+function isNonAffirmativeContextDisclosure(clause: string): boolean {
+  // Only complete, subject-bound absence/uncertainty phrases are exempt. A
+  // prefix such as "No watering event exists because ..." can otherwise hide
+  // an affirmative claim later in the same untrusted field.
+  return (
+    LEADING_CONTEXT_ABSENCE_RE.test(clause) ||
+    SUBJECT_CONTEXT_ABSENCE_RE.test(clause) ||
+    LEADING_CONTEXT_UNCERTAINTY_RE.test(clause) ||
+    PASSIVE_WATERING_UNCERTAINTY_RE.test(clause)
+  );
+}
+
+function hasTrustworthyAnnotatedSnapshot(packet: AiDoctorReviewRequestPacket): boolean {
+  const annotation = packet.recentSensorSnapshotAnnotation;
+  return Boolean(
+    packet.recentSensorSnapshot &&
+    packet.recentSensorSnapshot.severity !== "invalid" &&
+    annotation &&
+    annotation.includesValues &&
+    !annotation.stale &&
+    (annotation.source === "live" || annotation.source === "manual") &&
+    (annotation.trust === "medium" || annotation.trust === "high"),
+  );
+}
+
+function packetNeedsMissingInformation(packet: AiDoctorReviewRequestPacket): boolean {
+  const annotation = packet.recentSensorSnapshotAnnotation;
+  return (
+    packet.readiness.state !== "strong" ||
+    packet.readiness.missing.length > 0 ||
+    packet.missingLiveSensorReadings === true ||
+    Boolean(
+      annotation &&
+      (!annotation.includesValues ||
+        annotation.stale ||
+        annotation.trust === "low" ||
+        (annotation.source !== "live" && annotation.source !== "manual")),
+    )
+  );
+}
+
+function hasDoubleNegativeStabilityAssertion(clause: string): boolean {
+  return /\bnot\s+(?:unknown|uncertain|unconfirmed|unverified)\b[^.!?;]{0,120}\b(?:is\s+)?(?:stable|healthy|optimal|ideal|balanced|normal)\b/i.test(
+    clause,
+  );
+}
+
+const MISSING_INFORMATION_DENIAL_RE =
+  /^\s*(?:none|n\/?a|nothing|no\s+(?:missing(?:\s+information)?|additional\s+(?:information|context)|unknowns?))\s*[.!]*\s*$/i;
+
+const MISSING_CONTEXT_SIGNAL_SOURCE =
+  "(?:no|none|missing|unavailable|unknown|stale|invalid|insufficient|absent|lack(?:ing)?|need(?:s|ed)?|requir(?:e|es|ed)|cannot|can['’]t|unable|without|not\\s+(?:available|present|known|recorded|provided|included))";
+
+const MISSING_CONTEXT_SIGNAL_RE = new RegExp(`\\b${MISSING_CONTEXT_SIGNAL_SOURCE}\\b`, "i");
+
+const MISSING_CONTEXT_ABSENCE_STATE_SOURCE =
+  "(?:missing|unavailable|unknown|stale|invalid|insufficient|absent|lacking|needed|required|not\\s+(?:available|present|known|recorded|provided|included))";
+
+const MISSING_CONTEXT_SUBJECT_PREFIX_SOURCE =
+  "(?:(?:a|an|the|source[-\\s]?labeled|current|recent|latest|fresh|live|manual|trusted|usable|additional|plant|tent|root[-\\s]?zone|input|output|runoff|temperature|humidity|vpd|co2|ec|ph|ppm|ppfd|moisture|warnings?|invalid|or)\\s+){0,8}";
+
+const MISSING_CONTEXT_SUBJECT_TAIL_SOURCE =
+  "(?:\\s+(?:sensor|snapshot|telemetry|data|readings?|information|context|history|evidence|records?|events?|logs?|inspection|input|output|runoff)){0,3}";
+
+const MISSING_CONTEXT_CONJUNCTION_RE =
+  /\b(?:although|because|while|but|however|despite|as|and|or|then)\b/i;
+
+const MISSING_CONTEXT_TOPIC_MATCHERS: readonly (readonly [string, RegExp])[] = [
+  ["sensor_snapshot", /\b(?:sensor|snapshot|telemetry)\b/i],
+  ["live_current", /\b(?:live|current|fresh|source[-\s]?labeled)\b/i],
+  ["photo", /\b(?:photo|image)\b/i],
+  ["watering", /\b(?:water(?:ing|ed)?|irrigat(?:e|ed|ion))\b/i],
+  ["feeding", /\b(?:feed(?:ing)?|fertili[sz](?:e|ed|er|ing))\b/i],
+  ["root_zone", /\b(?:root[-\s]?zone|runoff|input|output|ec|ph)\b/i],
+  ["plant_profile", /\b(?:strain|stage|medium|pot(?:\s+size)?)\b/i],
+  ["timeline", /\b(?:timeline|diary|log(?:ged)?|event|history)\b/i],
+  ["environment", /\b(?:environment|temperature|humidity|vpd|co2|conditions?)\b/i],
+  ["context", /\b(?:evidence|observation|context|inspection)\b/i],
+];
+
+const MISSING_CONTEXT_TOKEN_STOP_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "available",
+  "be",
+  "for",
+  "from",
+  "has",
+  "have",
+  "information",
+  "is",
+  "it",
+  "missing",
+  "need",
+  "needed",
+  "not",
+  "of",
+  "or",
+  "required",
+  "the",
+  "to",
+  "unknown",
+  "unavailable",
+]);
+
+function missingContextTopics(text: string): readonly string[] {
+  return MISSING_CONTEXT_TOPIC_MATCHERS.filter(([, matcher]) => matcher.test(text)).map(
+    ([topic]) => topic,
+  );
+}
+
+function distinctiveMissingContextTokens(text: string): readonly string[] {
+  return normalizedMetricField(text)
+    .split(" ")
+    .filter((token) => token.length >= 4 && !MISSING_CONTEXT_TOKEN_STOP_WORDS.has(token));
+}
+
+function packetMissingContextRequirements(packet: AiDoctorReviewRequestPacket): readonly string[] {
+  const annotation = packet.recentSensorSnapshotAnnotation;
+  const requirements = [
+    ...packet.readiness.missing,
+    ...(annotation?.missingInformationHints ?? []),
+  ];
+  if (packet.missingLiveSensorReadings === true) {
+    requirements.push("A fresh live sensor snapshot is needed.");
+  }
+  if (
+    annotation &&
+    (!annotation.includesValues ||
+      annotation.stale ||
+      annotation.trust === "low" ||
+      (annotation.source !== "live" && annotation.source !== "manual")) &&
+    annotation.missingInformationHints.length === 0
+  ) {
+    requirements.push("A source-labeled current sensor snapshot is needed.");
+  }
+  if (packet.readiness.state !== "strong" && requirements.length === 0) {
+    requirements.push("Additional context or inspection is needed.");
+  }
+  return requirements;
+}
+
+function isSubstantiveMissingInformationDisclosure(text: string): boolean {
+  if (MISSING_INFORMATION_DENIAL_RE.test(text)) return false;
+  return missingContextTopics(text).length > 0 || distinctiveMissingContextTokens(text).length > 0;
+}
+
+function hasSubjectBoundMissingSignal(disclosure: string, topics: readonly string[]): boolean {
+  return splitSafetyClauses(disclosure).some((clause) =>
+    topics.some((topic) => {
+      const topicMatcher = MISSING_CONTEXT_TOPIC_MATCHERS.find(
+        ([candidateTopic]) => candidateTopic === topic,
+      )?.[1];
+      if (!topicMatcher) return false;
+
+      // Weak-context output is only a disclosure when the missing predicate is
+      // bound to the requested subject. A topic anywhere beside an unrelated
+      // "context is missing" phrase could otherwise launder a positive claim.
+      const topicIsMissing = new RegExp(
+        `^\\s*${MISSING_CONTEXT_SUBJECT_PREFIX_SOURCE}${topicMatcher.source}${MISSING_CONTEXT_SUBJECT_TAIL_SOURCE}\\s+(?:(?:is|are|was|were|remains|remain)\\s+)?${MISSING_CONTEXT_ABSENCE_STATE_SOURCE}\\s*[.!?]*\\s*$`,
+        "i",
+      );
+      const noTopicIsAvailable = new RegExp(
+        `^\\s*(?:there\\s+(?:is|are)\\s+)?(?:no|none)\\s+${MISSING_CONTEXT_SUBJECT_PREFIX_SOURCE}${topicMatcher.source}${MISSING_CONTEXT_SUBJECT_TAIL_SOURCE}(?:\\s+(?:(?:(?:is|are|was|were|remains)\\s+)?(?:currently\\s+)?(?:available|present|recorded|provided|included)|(?:has|have)\\s+been\\s+(?:recorded|provided|included)|exists?|(?:in|for|within|since|during|over|on)\\b[^.!?;,:]{0,48}))?\\s*[.!?]*\\s*$`,
+        "i",
+      );
+      const leadingMissingSubject = new RegExp(
+        `^\\s*(?:missing|unavailable|unknown|stale|invalid|insufficient|absent|need(?:s|ed)?|requir(?:e|es|ed))\\s+${MISSING_CONTEXT_SUBJECT_PREFIX_SOURCE}${topicMatcher.source}${MISSING_CONTEXT_SUBJECT_TAIL_SOURCE}\\s*[.!?]*\\s*$`,
+        "i",
+      );
+      const cannotConfirmSubject = new RegExp(
+        `^\\s*(?:cannot|can['’]t|unable\\s+to)\\s+(?:confirm|determine|verify|support|establish|find|locate|assess)\\b[^.!?;,:]{0,120}${topicMatcher.source}${MISSING_CONTEXT_SUBJECT_TAIL_SOURCE}\\s*[.!?]*\\s*$`,
+        "i",
+      );
+
+      return (
+        topicIsMissing.test(clause) ||
+        noTopicIsAvailable.test(clause) ||
+        leadingMissingSubject.test(clause) ||
+        (!MISSING_CONTEXT_CONJUNCTION_RE.test(clause) && cannotConfirmSubject.test(clause))
+      );
+    }),
+  );
+}
+
+function missingInformationDisclosureCoversRequirement(
+  disclosure: string,
+  requirement: string,
+): boolean {
+  const requirementTopics = missingContextTopics(requirement);
+  const disclosureTopics = missingContextTopics(disclosure);
+  // Recency/provenance words alone are not a missing-data subject. A "fresh
+  // pot-size" line must not satisfy a missing fresh sensor-snapshot signal.
+  const subjectTopics = requirementTopics.filter(
+    (topic) => topic !== "live_current" && topic !== "context",
+  );
+  if (subjectTopics.length > 0) {
+    const matchingTopics = subjectTopics.filter((topic) => disclosureTopics.includes(topic));
+    return matchingTopics.length > 0 && hasSubjectBoundMissingSignal(disclosure, matchingTopics);
+  }
+  if (requirementTopics.length > 0) {
+    const matchingTopics = requirementTopics.filter((topic) => disclosureTopics.includes(topic));
+    return matchingTopics.length > 0 && hasSubjectBoundMissingSignal(disclosure, matchingTopics);
+  }
+  const disclosureTokens = new Set(distinctiveMissingContextTokens(disclosure));
+  return (
+    MISSING_CONTEXT_SIGNAL_RE.test(disclosure) &&
+    distinctiveMissingContextTokens(requirement).some((token) => disclosureTokens.has(token))
+  );
+}
+
+function resultDisclosesPacketMissingInformation(
+  result: AiDoctorReviewResult,
+  packet: AiDoctorReviewRequestPacket,
+): boolean {
+  const disclosures = result.missing_information.filter(isSubstantiveMissingInformationDisclosure);
+  if (disclosures.length === 0) return false;
+  const requirements = packetMissingContextRequirements(packet);
+  return requirements.every((requirement) =>
+    disclosures.some((disclosure) =>
+      missingInformationDisclosureCoversRequirement(disclosure, requirement),
+    ),
+  );
+}
+
+function hasTrustworthyRootZoneEvidence(packet: AiDoctorReviewRequestPacket): boolean {
+  return (packet.recentRootZoneObservations ?? []).some(
+    (observation) =>
+      (observation.source === "manual" || observation.source === "csv") &&
+      ROOT_ZONE_NUMERIC_FIELDS.some(
+        (field) => observation[field] !== null && !observation.invalidFields?.includes(field),
+      ),
+  );
+}
+
+function packetHasAffirmativeEvidence(packet: AiDoctorReviewRequestPacket): boolean {
+  return (
+    packet.readiness.evidence.some((item) => !NON_AFFIRMATIVE_EVIDENCE_RE.test(item)) ||
+    packet.recentEvents.length > 0 ||
+    hasTrustworthyRootZoneEvidence(packet) ||
+    hasTrustworthyAnnotatedSnapshot(packet)
+  );
+}
+
+function resultHasAffirmativeEvidence(result: AiDoctorReviewResult): boolean {
+  return result.evidence.some((item) => !NON_AFFIRMATIVE_EVIDENCE_RE.test(item));
+}
+
+function hasUnsafeAutomationOrDeviceLanguage(result: AiDoctorReviewResult): boolean {
+  for (const text of outputTexts(result)) {
+    for (const rawClause of splitSafetyClauses(text)) {
+      for (const directiveClause of splitCautiousDirectiveClauses(rawClause)) {
+        const clause = directiveClause.trim();
+        if (!clause || isCautiousDirective(clause)) continue;
+        const hasAutomation = AUTOMATION_RE.test(clause);
+        const hasDevice = DEVICE_NOUN_RE.test(clause);
+        const hasControlAction = CONTROL_ACTION_RE.test(clause);
+        if (hasAutomation || (hasDevice && hasControlAction)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function certaintyMatchIsExplicitlyNegated(clause: string, match: RegExpMatchArray): boolean {
+  if (ABSOLUTE_CERTAINTY_UNNEGATABLE_RE.test(match[0])) return false;
+  const prefix = clause.slice(0, match.index ?? 0);
+  return (
+    /\b(?:not|no|without|never)\s*(?:yet\s*)?$/i.test(prefix) ||
+    /\b(?:cannot|can['’]t|unable\s+to)\s+(?:be\s+)?$/i.test(prefix)
+  );
+}
+
+function hasAffirmativeAbsoluteCertainty(clause: string): boolean {
+  const matcher = new RegExp(ABSOLUTE_CERTAINTY_RE.source, "gi");
+  return [...clause.matchAll(matcher)].some(
+    (match) => !certaintyMatchIsExplicitlyNegated(clause, match),
+  );
+}
+
+function hasAbsoluteCertainty(result: AiDoctorReviewResult): boolean {
+  return directClaimTexts(result).some((text) =>
+    splitSafetyClauses(text).some((rawClause) =>
+      splitCautiousDirectiveClauses(rawClause).some(
+        (clause) => !isCautiousDirective(clause) && hasAffirmativeAbsoluteCertainty(clause),
+      ),
+    ),
+  );
+}
+
+function hasTrustworthyEnvironmentSnapshot(
+  packet: AiDoctorReviewRequestPacket,
+  metric?: EnvironmentMetric,
+): boolean {
+  if (!hasTrustworthyAnnotatedSnapshot(packet) || packet.recentSensorSnapshot?.severity !== "ok") {
+    return false;
+  }
+  const metrics = metric ? [metric] : ENVIRONMENT_METRICS;
+  return metrics.some(
+    (environmentMetric) => trustworthySnapshotValuesForMetric(packet, environmentMetric).length > 0,
+  );
+}
+
+function environmentMetricsInClause(clause: string): readonly EnvironmentMetric[] {
+  return ENVIRONMENT_METRICS.filter((metric) => metricFieldMatches(metric, clause));
+}
+
+function hasUnsupportedStableOrHealthyEnvironmentClaim(
+  result: AiDoctorReviewResult,
+  packet: AiDoctorReviewRequestPacket,
+): boolean {
+  return directClaimTexts(result).some((text) => {
+    return splitSafetyClauses(text).some((rawClause) =>
+      splitCautiousDirectiveClauses(rawClause).some((clause) => {
+        if (
+          isCautiousDirective(clause) ||
+          (isNonAffirmativeStabilityClause(clause) &&
+            !hasDoubleNegativeStabilityAssertion(clause)) ||
+          !ENVIRONMENT_NOUN_RE.test(clause) ||
+          !STABLE_OR_HEALTHY_RE.test(clause)
+        ) {
+          return false;
+        }
+        const metrics = environmentMetricsInClause(clause);
+        return metrics.length === 0
+          ? !hasTrustworthyEnvironmentSnapshot(packet)
+          : metrics.some((metric) => !hasTrustworthyEnvironmentSnapshot(packet, metric));
+      }),
+    );
+  });
+}
+
+function normalizedMetricField(field: string): string {
+  return field.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+}
+
+function normalizedMetricUnit(unit: string): string {
+  return unit
+    .toLowerCase()
+    .replace(/[µμ]/g, "u")
+    .replace(/°/g, "")
+    .replace(/²/g, "2")
+    .replace(/\bper\b/g, "/")
+    .replace(/\s+/g, "");
+}
+
+/**
+ * Normalizes only known, metric-compatible units. Numeric claims without a
+ * usable unit fail closed rather than assuming Celsius, percent, or mS/cm.
+ */
+function toCanonicalMetricValue(
+  metric: MetricKey,
+  value: number,
+  rawUnit: string | undefined,
+): CanonicalMetricValue | null {
+  if (!Number.isFinite(value)) return null;
+  const unit = rawUnit === undefined ? null : normalizedMetricUnit(rawUnit);
+
+  switch (metric) {
+    case "temperature":
+      if (unit === "c" || unit === "celsius") return { value, unit: "temperature_c" };
+      if (unit === "f" || unit === "fahrenheit") {
+        return { value: ((value - 32) * 5) / 9, unit: "temperature_c" };
+      }
+      return null;
+    case "humidity":
+    case "moisture":
+      return unit === "%" || unit === "percent" || unit === "percentage"
+        ? { value, unit: "percent" }
+        : null;
+    case "vpd":
+      return unit === "kpa" ? { value, unit: "kpa" } : null;
+    case "ph":
+      return unit === null || unit === "ph" ? { value, unit: "ph" } : null;
+    case "ec":
+      if (unit === "ms/cm" || unit === "mscm" || unit === "millisiemens/cm") {
+        return { value, unit: "ec_ms_per_cm" };
+      }
+      if (unit === "us/cm" || unit === "uscm" || unit === "microsiemens/cm") {
+        return { value: value / 1000, unit: "ec_ms_per_cm" };
+      }
+      return null;
+    case "ppm":
+    case "co2":
+      return unit === "ppm" ? { value, unit: "ppm" } : null;
+    case "ppfd":
+      return unit === "umol/m2/s" || unit === "umolm-2s-1" ? { value, unit: "ppfd" } : null;
+  }
+}
+
+function metricFieldMatches(metric: MetricKey, field: string): boolean {
+  const normalized = normalizedMetricField(field);
+  return METRIC_ALIASES[metric].some((alias) => new RegExp(`\\b${alias}\\b`, "i").test(normalized));
+}
+
+function trustworthySnapshotValuesForMetric(
+  packet: AiDoctorReviewRequestPacket,
+  metric: MetricKey,
+): readonly CanonicalMetricValue[] {
+  if (!hasTrustworthyAnnotatedSnapshot(packet)) return [];
+  const readings = packet.recentSensorSnapshot?.readings ?? [];
+  return readings
+    .filter((reading) => metricFieldMatches(metric, reading.field))
+    .map((reading) => toCanonicalMetricValue(metric, reading.value, reading.unit))
+    .filter((reading): reading is CanonicalMetricValue => reading !== null);
+}
+
+function rootZoneFieldsForClaim(
+  metric: MetricKey,
+  clause: string,
+): readonly RootZoneNumericField[] {
+  switch (metric) {
+    case "ph":
+      if (/\binput\s+ph\b|\bph\s+(?:of|in)\s+(?:the\s+)?input\b/i.test(clause)) {
+        return ["inputPh"];
+      }
+      if (/\brunoff\s+ph\b|\bph\s+(?:of|in)\s+(?:the\s+)?runoff\b/i.test(clause)) {
+        return ["runoffPh"];
+      }
+      return [];
+    case "ec":
+      if (/\binput\s+ec\b|\bec\s+(?:of|in)\s+(?:the\s+)?input\b/i.test(clause)) {
+        return ["inputEcMsCm"];
+      }
+      if (/\boutput\s+ec\b|\bec\s+(?:of|in)\s+(?:the\s+)?output\b/i.test(clause)) {
+        return ["outputEcMsCm"];
+      }
+      if (/\brunoff\s+ec\b|\bec\s+(?:of|in)\s+(?:the\s+)?runoff\b/i.test(clause)) {
+        return ["runoffEcMsCm"];
+      }
+      return [];
+    case "temperature":
+      return /\b(?:water|nutrient(?:\s+solution)?|feed(?:ing)?\s+solution)\s+(?:temperature|temp)\b|\b(?:temperature|temp)\s+(?:of|in)\s+(?:the\s+)?(?:water|nutrient(?:\s+solution)?|feed(?:ing)?\s+solution)\b/i.test(
+        clause,
+      )
+        ? ["waterTempC"]
+        : [];
+    default:
+      return [];
+  }
+}
+
+function rootZoneCanonicalValue(
+  field: RootZoneNumericField,
+  value: number,
+): CanonicalMetricValue | null {
+  switch (field) {
+    case "inputPh":
+    case "runoffPh":
+      return toCanonicalMetricValue("ph", value, undefined);
+    case "inputEcMsCm":
+    case "outputEcMsCm":
+    case "runoffEcMsCm":
+      return toCanonicalMetricValue("ec", value, "mS/cm");
+    case "waterTempC":
+      return toCanonicalMetricValue("temperature", value, "C");
+  }
+}
+
+function rootZoneValuesForClaim(
+  packet: AiDoctorReviewRequestPacket,
+  metric: MetricKey,
+  clause: string,
+): readonly CanonicalMetricValue[] {
+  const fields = rootZoneFieldsForClaim(metric, clause);
+  if (fields.length === 0) return [];
+
+  const values: CanonicalMetricValue[] = [];
+  const claimsCsvRootZone = /\bcsv\b/i.test(clause);
+  for (const observation of packet.recentRootZoneObservations ?? []) {
+    if (observation.source !== "manual" && observation.source !== "csv") continue;
+    if (claimsCsvRootZone && observation.source !== "csv") continue;
+    if (observation.source === "csv" && !HISTORICAL_EVIDENCE_LABEL_RE.test(clause)) continue;
+    for (const field of fields) {
+      if (observation.invalidFields?.includes(field)) continue;
+      const rawValue = observation[field];
+      if (rawValue === null) continue;
+      const canonical = rootZoneCanonicalValue(field, rawValue);
+      if (canonical) values.push(canonical);
+    }
+  }
+  return values;
+}
+
+function historicalAggregateForClause(clause: string): HistoricalAggregate | null {
+  if (!HISTORICAL_EVIDENCE_LABEL_RE.test(clause)) return null;
+  const aggregates: HistoricalAggregate[] = [];
+  if (/\b(?:averages?|avg|mean)\b/i.test(clause)) aggregates.push("avg");
+  if (/\b(?:minimum|min)\b/i.test(clause)) aggregates.push("min");
+  if (/\b(?:maximum|max)\b/i.test(clause)) aggregates.push("max");
+  return aggregates.length === 1 ? aggregates[0] : null;
+}
+
+function historicalAggregateValuesForClaim(
+  packet: AiDoctorReviewRequestPacket,
+  metric: MetricKey,
+  clause: string,
+): readonly CanonicalMetricValue[] {
+  const aggregate = historicalAggregateForClause(clause);
+  const history = packet.imported_sensor_history;
+  if (!aggregate || !history || history.suspiciousFlagCount !== 0) return [];
+
+  return history.metrics
+    .filter((summary) => metricFieldMatches(metric, summary.metric))
+    .map((summary) => toCanonicalMetricValue(metric, summary[aggregate], summary.unit ?? undefined))
+    .filter((value): value is CanonicalMetricValue => value !== null);
+}
+
+function packetValuesForClaim(
+  packet: AiDoctorReviewRequestPacket,
+  metric: MetricKey,
+  clause: string,
+): readonly CanonicalMetricValue[] {
+  const claimsCurrentProvenance = CURRENT_LIVE_LATEST_CLAIM_RE.test(clause);
+  const rootZoneValues = rootZoneValuesForClaim(packet, metric, clause);
+  if (rootZoneValues.length > 0) return claimsCurrentProvenance ? [] : rootZoneValues;
+  if (ROOT_ZONE_CONTEXT_RE.test(clause)) return [];
+  if (HISTORICAL_EVIDENCE_LABEL_RE.test(clause)) {
+    return claimsCurrentProvenance ? [] : historicalAggregateValuesForClaim(packet, metric, clause);
+  }
+  return trustworthySnapshotValuesForMetric(packet, metric);
+}
+
+function decimalResolution(rawNumber: string): number {
+  const decimalIndex = rawNumber.indexOf(".");
+  return decimalIndex === -1 ? 1 : 10 ** -(rawNumber.length - decimalIndex - 1);
+}
+
+function isImmediateTemporalUnit(clause: string, match: RegExpMatchArray): boolean {
+  const end = (match.index ?? 0) + match[0].length;
+  return /^\s*(?:(?:[-–—]\s*|(?:to|through)\s+)\d+(?:\.\d+)?\s*)?(?:minutes?|hours?|days?|weeks?)\b/i.test(
+    clause.slice(end),
+  );
+}
+
+function canonicalClaimResolution(
+  claimed: CanonicalMetricValue,
+  rawNumber: string,
+  rawUnit: string | undefined,
+): number {
+  const resolution = decimalResolution(rawNumber);
+  const unit = rawUnit === undefined ? null : normalizedMetricUnit(rawUnit);
+  if (claimed.unit === "temperature_c" && (unit === "f" || unit === "fahrenheit")) {
+    return (resolution * 5) / 9;
+  }
+  if (
+    claimed.unit === "ec_ms_per_cm" &&
+    (unit === "us/cm" || unit === "uscm" || unit === "microsiemens/cm")
+  ) {
+    return resolution / 1000;
+  }
+  return resolution;
+}
+
+function hasApproximatePacketValue(
+  values: readonly CanonicalMetricValue[],
+  claimed: CanonicalMetricValue,
+  rawNumber: string,
+  rawUnit: string | undefined,
+): boolean {
+  const roundingTolerance = Math.min(
+    canonicalClaimResolution(claimed, rawNumber, rawUnit) / 2,
+    MAX_ROUNDING_TOLERANCE[claimed.unit],
+  );
+  return values.some(
+    (value) =>
+      value.unit === claimed.unit &&
+      Math.abs(value.value - claimed.value) <=
+        roundingTolerance +
+          Number.EPSILON * Math.max(1, Math.abs(value.value), Math.abs(claimed.value)) * 8,
+  );
+}
+
+type RelativeEventDay = "today" | "yesterday";
+type LoggedEventClaimTiming = RelativeEventDay | "untimed" | "unsupported";
+type LoggedEventCategory = AiDoctorReviewRequestPacket["recentEvents"][number]["category"];
+
+const NARROW_LOGGED_EVENT_ASSERTION_PATTERNS: Readonly<Record<LoggedEventCategory, RegExp>> = {
+  watering:
+    /^\s*(?:(?:the|this|that)\s+)?(?:plant\s+)?was\s+(?:watered|irrigated)(?:\s+(today|yesterday))?\s*[.!?]*\s*$/i,
+  feeding:
+    /^\s*(?:(?:the|this|that)\s+)?(?:plant\s+)?was\s+(?:fed|fertili[sz]ed)(?:\s+(today|yesterday))?\s*[.!?]*\s*$/i,
+  photos:
+    /^\s*(?:(?:the|these)\s+)?photos?\s+(?:were\s+)?(?:attached|provided)(?:\s+(today|yesterday))?\s*[.!?]*\s*$/i,
+};
+
+function loggedEventClaimTimingInClause(
+  clause: string,
+  category: LoggedEventCategory,
+): LoggedEventClaimTiming {
+  // Category-only support is intentionally limited to a whole, untimed event
+  // assertion. Timestamp support adds only bare today/yesterday to that same
+  // grammar; anything else is an unverified chronology claim.
+  const match = NARROW_LOGGED_EVENT_ASSERTION_PATTERNS[category].exec(clause);
+  if (!match) return "unsupported";
+  return match[1] ? (match[1].toLowerCase() as RelativeEventDay) : "untimed";
+}
+
+function utcCalendarDay(timestamp: number): number | null {
+  const date = new Date(timestamp);
+  const day = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  return Number.isFinite(day) ? day / 86_400_000 : null;
+}
+
+function hasRelativeEventSupport(
+  packet: AiDoctorReviewRequestPacket,
+  category: AiDoctorReviewRequestPacket["recentEvents"][number]["category"],
+  relativeDay: RelativeEventDay,
+): boolean {
+  // The request packet has no request-clock field. Its trusted current snapshot
+  // is the only bounded, deterministic reference time available to this pure
+  // fence, so a relative event claim fails closed without one.
+  if (!hasTrustworthyAnnotatedSnapshot(packet)) return false;
+  const referenceDay = utcCalendarDay(Date.parse(packet.recentSensorSnapshot?.capturedAt ?? ""));
+  if (referenceDay === null) return false;
+  const expectedOffset = relativeDay === "yesterday" ? 1 : 0;
+  return packet.recentEvents.some((event) => {
+    if (event.category !== category) return false;
+    const eventDay = utcCalendarDay(Date.parse(event.at));
+    return eventDay !== null && referenceDay - eventDay === expectedOffset;
+  });
+}
+
+function hasUnsupportedLoggedEventClaim(
+  result: AiDoctorReviewResult,
+  packet: AiDoctorReviewRequestPacket,
+): boolean {
+  for (const text of directClaimTexts(result)) {
+    for (const rawClause of splitSafetyClauses(text)) {
+      for (const clause of splitCautiousDirectiveClauses(rawClause)) {
+        if (isCautiousDirective(clause) || isNonAffirmativeContextDisclosure(clause)) continue;
+        for (const claim of LOGGED_EVENT_CLAIMS) {
+          if (!claim.pattern.test(clause)) continue;
+          const relativeTiming = loggedEventClaimTimingInClause(clause, claim.category);
+          const supported =
+            relativeTiming === "unsupported"
+              ? false
+              : relativeTiming === "untimed"
+                ? packet.recentEvents.some((event) => event.category === claim.category)
+                : hasRelativeEventSupport(packet, claim.category, relativeTiming);
+          if (!supported) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function hasUnsupportedSnapshotClaim(
+  result: AiDoctorReviewResult,
+  packet: AiDoctorReviewRequestPacket,
+): boolean {
+  for (const text of directClaimTexts(result)) {
+    for (const rawClause of splitSafetyClauses(text)) {
+      for (const clause of splitCautiousDirectiveClauses(rawClause)) {
+        if (isCautiousDirective(clause) || isNonAffirmativeContextDisclosure(clause)) continue;
+        if (DIRECT_SNAPSHOT_CLAIM_RE.test(clause) && !packet.recentSensorSnapshot) return true;
+        if (
+          SOURCE_LABELED_SNAPSHOT_CLAIM_RE.test(clause) &&
+          !packet.recentSensorSnapshotAnnotation
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Detects only direct numeric sensor assertions. General diagnosis language is
+ * deliberately outside this lexical fence: it needs horticultural judgement,
+ * not a brittle string comparison.
+ */
+function hasDirectUnsupportedPacketClaim(
+  result: AiDoctorReviewResult,
+  packet: AiDoctorReviewRequestPacket,
+): boolean {
+  for (const text of directClaimTexts(result)) {
+    for (const rawClause of splitNumericClaimClauses(text)) {
+      for (const clause of splitCautiousDirectiveClauses(rawClause)) {
+        // A cautious directive can legitimately contain a timed follow-up, but
+        // it must not suppress a separate assertion after a numeric range.
+        if (isCautiousDirective(clause) && !NUMERIC_RANGE_RE.test(clause)) continue;
+        for (const [metric, aliases] of Object.entries(METRIC_ALIASES) as Array<
+          [MetricKey, readonly string[]]
+        >) {
+          const metricAlternation = aliases
+            .map((alias) => alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+            .join("|");
+          // A bare metric-number adjacency must carry an unambiguous unit. This
+          // leaves follow-up timing such as "recheck temperature 24 hours" out
+          // of the numeric assertion fence while retaining table-like readings.
+          const unitSource = METRIC_CLAIM_UNIT_SOURCES[metric];
+          const metricFirstUnitCapture = unitSource ? `\\s*(${unitSource})?` : "";
+          const metricFirstWithConnector = new RegExp(
+            `\\b(?:${metricAlternation})\\b\\s*${ASSERTION_CONNECTOR_SOURCE}\\s*${APPROXIMATE_VALUE_PREFIX_SOURCE}(${NUMBER_RE.source})${metricFirstUnitCapture}`,
+            "gi",
+          );
+          // pH is conventionally unitless, so its metric label itself supplies
+          // the unambiguous unit. Immediate temporal units remain excluded
+          // below before any bare adjacency is treated as an assertion.
+          const metricFirstWithUnit = new RegExp(
+            unitSource
+              ? `\\b(?:${metricAlternation})\\b\\s*${APPROXIMATE_VALUE_PREFIX_SOURCE}(${NUMBER_RE.source})\\s*(${unitSource})`
+              : `\\b(?:${metricAlternation})\\b\\s*${APPROXIMATE_VALUE_PREFIX_SOURCE}(${NUMBER_RE.source})`,
+            "gi",
+          );
+          const metricFirstHistoricalAggregate = new RegExp(
+            unitSource
+              ? `\\b(?:${metricAlternation})\\b\\s+(?:has|had)\\s+(?:an?\\s+)?(?:historical|csv)\\s+(?:averages?|avg|mean|minimum|min|maximum|max)\\s+(?:of\\s+)?(${NUMBER_RE.source})\\s*(${unitSource})`
+              : `\\b(?:${metricAlternation})\\b\\s+(?:has|had)\\s+(?:an?\\s+)?(?:historical|csv)\\s+(?:averages?|avg|mean|minimum|min|maximum|max)\\s+(?:of\\s+)?(${NUMBER_RE.source})`,
+            "gi",
+          );
+          const valueFirst = new RegExp(
+            unitSource
+              ? `${APPROXIMATE_VALUE_PREFIX_SOURCE}(${NUMBER_RE.source})\\s*(${unitSource})\\s+\\b(?:${metricAlternation})\\b`
+              : `${APPROXIMATE_VALUE_PREFIX_SOURCE}(${NUMBER_RE.source})\\s+\\b(?:${metricAlternation})\\b`,
+            "gi",
+          );
+
+          for (const matcher of [
+            metricFirstWithConnector,
+            metricFirstWithUnit,
+            metricFirstHistoricalAggregate,
+            valueFirst,
+          ]) {
+            if (!matcher) continue;
+            for (const match of clause.matchAll(matcher)) {
+              const rawUnit = metric === "ph" ? undefined : match[2];
+              if (!rawUnit && isImmediateTemporalUnit(clause, match)) continue;
+              const claimed = toCanonicalMetricValue(metric, Number(match[1]), rawUnit);
+              const values = packetValuesForClaim(packet, metric, clause);
+              if (!claimed || !hasApproximatePacketValue(values, claimed, match[1], rawUnit)) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return (
+    hasUnsupportedLoggedEventClaim(result, packet) || hasUnsupportedSnapshotClaim(result, packet)
+  );
+}
+
+/**
+ * Return a stable failure code when a structural result makes a direct unsafe
+ * or ungrounded claim against its validated packet. The inputs are never
+ * mutated, normalized, persisted, logged, or returned from this helper.
+ */
+export function validateAiDoctorReviewGrounding(
+  result: AiDoctorReviewResult,
+  packet: AiDoctorReviewRequestPacket,
+): AiDoctorReviewGroundingValidation {
+  if (hasUnsafeAutomationOrDeviceLanguage(result)) {
+    return { ok: false, reason: "automation_or_device_language" };
+  }
+  if (hasAbsoluteCertainty(result)) {
+    return { ok: false, reason: "absolute_certainty" };
+  }
+  if (
+    result.confidence === "high" &&
+    (!packetHasAffirmativeEvidence(packet) || !resultHasAffirmativeEvidence(result))
+  ) {
+    return { ok: false, reason: "high_confidence_without_affirmative_evidence" };
+  }
+  if (hasUnsupportedStableOrHealthyEnvironmentClaim(result, packet)) {
+    return { ok: false, reason: "healthy_environment_without_trustworthy_snapshot" };
+  }
+  if (
+    packetNeedsMissingInformation(packet) &&
+    !resultDisclosesPacketMissingInformation(result, packet)
+  ) {
+    return { ok: false, reason: "missing_information_required" };
+  }
+  if (hasDirectUnsupportedPacketClaim(result, packet)) {
+    return { ok: false, reason: "claim_not_supported_by_packet" };
+  }
+  return { ok: true };
+}

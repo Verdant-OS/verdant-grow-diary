@@ -1,24 +1,51 @@
 @AGENTS.md
-@docs/agents/CURRENT_STATE.md
 @docs/agents/roles/claude.md
 
 # Claude startup rule
 
-**Sentinel-Version: 2026-09-01.2**
+**Sentinel-Version: 2026-09-01.5**
 
-Claude Code reads this file at the start of every project session. The three `@` imports
-above load the universal constitution, the current operating state, and Claude's assigned
-role. They are imports, not suggestions.
+Claude Code reads this file at the start of every project session. The two `@` imports
+above load the universal constitution and Claude's assigned role. They are imports, not
+suggestions.
+
+**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file tool
+before you acknowledge.** It is still the third required context file and nothing about
+its authority has changed. Measured 2026-08-21 at 153,142 bytes / ~27,400 tokens, it was
+68.9% of the whole memory chain and 19.1% of every context window, re-sent on every turn
+of every session whether or not that session touched operating state. It is also the
+changing shift report, revised several times a day, so most of what it costs on any given
+turn is history that has already been superseded. Loading it on demand costs the same
+tokens once, in the sessions that actually need it, instead of in all of them.
+
+Nothing else carries what it carries. Every claim about branch state, production, applied
+migrations, blockers, approved slices, and agent assignment lives in that file and nowhere
+else — reasoning about any of them from this file, from `AGENTS.md`, or from memory is how
+an agent ends up confidently wrong about production.
 
 Before planning, writing specifications, using tools, or proposing implementation:
 
-1. Confirm all three files above were loaded.
+1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.
+   `files_read:` must name it truthfully, or state that it was not read and why.
 2. Report any conflicting instructions rather than silently picking one.
 3. Return the `SENTINEL_ACK` block defined in `AGENTS.md`.
 4. Do not implement production code unless the current task explicitly assigns
    implementation to Claude (task ownership, not role rank). Claude's **default
    strength** is a specification precise enough that the slice owner — any peer —
    does not have to guess.
+
+## Check-in cadence — arm at 55 minutes, never "roughly hourly"
+
+`practical observation`, measured 2026-08-25: this harness's prompt cache lives **60
+minutes**, and a self check-in armed "roughly an hour out" lands at 61+ minutes — the
+token-waste audit caught live check-ins at 61.4 and 90.7 minutes, each missing the cache
+by minutes and re-paying a full context cache write (~143k tokens at the time of
+measurement) where a ≤55-minute wake is a cache read at a fraction of the cost.
+
+So: when arming a delayed self check-in (`send_later`, a scheduled wake, a re-armed PR
+watch), arm it at **55 minutes or less**. A deliberately longer gap is fine when the work
+genuinely needs one — take the miss knowingly. What this rule forbids is the accidental
+61-minute near-miss that default "hourly" phrasing produces.
 
 ## Scope reminder
 
@@ -42,6 +69,34 @@ Applies to every deliverable, without exception:
   site deploys from `verdant-grow-diary`, not `main`; auditing the wrong ref produces
   confidently wrong conclusions.
 - A metric with no applicable cases is `NOT_MEASURED`, never a 100% score.
+
+## Repository operating facts
+
+Verified 2026-08-19 on the deploy branch. Re-verify before citing on another branch.
+
+- Package manager is **bun** (`bun.lockb` authoritative — never npm/yarn/pnpm). On
+  Windows, `bun install` fails under OneDrive paths; use a non-OneDrive checkout.
+- Dev server: `bun run dev` → `http://localhost:8080` (port pinned by the Lovable
+  TanStack config, not Vite's 5173 default).
+- Typecheck gate on this branch: `bun run typecheck` (`tsc -p tsconfig.json --noEmit`,
+  strict). `tsconfig.app.json` exists only on `main`. `bun run typecheck:tsgo` is a
+  faster second opinion that has caught union errors tsc missed.
+- Tests: `bunx vitest run` (full suite, sharded in CI); single file:
+  `bunx vitest run src/test/<file> --reporter=dot`. Windows-local full runs carry
+  roughly twenty known machine-local failures — triage by import overlap with the
+  diff; CI gates.
+- Playwright: the `chromium-mocked` project needs no credentials; the quicklog smoke
+  and golden-path specs run against the deployed app or an owner-managed session —
+  post-deploy signals, never same-commit gates.
+- Many tests read source files and pin exact expressions, copy strings, and occurrence
+  counts. Renegotiate pins in the same commit as the behavior change; never
+  whole-file-format a legacy file (line re-wraps break pins far from the diff).
+- Quick Log persists through the single `quicklog_save_manual` write path (frozen by
+  `docs/specs/one-tent-loop-quicklog-single-write-path.md`); post-save refresh is
+  `applyQuickLogV2Refresh` plus one `verdant:entry-created` dispatch, only after
+  confirmed success.
+- Target selection is explicit or route-derived only; remembered-target and only-plant
+  auto-selection are banned and test-pinned.
 
 ---
 

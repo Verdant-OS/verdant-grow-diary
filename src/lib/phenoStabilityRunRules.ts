@@ -9,7 +9,8 @@
  *
  * DELIBERATELY DISTINCT VOCABULARY: the word "replication" is already
  * spoken for elsewhere in the pheno code with two OTHER meanings —
- * within-run specimen count (phenoSelectionRules.assessReplication) and
+ * within-run specimen count (formerly phenoSelectionRules.assessReplication;
+ * that orphaned module has since been removed) and
  * "a backup clone is preserved" (the `replication_readiness` / clone
  * insurance evidence goal). This module is a THIRD, sequential concept:
  * re-grow across cycles and see if traits hold. It uses "stability run"
@@ -46,6 +47,7 @@ export const STABILITY_RUN_LABEL_MAX = 80;
 export const STABILITY_RUN_NOTE_MAX = 500;
 /** Bound on the stored provenance id (a uuid is 36 chars; this is a cap, not a format check). */
 export const STABILITY_RUN_SOURCE_PLANT_ID_MAX = 64;
+export const STABILITY_RUN_ENVIRONMENT_MAX = 80;
 
 export interface StabilityRun {
   readonly runLabel: string;
@@ -60,6 +62,15 @@ export interface StabilityRun {
    * ledger is never proposed again. It never affects hold/drift evaluation.
    */
   readonly sourcePlantId?: string | null;
+  /**
+   * GROWER-ENTERED environment tag for this grow-out (e.g. "indoor coco,
+   * summer" or a tent name). OPTIONAL and additive, like sourcePlantId. It is
+   * always manual provenance — nothing auto-detects it — and it never affects
+   * the hold/drift evaluation; it exists so a drift on re-grow can be READ
+   * against the environment it happened in instead of being mistaken for
+   * genetic instability, and it gates the environment comparison below.
+   */
+  readonly environment?: string | null;
 }
 
 /**
@@ -125,14 +136,21 @@ export function sanitizeStabilityRuns(
       traits: sanitizeTraits(r.traits),
       note,
     };
-    // Provenance is ADDITIVE: only attach sourcePlantId when the stored row
-    // actually carries one, so a hand-typed run round-trips unchanged rather
-    // than gaining a null field it never had.
+    // Provenance is ADDITIVE: only attach sourcePlantId / environment when
+    // the stored row actually carries one, so a hand-typed run round-trips
+    // unchanged rather than gaining null fields it never had.
     const sourcePlantId =
       typeof r.sourcePlantId === "string" && r.sourcePlantId.trim() !== ""
         ? r.sourcePlantId.trim().slice(0, STABILITY_RUN_SOURCE_PLANT_ID_MAX)
         : null;
-    out.push(sourcePlantId === null ? run : { ...run, sourcePlantId });
+    const environment =
+      typeof r.environment === "string" && r.environment.trim() !== ""
+        ? r.environment.trim().slice(0, STABILITY_RUN_ENVIRONMENT_MAX)
+        : null;
+    let next: StabilityRun = run;
+    if (sourcePlantId !== null) next = { ...next, sourcePlantId };
+    if (environment !== null) next = { ...next, environment };
+    out.push(next);
   }
   return out;
 }
@@ -317,3 +335,123 @@ export const STABILITY_LEDGER_CAVEAT =
 
 export const STABILITY_LEDGER_EMPTY_COPY =
   "No grow-outs recorded yet. Add a run with the traits you observed to start the stability ledger.";
+
+// ---------------------------------------------------------------------------
+// Environment coverage — the gate in front of any environment comparison.
+//
+// A drift on re-grow can come from the phenotype OR from a different
+// environment; without environment tags the two are indistinguishable. The
+// comparison below is DESCRIPTIVE only (the grower's own observed values,
+// grouped by their own environment tags) — no interaction statistics, no
+// verdict. It requires at least GXE_MIN_TAGGED_RUNS environment-tagged
+// grow-outs before it renders at all; below that, presenters show the
+// insufficient-data copy naming exactly what is missing.
+// ---------------------------------------------------------------------------
+
+export const GXE_MIN_TAGGED_RUNS = 3;
+
+export interface StabilityEnvironmentCoverage {
+  readonly recordedRunCount: number;
+  readonly taggedRunCount: number;
+  /** Distinct environment tags, in first-seen order. */
+  readonly environments: readonly string[];
+  /** True when taggedRunCount >= GXE_MIN_TAGGED_RUNS AND 2+ distinct tags
+   * exist — one environment repeated three times compares nothing. */
+  readonly comparisonAvailable: boolean;
+}
+
+/** Identity key for an environment tag: "Tent A", "tent a" and "tent  A"
+ * all describe one environment and must never unlock the comparison gate as
+ * two. Display keeps the first-seen spelling; identity uses this key. */
+export function canonicalEnvironmentTag(env: string): string {
+  return env.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+export function summarizeEnvironmentCoverage(
+  runs: readonly StabilityRun[] | null | undefined,
+): StabilityEnvironmentCoverage {
+  const list = Array.isArray(runs) ? runs : [];
+  const displayByCanonical = new Map<string, string>();
+  let taggedRunCount = 0;
+  for (const run of list) {
+    const env = typeof run?.environment === "string" ? run.environment.trim() : "";
+    if (env === "") continue;
+    taggedRunCount += 1;
+    const key = canonicalEnvironmentTag(env);
+    if (!displayByCanonical.has(key)) displayByCanonical.set(key, env);
+  }
+  const environments = [...displayByCanonical.values()];
+  return {
+    recordedRunCount: list.length,
+    taggedRunCount,
+    environments,
+    comparisonAvailable: taggedRunCount >= GXE_MIN_TAGGED_RUNS && environments.length >= 2,
+  };
+}
+
+/** Honest insufficient-data copy naming exactly what evidence is missing. */
+export function environmentCoverageCopy(coverage: StabilityEnvironmentCoverage): string {
+  if (coverage.comparisonAvailable) return "";
+  if (coverage.recordedRunCount === 0) {
+    return "No grow-outs recorded — the environment comparison needs at least three grow-outs with an environment tag, across at least two different environments.";
+  }
+  if (coverage.taggedRunCount < GXE_MIN_TAGGED_RUNS) {
+    return `Environment tags recorded for ${coverage.taggedRunCount} of ${coverage.recordedRunCount} grow-outs. The environment comparison needs at least ${GXE_MIN_TAGGED_RUNS} tagged grow-outs (across at least two different environments) before observed differences can be read against the environment at all.`;
+  }
+  return `All ${coverage.taggedRunCount} tagged grow-outs share one environment ("${coverage.environments[0] ?? ""}") — with nothing to compare against, environment effects cannot be separated from the phenotype.`;
+}
+
+export interface EnvironmentAxisObservation {
+  readonly environment: string;
+  /** Observed values for this axis in that environment (recorded runs only). */
+  readonly values: readonly number[];
+}
+
+export interface EnvironmentAxisComparison {
+  readonly axisKey: string;
+  readonly axisLabel: string;
+  readonly byEnvironment: readonly EnvironmentAxisObservation[];
+}
+
+/**
+ * Group the grower's own observed axis values by their own environment tags —
+ * organizing, never concluding. Only axes observed in at least two different
+ * environments appear (a single-environment axis compares nothing). Returns []
+ * unless coverage meets the gate. Presenters must render the accompanying
+ * caveat: observed differences may reflect the environment, the phenotype, or
+ * both — a handful of grow-outs cannot separate them.
+ */
+export function buildEnvironmentComparison(
+  runs: readonly StabilityRun[] | null | undefined,
+): EnvironmentAxisComparison[] {
+  const coverage = summarizeEnvironmentCoverage(runs);
+  if (!coverage.comparisonAvailable) return [];
+  const list = (Array.isArray(runs) ? runs : []).filter(
+    (r) => typeof r?.environment === "string" && r.environment.trim() !== "",
+  );
+  const out: EnvironmentAxisComparison[] = [];
+  for (const axis of LOUD_TRAIT_AXES) {
+    // Grouped by canonical tag so case/whitespace variants pool together;
+    // rendered under the coverage summary's first-seen display spelling.
+    const byEnv = new Map<string, number[]>();
+    for (const run of list) {
+      const value = run.traits?.[axis.key];
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      if (value < axis.min || value > axis.max) continue;
+      const env = canonicalEnvironmentTag(run.environment as string);
+      (byEnv.get(env) ?? byEnv.set(env, []).get(env)!).push(value);
+    }
+    if (byEnv.size < 2) continue;
+    out.push({
+      axisKey: axis.key,
+      axisLabel: axis.label,
+      byEnvironment: coverage.environments
+        .filter((env) => byEnv.has(canonicalEnvironmentTag(env)))
+        .map((env) => ({ environment: env, values: byEnv.get(canonicalEnvironmentTag(env))! })),
+    });
+  }
+  return out;
+}
+
+export const ENVIRONMENT_COMPARISON_CAVEAT =
+  "Observed values grouped by your own environment tags. Differences here may reflect the environment, the phenotype, or both — a handful of grow-outs cannot separate them, and this table never tries to.";

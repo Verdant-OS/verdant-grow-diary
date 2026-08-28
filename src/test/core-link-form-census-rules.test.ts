@@ -633,6 +633,7 @@ describe("core link and form census rules", () => {
     "genetics_trace_resolve",
     "get_latest_tent_sensor_snapshot",
     "has_role",
+    "pheno_candidate_diary_entries_top_n",
     "verdant_search",
   ])("allows the explicitly reviewed read-only RPC %s", (name) => {
     expect(isReadOnlyRpc(name)).toBe(true);

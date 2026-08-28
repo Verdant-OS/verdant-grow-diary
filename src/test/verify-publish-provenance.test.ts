@@ -4,6 +4,7 @@
  *
  * Fixture tokens are fake labels only — never real Paddle secrets.
  */
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -17,6 +18,7 @@ import {
   formatPublishVerificationSummary,
   isOrphanStamp,
   reportJsonLeaksTokenPayload,
+  resolveCommittedTokenClass,
   runPublishVerification,
 } from "../../scripts/verify-publish-provenance.mjs";
 
@@ -142,6 +144,9 @@ describe("token class compare + report assembly", () => {
     expect(report.blockers).toEqual([]);
     expect(report.committedTokenClass).toBe("test_");
     expect(report.effectiveTokenClass).toBe("live_");
+    expect(formatPublishVerificationSummary(report)).toBe(
+      "[publish-verify] PASS token_class_mismatch",
+    );
 
     const serialized = JSON.stringify(report);
     expect(serialized).not.toContain(FIXTURE_TEST_TOKEN);
@@ -280,5 +285,76 @@ describe("runPublishVerification (injected I/O)", () => {
     expect(written).not.toContain(FIXTURE_TEST_TOKEN);
     expect(written).not.toContain(FIXTURE_LIVE_TOKEN);
     expect(reportJsonLeaksTokenPayload(written)).toBe(false);
+  });
+
+  it("exits 1 for a dirty stamp without leaking token bytes", async () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-"));
+    temporaryRoots.push(root);
+    const versionPath = resolve(root, "public/version.json");
+    const reportPath = resolve(root, "artifacts/publish-verification.json");
+    mkdirSync(resolve(root, "public"), { recursive: true });
+    writeFileSync(versionPath, `${JSON.stringify(cleanStamp({ dirty: true }), null, 2)}\n`, "utf8");
+
+    const logs: string[] = [];
+    const { exitCode, report } = await runPublishVerification({
+      rootDir: root,
+      versionPath,
+      reportPath,
+      resolveCommitted: async () => classifyTokenClassByPrefix(FIXTURE_TEST_TOKEN),
+      resolveEffective: async () => classifyTokenClassByPrefix(FIXTURE_TEST_TOKEN),
+      now: () => "2026-08-25T12:00:00.000Z",
+      logger: {
+        log: (line: string) => logs.push(line),
+        error: (line: string) => logs.push(line),
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(report.verdict).toBe("FAIL");
+    expect(report.blockers).toEqual(["stamp_dirty"]);
+    expect(report.tokenClassMismatch).toBe(false);
+    expect(logs).toEqual(["[publish-verify] FAIL stamp_dirty"]);
+    expect(reportJsonLeaksTokenPayload(readFileSync(reportPath, "utf8"))).toBe(false);
+  });
+});
+
+describe("package.json wiring", () => {
+  it("registers publish:verify and runs the verifier after stamp-version", () => {
+    const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf8"));
+    expect(packageJson.scripts["publish:verify"]).toBe("node scripts/verify-publish-provenance.mjs");
+    const prebuild = String(packageJson.scripts.prebuild).split(/\s*&&\s*/u);
+    expect(prebuild[0]).toBe("node scripts/restore-env-production-from-head.mjs");
+    expect(prebuild.at(-2)).toBe("node scripts/stamp-version.mjs");
+    expect(prebuild.at(-1)).toBe("node scripts/verify-publish-provenance.mjs");
+  });
+});
+
+describe("resolveCommittedTokenClass (HEAD blob, not working tree)", () => {
+  it("reports the committed class when the working tree is mutated to the other class", async () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-git-"));
+    temporaryRoots.push(root);
+
+    const gitEnv = {
+      ...process.env,
+      GIT_AUTHOR_NAME: "fixture",
+      GIT_AUTHOR_EMAIL: "fixture@example.com",
+      GIT_COMMITTER_NAME: "fixture",
+      GIT_COMMITTER_EMAIL: "fixture@example.com",
+    };
+    const git = (args: string[]) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", env: gitEnv });
+
+    expect(git(["init"]).status).toBe(0);
+    git(["config", "user.email", "fixture@example.com"]);
+    git(["config", "user.name", "fixture"]);
+    writeFileSync(join(root, ".env.production"), `VITE_PAYMENTS_CLIENT_TOKEN=${FIXTURE_TEST_TOKEN}\n`);
+    expect(git(["add", ".env.production"]).status).toBe(0);
+    expect(git(["commit", "-m", "fixture env"]).status).toBe(0);
+
+    writeFileSync(join(root, ".env.production"), `VITE_PAYMENTS_CLIENT_TOKEN=${FIXTURE_LIVE_TOKEN}\n`);
+
+    const committed = await resolveCommittedTokenClass(root);
+    expect(committed).toBe("test_");
+    expect(committed).not.toBe(FIXTURE_TEST_TOKEN);
+    expect(committed).not.toBe(FIXTURE_LIVE_TOKEN);
   });
 });

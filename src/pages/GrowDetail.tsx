@@ -41,6 +41,7 @@ import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import { GrowFollowUpReviewSection } from "@/components/GrowFollowUpReviewSection";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
+import GrowPendingOutcomeNotice from "@/components/GrowPendingOutcomeNotice";
 
 /**
  * Read-only grow detail hub. Presentational only — all data loading +
@@ -218,6 +219,8 @@ export default function GrowDetail() {
         testId="grow-detail-one-tent-loop-next-step-card"
         className="mb-4"
       />
+
+      <GrowPendingOutcomeNotice growId={grow.id} />
 
       <GrowStatusCard status={status} growId={grow.id} />
 

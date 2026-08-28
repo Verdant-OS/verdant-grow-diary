@@ -60,6 +60,7 @@ import {
 } from "@/lib/phenoSmokeTestService";
 import {
   upsertLabResult,
+  deleteLabResult as deleteLabResultRow,
   listLabResultsForHunt,
   type LabResultRow,
   type PhenoLabSource,
@@ -190,8 +191,12 @@ export interface UsePhenoHuntWorkspaceState {
       cbdPct: number | null;
       totalCannabinoidsPct: number | null;
       dominantTerpenes: readonly TerpeneReading[];
+      testedAt?: string | null;
+      note?: string | null;
     },
   ) => Promise<boolean>;
+  /** Remove one lab row (hunt+plant+source) — the undo for a stray save. */
+  deleteLabResult: (plantId: string, source: PhenoLabSource) => Promise<boolean>;
 }
 
 /** Fetch the five editable evidence maps for exactly one page of candidates. */
@@ -242,6 +247,22 @@ export function usePhenoHuntWorkspace(
   const [labByKey, setLabByKey] = useState<Record<string, LabResultRow>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  // Synchronous in-flight guard: React state lags a double-click, and the
+  // append-only paths (decision log, sex observations) would mint duplicate
+  // immutable rows if two identical saves ran concurrently. The ref refuses
+  // the second call before state has settled; button-disable stays a
+  // presentation nicety, not the safety mechanism.
+  const savingRef = useRef(false);
+  const beginSave = (plantId: string): boolean => {
+    if (savingRef.current) return false;
+    savingRef.current = true;
+    setSaving(plantId);
+    return true;
+  };
+  const endSave = (): void => {
+    savingRef.current = false;
+    setSaving(null);
+  };
   // Pagination + stale-response guard. requestRef is bumped on every reset
   // (mount / filter change); a page response tagged with an old id is dropped.
   const pageRef = useRef<number>(0);
@@ -444,6 +465,12 @@ export function usePhenoHuntWorkspace(
       setDecisionHistoryByPlant((prev) =>
         entries.length > 0 ? { ...prev, [plantId]: entries } : prev,
       );
+      // The service maps a failed read to [], indistinguishable from a truly
+      // empty history — so an empty result must NOT pin "loaded" for the
+      // session (a transient failure would render as "no history" forever).
+      // Un-marking lets the next open retry; re-reading a genuinely empty
+      // history is one bounded query.
+      if (entries.length === 0) historyLoadedRef.current.delete(plantId);
     },
     [id],
   );
@@ -506,9 +533,9 @@ export function usePhenoHuntWorkspace(
   const saveScore = useCallback(
     async (plantId: string, traits: Record<string, number>, note?: string | null) => {
       if (!id || !editablePlantIdsRef.current.has(plantId)) return false;
-      setSaving(plantId);
+      if (!beginSave(plantId)) return false;
       const res = await upsertCandidateScore({ huntId: id, plantId, traits, note });
-      setSaving(null);
+      endSave();
       if (res.ok === true) {
         setScoresByPlant((prev) => ({
           ...prev,
@@ -538,13 +565,19 @@ export function usePhenoHuntWorkspace(
       ) {
         return true;
       }
-      setSaving(plantId);
+      if (!beginSave(plantId)) return false;
       const at = new Date().toISOString();
       // Current-decision store (flat, one row per candidate) …
       const flat = await recordKeeperDecision({ huntId: id, plantId, decision, note: reason });
       // … plus an immutable audit-trail row with the reason (append-only log).
-      const logged = await appendKeeperDecision({ huntId: id, plantId, decision, reason });
-      setSaving(null);
+      // Only attempted when the flat write succeeded: writing an audit row for
+      // a decision that was never recorded would fabricate history, and the
+      // old both-at-once path could leave a current decision with no log row.
+      const logged =
+        flat.ok === true
+          ? await appendKeeperDecision({ huntId: id, plantId, decision, reason })
+          : flat;
+      endSave();
       if (flat.ok === true && logged.ok === true) {
         setDecisionsByPlant((prev) => ({
           ...prev,
@@ -587,7 +620,7 @@ export function usePhenoHuntWorkspace(
       if (!id || !editablePlantIdsRef.current.has(plantId) || !roundsLoadedRef.current.has(round)) {
         return false;
       }
-      setSaving(plantId);
+      if (!beginSave(plantId)) return false;
       const res = await upsertScoreRound({
         huntId: id,
         plantId,
@@ -597,7 +630,7 @@ export function usePhenoHuntWorkspace(
         noseNote: payload.noseNote,
         note: payload.note,
       });
-      setSaving(null);
+      endSave();
       if (res.ok === true) {
         setRoundsByKey((prev) => ({
           ...prev,
@@ -646,9 +679,9 @@ export function usePhenoHuntWorkspace(
       if (!existingSex && sex === DEFAULT_SEX_OBSERVATION && normalizedNote === null) {
         return true;
       }
-      setSaving(plantId);
+      if (!beginSave(plantId)) return false;
       const res = await appendSexObservation({ huntId: id, plantId, sex, note });
-      setSaving(null);
+      endSave();
       if (res.ok === true) {
         setSexByPlant((prev) => ({
           ...prev,
@@ -680,9 +713,9 @@ export function usePhenoHuntWorkspace(
       },
     ) => {
       if (!id || !editablePlantIdsRef.current.has(plantId)) return false;
-      setSaving(plantId);
+      if (!beginSave(plantId)) return false;
       const res = await upsertSmokeTest({ huntId: id, plantId, ...payload });
-      setSaving(null);
+      endSave();
       if (res.ok === true) {
         setSmokeByPlant((prev) => ({ ...prev, [plantId]: { plantId, ...payload } }));
         return true;
@@ -702,22 +735,49 @@ export function usePhenoHuntWorkspace(
         cbdPct: number | null;
         totalCannabinoidsPct: number | null;
         dominantTerpenes: readonly TerpeneReading[];
+        testedAt?: string | null;
+        note?: string | null;
       },
     ) => {
       if (!id || !editablePlantIdsRef.current.has(plantId)) return false;
-      setSaving(plantId);
+      if (!beginSave(plantId)) return false;
       const res = await upsertLabResult({ huntId: id, plantId, source, ...payload });
-      setSaving(null);
+      endSave();
       if (res.ok === true) {
         setLabByKey((prev) => ({
           ...prev,
           [`${plantId}:${source}`]: {
             plantId,
             source,
-            ...payload,
+            thcPct: payload.thcPct,
+            cbdPct: payload.cbdPct,
+            totalCannabinoidsPct: payload.totalCannabinoidsPct,
+            dominantTerpenes: payload.dominantTerpenes,
+            testedAt: payload.testedAt ?? null,
+            note: payload.note ?? null,
             labVerified: source === "coa",
           },
         }));
+        return true;
+      }
+      setError(res.error);
+      return false;
+    },
+    [id],
+  );
+
+  const deleteLabResult = useCallback(
+    async (plantId: string, source: PhenoLabSource) => {
+      if (!id || !editablePlantIdsRef.current.has(plantId)) return false;
+      if (!beginSave(plantId)) return false;
+      const res = await deleteLabResultRow({ huntId: id, plantId, source });
+      endSave();
+      if (res.ok === true) {
+        setLabByKey((prev) => {
+          const next = { ...prev };
+          delete next[`${plantId}:${source}`];
+          return next;
+        });
         return true;
       }
       setError(res.error);
@@ -761,5 +821,6 @@ export function usePhenoHuntWorkspace(
     saveSex,
     saveSmokeTest,
     saveLabResult,
+    deleteLabResult,
   };
 }

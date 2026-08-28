@@ -33,6 +33,8 @@ export interface PhenoStressWorkspaceState {
   readonly remove: (id: string) => Promise<boolean>;
   readonly refresh: () => Promise<void>;
   readonly loading: boolean;
+  /** True while a save/update/delete is in flight — presenters disable. */
+  readonly saving: boolean;
   readonly error: string | null;
 }
 
@@ -43,6 +45,7 @@ export function usePhenoStressObservations(
   const [diary, setDiary] = useState<DiaryOptionRow[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Refresh loads race unmount (route change away from the workspace, test
@@ -54,6 +57,21 @@ export function usePhenoStressObservations(
       mountedRef.current = false;
     };
   }, []);
+
+  // Synchronous in-flight guard: inserts are plain appends with no
+  // idempotency key, so a double-click before React state settles would
+  // record two identical stress observations.
+  const savingRef = useRef(false);
+  const beginWrite = (): boolean => {
+    if (savingRef.current) return false;
+    savingRef.current = true;
+    if (mountedRef.current) setSaving(true);
+    return true;
+  };
+  const endWrite = (): void => {
+    savingRef.current = false;
+    if (mountedRef.current) setSaving(false);
+  };
 
   const refresh = useCallback(async () => {
     if (!huntId) return;
@@ -84,6 +102,7 @@ export function usePhenoStressObservations(
   const save = useCallback(
     async (draft: PhenoStressPersistDraft): Promise<boolean> => {
       if (!huntId || !userId) return false;
+      if (!beginWrite()) return false;
       try {
         const inserted = await insertStressObservation({
           userId,
@@ -102,11 +121,13 @@ export function usePhenoStressObservations(
           linkedDiaryEntryId: draft.linkedDiaryEntryId,
           notes: draft.notes,
         });
-        setRows((prev) => [inserted, ...prev]);
+        if (mountedRef.current) setRows((prev) => [inserted, ...prev]);
         return true;
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
         return false;
+      } finally {
+        endWrite();
       }
     },
     [huntId, userId],
@@ -114,26 +135,32 @@ export function usePhenoStressObservations(
 
   const update = useCallback(
     async (id: string, input: PhenoStressUpdateInput): Promise<boolean> => {
+      if (!beginWrite()) return false;
       try {
         const updated = await updateStressObservation(id, input);
-        setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
+        if (mountedRef.current) setRows((prev) => prev.map((r) => (r.id === id ? updated : r)));
         return true;
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
         return false;
+      } finally {
+        endWrite();
       }
     },
     [],
   );
 
   const remove = useCallback(async (id: string): Promise<boolean> => {
+    if (!beginWrite()) return false;
     try {
       await deleteStressObservation(id);
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      if (mountedRef.current) setRows((prev) => prev.filter((r) => r.id !== id));
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (mountedRef.current) setError(err instanceof Error ? err.message : String(err));
       return false;
+    } finally {
+      endWrite();
     }
   }, []);
 
@@ -176,6 +203,7 @@ export function usePhenoStressObservations(
     remove,
     refresh,
     loading,
+    saving,
     error,
   };
 }

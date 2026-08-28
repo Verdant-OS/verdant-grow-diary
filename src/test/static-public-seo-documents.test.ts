@@ -38,6 +38,7 @@ describe("static public SEO documents", () => {
       "/guides",
       "/guides/grow-stage-care-guide",
       "/cultivars",
+      "/tools/grow-help-toolkit",
       "/tools/vpd-calculator",
       "/hardware-integrations",
       "/how-ai-doctor-works",

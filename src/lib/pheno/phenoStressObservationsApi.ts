@@ -194,11 +194,15 @@ export async function listStressObservationsForDiaryEntry(
   diaryEntryId: string,
   plantId?: string | null,
 ): Promise<readonly PhenoStressObservationRow[]> {
+  // Explicit bounds (matching the hunt read above): stress rows accumulate
+  // indefinitely, and an uncapped read is silently truncated at the server's
+  // ceiling in whatever order Postgres returns.
   const linkedQuery = supabase
     .from("pheno_stress_observations")
     .select("*")
     .eq("linked_diary_entry_id", diaryEntryId)
-    .order("start_date", { ascending: false });
+    .order("start_date", { ascending: false })
+    .limit(200);
   const { data: linked, error: linkedErr } = await linkedQuery;
   if (linkedErr) throw linkedErr;
   const linkedRows = (linked ?? []).map((r) => toRow(r as Row));
@@ -208,7 +212,8 @@ export async function listStressObservationsForDiaryEntry(
     .from("pheno_stress_observations")
     .select("*")
     .eq("plant_id", plantId)
-    .order("start_date", { ascending: false });
+    .order("start_date", { ascending: false })
+    .limit(200);
   if (plantErr) throw plantErr;
   const extras = (plantRows ?? []).map((r) => toRow(r as Row)).filter((r) => !seen.has(r.id));
   return [...linkedRows, ...extras];

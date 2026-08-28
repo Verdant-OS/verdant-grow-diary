@@ -8,7 +8,9 @@
  * Hard rules (V0):
  *  - No I/O. No fetch. No Supabase calls. No AI calls. No mutations.
  *  - No ranking. No automatic phenotype pick. Grower decides.
- *  - Demo / stale / invalid / unknown sensor sources are never trusted.
+ *  - Demo / stale / invalid sensor sources are never trusted; source
+ *    normalization delegates to the sanctioned table in
+ *    `@/lib/sensor/sensorSourceRules` (#592 → #1003 canon).
  *  - Missing context is reported explicitly, never guessed.
  *  - Deterministic output: stable sort with explicit tie-breakers.
  *  - Null-safe on every field.
@@ -16,6 +18,12 @@
  * This module is presenter input only. It does NOT decide outcomes for the
  * grower; the grower decides.
  */
+
+import {
+  normalizeSensorSource,
+  SENSOR_SOURCES,
+  type SensorSource,
+} from "@/lib/sensor/sensorSourceRules";
 
 export type ContextualPhenoEvidenceSource =
   | "diary"
@@ -28,24 +36,12 @@ export type ContextualPhenoEvidenceSource =
   | "manual"
   | "unknown";
 
-export type ContextualPhenoSensorSource =
-  "live" | "manual" | "csv" | "demo" | "stale" | "invalid" | "unknown";
-
-const SENSOR_SOURCE_VALUES: readonly ContextualPhenoSensorSource[] = [
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-  "unknown",
-];
+export type ContextualPhenoSensorSource = SensorSource;
 
 const UNTRUSTED_SOURCES: ReadonlySet<ContextualPhenoSensorSource> = new Set([
   "demo",
   "stale",
   "invalid",
-  "unknown",
 ]);
 
 export interface ContextualPhenoSensorReadingInput {
@@ -137,16 +133,6 @@ function nonNegInt(value: unknown): number {
   return Math.floor(value);
 }
 
-function normalizeSensorSource(input: unknown): ContextualPhenoSensorSource {
-  if (typeof input !== "string") return "unknown";
-  const v = input.trim().toLowerCase();
-  if (v.length === 0) return "unknown";
-  if ((SENSOR_SOURCE_VALUES as readonly string[]).includes(v)) {
-    return v as ContextualPhenoSensorSource;
-  }
-  return "unknown";
-}
-
 function emptySourceCounts(): Record<ContextualPhenoSensorSource, number> {
   return {
     live: 0,
@@ -155,7 +141,6 @@ function emptySourceCounts(): Record<ContextualPhenoSensorSource, number> {
     demo: 0,
     stale: 0,
     invalid: 0,
-    unknown: 0,
   };
 }
 
@@ -240,9 +225,7 @@ function aggregatePlant(input: ContextualPhenoPlantInput): PlantAggregation {
   const hasTrustedSensorContext = sourceCounts.live + sourceCounts.manual + sourceCounts.csv > 0;
 
   if (sensorReadingCount > 0 && !hasTrustedSensorContext) {
-    trustWarnings.add(
-      "All sensor readings come from untrusted sources (demo/stale/invalid/unknown).",
-    );
+    trustWarnings.add("All sensor readings come from untrusted sources (demo/stale/invalid).");
   }
 
   const notes = (input.comparisonNotes ?? [])
@@ -339,7 +322,7 @@ export function buildContextualPhenoComparisonView(
 
   const sourceQualitySummary = emptySourceCounts();
   for (const p of plants) {
-    for (const key of SENSOR_SOURCE_VALUES) {
+    for (const key of SENSOR_SOURCES) {
       sourceQualitySummary[key] += p.sourceCounts[key];
     }
   }

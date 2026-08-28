@@ -44,6 +44,12 @@ MULTI_CHANNEL_DEMO = {
 
 class FieldMapIngestReadinessTests(unittest.TestCase):
     def test_existing_field_map_names_preserved(self):
+        self.assertEqual(FIELD_MAP["temp_f"][:3], ("temp1f", "tempf", "tempinf"))
+        self.assertEqual(
+            FIELD_MAP["humidity_percent"][:3],
+            ("humidity1", "humidity", "humidityin"),
+        )
+        self.assertEqual(FIELD_MAP["soil_moisture_pct"][:2], ("soilmoisture1", "soilmoisture2"))
         self.assertIn("temp1f", FIELD_MAP["temp_f"])
         self.assertIn("tempinf", FIELD_MAP["temp_f"])
         self.assertIn("humidity1", FIELD_MAP["humidity_percent"])
@@ -52,6 +58,8 @@ class FieldMapIngestReadinessTests(unittest.TestCase):
         self.assertIn("soilmoisture2", FIELD_MAP["soil_moisture_pct"])
         self.assertIn("co2", FIELD_MAP["co2_ppm"])
         self.assertIn("co2in", FIELD_MAP["co2_ppm"])
+        self.assertNotIn("temp9f", FIELD_MAP["temp_f"])
+        self.assertNotIn("humidity9", FIELD_MAP["humidity_percent"])
 
     def test_extra_channels_accepted_onto_canonical_names(self):
         self.assertIn("temp2f", FIELD_MAP["temp_f"])

@@ -1,6 +1,7 @@
 /**
  * EcoWitt custom-HTTP bridge ingest-readiness — extra-channel + constitution tags.
  */
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -38,6 +39,20 @@ const MULTI_CHANNEL_DEMO = {
 
 describe("ecowittCustomHttpBridgeIngestRules — FIELD_MAP", () => {
   it("keeps existing FIELD_MAP names then accepts extra channels", () => {
+    expect([...ECOWITT_CUSTOM_HTTP_FIELD_MAP.temp_f].slice(0, 3)).toEqual([
+      "temp1f",
+      "tempf",
+      "tempinf",
+    ]);
+    expect([...ECOWITT_CUSTOM_HTTP_FIELD_MAP.humidity_percent].slice(0, 3)).toEqual([
+      "humidity1",
+      "humidity",
+      "humidityin",
+    ]);
+    expect([...ECOWITT_CUSTOM_HTTP_FIELD_MAP.soil_moisture_pct].slice(0, 2)).toEqual([
+      "soilmoisture1",
+      "soilmoisture2",
+    ]);
     expect(ECOWITT_CUSTOM_HTTP_FIELD_MAP.temp_f).toEqual(
       expect.arrayContaining(["temp1f", "tempf", "tempinf", "temp2f", "temp8f"]),
     );
@@ -50,6 +65,28 @@ describe("ecowittCustomHttpBridgeIngestRules — FIELD_MAP", () => {
     expect(ECOWITT_CUSTOM_HTTP_FIELD_MAP.co2_ppm).toEqual(
       expect.arrayContaining(["co2", "co2in", "co2_ppm"]),
     );
+    // Locked spec is temp2f…temp8f / humidity2…8 — do not invent further names.
+    expect(ECOWITT_CUSTOM_HTTP_FIELD_MAP.temp_f).not.toContain("temp9f");
+    expect(ECOWITT_CUSTOM_HTTP_FIELD_MAP.humidity_percent).not.toContain("humidity9");
+  });
+
+  it("TypeScript FIELD_MAP matches the Python listener FIELD_MAP (resolved)", () => {
+    const result = spawnSync(
+      "python3",
+      [
+        "-c",
+        "import json, sys; sys.path.insert(0, 'tools/ecowitt-testbench'); from ecowitt_listener import FIELD_MAP; print(json.dumps({k: list(v) for k, v in FIELD_MAP.items()}))",
+      ],
+      { encoding: "utf-8", cwd: process.cwd() },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const pyMap = JSON.parse(result.stdout) as Record<string, string[]>;
+    expect(pyMap).toEqual({
+      temp_f: [...ECOWITT_CUSTOM_HTTP_FIELD_MAP.temp_f],
+      humidity_percent: [...ECOWITT_CUSTOM_HTTP_FIELD_MAP.humidity_percent],
+      soil_moisture_pct: [...ECOWITT_CUSTOM_HTTP_FIELD_MAP.soil_moisture_pct],
+      co2_ppm: [...ECOWITT_CUSTOM_HTTP_FIELD_MAP.co2_ppm],
+    });
   });
 
   it("normalizes multi-channel demo payload (indoor + ch1 + soil1 + co2)", () => {

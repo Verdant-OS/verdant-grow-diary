@@ -26,17 +26,21 @@ import {
   type PlantType,
 } from "@/lib/plantTypeRules";
 
-export type FightEdge = "a" | "b" | "tie";
+/** "unknown" = at least one side never scored this trait — no edge is real. */
+export type FightEdge = "a" | "b" | "tie" | "unknown";
 
 export interface FightAxis {
   readonly key: AxisKey;
   readonly label: string;
   readonly weightPct: number;
-  readonly aValue: number;
-  readonly bValue: number;
-  /** Which side is stronger on this trait — or a tie. Not a verdict. */
+  /** 0–10, or null when that side never scored this trait. */
+  readonly aValue: number | null;
+  readonly bValue: number | null;
+  /** Which side is stronger on this trait — a tie, or unknown when either
+   * side's value is missing. Not a verdict; a missing value never "loses". */
   readonly edge: FightEdge;
-  readonly margin: number;
+  /** Absolute margin when both sides are scored; null otherwise. */
+  readonly margin: number | null;
 }
 
 export interface FightSide {
@@ -44,8 +48,9 @@ export interface FightSide {
   readonly name: string;
   readonly verdict: ContenderVerdict;
   readonly aroma: readonly string[];
-  readonly score: number;
-  /** Traits where this side has the edge (informational). */
+  /** Renormalized composite over this side's scored axes; null if unscored. */
+  readonly score: number | null;
+  /** Traits where this side has the edge (informational; both sides scored). */
   readonly axisWins: number;
   /** Normalized declared type — presenters render a persistent badge. */
   readonly plantType: PlantType;
@@ -56,6 +61,8 @@ export interface PhenoFight {
   readonly b: FightSide;
   readonly axes: readonly FightAxis[];
   readonly ties: number;
+  /** Axes where either side is unscored — surfaced, never counted as losses. */
+  readonly unknownAxes: number;
   /**
    * Pair comparability (autoflower/photoperiod plan, 2026-07-21): mixed or
    * unknown types, or stages beyond the locked tolerance, mark the fight
@@ -66,9 +73,11 @@ export interface PhenoFight {
   // No `winner`, by design — the call is the grower's.
 }
 
-function clamp10(v: unknown): number {
+/** Clamp a present value to 0–10; a missing value stays null (never a 0). */
+function clamp10OrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null;
   const n = typeof v === "number" ? v : Number(v);
-  if (!Number.isFinite(n)) return 0;
+  if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(10, n));
 }
 
@@ -78,17 +87,21 @@ function clean(v: unknown): string | null {
   return t.length > 0 ? t : null;
 }
 
-function clampAxes(axes: ContenderInput["axes"]): Record<AxisKey, number> {
+function clampAxes(axes: ContenderInput["axes"]): Record<AxisKey, number | null> {
   return {
-    nose: clamp10(axes?.nose),
-    resin: clamp10(axes?.resin),
-    structure: clamp10(axes?.structure),
-    yield: clamp10(axes?.yield),
-    breeding: clamp10(axes?.breeding),
+    nose: clamp10OrNull(axes?.nose),
+    resin: clamp10OrNull(axes?.resin),
+    structure: clamp10OrNull(axes?.structure),
+    yield: clamp10OrNull(axes?.yield),
+    breeding: clamp10OrNull(axes?.breeding),
   };
 }
 
-function toSide(input: ContenderInput, vals: Record<AxisKey, number>, axisWins: number): FightSide {
+function toSide(
+  input: ContenderInput,
+  vals: Record<AxisKey, number | null>,
+  axisWins: number,
+): FightSide {
   return {
     id: String(input.id),
     name: clean(input.name) ?? String(input.id),
@@ -117,14 +130,27 @@ export function buildFight(
   let aWins = 0;
   let bWins = 0;
   let ties = 0;
+  let unknownAxes = 0;
 
   const axes: FightAxis[] = CONTENDER_AXES.map((ax) => {
     const aValue = av[ax.key];
     const bValue = bv[ax.key];
-    const edge: FightEdge = aValue > bValue ? "a" : bValue > aValue ? "b" : "tie";
-    if (edge === "a") aWins += 1;
-    else if (edge === "b") bWins += 1;
-    else ties += 1;
+    // A missing value produces NO edge: an unscored trait is unknown, not a
+    // 10–0 loss. Only both-scored axes enter the tally.
+    let edge: FightEdge;
+    if (aValue === null || bValue === null) {
+      edge = "unknown";
+      unknownAxes += 1;
+    } else if (aValue > bValue) {
+      edge = "a";
+      aWins += 1;
+    } else if (bValue > aValue) {
+      edge = "b";
+      bWins += 1;
+    } else {
+      edge = "tie";
+      ties += 1;
+    }
     return {
       key: ax.key,
       label: ax.label,
@@ -132,7 +158,7 @@ export function buildFight(
       aValue,
       bValue,
       edge,
-      margin: Math.abs(aValue - bValue),
+      margin: aValue !== null && bValue !== null ? Math.abs(aValue - bValue) : null,
     };
   });
 
@@ -141,6 +167,7 @@ export function buildFight(
     b: toSide(b, bv, bWins),
     axes,
     ties,
+    unknownAxes,
     comparability: areComparable(
       { plantType: a.plantType ?? null, stageRank: plantStageRank(a.stage ?? null) },
       { plantType: b.plantType ?? null, stageRank: plantStageRank(b.stage ?? null) },

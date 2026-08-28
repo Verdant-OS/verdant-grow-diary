@@ -21,11 +21,14 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import { AuthProvider, useAuth } from "@/store/auth";
+import { AUTH_LAST_RESOLVED_IDENTITY_STORAGE_KEY, AuthProvider, useAuth } from "@/store/auth";
 import {
   OAUTH_SIGNUP_ACQUISITION_STORAGE_KEY,
   savePendingOAuthSignupAcquisition,
 } from "@/lib/oauthSignupAcquisitionRules";
+import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
+import { GLOBAL_SEARCH_SESSION_STORAGE_KEY } from "@/lib/globalSearchSession";
+import { clearLocalStorageForTest } from "@/test/helpers/localStorageTestHelper";
 
 function Probe() {
   const { user, loading } = useAuth();
@@ -34,6 +37,7 @@ function Probe() {
 
 beforeEach(() => {
   window.sessionStorage.clear();
+  clearLocalStorageForTest();
   mocks.getSession.mockReset();
   mocks.onAuthStateChange.mockReset();
   mocks.rpc.mockReset();
@@ -46,6 +50,31 @@ beforeEach(() => {
 });
 
 describe("AuthProvider OAuth signup attribution handoff", () => {
+  it("clears stale private search state on the first signed-out resolution", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null } });
+    const transitions: Array<[string | null, string | null]> = [];
+    const client = new QueryClient();
+    window.sessionStorage.setItem(
+      GLOBAL_SEARCH_SESSION_STORAGE_KEY,
+      "private query from an expired session",
+    );
+
+    render(
+      <AuthProvider
+        onBeforeAuthIdentityChange={(previousUserId, nextUserId) => {
+          transitions.push([previousUserId, nextUserId]);
+          clearPrivateClientStateBeforeAuthIdentityChange(client);
+        }}
+      >
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBeNull();
+    expect(transitions).toEqual([[null, null]]);
+  });
+
   it("flushes a pending fixed source after the verified session exists", async () => {
     savePendingOAuthSignupAcquisition("csv_history", window.sessionStorage, Date.now());
     mocks.getSession.mockResolvedValue({
@@ -87,18 +116,19 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
     await waitFor(() => expect(mocks.rpc).not.toHaveBeenCalled());
   });
 
-  it("clears cached private rows synchronously before exposing a new auth identity", async () => {
+  it("clears cached rows and search memory before every new auth identity is exposed", async () => {
     mocks.getSession.mockResolvedValue({
       data: { session: { user: { id: "owner-a" } } },
     });
     const client = new QueryClient();
     const transitions: Array<[string | null, string | null]> = [];
+    window.sessionStorage.setItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY, "anonymous query");
 
     render(
       <AuthProvider
         onBeforeAuthIdentityChange={(previousUserId, nextUserId) => {
           transitions.push([previousUserId, nextUserId]);
-          client.clear();
+          clearPrivateClientStateBeforeAuthIdentityChange(client);
         }}
       >
         <Probe />
@@ -106,10 +136,12 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
     );
 
     expect(await screen.findByText("owner-a")).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBeNull();
     client.setQueryData(
       ["sensor_readings", "all", 60, "owner", "owner-a"],
       [{ id: "owner-a-private-row" }],
     );
+    window.sessionStorage.setItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY, "owner-a private query");
     expect(client.getQueryCache().getAll()).toHaveLength(1);
 
     act(() => {
@@ -117,12 +149,103 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
       // React has not committed owner B yet; the synchronous transition fence
       // has already destroyed owner A's cache entry.
       expect(client.getQueryCache().getAll()).toHaveLength(0);
+      expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBeNull();
     });
 
     expect(await screen.findByText("owner-b")).toBeInTheDocument();
+    window.sessionStorage.setItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY, "owner-b private query");
+
+    act(() => {
+      mocks.authListener?.("SIGNED_OUT", null);
+      expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBeNull();
+    });
+
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
     expect(transitions).toEqual([
       [null, "owner-a"],
       ["owner-a", "owner-b"],
+      ["owner-b", null],
     ]);
+  });
+
+  it("does not wipe query cache or search memory on same-identity remount after reload", async () => {
+    mocks.getSession.mockResolvedValue({
+      data: { session: { user: { id: "owner-a" } } },
+    });
+    const client = new QueryClient();
+    const transitions: Array<[string | null, string | null]> = [];
+    window.sessionStorage.setItem(AUTH_LAST_RESOLVED_IDENTITY_STORAGE_KEY, "owner-a");
+    window.sessionStorage.setItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY, "owner-a private query");
+    client.setQueryData(
+      ["sensor_readings", "all", 60, "owner", "owner-a"],
+      [{ id: "owner-a-private-row" }],
+    );
+
+    const { unmount } = render(
+      <AuthProvider
+        onBeforeAuthIdentityChange={(previousUserId, nextUserId) => {
+          transitions.push([previousUserId, nextUserId]);
+          clearPrivateClientStateBeforeAuthIdentityChange(client);
+        }}
+      >
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("owner-a")).toBeInTheDocument();
+    expect(transitions).toEqual([]);
+    expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBe(
+      "owner-a private query",
+    );
+    expect(client.getQueryCache().getAll()).toHaveLength(1);
+
+    unmount();
+
+    const remountTransitions: Array<[string | null, string | null]> = [];
+    render(
+      <AuthProvider
+        onBeforeAuthIdentityChange={(previousUserId, nextUserId) => {
+          remountTransitions.push([previousUserId, nextUserId]);
+          clearPrivateClientStateBeforeAuthIdentityChange(client);
+        }}
+      >
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("owner-a")).toBeInTheDocument();
+    expect(remountTransitions).toEqual([]);
+    expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBe(
+      "owner-a private query",
+    );
+    expect(client.getQueryCache().getAll()).toHaveLength(1);
+  });
+
+  it("wipes leftover private state when an expired session resolves signed-out after a prior user", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null } });
+    const client = new QueryClient();
+    const transitions: Array<[string | null, string | null]> = [];
+    window.sessionStorage.setItem(AUTH_LAST_RESOLVED_IDENTITY_STORAGE_KEY, "owner-a");
+    window.sessionStorage.setItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY, "owner-a leftover query");
+    client.setQueryData(
+      ["sensor_readings", "all", 60, "owner", "owner-a"],
+      [{ id: "owner-a-private-row" }],
+    );
+
+    render(
+      <AuthProvider
+        onBeforeAuthIdentityChange={(previousUserId, nextUserId) => {
+          transitions.push([previousUserId, nextUserId]);
+          clearPrivateClientStateBeforeAuthIdentityChange(client);
+        }}
+      >
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+    expect(transitions).toEqual([[null, null]]);
+    expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBeNull();
+    expect(client.getQueryCache().getAll()).toHaveLength(0);
   });
 });

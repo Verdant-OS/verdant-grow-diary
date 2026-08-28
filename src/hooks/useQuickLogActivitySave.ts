@@ -110,6 +110,16 @@ export function useQuickLogActivitySave() {
       setError(null);
       try {
         if (plan.saveRoute === "manual_note") {
+          // Fail-closed before target resolution and before constructing the
+          // RPC: never call quicklog_save_manual with a null/short/overlong key.
+          if (
+            !input.idempotencyKey ||
+            input.idempotencyKey.length < 8 ||
+            input.idempotencyKey.length > 200
+          ) {
+            setError("missing_idempotency_key");
+            return { ok: false, reason: "missing_idempotency_key" };
+          }
           // quicklog_save_manual is target-scoped (p_target_type/p_target_id)
           // and derives grow/tent/plant server-side from the owned target row
           // — mirroring useQuickLogV2Save + quickLogV2SavePayload. No deployed
@@ -123,12 +133,6 @@ export function useQuickLogActivitySave() {
           const manualDetails: Record<string, unknown> = {
             ...(input.extraDetails ?? {}),
           };
-          const manualIdempotencyKey =
-            input.idempotencyKey &&
-            input.idempotencyKey.length >= 8 &&
-            input.idempotencyKey.length <= 200
-              ? input.idempotencyKey
-              : null;
           const { data, error: rpcErr } = await supabase.rpc(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_manual" as any,
@@ -143,7 +147,7 @@ export function useQuickLogActivitySave() {
               p_vpd_kpa: null,
               p_occurred_at: null,
               ...(Object.keys(manualDetails).length > 0 ? { p_details: manualDetails } : {}),
-              p_idempotency_key: manualIdempotencyKey,
+              p_idempotency_key: input.idempotencyKey,
             } as unknown as Record<string, unknown>,
           );
           if (rpcErr) {

@@ -1,6 +1,12 @@
 /// <reference types="vite/client" />
-import { Suspense, useEffect } from "react";
-import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
+import { Suspense, createElement, useEffect } from "react";
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRouteWithContext,
+  useRouterState,
+} from "@tanstack/react-router";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,11 +22,12 @@ import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
 import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
-import { clearGrowDataMeta } from "@/hooks/useGrowData";
+import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
+import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
 
 const SITE_URL = "https://verdantgrowdiary.com";
 const SITE_NAME = "Verdant Grow Diary";
@@ -109,8 +116,17 @@ export const Route = createRootRouteWithContext<RootRouteContext>()({
   errorComponent: RootErrorComponent,
 });
 
+function isGrowHelpToolkitPath(pathname: string): boolean {
+  return pathname === GROW_HELP_TOOLKIT_PATH || pathname === `${GROW_HELP_TOOLKIT_PATH}/`;
+}
+
 function RootErrorComponent({ error }: { error: Error }) {
-  reportLovableError(error);
+  const pathname = useRouterState({
+    select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
+  });
+  if (!isGrowHelpToolkitPath(pathname)) {
+    reportLovableError(error);
+  }
   return (
     <RootDocument>
       <div
@@ -127,13 +143,12 @@ function RootErrorComponent({ error }: { error: Error }) {
  * cancels active observers before AuthProvider exposes the next identity.
  * Source-disclosure metadata lives outside React Query and needs the same
  * identity fence so one grower's status cannot flash for the next account.
+ * Global Search query/history/selection state is also identity-scoped because
+ * its text can contain private grow, tent, or plant labels.
  */
 function useClearQueryCacheBeforeAuthIdentityChange() {
   const { queryClient } = Route.useRouteContext();
-  return () => {
-    queryClient.clear();
-    clearGrowDataMeta();
-  };
+  return () => clearPrivateClientStateBeforeAuthIdentityChange(queryClient);
 }
 
 function AnalyticsShell() {
@@ -180,6 +195,25 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const pathname = useRouterState({
+    select: (state) => state.resolvedLocation?.pathname ?? state.location.pathname,
+  });
+  if (isGrowHelpToolkitPath(pathname)) {
+    return (
+      <RootDocument>
+        <Suspense fallback={<PageLoader />}>
+          {/* Keep this local-only branch independent of application providers.
+              createElement also preserves the normal shell's structural
+              Outlet ordering contract used by its regression guard. */}
+          {createElement(Outlet)}
+        </Suspense>
+      </RootDocument>
+    );
+  }
+  return <ApplicationRootComponent />;
+}
+
+function ApplicationRootComponent() {
   const { queryClient } = Route.useRouteContext();
   const onBeforeAuthIdentityChange = useClearQueryCacheBeforeAuthIdentityChange();
   return (

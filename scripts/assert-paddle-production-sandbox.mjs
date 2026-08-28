@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { resolveCanonicalPaddleSandboxToken } from "./e2e/managed-session-materialize-core.mjs";
+import { resolveCanonicalPaddleProductionToken } from "./e2e/managed-session-materialize-core.mjs";
 
 const TOKEN_NAME = "VITE_PAYMENTS_CLIENT_TOKEN";
 const MAX_PRODUCTION_ENV_BYTES = 64 * 1024;
@@ -27,16 +27,16 @@ function readCanonicalProductionEnv(rootDir) {
   }
 }
 
-function resolveEffectiveSandboxToken(token) {
+function resolveEffectiveProductionToken(token) {
   if (typeof token !== "string") {
-    return fixedFailure("effective_paddle_token_not_sandbox");
+    return fixedFailure("effective_paddle_token_invalid");
   }
 
   // JSON quoting keeps line breaks and delimiter bytes inert while reusing the
   // strict canonical parser instead of introducing a second token classifier.
-  const resolved = resolveCanonicalPaddleSandboxToken(`${TOKEN_NAME}=${JSON.stringify(token)}`);
+  const resolved = resolveCanonicalPaddleProductionToken(`${TOKEN_NAME}=${JSON.stringify(token)}`);
   if (!resolved.ok) {
-    return fixedFailure("effective_paddle_token_not_sandbox");
+    return fixedFailure("effective_paddle_token_invalid");
   }
   return resolved;
 }
@@ -84,20 +84,21 @@ async function loadEffectiveProductionEnv(rootDir) {
 }
 
 /**
- * Verify both committed production source and the exact value Vite will
- * bundle. Results contain fixed codes only; token bytes never leave locals.
+ * Standing production client-token gate: verify the committed production
+ * source and the exact value Vite will bundle. Accepts test_ or live_.
+ * Results contain fixed codes only; token bytes never leave locals.
  */
-async function verifyPaddleProductionSandbox(rootDir = process.cwd()) {
+async function verifyPaddleProductionClientToken(rootDir = process.cwd()) {
   const rawEnv = readCanonicalProductionEnv(rootDir);
   if (!rawEnv.ok) return rawEnv;
 
-  const canonical = resolveCanonicalPaddleSandboxToken(rawEnv.text);
+  const canonical = resolveCanonicalPaddleProductionToken(rawEnv.text);
   if (!canonical.ok) return fixedFailure(canonical.reason);
 
   const effectiveEnv = await loadEffectiveProductionEnv(rootDir);
   if (!effectiveEnv.ok) return effectiveEnv;
 
-  const effective = resolveEffectiveSandboxToken(effectiveEnv.env[TOKEN_NAME]);
+  const effective = resolveEffectiveProductionToken(effectiveEnv.env[TOKEN_NAME]);
   if (!effective.ok) return effective;
   if (effective.token !== canonical.token) {
     return fixedFailure("effective_paddle_token_mismatch");
@@ -107,13 +108,13 @@ async function verifyPaddleProductionSandbox(rootDir = process.cwd()) {
 }
 
 async function main() {
-  const result = await verifyPaddleProductionSandbox();
+  const result = await verifyPaddleProductionClientToken();
   if (!result.ok) {
     console.error(`[paddle-production-policy] ${result.reason}`);
     process.exitCode = 1;
     return;
   }
-  console.log("[paddle-production-policy] sandbox source verified.");
+  console.log("[paddle-production-policy] production client token verified.");
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : null;

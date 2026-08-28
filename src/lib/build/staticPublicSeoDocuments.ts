@@ -560,6 +560,12 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       }),
     ],
   }),
+  publicDocument("/tools/grow-help-toolkit", {
+    title: "Free Nutrient, Grow Light & Cost Calculators | Verdant",
+    description:
+      "Plan nutrient recipes, canopy lighting, electricity and cost per dried saleable gram in one private browser-only toolkit. Formulas and units are shown with every result.",
+    imageAlt: "Verdant Grow Help Toolkit calculators",
+  }),
   publicDocument("/tools/vpd-calculator", {
     title: "Free Cannabis VPD Calculator by Growth Stage | Verdant",
     description:

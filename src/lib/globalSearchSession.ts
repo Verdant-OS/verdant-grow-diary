@@ -8,6 +8,8 @@
  * storage-disabled browsers degrade silently to defaults.
  */
 
+import { clearRecentSearches, RECENT_SEARCHES_STORAGE_KEY } from "@/lib/recentGlobalSearches";
+
 export type GlobalSearchEntityType = "grow" | "tent" | "plant" | "cultivar";
 
 export interface GlobalSearchSessionState {
@@ -26,7 +28,8 @@ const ALL_ON: Record<GlobalSearchEntityType, boolean> = {
 
 export const DEFAULT_FILTERS: Record<GlobalSearchEntityType, boolean> = ALL_ON;
 
-function safeStorage(): Storage | null {
+function safeStorage(provided?: Storage | null): Storage | null {
+  if (provided !== undefined) return provided;
   try {
     if (typeof window === "undefined") return null;
     return window.sessionStorage;
@@ -256,3 +259,75 @@ export function clearGlobalSearchLastSelected(): void {
 }
 
 export const GLOBAL_SEARCH_LAST_SELECTED_STORAGE_KEY = LAST_SELECTED_STORAGE_KEY;
+
+export const GLOBAL_SEARCH_PRIVATE_STORAGE_KEYS: readonly string[] = [
+  STORAGE_KEY,
+  HISTORY_STORAGE_KEY,
+  LAST_SELECTED_STORAGE_KEY,
+  RECENT_SEARCHES_STORAGE_KEY,
+];
+
+export interface ClearGlobalSearchPrivateStateDeps {
+  sessionStorage?: Storage | null;
+  /** Legacy persistent recent-query slot; removal only, never read for display. */
+  localStorage?: Storage | null;
+}
+
+type GlobalSearchPrivateStateClearListener = () => void;
+const privateStateClearListeners = new Set<GlobalSearchPrivateStateClearListener>();
+let privateStateEpoch = 0;
+
+/** Monotonic identity fence token for search hooks and query functions. */
+export function getGlobalSearchPrivateStateEpoch(): number {
+  return privateStateEpoch;
+}
+
+/**
+ * Keep mounted palettes inside the same identity fence as persisted state.
+ * The returned unsubscribe makes the module-level registry safe across route
+ * unmounts, tests, and HMR.
+ */
+export function subscribeGlobalSearchPrivateStateClear(
+  listener: GlobalSearchPrivateStateClearListener,
+): () => void {
+  privateStateClearListeners.add(listener);
+  return () => privateStateClearListeners.delete(listener);
+}
+
+function notifyGlobalSearchPrivateStateCleared(): void {
+  for (const listener of [...privateStateClearListeners]) {
+    try {
+      listener();
+    } catch {
+      /* one broken subscriber must never block an auth identity transition */
+    }
+  }
+}
+
+/**
+ * Remove every identity-scoped Global Search value without touching unrelated
+ * browser preferences. This runs synchronously before AuthProvider publishes a
+ * different user, so a previous grower's query or selected row cannot flash for
+ * the next account. Storage failures degrade safely and never block auth.
+ */
+export function clearGlobalSearchPrivateState(deps: ClearGlobalSearchPrivateStateDeps = {}): void {
+  // Invalidate active query functions before any React state update or
+  // QueryClient clear can schedule work for the previous identity.
+  privateStateEpoch += 1;
+  clearRecentSearches({
+    sessionStorage: deps.sessionStorage,
+    localStorage: deps.localStorage,
+  });
+
+  const storage = safeStorage(deps.sessionStorage);
+  if (storage) {
+    for (const key of GLOBAL_SEARCH_PRIVATE_STORAGE_KEYS) {
+      try {
+        storage.removeItem(key);
+      } catch {
+        /* ignore privacy-mode / unavailable-storage errors */
+      }
+    }
+  }
+  notifyGlobalSearchPrivateStateCleared();
+}

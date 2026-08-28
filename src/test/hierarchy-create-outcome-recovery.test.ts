@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH,
   HIERARCHY_CREATE_OUTCOME_RECOVERY_STORAGE_KEY,
   adoptLegacyHierarchyCreateOutcomeRecoveryAttempts,
   clearHierarchyCreateOutcomeRecoveryAttempt,
   getHierarchyCreateOutcomeRecoveryAttempts,
+  getHierarchyCreateOutcomeRecoveryRuntimeEpoch,
   recordHierarchyCreateOutcomeRecoveryAttempt,
 } from "@/lib/hierarchyCreateOutcomeRecovery";
 
@@ -17,6 +17,7 @@ const IDS = {
 } as const;
 
 const RECOVERY_RUNTIME_STATE_SLOT = "__verdantHierarchyCreateOutcomeRecoveryRuntimeState";
+const RECOVERY_RUNTIME_EPOCH_SLOT = "__verdantHierarchyCreateOutcomeRecoveryRuntimeEpoch";
 
 const GROW_ATTEMPT = {
   entity: "grow" as const,
@@ -33,6 +34,7 @@ const TENT_ATTEMPT = {
 
 beforeEach(() => {
   delete (globalThis as Record<string, unknown>)[RECOVERY_RUNTIME_STATE_SLOT];
+  delete (globalThis as Record<string, unknown>)[RECOVERY_RUNTIME_EPOCH_SLOT];
   window.sessionStorage.removeItem(HIERARCHY_CREATE_OUTCOME_RECOVERY_STORAGE_KEY);
 });
 
@@ -41,9 +43,10 @@ describe("hierarchy create outcome recovery", () => {
     recordHierarchyCreateOutcomeRecoveryAttempt(GROW_ATTEMPT);
     recordHierarchyCreateOutcomeRecoveryAttempt(TENT_ATTEMPT);
 
+    const epoch = getHierarchyCreateOutcomeRecoveryRuntimeEpoch();
     expect(getHierarchyCreateOutcomeRecoveryAttempts(IDS.ownerA)).toEqual([
-      { attempt: GROW_ATTEMPT, runtimeEpoch: HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH },
-      { attempt: TENT_ATTEMPT, runtimeEpoch: HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH },
+      { attempt: GROW_ATTEMPT, runtimeEpoch: epoch },
+      { attempt: TENT_ATTEMPT, runtimeEpoch: epoch },
     ]);
     expect(getHierarchyCreateOutcomeRecoveryAttempts(IDS.ownerB)).toEqual([]);
   });
@@ -55,7 +58,7 @@ describe("hierarchy create outcome recovery", () => {
     expect(clearHierarchyCreateOutcomeRecoveryAttempt(GROW_ATTEMPT)).toBe(true);
 
     expect(getHierarchyCreateOutcomeRecoveryAttempts(IDS.ownerA)).toEqual([
-      { attempt: TENT_ATTEMPT, runtimeEpoch: HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH },
+      { attempt: TENT_ATTEMPT, runtimeEpoch: getHierarchyCreateOutcomeRecoveryRuntimeEpoch() },
     ]);
   });
 
@@ -70,7 +73,10 @@ describe("hierarchy create outcome recovery", () => {
     ]);
     expect(adoptLegacyHierarchyCreateOutcomeRecoveryAttempts(IDS.ownerA)).toBe(true);
     expect(getHierarchyCreateOutcomeRecoveryAttempts(IDS.ownerA)).toEqual([
-      { attempt: GROW_ATTEMPT, runtimeEpoch: HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH },
+      {
+        attempt: GROW_ATTEMPT,
+        runtimeEpoch: getHierarchyCreateOutcomeRecoveryRuntimeEpoch(),
+      },
     ]);
   });
 
@@ -92,5 +98,61 @@ describe("hierarchy create outcome recovery", () => {
     );
 
     expect(getHierarchyCreateOutcomeRecoveryAttempts(IDS.ownerA)).toEqual([]);
+  });
+});
+
+describe("hierarchy create outcome recovery runtime epoch (CF Workers global-scope safety)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    delete (globalThis as Record<string, unknown>)[RECOVERY_RUNTIME_EPOCH_SLOT];
+    delete (globalThis as Record<string, unknown>)[RECOVERY_RUNTIME_STATE_SLOT];
+  });
+
+  it("can be imported in a worker-like context without Date.now / random / timer / fetch at module eval", async () => {
+    vi.resetModules();
+    delete (globalThis as Record<string, unknown>)[RECOVERY_RUNTIME_EPOCH_SLOT];
+    delete (globalThis as Record<string, unknown>)[RECOVERY_RUNTIME_STATE_SLOT];
+
+    const dateNow = vi.spyOn(Date, "now");
+    const mathRandom = vi.spyOn(Math, "random");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const randomUUID = vi.fn(() => "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    const performanceNow = vi.fn(() => 1.5);
+    vi.stubGlobal("crypto", { randomUUID });
+    vi.stubGlobal("performance", { now: performanceNow });
+
+    await import("@/lib/hierarchyCreateOutcomeRecovery");
+
+    // mintRuntimeEpoch uses crypto.randomUUID or Date.now + performance.now only;
+    // none of those (nor Math.random / fetch / timers) may run at module eval.
+    expect(dateNow).not.toHaveBeenCalled();
+    expect(mathRandom).not.toHaveBeenCalled();
+    expect(randomUUID).not.toHaveBeenCalled();
+    expect(performanceNow).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns a usable runtime epoch when called after import", async () => {
+    vi.resetModules();
+    delete (globalThis as Record<string, unknown>)[RECOVERY_RUNTIME_EPOCH_SLOT];
+    delete (globalThis as Record<string, unknown>)[RECOVERY_RUNTIME_STATE_SLOT];
+
+    const randomUUID = vi.fn(() => "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    vi.stubGlobal("crypto", { randomUUID });
+
+    const { getHierarchyCreateOutcomeRecoveryRuntimeEpoch: getEpoch } = await import(
+      "@/lib/hierarchyCreateOutcomeRecovery"
+    );
+
+    expect(randomUUID).not.toHaveBeenCalled();
+
+    const epoch = getEpoch();
+    expect(epoch).toBe("runtime:aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee");
+    expect(randomUUID).toHaveBeenCalledTimes(1);
+    expect(getEpoch()).toBe(epoch);
+    expect(randomUUID).toHaveBeenCalledTimes(1);
   });
 });

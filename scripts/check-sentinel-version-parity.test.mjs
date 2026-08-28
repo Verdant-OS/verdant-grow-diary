@@ -54,6 +54,12 @@ STATUS: BLOCKED — AGENT CONTEXT INCOMPLETE
 
 Do not continue until the context issue is resolved.`;
 
+const CLAUDE_STATE_READ_INSTRUCTION =
+  "**`docs/agents/CURRENT_STATE.md` is deliberately NOT imported — read it with a file " +
+  "tool before you acknowledge.**";
+const CLAUDE_STATE_READ_STEP =
+  "1. Read `docs/agents/CURRENT_STATE.md`, then confirm all three context files were loaded.";
+
 const fixtures = [];
 
 function run(command, args, cwd, extraEnv = {}) {
@@ -86,9 +92,17 @@ function writeGovernanceFile(root, path, version = "2026-08-01.1") {
     return;
   }
 
+  // CLAUDE.md imports two files and reads docs/agents/CURRENT_STATE.md on demand. The
+  // checker pins both read imperatives verbatim, so the fixture must carry them exactly.
+  // The trailing "See also" line is a deliberate incidental mention of the pathname: the
+  // drop-the-instruction test relies on it to prove a leftover reference cannot satisfy
+  // the check.
   const imports =
     path === "CLAUDE.md"
-      ? "@AGENTS.md\n@docs/agents/CURRENT_STATE.md\n@docs/agents/roles/claude.md\n\n"
+      ? "@AGENTS.md\n@docs/agents/roles/claude.md\n\n" +
+        `${CLAUDE_STATE_READ_INSTRUCTION}\n\n${CLAUDE_STATE_READ_STEP}\n\n` +
+        "See also docs/agents/CURRENT_STATE.md for operating state. The old import " +
+        "(`@docs/agents/CURRENT_STATE.md`) was removed in #1094.\n\n"
       : "";
   const core =
     path === "GEMINI.md"
@@ -228,7 +242,163 @@ test("fails when Claude's automatic imports drift", () => {
   const result = runChecker(root);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /CLAUDE\.md: the first three lines must import/);
+  assert.match(result.stderr, /CLAUDE\.md: the first two lines must import/);
+});
+
+// CURRENT_STATE.md stopped being an @import on 2026-08-21 (~27,400 tokens on every turn).
+// The written read instruction replaced it, and a sentence can be deleted without the
+// obvious diff signature that removing an import line has — so it is guarded explicitly.
+test("fails when both read imperatives are dropped even though an incidental mention of the pathname remains", () => {
+  const root = makeFixture();
+  // Remove the two pinned imperatives but keep the fixture's "See also
+  // docs/agents/CURRENT_STATE.md" line: a bare-pathname check would stay green here,
+  // which is exactly the hole this test pins shut.
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_INSTRUCTION, "Operating state is elsewhere.");
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_STEP, "1. Confirm context files were loaded.");
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /exact pre-ack read instruction .* is missing/);
+  assert.match(result.stderr, /exact startup step-1 read .* is missing/);
+});
+
+test("fails when the imperatives survive only inside a fenced example and a blockquote", () => {
+  const root = makeFixture();
+  // Codex's reproduced bypass: replace both operative imperatives with contradictory
+  // prose while their exact wording is retained in non-operative contexts — one inside
+  // an "obsolete example" fence, one as a blockquoted historical copy. A full-text
+  // includes() stays green here; the operative-prose check must not.
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_INSTRUCTION, "Operating state is optional now.");
+  replace(
+    root,
+    "CLAUDE.md",
+    CLAUDE_STATE_READ_STEP,
+    "1. Skip straight to acknowledging.\n\n" +
+      "Obsolete example, do not follow:\n\n" +
+      "\u0060\u0060\u0060text\n" +
+      `${CLAUDE_STATE_READ_INSTRUCTION}\n` +
+      "\u0060\u0060\u0060\n\n" +
+      `> ${CLAUDE_STATE_READ_STEP}`,
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /exact pre-ack read instruction .* is missing/);
+  assert.match(result.stderr, /exact startup step-1 read .* is missing/);
+});
+
+test("fails when the imperatives survive only inside a tilde fence and an HTML comment", () => {
+  const root = makeFixture();
+  // Same bypass class as the backtick-fence test, via the other CommonMark fence
+  // delimiter and an HTML comment — both non-operative contexts the parser must strip.
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_INSTRUCTION, "Operating state is optional now.");
+  replace(
+    root,
+    "CLAUDE.md",
+    CLAUDE_STATE_READ_STEP,
+    "1. Skip straight to acknowledging.\n\n" +
+      "~~~text\n" +
+      `${CLAUDE_STATE_READ_INSTRUCTION}\n` +
+      "~~~\n\n" +
+      `<!-- ${CLAUDE_STATE_READ_STEP} -->`,
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /exact pre-ack read instruction .* is missing/);
+  assert.match(result.stderr, /exact startup step-1 read .* is missing/);
+});
+
+test("fails when a pin survives inside a comment left behind by delimiter recombination", () => {
+  const root = makeFixture();
+  // CodeQL's incomplete-sanitization pattern, pointed at this gate: one strip pass over
+  // "<!<!-- x -->-- pin -->" removes the inner comment and leaves "<!-- pin -->" intact,
+  // so a single-pass parser counts the pin as operative. The fixpoint loop must not.
+  replace(root, "CLAUDE.md", CLAUDE_STATE_READ_STEP, "1. Skip straight to acknowledging.");
+  replace(
+    root,
+    "CLAUDE.md",
+    "See also docs/agents/CURRENT_STATE.md for operating state.",
+    `See also docs/agents/CURRENT_STATE.md for operating state.\n\n<!<!-- x -->-- ${CLAUDE_STATE_READ_STEP} -->`,
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /exact startup step-1 read .* is missing/);
+});
+
+test("passes when the read instruction is merely re-wrapped across different lines", () => {
+  const root = makeFixture();
+  // Whitespace-normalized comparison: a prose re-wrap must not read as a violation.
+  replace(
+    root,
+    "CLAUDE.md",
+    CLAUDE_STATE_READ_INSTRUCTION,
+    CLAUDE_STATE_READ_INSTRUCTION.replace(" read it with a file ", "\nread it with a file\n"),
+  );
+  // Commit the re-wrap so the BUMP gate sees no drift — this test isolates the
+  // whitespace-normalized pin comparison, not the content-change rule.
+  git(root, "add", ".");
+  git(root, "commit", "-m", "re-wrap the read instruction");
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 0, result.stderr);
+});
+
+// Re-importing it would silently undo the token saving, so the ordered-prefix assertion
+// has to reject a three-line header as firmly as it rejects a wrong one.
+test("fails when CURRENT_STATE.md is re-added as an automatic import", () => {
+  const root = makeFixture();
+  replace(
+    root,
+    "CLAUDE.md",
+    "@AGENTS.md\n@docs/agents/roles/claude.md",
+    "@AGENTS.md\n@docs/agents/CURRENT_STATE.md\n@docs/agents/roles/claude.md",
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /CLAUDE\.md: the first two lines must import/);
+});
+
+test("fails when CURRENT_STATE.md is imported inline in prose", () => {
+  const root = makeFixture();
+  // Claude Code resolves @-imports inline in a sentence, not only on standalone lines,
+  // and the fixture's backticked mention proves a code-span reference stays legal.
+  replace(
+    root,
+    "CLAUDE.md",
+    "See also docs/agents/CURRENT_STATE.md for operating state.",
+    "See @docs/agents/CURRENT_STATE.md for operating state.",
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /must not be imported automatically/);
+});
+
+test("fails when CURRENT_STATE.md is appended as a third import after the required prefix", () => {
+  const root = makeFixture();
+  // The two required lines stay first, so startsWith still holds — only the explicit
+  // reject-anywhere rule can catch this placement.
+  replace(
+    root,
+    "CLAUDE.md",
+    "@AGENTS.md\n@docs/agents/roles/claude.md",
+    "@AGENTS.md\n@docs/agents/roles/claude.md\n@docs/agents/CURRENT_STATE.md",
+  );
+
+  const result = runChecker(root);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /must not be imported automatically/);
 });
 
 test("fails when the legacy archive loses its inactive header", () => {

@@ -20,7 +20,7 @@ import {
 import {
   CONTEXTUAL_PHENO_COMPARISON_ALL_INSUFFICIENT_PLANT_INPUTS,
   CONTEXTUAL_PHENO_COMPARISON_EMPTY_STATE_PLANT_INPUTS,
-} from "@/test/fixtures/contextualPhenoComparisonFixtures";
+} from "@/lib/demo/contextualPhenoComparisonFixtures";
 
 const BANNED_TOKENS = [
   "healthy",

@@ -14,6 +14,22 @@ vi.mock("@/hooks/usePhenoHuntWorkspace", () => ({
   usePhenoHuntWorkspace: () => hookMock(),
 }));
 
+// Active Pro entitlement so the workspace renders its writable tree — the
+// page now fences every mutation control on canWriteFeatureData, and these
+// tests exercise saves, not the read-only gate.
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: {
+      effectivePlanId: "pro_monthly",
+      isActive: true,
+      source: "subscription",
+      hadProAccess: true,
+    },
+    refetch: vi.fn(),
+  }),
+}));
+
 const queueRemoval = vi.fn().mockResolvedValue(true);
 vi.mock("@/hooks/usePhenoHermCullSuggestion", () => ({
   usePhenoHermCullSuggestion: () => ({
@@ -83,6 +99,7 @@ function renderAt(state: Partial<UsePhenoHuntWorkspaceState>) {
     saveSex,
     saveSmokeTest: state.saveSmokeTest ?? vi.fn().mockResolvedValue(true),
     saveLabResult: state.saveLabResult ?? vi.fn().mockResolvedValue(true),
+    deleteLabResult: state.deleteLabResult ?? vi.fn().mockResolvedValue(true),
     ...state,
   };
   hookMock.mockImplementation(() => currentState);

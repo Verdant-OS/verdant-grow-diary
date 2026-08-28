@@ -75,10 +75,8 @@ describe("QuickLogSensorSnapshotStrip — trust badge rendering", () => {
     expect(screen.getByTestId("quicklog-sensor-snapshot-source")).toHaveTextContent(/ecowitt/i);
   });
 
-  it("stale Ecowitt → trust badge Stale, not attachable", () => {
-    mockHook.mockReturnValue(
-      ready(snap({ source: "ecowitt", status: "stale", freshness: "stale" })),
-    );
+  it("stale trusted-provenance row → trust badge Stale, not attachable", () => {
+    mockHook.mockReturnValue(ready(snap({ source: "live", status: "stale", freshness: "stale" })));
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
     const badge = screen.getByTestId("snapshot-trust-badge");
     expect(badge).toHaveAttribute("data-badge", "stale");
@@ -126,7 +124,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).not.toBe("live");
-    expect(v.trustBadge.badge).toBe("stale");
+    expect(v.trustBadge.badge).toBe("invalid");
     expect(v.trustBadge.attachable).toBe(false);
   });
 
@@ -140,6 +138,69 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
     });
     expect(v.trustBadge.badge).not.toBe("live");
     expect(v.trustBadge.attachable).toBe(false);
+  });
+
+  it("legacy vendor fresh_non_live row fails closed: Invalid, never usable (#1003)", () => {
+    // fresh_non_live proves freshness, not trust. A receiving-transport
+    // label outside the canonical vocabulary and its reviewed aliases
+    // must never present as healthy context.
+    for (const source of ["ecowitt", "ecowitt_mqtt", "mqtt", "webhook", "wat"]) {
+      const v = buildQuickLogStripFromTentState({
+        status: "ready",
+        snapshot: snap({ source, status: "fresh_non_live" }),
+        hasTent: true,
+        now: NOW,
+        temperatureUnit: "celsius",
+      });
+      expect(v.status, `source=${source}`).toBe("invalid");
+      expect(v.trustBadge.badge, `source=${source}`).toBe("invalid");
+      expect(v.trustBadge.attachable, `source=${source}`).toBe(false);
+      expect(v.classification.isHealthyEvidence, `source=${source}`).toBe(false);
+      // Provider identity survives as a chip; it is never a trust label.
+      expect(v.providerLabel, `source=${source}`).not.toBeNull();
+    }
+  });
+
+  it("missing source on a fresh_non_live row also fails closed to Invalid (#1003)", () => {
+    const v = buildQuickLogStripFromTentState({
+      status: "ready",
+      snapshot: snap({ source: null, status: "fresh_non_live" }),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
+    expect(v.status).toBe("invalid");
+    expect(v.trustBadge.attachable).toBe(false);
+  });
+
+  it("reviewed aliases are not over-demoted: pi_bridge and manual fresh_non_live stay usable", () => {
+    for (const source of ["pi_bridge", "manual"]) {
+      const v = buildQuickLogStripFromTentState({
+        status: "ready",
+        snapshot: snap({ source, status: "fresh_non_live" }),
+        hasTent: true,
+        now: NOW,
+        temperatureUnit: "celsius",
+      });
+      expect(v.status, `source=${source}`).toBe("usable");
+      expect(v.trustBadge.attachable, `source=${source}`).toBe(false);
+    }
+  });
+
+  it("pi_bridge fresh_non_live → usable pill, Live badge, attachable false, providerLabel Pi Bridge", () => {
+    const v = buildQuickLogStripFromTentState({
+      status: "ready",
+      snapshot: snap({ source: "pi_bridge", status: "fresh_non_live" }),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
+    expect(v.status).toBe("usable");
+    expect(v.trustBadge.badge).toBe("live");
+    expect(v.trustBadge.badge).not.toBe("stale");
+    expect(v.trustBadge.attachable).toBe(false);
+    expect(v.providerLabel).toBe("Pi Bridge");
+    expect(v.trustBadge.providerLabel).toBe("Pi Bridge");
   });
 
   it("empty/no_data trust resolves to invalid (never live)", () => {

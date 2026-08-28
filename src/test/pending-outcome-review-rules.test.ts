@@ -12,6 +12,10 @@ function completedAction(
     id: string;
     status: string;
     completed_at: string | null;
+    approved_at: string | null;
+    plant_id: string | null;
+    tent_id: string | null;
+    grow_id: string | null;
     suggested_change: string | null;
   }> = {},
 ) {
@@ -45,6 +49,31 @@ describe("findPendingOutcomeReviews", () => {
     expect(reviews[0].action_queue_id).toBe("a1");
     expect(reviews[0].hours_since_completed).toBe(26);
     expect(reviews[0].suggested_change).toBe("Lower RH by 5%");
+    expect(reviews[0].plant_id).toBeNull();
+    expect(reviews[0].tent_id).toBeNull();
+    expect(reviews[0].grow_id).toBeNull();
+  });
+
+  it("carries additive plant_id, tent_id, and grow_id when present", () => {
+    const reviews = findPendingOutcomeReviews({
+      completedActions: [
+        completedAction({
+          id: "scoped",
+          plant_id: "plant-1",
+          tent_id: "tent-1",
+          grow_id: "grow-1",
+        }),
+      ],
+      outcomes: [],
+      now: NOW,
+    });
+    expect(reviews).toHaveLength(1);
+    expect(reviews[0]).toMatchObject({
+      action_queue_id: "scoped",
+      plant_id: "plant-1",
+      tent_id: "tent-1",
+      grow_id: "grow-1",
+    });
   });
 
   it("hides completed actions younger than 24h", () => {

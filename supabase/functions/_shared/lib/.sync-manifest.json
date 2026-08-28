@@ -1,6 +1,6 @@
 {
   "generator": "scripts/sync-edge-shared.mjs",
-  "sourceCount": 100,
+  "sourceCount": 101,
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "387a0f98abfe7eeaeda0a24cc289b6491b5c017592989e095facf1efb2e671f2",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
@@ -20,6 +20,7 @@
     "src/lib/aiDoctorPromptAssembly.ts": "d1c7a5a0472ad910a10a0a6438887ae1f6acaf929b231e1da591cbd1f6c1a37c",
     "src/lib/aiDoctorPromptVocabularyRules.ts": "8ae5730352434fed3caabfbfb938ef81e444654b37abe7a21ef93a11c2b60b07",
     "src/lib/aiDoctorReviewEvidenceReceiptRules.ts": "0bc47bc4d88c01ac966f92ec1d0fb41858ee34b916800b1f4b1a1f12c185b4ca",
+    "src/lib/aiDoctorReviewGroundingRules.ts": "27b0729da30b44cf439edde821bfc1b272d90e7ebf0933f5a384db92c810e548",
     "src/lib/aiDoctorReviewRequestPacket.ts": "ba18d2fc3f1bb532a19b70525428e41ec51efc01c8070216295b1e548f3ed374",
     "src/lib/aiDoctorReviewRequestPacketValidationRules.ts": "3642286ce97d592749afe1f7c1a0e4ff81d9ae7b1c3a60d92976f3d4eacd0fa9",
     "src/lib/aiDoctorReviewRequestTransportRules.ts": "1dbc57788ccbd642efc95c241adb4081c3cab68661f514657ffc73772a2d2424",

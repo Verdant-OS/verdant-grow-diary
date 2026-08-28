@@ -23,7 +23,7 @@ function makeBuilder(table: string) {
   const result = () =>
     resultQueues[table]?.shift() ?? results[table] ?? { data: [], error: null, count: 0 };
   const builder: Record<string, unknown> = {};
-  for (const m of ["select", "eq", "in", "or", "ilike", "not", "order", "range", "limit"]) {
+  for (const m of ["select", "eq", "in", "is", "or", "ilike", "not", "order", "range", "limit"]) {
     builder[m] = (...args: unknown[]) => {
       rec.calls.push([m, ...args]);
       return builder;
@@ -35,7 +35,13 @@ function makeBuilder(table: string) {
 }
 
 vi.mock("@/integrations/supabase/phenoTables", () => ({
-  phenoDb: { from: (t: string) => makeBuilder(t) },
+  phenoDb: {
+    from: (t: string) => makeBuilder(t),
+    // Diary evidence rides the top-N-per-plant RPC now (empty here — this
+    // file pins the candidate query shape; the RPC contract is pinned in
+    // pheno-candidate-diary-evidence-rpc.test.ts).
+    rpc: () => Promise.resolve({ data: [], error: null }),
+  },
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: (t: string) => makeBuilder(t) },

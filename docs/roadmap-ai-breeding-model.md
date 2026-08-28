@@ -27,18 +27,18 @@ phase is gated by `docs/security-checklist.md` and ships with tests.
 
 ## Model → capability map (starting point)
 
-| Step | Model intent | Today | Target phase |
-|------|--------------|-------|--------------|
-| 1 | Diverse population → structured, genetically-grouped datasets | Pheno Hunt groups plants; `strain`/`lineage` are free text | Phase 1 |
-| 2a | Phenotyping (observation) | Pheno Comparison traits defined but **demo-only, unpersisted**; harvest = yield only | Phase 2 |
-| 2b | Genotyping (DNA sequencing) | **Absent** | Phase 3 |
-| 3 | Computation (trait → genome / marker discovery) | **Absent** | Phase 4 |
-| 4 | AI applied to genetic information | AI is health/cultivation advisory only | Phase 4 |
-| 5 | Novel cultivar creation | Crossing-workflow code exists but is **orphaned + broken at 4 layers** | Phase 0 |
+| Step | Model intent                                                  | Today                                                                                                                                                                                                                                                     | Target phase |
+| ---- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 1    | Diverse population → structured, genetically-grouped datasets | Pheno Hunt groups plants; `strain`/`lineage` are free text                                                                                                                                                                                                | Phase 1      |
+| 2a   | Phenotyping (observation)                                     | ~~demo-only, unpersisted~~ **Superseded (2026-08-26):** trait scores persist in `pheno_candidate_scores` + `pheno_score_rounds` (migration-safety tested); harvest = yield only                                                                           | Phase 2      |
+| 2b   | Genotyping (DNA sequencing)                                   | **Absent**                                                                                                                                                                                                                                                | Phase 3      |
+| 3    | Computation (trait → genome / marker discovery)               | **Absent**                                                                                                                                                                                                                                                | Phase 4      |
+| 4    | AI applied to genetic information                             | AI is health/cultivation advisory only                                                                                                                                                                                                                    | Phase 4      |
+| 5    | Novel cultivar creation                                       | ~~orphaned + broken at 4 layers~~ **Superseded (2026-08-26):** repaired by `20260707120000_breeding_workflow_v1.sql` + `20260728163100` reconciliation; `/breeding/*` routes are mounted (hosted apply status stays an operator axis — see CURRENT_STATE) | Phase 0      |
 
 ---
 
-## Phase 0 — Complete the orphaned breeding workflow (Step 5) · *immediate, in-repo*
+## Phase 0 — Complete the orphaned breeding workflow (Step 5) · _immediate, in-repo_
 
 The 6-event crossing workflow (`reversal_application → isolation_start →
 stigmas_receptive → pollen_shed_observed → pollination → cross_harvest`) already has
@@ -63,7 +63,7 @@ the existing quicklog RPC) so the write matches the trust boundary; fix the edge
 function's column selection; mount the UI on `GrowDetail` beside the existing
 Pheno Hunt entry; unit + component tests; run the DB-RPC RLS harness.
 
-**Outcome:** Step 5 goes from *orphaned* to *functional & reachable*.
+**Outcome:** Step 5 goes from _orphaned_ to _functional & reachable_.
 
 ---
 
@@ -93,7 +93,7 @@ produces the structured phenotype dataset Steps 3–4 require.
 
 ---
 
-## Phase 3 — Genotyping ingestion (Step 2b) · *external data integration*
+## Phase 3 — Genotyping ingestion (Step 2b) · _external data integration_
 
 No sequencing in-app. Build the **genomics data domain** that ingests external lab
 output.
@@ -111,6 +111,7 @@ first, value accrues as data arrives.
 Only meaningful once Phases 2–3 have populated enough paired phenotype + genotype rows.
 
 **Work:**
+
 - **Computation (Step 3):** marker–trait association (start descriptive:
   marker-frequency vs. trait-value tables per accession; graduate to QTL/association
   stats as N grows). Deterministic, evidence-linked, reproducible.

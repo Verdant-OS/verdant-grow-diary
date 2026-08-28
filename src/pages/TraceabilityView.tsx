@@ -3,7 +3,7 @@
  * keeper, clone, or cross. Reads the subject from the route, resolves the trace
  * server-side, and renders it as a semantic, keyboard-operable tree.
  */
-import { useParams } from "@/lib/react-router-compat";
+import { Link, useParams } from "@/lib/react-router-compat";
 import { GitBranch, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,14 @@ export default function TraceabilityView() {
         description={`Backward and forward provenance for this ${traceNodeKindLabel(kind).toLowerCase()}.`}
         icon={<GitBranch className="h-5 w-5" />}
       />
+
+      <Link
+        to="/genetics"
+        data-testid="trace-back-to-genetics"
+        className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+      >
+        ← Back to Genetics Library
+      </Link>
 
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Trace direction">
         {DIRECTIONS.map((d) => (

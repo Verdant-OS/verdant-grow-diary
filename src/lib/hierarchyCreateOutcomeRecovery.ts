@@ -58,8 +58,17 @@ function currentRuntimeEpoch(): string {
   return epoch;
 }
 
-/** Stable for this page runtime; a full reload receives a new epoch. */
-export const HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH = currentRuntimeEpoch();
+/**
+ * Stable for this page runtime; a full reload receives a new epoch.
+ *
+ * Lazily minted on first call — never at module evaluation. Cloudflare Workers
+ * (Nitro SSR) reject Date / crypto / timers / fetch in global scope, and the
+ * prior eager `= currentRuntimeEpoch()` export crashed every SSR request that
+ * loaded this chunk (`Disallowed operation called within global scope`).
+ */
+export function getHierarchyCreateOutcomeRecoveryRuntimeEpoch(): string {
+  return currentRuntimeEpoch();
+}
 
 function recoveryRuntimeState(): RuntimeRecoveryState {
   const host = runtimeHost();
@@ -235,7 +244,7 @@ export function recordHierarchyCreateOutcomeRecoveryAttempt(attempt: HierarchyCr
 
   const record: HierarchyCreateOutcomeRecoveryRecord = {
     attempt: normalized,
-    runtimeEpoch: HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH,
+    runtimeEpoch: getHierarchyCreateOutcomeRecoveryRuntimeEpoch(),
   };
   attempts.set(key, record);
   const state = recoveryRuntimeState();
@@ -279,7 +288,7 @@ export function adoptLegacyHierarchyCreateOutcomeRecoveryAttempts(
     if (record.attempt.ownerId !== normalizedOwnerId || record.runtimeEpoch !== null) continue;
     const adoptedRecord: HierarchyCreateOutcomeRecoveryRecord = {
       attempt: record.attempt,
-      runtimeEpoch: HIERARCHY_CREATE_OUTCOME_RECOVERY_RUNTIME_EPOCH,
+      runtimeEpoch: getHierarchyCreateOutcomeRecoveryRuntimeEpoch(),
     };
     attempts.set(key, adoptedRecord);
     adopted.set(key, adoptedRecord);

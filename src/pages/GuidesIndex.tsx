@@ -113,6 +113,24 @@ export default function GuidesIndex() {
         </div>
         <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
+            Free local planning toolkit
+          </p>
+          <h3 className="mt-2 font-display text-xl font-semibold">
+            Nutrients, grow lights, and true cycle costs
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Scale a working-reservoir recipe, estimate canopy light from PPF, and price actual
+            equipment draw and dried saleable harvest weight. Inputs stay in your browser.
+          </p>
+          <Link
+            to="/tools/grow-help-toolkit"
+            className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline"
+          >
+            Open the Grow Help Toolkit
+          </Link>
+        </div>
+        <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">
             Free grow-room tool
           </p>
           <h3 className="mt-2 font-display text-xl font-semibold">

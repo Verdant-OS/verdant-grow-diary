@@ -21,14 +21,51 @@ Grow → Tent → Plant → Diary/Logs → Photo → Sensor Snapshot → AI Doct
 - Supabase (Auth, Database, Storage, Edge Functions) via Lovable Cloud
 - Vitest for tests
 
+## Grow Help Toolkit
+
+`/tools/grow-help-toolkit` is a client-side nutrient, grow-light, and expense
+planner. It uses no account, backend, analytics, device control, or live sensor
+data. The last inputs are stored only in browser `localStorage`; CSV and print
+exports are also generated in the browser.
+
+Core formulas:
+
+- `PPM500 = EC × 500`, `PPM640 = EC × 640`, `PPM700 = EC × 700`
+- `EC = PPM ÷ selected scale`; `CF = EC × 10`
+- Label rate: `amount = dose per L/gal × working reservoir L/gal`
+- EC target, one part: `mL/L = (target EC − source-water EC) ÷ EC-per-mL/L`
+- EC target, ratio-aware multipart: `base mL/L = EC rise ÷ Σ(part EC-per-mL/L × part ratio)`;
+  `part mL/L = base mL/L × part ratio`
+- Dilution: `V1 = (C2 × V2) ÷ C1`
+- Dry salt: `grams = g/gal × working gallons`
+- `DLI (mol/m²/day) = PPFD × hours × 3600 ÷ 1,000,000`
+- Estimated PPF, only when needed: `PPF (µmol/s) = actual watts × efficacy (µmol/J)`
+- Planning average PPFD: `(fixture PPF × fixture count × canopy efficiency) ÷ area m²`
+- Inverse-square approximation: `PPFDnew = PPFDchart × (hchart ÷ hnew)²`
+- Fixtures needed: `(target PPFD × area m²) ÷ (fixture PPF × efficiency)`
+- Electricity: `kWh = (actual watts ÷ 1,000) × hours/day × days`; `cost = kWh × rate`
+- Fixture-output photon cost: `cost/mol = cycle electricity cost ÷ (PPF × fixture count × total light-hours × 3,600 ÷ 1,000,000)`
+- Unit cost: `cost/g = selected cycle cost ÷ dried saleable harvest grams`
+- Optional user comparison: `operating ROI % = (user comparison value − operating cost) ÷ operating cost × 100`;
+  `setup payback cycles = setup cost ÷ positive operating-cycle savings`
+
+All light outputs are planning estimates. Verify canopy PPFD with a PAR meter;
+inverse-square behavior and the optional 3×3 interpolation are approximations,
+not measured PAR maps. Nutrient EC/PPM ranges are typical starting references,
+not guarantees. Cost-per-weight accepts dried saleable weight only and never
+prefills a yield or market price. Optional N/P/K ppm entries are grower-entered
+planning notes only; they do not infer a dose without product elemental analysis.
+
 ## Local setup
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
-The dev server runs Vite. Open the URL it prints.
+The dev server runs Vite on `http://localhost:8080`. bun is the package manager
+(`bun.lockb` is authoritative) — do not use npm or yarn. On Windows, run
+`bun install` from a checkout outside OneDrive; OneDrive reparse points break it.
 
 ## Environment variables
 
@@ -45,8 +82,9 @@ Additional secrets (API keys for edge functions, third-party services) are confi
 Production domain: **https://verdantgrowdiary.com** (also served on
 `https://www.verdantgrowdiary.com`).
 
-- Only the `/welcome` landing route is public. All other routes require
-  authentication and are gated behind Supabase Auth.
+- Public acquisition, guide, cultivar, support, and local-tool routes are
+  registered explicitly. Private workspace routes remain gated behind
+  Supabase Auth.
 - SSL/TLS certificates are managed by the Lovable hosting platform. Both the
   apex and `www` hostnames must serve a valid certificate before announcing a
   release.
@@ -59,8 +97,9 @@ Public crawler surfaces:
 
 - [`public/robots.txt`](public/robots.txt) — allows crawling and points at the
   production sitemap.
-- [`public/sitemap.xml`](public/sitemap.xml) — lists only `/` and `/welcome`.
-  Private authenticated routes are intentionally excluded.
+- [`public/sitemap.xml`](public/sitemap.xml) — lists the indexable public
+  surfaces. Private authenticated and `noindex` routes are intentionally
+  excluded.
 
 ## Validation
 
@@ -496,9 +535,9 @@ Runtime:
 
 Environment variables:
 
-| Variable                                           | Required?       | Purpose                                                                                                                                                                          |
-| -------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SUPABASE_DB_URL` | Yes (diff mode) | Direct Postgres connection string used by `psql`. In CI, each protected environment binds its own environment secret into this process variable. |
+| Variable          | Required?       | Purpose                                                                                                                                            |
+| ----------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_DB_URL` | Yes (diff mode) | Direct Postgres connection string used by `psql`. In CI, each protected environment binds its own environment secret into this process variable.   |
 | `TARGET_ENV`      | Optional        | `sandbox` or `live`. Used for target-identity validation and stamped into JSON/SARIF output as `target_env`; it does not select a fallback secret. |
 
 The connection string must be the **direct** Postgres URL for the target
@@ -776,7 +815,7 @@ confirm all four:
 - [ ] The run was triggered by `push` or `pull_request` on a branch you
       have permission to see (not a fork PR).
 - [ ] `upload-sarif` step logs `SARIF upload complete` (not `Resource
-    not accessible` or `Invalid SARIF file`).
+  not accessible` or `Invalid SARIF file`).
 
 If all four are true and findings still don't show, jump to the
 _Security tab looks empty (GitHub UI gotchas)_ table below — the cause
@@ -2615,18 +2654,18 @@ Common failure modes and the fastest fix for each. All apply to both
 `scripts/assert-required-money-migrations-applied.mjs` and
 `scripts/diff-money-migration-prefixes.mjs` unless noted.
 
-| Symptom                                                                   | Likely cause                                                                                                                        | Quickest fix                                                                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`    | `SUPABASE_DB_URL` is not set                                                                                                        | `export SUPABASE_DB_URL=...` and set `TARGET_ENV=sandbox` or `TARGET_ENV=live` to match that connection. Verify with `env \| grep SUPABASE_DB_URL`.                                                                                                                   |
-| `psql: command not found` / `spawn psql ENOENT`                           | Postgres client not installed or not on `PATH`                                                                                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`.                                                                                                                               |
-| Applied-check reports drift but sandbox is definitely up to date          | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox)                                                              | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output.                                                                                                                               |
-| `psql: FATAL: password authentication failed`                             | Stale or wrong pooler credentials in the DB URL                                                                                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`.                                                                                                                     |
-| `Tracker query failed` / SARIF `money-migration-tooling`                  | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB)                                                        | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.                                                                                                                                   |
-| Exit `1` immediately, no drift table                                      | Manifest entry missing a 14-digit prefix (`money-migration-malformed`)                                                              | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`.                                                                                                               |
-| `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs                                                                   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.                                                                                                                                         |
+| Symptom                                                                   | Likely cause                                                                                                                        | Quickest fix                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `No DB URL provided` / exit code `2` / SARIF `money-migration-tooling`    | `SUPABASE_DB_URL` is not set                                                                                                        | `export SUPABASE_DB_URL=...` and set `TARGET_ENV=sandbox` or `TARGET_ENV=live` to match that connection. Verify with `env \| grep SUPABASE_DB_URL`.                                                                                                                           |
+| `psql: command not found` / `spawn psql ENOENT`                           | Postgres client not installed or not on `PATH`                                                                                      | macOS: `brew install libpq && brew link --force libpq`. Debian/Ubuntu: `sudo apt-get install postgresql-client`. Confirm: `which psql`.                                                                                                                                       |
+| Applied-check reports drift but sandbox is definitely up to date          | `TARGET_ENV` points at the wrong DB (e.g. `live` while URL is sandbox)                                                              | Set `TARGET_ENV` to match the URL variable you exported. Cross-check with `echo $TARGET_ENV` and the `target_env` field in JSON output.                                                                                                                                       |
+| `psql: FATAL: password authentication failed`                             | Stale or wrong pooler credentials in the DB URL                                                                                     | Refresh the connection string; ensure no shell-escaped `$` characters in the password. Test with `psql "$SUPABASE_DB_URL_SANDBOX" -c 'select 1'`.                                                                                                                             |
+| `Tracker query failed` / SARIF `money-migration-tooling`                  | `supabase_migrations.schema_migrations` unreachable (network, SSL, wrong DB)                                                        | Add `?sslmode=require` if the pooler needs it, and confirm the URL points at the Supabase project's Postgres, not a local instance.                                                                                                                                           |
+| Exit `1` immediately, no drift table                                      | Manifest entry missing a 14-digit prefix (`money-migration-malformed`)                                                              | Open `scripts/required-money-migrations.mjs` and confirm each path begins with a 14-digit timestamp. Re-run the unit tests: `bun run test:prefix-diff`.                                                                                                                       |
+| `mkdir` / `ENOENT` errors when writing diff or redirected SARIF artifacts | `DIFF_PATH` and shell `>` redirects don't auto-create parent dirs                                                                   | `mkdir -p audit/money-migrations` before setting `DIFF_PATH=` or `--sarif > path`. `--sarif-out=PATH` creates parents itself.                                                                                                                                                 |
 | CI green locally, red in Actions                                          | The protected environment's DB secret is missing or misnamed                                                                        | In **Settings → Environments**, verify `verdant-sandbox` has `SUPABASE_DB_URL_SANDBOX` and `verdant-production` has `SUPABASE_DB_URL`. Each workflow binds its environment secret to the process variable `SUPABASE_DB_URL`; neither uses `DATABASE_URL` or a fallback alias. |
-| Sandbox smoke script hangs                                                | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement                                                          | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                                                                                                                                                  |
-| `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push. |
+| Sandbox smoke script hangs                                                | Missing `SANDBOX_SMOKE_USER` or the user has no Paddle sandbox entitlement                                                          | Set `SANDBOX_SMOKE_USER` to a real sandbox account UUID; re-run with `--verbose` to see the checkpoint it stalls on.                                                                                                                                                          |
+| `Edge shared-lib mirror is out of sync` during `bun run build` / prebuild | Files under `src/lib` (or imported closure) changed without regenerating `supabase/functions/_shared/lib` and `.sync-manifest.json` | Run `bun run sync-edge-shared`, then `git add supabase/functions/_shared/lib .sync-manifest.json` and commit. Locally, `prebuild` auto-regenerates; in CI (`CI=1` / `--check-only`) it fails closed so drift can't be papered over — commit the sync output and push.         |
 
 ##### `--sarif` specific issues
 

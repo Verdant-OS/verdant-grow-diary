@@ -201,12 +201,42 @@ describe("useQuickLogActivitySave telemetry", () => {
     const { result } = renderHook(() => useQuickLogActivitySave());
 
     await act(async () => {
-      // Target-scoped manual route: the RPC needs a tent or plant target.
-      await result.current.save({ activityId: "note", growId: "grow-1", plantId: "plant-1" });
+      // Target-scoped manual route: the RPC needs a tent or plant target
+      // and a valid 8..200 idempotency key (fail-closed otherwise).
+      await result.current.save({
+        activityId: "note",
+        growId: "grow-1",
+        plantId: "plant-1",
+        idempotencyKey: "idem-key-12345678",
+      });
     });
 
     expect(quickLogEvents()).toEqual([["event", "quick_log_saved", { event_type: "note" }]]);
   });
+
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["short (<8)", "short"],
+    ["overlong (>200)", "x".repeat(201)],
+  ] as const)(
+    "emits zero calls when manual route fail-closes %s idempotency key",
+    async (_label, idempotencyKey) => {
+      const { result } = renderHook(() => useQuickLogActivitySave());
+
+      await act(async () => {
+        await result.current.save({
+          activityId: "note",
+          growId: "grow-1",
+          plantId: "plant-1",
+          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+        });
+      });
+
+      expect(rpcMock).not.toHaveBeenCalled();
+      expect(quickLogEvents()).toHaveLength(0);
+    },
+  );
 
   it("emits once from the event success branch and zero for an idempotent callback", async () => {
     rpcMock
@@ -240,7 +270,12 @@ describe("useQuickLogActivitySave telemetry", () => {
     const { result } = renderHook(() => useQuickLogActivitySave());
 
     await act(async () => {
-      await result.current.save({ activityId: "note", growId: "grow-1" });
+      await result.current.save({
+        activityId: "note",
+        growId: "grow-1",
+        plantId: "plant-1",
+        idempotencyKey: "idem-key-12345678",
+      });
       await result.current.save({
         activityId: "training",
         growId: "grow-1",

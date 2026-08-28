@@ -5,7 +5,7 @@
  * one result model, one GlobalSearchDialog — no second search system and no
  * client-side fetch-all of private data.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { VERDANT_CULTIVARS } from "@/constants/verdantCultivars";
@@ -16,6 +16,10 @@ import {
   type GlobalSearchResult,
   type PrivateSearchRow,
 } from "@/lib/globalSearchResults";
+import {
+  getGlobalSearchPrivateStateEpoch,
+  subscribeGlobalSearchPrivateStateClear,
+} from "@/lib/globalSearchSession";
 
 export type {
   GlobalSearchEntityType,
@@ -53,14 +57,31 @@ export interface UseGlobalSearchReturn {
 export function useGlobalSearch(query: string): UseGlobalSearchReturn {
   const trimmed = query.trim();
   const debounced = useDebouncedValue(trimmed, DEBOUNCE_MS);
-  const enabled = debounced.length > 0;
+  const privateStateEpoch = useSyncExternalStore(
+    subscribeGlobalSearchPrivateStateClear,
+    getGlobalSearchPrivateStateEpoch,
+    getGlobalSearchPrivateStateEpoch,
+  );
+  const hasQuery = trimmed.length > 0;
+  // Never execute or expose a stale debounced term after the raw query changes.
+  // In particular, the synchronous auth-identity fence clears the raw query
+  // before it clears QueryClient; disabling immediately prevents the previous
+  // owner's term from being reissued during the 200 ms debounce window.
+  const queryReady = hasQuery && trimmed === debounced;
+  const effectiveQuery = queryReady ? debounced : "";
 
   const { data, isLoading, isFetching, isError, refetch } = useQuery({
-    queryKey: ["global-search", debounced],
-    enabled,
+    // Never retain a stale private term in a post-fence query-cache key while
+    // React waits for the debounced value to catch up with the cleared input.
+    queryKey: ["global-search", privateStateEpoch, effectiveQuery],
+    // TanStack evaluates function-valued `enabled` at fetch time. Comparing
+    // against the live epoch closes the synchronous window before React has
+    // committed the clear listener's state update.
+    enabled: () => queryReady && getGlobalSearchPrivateStateEpoch() === privateStateEpoch,
     queryFn: async (): Promise<PrivateSearchRow[]> => {
+      if (getGlobalSearchPrivateStateEpoch() !== privateStateEpoch) return [];
       const { data, error } = await supabase.rpc("verdant_search", {
-        q: debounced,
+        q: effectiveQuery,
         max_results: MAX_RESULTS,
       });
       if (error) throw error;
@@ -76,8 +97,10 @@ export function useGlobalSearch(query: string): UseGlobalSearchReturn {
   // failure must never be presented as a verified empty result.
   const cultivarResults = useMemo(
     () =>
-      enabled ? searchCultivarReferences(VERDANT_CULTIVARS, debounced, MAX_RESULTS) : EMPTY_RESULTS,
-    [enabled, debounced],
+      queryReady
+        ? searchCultivarReferences(VERDANT_CULTIVARS, effectiveQuery, MAX_RESULTS)
+        : EMPTY_RESULTS,
+    [queryReady, effectiveQuery],
   );
 
   const mergedResults = useMemo(
@@ -86,17 +109,17 @@ export function useGlobalSearch(query: string): UseGlobalSearchReturn {
   );
 
   // When the query is empty, return a stable empty reference — not a fresh `[]`.
-  const results = enabled ? mergedResults : EMPTY_RESULTS;
+  const results = queryReady ? mergedResults : EMPTY_RESULTS;
 
   const retry = useCallback(() => {
-    if (enabled) void refetch();
-  }, [enabled, refetch]);
+    if (queryReady) void refetch();
+  }, [queryReady, refetch]);
 
   return {
     results,
     // Show loading while debouncing a non-empty query, or while fetching.
-    isLoading: enabled && (isLoading || isFetching || trimmed !== debounced),
-    isError,
+    isLoading: hasQuery && (!queryReady || isLoading || isFetching),
+    isError: queryReady && isError,
     retry,
   };
 }

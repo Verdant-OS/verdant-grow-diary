@@ -560,6 +560,12 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
       }),
     ],
   }),
+  publicDocument("/tools/grow-help-toolkit", {
+    title: "Free Nutrient, Grow Light & Cost Calculators | Verdant",
+    description:
+      "Plan nutrient recipes, canopy lighting, electricity and cost per dried saleable gram in one private browser-only toolkit. Formulas and units are shown with every result.",
+    imageAlt: "Verdant Grow Help Toolkit calculators",
+  }),
   publicDocument("/tools/vpd-calculator", {
     title: "Free Cannabis VPD Calculator by Growth Stage | Verdant",
     description:
@@ -685,7 +691,7 @@ const CORE_ACQUISITION_DOCUMENTS: ReadonlyArray<StaticPublicSeoDocument> = [
   publicDocument("/docs/mcp-api", {
     title: "Verdant Grow OS MCP API Reference | Tools, Parameters, Safety",
     description:
-      "Reference for the Verdant Grow OS MCP server: list_grows, list_recent_diary_entries, and get_latest_sensor_snapshot — parameters, response examples, and safety invariants.",
+      "Reference for the Verdant Grow OS MCP server: grows, diary, sensor, and bounded Grow Walk context reads — parameters, response examples, and safety invariants.",
     imageAlt: "Verdant Grow OS MCP API reference",
   }),
 ];

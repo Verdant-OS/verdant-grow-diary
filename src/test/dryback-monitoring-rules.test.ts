@@ -38,6 +38,16 @@ describe("classifyDrybackSource", () => {
     expect(classifyDrybackSource("demo")).toBe("demo");
     expect(classifyDrybackSource("")).toBe("unknown");
   });
+
+  it("follows the #1003 canon: pi_bridge is live; wildcards and 'bridge' are not (#592)", () => {
+    // Sanctioned first-party alias survives the fold.
+    expect(classifyDrybackSource("pi_bridge")).toBe("live");
+    // The old private table promoted "bridge" and any "live*" prefix to
+    // live. The canon does not: unrecognized labels fail closed.
+    expect(classifyDrybackSource("bridge")).toBe("invalid");
+    expect(classifyDrybackSource("livefeed")).toBe("invalid");
+    expect(classifyDrybackSource("ecowitt")).toBe("invalid");
+  });
 });
 
 describe("extractDrybackVwcSamples", () => {

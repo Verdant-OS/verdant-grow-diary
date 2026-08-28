@@ -104,7 +104,14 @@ function LivePackCard({ c, ranked }: { c: ContenderInput; ranked: boolean }) {
               ))}
             </div>
           )}
-          {ranked ? (
+          {ranked && score === null ? (
+            <div
+              className="mt-2 text-[11px] text-muted-foreground"
+              data-testid={`pheno-showcase-unscored-${String(c.id)}`}
+            >
+              Not yet scored — no Loud axes recorded for this candidate.
+            </div>
+          ) : ranked ? (
             <>
               <div className="mt-2 text-[11px] text-muted-foreground">
                 Loud score <span className="font-semibold text-foreground">{score}</span>
@@ -151,8 +158,14 @@ export default function PhenoHuntShowcase() {
         .filter((t): t is NonNullable<typeof t> => t != null),
     [data.cureTimelines],
   );
+  // Scored candidates sort by composite; unscored ones list after them (an
+  // unscored plant has no composite — it must never rank as an implicit zero).
   const pack = board.contenders.length
-    ? [...data.contenders].sort((a, b) => contenderScore(b.axes) - contenderScore(a.axes))
+    ? [...data.contenders].sort(
+        (a, b) =>
+          (contenderScore(b.axes) ?? Number.NEGATIVE_INFINITY) -
+          (contenderScore(a.axes) ?? Number.NEGATIVE_INFINITY),
+      )
     : [];
 
   const isDemo = source === "demo";
@@ -237,7 +250,18 @@ export default function PhenoHuntShowcase() {
             data-testid="pheno-hunt-showcase-not-found-link"
           >
             Back to your pheno hunts
-          </Link>
+          </Link>{" "}
+          <span className="text-muted-foreground">
+            (Hunts are plan-gated — the{" "}
+            <Link
+              to="/pheno-comparison"
+              className="font-medium underline underline-offset-2"
+              data-testid="pheno-hunt-showcase-preview-link"
+            >
+              public comparison preview
+            </Link>{" "}
+            needs no plan.)
+          </span>
         </p>
       </main>
     );

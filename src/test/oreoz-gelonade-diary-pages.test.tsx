@@ -42,6 +42,19 @@ const view = buildOreozGelonadeDiaryView(
   },
 );
 
+vi.mock("@/hooks/useMyEntitlements", () => ({
+  useMyEntitlements: () => ({
+    loading: false,
+    entitlement: {
+      effectivePlanId: "pro_monthly",
+      isActive: true,
+      source: "subscription",
+      hadProAccess: true,
+    },
+    refetch: () => {},
+  }),
+}));
+
 vi.mock("@/hooks/useOreozGelonadeDiary", () => ({
   useOreozGelonadeDiary: () => ({
     status: "ready",

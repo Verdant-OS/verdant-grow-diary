@@ -15,10 +15,14 @@ import { join } from "node:path";
 
 vi.mock("@/integrations/supabase/client", () => {
   const insert = vi.fn(async (_row: unknown) => ({ error: null }));
-  const from = vi.fn(() => ({ insert }));
+  const maybeSingle = vi.fn(async () => ({ data: null, error: null }));
+  const ownerEq = vi.fn(() => ({ maybeSingle }));
+  const idEq = vi.fn(() => ({ eq: ownerEq }));
+  const select = vi.fn(() => ({ eq: idEq }));
+  const from = vi.fn(() => ({ insert, select }));
   return {
     supabase: { from },
-    __mock: { from, insert },
+    __mock: { from, insert, select, idEq, ownerEq, maybeSingle },
   };
 });
 
@@ -31,7 +35,14 @@ import {
 import * as supabaseModule from "@/integrations/supabase/client";
 const mock = (
   supabaseModule as unknown as {
-    __mock: { from: ReturnType<typeof vi.fn>; insert: ReturnType<typeof vi.fn> };
+    __mock: {
+      from: ReturnType<typeof vi.fn>;
+      insert: ReturnType<typeof vi.fn>;
+      select: ReturnType<typeof vi.fn>;
+      idEq: ReturnType<typeof vi.fn>;
+      ownerEq: ReturnType<typeof vi.fn>;
+      maybeSingle: ReturnType<typeof vi.fn>;
+    };
   }
 ).__mock;
 
@@ -45,6 +56,8 @@ const baseInput = {
   photoPath: "user-1/grow-1/123.jpg",
   noteRaw: "Leaf curl on lower fan",
   action: "water",
+  ownerId: "owner-1",
+  entryId: "00000000-0000-4000-8000-000000000111",
   now,
 };
 
@@ -86,8 +99,13 @@ describe("buildQuickLogPhotoDiaryEntryRow", () => {
 describe("createQuickLogPhotoDiaryEntry", () => {
   beforeEach(() => {
     mock.from.mockClear();
-    mock.insert.mockClear();
+    mock.insert.mockReset();
+    mock.select.mockClear();
+    mock.idEq.mockClear();
+    mock.ownerEq.mockClear();
+    mock.maybeSingle.mockReset();
     mock.insert.mockImplementation(async () => ({ error: null }));
+    mock.maybeSingle.mockImplementation(async () => ({ data: null, error: null }));
   });
 
   it("inserts exactly one diary_entries row with the built payload", async () => {
@@ -96,12 +114,15 @@ describe("createQuickLogPhotoDiaryEntry", () => {
     expect(mock.from).toHaveBeenCalledTimes(1);
     expect(mock.from).toHaveBeenCalledWith("diary_entries");
     expect(mock.insert).toHaveBeenCalledTimes(1);
-    expect(mock.insert.mock.calls[0][0]).toEqual(buildQuickLogPhotoDiaryEntryRow(baseInput));
+    expect(mock.insert.mock.calls[0][0]).toEqual({
+      ...buildQuickLogPhotoDiaryEntryRow(baseInput),
+      id: "00000000-0000-4000-8000-000000000111",
+    });
   });
 
   it("returns a failure message on insert error and does not throw", async () => {
     mock.insert.mockImplementationOnce(async () => ({
-      error: { message: "rls denied" },
+      error: { message: "rls denied", code: "42501" },
     }));
     const res = await createQuickLogPhotoDiaryEntry(baseInput);
     expect(res.ok).toBe(false);
@@ -109,6 +130,52 @@ describe("createQuickLogPhotoDiaryEntry", () => {
       ok: false,
       message: "Photo diary entry failed: rls denied",
     });
+  });
+
+  it("reconciles a preallocated diary id scoped to its owner after a lost insert response", async () => {
+    mock.insert.mockResolvedValueOnce({
+      error: { message: "duplicate key after lost response", code: "23505" },
+    });
+    mock.maybeSingle.mockResolvedValueOnce({
+      data: { id: "00000000-0000-4000-8000-000000000111" },
+      error: null,
+    });
+
+    await expect(createQuickLogPhotoDiaryEntry(baseInput)).resolves.toEqual({ ok: true });
+
+    expect(mock.insert.mock.calls[0][0]).toEqual({
+      ...buildQuickLogPhotoDiaryEntryRow(baseInput),
+      id: "00000000-0000-4000-8000-000000000111",
+    });
+    expect(mock.select).toHaveBeenCalledWith("id");
+    expect(mock.idEq).toHaveBeenCalledWith("id", "00000000-0000-4000-8000-000000000111");
+    expect(mock.ownerEq).toHaveBeenCalledWith("user_id", "owner-1");
+  });
+
+  it("marks an error-form transport loss uncertain until the exact owner row can be confirmed", async () => {
+    mock.insert.mockResolvedValueOnce({
+      error: { message: "TypeError: Failed to fetch", code: "" },
+    });
+    mock.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+
+    await expect(createQuickLogPhotoDiaryEntry(baseInput)).resolves.toEqual({
+      ok: false,
+      ambiguous: true,
+      message: "Could not confirm the photo attachment; it may still appear in history.",
+    });
+    expect(mock.ownerEq).toHaveBeenCalledWith("user_id", "owner-1");
+  });
+
+  it("marks a lost insert response uncertain when the exact owner row cannot be confirmed", async () => {
+    mock.insert.mockRejectedValueOnce(new Error("network interrupted"));
+    mock.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+
+    await expect(createQuickLogPhotoDiaryEntry(baseInput)).resolves.toEqual({
+      ok: false,
+      ambiguous: true,
+      message: "Could not confirm the photo attachment; it may still appear in history.",
+    });
+    expect(mock.ownerEq).toHaveBeenCalledWith("user_id", "owner-1");
   });
 
   it("rapid retap-style parallel invocations only insert one row each (caller-owned guard)", async () => {
@@ -125,6 +192,7 @@ describe("createQuickLogPhotoDiaryEntry", () => {
 describe("QuickLogV2Sheet static safety — photo diary extraction", () => {
   it("merges optional extraDetails while the fixed identity keys always win", () => {
     const row = buildQuickLogPhotoDiaryEntryRow({
+      ownerId: "owner-1",
       growId: "g1",
       tentId: null,
       plantId: "p1",
@@ -151,6 +219,7 @@ describe("QuickLogV2Sheet static safety — photo diary extraction", () => {
 
   it("eventType override gives standalone Photo saves a displayable type (default marker preserved)", () => {
     const base = {
+      ownerId: "owner-1",
       growId: "g1",
       tentId: null,
       plantId: "p1",

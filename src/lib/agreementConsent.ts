@@ -50,10 +50,32 @@ export function computeAgreementGaps(
     .filter((g): g is AgreementGap => g !== null);
 }
 
+export interface OwnAcceptancePayload {
+  agreement_type: AgreementType;
+  version: string;
+  effective_date: string;
+  user_agent?: string | null;
+}
+
 /**
- * Returns the rows to insert into `user_agreement_acceptances` when a
- * user accepts the current agreement set (signup or re-consent).
- * `user_agent` is optional; callers may add it at insert time.
+ * Payload for `record_own_agreement_acceptances` — no client `user_id`.
+ * The RPC sets `user_id` from `auth.uid()` server-side.
+ */
+export function buildOwnAcceptancePayloads(
+  current: readonly AgreementVersion[] = CURRENT_AGREEMENT_LIST,
+  userAgent?: string | null,
+): OwnAcceptancePayload[] {
+  return current.map((a) => ({
+    agreement_type: a.type,
+    version: a.version,
+    effective_date: a.effectiveDate,
+    ...(userAgent !== undefined ? { user_agent: userAgent } : {}),
+  }));
+}
+
+/**
+ * @deprecated Prefer {@link buildOwnAcceptancePayloads} + the auth.uid() RPC.
+ * Kept for fixtures that still shape legacy direct-table rows with user_id.
  */
 export function buildAcceptanceRows(
   userId: string,

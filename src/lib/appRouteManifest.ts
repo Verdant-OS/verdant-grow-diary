@@ -514,6 +514,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
     description: "Public per-stage SOP target bands reference (temp, RH, EC, pH, PPFD, DLI).",
   },
   {
+    path: "/tools/grow-help-toolkit",
+    access: "public",
+    description:
+      "Local-only nutrient, light-planning, and grow-expense calculators with recipe export.",
+  },
+  {
     path: "/tools/vpd-calculator",
     access: "public",
     description: "Public manual-input, stage-aware air VPD calculator.",

@@ -1,17 +1,56 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { ConfigEnv, UserConfig } from "vite";
 
 const root = process.cwd();
-const viteConfig = readFileSync(resolve(root, "vite.config.ts"), "utf8");
+const viteConfigSource = readFileSync(resolve(root, "vite.config.ts"), "utf8");
 const generatedMcpFunction = readFileSync(resolve(root, "supabase/functions/mcp/index.ts"), "utf8");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")) as {
   scripts?: Record<string, string>;
 };
 
+type ViteConfigExport =
+  | UserConfig
+  | Promise<UserConfig>
+  | ((env: ConfigEnv) => UserConfig | Promise<UserConfig>);
+
+function flattenPlugins(plugins: unknown): Array<{ name?: string }> {
+  if (!Array.isArray(plugins)) return [];
+  const out: Array<{ name?: string }> = [];
+  for (const plugin of plugins) {
+    if (!plugin) continue;
+    if (Array.isArray(plugin)) {
+      out.push(...flattenPlugins(plugin));
+      continue;
+    }
+    if (typeof plugin === "object" && plugin !== null && !("then" in plugin)) {
+      out.push(plugin as { name?: string });
+    }
+  }
+  return out;
+}
+
 describe("Lovable MCP codegen host safety", () => {
-  it("does not run the known-broken MCP codegen path on Windows", () => {
-    expect(viteConfig).toMatch(/process\.platform\s*!==\s*["']win32["']\s*&&\s*mcpPlugin\(\)/);
+  it("does not invoke mcpPlugin from vite.config (Linux/Lovable/CI must not rewrite the MCP bundle)", async () => {
+    // Prior contract gated codegen with `process.platform !== "win32" && mcpPlugin()`.
+    // That still regenerated `supabase/functions/mcp/index.ts` on every non-Windows
+    // vite dev/build. The plugin must not be wired at all.
+    const codeWithoutLineComments = viteConfigSource
+      .split("\n")
+      .map((line) => line.replace(/\/\/.*$/, ""))
+      .join("\n");
+    expect(codeWithoutLineComments).not.toMatch(/\bmcpPlugin\s*\(/);
+    expect(codeWithoutLineComments).not.toMatch(/@lovable\.dev\/mcp-js/);
+    expect(codeWithoutLineComments).not.toMatch(/\bfrom\s+["'][^"']*mcp-js[^"']*["']/);
+
+    const mod = await import("../../vite.config");
+    const exported = mod.default as ViteConfigExport;
+    const env: ConfigEnv = { command: "serve", mode: "development", isSsrBuild: false };
+    const resolved = await Promise.resolve(typeof exported === "function" ? exported(env) : exported);
+    const pluginNames = flattenPlugins(resolved.plugins).map((plugin) => plugin.name ?? "");
+
+    expect(pluginNames.some((name) => /mcp/i.test(name))).toBe(false);
   });
 
   it("keeps the checked-in Supabase MCP function portable", () => {

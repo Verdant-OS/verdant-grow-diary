@@ -1,6 +1,6 @@
 # Verdant Agent Governance
 
-**Sentinel-Version: 2026-09-01.1**
+**Sentinel-Version: 2026-09-01.5**
 
 Multi-agent work on Verdant runs under one shared constitution plus a small
 platform-specific bootstrap per agent. A single file cannot reach every AI platform
@@ -12,7 +12,7 @@ platform actually auto-loads.
 ```text
 ROOT — auto-loaded by the platforms
   AGENTS.md                      universal constitution (canonical)
-  CLAUDE.md                      imports constitution + state + Claude role
+  CLAUDE.md                      imports constitution + Claude role; requires a pre-ack read of CURRENT_STATE.md
   GEMINI.md                      mirrors the full constitution + Gemini role
   .grok/rules/verdant-grok-role.md   Grok's automatic role rules
 
@@ -31,14 +31,14 @@ HISTORICAL — never active instructions
 
 ## Which files each agent loads
 
-| Agent         | Auto-loads                           | Must also read                                                    |
-| ------------- | ------------------------------------ | ----------------------------------------------------------------- |
-| Codex         | `AGENTS.md`                          | `docs/agents/roles/codex.md`, `CURRENT_STATE.md`                  |
-| Claude        | `CLAUDE.md` (which imports the rest) | —                                                                 |
-| Grok          | `AGENTS.md`, `.grok/rules/*`         | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`                   |
-| Gemini        | `GEMINI.md`                          | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`                 |
-| Security      | nothing automatically                | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/security.md`      |
-| Council Chair | nothing automatically                | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/council-chair.md` |
+| Agent         | Auto-loads                                | Must also read                                                            |
+| ------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
+| Codex         | `AGENTS.md`                               | `docs/agents/roles/codex.md`, `CURRENT_STATE.md`                          |
+| Claude        | `CLAUDE.md` (imports constitution + role) | `CURRENT_STATE.md` — not imported since #1094; read before `SENTINEL_ACK` |
+| Grok          | `AGENTS.md`, `.grok/rules/*`              | `docs/agents/roles/grok.md`, `CURRENT_STATE.md`                           |
+| Gemini        | `GEMINI.md`                               | `docs/agents/roles/gemini.md`, `CURRENT_STATE.md`                         |
+| Security      | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/security.md`              |
+| Council Chair | nothing automatically                     | all of: `AGENTS.md`, `CURRENT_STATE.md`, `roles/council-chair.md`         |
 
 Grok is Verdant's **Product Intelligence, Adversarial Audit, and Implementation Lead**
 (Cheek, 2026-08-20, refined): equally empowered to research, audit the live app,

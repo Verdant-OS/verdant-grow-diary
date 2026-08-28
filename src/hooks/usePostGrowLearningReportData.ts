@@ -23,12 +23,19 @@ import {
   type PostGrowSensorReadingLike,
 } from "@/lib/postGrowLearningReportRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
+import {
+  computeYieldEfficiency,
+  type YieldEfficiencyReport,
+} from "@/lib/yieldEfficiencyRules";
+import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 export type PostGrowReportStatus = "idle" | "loading" | "ready" | "unavailable";
 
 export interface UsePostGrowLearningReportDataResult {
   status: PostGrowReportStatus;
   report: PostGrowLearningReportViewModel | null;
+  /** Derived read-only efficiency metrics; null until the report loads. */
+  yieldEfficiency: YieldEfficiencyReport | null;
   error: string | null;
   reload: () => Promise<void>;
   saveLesson: (lesson: string) => Promise<{ ok: true } | { ok: false; message: string }>;
@@ -66,12 +73,16 @@ export function usePostGrowLearningReportData(
   const { user } = useAuth();
   const [status, setStatus] = useState<PostGrowReportStatus>("idle");
   const [report, setReport] = useState<PostGrowLearningReportViewModel | null>(null);
+  const [yieldEfficiency, setYieldEfficiency] = useState<YieldEfficiencyReport | null>(null);
+  const tempUnit = useTemperatureUnitPreference();
+  const measurementSystem = tempUnit === "celsius" ? ("metric" as const) : ("imperial" as const);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user || !growId) {
       setStatus("idle");
       setReport(null);
+      setYieldEfficiency(null);
       setError(null);
       return;
     }
@@ -93,7 +104,7 @@ export function usePostGrowLearningReportData(
 
       const { data: tents, error: tentErr } = await supabase
         .from("tents")
-        .select("id")
+        .select("id,size,light_wattage")
         .eq("grow_id", growId);
       if (tentErr) throw tentErr;
       const tentIds = (tents ?? []).map((t) => t.id as string).filter(Boolean);
@@ -138,13 +149,24 @@ export function usePostGrowLearningReportData(
         actions: (actionRes.data ?? []) as PostGrowActionLike[],
       });
       setReport(vm);
+      setYieldEfficiency(
+        computeYieldEfficiency({
+          harvestEntries: diaryRows.map((r) => ({ details: r.details })),
+          tents: (tents ?? []).map((t) => ({
+            size: (t as { size?: string | null }).size ?? null,
+            light: { wattage: (t as { light_wattage?: number | null }).light_wattage ?? null },
+          })),
+          system: measurementSystem,
+        }),
+      );
       setStatus("ready");
     } catch (err) {
       setReport(null);
+      setYieldEfficiency(null);
       setStatus("unavailable");
       setError(err instanceof Error ? err.message : "Unable to load post-grow report.");
     }
-  }, [user, growId]);
+  }, [user, growId, measurementSystem]);
 
   useEffect(() => {
     load();
@@ -212,5 +234,13 @@ export function usePostGrowLearningReportData(
     [user, growId],
   );
 
-  return { status, report, error, reload: load, saveLesson, applyLessonToNextGrow };
+  return {
+    status,
+    report,
+    yieldEfficiency,
+    error,
+    reload: load,
+    saveLesson,
+    applyLessonToNextGrow,
+  };
 }

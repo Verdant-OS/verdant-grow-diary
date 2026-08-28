@@ -92,6 +92,7 @@ import {
 import { plantDetailPath, tentsPath } from "@/lib/routes";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import { useTentQuickLogTargetEvidence } from "@/context/TentQuickLogTargetContext";
+import TentPendingOutcomeNotice from "@/components/TentPendingOutcomeNotice";
 
 const EMPTY_TENT_PLANTS: never[] = [];
 
@@ -299,6 +300,8 @@ export default function TentDetail() {
           />
         );
       })()}
+
+      <TentPendingOutcomeNotice growId={tent.growId ?? null} tentId={tent.id} />
 
       <div className="mb-3 flex items-center gap-2 flex-wrap">
         <TentCardActionsMenu

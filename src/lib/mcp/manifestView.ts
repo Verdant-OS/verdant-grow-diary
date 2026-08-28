@@ -115,7 +115,7 @@ export const MCP_MANIFEST: MCPManifestView = Object.freeze({
       name: "get_latest_sensor_snapshot",
       title: "Get latest sensor snapshot",
       description:
-        "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading keeps its `source` and `quality` labels verbatim and adds a response-time `freshness` field (`fresh`, `stale`, or `invalid`) plus `current_live`. `quality` is one of ok/degraded/stale/invalid. Canonical `source` labels are exactly live/manual/csv/demo/stale/invalid, where `live` means fresh validated connected telemetry; legacy rows may carry other ingest labels such as sim or vendor bridge names. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and sim, stale, invalid, or unknown labels are never current or healthy. Read-only.",
+        "Fetch the most recent sensor reading per metric (temperature_c, humidity_pct, vpd_kpa, co2_ppm, soil_moisture_pct, soil_temp_c, ph, ec, ppfd) for one of the signed-in grower's own tents, ordered by capture time (captured_at, falling back to ingest time). Every reading includes constitution `source` (exactly live/manual/csv/demo/stale/invalid — vendor/transport tokens such as ecowitt, mqtt, or sim, and any unrecognized label, are never returned as source), `quality`, derived `confidence` (0–1), response-time `freshness` (`fresh`, `stale`, or `invalid`), and `current_live`. `quality` is one of ok/degraded/stale/invalid. `live` means fresh validated connected telemetry. Treat a reading as current live telemetry ONLY when `current_live` is true: quality must be `ok`, source must be `live`, and freshness must be `fresh`. Every other source, quality, or freshness state keeps its label and is never live: manual stays manual, csv stays csv, demo stays demo, and stale or invalid are never current or healthy. Read-only.",
       readOnly: true,
       params: [
         {
@@ -123,6 +123,63 @@ export const MCP_MANIFEST: MCPManifestView = Object.freeze({
           type: "string (uuid)",
           required: true,
           description: "Tent id to fetch the latest readings for.",
+        },
+      ],
+    },
+    {
+      name: "list_grow_walk_targets",
+      title: "List Grow Walk targets",
+      description:
+        "List the signed-in Verdant grower's own tents and plants within one owned grow, ordered by deterministic physical-inspection priority. Results preserve missing evidence and source limits; archived targets are labeled historical; exact sensor evidence is loaded only by get_grow_walk_context. Priority is scouting guidance, not a diagnosis. Read-only.",
+      readOnly: true,
+      params: [
+        {
+          name: "growId",
+          type: "string (uuid)",
+          required: true,
+          description: "Owned grow id whose tents and plants should be listed.",
+        },
+        {
+          name: "includeInactivePlants",
+          type: "boolean",
+          required: false,
+          description: "Include archived or inactive plant records. Defaults to false.",
+        },
+        {
+          name: "limit",
+          type: "integer",
+          required: false,
+          description: "Maximum targets to return. Defaults to 50.",
+          constraints: "1–100",
+        },
+      ],
+    },
+    {
+      name: "get_grow_walk_context",
+      title: "Get Grow Walk context",
+      description:
+        "Fetch bounded, source-labeled evidence for one tent or plant the signed-in grower owns. Photo rows are metadata only, sensor evidence keeps source/quality/freshness labels, and partial lanes are named explicitly. Archived targets are labeled as historical. The result supports physical inspection and does not diagnose, approve actions, or control equipment. Read-only.",
+      readOnly: true,
+      params: [
+        {
+          name: "targetType",
+          type: "string enum",
+          required: true,
+          description: "Whether the owned target is a tent or plant.",
+          constraints: "tent | plant",
+        },
+        {
+          name: "targetId",
+          type: "string (uuid)",
+          required: true,
+          description: "Owned tent or plant id to review.",
+        },
+        {
+          name: "lookbackHours",
+          type: "integer",
+          required: false,
+          description: "Bounded history window in hours. Defaults to 72.",
+          constraints: "24–168",
         },
       ],
     },

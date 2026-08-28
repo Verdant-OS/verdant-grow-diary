@@ -872,9 +872,11 @@ export default function QuickLogV2Sheet({
     if (photoDiaryInFlightRef.current) {
       return { ok: false, message: "Photo diary entry already in progress." };
     }
+    if (!user) return { ok: false, message: "Sign in to attach photos." };
     photoDiaryInFlightRef.current = true;
     try {
       return await createQuickLogPhotoDiaryEntry({
+        ownerId: user.id,
         growId: input.growId,
         tentId: input.tentId,
         plantId: input.plantId,

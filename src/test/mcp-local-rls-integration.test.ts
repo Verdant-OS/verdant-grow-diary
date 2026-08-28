@@ -41,6 +41,8 @@ import type { ToolContext } from "@lovable.dev/mcp-js";
 import listGrowsTool from "@/lib/mcp/tools/list-grows";
 import listDiaryTool from "@/lib/mcp/tools/list-recent-diary-entries";
 import getSnapshotTool from "@/lib/mcp/tools/get-latest-sensor-snapshot";
+import listGrowWalkTargetsTool from "@/lib/mcp/tools/list-grow-walk-targets";
+import getGrowWalkContextTool from "@/lib/mcp/tools/get-grow-walk-context";
 import manifest from "../../.lovable/mcp/manifest.json";
 import {
   HarnessLog,
@@ -99,6 +101,22 @@ describe("MCP manifest tool contract (parameter allow-list)", () => {
     expect(hasPaginationOrFilterAxes(t!)).toBe(false);
   });
 
+  it("list_grow_walk_targets advertises an owned grow scope with optional target filters", () => {
+    const t = toolByName("list_grow_walk_targets");
+    expect(t).toBeTruthy();
+    const props = t!.inputSchema.properties ?? {};
+    expect(Object.keys(props).sort()).toEqual(["growId", "includeInactivePlants", "limit"].sort());
+    expect(t!.inputSchema.required ?? []).toEqual(["growId"]);
+  });
+
+  it("get_grow_walk_context advertises an owned target scope and bounded lookback", () => {
+    const t = toolByName("get_grow_walk_context");
+    expect(t).toBeTruthy();
+    const props = t!.inputSchema.properties ?? {};
+    expect(Object.keys(props).sort()).toEqual(["lookbackHours", "targetId", "targetType"].sort());
+    expect((t!.inputSchema.required ?? []).sort()).toEqual(["targetId", "targetType"].sort());
+  });
+
   it("get_latest_sensor_snapshot guidance teaches deny-by-default source trust", () => {
     const t = toolByName("get_latest_sensor_snapshot");
     expect(t).toBeTruthy();
@@ -149,6 +167,7 @@ describe("MCP manifest tool contract (parameter allow-list)", () => {
 
 type SeededGrow = { id: string; name: string; archived: boolean };
 type SeededDiary = { id: string; note: string; growId: string };
+type SeededPlant = { id: string; name: string };
 
 type SeededUser = {
   id: string;
@@ -158,6 +177,7 @@ type SeededUser = {
   accessToken: string;
   tentId: string;
   emptyTentId: string;
+  primaryPlant: SeededPlant;
   readingIds: string[];
   grows: SeededGrow[]; // includes both active + archived
   activeGrows: SeededGrow[];
@@ -304,6 +324,10 @@ describeIfHarness("MCP local RLS integration", () => {
       (await listDiaryTool.handler(args, ctx)) as unknown as Record<string, unknown>,
     get_latest_sensor_snapshot: async (args, ctx) =>
       (await getSnapshotTool.handler(args, ctx)) as unknown as Record<string, unknown>,
+    list_grow_walk_targets: async (args, ctx) =>
+      (await listGrowWalkTargetsTool.handler(args, ctx)) as unknown as Record<string, unknown>,
+    get_grow_walk_context: async (args, ctx) =>
+      (await getGrowWalkContextTool.handler(args, ctx)) as unknown as Record<string, unknown>,
   };
 
   async function callTool(
@@ -318,7 +342,7 @@ describeIfHarness("MCP local RLS integration", () => {
     const structured = (res as Record<string, unknown>).structuredContent as
       Record<string, unknown> | undefined;
     const rows = structured
-      ? ((structured.grows ?? structured.entries ?? null) as unknown[] | null)
+      ? ((structured.grows ?? structured.entries ?? structured.targets ?? null) as unknown[] | null)
       : null;
     harnessLog.record({
       tool: toolName,
@@ -380,14 +404,43 @@ describeIfHarness("MCP local RLS integration", () => {
     const { data: tents, error: tentErr } = await admin
       .from("tents")
       .insert([
-        { user_id: userId, name: `Tent-${marker}` },
-        { user_id: userId, name: `Tent-${marker}-empty` },
+        {
+          user_id: userId,
+          grow_id: primaryGrow.id,
+          name: `Tent-${marker}`,
+          stage: "veg",
+          is_archived: false,
+        },
+        {
+          user_id: userId,
+          grow_id: primaryGrow.id,
+          name: `Tent-${marker}-empty`,
+          stage: "veg",
+          is_archived: false,
+        },
       ])
       .select("id,name");
     if (tentErr || !tents || tents.length !== 2)
       throw new Error(`seed tents: ${fmtDbError(tentErr)}`);
     const tentId = tents.find((t) => !String(t.name).endsWith("-empty"))!.id as string;
     const emptyTentId = tents.find((t) => String(t.name).endsWith("-empty"))!.id as string;
+
+    const { data: plants, error: plantErr } = await admin
+      .from("plants")
+      .insert({
+        user_id: userId,
+        grow_id: primaryGrow.id,
+        tent_id: tentId,
+        name: `Plant-${marker}`,
+        stage: "veg",
+        health: "healthy",
+        plant_type: "photoperiod",
+        is_archived: false,
+      })
+      .select("id,name")
+      .single();
+    if (plantErr || !plants) throw new Error(`seed plant: ${fmtDbError(plantErr)}`);
+    const primaryPlant: SeededPlant = { id: plants.id as string, name: plants.name as string };
 
     // Seed several diary entries against the primary grow, spaced in time.
     // Live schema: no event_type column; entry_at drives tool ordering.
@@ -482,6 +535,7 @@ describeIfHarness("MCP local RLS integration", () => {
       accessToken: session.session.access_token,
       tentId,
       emptyTentId,
+      primaryPlant,
       readingIds: readings.map((r) => r.id as string),
       grows,
       activeGrows,
@@ -532,6 +586,7 @@ describeIfHarness("MCP local RLS integration", () => {
       try {
         await admin.from("sensor_readings").delete().eq("user_id", u.id);
         await admin.from("diary_entries").delete().eq("user_id", u.id);
+        await admin.from("plants").delete().eq("user_id", u.id);
         await admin.from("tents").delete().eq("user_id", u.id);
         await admin.from("grows").delete().eq("user_id", u.id);
         await admin.auth.admin.deleteUser(u.id);
@@ -940,11 +995,15 @@ describeIfHarness("MCP local RLS integration", () => {
       toolName: string,
       scopeParams: string[],
       owner: SeededUser,
+      contextTargetType: "tent" | "plant" = "tent",
     ): Record<string, unknown> {
       const args: Record<string, unknown> = {};
+      if (toolName === "get_grow_walk_context") args.targetType = contextTargetType;
       for (const name of scopeParams) {
         if (name === "growId") args.growId = owner.primaryGrow.id;
         else if (name === "tentId") args.tentId = owner.tentId;
+        else if (name === "targetId")
+          args.targetId = contextTargetType === "plant" ? owner.primaryPlant.id : owner.tentId;
         else throw new Error(`no seeded fixture for advertised scope param ${name}`);
       }
       return args;
@@ -965,12 +1024,27 @@ describeIfHarness("MCP local RLS integration", () => {
         } | null;
         return Object.values(snapshot?.readings ?? {}).map((r) => r.id);
       }
+      if (toolName === "list_grow_walk_targets") {
+        return ((structured.targets ?? []) as Array<{ targetId: string }>).map(
+          (target) => target.targetId,
+        );
+      }
+      if (toolName === "get_grow_walk_context") {
+        const context = structured.context as {
+          scope?: { plantId?: string | null; tentId?: string | null };
+        } | null;
+        const id = context?.scope?.plantId ?? context?.scope?.tentId;
+        return typeof id === "string" ? [id] : [];
+      }
       return [];
     }
 
     function ownedIds(toolName: string, user: SeededUser): Set<string> {
       if (toolName === "list_grows") return new Set(user.grows.map((g) => g.id));
       if (toolName === "list_recent_diary_entries") return new Set(user.diaries.map((d) => d.id));
+      if (toolName === "list_grow_walk_targets" || toolName === "get_grow_walk_context") {
+        return new Set([user.tentId, user.emptyTentId, user.primaryPlant.id]);
+      }
       return new Set(user.readingIds);
     }
 
@@ -991,51 +1065,66 @@ describeIfHarness("MCP local RLS integration", () => {
       }
 
       for (const c of cases) {
-        it(`${tool.name} ${c.label}: rows stay caller-scoped for both users`, async () => {
-          for (const [caller, other] of [
-            [userA, userB],
-            [userB, userA],
-          ] as Array<[SeededUser, SeededUser]>) {
-            const args = { ...c.args, ...fillScope(tool.name, c.scopeParams, caller) };
-            const res = await callTool(tool.name, caller, args, c.label);
-            assertMcpEnvelope(res);
-            assertNoSecretLeakage(res);
-            assertNoForeignMarker(res, other);
-            const owned = ownedIds(tool.name, caller);
-            const foreign = ownedIds(tool.name, other);
-            for (const id of extractRowIds(tool.name, res)) {
-              expect(owned.has(id), `${tool.name} returned non-owned row ${id}`).toBe(true);
-              expect(foreign.has(id), `${tool.name} leaked foreign row ${id}`).toBe(false);
-            }
-            if (typeof (args as { limit?: number }).limit === "number") {
-              const rowIds = extractRowIds(tool.name, res);
-              expect(rowIds.length).toBeLessThanOrEqual((args as { limit: number }).limit);
-            }
-          }
-        });
-
-        if (c.scopeParams.length > 0) {
-          it(`${tool.name} ${c.label}: foreign scope ids never leak the other user's rows`, async () => {
-            // User A supplies User B's resource ids.
-            const args = { ...c.args, ...fillScope(tool.name, c.scopeParams, userB) };
-            const res = await callTool(tool.name, userA, args, `${c.label} (foreign scope)`);
-            assertMcpEnvelope(res);
-            assertNoSecretLeakage(res);
-            assertNoForeignMarker(res, userB);
-            const bIds = ownedIds(tool.name, userB);
-            for (const id of extractRowIds(tool.name, res)) {
-              expect(bIds.has(id), `${tool.name} leaked foreign row ${id}`).toBe(false);
+        const contextTargetTypes: readonly ("tent" | "plant")[] =
+          tool.name === "get_grow_walk_context" ? ["tent", "plant"] : ["tent"];
+        for (const contextTargetType of contextTargetTypes) {
+          const targetLabel =
+            tool.name === "get_grow_walk_context" ? ` (${contextTargetType} target)` : "";
+          it(`${tool.name} ${c.label}${targetLabel}: rows stay caller-scoped for both users`, async () => {
+            for (const [caller, other] of [
+              [userA, userB],
+              [userB, userA],
+            ] as Array<[SeededUser, SeededUser]>) {
+              const args = {
+                ...c.args,
+                ...fillScope(tool.name, c.scopeParams, caller, contextTargetType),
+              };
+              const res = await callTool(tool.name, caller, args, c.label);
+              assertMcpEnvelope(res);
+              assertNoSecretLeakage(res);
+              assertNoForeignMarker(res, other);
+              const owned = ownedIds(tool.name, caller);
+              const foreign = ownedIds(tool.name, other);
+              for (const id of extractRowIds(tool.name, res)) {
+                expect(owned.has(id), `${tool.name} returned non-owned row ${id}`).toBe(true);
+                expect(foreign.has(id), `${tool.name} leaked foreign row ${id}`).toBe(false);
+              }
+              if (typeof (args as { limit?: number }).limit === "number") {
+                const rowIds = extractRowIds(tool.name, res);
+                expect(rowIds.length).toBeLessThanOrEqual((args as { limit: number }).limit);
+              }
             }
           });
-        }
 
-        it(`${tool.name} ${c.label}: unauthenticated caller stays blocked`, async () => {
-          const args = { ...c.args, ...fillScope(tool.name, c.scopeParams, userA) };
-          const res = await callTool(tool.name, null, args, `${c.label} (unauthenticated)`);
-          expect(res.isError).toBe(true);
-          assertNoForeignMarker(res, userA);
-          assertNoForeignMarker(res, userB);
-        });
+          if (c.scopeParams.length > 0) {
+            it(`${tool.name} ${c.label}${targetLabel}: foreign scope ids never leak the other user's rows`, async () => {
+              // User A supplies User B's resource ids.
+              const args = {
+                ...c.args,
+                ...fillScope(tool.name, c.scopeParams, userB, contextTargetType),
+              };
+              const res = await callTool(tool.name, userA, args, `${c.label} (foreign scope)`);
+              assertMcpEnvelope(res);
+              assertNoSecretLeakage(res);
+              assertNoForeignMarker(res, userB);
+              const bIds = ownedIds(tool.name, userB);
+              for (const id of extractRowIds(tool.name, res)) {
+                expect(bIds.has(id), `${tool.name} leaked foreign row ${id}`).toBe(false);
+              }
+            });
+          }
+
+          it(`${tool.name} ${c.label}${targetLabel}: unauthenticated caller stays blocked`, async () => {
+            const args = {
+              ...c.args,
+              ...fillScope(tool.name, c.scopeParams, userA, contextTargetType),
+            };
+            const res = await callTool(tool.name, null, args, `${c.label} (unauthenticated)`);
+            expect(res.isError).toBe(true);
+            assertNoForeignMarker(res, userA);
+            assertNoForeignMarker(res, userB);
+          });
+        }
       }
     }
   });

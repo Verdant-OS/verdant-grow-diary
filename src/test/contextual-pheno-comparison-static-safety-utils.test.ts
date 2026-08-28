@@ -180,23 +180,26 @@ describe("contextualPhenoComparisonStaticSafety — changed-file filter", () => 
       "src/lib/contextualPhenoComparisonViewModel.ts",
       "src/components/ContextualPhenoComparisonPanel.tsx",
       "src/pages/ContextualPhenoComparisonDemo.tsx",
-      "src/test/fixtures/contextualPhenoComparisonFixtures.ts",
+      "src/lib/demo/contextualPhenoComparisonFixtures.ts",
     ]);
     expect(out).toEqual([
       "src/components/ContextualPhenoComparisonPanel.tsx",
       "src/lib/contextualPhenoComparisonViewModel.ts",
+      "src/lib/demo/contextualPhenoComparisonFixtures.ts",
       "src/pages/ContextualPhenoComparisonDemo.tsx",
-      "src/test/fixtures/contextualPhenoComparisonFixtures.ts",
     ]);
   });
 
-  it("includes any file whose path matches the contextual-pheno pattern", () => {
+  it("includes pattern-matching runtime files but exempts guard files", () => {
     const out = filterChangedContextualPhenoFiles([
       "src/test/contextual-pheno-comparison-empty-states.test.tsx",
+      "src/test/utils/contextualPhenoComparisonStaticSafety.ts",
+      "docs/contextual-pheno-comparison-v0-audit.md",
       "src/lib/extra/ContextualPhenoComparisonHelper.ts",
     ]);
-    expect(out).toContain("src/test/contextual-pheno-comparison-empty-states.test.tsx");
-    expect(out).toContain("src/lib/extra/ContextualPhenoComparisonHelper.ts");
+    // Guard files quote the banned phrases to define or forbid them, so the
+    // changed-file scan skips them; runtime files stay covered.
+    expect(out).toEqual(["src/lib/extra/ContextualPhenoComparisonHelper.ts"]);
   });
 
   it("ignores unrelated files", () => {

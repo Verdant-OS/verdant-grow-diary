@@ -16,7 +16,7 @@ import {
   buildContextualPhenoComparisonView,
   type ContextualPhenoPlantInput,
 } from "@/lib/contextualPhenoComparisonViewModel";
-import { CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS } from "@/test/fixtures/contextualPhenoComparisonFixtures";
+import { CONTEXTUAL_PHENO_COMPARISON_DEMO_PLANT_INPUTS } from "@/lib/demo/contextualPhenoComparisonFixtures";
 
 const DESKTOP = { width: 1280, height: 800 };
 const MOBILE = { width: 390, height: 844 };

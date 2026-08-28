@@ -82,7 +82,7 @@ describe("QuickLogActivityPicker", () => {
 });
 
 describe("useQuickLogActivitySave — routing", () => {
-  it("routes Note through quicklog_save_manual with p_action=note", async () => {
+  it("routes Note through quicklog_save_manual with p_action=note and forwards a valid idempotency key", async () => {
     rpcMock.mockResolvedValueOnce({ data: { ok: true, grow_event_id: "n1" }, error: null });
     const { result } = renderHook(() => useQuickLogActivitySave());
     let res!: Awaited<ReturnType<typeof result.current.save>>;
@@ -92,6 +92,7 @@ describe("useQuickLogActivitySave — routing", () => {
         growId: "g1",
         plantId: "p1",
         note: "hello",
+        idempotencyKey: "idem-key-12345",
       });
     });
     expect(res.ok).toBe(true);
@@ -102,6 +103,7 @@ describe("useQuickLogActivitySave — routing", () => {
     // Real deployed signature is target-scoped; p_grow_id never existed.
     expect(payload.p_target_type).toBe("plant");
     expect(payload.p_target_id).toBe("p1");
+    expect(payload.p_idempotency_key).toBe("idem-key-12345");
     expect(payload).not.toHaveProperty("p_grow_id");
   });
 
@@ -120,18 +122,45 @@ describe("useQuickLogActivitySave — routing", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("refuses the manual route without a tent or plant target (no RPC call)", async () => {
+  it("refuses the manual route without a tent or plant target when a valid key is supplied (no RPC call)", async () => {
     const { result } = renderHook(() => useQuickLogActivitySave());
     let res!: Awaited<ReturnType<typeof result.current.save>>;
     await act(async () => {
       res = await result.current.save({
         activityId: "note",
         growId: "g1",
+        idempotencyKey: "idem-key-12345",
       });
     });
     expect(res).toEqual({ ok: false, reason: "missing_target" });
     expect(rpcMock).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["short (<8)", "short"],
+    ["eight spaces", " ".repeat(8)],
+    ["eight tabs", "\t".repeat(8)],
+    ["overlong (>200)", "x".repeat(201)],
+  ] as const)(
+    "manual route fail-closes %s idempotency key without RPC",
+    async (_label, idempotencyKey) => {
+      const { result } = renderHook(() => useQuickLogActivitySave());
+      let res!: Awaited<ReturnType<typeof result.current.save>>;
+      await act(async () => {
+        res = await result.current.save({
+          activityId: "note",
+          growId: "g1",
+          plantId: "p1",
+          note: "hello",
+          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+        });
+      });
+      expect(res).toEqual({ ok: false, reason: "missing_idempotency_key" });
+      expect(rpcMock).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     ["feeding", "feeding"],

@@ -79,6 +79,25 @@ const SECRET_PATTERNS: RegExp[] = [
   /PASSKEY/gi,
   // Admin-role marker (assembled at runtime to avoid scanners flagging us).
   new RegExp(["service", "_", "role"].join(""), "gi"),
+  // Credential VALUES, not just labels (issue #1003). Order matters:
+  // UUIDs run before the bare hex rules so a lettered UUID segment is
+  // redacted whole, never split into a partial leak.
+  // MAC / device hardware addresses (six hex pairs, colon or dash separated).
+  // Hex lookarounds — not \b — so word-char prefixes (mac_/0x) cannot evade.
+  /(?<![0-9A-Fa-f])[0-9A-Fa-f]{2}(?:[:-][0-9A-Fa-f]{2}){5}(?![0-9A-Fa-f])/g,
+  // UUIDs — internal private row/tenant identifiers. Same lookarounds so
+  // tent_<uuid> and similar word-char prefixes still redact.
+  /(?<![0-9A-Fa-f])[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}(?![0-9A-Fa-f])/g,
+  // Long hex runs — passkey values, digests, key material. Hex lookarounds
+  // instead of \b so prefixed forms ("0x…", "PASSKEY_…", "sbp_…") still match.
+  /(?<![0-9A-Fa-f])[0-9A-Fa-f]{32,}(?![0-9A-Fa-f])/g,
+  // Separator-free MAC-length hex runs (12–31 chars containing at least one
+  // hex letter, so plain long numbers/epoch timestamps are untouched).
+  /(?<![0-9A-Fa-f])(?=[0-9A-Fa-f]{0,30}[A-Fa-f])[0-9A-Fa-f]{12,31}(?![0-9A-Fa-f])/g,
+  // API keys and env NAME=value pairs (never export private env values).
+  // Quoted ("…"/'…') and unquoted forms both match; lone words do not.
+  /\bsk-[A-Za-z0-9_-]{16,}/g,
+  /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
 ];
 
 const REDACTED = "[REDACTED]";

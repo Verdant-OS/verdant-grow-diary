@@ -62,6 +62,22 @@ describe("buildOneTentLoopLiveProofView", () => {
     expect(positive).not.toMatch(/\bhealthy\b/);
   });
 
+  it("uses the injected current time for staleness when evidence has no explicit clock", () => {
+    const { now_ms: _ignored, ...withoutClock } = EMPTY;
+    const v = buildOneTentLoopLiveProofView(
+      {
+        ...withoutClock,
+        latest_sensor_snapshot: {
+          source: "live",
+          captured_at: "2026-06-09T12:00:00.000Z",
+          metric: "temperature",
+        },
+      },
+      "2026-06-09T12:20:00.000Z",
+    );
+    expect(v.steps.find((s) => s.id === "sensor-snapshot")?.status).toBe("stale");
+  });
+
   it("does not leak raw payload or unknown fields", () => {
     const evil = {
       ...EMPTY,

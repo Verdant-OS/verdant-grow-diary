@@ -137,6 +137,7 @@ const PUBLIC_MOBILE_ROUTES: string[] = [
   // AppShell — must render signed-out with zero private-table fetches.
   "/contact",
   "/feedback",
+  "/tools/grow-help-toolkit",
   "/tools/vpd-calculator",
   // Public per-stage target-band reference: renders static constants only,
   // no Supabase fetch — must render signed-out with zero private-table hits.

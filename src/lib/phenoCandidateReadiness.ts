@@ -160,6 +160,16 @@ const STAGE_DRYING = 4;
 const STAGE_CURING = 5;
 const STAGE_CURED = 6;
 
+/**
+ * True when the candidate's KNOWN stage is before harvest. Used to caution —
+ * never to block — recording post-cure evidence (smoke test, post_cure round)
+ * on a plant that is still growing; an unknown stage never nags.
+ */
+export function isKnownPreHarvestStage(stage: string | null | undefined): boolean {
+  const { rank, known } = normalizeStageRank(stage);
+  return known && rank < STAGE_HARVEST;
+}
+
 function normalizeStageRank(stage: string | null | undefined): {
   rank: number;
   known: boolean;

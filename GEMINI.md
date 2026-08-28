@@ -1,6 +1,6 @@
 # Verdant Sentinel Code
 
-**Sentinel-Version: 2026-09-01.1**
+**Sentinel-Version: 2026-09-01.5**
 
 `AGENTS.md` remains canonical. The exact mirrored constitution is delimited below so CI
 can reject content drift as well as version drift.
@@ -8,7 +8,7 @@ can reject content drift as well as version drift.
 <!-- SENTINEL-CORE:BEGIN — full mirror of AGENTS.md; keep byte-equivalent except line endings -->
 # Verdant Agent Constitution
 
-**Sentinel-Version: 2026-09-01.1**
+**Sentinel-Version: 2026-09-01.5**
 
 This is Verdant's universal Sentinel Code. Every agent inherits these durable product,
 engineering, data, safety, and release rules. Platform-specific bootstraps live at the
@@ -118,7 +118,7 @@ Preferred layering:
 | ------------------ | ----------------------------------------- |
 | Constants / config | `src/constants/*`                         |
 | Pure logic / rules | `src/lib/*Rules.ts`                       |
-| Advisors / engines | `src/lib/*Advisor.ts`                     |
+| Services / IO      | `src/lib/*Service.ts`                     |
 | View models        | `src/lib/*ViewModel.ts`                   |
 | React rendering    | `src/pages/*.tsx`, `src/components/*.tsx` |
 | Hooks              | `src/hooks/*`                             |
@@ -474,14 +474,19 @@ Use the repo's actual package manager and scripts.
 
 Prefer existing conventions.
 
-Common commands may include:
+Common commands (verified on the deploy branch, 2026-08-19):
 
 ```bash
-bun run type-check
+bun run typecheck
+bun run typecheck:tsgo
 bunx vitest run --reporter=dot
 bun run scripts/run-billing-rls-harness.ts
 bun run scripts/run-ai-credits-rls-harness.ts
 ```
+
+Branch note: `bun run type-check` and `tsconfig.app.json` are `main`-branch
+conventions and do not exist on `verdant-grow-diary`. Verify scripts against the
+branch you are on before citing them.
 
 If a command is unavailable, report that honestly and use the closest existing command.
 
@@ -664,12 +669,12 @@ Cursor Cloud sessions have reported on this environment; where they disagreed, b
 observations are kept below rather than one silently overwriting the other, since VM
 snapshots can differ.
 
-- **Stack & authoritative run guide.** React + Vite + TypeScript SPA (port **8080**)
-  backed by a **hosted** Supabase project — no local Supabase stack is needed to run the
-  app. The public anon key and URL are committed in `.env`. The authoritative
-  run/build/test guide is `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md`
-  has the overview. Read the skill before driving the app — do not duplicate its commands
-  here.
+- **Stack & authoritative run guide.** TanStack Start (SSR) on TanStack Router file
+  routes, written in React + Vite + TypeScript (port **8080**), backed by a **hosted**
+  Supabase project — no local Supabase stack is needed to run the app. The public anon
+  key and URL are committed in `.env`. The authoritative run/build/test guide is
+  `.claude/skills/run-verdant-grow-diary/SKILL.md`; `README.md` has the overview. Read
+  the skill before driving the app — do not duplicate its commands here.
 - **Package manager — check `node_modules` first; don't blindly retry installs.** Repo
   scripts run under **`bun`** in both observed snapshots. Per
   `.claude/skills/run-verdant-grow-diary/SKILL.md`: if `node_modules` already exists
@@ -696,7 +701,7 @@ snapshots can differ.
   not 5173** explicitly — Vite's default host `::` is unreliable in this container.
   Signed-out `/` renders the public landing directly through `RootEntry`; signed-in growers
   retain Dashboard inside the authenticated `AppShell`. An HTTP 200 on `/` therefore
-  represents the rendered public landing, not merely the SPA shell.
+  represents the rendered public landing, not merely a client-side shell.
 - **Lint / typecheck / test / build.** `bun run lint` (expect 0 errors, many
   pre-existing warnings), `bun run typecheck`, `bun run build` (its postbuild step runs
   the SEO/JSON-LD validators). Unit path is `bunx vitest run <files>` — the full suite

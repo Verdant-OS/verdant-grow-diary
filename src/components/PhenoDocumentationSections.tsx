@@ -7,6 +7,7 @@
  * Defaults populate empty fields but never overwrite anything already saved.
  */
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/store/auth";
 import {
   PHENO_DOCUMENTATION_DEFAULTS,
   mergeDocumentationValues,
@@ -40,18 +41,29 @@ interface Props {
   defaultOpen?: boolean;
 }
 
-function storageKey(recordType: PhenoDocRecordType, recordId: string): string {
-  return `phenoDocs:${recordType}:${recordId}`;
+function storageKey(
+  recordType: PhenoDocRecordType,
+  recordId: string,
+  userId: string | null,
+): string {
+  // USER-scoped when signed in: the old device-scoped key let another
+  // signed-in account on the same device see and edit the previous grower's
+  // values for the same record. Legacy device-scoped data is deliberately
+  // NOT read under a user id — it cannot be attributed to this user safely.
+  return userId
+    ? `phenoDocs:${userId}:${recordType}:${recordId}`
+    : `phenoDocs:${recordType}:${recordId}`;
 }
 
 function loadSaved(
   storage: Pick<Storage, "getItem" | "setItem"> | null,
   recordType: PhenoDocRecordType,
   recordId: string,
+  userId: string | null,
 ): PhenoDocumentationValues | null {
   if (storage === null) return null;
   try {
-    const raw = storage.getItem(storageKey(recordType, recordId));
+    const raw = storage.getItem(storageKey(recordType, recordId, userId));
     if (!raw) return null;
     return JSON.parse(raw) as PhenoDocumentationValues;
   } catch {
@@ -80,11 +92,13 @@ export default function PhenoDocumentationSections({
   defaultOpen = true,
 }: Props) {
   const store = useMemo(() => resolveDeviceStorage(storage), [storage]);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
 
   // Lazy hydration: null = storage not read yet (collapsed mode only). The
   // eager path preserves the original mount-time read for defaultOpen users.
   const [values, setValues] = useState<PhenoDocumentationValues | null>(() =>
-    defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId)) : null,
+    defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId)) : null,
   );
   const [saveStatus, setSaveStatus] = useState<DeviceSaveStatus>("idle");
   const [openSections, setOpenSections] = useState<ReadonlySet<string>>(new Set());
@@ -92,20 +106,20 @@ export default function PhenoDocumentationSections({
   // Re-hydrate if the record identity changes (e.g. switching candidates).
   useEffect(() => {
     setValues(
-      defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId)) : null,
+      defaultOpen ? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId)) : null,
     );
     setOpenSections(new Set());
     setSaveStatus("idle");
-  }, [store, recordType, recordId, defaultOpen]);
+  }, [store, recordType, recordId, defaultOpen, userId]);
 
   function hydrated(): PhenoDocumentationValues {
-    return values ?? mergeDocumentationValues(loadSaved(store, recordType, recordId));
+    return values ?? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId));
   }
 
   function setField(sectionKey: string, fieldKey: string, value: string) {
     setSaveStatus("idle");
     setValues((prev) => {
-      const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId));
+      const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId));
       return {
         ...base,
         [sectionKey]: {
@@ -119,7 +133,7 @@ export default function PhenoDocumentationSections({
   function setDiary(sectionKey: string, diaryEntryId: string | null) {
     setSaveStatus("idle");
     setValues((prev) => {
-      const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId));
+      const base = prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId, userId));
       return {
         ...base,
         [sectionKey]: { ...base[sectionKey], diaryEntryId },
@@ -133,7 +147,7 @@ export default function PhenoDocumentationSections({
       return;
     }
     try {
-      store.setItem(storageKey(recordType, recordId), JSON.stringify(hydrated()));
+      store.setItem(storageKey(recordType, recordId, userId), JSON.stringify(hydrated()));
       setSaveStatus("saved");
     } catch {
       // storage may be unavailable; keep values in-memory
@@ -171,7 +185,8 @@ export default function PhenoDocumentationSections({
                     const isOpen = (e.target as HTMLDetailsElement).open;
                     setValues(
                       (prev) =>
-                        prev ?? mergeDocumentationValues(loadSaved(store, recordType, recordId)),
+                        prev ??
+                        mergeDocumentationValues(loadSaved(store, recordType, recordId, userId)),
                     );
                     setOpenSections((prev) => {
                       const next = new Set(prev);

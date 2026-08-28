@@ -29,6 +29,11 @@ const ROUTES = [
     canonical: `${ORIGIN}/ai-doctor-readiness-check`,
   },
   {
+    path: "/tools/grow-help-toolkit",
+    expectTitle: /Free Nutrient, Grow Light & Cost Calculators/,
+    canonical: `${ORIGIN}/tools/grow-help-toolkit`,
+  },
+  {
     path: "/tools/vpd-calculator",
     expectTitle: /Free Cannabis VPD Calculator by Growth Stage/,
     canonical: `${ORIGIN}/tools/vpd-calculator`,

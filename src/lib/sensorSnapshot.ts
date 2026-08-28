@@ -11,6 +11,7 @@ import {
   isTemperatureValid,
   isVpdValid,
 } from "@/lib/sensorReadingNormalizationRules";
+import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import { summarizeCsvVendor } from "@/lib/sensorReadingVendorLineage";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
@@ -108,12 +109,20 @@ export interface SensorSnapshot {
    */
   metric_refs?: Partial<Record<SensorSnapshotMetricRefKey, SensorSnapshotMetricRef>>;
   /**
-   * Diary-row provenance for Environment Check snapshots only. Populated
-   * when {@link snapshotFromEnvironmentCheck} is given the originating
-   * `diary_entries.id`. Never present on sensor_readings-derived
+   * Diary-row provenance for manual Environment Check or Quick Log manual
+   * sensor snapshots. Populated only when the adapter receives the exact
+   * originating `diary_entries.id`. Never present on sensor_readings-derived
    * snapshots. Never confusable with {@link metric_refs}.
    */
   diary_evidence_ref?: SensorSnapshotDiaryEvidenceRef;
+  /**
+   * Whether this evidence may back an automatically persisted environment
+   * alert. Omitted preserves the existing eligibility contract; only the
+   * Plant Quick Log manual snapshot adapter sets this to false because its
+   * diary payload is display evidence, not a sensor row or an Environment
+   * Check observation.
+   */
+  alert_persistence_eligible?: boolean;
   /**
    * Tent the contributing rows came from, when they UNAMBIGUOUSLY share
    * one. Environment alerts persist this so tent-scoped surfaces (e.g.
@@ -466,6 +475,16 @@ export interface SnapshotFromEnvironmentCheckOptions {
   diaryEntryId?: string | null;
 }
 
+function buildDiaryEvidenceRef(
+  entryAt: string,
+  diaryEntryId: string | null | undefined,
+): SensorSnapshotDiaryEvidenceRef | undefined {
+  const diaryId = typeof diaryEntryId === "string" ? diaryEntryId.trim() : "";
+  return diaryId
+    ? ({ id: diaryId, entry_at: entryAt } satisfies SensorSnapshotDiaryEvidenceRef)
+    : undefined;
+}
+
 export function snapshotFromEnvironmentCheck(
   entryAt: string | null,
   envCheck: Record<string, unknown> | null | undefined,
@@ -478,11 +497,7 @@ export function snapshotFromEnvironmentCheck(
   const vpd = strictBandValue(envCheck.vpd_kpa, isVpdValid);
   if (temp === null && rh === null && vpd === null) return null;
 
-  const diaryId = typeof options?.diaryEntryId === "string" ? options.diaryEntryId.trim() : "";
-  const diary_evidence_ref =
-    diaryId && entryAt
-      ? ({ id: diaryId, entry_at: entryAt } satisfies SensorSnapshotDiaryEvidenceRef)
-      : undefined;
+  const diary_evidence_ref = buildDiaryEvidenceRef(entryAt, options?.diaryEntryId);
 
   return {
     source: "manual",
@@ -490,6 +505,59 @@ export function snapshotFromEnvironmentCheck(
     temp,
     rh,
     vpd,
+    co2: null,
+    soil: null,
+    soil_ec: null,
+    soil_temp: null,
+    ppfd: null,
+    device_id: null,
+    ...(diary_evidence_ref ? { diary_evidence_ref } : {}),
+  };
+}
+
+/**
+ * Build a current-state snapshot from Plant Quick Log's persisted
+ * `details.manual_sensor_snapshot` payload.
+ *
+ * The Quick Log payload is diary evidence, not a `sensor_readings` row:
+ *
+ * - Requires the literal `source: "manual"`; it never upgrades a diary blob
+ *   to live telemetry.
+ * - Maps only the fields the current SensorSnapshot contract understands:
+ *   `temp_f` -> canonical Celsius `temp` and `humidity_percent` -> `rh`.
+ *   pH / EC stay in the diary record because SensorSnapshot has no equivalent
+ *   fields; VPD is not derived here.
+ * - Requires number-typed, finite persisted values and drops out-of-band
+ *   temperature / humidity values. An all-missing or invalid payload returns
+ *   null, so it cannot masquerade as current sensor truth.
+ * - Carries the exact diary entry id when available; it never fabricates a
+ *   sensor_readings metric ref.
+ */
+export function snapshotFromManualSensorSnapshot(
+  entryAt: string | null,
+  manualSnapshot: Record<string, unknown> | null | undefined,
+  options?: SnapshotFromEnvironmentCheckOptions | null,
+): SensorSnapshot | null {
+  if (!manualSnapshot || typeof manualSnapshot !== "object") return null;
+  if (typeof entryAt !== "string" || !Number.isFinite(Date.parse(entryAt))) return null;
+  if (manualSnapshot.source !== "manual") return null;
+
+  const rawTempF = manualSnapshot.temp_f;
+  const tempF = typeof rawTempF === "number" && Number.isFinite(rawTempF) ? rawTempF : null;
+  const convertedTemp = tempF === null ? null : fahrenheitToCelsius(tempF);
+  const temp = convertedTemp !== null && isTemperatureValid(convertedTemp) ? convertedTemp : null;
+  const rh = strictBandValue(manualSnapshot.humidity_percent, isHumidityValid);
+
+  if (temp === null && rh === null) return null;
+
+  const diary_evidence_ref = buildDiaryEvidenceRef(entryAt, options?.diaryEntryId);
+  return {
+    source: "manual",
+    alert_persistence_eligible: false,
+    ts: entryAt,
+    temp,
+    rh,
+    vpd: null,
     co2: null,
     soil: null,
     soil_ec: null,

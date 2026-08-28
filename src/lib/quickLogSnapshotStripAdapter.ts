@@ -91,6 +91,12 @@ const DESCRIPTIONS: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "Add a snapshot so this log has room context.",
 };
 
+/** Demo-usable strip title — never claims live/current sensor context. */
+export const DEMO_USABLE_TITLE = "Demo sensor context";
+/** Demo-usable strip description — labeled demo, never treated as live. */
+export const DEMO_USABLE_DESCRIPTION =
+  "Sample data will be labeled demo — never treated as live sensor context.";
+
 const SENSORS_HREF = "/sensors";
 /**
  * Deep-link fragment for the Manual Sensor Reading anchor inside
@@ -461,26 +467,55 @@ export function buildQuickLogStripFromTentState(
     };
   }
 
-  // Provenance fence (#1003): `fresh_non_live` proves freshness, not
-  // trust. A source outside the canonical vocabulary and its reviewed
-  // aliases (legacy receiving-transport labels like "ecowitt"/"mqtt",
-  // or a missing label) must never present as healthy "Usable" context —
-  // demote to invalid, and hand the trust badge the same verdict so
-  // pill, badge, and advisory agree. `fresh_live` is untouched: the
-  // strict resolver only emits it for canonical live rows.
-  const provenanceInvalid =
-    snapshot.status === "fresh_non_live" && normalizeSensorSource(snapshot.source) === "invalid";
-  const status = provenanceInvalid ? "invalid" : narrowStrict(snapshot.status);
+  // Leftover #1163 / #1003 strip coherence: `fresh_non_live` and `stale`
+  // prove freshness/age, not trust. Derive pill status and trust-badge
+  // resolver status from the same `normalizeSensorSource` verdict so
+  // pill, badge, and advisory agree. Legacy receiving-transport labels
+  // (`ecowitt`/`mqtt`/…) and missing labels demote to invalid; reviewed
+  // live aliases (`pi_bridge`) stay coherent Live; demo/stale never
+  // healthy. `fresh_live` is untouched: the strict resolver only emits
+  // it for canonical live rows. Call normalizeSensorSource — never edit it.
+  const canonicalSource = normalizeSensorSource(snapshot.source);
+  const isNonLiveTelemetry = snapshot.status === "fresh_non_live" || snapshot.status === "stale";
+
+  let status: QuickLogSnapshotStripStatus;
+  let badgeResolverStatus: StrictSnapshotStatus;
+  if (isNonLiveTelemetry) {
+    if (canonicalSource === "invalid") {
+      status = "invalid";
+      badgeResolverStatus = "invalid";
+    } else if (snapshot.status === "stale" || canonicalSource === "stale") {
+      status = "stale";
+      badgeResolverStatus = "stale";
+    } else if (canonicalSource === "live") {
+      status = "usable";
+      badgeResolverStatus = "fresh_live";
+    } else {
+      status = "usable";
+      badgeResolverStatus = "fresh_non_live";
+    }
+  } else {
+    status = narrowStrict(snapshot.status);
+    badgeResolverStatus = snapshot.status;
+  }
   // `isEmpty` above already rejected a missing `captured_at`.
   const capturedAtIso = snapshot.captured_at ?? "";
   const capturedMs = Date.parse(capturedAtIso);
   const ageLabel = Number.isFinite(capturedMs) ? formatAge(capturedMs, now.getTime()) : null;
 
   const usableButDetached = status === "usable" && !attached;
-  const title = usableButDetached ? "Sensor snapshot available" : TITLES[status];
+  // Detached copy still wins over demo-usable copy.
+  const demoUsable = !usableButDetached && status === "usable" && canonicalSource === "demo";
+  const title = usableButDetached
+    ? "Sensor snapshot available"
+    : demoUsable
+      ? DEMO_USABLE_TITLE
+      : TITLES[status];
   const description = usableButDetached
     ? "Toggle “Attach sensor snapshot” to include it in this log."
-    : DESCRIPTIONS[status];
+    : demoUsable
+      ? DEMO_USABLE_DESCRIPTION
+      : DESCRIPTIONS[status];
   const baseAction: QuickLogSnapshotStripAction = usableButDetached
     ? { kind: "none" }
     : actionFor(status);
@@ -491,6 +526,29 @@ export function buildQuickLogStripFromTentState(
       ? MANUAL_SNAPSHOT_EDIT_ACTION
       : baseAction;
 
+  const classification = {
+    ...synthClassification(status, snapshot.badge_label),
+    ...(canonicalSource === "demo" ? { isHealthyEvidence: false as const } : {}),
+  };
+
+  // Live badge for reviewed aliases may stay (pill/badge coherence), but
+  // attachable must NOT become true unless the resolver status is actually
+  // `fresh_live`. Remapping badgeResolverStatus → fresh_live for display
+  // must not widen ATTACHABLE.live; restamp after classify.
+  const trustBadge = {
+    ...classifySnapshotTrustBadge({
+      resolverStatus: badgeResolverStatus,
+      // Non-live rows pass the canonical source so badge mapping agrees
+      // with the pill (raw transport labels never reach mapNonLiveSource).
+      source: isNonLiveTelemetry ? canonicalSource : snapshot.source,
+    }),
+    // Provider identity always from the RAW label (e.g. pi_bridge → Pi Bridge).
+    providerLabel: deriveProviderLabel(snapshot.source),
+  };
+  if (snapshot.status === "fresh_non_live") {
+    trustBadge.attachable = false;
+  }
+
   return {
     status,
     title,
@@ -500,11 +558,8 @@ export function buildQuickLogStripFromTentState(
     ageLabel,
     metrics: buildStrictMetrics(snapshot, temperatureUnit),
     action,
-    classification: synthClassification(status, snapshot.badge_label),
+    classification,
     providerLabel: deriveProviderLabel(snapshot.source),
-    trustBadge: classifySnapshotTrustBadge({
-      resolverStatus: provenanceInvalid ? "invalid" : snapshot.status,
-      source: snapshot.source,
-    }),
+    trustBadge,
   };
 }

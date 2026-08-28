@@ -17,10 +17,12 @@ import {
   decidePublishVerdict,
   formatPublishVerificationSummary,
   isOrphanStamp,
+  parseGitPorcelainPaths,
   reportJsonLeaksTokenPayload,
   resolveCommittedTokenClass,
   resolveEffectiveTokenClass,
   runPublishVerification,
+  sanitizeDirtyPathList,
 } from "../../scripts/verify-publish-provenance.mjs";
 
 const FIXTURE_TEST_TOKEN = "test_REDACTED_SANDBOX";
@@ -113,6 +115,7 @@ describe("stamp blockers and orphan classification", () => {
     expect(collectStampBlockers(cleanStamp({ commitSource: "none", commit: "unknown" }))).toEqual([
       "commit_unknown",
     ]);
+    expect(collectStampBlockers(cleanStamp({ commitSource: "none" }))).toEqual(["commit_unknown"]);
     expect(isOrphanStamp(cleanStamp({ commit: "unknown" }))).toBe(true);
     expect(isOrphanStamp(cleanStamp({ commitSource: "none" }))).toBe(true);
   });
@@ -198,7 +201,36 @@ describe("token class compare + report assembly", () => {
     expect(report.verdict).toBe("FAIL");
     expect(report.dirty).toBe(true);
     expect(report.blockers).toEqual(["stamp_dirty"]);
+    expect(report.dirtyPaths).toEqual([]);
     expect(formatPublishVerificationSummary(report)).toBe("[publish-verify] FAIL stamp_dirty");
+  });
+
+  it("omits dirty path names from PASS reports even if supplied", () => {
+    const report = buildPublishVerificationReport({
+      stamp: cleanStamp(),
+      committedTokenClass: "test_",
+      effectiveTokenClass: "test_",
+      generatedAt: "2026-08-25T00:00:00.000Z",
+      dirtyPaths: [".env.production"],
+    });
+    expect(report.verdict).toBe("PASS");
+    expect(report.dirtyPaths).toEqual([]);
+  });
+
+  it("records dirty path names without env dumps", () => {
+    const report = buildPublishVerificationReport({
+      stamp: cleanStamp({ dirty: true }),
+      committedTokenClass: "test_",
+      effectiveTokenClass: "test_",
+      generatedAt: "2026-08-25T00:00:00.000Z",
+      dirtyPaths: [".env.production", "scripts/verify-publish-provenance.mjs"],
+    });
+    expect(report.dirtyPaths).toEqual([".env.production", "scripts/verify-publish-provenance.mjs"]);
+    const serialized = JSON.stringify(report);
+    expect(serialized).not.toContain("VITE_PAYMENTS_CLIENT_TOKEN=");
+    expect(serialized).not.toContain(FIXTURE_TEST_TOKEN);
+    expect(serialized).not.toContain(FIXTURE_LIVE_TOKEN);
+    expect(reportJsonLeaksTokenPayload(serialized)).toBe(false);
   });
 
   it("flags token-shaped payloads and allows class labels", () => {
@@ -242,9 +274,27 @@ describe("token class compare + report assembly", () => {
       "blockers",
       "mismatches",
       "generatedAt",
+      "dirtyPaths",
     ]) {
       expect(report).toHaveProperty(key);
     }
+    expect(report.dirtyPaths).toEqual([]);
+  });
+});
+
+describe("parseGitPorcelainPaths", () => {
+  it("extracts path names only from porcelain status", () => {
+    expect(
+      parseGitPorcelainPaths(" M .env.production\n?? vite.config.ts.timestamp-1.mjs\n"),
+    ).toEqual([".env.production", "vite.config.ts.timestamp-1.mjs"]);
+  });
+
+  it("uses the rename destination and ignores empty input", () => {
+    expect(parseGitPorcelainPaths('R  "old file" -> scripts/new-name.mjs')).toEqual([
+      "scripts/new-name.mjs",
+    ]);
+    expect(parseGitPorcelainPaths("")).toEqual([]);
+    expect(sanitizeDirtyPathList(["docs/a.md", "docs/a.md", "\n"])).toEqual(["docs/a.md"]);
   });
 });
 
@@ -355,6 +405,18 @@ describe("package.json wiring", () => {
     expect(prebuild[0]).toBe("node scripts/restore-env-production-from-head.mjs");
     expect(prebuild.at(-2)).toBe("node scripts/stamp-version.mjs");
     expect(prebuild.at(-1)).toBe("node scripts/verify-publish-provenance.mjs");
+  });
+
+  it("restores a clean CI worktree immediately before the production stamp", () => {
+    const workflow = readFileSync(resolve(process.cwd(), ".github/workflows/ci.yml"), "utf8");
+    const restoreAt = workflow.indexOf("Restore clean worktree before production stamp");
+    const buildAt = workflow.indexOf("\n      - name: Build\n");
+    const uploadAt = workflow.indexOf("Upload publish verification report");
+    expect(restoreAt).toBeGreaterThan(-1);
+    expect(buildAt).toBeGreaterThan(restoreAt);
+    expect(uploadAt).toBeGreaterThan(buildAt);
+    expect(workflow.includes("git restore --source=HEAD --worktree --staged -- .")).toBe(true);
+    expect(workflow.includes("path: artifacts/publish-verification.json")).toBe(true);
   });
 });
 

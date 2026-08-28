@@ -42,6 +42,10 @@ export const PUBLISH_BLOCKER_CODES = Object.freeze([
 /** Fixed mismatch codes (reported; not automatic blockers in this gate). */
 export const PUBLISH_MISMATCH_CODES = Object.freeze(["token_class_mismatch"]);
 
+/** Cap diagnostic path names so a dirty tree cannot flood the report. */
+export const MAX_DIRTY_PATHS = 50;
+const MAX_DIRTY_PATH_CHARS = 240;
+
 /**
  * Classify a Paddle client token by PREFIX ONLY.
  * Never returns or inspects bytes after the class prefix.
@@ -136,6 +140,78 @@ export function decidePublishVerdict(blockers) {
   return Array.isArray(blockers) && blockers.length === 0 ? "PASS" : "FAIL";
 }
 
+function stripPorcelainPathQuotes(rawPath) {
+  const trimmed = String(rawPath).trim();
+  if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function sanitizeDirtyPath(rawPath) {
+  if (typeof rawPath !== "string") return "";
+  const withoutControls = rawPath.replace(/[\u0000-\u001f\u007f]/gu, "").trim();
+  if (withoutControls.length === 0) return "";
+  return withoutControls.slice(0, MAX_DIRTY_PATH_CHARS);
+}
+
+/**
+ * Parse `git status --porcelain` into relative path names only.
+ * Never returns file contents, diffs, or env payloads.
+ *
+ * @param {unknown} porcelainText
+ * @returns {string[]}
+ */
+export function parseGitPorcelainPaths(porcelainText) {
+  if (typeof porcelainText !== "string" || porcelainText.trim() === "") return [];
+  /** @type {string[]} */
+  const paths = [];
+  for (const line of porcelainText.split(/\r?\n/u)) {
+    if (line.length < 4) continue;
+    const rest = line.slice(3);
+    const renameAt = rest.lastIndexOf(" -> ");
+    const candidate = renameAt >= 0 ? rest.slice(renameAt + 4) : rest;
+    const sanitized = sanitizeDirtyPath(stripPorcelainPathQuotes(candidate));
+    if (sanitized) paths.push(sanitized);
+  }
+  return [...new Set(paths)].slice(0, MAX_DIRTY_PATHS);
+}
+
+function readMeaningfulDirtyPaths(rootDir) {
+  try {
+    const text = execSync(
+      'git status --porcelain --untracked-files=all -- . ":(exclude)public/version.json" ":(exclude)src/generated/buildInfo.ts"',
+      {
+        cwd: rootDir,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        maxBuffer: MAX_ENV_BYTES,
+      },
+    );
+    return parseGitPorcelainPaths(typeof text === "string" ? text : "");
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Path-name-only dirty list for the downloadable report.
+ * Empty unless the stamp is dirty. Never includes file contents.
+ *
+ * @param {unknown} dirtyPaths
+ * @returns {string[]}
+ */
+export function sanitizeDirtyPathList(dirtyPaths) {
+  if (!Array.isArray(dirtyPaths)) return [];
+  /** @type {string[]} */
+  const paths = [];
+  for (const entry of dirtyPaths) {
+    const sanitized = sanitizeDirtyPath(entry);
+    if (sanitized) paths.push(sanitized);
+  }
+  return [...new Set(paths)].slice(0, MAX_DIRTY_PATHS);
+}
+
 /**
  * Build the downloadable verification report. Token bytes must never appear.
  *
@@ -144,6 +220,7 @@ export function decidePublishVerdict(blockers) {
  *   committedTokenClass: string,
  *   effectiveTokenClass: string,
  *   generatedAt?: string,
+ *   dirtyPaths?: string[],
  * }} input
  */
 export function buildPublishVerificationReport({
@@ -151,11 +228,15 @@ export function buildPublishVerificationReport({
   committedTokenClass,
   effectiveTokenClass,
   generatedAt = new Date().toISOString(),
+  dirtyPaths = [],
 }) {
   const blockers = collectStampBlockers(stamp);
   const tokenCompare = compareTokenClasses(committedTokenClass, effectiveTokenClass);
   const verdict = decidePublishVerdict(blockers);
   const orphan = isOrphanStamp(stamp);
+  const reportedDirtyPaths = blockers.includes("stamp_dirty")
+    ? sanitizeDirtyPathList(dirtyPaths)
+    : [];
 
   const commit = stamp && typeof stamp.commit === "string" ? stamp.commit : "unknown";
   const shortCommit =
@@ -200,6 +281,7 @@ export function buildPublishVerificationReport({
     verdict,
     blockers,
     mismatches: tokenCompare.mismatches,
+    dirtyPaths: reportedDirtyPaths,
     generatedAt,
   };
 }
@@ -401,12 +483,14 @@ export async function runPublishVerification({
   const stamp = readStamp(versionPath);
   const committedTokenClass = await resolveCommitted(rootDir);
   const effectiveTokenClass = await resolveEffective(rootDir);
+  const dirtyPaths = readMeaningfulDirtyPaths(rootDir);
 
   const report = buildPublishVerificationReport({
     stamp,
     committedTokenClass,
     effectiveTokenClass,
     generatedAt: now(),
+    dirtyPaths,
   });
 
   const serialized = `${JSON.stringify(report, null, 2)}\n`;

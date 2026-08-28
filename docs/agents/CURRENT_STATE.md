@@ -1,6 +1,75 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~18:33 UTC)
+**Last updated:** 2026-08-28 UTC (~19:05 UTC)
+**Updated by:** Claude (2026-08-28: **#1176 MERGED — deploy tip is now `a76e73ad`** (squash of the
+fail-closed diagnostics export body redaction at head `789294c6`; prior tip `52c8abe2` = #1162).
+Verified against the deploy branch, not from a notification: `git ls-remote` shows
+`a76e73ad748d06bfee155c10136956d37d80ce61  refs/heads/verdant-grow-diary`, subject
+`fix(sensors): fail-closed diagnostics export body redaction (#1176)`, and the merge queue is empty.
+This block **supersedes** the prior block's line "#1176 stays draft, out of the queue, pending Blue
+Dream" — that is now false.
+
+**INDEPENDENT REVIEW GAP — this one is real, and it is NOT the #1169 case.** The prior block's
+directive "do not record a pre-merge review gap" is about **#1169**, where Blue Dream DID review
+`c84a8330` PASS in Cursor. **Do not read that directive across to #1176.** For #1176:
+
+- The `HANDOFF_PROTOCOL` block naming `789294c6` was posted at 18:02 as
+  [PR comment 5456019137](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176#issuecomment-5456019137),
+  **61 minutes** before the merge. **Blue Dream returned no verdict.**
+- The Cursor **Approval Agent** explicitly declined at 18:28: "Not approved: Cursor Bugbot skipped
+  (incomplete) and Cursor Security Agent: Security Reviewer stayed pending after the 8-minute wait.
+  Human review is needed; no additional reviewers were assigned."
+- It merged anyway at ~19:03. **The constitution's standing rule — "No code ships without peer
+  review"; an owned slice without a named independent reviewer is incomplete — was NOT satisfied.**
+  Owner: Claude. Independent reviewer: **Blue Dream, never rendered.** Any Blue Dream verdict on
+  this slice is now a **post-merge** read.
+- No automated finding-level review covered it either: Bugbot's _summary_ completed but its
+  finding-level run was **skipped/incomplete**, and the Cursor **Security Agent stayed pending** past
+  its 8-minute wait — on a diff whose entire subject is secret redaction.
+
+**A brake that did not hold — measured, and it corrects a belief this session acted on.** The merge
+commit `a76e73ad` is the **same SHA** as the `gh-readonly-queue/verdant-grow-diary/pr-1176-52c8abe2…`
+ref created by the 18:29:47 enqueue. That queue entry therefore **survived** the draft conversion at
+18:30:33. GitHub's own conversion notice asserts that converting to draft removes auto-merge and
+merge-queue membership; **on this evidence it did not**, or the queue had already built the commit
+and proceeded regardless. Treat `draft: true` as **insufficient** proof of queue eviction; the
+authoritative signal is the deploy tip.
+
+**Automation timeline, for the record.** `cursor[bot]` marked #1176 ready + enqueued it at 18:05;
+Claude converted to draft at 18:06; ready again 18:17 and 18:17 (within ~16s of each revert), at
+which point the revert loop was abandoned as unwinnable and put to Cheek. An enqueue between 18:17
+and 18:29 was **missed by the 20-minute queue-ref poll** — a cycle can open and close inside the
+polling gap, so that poll is a confirmation, never a detector. `cursor[bot]` dequeued at 18:29:30
+(after the Approval Agent declined), re-enqueued at 18:29:47, Claude braked at 18:30:33, `cursor[bot]`
+re-readied at 18:30:51. Cheek accepted ready as the resting state at ~18:19 ("leave it ready, watch
+for enqueue") and **disabled the Cursor automation at 18:33**. Merged ~19:03.
+
+**What actually shipped.** All **35 required contexts GREEN** on `789294c6`; all 16 `Full suite`
+batch lanes green (3/16 green on its one sanctioned re-run after a `bun install`
+`object-assign` tarball-integrity death that killed it before any test body ran); deployment preview
+verified on that exact commit. `Browser census (authenticated)` was red at
+`core-link-form-census.spec.ts:2092` (30-minute timeout, `/tents/:tentId` never rendered `<main>`) —
+**non-required**, and established not-this-PR's by enumerating the import chain: the changed module
+has exactly one production importer, `SensorsTestbenchPanel.tsx`, reached only from `Sensors.tsx`,
+which is not on the `/tents/:tentId` render path. Its one confirming re-run was spent.
+
+**Still open after the merge.** The upstream ordering defect in
+`ecowittLocalForwardingStatus.sanitizeReportText` is **NOT fixed** — its credential-LABEL rules run
+before its env `NAME=value` rule, so a pair whose NAME carries a label has the name fragmented and
+the VALUE survives. #1176 fenced this inside the diagnostics module only; **the same value still
+leaks on the forwarding-report path today.** Unassigned, and now a live production surface rather
+than a pre-merge note. Also unresolved: the **Cursor usage/spend limit** blocking Bugbot's
+finding-level runs (a `source claim` read off check and comment output, never a measured billing
+fact), and the three open questions put to Blue Dream that no one answered — credential-vocabulary
+scoping breadth, the `buildRedactedPayloadPreview` tent-id trade-off, and whether the depth-8
+ceiling is generous enough (**no real-world body was sampled — `NOT_MEASURED`**).
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1172 stays
+draft. #1170, #1171, #1153, #1151 untouched by this slice. This edit touches this file only. Prior
+header follows.)
+
+**Prior update:** 2026-08-28 UTC (~18:33 UTC)
 **Updated by:** Claude (2026-08-28: **fail-closed diagnostics export body redaction delivered as
 draft [PR #1176](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176).** Board-fact leftover
 on this same block only: Blue Dream DID review #1169 at `c84a8330307afca0891706ce5369bf703d9085ef`

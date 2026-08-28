@@ -39,8 +39,7 @@ function row(
     raw_payload: unknown;
   }> = {},
 ) {
-  const capturedAt =
-    overrides.captured_at === undefined ? FRESH_AT : overrides.captured_at;
+  const capturedAt = overrides.captured_at === undefined ? FRESH_AT : overrides.captured_at;
   return {
     tent_id: TENT,
     source: overrides.source ?? "live",
@@ -340,6 +339,24 @@ describe("post-merge QA — malformed / null / future timestamps fail closed (ne
         row: row({
           source: "live",
           captured_at: capturedAt,
+          raw_payload: { vendor: "ecowitt", dateutc },
+        }),
+        now: NOW,
+      });
+      expect(truth).toBe("invalid");
+      expect(truth).not.toBe("live");
+    },
+  );
+
+  it.each(["", "not-a-date", "NaN"] as const)(
+    "malformed dateutc=%j with fresh captured_at must not tag Live",
+    (dateutc) => {
+      // Packet dateutc is the preferred clock. Garbage there must fail closed even
+      // when captured_at is a valid fresh ISO (fallback must not promote to Live).
+      const truth = classifyEcowittTentSnapshotV0Source({
+        row: row({
+          source: "live",
+          captured_at: FRESH_AT,
           raw_payload: { vendor: "ecowitt", dateutc },
         }),
         now: NOW,

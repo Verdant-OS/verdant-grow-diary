@@ -86,7 +86,7 @@ export default function SensorSourceLineageLine({
           </span>
           <span
             data-testid={`${testId}-vendor`}
-            title="Provenance / vendor lineage (never used as Source)"
+            title="Provenance / vendor lineage (never used as Source; never used for auth)"
           >
             {provenanceLabel}
           </span>

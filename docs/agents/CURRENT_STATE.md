@@ -1,6 +1,79 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~21:25 UTC)
+**Last updated:** 2026-08-28 UTC (~21:45 UTC)
+**Updated by:** Claude (2026-08-28: **Both PRs are back to DRAFT and auto-merge is OFF. #1172 was
+found READY with auto-merge ARMED — one green CI run from merging itself.** GDP directive at 21:40:
+#1185 head `75a7de9` is **OPEN — REVIEW ONLY**.
+
+**The armed auto-merge on #1172 is the finding here.** GDP's directive said "#1172 at `bdeb058`
+stays draft", which presupposes it was already draft. **It was not.**
+
+Two claims, separated by evidence grade rather than blended:
+
+- **`draft=false` is `established fact`** — read directly from the PR list at 21:41, _before_ the
+  draft conversion.
+- **`auto_merge` was armed is an `inference`, not a measurement.** The `auto_merge` field was
+  **never read before** `disable_pr_auto_merge` was called, so there is no direct observation of it.
+  What supports it is a paired API result seconds apart: the same call **errored** on #1185
+  ("Can't disable auto-merge for this pull request") and **succeeded** on #1172 ("Auto-merge
+  disabled"), and GitHub errors when there is nothing to disable. Strong, but still inferred. The
+  honest gap is recorded rather than smoothed over — reading the field first would have settled it,
+  and that is the lesson for next time.
+
+If the inference holds, #1172 would have **merged itself the moment required CI went green** — no
+human step, no review. That is the identical mechanism this file already records for **#1169**,
+which landed with **no independent review** because auto-merge fired while the handoff relay was
+still pending.
+
+#1172 was then converted to `draft=true`. Verified after by fresh read: `draft: true`,
+`auto_merge: None`, head `bdeb058`, base `7fd6a001`. **No attribution is made for who armed it** —
+only the state as found is recorded.
+
+**#1185 converted back to draft.** Verified `draft=true`, head `75a7de9`, `auto_merge=None`.
+`disable_pr_auto_merge` on #1185 returned "Can't disable auto-merge for this pull request"; that was
+**not** treated as proof of anything, because inferring queue/draft state from an API response is a
+mistake already recorded twice in this file. A fresh read confirmed `auto_merge=None`, and GitHub's
+own converted-to-draft notice then stated that draft conversion removes auto-merge and merge-queue
+membership — so the draft conversion, which ran first, had already cleared it. Platform-confirmed,
+not inferred.
+
+**Dream Queen has the new SHA and her PASS does not transfer.** Pinned to `7be3d73`; the head is
+`75a7de9`, two moves on. Per GDP she is **not** to be pinged; the SHA reached her by another route.
+#1185 is review-only until she rules on `75a7de9`.
+
+**Deploy tip confirmed STILL `7fd6a001`** by `git rev-parse` against origin — unmoved since #1171.
+**Do not APPLY `20260827010000`.** It, `20260826100000`, `20260825233000` and `20260813030000` all
+remain **NOT applied**.
+
+**Required CI on `75a7de9` is `NOT_MEASURED`** — GDP concurs. Run `33211805786`, which supplies all
+35 required contexts, sat `queued` for 13+ minutes without starting: runner contention, **zero
+required contexts reported, zero red**.
+
+**`Full suite — batch 6/16` FAILED — install infrastructure, not this diff.** GDP's classification
+matches the job log read independently: ~60 `403`s pulling tarballs from
+`europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/…` during `bun install`; the process
+exited at dependency resolution and **no test body ran**. That lane is **not** in
+`config/required-status-checks.json` (checked programmatically, not from memory). **A repo-wide
+registry outage is ruled out**: the deployment-preview workflow `33211805872` installed dependencies
+successfully on this **same SHA** minutes later, and reported edge-shared preflight and production
+build both `success`. So the 403 is lane-scoped, not systemic.
+
+**One re-run is OWED and UNSPENT.** `rerun_failed_jobs` on run `33211805866` returned
+`403 This workflow is already running` — mechanical, not a permission problem. PR comment
+`5457954989` states publicly what failed, why it is not this PR's, and that the re-run is owed; that
+commitment stands even though the PR is now parked. **If the re-run fails a second time it is REAL**
+and gets root-caused, not re-run again — "flake" is not a diagnosis, and the successful install on
+the same SHA removes the easy excuse.
+
+**Parked and verified draft:** #1184 at `b49debb9` (`draft=true`), still parked until #1185 lands.
+Noted but deliberately untouched because it was outside the directive: **#1170 is `draft=false`** at
+`393dbcdc`. Flagged here rather than acted on.
+
+**Nothing was readied, enqueued, merged, published, applied, or rebased.** Every change in this
+entry is de-escalating: two PRs to draft, one auto-merge disarmed. This edit touches this file only.
+Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~21:25 UTC)
 **Updated by:** Claude (2026-08-28: **Copilot found a SECOND secret-leak bypass on #1185, it was
 real, and a dedicated security agent had already passed the leaking SHA clean.** Fixed in
 `75a7de9`. The independent-review picture below is worse than the prior header implied.

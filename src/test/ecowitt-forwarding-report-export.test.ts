@@ -526,9 +526,28 @@ describe("buildSanitizedForwardingReport — degraded input coercion (regression
 // exported intact. A plain name redacts correctly, which is why this went
 // unnoticed. Proven by execution on deploy tip 872741af before fixing.
 //
-// Only those two bare-word rules cause it: `Bearer` requires trailing
-// whitespace and never matches `MY_BEARER_VAR=`, and there is no bare `token`
-// rule in this list.
+// A SECOND, distinct mechanism destroys the NAME the same way, found by
+// Copilot's review of this PR and confirmed by execution on the untouched
+// deploy tip 7fd6a001 before fixing. The header rules CONSUME a whole
+// following token rather than fragmenting it: `Bearer\s+[A-Za-z0-9._-]{6,}`
+// swallows the NAME, so `Bearer MY_PASSKEY_VAR="s3cret"` became
+// `[REDACTED]="s3cret"` and the value survived. `Authorization\s*:\s*[^\s",}]+`
+// did the same.
+//
+// That mechanism does NOT require a credential label in the NAME at all —
+// `Bearer SOME_PLAIN_NAME="s3cret"` leaked identically — so it is strictly
+// wider than the fragmenting case above. An earlier revision of this comment
+// claimed only the two bare-word rules could cause a leak of this class; that
+// claim was WRONG and is corrected here rather than deleted, because the
+// narrow reading is what let the header case go unnoticed.
+//
+// It remains true that `Bearer` cannot match INSIDE a NAME (it requires
+// trailing whitespace, so `MY_BEARER_VAR=` is safe from fragmenting) and that
+// there is no bare `token` rule in this list. Those facts were correct; the
+// conclusion drawn from them was not.
+//
+// The fix for both is one placement: the env `NAME=value` rule runs above the
+// header rules AND the bare-word label rules.
 // ---------------------------------------------------------------------------
 
 const ORDER_SECRET = "s3cretV4lue";
@@ -539,6 +558,21 @@ const LABEL_IN_NAME_PAIRS = [
   `A_PASSKEY_B='${ORDER_SECRET}'`,
   `SERVICE_ROLE_SECRET=${ORDER_SECRET}`,
   `PASSKEY_FOR_BRIDGE=${ORDER_SECRET}`,
+];
+
+// Header-prefixed pairs: the header rule CONSUMES the NAME rather than
+// fragmenting it. Deliberately includes a plain NAME with no credential label,
+// because that case leaked too.
+const HEADER_PREFIXED_PAIRS = [
+  `Bearer MY_PASSKEY_VAR="${ORDER_SECRET}"`,
+  `bearer MY_PASSKEY_VAR="${ORDER_SECRET}"`,
+  `Bearer SUPABASE_SERVICE_ROLE_KEY="${ORDER_SECRET}"`,
+  `Bearer SOME_PLAIN_NAME="${ORDER_SECRET}"`,
+  `Bearer MY_PASSKEY_VAR=${ORDER_SECRET}`,
+  `Bearer MY_PASSKEY_VAR='${ORDER_SECRET}'`,
+  `Authorization: MY_PASSKEY_VAR="${ORDER_SECRET}"`,
+  `Authorization:MY_PASSKEY_VAR="${ORDER_SECRET}"`,
+  `Authorization: SOME_PLAIN_NAME="${ORDER_SECRET}"`,
 ];
 
 describe("sanitizeReportText — env pair whose NAME carries a credential label", () => {
@@ -554,6 +588,20 @@ describe("sanitizeReportText — env pair whose NAME carries a credential label"
   it("still redacts a plain env pair (regression fence)", () => {
     expect(sanitizeReportText(`SOME_PLAIN_NAME="${ORDER_SECRET}"`)).not.toContain(ORDER_SECRET);
     expect(sanitizeReportText(`SOME_PLAIN_NAME=${ORDER_SECRET}`)).not.toContain(ORDER_SECRET);
+  });
+
+  it.each(HEADER_PREFIXED_PAIRS)("scrubs the VALUE from %s", (pair) => {
+    expect(sanitizeReportText(pair), `value survived in: ${pair}`).not.toContain(ORDER_SECRET);
+  });
+
+  it.each(HEADER_PREFIXED_PAIRS)("scrubs it through the deep value path too: %s", (pair) => {
+    const out = JSON.stringify(sanitizeReportValue({ note: pair }));
+    expect(out, `value survived in: ${pair}`).not.toContain(ORDER_SECRET);
+  });
+
+  it("still redacts a real header credential (regression fence)", () => {
+    expect(sanitizeReportText("Bearer abc123def456ghi")).not.toContain("abc123def456ghi");
+    expect(sanitizeReportText("Authorization: abc123def456")).not.toContain("abc123def456");
   });
 
   it("still redacts the bare labels themselves when not part of a pair", () => {

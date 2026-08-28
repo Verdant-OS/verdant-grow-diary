@@ -74,21 +74,31 @@ export type LocalForwardingFetchState =
 const SECRET_PATTERNS: RegExp[] = [
   /vbt_[A-Za-z0-9_-]{6,}/g,
   /eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g,
-  /Bearer\s+[A-Za-z0-9._-]{6,}/gi,
-  /Authorization\s*:\s*[^\s",}]+/gi,
   // Env NAME=value pairs (never export private env values). Quoted ("…"/'…')
   // and unquoted forms both match; lone words do not.
   //
-  // ORDER IS LOAD-BEARING: this MUST stay above the bare-word label rules
-  // below. Those rules rewrite any occurrence of the label anywhere in the
-  // string, including inside an env NAME. Run them first and a pair like
-  // `MY_PASSKEY_VAR="s3cret"` becomes `MY_[REDACTED]_VAR="s3cret"`, whose
-  // fragmented name no longer satisfies `[A-Z][A-Z0-9_]{2,}=` — so the VALUE
-  // survives. A plain name redacted correctly, which is why the defect went
-  // unnoticed. Removing the whole pair first makes the label rules a no-op on
-  // that span instead of a hazard. Pinned by
-  // `sanitizeReportText — env pair whose NAME carries a credential label`.
+  // ORDER IS LOAD-BEARING: this MUST stay above BOTH the header rules and the
+  // bare-word label rules that follow. Either group can destroy the env NAME
+  // before this rule sees it, and once the NAME no longer satisfies
+  // `[A-Z][A-Z0-9_]{2,}=` the VALUE survives. Two distinct mechanisms:
+  //
+  //   1. FRAGMENTING — the bare-word label rules rewrite the label anywhere in
+  //      the string, including inside a NAME. Run first, `MY_PASSKEY_VAR="s"`
+  //      becomes `MY_[REDACTED]_VAR="s"` and the value is left behind.
+  //   2. CONSUMING — the header rules swallow a whole following token, NAME
+  //      included. Run first, `Bearer MY_PASSKEY_VAR="s"` becomes
+  //      `[REDACTED]="s"` and the value is again left behind. This one does
+  //      NOT need a credential label in the NAME at all: `Bearer
+  //      SOME_PLAIN_NAME="s"` leaked identically.
+  //
+  // A bare pair with no prefix redacted correctly throughout, which is why
+  // both defects went unnoticed. Removing the whole pair first makes every
+  // later rule a no-op on that span instead of a hazard. Pinned by
+  // `sanitizeReportText — env pair whose NAME carries a credential label` and
+  // `sanitizeReportText — env pair behind a header prefix`.
   /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
+  /Bearer\s+[A-Za-z0-9._-]{6,}/gi,
+  /Authorization\s*:\s*[^\s",}]+/gi,
   /PASSKEY/gi,
   // Admin-role marker (assembled at runtime to avoid scanners flagging us).
   new RegExp(["service", "_", "role"].join(""), "gi"),

@@ -441,6 +441,12 @@ def _resolve_source_from_validated(
     if looks_like_ecowitt_gateway(payload) and canonical_gateway_time is None:
         return "invalid"
 
+    # Stuck RH/soil at 0 or 100 must never remain healthy live/demo/stale.
+    if isinstance(payload, dict) and metrics_force_invalid_source(
+        normalize_metrics(payload)
+    ):
+        return "invalid"
+
     physical_gateway_evidence = _has_physical_gateway_evidence_from_validated(
         payload,
         remote_addr,
@@ -455,25 +461,18 @@ def _resolve_source_from_validated(
         # Only honor explicit live when it actually looks like a real
         # gateway from a non-loopback caller. Otherwise downgrade.
         if physical_gateway_evidence:
-            source = "stale" if stale_gateway_evidence else "live"
-        else:
-            source = "demo"
-    elif explicit in {"manual", "csv", "demo", "stale", "invalid"}:
-        source = explicit
-    elif physical_gateway_evidence:
-        source = "stale" if stale_gateway_evidence else "live"
-    elif header_mode == "live" or env_mode == "live":
-        # Header/environment live cannot bypass physical evidence.
-        source = "demo"
-    else:
-        source = "demo"
+            return "stale" if stale_gateway_evidence else "live"
+        return "demo"
+    if explicit in {"manual", "csv", "demo", "stale", "invalid"}:
+        return explicit
 
-    # Stuck RH/soil at 0 or 100 must never remain healthy live/demo/stale.
-    if isinstance(payload, dict) and metrics_force_invalid_source(
-        normalize_metrics(payload)
-    ):
-        return "invalid"
-    return source
+    if physical_gateway_evidence:
+        return "stale" if stale_gateway_evidence else "live"
+
+    if header_mode == "live" or env_mode == "live":
+        return "demo"
+
+    return "demo"
 
 
 

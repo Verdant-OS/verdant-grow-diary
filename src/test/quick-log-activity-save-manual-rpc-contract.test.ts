@@ -106,6 +106,25 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
   });
 
   it.each([
+    ["outer padding around a valid key", " \tidem-key-12345\t ", "idem-key-12345"],
+    ["an exact 8-character key after trim", " 12345678 ", "12345678"],
+    ["an exact 200-character key after trim", `\t${"x".repeat(200)} `, "x".repeat(200)],
+  ] as const)("trims and forwards %s", async (_label, idempotencyKey, expectedKey) => {
+    rpcMock.mockResolvedValueOnce(OK_RESPONSE);
+    const res = await save({
+      activityId: "note",
+      growId: "grow-1",
+      plantId: "plant-1",
+      idempotencyKey,
+    });
+    expect(res.ok).toBe(true);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    const [name, payload] = rpcMock.mock.calls[0];
+    expect(name).toBe("quicklog_save_manual");
+    expect(payload.p_idempotency_key).toBe(expectedKey);
+  });
+
+  it.each([
     ["missing", undefined],
     ["null", null],
     ["short (<8)", "short"],

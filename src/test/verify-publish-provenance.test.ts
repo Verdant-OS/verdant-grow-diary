@@ -321,7 +321,9 @@ describe("runPublishVerification (injected I/O)", () => {
 describe("package.json wiring", () => {
   it("registers publish:verify and runs the verifier after stamp-version", () => {
     const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf8"));
-    expect(packageJson.scripts["publish:verify"]).toBe("node scripts/verify-publish-provenance.mjs");
+    expect(packageJson.scripts["publish:verify"]).toBe(
+      "node scripts/verify-publish-provenance.mjs",
+    );
     const prebuild = String(packageJson.scripts.prebuild).split(/\s*&&\s*/u);
     expect(prebuild[0]).toBe("node scripts/restore-env-production-from-head.mjs");
     expect(prebuild.at(-2)).toBe("node scripts/stamp-version.mjs");
@@ -341,16 +343,23 @@ describe("resolveCommittedTokenClass (HEAD blob, not working tree)", () => {
       GIT_COMMITTER_NAME: "fixture",
       GIT_COMMITTER_EMAIL: "fixture@example.com",
     };
-    const git = (args: string[]) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", env: gitEnv });
+    const git = (args: string[]) =>
+      spawnSync("git", ["-C", root, ...args], { encoding: "utf8", env: gitEnv });
 
     expect(git(["init"]).status).toBe(0);
     git(["config", "user.email", "fixture@example.com"]);
     git(["config", "user.name", "fixture"]);
-    writeFileSync(join(root, ".env.production"), `VITE_PAYMENTS_CLIENT_TOKEN=${FIXTURE_TEST_TOKEN}\n`);
+    writeFileSync(
+      join(root, ".env.production"),
+      `VITE_PAYMENTS_CLIENT_TOKEN=${FIXTURE_TEST_TOKEN}\n`,
+    );
     expect(git(["add", ".env.production"]).status).toBe(0);
     expect(git(["commit", "-m", "fixture env"]).status).toBe(0);
 
-    writeFileSync(join(root, ".env.production"), `VITE_PAYMENTS_CLIENT_TOKEN=${FIXTURE_LIVE_TOKEN}\n`);
+    writeFileSync(
+      join(root, ".env.production"),
+      `VITE_PAYMENTS_CLIENT_TOKEN=${FIXTURE_LIVE_TOKEN}\n`,
+    );
 
     const committed = await resolveCommittedTokenClass(root);
     expect(committed).toBe("test_");

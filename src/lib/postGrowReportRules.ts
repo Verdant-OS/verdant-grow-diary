@@ -13,6 +13,7 @@
  */
 
 import type { TimelineSensorSourceKind } from "@/lib/timelineSensorSourceBadgeRules";
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 import { SENSOR_SOURCE_SHORT_LABEL } from "@/constants/sensorSourceLabels";
 
 export const PDF_EXPORT_HELPER_COPY =
@@ -177,19 +178,9 @@ export function buildPdfExportTitle(growName: unknown, now: Date = new Date()): 
 const HEALTHY_SOURCE_KINDS: readonly TimelineSensorSourceKind[] = ["live", "manual", "csv"];
 
 export function normalizeReportSensorSource(input: unknown): TimelineSensorSourceKind {
-  if (typeof input !== "string") return "invalid";
-  const v = input.trim().toLowerCase();
-  switch (v) {
-    case "live":
-    case "manual":
-    case "csv":
-    case "demo":
-    case "stale":
-    case "invalid":
-      return v;
-    default:
-      return "invalid";
-  }
+  // #592 fold: delegate to the sanctioned #1003 canon table — pi_bridge
+  // is live, diary is manual, sim is demo, everything else is invalid.
+  return normalizeSensorSource(input);
 }
 
 export function isReportSensorSourceHealthy(kind: TimelineSensorSourceKind): boolean {

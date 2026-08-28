@@ -87,11 +87,24 @@ async function mockLiveHunt(page: Page, capture: RestBoundaryCapture) {
     const table = new URL(request.url()).pathname.match(/\/rest\/v1\/([^/]+)/i)?.[1] ?? "";
 
     // The tent-context enrichment calls the read-only snapshot RPC. PostgREST
-    // invokes RPCs over POST regardless of whether they write, so this one
-    // read is allowed through the non-GET fence; "no snapshot" keeps the
-    // fixture deterministic.
-    if (/\/rpc\/get_latest_tent_sensor_snapshot$/i.test(new URL(request.url()).pathname)) {
+    // invokes RPCs over POST — and ONLY POST — so each exception requires it:
+    // a PUT/PATCH/DELETE to the same path must still fall through to the
+    // mutation fence below instead of being silently fulfilled.
+    if (
+      request.method() === "POST" &&
+      /\/rpc\/get_latest_tent_sensor_snapshot$/i.test(new URL(request.url()).pathname)
+    ) {
       await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
+      return;
+    }
+
+    // Diary evidence rides the read-only top-N-per-plant RPC (same POST-only
+    // transport rule); an empty set matches the diary_entries fixture.
+    if (
+      request.method() === "POST" &&
+      /\/rpc\/pheno_candidate_diary_entries_top_n$/i.test(new URL(request.url()).pathname)
+    ) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
       return;
     }
 
@@ -196,4 +209,61 @@ test("live route /pheno-hunts/:id/compare renders a real hunt's candidates (mock
   expect(restBoundary.unexpected, "unexpected Supabase REST reads must be blocked").toEqual([]);
   expect(restBoundary.mutations, "live comparison must not mutate Supabase REST").toEqual([]);
   expect(forbidden, "live route must not call AI/Action Queue/device hosts").toEqual([]);
+});
+
+test("read-only RPC exceptions admit POST only — other methods hit the mutation fence", async ({
+  page,
+}) => {
+  // Regression pin (Copilot, #1152): the browser flow only ever issues POSTs
+  // to these RPC paths, so without this probe the method guards could be
+  // removed again and no test would notice. Each path must fulfil its one
+  // sanctioned POST read and hand every other method to the mutation fence.
+  const restBoundary: RestBoundaryCapture = { unexpected: [], mutations: [] };
+  await denyAnalyticsConsent(page);
+  await mockThirdPartyFonts(page);
+  await mockLiveHunt(page, restBoundary);
+  // Any same-origin document serves as the fetch context; the fixture route
+  // makes no Supabase REST calls of its own.
+  await page.goto("/pheno-comparison", { waitUntil: "domcontentloaded" });
+
+  const RPC_PATHS = [
+    "/rest/v1/rpc/get_latest_tent_sensor_snapshot",
+    "/rest/v1/rpc/pheno_candidate_diary_entries_top_n",
+  ];
+  const NON_POST_METHODS = ["PUT", "PATCH", "DELETE"];
+
+  for (const path of RPC_PATHS) {
+    const ok = await page.evaluate(async (p) => {
+      const res = await fetch(p, { method: "POST", body: "{}" });
+      return res.ok;
+    }, path);
+    expect(ok, `${path} must fulfil its sanctioned POST read`).toBe(true);
+  }
+
+  for (const path of RPC_PATHS) {
+    for (const method of NON_POST_METHODS) {
+      const blocked = await page.evaluate(
+        async ({ p, m }) => {
+          try {
+            await fetch(p, { method: m, body: "{}" });
+            return false;
+          } catch {
+            return true;
+          }
+        },
+        { p: path, m: method },
+      );
+      expect(blocked, `${method} ${path} must be blocked at the boundary`).toBe(true);
+    }
+  }
+
+  for (const path of RPC_PATHS) {
+    for (const method of NON_POST_METHODS) {
+      expect(
+        restBoundary.mutations.some((l) => l.startsWith(`${method} `) && l.includes(path)),
+        `${method} ${path} must be recorded in capture.mutations`,
+      ).toBe(true);
+    }
+  }
+  expect(restBoundary.mutations).toHaveLength(RPC_PATHS.length * NON_POST_METHODS.length);
 });

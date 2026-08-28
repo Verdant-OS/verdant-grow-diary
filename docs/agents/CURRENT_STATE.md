@@ -1,6 +1,157 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-26 UTC (03:14 UTC)
+**Last updated:** 2026-08-27 UTC (~10:20 UTC)
+**Updated by:** Claude (2026-08-27: **Blue Dream P2 on [PR #1163](https://github.com/Verdant-OS/verdant-grow-diary/pull/1163)
+addressed — Quick Log strip provenance fence** pushed as fix commit `a16fec2` on
+`claude/sentinel-ack-1157-hold-neyqah`; the PR head is this state-edit commit, which lands
+immediately after `a16fec2` on the same branch. This supersedes the prior entry's stale
+"head `460973b`" reference (that SHA was the first code commit; Blue Dream's PASS-with-P2
+review was at `1a70689`). The P2: `buildQuickLogStripFromTentState` still mapped
+`fresh_non_live` → `usable` with no provenance check, so a legacy receiving-transport
+label (`ecowitt`, `mqtt`, …) rendered pill "Usable" while the trust badge read "stale"
+(`mapNonLiveSource` default) and the view-model advisory read invalid. Fix: the strip
+adapter gates exactly that branch through the sanctioned `normalizeSensorSource` table
+(called, not edited) — non-normalizing or missing sources demote the card to invalid and
+the trust badge gets the same verdict, so pill, badge, and advisory agree; `fresh_live`
+untouched; `pi_bridge`/`manual`/aliases not over-demoted; unknown stays non-attachable;
+the now-unreachable advisory suppression in `QuickLogSensorSnapshotStrip` is removed.
+Renegotiated pins (same commit): the two tests pinning the Usable pill for ecowitt
+`fresh_non_live` now pin Invalid, plus a coherence test and pure-adapter fence cases.
+Validation, exact, this round only: RED pre-fix 5 failed / 25 passed across the three
+strip suites; 30/30 green post-fix; targeted sweep
+(`ecowitt-*`/`quicklog-*`/`quick-log-*`/`sensor-*` + v0 contract 26/26) **6319 passed /
+3 skipped / 0 failed**; typecheck and scoped eslint clean. Blue Dream re-reviews at the
+new head. Still draft; no merge, no queue, no publish, no sandbox APPLY, no Preview
+action; #1151, #1153, #1162, #576 and the live `version.json` identity FAIL untouched.
+Publish stop-order and migration posture unchanged: `20260826100000`, `20260825233000`,
+`20260813030000` remain **NOT applied**. This edit touches this file only. Prior header
+follows.)
+
+**Prior update:** 2026-08-27 UTC (~07:40 UTC)
+**Updated by:** Claude (2026-08-27: **issue #1003 (sensor provenance fail-close + forwarding-report
+export allowlist) delivered as draft [PR #1163](https://github.com/Verdant-OS/verdant-grow-diary/pull/1163)**
+from branch `claude/sentinel-ack-1157-hold-neyqah`, cut from deploy tip `11b0ca6` (#1160), head
+`460973b`. The task's NOT_APPLICABLE gate did not fire — both holes were proven live on tip
+(`established fact`, by reading and executing the modules): `quickLogSensorSnapshotViewModelAdapter`
+promoted any unknown provider string to canonical `live` when upstream freshness was `fresh`
+(producing an attachable payload stamped `source: "live"`), and `ecowittForwardingReportExport`'s
+status-fallback envelope exported `captured_at`/`source`/`vendor` unsanitized while
+`SECRET_PATTERNS` matched credential labels, not values. Fix: adapter delegates to the sanctioned
+`normalizeSensorSource` alias table (unknown → `invalid`, freshness never consulted; first-party
+`pi_bridge` → live is preserved — it is the one active production writer of a provider-string
+source, per the ingest audit); export gains shape/value-allowlists on BOTH latest_metrics paths, a
+recursive output-allowlist serializer, and credential-VALUE redaction (MACs incl. bare 12-hex,
+32+-hex with lookarounds so `0x`/`PASSKEY_`/`sbp_` prefixes cannot evade, UUIDs, `sk-` keys, env
+`NAME=value`); the Quick Log strip suppresses the one contradictory Usable-pill-plus-invalid-advisory
+combination for legacy transport-labeled rows. Validation, exact: new suites RED-proven against the
+pre-fix tree with the final files (adapter 4 failed / 8 passed; export 7 failed / 10 passed; strip
+coherence 1 failed / 11 passed against the mid-state it guards), 41/41 green post-fix; broad
+targeted sweep 6298 passed / 3 skipped across all `ecowitt-*`/`quicklog-*`/`quick-log-*`/`sensor-*`
+suites + v0 contract 26/26; typecheck, scoped eslint, and `bun run build` (with SEO gates) clean.
+Three independent adversarial verify passes ran pre-push; both security findings they raised
+(vendor shape-regex bypass via station ids / bare MACs; `\b`-anchored hex evasion) are fixed and
+probe-tested in the diff. Recorded follow-ups, deliberately NOT in this slice: widget `metric_keys`
+key-name rendering, `safeSourceDetail` shape gate, the validation-panel `redacted_raw_payload`
+key-only redaction, and `sensorDiagnosticsExportRules`' vbt_-only body redaction. Owner: Claude;
+independent reviewer: **unassigned** — draft until Cheek/GDP names the reviewing peer. No merge, no
+publish, no sandbox APPLY, no Preview action; #1151, #1153, #1157, #1162, #576 untouched; #1157
+remains unqueued pending Blue Dream's re-review of `5791639b`. The publish stop-order and migration
+posture are untouched: `20260826100000`, `20260825233000`, `20260813030000` remain **NOT applied**.
+This edit touches this file only, on the #1163 branch. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (~23:15 UTC)
+**Updated by:** Claude (2026-08-26: **#1158 MERGED — deploy tip is now `b294b64`** (squash of
+the Gate Zero Day-0 SEO baseline slice at head `72a9a7e`). Timeline: Blue Dream's independent
+review returned PASS-with-P2 (the condition-1 cell fix, pushed as `72a9a7e`); the owner marked
+the PR ready and Cheek enqueued it at ~22:58 UTC; the merge queue landed it at ~23:04 UTC with
+**all 35 required checks green** — the only red was the known non-required `Supabase Preview`
+42P07 (inherited, per the section below). `docs/seo/seo-baseline-2026-08-26.md` is therefore
+now ON the deploy branch, with its Gate Zero verdicts: 1 FAIL (orphan / no provenance),
+2 PASS-at-timestamp, 3 FAIL (dual-home), 4 FAIL (soft-200 shells), 5 PASS (bounded),
+6 FAIL (GSC/GA4 NO_BASELINE) — Gate Zero is not all true; the file authorizes no content
+cohort and no publish. Codex and Copilot bot reviews landed two minutes AFTER enqueue
+(2 P2 + 5 findings, all verified real); per the #1092 queue-locked precedent the five accepted
+label-precision fixes ship as follow-up draft [PR #1159](https://github.com/Verdant-OS/verdant-grow-diary/pull/1159)
+from the restarted `claude/gate-zero-seo-baseline-dqbp46`, and all seven review threads on
+#1158 are resolved against it. No measurement value changes in the follow-up. The publish
+stop-order and migration posture are untouched: `20260826100000`, `20260825233000`, and
+`20260813030000` remain **NOT applied**. This edit touches this file only, on the #1159
+branch. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (~22:00 UTC)
+**Updated by:** Claude (2026-08-26: **Gate Zero Day-0 SEO baseline captured** as
+`docs/seo/seo-baseline-2026-08-26.md` (draft PR from `claude/gate-zero-seo-baseline-dqbp46`;
+the 2026-07-30 `docs/seo/seo-baseline.md` is preserved unchanged with a one-line pointer).
+Unauth re-fetch 2026-08-26T21:49–21:53Z found **production republished**: live `/version.json`
+now serves `2cc97c0e91aa` = deploy tip #1156 (`buildTime 2026-08-26T21:44:08.140Z`,
+`dirty: false`, `ref: "__orphan__"` persists, cause still NOT_MEASURED — commit identity
+matches tip at that timestamp, publish lag 0; this supersedes the 2026-08-25 `5e75a3a3ae85`
+identity rows below **for identity only**, not provenance). Live sitemap is now **62** locs,
+byte-identical to repo (`/tools/grow-help-toolkit` present, lastmod 2026-08-26; the toolkit
+page serves 767 words — no longer SOFT_200_THIN). Still FAIL: `/` + `/welcome` dual-home
+(identical title/h1, both self-canonical, both sitemapped); `/login`, `/dashboard`,
+`/internal/demo-advanced-nutrients-feeding` remain SOFT_200_THIN soft-200 shells with
+`index, follow`. P0 private-leak PASS on the unauth sweep set. GSC/GA4/Bing/Ahrefs stay
+NO_BASELINE/BLOCKED — Gate Zero condition 6 remains FAIL until an authenticated baseline
+exists. Pheno showcase/comparison indexation record stays OPEN (no noindex shipped). No
+publish, no production SQL, no content cohort authorized; drafts #1151/#1153, Slice 2,
+Paddle runtime slice, and #572 untouched. This edit touches this file plus the two
+`docs/seo/` files named above. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (18:55 UTC)
+**Updated by:** Claude (2026-08-26: **#1149 MERGED — deploy tip is now `b9cca9fb1`** (squash of
+the top-N diary RPC slice at head `c353c765`), after Blue Dream's independent review returned
+**PASS-with-P2** and Cheek/GDP merged GitHub-only. The migration apply posture is unchanged:
+`20260826100000`, `20260825233000`, and `20260813030000` are all still **NOT applied**; until
+the operator applies `20260826100000`, production growers ride the missing-RPC fallback and
+behavior is byte-identical to the pre-slice read. **Known red the merge carried:** both
+`Browser census` lanes failed at `c353c765` — root-caused, not a product defect: the mocked
+census fences abort any RPC POST not on their reviewed read-only allowlist, and the new
+`pheno_candidate_diary_entries_top_n` POST was aborted (authenticated lane: workspace success
+test-id never rendered; public lane: the aborted POST recorded as a blocked mutation). The
+deploy branch's census stays red until the follow-up fence fix merges. That fix (census
+`READ_ONLY_RPCS` allowlist + compare-deep-link fence + renegotiated reviewed-RPC pin,
+reproduced red locally on the deep-link spec then green) plus two P2 responses (Array.isArray
+fail-closed guard on the RPC payload with a RED-proven test at 1 failed / 7 passed; the
+retraction-is-server-side contract documented against the SQL pin) ship as a **new follow-up
+draft PR** from the restarted `claude/verdant-pheno-hunt-lab-vq6pd9`. The third P2 — a runtime
+RLS harness for the RPC — remains `BLOCKED` (no credentials in agent sessions) and is recorded
+here rather than silently dropped. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (18:15 UTC)
+**Updated by:** Claude (2026-08-26: **server-side top-N-per-plant diary read for Pheno Hunt
+candidates delivered as draft [PR #1149](https://github.com/Verdant-OS/verdant-grow-diary/pull/1149)**
+from branch `claude/verdant-pheno-hunt-lab-vq6pd9`, restarted from deploy tip `ec8aca7b5`
+(#1148) — the branch was byte-identical to tip before this slice, per the task order. Scope:
+`loadCandidateDiaryEvidence`'s one-`diary_entries`-query-per-plant fan-out (the #1139 fix for
+global-limit sibling starvation) is replaced by **one** `SECURITY INVOKER` RPC,
+`pheno_candidate_diary_entries_top_n` (`row_number()` partitioned by `plant_id`, ordered
+`entry_at DESC, id DESC`, `rn <=` a server-clamped hard-max-40 limit; `p_plant_ids` capped at
+100 = the workspace `MAX_PAGE_SIZE`, oversized calls rejected not clamped; EXECUTE to
+`authenticated` only, PUBLIC/anon/service_role revoked). Client chunks at 100 and keeps a
+missing-RPC-only fallback to the old per-plant read, so production behavior is byte-identical
+until the operator applies the migration. One additive migration
+(`20260826100000_pheno_candidate_diary_entries_top_n_rpc.sql`) ships **in-branch only — NOT
+applied to production**; `20260825233000` and `20260813030000` also remain unapplied, and the
+publish stop-order and migration immutability are untouched. Validation, exact: new tests
+18/18 (11 SQL contract + 7 client behavior; client suite proven RED pre-fix at 6 failed /
+1 passed), `src/test/pheno-*` + `use-pheno-*` sweep 1479/1479 across 151 files, migration
+gates + adjacent 265/265, typecheck clean, scoped eslint 0/0, `bun run build` + SEO gates
+green. Known-red on the PR: `Supabase Preview` 42P07 on `ai_credit_grants` — inherited, per
+the 03:14 UTC section below, not this diff. Owner: Claude; independent reviewer for THIS
+slice: **Blue Dream** (named in the task — distinct from the still-Cheek-named seat on the
+earlier Pheno Hunt + LAB territory PR recorded at 01:30 UTC). Draft until that review passes;
+GDP merges GitHub-only after PASS. No publish, no production SQL, no production data
+modification. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC
+**Updated by:** Codex (2026-08-26: records the Grow Help Toolkit owner/reviewer assignment
+and Cheek's current operational boundary for the separate drift-probe lane. This edit adds the
+toolkit section and updates the Codex/Grok assignment rows; it does not independently re-probe
+provider state. Cheek's current statement that `verdant-production` has 0 secrets supersedes the
+historical 2026-08-15 environment-secret snapshot below. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (03:14 UTC)
 **Updated by:** Claude (2026-08-26: records **one new section only** — the `Supabase Preview`
 42P07 replay failure and the four constraints on it, at Cheek's instruction. Nothing else in
 this file is touched, and no status below is restated, corrected or superseded by this edit.
@@ -1463,9 +1614,11 @@ verbatim `detail` in #912's last two comments names the host
 `db.bzatgtgjvuojpoxcknaa.supabase.co`.
 `scripts/lib/supabaseDatabaseTargetIdentity.mjs` pins `bzatgtgjvuojpoxcknaa` as
 **`sandbox`** (line 11) and production as `knkwiiywfkbqznbxwqfh` (line 15). The
-`verdant-production` GitHub environment's `SUPABASE_DB_URL` therefore holds a
-sandbox connection string. Even once it connects, it would measure the wrong
-database and report the result as production.
+At the time of this 2026-08-15 snapshot, the `verdant-production` GitHub environment's
+`SUPABASE_DB_URL` therefore held a sandbox connection string. **Historical, superseded current
+state:** Cheek stated on 2026-08-26 that `verdant-production` has 0 secrets. This toolkit slice did
+not re-probe either state. If the historical connection had succeeded, it would have measured the
+wrong database and reported the result as production.
 
 The reason nothing caught that: `scripts/probe-migration-drift.mjs` **does not
 import `supabaseDatabaseTargetIdentity.mjs` at all** — verified by search, zero
@@ -2976,13 +3129,35 @@ Cheek, as they did on #1092. This row, not a GitHub field, is the `AGENTS.md` re
 The owner did not review their own slice: the fourteen findings corrected on this branch came
 from Copilot and Codex, and are recorded in the spec's §10 correction record.
 
+### Grow Help Toolkit — owner and independent reviewer (recorded 2026-08-26 from Cheek's assignment)
+
+| Role                      | Agent     | Assignment record                                                     |
+| ------------------------- | --------- | --------------------------------------------------------------------- |
+| Owner                     | **Codex** | Scope confirmation supplied by Cheek; recorded 2026-08-26             |
+| Independent peer reviewer | **Grok**  | Selected by Cheek; recorded 2026-08-26; review pending, not performed |
+
+Codex owns the complete client-side Grow Help Toolkit implementation on
+`codex/grow-help-toolkit-20260825`. This temporary assignment replaces Codex's standing
+`CURRENT_STATE.md` work for the duration of this slice. Grok's independent review is assigned
+but **pending**; do not describe it as performed or approved. There is no Grok GitHub account on
+this repository, so Cheek must relay the review to the PR.
+
+The slice is limited to the local nutrient, light, and expense calculators, shared cycle state,
+browser-only persistence, formula tests, and browser-generated CSV/print exports. It authorizes
+no backend, schema, migration, database probe, secret, hosted apply, publish, merge, or deploy.
+Per Cheek's current instruction, `verdant-production` remains at **0 secrets**; this user-confirmed
+boundary was not independently re-probed in this slice and supersedes the historical 2026-08-15
+environment-secret snapshot above. The separate drift probe remains **BLOCKED** by the provider
+limit; nobody should hunt for `knk`, request a Lovable connection string, or represent a missing
+paste as the blocker. Cloud SQL remains an in-app, **Ask each time** path.
+
 ## Agents currently assigned
 
 | Agent             | Assignment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex             | Standing SEO measurement readiness and analytics integrity. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Codex             | **Grow Help Toolkit owner — temporary assignment replacing the standing work below for this slice.** Implementation is on `codex/grow-help-toolkit-20260825`; Grok review is assigned and pending. Standing SEO measurement readiness and analytics integrity resumes after Grok's independent-review handoff closes and this slice is closed. Option A slice 1 (#949) is live-verified. Convex Phase 1 of `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` remains in review: PR #977, still OPEN 2026-08-15. Scope stays Phase 1 only, under `spikes/convex-component-sandbox/`. **Do NOT rebuild the Postgres domain-reach detector — Phase 0 and Phase 1 of `POSTGRES_RESTRICTED_ROLE_SPIKE` are already delivered by Claude.** Incoming #986 still said Phase 1 was `HOLD`; that row was stale. Phase 2 of that arm is HOLD (JWT secret unobtainable on Lovable Cloud; role durability `UNKNOWN`)                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Claude            | **One-Tent Loop Tranche B+ — architect and implementer (Cheek, 2026-08-19). Substantially delivered as of 2026-08-21:** B0a (#1039), B1 (#1040), B3a (#1042), B2a (#1049), B4a (#1047) and D7 (#1041) merged; D5 (#1043) **merged** `e9e5ec5`; B2b/B5 blocked on unopened Tranche A slices A5/A3; **B4b has no remaining scope** — A2 landed and B4a already covers all of it, so do not open a B4b slice (see the Tranche B+ table note). Also delivered #1062, the routed `CURRENT_STATE` refresh specification (`docs/specs/current-state-refresh-2026-08-20.md`). `CONVEX_COMPONENT_PHYSICAL_SANDBOX_SPIKE` specification — delivered. `POSTGRES_RESTRICTED_ROLE_SPIKE`: spec delivered, **Phase 0 detector measured and Phase 1 role harness delivered (local-only)**, 2026-08-14 under Cheek's approval and full-authority grant. Not the 2026-08-13 “spec-only / not implementation” row. Prior completed out-of-slice work (#586/#809/#812/#885) unchanged. **Pheno Hunt + LAB territory (Cheek, 2026-08-25): delivered 2026-08-26 as one draft PR from `claude/verdant-pheno-hunt-lab-vq6pd9` — audit + dispositions (`docs/pheno-hunt-lab-territory-2026-08-26.md`), implementation, tests; in-branch additive migration NOT applied to production; independent-reviewer seat unassigned, Cheek to name the peer on the PR** |
-| Grok              | **Product Intelligence, Adversarial Audit, and Implementation Lead** (Cheek 2026-08-20, refined). Equally empowered to research, audit the live app, implement assigned slices, test, and independently review. Peer with Claude and Codex — **none outranks the others**; explicit task ownership controls. SEO/market/backlink strength retained (not a fence). Map: `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Does **not** take Tranche A remaining edit points (Codex) or Tranche B+ product code (Claude) unless done and unassigned. Prior delivered work unchanged: `ONE_TENT_LOOP_OPERATING_ORDER` repo slices 0/2/3/4; Slices 1 and 5 owner-`BLOCKED`; Cursor SDK spike gates on #985 / `CURSOR_API_KEY`. Reuse of the dispatcher not approved. Convex/Postgres spikes not paused. Production Convex HOLD. Not Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Grok              | **Grow Help Toolkit independent reviewer — assigned, review pending and not yet performed.** **Product Intelligence, Adversarial Audit, and Implementation Lead** (Cheek 2026-08-20, refined). Equally empowered to research, audit the live app, implement assigned slices, test, and independently review. Peer with Claude and Codex — **none outranks the others**; explicit task ownership controls. SEO/market/backlink strength retained (not a fence). Map: `docs/agents/grok-peer-elevation-map-2026-08-20.md`. Does **not** take Tranche A remaining edit points (Codex) or Tranche B+ product code (Claude) unless done and unassigned. Prior delivered work unchanged: `ONE_TENT_LOOP_OPERATING_ORDER` repo slices 0/2/3/4; Slices 1 and 5 owner-`BLOCKED`; Cursor SDK spike gates on #985 / `CURSOR_API_KEY`. Reuse of the dispatcher not approved. Convex/Postgres spikes not paused. Production Convex HOLD. Not Unassigned                                                                                                                                                                                                                                                                                                                                                                                             |
 | Security reviewer | Unassigned until Convex Phase 1 spike code is ready for review before any Convex cloud credential                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Gemini            | Unassigned                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Council Chair     | Convex-vs-Postgres comparison: **recommendation delivered in spec §10 — adopt Postgres incrementally, hold Convex.** Postgres arm has a measured number (8 cross-domain reaches across 22 service-role functions). Convex arm remains `NOT_MEASURED` pending #977 isolation proofs (green CI on #977 is not those proofs). Incoming #986 still said “do not issue a recommendation until both arms carry evidence”; that sentence is stale — the recommendation already shipped. `ai-coach`'s five reaches are the case neither architecture removes cheaply                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |

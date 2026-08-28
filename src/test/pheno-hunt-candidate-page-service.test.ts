@@ -35,7 +35,13 @@ function makeBuilder(table: string) {
 }
 
 vi.mock("@/integrations/supabase/phenoTables", () => ({
-  phenoDb: { from: (t: string) => makeBuilder(t) },
+  phenoDb: {
+    from: (t: string) => makeBuilder(t),
+    // Diary evidence rides the top-N-per-plant RPC now (empty here — this
+    // file pins the candidate query shape; the RPC contract is pinned in
+    // pheno-candidate-diary-evidence-rpc.test.ts).
+    rpc: () => Promise.resolve({ data: [], error: null }),
+  },
 }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: (t: string) => makeBuilder(t) },

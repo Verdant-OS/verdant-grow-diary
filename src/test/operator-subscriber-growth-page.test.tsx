@@ -54,6 +54,23 @@ describe("OperatorSubscriberGrowth", () => {
           error: null,
         });
       }
+      if (fn === "funnel_events_operator_summary") {
+        return Promise.resolve({
+          data: {
+            ok: true,
+            generated_at: "2026-07-14T05:00:00Z",
+            counts_by_event: [
+              { event_name: "signup", total: 20, last_30d: 20 },
+              { event_name: "quick_log_saved", total: 12, last_30d: 12 },
+              { event_name: "paywall_viewed", total: 10, last_30d: 10 },
+              { event_name: "paywall_cta_clicked", total: 4, last_30d: 4 },
+              { event_name: "checkout_started", total: 3, last_30d: 3 },
+              { event_name: "subscription_activated", total: 2, last_30d: 2 },
+            ],
+          },
+          error: null,
+        });
+      }
       if (fn === "signup_to_paid_operator_snapshot") {
         return Promise.resolve({
           data: {
@@ -148,6 +165,10 @@ describe("OperatorSubscriberGrowth", () => {
     expect(rpcMock).toHaveBeenCalledWith("signup_acquisition_operator_snapshot");
     expect(rpcMock).toHaveBeenCalledWith("signup_to_paid_operator_snapshot");
     expect(rpcMock).toHaveBeenCalledWith("paid_return_operator_snapshot");
+    expect(rpcMock).toHaveBeenCalledWith("funnel_events_operator_summary");
+    expect(screen.getByTestId("conversion-opportunity-lab")).toHaveTextContent(
+      "directional signals",
+    );
     expect(screen.getByText("49")).toBeInTheDocument();
     expect(screen.getByText("1.9/day")).toBeInTheDocument();
     expect(screen.getByTestId("subscriber-growth-sprint-board")).toBeInTheDocument();

@@ -22,9 +22,11 @@ import {
   mapDiaryRowsToCandidateEvidence,
   tentSnapshotToComparisonInput,
   type PhenoCandidateDiaryEvidence,
+  type PhenoDiaryEvidenceRow,
 } from "@/lib/phenoCandidateEvidenceEnrichmentRules";
 import { fetchLatestSensorSnapshot } from "@/lib/quick-log/fetchLatestSensorSnapshot";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
+import { isMissingRpcError } from "@/lib/rpcAvailability/missingRpcError";
 import { listLatestSexObservationsForHunt } from "@/lib/phenoSexObservationService";
 import {
   sanitizeBreedingObjectiveTargets,
@@ -284,29 +286,82 @@ function distinct(ids: readonly (string | null | undefined)[]): string[] {
 }
 
 /** Bounded canonical diary read for the candidates' own plants — the Pheno
- * Hunt links to plant memory, it never copies it. Newest first; per-plant
- * caps applied by the pure mapper. Fails closed (never "no entries" on a
- * failed read). Retracted entries are excluded. */
-const DIARY_EVIDENCE_ROW_LIMIT = 600;
+ * Hunt links to plant memory, it never copies it. ONE server-side
+ * top-N-per-plant RPC call per ≤100-id chunk (100 = the workspace page
+ * bound, so the page path is always a single request): row_number()
+ * partitioned by plant_id gives every candidate its OWN newest 40 rows, so a
+ * prolific sibling can never starve the others of diary evidence (#1144's
+ * deferred end-state). Newest first; the pure mapper applies the 5-entry /
+ * 4-photo presentation caps. Fails closed (never "no entries" on a failed
+ * read). Retracted entries are excluded server-side. Deploy-window compat:
+ * migrations reach production out of band, so a missing-RPC error — and only
+ * that error — falls back once to the previous per-plant batched read. */
+const DIARY_EVIDENCE_ROWS_PER_PLANT = 40;
+const DIARY_EVIDENCE_QUERY_BATCH = 8;
+const DIARY_EVIDENCE_RPC = "pheno_candidate_diary_entries_top_n";
+/** Mirrors the RPC's server-side p_plant_ids cap (= MAX_PAGE_SIZE). The
+ * server REJECTS oversized calls rather than clamping — a silently dropped
+ * plant would render as evidence-free, the exact starvation defect — so the
+ * client never sends more than this per call. */
+const DIARY_EVIDENCE_RPC_MAX_PLANT_IDS = 100;
 async function loadCandidateDiaryEvidence(
   plantIds: string[],
 ): Promise<PhenoCandidateDiaryEvidence> {
   if (plantIds.length === 0) {
     return { quickLogEntriesByPlantId: {}, timelineEventsByPlantId: {}, photosByPlantId: {} };
   }
-  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
-    let query = supabase
-      .from("diary_entries")
-      .select("id, plant_id, entry_at, note, photo_url, details")
-      .in("plant_id", plantIds);
-    if (withRetractionFilter) query = query.is("retracted_at", null);
-    return query
-      .order("entry_at", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(DIARY_EVIDENCE_ROW_LIMIT);
-  });
-  if (error || !data) throw new PhenoEvidenceReadError("diary_entries");
-  return mapDiaryRowsToCandidateEvidence(data);
+  const rows: PhenoDiaryEvidenceRow[] = [];
+  for (let i = 0; i < plantIds.length; i += DIARY_EVIDENCE_RPC_MAX_PLANT_IDS) {
+    const chunk = plantIds.slice(i, i + DIARY_EVIDENCE_RPC_MAX_PLANT_IDS);
+    const { data, error } = await phenoDb.rpc(DIARY_EVIDENCE_RPC, {
+      p_plant_ids: chunk,
+      p_limit_per_plant: DIARY_EVIDENCE_ROWS_PER_PLANT,
+    });
+    if (error) {
+      if (isMissingRpcError(error, DIARY_EVIDENCE_RPC)) {
+        return loadCandidateDiaryEvidenceLegacy(plantIds);
+      }
+      throw new PhenoEvidenceReadError("diary_entries");
+    }
+    // Fail closed on a null OR non-array payload (review P2): a malformed
+    // response must never be mistaken for "no diary evidence".
+    if (!Array.isArray(data)) throw new PhenoEvidenceReadError("diary_entries");
+    rows.push(...data);
+  }
+  return mapDiaryRowsToCandidateEvidence(rows);
+}
+
+/** Pre-RPC read path — one PER-PLANT limited query (batched for
+ * concurrency), which was itself the fix for one global limit starving
+ * siblings. Kept verbatim as the deploy-window fallback above; remove once
+ * 20260826100000 is applied to production. */
+async function loadCandidateDiaryEvidenceLegacy(
+  plantIds: string[],
+): Promise<PhenoCandidateDiaryEvidence> {
+  const rows: PhenoDiaryEvidenceRow[] = [];
+  for (let i = 0; i < plantIds.length; i += DIARY_EVIDENCE_QUERY_BATCH) {
+    const batch = plantIds.slice(i, i + DIARY_EVIDENCE_QUERY_BATCH);
+    const results = await Promise.all(
+      batch.map((plantId) =>
+        selectWithRetractionCompat((withRetractionFilter) => {
+          let query = supabase
+            .from("diary_entries")
+            .select("id, plant_id, entry_at, note, photo_url, details")
+            .eq("plant_id", plantId);
+          if (withRetractionFilter) query = query.is("retracted_at", null);
+          return query
+            .order("entry_at", { ascending: false })
+            .order("id", { ascending: false })
+            .limit(DIARY_EVIDENCE_ROWS_PER_PLANT);
+        }),
+      ),
+    );
+    for (const { data, error } of results) {
+      if (error || !data) throw new PhenoEvidenceReadError("diary_entries");
+      rows.push(...(data as typeof rows));
+    }
+  }
+  return mapDiaryRowsToCandidateEvidence(rows);
 }
 
 /** Latest source-labeled sensor snapshot per tent (bounded to the first 8
@@ -415,6 +470,28 @@ function normalizeLabSource(v: unknown): "coa" | "estimate" | "unspecified" {
   return v === "coa" || v === "estimate" ? v : "unspecified";
 }
 
+/** A raw lab row with no measurement at all — legacy empty saves exist, and
+ * an empty higher-provenance row must not shadow a populated lower one.
+ * Deliberately narrower than labResultHasAnyValue: this evidence packet
+ * neither selects nor renders `note`, so a note-only row counting as
+ * "value-bearing" here would shadow displayable numbers with a blank cell —
+ * the exact defect this predicate exists to prevent. */
+function rawLabRowHasAnyValue(row: {
+  thc_pct?: unknown;
+  cbd_pct?: unknown;
+  total_cannabinoids_pct?: unknown;
+  dominant_terpenes?: unknown;
+  tested_at?: unknown;
+}): boolean {
+  return (
+    typeof row.thc_pct === "number" ||
+    typeof row.cbd_pct === "number" ||
+    typeof row.total_cannabinoids_pct === "number" ||
+    (Array.isArray(row.dominant_terpenes) && row.dominant_terpenes.length > 0) ||
+    (typeof row.tested_at === "string" && row.tested_at.length > 0)
+  );
+}
+
 async function loadLabResults(
   huntId: string,
   plantIds: string[],
@@ -433,7 +510,21 @@ async function loadLabResults(
     if (!row.plant_id) continue;
     const source = normalizeLabSource(row.source);
     const existing = map[row.plant_id];
-    if (existing && LAB_SOURCE_RANK[existing.source] >= LAB_SOURCE_RANK[source]) continue;
+    if (existing) {
+      // Value-bearing rows outrank empty rows; provenance breaks ties.
+      const existingHasValue =
+        existing.thcPct !== null ||
+        existing.cbdPct !== null ||
+        existing.totalCannabinoidsPct !== null ||
+        (existing.dominantTerpenes?.length ?? 0) > 0 ||
+        existing.testedAt !== null;
+      const rowHasValue = rawLabRowHasAnyValue(row);
+      const keepExisting =
+        existingHasValue !== rowHasValue
+          ? existingHasValue
+          : LAB_SOURCE_RANK[existing.source] >= LAB_SOURCE_RANK[source];
+      if (keepExisting) continue;
+    }
     const terps = Array.isArray(row.dominant_terpenes)
       ? (row.dominant_terpenes
           .filter(

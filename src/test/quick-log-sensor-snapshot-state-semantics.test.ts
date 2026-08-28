@@ -91,10 +91,10 @@ describe("Quick Log sensor snapshot — state semantics", () => {
     expect(v.classification.isHealthyEvidence).toBe(false);
   });
 
-  it("stale resolver verdict renders STALE (not Invalid, not None)", () => {
+  it("stale resolver verdict with trusted provenance renders STALE", () => {
     const v = buildQuickLogStripFromTentState({
       status: "ready",
-      snapshot: snap({ status: "stale", freshness: "stale" }),
+      snapshot: snap({ source: "live", status: "stale", freshness: "stale" }),
       hasTent: true,
       now: NOW,
       temperatureUnit: "celsius",
@@ -102,6 +102,20 @@ describe("Quick Log sensor snapshot — state semantics", () => {
     expect(v.status).toBe("stale");
     expect(v.trustBadge.badge).toBe("stale");
     expect(v.trustBadge.attachable).toBe(false);
+  });
+
+  it("stale resolver verdict with unknown provenance fails closed to INVALID", () => {
+    const v = buildQuickLogStripFromTentState({
+      status: "ready",
+      snapshot: snap({ source: "ecowitt", status: "stale", freshness: "stale" }),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
+    expect(v.status).toBe("invalid");
+    expect(v.trustBadge.badge).toBe("invalid");
+    expect(v.trustBadge.attachable).toBe(false);
+    expect(v.classification.isHealthyEvidence).toBe(false);
   });
 
   it("manual snapshot renders MANUAL", () => {
@@ -113,7 +127,8 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).toBe("manual");
-    expect(v.trustBadge.attachable).toBe(true);
+    // fresh_non_live never grants attachable — only real fresh_live does.
+    expect(v.trustBadge.attachable).toBe(false);
   });
 
   it("demo/sim snapshot renders DEMO and is not attachable", () => {

@@ -17,6 +17,7 @@ function draft(over: Partial<PhenoOnboardingDraft> = {}): PhenoOnboardingDraft {
     notes: "",
     candidateIds: ["p1", "p2"],
     evidenceGoals: defaultEvidenceGoalSelection(),
+    setupCompleted: true,
     ...over,
   };
 }
@@ -127,10 +128,24 @@ describe("computePhenoHuntOnboardingViewModel", () => {
   });
 
   it("confirmation step is only complete after setupCompleted flip", () => {
-    const notConfirmed = computePhenoHuntOnboardingViewModel(draft());
+    const notConfirmed = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: false }));
     const confirmed = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: true }));
     expect(notConfirmed.steps.find((s) => s.id === "confirmation")!.complete).toBe(false);
     expect(confirmed.steps.find((s) => s.id === "confirmation")!.complete).toBe(true);
+  });
+
+  it("blocks creation until the grower confirms setup", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: false }));
+
+    expect(vm.canCreate).toBe(false);
+    expect(vm.blockingReasons).toContain("Confirm setup to enter the workspace");
+  });
+
+  it("allows creation after confirmation when all required fields are present", () => {
+    const vm = computePhenoHuntOnboardingViewModel(draft({ setupCompleted: true }));
+
+    expect(vm.canCreate).toBe(true);
+    expect(vm.blockingReasons).toEqual([]);
   });
 
   // ---- Setup complete vs Comparison-ready separation ----

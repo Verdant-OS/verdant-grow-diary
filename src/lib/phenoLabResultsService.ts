@@ -91,18 +91,23 @@ export function labResultHasAnyValue(
 
 /**
  * Best available lab row for a plant from a "plantId:source"-keyed map:
- * coa > estimate > unspecified. Presenters must still label the row's OWN
- * source — "best available" never upgrades an estimate to lab-verified.
+ * the highest-provenance row THAT CARRIES A VALUE (coa > estimate >
+ * unspecified), falling back to plain provenance order when every row is
+ * empty. Legacy all-empty COA rows exist (the old editor allowed empty
+ * saves), and an empty row must never shadow a populated lower-provenance
+ * one. Presenters must still label the row's OWN source — "best available"
+ * never upgrades an estimate to lab-verified.
  */
 export function bestLabResultForPlant(
   labByKey: Readonly<Record<string, LabResultRow>>,
   plantId: string,
 ): LabResultRow | undefined {
-  return (
-    labByKey[`${plantId}:coa`] ??
-    labByKey[`${plantId}:estimate`] ??
-    labByKey[`${plantId}:unspecified`]
-  );
+  const bySource = [
+    labByKey[`${plantId}:coa`],
+    labByKey[`${plantId}:estimate`],
+    labByKey[`${plantId}:unspecified`],
+  ];
+  return bySource.find((row) => labResultHasAnyValue(row)) ?? bySource.find((row) => row != null);
 }
 
 /** A percentage is 0–100 or absent. Anything else is invalid, never stored. */

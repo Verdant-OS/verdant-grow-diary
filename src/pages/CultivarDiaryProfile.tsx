@@ -10,6 +10,8 @@ import {
   type OreozGelonadeCultivarKey,
 } from "@/constants/oreozGelonadeExperience";
 import { useOreozGelonadeDiary } from "@/hooks/useOreozGelonadeDiary";
+import { useMyEntitlements } from "@/hooks/useMyEntitlements";
+import { canWriteFeatureData } from "@/lib/featureEntitlements";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import { upsertCandidateScore } from "@/lib/phenoCandidateScoresService";
 import {
@@ -50,7 +52,12 @@ function PlantPhenotypeEditor({
     setMessage(null);
   }, [plant]);
 
-  const canEdit = plant.canEditPhenotype && scoresReady;
+  // The allowReadOnly route path admits lapsed-Pro growers for viewing;
+  // phenotype editing additionally requires an active write entitlement
+  // (RESTRICTIVE RLS stays the server-side authority).
+  const { entitlement } = useMyEntitlements();
+  const canEdit =
+    canWriteFeatureData(entitlement, "pheno_tracker") && plant.canEditPhenotype && scoresReady;
 
   const save = async () => {
     if (!canEdit || !plant.huntId || saving) return;

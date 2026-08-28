@@ -60,6 +60,24 @@ export const EXPORT_BODY_UNAVAILABLE = "<unavailable — body could not be safel
 const MAX_BODY_DEPTH = 8;
 
 /**
+ * Ordering fence, proven not assumed. `sanitizeReportText` applies its
+ * credential-LABEL rules BEFORE its env NAME=value rule, so a pair whose
+ * NAME contains a label has that name fragmented first — for example
+ * `MY_PASSKEY_VAR="s3cret"` becomes `MY_[REDACTED]_VAR="s3cret"`, which no
+ * longer matches the env-pair rule, and the VALUE survives. The same holds
+ * for a name carrying the admin-role marker. A plain `SOME_NAME="s3cret"`
+ * redacts correctly, which is why this went unnoticed. Running the env-pair
+ * rule FIRST removes the whole pair before any label rule can split it.
+ *
+ * The upstream weakness is recorded as a follow-up; that file is out of this
+ * slice's scope, so it is fenced here rather than edited there. Names of
+ * privileged env vars are deliberately NOT spelled out above — the
+ * `src/ static safety` guard forbids that literal anywhere under `src/`,
+ * and neighbouring modules assemble it at runtime for the same reason.
+ */
+const ENV_PAIR_PATTERN = /\b[A-Z][A-Z0-9_]{2,}\s*=\s*(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g;
+
+/**
  * Fail-closed body redaction (recorded #1163 leftover). `redactTokens` above
  * only ever matched the `vbt_` prefix, so a server response body echoing any
  * OTHER secret shape — MAC, UUID, long hex run, `sk-` key, env NAME=value
@@ -74,20 +92,6 @@ const MAX_BODY_DEPTH = 8;
  * tent UUID out of `tent_id` would destroy the export's purpose without
  * closing any hole, since the grower already owns that identifier.
  */
-/**
- * Ordering fence, proven not assumed. `sanitizeReportText` applies its
- * credential-LABEL rules (`PASSKEY`, `service_role`) BEFORE its env
- * NAME=value rule, so a pair whose NAME contains a label has that name
- * fragmented first — `SUPABASE_SERVICE_ROLE_KEY="s3cret"` becomes
- * `SUPABASE_[REDACTED]_KEY="s3cret"`, which no longer matches the env-pair
- * rule, and the VALUE survives. A plain `SOME_NAME="s3cret"` redacts
- * correctly, which is why this went unnoticed. Running the env-pair rule
- * FIRST removes the whole pair before any label rule can split it. The
- * upstream weakness is recorded as a follow-up; that file is out of this
- * slice's scope, so it is fenced here rather than edited there.
- */
-const ENV_PAIR_PATTERN = /\b[A-Z][A-Z0-9_]{2,}\s*=\s*(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g;
-
 function redactBodyText(input: string): string {
   return sanitizeReportText(redactTokens(input.replace(ENV_PAIR_PATTERN, "[REDACTED]")));
 }

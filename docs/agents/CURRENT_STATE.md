@@ -1,6 +1,62 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~21:55 UTC)
+**Last updated:** 2026-08-28 UTC (~22:00 UTC)
+**Updated by:** Claude (2026-08-28: **#1185 is GREEN on all 35 required contexts at `75a7de9` — the
+first required verdict the header-bypass fix has had. The prior header recorded this axis as
+`NOT_MEASURED`; it is now measured.** Green is not approval, and the review coverage on this SHA is
+thinner than on any earlier one — see below.
+
+**35/35 required `success` on `75a7de9`** — 32 shards, `Lint, typecheck, test, build`,
+`Preflight — edge shared-lib mirror in sync`, `test:legal-seo`. All from workflow run
+`33211805786` (`completed` / `success`). **Tallied context by context against the pinned mirror
+`config/required-status-checks.json`, not read off the run-level conclusion** — a run summary is not
+the named required set, and conflating them is how a missing context goes unnoticed. **No green was
+carried forward** from `7be3d73` or `5bc6a917`.
+
+**Non-required, recorded not laundered:**
+
+- **`Full suite — batch 6/16` is still RED** — the `bun install` Lovable-registry 403. **15 of the
+  16** batch lanes passed on this same SHA.
+- **`Browser census (authenticated)` AND `(public)` both `success`.** Worth recording: the public
+  lane is the one that FAILED on #1176, where non-attribution rested on an import-chain argument.
+  It has now passed on three consecutive heads, which is stronger support for that argument than the
+  reasoning was.
+- `CodeQL` and all three `Analyze` jobs `success`; `tsc --noEmit`, `tsgo + vite build`, eslint,
+  `docs-safety`, both security suites, lockfile policy, One-Tent smoke, Symptom Check E2E, sitemap
+  parity, config guards, nested static proofs, both ai-doctor jobs, `node --test` all `success`.
+- **All four Cursor checks `neutral`** — still BLOCKED on the usage limit, not passing.
+- `Supabase Preview` `skipped` on #1185 (it is #1172 that hits the 42P07).
+
+**THE ONE RE-RUN IS NOW SPENT.** `rerun_failed_jobs` on run `33211805866` returned **201** at
+~21:55, once the workflow finished and the mechanical `403 This workflow is already running` block
+cleared. This honours the public commitment in PR comment `5457954989`. **There is no second
+allowance**: if `batch 6/16` fails again it is REAL, gets root-caused from its log, and does not get
+a third attempt. Three other workflows installed dependencies successfully on this same SHA
+(deployment preview on `75a7de9`, plus two on #1172), so a repo-wide registry outage is already
+ruled out and a repeat failure means something narrower.
+
+**GREEN IS NOT APPROVAL, and the review coverage on `75a7de9` is the thinnest of any head in this
+slice.** State it plainly rather than letting 35 green ticks imply more than they do:
+
+| Reviewer                                      | Coverage of `75a7de9`                                                                                       |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Dream Queen                                   | **None.** PASS pinned to `7be3d73`; covers neither `5bc6a917` nor `75a7de9`.                                |
+| Copilot                                       | Reviewed `5bc6a917` and **found the bypass**; both threads answered and resolved. Has not reviewed the fix. |
+| Codex                                         | **Reviewed `75a7de9`, no findings.** The only independent review of the fix itself.                         |
+| Cursor (Bugbot / Security / Approval / Vulns) | **BLOCKED** — spend limit, all four `neutral`.                                                              |
+
+So the header fix has had **exactly one** independent review, by a reviewer checking the fix rather
+than hunting independently for a third bypass — and the one dedicated security agent that would
+normally cover this is offline. That is the honest picture; it is not equivalent to the review
+posture #1176 was criticised for lacking, but it is not a strong one either.
+
+**Posture unchanged and re-verified.** #1185 `draft=true` at `75a7de9`, **OPEN — REVIEW ONLY** per
+GDP; #1172 `draft=true` at `e8f6558`; **auto-merge OFF on both**; deploy tip still `7fd6a001`.
+`20260827010000`, `20260826100000`, `20260825233000` and `20260813030000` all remain **NOT
+applied**. #1184 parked at `b49debb9`. Nothing was readied, enqueued, merged, published, applied, or
+rebased. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~21:55 UTC)
 **Updated by:** Claude (2026-08-28: **`Supabase Preview` FAILED on #1172 with SQLSTATE 42P07 — and
 the repo's own config predicted this failure, in writing, before it happened. The finding is a
 MECHANISM GAP, not a new defect.**

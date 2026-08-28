@@ -40,7 +40,11 @@ describe("quick log sensor snapshot badge dedupe", () => {
   });
 
   it("does not weaken sensor snapshot safety copy or navigation-only action", () => {
-    expect(STRIP).toContain("This does NOT change the save path.");
+    // Renegotiated with the #1168 attachable residual fix: the advisory
+    // stays display-only, and the strip + parent now gate the save path
+    // on `trustBadge.attachable` instead of disclaiming any effect on it.
+    expect(STRIP).toContain("The advisory itself is display-only");
+    expect(STRIP).toContain("attachable gate");
     expect(STRIP).toContain('role="note"');
     expect(STRIP).toContain("opens sensors page");
   });

@@ -91,7 +91,13 @@ run — usage limit reached" (18:05, 18:17, 18:17). Do **not** record either tha
 review definitely ran or that it definitely did not — this file claimed each in turn and each was
 wrong. What holds: **no Bugbot finding is currently open against `789294c6`**, and the usage/spend
 withhold is a `source claim` read off check and comment output, **never a measured billing fact**.
-Unresolved; an account issue, not a code defect.
+Unresolved; an account issue, not a code defect. **Resolved at 18:28 by a better source:** the
+Cursor **Approval Agent** posted "Not approved: Cursor Bugbot skipped (incomplete) and Cursor
+Security Agent: Security Reviewer stayed pending after the 8-minute wait. Human review is needed."
+That reconciles every observation — the PR-body block is Bugbot's _summary_, which completed, while
+the _finding-level_ review was **skipped/incomplete**. So the finding-level review did **not** run on
+`789294c6`, no Bugbot finding is open, and the Approval Agent is **withholding approval**, which is
+protective rather than a defect. Human review remains the gate.
 
 **An automation fought the standing draft-only order.** At 18:05 **cursor[bot]** marked #1176 ready
 for review **and enqueued it into the merge queue** on its own — Blue Dream had received the handoff

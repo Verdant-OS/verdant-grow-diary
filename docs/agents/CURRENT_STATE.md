@@ -1,14 +1,19 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~18:10 UTC)
-**Updated by:** Claude (2026-08-28: **Slice 3 delivered as draft [PR #1176](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176)
-— fail-closed diagnostics export body redaction.** Branch
+**Last updated:** 2026-08-28 UTC (~18:16 UTC)
+**Updated by:** Claude (2026-08-28: **fail-closed diagnostics export body redaction delivered as
+draft [PR #1176](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176).** Board-fact leftover
+on this same block only: Blue Dream DID review #1169 at `c84a8330` PASS pre-merge (do not record a
+pre-merge review gap; empty GitHub reviewer list is by design; do not request a post-merge review
+of squash `22c1242c`); #1170 head `5e40307c` stay draft; #1171 draft `e73ca6c7` recorded; Slice 3
+is **named** (trim leftover on the merged manual-route idempotency key), not parked — this #1176
+delivery is the diagnostics-export follow-up, not Slice 3. Branch
 `claude/sensor-diagnostics-export-fail-closed-redaction`, cut from deploy tip `52c8abe2` (#1162),
 head **`789294c6`**. Three files: `src/lib/sensorDiagnosticsExportRules.ts` plus its two existing
 suites, +392/-9. **Branch deviation, stated:** the harness-designated branch was
 `claude/trustbadge-attachable-strip-2441l2`, which is #1170's branch and moved remotely to
-`5e40307` mid-session; pushing there would have collided with #1170, so a new branch was cut and
-#1170's pointer was left untouched.
+`5e40307c15a3f6f6a77f69dbbb4c33a2f83fc90e` mid-session; pushing there would have collided with
+#1170, so a new branch was cut and #1170's pointer was left untouched.
 
 **The hole, proven by execution on the untouched tip — `established fact`, not cited from this
 file.** At `52c8abe2` with the production module unmodified, each shape was placed in
@@ -67,7 +72,8 @@ outcome was still `in_progress` at 18:07 — **NOT_MEASURED**, not a pass. `Supa
 (connected project at its concurrent preview-branch limit). **Cursor Bugbot, stated precisely:** the
 PR-body _summary_ for `789294c6` completed ("Medium Risk"), but the bug-_finding_ review posted
 "Bugbot couldn't run — usage limit reached" at 18:05. So **no automated finding-level review has run
-on this head**; the Cursor spend limit is unresolved and is an account issue, not a code defect.
+on this head**. That usage/spend withhold is **claimed from the #1169 checks**, not a newly
+measured billing fact; it remains unresolved and is an account issue, not a code defect.
 
 **An automation fought the standing draft-only order.** At 18:05 **cursor[bot]** marked #1176 ready
 for review **and enqueued it into the merge queue** on its own — Blue Dream had received the handoff
@@ -94,10 +100,18 @@ which is why it went unnoticed). Fenced inside the diagnostics module only — *
 survives on the forwarding-report path today.** Unassigned.
 
 **A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
-`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1176 stays
-draft, out of the queue, pending Blue Dream. #1172 is watched and parked (all 35 required green
-there; only non-required `Supabase Preview` red). #1170, #1171, #1153, #1151 untouched by this
-slice. This edit touches this file only. Prior header follows.)
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. Slice 3 is
+**named** (trim leftover on the merged manual-route idempotency key), not parked. Blue Dream **DID**
+review #1169 at `c84a8330307afca0891706ce5369bf703d9085ef` in Cursor before auto-merge. Verdict:
+**PASS**. Do not record a pre-merge review gap. Blue Dream reviews in Cursor, not on GitHub, so an
+empty GitHub reviewer list is by design. Do **not** request a post-merge review of squash `22c1242c`.
+#1176 stays draft, out of the queue, pending Blue Dream on that slice. #1172 stays draft. Other
+opens stay classified: **#1170** draft at `5e40307c15a3f6f6a77f69dbbb4c33a2f83fc90e` (test-only
+unknown/transport save-gate pin after product PASS at `48828dd`; stay draft), **#1171** draft at
+`e73ca6c760aebdb891477cdcdf12ae254e6562c3` (Blue Dream PASS; `safeSourceDetail` fail-closed; stay
+draft), and **#1153 / #1151 parked**. Cursor Bugbot / Approval Agent withhold remains as claimed
+from the #1169 checks (usage/spend limit — not a newly measured billing fact). This edit touches
+this file only. Prior header follows.)
 
 **Prior update:** 2026-08-28 UTC (~16:05 UTC)
 **Updated by:** Claude (2026-08-28: **#1169 MERGED — deploy tip is now `22c1242c`** (squash of the

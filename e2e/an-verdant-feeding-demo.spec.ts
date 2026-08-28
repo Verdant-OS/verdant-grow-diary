@@ -19,8 +19,9 @@ const FORBIDDEN_PATH_FRAGMENTS: ReadonlyArray<RegExp> = [
   /\/rest\/v1\/diary_entries/i,
   /\/rest\/v1\/action_queue/i,
   /\/rest\/v1\/feeding_events/i,
-  /openai\.com/i,
-  /api\.anthropic\.com/i,
+  // Host patterns must be URL-anchored (CodeQL IncompleteHostnameRegExp).
+  /^https?:\/\/([^/]*\.)?openai\.com(?:\/|$)/i,
+  /^https?:\/\/([^/]*\.)?api\.anthropic\.com(?:\/|$)/i,
 ];
 
 function isForbidden(req: Request): boolean {

@@ -23,10 +23,7 @@
 
 /** Canonical metric names already accepted by the webhook normalizer. */
 export type EcowittCustomHttpCanonicalMetric =
-  | "temp_f"
-  | "humidity_percent"
-  | "soil_moisture_pct"
-  | "co2_ppm";
+  "temp_f" | "humidity_percent" | "soil_moisture_pct" | "co2_ppm";
 
 /**
  * Existing FIELD_MAP, then extra grow channels accepted onto the same names.
@@ -120,10 +117,7 @@ function coerceFinite(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function payloadKeyLookup(
-  payload: Record<string, unknown>,
-  wanted: string,
-): unknown {
+function payloadKeyLookup(payload: Record<string, unknown>, wanted: string): unknown {
   const lower = wanted.toLowerCase();
   for (const [key, value] of Object.entries(payload)) {
     if (key.toLowerCase() === lower) return value;
@@ -269,4 +263,146 @@ export function listEcowittCustomHttpExtraChannelKeysAccepted(
   return Object.keys(payload)
     .filter((k) => extra.has(k.toLowerCase()))
     .sort((a, b) => a.localeCompare(b));
+}
+
+/** Non-secret EcoWitt gateway markers — same set as the Python listener. */
+export const ECOWITT_CUSTOM_HTTP_GATEWAY_MARKERS = [
+  "stationtype",
+  "model",
+  "dateutc",
+  "freq",
+  "runtime",
+  "wh65batt",
+  "wh25batt",
+] as const;
+
+const LOOPBACK_ADDRS = new Set(["127.0.0.1", "::1", "localhost"]);
+const DATEUTC_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+const FUTURE_SKEW_MS = 5 * 60 * 1000;
+
+export interface ResolveEcowittCustomHttpSourceInput {
+  payload?: Record<string, unknown> | null;
+  remoteAddr?: string | null;
+  headerMode?: string | null;
+  envMode?: string | null;
+  now?: Date;
+}
+
+function payloadKeysLower(payload: Record<string, unknown> | null | undefined): Set<string> {
+  if (!payload || typeof payload !== "object") return new Set();
+  return new Set(Object.keys(payload).map((k) => k.toLowerCase()));
+}
+
+export function isEcowittCustomHttpLoopbackAddr(addr: unknown): boolean {
+  const a = typeof addr === "string" ? addr.trim().toLowerCase() : "";
+  if (!a) return false;
+  if (LOOPBACK_ADDRS.has(a)) return true;
+  if (a.startsWith("::ffff:127.") || a.startsWith("127.")) return true;
+  return false;
+}
+
+/**
+ * Parse EcoWitt Customized Upload `dateutc` (`YYYY-MM-DD HH:MM:SS`, UTC).
+ * Missing or malformed timestamps fail closed.
+ */
+export function parseEcowittCustomHttpDateUtcMs(raw: unknown): number | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!DATEUTC_RE.test(s)) return null;
+  const ms = Date.parse(s.replace(" ", "T") + "Z");
+  return Number.isFinite(ms) ? ms : null;
+}
+
+export function looksLikeEcowittCustomHttpGateway(
+  payload: Record<string, unknown> | null | undefined,
+): boolean {
+  const keys = payloadKeysLower(payload);
+  let hits = 0;
+  for (const marker of ECOWITT_CUSTOM_HTTP_GATEWAY_MARKERS) {
+    if (keys.has(marker)) hits += 1;
+  }
+  return hits >= 2;
+}
+
+function canonicalGatewayTimeMs(
+  payload: Record<string, unknown> | null | undefined,
+  nowMs: number,
+): number | null {
+  const raw = payload ? payloadKeyLookup(payload, "dateutc") : undefined;
+  const ms = parseEcowittCustomHttpDateUtcMs(raw);
+  if (ms === null) return null;
+  if (ms > nowMs + FUTURE_SKEW_MS) return null;
+  return ms;
+}
+
+function hasPhysicalGatewayEvidence(
+  payload: Record<string, unknown> | null | undefined,
+  remoteAddr: string | null | undefined,
+  gatewayTimeMs: number | null,
+): boolean {
+  const addr = typeof remoteAddr === "string" ? remoteAddr.trim() : "";
+  return (
+    Boolean(addr) &&
+    !isEcowittCustomHttpLoopbackAddr(addr) &&
+    looksLikeEcowittCustomHttpGateway(payload) &&
+    gatewayTimeMs !== null
+  );
+}
+
+/**
+ * Constitution Sensor Truth for one custom-HTTP EcoWitt packet.
+ *
+ * Mirrors `ecowitt_listener.resolve_source` plus stuck RH/soil → invalid:
+ *  - Demo GET / loopback → demo
+ *  - Forbidden vendor/transport tokens → invalid (freshness cannot rescue)
+ *  - Real LAN packet + valid dateutc ≤ 15 min → live
+ *  - dateutc > 15 min → stale
+ *  - Header/env live without physical evidence → demo, never live
+ */
+export function resolveEcowittCustomHttpConstitutionSource(
+  input: ResolveEcowittCustomHttpSourceInput,
+): EcowittCustomHttpConstitutionSource {
+  const payload = input.payload ?? null;
+  const nowMs = (input.now ?? new Date()).getTime();
+  const headerMode = (input.headerMode ?? "").trim().toLowerCase();
+  const envMode = (input.envMode ?? "").trim().toLowerCase();
+  const gatewayTimeMs = canonicalGatewayTimeMs(payload, nowMs);
+
+  let explicit: EcowittCustomHttpConstitutionSource | null = null;
+  if (payload && typeof payload === "object") {
+    const rawSrc = payloadKeyLookup(payload, "source");
+    if (typeof rawSrc === "string" && rawSrc.trim()) {
+      const cand = rawSrc.trim().toLowerCase();
+      if (isEcowittCustomHttpConstitutionSource(cand)) {
+        explicit = cand;
+      } else {
+        return "invalid";
+      }
+    }
+  }
+
+  if (looksLikeEcowittCustomHttpGateway(payload) && gatewayTimeMs === null) {
+    return "invalid";
+  }
+
+  const physical = hasPhysicalGatewayEvidence(payload, input.remoteAddr, gatewayTimeMs);
+  const stale =
+    physical &&
+    gatewayTimeMs !== null &&
+    nowMs - gatewayTimeMs > ECOWITT_CUSTOM_HTTP_LIVE_FRESHNESS_MS;
+
+  let source: EcowittCustomHttpConstitutionSource;
+  if (explicit === "live") {
+    source = physical ? (stale ? "stale" : "live") : "demo";
+  } else if (explicit) {
+    source = explicit;
+  } else if (physical) {
+    source = stale ? "stale" : "live";
+  } else if (headerMode === "live" || envMode === "live") {
+    source = "demo";
+  } else {
+    source = "demo";
+  }
+
+  return applyEcowittCustomHttpStuckInvalid(source, normalizeEcowittCustomHttpMetrics(payload));
 }

@@ -1438,7 +1438,9 @@ describe("ecowitt windows testbench — forwarding tests CI workflow", () => {
     expect(wf).toMatch(/push:/);
     expect(wf).toContain("tools/ecowitt-testbench/**");
     expect(wf).toContain("docs/ecowitt-windows-testbench.md");
+    expect(wf).toContain("src/lib/ecowittCustomHttpBridgeIngestRules.ts");
     expect(wf).toContain("src/test/ecowitt-windows-testbench-static-safety.test.ts");
+    expect(wf).toContain("src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts");
   });
 
   it("workflow runs python forwarding tests", () => {

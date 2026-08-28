@@ -6,13 +6,17 @@ on:
     paths:
       - "tools/ecowitt-testbench/**"
       - "docs/ecowitt-windows-testbench.md"
+      - "src/lib/ecowittCustomHttpBridgeIngestRules.ts"
       - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
+      - "src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts"
       - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
   pull_request:
     paths:
       - "tools/ecowitt-testbench/**"
       - "docs/ecowitt-windows-testbench.md"
+      - "src/lib/ecowittCustomHttpBridgeIngestRules.ts"
       - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
+      - "src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts"
       - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
   workflow_dispatch:
 

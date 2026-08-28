@@ -14,6 +14,7 @@ import {
   listEcowittCustomHttpRawPayloadOnlyKeys,
   normalizeEcowittCustomHttpMetrics,
   redactEcowittCustomHttpRawPayload,
+  resolveEcowittCustomHttpConstitutionSource,
 } from "@/lib/ecowittCustomHttpBridgeIngestRules";
 
 const MULTI_CHANNEL_DEMO = {
@@ -78,19 +79,36 @@ describe("ecowittCustomHttpBridgeIngestRules — FIELD_MAP", () => {
     expect(metrics.humidity_percent).toBe(48);
   });
 
-  it("keeps leafwetness/tf_ch in raw_payload only and redacts PASSKEY", () => {
-    expect(listEcowittCustomHttpRawPayloadOnlyKeys(MULTI_CHANNEL_DEMO)).toEqual([
+  it("keeps leafwetness/tf_ch/WH52 EC in raw_payload only and redacts PASSKEY", () => {
+    const withEc = {
+      ...MULTI_CHANNEL_DEMO,
+      soilad1: "1234",
+      ec1: "0.8",
+      unknown_probe: "keep-me",
+    };
+    expect(listEcowittCustomHttpRawPayloadOnlyKeys(withEc)).toEqual([
+      "ec1",
       "leafwetness1",
+      "soilad1",
       "tf_ch1",
     ]);
     expect(listEcowittCustomHttpExtraChannelKeysAccepted(MULTI_CHANNEL_DEMO).sort()).toEqual(
       ["humidity2", "soilmoisture3", "temp2f"].sort(),
     );
-    const redacted = redactEcowittCustomHttpRawPayload(MULTI_CHANNEL_DEMO);
+    const redacted = redactEcowittCustomHttpRawPayload(withEc);
     expect(redacted).not.toHaveProperty("PASSKEY");
     expect(redacted?.leafwetness1).toBe("12");
     expect(redacted?.tf_ch1).toBe("70.1");
     expect(redacted?.temp2f).toBe("74.0");
+    expect(redacted?.dateutc).toBe("2026-06-17 05:40:30");
+    expect(redacted?.soilad1).toBe("1234");
+    expect(redacted?.ec1).toBe("0.8");
+    expect(redacted?.unknown_probe).toBe("keep-me");
+    const mapped = Object.values(ECOWITT_CUSTOM_HTTP_FIELD_MAP).flat();
+    expect(mapped).not.toContain("leafwetness1");
+    expect(mapped).not.toContain("tf_ch1");
+    expect(mapped).not.toContain("soilad1");
+    expect(mapped).not.toContain("ec1");
   });
 
   it("missing/unparseable → null", () => {
@@ -154,5 +172,63 @@ describe("ecowittCustomHttpBridgeIngestRules — constitution Sensor Truth", () 
         co2_ppm: 700,
       }),
     ).toBe("demo");
+  });
+
+  it("normalizes multi-channel demo GET/loopback as demo", () => {
+    expect(
+      resolveEcowittCustomHttpConstitutionSource({
+        payload: MULTI_CHANNEL_DEMO,
+        remoteAddr: "127.0.0.1",
+        now: new Date("2026-06-17T05:45:30Z"),
+      }),
+    ).toBe("demo");
+  });
+
+  it("tags a real LAN packet with live opt-in and dateutc ≤15 min as live", () => {
+    expect(
+      resolveEcowittCustomHttpConstitutionSource({
+        payload: {
+          stationtype: "GW1200B_V1.4.7",
+          model: "GW1200B",
+          dateutc: "2026-06-17 05:31:00",
+          temp1f: "77.4",
+          humidity1: "58",
+        },
+        remoteAddr: "192.168.68.75",
+        headerMode: "live",
+        now: new Date("2026-06-17T05:45:30Z"),
+      }),
+    ).toBe("live");
+  });
+
+  it("tags dateutc >15 min as stale", () => {
+    expect(
+      resolveEcowittCustomHttpConstitutionSource({
+        payload: {
+          stationtype: "GW1200B_V1.4.7",
+          model: "GW1200B",
+          dateutc: "2026-06-17 05:30:29",
+          temp1f: "77.4",
+          humidity1: "58",
+        },
+        remoteAddr: "192.168.68.75",
+        now: new Date("2026-06-17T05:45:30Z"),
+      }),
+    ).toBe("stale");
+  });
+
+  it("does not promote vendor/unknown to live via freshness", () => {
+    expect(
+      resolveEcowittCustomHttpConstitutionSource({
+        payload: {
+          ...MULTI_CHANNEL_DEMO,
+          source: "ecowitt",
+          stationtype: "GW1200B_V1.4.7",
+          model: "GW1200B",
+        },
+        remoteAddr: "192.168.68.75",
+        now: new Date("2026-06-17T05:45:30Z"),
+      }),
+    ).toBe("invalid");
   });
 });

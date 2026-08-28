@@ -279,6 +279,21 @@ describe("ecowittTentSnapshotV0Rules — Safe-by-Design temperature units", () =
     expect(temp?.unit).toBe("°C");
   });
 
+  it("rejects Fahrenheit-looking temp_c and temp keys as invalid (no silent F reinterpret)", () => {
+    for (const metric of ["temp_c", "temp"] as const) {
+      const resolved = resolveEcowittTentSnapshotV0TempCelsius(metric, 77);
+      expect(resolved.fromFahrenheit).toBe(false);
+      expect(resolved.celsius).toBe(77);
+      const vm = buildEcowittTentSnapshotV0ViewModel(
+        [row({ metric, value: 77, captured_at: FRESH_AT })],
+        { tentId: TENT, now: NOW },
+      );
+      const temp = vm.metrics.find((m) => m.key === "temp");
+      expect(temp?.truthSource).toBe("invalid");
+      expect(temp?.value).toBeNull();
+    }
+  });
+
   it("converts temp_f Fahrenheit to Celsius before Live display", () => {
     expect(mapEcowittTentSnapshotV0MetricKey("temp_f")).toBe("temp");
     const resolved = resolveEcowittTentSnapshotV0TempCelsius("temp_f", 77);

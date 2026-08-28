@@ -35,6 +35,7 @@ MULTI_CHANNEL_DEMO = {
     "leafwetness1": "12",
     "tf_ch1": "70.1",
     "PASSKEY": "should-never-forward",
+    "dateutc": "2026-06-17 05:40:30",
 }
 
 
@@ -84,10 +85,21 @@ class FieldMapIngestReadinessTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["temp_f"], 72.0)
         self.assertAlmostEqual(metrics["humidity_percent"], 48.0)
 
-    def test_leafwetness_and_tf_ch_not_in_field_map(self):
+    def test_leafwetness_tf_ch_and_wh52_ec_not_in_field_map(self):
         all_candidates = {c for keys in FIELD_MAP.values() for c in keys}
         self.assertNotIn("leafwetness1", all_candidates)
         self.assertNotIn("tf_ch1", all_candidates)
+        self.assertNotIn("soilad1", all_candidates)
+        self.assertNotIn("ec1", all_candidates)
+
+    def test_unknown_and_extra_keys_stay_in_redacted_raw_payload(self):
+        payload = dict(MULTI_CHANNEL_DEMO, soilad1="1234", unknown_probe="keep-me")
+        redacted = _redact_raw_payload_for_forward(payload)
+        self.assertNotIn("PASSKEY", redacted)
+        self.assertEqual(redacted["dateutc"], MULTI_CHANNEL_DEMO["dateutc"])
+        self.assertEqual(redacted["temp2f"], "74.0")
+        self.assertEqual(redacted["soilad1"], "1234")
+        self.assertEqual(redacted["unknown_probe"], "keep-me")
 
     def test_unparseable_becomes_null(self):
         metrics = normalize_metrics({"temp1f": "NaN", "humidity1": "abc", "soilmoisture1": ""})

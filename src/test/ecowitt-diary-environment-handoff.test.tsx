@@ -714,6 +714,51 @@ describe("evidence rules", () => {
     },
   );
 
+  // Header-prefixed assignments. The header patterns CONSUME the whole following
+  // token, variable NAME included, so if they run before the assignment rule the
+  // NAME is gone and `[A-Z][A-Z0-9_]{2,}=` can no longer match — leaving the VALUE
+  // in both redacted_raw_payload and the clipboard export. Distinct from the
+  // label-fragmenting case above: this one needs NO credential label in the NAME
+  // at all, so a plain SOME_PLAIN_NAME behind a `Bearer ` prefix leaked too.
+  // Reported by Copilot on #1184 and confirmed by execution before the fix.
+  it.each([
+    ['Authorization: PASSKEY="flower-room-credential"', "flower-room-credential"],
+    ["Bearer PASSKEY=flower-room-credential", "flower-room-credential"],
+    ['Bearer MY_PASSKEY_VAR="flower-room-credential"', "flower-room-credential"],
+    ['Bearer SOME_PLAIN_NAME="flower-room-credential"', "flower-room-credential"],
+    ['Authorization: SOME_PLAIN_NAME="flower-room-credential"', "flower-room-credential"],
+    ['authorization: MY_PASSKEY_VAR="flower-room-credential"', "flower-room-credential"],
+  ] as const)(
+    "redacts the credential assignment behind a header prefix: %s",
+    (credentialAssignment, secretValue) => {
+      const snap = evidenceSnapshot({
+        transport: "mqtt_local_test",
+        config_note: credentialAssignment,
+      });
+      const payload = snap.redacted_raw_payload as Record<string, unknown>;
+      const text = serializeEvidenceForClipboard(snap);
+
+      expect(payload.config_note, `value survived in: ${credentialAssignment}`).not.toContain(
+        secretValue,
+      );
+      expect(text).not.toContain(secretValue);
+    },
+  );
+
+  it("still redacts a real header credential, and leaves benign telemetry alone", () => {
+    const snap = evidenceSnapshot({
+      transport: "mqtt_local_test",
+      config_note: "Bearer abc123def456ghi",
+      note: "tent stable",
+      temp_f: 77.4,
+    });
+    const payload = snap.redacted_raw_payload as Record<string, unknown>;
+
+    expect(payload.config_note).not.toContain("abc123def456ghi");
+    expect(payload.note).toBe("tent stable");
+    expect(payload.temp_f).toBe(77.4);
+  });
+
   it.each([
     ["missing", undefined],
     ["null", null],

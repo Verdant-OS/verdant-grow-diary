@@ -35,9 +35,26 @@ const REDACTED_SECRET_VALUE = "[REDACTED]";
 const SECRET_VALUE_PATTERNS: RegExp[] = [
   /vbt_[A-Za-z0-9_-]{6,}/g,
   /eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g,
+  // Env NAME=value assignments.
+  //
+  // ORDER IS LOAD-BEARING: this MUST stay above BOTH the header patterns and the
+  // bare-word label patterns below. Either group can destroy the variable NAME
+  // before this rule sees it, and once the NAME no longer satisfies
+  // `[A-Z][A-Z0-9_]{2,}=` the VALUE survives into redacted_raw_payload and the
+  // clipboard export. Two distinct mechanisms:
+  //
+  //   1. FRAGMENTING — a bare-word label rule rewrites the label inside the NAME,
+  //      so `PASSKEY=secret` became `[REDACTED]=secret`.
+  //   2. CONSUMING — a header rule swallows the whole following token, NAME
+  //      included, so `Authorization: PASSKEY="secret"` became
+  //      `[REDACTED]"secret"`. This one needs NO credential label in the NAME at
+  //      all: `Bearer SOME_PLAIN_NAME="secret"` leaked identically.
+  //
+  // Pinned by "redacts the whole credential assignment in a safe-key string" and
+  // "redacts the credential assignment behind a header prefix".
+  /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
   /Bearer\s+[A-Za-z0-9._-]{6,}/gi,
   /Authorization\s*:\s*[^\s",}]+/gi,
-  /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
   /PASSKEY/gi,
   new RegExp(["service", "_", "role"].join(""), "gi"),
   /(?<![0-9A-Fa-f])[0-9A-Fa-f]{2}(?:[:-][0-9A-Fa-f]{2}){5}(?![0-9A-Fa-f])/g,

@@ -14,9 +14,11 @@
  *    provenance. Demo rows remain view-only and never reach the payload.
  *  - Unknown / receiving-transport provenance (non-canon labels the
  *    resolver treats as invalid/non-attachable) must never ship
- *    `details.sensor`. That is the usable-leak fence: if strip status
- *    ever became usable for such a row, `trustBadge.attachable` stays
- *    false and the save AND still omits the sensor payload.
+ *    `details.sensor`. The usable-leak fence is exercised here with a
+ *    test-only strip-status override to `"usable"`; `trustBadge.attachable`
+ *    stays whatever the real adapter computed (false). If that bit ever
+ *    flipped true, auto-attach would fire and `details.sensor` would sneak
+ *    in. The override never touches attachable and never stubs the strip.
  *
  * Renders the REAL QuickLog dialog and the REAL strip (no strip stub) so
  * the toggle, helper copy, strip copy, and RPC payload are all asserted
@@ -26,12 +28,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const { rpcMock, snapState } = vi.hoisted(() => ({
+const { rpcMock, snapState, stripStatusLeak } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
   snapState: {
     status: "ready" as "ready" | "loading" | "empty",
     snapshot: null as unknown,
   },
+  // Test-only usable-leak: override strip `status` after the real adapter
+  // runs. `trustBadge.attachable` is never rewritten here.
+  stripStatusLeak: { to: null as null | "usable" },
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -73,6 +78,20 @@ vi.mock("@/lib/sensor", async (orig) => {
       snapshot: snapState.snapshot,
       lastUpdatedAt: 0,
     }),
+  };
+});
+
+vi.mock("@/lib/quickLogSnapshotStripAdapter", async (orig) => {
+  const real = await orig<typeof import("@/lib/quickLogSnapshotStripAdapter")>();
+  return {
+    ...real,
+    buildQuickLogStripFromTentState: (
+      args: Parameters<typeof real.buildQuickLogStripFromTentState>[0],
+    ) => {
+      const view = real.buildQuickLogStripFromTentState(args);
+      if (stripStatusLeak.to === null) return view;
+      return { ...view, status: stripStatusLeak.to };
+    },
   };
 });
 
@@ -144,6 +163,7 @@ beforeEach(() => {
   rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "e1" }, error: null });
   snapState.status = "ready";
   snapState.snapshot = snap();
+  stripStatusLeak.to = null;
 });
 afterEach(() => cleanup());
 
@@ -308,15 +328,18 @@ describe("attachable gate — demo and csv fresh_non_live", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Unknown / transport provenance: non-attachable; save omits details.sensor
-// (usable-leak fence — attachable stays false even if status ever leaked)
+// Unknown / transport provenance: usable-leak fence
+// Strip status is overridden to "usable" in this describe only. Attachable
+// stays the real adapter verdict (false). Save must still omit details.sensor.
 // ---------------------------------------------------------------------------
 
 describe("attachable gate — unknown/transport provenance", () => {
-  it("transport label: attachable false; save omits details.sensor", async () => {
+  beforeEach(() => {
+    stripStatusLeak.to = "usable";
+  });
+
+  it("transport label: usable leak still omits details.sensor", async () => {
     // Receiving-transport label the resolver treats as invalid/non-attachable.
-    // Today the strip demotes to invalid; the fence that matters for a future
-    // usable leak is attachable=false on the save AND.
     snapState.snapshot = snap({
       source: "ecowitt",
       status: "fresh_non_live",
@@ -324,17 +347,20 @@ describe("attachable gate — unknown/transport provenance", () => {
     });
     renderQL();
     const toggle = (await screen.findByTestId("quick-log-snapshot-toggle")) as HTMLButtonElement;
+    expect(toggle.getAttribute("data-snapshot-status")).toBe("usable");
     expect(toggle.getAttribute("data-snapshot-attachable")).toBe("false");
     expect(toggle.disabled).toBe(true);
-    expect(toggle.getAttribute("data-snapshot-status")).toBe("invalid");
+    await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"));
     const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
+    expect(strip.getAttribute("data-status")).toBe("usable");
     expect(strip.getAttribute("data-attachable")).toBe("false");
+    expect(strip.textContent).toContain(STRIP_NON_ATTACHABLE_DESCRIPTION);
     const payload = await saveNoteAndGetPayload();
     const details = (payload.p_details ?? null) as Record<string, unknown> | null;
     expect(details === null || !("sensor" in details)).toBe(true);
   });
 
-  it("unknown label: attachable false; save omits details.sensor", async () => {
+  it("unknown label: usable leak still omits details.sensor", async () => {
     snapState.snapshot = snap({
       source: "wat",
       status: "fresh_non_live",
@@ -342,9 +368,13 @@ describe("attachable gate — unknown/transport provenance", () => {
     });
     renderQL();
     const toggle = (await screen.findByTestId("quick-log-snapshot-toggle")) as HTMLButtonElement;
+    expect(toggle.getAttribute("data-snapshot-status")).toBe("usable");
     expect(toggle.getAttribute("data-snapshot-attachable")).toBe("false");
     expect(toggle.disabled).toBe(true);
-    expect(toggle.getAttribute("data-snapshot-status")).toBe("invalid");
+    await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"));
+    const strip = screen.getByTestId("quicklog-sensor-snapshot-strip");
+    expect(strip.getAttribute("data-status")).toBe("usable");
+    expect(strip.getAttribute("data-attachable")).toBe("false");
     const payload = await saveNoteAndGetPayload();
     const details = (payload.p_details ?? null) as Record<string, unknown> | null;
     expect(details === null || !("sensor" in details)).toBe(true);

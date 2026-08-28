@@ -1,8 +1,10 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~15:50 UTC)
+**Last updated:** 2026-08-28 UTC (~16:05 UTC)
 **Updated by:** Claude (2026-08-28: **#1169 MERGED — deploy tip is now `22c1242c`** (squash of the
-fail-closed manual idempotency slice at head `c84a8330`, prior tip `a53924da` = #1168). The slice:
+fail-closed manual idempotency slice at head `c84a8330`, prior tip `a53924da` = #1168). Board-fact
+correction on this same block only: Blue Dream DID review `c84a8330` PASS pre-merge; #1170 head
+`5e40307c`; #1171 draft `e73ca6c7` recorded; Slice 3 named not parked. The slice:
 `useQuickLogActivitySave.ts`'s `manual_note` route now fail-closes a missing / null / `length < 8` /
 `length > 200` idempotency key with `{ ok: false, reason: "missing_idempotency_key" }` **before**
 target resolution and before any `quicklog_save_manual` RPC, mirroring the fence the event route
@@ -32,19 +34,18 @@ green (edge-shared preflight, typecheck + production build).
 no manifest, no auth redirect, so it is **PLAUSIBLY not this PR's — `NOT_MEASURED`, not proven**:
 the one confirming re-run was never spent. `Supabase Preview` FAILED with the inherited
 `ai_credit_grants` 42P07 (non-required; this PR carries no migrations). `Cursor Bugbot` could not
-run (**Cursor usage/spend limit**), and because of that the `Cursor Approval Agent` explicitly
-withheld approval on this SHA — "Not approved ... human review is still needed". That spend limit
-is unresolved and will keep withholding automated approval on subsequent PRs.
+run (**Cursor usage/spend limit** — claimed from the #1169 checks, not a newly measured billing
+fact), and because of that the `Cursor Approval Agent` explicitly withheld approval on this SHA —
+"Not approved ... human review is still needed". That claimed spend limit is unresolved and will
+keep withholding automated approval on subsequent PRs.
 
-**Review posture — a real gap, stated plainly.** **Blue Dream did NOT review `c84a8330` before it
-merged.** A `HANDOFF_PROTOCOL` block naming that SHA was posted as a PR comment
-([#1169 comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/1169#issuecomment-5454545004))
-and relay to Cursor was still pending when auto-merge fired. Blue Dream reviews in Cursor, not on
-GitHub, so an empty GitHub reviewer list is by design (see the reviewer rows below) — but the
-independent-review seat for this slice was **not** satisfied pre-merge. Any Blue Dream verdict on
-this work is now a post-merge read. One open question was carried in that handoff and remains
-unanswered: whether the fail-closed path emitting **no** `quick_log_saved` telemetry is the intended
-contract, or whether a distinct fail-closed signal should fire instead.
+**Review posture — satisfied pre-merge.** Blue Dream **DID** review #1169 at
+`c84a8330307afca0891706ce5369bf703d9085ef` in Cursor before auto-merge. Verdict: **PASS**. Do not
+record a pre-merge review gap. Blue Dream reviews in Cursor, not on GitHub, so an empty GitHub
+reviewer list is by design (see the reviewer rows below). Do **not** request a post-merge review
+of squash `22c1242c`. One open question was carried in the handoff and remains unanswered: whether
+the fail-closed path emitting **no** `quick_log_saved` telemetry is the intended contract, or
+whether a distinct fail-closed signal should fire instead.
 
 **Merge mechanics, for the record.** cursor[bot] enqueued at 15:40; `disable_pr_auto_merge` did NOT
 evict the live entry (auto-merge is the arming mechanism, not the queue seat); a Cheek-directed
@@ -55,11 +56,14 @@ commit the queue had built at 15:41 on `gh-readonly-queue/verdant-grow-diary/pr-
 
 **A merge is not a deployment. No publish was performed and none is authorized here.** The publish
 stop-order and migration posture are unchanged: `20260826100000`, `20260825233000`, and
-`20260813030000` all remain **NOT applied**. Slice 3 stays **parked** until further direction.
-Other opens are untouched and stay classified: **#1170** draft at `48828dd` (honors
-`trustBadge.attachable` on the Quick Log strip save path; all 35 required contexts green there,
-only the inherited non-required `Supabase Preview` red; unwatched, no ready, no merge), and
-**#1162 / #1153 / #1151 parked**. This edit touches this file only. Prior header follows.)
+`20260813030000` all remain **NOT applied**. Slice 3 is **named** (trim leftover on the merged
+manual-route idempotency key), not parked. Other opens stay classified: **#1170** draft at
+`5e40307c15a3f6f6a77f69dbbb4c33a2f83fc90e` (test-only unknown/transport save-gate pin after product
+PASS at `48828dd`; stay draft), **#1171** draft at `e73ca6c760aebdb891477cdcdf12ae254e6562c3`
+(Blue Dream PASS; `safeSourceDetail` fail-closed; stay draft), and **#1162 / #1153 / #1151
+parked**. Cursor Bugbot / Approval Agent withhold remains as claimed from the #1169 checks
+(usage/spend limit — not a newly measured billing fact). This edit touches this file only. Prior
+header follows.)
 
 **Prior update:** 2026-08-27 UTC (~10:20 UTC)
 **Updated by:** Claude (2026-08-27: **Blue Dream P2 on [PR #1163](https://github.com/Verdant-OS/verdant-grow-diary/pull/1163)

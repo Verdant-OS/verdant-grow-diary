@@ -898,13 +898,19 @@ export default function QuickLog({
     if (!open || saveInFlightRef.current) return;
     if (snapshotUserTouchedRef.current) return;
     if (!selectedPlant?.tent_id) return;
-    if (stripView.status === "usable" && !snapshot) setSnapshot(true);
-  }, [open, stripView.status, selectedPlant?.tent_id, snapshot]);
+    // Auto-attach only when the trust verdict says this snapshot may be
+    // attached (`trustBadge.attachable`). A usable-but-non-attachable row
+    // (reviewed live alias, manual, csv, demo on fresh_non_live) must never
+    // self-enable the toggle — the save path below will not include it.
+    if (stripView.status === "usable" && stripView.trustBadge.attachable && !snapshot)
+      setSnapshot(true);
+  }, [open, stripView.status, stripView.trustBadge.attachable, selectedPlant?.tent_id, snapshot]);
 
   useEffect(() => {
     if (!open || saveInFlightRef.current) return;
-    if (stripView.status !== "usable" && snapshot) setSnapshot(false);
-  }, [open, stripView.status, snapshot]);
+    if ((stripView.status !== "usable" || !stripView.trustBadge.attachable) && snapshot)
+      setSnapshot(false);
+  }, [open, stripView.status, stripView.trustBadge.attachable, snapshot]);
 
   useEffect(() => {
     if (!open || saveInFlightRef.current) return;
@@ -1255,8 +1261,12 @@ export default function QuickLog({
     setBusy(true);
     try {
       const noteWithHardware = appendHardwareReadingsToNote(note, hardware);
+      // Honor `trustBadge.attachable` on the save path (GDP / Blue Dream
+      // #1168 residual): attachable=false means this log must NOT include
+      // the snapshot as sensor context, whatever the toggle says. At this
+      // head only a real resolver `fresh_live` verdict is attachable.
       const sensorAttachPayload =
-        snapshot && sensorTentId && stripView.status === "usable"
+        snapshot && sensorTentId && stripView.status === "usable" && stripView.trustBadge.attachable
           ? buildSensorSnapshotSavePayload(sensorState.snapshot)
           : null;
       const earlyStageEnvelope = buildEarlyStageDetails({
@@ -1467,7 +1477,11 @@ export default function QuickLog({
   }
 
   const snapshotUsable = stripView.status === "usable";
-  const attachDisabled = saveLocked || !resolvedTarget || !snapshotUsable;
+  // Trust verdict, not toggle state: only a real resolver `fresh_live`
+  // snapshot is attachable at this head. Usable-but-non-attachable rows
+  // render a disabled, unchecked toggle and save as manual logs only.
+  const snapshotAttachable = stripView.trustBadge.attachable;
+  const attachDisabled = saveLocked || !resolvedTarget || !snapshotUsable || !snapshotAttachable;
   const showMismatch = !!(
     prefill?.plantId &&
     selectedPlant &&
@@ -2128,9 +2142,11 @@ export default function QuickLog({
                 className="text-[12px] text-muted-foreground leading-snug"
               >
                 {stripView.status === "usable"
-                  ? snapshot
-                    ? "Sensor context is usable and will attach to this log."
-                    : "Sensor context is usable but not attached."
+                  ? snapshotAttachable
+                    ? snapshot
+                      ? "Sensor context is usable and will attach to this log."
+                      : "Sensor context is usable but not attached."
+                    : "Sensor context is present but not attachable. This will save as a manual log only."
                   : stripView.status === "no_data"
                     ? "No usable sensor context. This will save as a manual log only."
                     : "Sensor context is not usable enough to attach. This will save as a manual log only."}
@@ -2147,7 +2163,7 @@ export default function QuickLog({
                       {line}
                     </li>
                   ))}
-                  {(!snapshot || !snapshotUsable) && (
+                  {(!snapshot || !snapshotUsable || !snapshotAttachable) && (
                     <li
                       data-testid="quick-log-snapshot-manual-truth-missing"
                       className="text-muted-foreground"
@@ -2181,7 +2197,8 @@ export default function QuickLog({
                     <Switch
                       data-testid="quick-log-snapshot-toggle"
                       data-snapshot-status={stripView.status}
-                      checked={snapshot && !!selectedPlant && snapshotUsable}
+                      data-snapshot-attachable={snapshotAttachable ? "true" : "false"}
+                      checked={snapshot && !!selectedPlant && snapshotUsable && snapshotAttachable}
                       onCheckedChange={(v) => {
                         if (isMainDraftMutationLocked()) return;
                         snapshotUserTouchedRef.current = true;
@@ -2197,7 +2214,12 @@ export default function QuickLog({
                     data-testid="quick-log-snapshot-session-helper"
                     className="text-[11px] text-muted-foreground"
                   >
-                    {selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
+                    {selectedPlant && snapshotUsable && !snapshotAttachable ? (
+                      <span data-testid="quick-log-snapshot-non-attachable-helper">
+                        Only verified live readings can attach as sensor context. This snapshot
+                        stays view-only and will not be included in this log.
+                      </span>
+                    ) : selectedPlant && !snapshotUsable && stripView.status !== "no_data" ? (
                       <span data-testid="quick-log-snapshot-stale-helper">
                         {buildStaleSnapshotHelperCopy(stripView.capturedAt)}
                       </span>
@@ -2213,7 +2235,7 @@ export default function QuickLog({
               <QuickLogSensorSnapshotStrip
                 growId={resolvedTarget?.growId ?? null}
                 tentId={resolvedTarget?.tentId ?? null}
-                attached={snapshot && !!resolvedTarget}
+                attached={snapshot && !!resolvedTarget && snapshotAttachable}
               />
             )}
 

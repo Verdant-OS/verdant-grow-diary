@@ -79,6 +79,7 @@ export type SensorSnapshotReasonCode =
   | "missing_captured_at"
   | "future_captured_at"
   | "unknown_source"
+  | "invalid_source_detail"
   | "invalid_flag"
   | "demo_source"
   | "manual_source"
@@ -139,11 +140,14 @@ function normalizeSource(source: unknown): SensorSnapshotSource | null {
   return ALLOWED_SOURCES.has(s) ? s : null;
 }
 
-function safeSourceDetail(detail: unknown): string | null {
-  if (typeof detail !== "string") return null;
+function safeSourceDetail(detail: unknown): { value: string | null; isValid: boolean } {
+  if (detail === null || detail === undefined) return { value: null, isValid: true };
+  if (typeof detail !== "string") return { value: null, isValid: false };
   const trimmed = detail.trim().toLowerCase();
-  if (!trimmed) return null;
-  return SAFE_SOURCE_DETAIL_RE.test(trimmed) ? trimmed : null;
+  if (!trimmed || !SAFE_SOURCE_DETAIL_RE.test(trimmed)) {
+    return { value: null, isValid: true };
+  }
+  return { value: trimmed, isValid: true };
 }
 
 function parseCapturedAt(value: unknown): { iso: string; ms: number } | null {
@@ -212,7 +216,8 @@ export function resolveSensorSnapshotDisplay(
   const normalizedSource = normalizeSource(safeInput.source);
   const originalSource =
     typeof safeInput.source === "string" && safeInput.source.length > 0 ? safeInput.source : null;
-  const sourceDetail = safeSourceDetail(safeInput.sourceDetail);
+  const safeSourceDetailResult = safeSourceDetail(safeInput.sourceDetail);
+  const sourceDetail = safeSourceDetailResult.value;
   const captured = parseCapturedAt(safeInput.capturedAt);
   const confidence = clampConfidence(safeInput.confidence);
 
@@ -239,7 +244,27 @@ export function resolveSensorSnapshotDisplay(
     });
   }
 
-  // 2. Unknown / missing source becomes invalid.
+  // 2. A present non-string source-detail value has an unexpected runtime
+  // shape and is invalid evidence. Optional null/undefined remains valid
+  // absence, while strings retain the established sanitization behavior.
+  if (!safeSourceDetailResult.isValid) {
+    reasonCodes.push("invalid_source_detail");
+    return finalize({
+      effectiveSource: "invalid",
+      originalSource,
+      capturedAt: captured?.iso ?? null,
+      ageMs: null,
+      ageLabel: null,
+      freshness: "invalid",
+      tone: "danger",
+      confidence,
+      reasonCodes,
+      sourceDetail,
+      metrics,
+    });
+  }
+
+  // 3. Unknown / missing source becomes invalid.
   if (!normalizedSource) {
     reasonCodes.push("unknown_source");
     return finalize({
@@ -257,7 +282,7 @@ export function resolveSensorSnapshotDisplay(
     });
   }
 
-  // 3. Demo stays demo regardless of age.
+  // 4. Demo stays demo regardless of age.
   if (normalizedSource === "demo") {
     reasonCodes.push("demo_source");
     return finalize({
@@ -275,7 +300,7 @@ export function resolveSensorSnapshotDisplay(
     });
   }
 
-  // 4. Source already declared stale/invalid upstream — preserve it.
+  // 5. Source already declared stale/invalid upstream — preserve it.
   if (normalizedSource === "invalid") {
     reasonCodes.push("invalid_flag");
     return finalize({
@@ -309,7 +334,7 @@ export function resolveSensorSnapshotDisplay(
     });
   }
 
-  // 5. For live/manual/csv, captured_at is required to be healthy.
+  // 6. For live/manual/csv, captured_at is required to be healthy.
   if (!captured) {
     reasonCodes.push("missing_captured_at");
     return finalize({
@@ -330,7 +355,7 @@ export function resolveSensorSnapshotDisplay(
   const now = nowMs(options);
   const ageMs = now - captured.ms;
 
-  // 6. Future captured_at is never healthy.
+  // 7. Future captured_at is never healthy.
   if (ageMs < 0) {
     reasonCodes.push("future_captured_at");
     return finalize({
@@ -348,7 +373,7 @@ export function resolveSensorSnapshotDisplay(
     });
   }
 
-  // 7. Determine stale-window from the most demanding included metric.
+  // 8. Determine stale-window from the most demanding included metric.
   // Soil-only snapshots get the soil window; mixed/environment snapshots
   // get the stricter environment window. This protects against
   // mislabeling stale environment data as fresh.
@@ -374,7 +399,7 @@ export function resolveSensorSnapshotDisplay(
     });
   }
 
-  // 8. Fresh.
+  // 9. Fresh.
   if (normalizedSource === "manual") reasonCodes.push("manual_source");
   else if (normalizedSource === "csv") reasonCodes.push("csv_source");
   else reasonCodes.push("fresh");
@@ -420,6 +445,9 @@ function deriveWarningCopy(m: Omit<SensorSnapshotDisplayModel, "warning">): stri
       }
       if (m.reasonCodes.includes("unknown_source")) {
         return "Sensor source is unknown. Treated as invalid. Confirm the source label.";
+      }
+      if (m.reasonCodes.includes("invalid_source_detail")) {
+        return "Sensor source detail is invalid. Treated as invalid. Confirm the source detail.";
       }
       return "Sensor data is invalid. Refresh evidence before using this for decisions.";
     case "unknown":

@@ -10,6 +10,7 @@
  *     are never serialized.
  */
 
+import { sanitizeReportText } from "./ecowittLocalForwardingStatus";
 import type { EnvMatchItem } from "./sensorIngestTestResultRules";
 import type { SensorIngestTestClassification } from "./sensorIngestTestResultRules";
 
@@ -49,13 +50,141 @@ function redactTokens(input: string): string {
 }
 
 /**
+ * Marker for a body that could not be represented safely (circular, too
+ * deep, or not JSON-serializable). Fail-closed: an inspectable body is
+ * replaced by this, never emitted raw.
+ */
+export const EXPORT_BODY_UNAVAILABLE = "<unavailable — body could not be safely serialized>";
+
+/** Depth ceiling for the body walk; deeper nodes collapse to the marker. */
+const MAX_BODY_DEPTH = 8;
+
+/**
+ * Ordering fence, proven not assumed. `sanitizeReportText` applies its
+ * credential-LABEL rules BEFORE its env NAME=value rule, so a pair whose
+ * NAME contains a label has that name fragmented first — for example
+ * `MY_PASSKEY_VAR="s3cret"` becomes `MY_[REDACTED]_VAR="s3cret"`, which no
+ * longer matches the env-pair rule, and the VALUE survives. The same holds
+ * for a name carrying the admin-role marker. A plain `SOME_NAME="s3cret"`
+ * redacts correctly, which is why this went unnoticed. Running the env-pair
+ * rule FIRST removes the whole pair before any label rule can split it.
+ *
+ * The upstream weakness is recorded as a follow-up; that file is out of this
+ * slice's scope, so it is fenced here rather than edited there. Names of
+ * privileged env vars are deliberately NOT spelled out above — the
+ * `src/ static safety` guard forbids that literal anywhere under `src/`,
+ * and neighbouring modules assemble it at runtime for the same reason.
+ */
+const ENV_PAIR_PATTERN = /\b[A-Z][A-Z0-9_]{2,}\s*=\s*(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g;
+
+/**
+ * Credential vocabulary, declared ONCE. `SENSITIVE_KEY_RE` (object-key
+ * masking, below) and `SENSITIVE_PAIR_PATTERN` (free-text pair scrubbing) are
+ * both built from this, so the two surfaces cannot drift apart.
+ */
+const SENSITIVE_KEY_SOURCE =
+  "(token|authorization|bearer|api[_-]?key|secret|password|service[_-]?role|anon[_-]?key|bridge[_-]?token)";
+
+/**
+ * Secret `key=value` / `key: value` pairs inside FREE TEXT, any case
+ * (cursor[bot] review on #1176, verified before fixing).
+ *
+ * `ENV_PAIR_PATTERN` above and the shared class's own env rule both require an
+ * ALL-UPPERCASE name, which is right for real env vars but blind to a server
+ * message like `api_key=secretvalue` or `my_secret=secretvalue`. Object KEYS
+ * were already masked by `SENSITIVE_KEY_RE`; a pair living inside a string
+ * VALUE is what key masking never sees, and it reached the support artifact
+ * intact.
+ *
+ * Scoped to the credential vocabulary rather than to every `name=value`: a
+ * blanket rule would eat `temp_f=77.4` and `inserted=1`, and an export that
+ * redacts its own telemetry is useless to the grower it exists to help.
+ */
+const SENSITIVE_PAIR_PATTERN = new RegExp(
+  `[A-Za-z0-9_-]*${SENSITIVE_KEY_SOURCE}[A-Za-z0-9_-]*\\s*[=:]\\s*(?:"[^"]+"|'[^']+'|[^\\s"',;}]+)`,
+  "gi",
+);
+
+/**
+ * Fail-closed body redaction (recorded #1163 leftover). `redactTokens` above
+ * only ever matched the `vbt_` prefix, so a server response body echoing any
+ * OTHER secret shape — MAC, UUID, long hex run, `sk-` key, env NAME=value
+ * pair, JWT, Bearer header — was exported verbatim. Untrusted bodies now go
+ * through the same secret-VALUE class the forwarding-report export already
+ * uses. `sanitizeReportText` is CALLED, never re-declared here, so the two
+ * paths cannot drift apart.
+ *
+ * Deliberately body-scoped. The export ENVELOPE (tent id, endpoints, token
+ * PREFIX, env_match labels) is the diagnostic payload growers are asked to
+ * share and keeps its existing `redactTokens`-only treatment — scrubbing the
+ * tent UUID out of `tent_id` would destroy the export's purpose without
+ * closing any hole, since the grower already owns that identifier.
+ */
+function redactBodyText(input: string): string {
+  const pairsRemoved = input
+    .replace(SENSITIVE_PAIR_PATTERN, "[REDACTED]")
+    .replace(ENV_PAIR_PATTERN, "[REDACTED]");
+  return sanitizeReportText(redactTokens(pairsRemoved));
+}
+
+function redactBodyValue(value: unknown, depth: number, seen: WeakSet<object>): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return redactBodyText(value);
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "bigint") return redactBodyText(value.toString());
+  // Functions, symbols, anything else JSON cannot carry: unusable, never raw.
+  if (typeof value !== "object") return EXPORT_BODY_UNAVAILABLE;
+  if (depth >= MAX_BODY_DEPTH) return EXPORT_BODY_UNAVAILABLE;
+  const node = value as object;
+  // Only a true ancestor cycle is unusable — a repeated sibling reference is
+  // legitimate, so the node is released once its own subtree is walked.
+  if (seen.has(node)) return EXPORT_BODY_UNAVAILABLE;
+  seen.add(node);
+  let out: unknown;
+  if (Array.isArray(value)) {
+    out = value.map((v) => redactBodyValue(v, depth + 1, seen));
+  } else {
+    const obj: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      obj[k] = SENSITIVE_KEY_RE.test(k) ? "<redacted>" : redactBodyValue(v, depth + 1, seen);
+    }
+    out = obj;
+  }
+  seen.delete(node);
+  return out;
+}
+
+/**
+ * Sanitize an untrusted request/response body before it reaches any export,
+ * preview, or on-screen surface. Structure is preserved; secret-shaped VALUES
+ * are redacted and unrepresentable nodes collapse to EXPORT_BODY_UNAVAILABLE.
+ */
+export function redactExportBody(body: unknown): unknown {
+  return redactBodyValue(body, 0, new WeakSet<object>());
+}
+
+/**
+ * Serialize an ALREADY-sanitized body. A serialization failure stays
+ * unusable — it must never fall back to a raw dump or throw at the caller.
+ */
+function safeStringifyBody(value: unknown): string {
+  try {
+    const out = JSON.stringify(value, null, 2);
+    return typeof out === "string" ? out : JSON.stringify(EXPORT_BODY_UNAVAILABLE);
+  } catch {
+    return JSON.stringify(EXPORT_BODY_UNAVAILABLE);
+  }
+}
+
+/**
  * On-screen twin of the export redaction (bridge audit gap G6): server
  * response bodies rendered in the DOM must pass through this, exactly like
  * the export builders — a token-echoing or malicious response must never
  * put a vbt_-shaped string on screen.
  */
 export function redactedResponseBodyJson(body: unknown): string {
-  return redactTokens(JSON.stringify(body, null, 2) ?? "null");
+  return safeStringifyBody(redactExportBody(body));
 }
 
 export function buildDiagnosticsExport(input: DiagnosticsExportInput): DiagnosticsExportInput {
@@ -89,7 +218,7 @@ export function buildDiagnosticsExport(input: DiagnosticsExportInput): Diagnosti
           http_status: input.latest_test_result.http_status,
           classification: input.latest_test_result.classification,
           headline: input.latest_test_result.headline,
-          body: input.latest_test_result.body,
+          body: redactExportBody(input.latest_test_result.body),
         }
       : null,
   };
@@ -278,7 +407,7 @@ export const SENSOR_INGEST_HISTORY_MAX = 20;
  * includes Authorization headers — the input is the JSON body only.
  */
 export function buildRedactedPayloadPreview(payload: unknown): string {
-  return redactTokens(JSON.stringify(payload, null, 2));
+  return safeStringifyBody(redactExportBody(payload));
 }
 
 export interface BuildPowerShellIngestInput {
@@ -348,7 +477,7 @@ export function buildHistoryExport(input: BuildHistoryExportInput): HistoryExpor
       classification: h.classification,
       headline: h.headline,
       detail: h.detail,
-      body: h.body,
+      body: redactExportBody(h.body),
       inserted: h.inserted,
       skipped_duplicate: h.skipped_duplicate,
       rejected_count: h.rejected_count,
@@ -451,8 +580,9 @@ export function buildDiagnosticsBundleFiles(
 // Safe response inspector
 // ---------------------------------------------------------------------------
 
-const SENSITIVE_KEY_RE =
-  /(token|authorization|bearer|api[_-]?key|secret|password|service[_-]?role|anon[_-]?key|bridge[_-]?token)/i;
+// Built from the single shared vocabulary above so key masking and free-text
+// pair scrubbing can never cover different word sets.
+const SENSITIVE_KEY_RE = new RegExp(SENSITIVE_KEY_SOURCE, "i");
 
 export interface SafeResponseField {
   path: string;
@@ -495,7 +625,7 @@ export function buildSafeResponseInspector(
     };
   }
   if (typeof body === "string") {
-    const safe = redactTokens(body);
+    const safe = redactBodyText(body);
     return {
       http_status: status,
       classification,
@@ -521,7 +651,7 @@ export function buildSafeResponseInspector(
         {
           path: "$",
           type: typeof body,
-          preview: String(body),
+          preview: redactBodyText(String(body)),
           redacted: false,
         },
       ],
@@ -577,7 +707,7 @@ export function buildSafeResponseInspector(
       return;
     }
     if (typeof v === "string") {
-      const safe = redactTokens(v);
+      const safe = redactBodyText(v);
       fields.push({
         path,
         type: "string",

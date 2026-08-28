@@ -80,6 +80,7 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
       growId: "grow-1",
       tentId: "tent-1",
       note: "Room walk complete",
+      idempotencyKey: "idem-key-12345678",
     });
     expect(res.ok).toBe(true);
     expect(rpcMock).toHaveBeenCalledTimes(1);
@@ -88,23 +89,66 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
     expect(payload.p_target_id).toBe("tent-1");
     expect(payload.p_action).toBe("note");
     expect(payload.p_volume_ml).toBeNull();
+    expect(payload.p_idempotency_key).toBe("idem-key-12345678");
   });
 
-  it("omits p_details without extra details and nulls a server-invalid key", async () => {
+  it("omits p_details without extra details and forwards a valid 8..200 key", async () => {
     rpcMock.mockResolvedValueOnce(OK_RESPONSE);
     await save({
       activityId: "note",
       growId: "grow-1",
       plantId: "plant-1",
-      idempotencyKey: "short",
+      idempotencyKey: "idem-key-12345678",
     });
     const [, payload] = rpcMock.mock.calls[0];
     expect(payload).not.toHaveProperty("p_details");
-    expect(payload.p_idempotency_key).toBeNull();
+    expect(payload.p_idempotency_key).toBe("idem-key-12345678");
   });
 
+  it.each([
+    ["outer padding around a valid key", " \tidem-key-12345\t ", "idem-key-12345"],
+    ["an exact 8-character key after trim", " 12345678 ", "12345678"],
+    ["an exact 200-character key after trim", `\t${"x".repeat(200)} `, "x".repeat(200)],
+  ] as const)("trims and forwards %s", async (_label, idempotencyKey, expectedKey) => {
+    rpcMock.mockResolvedValueOnce(OK_RESPONSE);
+    const res = await save({
+      activityId: "note",
+      growId: "grow-1",
+      plantId: "plant-1",
+      idempotencyKey,
+    });
+    expect(res.ok).toBe(true);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    const [name, payload] = rpcMock.mock.calls[0];
+    expect(name).toBe("quicklog_save_manual");
+    expect(payload.p_idempotency_key).toBe(expectedKey);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["short (<8)", "short"],
+    ["overlong (>200)", "x".repeat(201)],
+  ] as const)(
+    "fail-closes %s idempotency key without calling quicklog_save_manual",
+    async (_label, idempotencyKey) => {
+      const res = await save({
+        activityId: "note",
+        growId: "grow-1",
+        plantId: "plant-1",
+        ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+      });
+      expect(res).toEqual({ ok: false, reason: "missing_idempotency_key" });
+      expect(rpcMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("refuses to call the RPC without a tent or plant target", async () => {
-    const res = await save({ activityId: "note", growId: "grow-1" });
+    const res = await save({
+      activityId: "note",
+      growId: "grow-1",
+      idempotencyKey: "idem-key-12345678",
+    });
     expect(res).toEqual({ ok: false, reason: "missing_target" });
     expect(rpcMock).not.toHaveBeenCalled();
   });
@@ -131,7 +175,9 @@ describe("useQuickLogActivitySave — quicklog_save_manual payload shape", () =>
       activityId: "note",
       growId: "grow-1",
       plantId: "plant-1",
+      idempotencyKey: "idem-key-12345678",
     });
     expect(res).toEqual({ ok: false, reason: "save_failed" });
+    expect(rpcMock).toHaveBeenCalledTimes(1);
   });
 });

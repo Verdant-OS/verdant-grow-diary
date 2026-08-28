@@ -78,6 +78,34 @@ const MAX_BODY_DEPTH = 8;
 const ENV_PAIR_PATTERN = /\b[A-Z][A-Z0-9_]{2,}\s*=\s*(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g;
 
 /**
+ * Credential vocabulary, declared ONCE. `SENSITIVE_KEY_RE` (object-key
+ * masking, below) and `SENSITIVE_PAIR_PATTERN` (free-text pair scrubbing) are
+ * both built from this, so the two surfaces cannot drift apart.
+ */
+const SENSITIVE_KEY_SOURCE =
+  "(token|authorization|bearer|api[_-]?key|secret|password|service[_-]?role|anon[_-]?key|bridge[_-]?token)";
+
+/**
+ * Secret `key=value` / `key: value` pairs inside FREE TEXT, any case
+ * (cursor[bot] review on #1176, verified before fixing).
+ *
+ * `ENV_PAIR_PATTERN` above and the shared class's own env rule both require an
+ * ALL-UPPERCASE name, which is right for real env vars but blind to a server
+ * message like `api_key=secretvalue` or `my_secret=secretvalue`. Object KEYS
+ * were already masked by `SENSITIVE_KEY_RE`; a pair living inside a string
+ * VALUE is what key masking never sees, and it reached the support artifact
+ * intact.
+ *
+ * Scoped to the credential vocabulary rather than to every `name=value`: a
+ * blanket rule would eat `temp_f=77.4` and `inserted=1`, and an export that
+ * redacts its own telemetry is useless to the grower it exists to help.
+ */
+const SENSITIVE_PAIR_PATTERN = new RegExp(
+  `[A-Za-z0-9_-]*${SENSITIVE_KEY_SOURCE}[A-Za-z0-9_-]*\\s*[=:]\\s*(?:"[^"]+"|'[^']+'|[^\\s"',;}]+)`,
+  "gi",
+);
+
+/**
  * Fail-closed body redaction (recorded #1163 leftover). `redactTokens` above
  * only ever matched the `vbt_` prefix, so a server response body echoing any
  * OTHER secret shape — MAC, UUID, long hex run, `sk-` key, env NAME=value
@@ -93,7 +121,10 @@ const ENV_PAIR_PATTERN = /\b[A-Z][A-Z0-9_]{2,}\s*=\s*(?:"[^"]{2,}"|'[^']{2,}'|[^
  * closing any hole, since the grower already owns that identifier.
  */
 function redactBodyText(input: string): string {
-  return sanitizeReportText(redactTokens(input.replace(ENV_PAIR_PATTERN, "[REDACTED]")));
+  const pairsRemoved = input
+    .replace(SENSITIVE_PAIR_PATTERN, "[REDACTED]")
+    .replace(ENV_PAIR_PATTERN, "[REDACTED]");
+  return sanitizeReportText(redactTokens(pairsRemoved));
 }
 
 function redactBodyValue(value: unknown, depth: number, seen: WeakSet<object>): unknown {
@@ -549,8 +580,9 @@ export function buildDiagnosticsBundleFiles(
 // Safe response inspector
 // ---------------------------------------------------------------------------
 
-const SENSITIVE_KEY_RE =
-  /(token|authorization|bearer|api[_-]?key|secret|password|service[_-]?role|anon[_-]?key|bridge[_-]?token)/i;
+// Built from the single shared vocabulary above so key masking and free-text
+// pair scrubbing can never cover different word sets.
+const SENSITIVE_KEY_RE = new RegExp(SENSITIVE_KEY_SOURCE, "i");
 
 export interface SafeResponseField {
   path: string;

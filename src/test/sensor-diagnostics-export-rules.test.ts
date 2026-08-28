@@ -286,3 +286,58 @@ describe("fail-closed export body redaction", () => {
     expect(redactedResponseBodyJson(undefined)).toBe("null");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Lower/mixed-case secret pairs inside FREE TEXT (cursor[bot] review, #1176).
+//
+// The env-pair fence only matched ALL-UPPERCASE `NAME=value`, and the shared
+// class's env rule is uppercase too. A response message like
+// `api_key=secretvalue` therefore reached the support artifact intact. Object
+// KEYS were already masked; this is about a pair living inside a string VALUE,
+// which key masking never sees.
+//
+// Benign telemetry pairs must survive — an export that redacts `temp_f=77.4`
+// is useless to the grower it is meant to help.
+// ---------------------------------------------------------------------------
+
+const SECRET_PAIRS = [
+  "api_key=secretvalue",
+  "my_secret=secretvalue",
+  "Api_Key=secretvalue",
+  "password=hunter2hunter2",
+  "bridge_token=plaintextvalue",
+  "apiKey: secretvalue",
+  "client_secret = secretvalue",
+];
+
+describe("lower/mixed-case secret pairs in free text", () => {
+  it.each(SECRET_PAIRS)("scrubs %s from the exported body", (pair) => {
+    const json = diagnosticsExportToJson(withBody({ message: pair }));
+    expect(json, `leaked ${pair}`).not.toContain("secretvalue");
+    expect(json, `leaked ${pair}`).not.toContain("hunter2hunter2");
+    expect(json, `leaked ${pair}`).not.toContain("plaintextvalue");
+  });
+
+  it.each(SECRET_PAIRS)("scrubs %s from the response inspector", (pair) => {
+    const out = JSON.stringify(
+      buildSafeResponseInspector({ status: 200, classification: "ok", body: { message: pair } }),
+    );
+    expect(out, `leaked ${pair}`).not.toContain("secretvalue");
+    expect(out, `leaked ${pair}`).not.toContain("hunter2hunter2");
+    expect(out, `leaked ${pair}`).not.toContain("plaintextvalue");
+  });
+
+  it("scrubs a secret pair in a plain-string body", () => {
+    const json = diagnosticsExportToJson(withBody("upstream said api_key=secretvalue, retry"));
+    expect(json).not.toContain("secretvalue");
+  });
+
+  it("keeps benign telemetry pairs readable", () => {
+    const json = diagnosticsExportToJson(
+      withBody({ message: "temp_f=77.4 humidity=55 inserted=1 tent=veg-a" }),
+    );
+    expect(json).toContain("temp_f=77.4");
+    expect(json).toContain("humidity=55");
+    expect(json).toContain("inserted=1");
+  });
+});

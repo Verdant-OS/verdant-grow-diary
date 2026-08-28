@@ -1,6 +1,47 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~19:45 UTC)
+**Last updated:** 2026-08-28 UTC (~20:00 UTC)
+**Updated by:** Claude (2026-08-28: **#1185 is GREEN on all 35 required contexts at `5f75806`** —
+32 shards, `Lint, typecheck, test, build`, `Preflight — edge shared-lib mirror in sync`,
+`test:legal-seo`. All 16 batch lanes green, plus CodeQL and all three `Analyze` jobs, eslint, tsc,
+tsgo+vite build, docs-safety, both security suites, lockfile policy, One-Tent smoke, Symptom Check
+E2E, sitemap parity, validate, config guards, nested static proofs, both ai-doctor jobs, node --test,
+and the deployment preview pipeline. **Clean on the first attempt** — no red at any point, in
+contrast with #1176's three commits.
+
+**Non-required, recorded not laundered.** `Supabase Preview` **cancelled** — supabase[bot] posted
+that #1185 is ignored for project `bzatgtgjvuojpoxcknaa` because the concurrent preview-branch limit
+was reached; account quota, not a code defect. **`Browser census (public)` PASSED** — worth
+recording because that is the lane that FAILED on #1176, which independently supports the
+import-chain reasoning used there to conclude those census failures were not diff-attributable.
+`Browser census (authenticated)` was still `in_progress` at 20:00 — **NOT_MEASURED**, not a pass;
+its one confirming re-run is unspent. Cursor Bugbot / Approval Agent may still withhold on the
+unresolved spend limit.
+
+**Deploy tip moved again: `872741af` → `db0187b` = #1173,**
+`fix(quicklog): trim fail-closed idempotency on activity-save manual route` — this is the slice the
+board named **Slice 3**. Recorded from git log on the deploy branch. **Not Claude's slice**; its
+contents are known here only from `git show --stat` (`useQuickLogActivitySave.ts` plus two test
+files, +26/−7) and no claim is made about its internals. It touches a **different module** from
+#1185, so there is no collision and no competing implementation.
+
+**#1185's base is now one commit behind** (`872741af` vs `db0187b`). No conflict is flagged and the
+files do not overlap, so the base was deliberately **not** merged in — an unnecessary merge would
+invalidate the green run for no benefit. Re-verified at the new tip that the defect is **still
+present**: `/PASSKEY/gi` at line 79 still precedes the env `NAME=value` rule at line 100, so the fix
+remains needed.
+
+**Independent reviewer: Blue Dream, ASSIGNED — NO VERDICT YET.** Handoff for `5f75806` posted 19:45
+as [PR comment 5456996334](https://github.com/Verdant-OS/verdant-grow-diary/pull/1185#issuecomment-5456996334).
+#1185 is deliberately held as **draft with no auto-merge path**, so reviewer silence cannot ship it
+the way it shipped #1176. Green CI is **not** approval and is not being treated as such.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1185 stays
+draft — no ready, no enqueue, no merge. #1172 stays draft. This edit touches this file only. Prior
+header follows.)
+
+**Prior update:** 2026-08-28 UTC (~19:45 UTC)
 **Updated by:** Claude (2026-08-28: **#1179 merged and the upstream `sanitizeReportText` ordering
 defect is now open as draft [PR #1185](https://github.com/Verdant-OS/verdant-grow-diary/pull/1185).**
 

@@ -74,14 +74,30 @@ describe("ecowittCustomHttpBridgeIngestRules — FIELD_MAP", () => {
   });
 
   it("TypeScript FIELD_MAP matches the Python listener FIELD_MAP (resolved)", () => {
-    const result = spawnSync(
-      "python3",
-      [
-        "-c",
-        "import json, sys; sys.path.insert(0, 'tools/ecowitt-testbench'); from ecowitt_listener import FIELD_MAP; print(json.dumps({k: list(v) for k, v in FIELD_MAP.items()}))",
-      ],
-      { encoding: "utf-8", cwd: REPO_ROOT },
-    );
+    // Resolve the listener's FIELD_MAP via ast.literal_eval so this Vitest
+    // shard does not import Flask (CI full-suite runners have python3, not
+    // the testbench venv). This is a resolved-value contract, not a regex
+    // over source text.
+    const extractor = [
+      "import ast, json, pathlib, sys",
+      "path = pathlib.Path('tools/ecowitt-testbench/ecowitt_listener.py')",
+      "tree = ast.parse(path.read_text(encoding='utf-8'))",
+      "found = None",
+      "for node in tree.body:",
+      "    if isinstance(node, ast.Assign):",
+      "        names = [t.id for t in node.targets if isinstance(t, ast.Name)]",
+      "        if 'FIELD_MAP' in names:",
+      "            found = ast.literal_eval(node.value)",
+      "            break",
+      "if found is None:",
+      "    sys.stderr.write('FIELD_MAP assignment not found\\n')",
+      "    sys.exit(1)",
+      "print(json.dumps({k: list(v) for k, v in found.items()}))",
+    ].join("\n");
+    const result = spawnSync("python3", ["-c", extractor], {
+      encoding: "utf-8",
+      cwd: REPO_ROOT,
+    });
     expect(result.status, result.stderr).toBe(0);
     const pyMap = JSON.parse(result.stdout) as Record<string, string[]>;
     expect(pyMap).toEqual({

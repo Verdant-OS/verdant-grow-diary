@@ -20,13 +20,11 @@ BEGIN
   IF current_setting('role', true) = 'service_role' THEN
     RETURN NEW;
   END IF;
-
-  NEW.nugs_total    := 0;
-  NEW.level         := 0;
-  NEW.tier          := 'seedling';
+  NEW.nugs_total := 0;
+  NEW.level := 0;
+  NEW.tier := 'seedling';
   NEW.current_badge := NULL;
   NEW.referral_code := NULL;
-
   RETURN NEW;
 END;
 $function$;
@@ -41,18 +39,15 @@ BEGIN
   IF current_setting('role', true) = 'service_role' THEN
     RETURN NEW;
   END IF;
-
   IF NEW.nugs_total IS DISTINCT FROM OLD.nugs_total
      OR NEW.level IS DISTINCT FROM OLD.level
-     OR NEW.tier  IS DISTINCT FROM OLD.tier
+     OR NEW.tier IS DISTINCT FROM OLD.tier
      OR NEW.current_badge IS DISTINCT FROM OLD.current_badge THEN
     RAISE EXCEPTION 'gamification fields (nugs_total, level, tier, current_badge) are not directly writable';
   END IF;
-
   IF NEW.referral_code IS DISTINCT FROM OLD.referral_code THEN
     RAISE EXCEPTION 'referral_code is not directly writable';
   END IF;
-
   RETURN NEW;
 END;
 $function$;

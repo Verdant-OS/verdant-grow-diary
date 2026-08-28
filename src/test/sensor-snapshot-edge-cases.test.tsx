@@ -136,6 +136,46 @@ describe("sensorSnapshotFreshnessRules — timestamp boundary edge cases", () =>
     expect(r.effectiveSource).not.toBe("live");
   });
 
+  it.each([
+    ["object", { vendor: "ecowitt" }],
+    ["array", ["ecowitt"]],
+    ["number", 42],
+    ["boolean", true],
+  ])("unexpected %s source-detail shape fails closed, never live or usable", (_label, detail) => {
+    const r = resolveSensorSnapshotDisplay(
+      {
+        source: "live",
+        sourceDetail: detail,
+        capturedAt: isoMinusMs(0),
+      } as never,
+      opts,
+    );
+    expect(r.effectiveSource).toBe("invalid");
+    expect(r.freshness).toBe("invalid");
+    expect(r.reasonCodes).toContain("invalid_source_detail");
+    expect(r.sourceDetail).toBeNull();
+    expect(isHealthySensorDisplay(r)).toBe(false);
+    expect(r.warning).toMatch(/source detail is invalid/i);
+    expect(r.warning).toMatch(/confirm the source detail/i);
+  });
+
+  it.each([
+    ["absent", undefined, null],
+    ["null", null, null],
+    ["allowlisted string", " GGS_Controller ", "ggs_controller"],
+    ["whitespace string", "   ", null],
+    ["disallowed string", "vendor/path", null],
+  ])("preserves prior %s source-detail sanitization", (_label, sourceDetail, expectedDetail) => {
+    const r = resolveSensorSnapshotDisplay(
+      { source: "live", sourceDetail, capturedAt: isoMinusMs(0) },
+      opts,
+    );
+    expect(r.effectiveSource).toBe("live");
+    expect(r.freshness).toBe("fresh");
+    expect(r.sourceDetail).toBe(expectedDetail);
+    expect(isHealthySensorDisplay(r)).toBe(true);
+  });
+
   it("missing source AND missing captured_at → invalid, never healthy", () => {
     const r = resolveSensorSnapshotDisplay({}, opts);
     expect(r.effectiveSource).toBe("invalid");

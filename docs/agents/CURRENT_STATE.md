@@ -1,6 +1,71 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~19:05 UTC)
+**Last updated:** 2026-08-28 UTC (~19:45 UTC)
+**Updated by:** Claude (2026-08-28: **#1179 merged and the upstream `sanitizeReportText` ordering
+defect is now open as draft [PR #1185](https://github.com/Verdant-OS/verdant-grow-diary/pull/1185).**
+
+**Deploy tip moved twice more.** `a76e73ad` (#1176) → **`872741af`** = #1179,
+`fix(sensors): fail-closed validation-panel raw-payload value redaction`. Recorded from git, not
+from a notification: `git log` on the deploy branch. **#1179 is not Claude's slice** — its contents
+are known here only from `git show --stat` (`ecowittValidationEvidenceRules.ts`, its
+`supabase/functions/_shared` mirror, and one test, +208/−18). No claim is made about its internals.
+Checked for collision before starting #1185: #1179 touched a **different** module, so there is no
+competing implementation of the same fix.
+
+**#1185 — the leak that #1176 could only fence.** Branch
+`claude/sanitize-report-text-env-pair-ordering`, cut from `872741af`, head **`5f75806`**. Two files:
+`src/lib/ecowittLocalForwardingStatus.ts` (reorder only) plus 10 tests in the existing
+`ecowitt-forwarding-report-export` suite. `SECRET_PATTERNS` ran `/PASSKEY/gi` and the assembled
+admin-role marker as **bare-word** rules BEFORE the env `NAME=value` rule; those rules rewrite the
+label anywhere in the string, including inside an env NAME, so such a pair had its name fragmented
+first and the fragmented name no longer satisfied `[A-Z][A-Z0-9_]{2,}=` — the VALUE survived.
+
+**Proven by execution on the untouched tip `872741af`**, `established fact`, not inferred:
+`SUPABASE_SERVICE_ROLE_KEY="s3cretV4lue"` → `SUPABASE_[REDACTED]_KEY="s3cretV4lue"` (**leaks**);
+`MY_PASSKEY_VAR="s3cretV4lue"` → `MY_[REDACTED]_VAR="s3cretV4lue"` (**leaks**);
+`SOME_PLAIN_NAME="s3cretV4lue"` → `[REDACTED]` (correct). It leaks through **both**
+`sanitizeReportText` and the deep `sanitizeReportValue` path, so it reached the forwarding-report
+export and `normalizeLocalForwardingStatus`, not merely free-form text.
+
+**Scope correction — earlier entries in this file over-stated it.** Prior blocks implied any
+credential label inside a NAME would trigger this. Measurement says **only the two bare-word rules
+do**: `Bearer` requires trailing whitespace and never matches `MY_BEARER_VAR=`, and that list
+contains no bare `token` rule. `MY_TOKEN_VAR=` and `MY_BEARER_VAR=` were always safe. Treat the
+narrower statement as correct and the earlier wording as superseded.
+
+**Exposure window, stated plainly.** The defect was surfaced by a failing test during #1176 and
+fenced there **for the diagnostics export only**. It has been live on the forwarding-report path
+from `a76e73ad` (#1176's merge) until #1185 lands. That is a production surface, not a pre-merge
+note.
+
+**Validation at `5f75806`.** RED then GREEN with the final test files, reverting **only** the
+production module: **10 failed / 22 passed → 32/32**. Direct consumers of the module (4 suites)
+**243 passed / 3 skipped**. Broad `*ecowitt*` + `*sensor*` sweep **435 files, 5902 passed / 4
+skipped / 0 failed**. `tsc --noEmit` and scoped eslint clean. **Not run locally and stated as such:**
+`bunx vitest run` (full) and `bun run build` — CI gates both. The module is **not** mirrored into
+`supabase/functions/_shared` (checked), so there is no edge-sync obligation.
+
+**Independent reviewer: Blue Dream, ASSIGNED** by Cheek on this slice, with the `HANDOFF_PROTOCOL`
+block for `5f75806` posted as
+[PR comment 5456996334](https://github.com/Verdant-OS/verdant-grow-diary/pull/1185#issuecomment-5456996334).
+Owner Claude, reviewer Blue Dream — different peers, as the standing rule requires. **This is a
+deliberate contrast with #1176, which merged with no independent review at all.** Three questions
+were put to the reviewer rather than decided unilaterally: whether a reorder is the right shape or
+the bare-word rules should instead be anchored so they cannot match inside a longer NAME; whether
+#1176's now-redundant local `ENV_PAIR_PATTERN` pre-pass should be removed (left in as defence in
+depth rather than widening the slice); and confirmation of the narrowed two-rule reading, on which
+the whole test set rests. **The rest of `SECRET_PATTERNS` was NOT re-audited** for further ordering
+defects of the same class — only the proven case was in scope. That audit is unassigned and
+`NOT_MEASURED`.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1185 stays
+draft — no ready, no enqueue, no merge. #1172 stays draft. `Supabase Preview` on #1185 is **ignored**
+(supabase[bot]: the connected project hit its concurrent preview-branch limit) — an account quota,
+non-required, not a code defect. The Cursor spend limit blocking Bugbot's finding-level runs is
+still unresolved. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~19:05 UTC)
 **Updated by:** Claude (2026-08-28: **#1176 MERGED — deploy tip is now `a76e73ad`** (squash of the
 fail-closed diagnostics export body redaction at head `789294c6`; prior tip `52c8abe2` = #1162).
 Verified against the deploy branch, not from a notification: `git ls-remote` shows

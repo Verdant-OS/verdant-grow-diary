@@ -1,6 +1,98 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~20:40 UTC)
+**Last updated:** 2026-08-28 UTC (~21:25 UTC)
+**Updated by:** Claude (2026-08-28: **Copilot found a SECOND secret-leak bypass on #1185, it was
+real, and a dedicated security agent had already passed the leaking SHA clean.** Fixed in
+`75a7de9`. The independent-review picture below is worse than the prior header implied.
+
+**The finding.** Copilot's review of #1185 reported that the env `NAME=value` rule still ran after
+the header rules. Treated as a bug report and **proven by execution on the untouched deploy tip
+`7fd6a001`** before any change — so it is `established fact`, and it **pre-existed this PR** rather
+than being introduced by it:
+
+```text
+Bearer MY_PASSKEY_VAR="s3cretV4lue"          -> [REDACTED]="s3cretV4lue"     LEAKS
+Authorization: MY_PASSKEY_VAR="s3cretV4lue"  -> [REDACTED]"s3cretV4lue"      LEAKS
+Bearer SOME_PLAIN_NAME="s3cretV4lue"         -> [REDACTED]="s3cretV4lue"     LEAKS
+```
+
+**It is wider than Copilot reported.** Two distinct mechanisms destroy the env NAME before the
+`NAME=value` rule can match, after which the VALUE survives:
+
+1. **FRAGMENTING** — a bare-word label rule rewrites the label inside the NAME. This is what the
+   first commit on #1185 fixed.
+2. **CONSUMING** — a header rule swallows the whole following token, NAME included. Both the
+   `Bearer` rule and the `Authorization` rule do it. Not fixed by the first commit.
+
+The consuming case needs **no credential label in the NAME at all** — the third line above is a
+plain `SOME_PLAIN_NAME` — so it is strictly wider than the fragmenting case, and wider than the
+review described. Copilot also called the mechanism "fragmenting"; measurement says consuming. The
+distinction is recorded because it changes where a reader looks.
+
+**Fixed in `75a7de9`** — the env rule moves above the header rules as well as the label rules. Same
+reorder shape, **no new pattern, no new file, no schema**. RED **18 failed / 33 passed (51)** with
+the final tests against the untouched module; GREEN **51/51**; direct consumers 262 passed / 3
+skipped; `ecowitt`+`sensor` sweep **445 files, 6079 passed / 4 skipped / 0 failed**; `tsc --noEmit`
+and eslint clean. **No new redaction breadth**: ten regression inputs (real bearer tokens,
+`Authorization:` headers, lowercase telemetry, bare labels, prose) produce **byte-identical** output
+before and after; only the nine leaking header-prefixed cases changed.
+
+**THE SECURITY-AGENT MISS — record this, it is the most transferable finding here.** The
+`Cursor Automation: Find vulnerabilities` agent reviewed `5bc6a917` and reported
+**"no medium/high/critical vulnerability found in the current PR diff"**, stating the reorder
+"removes the demonstrated value-survival path". **That SHA still leaked**, proven by execution
+twenty minutes later. Its own review text explains the miss: it probed exactly four inputs —
+`SUPABASE_SERVICE_ROLE_KEY`, `MY_PASSKEY_VAR`, `SERVICE_ROLE_SECRET`, and a plain env pair — **all
+bare, none header-prefixed**. It tested the mechanism that had been fixed and not the one that had
+not. To its credit it declared its own gap honestly (`Local Vitest: BLOCKED`, no `node_modules`).
+The lesson is `practical observation`: **a green verdict from that agent is not coverage.** On this
+PR a dedicated security reviewer returned clean on a live secret leak and a general code reviewer
+caught it. Do not treat its PASS as evidence a redaction path is sound.
+
+**Cursor Bugbot is `BLOCKED`, definitively.** All four Cursor checks completed `neutral` within
+~1 second at 21:16:04 on `75a7de9`, and Bugbot commented **"Bugbot couldn't run — usage limit
+reached"**. The "Low Risk" summary appended to the PR body was a body annotation, **not** a
+finding-level review. Earlier entries in this file claimed Bugbot's status three different ways and
+each was wrong; this one is from Bugbot's own check conclusion plus its own comment. **There is no
+Cursor review of the `75a7de9` fix at all.**
+
+**Codex reviewed `75a7de9` and found nothing** — completed 21:18:58, triggered by the new commit.
+Confirmed two ways: no new review threads, and no Codex entry in `get_reviews` (it comments only
+when it has suggestions). It is the **only** independent reviewer that actually ran on the fix. One
+reviewer, reviewing the fix — not a consensus, and not an independent hunt for a third bypass.
+
+**Head history, all verified from git.** `7be3d73` → `5bc6a917` → `75a7de9`.
+`5bc6a917` is a **MERGE** commit (parents `7be3d73` + `7fd6a001`), author "Verdant", 20:48:00Z —
+**not a rebase and not Claude's action**; the slice content was untouched by it
+(`git diff 7fd6a001..5bc6a91` hashes identical to `git diff db0187b..7be3d73`). `75a7de9` is
+Claude's push of the header fix. **Cheek marked #1185 READY at 20:47:53** — the author's own call;
+the "stay draft" fence bound Claude, not Cheek.
+
+**Dream Queen's PASS covers NONE of the current head.** It was pinned to `7be3d73`, now two heads
+back. The prior header said this slice "closes the independent-review requirement #1176 shipped
+without" — **that is no longer true of the shipping SHA** and is corrected here. Per GDP's standing
+instruction Dream Queen has **not** been pinged about either move.
+
+**CI on `75a7de9`: `NOT_MEASURED`.** At 21:25 **zero of the 35 required contexts had reported** —
+all queued. **Zero red.** Non-required completed: `docs-safety`, `Config guards`, `node --test`,
+`Analyze (python)` all `success`; `CodeQL` `neutral`; `Supabase Preview` and the irrigation/
+stabilization jobs `skipped`. No green may be carried forward from `7be3d73` or `5bc6a917`.
+
+**The leak is LIVE on the deploy branch.** It pre-exists #1185, so `7fd6a001` still leaks today.
+#1185 closes it; if #1185 does not land, the exposure remains.
+
+**Still parked, explicitly not in this slice:** the three handoff questions; the mixed-case /
+spaced `NAME = value` P2 (pattern stays uppercase-only, no `\s*` around `=`); the rest of
+`SECRET_PATTERNS`, still **un-audited** for further ordering defects — `NOT_MEASURED`, and fixing
+**two** instances is not evidence the class is gone; #1184's rebase.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied** — note that
+`20260827010000` now appears on this branch via the base-branch merge `3e6b64c`, which is committed
+history arriving from the deploy branch, **not** an APPLY. #1185 is ready but **not enqueued and not
+merged by Claude**; no SQL, no APPLY. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~20:40 UTC)
 **Updated by:** Claude (2026-08-28: **#1185 has an independent-reviewer PASS on `7be3d73`, is green
 on all 35 required contexts at that SHA, and is `mergeable_state: clean`. It remains draft.**
 

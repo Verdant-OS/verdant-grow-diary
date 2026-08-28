@@ -152,8 +152,10 @@ describe("Sensors → Doctor plant re-emission (rendered page, not source text)"
     renderSensors(`/sensors?tentId=${UNOWNED_TENT}&tentIntent=required&plantId=${PLANT}`);
 
     // Required intent that cannot be honoured leaves no tent selected, so the
-    // pair is incomplete and the plant must not travel on its own.
+    // pair is incomplete and the plant must not travel on its own. Exact
+    // `/doctor` is the pin — a grow-less `?plantId=` would still contain the
+    // UUID and a weaker `not.toContain(PLANT)` would miss other leftovers.
     await screen.findByTestId("sensors-required-tent-unavailable");
-    expect(nextStepHref()).not.toContain(PLANT);
+    await waitFor(() => expect(nextStepHref()).toBe("/doctor"));
   });
 });

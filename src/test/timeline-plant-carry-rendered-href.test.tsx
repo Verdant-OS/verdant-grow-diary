@@ -24,7 +24,7 @@
  * the grower would actually follow. Presenter-level only: no schema, no writes,
  * no paging, no directory-completeness proof.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -223,6 +223,20 @@ async function nextStepHref(): Promise<string | null> {
   return anchor?.getAttribute("href") ?? null;
 }
 
+/**
+ * Directory names only replace the fragment fallback AFTER the owner-scoped
+ * plants/tents read settles. Asserting the Sensors href before that commit
+ * reads the loading-state omission (`plantTentIdsById === null`) and can
+ * miss a later guess. Native <option> text is the settlement signal.
+ */
+async function waitForDirectoryPlantName() {
+  await screen.findByRole("option", { name: /Blue Dream #2/ });
+}
+
+async function waitForDirectoryTentName() {
+  await screen.findByRole("option", { name: /Tent A/ });
+}
+
 describe("Timeline → Sensors plant carry (rendered page, not source text)", () => {
   beforeEach(() => {
     harness.executeQuery.mockReset();
@@ -247,10 +261,27 @@ describe("Timeline → Sensors plant carry (rendered page, not source text)", ()
   it("puts the grower's chosen plant UUID in the rendered Sensors href", async () => {
     renderTimeline(`/timeline?plantId=${PLANT}`);
 
-    // The carry the whole Doctor-says-so slice exists to deliver. Asserted on
-    // the resolved href so that a page which stops passing `plantId` fails
-    // here, whether the prop was deleted, commented out, or renamed.
-    await vi.waitFor(async () =>
+    // Directory first: the loading-state href omits plantId, which is the
+    // same shape as a page that never wires it. Wait for the name so the
+    // assertion below is about the settled handoff, not the first paint.
+    await waitForDirectoryPlantName();
+    await waitFor(async () =>
+      expect(await nextStepHref()).toBe(
+        `/sensors?tentId=${TENT}&tentIntent=required&plantId=${PLANT}`,
+      ),
+    );
+  });
+
+  it("carries the plant the grower picks in the Timeline filter, not only a pre-set URL", async () => {
+    renderTimeline("/timeline");
+    await waitForDirectoryPlantName();
+    await waitFor(async () => expect(await nextStepHref()).toBe("/sensors"));
+
+    fireEvent.change(screen.getByTestId("timeline-plant-filter"), {
+      target: { value: PLANT },
+    });
+
+    await waitFor(async () =>
       expect(await nextStepHref()).toBe(
         `/sensors?tentId=${TENT}&tentIntent=required&plantId=${PLANT}`,
       ),
@@ -259,7 +290,8 @@ describe("Timeline → Sensors plant carry (rendered page, not source text)", ()
 
   it("never renders the carried plant or tent UUID as visible copy", async () => {
     const { container } = renderTimeline(`/timeline?plantId=${PLANT}`);
-    await vi.waitFor(async () => expect(await nextStepHref()).toContain(PLANT));
+    await waitForDirectoryPlantName();
+    await waitFor(async () => expect(await nextStepHref()).toContain(PLANT));
 
     // A UUID is an internal id, not a plant name. Doctrine is that Sensors
     // re-emits intent WITHOUT inventing an identity for it.
@@ -279,7 +311,11 @@ describe("Timeline → Sensors plant carry (rendered page, not source text)", ()
 
     renderTimeline(`/timeline?plantId=${PLANT}&tentId=${TENT}`);
 
-    await vi.waitFor(async () => expect(await nextStepHref()).toBe(`/sensors?tentId=${TENT}`));
+    // Loading-state href is already `/sensors?tentId=${TENT}` (plant omitted
+    // while plantTentIdsById is null). Wait for the directory name so a
+    // post-load regression that starts carrying the mismatched plant fails.
+    await waitForDirectoryPlantName();
+    await waitFor(async () => expect(await nextStepHref()).toBe(`/sensors?tentId=${TENT}`));
     expect(await nextStepHref()).not.toContain(PLANT);
   });
 
@@ -295,12 +331,12 @@ describe("Timeline → Sensors plant carry (rendered page, not source text)", ()
 
     renderTimeline(`/timeline?plantId=${PLANT}`);
 
-    // No proven tent means no plant intent — never a first-available guess.
-    const href = await (async () => {
-      await screen.findByTestId("timeline-one-tent-loop-next-step-card-cta");
-      return nextStepHref();
-    })();
-    expect(href).not.toContain(PLANT);
-    expect(href).not.toContain("tentIntent=required");
+    // Tents can still name themselves after a plants-read failure; that is
+    // the settlement signal. The exact generic `/sensors` href is the
+    // no-guess pin — `/sensors?tentId=${TENT}` would also lack plantId and
+    // tentIntent=required, so a first-available tent guess must not pass.
+    await waitForDirectoryTentName();
+    await waitFor(async () => expect(await nextStepHref()).toBe("/sensors"));
+    expect(screen.queryByRole("option", { name: /Blue Dream #2/ })).toBeNull();
   });
 });

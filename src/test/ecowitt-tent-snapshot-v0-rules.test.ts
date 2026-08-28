@@ -1,6 +1,7 @@
 /**
  * EcoWitt tent Snapshot V0 — Sensor Truth tagging + quiet bridge + stuck extremes.
- * Post-merge QA (Testy): tent/plant isolation, malformed timestamps, unit fail-closed.
+ * Post-merge QA (Testy): malformed timestamps + unit fail-closed.
+ * Tent isolation lives in ecowitt-tent-snapshot-v0-isolation.test.ts (V0 VM only).
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -22,12 +23,12 @@ import { selectEcowittCandidates } from "@/lib/ecowittLatestSnapshotFilter";
 
 const NOW = new Date("2026-08-20T18:00:00.000Z");
 const FRESH_AT = "2026-08-20T17:50:00.000Z"; // 10 min ago
-const NEWER_AT = "2026-08-20T17:55:00.000Z"; // 5 min ago — newer than FRESH_AT
 const STALE_AT = "2026-08-20T16:00:00.000Z"; // 2h ago
 /** Far-future vs NOW (>5 min) — classify must fail closed as invalid. */
 const FUTURE_AT = "2026-08-20T18:20:00.000Z"; // 20 min ahead of NOW
+/** Just over the exclusive 5-minute future grace (ageMs < -5min → invalid). */
+const FUTURE_JUST_OVER_AT = "2026-08-20T18:05:01.000Z";
 const TENT = "11111111-1111-4111-8111-111111111111";
-const TENT_B = "22222222-2222-4222-8222-222222222222";
 
 function row(
   overrides: Partial<{
@@ -36,15 +37,12 @@ function row(
     metric: string;
     value: number;
     raw_payload: unknown;
-    tent_id: string | null;
-    plant_id: string | null;
   }> = {},
 ) {
   const capturedAt =
     overrides.captured_at === undefined ? FRESH_AT : overrides.captured_at;
   return {
-    tent_id: overrides.tent_id === undefined ? TENT : overrides.tent_id,
-    plant_id: overrides.plant_id === undefined ? null : overrides.plant_id,
+    tent_id: TENT,
     source: overrides.source ?? "live",
     captured_at: capturedAt,
     metric: overrides.metric ?? "temperature_c",
@@ -306,89 +304,6 @@ describe("ecowittLatestSnapshotFilter — vendor ecowitt never resolves to live"
   });
 });
 
-describe("post-merge QA — V0 tent scope isolation", () => {
-  // Legacy selectEcowittCandidates / persisted-latest isolation is already proven
-  // in ecowitt-latest-snapshot-filtering + ecowitt-persisted-latest-snapshot-ui.
-  // These cases cover only buildEcowittTentSnapshotV0ViewModel options.tentId.
-
-  it("newer tent B row never appears on tent A", () => {
-    const vm = buildEcowittTentSnapshotV0ViewModel(
-      [
-        row({
-          tent_id: TENT,
-          metric: "temperature_c",
-          value: 24,
-          captured_at: FRESH_AT,
-        }),
-        row({
-          tent_id: TENT_B,
-          metric: "temperature_c",
-          value: 99,
-          captured_at: NEWER_AT,
-          raw_payload: { vendor: "ecowitt", dateutc: NEWER_AT },
-        }),
-      ],
-      { tentId: TENT, now: NOW },
-    );
-    const temp = vm.metrics.find((m) => m.key === "temp");
-    expect(temp?.value).toBe(24);
-    expect(temp?.capturedAt).toBe(FRESH_AT);
-    expect(temp?.value).not.toBe(99);
-  });
-
-  it("null tent_id rows never bleed into a scoped tent", () => {
-    const vm = buildEcowittTentSnapshotV0ViewModel(
-      [
-        row({
-          tent_id: null,
-          metric: "humidity_pct",
-          value: 88,
-          captured_at: NEWER_AT,
-          raw_payload: { vendor: "ecowitt", dateutc: NEWER_AT },
-        }),
-        row({
-          tent_id: TENT,
-          metric: "humidity_pct",
-          value: 55,
-          captured_at: FRESH_AT,
-        }),
-      ],
-      { tentId: TENT, now: NOW },
-    );
-    const rh = vm.metrics.find((m) => m.key === "rh");
-    expect(rh?.value).toBe(55);
-    expect(rh?.value).not.toBe(88);
-  });
-
-  it("plant_id on a foreign tent never leaks into tent A (tent filter only)", () => {
-    // V0 has no plantId option; tent scope must still drop tent-B rows even when
-    // they carry a plant_id that looks related.
-    const vm = buildEcowittTentSnapshotV0ViewModel(
-      [
-        row({
-          tent_id: TENT,
-          plant_id: "33333333-3333-4333-8333-333333333333",
-          metric: "soil_moisture_pct",
-          value: 40,
-          captured_at: FRESH_AT,
-        }),
-        row({
-          tent_id: TENT_B,
-          plant_id: "33333333-3333-4333-8333-333333333333",
-          metric: "soil_moisture_pct",
-          value: 91,
-          captured_at: NEWER_AT,
-          raw_payload: { vendor: "ecowitt", dateutc: NEWER_AT },
-        }),
-      ],
-      { tentId: TENT, now: NOW },
-    );
-    const soil = vm.metrics.find((m) => m.key === "soil");
-    expect(soil?.value).toBe(40);
-    expect(soil?.value).not.toBe(91);
-  });
-});
-
 describe("post-merge QA — malformed / null / future timestamps fail closed (never Live)", () => {
   it.each([
     ["", null],
@@ -459,6 +374,19 @@ describe("post-merge QA — malformed / null / future timestamps fail closed (ne
     expect(truth).toBe("invalid");
     expect(truth).not.toBe("live");
     expect(truth).not.toBe("stale");
+  });
+
+  it("canonical live + just-over-5min future dateutc → invalid, never live", () => {
+    const truth = classifyEcowittTentSnapshotV0Source({
+      row: row({
+        source: "live",
+        captured_at: FUTURE_JUST_OVER_AT,
+        raw_payload: { vendor: "ecowitt", dateutc: FUTURE_JUST_OVER_AT },
+      }),
+      now: NOW,
+    });
+    expect(truth).toBe("invalid");
+    expect(truth).not.toBe("live");
   });
 
   it("V0 view-model: garbage / null timestamps never render as healthy Live", () => {
@@ -546,6 +474,19 @@ describe("post-merge QA — unit ambiguity (V0 temperature_c displayed as-is)", 
     const temp = vm.metrics.find((m) => m.key === "temp");
     expect(temp?.value).toBeNull();
     expect(temp?.badgeLabel).not.toBe("Live");
+  });
+
+  it("Celsius temperature_c is displayed as-is in °C, not converted to Fahrenheit", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [row({ metric: "temperature_c", value: 24, captured_at: FRESH_AT })],
+      { tentId: TENT, now: NOW },
+    );
+    const temp = vm.metrics.find((m) => m.key === "temp");
+    expect(temp?.value).toBe(24);
+    expect(temp?.unit).toBe("°C");
+    expect(temp?.unit).not.toBe("°F");
+    // 24°C in Fahrenheit is 75.2 — V0 must not silently convert.
+    expect(temp?.value).not.toBe(75.2);
   });
 
   it("plausible Celsius temperature_c still tags Live when fresh", () => {

@@ -76,6 +76,19 @@ const SECRET_PATTERNS: RegExp[] = [
   /eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g,
   /Bearer\s+[A-Za-z0-9._-]{6,}/gi,
   /Authorization\s*:\s*[^\s",}]+/gi,
+  // Env NAME=value pairs (never export private env values). Quoted ("…"/'…')
+  // and unquoted forms both match; lone words do not.
+  //
+  // ORDER IS LOAD-BEARING: this MUST stay above the bare-word label rules
+  // below. Those rules rewrite any occurrence of the label anywhere in the
+  // string, including inside an env NAME. Run them first and a pair like
+  // `MY_PASSKEY_VAR="s3cret"` becomes `MY_[REDACTED]_VAR="s3cret"`, whose
+  // fragmented name no longer satisfies `[A-Z][A-Z0-9_]{2,}=` — so the VALUE
+  // survives. A plain name redacted correctly, which is why the defect went
+  // unnoticed. Removing the whole pair first makes the label rules a no-op on
+  // that span instead of a hazard. Pinned by
+  // `sanitizeReportText — env pair whose NAME carries a credential label`.
+  /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
   /PASSKEY/gi,
   // Admin-role marker (assembled at runtime to avoid scanners flagging us).
   new RegExp(["service", "_", "role"].join(""), "gi"),
@@ -94,10 +107,9 @@ const SECRET_PATTERNS: RegExp[] = [
   // Separator-free MAC-length hex runs (12–31 chars containing at least one
   // hex letter, so plain long numbers/epoch timestamps are untouched).
   /(?<![0-9A-Fa-f])(?=[0-9A-Fa-f]{0,30}[A-Fa-f])[0-9A-Fa-f]{12,31}(?![0-9A-Fa-f])/g,
-  // API keys and env NAME=value pairs (never export private env values).
-  // Quoted ("…"/'…') and unquoted forms both match; lone words do not.
+  // API keys. The env NAME=value rule that used to sit here has moved ABOVE
+  // the bare-word label rules — see the ordering note there.
   /\bsk-[A-Za-z0-9_-]{16,}/g,
-  /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
 ];
 
 const REDACTED = "[REDACTED]";

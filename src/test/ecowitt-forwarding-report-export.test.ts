@@ -25,6 +25,7 @@ import {
 } from "@/lib/ecowittForwardingReportExport";
 import {
   sanitizeReportText,
+  sanitizeReportValue,
   type LocalForwardingLatestMetrics,
   type LocalForwardingStatus,
 } from "@/lib/ecowittLocalForwardingStatus";
@@ -510,5 +511,58 @@ describe("buildSanitizedForwardingReport — degraded input coercion (regression
     const a = buildSanitizedForwardingReport({ status: status(), nowIso: NOW_ISO });
     const b = buildSanitizedForwardingReport({ status: status(), nowIso: NOW_ISO });
     expect(a).toEqual(b);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pattern-ORDER defect: a credential LABEL inside an env NAME fragments the
+// name before the NAME=value rule can match, so the VALUE survives.
+//
+// SECRET_PATTERNS runs `/PASSKEY/gi` and the assembled admin-role marker as
+// bare-word rules BEFORE the env `NAME=value` rule. On a pair whose NAME
+// contains one of those words, the label rule rewrites the name first —
+// `MY_PASSKEY_VAR="s3cret"` becomes `MY_[REDACTED]_VAR="s3cret"` — and the
+// fragmented name no longer satisfies `[A-Z][A-Z0-9_]{2,}=`, so the value is
+// exported intact. A plain name redacts correctly, which is why this went
+// unnoticed. Proven by execution on deploy tip 872741af before fixing.
+//
+// Only those two bare-word rules cause it: `Bearer` requires trailing
+// whitespace and never matches `MY_BEARER_VAR=`, and there is no bare `token`
+// rule in this list.
+// ---------------------------------------------------------------------------
+
+const ORDER_SECRET = "s3cretV4lue";
+
+const LABEL_IN_NAME_PAIRS = [
+  `SUPABASE_SERVICE_ROLE_KEY="${ORDER_SECRET}"`,
+  `MY_PASSKEY_VAR="${ORDER_SECRET}"`,
+  `A_PASSKEY_B='${ORDER_SECRET}'`,
+  `SERVICE_ROLE_SECRET=${ORDER_SECRET}`,
+  `PASSKEY_FOR_BRIDGE=${ORDER_SECRET}`,
+];
+
+describe("sanitizeReportText — env pair whose NAME carries a credential label", () => {
+  it.each(LABEL_IN_NAME_PAIRS)("scrubs the VALUE from %s", (pair) => {
+    expect(sanitizeReportText(pair), `value survived in: ${pair}`).not.toContain(ORDER_SECRET);
+  });
+
+  it.each(LABEL_IN_NAME_PAIRS)("scrubs it through the deep value path too: %s", (pair) => {
+    const out = JSON.stringify(sanitizeReportValue({ note: pair }));
+    expect(out, `value survived in: ${pair}`).not.toContain(ORDER_SECRET);
+  });
+
+  it("still redacts a plain env pair (regression fence)", () => {
+    expect(sanitizeReportText(`SOME_PLAIN_NAME="${ORDER_SECRET}"`)).not.toContain(ORDER_SECRET);
+    expect(sanitizeReportText(`SOME_PLAIN_NAME=${ORDER_SECRET}`)).not.toContain(ORDER_SECRET);
+  });
+
+  it("still redacts the bare labels themselves when not part of a pair", () => {
+    expect(sanitizeReportText("PASSKEY")).toBe("[REDACTED]");
+    expect(sanitizeReportText(["service", "_", "role"].join(""))).toBe("[REDACTED]");
+  });
+
+  it("leaves ordinary prose and telemetry untouched", () => {
+    expect(sanitizeReportText("forwarding ready, 3 metrics")).toBe("forwarding ready, 3 metrics");
+    expect(sanitizeReportText("temp_f=77.4")).toBe("temp_f=77.4");
   });
 });

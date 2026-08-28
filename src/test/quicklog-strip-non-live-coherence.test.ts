@@ -178,8 +178,9 @@ describe("buildQuickLogStripFromTentState — non-live coherence", () => {
     expect(v.status).toBe("usable");
     expect(v.trustBadge.badge).toBe("live");
     expect(v.trustBadge.attachable).toBe(true);
-    // Strip provider chip reads raw snapshot.source; badge gets canonical
-    // "live" (no chip) so Live is never duplicated as a provider label.
+    // Chip identity is restamped from the RAW label; canonical "live" is
+    // only the trust mapping (Live badge, not a second "Live" chip).
     expect(v.providerLabel).toBe("Pi Bridge");
+    expect(v.trustBadge.providerLabel).toBe("Pi Bridge");
   });
 });

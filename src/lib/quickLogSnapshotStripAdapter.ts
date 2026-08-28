@@ -529,6 +529,12 @@ export function buildQuickLogStripFromTentState(
     classification.isHealthyEvidence = false;
   }
 
+  // Chip identity always comes from the RAW snapshot.source (e.g. "  PI_BRIDGE  "
+  // → "Pi Bridge"). Canonical source is only for trust mapping so Live is not
+  // duplicated as a provider string. Do not restamp attachable — that is the
+  // classifier's job (`fresh_live` / Live badge may attach; demo may not).
+  const rawProviderLabel = deriveProviderLabel(snapshot.source);
+
   return {
     status,
     title,
@@ -539,13 +545,15 @@ export function buildQuickLogStripFromTentState(
     metrics: buildStrictMetrics(snapshot, temperatureUnit),
     action,
     classification,
-    providerLabel: deriveProviderLabel(snapshot.source),
-    trustBadge: classifySnapshotTrustBadge({
-      resolverStatus: badgeResolverStatus,
-      // Non-live: pass canonical so alias badges (demo/manual/csv) and
-      // Live-for-pi_bridge agree with the pill. Provider chip still uses
-      // the raw snapshot.source via deriveProviderLabel above.
-      source: isNonLiveTelemetry ? canonicalSource : snapshot.source,
-    }),
+    providerLabel: rawProviderLabel,
+    trustBadge: {
+      ...classifySnapshotTrustBadge({
+        resolverStatus: badgeResolverStatus,
+        // Non-live: pass canonical so alias badges (demo/manual/csv) and
+        // Live-for-pi_bridge agree with the pill.
+        source: isNonLiveTelemetry ? canonicalSource : snapshot.source,
+      }),
+      providerLabel: rawProviderLabel,
+    },
   };
 }

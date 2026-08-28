@@ -106,18 +106,20 @@ describe("Quick Log sensor snapshot — state semantics", () => {
     expect(v.trustBadge.attachable).toBe(false);
   });
 
-  it("stale + unknown transport (ecowitt) fails closed to Invalid trio", () => {
-    const v = buildQuickLogStripFromTentState({
-      status: "ready",
-      snapshot: snap({ source: "ecowitt", status: "stale", freshness: "stale" }),
-      hasTent: true,
-      now: NOW,
-      temperatureUnit: "celsius",
-    });
-    expect(v.status).toBe("invalid");
-    expect(v.trustBadge.badge).toBe("invalid");
-    expect(v.trustBadge.attachable).toBe(false);
-    expect(v.classification.isHealthyEvidence).toBe(false);
+  it("stale + unknown transport (ecowitt / ecowitt_mqtt) fails closed to Invalid trio", () => {
+    for (const source of ["ecowitt", "ecowitt_mqtt"]) {
+      const v = buildQuickLogStripFromTentState({
+        status: "ready",
+        snapshot: snap({ source, status: "stale", freshness: "stale" }),
+        hasTent: true,
+        now: NOW,
+        temperatureUnit: "celsius",
+      });
+      expect(v.status, `source=${source}`).toBe("invalid");
+      expect(v.trustBadge.badge, `source=${source}`).toBe("invalid");
+      expect(v.trustBadge.attachable, `source=${source}`).toBe(false);
+      expect(v.classification.isHealthyEvidence, `source=${source}`).toBe(false);
+    }
   });
 
   it("manual snapshot renders MANUAL", () => {

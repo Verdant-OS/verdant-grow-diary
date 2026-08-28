@@ -1,6 +1,67 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-27 UTC (~10:20 UTC)
+**Last updated:** 2026-08-28 UTC (~15:50 UTC)
+**Updated by:** Claude (2026-08-28: **#1169 MERGED — deploy tip is now `22c1242c`** (squash of the
+fail-closed manual idempotency slice at head `c84a8330`, prior tip `a53924da` = #1168). The slice:
+`useQuickLogActivitySave.ts`'s `manual_note` route now fail-closes a missing / null / `length < 8` /
+`length > 200` idempotency key with `{ ok: false, reason: "missing_idempotency_key" }` **before**
+target resolution and before any `quicklog_save_manual` RPC, mirroring the fence the event route
+already had; valid 8..200 keys forward unchanged as `p_idempotency_key`. Event route untouched, no
+`p_stage`, no schema, no SQL. Four files, +109/-16.
+
+**Why it took three commits.** The original head `8daddcbf` (cut from `90bb368c`) shipped the gate
+without renegotiating the pins that encoded the OLD nullable-key behavior, so two **required**
+contexts were red on its own change, not on flake: `Full test suite (shard 16/32)`
+(`quick-log-activity-save-manual-rpc-contract.test.ts:135` expected `reason: "save_failed"`, got
+`"missing_idempotency_key"`) and `(shard 17/32)`
+(`quick-log-success-telemetry-hooks.test.tsx:208` expected a `quick_log_saved` event, got `[]`
+because the save now short-circuits before the RPC). Batch lane 9/16 showed 4 failed / 2 passed in
+the rpc-contract file and reproduced identically on its automatic retry — deterministic. `f189080`
+merged deploy tip `a53924da` in (never rebased); `c84a8330` renegotiated both suites (+69/-7, spec
+files only, no production change in that commit).
+
+**Validation, exact.** At `c84a8330`, local run of both renegotiated suites: **2 files, 24/24
+passed**. CI at `c84a8330`: **all 35 required contexts green**, including shards 16/32 and 17/32 and
+all 16 `Full suite` batch lanes (batches 2 and 9 flipped from red). Deployment preview pipeline
+green (edge-shared preflight, typecheck + production build).
+
+**Known red at merge, none of them required, none re-run — recorded, not laundered.**
+`Browser census (public)` FAILED on `c84a8330`: `core-link-form-census.spec.ts:2080`, clicking
+`/settings/agent-integrations` from `/docs/mcp-api` expected pathname `/welcome`, received
+`/settings/agent-integrations`, then burned the 420s test timeout. This diff touches no routing,
+no manifest, no auth redirect, so it is **PLAUSIBLY not this PR's — `NOT_MEASURED`, not proven**:
+the one confirming re-run was never spent. `Supabase Preview` FAILED with the inherited
+`ai_credit_grants` 42P07 (non-required; this PR carries no migrations). `Cursor Bugbot` could not
+run (**Cursor usage/spend limit**), and because of that the `Cursor Approval Agent` explicitly
+withheld approval on this SHA — "Not approved ... human review is still needed". That spend limit
+is unresolved and will keep withholding automated approval on subsequent PRs.
+
+**Review posture — a real gap, stated plainly.** **Blue Dream did NOT review `c84a8330` before it
+merged.** A `HANDOFF_PROTOCOL` block naming that SHA was posted as a PR comment
+([#1169 comment](https://github.com/Verdant-OS/verdant-grow-diary/pull/1169#issuecomment-5454545004))
+and relay to Cursor was still pending when auto-merge fired. Blue Dream reviews in Cursor, not on
+GitHub, so an empty GitHub reviewer list is by design (see the reviewer rows below) — but the
+independent-review seat for this slice was **not** satisfied pre-merge. Any Blue Dream verdict on
+this work is now a post-merge read. One open question was carried in that handoff and remains
+unanswered: whether the fail-closed path emitting **no** `quick_log_saved` telemetry is the intended
+contract, or whether a distinct fail-closed signal should fire instead.
+
+**Merge mechanics, for the record.** cursor[bot] enqueued at 15:40; `disable_pr_auto_merge` did NOT
+evict the live entry (auto-merge is the arming mechanism, not the queue seat); a Cheek-directed
+draft conversion at 15:46 did evict it — GitHub's own notice confirms a draft conversion removes
+auto-merge and queue membership and does not restore either. Marked ready + auto-merge re-armed
+(SQUASH) at 15:48; merged 15:49. The commit that landed, `22c1242c`, is the same prepared merge
+commit the queue had built at 15:41 on `gh-readonly-queue/verdant-grow-diary/pr-1169-a53924da…`.
+
+**A merge is not a deployment. No publish was performed and none is authorized here.** The publish
+stop-order and migration posture are unchanged: `20260826100000`, `20260825233000`, and
+`20260813030000` all remain **NOT applied**. Slice 3 stays **parked** until further direction.
+Other opens are untouched and stay classified: **#1170** draft at `48828dd` (honors
+`trustBadge.attachable` on the Quick Log strip save path; all 35 required contexts green there,
+only the inherited non-required `Supabase Preview` red; unwatched, no ready, no merge), and
+**#1162 / #1153 / #1151 parked**. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-27 UTC (~10:20 UTC)
 **Updated by:** Claude (2026-08-27: **Blue Dream P2 on [PR #1163](https://github.com/Verdant-OS/verdant-grow-diary/pull/1163)
 addressed — Quick Log strip provenance fence** pushed as fix commit `a16fec2` on
 `claude/sentinel-ack-1157-hold-neyqah`; the PR head is this state-edit commit, which lands

@@ -697,6 +697,24 @@ describe("evidence rules", () => {
   });
 
   it.each([
+    ["PASSKEY=flower-room-credential", "flower-room-credential"],
+    ['SERVICE_ROLE="service-role-credential"', "service-role-credential"],
+  ] as const)(
+    "redacts the whole credential assignment in a safe-key string: %s",
+    (credentialAssignment, secretValue) => {
+      const snap = evidenceSnapshot({
+        transport: "mqtt_local_test",
+        config_note: credentialAssignment,
+      });
+      const payload = snap.redacted_raw_payload as Record<string, unknown>;
+      const text = serializeEvidenceForClipboard(snap);
+
+      expect(payload.config_note).toBe("[REDACTED]");
+      expect(text).not.toContain(secretValue);
+    },
+  );
+
+  it.each([
     ["missing", undefined],
     ["null", null],
     ["scalar", "safe-looking malformed raw body"],

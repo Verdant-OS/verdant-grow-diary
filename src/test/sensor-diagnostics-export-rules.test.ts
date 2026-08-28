@@ -3,8 +3,10 @@ import {
   buildSensorIngestCurl,
   buildSensorIngestHistoryItem,
   buildSensorIngestTestPayload,
+  buildSafeResponseInspector,
   diagnosticsExportToJson,
   diagnosticsExportToText,
+  redactedResponseBodyJson,
 } from "@/lib/sensorDiagnosticsExportRules";
 import { classifySensorIngestTestResult } from "@/lib/sensorIngestTestResultRules";
 
@@ -156,5 +158,186 @@ describe("buildSensorIngestHistoryItem", () => {
     const serialized = JSON.stringify(item);
     expect(serialized).not.toMatch(/authorization/i);
     expect(serialized).not.toContain(PLAINTEXT);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fail-closed body redaction (recorded #1163 leftover).
+//
+// The module's `redactTokens` pass only ever matched the `vbt_` prefix, so a
+// server response body echoing any OTHER secret shape — MAC, UUID, long hex,
+// `sk-` key, env NAME=value pair, JWT, Bearer header — was exported verbatim.
+// The envelope (tent identity, endpoints, token PREFIX) is deliberately NOT
+// scrubbed by this class: it is the diagnostic payload growers are asked to
+// share, and the fences below pin that it survives.
+// ---------------------------------------------------------------------------
+
+const BODY_SECRETS = {
+  mac: "AA:BB:CC:DD:EE:FF",
+  bareMac: "AABBCCDDEEFF",
+  uuid: "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+  hex64: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+  skKey: "sk-ABCDEFGHIJKLMNOPQRSTUV",
+  envValue: "hunter2hunter2",
+  jwt: "eyJhbGciOi.eyJzdWIiOi.SflKxwRJSM",
+  bearer: "Bearer abcdef123456",
+};
+
+const SECRET_BODY = {
+  device: BODY_SECRETS.mac,
+  station: BODY_SECRETS.bareMac,
+  row_id: BODY_SECRETS.uuid,
+  digest: BODY_SECRETS.hex64,
+  provider_key: BODY_SECRETS.skKey,
+  env_line: `SUPABASE_SERVICE_ROLE_KEY="${BODY_SECRETS.envValue}"`,
+  jwt: BODY_SECRETS.jwt,
+  header: BODY_SECRETS.bearer,
+};
+
+function withBody(body: unknown) {
+  return {
+    ...EXPORT_INPUT,
+    latest_test_result: {
+      attempted_at: "2026-06-06T18:00:00Z",
+      http_status: 200,
+      classification: "ok" as const,
+      headline: "HTTP 200",
+      body,
+    },
+  };
+}
+
+function expectNoSecrets(out: string) {
+  for (const [name, value] of Object.entries(BODY_SECRETS)) {
+    expect(out, `leaked ${name}`).not.toContain(value);
+  }
+}
+
+describe("fail-closed export body redaction", () => {
+  it("JSON export scrubs every secret-value shape from the response body", () => {
+    expectNoSecrets(diagnosticsExportToJson(withBody(SECRET_BODY)));
+  });
+
+  it("text export scrubs every secret-value shape from the response body", () => {
+    expectNoSecrets(diagnosticsExportToText(withBody(SECRET_BODY)));
+  });
+
+  it("scrubs secrets nested deep inside the response body", () => {
+    const nested = { a: { b: { c: [{ d: BODY_SECRETS.mac }, BODY_SECRETS.uuid] } } };
+    expectNoSecrets(diagnosticsExportToJson(withBody(nested)));
+  });
+
+  it("scrubs secrets in a non-JSON (plain string) response body", () => {
+    const text = `device ${BODY_SECRETS.mac} row ${BODY_SECRETS.uuid} key ${BODY_SECRETS.skKey}`;
+    expectNoSecrets(diagnosticsExportToJson(withBody(text)));
+  });
+
+  it("redactedResponseBodyJson scrubs every secret-value shape", () => {
+    expectNoSecrets(redactedResponseBodyJson(SECRET_BODY));
+  });
+
+  it("safe response inspector scrubs secrets in string previews", () => {
+    const inspector = buildSafeResponseInspector({
+      status: 200,
+      classification: "ok",
+      body: SECRET_BODY,
+    });
+    expectNoSecrets(JSON.stringify(inspector));
+  });
+
+  it("safe response inspector scrubs secrets in a plain-string body", () => {
+    const inspector = buildSafeResponseInspector({
+      status: 200,
+      classification: "ok",
+      body: `mac=${BODY_SECRETS.mac} uuid=${BODY_SECRETS.uuid}`,
+    });
+    expectNoSecrets(JSON.stringify(inspector));
+  });
+
+  it("keeps the diagnostic envelope readable — redaction is body-scoped", () => {
+    const json = diagnosticsExportToJson(withBody(SECRET_BODY));
+    expect(json).toContain("https://abc.supabase.co");
+    expect(json).toContain("sensor-ingest-webhook");
+    expect(json).toContain("tent-1");
+    expect(json).toContain("vbt_AB12");
+  });
+
+  it("a circular body stays unusable — no throw, no clean dump", () => {
+    const circular: Record<string, unknown> = { device: BODY_SECRETS.mac };
+    circular.self = circular;
+    let json = "";
+    expect(() => {
+      json = diagnosticsExportToJson(withBody(circular));
+    }).not.toThrow();
+    expectNoSecrets(json);
+    expect(json).toContain("unavailable");
+  });
+
+  it("an unserializable (BigInt) body stays unusable — no throw", () => {
+    let json = "";
+    expect(() => {
+      json = diagnosticsExportToJson(withBody({ n: BigInt(1), device: BODY_SECRETS.mac }));
+    }).not.toThrow();
+    expectNoSecrets(json);
+  });
+
+  it("a missing body never becomes a clean dump", () => {
+    expect(() => diagnosticsExportToJson(withBody(undefined))).not.toThrow();
+    expect(redactedResponseBodyJson(undefined)).toBe("null");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lower/mixed-case secret pairs inside FREE TEXT (cursor[bot] review, #1176).
+//
+// The env-pair fence only matched ALL-UPPERCASE `NAME=value`, and the shared
+// class's env rule is uppercase too. A response message like
+// `api_key=secretvalue` therefore reached the support artifact intact. Object
+// KEYS were already masked; this is about a pair living inside a string VALUE,
+// which key masking never sees.
+//
+// Benign telemetry pairs must survive — an export that redacts `temp_f=77.4`
+// is useless to the grower it is meant to help.
+// ---------------------------------------------------------------------------
+
+const SECRET_PAIRS = [
+  "api_key=secretvalue",
+  "my_secret=secretvalue",
+  "Api_Key=secretvalue",
+  "password=hunter2hunter2",
+  "bridge_token=plaintextvalue",
+  "apiKey: secretvalue",
+  "client_secret = secretvalue",
+];
+
+describe("lower/mixed-case secret pairs in free text", () => {
+  it.each(SECRET_PAIRS)("scrubs %s from the exported body", (pair) => {
+    const json = diagnosticsExportToJson(withBody({ message: pair }));
+    expect(json, `leaked ${pair}`).not.toContain("secretvalue");
+    expect(json, `leaked ${pair}`).not.toContain("hunter2hunter2");
+    expect(json, `leaked ${pair}`).not.toContain("plaintextvalue");
+  });
+
+  it.each(SECRET_PAIRS)("scrubs %s from the response inspector", (pair) => {
+    const out = JSON.stringify(
+      buildSafeResponseInspector({ status: 200, classification: "ok", body: { message: pair } }),
+    );
+    expect(out, `leaked ${pair}`).not.toContain("secretvalue");
+    expect(out, `leaked ${pair}`).not.toContain("hunter2hunter2");
+    expect(out, `leaked ${pair}`).not.toContain("plaintextvalue");
+  });
+
+  it("scrubs a secret pair in a plain-string body", () => {
+    const json = diagnosticsExportToJson(withBody("upstream said api_key=secretvalue, retry"));
+    expect(json).not.toContain("secretvalue");
+  });
+
+  it("keeps benign telemetry pairs readable", () => {
+    const json = diagnosticsExportToJson(
+      withBody({ message: "temp_f=77.4 humidity=55 inserted=1 tent=veg-a" }),
+    );
+    expect(json).toContain("temp_f=77.4");
+    expect(json).toContain("humidity=55");
+    expect(json).toContain("inserted=1");
   });
 });

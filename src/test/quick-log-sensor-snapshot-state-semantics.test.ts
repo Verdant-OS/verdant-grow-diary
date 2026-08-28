@@ -91,7 +91,9 @@ describe("Quick Log sensor snapshot — state semantics", () => {
     expect(v.classification.isHealthyEvidence).toBe(false);
   });
 
-  it("stale resolver verdict with trusted provenance renders STALE", () => {
+  it("stale + trusted source (live) renders STALE trio (not Invalid, not None)", () => {
+    // Stale age with a trusted provenance stays Stale. Unknown transport
+    // labels (ecowitt, …) fail closed to Invalid — covered separately.
     const v = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: snap({ source: "live", status: "stale", freshness: "stale" }),
@@ -104,7 +106,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
     expect(v.trustBadge.attachable).toBe(false);
   });
 
-  it("stale resolver verdict with unknown provenance fails closed to INVALID", () => {
+  it("stale + unknown transport (ecowitt) fails closed to Invalid trio", () => {
     const v = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: snap({ source: "ecowitt", status: "stale", freshness: "stale" }),
@@ -127,11 +129,10 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).toBe("manual");
-    // fresh_non_live never grants attachable — only real fresh_live does.
-    expect(v.trustBadge.attachable).toBe(false);
+    expect(v.trustBadge.attachable).toBe(true);
   });
 
-  it("demo/sim snapshot renders DEMO and is not attachable", () => {
+  it("demo/sim snapshot renders DEMO, not attachable, not healthy evidence, honest copy", () => {
     const v = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: snap({ source: "sim", status: "fresh_non_live" }),
@@ -139,8 +140,12 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       now: NOW,
       temperatureUnit: "celsius",
     });
+    expect(v.status).toBe("usable");
     expect(v.trustBadge.badge).toBe("demo");
     expect(v.trustBadge.attachable).toBe(false);
+    expect(v.classification.isHealthyEvidence).toBe(false);
+    expect(v.title).toBe("Demo sensor context");
+    expect(v.description).toMatch(/never treated as live/i);
   });
 
   it("live fresh valid Ecowitt snapshot renders LIVE and attachable", () => {

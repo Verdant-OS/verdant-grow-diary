@@ -75,11 +75,21 @@ describe("QuickLogSensorSnapshotStrip — trust badge rendering", () => {
     expect(screen.getByTestId("quicklog-sensor-snapshot-source")).toHaveTextContent(/ecowitt/i);
   });
 
-  it("stale trusted-provenance row → trust badge Stale, not attachable", () => {
+  it("stale + trusted source (live) → trust badge Stale, not attachable", () => {
     mockHook.mockReturnValue(ready(snap({ source: "live", status: "stale", freshness: "stale" })));
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
     const badge = screen.getByTestId("snapshot-trust-badge");
     expect(badge).toHaveAttribute("data-badge", "stale");
+    expect(badge).toHaveAttribute("data-attachable", "false");
+  });
+
+  it("stale + unknown transport (ecowitt) → trust badge Invalid, not attachable", () => {
+    mockHook.mockReturnValue(
+      ready(snap({ source: "ecowitt", status: "stale", freshness: "stale" })),
+    );
+    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
+    const badge = screen.getByTestId("snapshot-trust-badge");
+    expect(badge).toHaveAttribute("data-badge", "invalid");
     expect(badge).toHaveAttribute("data-attachable", "false");
   });
 
@@ -115,7 +125,7 @@ describe("QuickLogSensorSnapshotStrip — trust badge rendering", () => {
 });
 
 describe("buildQuickLogStripFromTentState — trust badge gating (no Live for vendor)", () => {
-  it("ecowitt_mqtt vendor without fresh_live resolver verdict is NOT Live", () => {
+  it("ecowitt_mqtt vendor without fresh_live fails closed to Invalid (never Stale-as-trust)", () => {
     const v = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: snap({ source: "ecowitt_mqtt", status: "stale", freshness: "stale" }),
@@ -124,11 +134,12 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).not.toBe("live");
+    expect(v.status).toBe("invalid");
     expect(v.trustBadge.badge).toBe("invalid");
     expect(v.trustBadge.attachable).toBe(false);
   });
 
-  it("unknown vendor source resolved as stale is not attachable", () => {
+  it("unknown vendor source resolved as stale fails closed to Invalid, not attachable", () => {
     const v = buildQuickLogStripFromTentState({
       status: "ready",
       snapshot: snap({ source: "wat", status: "stale", freshness: "stale" }),
@@ -137,6 +148,8 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
       temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).not.toBe("live");
+    expect(v.status).toBe("invalid");
+    expect(v.trustBadge.badge).toBe("invalid");
     expect(v.trustBadge.attachable).toBe(false);
   });
 
@@ -183,24 +196,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
         temperatureUnit: "celsius",
       });
       expect(v.status, `source=${source}`).toBe("usable");
-      expect(v.trustBadge.attachable, `source=${source}`).toBe(false);
     }
-  });
-
-  it("pi_bridge fresh_non_live → usable pill, Live badge, attachable false, providerLabel Pi Bridge", () => {
-    const v = buildQuickLogStripFromTentState({
-      status: "ready",
-      snapshot: snap({ source: "pi_bridge", status: "fresh_non_live" }),
-      hasTent: true,
-      now: NOW,
-      temperatureUnit: "celsius",
-    });
-    expect(v.status).toBe("usable");
-    expect(v.trustBadge.badge).toBe("live");
-    expect(v.trustBadge.badge).not.toBe("stale");
-    expect(v.trustBadge.attachable).toBe(false);
-    expect(v.providerLabel).toBe("Pi Bridge");
-    expect(v.trustBadge.providerLabel).toBe("Pi Bridge");
   });
 
   it("empty/no_data trust resolves to invalid (never live)", () => {

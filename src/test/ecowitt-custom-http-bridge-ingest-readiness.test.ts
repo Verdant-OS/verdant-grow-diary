@@ -231,4 +231,20 @@ describe("ecowittCustomHttpBridgeIngestRules — constitution Sensor Truth", () 
       }),
     ).toBe("invalid");
   });
+
+  it("marks stuck humidity on a live LAN packet as invalid", () => {
+    expect(
+      resolveEcowittCustomHttpConstitutionSource({
+        payload: {
+          stationtype: "GW1200B_V1.4.7",
+          model: "GW1200B",
+          dateutc: "2026-06-17 05:31:00",
+          temp1f: "77.4",
+          humidity1: "0",
+        },
+        remoteAddr: "192.168.68.75",
+        now: new Date("2026-06-17T05:45:30Z"),
+      }),
+    ).toBe("invalid");
+  });
 });

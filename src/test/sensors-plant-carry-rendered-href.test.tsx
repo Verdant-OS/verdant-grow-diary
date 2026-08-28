@@ -5,14 +5,12 @@
  * `?plantId=` UUID intent onward WITHOUT resolving it against any plant row,
  * so `AiDoctorStart` stays the single validator.
  *
- * Measured on deploy tip `52c8abe2b`, the only guard on that forwarding was
- * `sensors-one-tent-loop-card.test.tsx`'s `expect(src).toContain("plantId:
- * carriedPlantIntentId")` — a grep over `Sensors.tsx`. Commenting the prop out
- * (with the matching Timeline prop) left the string in the file: the two
- * existing source-scan suites stayed green (17/17) while these rendered href
- * cases failed 4 / passed 5. That is the #1102 failure mode with a different
- * file name, so the guard is replaced here by one that renders the page and
- * reads the href.
+ * Measured on deploy tip `52c8abe2b` against the **current** ten rendered
+ * cases (five Timeline + five Sensors): commenting this prop out (with the
+ * matching Timeline prop) left the grep string in `Sensors.tsx`. Exact RED:
+ * **5 failed / 5 passed** on the new files; source-scan suites 17/17 green.
+ * That is the #1102 failure mode with a different file name, so the guard is
+ * replaced here by one that renders the page and reads the href.
  *
  * Presenter-level only: no schema, no writes, no plant-row resolution, and no
  * assertion that Sensors knows anything about the plant beyond the token.

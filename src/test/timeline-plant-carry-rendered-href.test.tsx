@@ -11,14 +11,17 @@
  *     comment-out satisfies — the exact defeat `AGENTS.md` documents for
  *     `playwright-action-timeout-fence`.
  *
- * Measured on deploy tip `52c8abe2b`: commenting that one line out (and the
- * matching Sensors prop) returned the page to the inert state #1102 shipped.
- * The two existing source-scan suites stayed green (17/17:
- * `timeline-one-tent-loop-card` + `sensors-one-tent-loop-card`). These rendered
- * href cases failed 4 / passed 5 — the 4 failures are the carry assertions;
- * the 5 passes are the already-fail-closed omit paths. #1102 merged inert for
- * this precise reason, so the regression guard for it must not itself be a
- * source scan.
+ * Measured on deploy tip `52c8abe2b` against the **current** ten rendered
+ * cases (five Timeline + five Sensors, including the filter-pick case):
+ * commenting both production `plantId` props out returned the pages to the
+ * inert state #1102 shipped. Exact RED: **5 failed / 5 passed** on the new
+ * files; the two existing source-scan suites stayed green (17/17:
+ * `timeline-one-tent-loop-card` + `sensors-one-tent-loop-card`). Combined
+ * four-file run: 5 failed / 22 passed (27). The five failures are the carry
+ * assertions (URL plant, **filter pick**, UUID-not-copy wait on href, Sensors
+ * re-emit, Sensors UUID-not-copy wait). The five passes are the already
+ * fail-closed omit paths. #1102 merged inert for this precise reason, so the
+ * regression guard for it must not itself be a source scan.
  *
  * These cases render the real `Timeline` with the real card and assert the href
  * the grower would actually follow. Presenter-level only: no schema, no writes,
@@ -273,6 +276,10 @@ describe("Timeline → Sensors plant carry (rendered page, not source text)", ()
   });
 
   it("carries the plant the grower picks in the Timeline filter, not only a pre-set URL", async () => {
+    // RED-proven against inert wiring (plantId props commented out): this
+    // case failed — href stayed `/sensors` after the filter change. Copilot
+    // asked that this later-added case be demonstrated failing, not only the
+    // original URL-preset carry assertion.
     renderTimeline("/timeline");
     await waitForDirectoryPlantName();
     await waitFor(async () => expect(await nextStepHref()).toBe("/sensors"));

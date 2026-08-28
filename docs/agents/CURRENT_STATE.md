@@ -1,6 +1,68 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~20:00 UTC)
+**Last updated:** 2026-08-28 UTC (~20:40 UTC)
+**Updated by:** Claude (2026-08-28: **#1185 has an independent-reviewer PASS on `7be3d73`, is green
+on all 35 required contexts at that SHA, and is `mergeable_state: clean`. It remains draft.**
+
+**Dream Queen PASSed `7be3d73e19ce297837f00ec0f60896d895721ce5`.** Recorded as a `source claim`,
+relayed by GDP at ~20:40 — **not** independently verified. `get_reviews` on #1185 returns `[]`,
+which is expected because Dream Queen reviews in **Cursor, not GitHub**, so there is no GitHub
+artifact to check it against. It is recorded as relayed rather than measured. This closes the
+independent-review requirement that **#1176 shipped without**, which is the entire reason this
+cleanup slice exists.
+
+**#1185 was rebased onto `db0187b` (#1173); head is now `7be3d73`,** previously `5f75806`. The diff
+is **byte-identical** against the new base — verified by tree hash (`24c657f3…`) and by
+`git diff db0187b..HEAD`, not assumed. Another session had already pushed the identical rebase;
+`--force-with-lease` correctly rejected the duplicate this session produced (`4e1c18f`), and that
+duplicate was **discarded rather than force-pushed**, since the trees matched and pushing would have
+churned the SHA for zero content change.
+
+**GREEN on all 35 required contexts at `7be3d73`** — 32 shards, `Lint, typecheck, test, build`,
+`Preflight — edge shared-lib mirror in sync`, `test:legal-seo` — all from workflow run
+`33206645055`, started 20:04, **the post-rebase run**. Tallied against the pinned mirror
+`config/required-status-checks.json` (35 entries), not from memory. The earlier green on `5f75806`
+is **not** carried forward: green is SHA-pinned exactly as a verdict is.
+
+**`Browser census (authenticated)` has since completed `success`,** resolving the `NOT_MEASURED`
+recorded in the prior header. **Its one confirming re-run is now SPENT** — a future red on this SHA
+cannot be waved off as a flake. `Browser census (public)` passed again, and `CodeQL` finished
+`success` after reading `neutral` on an earlier poll. Every non-required job on the head is now
+green; `mergeable_state` is `clean`.
+
+**Deploy tip moved again: `db0187b` → `7fd6a001` = #1171,** `fix(sensor): fail closed on malformed
+source detail`. Verified from `git log` on the deploy branch, not from a notification. **Not
+Claude's slice**; its contents are known here only from `git show --stat`
+(`sensorSnapshotFreshnessRules.ts` plus `sensor-snapshot-edge-cases.test.tsx`, +80/−12) and no claim
+is made about its internals. **No file overlap with #1185**, and `git merge-tree` reports **zero
+conflict markers** against `7be3d73`. **GDP's instruction is explicit: do NOT rebase #1185 onto
+`7fd6a001`.** The base stays `db0187b`, one commit behind, with no conflict.
+
+**Correction, recorded rather than quietly dropped.**
+[PR comment 5457478650](https://github.com/Verdant-OS/verdant-grow-diary/pull/1185#issuecomment-5457478650),
+posted 20:33, asserts "the re-review is still open" and asks Dream Queen to re-establish the verdict
+on `7be3d73`. GDP classified that premise as **wrong** — the PASS already covered `7be3d73`. The
+comment **stands uncorrected on the PR**; a retraction was offered to Cheek and deliberately **not**
+posted, because the standing instruction is not to ping Dream Queen. This is the **second** time in
+this sequence a claim about review state was asserted and then walked back (the first was the Bugbot
+status on #1176). The pattern is the same both times: inferring review state instead of waiting for
+the relay. Recorded so the pattern is visible, not just the individual errors.
+
+**Parked, not done — none of this is in #1185.** The three handoff questions stay open as leftovers:
+reorder vs. **anchoring** the bare-word label rules so they cannot match inside a longer NAME;
+whether #1176's now-redundant local `ENV_PAIR_PATTERN` pre-pass in `sensorDiagnosticsExportRules.ts`
+is removed or kept as defence in depth; and whether the **narrowed two-rule reading** holds. The
+mixed-case / spaced `NAME = value` P2 is likewise **not absorbed** and stays a separate slice — the
+pattern remains uppercase-only with no `\s*` around `=`. The **rest of `SECRET_PATTERNS` remains
+un-audited** for further ordering defects of the same class: `NOT_MEASURED`. Fixing one instance is
+not evidence the class is gone. **#1184's rebase stays PARKED** until #1185 lands.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1185 stays
+draft — no ready, no enqueue, no merge, no publish, no SQL, no APPLY. #1172 stays draft. This edit
+touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~20:00 UTC)
 **Updated by:** Claude (2026-08-28: **#1185 is GREEN on all 35 required contexts at `5f75806`** —
 32 shards, `Lint, typecheck, test, build`, `Preflight — edge shared-lib mirror in sync`,
 `test:legal-seo`. All 16 batch lanes green, plus CodeQL and all three `Analyze` jobs, eslint, tsc,

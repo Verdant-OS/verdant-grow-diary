@@ -88,7 +88,8 @@ export function collectStampBlockers(stamp) {
 
   /** @type {string[]} */
   const blockers = [];
-  if (stamp.dirty === true) blockers.push("stamp_dirty");
+  // PASS requires dirty === false. Missing/non-boolean dirty is not clean.
+  if (stamp.dirty !== false) blockers.push("stamp_dirty");
   if (stamp.ref === "__orphan__") blockers.push("stamp_orphan");
   if (
     stamp.commitSource === "none" ||

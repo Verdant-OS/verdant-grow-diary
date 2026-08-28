@@ -19,6 +19,7 @@ import {
   isOrphanStamp,
   reportJsonLeaksTokenPayload,
   resolveCommittedTokenClass,
+  resolveEffectiveTokenClass,
   runPublishVerification,
 } from "../../scripts/verify-publish-provenance.mjs";
 
@@ -81,6 +82,22 @@ describe("stamp blockers and orphan classification", () => {
   it("fails dirty stamps", () => {
     expect(collectStampBlockers(cleanStamp({ dirty: true }))).toEqual(["stamp_dirty"]);
     expect(decidePublishVerdict(["stamp_dirty"])).toBe("FAIL");
+  });
+
+  it("fails stamps whose dirty flag is missing or non-boolean (PASS requires dirty false)", () => {
+    const omitted = cleanStamp();
+    delete (omitted as { dirty?: boolean }).dirty;
+    expect(collectStampBlockers(omitted)).toEqual(["stamp_dirty"]);
+    expect(collectStampBlockers(cleanStamp({ dirty: "false" }))).toEqual(["stamp_dirty"]);
+    const report = buildPublishVerificationReport({
+      stamp: omitted,
+      committedTokenClass: "test_",
+      effectiveTokenClass: "test_",
+      generatedAt: "2026-08-25T00:00:00.000Z",
+    });
+    expect(report.dirty).toBe(true);
+    expect(report.verdict).toBe("FAIL");
+    expect(report.blockers).toEqual(["stamp_dirty"]);
   });
 
   it("fails __orphan__ refs", () => {
@@ -182,6 +199,16 @@ describe("token class compare + report assembly", () => {
     expect(report.dirty).toBe(true);
     expect(report.blockers).toEqual(["stamp_dirty"]);
     expect(formatPublishVerificationSummary(report)).toBe("[publish-verify] FAIL stamp_dirty");
+  });
+
+  it("flags token-shaped payloads and allows class labels", () => {
+    expect(reportJsonLeaksTokenPayload(JSON.stringify({ token: FIXTURE_TEST_TOKEN }))).toBe(true);
+    expect(reportJsonLeaksTokenPayload(JSON.stringify({ token: FIXTURE_LIVE_TOKEN }))).toBe(true);
+    expect(
+      reportJsonLeaksTokenPayload(
+        JSON.stringify({ committedTokenClass: "test_", effectiveTokenClass: "live_" }),
+      ),
+    ).toBe(false);
   });
 
   it("serialized report never contains token-shaped payloads", () => {
@@ -365,5 +392,44 @@ describe("resolveCommittedTokenClass (HEAD blob, not working tree)", () => {
     expect(committed).toBe("test_");
     expect(committed).not.toBe(FIXTURE_TEST_TOKEN);
     expect(committed).not.toBe(FIXTURE_LIVE_TOKEN);
+  });
+});
+
+describe("resolveEffectiveTokenClass (Vite production env, class only)", () => {
+  const TOKEN_NAME = "VITE_PAYMENTS_CLIENT_TOKEN";
+
+  it("classifies the effective production token by prefix without returning bytes", async () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-effective-"));
+    temporaryRoots.push(root);
+    writeFileSync(join(root, ".env.production"), `${TOKEN_NAME}=${FIXTURE_LIVE_TOKEN}\n`);
+
+    const hadToken = Object.hasOwn(process.env, TOKEN_NAME);
+    const previous = process.env[TOKEN_NAME];
+    delete process.env[TOKEN_NAME];
+    try {
+      const effective = await resolveEffectiveTokenClass(root);
+      expect(effective).toBe("live_");
+      expect(effective).not.toBe(FIXTURE_LIVE_TOKEN);
+      expect(effective).not.toBe(FIXTURE_TEST_TOKEN);
+    } finally {
+      if (hadToken) process.env[TOKEN_NAME] = previous;
+      else delete process.env[TOKEN_NAME];
+    }
+  });
+
+  it("reports missing when production env has no client token", async () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-effective-missing-"));
+    temporaryRoots.push(root);
+    writeFileSync(join(root, ".env.production"), "VITE_APP_NAME=fixture\n");
+
+    const hadToken = Object.hasOwn(process.env, TOKEN_NAME);
+    const previous = process.env[TOKEN_NAME];
+    delete process.env[TOKEN_NAME];
+    try {
+      expect(await resolveEffectiveTokenClass(root)).toBe("missing");
+    } finally {
+      if (hadToken) process.env[TOKEN_NAME] = previous;
+      else delete process.env[TOKEN_NAME];
+    }
   });
 });

@@ -2201,6 +2201,15 @@ export default function QuickLog({
                       checked={snapshot && !!selectedPlant && snapshotUsable && snapshotAttachable}
                       onCheckedChange={(v) => {
                         if (isMainDraftMutationLocked()) return;
+                        // Refuse to arm local snapshot state for a
+                        // non-attachable row (GDP #1170 residual): `disabled`
+                        // is presentation, not a fence — a forced/programmatic
+                        // onCheckedChange(true) must not set `snapshot` when
+                        // the trust verdict forbids attach. The refused gesture
+                        // also never counts as a grower touch. Turning OFF
+                        // stays allowed. The save gate's own attachable AND
+                        // stays regardless.
+                        if (v && !snapshotAttachable) return;
                         snapshotUserTouchedRef.current = true;
                         setSnapshot(v);
                       }}

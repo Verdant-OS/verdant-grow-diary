@@ -1,13 +1,17 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~18:16 UTC)
+**Last updated:** 2026-08-28 UTC (~18:33 UTC)
 **Updated by:** Claude (2026-08-28: **fail-closed diagnostics export body redaction delivered as
 draft [PR #1176](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176).** Board-fact leftover
-on this same block only: Blue Dream DID review #1169 at `c84a8330` PASS pre-merge (do not record a
-pre-merge review gap; empty GitHub reviewer list is by design; do not request a post-merge review
-of squash `22c1242c`); #1170 head `5e40307c` stay draft; #1171 draft `e73ca6c7` recorded; Slice 3
-is **named** (trim leftover on the merged manual-route idempotency key), not parked — this #1176
-delivery is the diagnostics-export follow-up, not Slice 3. Branch
+on this same block only: Blue Dream DID review #1169 at `c84a8330307afca0891706ce5369bf703d9085ef`
+in Cursor before auto-merge. Verdict PASS. Do not record a pre-merge review gap; empty GitHub
+reviewer list is by design; do not request a post-merge review of squash `22c1242c`. #1170 head
+`5e40307c15a3f6f6a77f69dbbb4c33a2f83fc90e` (test-only unknown/transport save-gate pin after product
+PASS at `48828dd`; stay draft). #1171 draft `e73ca6c760aebdb891477cdcdf12ae254e6562c3` (Blue Dream
+PASS; `safeSourceDetail` fail-closed; stay draft). Slice 3 is **named** (trim leftover on the merged
+manual-route idempotency key), not parked. Cursor spend / Bugbot withhold labelled as claimed from
+the #1169 checks, not a newly measured billing fact — this #1176 delivery is the diagnostics-export
+follow-up, not Slice 3. Branch
 `claude/sensor-diagnostics-export-fail-closed-redaction`, cut from deploy tip `52c8abe2` (#1162),
 head **`789294c6`**. Three files: `src/lib/sensorDiagnosticsExportRules.ts` plus its two existing
 suites, +392/-9. **Branch deviation, stated:** the harness-designated branch was
@@ -90,8 +94,9 @@ shared-sanitizer fencing as its caveat), while **three** separate comments poste
 run — usage limit reached" (18:05, 18:17, 18:17). Do **not** record either that a finding-level
 review definitely ran or that it definitely did not — this file claimed each in turn and each was
 wrong. What holds: **no Bugbot finding is currently open against `789294c6`**, and the usage/spend
-withhold is a `source claim` read off check and comment output, **never a measured billing fact**.
-Unresolved; an account issue, not a code defect. **Resolved at 18:28 by a better source:** the
+withhold is a `source claim` claimed from the #1169 checks (read off check and comment output),
+**not a newly measured billing fact**. Unresolved; an account issue, not a code defect.
+**Resolved at 18:28 by a better source:** the
 Cursor **Approval Agent** posted "Not approved: Cursor Bugbot skipped (incomplete) and Cursor
 Security Agent: Security Reviewer stayed pending after the 8-minute wait. Human review is needed."
 That reconciles every observation — the PR-body block is Bugbot's _summary_, which completed, while

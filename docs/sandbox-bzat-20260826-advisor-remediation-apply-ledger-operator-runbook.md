@@ -136,17 +136,18 @@ The advisor writeup said **Group C was DEFERRED**.
 
 ## Safety / validation
 
-| Check                                                                               | Status               | Notes                                                                 |
-| ----------------------------------------------------------------------------------- | -------------------- | --------------------------------------------------------------------- |
-| Repo ACL: client `EXECUTE` on `grant_lovable_credits` / `grant_lovable_credit_pack` | `PASS`               | Git shows REVOKE PUBLIC/anon/authenticated; GRANT service_role only   |
-| Claim "anon key can mint credits" as git fact                                       | `FAIL`               | Contradicted by git ACL + absence of app `.rpc` mint path             |
-| Live knk ACL for grant_*                                                            | `NOT_MEASURED`       | No knk credential measurement in this ledger                          |
-| Three claimed 20260826 applies in git                                               | **`FAIL`**           | As git presence: 0 hits on tip; last migration is `20260825233000_…`  |
-| Scope of claimed applies                                                            | **`NOT_APPLICABLE`** | Sandbox-only (`bzatgtgjvuojpoxcknaa`) — does not apply to a knk apply |
-| Apply this ledger to knk                                                            | **`FORBIDDEN`**      | Explicit hard stop                                                    |
-| Preview-replay this ledger as migration                                             | **`FORBIDDEN`**      | Docs record only                                                      |
-| Group C applied                                                                     | **`FORBIDDEN`**      | Not applied; deferred per writeup. Do not apply                       |
-| Product / publish PASS                                                              | `NOT_APPLICABLE`     | Docs ledger only; no publish                                          |
+| Check                                                                               | Status             | Notes                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repo ACL: client `EXECUTE` on `grant_lovable_credits` / `grant_lovable_credit_pack` | `PASS`             | Git shows REVOKE PUBLIC/anon/authenticated; GRANT service_role only                                                                                                       |
+| Claim "anon key can mint credits" as git fact                                       | `FAIL`             | Contradicted by git ACL + absence of app `.rpc` mint path                                                                                                                 |
+| Live knk ACL for grant_*                                                            | `NOT_MEASURED`     | No knk credential measurement in this ledger                                                                                                                              |
+| Three claimed 20260826 applies in git                                               | **`FAIL`**         | As git presence: 0 hits on tip; last migration is `20260825233000_…`                                                                                                      |
+| Scope of claimed applies                                                            | **`PASS`**         | Sandbox-only: `bzatgtgjvuojpoxcknaa`, not knk `knkwiiywfkbqznbxwqfh`. Verified from the writeup, which is direct evidence of the claims' scope and not of their execution |
+| Apply this ledger to knk                                                            | **`FORBIDDEN`**    | Explicit hard stop                                                                                                                                                        |
+| Preview-replay this ledger as migration                                             | **`FORBIDDEN`**    | Docs record only                                                                                                                                                          |
+| Group C applied                                                                     | **`NOT_MEASURED`** | Writeup says "not applied; deferred". That is a claim, not a live-state measurement, and this ledger takes none                                                           |
+| Apply Group C                                                                       | **`FORBIDDEN`**    | Do not apply                                                                                                                                                              |
+| Product / publish PASS                                                              | `NOT_APPLICABLE`   | Docs ledger only; no publish                                                                                                                                              |
 
 **Verdict:** `PASS` on repo ACL for `grant_*` client `EXECUTE`; `NOT_MEASURED` on knk;
 sandbox-only for the three claimed applies.

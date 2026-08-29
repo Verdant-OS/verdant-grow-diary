@@ -1,6 +1,89 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~00:05 UTC)
+**Last updated:** 2026-08-29 UTC (~01:05 UTC)
+**Updated by:** Claude (2026-08-29: **The ordering audit was DONE — the first deliberate one. It
+found a THIRD instance (fixed in #1187) and, more usefully, the counter-example: this codebase
+already contained the correct pattern, documented, the whole time.**
+
+**INVENTORY — this did not exist before, and the first pass was incomplete.** A search for
+`SECRET_PATTERNS` / `SECRET_VALUE_PATTERNS` / `SENSITIVE_*PATTERN` returned **11** production
+modules. A widened search then caught a **12th**, `proofReportRedactionRules.ts`, which uses
+different constant names and which the first pass MISSED — and which turned out to be the most
+important file in the audit. Recorded because the near-miss is the lesson: an inventory built from
+one naming convention is not an inventory.
+
+**Only THREE modules meet the precondition** for this defect class — both an **assignment-style
+rule** and an **earlier rule that can consume or fragment its NAME**. The other nine have no
+assignment rule, so the class cannot apply to them.
+
+| Module                              | Status                                          |
+| ----------------------------------- | ----------------------------------------------- |
+| `ecowittLocalForwardingStatus.ts`   | **FIXED** — #1185, merged as `f9f4d11`          |
+| `ecowittValidationEvidenceRules.ts` | **FIXED** — #1184, green at `e3f79be`, unmerged |
+| `postGrowReportRules.ts`            | **FIXED** — #1187, new draft                    |
+
+**#1187 — `postGrowReportRules.ts`, two findings, both proven by execution on `f9f4d11`:**
+
+1. **ORDERING.** `\bbearer\s+…` ran before `\bBridgeToken\s*[:=]\s*\S+`, consuming the NAME:
+   `bearer BridgeToken=s3cretV4lue123456` -> `[redacted]=s3cretV4lue123456`.
+2. **COVERAGE, and NOT an ordering bug — reordering alone would not have fixed it.**
+   `SERVICE_ROLE_KEY=s3cretV4lue123456` passed through **ENTIRELY unredacted**. Two causes, both
+   verified: `\bservice_role\b` **cannot match inside `SERVICE_ROLE_KEY`** because `_` is a word
+   character so the trailing `\b` fails (checked directly: `false`), and the module had **no
+   credential-assignment rule of any kind** as a backstop (verified: 0 matches).
+
+**The design decision on #1187, which is a deliberate DIVERGENCE from the two sibling fixes.** The
+generic `[A-Z][A-Z0-9_]{2,}=` rule used in the other modules was **not** reused here. This helper
+renders a **user-facing grow report** whose stated contract is _"Preserves prose"_, and grow
+telemetry uses the identical uppercase shape — a generic rule would redact `VPD=1.2`, `PPFD=800`,
+`EC=1.8` and destroy real report content. The new rule instead **requires a credential label in the
+NAME**. Consistency across modules would have been easier and wrong. Proven: nine benign inputs,
+including uppercase telemetry, a mixed prose-and-telemetry sentence and plain prose, are
+**byte-identical** before and after.
+
+| Validation on #1187                  | Result                                         |
+| ------------------------------------ | ---------------------------------------------- |
+| RED — new tests vs. untouched module | **7 failed / 60 passed (67)**                  |
+| GREEN — after the fix                | **67 / 67**                                    |
+| post-grow + report sweep             | **92 files, 839 passed / 0 failed**            |
+| `tsc --noEmit`, eslint               | clean                                          |
+| Edge mirror                          | **not mirrored** — checked, no sync obligation |
+
+**THE COUNTER-EXAMPLE — the most transferable finding of the whole audit.**
+**`proofReportRedactionRules.ts` already implements the correct ordering AND documents this exact
+hazard in its own comments:**
+
+> _"Authorization headers first — strip whole value before any sub-pattern (e.g. `Bearer ...`) is
+> partially consumed by other rules."_
+> _"Bare keyword fallback — replaces a residual reference once any preceding `key=value` pairs have
+> been stripped."_
+
+Proven correct by execution: `Bearer access_token=<secret>` -> `Bearer [redacted]`. Its order is
+**auth headers -> pairs -> bare keywords**. So the three defects fixed in the last day were **not
+three independent mistakes** — they were **three modules that did not follow a solved, documented
+pattern already sitting in the same directory**. **That reframes the remedy: the durable fix is a
+shared ordering contract or a lint/test fence, NOT a fourth one-line move.** That fence is
+**explicitly out of scope on #1187** and is not yet written.
+
+One caveat so the counter-example is not oversold: `proofReportRedactionRules`'s protection is
+bounded by its own `SECRET_KEYWORDS` list, and inputs outside that list pass through. Its
+**ordering** is right; its **scope** is its own concern.
+
+**`NOT_MEASURED`, stated rather than assumed:** whether any of these leaked strings reach a
+user-facing surface in practice for any of the three modules; and whether edge-function copies
+beyond the one mirrored file (`ecowittValidationEvidenceRules`) carry the same lists.
+
+**Scope note on this file's own PR.** These audit entries are being appended to **#1186**, whose
+stated scope was "#1185 merged + three corrections". That is a deliberate widening: `CURRENT_STATE`
+is a single file, and a fourth parallel branch editing it would conflict rather than help.
+
+**Posture.** Deploy tip **`f9f4d11`**. **Production exposure `NOT_MEASURED` for all three leaks** —
+one merged to the deploy branch, two unmerged, and no verified publish for any. `20260827010000`,
+`20260826100000`, `20260825233000`, `20260813030000` all remain **NOT applied**. #1184, #1186 and
+#1187 are all **draft**: nothing readied, enqueued or merged. This edit touches this file only.
+Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~00:05 UTC)
 **Updated by:** Claude (2026-08-29: **The SAME redaction-ordering defect was found in a SECOND
 module and fixed on #1184 (`e3f79be`). Two modules, one evening, two different reviewers. That is a
 PATTERN, and the audit that would close it is still `NOT_MEASURED`.**

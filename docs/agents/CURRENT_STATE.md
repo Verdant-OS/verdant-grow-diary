@@ -247,8 +247,35 @@ lane or retiring that lane as a check. **Not opened** — it is a slice decision
   **Copilot** was the only reviewer to produce findings — the two `AGENTS.md` vocabulary threads,
   correct and still open on the deploy branch. **Codex** ran on the merging SHA `dae0cbb8a` and
   completed **clean** at 10:58:51Z; that is a pass, and a pass is not an absence of review.
-  **Bugbot** hit the Cursor usage limit, as it did on **every head of every PR tonight**, unbroken —
-  and that one _is_ an absence.
+  **Bugbot** produced **no finding-level review** — its run posted _"couldn't run — usage limit
+  reached"_ at 10:58:07Z on `dae0cbb8a`, and the `Cursor Bugbot` check concluded `neutral`. That
+  absence is real, and it is the part that matters for coverage. **But Bugbot was not silent on
+  #1204:** its **summary** surface completed on the same SHA and is still in the PR body — a
+  substantive "Low Risk" overview naming the `FORBIDDEN` / `NOT_APPLICABLE` contrast, the deliberate
+  `AGENTS.md` gap, and the prettier column padding. Two surfaces, two outcomes, one SHA.
+
+**Corrected 2026-08-29 on a follow-up branch cut from `4e3e715ab`, after I raised the discrepancy
+myself.** The bullet above originally read _"**Bugbot** hit the Cursor usage limit, as it did on
+**every head of every PR tonight**, unbroken — and that one is an absence."_ **Withdrawn.** It was
+wrong at its own subject: on #1204 — the PR this section is about — Bugbot's summary completed, so
+"unbroken" is false, and "an absence" is true only of the **finding-level** surface. The evidence was
+in #1204's own body the whole time.
+
+**Scope of what the summary proves is narrower than it looks.** Its overview restates points that
+also appear in #1204's PR body, so whether it derives from the diff or from the body is
+**`NOT_MEASURED`**. What is established is that the summary surface **ran and emitted content** while
+the finding-level surface did not — not that anything reviewed the change.
+
+**Why this one matters beyond the sentence.** This file had **already** separated those two surfaces,
+in the **2026-08-28** entry, resolved there by a better source — the Cursor **Approval Agent**'s
+_"Cursor Bugbot skipped (incomplete)"_ — which reconciled a summary that completed against a
+finding-level run that did not. That passage closes with a standing warning still in this file: _"Do
+**not** record either that a finding-level review definitely ran or that it definitely did not — this
+file claimed each in turn and each was wrong."_ I collapsed the surfaces back together anyway. Same
+defect class as the stale tip and the inverted coverage line — **the file contradicting a passage it
+already contains** — and the fourth instance this shift. The transferable rule is narrower than
+"check your claims": **before recording a reviewer's status, grep this file for what it has already
+concluded about that reviewer.**
 
 ## 6. Status
 
@@ -453,6 +480,12 @@ Stated as a qualifier at the time rather than left standing.
 | #1186 `CURRENT_STATE`              | draft, `b00799c0a` green (ci.yml 33246617606, 10:03:41Z); this edit extends it |
 | `Supabase Preview` 42P07           | red and pre-existing; already covered by the replay-compat config; not a gate  |
 | Bugbot                             | Cursor usage limit on **every head of every PR** tonight                       |
+
+**Corrected 2026-08-29 — the `Bugbot` row above is withdrawn as written.** Its **finding-level** run
+was indeed usage-limited, but "every head of every PR" overstates it: Bugbot's **summary** surface
+completed on #1204's `dae0cbb8a` and on #1186's `025c10852`. The row is left in place rather than
+rewritten, per this file's annotate-don't-hide convention. See the corrected bullet in `## 5` of the
+newer entry above.
 
 ## 9. `NOT_MEASURED`
 

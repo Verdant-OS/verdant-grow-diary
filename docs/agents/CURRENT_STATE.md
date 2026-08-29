@@ -26,7 +26,7 @@ identical wording on #1200 and both were right.
 | ------------------------ | ------------------------------------------------------------------------- |
 | GitHub apply lane        | **never succeeded** — only its failed PREFLIGHT exists                    |
 | Production objects       | **applied verbatim 2026-08-21** via Lovable, md5-guarded                  |
-| Current production state | **`NOT_MEASURED`** — not re-measured here, and nothing in-repo can        |
+| Current production state | **`NOT_MEASURED`** — not re-measured here; nothing in-repo can measure it |
 | Re-applying it           | **`FORBIDDEN`** — re-issues an unguarded `handle_new_user` over the guard |
 
 **Codex named the mechanism, and it is why this is a `P1` and not a wording nit:** the newest entry
@@ -42,8 +42,15 @@ that licenses the APPLY. Fixed in `a57a946ab`; the other three keep the plain re
 | **Codex**   | same defect, rated **`P1`**              | 18:48:11Z |
 
 Copilot found it first. Both were verified against the file before either was accepted, and both
-threads were answered and resolved. **Bugbot's finding-level run was usage-limited again** — it has
-now failed that way on every head of every PR this shift without exception.
+threads were answered and resolved. **Bugbot's finding-level run was usage-limited again.**
+
+**Scope of that last claim, narrowed after Copilot flagged it on #1215.** A draft of this sentence
+read _"on every head of every PR this shift without exception"_. That is a completeness claim I did
+not verify — it covers PRs I never inspected for Bugbot state, Codex's among them. What is observed:
+the finding-level run reported a usage limit on **every head of my own PRs that I checked** —
+#1204 `dae0cbb8a`, #1186 (four heads), #1212 (three), #1213 (two), #1215 — and no head was found
+where it ran. **This is the same over-claim the `## 1` of the prior entry corrects**, restored here by
+carrying the phrasing forward instead of re-deriving it.
 
 ## 3. Green CI never saw any of it — now demonstrated three times
 
@@ -81,9 +88,28 @@ Four files, +14/−10, one commit.
 
 It closes the half of the Authorization redaction gap that **#1211 left open**: the credential-pair
 rule reserved only `Bearer|Basic`, so `Digest` and `Negotiate` blobs stayed visible in
-`redacted_raw_payload` and clipboard exports. Both are now reserved in the negative lookahead and
-included in the `Authorization:` value pattern, with Digest/Negotiate cases added to the existing
-matrix and the `_shared` mirror regenerated.
+`redacted_raw_payload` and clipboard exports. Both are now reserved in the credential-pair negative
+lookahead and added to the `Authorization:` prefix alternation, with Digest/Negotiate cases added to
+the existing matrix and the `_shared` mirror regenerated.
+
+**It does NOT close Digest/Negotiate for parameterized headers — verified by execution on the deploy
+branch, after Copilot flagged the claim on #1215.** The value pattern is
+`/Authorization\s*:\s*(?:(?:Basic|Digest|Negotiate)\s+)?[^\s",}]+/gi`, and `[^\s",}]+` **stops at
+the first quote**, so a parameterized header is not consumed whole:
+
+```
+IN : Authorization: Digest username="grower", realm="verdant", nonce="secret"
+OUT: [REDACTED]"grower", realm="verdant", nonce="secret"
+```
+
+A realistic RFC-shaped header **does** redact its sensitive parameters — but **incidentally**, via the
+generic hex-shape rules (`nonce`, `response`, `opaque` are long hex), **not** via anything #1214
+added. A short or non-hex value survives, as above. #1214's added test covers only the
+**token-shaped** form (`Digest <base64>`), which redacts fully.
+
+**Status: the parameterized Digest/Negotiate case is OPEN, not closed.** `redacted_raw_payload` and
+clipboard exports are the affected surfaces. This is Codex's slice (#1207 → #1214) and **not Claude's
+to fix**; recorded here so the chain is not marked complete when it is not.
 
 **No collision.** It touches `src/lib/ecowittValidationEvidenceRules.ts`, its test, the mirror and the
 sync manifest — zero overlap with this file. Its own body records _"Behind tip `3afc2df68` by

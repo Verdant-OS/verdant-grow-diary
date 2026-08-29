@@ -75,11 +75,16 @@ sentence that reads as licence to re-apply a migration whose objects were applie
 - Merged **19:01:54Z**. Deploy tip `3afc2df68` → **`0e2cd02ba`**. One file, one parent, subject ends
   `(#1213)`; squash SHA **equals** the merge-group SHA — no queue re-resolution.
 - **Zero open threads at merge**, the second of my merges this shift to manage that.
-- **The merge-method question is settled by evidence.** Auto-merge stored `merge_method: merge`
-  despite two explicit `SQUASH` requests (tool response and GitHub's own `auto_merge_enabled` event
-  both said `merge`). The **queue** squashes regardless — now observed on #1186, #1212 and #1213. The
-  stored field is not what governs. Reading the ruleset to confirm the setting needs
-  `Administration:read`, which the token lacks, so the setting itself stays **`NOT_MEASURED`**.
+- **The merge method: three observed outcomes, no invariant.** Auto-merge stored
+  `merge_method: merge` despite two explicit `SQUASH` requests — tool response and GitHub's own
+  `auto_merge_enabled` event both said `merge`. **Observed:** #1186, #1212 and #1213 each landed as a
+  single squash commit with `(#NNNN)` in the subject, each with squash SHA equal to its merge-group
+  SHA. **Not established:** that the queue squashes _regardless_, that the stored field is never
+  consulted, or what a future queued PR will do. Those are mechanism claims, and three outcomes do
+  not make one. Reading the configured method needs `Administration:read`, which the token lacks, so
+  **the mechanism stays `NOT_MEASURED`** — the outcomes are the evidence, and they are the whole of
+  it. **A draft of this bullet called the question "settled by evidence" while the same sentence
+  said `NOT_MEASURED`; caught by Codex on #1215.**
 
 ## 5. #1214 merged — Codex, and not mine
 

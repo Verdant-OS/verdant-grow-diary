@@ -397,10 +397,11 @@ function buildWindow(args: {
   const endMs = args.end ? args.end.ms : args.nowMs;
   // Samples strictly after watering start, at or before next watering (or now).
   const inWindow = args.samples.filter((s) => s.ms > args.start.ms && s.ms <= endMs);
+  const mathSamples = inWindow.filter((s) => s.sourceClass !== "invalid");
 
   const peakDeadline = args.start.ms + args.peakSearchMs;
-  const peakCandidates = inWindow.filter((s) => s.ms <= peakDeadline);
-  const peakPool = peakCandidates.length > 0 ? peakCandidates : inWindow;
+  const peakCandidates = mathSamples.filter((s) => s.ms <= peakDeadline);
+  const peakPool = peakCandidates.length > 0 ? peakCandidates : mathSamples;
 
   let peak: NormalizedSample | null = null;
   for (const s of peakPool) {
@@ -411,7 +412,7 @@ function buildWindow(args: {
 
   let trough: NormalizedSample | null = null;
   if (peak) {
-    for (const s of inWindow) {
+    for (const s of mathSamples) {
       if (s.ms < peak.ms) continue;
       if (!trough || s.vwcPct < trough.vwcPct || (s.vwcPct === trough.vwcPct && s.ms > trough.ms)) {
         trough = s;
@@ -440,8 +441,8 @@ function buildWindow(args: {
     durationLabel = formatDuration(durationMs);
   }
 
-  // Any invalid-source sample in the window participated in peak/trough
-  // math. Do not let a live majority relabel that window Live or usable.
+  // Invalid-source samples remain counted evidence and still block a Live /
+  // usable label, but they do not participate in peak/trough math.
   const sourceClass = inWindow.some((s) => s.sourceClass === "invalid")
     ? "invalid"
     : majoritySource(inWindow);
@@ -679,7 +680,9 @@ export function buildDrybackMonitoring(
   const latestClosed = closed[0] ?? null;
 
   const hasAnyEvidence = windows.some(
-    (w) => w.sampleCount > 0 && (w.deltaPctPoints !== null || w.kind === "open"),
+    (w) =>
+      w.sampleCount > 0 &&
+      (w.deltaPctPoints !== null || w.kind === "open" || w.sourceClass === "invalid"),
   );
 
   if (!hasAnyEvidence) {

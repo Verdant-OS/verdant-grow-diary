@@ -333,7 +333,6 @@ describe("projectDrybackSamplesForMonitoring / calibrated series", () => {
     expect(vm.openWindow?.troughVwcPct).toBe(40);
   });
 
-
   it("keeps invalid-source soil samples as evidence (ecowitt/mqtt/home_assistant)", () => {
     const w0 = hoursFrom(T0, -24);
     const w1 = hoursFrom(T0, -2);
@@ -358,6 +357,10 @@ describe("projectDrybackSamplesForMonitoring / calibrated series", () => {
       expect(vm.latestClosed?.sourceLabel).toBe("Invalid telemetry");
       expect(vm.latestClosed?.quality).not.toBe("usable");
       expect(["weak", "unusable"]).toContain(vm.latestClosed?.quality);
+      expect(vm.latestClosed?.peakVwcPct).toBeNull();
+      expect(vm.latestClosed?.troughVwcPct).toBeNull();
+      expect(vm.latestClosed?.deltaPctPoints).toBeNull();
+      expect(vm.latestClosed?.durationLabel).toBeNull();
     }
   });
 
@@ -400,14 +403,13 @@ describe("projectDrybackSamplesForMonitoring / calibrated series", () => {
     expect(["live"]).toContain(vm.latestClosed?.sourceClass);
   });
 
-
   it("one invalid-source sample blocks usable and Live on a live-majority window", () => {
     const w0 = hoursFrom(T0, -48);
     const w1 = hoursFrom(T0, -12);
     const samples = [
       { id: "a", capturedAt: hoursFrom(T0, -47), vwcPct: 55, source: "live" },
       { id: "b", capturedAt: hoursFrom(T0, -40), vwcPct: 48, source: "live" },
-      { id: "c", capturedAt: hoursFrom(T0, -30), vwcPct: 40, source: "ecowitt" },
+      { id: "c", capturedAt: hoursFrom(T0, -46), vwcPct: 90, source: "ecowitt" },
       { id: "d", capturedAt: hoursFrom(T0, -20), vwcPct: 35, source: "live" },
       { id: "e", capturedAt: hoursFrom(T0, -13), vwcPct: 32, source: "live" },
     ];
@@ -421,6 +423,13 @@ describe("projectDrybackSamplesForMonitoring / calibrated series", () => {
     );
     expect(vm.status).toBe("windows");
     expect(vm.sampleCount).toBe(5);
+    expect(vm.latestClosed?.sampleCount).toBe(5);
+    expect(vm.latestClosed?.peakVwcPct).toBe(55);
+    expect(vm.latestClosed?.troughVwcPct).toBe(32);
+    expect(vm.latestClosed?.deltaPctPoints).toBe(23);
+    expect(vm.latestClosed?.peakAt).toBe(hoursFrom(T0, -47));
+    expect(vm.latestClosed?.troughAt).toBe(hoursFrom(T0, -13));
+    expect(vm.latestClosed?.durationLabel).toBe("34h");
     expect(vm.latestClosed?.sourceClass).toBe("invalid");
     expect(vm.latestClosed?.sourceLabel).toBe("Invalid telemetry");
     expect(vm.latestClosed?.sourceLabel).not.toMatch(/live/i);
@@ -428,5 +437,4 @@ describe("projectDrybackSamplesForMonitoring / calibrated series", () => {
     expect(["weak", "unusable"]).toContain(vm.latestClosed?.quality);
     expect(classifyDrybackSource("ecowitt")).toBe("invalid");
   });
-
 });

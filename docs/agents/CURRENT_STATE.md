@@ -1,6 +1,140 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~18:25 UTC)
+**Last updated:** 2026-08-29 UTC (~19:10 UTC)
+**Updated by:** Claude (2026-08-29: **#1213 drew a `P1` — from Copilot and Codex independently — and
+it was a repeat of an error this file already documents me making.** The entry recording #1212's
+overcorrection itself listed `20260813030000` among migrations that "remain NOT applied", which is
+false in the direction that licenses an APPLY. Fixed, merged clean. **#1214 (Codex) merged after it**,
+closing the Digest/Negotiate half of the Authorization redaction gap. Prior header follows.)
+
+## 1. The `P1`: I reproduced a documented error, one section below its own record
+
+`established fact`, established by reading the cited passages before accepting the finding.
+
+The #1212-findings entry closed with a `NOT_MEASURED` bullet listing all four migrations together:
+
+> `20260827010000`, `20260826100000`, `20260825233000`, `20260813030000` — all remain **NOT applied**.
+
+For `20260813030000` that is **false in the dangerous direction**, and this file's `## 1` two entries
+down is titled _"The `20260813030000` error — mine, propagated, and in the dangerous direction"_. The
+posture line was corrected at 09:55Z the same day, recording that Copilot and Codex both caught the
+identical wording on #1200 and both were right.
+
+**I wrote it again**, in a new entry, in the same file, below that record.
+
+| Sense                    | State                                                                     |
+| ------------------------ | ------------------------------------------------------------------------- |
+| GitHub apply lane        | **never succeeded** — only its failed PREFLIGHT exists                    |
+| Production objects       | **applied verbatim 2026-08-21** via Lovable, md5-guarded                  |
+| Current production state | **`NOT_MEASURED`** — not re-measured here, and nothing in-repo can        |
+| Re-applying it           | **`FORBIDDEN`** — re-issues an unguarded `handle_new_user` over the guard |
+
+**Codex named the mechanism, and it is why this is a `P1` and not a wording nit:** the newest entry
+_is_ the posture an operator reads first, and it simultaneously reports no `knk` or `query_database`
+access. A blanket "all remain NOT applied" in that position is not imprecise — it is the sentence
+that licenses the APPLY. Fixed in `a57a946ab`; the other three keep the plain reading.
+
+## 2. Two reviewers, same defect, independently
+
+| Reviewer    | Verdict                                  | Timing    |
+| ----------- | ---------------------------------------- | --------- |
+| **Copilot** | flagged it, citing both passages by line | 18:46:53Z |
+| **Codex**   | same defect, rated **`P1`**              | 18:48:11Z |
+
+Copilot found it first. Both were verified against the file before either was accepted, and both
+threads were answered and resolved. **Bugbot's finding-level run was usage-limited again** — it has
+now failed that way on every head of every PR this shift without exception.
+
+## 3. Green CI never saw any of it — now demonstrated three times
+
+`practical observation`, and the reason it is repeated here rather than assumed learned:
+
+| Head        | State           | What it carried       |
+| ----------- | --------------- | --------------------- |
+| `87dcff867` | **35/35 green** | #1212's two defects   |
+| `5d034f706` | **35/35 green** | this `P1`             |
+| `a57a946ab` | **35/35 green** | nothing — Codex clean |
+
+The first two were green _while wrong_. **CI proves the file parses, formats and passes the docs
+gates; it cannot evaluate whether a claim is true.** Every finding this sequence produced arrived
+after a draft→ready transition, because that is what triggers Codex. Had either PR merged from draft
+on the strength of its green count, the deploy branch would carry the defect — in #1213's case, a
+sentence that reads as licence to re-apply a migration whose objects are already live.
+
+## 4. #1213 merged clean, and closed an open question about the queue
+
+- Merged **19:01:54Z**. Deploy tip `3afc2df68` → **`0e2cd02ba`**. One file, one parent, subject ends
+  `(#1213)`; squash SHA **equals** the merge-group SHA — no queue re-resolution.
+- **Zero open threads at merge**, the second of my merges this shift to manage that.
+- **The merge-method question is settled by evidence.** Auto-merge stored `merge_method: merge`
+  despite two explicit `SQUASH` requests (tool response and GitHub's own `auto_merge_enabled` event
+  both said `merge`). The **queue** squashes regardless — now observed on #1186, #1212 and #1213. The
+  stored field is not what governs. Reading the ruleset to confirm the setting needs
+  `Administration:read`, which the token lacks, so the setting itself stays **`NOT_MEASURED`**.
+
+## 5. #1214 merged — Codex, and not mine
+
+`established fact`, read from the PR and verified on the tip.
+
+**#1214** `codex/ecowitt-digest-negotiate-redaction-20260829`, merged **19:05:50Z** as **`3f95527bf`**.
+Four files, +14/−10, one commit.
+
+It closes the half of the Authorization redaction gap that **#1211 left open**: the credential-pair
+rule reserved only `Bearer|Basic`, so `Digest` and `Negotiate` blobs stayed visible in
+`redacted_raw_payload` and clipboard exports. Both are now reserved in the negative lookahead and
+included in the `Authorization:` value pattern, with Digest/Negotiate cases added to the existing
+matrix and the `_shared` mirror regenerated.
+
+**No collision.** It touches `src/lib/ecowittValidationEvidenceRules.ts`, its test, the mirror and the
+sync manifest — zero overlap with this file. Its own body records _"Behind tip `3afc2df68` by
+CURRENT_STATE.md only. Do not rebase"_, so Codex identified the difference as non-conflicting and
+declined to rebase, which is the same call made in the other direction on #1213.
+
+This is the tail of the redaction chain — **#1207 → #1209 → #1211 → #1214**, Codex's slice throughout.
+
+## 6. Assignment
+
+**The `AGENTS.md` `FORBIDDEN` alignment slice is NOT Claude's** — Cheek, 2026-08-29, directly. It
+stays proposed and unopened here; do not open, prepare or stage it. The underlying gap is unchanged
+and still real: two merged ledgers declare `FORBIDDEN`, the constitution does not, and closing it
+means a twelve-file `Sentinel-Version` bump under `sentinel-version-parity`.
+
+## 7. Status
+
+| Item                                | Status                                                                                                         |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| #1213 `#1212`-findings entry        | **MERGED** `0e2cd02ba` — verified on the tip by execution                                                      |
+| #1214 Digest/Negotiate redaction    | **MERGED** `3f95527bf` — Codex's; deploy tip as of 19:05:50Z                                                   |
+| `AGENTS.md` `FORBIDDEN` gap         | **OPEN, and not Claude's to close**                                                                            |
+| Superseded `LIVE`/`FORBIDDEN` entry | its Codex `P2` stays **OPEN on purpose**; not rewritten                                                        |
+| Merge method                        | queue squashes; auto-merge field says `merge`; ruleset setting **`NOT_MEASURED`**                              |
+| `Supabase Preview` 42P07            | red repo-wide across **nine** distinct preview projects; non-required, not a gate                              |
+| Branch-name conflict                | **with Cheek.** Harness designates `claude/trustbadge-attachable-strip-2441l2`; descriptive names used instead |
+
+## 8. `NOT_MEASURED`
+
+- **Production.** The deploy branch is **`3f95527bf`** as of 19:05:50Z. **A merge is not a
+  deployment**; no publish was performed or authorized this shift. Re-verify the tip, do not cite this
+  line.
+- **Migrations, in both senses.** `20260827010000`, `20260826100000` and `20260825233000` remain
+  **NOT applied**, plainly. **`20260813030000`** — GitHub apply lane never succeeded; **production
+  objects live since 2026-08-21**; current state **`NOT_MEASURED`**; re-apply **`FORBIDDEN`**.
+- Whether #1214's Digest/Negotiate redaction holds against real payloads in production. It is
+  test-pinned on the deploy branch; **nothing here measured production behaviour.**
+- The repository's configured merge method. Inferred from three squashed merges; the ruleset was
+  never read.
+- How many times this file has contradicted a passage it already contains. **No ordinal asserted** —
+  an earlier entry miscounted that kind of total, and the count is not what carries the lesson.
+
+## 9. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added.
+`AGENTS.md` untouched and its slice not mine. No strip file touched. `vsrc` not implemented and not
+inferred. One housekeeping slip worth recording: two overlapping self check-ins were armed for #1213
+at once, and the stale one fired ~1 minute after the merge against a state that no longer existed. It
+was one-shot and no action was taken on it; all self check-ins are now cleared.
+
+**Prior update:** 2026-08-29 UTC (~18:25 UTC)
 **Updated by:** Claude (2026-08-29: **#1212 corrected the Bugbot coverage line — and the version
 readied for review was itself wrong, in two independent ways, on a head that was 35/35 green.**
 Copilot and Codex caught an OVERCORRECTION: I declared a true-but-unqualified claim false. A third

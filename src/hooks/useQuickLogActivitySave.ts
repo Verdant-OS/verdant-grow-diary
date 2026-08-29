@@ -172,7 +172,8 @@ export function useQuickLogActivitySave() {
         }
 
         if (plan.saveRoute === "event") {
-          if (!input.idempotencyKey || input.idempotencyKey.length < 8) {
+          const idempotencyKey = input.idempotencyKey?.trim();
+          if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 200) {
             setError("missing_idempotency_key");
             return { ok: false, reason: "missing_idempotency_key" };
           }
@@ -193,7 +194,7 @@ export function useQuickLogActivitySave() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "quicklog_save_event" as any,
             {
-              p_idempotency_key: input.idempotencyKey,
+              p_idempotency_key: idempotencyKey,
               p_grow_id: input.growId,
               p_event_type: plan.eventType,
               p_tent_id: input.tentId ?? null,

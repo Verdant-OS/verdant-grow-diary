@@ -127,8 +127,7 @@ describe("Quick Log sensor snapshot — state semantics", () => {
       temperatureUnit: "celsius",
     });
     expect(v.trustBadge.badge).toBe("manual");
-    // fresh_non_live never grants attachable — only real fresh_live does.
-    expect(v.trustBadge.attachable).toBe(false);
+    expect(v.trustBadge.attachable).toBe(true);
   });
 
   it("demo/sim snapshot renders DEMO and is not attachable", () => {

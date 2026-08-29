@@ -7,7 +7,10 @@ import {
   handleRootId,
   type QuickLogEntryHandleRef,
 } from "@/lib/quick-log/quickLogRevisionRules";
-import { useQuickLogRevisionBadges } from "@/hooks/useQuickLogRevisionBadges";
+import {
+  QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE,
+  useQuickLogRevisionBadges,
+} from "@/hooks/useQuickLogRevisionBadges";
 import QuickLogEntryIntegrityControls, {
   QuickLogEditedBadge,
 } from "@/components/QuickLogEntryIntegrityControls";
@@ -197,10 +200,17 @@ export default function WateringHistoryPanel({
       ].filter((id) => id.length > 0),
     [rows, handleIndex],
   );
-  const { badges } = useQuickLogRevisionBadges(rootIds);
+  const { badges, status: revisionBadgesStatus } = useQuickLogRevisionBadges(rootIds);
+  const revisionBadgesReady = revisionBadgesStatus === "ok";
+  const revisionLedgerUnread = revisionBadgesStatus === "unavailable";
 
   return (
-    <section className={"glass rounded-2xl p-4 " + (className ?? "")} aria-label="Watering history">
+    <section
+      className={"glass rounded-2xl p-4 " + (className ?? "")}
+      aria-label="Watering history"
+      data-testid="watering-history-panel"
+      data-revision-badges-status={revisionBadgesStatus}
+    >
       <header className="flex items-center justify-between mb-3">
         <h2 className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <Droplets className="h-3.5 w-3.5 text-primary" />
@@ -210,6 +220,16 @@ export default function WateringHistoryPanel({
           {rows.length === 0 ? "0" : rows.length === 1 ? "1 entry" : `${rows.length} entries`}
         </span>
       </header>
+
+      {revisionLedgerUnread && rows.length > 0 ? (
+        <p
+          className="mb-2 text-xs text-muted-foreground"
+          role="status"
+          data-testid="quicklog-revision-badges-unavailable"
+        >
+          {QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE}
+        </p>
+      ) : null}
 
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-4 text-center">
@@ -228,7 +248,7 @@ export default function WateringHistoryPanel({
                 key={r.id}
                 row={r}
                 integrityHandle={handle}
-                correctionCount={badge?.correctionCount ?? 0}
+                correctionCount={revisionBadgesReady ? (badge?.correctionCount ?? 0) : 0}
                 currentNote={rawNoteById.get(r.id) ?? null}
                 onEntryChanged={onEntryChanged}
               />

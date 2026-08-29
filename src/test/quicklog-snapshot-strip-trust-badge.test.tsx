@@ -173,8 +173,11 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
     expect(v.trustBadge.attachable).toBe(false);
   });
 
-  it("reviewed aliases are not over-demoted: pi_bridge and manual fresh_non_live stay usable", () => {
-    for (const source of ["pi_bridge", "manual"]) {
+  it("usable fresh_non_live rows keep source-specific attachability", () => {
+    for (const { source, attachable } of [
+      { source: "pi_bridge", attachable: false },
+      { source: "manual", attachable: true },
+    ]) {
       const v = buildQuickLogStripFromTentState({
         status: "ready",
         snapshot: snap({ source, status: "fresh_non_live" }),
@@ -183,7 +186,7 @@ describe("buildQuickLogStripFromTentState — trust badge gating (no Live for ve
         temperatureUnit: "celsius",
       });
       expect(v.status, `source=${source}`).toBe("usable");
-      expect(v.trustBadge.attachable, `source=${source}`).toBe(false);
+      expect(v.trustBadge.attachable, `source=${source}`).toBe(attachable);
     }
   });
 

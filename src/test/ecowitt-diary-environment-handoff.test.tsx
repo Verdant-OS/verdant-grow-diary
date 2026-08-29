@@ -859,6 +859,10 @@ describe("evidence rules", () => {
   // Reported by Copilot on #1184 and confirmed by execution before the fix.
   it.each([
     ["Authorization: Bearer actualtoken123456", "actualtoken123456"],
+    [
+      "Authorization: Basic dXNlcjpwYXNzLXNob3VsZC1ub3QtbGVhaw==",
+      "dXNlcjpwYXNzLXNob3VsZC1ub3QtbGVhaw==",
+    ],
     ['Authorization: PASSKEY="flower-room-credential"', "flower-room-credential"],
     ["Bearer PASSKEY=flower-room-credential", "flower-room-credential"],
     ['Bearer MY_PASSKEY_VAR="flower-room-credential"', "flower-room-credential"],

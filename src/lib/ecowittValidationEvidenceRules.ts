@@ -50,6 +50,7 @@ const CREDENTIAL_PAIR_PATTERN = new RegExp(
 const SECRET_VALUE_PATTERNS: RegExp[] = [
   /vbt_[A-Za-z0-9_-]{6,}/g,
   /eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g,
+  /Authorization\s*:\s*Basic\s+[^\s",}]+/gi,
   CREDENTIAL_PAIR_PATTERN,
   // Env NAME=value assignments.
   //

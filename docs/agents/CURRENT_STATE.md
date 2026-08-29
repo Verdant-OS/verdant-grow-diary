@@ -112,7 +112,21 @@ Tip chain: **`4e3e715ab`** (#1186, 16:32Z) → **`f5fd474ef`** (#1211, sensors) 
 
 - **Production.** The deploy branch is **`3afc2df68`** as of 18:22Z. **A merge is not a deployment**;
   no publish was performed or authorized this shift. Re-verify the tip rather than citing this line.
-- `20260827010000`, `20260826100000`, `20260825233000`, `20260813030000` — all remain **NOT applied**.
+- **Migrations — stated in both senses, because a bare "not applied" is false in the dangerous
+  direction.** `20260827010000`, `20260826100000` and `20260825233000` remain **NOT applied**, plainly.
+  **`20260813030000` is not like them**: its **GitHub apply lane never succeeded**, but its
+  **production objects were applied verbatim on 2026-08-21** through Lovable, md5-guarded. Its
+  **current** production state is **`NOT_MEASURED`**, and re-applying it is **`FORBIDDEN`** — it would
+  re-issue an unguarded `handle_new_user` over the live guard.
+
+  **Corrected 2026-08-29 after Copilot raised it on #1213.** This bullet first listed all four
+  together as bare "NOT applied" — **the identical defect this file already records me making**,
+  caught then by Copilot and Codex on #1200 and corrected at 09:55Z as _"false in the dangerous
+  direction"_. I reproduced it in the very file that documents it, one section below a passage titled
+  _"The `20260813030000` error — mine, propagated, and in the dangerous direction"_. The three-plus-one
+  split above is the form that cannot be misread; the flat list is the form that reads as licence to
+  APPLY.
+
 - Whether Bugbot's summary output derives from the **diff** or restates the **PR body**. Its content
   appears in both, so what is established is that one surface emitted content and the other did not —
   **not** that anything reviewed the change.

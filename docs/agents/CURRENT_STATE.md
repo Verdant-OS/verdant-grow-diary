@@ -282,9 +282,14 @@ the finding-level surface did not — not that anything reviewed the change.
 **Why this matters beyond the sentence — it went wrong twice, in opposite directions.** This file had
 **already** separated the two surfaces, in the **2026-08-28** entry, resolved there by a better
 source: the Cursor **Approval Agent**'s _"Cursor Bugbot skipped (incomplete)"_, reconciling a summary
-that completed against a finding-level run that did not. That passage closes with a standing warning
-still in this file: _"Do **not** record either that a finding-level review definitely ran or that it
-definitely did not — this file claimed each in turn and each was wrong."_ The original bullet
+that completed against a finding-level run that did not. **That resolution is the operative
+conclusion, and it is what should be cited.** The same passage's earlier line — _"Do **not** record
+either that a finding-level review definitely ran or that it definitely did not"_ — was the
+**interim** state, marked `Unresolved` and then closed by the paragraph headed _"Resolved at 18:28 by
+a better source"_. An earlier revision of this correction quoted that interim line as standing
+guidance; **that was wrong**, raised by Codex on #1212 and verified against the passage before being
+accepted. Citing a superseded provisional note as a rule is the same error the note itself was about.
+The original bullet
 collapsed the surfaces by naming neither. The correction then over-swung and called the result false.
 Both failures share one root — **writing a reviewer's status without checking what this file had
 already concluded about that reviewer** — and both are the same defect class as the stale deploy tip

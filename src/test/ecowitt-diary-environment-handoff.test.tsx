@@ -801,6 +801,55 @@ describe("evidence rules", () => {
     },
   );
 
+  it("redacts every sensitive credential label when it appears in a safe-key string", () => {
+    const credentialAssignments = [
+      ["PassKey=plain-passkey-987", "plain-passkey-987"],
+      ["JWT: plain-jwt-987", "plain-jwt-987"],
+      ['signature="plain-signature-987"', "plain-signature-987"],
+      ["vBt=plain-vbt-987", "plain-vbt-987"],
+      ["user_id: plain-user-id-987", "plain-user-id-987"],
+    ] as const;
+
+    const redactedValues = credentialAssignments.map(([credentialAssignment]) => {
+      const snap = evidenceSnapshot({
+        transport: "mqtt_local_test",
+        config_note: credentialAssignment,
+      });
+      const payload = snap.redacted_raw_payload as Record<string, unknown>;
+      return payload.config_note;
+    });
+    const text = credentialAssignments
+      .map(([credentialAssignment]) =>
+        serializeEvidenceForClipboard(
+          evidenceSnapshot({
+            transport: "mqtt_local_test",
+            config_note: credentialAssignment,
+          }),
+        ),
+      )
+      .join("\n");
+
+    expect(redactedValues).toEqual(credentialAssignments.map(() => "[REDACTED]"));
+    for (const [, secretValue] of credentialAssignments) {
+      expect(text).not.toContain(secretValue);
+    }
+  });
+
+  it("redacts a credential pair whose JSON key is quoted inside a safe-key string", () => {
+    const secretValue = "flower-room-json-credential";
+    const snap = evidenceSnapshot({
+      transport: "mqtt_local_test",
+      config_note: `{"api_key":"${secretValue}","temp_f":77.4}`,
+    });
+    const payload = snap.redacted_raw_payload as Record<string, unknown>;
+    const text = serializeEvidenceForClipboard(snap);
+
+    expect(payload.config_note).toBe('{[REDACTED],"temp_f":77.4}');
+    expect(text).not.toContain(secretValue);
+    expect(text).toContain("temp_f");
+    expect(text).toContain("77.4");
+  });
+
   // Header-prefixed assignments. The header patterns CONSUME the whole following
   // token, variable NAME included, so if they run before the assignment rule the
   // NAME is gone and `[A-Z][A-Z0-9_]{2,}=` can no longer match — leaving the VALUE

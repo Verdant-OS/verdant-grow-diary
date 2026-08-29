@@ -440,7 +440,11 @@ function buildWindow(args: {
     durationLabel = formatDuration(durationMs);
   }
 
-  const sourceClass = majoritySource(inWindow);
+  // Any invalid-source sample in the window participated in peak/trough
+  // math. Do not let a live majority relabel that window Live or usable.
+  const sourceClass = inWindow.some((s) => s.sourceClass === "invalid")
+    ? "invalid"
+    : majoritySource(inWindow);
   const scored = scoreWindow({
     kind,
     sampleCount: inWindow.length,

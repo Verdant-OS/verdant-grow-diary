@@ -400,4 +400,33 @@ describe("projectDrybackSamplesForMonitoring / calibrated series", () => {
     expect(["live"]).toContain(vm.latestClosed?.sourceClass);
   });
 
+
+  it("one invalid-source sample blocks usable and Live on a live-majority window", () => {
+    const w0 = hoursFrom(T0, -48);
+    const w1 = hoursFrom(T0, -12);
+    const samples = [
+      { id: "a", capturedAt: hoursFrom(T0, -47), vwcPct: 55, source: "live" },
+      { id: "b", capturedAt: hoursFrom(T0, -40), vwcPct: 48, source: "live" },
+      { id: "c", capturedAt: hoursFrom(T0, -30), vwcPct: 40, source: "ecowitt" },
+      { id: "d", capturedAt: hoursFrom(T0, -20), vwcPct: 35, source: "live" },
+      { id: "e", capturedAt: hoursFrom(T0, -13), vwcPct: 32, source: "live" },
+    ];
+    const vm = buildDrybackMonitoring(
+      samples,
+      [
+        { id: "w0", occurredAt: w0, volumeMl: 1800 },
+        { id: "w1", occurredAt: w1, volumeMl: 1600 },
+      ],
+      { now: T0 },
+    );
+    expect(vm.status).toBe("windows");
+    expect(vm.sampleCount).toBe(5);
+    expect(vm.latestClosed?.sourceClass).toBe("invalid");
+    expect(vm.latestClosed?.sourceLabel).toBe("Invalid telemetry");
+    expect(vm.latestClosed?.sourceLabel).not.toMatch(/live/i);
+    expect(vm.latestClosed?.quality).not.toBe("usable");
+    expect(["weak", "unusable"]).toContain(vm.latestClosed?.quality);
+    expect(classifyDrybackSource("ecowitt")).toBe("invalid");
+  });
+
 });

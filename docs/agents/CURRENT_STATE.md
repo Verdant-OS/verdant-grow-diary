@@ -1,6 +1,110 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~05:00 UTC)
+**Last updated:** 2026-08-29 UTC (~05:25 UTC)
+**Updated by:** Claude (2026-08-29: **#1192 MERGED at 04:47 UTC — BOTH LIVE LEAKS ARE CLOSED ON THE
+DEPLOY BRANCH. Deploy tip `84d3b813` -> `061eeb8c`. #1189 is now green on production truth with
+NOTHING carried, which is the strongest state the contract can be in. #1190 and #1191 are
+superseded — proven byte-identical, not assumed.**
+
+## 1. #1192 closed both leaks — verified by execution on the merged tip
+
+`061eeb8c` — _"fix(security): redact unlabeled NAME= before Bearer on proof/secrets sanitizers"_.
+One product slice covering both sanitizers. Its own body states it **restores the `68d75444`
+product delta onto tip**, adds a header-prefixed `NAME=value` rule above Bearer/Authorization, and
+deliberately keeps **no** generic uppercase assignment rule so grow reports keep `VPD=1.2` /
+`PPFD=800`.
+
+**Probed on the merged tip, not inferred from the description:**
+
+```text
+postGrow   bearer SOME_PLAIN_NAME=…           -> [redacted]   CLOSED
+postGrow   Bearer SOME_PLAIN_NAME="…"         -> [redacted]   CLOSED
+postGrow   Authorization: SOME_PLAIN_NAME=…   -> [redacted]   CLOSED
+proofRept  Bearer MY_PASSKEY_VAR="…"          -> [redacted]   CLOSED
+proofRept  Bearer SOME_PLAIN_NAME="…"         -> [redacted]   CLOSED
+proofRept  bearer MY_API_KEY_VAR="…"          -> [redacted]   CLOSED   (the case-sensitivity gap)
+
+VPD=1.2 · "runoff EC=1.8 and VPD=1.2." · "The bearer of this report…"  -> ALL unchanged
+```
+
+Both halves matter: the leaks close **and** benign prose survives. A sanitizer that went blunt
+would be a different failure, not a fix.
+
+## 2. #1190 and #1191 are superseded — PROVEN, not assumed
+
+The supersession claim came from #1192's own body, so it was checked rather than believed:
+
+```text
+src/lib/postGrowReportRules.ts        #1190 head 93d9c2e  vs  merged 061eeb8c  ->  IDENTICAL
+src/lib/proofReportRedactionRules.ts  #1191 head 00e3e4d  vs  merged 061eeb8c  ->  IDENTICAL
+```
+
+Byte-identical on both product files. **And the regression tests shipped with the fix** — checked
+separately, because a fix landing without its RED-proven pins would be a silent gap:
+
+- `post-grow-report-pdf-export.test.tsx` — the unlabelled-name table **and** the partial-redaction
+  fence, both present on the deploy tip
+- `proofReportRedactionRules.test.ts` — the header-prefixed table, present
+
+**#1190 and #1191 remain OPEN drafts.** They are fully redundant, but closing another agent's
+merged-elsewhere work is Cheek's call, not Claude's; flagged, not actioned.
+
+## 3. #1189 — green on production truth
+
+Cheek restamped it to **`8766ab6c`**: _"tests-only restamp onto #1192 tip. Drops carried product
+files. Stay draft."_ `ci.yml` run `33234974998` **SUCCESS** at 05:13 UTC.
+
+```text
+contract on 8766ab6c, NOTHING carried:  165 passed | 20 skipped (185)
+```
+
+This is a materially better green than the one at `d25e5bf` two hours earlier. That one passed
+because the branch carried its own fixes; **this one passes against the real deploy branch**. The
+contract has become an _independent_ check — the fix came from someone else's PR, and the invariant
+confirms it closes exactly the shapes it was built to catch without over-redacting prose. That is
+the difference between a test that agrees with itself and a test that verifies the world.
+
+**Correction to the prior entry:** it recorded both leaks as `LIVE ON DEPLOY`. True when written at
+~05:00 UTC; **false since 04:47 UTC**. The window was roughly three hours from #1187's merge
+(01:58) to #1192's (04:47).
+
+## 4. The class, closed — five modules, four instances plus a counter-example that wasn't
+
+| Module                                                                      | Status         | Where                               |
+| --------------------------------------------------------------------------- | -------------- | ----------------------------------- |
+| `ecowittLocalForwardingStatus.ts`                                           | **CLOSED**     | merged `f9f4d11` (#1185)            |
+| `ecowittValidationEvidenceRules.ts`                                         | **CLOSED**     | merged `1d19c4c` (#1184)            |
+| `postGrowReportRules.ts` — labelled assignments                             | **CLOSED**     | merged `84d3b813` (#1187)           |
+| `postGrowReportRules.ts` — header-prefixed unlabelled                       | **CLOSED**     | merged `061eeb8c` (#1192)           |
+| `proofReportRedactionRules.ts` — header-prefixed                            | **CLOSED**     | merged `061eeb8c` (#1192)           |
+| `quickLogSnapshotStripAdapter` / save path — non-canonical persisted source | **OPEN, LIVE** | #1170, **ready-not-draft**, unfixed |
+
+**The redaction-ordering class is closed on the deploy branch, and #1189 pins it.** What remains is
+the _sensor-truth_ defect on #1170 — a different class, still live, and on the one PR that is ready
+rather than draft.
+
+## 5. `NOT_MEASURED` — unchanged by any of this
+
+- **Whether any leaked string ever reached a real user-facing export, clipboard, or print
+  surface**, for any of the four instances. Closing a leak does not retroactively measure its
+  exposure.
+- **Production exposure.** `061eeb8c` is the **deploy branch**; a merge is not a deployment and no
+  publish has been performed or authorized.
+- Edge-function redaction copies beyond the one mirrored file (`ecowittValidationEvidenceRules`).
+- `sanitizeProofReportMarkdown` coverage for a label inside a longer NAME **bare**, with no header
+  prefix — recorded in `COVERAGE_BASELINE`, deliberately unfixed.
+- Mixed-case / spaced `NAME = value`, explicitly out of #1192's scope.
+
+## 6. Posture
+
+Deploy tip **`061eeb8c`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. #1186 (`f008f46`), #1189 (`8766ab6c`), #1190 (`93d9c2e`) and #1191
+(`58bf2a2`) are **draft**; **#1170 (`393dbcdc`) is ready-not-draft with two unresolved P1-class
+review threads and is NOT Claude's to ready, merge or unilaterally fix**. Nothing readied,
+enqueued, merged, published or applied by Claude at any point in this sequence. This edit touches
+this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~05:00 UTC)
 **Updated by:** Claude (2026-08-29: **#1189 is GREEN at `d25e5bf` — 35/35 required — but green WITH the
 fixes carried, not green on production truth. In between it went RED in CI, and that red was the
 contract catching both live leaks through the repo's own required gate. Separately, a fifth

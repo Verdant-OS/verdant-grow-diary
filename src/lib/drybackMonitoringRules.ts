@@ -264,8 +264,9 @@ function normalizeSamples(samples: readonly DrybackVwcSampleInput[]): Normalized
     const vwc = finiteNumber(s.vwcPct);
     if (vwc === null || !isPlausibleDrybackVwc(vwc)) continue;
     const sourceClass = classifyDrybackSource(s.source);
-    if (sourceClass === "invalid") continue;
-    // Quality string invalid also rejected.
+    // Invalid *source* stays tagged as evidence. Do not drop it here —
+    // that hid real EcoWitt/MQTT/HA soil probes behind empty-copy.
+    // Quality string invalid/error still rejected.
     const q = (s.quality ?? "").trim().toLowerCase();
     if (q === "invalid" || q === "error") continue;
     out.push({
@@ -346,6 +347,9 @@ function scoreWindow(args: {
   }
   if (args.sourceClass === "stale") {
     warnings.push("Stale source present in window.");
+  }
+  if (args.sourceClass === "invalid") {
+    warnings.push("Invalid-labeled samples — not live telemetry.");
   }
   if (args.sampleCount < args.minSamples) {
     return { quality: "unusable", confidence: null, warnings: [...warnings, "Too few samples."] };

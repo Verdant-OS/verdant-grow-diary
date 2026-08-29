@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~07:00 UTC)
+**Last updated:** 2026-08-29 UTC (~07:10 UTC)
 **Updated by:** Claude (2026-08-29: **#1170's sensor-truth defect is FIXED at `6c2afa4a` — the last
 live defect of this sequence. Cheek chose option A; measuring the question I had left
 `NOT_MEASURED` made the correct fix NARROWER than option A as written, and a blanket version would
@@ -82,18 +82,44 @@ _"couldn't run — usage limit reached"_ on **#1187, #1189 and #1170** — every
 this sequence. On #1187 it had posted a "Low Risk" summary while Copilot and Codex both caught a real
 `P1` it never saw. Raising the spend limit is a Cursor dashboard change, outside this agent's reach.
 
+**Precision, added 07:10Z — #1170 shows the same split, and it is the misleading one.** The
+finding-level review did **not** run: the `Cursor Bugbot` check concluded `neutral` in two seconds at
+06:58:27Z, and Bugbot's own comment reads _"couldn't run — usage limit reached"_. But a
+Cursor-authored `[!NOTE] Medium Risk` overview **did** land in the PR body, naming `6c2afa4a` and
+describing `persistedSensorSourceLabel` accurately. A reader who checks #1170 against the heading
+above will see that block and conclude this section is wrong. It is not — **a body summary is not a
+finding-level pass.** This same split is already recorded further down this file for `789294c6`, and
+it makes the gap **harder to notice, not smaller**, which is the entire reason this section exists.
+
 ## 6. Status — the sequence is functionally complete
 
-| Item                                         | Status                                                            |
-| -------------------------------------------- | ----------------------------------------------------------------- |
-| Redaction-ordering class, four instances     | **CLOSED on deploy** (#1185, #1184, #1187, #1192)                 |
-| The contract pinning it                      | **MERGED** (#1189, `a95ba7d2`)                                    |
-| Contract's self-contradicting comment        | #1193, draft, **35/35 green**                                     |
-| Sensor-truth: non-canonical persisted source | **FIXED** at `6c2afa4a` — #1170, ready-not-draft, awaiting review |
-| `CURRENT_STATE`                              | this file, #1186, draft                                           |
+| Item                                         | Status                                                      |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| Redaction-ordering class, four instances     | **CLOSED on deploy** (#1185, #1184, #1187, #1192)           |
+| The contract pinning it                      | **MERGED** (#1189, `a95ba7d2`)                              |
+| Contract's self-contradicting comment        | #1193, draft, **35/35 green**                               |
+| Sensor-truth: non-canonical persisted source | **FIXED** at `6c2afa4a` — #1170, **Codex re-review `PASS`** |
+| `CURRENT_STATE`                              | this file, #1186, draft                                     |
 
-**No known live defect remains open and unaddressed.** #1170 is fixed but not merged; #1193 is green
-but not merged.
+**Independent review closed the loop at 07:02Z.** Codex re-reviewed `6c2afa4a` and returned **`PASS`**
+— a full audit, no changes required, and explicitly no competing PR and no empty commit. It confirmed
+from source that the helper rewrites only canonical `manual`/`csv` results; that it leaves provider
+labels alone, naming the EcoWitt / Node-RED false-`invalid` hazard itself; that the save gate still
+requires an attachable snapshot; and that the suite asserts the real persisted
+`p_details.sensor.source` across five manual aliases, two CSV aliases and the `pi_bridge` fence. Its
+own run: **19 passed / 0 failed**, `tsc` clean. Both review threads — Codex's `P1` and Copilot's —
+are now **resolved**, each against the fix on the head rather than a promise.
+
+`6c2afa4a`'s CI was **still in flight** as this was written (runs started 06:58Z): every _completed_
+required context green, zero failures, the only red the inherited `ai_credit_grants` 42P07. **The
+35/35 verdict is `NOT_MEASURED` until that run lands** — it is not a pass yet and is not recorded as
+one.
+
+#1170 is also `behind` deploy tip `a95ba7d2` — **not** a conflict, and the merge queue rebases on
+enqueue. Deliberately not updated here: a branch push would restart the in-flight run for no gain.
+
+**No known live defect remains open and unaddressed.** #1170 is fixed, reviewed and not merged; #1193
+is green and not merged.
 
 ## 7. `NOT_MEASURED` — unchanged
 

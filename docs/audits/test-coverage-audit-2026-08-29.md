@@ -22,16 +22,19 @@ not present in this clone's history, so the exact commit distance is `NOT_MEASUR
 
 Two things are true at once, and the second is the one that needs work:
 
-- **Breadth is genuinely good.** 2,908 test files and **39,407 executed test cases** (39,217
-  passed, 190 skipped — measured by running the suite, §9). 98.2% of product modules are loaded by
-  at least one test. Zero `.only` anywhere. That is better than most repositories this size.
+- **Breadth is genuinely good.** **3,008 test files across four lanes** — 2,908 Vitest, 60
+  Playwright, 31 Deno, 9 pgTAP. The Vitest lane discovers **39,407** cases and **executes 39,217**
+  (190 skipped, §9). 98.2% of product modules are reached by some Vitest test. Zero `.only`
+  anywhere. That is better than most repositories this size.
+  Every per-case and per-assertion figure in this document is **Vitest-only** unless it says
+  otherwise; the other three lanes are counted by file, because nothing aggregates their cases.
 - **Depth is unmeasured, and four separate lanes of already-written tests never execute.**
   There is no coverage instrumentation of any kind, so the fraction of _branches_ the suite
-  exercises is `NOT_MEASURED`. 21.8% of all assertions are substring or regex matches against
-  source **text**, which — proven by execution in §3 — go red on behaviour-preserving refactors
-  and stay green through real behaviour breaks. And 21 of 31 Deno edge tests, 16 of 33 runtime
-  RLS/billing harnesses, 7 of 9 pgTAP suites, and 32 of 60 Playwright specs are never run by any
-  workflow.
+  exercises is `NOT_MEASURED`. **16.3% of all Vitest assertions** are `toContain`/`toMatch` checks
+  against source **text** inside scan-only files (14,251 of 87,351) — a class proven by execution
+  in §3 to go red on behaviour-preserving refactors and stay green through real behaviour breaks.
+  And 21 of 31 Deno edge tests, 16 of 33 runtime RLS/billing harnesses, 7 of 9 pgTAP suites, and
+  32 of 60 Playwright specs are never run by any workflow.
 
 The single highest-value action is not writing new tests. It is **running the tests that already
 exist** (§7, P2) and **measuring what they touch** (§7, P1). Both are small, both are cheap, and
@@ -43,8 +46,11 @@ The calibrated verdict is at §10.
 
 ## 1. Method, and what it cannot tell you
 
-`established fact` unless labelled otherwise. Scripts used are reproducible from the commands in
-each section.
+`established fact` unless labelled otherwise. **Every headline count below is reproduced by
+`scripts/measure-test-estate.mjs`**, committed with this audit — run `node scripts/measure-test-estate.mjs`
+(or `--json`) to re-derive them. A measurement nobody can re-run is not evidence, which is the same
+defect this document is about. The two mutation experiments in §3 are the exception: they are
+described step by step because they deliberately mutate and restore a product file.
 
 | Axis                        | How it was measured                                                                       |
 | --------------------------- | ----------------------------------------------------------------------------------------- |
@@ -69,11 +75,12 @@ each section.
    covered by the `test:legal-seo:e2e` lane.
 4. **Static call-site counts are not executed-case counts.** The per-bucket tables in §3 count
    occurrences in source — `it(` / `test(` / `expect(` — because that is the only way to attribute
-   a case to a _kind_ of test without instrumentation. The runner reports **39,407** executed cases
-   against **32,080** such call sites, the difference being `it.each`/`test.each` expansion and
-   generated cases. §3's ratios compare static counts with static counts, so they hold; do not mix
-   a number from §3 with one from §9. The same gap applies to skips: **13** `.skip(` call sites in
-   source, **190** skipped cases at runtime.
+   a case to a _kind_ of test without instrumentation. The runner **discovers 39,407** cases and
+   **executes 39,217** of them (190 skipped), against **32,080** such call sites — the discovery gap
+   being `it.each`/`test.each` expansion and generated cases. Discovered, executed and call-site
+   counts are three different numbers; §3's ratios compare call sites with call sites, so they hold,
+   but do not mix a number from §3 with one from §9. The same gap applies to skips: **13** `.skip(`
+   call sites in source, **190** skipped cases at runtime. All of these are Vitest-only.
 5. **`NOT_MEASURED`, not zero:** line coverage, branch coverage, and mutation score. See §8.
 
 ---
@@ -105,10 +112,12 @@ Consequences, in order of severity:
 
 ---
 
-## 3. Finding F2 — 21.8% of the suite's assertions cannot fail for a behavioural reason
+## 3. Finding F2 — a fifth of the Vitest suite asserts on source text, not behaviour
 
 `established fact` for the counts. **`established fact`, proven by execution**, for the two
-experiments.
+experiments — which demonstrate the failure mode on **one** pin, in both directions. That the whole
+bucket shares the mechanism is `inference`, not measurement: what is measured is that these files
+import no product module and render nothing, so nothing in them observes runtime behaviour.
 
 ### 3.1 The measurement
 
@@ -120,7 +129,11 @@ experiments.
 | **Any file I/O** (`readFileSync`/`readFile(`/`readdirSync`/`globSync`) | **1,397** (48.0%) | —                  | —                 |
 
 Within the scan-only bucket, **74.8% of assertions are `toContain(...)` or `toMatch(...)`** —
-substring and regex checks over file text. 806 test files read a path under `src/`.
+14,251 substring and regex checks over file text, which is **16.3% of all 87,351 Vitest
+assertions**, not 21.8%. (21.8% is the bucket's total share of assertions; the two figures were
+conflated in an earlier draft of §0.) The hybrid bucket contributes further source-text assertions
+that are `NOT_MEASURED` — its files mix scanning with real imports, and the two were not separated.
+806 test files read a path under `src/`.
 
 Every figure in that table is a **static count of source occurrences**, per §1 limit 4 — the ratios
 are static-against-static and hold, but they are not the runner's executed-case numbers in §9.
@@ -231,10 +244,24 @@ and do not. Verified credential-free and unrun:
   never runs.
 - **`e2e/sensors-truth-closure.spec.ts`** — sensor source/quality labelling in the browser, fully
   intercepted (4 `page.route` blocks).
-- `plant-detail-quicklog-watering-readpath`, `timeline-local-day-date-filter`,
-  `ui-overhaul-responsive`, `tents-mobile-overflow`, `dashboard-mobile-overflow`,
-  `post-claude-route-access`, `analytics-consent-gate`, `manual-sensor-snapshot-edit-smoke`,
-  `public-quick-log-starter`, `quick-log-target-panel-smoke`, `evidence-tile-mismatch-smoke`.
+- `plant-detail-quicklog-watering-readpath` (4 `page.route` blocks), `timeline-local-day-date-filter`
+  (8), `ui-overhaul-responsive` (7), `tents-mobile-overflow` (4), `dashboard-mobile-overflow` (4),
+  `post-claude-route-access` (4), `analytics-consent-gate` (1).
+- `public-quick-log-starter` installs **no** route mocks and needs none: `/quick-log` is a public
+  route that saves a draft locally, and `AGENTS.md` lists it as a credential-free smoke surface.
+  It is credential-free for a different reason from the others, not because it stubs traffic.
+
+**Correction — three specs are NOT credential-free**, raised by Codex on #1218 and confirmed here by
+reading them. `manual-sensor-snapshot-edit-smoke`, `quick-log-target-panel-smoke` and
+`evidence-tile-mismatch-smoke` install **zero** `page.route` mocks and open with a `test.skip` gated
+on a fixture URL — `E2E_MANUAL_SNAPSHOT_STRIP_URL`, `E2E_GROW_1_PLANT_URL`,
+`E2E_EVIDENCE_TILE_PLANT_URL` — then `page.goto` that real URL unmocked. Wiring them into
+`chromium-mocked` would record vacuous skips that read as coverage, or reach an external
+authenticated fixture. They need an authenticated fixture lane or an explicit exemption, and an
+earlier draft of this section listed them under "verified credential-free" when only their unrun
+status had been verified. The word `verified` was doing work an inference had done: the per-spec
+`page.route` count was in hand and not consulted. **10 of the 13 candidates are credential-free;
+3 are fixture-gated.**
 
 ### 4.3 Runtime harnesses — including the two the constitution names
 
@@ -331,9 +358,16 @@ reviewer, per `AGENTS.md`. **None of these is assigned here** — assignment is 
 
 ### P1 — Instrument coverage, report-only, off the merge gate `smallest credible next tranche`
 
-Add `@vitest/coverage-v8`; add a `coverage` block to `vitest.config.ts` with `all: true` (so
-untouched files count as 0%, not as absent), `json-summary` + `text` reporters, and **no
-thresholds**. Add `test:coverage`. Run it in a **new, non-required, scheduled** workflow, not in
+Add `@vitest/coverage-v8`; add a `coverage` block to `vitest.config.ts` with
+`include: ["src/**"]`, `json-summary` + `text` reporters, and **no thresholds**.
+The `include` scoping is the load-bearing part: `coverage.include` defaults to `["**"]` in the
+installed Vitest 3.2.7, so an unscoped baseline sweeps `scripts/`, `e2e/` and `supabase/` as well and
+the resulting percentage means nothing. Do **not** bother setting `all: true` — Copilot raised this
+on #1218 as "the removed `coverage.all` option", and that premise is wrong for this repo:
+`all` is present in 3.2.7's `BaseCoverageOptions` with `@default true` and carries no `@deprecated`
+tag (the only one in that declaration file is `server.deps.fallbackCJS`). It is redundant, not
+unavailable. The reviewer's conclusion — that explicit `include` patterns are required — holds for
+the different reason given above. Add `test:coverage`. Run it in a **new, non-required, scheduled** workflow, not in
 the 32-shard required lane — coverage instrumentation on ~2,900 files will slow the merge path, and
 sharded coverage needs a merge step that is not worth building in tranche 1.
 
@@ -429,8 +463,11 @@ Not to be rounded up by anyone quoting this document.
   predict the 32-shard CI lane.
 - **Whether the 21 dead edge tests and 7 dead pgTAP suites pass today** — `NOT_MEASURED`. They were
   found unexecuted; they were not run. Some may be red. P2 must establish this before wiring.
-- **Playwright suite state** — `NOT_MEASURED`. No spec was executed for this audit. `CLAUDE.md`
-  records some mocked specs as known-flaky.
+- **Playwright suite state** — `NOT_MEASURED` as a suite. No spec was executed **locally** for this
+  audit. CI is not silent, though: the required `test:legal-seo` job runs `test:legal-seo:e2e`
+  (`.github/workflows/ci.yml`), so one Playwright spec did execute and go green on the audited head —
+  §9 records that context. An earlier draft said flatly that no spec was executed, which was wrong
+  about CI; the claim only ever held locally. `CLAUDE.md` records some mocked specs as known-flaky.
 - **Production, deployment, indexing** — untouched and out of scope. A merge is not a deployment.
 - **Whether any of these gaps has ever admitted a defect to production** — `NOT_MEASURED`, and
   deliberately not inferred. §3's experiments prove the _class_ is undetectable, not that it has
@@ -446,21 +483,29 @@ Targeted tests:      src/test/timeline-grow-filter.test.ts, src/test/action-queu
 Experiment A:        1 failed | 9 passed  (behaviour-preserving refactor → false positive)
 Experiment B:        156 files, 1,925 cases, ALL PASSING with the injected precedence bug
                      (real behaviour break → false negative)
-Full suite:          PASS — all 32 `Full test suite (shard n/32)` required contexts green on
-                     `7a5b48a` (PR #1218, workflow run 33278919894), 2026-08-29 22:34-22:37 UTC.
-                     This is the sharded CI lane, i.e. the one that actually gates. Also green on
-                     that head: `Preflight — edge shared-lib mirror in sync` and `test:legal-seo`
-                     (both required), plus `test:security-regression` — the single `mustBeGreen`
-                     entry — `eslint`, `tsc --noEmit`, `tsgo --noEmit + vite build`, `docs-safety`
-                     and `One-Tent Loop smoke audit`.
+Full suite:          PASS on the CI lane that actually gates. Recorded on two heads of PR #1218,
+                     because the branch moved while the audit was being corrected:
+                       `7a5b48a` — 32/32 shards green, workflow run 33278919894, 22:34-22:37 UTC
+                       `74e6da2` — ALL 35 REQUIRED CONTEXTS green, run 33279295744, 22:43-22:49 UTC
+                     `74e6da2` is the fuller result and the later head: the 32 shards plus
+                     `Lint, typecheck, test, build`, `Preflight — edge shared-lib mirror in sync`
+                     and `test:legal-seo`. Also green there: `test:security-regression` (the single
+                     `mustBeGreen` entry), `test:security-db-local`, `eslint`, `tsc --noEmit`,
+                     `tsgo --noEmit + vite build`, `docs-safety`, `One-Tent Loop smoke audit`.
+                     The commit carrying these review corrections moves the head again; re-read the
+                     PR's checks rather than treating either SHA above as current.
                      Local confirmation, same tip, completed after the above was recorded:
                      `npx vitest run` (unsharded) → Test Files 2903 passed | 5 skipped (2908);
                      Tests 39217 passed | 190 skipped (39407); Duration 1078.77s; exit 0.
-                     ZERO failures. This is where the 39,407 executed-case figure comes from.
-Type-check:          NOT RUN — this audit changes no TypeScript
-Runtime harness:     NOT RUN — no Supabase access in this session; billing/AI-credit harnesses are
-                     BLOCKED here for the same reason §4.3 says CI cannot run them
-Playwright:          NOT RUN
+                     ZERO failures. 39,407 is the DISCOVERED total; 39,217 executed and passed.
+Type-check:          NOT RUN LOCALLY (this audit changes no TypeScript) — but PASS in CI on the
+                     audited head: `tsc --noEmit`, `tsgo --noEmit + vite build`, and the `typecheck`
+                     step inside the required `test:legal-seo` job all reported success.
+Runtime harness:     NOT RUN — no Supabase access in this session, so BLOCKED here. Note the
+                     precise claim: §4.3 establishes that NO WORKFLOW INVOKES the billing and
+                     AI-credit harnesses, not that CI is incapable of running them. CI could run
+                     them against a disposable stack today; that is what P5 proposes.
+Playwright:          NOT RUN LOCALLY. CI executed `test:legal-seo:e2e` in the required lane.
 Skipped:             everything requiring credentials, network to Supabase, or production
 Introduced failures: 0 — the working tree was restored and verified byte-identical after each
                      experiment, before any commit

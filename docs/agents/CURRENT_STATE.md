@@ -1,6 +1,158 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~10:40 UTC)
+**Last updated:** 2026-08-29 UTC (~11:10 UTC)
+**Updated by:** Claude (2026-08-29: **#1204 merged as `d80ad94b2`, closing the Codex `P2` that #1203
+merged with open — `FORBIDDEN` is now a declared status in both apply ledgers. It merged carrying
+TWO open Copilot threads, the SEVENTH merge with an open finding, and the FIRST where that was an
+argued position rather than a race casualty.** The finding was recorded in the PR body before the
+reviewer raised it. Prior header follows.)
+
+## 1. #1204 merged — `FORBIDDEN` is a real status on the deploy branch
+
+`established fact`, verified on the deploy tip by execution, not from the PR body.
+
+Merged ~11:04Z. Deploy tip `cc0b7bd3f` -> **`d80ad94b2`**, the merge-group commit itself.
+
+| Check on the tip                                  | Result                |
+| ------------------------------------------------- | --------------------- |
+| Files changed                                     | **2**, +47/-45        |
+| Files under `supabase/migrations/`                | **0**                 |
+| Migration count                                   | **278**               |
+| `FORBIDDEN` declared in both ledger vocabularies  | **yes**, one row each |
+| `NOT_APPLICABLE` / forbidden composites remaining | **0**                 |
+
+The label as declared, identically in both files:
+
+> `FORBIDDEN` — The operation is available and must not be performed — **not** `NOT_APPLICABLE`,
+> which means the check does not apply at all.
+
+The contrast is stated **at the point of definition** so the conflation cannot be repeated by
+someone reading only the vocabulary. Every Notes cell is byte-identical to its previous text: the
+hard stop was not softened into Notes, it was promoted from a composite into a declared label.
+
+## 2. It merged carrying two open Copilot threads — and that was a decision, not a miss
+
+`established fact` for the finding; `inference` for the disposition.
+
+Copilot filed the same finding on both files
+(`discussion_r3886407209`, `discussion_r3886407189`): **`FORBIDDEN` is absent from `AGENTS.md`'s
+status vocabulary**, which declares eight values — `PASS`, `FAIL`, `BLOCKED`, `NO_BASELINE`,
+`NO_DATA`, `NOT_MEASURED`, `SKIPPED`, `NOT_APPLICABLE`. The finding is **correct**. Its remedy —
+"add it to the canonical governance vocabulary and required mirrors in the same slice" — was
+declined, for reasons in this order:
+
+1. **Scope was assigned, not chosen.** N=2, `AGENTS.md` explicitly excluded by Cheek.
+2. **"Same slice" is not a small ask.** `AGENTS.md` is one of **twelve** version-locked governance
+   files. One vocabulary row means a twelve-file `Sentinel-Version` bump under
+   `sentinel-version-parity` (PARITY, MIRROR, BUMP), plus `GEMINI.md`'s `SENTINEL-CORE` staying
+   byte-equivalent. Bundling it would have flipped this PR's own sentinel gate from _0 governance
+   files changed_ to twelve — a materially different diff than the one that went green.
+
+**The direction of the defect matters, and the reviewer's framing inverted it.** Copilot called this
+"two conflicting status contracts". Before #1204 the ledgers used `NOT_APPLICABLE` — defined as _"the
+check does not apply to this target"_ — for prohibitions. That was a **contract violation**: one word
+carrying two incompatible meanings, the dangerous one reading a hard stop as an inapplicable row.
+What exists now is a **gap**: a local label the constitution has not yet adopted, visible,
+documented, and impossible to misread as permission. Trading a collision for a documented gap is the
+improvement. A gap a reviewer can see beats a collision a reviewer cannot.
+
+Both threads were replied to and **deliberately left open**. Resolving them would have been false
+tidying — the rule is to resolve only what was addressed.
+
+**Seventh merge with an open finding**, after #1187, #1189, #1170, #1199, #1200, #1203. It is the
+first of the seven where the open finding was **known and argued in the PR body before the reviewer
+raised it**, rather than a race casualty. Severity has fallen from a live credential leak to an
+un-adopted vocabulary row.
+
+## 3. The race cost nothing on #1204 — the first clean pass of the loop
+
+`established fact`, from timestamps.
+
+| Event                            | Time      |
+| -------------------------------- | --------- |
+| Required CI green (35/35)        | 10:50:37Z |
+| Readied                          | 10:57:57Z |
+| Enqueued                         | 10:57:58Z |
+| Codex review completed **clean** | 10:58:51Z |
+| Copilot threads filed            | 10:59:51Z |
+| Merged                           | ~11:04Z   |
+
+CI was green **seven minutes before** the enqueue, and Codex cleared the exact merging SHA. The
+enqueue-then-review race still fired in form — Codex triggers on draft-marked-ready — but it cost
+nothing, because the review finished before the merge and found nothing. Contrast #1203, where the
+only reason a fix could land was an accidental 48-second dequeue.
+
+The mechanism is still unchanged and still unfixed: **separating the ready and enqueue gestures
+remains the only real remedy.** #1204 is evidence that the race is survivable when CI is already
+green and the reviewer is fast, not evidence that it is closed.
+
+## 4. `Supabase Preview` is permanently red repo-wide — four preview projects
+
+`established fact`, and new since the prior entry, which recorded only three heads of one PR.
+
+| PR    | Preview project        | Diff type | Result |
+| ----- | ---------------------- | --------- | ------ |
+| #1204 | `pxcolzcdbitqgdcpzmtv` | docs-only | 42P07  |
+| #1186 | `cssyuwfpswrztleslkkw` | docs-only | 42P07  |
+| #1203 | `litngfnnubyfrrktykqr` | docs-only | 42P07  |
+| #1202 | `rixddyzvmqlcpxjappqo` | product   | 42P07  |
+
+Byte-identical `ERROR: relation "ai_credit_grants" already exists (SQLSTATE 42P07)` across **four
+distinct preview projects**, three docs-only diffs and one product diff. Every fresh preview branch
+replays committed history from scratch and hits the same duplicate `CREATE TABLE`. The failure is a
+property of **the branch being new**, not of anything any PR changed.
+
+Already declared in `config/local-supabase-replay-compatibility.json` (canonical
+`20260721103000_ai_credit_grants.sql`, duplicate `20260721182752_4fc51714-…`, SQLSTATE named verbatim
+in its `reason`) — but that config governs the **local** replay preparer, and the **hosted Preview
+lane does not read it**. Not in the ruleset: #1202, #1203 and #1204 all merged with it red.
+
+**The consequence worth acting on eventually:** a check red on every branch regardless of content has
+stopped carrying information. Remedy is either extending the replay-compat mechanism to the hosted
+lane or retiring that lane as a check. **Not opened** — it is a slice decision, not a docs edit.
+
+## 5. Parked, and whose it is
+
+- **The `FORBIDDEN` alignment slice** — `AGENTS.md` plus the eleven mirrors, one vocabulary row, one
+  `Sentinel-Version` bump via `scripts/sync-sentinel-mirror.mjs`. Argued in #1204's body and in both
+  thread replies. **Not opened.**
+- **Three non-status cells in the sandbox ledger** — `FAIL (as git presence)`,
+  `sandbox-only (bzatgtgjvuojpoxcknaa)`, `not applied; deferred per writeup`. Same defect class,
+  flagged in #1204's body, outside its N=2 scope. Cheek: these **collide with #1204**, and now that
+  `dae0cbb8a` is merged, **GDP names that follow-up from the #1204 squash.** Not Claude's to open,
+  prepare, or stage.
+- **Bugbot** hit the Cursor usage limit on **every head of every PR tonight**, unbroken. Codex was
+  the only finding-level review that ran on #1204.
+
+## 6. Status
+
+| Item                            | Status                                                               |
+| ------------------------------- | -------------------------------------------------------------------- |
+| #1204 `FORBIDDEN` vocabulary    | **MERGED** `d80ad94b2` — verified on the tip by execution            |
+| Two Copilot `AGENTS.md` threads | **OPEN on the deploy branch**, answered, deliberately unresolved     |
+| #1203 knk ledger corrections    | **MERGED** `cc0b7bd3f`; its Codex `P2` is now closed by #1204        |
+| `FORBIDDEN` alignment slice     | **proposed, NOT opened** — GDP names the next cut                    |
+| Sandbox non-status cells        | **parked** — collides with #1204; GDP names it from the squash       |
+| #1186 `CURRENT_STATE`           | draft, `c959cfc52` green; **ACTIVE OWNER of `CURRENT_STATE.md`**     |
+| `Supabase Preview` 42P07        | red repo-wide, pre-existing, not a gate; one comment per PR, no more |
+
+## 7. `NOT_MEASURED`
+
+- **Production.** `d80ad94b2` is the deploy branch. A merge is not a deployment; no publish
+  performed or authorized.
+- Whether any operator ever read a `NOT_APPLICABLE` / forbidden row as inapplicable rather than
+  prohibited. Closing the ambiguity does not measure its past effect.
+- Which check dequeued #1203 at 10:13:23Z. Still `UNKNOWN`, not `NOT_MEASURED` — both surfaces were
+  measured and neither named it.
+- Whether the two captured trigger bindings carry `UPDATE OF`, `WHEN`, or schema qualification —
+  unchanged; the raw `pg_get_triggerdef` output was never preserved.
+
+## 8. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added —
+count stays **278**. `AGENTS.md` untouched. No strip file touched. No new cut opened.
+
+**Prior update:** 2026-08-29 UTC (~10:40 UTC)
 **Updated by:** Claude (2026-08-29: **#1203 merged as `cc0b7bd3f` carrying an open Codex `P2` — the
 SIXTH merge with an open finding, not the seventh as I twice reported. It also produced the first
 review fix in this entire sequence that actually landed BEFORE its own merge — and that happened by

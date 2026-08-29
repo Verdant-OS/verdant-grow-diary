@@ -30,11 +30,25 @@ const INTERNAL_ID_KEYS = new Set(["id", "row_id", "internal_id"]);
 const REDACTED = "[redacted]";
 const REDACTED_SECRET_VALUE = "[REDACTED]";
 
+// Keep credential-labelled free-text pairs aligned with the diagnostics
+// sanitizer without importing its export-specific implementation. Scoping the
+// rule to credential vocabulary preserves useful telemetry such as
+// `temp_f=77.4` and `inserted=1`.
+const CREDENTIAL_KEY_SOURCE =
+  "(token|authorization|bearer|api[_-]?key|secret|password|service[_-]?role|anon[_-]?key|bridge[_-]?token)";
+// Do not consume a Bearer prefix or the name of a nested assignment as the
+// credential value; the dedicated later rules must see those spans whole.
+const CREDENTIAL_PAIR_PATTERN = new RegExp(
+  `[A-Za-z0-9_-]*${CREDENTIAL_KEY_SOURCE}[A-Za-z0-9_-]*\\s*[=:]\\s*(?!Bearer\\b)(?![A-Za-z0-9_-]+\\s*[=:])(?:"[^"]+"|'[^']+'|[^\\s"',;}]+)`,
+  "gi",
+);
+
 // Keep this value class aligned with the forwarding-report sanitizer:
 // secret-shaped strings must redact even when their containing key looks safe.
 const SECRET_VALUE_PATTERNS: RegExp[] = [
   /vbt_[A-Za-z0-9_-]{6,}/g,
   /eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g,
+  CREDENTIAL_PAIR_PATTERN,
   // Env NAME=value assignments.
   //
   // ORDER IS LOAD-BEARING: this MUST stay above BOTH the header patterns and the
@@ -114,8 +128,12 @@ function redactEvidenceNode(value: unknown): unknown {
 
 export function redactEvidenceValue(value: unknown): unknown {
   try {
-    if (!isPlainRecord(value)) return REDACTED;
-    return redactEvidenceNode(value);
+    if (isPlainRecord(value)) return redactEvidenceNode(value);
+    if (Array.isArray(value)) {
+      if (!value.every((reading) => isPlainRecord(reading))) return REDACTED;
+      return value.map((reading) => redactEvidenceNode(reading));
+    }
+    return REDACTED;
   } catch {
     return REDACTED;
   }

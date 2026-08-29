@@ -684,6 +684,93 @@ describe("evidence rules", () => {
     expect(text).toContain("[REDACTED]");
   });
 
+  it("redacts credential assignments inside every reading of a nested batch", () => {
+    const secretValues = ["zz-canopy-alpha-77", "zz-canopy-beta-88", "zz-canopy-gamma-99"];
+    const snap = evidenceSnapshot({
+      readings: [
+        {
+          sequence: 1,
+          detail: `api_key=${secretValues[0]}`,
+          temp_f: 77.4,
+        },
+        {
+          sequence: 2,
+          detail: `my_password="${secretValues[1]}"`,
+          humidity_pct: 56.2,
+        },
+        {
+          sequence: 3,
+          detail: `bridge-token: ${secretValues[2]}`,
+          note: "temp_f=77.4 inserted=1",
+        },
+      ],
+    });
+    const payload = snap.redacted_raw_payload as {
+      readings: Array<Record<string, unknown>>;
+    };
+    const text = serializeEvidenceForClipboard(snap);
+
+    expect(payload.readings).toHaveLength(3);
+    expect(payload.readings.map((reading) => reading.detail)).toEqual([
+      "[REDACTED]",
+      "[REDACTED]",
+      "[REDACTED]",
+    ]);
+    expect(payload.readings[0].temp_f).toBe(77.4);
+    expect(payload.readings[1].humidity_pct).toBe(56.2);
+    expect(payload.readings[2].note).toBe("temp_f=77.4 inserted=1");
+    for (const secretValue of secretValues) {
+      expect(text).not.toContain(secretValue);
+    }
+  });
+
+  it("preserves a valid top-level reading batch while redacting every reading deterministically", () => {
+    const rawPayload = [
+      {
+        sequence: 1,
+        detail: "api_key=zz-root-alpha-77",
+        temp_f: 76.8,
+      },
+      {
+        sequence: 2,
+        detail: 'my_secret="zz-root-beta-88"',
+        humidity_pct: 55.1,
+      },
+    ];
+    const first = evidenceSnapshot(rawPayload);
+    const second = evidenceSnapshot(rawPayload);
+    const payload = first.redacted_raw_payload as Array<Record<string, unknown>>;
+    const text = serializeEvidenceForClipboard(first);
+
+    expect(Array.isArray(payload)).toBe(true);
+    expect(payload).toHaveLength(2);
+    expect(payload.map((reading) => reading.detail)).toEqual(["[REDACTED]", "[REDACTED]"]);
+    expect(payload[0].temp_f).toBe(76.8);
+    expect(payload[1].humidity_pct).toBe(55.1);
+    expect(second.redacted_raw_payload).toEqual(payload);
+    expect(text).not.toContain("zz-root-alpha-77");
+    expect(text).not.toContain("zz-root-beta-88");
+  });
+
+  it("keeps empty batches empty and rejects mixed batches without partial readings", () => {
+    expect(evidenceSnapshot([]).redacted_raw_payload).toEqual([]);
+
+    const mixed = evidenceSnapshot([
+      {
+        detail: "api_key=zz-mixed-alpha-77",
+        temp_f: 77.2,
+      },
+      "safe-looking malformed raw body",
+    ]);
+    const text = serializeEvidenceForClipboard(mixed);
+
+    expect(mixed.redacted_raw_payload).toBe("[redacted]");
+    expect(text).toContain('"redacted_raw_payload": "[redacted]"');
+    expect(text).not.toContain("zz-mixed-alpha-77");
+    expect(text).not.toContain("safe-looking malformed raw body");
+    expect(text).not.toContain("77.2");
+  });
+
   it("redacts a PASSKEY field even when its value has no recognizable secret shape", () => {
     const snap = evidenceSnapshot({
       transport: "mqtt_local_test",
@@ -722,6 +809,7 @@ describe("evidence rules", () => {
   // at all, so a plain SOME_PLAIN_NAME behind a `Bearer ` prefix leaked too.
   // Reported by Copilot on #1184 and confirmed by execution before the fix.
   it.each([
+    ["Authorization: Bearer actualtoken123456", "actualtoken123456"],
     ['Authorization: PASSKEY="flower-room-credential"', "flower-room-credential"],
     ["Bearer PASSKEY=flower-room-credential", "flower-room-credential"],
     ['Bearer MY_PASSKEY_VAR="flower-room-credential"', "flower-room-credential"],

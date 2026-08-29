@@ -1,10 +1,221 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~07:10 UTC)
+**Last updated:** 2026-08-29 UTC (~07:40 UTC)
+**Updated by:** Claude (2026-08-29: **Everything in this sequence is now MERGED or CLOSED. Deploy tip
+`a95ba7d2` -> `78125d82` across FIVE merges. #1170 merged at 07:33 UTC carrying a verified Codex
+`P1` — the THIRD PR tonight to merge with an open finding, and the same merge-queue mechanism each
+time.** Prior header follows.)
+
+## 1. Five merges moved the tip, and two of my own notes were stale
+
+`established fact`, verified by `git ls-remote` and `git log`, not from memory:
+
+| Tip         | PR    | Merged  |
+| ----------- | ----- | ------- |
+| `a95ba7d2c` | #1189 | 05:40Z  |
+| `1edfa2226` | #1194 | 06:17Z  |
+| `9c7a9c650` | #1195 | 07:14Z  |
+| `e14f27284` | #1193 | 07:29Z  |
+| `dd7e732cf` | #1170 | 07:33Z  |
+| `78125d82a` | #1196 | ~07:37Z |
+
+**Correction.** For roughly half an hour I stated the tip as `a95ba7d2` in this file, in my check-in
+notes and to Cheek, after #1194 and #1195 had already moved it. Neither is mine; both landed while I
+was watching #1170's CI. The prior entry's `## 7` and `## 8` still say `a95ba7d2` and are superseded
+by this table. **The tip moves faster than a shift entry — re-verify it with `git ls-remote origin
+verdant-grow-diary` before citing it, never from a cached note.**
+
+#1194 (timeline revision-badge lanes), #1195 and #1196 (Quick Log revision-payload fail-closed, and
+the follow-up removing the silent-filter adapter) are Codex/GDP slices, not mine. #1195 was checked
+for file overlap with #1170 before it merged: **none**.
+
+## 2. #1170 merged — the sensor-truth fix is on the deploy branch
+
+`dd7e732cf`. Both halves verified on the merged deploy branch by execution, not inferred:
+
+```
+quickLogSnapshotStripAdapter.ts     persistedSensorSourceLabel        defined
+QuickLog.tsx:1276                   source: persistedSensorSourceLabel(...)   called at the save site
+QuickLogSensorSnapshotStrip.tsx:148 const attachBlocked = ...         gate live
+QuickLogSensorSnapshotStrip.tsx:199 data-attachable={...}             rendered
+```
+
+**35/35 required green, verified at 07:15Z** against `config/required-status-checks.json` rather
+than by eyeballing a summary: all 32 shards, `Lint, typecheck, test, build` (success 07:08:33Z, the
+last to land), `Preflight — edge shared-lib mirror in sync`, `test:legal-seo`, plus the `mustBeGreen`
+`test:security-regression`. The only red across all 91 checks was the non-required `Supabase Preview`
+42P07. `Browser census (public)` passed on its own at 07:05:22Z — no re-run spent this time.
+
+Codex re-reviewed `6c2afa4a` at 07:02Z and returned **`PASS`** (full audit, no changes required, and
+it explicitly declined to open a competing PR or an empty commit). Both review threads — Codex's `P1`
+and Copilot's — were **resolved by me at ~07:05Z**, against the fix on the head rather than a promise.
+
+Cheek converted it to draft at 07:12:34Z, then readied and enqueued it at 07:24Z. Neither was mine.
+
+## 3. #1170 merged CARRYING a verified `P1`, and the finding is mine
+
+Codex posted it at 07:28:09Z — **four minutes after the enqueue**, on a branch the queue had already
+locked. I could not push. It merged at 07:33:03Z with the finding open.
+
+**I verified it by execution before reporting it, and it is real.** At `6c2afa4a`, and still on
+deploy at `78125d82`, `src/test/quicklog-sensor-snapshot-badge-dedupe.test.ts:46-47` asserts:
+
+| Assertion                               | Where it actually lives                             |
+| --------------------------------------- | --------------------------------------------------- |
+| `"The advisory itself is display-only"` | `QuickLogSensorSnapshotStrip.tsx:160` — **comment** |
+| `"attachable gate"`                     | `QuickLogSensorSnapshotStrip.tsx:161` — **comment** |
+| `role="note"`                           | line 250 — real JSX                                 |
+| `"opens sensors page"`                  | lines 287, 297 — real `aria-label`s                 |
+
+Delete the gate (`attachBlocked` at 148, `data-attachable` at 199), keep the two comment lines, and
+**that test stays green**. That is the `playwright-action-timeout-fence` failure mode `AGENTS.md`
+documents by name, and the rule Codex cited is the right one.
+
+**Two corrections to the finding, both verified.** Its scope is overstated — it says the assertions
+occur "only in explanatory comments", but two of the four are real rendered output. And the gate is
+**not solely guarded by this scan**: `quicklog-attachable-save-gate.test.tsx` has 73 `expect(` calls,
+renders the real QuickLog, asserts the real persisted `p_details.sensor.source`, and was RED-proven
+at **7 failed / 12 passed** with the fix reverted. So `P1` overstates the exposure. This is
+**test-quality only — no product defect and nothing user-facing.**
+
+**It is still mine.** The prior version of that block asserted `"This does NOT change the save
+path."` — also comment-only — so I did not invent the anti-pattern. But I renegotiated that pin in
+this PR and swapped one comment assertion for two others when I could have made it behavioural.
+
+**Proposed and NOT started, pending Cheek:** a fresh branch off the current tip (the merged PR cannot
+carry it), one file, both comment assertions replaced with assertions on resolved rendered output —
+`data-attachable` and `STRIP_NON_ATTACHABLE_DESCRIPTION`, both already real. RED-proven properly:
+revert the gate and show the _new_ assertions fail where the old ones stayed green. That
+demonstration is the actual point of the change.
+
+## 4. #1177 closed on Cheek's instruction — a real collision, deliberately resolved
+
+Closed by me at 07:18:20Z on Cheek's explicit "close 1177". Not merged; branch
+`cursor/quicklog-unify-strip-non-live-e8ed` intact at `fd5d5e476` and reopenable. Reason recorded in
+comment `5461068252` so the Cursor agent does not find it silently gone.
+
+It edited **the same four files as #1170** and took the opposite position: it deleted the
+`fresh_non_live` -> `attachable = false` restamp and flipped the pins for `pi_bridge` / `sensor` /
+`realtime` and manual from `false` to `true`, deleting the test that pinned `pi_bridge
+fresh_non_live -> attachable false`.
+
+Why that combination was unsafe, verified: #1177 touched only the adapter, not `QuickLog.tsx`. Both
+landing would mean `pi_bridge` becomes attachable -> #1170's save gate attaches it ->
+`persistedSensorSourceLabel` does **not** rewrite it (canonical `live`, not `manual`/`csv`) -> it
+persists verbatim -> `timelineEvidenceDetailViewModel.normalizeSource` renders it **`unknown`**,
+because `ALLOWED_SOURCES` is `{manual, live, csv, demo, stale, invalid, unknown}` and has no
+`pi_bridge`. The same defect #1170 exists to close, re-opened for the live-alias set.
+
+**#1177's own body had already flagged the overlap** ("Collision (do not merge unilaterally) ...
+merge order matters"), which is why it was resolved by decision rather than by merge order.
+
+**What closing it discarded**, recorded so the loss is a decision and not a side effect: the
+`DEMO_USABLE_*` copy honesty, the stale-plus-unknown-transport -> Invalid coherence pins, and the
+raw-label provider chip. None are carried by #1170. If wanted, they need their own slice with the
+attachable restamp left intact.
+
+## 5. #1193 merged clean — the contract's contradiction is closed
+
+`e14f27284`, merged 07:29:38Z. Cheek readied and enqueued it at 07:23Z; Codex's review completed at
+07:24:13Z with **zero review threads**. 35/35 required green. So the skip-branch comment that #1189
+shipped self-refuting is now corrected on the deploy branch.
+
+## 6. #1186's own CI: a transient install failure, root-caused not assumed
+
+`Lint, typecheck, test, build` — a **required** context — failed on this PR's superseded head
+`b3bea84d8` (check `99067293041`). Root-caused by reading the job, not guessed: **step 6, "Install
+dependencies", failed in 2 seconds**; steps 7-41 were all `skipped` in consequence, which is why the
+build summary showed every validator `skipped` with only the job-status backstop reporting `failure`.
+This PR is docs-only and cannot break dependency installation — the same signature as the earlier
+`Full suite — batch 10/16` non-attribution.
+
+The push of `0d7106fc1` re-queued that check, which is the one sanctioned re-run, obtained by the
+push rather than spent manually. **It passed at 07:16:53Z.** Transient, confirmed, closed. This PR is
+now **35/35 green**; only red is the non-required 42P07.
+
+One process note: mid-investigation I said `failed_only` reporting "0 failed jobs of 30" contradicted
+the check run. It did not — that filter is unreliable against a run still `in_progress`. The
+authoritative read was the job's own step list.
+
+## 7. The enqueue-then-review race is structural, not bad luck — three for three
+
+`practical observation`, and the most reusable thing in this entry. Three PRs tonight merged while a
+review was still running or a finding was already open, and each time the merge-queue branch lock
+meant the fix could not be pushed:
+
+| PR    | What merged with it                                  | Severity                |
+| ----- | ---------------------------------------------------- | ----------------------- |
+| #1187 | a real `P1` redaction leak, flagged by two reviewers | genuine security defect |
+| #1189 | a comment contradicting the file's own invariant     | documentation defect    |
+| #1170 | a `P1` comment-only assertion                        | test quality only       |
+
+The severity fell each time; **the mechanism never changed.** Codex reviews trigger on
+draft-marked-ready, and the enqueue happens in the same gesture, so the review structurally cannot
+finish first. Then the lock removes the only remedy. This is a workflow property, not three
+coincidences, and it will keep costing a follow-up PR per occurrence until the ready-and-enqueue
+gestures are separated.
+
+## 8. Bugbot was effectively absent all night
+
+`practical observation`. Four consecutive finding-level misses on the Cursor usage limit — **#1187,
+#1189, #1170, #1193** — plus a fifth on #1170's re-trigger. Codex and Copilot caught every real
+defect of this sequence; Bugbot caught none, and on #1187 posted a "Low Risk" summary over a `P1` it
+never saw.
+
+The precision that matters, because it is what makes the gap easy to miss: on #1170 and #1193 a
+Cursor-authored PR-**body** overview _did_ land, naming the commit and describing the change
+accurately, while the finding-level review did not run. **A body summary is not a finding-level
+pass.** Raising the spend limit is a Cursor dashboard change, outside this agent's reach.
+
+## 9. Status
+
+| Item                                         | Status                                               |
+| -------------------------------------------- | ---------------------------------------------------- |
+| Redaction-ordering class, four instances     | **CLOSED on deploy** (#1185, #1184, #1187, #1192)    |
+| The contract pinning it                      | **MERGED** (#1189)                                   |
+| Contract's self-contradicting comment        | **MERGED** (#1193, `e14f27284`)                      |
+| Sensor-truth: non-canonical persisted source | **MERGED** (#1170, `dd7e732cf`)                      |
+| #1170's `P1` comment-only assertions         | **OPEN on deploy** — follow-up proposed, not started |
+| Strip-vs-save collision (#1177)              | **CLOSED**, not merged                               |
+| `CURRENT_STATE`                              | this file, #1186, draft, **35/35 green**             |
+
+**No known product defect remains open.** The one open item is a test-quality weakness on deploy,
+awaiting Cheek's call on the follow-up.
+
+## 10. `NOT_MEASURED`
+
+- **Production.** `78125d82` is the **deploy branch**. A merge is not a deployment; no publish has
+  been performed or authorized, so production exposure for every item above is `NOT_MEASURED`.
+- Whether any leaked string ever reached a real export, clipboard or print surface, for any of the
+  four closed redaction instances.
+- Whether any already-persisted diary row carries one of the seven non-canonical aliases — the #1170
+  fix is forward-only and nothing here inspected production data.
+- Edge-function redaction copies beyond the one mirrored file.
+
+## 11. Posture
+
+Deploy tip **`78125d82`** (re-verify before citing). `20260827010000`, `20260826100000`,
+`20260825233000` and `20260813030000` all remain **NOT applied**. Merged today: #1185, #1184, #1187,
+#1192, #1189, #1194, #1195, #1193, #1170, #1196. Closed: #1190, #1191, #1177. Open and not mine to
+advance: #1172 (`bdeb058`, draft, auto-merge disabled, parked), #1184's rebase (parked), #1183,
+#1181, #1180, #1178, #1175, #1174, #1153, #1151, #1088, #1082.
+
+**Nothing was readied, enqueued, dequeued, merged, published or applied by Claude at any point in
+this sequence.** The only outward actions taken were: PR comments, resolving two review threads on
+#1170, and closing #1177 on Cheek's explicit instruction. This edit touches this file only.
+
+**Prior update:** 2026-08-29 UTC (~07:10 UTC)
 **Updated by:** Claude (2026-08-29: **#1170's sensor-truth defect is FIXED at `6c2afa4a` — the last
 live defect of this sequence. Cheek chose option A; measuring the question I had left
 `NOT_MEASURED` made the correct fix NARROWER than option A as written, and a blanket version would
 have been actively harmful.**
+
+> **Superseded in part by the ~07:40 entry above, and left in place rather than rewritten.** Still
+> accurate: the fix itself, why it is narrower, and the Bugbot precision in its `## 5`. Now
+> **overtaken by events**: its `## 6` says #1170 and #1193 are "not merged" and calls #1170's 35/35
+> verdict `NOT_MEASURED` — both merged, and the verdict is now a measured **PASS**; its `## 7` and
+> `## 8` give the deploy tip as `a95ba7d2`, which moved five times afterwards. Read the top entry for
+> current state.
 
 ## 1. The fix, and why it is narrower than what was proposed
 

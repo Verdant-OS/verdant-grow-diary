@@ -117,13 +117,34 @@ export function buildProvenanceBadgeRows(
  * opaque token. Applied to every free-text field going into the PDF.
  */
 const SECRET_PATTERNS: readonly RegExp[] = [
+  // ORDER IS LOAD-BEARING — assignments before labels and headers.
+  //
+  // A rule that runs earlier can destroy the variable NAME, after which the
+  // assignment rule below can no longer match and the VALUE survives. Both
+  // mechanisms were found in sibling modules and fixed the same way
+  // (#1185 `ecowittLocalForwardingStatus`, #1184 `ecowittValidationEvidenceRules`):
+  //
+  //   1. FRAGMENTING — a bare-word label rule rewrites the label inside a NAME.
+  //   2. CONSUMING  — a header rule swallows the whole following token, NAME
+  //      included: `bearer BridgeToken=secret` became `[redacted]=secret`.
+  //
+  // Credential-LABELLED assignments. Deliberately NOT a generic
+  // `[A-Z][A-Z0-9_]{2,}=` rule: this helper renders a user-facing grow report
+  // and promises to preserve prose, and grow telemetry uses the same uppercase
+  // shape — a generic rule would redact `VPD=1.2` and `PPFD=800`. Requiring a
+  // credential label in the NAME keeps report content intact. Pinned by
+  // "redacts a labelled credential assignment" and "preserves benign report
+  // content".
+  /\b[A-Za-z0-9_-]*(?:service[_-]?role|passkey|api[_-]?key|secret|password|token)[A-Za-z0-9_-]*\s*[:=]\s*(?:"[^"]+"|'[^']+'|\S+)/gi,
+  // Whole BridgeToken assignment — above the header/label rules that would
+  // otherwise consume the `BridgeToken` name first.
+  /\bBridgeToken\s*[:=]\s*\S+/gi,
   /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, // JWT-like
   /sk_(?:live|test)_[A-Za-z0-9]{8,}/g,
   /pk_(?:live|test)_[A-Za-z0-9]{8,}/g,
   /rk_(?:live|test)_[A-Za-z0-9]{8,}/g,
   /\bservice_role\b/gi,
   /\bbearer\s+[A-Za-z0-9._-]{8,}/gi,
-  /\bBridgeToken\s*[:=]\s*\S+/gi,
   /[A-Fa-f0-9]{32,}/g, // long hex secrets
 ];
 

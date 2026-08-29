@@ -1,6 +1,118 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~05:25 UTC)
+**Last updated:** 2026-08-29 UTC (~05:45 UTC)
+**Updated by:** Claude (2026-08-29: **#1189 MERGED at 05:40 UTC — the ordering contract is ON THE
+DEPLOY BRANCH. Deploy tip `061eeb8c` -> `a95ba7d2`. The redaction-ordering class is closed across
+all four instances AND pinned. But #1189 shipped carrying a comment that contradicts its own
+invariant, because the merge-queue lock swallowed the fix for the SECOND time tonight.**
+
+## 1. #1189 merged — the class is now closed and pinned
+
+`a95ba7d2`. Confirmed on the merged tip: `src/test/redaction-ordering-contract.test.ts` is present
+on the deploy branch. Its last pre-merge CI run (`33234974998`, head `8766ab6c`) was **SUCCESS** —
+35/35 required, 16/16 batch lanes, public census under the cap, `Supabase Preview` skipped.
+
+Cheek readied and enqueued it at 05:29 UTC. **Codex reviewed `8766ab6c` and completed with no
+findings.** Bugbot **could not run — Cursor usage limit** — the _second_ consecutive security PR it
+has silently missed tonight (also #1187, where Copilot and Codex both caught a real `P1` it never
+saw). `practical observation`, recorded because a reviewer that is absent from every security merge
+is a coverage gap that looks like a pass.
+
+## 2. Copilot found a contradiction in the contract — and it shipped anyway
+
+**The finding is correct and the error was mine.** The skip branch asserted:
+
+> _"Nothing to keep ordered: no rule matches the shape bare, so no rule can destroy it decorated
+> either."_
+
+That is **precisely the reasoning the partial-redaction block later in the SAME FILE exists to
+refute**, and which this session disproved twice by execution — `postGrowReportRules` and
+`proofReportRedactionRules` each fired a prefix-specific rule on a shape nothing matched bare,
+consumed the NAME and stranded the VALUE.
+
+Why this is more than a stray comment: the contract's behaviour is 433 lines of matrix, but its
+_value_ is that a future reader understands why two invariants exist. **A reader of only the skip
+branch would conclude the partial-redaction block is redundant and could delete the one invariant
+that catches this class.**
+
+**The fix was written, validated and could not be pushed.** `protected branch hook declined` —
+rejected TWICE while #1189 sat in the merge queue, and #1189 merged at 05:40 UTC still locked. Not
+retried blindly, because the #1187 retry succeeded only _after_ that PR merged and landed the
+commit on a dead branch.
+
+Follow-up opened immediately, as promised on the PR: **#1193**, draft, cut fresh from `a95ba7d2`.
+Verified there — contradicting line **0 occurrences**, corrected text present, contract
+**165 passed | 20 skipped** (identical to the merged head), `tsc` and eslint clean. Comment only,
++13/-4; no assertion touched, `COVERAGE_BASELINE` untouched.
+
+## 3. THE MERGE-QUEUE LOCK HAS NOW COST TWO VALIDATED FIXES
+
+`established fact`, twice in one night, same mechanism:
+
+| PR        | What was written, validated, and could not be pushed | What merged instead                                                              |
+| --------- | ---------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **#1187** | the unlabelled-NAME redaction fix                    | a **live credential leak** two reviewers had flagged as `P1` six minutes earlier |
+| **#1189** | this comment correction                              | a contract asserting reasoning its own invariant refutes                         |
+
+The pattern: a reviewer flags a real defect, the fix is ready before the merge, and the branch lock
+rejects the push until the PR has already merged. **Neither miss was a review failure — both
+reviews worked. The gap is between "fix exists" and "fix can land".**
+
+Recorded as a standing rule for this session: on `protected branch hook declined`, report to Cheek
+**immediately**, never retry blindly. A retry that succeeds post-merge writes to a dead branch.
+
+## 4. #1190 and #1191 closed — supersession PROVEN
+
+Closed at Cheek's instruction after re-verifying, not on the strength of #1192's description. **All
+four files byte-identical to the deploy tip:**
+
+```text
+src/lib/postGrowReportRules.ts                  IDENTICAL
+src/test/post-grow-report-pdf-export.test.tsx   IDENTICAL
+src/lib/proofReportRedactionRules.ts            IDENTICAL
+src/test/proofReportRedactionRules.test.ts      IDENTICAL
+```
+
+Product **and** tests — checked separately, because a fix landing without its RED-proven pins would
+be a silent gap. Zero bytes lost. Each carries a closing comment with that evidence.
+
+## 5. Status — one live defect remains
+
+| Item                                                              | Status                                                  |
+| ----------------------------------------------------------------- | ------------------------------------------------------- |
+| Redaction-ordering class, all four instances                      | **CLOSED on deploy** (#1185, #1184, #1187, #1192)       |
+| The contract pinning it                                           | **MERGED** (#1189, `a95ba7d2`)                          |
+| Contract's self-contradicting comment                             | **OPEN** — #1193, draft, fix verified                   |
+| `CURRENT_STATE`                                                   | this file, #1186, draft                                 |
+| **Sensor-truth: non-canonical persisted `details.sensor.source`** | **OPEN AND LIVE** — #1170, **ready-NOT-draft**, unfixed |
+
+**#1170 is now the only live defect, and it is the only PR of the set that is ready rather than
+draft.** Two unresolved threads, Codex `P1` + Copilot, verified by execution: 7 manual/CSV aliases
+are attachable but persist a source outside the six-label contract, which the timeline renders as
+`unknown` — a genuinely manual reading displayed as unknown provenance. Wider than reported
+(`pi_bridge`, `realtime`, `sensor` too, **pre-existing**, not #1170's regression). Deliberately not
+fixed: both remedies are product decisions and it writes **persisted user data**. Options and a
+recommendation are on the PR.
+
+## 6. `NOT_MEASURED` — unchanged
+
+- **Whether any leaked string ever reached a real export, clipboard, or print surface**, for any of
+  the four closed instances. Closing a leak does not retroactively measure exposure.
+- **Production.** `a95ba7d2` is the **deploy branch**; a merge is not a deployment and no publish
+  has been performed or authorized.
+- Edge-function redaction copies beyond the one mirrored file.
+- `sanitizeProofReportMarkdown` bare-shape coverage, recorded in `COVERAGE_BASELINE`.
+- Mixed-case / spaced `NAME = value`, out of #1192's scope.
+
+## 7. Posture
+
+Deploy tip **`a95ba7d2`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. Open: #1186 (`af4537b`, draft), #1193 (`cfb65d2`, draft), **#1170
+(`393dbcdc`, ready-not-draft)**. Closed: #1190, #1191. Merged tonight: #1185, #1184, #1187, #1192,
+#1189. **Nothing readied, enqueued, merged, published or applied by Claude at any point.** This edit
+touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~05:25 UTC)
 **Updated by:** Claude (2026-08-29: **#1192 MERGED at 04:47 UTC — BOTH LIVE LEAKS ARE CLOSED ON THE
 DEPLOY BRANCH. Deploy tip `84d3b813` -> `061eeb8c`. #1189 is now green on production truth with
 NOTHING carried, which is the strongest state the contract can be in. #1190 and #1191 are

@@ -128,6 +128,21 @@ const SECRET_PATTERNS: readonly RegExp[] = [
   //   2. CONSUMING  — a header rule swallows the whole following token, NAME
   //      included: `bearer BridgeToken=secret` became `[redacted]=secret`.
   //
+  // HEADER-PREFIXED assignment, ANY name. Must stay above the `bearer` rule
+  // below, which consumes only the NAME and leaves the VALUE behind:
+  // `bearer SOME_PLAIN_NAME=secret` became `[redacted]=secret` — output that
+  // LOOKS redacted while the credential survives, the most dangerous state a
+  // sanitizer can produce. Raised by Copilot on #1187 and confirmed by
+  // execution; the `Authorization:` variant was found in the same probe and
+  // was not redacted at all, this module having had no Authorization rule.
+  //
+  // A credential header is the discriminator that makes this safe here: it
+  // fires ONLY behind `bearer`/`Authorization`, so bare grow telemetry
+  // (`VPD=1.2`, `PPFD=800`, `EC=1.8`) is untouched — which is why this closes
+  // the unlabelled-NAME gap that a generic `[A-Z][A-Z0-9_]{2,}=` rule could
+  // not close without destroying report content. Pinned by "redacts a
+  // header-prefixed assignment with an unlabelled name".
+  /\b(?:bearer|authorization)\b\s*:?\s*[A-Za-z0-9._-]+\s*[:=]\s*(?:"[^"]+"|'[^']+'|\S+)/gi,
   // Credential-LABELLED assignments. Deliberately NOT a generic
   // `[A-Z][A-Z0-9_]{2,}=` rule: this helper renders a user-facing grow report
   // and promises to preserve prose, and grow telemetry uses the same uppercase

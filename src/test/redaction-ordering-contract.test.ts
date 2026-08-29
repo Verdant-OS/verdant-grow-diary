@@ -312,10 +312,19 @@ describe("redaction ordering contract — decoration must never reduce redaction
             const title = `${label} / ${shape.id} / ${context.id}`;
 
             if (!covered) {
-              // Out of this module's coverage. Nothing to keep ordered: no
-              // rule matches the shape bare, so no rule can destroy it
-              // decorated either. Asserting redaction here would be a
-              // coverage demand wearing an ordering test's clothes.
+              // Out of this module's coverage, so INVARIANT 1 HAS NO PREMISE
+              // here: there is no clean `redact(X)` for a prefix to erode.
+              // Asserting redaction would be a coverage demand wearing an
+              // ordering test's clothes.
+              //
+              // This is NOT a claim that the decorated form is safe. A
+              // prefix-specific rule can fire on a shape nothing matches
+              // bare, consume the NAME and strand the VALUE — that is
+              // exactly the defect the "no partial redaction" block below
+              // catches, which is why that block makes NO coverage judgment
+              // and runs on every input, these skipped ones included.
+              // Raised by Copilot on #1189: the original wording here
+              // asserted the very reasoning that block exists to refute.
               it.skip(`${title} — not covered undecorated, ordering not applicable`, () => {});
               continue;
             }

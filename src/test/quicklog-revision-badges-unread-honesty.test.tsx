@@ -75,7 +75,7 @@ const HISTORY_ENTRY = {
   entry_type: "watering",
   entry_at: "2026-08-15T12:00:00.000Z",
   note: "Watered.",
-  details: { event_type: "watering" },
+  details: { event_type: "watering", origin_grow_event_id: "ge-diary-1" },
 } as const;
 
 describe("Quick Log revision badge unread honesty", () => {
@@ -195,7 +195,7 @@ const FEEDING_ENTRY = {
   entry_type: "feeding",
   entry_at: "2026-08-15T12:00:00.000Z",
   note: "Fed.",
-  details: { event_type: "feeding" },
+  details: { event_type: "feeding", origin_grow_event_id: "ge-feed-1" },
 } as const;
 
 const PHOTO_ENTRY = {
@@ -204,7 +204,7 @@ const PHOTO_ENTRY = {
   entry_at: "2026-08-15T12:00:00.000Z",
   note: "Canopy shot.",
   photo_url: "https://example.com/canopy.jpg",
-  details: { event_type: "photo", photo_url: "https://example.com/canopy.jpg" },
+  details: { event_type: "photo", photo_url: "https://example.com/canopy.jpg", origin_grow_event_id: "ge-photo-1" },
 } as const;
 
 function laneCases(
@@ -253,13 +253,13 @@ function laneCases(
   });
 }
 
-laneCases("feeding panel", FeedingHistoryPanel, FEEDING_ENTRY, "feeding-history-panel", "diary-feed-1");
-laneCases("photo panel", PhotoHistoryPanel, PHOTO_ENTRY, "photo-history-panel", "diary-photo-1");
-laneCases("watering panel", WateringHistoryPanel, HISTORY_ENTRY, "watering-history-panel", "diary-1");
+laneCases("feeding panel", FeedingHistoryPanel, FEEDING_ENTRY, "feeding-history-panel", "ge-feed-1");
+laneCases("photo panel", PhotoHistoryPanel, PHOTO_ENTRY, "photo-history-panel", "ge-photo-1");
+laneCases("watering panel", WateringHistoryPanel, HISTORY_ENTRY, "watering-history-panel", "ge-diary-1");
 
 it("history panel: ok with a matching badge shows the edited chrome", () => {
   badgeHookMock.status = "ok";
-  badgeHookMock.badges = new Map([["diary-1", { correctionCount: 2 }]]);
+  badgeHookMock.badges = new Map([["ge-diary-1", { correctionCount: 2 }]]);
   render(<RecentQuickLogActivityPanel rawEntries={[HISTORY_ENTRY]} />, { wrapper: makeWrapper() });
   expect(screen.getByTestId("quicklog-entry-edited-badge")).toBeInTheDocument();
   expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();

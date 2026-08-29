@@ -36,14 +36,27 @@ It is **not**:
 **Do not** replay this via GitHub Preview.
 **Do not** APPLY `20260813030000` as part of, or because of, this ledger.
 
+**State which sense you mean, every time.** "Unapplied" is ambiguous for `20260813030000` and one
+reading is dangerous: its **GitHub apply lane** never succeeded, but its **objects were applied to
+production on 2026-08-21** — verbatim, through Lovable. That is a point-in-time record, not a current
+measurement; this ledger does not re-measure production. A bare "not applied" reads as licence to
+apply it, which would re-issue an **unguarded `handle_new_user`** over the guard applied that day. See the section
+_"`20260813030000` — 'unapplied' carries two meanings, and one is dangerous"_ in
+`docs/agents/CURRENT_STATE.md`, which is the authority on this and is not edited by this PR.
+
 ### Why this is docs and not a migration
 
 A migration file under `supabase/migrations/` is an instruction to a replayer. These
-objects are **already live**; there is nothing to apply, and a file shaped like a
-migration invites exactly the two failures this record exists to prevent — a reviewer
-reading merge as APPLY, and Supabase Preview replaying it against a disposable database
-where the live UPDATE freeze is stricter than the older committed body in
-`20260606034030`.
+objects were **already applied when captured**; there is nothing to apply, and a file shaped
+like a migration invites exactly the two failures this record exists to prevent — a reviewer
+reading merge as APPLY, and Supabase Preview replaying it against a disposable database where
+the captured UPDATE freeze is stricter than committed history.
+
+Measure that strictness against the **last committed definition in migration order** —
+`20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql` (lines 63-70), **not** the earlier
+`20260606034030`, which is superseded and overstates the gap. Against that end state the
+captured body adds exactly one field, `current_badge`. See flag 4 below; the two statements
+must not diverge.
 
 This follows the docs-only pattern established by
 [`docs/sandbox-bzat-20260826-advisor-remediation-apply-ledger-operator-runbook.md`](./sandbox-bzat-20260826-advisor-remediation-apply-ledger-operator-runbook.md)
@@ -102,8 +115,11 @@ END;
 $function$;
 ```
 
-Bound as `profiles_force_gamification_defaults_on_insert_trg`, `BEFORE INSERT ON profiles
-FOR EACH ROW`.
+Bound by this exact statement from the capture:
+
+```sql
+CREATE TRIGGER profiles_force_gamification_defaults_on_insert_trg BEFORE INSERT ON profiles FOR EACH ROW EXECUTE FUNCTION profiles_force_gamification_defaults_on_insert();
+```
 
 ### `public.profiles_block_gamification_updates()` — BEFORE UPDATE
 
@@ -132,7 +148,20 @@ END;
 $function$;
 ```
 
-Bound as `profiles_block_gamification_updates`, `BEFORE UPDATE ON profiles FOR EACH ROW`.
+Bound by this exact statement from the capture:
+
+```sql
+CREATE TRIGGER profiles_block_gamification_updates BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION profiles_block_gamification_updates();
+```
+
+**Provenance caveat on both bindings.** These are the `CREATE TRIGGER` statements as recorded in the
+2026-08-24 capture. That capture's own header states the definitions were "recorded as
+`CREATE OR REPLACE` / `DROP TRIGGER IF EXISTS` + `CREATE TRIGGER` for idempotent ledger shape only",
+so the surrounding `DROP TRIGGER IF EXISTS … ON public.profiles;` guards were added for idempotence
+and are **not** part of the read. Whether raw `pg_get_triggerdef` output would additionally
+schema-qualify (`ON public.profiles`, `EXECUTE FUNCTION public.…`) is **`NOT_MEASURED`** — only this
+transcription survives in the repository. Neither trigger carries an `UPDATE OF` column list or a
+`WHEN` clause in the recorded text.
 
 ## Reviewer flags
 
@@ -148,9 +177,13 @@ question for the reviewer, not a finding this ledger resolves.
 3. **The UPDATE exception string names four fields** — `'gamification fields (nugs_total,
 level, tier, current_badge) are not directly writable'`. Do not accept shortened prose
    that omits `tier`; the live string is the one above.
-4. **The live UPDATE freeze is stricter than the committed GitHub body.** The function in
-   `20260606034030` guards `nugs_total` / `level` / `tier` only. Live additionally guards
-   `current_badge` and `referral_code`. This divergence is the substance of the record.
+4. **The live UPDATE freeze adds exactly one field over committed history.** Compare against the
+   **last committed definition in migration order**, not `20260606034030` — an earlier definition is
+   the wrong baseline and overstates the drift. `20260721107000_referral_code_and_pending_capture.sql`
+   (lines 100-108) and the later `20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql`
+   (lines 63-70) **already guard `referral_code`**. Against that end state the captured body adds
+   only **`current_badge`**. Describing `referral_code` as live-only sends a reviewer to remediate
+   behaviour that is already recorded.
 5. **Grants / `EXECUTE` privileges are `NOT_MEASURED`.** They were not captured. Do not
    infer them from this file in either direction.
 
@@ -168,13 +201,16 @@ level, tier, current_badge) are not directly writable'`. Do not accept shortened
 
 ## Safety / validation
 
-| Check                                                          | Status                       | Notes                                                                 |
-| -------------------------------------------------------------- | ---------------------------- | --------------------------------------------------------------------- |
-| Files under `supabase/migrations/` in this change              | **`PASS`** — zero            | Docs-only; migration count unchanged at 278                           |
-| Definitions transcribed byte-for-byte from the 2026-08-24 read | **`PASS`**                   | Including `$function$` delimiters and the four-field exception string |
-| Apply / re-apply these objects to knk                          | `NOT_APPLICABLE` / forbidden | Explicit hard stop; production SQL stays locked                       |
-| Preview-replay this ledger                                     | `NOT_APPLICABLE` / forbidden | Docs record only; nothing here is replayable                          |
-| Live knk state at time of writing                              | **`NOT_MEASURED`**           | No knk credential measurement was taken for this file                 |
-| Grants / `EXECUTE` ACLs                                        | **`NOT_MEASURED`**           | Not captured on 2026-08-24                                            |
-| Production exposure of the divergence in flag 4                | **`NOT_MEASURED`**           | Recording a divergence does not measure its effect                    |
-| `20260813030000`                                               | **NOT applied**              | And must not be applied because of this ledger                        |
+| Check                                                          | Status                       | Notes                                                                                                                         |
+| -------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Files under `supabase/migrations/` in this change              | **`PASS`** — zero            | Docs-only; migration count unchanged at 278                                                                                   |
+| Definitions transcribed byte-for-byte from the 2026-08-24 read | **`PASS`**                   | Including `$function$` delimiters and the four-field exception string                                                         |
+| Apply / re-apply these objects to knk                          | `NOT_APPLICABLE` / forbidden | Explicit hard stop; production SQL stays locked                                                                               |
+| Preview-replay this ledger                                     | `NOT_APPLICABLE` / forbidden | Docs record only; nothing here is replayable                                                                                  |
+| Live knk state at time of writing                              | **`NOT_MEASURED`**           | No knk credential measurement was taken for this file                                                                         |
+| Grants / `EXECUTE` ACLs                                        | **`NOT_MEASURED`**           | Not captured on 2026-08-24                                                                                                    |
+| Production exposure of the divergence in flag 4                | **`NOT_MEASURED`**           | Recording a divergence does not measure its effect                                                                            |
+| `20260813030000` — GitHub apply lane ever succeeded            | **`FAIL`**                   | The apply workflow shows only its failed PREFLIGHT                                                                            |
+| `20260813030000` — applied to production on 2026-08-21         | **`PASS`**                   | Point-in-time, sourced to `docs/signup-attribution-outage-operator-runbook.md`: applied verbatim through Lovable, md5-guarded |
+| `20260813030000` — production objects now                      | **`NOT_MEASURED`**           | Not re-measured. The 2026-08-21 record is the only evidence, and it is **not** a licence to re-apply                          |
+| GitHub-APPLY `20260813030000`                                  | `NOT_APPLICABLE` / forbidden | Re-issues an unguarded `handle_new_user` over the guard applied 2026-08-21 — an incident                                      |

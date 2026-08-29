@@ -1,6 +1,195 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~09:55 UTC)
+**Last updated:** 2026-08-29 UTC (~10:40 UTC)
+**Updated by:** Claude (2026-08-29: **#1203 merged as `cc0b7bd3f` carrying an open Codex `P2` — the
+SIXTH merge with an open finding, not the seventh as I twice reported. It also produced the first
+review fix in this entire sequence that actually landed BEFORE its own merge — and that happened by
+accident, via a 48-second merge-queue dequeue whose cause was never established.** Two of my own
+hypotheses about that dequeue were falsified by evidence before I reported them. Prior header
+follows.)
+
+## 1. #1203 merged carrying an open `P2` — and my count of the pattern was wrong
+
+`established fact`, verified on the deploy tip by execution, not from the PR body.
+
+#1203 merged between **10:34:15Z and 10:36:26Z** — `git ls-remote` showed it still queued at the
+first timestamp and the tip moved by the second. Deploy tip `353702983` -> **`cc0b7bd3f`**, which is
+the merge-group commit itself.
+
+Verified on that tip: **one** file changed, +57/-21, **zero** files under `supabase/migrations/`,
+migration count **278**, both baseline statements naming `20260721194325_f96507e6` and marking
+`20260606034030` the wrong baseline, and **zero** occurrences of the three undeclared status labels.
+
+**Correction to my own reporting.** I twice told Cheek this was the _seventh_ merge with an open
+finding. `## 4` of the prior entry names **five** — #1187, #1189, #1170, #1199, #1200 — so **#1203
+is the sixth.** The error came from adding together two series I had been tracking separately:
+occurrences of the enqueue-then-review race, and merges that carried an open finding. They overlap
+but are not the same list, and summing them inflates both.
+
+## 2. Copilot found an incomplete fix, and a defect I introduced while fixing it
+
+`established fact`, both verified against the file before either was touched, both fixed in
+`5426b9dc4` and both threads resolved.
+
+**Finding 1 — the round-1 baseline correction was half-applied.** #1203 rewrote flag 4 to compare
+against the last committed definition in migration order, but left the _"Why this is docs and not a
+migration"_ paragraph anchored on `20260606034030`. The ledger therefore stated **two different
+baselines for one question**. That is worse than the overstatement it was correcting: an operator
+reading the top of the file and one reading flag 4 would have gone off to remediate different
+things. A partial correction to a safety document can be more dangerous than no correction.
+
+**Finding 2 — my fix for a false claim introduced a fresh unmeasured one.** The safety rows I added
+used three labels the ledger's own vocabulary section does not declare, and one of them, `LIVE since
+2026-08-21`, asserts continuing current state **five rows above** a `NOT_MEASURED` row saying live
+knk state was never measured for this file. Same table, same PR, same class of error as the one
+being corrected.
+
+Both now sit inside the declared vocabulary: apply lane ever succeeded `FAIL`, applied to production
+on 2026-08-21 `PASS` (point-in-time, sourced), production objects now `NOT_MEASURED`, GitHub-APPLY
+forbidden. The hazard is undiminished — the prohibition now rests on the guard applied that day
+rather than on an unmeasured claim about the present.
+
+## 3. Codex's `P2` merged open, and its root cause is a gap in the vocabulary itself
+
+`established fact` for the measurements; `inference` for the remedy.
+
+Codex filed a `P2` at 10:30:31Z, **2m16s after the enqueue**, on the `NOT_APPLICABLE / forbidden`
+composite: `NOT_APPLICABLE` is declared, here and in `AGENTS.md`, as _"the check does not apply to
+this target"_, whereas GitHub-APPLY **does** apply and is prohibited. The finding is correct.
+
+It was **deliberately not fixed**, for reasons measured rather than asserted:
+
+| Where `NOT_APPLICABLE` / forbidden appears                      | Count |
+| --------------------------------------------------------------- | ----- |
+| The knk ledger at parent `a066ce6a8`, **before** #1203          | 2     |
+| `docs/sandbox-bzat-20260826-…-apply-ledger-operator-runbook.md` | 2     |
+| Added by #1203                                                  | 1     |
+
+Fixing one row of five leaves two files saying the same thing two ways — worse for the operator the
+finding protects. Fixing all five turns a docs-correction PR into a cross-file convention change
+nobody asked for.
+
+**The real finding is underneath it:** neither vocabulary has a label for _"this operation is real,
+available, and must not be performed."_ This ledger declares five; `AGENTS.md` declares eight. None
+of the thirteen fits. That absence is why the composite was invented here before #1203 existed — and
+why Codex's own suggested workaround, "put the prohibition in Notes", is wrong: demoting a
+prohibition to a Notes column is exactly the softening these ledgers exist to prevent.
+
+**This file does the same thing.** The two-sense table in `## 1` of the prior entry uses `LIVE` and
+`FORBIDDEN`, neither declared. Three separate documents independently invented a prohibition label
+because the constitution does not supply one. That is the case for the proposed slice — declare
+`FORBIDDEN` (_"the operation is available and must not be performed"_) in `AGENTS.md` and both
+apply-ledger runbooks, then replace all the composites — and the case for it being **its own PR**,
+reviewed as a convention change. **Not opened.** GDP names the next cut.
+
+Also recorded, because the file punishes convergence errors: this was **round three**, and each fix
+drew the next — round 1's status labels flagged, round 2's replacement for them flagged here. That
+is the documented point to stop pushing for a bot and raise once, which is what happened.
+
+## 4. The merge queue dequeued #1203 in 48 seconds and the cause was never established
+
+`established fact` for the observations; **`UNKNOWN`** for the cause, and it stays `UNKNOWN`.
+
+First enqueue 10:12:35Z. `github-merge-queue[bot]` removed it 10:13:23Z with reason `CI_FAILURE` —
+**48 seconds**, and the group ref was deleted **while three of its own workflows were still
+running** (five had completed `success`; `CI`, `Dependency & Security CI` and `Full Vitest Suite`
+were `in_progress`). So the queue did not wait for the checks it was supposedly failing on.
+
+- **No merge-group Actions workflow failed.** Eight ran on merge SHA `2c250c7c`; none concluded
+  `failure`.
+- **On the PR head, 85 check runs and exactly one `failure`** — `Supabase Preview`. All 35 required
+  contexts `success`, `test:security-regression` `success`, every reviewer check `neutral` or
+  `success`.
+- The diff was **one markdown file** with zero migrations. No lint, typecheck, test, build,
+  docs-safety or sentinel gate can change result on it, and all of them passed.
+
+Both surfaces were checked and neither names a failing check. **Which signal dequeued it is
+`UNKNOWN`** and no cause was invented. A single re-queue is the sanctioned retry; Cheek took it at
+10:28:18Z and it merged.
+
+## 5. Two hypotheses killed by evidence before they were reported
+
+`practical observation`, and the most transferable item here — both would have become confidently
+wrong lore in this file.
+
+**Hypothesis A: `Supabase Preview` had started gating the merge queue.** If true, the pinned
+`config/required-status-checks.json` (`capturedAt: 2026-08-10`) would be **stale**, and every
+"35/35 green" reading in this file — including mine an hour earlier — would be incomplete. **Killed:**
+#1202 was enqueued at 09:49Z with the _identical_ failure red on its head (Branch Error last updated
+09:27:05Z, never superseded) and **merged**. Supabase Preview does not gate this queue, and no
+ruleset drift is demonstrated.
+
+**Hypothesis B: the `ai_credit_grants` collision was new.** **Killed:** `ERROR: relation
+"ai_credit_grants" already exists (SQLSTATE 42P07)` is pre-existing committed history, already
+declared in `config/local-supabase-replay-compatibility.json` — canonical
+`20260721103000_ai_credit_grants.sql`, duplicate `20260721182752_4fc51714-…`, whose recorded
+`reason` names SQLSTATE 42P07 verbatim. Nothing to fix; the sanctioned mechanism already covers it.
+
+It reproduced identically on `dd382ffd8`, `5426b9dc4` and #1202's head, so it is **deterministic, not
+a flake**, and re-running it would establish nothing. It is an external Supabase integration check,
+so there is no means to re-run it in any case. One standing-down comment was posted and no second.
+
+## 6. The race broke once, by accident, then closed again
+
+`practical observation`. The enqueue-then-review race (`## 7` of the entry two below) held for a
+sixth time — but with an instructive interruption.
+
+The **dequeue** created the gap the race normally denies: it unlocked the branch and left a
+fifteen-minute window. In it, Copilot's two findings were filed, verified, fixed, pushed as
+`5426b9dc4`, replied to and resolved — **the first time in this entire sequence that a review fix
+landed before its own PR merged.** Every prior occurrence lost the fix to the lock.
+
+Then the ready-toggle re-fired Codex a third time on an already-cleared SHA, six seconds after the
+re-enqueue, and it found the `P2` at 10:30:31Z with the branch locked again. So the mechanism that
+finally let a fix land was **an accident, not a process change** — and the moment normal service
+resumed, the race resumed with it. Separating the ready and enqueue gestures remains the only real
+remedy.
+
+Two further mechanics worth keeping: converting a PR to draft **permanently destroys its queue
+membership** (GitHub does not restore it on ready), and the ready toggle **re-fires Codex on an
+unchanged SHA**, which is how a commit already cleared twice produced a finding on its third pass.
+
+## 7. Two reporting errors of my own in this sequence
+
+Recorded because the evidence-discipline rule applies to me first.
+
+1. **"Seventh merge with an open finding."** It is the sixth. Corrected in `## 1`.
+2. **"Four-instance convention"** in the heading of my reply on the Codex thread, where the count is
+   five. The table directly beneath it and two later references in the same comment say five, so a
+   reader gets the right number; the heading was not corrected, because a second comment on a queued
+   PR to fix a heading is noise.
+
+Also: I told Cheek the race "did not apply" to the 10:28 enqueue. It held for about two minutes.
+Stated as a qualifier at the time rather than left standing.
+
+## 8. Status
+
+| Item                               | Status                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| #1203 knk ledger corrections       | **MERGED** `cc0b7bd3f` — verified on the tip by execution                      |
+| Codex `P2` on the composite status | **OPEN on the deploy branch**, thread unresolved, deliberately not fixed       |
+| `FORBIDDEN` vocabulary slice       | **proposed, NOT opened** — GDP names the next cut                              |
+| #1186 `CURRENT_STATE`              | draft, `b00799c0a` green (ci.yml 33246617606, 10:03:41Z); this edit extends it |
+| `Supabase Preview` 42P07           | red and pre-existing; already covered by the replay-compat config; not a gate  |
+| Bugbot                             | Cursor usage limit on **every head of every PR** tonight                       |
+
+## 9. `NOT_MEASURED`
+
+- **Production.** `cc0b7bd3f` is the deploy branch. A merge is not a deployment; no publish
+  performed or authorized.
+- Which check dequeued #1203 at 10:13:23Z. `UNKNOWN`, not `NOT_MEASURED` — both surfaces were
+  measured and neither named it.
+- Whether the `NOT_APPLICABLE` / forbidden composite has ever caused an operator to misread a row as
+  inapplicable rather than prohibited. Recording the ambiguity does not measure its effect.
+- Whether the two captured trigger bindings carry `UPDATE OF`, `WHEN`, or schema qualification —
+  unchanged from the prior entry; the raw `pg_get_triggerdef` output was never preserved.
+
+## 10. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added —
+count stays **278**. No new cut opened, including the `FORBIDDEN` slice this entry argues for.
+
+**Prior update:** 2026-08-29 UTC (~09:55 UTC)
 **Updated by:** Claude (2026-08-29: **#1200 merged carrying THREE verified findings — the fifth PR
 tonight to merge with an open finding. One of them is a FALSE MIGRATION-STATE FACT that I wrote, and
 I had propagated the same wording into this file. Corrected in place below and at §11 of the prior
@@ -33,6 +222,15 @@ from now on:
 | GitHub apply lane     | **never succeeded** — the workflow shows only its failed PREFLIGHT |
 | Production objects    | **LIVE** since 2026-08-21 (Lovable, verbatim, md5-guarded)         |
 | GitHub-APPLY the file | **FORBIDDEN** — would overwrite the live guard                     |
+
+> **Annotated 2026-08-29 (~10:40 UTC), not rewritten.** Codex later filed a `P2` on exactly this
+> shape in the knk ledger: `LIVE` and `FORBIDDEN` are **not** declared in `AGENTS.md`'s status
+> vocabulary, and the composite `NOT_APPLICABLE` / forbidden misuses a label meaning _"does not
+> apply"_ for an operation that does apply and is prohibited. The table above is left standing
+> because the two-sense distinction it draws is correct and load-bearing; only the labels are
+> undeclared. See `## 3` of the newest entry — the root cause is that no declared vocabulary has a
+> prohibition label, which is why this file, the knk ledger and the #1142 sibling ledger each
+> invented one independently.
 
 `20260827010000`, `20260826100000` and `20260825233000` remain **NOT applied** in the plain sense.
 

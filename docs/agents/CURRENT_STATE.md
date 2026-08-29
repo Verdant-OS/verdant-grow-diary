@@ -1,6 +1,118 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~05:45 UTC)
+**Last updated:** 2026-08-29 UTC (~07:00 UTC)
+**Updated by:** Claude (2026-08-29: **#1170's sensor-truth defect is FIXED at `6c2afa4a` — the last
+live defect of this sequence. Cheek chose option A; measuring the question I had left
+`NOT_MEASURED` made the correct fix NARROWER than option A as written, and a blanket version would
+have been actively harmful.**
+
+## 1. The fix, and why it is narrower than what was proposed
+
+Codex (`P1`) and Copilot both raised it; both were right; verified by execution on `393dbcdc` before
+anything changed. The strip gates attachability on `normalizeSensorSource()`, but
+`buildSensorSnapshotDetails` persists `snapshot.source` **verbatim** — so the seven manual/CSV
+aliases #1170's third commit made attachable were saved with a label outside the six-label contract,
+which `timelineEvidenceDetailViewModel.normalizeSource` renders as `unknown`. **A genuinely MANUAL
+reading written to the diary and displayed as unknown provenance.**
+
+I had flagged one thing as `NOT_MEASURED` when proposing the remedy: whether anything reads the
+persisted `source` for provider identity. **Measuring it changed the fix.** It does —
+`growDiaryTimelineRules.SOURCE_DISPLAY_LABELS`:
+
+| raw source        | timeline label  | canonical form | a blanket rewrite would               |
+| ----------------- | --------------- | -------------- | ------------------------------------- |
+| `pi_bridge`       | **"Pi bridge"** | `live`         | lose provider identity                |
+| `ecowitt`         | **"EcoWitt"**   | **`invalid`**  | **persist a real reading as invalid** |
+| `node_red_bridge` | **"Node-RED"**  | **`invalid`**  | same                                  |
+
+**Blanket canonicalization would have been a WORSE sensor-truth violation than the one being
+fixed.** That is the whole case for measuring an `UNKNOWN` before acting on it rather than shipping
+the plausible version.
+
+## 2. What shipped
+
+`persistedSensorSourceLabel` in `quickLogSnapshotStripAdapter.ts` rewrites **only when the canonical
+form is `manual` or `csv`** — exactly the seven aliases this PR made attachable. They carry no
+provider identity (they render as sanitized echoes), so canonicalizing them also **improves** the
+timeline label:
+
+```text
+manual_snapshot       -> manual   timeline "Manual_snapshot" -> "Manual"
+import / imported     -> csv      timeline "Import"          -> "CSV"
+user/entry/log/diary  -> manual                              -> "Manual"
+
+pi_bridge · ecowitt · node_red_bridge · esp32_arduino · webhook · mqtt   -> UNTOUCHED
+manual · csv · live · demo · stale · invalid                             -> UNTOUCHED
+```
+
+Helper placed in the adapter, **not** `sensorSourceRules.ts`, because #1170's own body declares that
+file out of scope. Neither touched file is mirrored to `_shared`.
+
+## 3. Validation
+
+| Stage                                                     | Result                     |
+| --------------------------------------------------------- | -------------------------- |
+| **RED** — the seven alias cases vs. the unfixed save path | **7 failed \| 12 passed**  |
+| **GREEN** — after                                         | **19 passed**              |
+| quicklog / strip / sensor-source / timeline sweep         | **172 files, 2692 passed** |
+| `v0-operating-loop-contract`                              | 26/26                      |
+| `tsc --noEmit` · eslint · edge mirror                     | clean · clean · in sync    |
+
+All seven alias cases render the real QuickLog and assert on the actual persisted
+`p_details.sensor.source` — Copilot asked specifically to "cover an alias through the save-path
+test", and a helper-only unit test would not have answered that.
+
+**The `pi_bridge` case is a FENCE, not a fix** — it passes both before and after, so it is not
+evidence for the change. Stated as such on the PR rather than counted in the RED total. Its job is to
+fail if someone later widens the rewrite to reach a provider label.
+
+## 4. Deliberately NOT fixed, and why bundling it would be wrong
+
+`pi_bridge`, `realtime` and `sensor` also persist non-canonical sources. That is **pre-existing** —
+those were attachable long before #1170 — and canonicalizing them is precisely the destructive path
+in the table above. It needs a different remedy (widening `ALLOWED_SOURCES`, or a separate provider
+field) and its own reviewed slice. **`NOT_MEASURED`: whether any already-persisted diary row carries
+one of the seven aliases.** This fix is forward-only; it does not migrate existing rows, and nothing
+here inspected production data.
+
+## 5. Bugbot has now missed THREE consecutive PRs
+
+`practical observation`, recorded because a silent reviewer reads as a pass: Cursor Bugbot returned
+_"couldn't run — usage limit reached"_ on **#1187, #1189 and #1170** — every security-relevant PR of
+this sequence. On #1187 it had posted a "Low Risk" summary while Copilot and Codex both caught a real
+`P1` it never saw. Raising the spend limit is a Cursor dashboard change, outside this agent's reach.
+
+## 6. Status — the sequence is functionally complete
+
+| Item                                         | Status                                                            |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| Redaction-ordering class, four instances     | **CLOSED on deploy** (#1185, #1184, #1187, #1192)                 |
+| The contract pinning it                      | **MERGED** (#1189, `a95ba7d2`)                                    |
+| Contract's self-contradicting comment        | #1193, draft, **35/35 green**                                     |
+| Sensor-truth: non-canonical persisted source | **FIXED** at `6c2afa4a` — #1170, ready-not-draft, awaiting review |
+| `CURRENT_STATE`                              | this file, #1186, draft                                           |
+
+**No known live defect remains open and unaddressed.** #1170 is fixed but not merged; #1193 is green
+but not merged.
+
+## 7. `NOT_MEASURED` — unchanged
+
+- Whether any leaked string ever reached a real export, clipboard or print surface, for any of the
+  four closed redaction instances.
+- Whether any already-persisted diary row carries one of the seven non-canonical aliases.
+- **Production.** `a95ba7d2` is the **deploy branch**; a merge is not a deployment and no publish has
+  been performed or authorized.
+- Edge-function redaction copies beyond the one mirrored file.
+
+## 8. Posture
+
+Deploy tip **`a95ba7d2`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. Open: #1186 (`a76db59`, draft), #1193 (`cfb65d2`, draft, green), **#1170
+(`6c2afa4a`, ready-not-draft, fixed, Codex re-reviewing)**. Closed: #1190, #1191. Merged today:
+#1185, #1184, #1187, #1192, #1189. **Nothing readied, enqueued, merged, published or applied by
+Claude at any point in this sequence.** This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~05:45 UTC)
 **Updated by:** Claude (2026-08-29: **#1189 MERGED at 05:40 UTC — the ordering contract is ON THE
 DEPLOY BRANCH. Deploy tip `061eeb8c` -> `a95ba7d2`. The redaction-ordering class is closed across
 all four instances AND pinned. But #1189 shipped carrying a comment that contradicts its own

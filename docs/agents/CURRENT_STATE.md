@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~20:05 UTC)
+**Last updated:** 2026-08-29 UTC (~20:26 UTC)
 **Updated by:** Claude (2026-08-29: #1213 and #1214 merged. #1213 carried a `P1` — `20260813030000`
 listed among migrations that "remain NOT applied", corrected before merge. #1214 closes the
 Authorization redaction gap for **token-shaped** Digest/Negotiate only; the **parameterized case is

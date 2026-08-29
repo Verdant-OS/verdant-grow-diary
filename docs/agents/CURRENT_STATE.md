@@ -5,7 +5,8 @@
 it was a repeat of an error this file already documents me making.** The entry recording #1212's
 overcorrection itself listed `20260813030000` among migrations that "remain NOT applied", which is
 false in the direction that licenses an APPLY. Fixed, merged clean. **#1214 (Codex) merged after it**,
-closing the Digest/Negotiate half of the Authorization redaction gap. Prior header follows.)
+closing the Authorization redaction gap **for token-shaped Digest/Negotiate only — the parameterized
+case is still OPEN**, verified by execution. Prior header follows.)
 
 ## 1. The `P1`: I reproduced a documented error, one section below its own record
 
@@ -66,7 +67,8 @@ The first two were green _while wrong_. **CI proves the file parses, formats and
 gates; it cannot evaluate whether a claim is true.** Every finding this sequence produced arrived
 after a draft→ready transition, because that is what triggers Codex. Had either PR merged from draft
 on the strength of its green count, the deploy branch would carry the defect — in #1213's case, a
-sentence that reads as licence to re-apply a migration whose objects are already live.
+sentence that reads as licence to re-apply a migration whose objects were applied to production on
+2026-08-21 and whose current state is `NOT_MEASURED`.
 
 ## 4. #1213 merged clean, and closed an open question about the queue
 
@@ -86,7 +88,8 @@ sentence that reads as licence to re-apply a migration whose objects are already
 **#1214** `codex/ecowitt-digest-negotiate-redaction-20260829`, merged **19:05:50Z** as **`3f95527bf`**.
 Four files, +14/−10, one commit.
 
-It closes the half of the Authorization redaction gap that **#1211 left open**: the credential-pair
+It addresses the half of the Authorization redaction gap that **#1211 left open — but only for the
+token-shaped form; see below.** The credential-pair
 rule reserved only `Bearer|Basic`, so `Digest` and `Negotiate` blobs stayed visible in
 `redacted_raw_payload` and clipboard exports. Both are now reserved in the credential-pair negative
 lookahead and added to the `Authorization:` prefix alternation, with Digest/Negotiate cases added to
@@ -130,7 +133,7 @@ means a twelve-file `Sentinel-Version` bump under `sentinel-version-parity`.
 | Item                                | Status                                                                                                         |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | #1213 `#1212`-findings entry        | **MERGED** `0e2cd02ba` — verified on the tip by execution                                                      |
-| #1214 Digest/Negotiate redaction    | **MERGED** `3f95527bf` — Codex's; deploy tip as of 19:05:50Z                                                   |
+| #1214 Digest/Negotiate redaction    | **MERGED** `3f95527bf` (Codex's). **Token-shaped only — parameterized Digest/Negotiate is OPEN**               |
 | `AGENTS.md` `FORBIDDEN` gap         | **OPEN, and not Claude's to close**                                                                            |
 | Superseded `LIVE`/`FORBIDDEN` entry | its Codex `P2` stays **OPEN on purpose**; not rewritten                                                        |
 | Merge method                        | queue squashes; auto-merge field says `merge`; ruleset setting **`NOT_MEASURED`**                              |
@@ -150,8 +153,10 @@ means a twelve-file `Sentinel-Version` bump under `sentinel-version-parity`.
   present availability and contradicts `NOT_MEASURED` in the same sentence — caught by Codex on
   #1215 before merge. The evidence establishes that they **were applied** on that date, not that
   they **are** there now; only a measurement could say the latter, and this shift took none.
-- Whether #1214's Digest/Negotiate redaction holds against real payloads in production. It is
-  test-pinned on the deploy branch; **nothing here measured production behaviour.**
+- Whether real EcoWitt payloads ever carry a **parameterized** `Authorization: Digest`/`Negotiate`
+  header. Execution shows the sanitizer leaks non-hex quoted values in that shape, but **nothing here
+  measured production traffic**, so the exposure's real-world frequency is unknown. The token-shaped
+  form is test-pinned and redacts.
 - The repository's configured merge method. Inferred from three squashed merges; the ruleset was
   never read.
 - How many times this file has contradicted a passage it already contains. **No ordinal asserted** —

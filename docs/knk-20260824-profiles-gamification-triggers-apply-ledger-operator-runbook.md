@@ -5,13 +5,14 @@
 Use these labels literally. Do not translate an uncaptured ACL into a product failure,
 and do not translate this record into an authorization.
 
-| Status           | Meaning in this ledger                                               |
-| ---------------- | -------------------------------------------------------------------- |
-| `PASS`           | Direct evidence verified the check                                   |
-| `FAIL`           | Direct evidence verified a defect                                    |
-| `BLOCKED`        | Access, permission, credential, or dependency prevented verification |
-| `NOT_MEASURED`   | The metric was not measured; this is never a perfect score           |
-| `NOT_APPLICABLE` | The check does not apply to this target                              |
+| Status           | Meaning in this ledger                                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `PASS`           | Direct evidence verified the check                                                                                           |
+| `FAIL`           | Direct evidence verified a defect                                                                                            |
+| `BLOCKED`        | Access, permission, credential, or dependency prevented verification                                                         |
+| `NOT_MEASURED`   | The metric was not measured; this is never a perfect score                                                                   |
+| `NOT_APPLICABLE` | The check does not apply to this target                                                                                      |
+| `FORBIDDEN`      | The operation is available and must not be performed — **not** `NOT_APPLICABLE`, which means the check does not apply at all |
 
 ## What this file is
 
@@ -201,16 +202,16 @@ level, tier, current_badge) are not directly writable'`. Do not accept shortened
 
 ## Safety / validation
 
-| Check                                                          | Status                       | Notes                                                                                                                         |
-| -------------------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Files under `supabase/migrations/` in this change              | **`PASS`** — zero            | Docs-only; migration count unchanged at 278                                                                                   |
-| Definitions transcribed byte-for-byte from the 2026-08-24 read | **`PASS`**                   | Including `$function$` delimiters and the four-field exception string                                                         |
-| Apply / re-apply these objects to knk                          | `NOT_APPLICABLE` / forbidden | Explicit hard stop; production SQL stays locked                                                                               |
-| Preview-replay this ledger                                     | `NOT_APPLICABLE` / forbidden | Docs record only; nothing here is replayable                                                                                  |
-| Live knk state at time of writing                              | **`NOT_MEASURED`**           | No knk credential measurement was taken for this file                                                                         |
-| Grants / `EXECUTE` ACLs                                        | **`NOT_MEASURED`**           | Not captured on 2026-08-24                                                                                                    |
-| Production exposure of the divergence in flag 4                | **`NOT_MEASURED`**           | Recording a divergence does not measure its effect                                                                            |
-| `20260813030000` — GitHub apply lane ever succeeded            | **`FAIL`**                   | The apply workflow shows only its failed PREFLIGHT                                                                            |
-| `20260813030000` — applied to production on 2026-08-21         | **`PASS`**                   | Point-in-time, sourced to `docs/signup-attribution-outage-operator-runbook.md`: applied verbatim through Lovable, md5-guarded |
-| `20260813030000` — production objects now                      | **`NOT_MEASURED`**           | Not re-measured. The 2026-08-21 record is the only evidence, and it is **not** a licence to re-apply                          |
-| GitHub-APPLY `20260813030000`                                  | `NOT_APPLICABLE` / forbidden | Re-issues an unguarded `handle_new_user` over the guard applied 2026-08-21 — an incident                                      |
+| Check                                                          | Status             | Notes                                                                                                                         |
+| -------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Files under `supabase/migrations/` in this change              | **`PASS`** — zero  | Docs-only; migration count unchanged at 278                                                                                   |
+| Definitions transcribed byte-for-byte from the 2026-08-24 read | **`PASS`**         | Including `$function$` delimiters and the four-field exception string                                                         |
+| Apply / re-apply these objects to knk                          | **`FORBIDDEN`**    | Explicit hard stop; production SQL stays locked                                                                               |
+| Preview-replay this ledger                                     | **`FORBIDDEN`**    | Docs record only; nothing here is replayable                                                                                  |
+| Live knk state at time of writing                              | **`NOT_MEASURED`** | No knk credential measurement was taken for this file                                                                         |
+| Grants / `EXECUTE` ACLs                                        | **`NOT_MEASURED`** | Not captured on 2026-08-24                                                                                                    |
+| Production exposure of the divergence in flag 4                | **`NOT_MEASURED`** | Recording a divergence does not measure its effect                                                                            |
+| `20260813030000` — GitHub apply lane ever succeeded            | **`FAIL`**         | The apply workflow shows only its failed PREFLIGHT                                                                            |
+| `20260813030000` — applied to production on 2026-08-21         | **`PASS`**         | Point-in-time, sourced to `docs/signup-attribution-outage-operator-runbook.md`: applied verbatim through Lovable, md5-guarded |
+| `20260813030000` — production objects now                      | **`NOT_MEASURED`** | Not re-measured. The 2026-08-21 record is the only evidence, and it is **not** a licence to re-apply                          |
+| GitHub-APPLY `20260813030000`                                  | **`FORBIDDEN`**    | Re-issues an unguarded `handle_new_user` over the guard applied 2026-08-21 — an incident                                      |

@@ -1,6 +1,146 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~01:45 UTC)
+**Last updated:** 2026-08-29 UTC (~03:35 UTC)
+**Updated by:** Claude (2026-08-29: **#1187 MERGED CARRYING A LEAK that two reviewers had already
+flagged, a FOURTH instance of the class was found in the module this file called the correct
+counter-example, and my own ordering contract stayed silent on both. Two live leaks are on the
+deploy branch right now. Fixes are open in draft as #1190 and #1191.**
+
+## 1. #1187 merged with a known, reported leak — deploy tip `f9f4d11` -> `84d3b813`
+
+**Copilot AND Codex both flagged the same defect as `P1` before the merge**, six minutes before it.
+Codex, verbatim:
+
+> When a bearer-prefixed credential uses a non-allowlisted variable name, such as
+> `Bearer SOME_PLAIN_NAME=s3cretV4lue123456`, this new assignment pattern does not match; the later
+> bearer rule then consumes only `Bearer SOME_PLAIN_NAME`, leaving `[redacted]=s3cretV4lue123456` in
+> the exported report.
+
+Confirmed by execution on `9f739b4` before any change, and **re-confirmed on the merged tip
+`84d3b813`** — not carried over from the pre-merge measurement:
+
+```text
+bearer SOME_PLAIN_NAME=s3cretV4lue123456      -> [redacted]=s3cretV4lue123456       PARTIAL
+Bearer SOME_PLAIN_NAME="s3cretV4lue123456"    -> [redacted]="s3cretV4lue123456"     PARTIAL
+Authorization: SOME_PLAIN_NAME=s3cret…        -> UNCHANGED, not redacted at all
+```
+
+The `Authorization:` row is a second leak found in the same probe that **neither reviewer
+reported**: that module had no Authorization rule of any kind.
+
+**Why the fix is not on #1187.** It was committed and validated before the PR closed. The push was
+rejected — `protected branch hook declined`, the **merge-queue branch lock** — and by the time the
+retry succeeded the PR had merged at `9f739b4` and closed. `established fact`, and the same
+mechanism that blocked the #1172 correction earlier in this sequence. A merged PR cannot carry
+follow-up work, so the fix is a fresh branch: **#1190**.
+
+**Process note recorded because it will recur:** a fix in hand does not beat a queue that is already
+moving. The lock is silent from the pusher's side until it rejects.
+
+## 2. A FOURTH instance — in the module this file called the counter-example
+
+`proofReportRedactionRules.ts`. The prior entry, #1187's PR body, and my audit all cited it as the
+module that got this right. **That citation was right about ordering and wrong about coverage.**
+
+```text
+Bearer MY_PASSKEY_VAR="zz-canopy-note-77"   -> [redacted]="zz-canopy-note-77"   PARTIAL
+Bearer SOME_PLAIN_NAME="zz-canopy-note-77"  -> [redacted]="zz-canopy-note-77"   PARTIAL
+bearer MY_API_KEY_VAR="zz-canopy-note-77"   -> UNCHANGED  (BEARER_RE is case-SENSITIVE)
+```
+
+It does order `AUTH_HEADER_RE` -> pairs -> bare keywords correctly, and documents the hazard in its
+own comments. It simply **had no rule for `Bearer <name>=<value>` at all**, so `BEARER_RE` consumed
+the NAME and stranded the VALUE. Its keyword rules cannot reach the shape: they are `\b`-anchored
+(`\bapi_key\b`) and `_` is a word character, so a label inside `MY_API_KEY_VAR` matches nothing.
+
+This is a **copy-to-clipboard and print surface**. Fixed in **#1191**.
+
+## 3. My ordering contract had a hole, and it let both leaks through
+
+The coverage-calibrated ordering check (#1189, first commit) skips shapes a module does not redact
+bare, reasoning _"no rule matches it bare, so no rule can destroy it decorated."_ **That reasoning is
+wrong.** A module can deliberately not cover a shape while another of its rules still fires on the
+decorated form, consuming the NAME and stranding the VALUE — output carrying a placeholder AND the
+secret, which looks sanitized and is not.
+
+So the contract was silent on the exact leak Copilot and Codex caught. `inference` corrected to
+`established fact` by running it: 1 failure in `redactSecrets`, 5 in `sanitizeProofReportMarkdown`,
+once the new invariant was added.
+
+**The remedy — the partial-redaction invariant**, which makes NO coverage judgment:
+
+```text
+if   redact(X) contains a placeholder,
+then redact(X) must NOT still contain the secret
+```
+
+It found the fourth instance. **That is the first defect this contract has FOUND rather than
+restated.**
+
+## 4. Corrections to what this file previously said
+
+| Prior claim                                                                                      | Status                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `proofReportRedactionRules.ts` "already implements the correct order" and is the counter-example | **Half wrong.** Correct on ordering; it had the same partial-redaction leak via an uncovered shape.                                                                     |
+| The shared ordering contract is "the durable remedy" preventing a fourth instance                | **Overstated.** As first written it would not have caught #1190's leak, and a fourth instance already existed. Only the partial-redaction invariant catches this class. |
+| "Three modules independently failed to follow it"                                                | **Four.** The module they were being compared against is the fourth.                                                                                                    |
+
+## 5. Leak status — four modules
+
+| Module                                                | Leak                           | Where                     |
+| ----------------------------------------------------- | ------------------------------ | ------------------------- |
+| `ecowittLocalForwardingStatus.ts`                     | **CLOSED**, execution-verified | merged `f9f4d11` (#1185)  |
+| `ecowittValidationEvidenceRules.ts`                   | **CLOSED**, execution-verified | merged `1d19c4c` (#1184)  |
+| `postGrowReportRules.ts` — labelled assignments       | **CLOSED**                     | merged `84d3b813` (#1187) |
+| `postGrowReportRules.ts` — header-prefixed UNLABELLED | **LIVE ON DEPLOY**             | #1190, draft              |
+| `proofReportRedactionRules.ts` — header-prefixed      | **LIVE ON DEPLOY**             | #1191, draft              |
+
+**Two leaks are live on `84d3b813` right now.** Both have verified fixes in draft. Neither is
+readied, enqueued or merged — that is Cheek's call, not Claude's.
+
+## 6. CI measured at 03:30 UTC — all four PRs, best state of the session
+
+| PR              | Required 35                          | `mustBeGreen`                    | Remaining red                                                                            |
+| --------------- | ------------------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| #1190 `93d9c2e` | **35/35 GREEN**                      | `test:security-regression` green | `batch 10/16`, `Supabase Preview` — both non-required, both established non-attributable |
+| #1191 `58bf2a2` | **GREEN**                            | green                            | `Supabase Preview` only                                                                  |
+| #1189 `68d7544` | `ci.yml` run 33228299151 **SUCCESS** | —                                | none                                                                                     |
+| #1186 `be79171` | —                                    | —                                | `Supabase Preview` only                                                                  |
+
+**Non-attribution established by evidence, not assertion:**
+
+- **`Full suite — batch 10/16`** — the **`Install dependencies` step** is what failed (Lovable
+  private-registry 403s); the test step is recorded `skipped`, so no test body ran. Decisive: **15 of
+  the 16 batches on the same commit, in the same workflow run, installed and passed.**
+- **`Browser census (public)`** — a genuine near-miss worth recording. It failed on #1190 and
+  **passed** on #1191, so the easy exoneration was not available. The durations settled it: the
+  census is a SINGLE Playwright test walking every public route, against a **420s per-test cap** —
+  it took **433s** on #1190 and **406s (14 seconds of headroom)** on #1191. The one sanctioned re-run
+  **passed**. `established fact`: this check will fail intermittently on any PR in this repo
+  regardless of content. Raised once on #1190; NOT fixed — raising the cap or sharding the census
+  changes a shared CI gate and belongs in its own reviewed slice.
+- **`Supabase Preview` 42P07** — eleventh instance. Two merged migrations both create
+  `ai_credit_grants`; declared in `config/local-supabase-replay-compatibility.json`, which governs
+  **local** replay only. The hosted preview never consults it. Reported once (#1186 comment
+  5459603190, #1190, #1191); deterministic, so never re-run and never re-litigated.
+
+## 7. `NOT_MEASURED` — not to be rounded up
+
+- **Production exposure for all four modules.** Two leaks are on the **deploy branch**; a merge is
+  not a deployment and no publish has been performed or authorized.
+- Whether any leaked string ever reached a real exported report, clipboard, or print surface.
+- Edge-function redaction copies beyond the one mirrored file (`ecowittValidationEvidenceRules`).
+- `sanitizeProofReportMarkdown` coverage for a label embedded in a longer NAME **bare** (no header
+  prefix) — recorded in `COVERAGE_BASELINE`, deliberately not fixed.
+
+## 8. Posture
+
+Deploy tip **`84d3b813`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. #1186, #1189, #1190 and #1191 are **draft**; nothing readied, enqueued,
+merged, published or applied by Claude. One re-run spent on #1190 (census), none remain. This edit
+touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~01:45 UTC)
 **Updated by:** Claude (2026-08-29: **The shared ordering contract is WRITTEN — #1189, draft. The
 prior entry's "un-started" item is closed. It is a BEHAVIOURAL contract over five redaction entry
 points, proven RED at 111 failures before being restored to green. It does NOT close any leak and

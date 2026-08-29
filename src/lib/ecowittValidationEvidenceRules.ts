@@ -36,8 +36,10 @@ const REDACTED_SECRET_VALUE = "[REDACTED]";
 // `temp_f=77.4` and `inserted=1`.
 const CREDENTIAL_KEY_SOURCE =
   "(token|authorization|bearer|api[_-]?key|secret|password|service[_-]?role|anon[_-]?key|bridge[_-]?token)";
+// Do not consume a Bearer prefix or the name of a nested assignment as the
+// credential value; the dedicated later rules must see those spans whole.
 const CREDENTIAL_PAIR_PATTERN = new RegExp(
-  `[A-Za-z0-9_-]*${CREDENTIAL_KEY_SOURCE}[A-Za-z0-9_-]*\\s*[=:]\\s*(?![A-Za-z0-9_-]+\\s*[=:])(?:"[^"]+"|'[^']+'|[^\\s"',;}]+)`,
+  `[A-Za-z0-9_-]*${CREDENTIAL_KEY_SOURCE}[A-Za-z0-9_-]*\\s*[=:]\\s*(?!Bearer\\b)(?![A-Za-z0-9_-]+\\s*[=:])(?:"[^"]+"|'[^']+'|[^\\s"',;}]+)`,
   "gi",
 );
 

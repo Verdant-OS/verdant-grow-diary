@@ -809,6 +809,7 @@ describe("evidence rules", () => {
   // at all, so a plain SOME_PLAIN_NAME behind a `Bearer ` prefix leaked too.
   // Reported by Copilot on #1184 and confirmed by execution before the fix.
   it.each([
+    ["Authorization: Bearer actualtoken123456", "actualtoken123456"],
     ['Authorization: PASSKEY="flower-room-credential"', "flower-room-credential"],
     ["Bearer PASSKEY=flower-room-credential", "flower-room-credential"],
     ['Bearer MY_PASSKEY_VAR="flower-room-credential"', "flower-room-credential"],

@@ -1,6 +1,117 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~03:35 UTC)
+**Last updated:** 2026-08-29 UTC (~05:00 UTC)
+**Updated by:** Claude (2026-08-29: **#1189 is GREEN at `d25e5bf` — 35/35 required — but green WITH the
+fixes carried, not green on production truth. In between it went RED in CI, and that red was the
+contract catching both live leaks through the repo's own required gate. Separately, a fifth
+sensor-truth defect was found on #1170: two reviewers, one `P1`, verified by execution, NOT fixed.**
+
+## 1. #1189 went red, then green — and the red was the point
+
+**Cheek rebased #1189 to `604d9092`** at 04:22Z: _"tests-only rebase onto #1187 tip. Drops carried
+#1187 product files. Stay draft."_ Correct about #1187 — those files are in the base at `84d3b813`
+now. But the branch was also carrying **#1190 and #1191 as dependencies**, and those are **not** in
+the base, so the rebase dropped them too.
+
+Verified on `604d9092`, not assumed:
+
+```text
+postGrowReportRules        (?:bearer|authorization) rule  ->  absent
+proofReportRedactionRules  HEADER_ASSIGNMENT_RE           ->  absent
+contract                   6 failed | 159 passed | 20 skipped
+```
+
+**CI then confirmed it on a REQUIRED check** — `Full test suite (shard 5/32)` and
+`Full suite — batch 13/16` both failed, carrying the contract's own diagnostic verbatim:
+
+> `sanitizeProofReportMarkdown produced a PARTIAL redaction: a placeholder is present, so a rule
+fired on this span, but the secret survived it. Output that looks sanitized and is not.`
+
+`established fact`: the leak is no longer only a local probe result. **The repo's own required gate
+now demonstrates it.** The batch lane's automatic retry did not change the outcome, so it is
+deterministic, not flake.
+
+**Re-merged at Cheek's instruction** → `d25e5bf`. Built ON TOP of the rebase: `604d9092` as base,
+both fix branches as merge commits. No force-push, no rebase, no resurrection of the dropped
+`#1187` history. Checked first that Cheek's test file was **byte-identical** to the one pushed at
+`68d7544`, so the partial-redaction invariant survived intact and nothing needed reconstructing.
+
+## 2. #1189 green — the fullest green of this session
+
+`ci.yml` run `33234078079` on `d25e5bf`, **conclusion `success`** at 04:43:04Z.
+
+| Lane                                                                              | Result                                                                                                                                             |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 32/32 `Full test suite (shard N/32)`                                              | **green** — shard 5, red on `604d9092`, now passes                                                                                                 |
+| `Lint, typecheck, test, build`                                                    | green                                                                                                                                              |
+| `Preflight — edge shared-lib mirror in sync`                                      | green                                                                                                                                              |
+| `test:legal-seo`                                                                  | green                                                                                                                                              |
+| `test:security-regression` (the one `mustBeGreen`)                                | green                                                                                                                                              |
+| **16/16 batch lanes**                                                             | **all green** — including `batch 13/16` (red on the prior head) and `batch 10/16`, which failed the Lovable registry 403 on every other PR tonight |
+| `Browser census (public)`                                                         | green, 6m47s — back under the 420s cap                                                                                                             |
+| `Supabase Preview`                                                                | **`skipped`** — first time in this sequence it did not fire the 42P07                                                                              |
+| CodeQL ×3, eslint, tsc, docs-safety, One-Tent Loop smoke, both edge-mirror checks | green                                                                                                                                              |
+
+**Correction to my own report:** I told Cheek `Browser census (authenticated)` was "still running".
+It finished **`cancelled`**, not passed. Not a failure, not required, and it passed on the prior head
+— but "still running" was wrong.
+
+**What this green does and does not prove.** The six failures on `604d9092` were the invariant
+catching two live leaks; they are green on `d25e5bf` **because this head carries the fixes**.
+`COVERAGE_BASELINE` is untouched and no case was pinned as expected — nothing was relaxed. So this
+is **green-with-the-fixes, not green-on-production-truth**. `84d3b813` still carries both leaks.
+
+## 3. A FIFTH defect, on #1170 — verified, NOT fixed
+
+This session was subscribed to **#1170** (`trustBadge.attachable`, from this session pre-compaction).
+It is **NOT draft** — ready, and could be enqueued. Two review threads, unresolved since 20:54Z
+yesterday: **Codex at `P1` and Copilot, independently, on the same defect.**
+
+Both are right. Verified by execution on `393dbcdc`:
+
+| snapshot source                                                          | attachable | persisted `details.sensor.source` | in the six-label contract   |
+| ------------------------------------------------------------------------ | ---------- | --------------------------------- | --------------------------- |
+| `manual`, `csv`                                                          | true       | `manual`, `csv`                   | yes                         |
+| `manual_snapshot`, `import`, `imported`, `user`, `entry`, `log`, `diary` | **true**   | raw alias, verbatim               | **NO -> renders `unknown`** |
+
+The strip gates on `normalizeSensorSource()`, but `buildSensorSnapshotDetails` persists
+`source: snapshot.source` **verbatim**, and `normalizeSource` maps anything outside
+`{live, manual, csv, demo, stale, invalid, unknown}` to `unknown`. **A genuinely manual reading is
+written to the diary with a label the timeline renders as unknown provenance** — the sensor-truth
+contract in `AGENTS.md`, not a cosmetic issue.
+
+**Wider than either reviewer said.** Same probe: `pi_bridge`, `realtime` and `sensor` persist
+non-canonical sources too — but those were **already attachable before #1170**, so they are
+**pre-existing**, not its regression. #1170's third commit (`48828dd`) widened the blast radius to
+the 7 manual/CSV aliases; the 3 live aliases are a separate slice.
+
+**Deliberately not fixed.** Both remedies are product decisions, not nits: canonicalizing at the
+save site rewrites `pi_bridge` -> `live` in persisted data (whether any consumer reads that field
+for identity is **`NOT_MEASURED`**), and restricting attachment reverses `48828dd` and breaks its
+test pins at `quicklog-strip-non-live-coherence.test.ts:225-251`. Raised once on #1170 with both
+options, the trade-offs, and a recommendation. **It is ready-not-draft and touches persisted user
+data — it should not merge on Claude's unilateral read.** Same shape as #1187 earlier tonight.
+
+## 4. Leak / defect status
+
+| Module                                                                      | Status                                               | Where                               |
+| --------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------- |
+| `ecowittLocalForwardingStatus.ts`                                           | **CLOSED**, execution-verified                       | merged `f9f4d11` (#1185)            |
+| `ecowittValidationEvidenceRules.ts`                                         | **CLOSED**, execution-verified                       | merged `1d19c4c` (#1184)            |
+| `postGrowReportRules.ts` — labelled                                         | **CLOSED**                                           | merged `84d3b813` (#1187)           |
+| `postGrowReportRules.ts` — header-prefixed unlabelled                       | **LIVE ON DEPLOY**                                   | #1190, draft, 35/35 green           |
+| `proofReportRedactionRules.ts` — header-prefixed                            | **LIVE ON DEPLOY**                                   | #1191, draft, required green        |
+| `quickLogSnapshotStripAdapter` / save path — non-canonical persisted source | **LIVE ON DEPLOY (pre-existing) + widened by #1170** | #1170, **ready-not-draft**, unfixed |
+
+## 5. Posture
+
+Deploy tip **`84d3b813`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. #1186 (`5005cac`), #1189 (`d25e5bf`), #1190 (`93d9c2e`) and #1191
+(`58bf2a2`) are **draft**; **#1170 (`393dbcdc`) is ready-not-draft and NOT mine to ready or merge**.
+Nothing readied, enqueued, merged, published or applied by Claude. One re-run spent on #1190
+(census, passed); none spent elsewhere. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~03:35 UTC)
 **Updated by:** Claude (2026-08-29: **#1187 MERGED CARRYING A LEAK that two reviewers had already
 flagged, a FOURTH instance of the class was found in the module this file called the correct
 counter-example, and my own ordering contract stayed silent on both. Two live leaks are on the

@@ -1,6 +1,162 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~18:25 UTC)
+**Last updated:** 2026-08-29 UTC (~21:47 UTC)
+**Updated by:** Claude (2026-08-29: #1213 and #1214 merged. #1213 carried a `P1` — `20260813030000`
+listed among migrations that "remain NOT applied", corrected before merge. #1214 closes the
+Authorization redaction gap for **token-shaped** Digest/Negotiate only; the **parameterized case is
+OPEN**, verified by execution, and **`BLOCKED` — that slice has no independent reviewer assigned**.
+Prior header follows.)
+
+## 1. `20260813030000` — both senses
+
+`established fact`, read from the cited passages and the 2026-08-21 runbook.
+
+| Sense                    | State                                                                     |
+| ------------------------ | ------------------------------------------------------------------------- |
+| GitHub apply lane        | **never succeeded** — only its failed PREFLIGHT exists                    |
+| Production objects       | **applied verbatim 2026-08-21** via Lovable, md5-guarded                  |
+| Current production state | **`NOT_MEASURED`** — not re-measured here; nothing in-repo can measure it |
+| Re-applying it           | **`FORBIDDEN`** — re-issues an unguarded `handle_new_user` over the guard |
+
+A bare "remains NOT applied" for this migration is **false in the direction that licenses an APPLY**.
+The newest entry is the posture an operator reads first, and it reports no `knk` or `query_database`
+access, so a blanket claim there is the sentence that authorises the APPLY. State both senses, every
+time.
+
+`20260827010000`, `20260826100000` and `20260825233000` remain **NOT applied**, plainly.
+
+## 2. #1213 — findings and merge
+
+| Reviewer    | Finding                                       | Time      | Fixed in    |
+| ----------- | --------------------------------------------- | --------- | ----------- |
+| **Copilot** | `20260813030000` listed as bare "NOT applied" | 18:46:53Z | `a57a946ab` |
+| **Codex**   | same defect, rated **`P1`**                   | 18:48:11Z | `a57a946ab` |
+
+Both verified against the cited passages before acceptance; both threads answered and resolved.
+
+Merged **19:01:54Z**. Deploy tip `3afc2df68` → **`0e2cd02ba`**. One file, one parent, subject ends
+`(#1213)`; squash SHA **equals** the merge-group SHA. Zero open threads at merge.
+
+## 3. Required CI did not detect either defect
+
+`practical observation`.
+
+| Head        | Required CI     | Carried             |
+| ----------- | --------------- | ------------------- |
+| `87dcff867` | **35/35 green** | #1212's two defects |
+| `5d034f706` | **35/35 green** | the #1213 `P1`      |
+| `a57a946ab` | **35/35 green** | none                |
+
+CI verifies that the file parses, formats and passes the docs gates. It does not evaluate whether a
+claim is true. Every finding in this sequence was raised after a draft→ready transition, which is
+what triggers Codex review.
+
+## 4. Merge method
+
+`established fact` for the outcomes; `NOT_MEASURED` for the mechanism.
+
+Auto-merge stored `merge_method: merge` despite two explicit `SQUASH` requests — the tool response
+and GitHub's `auto_merge_enabled` event both recorded `merge`.
+
+**Observed:** #1186, #1212 and #1213 each landed as a single squash commit with `(#NNNN)` in the
+subject, each with squash SHA equal to its merge-group SHA.
+
+**Not established:** that the queue squashes regardless, that the stored field is never consulted, or
+what a future queued PR will do. Reading the configured method needs `Administration:read`, which the
+token lacks.
+
+## 5. #1214 — Codex's, merged, and only half the gap
+
+`established fact`, read from the PR and verified by execution on the deploy branch.
+
+**#1214** `codex/ecowitt-digest-negotiate-redaction-20260829`, merged **19:05:50Z** as **`3f95527bf`**.
+Four files, +14/−10, one commit. Tail of the chain **#1207 → #1209 → #1211 → #1214**.
+
+It reserves `Digest` and `Negotiate` in the credential-pair negative lookahead and adds them to the
+`Authorization:` prefix alternation, with cases added to the existing matrix and the `_shared` mirror
+regenerated.
+
+**The parameterized case is OPEN.** The value pattern is
+`/Authorization\s*:\s*(?:(?:Basic|Digest|Negotiate)\s+)?[^\s",}]+/gi`; `[^\s",}]+` stops at the first
+quote, so a parameterized header is not consumed whole:
+
+```
+IN : Authorization: Digest username="grower", realm="verdant", nonce="secret"
+OUT: [REDACTED]"grower", realm="verdant", nonce="secret"
+```
+
+RFC-shaped headers redact their sensitive parameters via the **generic hex-shape rules** (`nonce`,
+`response`, `opaque` are long hex), not via anything #1214 added; short or non-hex values survive.
+#1214's added test covers only the token-shaped form (`Digest <base64>`), which redacts fully.
+
+Affected surfaces: `redacted_raw_payload` in the clipboard evidence copy **and in the downloaded
+validation JSON** (`buildEcowittValidationExport` → `serializeExport` →
+`EcowittIngestValidationPanel.handleConfirmExportJson`, a file written to disk). The CSV download
+excludes the raw payload — `CSV_HEADER` carries no such column.
+
+Reachability, verified by execution: the regex path runs only on a **string nested under a
+non-secret key**. `redactEvidenceValue` replaces a top-level string wholesale, and
+`redactEvidenceNode` replaces any value under an `Authorization`-named key wholesale; both return
+`[redacted]` with nothing surviving. The leak needs a shape such as
+`{ request_log: "…Authorization: Digest …" }`, which serialized to the JSON download as:
+
+```
+"redacted_raw_payload": { "request_log": "POST /ingest\n[REDACTED]\"grower\", realm=\"verdant\", nonce=\"secret\"\nbody=1" }
+```
+
+Whether real EcoWitt payloads carry that shape is `NOT_MEASURED`. **Codex's slice — not Claude's to
+fix.**
+
+**`BLOCKED` — no independent reviewer assigned.** `AGENTS.md` (lines 586-589) requires every assigned
+slice to name **one owner** and **a different peer** as independent reviewer, and states that a slice
+without one is **incomplete**. This slice names an owner and no reviewer, so it is **not ready to
+implement or ship**. Codex raised this on #1215; naming the reviewer is Cheek's call, not Claude's,
+and the label records the gap rather than closing it. Cheek instructed the `BLOCKED` marking on
+2026-08-29; the reviewer assignment itself remains outstanding.
+
+No collision with this file: #1214 touches `src/lib/ecowittValidationEvidenceRules.ts`, its test, the
+mirror and the sync manifest. Its body records _"Behind tip `3afc2df68` by CURRENT_STATE.md only. Do
+not rebase"_.
+
+## 6. Assignment
+
+**The `AGENTS.md` `FORBIDDEN` alignment slice is NOT Claude's** — Cheek, 2026-08-29. Do not open,
+prepare or stage it. The gap is unchanged: two merged ledgers declare `FORBIDDEN`, the constitution
+does not, and closing it means a twelve-file `Sentinel-Version` bump under `sentinel-version-parity`.
+
+## 7. Status
+
+| Item                                | Status                                                                                                         |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| #1213 `#1212`-findings entry        | **MERGED** `0e2cd02ba` — verified on the tip by execution                                                      |
+| #1214 Digest/Negotiate redaction    | **MERGED** `3f95527bf` (Codex's). **Token-shaped only — parameterized is OPEN**                                |
+| Parameterized Digest/Negotiate leak | **OPEN** on `3f95527bf`; Codex's slice. **`BLOCKED` — no independent reviewer assigned**                       |
+| `AGENTS.md` `FORBIDDEN` gap         | **OPEN, and not Claude's to close**                                                                            |
+| Superseded `LIVE`/`FORBIDDEN` entry | its Codex `P2` stays **OPEN on purpose**; not rewritten                                                        |
+| Merge method                        | three squash outcomes observed; configured method **`NOT_MEASURED`**                                           |
+| `Supabase Preview` 42P07            | red repo-wide across **ten** distinct preview projects; non-required, not a gate                               |
+| Branch-name conflict                | **with Cheek.** Harness designates `claude/trustbadge-attachable-strip-2441l2`; descriptive names used instead |
+
+## 8. `NOT_MEASURED`
+
+- **Production.** The deploy branch is **`3f95527bf`** as of 19:05:50Z. A merge is not a deployment;
+  no publish was performed or authorized this shift. Re-verify the tip rather than citing this line.
+- **`20260813030000` current production state** — see `## 1`. Applied 2026-08-21; not re-measured
+  since; re-apply **`FORBIDDEN`**.
+- Whether real EcoWitt payloads carry **parameterized** `Authorization: Digest`/`Negotiate` headers.
+  Execution shows the sanitizer leaks non-hex quoted values in that shape; production traffic was not
+  measured, so real-world frequency is unknown.
+- The repository's configured merge method — inferred from three outcomes; the ruleset was not read.
+- Bugbot's finding-level coverage beyond the heads checked. Observed usage-limited on every head of
+  Claude's own PRs inspected — #1204 `dae0cbb8a`, #1186 (four), #1212 (three), #1213 (two), #1215 —
+  with no head found where it ran. Codex's PRs were not inspected for Bugbot state.
+
+## 9. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added.
+`AGENTS.md` untouched. No strip file touched. `vsrc` not implemented.
+
+**Prior update:** 2026-08-29 UTC (~18:25 UTC)
 **Updated by:** Claude (2026-08-29: **#1212 corrected the Bugbot coverage line — and the version
 readied for review was itself wrong, in two independent ways, on a head that was 35/35 green.**
 Copilot and Codex caught an OVERCORRECTION: I declared a true-but-unqualified claim false. A third

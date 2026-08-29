@@ -1,6 +1,88 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~22:50 UTC)
+**Last updated:** 2026-08-29 UTC (~00:05 UTC)
+**Updated by:** Claude (2026-08-29: **The SAME redaction-ordering defect was found in a SECOND
+module and fixed on #1184 (`e3f79be`). Two modules, one evening, two different reviewers. That is a
+PATTERN, and the audit that would close it is still `NOT_MEASURED`.**
+
+**#1184 — `ecowittValidationEvidenceRules.ts` had the identical CONSUMING case.** The branch had
+already moved the env-assignment rule above the `PASSKEY` / admin-role label patterns, fixing
+**fragmenting** — but the rule still ran **after** `Bearer` and `Authorization`, so those consumed the
+variable NAME first and the VALUE survived. Exactly the state `75a7de9` corrected in the sibling
+forwarding sanitizer three hours earlier.
+
+**Found independently, twice, and Copilot got there first.** Copilot filed it on #1184 at **22:32**;
+this session did not read that thread until **23:50**, having reached the same conclusion separately
+by execution. Recorded that way round because it is the honest order: the reviewer beat the owner to
+it by well over an hour, and the thread sat unread in between.
+
+**Proof by execution on the untouched head `a6c95f9`**, via the **object path**:
+
+```text
+{ config_note: 'Bearer MY_PASSKEY_VAR="flower-room-credential"' }
+  ->  { "config_note": "[REDACTED]=\"flower-room-credential\"" }
+```
+
+Benign sibling fields in the same call (`temp_f: 77.4`, `note: "stable"`) passed through untouched —
+which is what proves this is real substitution and a real leak, not fail-closed behaviour.
+
+**THE GOTCHA WORTH KEEPING — a naive probe of this module returns a FALSE NEGATIVE.** Called on a
+**bare string**, `redactEvidenceValue` returns `[redacted]` wholesale for _everything_, including
+benign input like `"all good, tent stable"`. The leak appears **only through the object path**, where
+per-field substitution happens. This session's first probe came back entirely clean for exactly that
+reason and nearly closed the question. **When testing a redactor, test the shape the caller actually
+passes**, not the most convenient one.
+
+**Wider than reported, again.** The consuming case needs **no credential label in the NAME at all** —
+`Bearer SOME_PLAIN_NAME="…"` leaked identically. Copilot reported it for label-carrying names;
+measurement showed the unlabelled case too. Same widening as on #1185.
+
+**Fixed in `e3f79be`,** same one-line shape: assignment rule above the header patterns as well as the
+label patterns. No new pattern, no new file, no schema. Six header-prefixed regression cases added,
+including Copilot's exact `Authorization: PASSKEY="…"`, the unlabelled plain-NAME case and a
+lowercase header, plus a fence that a real header credential still redacts and benign telemetry is
+untouched. **Edge mirror and `.sync-manifest.json` regenerated with `scripts/sync-edge-shared.mjs`,
+never by hand** — this module IS mirrored into `supabase/functions/_shared`, unlike the forwarding
+one, so that step is mandatory here.
+
+| Validation on `e3f79be`              | Result                                            |
+| ------------------------------------ | ------------------------------------------------- |
+| RED — new tests vs. untouched module | **6 failed / 40 passed (46)**                     |
+| GREEN — after the fix                | **46 / 46**                                       |
+| Broad `*ecowitt*` sweep              | **164 files, 2555 passed / 3 skipped / 0 failed** |
+| `tsc --noEmit`, eslint               | clean                                             |
+| Edge shared mirror                   | **OK — 101 files in sync**                        |
+| Edge forbidden-import scan           | OK                                                |
+
+**#1184 was brought current by MERGE, not rebase — deliberately.** `f2b02cc` merges `f9f4d11` into
+`codex/validation-panel-passkey-order-872741af`. That branch is **not one this session created**, and
+rewriting history on someone else's branch — rebase, amend or force-push — is a hard never; a merge
+commit keeps their checkout valid. It also matches the convention already on that branch, whose prior
+head `a6c95f9` was itself a base merge. Cheek asked for "the #1184 rebase"; the outcome was delivered
+by the safe mechanism and the substitution was stated rather than silently made.
+
+**Codex reviewed `e3f79be` and found nothing.** Copilot's thread is answered and **resolved**.
+
+**THE PATTERN, which is the point of this entry.** Tonight the identical ordering defect was found and
+fixed in **two separate modules** — `ecowittLocalForwardingStatus.ts` (#1185) and
+`ecowittValidationEvidenceRules.ts` (#1184) — by **two different reviewers**, neither time by a
+deliberate audit. Both fixes were the same one-line move. **Neither `SECRET_PATTERNS` nor
+`SECRET_VALUE_PATTERNS` has had a systematic ordering audit**, and no inventory exists of how many
+other modules carry a copy of this pattern list. **`NOT_MEASURED`.** Two instances found by accident
+is not evidence the class is exhausted — it is evidence that nobody has looked.
+
+**Cursor was absent from the review surface all evening.** Bugbot reported `BLOCKED — usage limit
+reached` on **every** head across #1185, #1172, #1186 and #1184. The one time its security agent did
+run, it passed a leaking SHA (recorded below). Treat Cursor as **not** currently contributing review
+coverage.
+
+**Posture.** Deploy tip **`f9f4d11`**. **Production exposure `NOT_MEASURED` for BOTH leaks** — the
+merges close them on the deploy branch; exposure ends at a verified publish, and #1184 has not even
+merged yet. `20260827010000`, `20260826100000`, `20260825233000`, `20260813030000` all remain **NOT
+applied**. #1184 is Codex's PR — the authorized fix was pushed and nothing else: no ready, no enqueue,
+no merge. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~22:50 UTC)
 **Updated by:** Claude (2026-08-28: **#1185 MERGED as `f9f4d11`. The sanitizer leak is closed on the
 deploy branch — verified by execution, not inferred. Production exposure is `NOT_MEASURED`.** This
 entry also carries **three corrections to my own earlier entries**, all raised by reviewers on #1172

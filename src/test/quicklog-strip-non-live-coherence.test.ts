@@ -140,7 +140,13 @@ describe("quicklog strip non-live coherence — fresh row source stale", () => {
 });
 
 describe("quicklog strip non-live coherence — demo aliases", () => {
-  for (const source of ["demo", "sim", "mock", "sample", "fixture"]) {
+  for (const [source, providerLabel] of [
+    ["demo", "Demo"],
+    ["sim", "Sim"],
+    ["mock", "Mock"],
+    ["sample", "Sample"],
+    ["fixture", "Fixture"],
+  ] as const) {
     it(`${source} fresh_non_live → usable + DEMO_USABLE copy, Demo badge`, () => {
       const s = snap({ source, status: "fresh_non_live", freshness: "fresh" });
       const v = buildQuickLogStripFromTentState({
@@ -157,6 +163,8 @@ describe("quicklog strip non-live coherence — demo aliases", () => {
       expect(v.trustBadge.badge).not.toBe("stale");
       expect(v.trustBadge.attachable).toBe(false);
       expect(v.classification.isHealthyEvidence).toBe(false);
+      expect(v.providerLabel).toBe(providerLabel);
+      expect(v.trustBadge.providerLabel).toBe(providerLabel);
       const adv = advisoryFor(s);
       expect(adv.kind).toBe("demo");
       expect(adv.copy).toMatch(/demo|never treated as live/i);
@@ -217,6 +225,9 @@ describe("quicklog strip non-live coherence — transport labels fail closed", (
       expect(v.status).toBe("invalid");
       expect(v.trustBadge.badge).toBe("invalid");
       expect(v.trustBadge.attachable).toBe(false);
+      const adv = advisoryFor(s);
+      expect(adv.kind).toBe("invalid");
+      expect(adv.copy).toMatch(/invalid|unknown/i);
     });
   }
 });
@@ -279,6 +290,27 @@ describe("quicklog strip non-live coherence — manual / csv aliases", () => {
 });
 
 describe("quicklog strip non-live coherence — provider identity from RAW label", () => {
+  it("canonical-invalid sources keep only their raw provider identity", () => {
+    for (const [source, providerLabel] of [
+      ["ecowitt", "EcoWitt"],
+      ["mqtt", "MQTT"],
+      ["   ", null],
+    ] as const) {
+      const v = buildQuickLogStripFromTentState({
+        status: "ready",
+        snapshot: snap({ source, status: "fresh_non_live" }),
+        hasTent: true,
+        now: NOW,
+        temperatureUnit: "celsius",
+      });
+      expect(v.status, `source=${JSON.stringify(source)}`).toBe("invalid");
+      expect(v.trustBadge.badge, `source=${JSON.stringify(source)}`).toBe("invalid");
+      expect(v.trustBadge.attachable, `source=${JSON.stringify(source)}`).toBe(false);
+      expect(v.providerLabel, `source=${JSON.stringify(source)}`).toBe(providerLabel);
+      expect(v.trustBadge.providerLabel, `source=${JSON.stringify(source)}`).toBe(providerLabel);
+    }
+  });
+
   it("pi_bridge → Pi Bridge on strip and trustBadge, attachable false", () => {
     const v = buildQuickLogStripFromTentState({
       status: "ready",
@@ -354,14 +386,18 @@ describe("quicklog strip non-live coherence — deterministic + whitespace/casin
     expect(liveAlias.trustBadge.badge).toBe("live");
     expect(liveAlias.trustBadge.attachable).toBe(false);
 
+    const blankSnapshot = snap({ source: "   ", status: "fresh_non_live" });
     const blank = buildQuickLogStripFromTentState({
       status: "ready",
-      snapshot: snap({ source: "   ", status: "fresh_non_live" }),
+      snapshot: blankSnapshot,
       hasTent: true,
       now: NOW,
       temperatureUnit: "celsius",
     });
     expect(blank.status).toBe("invalid");
     expect(blank.trustBadge.badge).toBe("invalid");
+    const blankAdvisory = advisoryFor(blankSnapshot);
+    expect(blankAdvisory.kind).toBe("invalid");
+    expect(blankAdvisory.copy).toMatch(/invalid|unknown/i);
   });
 });

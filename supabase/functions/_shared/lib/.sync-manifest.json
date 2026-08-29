@@ -42,7 +42,7 @@
     "src/lib/earlyStageQuickLogRules.ts": "00155ca8d3cba5e737c37d212d6ab1f957f349a8bfd229a44df5c712f08d1e18",
     "src/lib/earlyStageTimelineViewModel.ts": "1ae0502a76d42d64bc1e87cbd86b278745fb05ad8c8c8c82e9a2559246332906",
     "src/lib/ecowittDiaryEnvironmentCheckRules.ts": "884517538709ed72fad1a39ca8bc5b7e1c26f01f051c58f4045f1fa605d124f2",
-    "src/lib/ecowittValidationEvidenceRules.ts": "7865cf089aad7093f9fa834bbe3b389f21d8359e4697173343e57e7f030b750b",
+    "src/lib/ecowittValidationEvidenceRules.ts": "83ba050ca9965959502d21952666d70f74613d9a1b7ddf127df8d432d5a43860",
     "src/lib/entitlements/capabilities.ts": "436131f98e1a631df1d1dcbb8702f6ec48fbbeba4cb40f062fcde6a95f5be430",
     "src/lib/entitlements/lovablePaddleAdapter.ts": "46b09a6310f0065709916d68667321af6269479526fd24c8f831a4f5270ef0ab",
     "src/lib/entitlements/planCatalog.ts": "65e646ada63a4b4abf9d74d855e147845e496fad8137d7601c3cb5ebbc7be610",

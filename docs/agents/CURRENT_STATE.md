@@ -121,8 +121,12 @@ lane or retiring that lane as a check. **Not opened** — it is a slice decision
   flagged in #1204's body, outside its N=2 scope. Cheek: these **collide with #1204**, and now that
   `dae0cbb8a` is merged, **GDP names that follow-up from the #1204 squash.** Not Claude's to open,
   prepare, or stage.
-- **Bugbot** hit the Cursor usage limit on **every head of every PR tonight**, unbroken. Codex was
-  the only finding-level review that ran on #1204.
+- **Review coverage on #1204**, stated per reviewer because the earlier wording inverted it:
+  **Copilot** was the only reviewer to produce findings — the two `AGENTS.md` vocabulary threads,
+  correct and still open on the deploy branch. **Codex** ran on the merging SHA `dae0cbb8a` and
+  completed **clean** at 10:58:51Z; that is a pass, and a pass is not an absence of review.
+  **Bugbot** hit the Cursor usage limit, as it did on **every head of every PR tonight**, unbroken —
+  and that one _is_ an absence.
 
 ## 6. Status
 

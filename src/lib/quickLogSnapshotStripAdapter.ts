@@ -427,6 +427,39 @@ function buildStrictMetrics(
   return out;
 }
 
+/**
+ * Source label to PERSIST in `details.sensor.source` for an attached snapshot.
+ *
+ * Raised by Codex (P1) and Copilot on #1170: the strip gates attachability on
+ * `normalizeSensorSource()`, but `buildSensorSnapshotDetails` persists
+ * `snapshot.source` VERBATIM. So a `fresh_non_live` row sourced
+ * `manual_snapshot` / `import` / `user` / `entry` / `log` / `diary` was
+ * attachable yet persisted a label outside the six-label contract, which
+ * `timelineEvidenceDetailViewModel.normalizeSource` renders as `unknown` — a
+ * genuinely MANUAL reading displayed as unknown provenance.
+ *
+ * Deliberately narrow. Canonicalizing every source would be WORSE, not better,
+ * because the raw label carries provider identity that the timeline displays
+ * (`growDiaryTimelineRules.SOURCE_DISPLAY_LABELS`), and two of those canonicalize
+ * to a falsehood:
+ *
+ *   pi_bridge       -> "Pi bridge"   canonical live     identity lost
+ *   ecowitt         -> "EcoWitt"     canonical INVALID  a real reading marked invalid
+ *   node_red_bridge -> "Node-RED"    canonical INVALID  same
+ *
+ * So this rewrites ONLY when the canonical form is `manual` or `csv` — the
+ * aliases this PR made attachable, which carry no provider identity (they render
+ * as sanitized echoes: "Manual_snapshot", "Import", "User"). Every other label,
+ * including every provider, is persisted untouched. The pre-existing behaviour of
+ * live aliases is out of scope and unchanged.
+ */
+export function persistedSensorSourceLabel(rawSource: unknown): unknown {
+  if (typeof rawSource !== "string") return rawSource;
+  const canonical = normalizeSensorSource(rawSource);
+  if (canonical !== "manual" && canonical !== "csv") return rawSource;
+  return canonical;
+}
+
 export function buildQuickLogStripFromTentState(
   args: BuildQuickLogStripFromTentStateArgs,
 ): QuickLogSnapshotStripViewModel {
@@ -506,6 +539,13 @@ export function buildQuickLogStripFromTentState(
   const usableButDetached = status === "usable" && !attached;
   // Detached copy still wins over demo-usable copy.
   const demoUsable = !usableButDetached && status === "usable" && canonicalSource === "demo";
+  const manualContext = snapshot.status === "fresh_non_live" && canonicalSource === "manual";
+  const csvContext = snapshot.status === "fresh_non_live" && canonicalSource === "csv";
+  const usableDescription = manualContext
+    ? "This log will include grower-entered Manual context — not live telemetry."
+    : csvContext
+      ? "This log will include imported CSV history — not current conditions."
+      : DESCRIPTIONS.usable;
   const title = usableButDetached
     ? "Sensor snapshot available"
     : demoUsable
@@ -515,7 +555,9 @@ export function buildQuickLogStripFromTentState(
     ? "Toggle “Attach sensor snapshot” to include it in this log."
     : demoUsable
       ? DEMO_USABLE_DESCRIPTION
-      : DESCRIPTIONS[status];
+      : status === "usable"
+        ? usableDescription
+        : DESCRIPTIONS[status];
   const baseAction: QuickLogSnapshotStripAction = usableButDetached
     ? { kind: "none" }
     : actionFor(status);
@@ -531,10 +573,10 @@ export function buildQuickLogStripFromTentState(
     ...(canonicalSource === "demo" ? { isHealthyEvidence: false as const } : {}),
   };
 
-  // Live badge for reviewed aliases may stay (pill/badge coherence), but
-  // attachable must NOT become true unless the resolver status is actually
-  // `fresh_live`. Remapping badgeResolverStatus → fresh_live for display
-  // must not widen ATTACHABLE.live; restamp after classify.
+  // Live badge for reviewed aliases may stay for display coherence, but
+  // remapping `badgeResolverStatus` to `fresh_live` must not grant a real
+  // `fresh_non_live` row Live attachability. Preserve the canonical resolver's
+  // attachable Manual/CSV verdicts, including its reviewed source aliases.
   const trustBadge = {
     ...classifySnapshotTrustBadge({
       resolverStatus: badgeResolverStatus,
@@ -545,7 +587,7 @@ export function buildQuickLogStripFromTentState(
     // Provider identity always from the RAW label (e.g. pi_bridge → Pi Bridge).
     providerLabel: deriveProviderLabel(snapshot.source),
   };
-  if (snapshot.status === "fresh_non_live") {
+  if (snapshot.status === "fresh_non_live" && badgeResolverStatus === "fresh_live") {
     trustBadge.attachable = false;
   }
 

@@ -232,6 +232,7 @@ describe("quicklog strip non-live coherence — manual / csv aliases", () => {
         temperatureUnit: "celsius",
       });
       expect(v.trustBadge.badge).toBe("manual");
+      expect(v.trustBadge.attachable).toBe(true);
     });
   }
 
@@ -245,8 +246,36 @@ describe("quicklog strip non-live coherence — manual / csv aliases", () => {
         temperatureUnit: "celsius",
       });
       expect(v.trustBadge.badge).toBe("csv");
+      expect(v.trustBadge.attachable).toBe(true);
     });
   }
+
+  it("canonical manual stays attachable without claiming live telemetry", () => {
+    const v = buildQuickLogStripFromTentState({
+      status: "ready",
+      snapshot: snap({ source: "manual", status: "fresh_non_live" }),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
+    expect(v.trustBadge.attachable).toBe(true);
+    expect(v.description).toMatch(/manual.*not live telemetry/i);
+    expect(v.description).not.toMatch(/current sensor context/i);
+  });
+
+  it("canonical csv stays attachable as history without claiming current conditions", () => {
+    const v = buildQuickLogStripFromTentState({
+      status: "ready",
+      snapshot: snap({ source: "csv", status: "fresh_non_live" }),
+      hasTent: true,
+      now: NOW,
+      temperatureUnit: "celsius",
+    });
+    expect(v.trustBadge.attachable).toBe(true);
+    expect(v.description).toMatch(/csv|imported history/i);
+    expect(v.description).toMatch(/not current conditions/i);
+    expect(v.description).not.toMatch(/will include current sensor context/i);
+  });
 });
 
 describe("quicklog strip non-live coherence — provider identity from RAW label", () => {

@@ -18,6 +18,7 @@ import { Gauge, History } from "lucide-react";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import {
   buildQuickLogStripFromTentState,
+  MANUAL_SNAPSHOT_EDIT_ACTION,
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
@@ -81,6 +82,16 @@ const PILL_ARIA: Record<QuickLogSnapshotStripStatus, string> = {
   no_data: "Sensor snapshot status: no data",
 };
 
+/**
+ * Description shown when the resolved snapshot is usable to LOOK at but
+ * `trustBadge.attachable` is false. The strip must never claim such a
+ * snapshot will be included in the log; the Quick Log save path enforces
+ * the same gate.
+ * Pinned copy; renegotiate tests in the same commit as any change.
+ */
+export const STRIP_NON_ATTACHABLE_DESCRIPTION =
+  "This snapshot is view-only and won't be included in this log.";
+
 // Canonical-badge contract: the SnapshotTrustBadge is the authoritative
 // sensor-truth signal (Live/Stale/Invalid/Manual/Demo/CSV) and must
 // always render so growers (and the trust-badge tests) can read it.
@@ -130,9 +141,24 @@ export default function QuickLogSensorSnapshotStrip({
     temperatureUnit,
   });
 
+  // Honor `trustBadge.attachable` (GDP / Blue Dream #1168 residual): a
+  // usable row whose trust verdict is non-attachable must never read as
+  // "will be included". The parent (QuickLog) enforces the same gate on
+  // the toggle and the save payload; this strip surfaces it.
+  const attachBlocked = view.status === "usable" && !view.trustBadge.attachable;
+  const description = attachBlocked ? STRIP_NON_ATTACHABLE_DESCRIPTION : view.description;
+  // Forced-detach must not cost growers the manual edit affordance: the
+  // adapter drops it in the detached state, so restore it here from the
+  // classified badge (no source classification in this file).
+  const action =
+    attachBlocked && view.trustBadge.badge === "manual" && view.action.kind === "none"
+      ? MANUAL_SNAPSHOT_EDIT_ACTION
+      : view.action;
+
   // Additive: derive a single consistent freshness/empty advisory line
   // from the new pure view-model so growers see one canonical warning
-  // copy before saving. This does NOT change the save path.
+  // copy before saving. The advisory itself is display-only; the
+  // attachable gate above and in the parent is what changes the save path.
   const vm = buildQuickLogSensorSnapshotViewModel(
     adaptQuickLogSensorContextInput({
       state: { status: state.status, snapshot: state.snapshot },
@@ -170,6 +196,7 @@ export default function QuickLogSensorSnapshotStrip({
     <section
       data-testid="quicklog-sensor-snapshot-strip"
       data-status={view.status}
+      data-attachable={view.trustBadge.attachable ? "true" : "false"}
       aria-label="Sensor snapshot summary"
       className={`rounded-lg border p-3 space-y-2 ${TONE[view.status]}`}
     >
@@ -214,7 +241,7 @@ export default function QuickLogSensorSnapshotStrip({
         </div>
       </div>
 
-      <p className="text-[12px] text-muted-foreground leading-snug">{view.description}</p>
+      <p className="text-[12px] text-muted-foreground leading-snug">{description}</p>
 
       {advisory && (
         <p
@@ -252,15 +279,15 @@ export default function QuickLogSensorSnapshotStrip({
         </div>
       )}
 
-      {view.action.kind !== "none" && (
+      {action.kind !== "none" && (
         <a
-          href={view.action.href}
+          href={action.href}
           data-testid="quicklog-sensor-snapshot-action"
-          data-action-kind={view.action.kind}
-          aria-label={`${view.action.label} — opens sensors page`}
+          data-action-kind={action.kind}
+          aria-label={`${action.label} — opens sensors page`}
           className="inline-flex items-center text-[12px] font-medium text-primary hover:underline rounded-sm focus:outline-hidden focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          {view.action.label}
+          {action.label}
         </a>
       )}
       {correctionHref && (

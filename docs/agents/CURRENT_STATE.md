@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~22:16 UTC)
+**Last updated:** 2026-08-29 UTC (~22:22 UTC)
 **Updated by:** Claude (2026-08-29: #1215 and #1216 merged; deploy branch is now **`5d6efc95a`**.
 #1216 closes **token-shaped NTLM** only — parameterized `Authorization` headers **still leak on the
 current tip across Digest, Negotiate and NTLM**, verified by execution. Live production is
@@ -16,9 +16,10 @@ current tip across Digest, Negotiate and NTLM**, verified by execution. Live pro
 | **#1216** | `5d6efc95a` | 1       | **squash**; SHA equals its merge group | `(#1216)`    |
 
 Both went through the merge queue, #1216 stacked on #1215's group. Auto-merge stored `merge_method:
-merge` on #1215; the queue produced a squash. That is now a **fourth observed squash outcome**
-(#1186, #1212, #1213, #1215/#1216) and stays an **observation** — the configured method remains
-`NOT_MEASURED`; reading it needs `Administration:read`, which the token lacks.
+merge` on #1215; the queue produced a squash. #1215 and #1216 are **two** separate squashes, so they
+are the **fourth and fifth observed outcomes** (#1186, #1212, #1213 were the first three). They stay
+**observations** — the configured method remains `NOT_MEASURED`; reading it needs
+`Administration:read`, which the token lacks.
 
 **Two state changes on #1215 were attributed to `cheekhimself` and were not performed by Claude:**
 the ready at 19:34:30Z, and a **draft conversion at 21:53:23Z** that silently stripped the armed

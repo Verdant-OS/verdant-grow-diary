@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~20:26 UTC)
+**Last updated:** 2026-08-29 UTC (~20:31 UTC)
 **Updated by:** Claude (2026-08-29: #1213 and #1214 merged. #1213 carried a `P1` — `20260813030000`
 listed among migrations that "remain NOT applied", corrected before merge. #1214 closes the
 Authorization redaction gap for **token-shaped** Digest/Negotiate only; the **parameterized case is
@@ -88,7 +88,22 @@ RFC-shaped headers redact their sensitive parameters via the **generic hex-shape
 `response`, `opaque` are long hex), not via anything #1214 added; short or non-hex values survive.
 #1214's added test covers only the token-shaped form (`Digest <base64>`), which redacts fully.
 
-Affected surfaces: `redacted_raw_payload` and clipboard exports. **Codex's slice — not Claude's to
+Affected surfaces: `redacted_raw_payload` in the clipboard evidence copy **and in the downloaded
+validation JSON** (`buildEcowittValidationExport` → `serializeExport` →
+`EcowittIngestValidationPanel.handleConfirmExportJson`, a file written to disk). The CSV download
+excludes the raw payload — `CSV_HEADER` carries no such column.
+
+Reachability, verified by execution: the regex path runs only on a **string nested under a
+non-secret key**. `redactEvidenceValue` replaces a top-level string wholesale, and
+`redactEvidenceNode` replaces any value under an `Authorization`-named key wholesale; both return
+`[redacted]` with nothing surviving. The leak needs a shape such as
+`{ request_log: "…Authorization: Digest …" }`, which serialized to the JSON download as:
+
+```
+"redacted_raw_payload": { "request_log": "POST /ingest\n[REDACTED]\"grower\", realm=\"verdant\", nonce=\"secret\"\nbody=1" }
+```
+
+Whether real EcoWitt payloads carry that shape is `NOT_MEASURED`. **Codex's slice — not Claude's to
 fix.**
 
 No collision with this file: #1214 touches `src/lib/ecowittValidationEvidenceRules.ts`, its test, the

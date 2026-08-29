@@ -860,6 +860,8 @@ describe("evidence rules", () => {
   it.each([
     ["Authorization: Bearer actualtoken123456", "actualtoken123456"],
     ["Authorization: Basic Zmxvd2VyOnJvb20tc2VjcmV0", "Zmxvd2VyOnJvb20tc2VjcmV0"],
+    ["Authorization: Digest ZGlnZXN0OnNlY3JldA==", "ZGlnZXN0OnNlY3JldA=="],
+    ["Authorization: Negotiate bmVnb3RpYXRlLXNlY3JldA==", "bmVnb3RpYXRlLXNlY3JldA=="],
     ['Authorization: PASSKEY="flower-room-credential"', "flower-room-credential"],
     ["Bearer PASSKEY=flower-room-credential", "flower-room-credential"],
     ['Bearer MY_PASSKEY_VAR="flower-room-credential"', "flower-room-credential"],

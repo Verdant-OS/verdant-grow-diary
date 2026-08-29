@@ -10,7 +10,11 @@
  */
 import { describe, it, expect } from "vitest";
 import { classifySnapshotTrustBadge } from "@/lib/sensorSnapshotTrustBadgeRules";
-import { buildQuickLogStripFromTentState } from "@/lib/quickLogSnapshotStripAdapter";
+import {
+  buildQuickLogStripFromTentState,
+  DEMO_USABLE_DESCRIPTION,
+  DEMO_USABLE_TITLE,
+} from "@/lib/quickLogSnapshotStripAdapter";
 import {
   EMPTY_SENSOR_SNAPSHOT,
   type SensorSnapshot as StrictSensorSnapshot,
@@ -104,18 +108,28 @@ describe("Quick Log sensor snapshot — state semantics", () => {
     expect(v.trustBadge.attachable).toBe(false);
   });
 
-  it("stale resolver verdict with unknown provenance fails closed to INVALID", () => {
-    const v = buildQuickLogStripFromTentState({
-      status: "ready",
-      snapshot: snap({ source: "ecowitt", status: "stale", freshness: "stale" }),
-      hasTent: true,
-      now: NOW,
-      temperatureUnit: "celsius",
-    });
-    expect(v.status).toBe("invalid");
-    expect(v.trustBadge.badge).toBe("invalid");
-    expect(v.trustBadge.attachable).toBe(false);
-    expect(v.classification.isHealthyEvidence).toBe(false);
+  it("canonical-invalid sources fail closed to the Invalid trio for fresh_non_live and stale", () => {
+    for (const status of ["fresh_non_live", "stale"] as const) {
+      for (const source of ["ecowitt", "mqtt", "   "]) {
+        const v = buildQuickLogStripFromTentState({
+          status: "ready",
+          snapshot: snap({
+            source,
+            status,
+            freshness: status === "stale" ? "stale" : "fresh",
+          }),
+          hasTent: true,
+          now: NOW,
+          temperatureUnit: "celsius",
+        });
+        const label = `status=${status}, source=${JSON.stringify(source)}`;
+        expect(v.status, label).toBe("invalid");
+        expect(v.trustBadge.badge, label).toBe("invalid");
+        expect(v.trustBadge.attachable, label).toBe(false);
+        expect(v.classification.status, label).toBe("invalid");
+        expect(v.classification.isHealthyEvidence, label).toBe(false);
+      }
+    }
   });
 
   it("manual snapshot renders MANUAL", () => {
@@ -130,16 +144,22 @@ describe("Quick Log sensor snapshot — state semantics", () => {
     expect(v.trustBadge.attachable).toBe(true);
   });
 
-  it("demo/sim snapshot renders DEMO and is not attachable", () => {
-    const v = buildQuickLogStripFromTentState({
-      status: "ready",
-      snapshot: snap({ source: "sim", status: "fresh_non_live" }),
-      hasTent: true,
-      now: NOW,
-      temperatureUnit: "celsius",
-    });
-    expect(v.trustBadge.badge).toBe("demo");
-    expect(v.trustBadge.attachable).toBe(false);
+  it("all canonical demo aliases stay usable Demo context without becoming attachable or healthy", () => {
+    for (const source of ["demo", "sim", "mock", "sample", "fixture"]) {
+      const v = buildQuickLogStripFromTentState({
+        status: "ready",
+        snapshot: snap({ source, status: "fresh_non_live" }),
+        hasTent: true,
+        now: NOW,
+        temperatureUnit: "celsius",
+      });
+      expect(v.status, `source=${source}`).toBe("usable");
+      expect(v.title, `source=${source}`).toBe(DEMO_USABLE_TITLE);
+      expect(v.description, `source=${source}`).toBe(DEMO_USABLE_DESCRIPTION);
+      expect(v.trustBadge.badge, `source=${source}`).toBe("demo");
+      expect(v.trustBadge.attachable, `source=${source}`).toBe(false);
+      expect(v.classification.isHealthyEvidence, `source=${source}`).toBe(false);
+    }
   });
 
   it("live fresh valid Ecowitt snapshot renders LIVE and attachable", () => {

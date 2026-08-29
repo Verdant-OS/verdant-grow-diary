@@ -17,9 +17,16 @@ const STRIP = readSource("src/components/QuickLogSensorSnapshotStrip.tsx");
  * sentence describing one, so an assertion satisfied only by a comment
  * stays green after the code it claims to guard is deleted. Codex raised
  * exactly that on #1170: this block asserted two phrases that existed
- * nowhere but the strip's own comments. Scan `STRIP_CODE` for anything
- * that must actually execute; keep `STRIP` for absence checks, where a
- * mention in a comment is still worth failing on.
+ * nowhere but the strip's own comments. Copilot then pointed out on #1199
+ * that converting only that block left the claim overstated -- every other
+ * positive presence check still scanned raw source and could equally be
+ * satisfied by a comment.
+ *
+ * The split is therefore by assertion polarity, not by block: every
+ * POSITIVE check -- anything asserting that code is present and must
+ * execute -- scans `STRIP_CODE`; raw `STRIP` is used only for the NEGATIVE
+ * forbidden-token checks, where a mention inside a comment is still worth
+ * failing on.
  */
 const STRIP_CODE = STRIP.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
@@ -36,22 +43,22 @@ const FORBIDDEN_SIDE_EFFECT_TOKENS = [
 
 describe("quick log sensor snapshot badge dedupe", () => {
   it("does not render the trust badge when it duplicates the strip status pill", () => {
-    expect(STRIP).toMatch(/function shouldRenderTrustBadge/);
-    expect(STRIP).toMatch(/trustLabel\.trim\(\)\.toLowerCase\(\)/);
-    expect(STRIP).toMatch(/PILL_LABEL\[status\]\.toLowerCase\(\)/);
-    expect(STRIP).toMatch(/showTrustBadge && <SnapshotTrustBadge/);
+    expect(STRIP_CODE).toMatch(/function shouldRenderTrustBadge/);
+    expect(STRIP_CODE).toMatch(/trustLabel\.trim\(\)\.toLowerCase\(\)/);
+    expect(STRIP_CODE).toMatch(/PILL_LABEL\[status\]\.toLowerCase\(\)/);
+    expect(STRIP_CODE).toMatch(/showTrustBadge && <SnapshotTrustBadge/);
   });
 
   it("keeps the canonical strip status pill visible", () => {
-    expect(STRIP).toContain('data-testid="quicklog-sensor-snapshot-pill"');
-    expect(STRIP).toMatch(/PILL_LABEL\[view\.status\]/);
-    expect(STRIP).toMatch(/PILL_ARIA\[view\.status\]/);
+    expect(STRIP_CODE).toContain('data-testid="quicklog-sensor-snapshot-pill"');
+    expect(STRIP_CODE).toMatch(/PILL_LABEL\[view\.status\]/);
+    expect(STRIP_CODE).toMatch(/PILL_ARIA\[view\.status\]/);
   });
 
   it("keeps provider/source rendering separate from trust status", () => {
-    expect(STRIP).toContain('data-testid="quicklog-sensor-snapshot-source"');
-    expect(STRIP).toMatch(/Sensor source: \$\{view\.providerLabel\}/);
-    expect(STRIP).toMatch(/source: \{view\.providerLabel\}/);
+    expect(STRIP_CODE).toContain('data-testid="quicklog-sensor-snapshot-source"');
+    expect(STRIP_CODE).toMatch(/Sensor source: \$\{view\.providerLabel\}/);
+    expect(STRIP_CODE).toMatch(/source: \{view\.providerLabel\}/);
   });
 
   it("does not weaken sensor snapshot safety copy or navigation-only action", () => {

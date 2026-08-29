@@ -123,13 +123,6 @@ export function adaptQuickLogRevisionDatabaseRow(value: unknown): QuickLogRevisi
   return row;
 }
 
-export function adaptQuickLogRevisionDatabaseRows(data: unknown): QuickLogRevisionRow[] {
-  if (!Array.isArray(data)) return [];
-  return data
-    .map(adaptQuickLogRevisionDatabaseRow)
-    .filter((row): row is QuickLogRevisionRow => row !== null);
-}
-
 export type QuickLogRevisionRowsDecodeResult =
   { ok: true; rows: QuickLogRevisionRow[] } | { ok: false };
 

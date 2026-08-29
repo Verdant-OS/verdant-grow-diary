@@ -122,6 +122,12 @@ describe("Quick Log revision client contract", () => {
     expect(retractedHook).not.toMatch(/\bas\s+QuickLogRevisionRow\[\]/);
   });
 
+  it("does not publicly export the deleted silent-filter batch adapter", async () => {
+    const serviceExports = await import("@/lib/quickLogRevisionService");
+
+    expect(serviceExports).not.toHaveProperty("adaptQuickLogRevisionDatabaseRows");
+  });
+
   it("fails closed when an RPC claims success without its required result fields", async () => {
     supabaseMock.rpc.mockResolvedValue({ data: { ok: true }, error: null });
 
@@ -326,7 +332,10 @@ describe("Quick Log revision client contract", () => {
       count: 1,
     };
     supabaseMock.revisionResult = {
-      data: [makeRevisionRow({ diary_entry_id: 42 })],
+      data: [
+        makeRevisionRow(),
+        makeRevisionRow({ id: "revision-2", diary_entry_id: 42, revision_no: 2 }),
+      ],
       error: null,
     };
 

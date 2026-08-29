@@ -36,12 +36,12 @@ const REDACTED_SECRET_VALUE = "[REDACTED]";
 // `temp_f=77.4` and `inserted=1`.
 const CREDENTIAL_KEY_SOURCE =
   "(?:token|authorization|bearer|api[_-]?key|secret|password|service[_-]?role|anon[_-]?key|bridge[_-]?token|passkey|signature|jwt|vbt|user_id)";
-// Do not consume a Bearer prefix or the name of a nested assignment as the
-// credential value; the dedicated later rules must see those spans whole. A
+// Do not consume a Bearer/Basic prefix or the name of a nested assignment as
+// the credential value; the dedicated later rules must see those spans whole. A
 // matching optional quote pair keeps serialized JSON keys inside safe strings
 // on the same redaction path as their unquoted free-text equivalents.
 const CREDENTIAL_PAIR_PATTERN = new RegExp(
-  `(["']?)[A-Za-z0-9_-]*${CREDENTIAL_KEY_SOURCE}[A-Za-z0-9_-]*\\1\\s*[=:]\\s*(?!Bearer\\b)(?![A-Za-z0-9_-]+\\s*[=:])(?:"[^"]+"|'[^']+'|[^\\s"',;}]+)`,
+  `(["']?)[A-Za-z0-9_-]*${CREDENTIAL_KEY_SOURCE}[A-Za-z0-9_-]*\\1\\s*[=:]\\s*(?!(?:Bearer|Basic)\\b)(?![A-Za-z0-9_-]+\\s*[=:])(?:"[^"]+"|'[^']+'|[^\\s"',;}]+)`,
   "gi",
 );
 
@@ -70,7 +70,7 @@ const SECRET_VALUE_PATTERNS: RegExp[] = [
   // "redacts the credential assignment behind a header prefix".
   /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
   /Bearer\s+[A-Za-z0-9._-]{6,}/gi,
-  /Authorization\s*:\s*[^\s",}]+/gi,
+  /Authorization\s*:\s*(?:Basic\s+)?[^\s",}]+/gi,
   /PASSKEY/gi,
   new RegExp(["service", "_", "role"].join(""), "gi"),
   /(?<![0-9A-Fa-f])[0-9A-Fa-f]{2}(?:[:-][0-9A-Fa-f]{2}){5}(?![0-9A-Fa-f])/g,

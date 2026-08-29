@@ -254,28 +254,48 @@ lane or retiring that lane as a check. **Not opened** — it is a slice decision
   substantive "Low Risk" overview naming the `FORBIDDEN` / `NOT_APPLICABLE` contrast, the deliberate
   `AGENTS.md` gap, and the prettier column padding. Two surfaces, two outcomes, one SHA.
 
-**Corrected 2026-08-29 on a follow-up branch cut from `4e3e715ab`, after I raised the discrepancy
-myself.** The bullet above originally read _"**Bugbot** hit the Cursor usage limit, as it did on
-**every head of every PR tonight**, unbroken — and that one is an absence."_ **Withdrawn.** It was
-wrong at its own subject: on #1204 — the PR this section is about — Bugbot's summary completed, so
-"unbroken" is false, and "an absence" is true only of the **finding-level** surface. The evidence was
-in #1204's own body the whole time.
+**Corrected 2026-08-29 on a follow-up branch cut from `4e3e715ab` after I raised the discrepancy
+myself — then corrected a second time on the same branch after Copilot caught the first
+correction.** The bullet above originally read _"**Bugbot** hit the Cursor usage limit, as it did on
+**every head of every PR tonight**, unbroken — and that one is an absence."_ **Its defect is that it
+is unqualified, not that it is false.** It names no surface. Read of the **finding-level** run — the
+surface that decides review coverage — it is **supported**: that run posted _"couldn't run — usage
+limit reached"_ on every head checked, `dae0cbb8a` included. Read of Bugbot as a whole, it invites
+the conclusion that nothing Bugbot-shaped happened, which the completed summary contradicts. **The
+fix is to name the surface, not to withdraw the claim.**
+
+**My first attempt at this correction asserted that "unbroken" was false — the same error one level
+up.** A completed summary and a usage-limited finding-level run are **compatible outcomes**, and this
+file already says so twice: _"a body summary is not a finding-level pass."_ The second of those
+passages carries the exact warning I then walked into — _"A reader who checks #1170 against the
+heading above will see that block and conclude this section is wrong. **It is not.**"_ I was that
+reader: I found the summary in #1204's body and concluded the row was false. Overcorrecting a
+true-but-unqualified claim into a false one is not an improvement on ambiguity; it is a worse defect
+wearing the costume of rigour. Caught by **Copilot** on #1212, confirmed against both cited passages
+before being accepted.
 
 **Scope of what the summary proves is narrower than it looks.** Its overview restates points that
 also appear in #1204's PR body, so whether it derives from the diff or from the body is
 **`NOT_MEASURED`**. What is established is that the summary surface **ran and emitted content** while
 the finding-level surface did not — not that anything reviewed the change.
 
-**Why this one matters beyond the sentence.** This file had **already** separated those two surfaces,
-in the **2026-08-28** entry, resolved there by a better source — the Cursor **Approval Agent**'s
-_"Cursor Bugbot skipped (incomplete)"_ — which reconciled a summary that completed against a
-finding-level run that did not. That passage closes with a standing warning still in this file: _"Do
-**not** record either that a finding-level review definitely ran or that it definitely did not — this
-file claimed each in turn and each was wrong."_ I collapsed the surfaces back together anyway. Same
-defect class as the stale tip and the inverted coverage line — **the file contradicting a passage it
-already contains** — and the fourth instance this shift. The transferable rule is narrower than
-"check your claims": **before recording a reviewer's status, grep this file for what it has already
-concluded about that reviewer.**
+**Why this matters beyond the sentence — it went wrong twice, in opposite directions.** This file had
+**already** separated the two surfaces, in the **2026-08-28** entry, resolved there by a better
+source: the Cursor **Approval Agent**'s _"Cursor Bugbot skipped (incomplete)"_, reconciling a summary
+that completed against a finding-level run that did not. That passage closes with a standing warning
+still in this file: _"Do **not** record either that a finding-level review definitely ran or that it
+definitely did not — this file claimed each in turn and each was wrong."_ The original bullet
+collapsed the surfaces by naming neither. The correction then over-swung and called the result false.
+Both failures share one root — **writing a reviewer's status without checking what this file had
+already concluded about that reviewer** — and both are the same defect class as the stale deploy tip
+and the inverted coverage line: **the file contradicting a passage it already contains.** No ordinal
+is asserted for how many times that has now happened this shift; an earlier entry miscounted exactly
+that kind of running total, and the count is not what carries the lesson.
+
+The transferable rule is narrower than "check your claims" and narrower than the first attempt's
+version of it: **before recording a reviewer's status, grep this file for what it already concluded
+about that reviewer — and when the answer is that two outcomes are compatible, qualify the claim
+rather than reversing it.**
 
 ## 6. Status
 
@@ -481,11 +501,12 @@ Stated as a qualifier at the time rather than left standing.
 | `Supabase Preview` 42P07           | red and pre-existing; already covered by the replay-compat config; not a gate  |
 | Bugbot                             | Cursor usage limit on **every head of every PR** tonight                       |
 
-**Corrected 2026-08-29 — the `Bugbot` row above is withdrawn as written.** Its **finding-level** run
-was indeed usage-limited, but "every head of every PR" overstates it: Bugbot's **summary** surface
-completed on #1204's `dae0cbb8a` and on #1186's `025c10852`. The row is left in place rather than
-rewritten, per this file's annotate-don't-hide convention. See the corrected bullet in `## 5` of the
-newer entry above.
+**Corrected 2026-08-29 — the `Bugbot` row above is `unqualified`, not wrong.** It names no surface.
+Of the **finding-level** run the row is **supported** — that run was usage-limited on every head
+checked. What it omits is that Bugbot's **summary** surface completed on #1204's `dae0cbb8a` and on
+#1186's `025c10852`; a completed summary is compatible with a usage-limited finding-level run, and is
+**not** a finding-level pass. The row is left in place rather than rewritten, per this file's
+annotate-don't-hide convention. See the corrected bullet in `## 5` of the newer entry above.
 
 ## 9. `NOT_MEASURED`
 

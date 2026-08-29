@@ -1,6 +1,61 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~01:05 UTC)
+**Last updated:** 2026-08-29 UTC (~01:20 UTC)
+**Updated by:** Claude (2026-08-29: **#1184 MERGED as `1d19c4c`. TWO of the three redaction leaks
+are now closed on the deploy branch, both verified by EXECUTION. The third is still open in draft.
+Production exposure remains `NOT_MEASURED` for all three.**
+
+**#1184 merged — deploy tip `f9f4d11` -> `1d19c4c`.** Verified on the merged tip, not assumed:
+
+- **Pattern order correct in the shipping module** — the env assignment rule at line 55, above
+  `Bearer` (56), `Authorization` (57) and `PASSKEY` (58).
+- **The edge mirror carries the fix too** — `supabase/functions/_shared/lib/lib/
+ecowittValidationEvidenceRules.ts` checked directly on the tip, not inferred from CI.
+- **Re-probed by execution in a detached worktree at `1d19c4c`, through the OBJECT PATH** — the
+  shape that actually leaked, since a bare string returns `[redacted]` wholesale and yields a false
+  negative:
+
+```text
+Bearer MY_PASSKEY_VAR="…"   -> { "config_note": "Bearer [REDACTED]", "temp_f": 77.4, "note": "stable" }
+Authorization: PASSKEY="…"  -> { "config_note": "[REDACTED]", … }
+Bearer SOME_PLAIN_NAME="…"  -> { "config_note": "Bearer [REDACTED]", … }
+```
+
+All four previously-leaking inputs redact. **Benign siblings `temp_f: 77.4` and `note: "stable"`
+survive untouched**, which is what distinguishes "the leak closed" from "the redactor went blunt".
+
+**#1184 merged in the strongest state of any PR in this sequence**, recorded because it is the
+contrast case with #1169 and #1176: **35/35 required green** on the exact merging SHA `e3f79be`,
+**Codex reviewed it clean TWICE** on that same SHA, Copilot's finding fixed with its thread
+**resolved**, and both edge-mirror checks green in CI. No stale-SHA gap, no unreviewed head.
+
+**Leak status across the three modules:**
+
+| Module                              | Leak                           | Where                    |
+| ----------------------------------- | ------------------------------ | ------------------------ |
+| `ecowittLocalForwardingStatus.ts`   | **CLOSED**, execution-verified | merged `f9f4d11` (#1185) |
+| `ecowittValidationEvidenceRules.ts` | **CLOSED**, execution-verified | merged `1d19c4c` (#1184) |
+| `postGrowReportRules.ts`            | **STILL OPEN**                 | #1187, draft             |
+
+**`NOT_MEASURED` and not to be rounded up: production exposure for ALL THREE.** Two are closed on
+the **deploy branch**; the third is not merged at all. **A merge is not a deployment** — exposure
+ends only at a verified publish, and none has been performed or authorized.
+
+**Both open CURRENT_STATE-adjacent PRs are now one commit behind.** #1186 (`fea3709`) and #1187
+(`9f739b4`) are both based on `f9f4d11`. **Neither conflicts with `1d19c4c`**, so neither was
+rebased or merged forward — churning their SHAs would invalidate their CI and reviews for no content
+change. Left deliberately.
+
+**Still not written: the shared ordering contract.** The audit's central finding stands —
+`proofReportRedactionRules.ts` already implements the correct order and documents the hazard, and
+three modules independently failed to follow it. Three one-line fixes do not prevent a fourth. A
+lint rule or shared contract is the durable remedy and remains **un-started**.
+
+**Posture.** Deploy tip **`1d19c4c`**. `20260827010000`, `20260826100000`, `20260825233000` and
+`20260813030000` all remain **NOT applied**. #1186 and #1187 are **draft**; nothing readied,
+enqueued or merged by Claude. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~01:05 UTC)
 **Updated by:** Claude (2026-08-29: **The ordering audit was DONE — the first deliberate one. It
 found a THIRD instance (fixed in #1187) and, more usefully, the counter-example: this codebase
 already contained the correct pattern, documented, the whole time.**

@@ -209,14 +209,14 @@ const PHOTO_ENTRY = {
 
 function laneCases(
   name: string,
-  Panel: typeof FeedingHistoryPanel,
-  entry: typeof FEEDING_ENTRY,
+  Panel: (props: { rawEntries: readonly unknown[] }) => JSX.Element | null,
+  entry: Record<string, unknown>,
   testId: string,
   rootId: string,
 ) {
   it(`${name}: empty-success shows no unavailable note`, () => {
     badgeHookMock.status = "ok";
-    render(<Panel rawEntries={[entry]} />, { wrapper: makeWrapper() });
+    render(<Panel rawEntries={[entry] as never} />, { wrapper: makeWrapper() });
     expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();
     expect(screen.getByTestId(testId)).toHaveAttribute("data-revision-badges-status", "ok");
   });
@@ -225,7 +225,7 @@ function laneCases(
     badgeHookMock.status = "pending";
     badgeHookMock.isLoading = true;
     badgeHookMock.badges = new Map([[rootId, { correctionCount: 2 }]]);
-    render(<Panel rawEntries={[entry]} />, { wrapper: makeWrapper() });
+    render(<Panel rawEntries={[entry] as never} />, { wrapper: makeWrapper() });
     expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();
     expect(screen.queryByTestId("quicklog-entry-edited-badge")).not.toBeInTheDocument();
     expect(screen.getByTestId(testId)).toHaveAttribute("data-revision-badges-status", "pending");
@@ -234,7 +234,7 @@ function laneCases(
   it(`${name}: unread ledger shows a quiet unavailable note, not edited chrome`, () => {
     badgeHookMock.status = "unavailable";
     badgeHookMock.badges = new Map([[rootId, { correctionCount: 2 }]]);
-    render(<Panel rawEntries={[entry]} />, { wrapper: makeWrapper() });
+    render(<Panel rawEntries={[entry] as never} />, { wrapper: makeWrapper() });
     const note = screen.getByTestId("quicklog-revision-badges-unavailable");
     expect(note).toHaveTextContent(QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE);
     expect(screen.queryByTestId("quicklog-entry-edited-badge")).not.toBeInTheDocument();
@@ -244,7 +244,7 @@ function laneCases(
   it(`${name}: ok with a matching badge shows the edited chrome`, () => {
     badgeHookMock.status = "ok";
     badgeHookMock.badges = new Map([[rootId, { correctionCount: 2 }]]);
-    render(<Panel rawEntries={[entry]} />, { wrapper: makeWrapper() });
+    render(<Panel rawEntries={[entry] as never} />, { wrapper: makeWrapper() });
     const badge = screen.getByTestId("quicklog-entry-edited-badge");
     expect(badge).toBeInTheDocument();
     expect(badge.textContent?.toLowerCase()).toMatch(/correct|edit/);

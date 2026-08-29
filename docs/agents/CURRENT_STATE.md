@@ -1,6 +1,148 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~15:15 UTC)
+**Last updated:** 2026-08-29 UTC (~18:25 UTC)
+**Updated by:** Claude (2026-08-29: **#1212 corrected the Bugbot coverage line — and the version
+readied for review was itself wrong, in two independent ways, on a head that was 35/35 green.**
+Copilot and Codex caught an OVERCORRECTION: I declared a true-but-unqualified claim false. A third
+Codex `P2` caught me quoting a SUPERSEDED interim note as standing guidance. All three confirmed by
+execution, fixed, and merged with zero open threads. Prior header follows.)
+
+## 1. What #1212 set out to fix, and what it got wrong
+
+`established fact`, established by reading the cited passages, not from the PR bodies.
+
+#1186's entry carried this in its `## 5` review-coverage bullet, and it went live on the deploy
+branch when #1186 merged at 16:32Z:
+
+> **Bugbot** hit the Cursor usage limit, as it did on **every head of every PR tonight**, unbroken —
+> and that one _is_ an absence.
+
+I raised it myself: Bugbot's **summary** surface had completed on #1204's `dae0cbb8a`, which sat
+against the word "unbroken". #1212 was cut to fix that.
+
+**The first cut fixed it in the wrong direction.** It declared the claim **false** and marked the row
+**Withdrawn**. That inference does not hold, and this file already said so twice.
+
+## 2. The three findings — all confirmed against the file before being accepted
+
+| #   | Reviewer       | Finding                                                                                                                         | Fixed in    |
+| --- | -------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | **Copilot**    | Summary completion does not disprove a finding-level usage-limit result; reframe around surface ambiguity                       | `8ad3aa4ce` |
+| 2   | **Codex `P2`** | Withdraws the all-head claim **without identifying any head whose finding-level review actually ran**                           | `8ad3aa4ce` |
+| 3   | **Codex `P2`** | The 2026-08-28 warning quoted as "standing" is **provisional** — its next paragraph is _"Resolved at 18:28 by a better source"_ | `9b3ce03c0` |
+
+Findings 1 and 2 are the same defect found independently. Finding 3 is **separate**.
+
+## 3. The defect: overcorrection, and the file predicted it
+
+A completed **summary** and a usage-limited **finding-level** run are **compatible outcomes**. This
+file states it twice — _"a body summary is not a finding-level pass"_ — and the second passage
+anticipates exactly the mistake:
+
+> A reader who checks #1170 against the heading above will see that block and conclude this section
+> is wrong. **It is not.**
+
+I was that reader. I found the summary in #1204's body and concluded the row was false.
+
+Read of the finding-level run, the original claim is **supported**: that run posted _"couldn't run —
+usage limit reached"_ on every head checked — `dae0cbb8a` 10:58:07Z, #1186 at 12:08:03Z / 12:16:31Z /
+12:26:14Z / 15:46:07Z, #1212's own head 17:58:51Z. **No head was found whose finding-level review
+ran**, which is precisely why withdrawal was unjustified. Its real defect is that it **named no
+surface**.
+
+**Overcorrecting a true-but-unqualified claim into a false one is not an improvement on the
+ambiguity — it is a worse defect wearing the costume of rigour.** The remedy for an unqualified
+claim is to qualify it, not reverse it.
+
+## 4. The third finding is its own lesson
+
+The line I quoted as _"a standing warning still in this file"_ sits inside a block ending
+**`Unresolved`**, and the very next paragraph is headed **"Resolved at 18:28 by a better source"** —
+the Cursor Approval Agent's _"Cursor Bugbot skipped (incomplete)"_, which closed it.
+
+So an **interim state was quoted as a rule**, inside a correction whose entire subject is not
+misreading this file's own record. The resolved conclusion is what is now cited. The `#1170` passage
+is **not** part of that superseded block and still stands.
+
+## 5. Green CI did not catch any of it — and readying is what did
+
+`practical observation`, and it is the most transferable item here.
+
+**All 35 required contexts were green on `87dcff867`**, the head carrying both defects. CI cannot
+evaluate whether a claim about review coverage is true; it can only prove the file parses, formats
+and does not trip the docs gates. **Green CI is not review**, and for a prose governance file the gap
+between the two is total.
+
+The findings arrived **only because the PR was readied** — Codex triggers on draft→ready, and before
+that moment `get_reviews` on #1212 returned empty. Had it merged from draft on the strength of 35/35,
+the deploy branch would now carry a false claim **inside a correction about false claims**.
+
+## 6. A cost I caused, recorded because it was avoidable
+
+The two fixes went out as two pushes ~90 seconds apart. The second superseded the first's in-flight
+run, so `Typecheck + production build` was **`cancelled`** on `8ad3aa4ce` and `Publish preview status
+to PR` failed as a consequence. Both are **non-required**, both were confined to the superseded head,
+and both passed clean on `9b3ce03c0`. Self-inflicted; one commit would have avoided it.
+
+## 7. Merge facts, verified by execution
+
+Tip chain: **`4e3e715ab`** (#1186, 16:32Z) → **`f5fd474ef`** (#1211, sensors) → **`3afc2df68`**
+(#1212, 18:22Z). Re-verify with `git ls-remote` rather than citing this line.
+
+- For **both** #1186 and #1212 the **squash SHA equals the merge-group SHA** — no queue
+  re-resolution; what merged is what the queue tested.
+- **#1212 merged with zero open threads** — the first of my merges this shift to do so. #1203, #1204,
+  #1206, #1208 and #1186 each landed carrying at least one open finding.
+- #1211 touched product code only and shared no file with #1212; being behind the tip was never a
+  conflict and no rebase was performed.
+
+## 8. Status
+
+| Item                                     | Status                                                                                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| #1212 Bugbot coverage correction         | **MERGED** `3afc2df68` — verified on the tip by execution                                                                                                                            |
+| #1186 `CURRENT_STATE` corrections        | **MERGED** `4e3e715ab`, carrying one open thread by instruction                                                                                                                      |
+| `AGENTS.md` does not declare `FORBIDDEN` | **OPEN — the oldest unclosed thread of this shift.** Two merged ledgers use a status the constitution does not carry                                                                 |
+| `FORBIDDEN` alignment slice              | **proposed, NOT opened** — twelve-file `Sentinel-Version` bump; needs its own review                                                                                                 |
+| Superseded `LIVE`/`FORBIDDEN` entry      | its Codex `P2` stays **OPEN on purpose**; not rewritten                                                                                                                              |
+| Branch-name conflict                     | **with Cheek.** Harness designates `claude/trustbadge-attachable-strip-2441l2`; descriptive names used instead, since that name denotes a different slice and strip files are fenced |
+| `Supabase Preview` 42P07                 | red repo-wide across **eight** distinct preview projects; non-required, absent from the ruleset, not a gate                                                                          |
+
+## 9. `NOT_MEASURED`
+
+- **Production.** The deploy branch is **`3afc2df68`** as of 18:22Z. **A merge is not a deployment**;
+  no publish was performed or authorized this shift. Re-verify the tip rather than citing this line.
+- **Migrations — stated in both senses, because a bare "not applied" is false in the dangerous
+  direction.** `20260827010000`, `20260826100000` and `20260825233000` remain **NOT applied**, plainly.
+  **`20260813030000` is not like them**: its **GitHub apply lane never succeeded**, but its
+  **production objects were applied verbatim on 2026-08-21** through Lovable, md5-guarded. Its
+  **current** production state is **`NOT_MEASURED`**, and re-applying it is **`FORBIDDEN`** — it would
+  re-issue an unguarded `handle_new_user` over the live guard.
+
+  **Corrected 2026-08-29 after Copilot raised it on #1213.** This bullet first listed all four
+  together as bare "NOT applied" — **the identical defect this file already records me making**,
+  caught then by Copilot and Codex on #1200 and corrected at 09:55Z as _"false in the dangerous
+  direction"_. I reproduced it in the very file that documents it, one section below a passage titled
+  _"The `20260813030000` error — mine, propagated, and in the dangerous direction"_. The three-plus-one
+  split above is the form that cannot be misread; the flat list is the form that reads as licence to
+  APPLY.
+
+- Whether Bugbot's summary output derives from the **diff** or restates the **PR body**. Its content
+  appears in both, so what is established is that one surface emitted content and the other did not —
+  **not** that anything reviewed the change.
+- Whether any reader acted on the defective #1212 first cut. `87dcff867` was the PR head for roughly
+  **66 minutes** (pushed ~16:58Z, superseded by `8ad3aa4ce` at ~18:04Z), of which about **5** were as
+  a _ready_ PR — readied 17:58:39Z, first finding filed 18:01:12Z. It never reached the deploy branch.
+- How many times this file has now contradicted a passage it already contains. **No ordinal is
+  asserted**: an earlier entry miscounted exactly that kind of running total, and the count is not
+  what carries the lesson.
+
+## 10. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added.
+`AGENTS.md` untouched. No strip file touched. `vsrc` not implemented and not inferred.
+
+**Prior update:** 2026-08-29 UTC (~15:15 UTC)
 **Updated by:** Claude (2026-08-29: **#1206 shipped a real defect of mine and #1208 closed it. Two
 rows of the sandbox ledger had their answer in an INFORMAL Status cell; #1206 replaced both with
 declared labels that answer different questions, and its body claimed in bold "No claim is changed"

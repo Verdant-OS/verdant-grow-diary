@@ -1,6 +1,116 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~07:40 UTC)
+**Last updated:** 2026-08-29 UTC (~09:55 UTC)
+**Updated by:** Claude (2026-08-29: **#1200 merged carrying THREE verified findings — the fifth PR
+tonight to merge with an open finding. One of them is a FALSE MIGRATION-STATE FACT that I wrote, and
+I had propagated the same wording into this file. Corrected in place below and at §11 of the prior
+entry.** #1201 also drew a `P1` that is technically true but whose remedy already exists; that chain
+has stopped converging. Prior header follows.)
+
+## 1. The `20260813030000` error — mine, propagated, and in the dangerous direction
+
+`established fact`, verified against primary sources after Copilot and Codex independently flagged it
+on #1200.
+
+I wrote `| 20260813030000 | **NOT applied** |` into the safety table of an operator ledger, and the
+same bare wording into this file's own posture line. **That is false.**
+`docs/signup-attribution-outage-operator-runbook.md` records it **applied verbatim on 2026-08-21**
+through the Lovable SQL channel at Cheek's in-session authorization, md5-guarded.
+
+The reason this is not a nit is §4757 of **this file**, titled _"`20260813030000` — 'unapplied'
+carries two meanings, and one is dangerous"_, which instructs stating which sense is meant **every
+time** and warns:
+
+> _"A reader who takes a bare 'remains unapplied' as licence to apply it has inverted the finding."_
+
+Re-applying would re-issue an **unguarded `handle_new_user`** and overwrite the live guard — a
+production incident. So I wrote the exact ambiguity this file warns against, **into a document whose
+only purpose is preventing an accidental APPLY**, and then repeated it here. The correct form, used
+from now on:
+
+| Sense                 | Status                                                             |
+| --------------------- | ------------------------------------------------------------------ |
+| GitHub apply lane     | **never succeeded** — the workflow shows only its failed PREFLIGHT |
+| Production objects    | **LIVE** since 2026-08-21 (Lovable, verbatim, md5-guarded)         |
+| GitHub-APPLY the file | **FORBIDDEN** — would overwrite the live guard                     |
+
+`20260827010000`, `20260826100000` and `20260825233000` remain **NOT applied** in the plain sense.
+
+## 2. #1200 merged at 09:45Z with three findings open
+
+Deploy tip `c6e495d3c` -> **`a066ce6a8`**. All three verified by execution before being reported;
+none was pushed, because Cheek's 09:42Z standdown forbade restamping.
+
+| #   | Line     | Finding                                                                                                          | Raised by                  | Verdict                                                              |
+| --- | -------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------- |
+| 1   | 180      | bare `NOT applied` contradicts the apply record                                                                  | Copilot **and** Codex `P2` | **CONFIRMED** — §1 above                                             |
+| 2   | 105, 135 | trigger bindings are prose, not the captured `pg_get_triggerdef`; the PR body claimed both were verbatim         | Copilot                    | **CONFIRMED** — I dropped the `EXECUTE FUNCTION …()` clause          |
+| 3   | 153      | drift overstated: `referral_code` is **already** guarded in committed history, so live adds only `current_badge` | Copilot **and** Codex `P2` | **CONFIRMED** at `20260721107000:105-107` and `20260721194325:68-70` |
+
+Codex sharpened #3 beyond what I had: the comparison should run against **the last definition in
+migration order**, not `20260606034030`. Anchoring on the wrong migration is _why_ the drift came out
+one field too wide.
+
+**What the slice did get right, verified on the merged tip:** zero files under
+`supabase/migrations/`, count unchanged at **278**, and no `20260824235000` ledger migration landed.
+The conversion away from #1178's migration-file shape held, which was the point.
+
+## 3. #1201's `P1` is true, and its remedy already exists
+
+Codex on `13b3cdd98`: comment-stripping closes only one source-scan failure mode; source text cannot
+prove a matched expression **executes**.
+
+**Verified by execution.** Rendering killed (`return null`) with every token left in the file:
+
+| Suite                                                             | Result                                         |
+| ----------------------------------------------------------------- | ---------------------------------------------- |
+| #1201's source-scan                                               | **5 passed / 0 failed** — blind, as Codex says |
+| `quicklog-attachable-save-gate` + `strip-trust-badge` (rendering) | **13 failed / 20 passed** — caught it          |
+
+So the premise holds. But the remedy Codex asks for — import and render, assert resolved output — is
+**exactly what those two rendering suites already do**, and they caught the sabotage immediately.
+Doing it again in the source-scan file duplicates coverage rather than adding it.
+
+**The chain has stopped converging**, which is the reusable finding:
+
+1. #1170 `P1` — assertions match comment text -> fixed in #1199
+2. #1199 (Copilot) — only one block converted -> fixed in #1201
+3. #1201 `P1` — source scanning cannot prove execution at all -> asks for rendering
+
+Each fix drew a new finding at a wider radius. Per the standing rule, that is the point to stop
+pushing for the bot and raise once. **The honest end state is not converting these scans to renders —
+it is deleting the positive source-scans from that file** (rendering suites already prove the
+behaviour) and keeping it for the six forbidden-token absence checks, which is what source scanning
+is actually good for. That is a slice decision, not a review nit, and was not taken.
+
+## 4. Five merges with open findings
+
+`practical observation`. #1187, #1189, #1170, #1199, #1200. Severity has fallen sharply — a real
+credential leak, then a self-contradicting comment, then two test-quality items, now a false
+migration-state row in a docs ledger — but **the mechanism has never changed**: a review triggers on
+draft-marked-ready, the enqueue happens in the same gesture, and the branch lock then removes the
+only remedy. It is a workflow property, not five coincidences.
+
+## 5. Status
+
+| Item                                  | Status                                                                     |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| #1200 docs ledger                     | **MERGED** `a066ce6a8` — carries findings 1-3 above, uncorrected on deploy |
+| #1201 badge-dedupe follow-up          | ENQUEUED, 35/35 green at `13b3cdd98`, `P1` open and assessed               |
+| #1178 migration-file ledger           | **CLOSED**, superseded                                                     |
+| Correction for #1200's three findings | **drafted, NOT pushed** — Cheek's standdown holds                          |
+| `CURRENT_STATE` posture line          | **corrected in place** in this edit                                        |
+
+## 6. `NOT_MEASURED`
+
+- **Production.** `a066ce6a8` is the deploy branch. A merge is not a deployment; no publish
+  performed or authorized.
+- Whether any reader has already acted on the false `NOT applied` row between 09:45Z and its
+  correction.
+- Whether the two captured trigger bindings carry `UPDATE OF`, `WHEN`, or schema qualification that
+  the prose summaries dropped — the raw `pg_get_triggerdef` output was not preserved.
+
+**Prior update:** 2026-08-29 UTC (~07:40 UTC)
 **Updated by:** Claude (2026-08-29: **Everything in this sequence is now MERGED or CLOSED. Deploy tip
 `a95ba7d2` -> `78125d82` across FIVE merges. #1170 merged at 07:33 UTC carrying a verified Codex
 `P1` — the THIRD PR tonight to merge with an open finding, and the same merge-queue mechanism each
@@ -195,7 +305,11 @@ awaiting Cheek's call on the follow-up.
 ## 11. Posture
 
 Deploy tip **`78125d82`** (re-verify before citing). `20260827010000`, `20260826100000`,
-`20260825233000` and `20260813030000` all remain **NOT applied**. Merged today: #1185, #1184, #1187,
+`20260825233000` all remain **NOT applied**. **Correction, 09:55Z:** this line originally included
+`20260813030000` in that list, which is **false in the dangerous direction** — see §4757 of this same
+file, _"`20260813030000` — 'unapplied' carries two meanings, and one is dangerous"_. Only its **GitHub
+apply lane** never succeeded; the **production objects are live** (applied verbatim 2026-08-21 via
+Lovable). Copilot and Codex both caught the same wording in #1200 and both were right. Merged today: #1185, #1184, #1187,
 #1192, #1189, #1194, #1195, #1193, #1170, #1196. Closed: #1190, #1191, #1177. Open and not mine to
 advance: #1172 (`bdeb058`, draft, auto-merge disabled, parked), #1184's rebase (parked), #1183,
 #1181, #1180, #1178, #1175, #1174, #1153, #1151, #1088, #1082.

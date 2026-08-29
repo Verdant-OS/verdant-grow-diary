@@ -1,6 +1,128 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~11:10 UTC)
+**Last updated:** 2026-08-29 UTC (~15:15 UTC)
+**Updated by:** Claude (2026-08-29: **#1206 shipped a real defect of mine and #1208 closed it. Two
+rows of the sandbox ledger had their answer in an INFORMAL Status cell; #1206 replaced both with
+declared labels that answer different questions, and its body claimed in bold "No claim is changed"
+— true for one row, false for two.** The worse of the two let an UNMEASURED apply state read as
+settled, in a ledger built to prevent an accidental APPLY. Prior header follows.)
+
+## 1. What #1206 actually broke
+
+`established fact`, established by diffing each row against its parent, not from either PR body.
+
+#1206's premise was that three Status cells were "informal" and should move onto declared
+vocabulary. For one row that was right. **For two rows the informal cell WAS the answer to its own
+Check**, and replacing it with a declared label moved the answer into Notes and put a different
+question's answer in its place.
+
+| Check                                 | Before #1206                              | #1206 shipped        | Wrong how                                        |
+| ------------------------------------- | ----------------------------------------- | -------------------- | ------------------------------------------------ |
+| Three claimed 20260826 applies in git | `FAIL` (as git presence)                  | **`FAIL`**           | **Correct** — `FAIL` answers "are they in git?"  |
+| Scope of claimed applies              | ``sandbox-only (`bzatgtgjvuojpoxcknaa`)`` | **`NOT_APPLICABLE`** | Denies a question that applies and has an answer |
+| Group C applied                       | `not applied; deferred per writeup`       | **`FORBIDDEN`**      | Answers "may it be performed?", not "was it?"    |
+
+**The Group C row is the one with consequence.** "Not applied" rests on the advisor writeup's claim,
+not a measurement — and that same table already draws the line (`Live knk ACL for grant_* |
+NOT_MEASURED`). A prohibition standing where an observation belongs lets an **unmeasured apply state
+read as settled**. In an anti-APPLY ledger that is the wrong direction to be wrong in.
+
+Both were filed as Codex `P2`s **while #1206 sat in the merge queue**, so the branch was locked and
+the standdown forbade restamping. #1206 merged carrying both. Their threads were marked resolved by
+someone other than me; **resolution is not repair**, and the defects were live on deploy until
+#1208.
+
+## 2. My own overclaim, and the correction
+
+#1206's description said, in bold, **"No claim is changed."** That is true for the git-presence row
+and **false for the other two** — both now assert something different from what they asserted
+before. I also wrote that the scope row "was already carrying its real status in the Notes column",
+which **inverts** what the two cells were doing: the Status held the answer, Notes held a
+consequence.
+
+That is the third internal-contradiction of this shift, after the two conflicting drift baselines on
+#1203 and the stale deploy tip. The pattern is consistent enough to name: **when a cell looks
+informal, check whether it is answering its own question before replacing it.**
+
+## 3. #1208 closed both — verified on the tip
+
+`established fact`, verified on `675e5a512` by execution.
+
+| Check                    | Status now         | Notes                                                                                            |
+| ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------ |
+| Scope of claimed applies | **`PASS`**         | Sandbox-only `bzatgtgjvuojpoxcknaa`, not knk. Evidence of the claims' scope, not their execution |
+| Group C applied          | **`NOT_MEASURED`** | Writeup says "not applied; deferred" — a claim, not a measurement                                |
+| Apply Group C            | **`FORBIDDEN`**    | Do not apply                                                                                     |
+
+The prohibition **moved onto the operation it forbids**, which is `FORBIDDEN`'s declared meaning, so
+the hard stop is stronger rather than weaker. One file, +12/-11, zero migrations, count **278**. No
+new vocabulary word was invented.
+
+## 4. #1208's first cut over-scoped, and Cheek reverted it
+
+`practical observation`, worth keeping because the correction came from the owner, not a reviewer.
+
+My first cut (`0756da6ac`) rewrote the scope Check into an asserted proposition, moved the bzat id
+into the Check column, and **added a `Claimed applies apply to knk …` → `NOT_APPLICABLE` row nobody
+asked for**. The assigned shape was narrower: keep the Check, make Status the verification result,
+keep the bzat id in Notes, one row. Aligned in `25a020e14`.
+
+**Then I left the PR description describing the reverted shape.** Copilot caught that the body
+claimed a two-row Check rewrite the diff does not contain. Fixed by editing the description only —
+no SHA change, no restamp, no rebase, queue position undisturbed. Fixing the code and forgetting the
+prose that describes it is its own failure mode, and it is now on the record twice in one shift.
+
+## 5. #1208 merged with one open thread, and that one is adjudicated
+
+`inference`, stated as a disposition rather than a defect.
+
+Copilot's residual: with the Check left open-ended (`Scope of claimed applies`), `PASS` reports
+**that** the scope was verified while **what it is** sits in Notes. The point is fair. Closing it
+needs either an invented vocabulary word or the Check rewrite the owner had just reverted — both out
+of scope — so it was explained and left open.
+
+It is categorically milder than what it replaced: `NOT_APPLICABLE` **denied a question that
+applies**, which is contradictory; `PASS` on an open-ended Check is **incomplete**, never false, with
+the answer one column away. **Trading a contradiction for a documented incompleteness is the
+improvement available inside the assigned scope.**
+
+## 6. Deploy tip chain, verified by `git log`
+
+`984dcf230` -> `ce2552983` (#1207) -> `ad80065bf` (#1206) -> `d4dc5bd6f` (#1209) -> **`675e5a512`**
+(#1208), as of **15:14Z**. **Re-verify with `git ls-remote` rather than citing this line.**
+
+Recorded without a claim attached: **#1207 and #1209 carry the same subject** —
+`fix(sensors): fail-closed multi-reading validation-evidence redaction`. Neither is Claude's and
+neither was inspected here; whether that is a re-land, a split, or a duplicate is **`UNKNOWN`**.
+
+## 7. Status
+
+| Item                            | Status                                                                            |
+| ------------------------------- | --------------------------------------------------------------------------------- |
+| #1206 sandbox-ledger vocabulary | **MERGED** `ad80065bf` — shipped two defective rows                               |
+| #1208 Status-answers-Check fix  | **MERGED** `675e5a512` — both closed, verified on the tip                         |
+| #1208's residual Copilot thread | **OPEN**, adjudicated: no invented vocab, no Check rewrite                        |
+| #1204's two `AGENTS.md` threads | **OPEN on the deploy branch** by design                                           |
+| `FORBIDDEN` in `AGENTS.md`      | **still absent** — alignment slice proposed, NOT opened                           |
+| #1186 `CURRENT_STATE`           | open; its head moves with every entry, so re-verify rather than citing a SHA here |
+
+## 8. `NOT_MEASURED`
+
+- **Production.** `675e5a512` is the deploy branch as of 15:14Z. A merge is not a deployment; no
+  publish performed or authorized.
+- Whether any operator read the `FORBIDDEN` Group C row as a settled apply state during the ~42
+  minutes it was live on deploy (13:44Z to ~14:26Z).
+- Whether Group C was in fact applied to sandbox. The ledger carries the writeup's claim only, which
+  is exactly why that row is now `NOT_MEASURED` rather than a verdict.
+- Which check dequeued #1203 at 10:13:23Z. Still `UNKNOWN`, not `NOT_MEASURED` — both surfaces were
+  measured and neither named it.
+
+## 9. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added —
+count stays **278**. `AGENTS.md` untouched. No strip file touched. No new cut opened.
+
+**Prior update:** 2026-08-29 UTC (~11:10 UTC)
 **Updated by:** Claude (2026-08-29: **#1204 merged as `d80ad94b2`, closing the Codex `P2` that #1203
 merged with open — `FORBIDDEN` is now a declared status in both apply ledgers. It merged carrying
 TWO open Copilot threads, the SEVENTH merge with an open finding, and the FIRST where that was an

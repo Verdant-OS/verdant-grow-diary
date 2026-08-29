@@ -126,20 +126,23 @@ lane or retiring that lane as a check. **Not opened** — it is a slice decision
 
 ## 6. Status
 
-| Item                            | Status                                                               |
-| ------------------------------- | -------------------------------------------------------------------- |
-| #1204 `FORBIDDEN` vocabulary    | **MERGED** `d80ad94b2` — verified on the tip by execution            |
-| Two Copilot `AGENTS.md` threads | **OPEN on the deploy branch**, answered, deliberately unresolved     |
-| #1203 knk ledger corrections    | **MERGED** `cc0b7bd3f`; its Codex `P2` is now closed by #1204        |
-| `FORBIDDEN` alignment slice     | **proposed, NOT opened** — GDP names the next cut                    |
-| Sandbox non-status cells        | **parked** — collides with #1204; GDP names it from the squash       |
-| #1186 `CURRENT_STATE`           | draft, `c959cfc52` green; **ACTIVE OWNER of `CURRENT_STATE.md`**     |
-| `Supabase Preview` 42P07        | red repo-wide, pre-existing, not a gate; one comment per PR, no more |
+| Item                            | Status                                                                                                                     |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| #1204 `FORBIDDEN` vocabulary    | **MERGED** `d80ad94b2` — verified on the tip by execution                                                                  |
+| Two Copilot `AGENTS.md` threads | **OPEN on the deploy branch**, answered, deliberately unresolved                                                           |
+| #1203 knk ledger corrections    | **MERGED** `cc0b7bd3f`; its Codex `P2` is now closed by #1204                                                              |
+| `FORBIDDEN` alignment slice     | **proposed, NOT opened** — GDP names the next cut                                                                          |
+| Sandbox non-status cells        | **parked** — collides with #1204; GDP names it from the squash                                                             |
+| #1186 `CURRENT_STATE`           | open; **ACTIVE OWNER of `CURRENT_STATE.md`** — its head moves with every entry, so re-verify rather than citing a SHA here |
+| `Supabase Preview` 42P07        | red repo-wide, pre-existing, not a gate; one comment per PR, no more                                                       |
 
 ## 7. `NOT_MEASURED`
 
-- **Production.** `d80ad94b2` is the deploy branch. A merge is not a deployment; no publish
-  performed or authorized.
+- **Production.** The deploy branch is **`984dcf230`** as of 12:14Z — #1205 merged after this entry
+  was first written, when it correctly read `d80ad94b2`. **Re-verify with `git ls-remote` rather than
+  citing this line**; it is a snapshot, and the `a95ba7d2` correction in an earlier entry is what
+  happens when it is trusted as current. A merge is not a deployment; no publish performed or
+  authorized.
 - Whether any operator ever read a `NOT_APPLICABLE` / forbidden row as inapplicable rather than
   prohibited. Closing the ambiguity does not measure its past effect.
 - Which check dequeued #1203 at 10:13:23Z. Still `UNKNOWN`, not `NOT_MEASURED` — both surfaces were

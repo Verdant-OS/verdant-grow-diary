@@ -435,10 +435,15 @@ Targeted tests:      src/test/timeline-grow-filter.test.ts, src/test/action-queu
 Experiment A:        1 failed | 9 passed  (behaviour-preserving refactor → false positive)
 Experiment B:        156 files, 1,925 cases, ALL PASSING with the injected precedence bug
                      (real behaviour break → false negative)
-Full suite:          `npx vitest run` (unsharded, this container) — STILL RUNNING when this
-                     document was first committed. No failure had been emitted at that point.
-                     The result is recorded in a follow-up commit on this branch; until then the
-                     full-suite pass/fail count is NOT_MEASURED and must not be quoted as green.
+Full suite:          PASS — all 32 `Full test suite (shard n/32)` required contexts green on
+                     `7a5b48a` (PR #1218, workflow run 33278919894), 2026-08-29 22:34-22:37 UTC.
+                     This is the sharded CI lane, i.e. the one that actually gates. Also green on
+                     that head: `Preflight — edge shared-lib mirror in sync` and `test:legal-seo`
+                     (both required), plus `test:security-regression` — the single `mustBeGreen`
+                     entry — `eslint`, `tsc --noEmit`, `tsgo --noEmit + vite build`, `docs-safety`
+                     and `One-Tent Loop smoke audit`.
+                     The local unsharded `npx vitest run` in this container was still executing and
+                     is NOT the number quoted here; it is redundant with the CI lane.
 Type-check:          NOT RUN — this audit changes no TypeScript
 Runtime harness:     NOT RUN — no Supabase access in this session; billing/AI-credit harnesses are
                      BLOCKED here for the same reason §4.3 says CI cannot run them
@@ -446,7 +451,13 @@ Playwright:          NOT RUN
 Skipped:             everything requiring credentials, network to Supabase, or production
 Introduced failures: 0 — the working tree was restored and verified byte-identical after each
                      experiment, before any commit
-Pre-existing failures: see the full-suite line above
+Pre-existing failures: none in the required lane on `7a5b48a`. One NON-required check is red:
+                     `Supabase Preview`, with `ERROR: relation "ai_credit_grants" already exists
+                     (SQLSTATE 42P07)` — the failure `CURRENT_STATE.md` documents as repo-wide with
+                     no PR-side workaround. This PR contains no migration (`git diff --name-only
+                     origin/verdant-grow-diary...HEAD -- supabase/` is empty), the check is in
+                     neither `required` nor `mustBeGreen`, and it is recorded on the PR rather than
+                     worked around.
 ```
 
 **Safety verdict:** this audit adds no product code, no schema, no migration, no policy, no

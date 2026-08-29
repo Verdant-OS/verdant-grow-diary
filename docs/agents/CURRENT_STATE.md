@@ -1,10 +1,11 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~20:31 UTC)
+**Last updated:** 2026-08-29 UTC (~21:47 UTC)
 **Updated by:** Claude (2026-08-29: #1213 and #1214 merged. #1213 carried a `P1` — `20260813030000`
 listed among migrations that "remain NOT applied", corrected before merge. #1214 closes the
 Authorization redaction gap for **token-shaped** Digest/Negotiate only; the **parameterized case is
-OPEN**, verified by execution. Prior header follows.)
+OPEN**, verified by execution, and **`BLOCKED` — that slice has no independent reviewer assigned**.
+Prior header follows.)
 
 ## 1. `20260813030000` — both senses
 
@@ -106,6 +107,13 @@ non-secret key**. `redactEvidenceValue` replaces a top-level string wholesale, a
 Whether real EcoWitt payloads carry that shape is `NOT_MEASURED`. **Codex's slice — not Claude's to
 fix.**
 
+**`BLOCKED` — no independent reviewer assigned.** `AGENTS.md` (lines 586-589) requires every assigned
+slice to name **one owner** and **a different peer** as independent reviewer, and states that a slice
+without one is **incomplete**. This slice names an owner and no reviewer, so it is **not ready to
+implement or ship**. Codex raised this on #1215; naming the reviewer is Cheek's call, not Claude's,
+and the label records the gap rather than closing it. Cheek instructed the `BLOCKED` marking on
+2026-08-29; the reviewer assignment itself remains outstanding.
+
 No collision with this file: #1214 touches `src/lib/ecowittValidationEvidenceRules.ts`, its test, the
 mirror and the sync manifest. Its body records _"Behind tip `3afc2df68` by CURRENT_STATE.md only. Do
 not rebase"_.
@@ -122,7 +130,7 @@ does not, and closing it means a twelve-file `Sentinel-Version` bump under `sent
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | #1213 `#1212`-findings entry        | **MERGED** `0e2cd02ba` — verified on the tip by execution                                                      |
 | #1214 Digest/Negotiate redaction    | **MERGED** `3f95527bf` (Codex's). **Token-shaped only — parameterized is OPEN**                                |
-| Parameterized Digest/Negotiate leak | **OPEN** on `3f95527bf`; Codex's slice, not Claude's                                                           |
+| Parameterized Digest/Negotiate leak | **OPEN** on `3f95527bf`; Codex's slice. **`BLOCKED` — no independent reviewer assigned**                       |
 | `AGENTS.md` `FORBIDDEN` gap         | **OPEN, and not Claude's to close**                                                                            |
 | Superseded `LIVE`/`FORBIDDEN` entry | its Codex `P2` stays **OPEN on purpose**; not rewritten                                                        |
 | Merge method                        | three squash outcomes observed; configured method **`NOT_MEASURED`**                                           |

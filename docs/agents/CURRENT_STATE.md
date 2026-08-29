@@ -1,7 +1,100 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~21:47 UTC)
-**Updated by:** Claude (2026-08-29: #1213 and #1214 merged. #1213 carried a `P1` — `20260813030000`
+**Last updated:** 2026-08-29 UTC (~22:43 UTC)
+**Updated by:** Claude (2026-08-29: #1215 and #1216 merged; deploy branch is now **`5d6efc95a`**.
+#1216 closes **token-shaped NTLM** only — parameterized `Authorization` headers **still leak on the
+current tip across Digest, Negotiate and NTLM**, verified by execution — **OPEN, REVIEW ONLY.** Live
+production is **MEASURED at `5bf4db1d`** (`dirty:false`, ref `master`, GDP) and is **not** the deploy
+tip. Prior header follows.)
+
+## 1. #1215 and #1216 merged — deploy branch `5d6efc95a`
+
+`established fact`, verified by `git ls-remote` and `git log`, not from webhook events.
+
+| PR        | Merge SHA   | Parents | Shape                                  | Subject ends |
+| --------- | ----------- | ------- | -------------------------------------- | ------------ |
+| **#1215** | `5bf4db1d4` | 1       | **squash**; SHA equals its merge group | `(#1215)`    |
+| **#1216** | `5d6efc95a` | 1       | **squash**; SHA equals its merge group | `(#1216)`    |
+
+**#1216 detail** (`source claim`, Cheek, where not independently checkable): merged **`5d6efc95`**
+from head **`358492766`**, parent **`5bf4db1d`**, **Dream Queen `PASS`**. The merge SHA, parent and
+subject are verified here by `git log`; the **head SHA and the Dream Queen result are not** — that PR
+branch was squashed away and is not in this clone, and no Dream Queen run is readable from the
+repository. Recorded as reported, not as measured.
+
+Both went through the merge queue, #1216 stacked on #1215's group. Auto-merge stored `merge_method:
+merge` on #1215; the queue produced a squash. #1215 and #1216 are **two** separate squashes, so they
+are the **fourth and fifth observed outcomes** (#1186, #1212, #1213 were the first three). They stay
+**observations** — the configured method remains `NOT_MEASURED`; reading it needs
+`Administration:read`, which the token lacks.
+
+**Two state changes on #1215 were attributed to `cheekhimself` and were not performed by Claude:**
+the ready at 19:34:30Z, and a **draft conversion at 21:53:23Z** that silently stripped the armed
+auto-merge (GitHub does not restore auto-merge when a PR returns to ready). Cheek confirmed neither
+was him. Claude restored ready and re-armed only after that confirmation. `UNKNOWN`: what actor
+performed them.
+
+## 2. Parameterized `Authorization` — still OPEN on `5d6efc95a`
+
+`established fact`, executed against the current deploy tip, not inferred from the PR title.
+
+#1216 added `NTLM` to the scheme alternation in both the credential-pair lookahead and the header
+regex. **It did not change the value tail `[^\s",}]+`**, which stops at the first quote — so a
+parameterized header is still never consumed whole:
+
+| Input (string nested under a non-secret key)   | Result on `5d6efc95a` |
+| ---------------------------------------------- | --------------------- |
+| `Authorization: Digest username="grower", …`   | **leaks**             |
+| `Authorization: NTLM username="grower", …`     | **leaks**             |
+| `Authorization: Negotiate opaque="x", …`       | **leaks**             |
+| `Authorization: NTLM TlRMTVNTUAABAAAAB4IIog==` | fully redacted        |
+
+```
+OUT: {"request_log":"[REDACTED]\"grower\", realm=\"verdant\", nonce=\"secret\""}
+```
+
+**#1216 is the same shape of partial fix as #1214**: it closes the **token-shaped** case for one more
+scheme and leaves the parameterized case open. Adding schemes does not address the tail. Cheek,
+2026-08-29: **do not invent another Authorization scheme after NTLM.**
+
+**Reachability, unchanged and narrower than it looks.** The regex path runs only on a **string nested
+under a non-secret key**; `redactEvidenceValue` replaces a top-level string wholesale and
+`redactEvidenceNode` replaces any value under an `Authorization`-named key wholesale. Whether real
+EcoWitt payloads carry the leaking shape is **`NOT_MEASURED`**.
+
+**Affected surfaces** — `redacted_raw_payload` in the clipboard evidence copy and in the **downloaded
+validation JSON** (`buildEcowittValidationExport` → `serializeExport` →
+`EcowittIngestValidationPanel.handleConfirmExportJson`, written to disk). The CSV download excludes
+the raw payload.
+
+**Status: `OPEN` — REVIEW ONLY.** Do not implement. Do not touch `src/` or `supabase/`. **Codex's
+slice — not Claude's to fix.**
+
+**The three `BLOCKED — no independent reviewer assigned` sites in the prior entry are CLOSED as
+stale** — Cheek, 2026-08-29. They read as gating Digest/Negotiate work that has since merged
+(**#1214 as `3f95527b`**, and the **NTLM leftover as #1216**), so the gate no longer describes
+anything outstanding. Those sites are **superseded here, not rewritten**: they sit in a demoted
+entry, and this file does not edit superseded text. The parameterized case itself stays **OPEN** —
+closing the stale label does not close the leak.
+
+**Codex is measure-only on `5d6efc95`** — Cheek, 2026-08-29. **No PR unless a `FAIL` names one scheme
+and the blob.**
+
+## 3. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No republish, no publish. No APPLY. No EcoWitt-to-live.**
+- **Live production is MEASURED at `5bf4db1d`** — `dirty:false`, ref `master`, measured by **GDP**,
+  2026-08-29. This supersedes the earlier unmeasured live value carried in this entry. Claude did not
+  take this measurement and cannot.
+- **Live is one commit behind the deploy branch tip.** `5bf4db1d` is #1215's merge; the tip
+  `5d6efc95a` is #1216's. So **#1216 is merged but not published** — verifiable from `git log`, and a
+  direct instance of **a merge is not a deployment**.
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+- Branch-name conflict still open: the harness designates `claude/trustbadge-attachable-strip-2441l2`;
+  descriptive branch names are used instead.
+
+**Prior update:** Claude (2026-08-29: #1213 and #1214 merged. #1213 carried a `P1` — `20260813030000`
 listed among migrations that "remain NOT applied", corrected before merge. #1214 closes the
 Authorization redaction gap for **token-shaped** Digest/Negotiate only; the **parameterized case is
 OPEN**, verified by execution, and **`BLOCKED` — that slice has no independent reviewer assigned**.

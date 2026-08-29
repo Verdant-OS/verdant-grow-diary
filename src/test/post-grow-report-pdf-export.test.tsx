@@ -166,6 +166,49 @@ describe("postGrowReportRules — filename + sanitization", () => {
     expect(redactSecrets(input), `value survived in: ${input}`).not.toContain(secret);
   });
 
+  // Raised by Copilot on #1187 and CONFIRMED by execution before being fixed.
+  // The credential-labelled rule above only protects NAMEs carrying a keyword,
+  // so behind a header prefix an unlabelled NAME still had its name consumed
+  // and its VALUE left behind: `bearer SOME_PLAIN_NAME=secret` produced
+  // `[redacted]=secret` — output that LOOKS sanitized while the credential
+  // survives, which is worse than no redaction at all.
+  //
+  // The `Authorization:` rows were found in the same probe and were NOT part
+  // of the report: this module had no Authorization rule of any kind, so those
+  // inputs passed through completely unredacted.
+  it.each([
+    ["bearer SOME_PLAIN_NAME=s3cretV4lue123456", "s3cretV4lue123456"],
+    ['Bearer SOME_PLAIN_NAME="s3cretV4lue123456"', "s3cretV4lue123456"],
+    ["bearer MY_CONFIG_VAR=s3cretV4lue123456", "s3cretV4lue123456"],
+    ["Authorization: SOME_PLAIN_NAME=s3cretV4lue123456", "s3cretV4lue123456"],
+    ["Authorization: MY_CONFIG_VAR=s3cretV4lue123456", "s3cretV4lue123456"],
+    ["AUTHORIZATION: SOME_PLAIN_NAME=s3cretV4lue123456", "s3cretV4lue123456"],
+  ] as const)(
+    "redacts a header-prefixed assignment with an unlabelled name: %s",
+    (input, secret) => {
+      expect(redactSecrets(input), `value survived in: ${input}`).not.toContain(secret);
+    },
+  );
+
+  // The partial-redaction fence, stated as its own property rather than left
+  // implicit in the cases above: a placeholder in the output while the secret
+  // is STILL present means a rule fired and destroyed only part of the span.
+  // That is the exact shape of every defect in this class, and it is the one
+  // failure mode a reader cannot spot by eye.
+  it.each([
+    "bearer SOME_PLAIN_NAME=s3cretV4lue123456",
+    "Authorization: SOME_PLAIN_NAME=s3cretV4lue123456",
+    "bearer BridgeToken=s3cretV4lue123456",
+    'MY_PASSKEY_VAR="s3cretV4lue123456"',
+  ] as const)("never leaves a placeholder beside a surviving secret: %s", (input) => {
+    const out = redactSecrets(input);
+    if (out.includes("[redacted]")) {
+      expect(out, `partial redaction — looks sanitized but is not: ${out}`).not.toContain(
+        "s3cretV4lue123456",
+      );
+    }
+  });
+
   // Fence: this is a user-facing grow report and the helper promises to
   // preserve prose. Grow telemetry uses uppercase NAME=value shapes, so a
   // generic uppercase-assignment rule would destroy real report content. These

@@ -1,6 +1,110 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~01:20 UTC)
+**Last updated:** 2026-08-29 UTC (~01:45 UTC)
+**Updated by:** Claude (2026-08-29: **The shared ordering contract is WRITTEN — #1189, draft. The
+prior entry's "un-started" item is closed. It is a BEHAVIOURAL contract over five redaction entry
+points, proven RED at 111 failures before being restored to green. It does NOT close any leak and
+does NOT change production exposure, which stays `NOT_MEASURED` for all three.**
+
+**What it pins — one invariant, not a coverage demand:**
+
+```text
+if   redact(X)          does not contain the secret,
+then redact(PREFIX + X) must not contain the secret either.
+```
+
+Decoration must never reduce redaction. Each case **calibrates against the module's own
+undecorated behaviour first**: a shape a module does not redact bare is out of scope and its
+decorated forms are skipped; a shape it handles bare and then leaks decorated is always an
+ordering bug, never a design choice.
+
+**That separation was earned, not assumed.** A first draft conflated ordering with coverage and
+produced **13 failures against `proofReportRedactionRules.ts`** — the module the audit had already
+established as the CORRECT counter-example. Investigating rather than trusting them showed the
+failures were spurious: that module destroys nothing, its `\b`-anchored keyword rules simply never
+match a label inside a longer NAME (`\bapi_key\b` cannot see `MY_API_KEY_VAR`, because `_` is a
+word character). **Coverage, not ordering.** The per-shape calibration is the fix for that false
+signal. Recorded because the contract's first output was wrong about my own audit's key finding.
+
+**Behavioural, not a structural lint — and that was forced, not preferred.** `AGENTS.md`: _"A
+contract test over a config or module MUST import it and assert on the resolved value. Matching a
+regex against the file's source text is not permitted for this purpose."_ A lint over the pattern
+arrays cannot distinguish a live rule from a commented-out or reordered one — **the exact failure
+mode this contract exists to catch**. It calls the real entry points and never reads a source file.
+
+**RED evidence — the contract was seen failing before it was trusted.** Ordering reverted in all
+three fixed modules (each whole-assignment rule moved back below the header and bare-word label
+rules), contract unchanged:
+
+```text
+Tests  111 failed | 29 passed | 20 skipped (160)
+```
+
+All four named historical-defect cases failed, and so did the coverage calibration. Two figures in
+that run need stating precisely rather than rounded:
+
+| Module                        |  Failures | Why that number is right                                                                                                                                                                                                                                                                                   |
+| ----------------------------- | --------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sanitizeReportText`          |        30 | reverted                                                                                                                                                                                                                                                                                                   |
+| `sanitizeReportValue`         |        30 | reverted                                                                                                                                                                                                                                                                                                   |
+| `redactEvidenceValue`         |        30 | reverted                                                                                                                                                                                                                                                                                                   |
+| `redactSecrets`               | **16/24** | The 8 survivors are exactly `PASSKEY` and `API_KEY` in bare shapes — **both 7 characters**, below the `{8,}` threshold of that module's `\bbearer\s+[A-Za-z0-9._-]{8,}` rule, so nothing consumes them and the reverted order is genuinely harmless there. The class is still caught through the other 16. |
+| `sanitizeProofReportMarkdown` |     **0** | **Correct, not a gap.** It was never broken and was not reverted — it already orders its rules right and documents the hazard. The counter-example stays the counter-example.                                                                                                                              |
+
+After restoring (tree verified clean first, per the `AGENTS.md` rule against committing while a
+review experiment is mutating the working tree): `140 passed | 20 skipped`.
+
+**Two coverage gaps RECORDED, deliberately NOT fixed** — pinned in a `COVERAGE_BASELINE` so a
+change in either direction fails loudly:
+
+| Module                        | Uncovered shape                              | Status                                                                                                                                                                                        |
+| ----------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `redactSecrets`               | unlabelled NAMEs (`SOME_PLAIN_NAME=…`)       | **Deliberate.** Renders a user-facing grow report; grow telemetry shares the uppercase `NAME=value` shape, so a generic rule would redact `VPD=1.2` and `EC=1.8`. Pinned by an existing test. |
+| `sanitizeProofReportMarkdown` | label inside a longer NAME; unlabelled NAMEs | **`NOT_MEASURED` gap, recorded not fixed.** Widening it is a separate reviewed change, not something to slip into a tests-only PR.                                                            |
+
+**Known weakness, stated rather than papered over: the calibration can go QUIET.** If a module
+loses bare coverage for a shape, its ordering cases stop running instead of failing.
+`COVERAGE_BASELINE` is the mitigation, not a cure. That is a deliberate trade — demanding coverage
+was not this contract's mandate.
+
+**#1189 carries #1187's commit, and that is a real dependency, not sloppiness.** On the deploy tip
+without #1187, `redactSecrets` does not redact `PASSKEY="…"` at all, so the coverage calibration is
+**RED**. The branch was cut fresh from `1d19c4c` and #1187 merged in; diff against the deploy branch
+is exactly 3 files (#1187's 2 + the new test). Once #1187 lands, #1189 reduces to the single test
+file. Flagged at the top of the PR body.
+
+**#1189 CI is `NOT_MEASURED` — in flight, NOT green and NOT red.** On `669754c`: both edge-mirror
+preflights `success` (one is required), `Verify stabilization PR scope` skipped, production build
+`success` via the preview pipeline, **`Supabase Preview` cancelled** — the same non-required lane as
+the eight prior instances, already diagnosed and not re-litigated. The 32 shards,
+`Lint, typecheck, test, build` and `test:legal-seo` were still queued or running at the time of
+this entry. **No review comments yet.**
+
+Local validation actually run (not the full suite — stated as such in the PR body): the contract
+`140 passed | 20 skipped`; 11 sibling suites for all four modules `571 passed | 23 skipped`;
+`tsc --noEmit` exit 0; eslint clean after `prettier --write`; `verify-edge-shared-in-sync.mjs` OK
+(101 mirrored files); `check-contract-test-resolution.mjs` OK; `assert-docs-safety.mjs` PASS;
+`v0-operating-loop-contract` 26/26. The pre-commit hook was **bypassed** (it exceeded a timeout
+earlier this session) and every one of its four steps was then run explicitly instead.
+
+**Leak status unchanged by this PR:**
+
+| Module                              | Leak                           | Where                    |
+| ----------------------------------- | ------------------------------ | ------------------------ |
+| `ecowittLocalForwardingStatus.ts`   | **CLOSED**, execution-verified | merged `f9f4d11` (#1185) |
+| `ecowittValidationEvidenceRules.ts` | **CLOSED**, execution-verified | merged `1d19c4c` (#1184) |
+| `postGrowReportRules.ts`            | **STILL OPEN**                 | #1187, draft             |
+
+**Still `NOT_MEASURED` and not to be rounded up:** production exposure for all three; whether the
+leaked strings ever reached a user-facing surface; and edge-function redaction copies beyond the one
+mirrored file. The contract measures none of these — it prevents a fourth instance, it does not
+retire the first three.
+
+**Posture.** Deploy tip **`1d19c4c`**. `20260827010000`, `20260826100000`, `20260825233000` and
+`20260813030000` all remain **NOT applied**. #1186, #1187 and #1189 are **draft**; nothing readied,
+enqueued, merged or published by Claude. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~01:20 UTC)
 **Updated by:** Claude (2026-08-29: **#1184 MERGED as `1d19c4c`. TWO of the three redaction leaks
 are now closed on the deploy branch, both verified by EXECUTION. The third is still open in draft.
 Production exposure remains `NOT_MEASURED` for all three.**

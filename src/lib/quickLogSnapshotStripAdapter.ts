@@ -573,6 +573,11 @@ export function buildQuickLogStripFromTentState(
     ...(canonicalSource === "demo" ? { isHealthyEvidence: false as const } : {}),
   };
 
+  // Provider identity always comes from the RAW label. Canonical source is
+  // only for trust mapping, so `sim` can remain a Demo badge with a Sim chip
+  // and `ecowitt` can remain Invalid with an EcoWitt chip.
+  const rawProviderLabel = deriveProviderLabel(snapshot.source);
+
   // Live badge for reviewed aliases may stay for display coherence, but
   // remapping `badgeResolverStatus` to `fresh_live` must not grant a real
   // `fresh_non_live` row Live attachability. Preserve the canonical resolver's
@@ -584,8 +589,7 @@ export function buildQuickLogStripFromTentState(
       // with the pill (raw transport labels never reach mapNonLiveSource).
       source: isNonLiveTelemetry ? canonicalSource : snapshot.source,
     }),
-    // Provider identity always from the RAW label (e.g. pi_bridge → Pi Bridge).
-    providerLabel: deriveProviderLabel(snapshot.source),
+    providerLabel: rawProviderLabel,
   };
   if (snapshot.status === "fresh_non_live" && badgeResolverStatus === "fresh_live") {
     trustBadge.attachable = false;
@@ -601,7 +605,7 @@ export function buildQuickLogStripFromTentState(
     metrics: buildStrictMetrics(snapshot, temperatureUnit),
     action,
     classification,
-    providerLabel: deriveProviderLabel(snapshot.source),
+    providerLabel: rawProviderLabel,
     trustBadge,
   };
 }

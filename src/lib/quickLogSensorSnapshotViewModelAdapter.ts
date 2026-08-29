@@ -8,9 +8,14 @@
  *  - Pure: no I/O, no React, no Supabase, no Date.now().
  *  - Never returns raw_payload, secrets, tokens, MAC addresses, or
  *    private identifiers. Only canonical/whitelisted fields are mapped.
- *  - Provider/bridge identifiers (e.g. "ecowitt", "home_assistant")
- *    are NEVER promoted to a stronger trust label here; they are
- *    carried as `sourceDetail` only, and the resolver decides freshness.
+ *  - Provider/bridge identifiers are NEVER promoted to a stronger
+ *    trust label here; they are carried as `sourceDetail` only. Source
+ *    normalization delegates to the repo's single sanctioned alias
+ *    table (`normalizeSensorSource`), which fails closed: anything
+ *    outside the canonical vocabulary and its reviewed aliases (e.g.
+ *    the first-party `pi_bridge` → live) normalizes to "invalid" —
+ *    freshness alone can never upgrade unknown provenance to "live"
+ *    (issue #1003).
  *  - Empty/loading/error/no-tent inputs collapse to a null snapshot so
  *    the view-model produces the canonical "No sensor snapshot
  *    available." empty copy.
@@ -24,39 +29,22 @@ import type {
   SensorSnapshotMetricInput,
   SensorSnapshotSource,
 } from "@/lib/sensorSnapshotFreshnessRules";
-
-const CANONICAL_SOURCES: ReadonlySet<SensorSnapshotSource> = new Set([
-  "live",
-  "manual",
-  "csv",
-  "demo",
-  "stale",
-  "invalid",
-]);
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 
 /**
- * Map an upstream source label to the canonical view-model source.
- * Provider/bridge strings collapse to "live" only when freshness has
- * already been established by the upstream resolver; we never invent
- * a "live" label out of thin air.
+ * Map an upstream source label to the canonical view-model source via
+ * the repo's single sanctioned alias table. `normalizeSensorSource`
+ * fails closed: canonical labels pass through, reviewed aliases map
+ * (sim→demo, diary→manual, first-party pi_bridge→live), and every
+ * other string — provider identifiers, typos, adversarial values —
+ * normalizes to "invalid". Freshness is deliberately not consulted: a
+ * fresh timestamp must never upgrade unknown provenance to "live"
+ * (issue #1003). Missing/empty input stays null so the resolver
+ * reports the honest "unknown_source" reason.
  */
-function mapSource(
-  raw: string | null | undefined,
-  freshness: SensorSnapshot["freshness"],
-): SensorSnapshotSource | null {
-  if (typeof raw !== "string" || raw.length === 0) return null;
-  const lower = raw.toLowerCase();
-  if (CANONICAL_SOURCES.has(lower as SensorSnapshotSource)) {
-    return lower as SensorSnapshotSource;
-  }
-  if (lower === "sim") return "demo";
-  if (lower === "diary") return "manual";
-  // Unknown provider/bridge identifier. Only treat as live when the
-  // upstream resolver already classified the snapshot as fresh — never
-  // upgrade stale/invalid/unknown provider data to live.
-  if (freshness === "fresh") return "live";
-  if (freshness === "stale") return "stale";
-  return null;
+function mapSource(raw: string | null | undefined): SensorSnapshotSource | null {
+  if (typeof raw !== "string" || raw.trim().length === 0) return null;
+  return normalizeSensorSource(raw);
 }
 
 function mapMetrics(snapshot: SensorSnapshot): SensorSnapshotMetricInput[] {
@@ -100,7 +88,7 @@ export function adaptQuickLogSensorContextInput(
     return { tentId: tentId ?? null, plantId: plantId ?? null, snapshot: null };
   }
 
-  const mappedSource = mapSource(snap.source, snap.freshness);
+  const mappedSource = mapSource(snap.source);
 
   const input: SensorSnapshotInput = {
     source: mappedSource,

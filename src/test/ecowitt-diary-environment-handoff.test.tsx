@@ -69,6 +69,23 @@ function acceptedInput(
   };
 }
 
+function evidenceSnapshot(rawPayload: unknown) {
+  return buildLatestEvidenceSnapshot({
+    hasEvidence: true,
+    status: "accepted",
+    statusMessage: "Accepted by ingest webhook.",
+    sourceLabel: "ecowitt",
+    tentScopedLabel: "1111…(len=36)",
+    capturedAtLabel: "2026-06-07T11:58:00Z",
+    isTestSender: true,
+    invalidTest: false,
+    stale: false,
+    metricRows: [],
+    rawPayload,
+    derivedReadingWarnings: [],
+  })!;
+}
+
 describe("ecowitt diary environment check rules", () => {
   it("links only to a real Timeline entry anchor when the saved event id is known", () => {
     expect(environmentCheckTimelineHref("2026-06-07T11:58:00Z", "grow-123", "grow-event-456")).toBe(
@@ -636,6 +653,150 @@ describe("evidence rules", () => {
     const text = serializeEvidenceForClipboard(snap);
     expect(text).toContain("Local EcoWitt validation evidence");
     expect(text).not.toMatch(/"live"\s*:/i);
+  });
+
+  it("redacts secret-shaped raw-payload values even when their keys look safe", () => {
+    const secretValues = {
+      device_identity: "device_84:F3:EB:21:9C:01",
+      tenant_reference: "tenant_123e4567-e89b-42d3-a456-426614174000",
+      opaque_material: "0xd41d8cd98f00b204e9800998ecf8427e",
+      api_note: "sk-proj-Ab3dEfG7hIjKlMnOpQr",
+      config_note: 'VERDANT_CONFIG="private-env-value"',
+      nested: { hardware_identity: "24CB88AF4C01" },
+    };
+    const snap = evidenceSnapshot({
+      transport: "mqtt_local_test",
+      ...secretValues,
+    });
+    const text = serializeEvidenceForClipboard(snap);
+
+    expect(text).toContain("mqtt_local_test");
+    for (const value of [
+      secretValues.device_identity,
+      secretValues.tenant_reference,
+      secretValues.opaque_material,
+      secretValues.api_note,
+      secretValues.config_note,
+      secretValues.nested.hardware_identity,
+    ]) {
+      expect(text).not.toContain(value);
+    }
+    expect(text).toContain("[REDACTED]");
+  });
+
+  it("redacts a PASSKEY field even when its value has no recognizable secret shape", () => {
+    const snap = evidenceSnapshot({
+      transport: "mqtt_local_test",
+      PASSKEY: "flower-room-credential",
+    });
+    const payload = snap.redacted_raw_payload as Record<string, unknown>;
+    const text = serializeEvidenceForClipboard(snap);
+
+    expect(payload.PASSKEY).toBe("[redacted]");
+    expect(text).not.toContain("flower-room-credential");
+  });
+
+  it.each([
+    ["PASSKEY=flower-room-credential", "flower-room-credential"],
+    ['SERVICE_ROLE="service-role-credential"', "service-role-credential"],
+  ] as const)(
+    "redacts the whole credential assignment in a safe-key string: %s",
+    (credentialAssignment, secretValue) => {
+      const snap = evidenceSnapshot({
+        transport: "mqtt_local_test",
+        config_note: credentialAssignment,
+      });
+      const payload = snap.redacted_raw_payload as Record<string, unknown>;
+      const text = serializeEvidenceForClipboard(snap);
+
+      expect(payload.config_note).toBe("[REDACTED]");
+      expect(text).not.toContain(secretValue);
+    },
+  );
+
+  // Header-prefixed assignments. The header patterns CONSUME the whole following
+  // token, variable NAME included, so if they run before the assignment rule the
+  // NAME is gone and `[A-Z][A-Z0-9_]{2,}=` can no longer match — leaving the VALUE
+  // in both redacted_raw_payload and the clipboard export. Distinct from the
+  // label-fragmenting case above: this one needs NO credential label in the NAME
+  // at all, so a plain SOME_PLAIN_NAME behind a `Bearer ` prefix leaked too.
+  // Reported by Copilot on #1184 and confirmed by execution before the fix.
+  it.each([
+    ['Authorization: PASSKEY="flower-room-credential"', "flower-room-credential"],
+    ["Bearer PASSKEY=flower-room-credential", "flower-room-credential"],
+    ['Bearer MY_PASSKEY_VAR="flower-room-credential"', "flower-room-credential"],
+    ['Bearer SOME_PLAIN_NAME="flower-room-credential"', "flower-room-credential"],
+    ['Authorization: SOME_PLAIN_NAME="flower-room-credential"', "flower-room-credential"],
+    ['authorization: MY_PASSKEY_VAR="flower-room-credential"', "flower-room-credential"],
+  ] as const)(
+    "redacts the credential assignment behind a header prefix: %s",
+    (credentialAssignment, secretValue) => {
+      const snap = evidenceSnapshot({
+        transport: "mqtt_local_test",
+        config_note: credentialAssignment,
+      });
+      const payload = snap.redacted_raw_payload as Record<string, unknown>;
+      const text = serializeEvidenceForClipboard(snap);
+
+      expect(payload.config_note, `value survived in: ${credentialAssignment}`).not.toContain(
+        secretValue,
+      );
+      expect(text).not.toContain(secretValue);
+    },
+  );
+
+  it("still redacts a real header credential, and leaves benign telemetry alone", () => {
+    const snap = evidenceSnapshot({
+      transport: "mqtt_local_test",
+      config_note: "Bearer abc123def456ghi",
+      note: "tent stable",
+      temp_f: 77.4,
+    });
+    const payload = snap.redacted_raw_payload as Record<string, unknown>;
+
+    expect(payload.config_note).not.toContain("abc123def456ghi");
+    expect(payload.note).toBe("tent stable");
+    expect(payload.temp_f).toBe(77.4);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["scalar", "safe-looking malformed raw body"],
+    ["array", ["safe-looking malformed raw body"]],
+  ] as const)(
+    "marks %s raw payload as unusable instead of serializing it",
+    (_label, rawPayload) => {
+      const snap = evidenceSnapshot(rawPayload);
+      const text = serializeEvidenceForClipboard(snap);
+
+      expect(snap.redacted_raw_payload).toBe("[redacted]");
+      expect(text).toContain('"redacted_raw_payload": "[redacted]"');
+      expect(text).not.toContain("safe-looking malformed raw body");
+    },
+  );
+
+  it("replaces malformed nested values instead of omitting or serializing them", () => {
+    class UnexpectedPayloadValue {
+      body = "safe-looking nested raw body";
+    }
+
+    const snap = evidenceSnapshot({
+      transport: "mqtt_local_test",
+      missing: undefined,
+      non_finite: Number.NaN,
+      unexpected: new UnexpectedPayloadValue(),
+    });
+    const payload = snap.redacted_raw_payload as Record<string, unknown>;
+    const text = serializeEvidenceForClipboard(snap);
+
+    expect(payload).toEqual({
+      transport: "mqtt_local_test",
+      missing: "[redacted]",
+      non_finite: "[redacted]",
+      unexpected: "[redacted]",
+    });
+    expect(text).not.toContain("safe-looking nested raw body");
   });
 });
 

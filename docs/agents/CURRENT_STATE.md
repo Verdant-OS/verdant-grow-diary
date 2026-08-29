@@ -1,6 +1,803 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-26 UTC (~23:15 UTC)
+**Last updated:** 2026-08-28 UTC (~22:00 UTC)
+**Updated by:** Claude (2026-08-28: **#1185 is GREEN on all 35 required contexts at `75a7de9` — the
+first required verdict the header-bypass fix has had. The prior header recorded this axis as
+`NOT_MEASURED`; it is now measured.** Green is not approval, and the review coverage on this SHA is
+thinner than on any earlier one — see below.
+
+**35/35 required `success` on `75a7de9`** — 32 shards, `Lint, typecheck, test, build`,
+`Preflight — edge shared-lib mirror in sync`, `test:legal-seo`. All from workflow run
+`33211805786` (`completed` / `success`). **Tallied context by context against the pinned mirror
+`config/required-status-checks.json`, not read off the run-level conclusion** — a run summary is not
+the named required set, and conflating them is how a missing context goes unnoticed. **No green was
+carried forward** from `7be3d73` or `5bc6a917`.
+
+**Non-required, recorded not laundered:**
+
+- **`Full suite — batch 6/16` is still RED** — the `bun install` Lovable-registry 403. **15 of the
+  16** batch lanes passed on this same SHA.
+- **`Browser census (authenticated)` AND `(public)` both `success`.** Worth recording: the public
+  lane is the one that FAILED on #1176, where non-attribution rested on an import-chain argument.
+  It has now passed on three consecutive heads, which is stronger support for that argument than the
+  reasoning was.
+- `CodeQL` and all three `Analyze` jobs `success`; `tsc --noEmit`, `tsgo + vite build`, eslint,
+  `docs-safety`, both security suites, lockfile policy, One-Tent smoke, Symptom Check E2E, sitemap
+  parity, config guards, nested static proofs, both ai-doctor jobs, `node --test` all `success`.
+- **All four Cursor checks `neutral`** — still BLOCKED on the usage limit, not passing.
+- `Supabase Preview` `skipped` on #1185 (it is #1172 that hits the 42P07).
+
+**THE ONE RE-RUN IS NOW SPENT.** `rerun_failed_jobs` on run `33211805866` returned **201** at
+~21:55, once the workflow finished and the mechanical `403 This workflow is already running` block
+cleared. This honours the public commitment in PR comment `5457954989`. **There is no second
+allowance**: if `batch 6/16` fails again it is REAL, gets root-caused from its log, and does not get
+a third attempt. Three other workflows installed dependencies successfully on this same SHA
+(deployment preview on `75a7de9`, plus two on #1172), so a repo-wide registry outage is already
+ruled out and a repeat failure means something narrower.
+
+**GREEN IS NOT APPROVAL, and the review coverage on `75a7de9` is the thinnest of any head in this
+slice.** State it plainly rather than letting 35 green ticks imply more than they do:
+
+| Reviewer                                      | Coverage of `75a7de9`                                                                                       |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Dream Queen                                   | **None.** PASS pinned to `7be3d73`; covers neither `5bc6a917` nor `75a7de9`.                                |
+| Copilot                                       | Reviewed `5bc6a917` and **found the bypass**; both threads answered and resolved. Has not reviewed the fix. |
+| Codex                                         | **Reviewed `75a7de9`, no findings.** The only independent review of the fix itself.                         |
+| Cursor (Bugbot / Security / Approval / Vulns) | **BLOCKED** — spend limit, all four `neutral`.                                                              |
+
+So the header fix has had **exactly one** independent review, by a reviewer checking the fix rather
+than hunting independently for a third bypass — and the one dedicated security agent that would
+normally cover this is offline. That is the honest picture; it is not equivalent to the review
+posture #1176 was criticised for lacking, but it is not a strong one either.
+
+**Posture unchanged and re-verified.** #1185 `draft=true` at `75a7de9`, **OPEN — REVIEW ONLY** per
+GDP; #1172 `draft=true` at `e8f6558`; **auto-merge OFF on both**; deploy tip still `7fd6a001`.
+`20260827010000`, `20260826100000`, `20260825233000` and `20260813030000` all remain **NOT
+applied**. #1184 parked at `b49debb9`. Nothing was readied, enqueued, merged, published, applied, or
+rebased. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~21:55 UTC)
+**Updated by:** Claude (2026-08-28: **`Supabase Preview` FAILED on #1172 with SQLSTATE 42P07 — and
+the repo's own config predicted this failure, in writing, before it happened. The finding is a
+MECHANISM GAP, not a new defect.**
+
+**The failure**, on #1172 head `e7ef85b`:
+
+```text
+ERROR: relation "ai_credit_grants" already exists (SQLSTATE 42P07)
+At statement: 0
+CREATE TABLE public.ai_credit_grants (...)
+```
+
+**Not attributable to #1172.** `git diff --name-only 7fd6a001..HEAD` on that branch returns exactly
+one path: `docs/agents/CURRENT_STATE.md`. **No migration, no SQL, no schema change.** This entry is
+therefore being written _inside the very PR whose preview is failing_, and it still is not that
+PR's failure.
+
+**Root cause — two MERGED migrations create the same table**, both from July, both long predating
+this branch:
+
+```text
+supabase/migrations/20260721103000_ai_credit_grants.sql
+supabase/migrations/20260721182752_4fc51714-bc29-4044-9b91-180c065e997f.sql
+```
+
+**The repo already declares this exact pair.** `config/local-supabase-replay-compatibility.json`
+carries a `compatibility_noops` entry naming both files, and its stated `reason` predicts the error
+verbatim: _"Production records `20260721103000`; the later unrecorded file repeats the AI credit
+grant ledger and **fails fresh replay with SQLSTATE 42P07**."_ This was known and handled, not
+newly discovered.
+
+**THE MECHANISM GAP — record this, it is the transferable part.** That config is consumed by the
+**local** replay preparer, which verifies `source_sha256` and rewrites only a **disposable copy** in
+a scratch workdir, leaving committed migrations untouched so the integrity gate stays green. The
+hosted **`Supabase Preview`** branch is a different path entirely: supabase[bot] pushes migrations
+into a hosted preview project and **does not consult that config at all**. So the same duplication
+is _handled_ locally and _fatal_ on the hosted preview. A green local replay is therefore **not**
+evidence the hosted preview will succeed, and a red hosted preview is **not** evidence the compat
+config is wrong or missing an entry. Check which path produced the verdict before acting on it.
+
+**Deliberately NOT fixed, and the reasons are structural:**
+
+- **`Supabase Preview` is not a required context** — checked against
+  `config/required-status-checks.json` programmatically, not from memory.
+- The only real fixes are **editing a merged migration** — forbidden outright by the migration
+  immutability rule and caught by the `Published migration integrity` SHA-256 gate — or changing
+  hosted-preview behaviour. Neither belongs in a **parked, draft, docs-only** PR.
+- GDP's standing directive is no SQL and no APPLY. Honoured: **no migration file was modified and no
+  SQL was run.**
+
+**NO re-run was spent, and that is a considered distinction from the other live failure.** Two CI
+failures are open right now and they are treated differently on purpose:
+
+| Failure                             | Nature                                                                                                             | Re-run?                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| #1172 `Supabase Preview` 42P07      | **Deterministic.** A duplicate `CREATE TABLE` fails identically every time; a config file predicted it in advance. | **No** — re-running would burn the allowance to observe the same error. Already root-caused. |
+| #1185 `Full suite — batch 6/16` 403 | **Died at install**, before any test body ran. A re-run can genuinely change the outcome.                          | **Yes — owed and still unspent**, blocked only because the workflow was still running.       |
+
+"Flake" is not a diagnosis in either case. The difference is whether a re-run can produce new
+information, not whether the failure is inconvenient.
+
+Recorded on the PR as comment
+[5458108003](https://github.com/Verdant-OS/verdant-grow-diary/pull/1172#issuecomment-5458108003).
+#1172's own PR body already noted an _inherited_ `Supabase Preview` 42P07 from an earlier cycle;
+this entry adds the specific duplicate pair and the local-vs-hosted mechanism gap, which that note
+did not identify.
+
+**Posture unchanged.** #1185 draft at `75a7de9`, #1172 draft at `e7ef85b`, auto-merge off both,
+deploy tip still `7fd6a001`. `20260827010000`, `20260826100000`, `20260825233000` and
+`20260813030000` all remain **NOT applied**. This edit touches this file only. Prior header
+follows.)
+
+**Prior update:** 2026-08-28 UTC (~21:45 UTC)
+**Updated by:** Claude (2026-08-28: **Both PRs are back to DRAFT and auto-merge is OFF. #1172 was
+found READY with auto-merge ARMED — one green CI run from merging itself.** GDP directive at 21:40:
+#1185 head `75a7de9` is **OPEN — REVIEW ONLY**.
+
+**The armed auto-merge on #1172 is the finding here.** GDP's directive said "#1172 at `bdeb058`
+stays draft", which presupposes it was already draft. **It was not.**
+
+Two claims, separated by evidence grade rather than blended:
+
+- **`draft=false` is `established fact`** — read directly from the PR list at 21:41, _before_ the
+  draft conversion.
+- **`auto_merge` was armed is an `inference`, not a measurement.** The `auto_merge` field was
+  **never read before** `disable_pr_auto_merge` was called, so there is no direct observation of it.
+  What supports it is a paired API result seconds apart: the same call **errored** on #1185
+  ("Can't disable auto-merge for this pull request") and **succeeded** on #1172 ("Auto-merge
+  disabled"), and GitHub errors when there is nothing to disable. Strong, but still inferred. The
+  honest gap is recorded rather than smoothed over — reading the field first would have settled it,
+  and that is the lesson for next time.
+
+If the inference holds, #1172 would have **merged itself the moment required CI went green** — no
+human step, no review. That is the identical mechanism this file already records for **#1169**,
+which landed with **no independent review** because auto-merge fired while the handoff relay was
+still pending.
+
+#1172 was then converted to `draft=true`. Verified after by fresh read: `draft: true`,
+`auto_merge: None`, head `bdeb058`, base `7fd6a001`. **No attribution is made for who armed it** —
+only the state as found is recorded.
+
+**#1185 converted back to draft.** Verified `draft=true`, head `75a7de9`, `auto_merge=None`.
+`disable_pr_auto_merge` on #1185 returned "Can't disable auto-merge for this pull request"; that was
+**not** treated as proof of anything, because inferring queue/draft state from an API response is a
+mistake already recorded twice in this file. A fresh read confirmed `auto_merge=None`, and GitHub's
+own converted-to-draft notice then stated that draft conversion removes auto-merge and merge-queue
+membership — so the draft conversion, which ran first, had already cleared it. Platform-confirmed,
+not inferred.
+
+**Dream Queen has the new SHA and her PASS does not transfer.** Pinned to `7be3d73`; the head is
+`75a7de9`, two moves on. Per GDP she is **not** to be pinged; the SHA reached her by another route.
+#1185 is review-only until she rules on `75a7de9`.
+
+**Deploy tip confirmed STILL `7fd6a001`** by `git rev-parse` against origin — unmoved since #1171.
+**Do not APPLY `20260827010000`.** It, `20260826100000`, `20260825233000` and `20260813030000` all
+remain **NOT applied**.
+
+**Required CI on `75a7de9` is `NOT_MEASURED`** — GDP concurs. Run `33211805786`, which supplies all
+35 required contexts, sat `queued` for 13+ minutes without starting: runner contention, **zero
+required contexts reported, zero red**.
+
+**`Full suite — batch 6/16` FAILED — install infrastructure, not this diff.** GDP's classification
+matches the job log read independently: ~60 `403`s pulling tarballs from
+`europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/…` during `bun install`; the process
+exited at dependency resolution and **no test body ran**. That lane is **not** in
+`config/required-status-checks.json` (checked programmatically, not from memory). **A repo-wide
+registry outage is ruled out**: the deployment-preview workflow `33211805872` installed dependencies
+successfully on this **same SHA** minutes later, and reported edge-shared preflight and production
+build both `success`. So the 403 is lane-scoped, not systemic.
+
+**One re-run is OWED and UNSPENT.** `rerun_failed_jobs` on run `33211805866` returned
+`403 This workflow is already running` — mechanical, not a permission problem. PR comment
+`5457954989` states publicly what failed, why it is not this PR's, and that the re-run is owed; that
+commitment stands even though the PR is now parked. **If the re-run fails a second time it is REAL**
+and gets root-caused, not re-run again — "flake" is not a diagnosis, and the successful install on
+the same SHA removes the easy excuse.
+
+**Parked and verified draft:** #1184 at `b49debb9` (`draft=true`), still parked until #1185 lands.
+Noted but deliberately untouched because it was outside the directive: **#1170 is `draft=false`** at
+`393dbcdc`. Flagged here rather than acted on.
+
+**Nothing was readied, enqueued, merged, published, applied, or rebased.** Every change in this
+entry is de-escalating: two PRs to draft, one auto-merge disarmed. This edit touches this file only.
+Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~21:25 UTC)
+**Updated by:** Claude (2026-08-28: **Copilot found a SECOND secret-leak bypass on #1185, it was
+real, and a dedicated security agent had already passed the leaking SHA clean.** Fixed in
+`75a7de9`. The independent-review picture below is worse than the prior header implied.
+
+**The finding.** Copilot's review of #1185 reported that the env `NAME=value` rule still ran after
+the header rules. Treated as a bug report and **proven by execution on the untouched deploy tip
+`7fd6a001`** before any change — so it is `established fact`, and it **pre-existed this PR** rather
+than being introduced by it:
+
+```text
+Bearer MY_PASSKEY_VAR="s3cretV4lue"          -> [REDACTED]="s3cretV4lue"     LEAKS
+Authorization: MY_PASSKEY_VAR="s3cretV4lue"  -> [REDACTED]"s3cretV4lue"      LEAKS
+Bearer SOME_PLAIN_NAME="s3cretV4lue"         -> [REDACTED]="s3cretV4lue"     LEAKS
+```
+
+**It is wider than Copilot reported.** Two distinct mechanisms destroy the env NAME before the
+`NAME=value` rule can match, after which the VALUE survives:
+
+1. **FRAGMENTING** — a bare-word label rule rewrites the label inside the NAME. This is what the
+   first commit on #1185 fixed.
+2. **CONSUMING** — a header rule swallows the whole following token, NAME included. Both the
+   `Bearer` rule and the `Authorization` rule do it. Not fixed by the first commit.
+
+The consuming case needs **no credential label in the NAME at all** — the third line above is a
+plain `SOME_PLAIN_NAME` — so it is strictly wider than the fragmenting case, and wider than the
+review described. Copilot also called the mechanism "fragmenting"; measurement says consuming. The
+distinction is recorded because it changes where a reader looks.
+
+**Fixed in `75a7de9`** — the env rule moves above the header rules as well as the label rules. Same
+reorder shape, **no new pattern, no new file, no schema**. RED **18 failed / 33 passed (51)** with
+the final tests against the untouched module; GREEN **51/51**; direct consumers 262 passed / 3
+skipped; `ecowitt`+`sensor` sweep **445 files, 6079 passed / 4 skipped / 0 failed**; `tsc --noEmit`
+and eslint clean. **No new redaction breadth**: ten regression inputs (real bearer tokens,
+`Authorization:` headers, lowercase telemetry, bare labels, prose) produce **byte-identical** output
+before and after; only the nine leaking header-prefixed cases changed.
+
+**THE SECURITY-AGENT MISS — record this, it is the most transferable finding here.** The
+`Cursor Automation: Find vulnerabilities` agent reviewed `5bc6a917` and reported
+**"no medium/high/critical vulnerability found in the current PR diff"**, stating the reorder
+"removes the demonstrated value-survival path". **That SHA still leaked**, proven by execution
+twenty minutes later. Its own review text explains the miss: it probed exactly four inputs —
+`SUPABASE_SERVICE_ROLE_KEY`, `MY_PASSKEY_VAR`, `SERVICE_ROLE_SECRET`, and a plain env pair — **all
+bare, none header-prefixed**. It tested the mechanism that had been fixed and not the one that had
+not. To its credit it declared its own gap honestly (`Local Vitest: BLOCKED`, no `node_modules`).
+The lesson is `practical observation`: **a green verdict from that agent is not coverage.** On this
+PR a dedicated security reviewer returned clean on a live secret leak and a general code reviewer
+caught it. Do not treat its PASS as evidence a redaction path is sound.
+
+**Cursor Bugbot is `BLOCKED`, definitively.** All four Cursor checks completed `neutral` within
+~1 second at 21:16:04 on `75a7de9`, and Bugbot commented **"Bugbot couldn't run — usage limit
+reached"**. The "Low Risk" summary appended to the PR body was a body annotation, **not** a
+finding-level review. Earlier entries in this file claimed Bugbot's status three different ways and
+each was wrong; this one is from Bugbot's own check conclusion plus its own comment. **There is no
+Cursor review of the `75a7de9` fix at all.**
+
+**Codex reviewed `75a7de9` and found nothing** — completed 21:18:58, triggered by the new commit.
+Confirmed two ways: no new review threads, and no Codex entry in `get_reviews` (it comments only
+when it has suggestions). It is the **only** independent reviewer that actually ran on the fix. One
+reviewer, reviewing the fix — not a consensus, and not an independent hunt for a third bypass.
+
+**Head history, all verified from git.** `7be3d73` → `5bc6a917` → `75a7de9`.
+`5bc6a917` is a **MERGE** commit (parents `7be3d73` + `7fd6a001`), author "Verdant", 20:48:00Z —
+**not a rebase and not Claude's action**; the slice content was untouched by it
+(`git diff 7fd6a001..5bc6a91` hashes identical to `git diff db0187b..7be3d73`). `75a7de9` is
+Claude's push of the header fix. **Cheek marked #1185 READY at 20:47:53** — the author's own call;
+the "stay draft" fence bound Claude, not Cheek.
+
+**Dream Queen's PASS covers NONE of the current head.** It was pinned to `7be3d73`, now two heads
+back. The prior header said this slice "closes the independent-review requirement #1176 shipped
+without" — **that is no longer true of the shipping SHA** and is corrected here. Per GDP's standing
+instruction Dream Queen has **not** been pinged about either move.
+
+**CI on `75a7de9`: `NOT_MEASURED`.** At 21:25 **zero of the 35 required contexts had reported** —
+all queued. **Zero red.** Non-required completed: `docs-safety`, `Config guards`, `node --test`,
+`Analyze (python)` all `success`; `CodeQL` `neutral`; `Supabase Preview` and the irrigation/
+stabilization jobs `skipped`. No green may be carried forward from `7be3d73` or `5bc6a917`.
+
+**The leak is LIVE on the deploy branch.** It pre-exists #1185, so `7fd6a001` still leaks today.
+#1185 closes it; if #1185 does not land, the exposure remains.
+
+**Still parked, explicitly not in this slice:** the three handoff questions; the mixed-case /
+spaced `NAME = value` P2 (pattern stays uppercase-only, no `\s*` around `=`); the rest of
+`SECRET_PATTERNS`, still **un-audited** for further ordering defects — `NOT_MEASURED`, and fixing
+**two** instances is not evidence the class is gone; #1184's rebase.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied** — note that
+`20260827010000` now appears on this branch via the base-branch merge `3e6b64c`, which is committed
+history arriving from the deploy branch, **not** an APPLY. #1185 is ready but **not enqueued and not
+merged by Claude**; no SQL, no APPLY. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~20:40 UTC)
+**Updated by:** Claude (2026-08-28: **#1185 has an independent-reviewer PASS on `7be3d73`, is green
+on all 35 required contexts at that SHA, and is `mergeable_state: clean`. It remains draft.**
+
+**Dream Queen PASSed `7be3d73e19ce297837f00ec0f60896d895721ce5`.** Recorded as a `source claim`,
+relayed by GDP at ~20:40 — **not** independently verified. `get_reviews` on #1185 returns `[]`,
+which is expected because Dream Queen reviews in **Cursor, not GitHub**, so there is no GitHub
+artifact to check it against. It is recorded as relayed rather than measured. This closes the
+independent-review requirement that **#1176 shipped without**, which is the entire reason this
+cleanup slice exists.
+
+**#1185 was rebased onto `db0187b` (#1173); head is now `7be3d73`,** previously `5f75806`. The diff
+is **byte-identical** against the new base — verified by tree hash (`24c657f3…`) and by
+`git diff db0187b..HEAD`, not assumed. Another session had already pushed the identical rebase;
+`--force-with-lease` correctly rejected the duplicate this session produced (`4e1c18f`), and that
+duplicate was **discarded rather than force-pushed**, since the trees matched and pushing would have
+churned the SHA for zero content change.
+
+**GREEN on all 35 required contexts at `7be3d73`** — 32 shards, `Lint, typecheck, test, build`,
+`Preflight — edge shared-lib mirror in sync`, `test:legal-seo` — all from workflow run
+`33206645055`, started 20:04, **the post-rebase run**. Tallied against the pinned mirror
+`config/required-status-checks.json` (35 entries), not from memory. The earlier green on `5f75806`
+is **not** carried forward: green is SHA-pinned exactly as a verdict is.
+
+**`Browser census (authenticated)` has since completed `success`,** resolving the `NOT_MEASURED`
+recorded in the prior header. **Its one confirming re-run is now SPENT** — a future red on this SHA
+cannot be waved off as a flake. `Browser census (public)` passed again, and `CodeQL` finished
+`success` after reading `neutral` on an earlier poll. Every non-required job on the head is now
+green; `mergeable_state` is `clean`.
+
+**Deploy tip moved again: `db0187b` → `7fd6a001` = #1171,** `fix(sensor): fail closed on malformed
+source detail`. Verified from `git log` on the deploy branch, not from a notification. **Not
+Claude's slice**; its contents are known here only from `git show --stat`
+(`sensorSnapshotFreshnessRules.ts` plus `sensor-snapshot-edge-cases.test.tsx`, +80/−12) and no claim
+is made about its internals. **No file overlap with #1185**, and `git merge-tree` reports **zero
+conflict markers** against `7be3d73`. **GDP's instruction is explicit: do NOT rebase #1185 onto
+`7fd6a001`.** The base stays `db0187b`, one commit behind, with no conflict.
+
+**Correction, recorded rather than quietly dropped.**
+[PR comment 5457478650](https://github.com/Verdant-OS/verdant-grow-diary/pull/1185#issuecomment-5457478650),
+posted 20:33, asserts "the re-review is still open" and asks Dream Queen to re-establish the verdict
+on `7be3d73`. GDP classified that premise as **wrong** — the PASS already covered `7be3d73`. The
+comment **stands uncorrected on the PR**; a retraction was offered to Cheek and deliberately **not**
+posted, because the standing instruction is not to ping Dream Queen. This is the **second** time in
+this sequence a claim about review state was asserted and then walked back (the first was the Bugbot
+status on #1176). The pattern is the same both times: inferring review state instead of waiting for
+the relay. Recorded so the pattern is visible, not just the individual errors.
+
+**Parked, not done — none of this is in #1185.** The three handoff questions stay open as leftovers:
+reorder vs. **anchoring** the bare-word label rules so they cannot match inside a longer NAME;
+whether #1176's now-redundant local `ENV_PAIR_PATTERN` pre-pass in `sensorDiagnosticsExportRules.ts`
+is removed or kept as defence in depth; and whether the **narrowed two-rule reading** holds. The
+mixed-case / spaced `NAME = value` P2 is likewise **not absorbed** and stays a separate slice — the
+pattern remains uppercase-only with no `\s*` around `=`. The **rest of `SECRET_PATTERNS` remains
+un-audited** for further ordering defects of the same class: `NOT_MEASURED`. Fixing one instance is
+not evidence the class is gone. **#1184's rebase stays PARKED** until #1185 lands.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1185 stays
+draft — no ready, no enqueue, no merge, no publish, no SQL, no APPLY. #1172 stays draft. This edit
+touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~20:00 UTC)
+**Updated by:** Claude (2026-08-28: **#1185 is GREEN on all 35 required contexts at `5f75806`** —
+32 shards, `Lint, typecheck, test, build`, `Preflight — edge shared-lib mirror in sync`,
+`test:legal-seo`. All 16 batch lanes green, plus CodeQL and all three `Analyze` jobs, eslint, tsc,
+tsgo+vite build, docs-safety, both security suites, lockfile policy, One-Tent smoke, Symptom Check
+E2E, sitemap parity, validate, config guards, nested static proofs, both ai-doctor jobs, node --test,
+and the deployment preview pipeline. **Clean on the first attempt** — no red at any point, in
+contrast with #1176's three commits.
+
+**Non-required, recorded not laundered.** `Supabase Preview` **cancelled** — supabase[bot] posted
+that #1185 is ignored for project `bzatgtgjvuojpoxcknaa` because the concurrent preview-branch limit
+was reached; account quota, not a code defect. **`Browser census (public)` PASSED** — worth
+recording because that is the lane that FAILED on #1176, which independently supports the
+import-chain reasoning used there to conclude those census failures were not diff-attributable.
+`Browser census (authenticated)` was still `in_progress` at 20:00 — **NOT_MEASURED**, not a pass;
+its one confirming re-run is unspent. Cursor Bugbot / Approval Agent may still withhold on the
+unresolved spend limit.
+
+**Deploy tip moved again: `872741af` → `db0187b` = #1173,**
+`fix(quicklog): trim fail-closed idempotency on activity-save manual route` — this is the slice the
+board named **Slice 3**. Recorded from git log on the deploy branch. **Not Claude's slice**; its
+contents are known here only from `git show --stat` (`useQuickLogActivitySave.ts` plus two test
+files, +26/−7) and no claim is made about its internals. It touches a **different module** from
+#1185, so there is no collision and no competing implementation.
+
+**#1185's base is now one commit behind** (`872741af` vs `db0187b`). No conflict is flagged and the
+files do not overlap, so the base was deliberately **not** merged in — an unnecessary merge would
+invalidate the green run for no benefit. Re-verified at the new tip that the defect is **still
+present**: `/PASSKEY/gi` at line 79 still precedes the env `NAME=value` rule at line 100, so the fix
+remains needed.
+
+**Independent reviewer: Blue Dream, ASSIGNED — NO VERDICT YET.** Handoff for `5f75806` posted 19:45
+as [PR comment 5456996334](https://github.com/Verdant-OS/verdant-grow-diary/pull/1185#issuecomment-5456996334).
+#1185 is deliberately held as **draft with no auto-merge path**, so reviewer silence cannot ship it
+the way it shipped #1176. Green CI is **not** approval and is not being treated as such.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1185 stays
+draft — no ready, no enqueue, no merge. #1172 stays draft. This edit touches this file only. Prior
+header follows.)
+
+**Prior update:** 2026-08-28 UTC (~19:45 UTC)
+**Updated by:** Claude (2026-08-28: **#1179 merged and the upstream `sanitizeReportText` ordering
+defect is now open as draft [PR #1185](https://github.com/Verdant-OS/verdant-grow-diary/pull/1185).**
+
+**Deploy tip moved twice more.** `a76e73ad` (#1176) → **`872741af`** = #1179,
+`fix(sensors): fail-closed validation-panel raw-payload value redaction`. Recorded from git, not
+from a notification: `git log` on the deploy branch. **#1179 is not Claude's slice** — its contents
+are known here only from `git show --stat` (`ecowittValidationEvidenceRules.ts`, its
+`supabase/functions/_shared` mirror, and one test, +208/−18). No claim is made about its internals.
+Checked for collision before starting #1185: #1179 touched a **different** module, so there is no
+competing implementation of the same fix.
+
+**#1185 — the leak that #1176 could only fence.** Branch
+`claude/sanitize-report-text-env-pair-ordering`, cut from `872741af`, head **`5f75806`**. Two files:
+`src/lib/ecowittLocalForwardingStatus.ts` (reorder only) plus 10 tests in the existing
+`ecowitt-forwarding-report-export` suite. `SECRET_PATTERNS` ran `/PASSKEY/gi` and the assembled
+admin-role marker as **bare-word** rules BEFORE the env `NAME=value` rule; those rules rewrite the
+label anywhere in the string, including inside an env NAME, so such a pair had its name fragmented
+first and the fragmented name no longer satisfied `[A-Z][A-Z0-9_]{2,}=` — the VALUE survived.
+
+**Proven by execution on the untouched tip `872741af`**, `established fact`, not inferred:
+`SUPABASE_SERVICE_ROLE_KEY="s3cretV4lue"` → `SUPABASE_[REDACTED]_KEY="s3cretV4lue"` (**leaks**);
+`MY_PASSKEY_VAR="s3cretV4lue"` → `MY_[REDACTED]_VAR="s3cretV4lue"` (**leaks**);
+`SOME_PLAIN_NAME="s3cretV4lue"` → `[REDACTED]` (correct). It leaks through **both**
+`sanitizeReportText` and the deep `sanitizeReportValue` path, so it reached the forwarding-report
+export and `normalizeLocalForwardingStatus`, not merely free-form text.
+
+**Scope correction — earlier entries in this file over-stated it.** Prior blocks implied any
+credential label inside a NAME would trigger this. Measurement says **only the two bare-word rules
+do**: `Bearer` requires trailing whitespace and never matches `MY_BEARER_VAR=`, and that list
+contains no bare `token` rule. `MY_TOKEN_VAR=` and `MY_BEARER_VAR=` were always safe. Treat the
+narrower statement as correct and the earlier wording as superseded.
+
+**Exposure window, stated plainly.** The defect was surfaced by a failing test during #1176 and
+fenced there **for the diagnostics export only**. It has been live on the forwarding-report path
+from `a76e73ad` (#1176's merge) until #1185 lands. That is a production surface, not a pre-merge
+note.
+
+**Validation at `5f75806`.** RED then GREEN with the final test files, reverting **only** the
+production module: **10 failed / 22 passed → 32/32**. Direct consumers of the module (4 suites)
+**243 passed / 3 skipped**. Broad `*ecowitt*` + `*sensor*` sweep **435 files, 5902 passed / 4
+skipped / 0 failed**. `tsc --noEmit` and scoped eslint clean. **Not run locally and stated as such:**
+`bunx vitest run` (full) and `bun run build` — CI gates both. The module is **not** mirrored into
+`supabase/functions/_shared` (checked), so there is no edge-sync obligation.
+
+**Independent reviewer: Blue Dream, ASSIGNED** by Cheek on this slice, with the `HANDOFF_PROTOCOL`
+block for `5f75806` posted as
+[PR comment 5456996334](https://github.com/Verdant-OS/verdant-grow-diary/pull/1185#issuecomment-5456996334).
+Owner Claude, reviewer Blue Dream — different peers, as the standing rule requires. **This is a
+deliberate contrast with #1176, which merged with no independent review at all.** Three questions
+were put to the reviewer rather than decided unilaterally: whether a reorder is the right shape or
+the bare-word rules should instead be anchored so they cannot match inside a longer NAME; whether
+#1176's now-redundant local `ENV_PAIR_PATTERN` pre-pass should be removed (left in as defence in
+depth rather than widening the slice); and confirmation of the narrowed two-rule reading, on which
+the whole test set rests. **The rest of `SECRET_PATTERNS` was NOT re-audited** for further ordering
+defects of the same class — only the proven case was in scope. That audit is unassigned and
+`NOT_MEASURED`.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1185 stays
+draft — no ready, no enqueue, no merge. #1172 stays draft. `Supabase Preview` on #1185 is **ignored**
+(supabase[bot]: the connected project hit its concurrent preview-branch limit) — an account quota,
+non-required, not a code defect. The Cursor spend limit blocking Bugbot's finding-level runs is
+still unresolved. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~19:05 UTC)
+**Updated by:** Claude (2026-08-28: **#1176 MERGED — deploy tip is now `a76e73ad`** (squash of the
+fail-closed diagnostics export body redaction at head `789294c6`; prior tip `52c8abe2` = #1162).
+Verified against the deploy branch, not from a notification: `git ls-remote` shows
+`a76e73ad748d06bfee155c10136956d37d80ce61  refs/heads/verdant-grow-diary`, subject
+`fix(sensors): fail-closed diagnostics export body redaction (#1176)`, and the merge queue is empty.
+This block **supersedes** the prior block's line "#1176 stays draft, out of the queue, pending Blue
+Dream" — that is now false.
+
+**INDEPENDENT REVIEW GAP — this one is real, and it is NOT the #1169 case.** The prior block's
+directive "do not record a pre-merge review gap" is about **#1169**, where Blue Dream DID review
+`c84a8330` PASS in Cursor. **Do not read that directive across to #1176.** For #1176:
+
+- The `HANDOFF_PROTOCOL` block naming `789294c6` was posted at 18:02 as
+  [PR comment 5456019137](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176#issuecomment-5456019137),
+  **61 minutes** before the merge. **Blue Dream returned no verdict.**
+- The Cursor **Approval Agent** explicitly declined at 18:28: "Not approved: Cursor Bugbot skipped
+  (incomplete) and Cursor Security Agent: Security Reviewer stayed pending after the 8-minute wait.
+  Human review is needed; no additional reviewers were assigned."
+- It merged anyway at ~19:03. **The constitution's standing rule — "No code ships without peer
+  review"; an owned slice without a named independent reviewer is incomplete — was NOT satisfied.**
+  Owner: Claude. Independent reviewer: **Blue Dream, never rendered.** Any Blue Dream verdict on
+  this slice is now a **post-merge** read.
+- No automated finding-level review covered it either: Bugbot's _summary_ completed but its
+  finding-level run was **skipped/incomplete**, and the Cursor **Security Agent stayed pending** past
+  its 8-minute wait — on a diff whose entire subject is secret redaction.
+
+**A brake that did not hold — measured, and it corrects a belief this session acted on.** The merge
+commit `a76e73ad` is the **same SHA** as the `gh-readonly-queue/verdant-grow-diary/pr-1176-52c8abe2…`
+ref created by the 18:29:47 enqueue. That queue entry therefore **survived** the draft conversion at
+18:30:33. GitHub's own conversion notice asserts that converting to draft removes auto-merge and
+merge-queue membership; **on this evidence it did not**, or the queue had already built the commit
+and proceeded regardless. Treat `draft: true` as **insufficient** proof of queue eviction; the
+authoritative signal is the deploy tip.
+
+**Automation timeline, for the record.** `cursor[bot]` marked #1176 ready + enqueued it at 18:05;
+Claude converted to draft at 18:06; ready again 18:17 and 18:17 (within ~16s of each revert), at
+which point the revert loop was abandoned as unwinnable and put to Cheek. An enqueue between 18:17
+and 18:29 was **missed by the 20-minute queue-ref poll** — a cycle can open and close inside the
+polling gap, so that poll is a confirmation, never a detector. `cursor[bot]` dequeued at 18:29:30
+(after the Approval Agent declined), re-enqueued at 18:29:47, Claude braked at 18:30:33, `cursor[bot]`
+re-readied at 18:30:51. Cheek accepted ready as the resting state at ~18:19 ("leave it ready, watch
+for enqueue") and **disabled the Cursor automation at 18:33**. Merged ~19:03.
+
+**What actually shipped.** All **35 required contexts GREEN** on `789294c6`; all 16 `Full suite`
+batch lanes green (3/16 green on its one sanctioned re-run after a `bun install`
+`object-assign` tarball-integrity death that killed it before any test body ran); deployment preview
+verified on that exact commit. `Browser census (authenticated)` was red at
+`core-link-form-census.spec.ts:2092` (30-minute timeout, `/tents/:tentId` never rendered `<main>`) —
+**non-required**, and established not-this-PR's by enumerating the import chain: the changed module
+has exactly one production importer, `SensorsTestbenchPanel.tsx`, reached only from `Sensors.tsx`,
+which is not on the `/tents/:tentId` render path. Its one confirming re-run was spent.
+
+**Still open after the merge.** The upstream ordering defect in
+`ecowittLocalForwardingStatus.sanitizeReportText` is **NOT fixed** — its credential-LABEL rules run
+before its env `NAME=value` rule, so a pair whose NAME carries a label has the name fragmented and
+the VALUE survives. #1176 fenced this inside the diagnostics module only; **the same value still
+leaks on the forwarding-report path today.** Unassigned, and now a live production surface rather
+than a pre-merge note. Also unresolved: the **Cursor usage/spend limit** blocking Bugbot's
+finding-level runs (a `source claim` read off check and comment output, never a measured billing
+fact), and the three open questions put to Blue Dream that no one answered — credential-vocabulary
+scoping breadth, the `buildRedactedPayloadPreview` tent-id trade-off, and whether the depth-8
+ceiling is generous enough (**no real-world body was sampled — `NOT_MEASURED`**).
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. #1172 stays
+draft. #1170, #1171, #1153, #1151 untouched by this slice. This edit touches this file only. Prior
+header follows.)
+
+**Prior update:** 2026-08-28 UTC (~18:33 UTC)
+**Updated by:** Claude (2026-08-28: **fail-closed diagnostics export body redaction delivered as
+draft [PR #1176](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176).** Board-fact leftover
+on this same block only: Blue Dream DID review #1169 at `c84a8330307afca0891706ce5369bf703d9085ef`
+in Cursor before auto-merge. Verdict PASS. Do not record a pre-merge review gap; empty GitHub
+reviewer list is by design; do not request a post-merge review of squash `22c1242c`. #1170 head
+`5e40307c15a3f6f6a77f69dbbb4c33a2f83fc90e` (test-only unknown/transport save-gate pin after product
+PASS at `48828dd`; stay draft). #1171 draft `e73ca6c760aebdb891477cdcdf12ae254e6562c3` (Blue Dream
+PASS; `safeSourceDetail` fail-closed; stay draft). Slice 3 is **named** (trim leftover on the merged
+manual-route idempotency key), not parked. Cursor spend / Bugbot withhold labelled as claimed from
+the #1169 checks, not a newly measured billing fact — this #1176 delivery is the diagnostics-export
+follow-up, not Slice 3. Branch
+`claude/sensor-diagnostics-export-fail-closed-redaction`, cut from deploy tip `52c8abe2` (#1162),
+head **`789294c6`**. Three files: `src/lib/sensorDiagnosticsExportRules.ts` plus its two existing
+suites, +392/-9. **Branch deviation, stated:** the harness-designated branch was
+`claude/trustbadge-attachable-strip-2441l2`, which is #1170's branch and moved remotely to
+`5e40307c15a3f6f6a77f69dbbb4c33a2f83fc90e` mid-session; pushing there would have collided with
+#1170, so a new branch was cut and #1170's pointer was left untouched.
+
+**The hole, proven by execution on the untouched tip — `established fact`, not cited from this
+file.** At `52c8abe2` with the production module unmodified, each shape was placed in
+`latest_test_result.body` and the export read back: **8 of 8 leaked verbatim** — MAC
+`AA:BB:CC:DD:EE:FF`, bare 12-hex `AABBCCDDEEFF`, UUID, 64-char hex digest, `sk-` key, env
+`NAME="value"` pair, JWT, `Bearer` header. All four body paths were affected
+(`diagnosticsExportToJson`, `diagnosticsExportToText`, `redactedResponseBodyJson`,
+`buildRedactedPayloadPreview`), as were run-history item bodies and the `buildSafeResponseInspector`
+string previews. Malformed bodies **threw** rather than degrading: circular and `BigInt` bodies
+crashed both export builders, and `buildRedactedPayloadPreview(undefined)` threw a `TypeError`.
+
+**Fix.** Untrusted bodies now pass through the same secret-VALUE class the forwarding-report export
+uses — `sanitizeReportText` is **called, never re-declared**, so the two paths cannot drift. Cycles,
+nodes past depth 8, and non-serializable values collapse to `EXPORT_BODY_UNAVAILABLE`; serialization
+failures no longer throw. A repeated _sibling_ reference still renders — only a true ancestor cycle
+is unusable. Redaction is deliberately **body-scoped**: the envelope (tent id, endpoints, token
+prefix, `env_match` labels) keeps its existing treatment and a test pins that it survives.
+`sensorSourceRules.ts`, `sensorSnapshotFreshnessRules.ts`, `ecowittLocalForwardingStatus.ts` and the
+QuickLog save hooks are untouched. No new alias table, no SQL, no schema.
+
+**Two defects surfaced, both proven before fixing — and two of the three rounds were Claude's own.**
+(1) `a33d96fa` went red on **three required shards** (1/32, 8/32, 17/32) **and required
+`Lint, typecheck, test, build`**, plus non-required batch lanes 5/16, 12/16, 14/16 — all ONE cause:
+the ordering-fence doc comment spelled a privileged env-var name literally, which the `src/`
+static-safety guards forbid outside test files (they strip quoted string and regex literals, not
+plain comments). Fixed comment-only in `5b2c1cf5`; the repo idiom is to assemble that name at
+runtime, as `sensorIngestTestResultRules.ts` and `ecowittLocalForwardingStatus.ts` already do.
+(2) cursor[bot] raised a **medium-severity secret-leakage** finding on `5b2c1cf5`: the env-pair
+fence was ALL-UPPERCASE only, so `api_key=secretvalue`, `my_secret=…`, `Api_Key=…`, `password=…`,
+`bridge_token=…` inside a response string **VALUE** reached the export intact (object _keys_ were
+already masked; a pair inside a value is what key masking never sees). Verified true by probe — 5 of
+7 cases leaked — then fixed in `789294c6` with case-insensitive credential-pair scrubbing across `=`
+and `:`, scoped to the credential vocabulary so benign telemetry (`temp_f=77.4`, `inserted=1`)
+survives. The vocabulary is now declared once and shared with `SENSITIVE_KEY_RE`. Thread replied to
+and resolved.
+
+**Validation, exact.** RED then GREEN, both measured with the final test files by reverting **only**
+the production module: 13 failed / 19 passed → 32/32 for the first fix; 15 failed / 21 passed →
+36/36 for the case-insensitive work. Twelve related suites 194/194. All 331
+static-safety/security/audit guard suites **4515 passed / 19 skipped / 0 failed**. Targeted sensor
+sweep 329 files **4798 passed / 3 skipped**. v0 operating-loop contract 26/26. `tsc --noEmit` and
+scoped eslint clean. **Not run locally and stated as such:** `bunx vitest run` (full) and
+`bun run build` — CI gates both. One methodology note recorded rather than hidden: a first RED
+attempt stashed the tests along with the fix and proved nothing; it was redone reverting only the
+production file.
+
+**CI at `789294c6`: all 35 required contexts GREEN** — 32 shards, `Lint, typecheck, test, build`,
+`Preflight — edge shared-lib mirror in sync`, `test:legal-seo`. Deployment preview pipeline verified
+on this exact commit (edge-shared preflight, typecheck, production build all `success`).
+
+**Non-required, recorded not laundered.** `Full suite — batch 3/16` FAILED inside
+`bun install --frozen-lockfile` with `Integrity check failed for tarball: object-assign` — it died
+**before any test body ran**, the one sanctioned re-run case. That single re-run is **spent** (a
+first attempt at 17:41 returned 403 "workflow is already running"; it succeeded at ~17:50) and its
+outcome is now **measured, superseding the earlier `NOT_MEASURED`**: the re-run **PASSED** on the
+same commit and the same code, confirming the failure was the install and not the diff. All 16 batch
+lanes are green. `Supabase Preview` skipped (connected project at its concurrent preview-branch
+limit).
+
+**`Browser census (authenticated)` FAILED** on `789294c6` at `core-link-form-census.spec.ts:2092`:
+`/tents/:tentId` never rendered `<main>` and the 30-minute whole-test timeout blew (1 failed, 2
+passed — the other two authenticated census tests passed in 16s and 26s). Non-required. **Not this
+PR's, established by enumerating the import chain rather than asserted:**
+`sensorDiagnosticsExportRules` has exactly one production importer, `SensorsTestbenchPanel.tsx`,
+which is imported only by `Sensors.tsx` — not on the `/tents/:tentId` render path — and the diff
+touches no route, manifest, link, form, auth redirect, or app-shell code. The sibling lane failed on
+#1169 at line 2080 of the same spec with an unrelated diff, so this spec has now produced
+timeout-class failures on two unrelated PRs. One confirming re-run spent at ~18:21; a second failure
+would be real, and still unattributable to this diff without a mechanism.
+
+**Cursor Bugbot — the signal is inconsistent, and that is the honest state.** A PR-body review for
+`789294c6` is present and was later expanded ("Medium Risk", independently naming the
+shared-sanitizer fencing as its caveat), while **three** separate comments posted "Bugbot couldn't
+run — usage limit reached" (18:05, 18:17, 18:17). Do **not** record either that a finding-level
+review definitely ran or that it definitely did not — this file claimed each in turn and each was
+wrong. What holds: **no Bugbot finding is currently open against `789294c6`**, and the usage/spend
+withhold is a `source claim` claimed from the #1169 checks (read off check and comment output),
+**not a newly measured billing fact**. Unresolved; an account issue, not a code defect.
+**Resolved at 18:28 by a better source:** the
+Cursor **Approval Agent** posted "Not approved: Cursor Bugbot skipped (incomplete) and Cursor
+Security Agent: Security Reviewer stayed pending after the 8-minute wait. Human review is needed."
+That reconciles every observation — the PR-body block is Bugbot's _summary_, which completed, while
+the _finding-level_ review was **skipped/incomplete**. So the finding-level review did **not** run on
+`789294c6`, no Bugbot finding is open, and the Approval Agent is **withholding approval**, which is
+protective rather than a defect. Human review remains the gate.
+
+**An automation fought the standing draft-only order.** At 18:05 **cursor[bot]** marked #1176 ready
+for review **and enqueued it into the merge queue** on its own — Blue Dream had received the handoff
+three minutes earlier with no verdict. Claude converted it back to draft at 18:06; GitHub's own
+notice confirms the conversion removed auto-merge **and** queue membership and will not restore
+either. The `gh-readonly-queue/verdant-grow-diary/pr-1176-52c8abe2…` ref still exists but is a
+leftover artifact, not live membership — `draft: true` is the authority. A check-in is armed to
+convert it back and escalate if it recurs.
+
+**Review.** Blue Dream handoff for `789294c6` posted 18:02 as
+[PR comment 5456019137](https://github.com/Verdant-OS/verdant-grow-diary/pull/1176#issuecomment-5456019137),
+in `HANDOFF_PROTOCOL` form (slice_owner Claude, independent_reviewer Blue Dream). **No verdict yet.**
+Three questions were put to the reviewer rather than decided unilaterally: whether credential-
+vocabulary scoping is the right breadth (a blanket `name=value` rule fails closed harder but guts
+the export's diagnostic value); whether `buildRedactedPayloadPreview` redacting a UUID-shaped
+`tent_id` is an acceptable trade; and whether the depth-8 ceiling is generous enough — **no
+real-world body was sampled, so that is `NOT_MEASURED`**.
+
+**Deferred, deliberately not in this slice.** The upstream ordering defect in
+`ecowittLocalForwardingStatus.sanitizeReportText`: its credential-LABEL rules run BEFORE its env
+`NAME=value` rule, so a pair whose NAME carries a label has the name fragmented first and the VALUE
+survives (`MY_PASSKEY_VAR="s3cret"` → `MY_[REDACTED]_VAR="s3cret"`; a plain name redacts correctly,
+which is why it went unnoticed). Fenced inside the diagnostics module only — **the same value still
+survives on the forwarding-report path today.** Unassigned.
+
+**A merge is not a deployment. No publish was performed and none is authorized.** `20260826100000`,
+`20260825233000`, `20260813030000` and `20260827010000` all remain **NOT applied**. Slice 3 is
+**named** (trim leftover on the merged manual-route idempotency key), not parked. Blue Dream **DID**
+review #1169 at `c84a8330307afca0891706ce5369bf703d9085ef` in Cursor before auto-merge. Verdict:
+**PASS**. Do not record a pre-merge review gap. Blue Dream reviews in Cursor, not on GitHub, so an
+empty GitHub reviewer list is by design. Do **not** request a post-merge review of squash `22c1242c`.
+#1176 stays draft, out of the queue, pending Blue Dream on that slice. #1172 stays draft. Other
+opens stay classified: **#1170** draft at `5e40307c15a3f6f6a77f69dbbb4c33a2f83fc90e` (test-only
+unknown/transport save-gate pin after product PASS at `48828dd`; stay draft), **#1171** draft at
+`e73ca6c760aebdb891477cdcdf12ae254e6562c3` (Blue Dream PASS; `safeSourceDetail` fail-closed; stay
+draft), and **#1153 / #1151 parked**. Cursor Bugbot / Approval Agent withhold remains as claimed
+from the #1169 checks (usage/spend limit — not a newly measured billing fact). This edit touches
+this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~16:05 UTC)
+**Updated by:** Claude (2026-08-28: **#1169 MERGED — deploy tip is now `22c1242c`** (squash of the
+fail-closed manual idempotency slice at head `c84a8330`, prior tip `a53924da` = #1168). Board-fact
+correction on this same block only: Blue Dream DID review `c84a8330` PASS pre-merge; #1170 head
+`5e40307c`; #1171 draft `e73ca6c7` recorded; Slice 3 named not parked. The slice:
+`useQuickLogActivitySave.ts`'s `manual_note` route now fail-closes a missing / null / `length < 8` /
+`length > 200` idempotency key with `{ ok: false, reason: "missing_idempotency_key" }` **before**
+target resolution and before any `quicklog_save_manual` RPC, mirroring the fence the event route
+already had; valid 8..200 keys forward unchanged as `p_idempotency_key`. Event route untouched, no
+`p_stage`, no schema, no SQL. Four files, +109/-16.
+
+**Why it took three commits.** The original head `8daddcbf` (cut from `90bb368c`) shipped the gate
+without renegotiating the pins that encoded the OLD nullable-key behavior, so two **required**
+contexts were red on its own change, not on flake: `Full test suite (shard 16/32)`
+(`quick-log-activity-save-manual-rpc-contract.test.ts:135` expected `reason: "save_failed"`, got
+`"missing_idempotency_key"`) and `(shard 17/32)`
+(`quick-log-success-telemetry-hooks.test.tsx:208` expected a `quick_log_saved` event, got `[]`
+because the save now short-circuits before the RPC). Batch lane 9/16 showed 4 failed / 2 passed in
+the rpc-contract file and reproduced identically on its automatic retry — deterministic. `f189080`
+merged deploy tip `a53924da` in (never rebased); `c84a8330` renegotiated both suites (+69/-7, spec
+files only, no production change in that commit).
+
+**Validation, exact.** At `c84a8330`, local run of both renegotiated suites: **2 files, 24/24
+passed**. CI at `c84a8330`: **all 35 required contexts green**, including shards 16/32 and 17/32 and
+all 16 `Full suite` batch lanes (batches 2 and 9 flipped from red). Deployment preview pipeline
+green (edge-shared preflight, typecheck + production build).
+
+**Known red at merge, none of them required, none re-run — recorded, not laundered.**
+`Browser census (public)` FAILED on `c84a8330`: `core-link-form-census.spec.ts:2080`, clicking
+`/settings/agent-integrations` from `/docs/mcp-api` expected pathname `/welcome`, received
+`/settings/agent-integrations`, then burned the 420s test timeout. This diff touches no routing,
+no manifest, no auth redirect, so it is **PLAUSIBLY not this PR's — `NOT_MEASURED`, not proven**:
+the one confirming re-run was never spent. `Supabase Preview` FAILED with the inherited
+`ai_credit_grants` 42P07 (non-required; this PR carries no migrations). `Cursor Bugbot` could not
+run (**Cursor usage/spend limit** — claimed from the #1169 checks, not a newly measured billing
+fact), and because of that the `Cursor Approval Agent` explicitly withheld approval on this SHA —
+"Not approved ... human review is still needed". That claimed spend limit is unresolved and will
+keep withholding automated approval on subsequent PRs.
+
+**Review posture — satisfied pre-merge.** Blue Dream **DID** review #1169 at
+`c84a8330307afca0891706ce5369bf703d9085ef` in Cursor before auto-merge. Verdict: **PASS**. Do not
+record a pre-merge review gap. Blue Dream reviews in Cursor, not on GitHub, so an empty GitHub
+reviewer list is by design (see the reviewer rows below). Do **not** request a post-merge review
+of squash `22c1242c`. One open question was carried in the handoff and remains unanswered: whether
+the fail-closed path emitting **no** `quick_log_saved` telemetry is the intended contract, or
+whether a distinct fail-closed signal should fire instead.
+
+**Merge mechanics, for the record.** cursor[bot] enqueued at 15:40; `disable_pr_auto_merge` did NOT
+evict the live entry (auto-merge is the arming mechanism, not the queue seat); a Cheek-directed
+draft conversion at 15:46 did evict it — GitHub's own notice confirms a draft conversion removes
+auto-merge and queue membership and does not restore either. Marked ready + auto-merge re-armed
+(SQUASH) at 15:48; merged 15:49. The commit that landed, `22c1242c`, is the same prepared merge
+commit the queue had built at 15:41 on `gh-readonly-queue/verdant-grow-diary/pr-1169-a53924da…`.
+
+**A merge is not a deployment. No publish was performed and none is authorized here.** The publish
+stop-order and migration posture are unchanged: `20260826100000`, `20260825233000`, and
+`20260813030000` all remain **NOT applied**. Slice 3 is **named** (trim leftover on the merged
+manual-route idempotency key), not parked. Other opens stay classified: **#1170** draft at
+`5e40307c15a3f6f6a77f69dbbb4c33a2f83fc90e` (test-only unknown/transport save-gate pin after product
+PASS at `48828dd`; stay draft), **#1171** draft at `e73ca6c760aebdb891477cdcdf12ae254e6562c3`
+(Blue Dream PASS; `safeSourceDetail` fail-closed; stay draft), and **#1162 / #1153 / #1151
+parked**. Cursor Bugbot / Approval Agent withhold remains as claimed from the #1169 checks
+(usage/spend limit — not a newly measured billing fact). This edit touches this file only. Prior
+header follows.)
+
+**Prior update:** 2026-08-27 UTC (~10:20 UTC)
+**Updated by:** Claude (2026-08-27: **Blue Dream P2 on [PR #1163](https://github.com/Verdant-OS/verdant-grow-diary/pull/1163)
+addressed — Quick Log strip provenance fence** pushed as fix commit `a16fec2` on
+`claude/sentinel-ack-1157-hold-neyqah`; the PR head is this state-edit commit, which lands
+immediately after `a16fec2` on the same branch. This supersedes the prior entry's stale
+"head `460973b`" reference (that SHA was the first code commit; Blue Dream's PASS-with-P2
+review was at `1a70689`). The P2: `buildQuickLogStripFromTentState` still mapped
+`fresh_non_live` → `usable` with no provenance check, so a legacy receiving-transport
+label (`ecowitt`, `mqtt`, …) rendered pill "Usable" while the trust badge read "stale"
+(`mapNonLiveSource` default) and the view-model advisory read invalid. Fix: the strip
+adapter gates exactly that branch through the sanctioned `normalizeSensorSource` table
+(called, not edited) — non-normalizing or missing sources demote the card to invalid and
+the trust badge gets the same verdict, so pill, badge, and advisory agree; `fresh_live`
+untouched; `pi_bridge`/`manual`/aliases not over-demoted; unknown stays non-attachable;
+the now-unreachable advisory suppression in `QuickLogSensorSnapshotStrip` is removed.
+Renegotiated pins (same commit): the two tests pinning the Usable pill for ecowitt
+`fresh_non_live` now pin Invalid, plus a coherence test and pure-adapter fence cases.
+Validation, exact, this round only: RED pre-fix 5 failed / 25 passed across the three
+strip suites; 30/30 green post-fix; targeted sweep
+(`ecowitt-*`/`quicklog-*`/`quick-log-*`/`sensor-*` + v0 contract 26/26) **6319 passed /
+3 skipped / 0 failed**; typecheck and scoped eslint clean. Blue Dream re-reviews at the
+new head. Still draft; no merge, no queue, no publish, no sandbox APPLY, no Preview
+action; #1151, #1153, #1162, #576 and the live `version.json` identity FAIL untouched.
+Publish stop-order and migration posture unchanged: `20260826100000`, `20260825233000`,
+`20260813030000` remain **NOT applied**. This edit touches this file only. Prior header
+follows.)
+
+**Prior update:** 2026-08-27 UTC (~07:40 UTC)
+**Updated by:** Claude (2026-08-27: **issue #1003 (sensor provenance fail-close + forwarding-report
+export allowlist) delivered as draft [PR #1163](https://github.com/Verdant-OS/verdant-grow-diary/pull/1163)**
+from branch `claude/sentinel-ack-1157-hold-neyqah`, cut from deploy tip `11b0ca6` (#1160), head
+`460973b`. The task's NOT_APPLICABLE gate did not fire — both holes were proven live on tip
+(`established fact`, by reading and executing the modules): `quickLogSensorSnapshotViewModelAdapter`
+promoted any unknown provider string to canonical `live` when upstream freshness was `fresh`
+(producing an attachable payload stamped `source: "live"`), and `ecowittForwardingReportExport`'s
+status-fallback envelope exported `captured_at`/`source`/`vendor` unsanitized while
+`SECRET_PATTERNS` matched credential labels, not values. Fix: adapter delegates to the sanctioned
+`normalizeSensorSource` alias table (unknown → `invalid`, freshness never consulted; first-party
+`pi_bridge` → live is preserved — it is the one active production writer of a provider-string
+source, per the ingest audit); export gains shape/value-allowlists on BOTH latest_metrics paths, a
+recursive output-allowlist serializer, and credential-VALUE redaction (MACs incl. bare 12-hex,
+32+-hex with lookarounds so `0x`/`PASSKEY_`/`sbp_` prefixes cannot evade, UUIDs, `sk-` keys, env
+`NAME=value`); the Quick Log strip suppresses the one contradictory Usable-pill-plus-invalid-advisory
+combination for legacy transport-labeled rows. Validation, exact: new suites RED-proven against the
+pre-fix tree with the final files (adapter 4 failed / 8 passed; export 7 failed / 10 passed; strip
+coherence 1 failed / 11 passed against the mid-state it guards), 41/41 green post-fix; broad
+targeted sweep 6298 passed / 3 skipped across all `ecowitt-*`/`quicklog-*`/`quick-log-*`/`sensor-*`
+suites + v0 contract 26/26; typecheck, scoped eslint, and `bun run build` (with SEO gates) clean.
+Three independent adversarial verify passes ran pre-push; both security findings they raised
+(vendor shape-regex bypass via station ids / bare MACs; `\b`-anchored hex evasion) are fixed and
+probe-tested in the diff. Recorded follow-ups, deliberately NOT in this slice: widget `metric_keys`
+key-name rendering, `safeSourceDetail` shape gate, the validation-panel `redacted_raw_payload`
+key-only redaction, and `sensorDiagnosticsExportRules`' vbt_-only body redaction. Owner: Claude;
+independent reviewer: **unassigned** — draft until Cheek/GDP names the reviewing peer. No merge, no
+publish, no sandbox APPLY, no Preview action; #1151, #1153, #1157, #1162, #576 untouched; #1157
+remains unqueued pending Blue Dream's re-review of `5791639b`. The publish stop-order and migration
+posture are untouched: `20260826100000`, `20260825233000`, `20260813030000` remain **NOT applied**.
+This edit touches this file only, on the #1163 branch. Prior header follows.)
+
+**Prior update:** 2026-08-26 UTC (~23:15 UTC)
 **Updated by:** Claude (2026-08-26: **#1158 MERGED — deploy tip is now `b294b64`** (squash of
 the Gate Zero Day-0 SEO baseline slice at head `72a9a7e`). Timeline: Blue Dream's independent
 review returned PASS-with-P2 (the condition-1 cell fix, pushed as `72a9a7e`); the owner marked

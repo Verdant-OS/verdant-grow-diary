@@ -133,21 +133,22 @@ describe("buildContextualPhenoComparisonView — aggregation", () => {
       plant("b"),
     ]);
     const a = v.plants.find((p) => p.plantId === "a")!;
+    // Canonical vocabulary only (#592 → #1003 canon): an unrecognized
+    // provider string normalizes to "invalid"; there is no "unknown".
     expect(a.sourceCounts).toEqual({
       live: 1,
       manual: 1,
       csv: 1,
       demo: 1,
       stale: 1,
-      invalid: 1,
-      unknown: 1,
+      invalid: 2,
     });
     // Aggregate summary preserves the per-source split across plants.
     expect(v.sourceQualitySummary.demo).toBe(1);
     expect(v.sourceQualitySummary.live).toBe(1);
   });
 
-  it("flags demo/stale/invalid/unknown as untrusted via trustWarnings", () => {
+  it("flags demo/stale/invalid (incl. unrecognized providers) as untrusted via trustWarnings", () => {
     const v = buildContextualPhenoComparisonView([
       plant("a", {
         sensorReadings: [
@@ -165,9 +166,27 @@ describe("buildContextualPhenoComparisonView — aggregation", () => {
     expect(joined).toMatch(/demo/);
     expect(joined).toMatch(/stale/);
     expect(joined).toMatch(/invalid/);
-    expect(joined).toMatch(/unknown/);
     // untrusted readings must NOT contribute to averages
     expect(a.environmentSummary.avgTempF).toBeNull();
+  });
+
+  it("honors the sanctioned first-party aliases: pi_bridge is live, diary is manual (#592)", () => {
+    const v = buildContextualPhenoComparisonView([
+      plant("a", {
+        sensorReadings: [
+          { source: "pi_bridge", capturedAt: "2026-06-27T10:00:00Z", tempF: 75 },
+          { source: "diary", capturedAt: "2026-06-27T11:00:00Z", tempF: 77 },
+        ],
+      }),
+      plant("b"),
+    ]);
+    const a = v.plants.find((p) => p.plantId === "a")!;
+    expect(a.sourceCounts.live).toBe(1);
+    expect(a.sourceCounts.manual).toBe(1);
+    expect(a.sourceCounts.invalid).toBe(0);
+    expect(a.environmentSummary.hasTrustedSensorContext).toBe(true);
+    // First-party bridge and diary readings count as trusted context.
+    expect(a.environmentSummary.avgTempF).toBe(76);
   });
 
   it("ignores invalid numeric sensor values", () => {

@@ -5,8 +5,12 @@
  * No I/O. No React. No writes.
  *
  * Sensor sources allowed: live | manual | csv | demo | stale | invalid.
- * Anything else normalizes to "invalid" — never to a healthy label.
+ * Normalization delegates to the sanctioned #1003 canon table (#592
+ * fold): pi_bridge is live, diary is manual, sim is demo — anything
+ * else normalizes to "invalid", never to a healthy label.
  */
+
+import { normalizeSensorSource } from "@/lib/sensor/sensorSourceRules";
 
 export const PHENO_COMPARISON_SENSOR_SOURCES = [
   "live",
@@ -39,12 +43,7 @@ const SOURCE_LABEL: Record<PhenoComparisonSensorSource, string> = {
 };
 
 export function normalizePhenoSensorSource(input: unknown): PhenoComparisonSensorSource {
-  if (typeof input !== "string") return "invalid";
-  const v = input.trim().toLowerCase();
-  if ((PHENO_COMPARISON_SENSOR_SOURCES as readonly string[]).includes(v)) {
-    return v as PhenoComparisonSensorSource;
-  }
-  return "invalid";
+  return normalizeSensorSource(input);
 }
 
 export function phenoSensorSourceLabel(source: PhenoComparisonSensorSource): string {

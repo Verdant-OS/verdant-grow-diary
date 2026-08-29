@@ -140,6 +140,10 @@ export default function QuickLogSensorSnapshotStrip({
       attached,
     }),
   );
+  // Coherence: the strip adapter's provenance fence (#1003) demotes
+  // unknown-provenance rows to an Invalid card, so the invalid advisory
+  // below always agrees with the pill and trust badge — no
+  // usable-vs-invalid contradiction is reachable.
   const advisory =
     vm.display && vm.display.freshness === "fresh" ? null : (vm.warning ?? vm.emptyCopy);
   const advisoryKind = vm.display ? vm.display.freshness : vm.emptyCopy ? "missing" : null;

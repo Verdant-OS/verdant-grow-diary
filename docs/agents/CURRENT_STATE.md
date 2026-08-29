@@ -247,8 +247,60 @@ lane or retiring that lane as a check. **Not opened** — it is a slice decision
   **Copilot** was the only reviewer to produce findings — the two `AGENTS.md` vocabulary threads,
   correct and still open on the deploy branch. **Codex** ran on the merging SHA `dae0cbb8a` and
   completed **clean** at 10:58:51Z; that is a pass, and a pass is not an absence of review.
-  **Bugbot** hit the Cursor usage limit, as it did on **every head of every PR tonight**, unbroken —
-  and that one _is_ an absence.
+  **Bugbot** produced **no finding-level review** — its run posted _"couldn't run — usage limit
+  reached"_ at 10:58:07Z on `dae0cbb8a`, and the `Cursor Bugbot` check concluded `neutral`. That
+  absence is real, and it is the part that matters for coverage. **But Bugbot was not silent on
+  #1204:** its **summary** surface completed on the same SHA and is still in the PR body — a
+  substantive "Low Risk" overview naming the `FORBIDDEN` / `NOT_APPLICABLE` contrast, the deliberate
+  `AGENTS.md` gap, and the prettier column padding. Two surfaces, two outcomes, one SHA.
+
+**Corrected 2026-08-29 on a follow-up branch cut from `4e3e715ab` after I raised the discrepancy
+myself — then corrected a second time on the same branch after Copilot caught the first
+correction.** The bullet above originally read _"**Bugbot** hit the Cursor usage limit, as it did on
+**every head of every PR tonight**, unbroken — and that one is an absence."_ **Its defect is that it
+is unqualified, not that it is false.** It names no surface. Read of the **finding-level** run — the
+surface that decides review coverage — it is **supported**: that run posted _"couldn't run — usage
+limit reached"_ on every head checked, `dae0cbb8a` included. Read of Bugbot as a whole, it invites
+the conclusion that nothing Bugbot-shaped happened, which the completed summary contradicts. **The
+fix is to name the surface, not to withdraw the claim.**
+
+**My first attempt at this correction asserted that "unbroken" was false — the same error one level
+up.** A completed summary and a usage-limited finding-level run are **compatible outcomes**, and this
+file already says so twice: _"a body summary is not a finding-level pass."_ The second of those
+passages carries the exact warning I then walked into — _"A reader who checks #1170 against the
+heading above will see that block and conclude this section is wrong. **It is not.**"_ I was that
+reader: I found the summary in #1204's body and concluded the row was false. Overcorrecting a
+true-but-unqualified claim into a false one is not an improvement on ambiguity; it is a worse defect
+wearing the costume of rigour. Caught by **Copilot** on #1212, confirmed against both cited passages
+before being accepted.
+
+**Scope of what the summary proves is narrower than it looks.** Its overview restates points that
+also appear in #1204's PR body, so whether it derives from the diff or from the body is
+**`NOT_MEASURED`**. What is established is that the summary surface **ran and emitted content** while
+the finding-level surface did not — not that anything reviewed the change.
+
+**Why this matters beyond the sentence — it went wrong twice, in opposite directions.** This file had
+**already** separated the two surfaces, in the **2026-08-28** entry, resolved there by a better
+source: the Cursor **Approval Agent**'s _"Cursor Bugbot skipped (incomplete)"_, reconciling a summary
+that completed against a finding-level run that did not. **That resolution is the operative
+conclusion, and it is what should be cited.** The same passage's earlier line — _"Do **not** record
+either that a finding-level review definitely ran or that it definitely did not"_ — was the
+**interim** state, marked `Unresolved` and then closed by the paragraph headed _"Resolved at 18:28 by
+a better source"_. An earlier revision of this correction quoted that interim line as standing
+guidance; **that was wrong**, raised by Codex on #1212 and verified against the passage before being
+accepted. Citing a superseded provisional note as a rule is the same error the note itself was about.
+The original bullet
+collapsed the surfaces by naming neither. The correction then over-swung and called the result false.
+Both failures share one root — **writing a reviewer's status without checking what this file had
+already concluded about that reviewer** — and both are the same defect class as the stale deploy tip
+and the inverted coverage line: **the file contradicting a passage it already contains.** No ordinal
+is asserted for how many times that has now happened this shift; an earlier entry miscounted exactly
+that kind of running total, and the count is not what carries the lesson.
+
+The transferable rule is narrower than "check your claims" and narrower than the first attempt's
+version of it: **before recording a reviewer's status, grep this file for what it already concluded
+about that reviewer — and when the answer is that two outcomes are compatible, qualify the claim
+rather than reversing it.**
 
 ## 6. Status
 
@@ -453,6 +505,13 @@ Stated as a qualifier at the time rather than left standing.
 | #1186 `CURRENT_STATE`              | draft, `b00799c0a` green (ci.yml 33246617606, 10:03:41Z); this edit extends it |
 | `Supabase Preview` 42P07           | red and pre-existing; already covered by the replay-compat config; not a gate  |
 | Bugbot                             | Cursor usage limit on **every head of every PR** tonight                       |
+
+**Corrected 2026-08-29 — the `Bugbot` row above is `unqualified`, not wrong.** It names no surface.
+Of the **finding-level** run the row is **supported** — that run was usage-limited on every head
+checked. What it omits is that Bugbot's **summary** surface completed on #1204's `dae0cbb8a` and on
+#1186's `025c10852`; a completed summary is compatible with a usage-limited finding-level run, and is
+**not** a finding-level pass. The row is left in place rather than rewritten, per this file's
+annotate-don't-hide convention. See the corrected bullet in `## 5` of the newer entry above.
 
 ## 9. `NOT_MEASURED`
 

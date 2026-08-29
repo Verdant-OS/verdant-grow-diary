@@ -116,6 +116,7 @@ import {
 import { rememberRecentQuickLogTarget } from "@/lib/quickLogRecentTargetStore";
 import { resolveQuickLogTargetPlan } from "@/lib/quickLogTargetResolutionRules";
 import { buildSensorSnapshotSavePayload } from "@/lib/latestSensorSnapshotRules";
+import { persistedSensorSourceLabel } from "@/lib/quickLogSnapshotStripAdapter";
 import { quickLogReasonToOperatorMessage } from "@/lib/quickLogSaveErrorMessage";
 import { buildStaleSnapshotHelperCopy } from "@/lib/quickLogStaleSnapshotHelperCopy";
 import { buildQuickLogDraftPreview } from "@/lib/quickLogDraftPreviewViewModel";
@@ -1266,7 +1267,18 @@ export default function QuickLog({
       // the snapshot as sensor context, whatever the toggle says.
       const sensorAttachPayload =
         snapshot && sensorTentId && stripView.status === "usable" && stripView.trustBadge.attachable
-          ? buildSensorSnapshotSavePayload(sensorState.snapshot)
+          ? buildSensorSnapshotSavePayload(
+              sensorState.snapshot
+                ? {
+                    ...sensorState.snapshot,
+                    // Persist a contract-valid source for manual/CSV aliases.
+                    // See persistedSensorSourceLabel — Codex P1 + Copilot on #1170.
+                    source: persistedSensorSourceLabel(
+                      sensorState.snapshot.source,
+                    ) as typeof sensorState.snapshot.source,
+                  }
+                : sensorState.snapshot,
+            )
           : null;
       const earlyStageEnvelope = buildEarlyStageDetails({
         milestone: earlyMilestone,

@@ -284,6 +284,70 @@ describe("attachable gate — manual fresh_non_live", () => {
   });
 });
 
+// Raised by Codex (P1) and Copilot on #1170, and asked for explicitly:
+// "cover an alias through the save-path test". The strip gates attachability on
+// normalizeSensorSource(), but buildSensorSnapshotDetails persists
+// snapshot.source VERBATIM — so these aliases were attachable while persisting a
+// label outside the six-label contract, which the timeline renders as `unknown`.
+// A genuinely MANUAL reading displayed as unknown provenance.
+describe("attachable gate — manual/CSV aliases persist a canonical source", () => {
+  const MANUAL_ALIASES = ["manual_snapshot", "user", "entry", "log", "diary"] as const;
+  const CSV_ALIASES = ["import", "imported"] as const;
+  const CONTRACT = ["live", "manual", "csv", "demo", "stale", "invalid"];
+
+  for (const source of MANUAL_ALIASES) {
+    it(`${source} attaches and persists source "manual", not the raw alias`, async () => {
+      snapState.snapshot = snap({
+        source,
+        status: "fresh_non_live",
+        badge_label: `${source} • as of 5m ago`,
+      });
+      renderQL();
+      const toggle = await screen.findByTestId("quick-log-snapshot-toggle");
+      await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"));
+      const payload = await saveNoteAndGetPayload();
+      const details = payload.p_details as { sensor?: { source?: string } };
+      expect(details?.sensor?.source).toBe("manual");
+      expect(CONTRACT).toContain(details?.sensor?.source);
+    });
+  }
+
+  for (const source of CSV_ALIASES) {
+    it(`${source} attaches and persists source "csv", not the raw alias`, async () => {
+      snapState.snapshot = snap({
+        source,
+        status: "fresh_non_live",
+        badge_label: `${source} • as of 5m ago`,
+      });
+      renderQL();
+      const toggle = await screen.findByTestId("quick-log-snapshot-toggle");
+      await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"));
+      const payload = await saveNoteAndGetPayload();
+      const details = payload.p_details as { sensor?: { source?: string } };
+      expect(details?.sensor?.source).toBe("csv");
+      expect(CONTRACT).toContain(details?.sensor?.source);
+    });
+  }
+
+  // Fence: the rewrite must NOT reach a label carrying provider identity.
+  // `pi_bridge` renders as "Pi bridge" in the timeline, and `ecowitt` /
+  // `node_red_bridge` canonicalize to `invalid` — canonicalizing those would
+  // mark a real reading invalid. Only manual/CSV aliases are rewritten.
+  it("real fresh_live keeps its raw provider label in the persisted payload", async () => {
+    snapState.snapshot = snap({
+      source: "pi_bridge",
+      status: "fresh_live",
+      badge_label: "pi_bridge • as of 2m ago",
+    });
+    renderQL();
+    const toggle = await screen.findByTestId("quick-log-snapshot-toggle");
+    await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"));
+    const payload = await saveNoteAndGetPayload();
+    const details = payload.p_details as { sensor?: { source?: string } };
+    expect(details?.sensor?.source).toBe("pi_bridge");
+  });
+});
+
 describe("attachable gate — demo and csv fresh_non_live", () => {
   it("demo row: toggle disabled, strip shows the non-attachable description", async () => {
     snapState.snapshot = snap({

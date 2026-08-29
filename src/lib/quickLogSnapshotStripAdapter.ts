@@ -427,6 +427,39 @@ function buildStrictMetrics(
   return out;
 }
 
+/**
+ * Source label to PERSIST in `details.sensor.source` for an attached snapshot.
+ *
+ * Raised by Codex (P1) and Copilot on #1170: the strip gates attachability on
+ * `normalizeSensorSource()`, but `buildSensorSnapshotDetails` persists
+ * `snapshot.source` VERBATIM. So a `fresh_non_live` row sourced
+ * `manual_snapshot` / `import` / `user` / `entry` / `log` / `diary` was
+ * attachable yet persisted a label outside the six-label contract, which
+ * `timelineEvidenceDetailViewModel.normalizeSource` renders as `unknown` — a
+ * genuinely MANUAL reading displayed as unknown provenance.
+ *
+ * Deliberately narrow. Canonicalizing every source would be WORSE, not better,
+ * because the raw label carries provider identity that the timeline displays
+ * (`growDiaryTimelineRules.SOURCE_DISPLAY_LABELS`), and two of those canonicalize
+ * to a falsehood:
+ *
+ *   pi_bridge       -> "Pi bridge"   canonical live     identity lost
+ *   ecowitt         -> "EcoWitt"     canonical INVALID  a real reading marked invalid
+ *   node_red_bridge -> "Node-RED"    canonical INVALID  same
+ *
+ * So this rewrites ONLY when the canonical form is `manual` or `csv` — the
+ * aliases this PR made attachable, which carry no provider identity (they render
+ * as sanitized echoes: "Manual_snapshot", "Import", "User"). Every other label,
+ * including every provider, is persisted untouched. The pre-existing behaviour of
+ * live aliases is out of scope and unchanged.
+ */
+export function persistedSensorSourceLabel(rawSource: unknown): unknown {
+  if (typeof rawSource !== "string") return rawSource;
+  const canonical = normalizeSensorSource(rawSource);
+  if (canonical !== "manual" && canonical !== "csv") return rawSource;
+  return canonical;
+}
+
 export function buildQuickLogStripFromTentState(
   args: BuildQuickLogStripFromTentStateArgs,
 ): QuickLogSnapshotStripViewModel {

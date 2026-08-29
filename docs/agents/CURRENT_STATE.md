@@ -1,7 +1,84 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~21:47 UTC)
-**Updated by:** Claude (2026-08-29: #1213 and #1214 merged. #1213 carried a `P1` — `20260813030000`
+**Last updated:** 2026-08-29 UTC (~22:16 UTC)
+**Updated by:** Claude (2026-08-29: #1215 and #1216 merged; deploy branch is now **`5d6efc95a`**.
+#1216 closes **token-shaped NTLM** only — parameterized `Authorization` headers **still leak on the
+current tip across Digest, Negotiate and NTLM**, verified by execution. Live production is
+**`84d3b813`** per Cheek and is **not** the deploy tip. Prior header follows.)
+
+## 1. #1215 and #1216 merged — deploy branch `5d6efc95a`
+
+`established fact`, verified by `git ls-remote` and `git log`, not from webhook events.
+
+| PR        | Merge SHA   | Parents | Shape                                  | Subject ends |
+| --------- | ----------- | ------- | -------------------------------------- | ------------ |
+| **#1215** | `5bf4db1d4` | 1       | **squash**; SHA equals its merge group | `(#1215)`    |
+| **#1216** | `5d6efc95a` | 1       | **squash**; SHA equals its merge group | `(#1216)`    |
+
+Both went through the merge queue, #1216 stacked on #1215's group. Auto-merge stored `merge_method:
+merge` on #1215; the queue produced a squash. That is now a **fourth observed squash outcome**
+(#1186, #1212, #1213, #1215/#1216) and stays an **observation** — the configured method remains
+`NOT_MEASURED`; reading it needs `Administration:read`, which the token lacks.
+
+**Two state changes on #1215 were attributed to `cheekhimself` and were not performed by Claude:**
+the ready at 19:34:30Z, and a **draft conversion at 21:53:23Z** that silently stripped the armed
+auto-merge (GitHub does not restore auto-merge when a PR returns to ready). Cheek confirmed neither
+was him. Claude restored ready and re-armed only after that confirmation. `UNKNOWN`: what actor
+performed them.
+
+## 2. Parameterized `Authorization` — still OPEN on `5d6efc95a`
+
+`established fact`, executed against the current deploy tip, not inferred from the PR title.
+
+#1216 added `NTLM` to the scheme alternation in both the credential-pair lookahead and the header
+regex. **It did not change the value tail `[^\s",}]+`**, which stops at the first quote — so a
+parameterized header is still never consumed whole:
+
+| Input (string nested under a non-secret key)   | Result on `5d6efc95a` |
+| ---------------------------------------------- | --------------------- |
+| `Authorization: Digest username="grower", …`   | **leaks**             |
+| `Authorization: NTLM username="grower", …`     | **leaks**             |
+| `Authorization: Negotiate opaque="x", …`       | **leaks**             |
+| `Authorization: NTLM TlRMTVNTUAABAAAAB4IIog==` | fully redacted        |
+
+```
+OUT: {"request_log":"[REDACTED]\"grower\", realm=\"verdant\", nonce=\"secret\""}
+```
+
+**#1216 is the same shape of partial fix as #1214**: it closes the **token-shaped** case for one more
+scheme and leaves the parameterized case open. Adding schemes does not address the tail. Cheek,
+2026-08-29: **do not invent another Authorization scheme after NTLM.**
+
+**Reachability, unchanged and narrower than it looks.** The regex path runs only on a **string nested
+under a non-secret key**; `redactEvidenceValue` replaces a top-level string wholesale and
+`redactEvidenceNode` replaces any value under an `Authorization`-named key wholesale. Whether real
+EcoWitt payloads carry the leaking shape is **`NOT_MEASURED`**.
+
+**Affected surfaces** — `redacted_raw_payload` in the clipboard evidence copy and in the **downloaded
+validation JSON** (`buildEcowittValidationExport` → `serializeExport` →
+`EcowittIngestValidationPanel.handleConfirmExportJson`, written to disk). The CSV download excludes
+the raw payload.
+
+**`BLOCKED` — no independent reviewer assigned.** `AGENTS.md` (586-589) requires one owner and a
+different peer as independent reviewer, and makes a slice without one **incomplete**. This slice
+names an owner (Codex) and no reviewer, so it is **not ready to implement or ship**. Cheek instructed
+the `BLOCKED` marking on 2026-08-29; the assignment itself remains outstanding. **Codex's slice — not
+Claude's to fix.**
+
+**Codex is measure-only on `5d6efc95`** — Cheek, 2026-08-29. **No PR unless a `FAIL` names one scheme
+and the blob.**
+
+## 3. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No republish, no publish.** Live production is **`84d3b813`** (`source claim`, Cheek). That is a
+  different axis from the deploy branch tip `5d6efc95a`; Claude has not measured it and cannot.
+  **A merge is not a deployment.**
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+- Branch-name conflict still open: the harness designates `claude/trustbadge-attachable-strip-2441l2`;
+  descriptive branch names are used instead.
+
+**Prior update:** Claude (2026-08-29: #1213 and #1214 merged. #1213 carried a `P1` — `20260813030000`
 listed among migrations that "remain NOT applied", corrected before merge. #1214 closes the
 Authorization redaction gap for **token-shaped** Digest/Negotiate only; the **parameterized case is
 OPEN**, verified by execution, and **`BLOCKED` — that slice has no independent reviewer assigned**.

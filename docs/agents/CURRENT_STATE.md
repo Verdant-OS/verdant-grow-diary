@@ -117,8 +117,13 @@ means a twelve-file `Sentinel-Version` bump under `sentinel-version-parity`.
   deployment**; no publish was performed or authorized this shift. Re-verify the tip, do not cite this
   line.
 - **Migrations, in both senses.** `20260827010000`, `20260826100000` and `20260825233000` remain
-  **NOT applied**, plainly. **`20260813030000`** — GitHub apply lane never succeeded; **production
-  objects live since 2026-08-21**; current state **`NOT_MEASURED`**; re-apply **`FORBIDDEN`**.
+  **NOT applied**, plainly. **`20260813030000`** — GitHub apply lane **never succeeded**; production
+  objects **applied verbatim 2026-08-21** via Lovable, md5-guarded; **current state
+  `NOT_MEASURED`**; re-apply **`FORBIDDEN`**. **The middle row is point-in-time and must stay that
+  way.** A draft of this bullet read _"objects live since 2026-08-21"_, which asserts continuous
+  present availability and contradicts `NOT_MEASURED` in the same sentence — caught by Codex on
+  #1215 before merge. The evidence establishes that they **were applied** on that date, not that
+  they **are** there now; only a measurement could say the latter, and this shift took none.
 - Whether #1214's Digest/Negotiate redaction holds against real payloads in production. It is
   test-pinned on the deploy branch; **nothing here measured production behaviour.**
 - The repository's configured merge method. Inferred from three squashed merges; the ruleset was

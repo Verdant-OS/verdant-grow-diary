@@ -22,9 +22,9 @@ not present in this clone's history, so the exact commit distance is `NOT_MEASUR
 
 Two things are true at once, and the second is the one that needs work:
 
-- **Breadth is genuinely good.** 2,908 test files, 32,080 test cases, 87,351 assertions. 98.2% of
-  product modules are loaded by at least one test. Thirteen `.skip`s in the whole suite and zero
-  `.only`. That is better than most repositories this size.
+- **Breadth is genuinely good.** 2,908 test files and **39,407 executed test cases** (39,217
+  passed, 190 skipped — measured by running the suite, §9). 98.2% of product modules are loaded by
+  at least one test. Zero `.only` anywhere. That is better than most repositories this size.
 - **Depth is unmeasured, and four separate lanes of already-written tests never execute.**
   There is no coverage instrumentation of any kind, so the fraction of _branches_ the suite
   exercises is `NOT_MEASURED`. 21.8% of all assertions are substring or regex matches against
@@ -53,8 +53,9 @@ each section.
 | Test _kind_ (scan vs value) | Presence of `readFileSync`/`readdirSync` vs product imports vs `render()`                 |
 | CI execution                | Every `.github/workflows/*.yml` plus transitive expansion of `package.json` script chains |
 | Behavioural strength        | Two mutation experiments run by execution against `src/pages/Timeline.tsx` (§3)           |
+| Executed suite result       | One unsharded `npx vitest run` at `5d6efc9`, plus CI's 32 shards on the PR head (§9)      |
 
-**Four limits, stated up front so nothing below is over-read:**
+**Five limits, stated up front so nothing below is over-read:**
 
 1. **Module reachability is not coverage.** "A test imports this module" says nothing about which
    branches ran. Only instrumentation answers that, and there is none (§2).
@@ -66,8 +67,14 @@ each section.
 3. **The reachability graph is Vitest-only.** Playwright drives the built app in a browser and is
    not in that graph — the three `src/pages/legal/*.tsx` pages are "unreached" by Vitest and are
    covered by the `test:legal-seo:e2e` lane.
-4. **`NOT_MEASURED`, not zero:** line coverage, branch coverage, mutation score, and full-suite CI
-   wall time. See §8.
+4. **Static call-site counts are not executed-case counts.** The per-bucket tables in §3 count
+   occurrences in source — `it(` / `test(` / `expect(` — because that is the only way to attribute
+   a case to a _kind_ of test without instrumentation. The runner reports **39,407** executed cases
+   against **32,080** such call sites, the difference being `it.each`/`test.each` expansion and
+   generated cases. §3's ratios compare static counts with static counts, so they hold; do not mix
+   a number from §3 with one from §9. The same gap applies to skips: **13** `.skip(` call sites in
+   source, **190** skipped cases at runtime.
+5. **`NOT_MEASURED`, not zero:** line coverage, branch coverage, and mutation score. See §8.
 
 ---
 
@@ -114,6 +121,9 @@ experiments.
 
 Within the scan-only bucket, **74.8% of assertions are `toContain(...)` or `toMatch(...)`** —
 substring and regex checks over file text. 806 test files read a path under `src/`.
+
+Every figure in that table is a **static count of source occurrences**, per §1 limit 4 — the ratios
+are static-against-static and hold, but they are not the runner's executed-case numbers in §9.
 
 Names in that bucket read like behaviour tests, not like lint rules:
 `action-queue-row-evidence-badge.test.ts`, `timeline-grow-filter.test.ts`,
@@ -414,8 +424,9 @@ Not to be rounded up by anyone quoting this document.
   There is also **`NO_BASELINE`**: no prior coverage measurement exists to compare against.
 - **Mutation score** — `NOT_MEASURED`. Two mutants were run by hand (§3); that is an existence
   proof, not a score.
-- **Full-suite CI wall time and per-shard balance** — `NOT_MEASURED` here. The local run in §9 is a
-  single unsharded machine and does not predict the 32-shard CI lane.
+- **Per-shard balance in CI** — `NOT_MEASURED`. Individual shard durations were not collected.
+  Suite wall time on one unsharded container **is** now measured: 1,078.77s (§9). That does not
+  predict the 32-shard CI lane.
 - **Whether the 21 dead edge tests and 7 dead pgTAP suites pass today** — `NOT_MEASURED`. They were
   found unexecuted; they were not run. Some may be red. P2 must establish this before wiring.
 - **Playwright suite state** — `NOT_MEASURED`. No spec was executed for this audit. `CLAUDE.md`
@@ -442,8 +453,10 @@ Full suite:          PASS — all 32 `Full test suite (shard n/32)` required con
                      (both required), plus `test:security-regression` — the single `mustBeGreen`
                      entry — `eslint`, `tsc --noEmit`, `tsgo --noEmit + vite build`, `docs-safety`
                      and `One-Tent Loop smoke audit`.
-                     The local unsharded `npx vitest run` in this container was still executing and
-                     is NOT the number quoted here; it is redundant with the CI lane.
+                     Local confirmation, same tip, completed after the above was recorded:
+                     `npx vitest run` (unsharded) → Test Files 2903 passed | 5 skipped (2908);
+                     Tests 39217 passed | 190 skipped (39407); Duration 1078.77s; exit 0.
+                     ZERO failures. This is where the 39,407 executed-case figure comes from.
 Type-check:          NOT RUN — this audit changes no TypeScript
 Runtime harness:     NOT RUN — no Supabase access in this session; billing/AI-credit harnesses are
                      BLOCKED here for the same reason §4.3 says CI cannot run them

@@ -1,7 +1,139 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-30 UTC (~02:58 UTC)
-**Updated by:** Claude (2026-08-30: **#1222 merged as `1f68d7d3`** — deploy branch is now that tip. It
+**Last updated:** 2026-08-30 UTC (~05:56 UTC)
+**Updated by:** Claude (2026-08-30: **#1224 merged as `c63f969f`** — deploy tip is now that commit.
+It closes the **remainder** of a parameterized `Authorization` header for the four reserved schemes
+`Basic|Digest|Negotiate|NTLM`; verified by executing the merged tip, not read from the title.
+**`Kerberos` and `HOBA` still leak their attribute lists** and the unknown-scheme catch-all stays
+`OPEN` — REVIEW ONLY / `BLOCKED`. **#1225 was CLOSED as SUPERSEDED** — Claude built a duplicate of
+#1224. Prior header follows.)
+
+## 1. #1224 merged — deploy tip `c63f969f`
+
+| Field     | Value                                           | How known                          |
+| --------- | ----------------------------------------------- | ---------------------------------- |
+| Merge SHA | **`c63f969f`**                                  | verified, `git log`                |
+| Parent    | `622615d66` (#1223)                             | verified, `git log`                |
+| Shape     | **squash** — one parent; subject ends `(#1224)` | verified, `git rev-list --parents` |
+| Head      | **`a55b12ec`**                                  | **verified twice** — see below     |
+| Owner     | Codex                                           | PR body                            |
+| Reviewer  | **Super Blue** — `PASS` at `a55b12ec`           | reported (Cheek), 2026-08-30       |
+
+Files: `src/lib/ecowittValidationEvidenceRules.ts`, its test, the edge mirror and
+`.sync-manifest.json`. **+9 / −5, zero migrations.**
+
+The head SHA is `established fact` here, not a `source claim` as in the #1222 and #1216 rows above:
+the GitHub API reported `head.sha` while the PR was open, and the squash commit message on the tip
+embeds `a55b12ec7e3c5162d19b0a09be7f6fc534dc705b` verbatim in its Cursor Bugbot line. Two
+independent readings agree.
+
+**The independent reviewer is Super Blue — `PASS` at `a55b12ec`** (Cheek, 2026-08-30). Super Blue is a
+peer, so this slice carries an owner and a different independent reviewer. Recorded as **reported**: as
+with the Dream Queen results in the entries below, no review run is readable from this repository, so the
+provenance is Cheek's report rather than an in-repo artefact.
+
+**Eleventh observed squash outcome** (#1186, #1212, #1213, #1215, #1216, #1217, #1218, #1220, #1222,
+#1223, #1224 — parent counts checked, not inferred). It stays an **observation**: the configured
+merge method remains **`NOT_MEASURED`**, since reading it needs `Administration:read`.
+
+## 2. What #1224 closed — measured on the tip
+
+`established fact`, **executed against `c63f969f`**. The named suite is **63 passed / 0 failed** on
+this tip. The behaviour table below comes from calling `redactEvidenceValue` on the merged tip through
+a temporary probe, removed afterwards; the tree was verified clean before and after.
+
+| Input (string nested under a non-secret key)                                  | Result on `c63f969f`                      |
+| ----------------------------------------------------------------------------- | ----------------------------------------- |
+| `Authorization: Digest username="grower", realm="verdant", nonce="secret"`    | **`[REDACTED]`** — whole header           |
+| `Authorization: NTLM username="grower", realm="verdant", nonce="secret"`      | **`[REDACTED]`** — whole header           |
+| `Authorization: Negotiate username="grower", realm="verdant", nonce="secret"` | **`[REDACTED]`** — whole header           |
+| `Authorization: Negotiate opaque="x", nonce="secret"`                         | **`[REDACTED]`** — whole header           |
+| `Authorization: Basic username="grower", nonce="secret"`                      | **`[REDACTED]`** — whole header           |
+| `Authorization: NTLM TlRMTVNTUAABAAAAB4IIog==`                                | `[REDACTED]` — token-shaped pin holds     |
+| `Authorization: Bearer abc123def456ghi`                                       | `[REDACTED]` — token-shaped pin holds     |
+| `temp_f=77.4 inserted=1 humidity=55`                                          | **unchanged** — benign telemetry survives |
+| `The authorization desk is open, realm="lobby"`                               | **unchanged** — no over-reach on prose    |
+
+The shipped rule adds a repeating comma-separated attribute group and admits `Basic` into the
+parameterized branch:
+
+```
+/Authorization\s*:\s*(?:(?:Basic|Digest|Negotiate|NTLM)\s+[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*')(?:\s*,\s*[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'))*|(?:(?:Basic|Digest|Negotiate|NTLM)\s+)?[^\s",}]+)/gi
+```
+
+Both leftovers recorded in the entry demoted below are **closed**: the remainder after the first
+comma, and parameterized `Basic`.
+
+**Reachability is unchanged and still narrower than it looks:** this regex path runs only on a
+**string nested under a non-secret key**. A top-level string, and any value under an
+`Authorization`-named key, are replaced wholesale before it. Whether real EcoWitt payloads carry the
+leaking shape remains **`NOT_MEASURED`**. Affected surfaces are unchanged — `redacted_raw_payload` in
+the clipboard evidence copy and in the downloaded validation JSON; CSV excludes the raw payload.
+
+## 3. What still leaks — `BLOCKED`, and deliberately so
+
+`established fact`, same probe, same tip:
+
+| Input                                                       | Result on `c63f969f`                           |
+| ----------------------------------------------------------- | ---------------------------------------------- |
+| `Authorization: Kerberos username="grower", nonce="secret"` | `[REDACTED] username="grower", nonce="secret"` |
+| `Authorization: HOBA username="grower", nonce="secret"`     | `[REDACTED] username="grower", nonce="secret"` |
+
+The scheme word alone is consumed by the value-tail branch; the attribute list survives. The scheme
+list is **CLOSED** by design — `Basic|Digest|Negotiate|NTLM` and no more.
+
+**The parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY / `BLOCKED`.** Do not
+implement it. **Do not add `Kerberos`. Do not add `HOBA`.** Adding schemes one at a time is what
+produced #1214, #1216, #1222 and #1224; an open scheme class would consume arbitrary
+`word attr="value"` spans far from any real header. Neither direction is authorised here.
+
+## 4. #1225 CLOSED — SUPERSEDED, and Claude built the duplicate
+
+`established fact`, from the GitHub API and `git log`.
+
+Cheek closed **#1225** unmerged at 03:22:34Z: _"SUPERSEDED by #1224. Same four files, GDP-named Codex
+remainder-attr slice. Do not reopen. Do not rebase onto #1224."_ It is closed, not merged; the branch
+`claude/gdp-parameterized-remainder` is retained at `fd5b3a6ce` and **not** deleted, so the closure
+stays reversible.
+
+|         | #1224 (Codex)         | #1225 (Claude)       |
+| ------- | --------------------- | -------------------- |
+| Opened  | **03:12:39Z**         | 03:17:47Z            |
+| Parent  | `1f68d7d3`            | `1f68d7d3`           |
+| Files   | 4                     | 4 — same closed list |
+| Diff    | +9 / −5               | +73 / −4             |
+| Outcome | **merged `c63f969f`** | **closed unmerged**  |
+
+**The two `Authorization` patterns are byte-identical** — checked with `cmp`, not by eye. Both add the
+same four cases (Digest/NTLM/Negotiate remainder, parameterized `Basic`). Codex extended the existing
+`it.each` table; Claude added a separate block that additionally asserted no component value appears
+in the payload **or the clipboard text**. That extra assertion is the only behavioural difference and
+it is **not** in the shipped tests.
+
+**Why the duplicate existed.** `AGENTS.md` requires checking open PRs for overlapping work before
+starting substantial new work, and requires **surfacing** a collision rather than building a competing
+version. #1224 had been open five minutes when Claude began. Claude did not run that check. Recorded
+as a process failure, not smoothed over; the wasted work is Claude's, and no repository state was
+harmed.
+
+## 5. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No publish, no republish. No EcoWitt-to-live. No rebase. No update-branch.**
+- **Live production** was MEASURED at **`5bf4db1d`** — `dirty:false`, ref **`master`**, GDP,
+  2026-08-29. It is now **seven commits behind the deploy tip** (counted, not estimated) and is
+  **not a current measurement**. Re-measuring needs Cheek or GDP; Claude did not take it and cannot.
+  **A merge is not a deployment.**
+- **#1221 stays draft and unassigned** — open, draft, 16 files, +1440 / −242, based on `d4e5a7ea4`,
+  which is now four commits behind the tip. It is not being readied, rebased or updated.
+- No `knk`. No `query_database`. No production SQL. No device control. No Action Queue write.
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+- `Supabase Preview` failed again on #1225's head with the repo-wide `ai_credit_grants` 42P07 replay
+  collision — **fourteenth** distinct preview project. Non-required, in neither `required` nor
+  `mustBeGreen`, and no branch involved carries a migration. Not commented on, per standing
+  instruction.
+
+**Prior update:** Claude (2026-08-30: **#1222 merged as `1f68d7d3`** — deploy branch is now that tip. It
 redacts the **first quoted attribute** after a `Digest`/`Negotiate`/`NTLM` scheme; **the remainder of
 the header still leaks**, and **parameterized `Basic` still leaks entirely**. Verified by execution
 against the merged tip. The **parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY /

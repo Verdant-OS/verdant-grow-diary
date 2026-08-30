@@ -439,6 +439,42 @@ jobs:
       - name: Operator GGS real-payload boundary tests (Deno)
         run: deno test --no-lock supabase/functions/operator-ggs-real-payload-commit/handler.test.ts supabase/functions/operator-ggs-real-payload-commit/productionDeps.test.ts
 
+      # Colocated Deno unit tests that shipped with their Edge Functions and
+      # which NOTHING executed until now. 18 files, 236 cases, covering the
+      # bridge credential and tent-ownership lookups, the billing signature
+      # verifier, the founder slot ledger, and the transactional email
+      # contracts. They pass with NO network permission at all, which is
+      # itself the proof that none of them makes a runtime call.
+      #
+      # KEEP THE FILE LIST IN package.json. Do not "simplify" this by inlining
+      # the paths here: src/test/v0-operating-loop-ci-guardrails.test.ts scans
+      # this file for a set of forbidden substrings, and one of the 18 paths
+      # contains one of them. Inlining turns that guard red on a term unrelated
+      # to whatever you were changing.
+      #
+      # Two colocated files are deliberately NOT in this lane, and neither is
+      # skipped or quarantined - both are named here with their reason:
+      #   rls-selftest/index.test.ts needs a DEPLOYED function plus
+      #     RLS_TEST_SECRET, so it cannot run hermetically. Same category as
+      #     pi-ingest-readings/smoke.test.ts, which pi-ingest-smoke.yml runs
+      #     against a deployment.
+      #   pi-ingest-readings/bridgeCredentialLookupContract.test.ts is a
+      #     genuine RED: its "no SUPABASE_SERVICE_ROLE_KEY runtime read exists
+      #     anywhere in src/" case fails on four files today. That is a
+      #     security-boundary judgement for the owner, not something to wire
+      #     red into the required gate.
+      - name: Edge Function colocated Deno unit tests
+        run: bun run test:edge:colocated-unit
+
+      # Separate invocation because this one function calls Deno.serve at
+      # module scope with no import.meta.main guard, so merely importing it
+      # binds a port. The grant is scoped to the single bind address; every
+      # other destination stays denied. Collapsing this back into the step
+      # above would hand that permission to all 18 files above, which provably
+      # do not need it.
+      - name: Edge metrics alert check Deno unit tests
+        run: bun run test:edge:metrics-alert-check
+
       # Optional: QuickLog RPC runtime harnesses. Only runs when staging
       # Supabase credentials are configured as repo/org secrets. The
       # orchestrator script also skips cleanly when env is missing, so this

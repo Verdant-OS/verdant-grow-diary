@@ -886,6 +886,25 @@ describe("evidence rules", () => {
     },
   );
 
+  it.each([
+    ['Authorization: Digest username="grower"', "[REDACTED]"],
+    ['Authorization: NTLM username="grower"', "[REDACTED]"],
+    ['Authorization: Negotiate opaque="x"', "[REDACTED]"],
+  ] as const)(
+    "redacts the whole quoted attribute on a reserved authorization scheme: %s",
+    (authorizationHeader, expected) => {
+      const snap = evidenceSnapshot({
+        transport: "mqtt_local_test",
+        request_log: authorizationHeader,
+      });
+      const payload = snap.redacted_raw_payload as Record<string, unknown>;
+      const text = serializeEvidenceForClipboard(snap);
+
+      expect(payload.request_log).toBe(expected);
+      expect(text).not.toContain(authorizationHeader);
+    },
+  );
+
   it("still redacts a real header credential, and leaves benign telemetry alone", () => {
     const snap = evidenceSnapshot({
       transport: "mqtt_local_test",

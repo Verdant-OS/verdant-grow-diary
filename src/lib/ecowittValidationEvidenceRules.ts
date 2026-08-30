@@ -71,7 +71,7 @@ const SECRET_VALUE_PATTERNS: RegExp[] = [
   // "redacts the credential assignment behind a header prefix".
   /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
   /Bearer\s+[A-Za-z0-9._-]{6,}/gi,
-  /Authorization\s*:\s*(?:(?:Basic|Digest|Negotiate|NTLM)\s+)?[^\s",}]+/gi,
+  /Authorization\s*:\s*(?:(?:Digest|Negotiate|NTLM)\s+[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*')|(?:(?:Basic|Digest|Negotiate|NTLM)\s+)?[^\s",}]+)/gi,
   /PASSKEY/gi,
   new RegExp(["service", "_", "role"].join(""), "gi"),
   /(?<![0-9A-Fa-f])[0-9A-Fa-f]{2}(?:[:-][0-9A-Fa-f]{2}){5}(?![0-9A-Fa-f])/g,

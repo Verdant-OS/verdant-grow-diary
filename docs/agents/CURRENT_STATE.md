@@ -1,7 +1,91 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~22:43 UTC)
-**Updated by:** Claude (2026-08-29: #1215 and #1216 merged; deploy branch is now **`5d6efc95a`**.
+**Last updated:** 2026-08-30 UTC (~01:15 UTC)
+**Updated by:** Claude (2026-08-30: **the `BLOCKED` marking on the parameterized `Authorization`
+slice is RESTORED** — Cheek, 2026-08-30. The #1217 closure was wrong; Codex raised it as a `P1` and
+the finding is correct. Deploy branch is now **`d4e5a7ea4`** (#1217, #1218 merged). Prior header
+follows.)
+
+## 1. The `BLOCKED` marking is restored — the #1217 closure was wrong
+
+`established fact`, verified by reading all three sites before accepting the finding.
+
+**Status: the parameterized `Authorization` slice is `OPEN` and `BLOCKED` — no independent reviewer
+assigned.** `AGENTS.md` (586-589) requires every assigned slice to name **one owner** and **a
+different peer** as independent reviewer, and states that a slice without one is **incomplete**. This
+slice names an owner (Codex) and no reviewer, so it is **not ready to implement or ship**.
+
+**What #1217 got wrong.** It closed three `BLOCKED — no independent reviewer assigned` labels as
+"stale", on the premise that they gated Digest/Negotiate work already merged in #1214 and #1216. That
+premise is false. All three labels attach to the **parameterized** case, which is still open:
+
+| Site (in the entry demoted by #1217) | What it actually says                                                             |
+| ------------------------------------ | --------------------------------------------------------------------------------- |
+| Entry header                         | "the **parameterized case is OPEN** … `BLOCKED` — **that slice** has no reviewer" |
+| Slice paragraph                      | the `BLOCKED` block sits under "**Codex's slice — not Claude's to fix**"          |
+| Status row                           | "\| **Parameterized** Digest/Negotiate leak \| **OPEN** … `BLOCKED` … \|"         |
+
+#1214 and #1216 closed the **token-shaped** case only. They never addressed what these labels gate,
+so merging them could not make the labels stale. Closing the blocker left an assigned slice with an
+owner, no reviewer and no gate — precisely the state the constitution calls incomplete.
+
+**Provenance, recorded rather than smoothed over.** Cheek instructed the closure on 2026-08-29;
+Claude executed it, having flagged the tension but **not** having checked the staleness premise
+itself — the one part that needed checking, and checkable in the same command that located the sites.
+Codex's `P1` landed on `bfba734f6` at 23:42:30Z, **three minutes after #1217 merged** at 23:39:24Z,
+so there was no window to fix it before it shipped. Cheek instructed the restoration on 2026-08-30.
+
+**Closing the label never closed the leak, and restoring it does not fix the leak.** The parameterized
+case remains **`OPEN` — REVIEW ONLY**. Do not implement. Do not touch `src/` or `supabase/`. **Codex's
+slice.** Codex is **measure-only**; no PR unless a `FAIL` names one scheme and the blob. **Do not
+propose another `Authorization` scheme after NTLM** — the scheme list was never the defect; the value
+tail is.
+
+## 2. #1217 and #1218 merged — deploy branch `d4e5a7ea4`
+
+`established fact`, verified by `git log`, not from webhook events.
+
+| PR        | Merge SHA   | Parents | Shape      | Subject ends |
+| --------- | ----------- | ------- | ---------- | ------------ |
+| **#1217** | `fead4f502` | 1       | **squash** | `(#1217)`    |
+| **#1218** | `d4e5a7ea4` | 1       | **squash** | `(#1218)`    |
+
+#1218 is a **docs-only** read-only test-coverage audit — zero migrations, no `src/` or `supabase/`
+file. **Claude did not open, ready, enqueue or merge it.**
+
+Sixth and seventh observed squash outcomes. They stay **observations**: the configured merge method
+remains **`NOT_MEASURED`** (reading it needs `Administration:read`, which the token lacks).
+
+## 3. Actor events Claude did not perform
+
+`established fact` for the record; **`UNKNOWN`** as to cause — no explanation is inferred here.
+
+Four state changes attributed to `cheekhimself` that this session did not perform. Cheek confirmed
+the first two were not him:
+
+| When      | Event                                                            |
+| --------- | ---------------------------------------------------------------- |
+| 19:34:30Z | #1215 readied                                                    |
+| 21:53:23Z | #1215 converted to draft, silently stripping an armed auto-merge |
+| 23:39:24Z | #1217 readied, **and enqueued at 23:39:25Z — one second later**  |
+| 23:45:24Z | #1218 opened, queued and merged — a PR Claude never opened       |
+
+The first two were reversible; the last two **landed commits on the deploy branch**. Recorded because
+it bears on who is changing operating state, not as a conclusion about cause.
+
+## 4. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No publish, no republish. No EcoWitt-to-live. No rebase.**
+- **Live production was MEASURED at `5bf4db1d`** — `dirty:false`, ref `master`, GDP, 2026-08-29
+  ~22:4xZ. That is a **point-in-time reading and is now three commits behind the tip** (#1216, #1217
+  and #1218 merged after it). **It is not a current measurement**; re-measuring needs Cheek or GDP.
+  Claude did not take it and cannot.
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+- The entry demoted below carries **"No APPLY" twice** in its posture list. Redundant, not incorrect,
+  and **left as-is**: it is superseded text, and this file does not rewrite superseded entries.
+
+**Prior update:** Claude (2026-08-29: #1215 and #1216 merged; deploy branch is now **`5d6efc95a`**.
 #1216 closes **token-shaped NTLM** only — parameterized `Authorization` headers **still leak on the
 current tip across Digest, Negotiate and NTLM**, verified by execution — **OPEN, REVIEW ONLY.** Live
 production is **MEASURED at `5bf4db1d`** (`dirty:false`, ref `master`, GDP) and is **not** the deploy

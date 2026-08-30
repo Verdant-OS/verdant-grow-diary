@@ -1,6 +1,6 @@
 name: Mocked E2E closure (previously unrun specs)
 
-# Fourteen credential-free Playwright specs that were committed, reviewed and
+# Fifteen credential-free Playwright specs that were committed, reviewed and
 # merged, and that NO workflow executed. Audited 2026-08-29
 # (docs/audits/test-coverage-audit-2026-08-29.md): 25 of 60 specs are named by
 # no workflow. Each one reads as coverage in review and provides none, because
@@ -21,6 +21,14 @@ name: Mocked E2E closure (previously unrun specs)
 # unfiltered run also selects authenticated and fixture specs and can reach real
 # Supabase.
 #
+# founder-owner-prefs WAS excluded here as contention-sensitive: one focus
+# assertion failed once under a forced --workers=2 run, then passed 3 times.
+# Re-measured 2026-08-30 and now WIRED: 3 of 3 green at --workers=2 and 3 of 3
+# green single-worker, i.e. 9 passes against that one historical failure. The
+# config also makes the original scenario non-representative — playwright.config
+# sets fullyParallel: false, and retries is 1 on CI, so a single-attempt flake is
+# absorbed. Wired on measurement, not on the absence of a failure.
+#
 # NOT WIRED HERE, and why — none of these is skipped or quarantined, each is
 # named so the gap stays visible:
 #   quick-log-activation-handoff  1 of 3 tests fails deterministically (2/2
@@ -31,8 +39,6 @@ name: Mocked E2E closure (previously unrun specs)
 #     which observed a POST to /rest/v1/rpc/has_role on a read-only load.
 #   ui-overhaul-responsive  2 of 9 fail at 320px and 1440px on /daily-check
 #     concealing intrinsic horizontal overflow. The other 7 pass.
-#   founder-owner-prefs  contention-sensitive: one focus assertion failed once
-#     under 2 workers and then passed 3 consecutive times. Flaky, not wired.
 #   pheno-comparison-reload  needs fonts.googleapis.com, which is unreachable
 #     from the audit container. Whether it passes on a GitHub runner is
 #     NOT_MEASURED, so it is left out rather than wired on a guess.
@@ -64,7 +70,7 @@ concurrency:
 
 jobs:
   mocked-e2e-closure:
-    name: Mocked E2E closure (14 previously unrun specs)
+    name: Mocked E2E closure (15 previously unrun specs)
     runs-on: ubuntu-latest
     timeout-minutes: 25
 

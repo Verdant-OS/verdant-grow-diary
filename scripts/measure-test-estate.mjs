@@ -122,40 +122,115 @@ const transitive = [...reached].filter((f) => !direct.has(f)).length;
 const unreached = product.filter((f) => !reached.has(f));
 
 /* ---------- 3. Which test files any workflow actually executes ---------- */
+/**
+ * Resolving "does any workflow run this file?" is easy to get wrong in BOTH
+ * directions, and the first version of this script got it wrong in both. The
+ * three defects, each found by checking a specific file by hand:
+ *
+ *   FALSE-LIVE  A spec named only inside a workflow's `on: ... paths:` filter
+ *               was counted as executed. A trigger filter decides WHEN a
+ *               workflow runs, never WHAT it runs. Two pheno specs were
+ *               miscounted this way.
+ *   FALSE-DEAD  `bun --env-file=.env run e2e:one-tent:ui` did not match a
+ *               script-expansion regex that required `run` to follow the
+ *               runner immediately, so quicklog-smoke.yml's execution of
+ *               e2e/one-tent-loop-golden-path-ui.spec.ts was invisible.
+ *   FALSE-DEAD  A workflow that runs `bun run scripts/e2e/<runner>.mjs` hides
+ *               the spec list inside that runner. Three pheno-disabled-compare
+ *               specs were miscounted this way.
+ *
+ * So: strip the trigger block, expand script chains tolerating flags, follow
+ * one hop into repo runner scripts, and match on EXACT repo-relative path
+ * equality. Exactness is not fussiness — a prototype that accepted directory
+ * and glob tokens reported all 100 lane files as reached, because a bare `**`
+ * token appears somewhere in the corpus. A guard that can never fail is worse
+ * than no guard.
+ */
 const pkg = JSON.parse(read("package.json")).scripts ?? {};
-const RUN = /(?:bun|bunx|npm|yarn|pnpm)\s+run\s+([A-Za-z0-9:_-]+)/g;
-const expand = (name, depth = 0) => {
-  if (depth > 8 || !pkg[name]) return "";
+
+/** `bun run x`, and also `bun --env-file=.env run x`. Flags may sit between. */
+const RUN_SCRIPT = /(?:bun|bunx|npm|yarn|pnpm)(?:\s+--?[^\s]+)*\s+run\s+([A-Za-z0-9:_-]+)/g;
+
+const expandScript = (name, depth = 0, seen = new Set()) => {
+  if (depth > 8 || !pkg[name] || seen.has(name)) return "";
+  seen.add(name);
   let out = pkg[name];
-  for (const m of pkg[name].matchAll(new RegExp(RUN.source, "g")))
-    out += ` ${expand(m[1], depth + 1)}`;
+  for (const m of pkg[name].matchAll(new RegExp(RUN_SCRIPT.source, "g"))) {
+    out += ` ${expandScript(m[1], depth + 1, seen)}`;
+  }
   return out;
 };
+
+/**
+ * Remove the top-level `on:` block. GitHub workflow YAML puts top-level keys at
+ * column 0, so the block runs until the next column-0 key. Textual rather than a
+ * YAML parse so this stays dependency-free: js-yaml is only a transitive dep here.
+ */
+function stripTriggerBlock(text) {
+  const lines = text.split("\n");
+  const out = [];
+  let inTrigger = false;
+  for (const line of lines) {
+    if (/^on:/.test(line)) {
+      inTrigger = true;
+      continue;
+    }
+    if (inTrigger && /^[^\s#]/.test(line)) inTrigger = false;
+    if (!inTrigger) out.push(line);
+  }
+  return out.join("\n");
+}
+
+/** A repo runner script a workflow may delegate to. Never follow a test file. */
+const RUNNER = /(?:^|[\s"'`])((?:scripts|e2e|tools)\/[A-Za-z0-9_./-]+\.(?:mjs|cjs|js|ts))/g;
+const IS_TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/;
+
 let corpus = "";
 for (const f of readdirSync(path.join(ROOT, ".github/workflows"))) {
-  const s = read(`.github/workflows/${f}`);
-  corpus += s;
-  for (const m of s.matchAll(new RegExp(RUN.source, "g"))) corpus += ` ${expand(m[1])}`;
+  corpus += ` ${stripTriggerBlock(read(`.github/workflows/${f}`))}`;
 }
+// Expand package.json script chains named anywhere in the workflow bodies.
+for (const m of corpus.matchAll(new RegExp(RUN_SCRIPT.source, "g"))) {
+  corpus += ` ${expandScript(m[1])}`;
+}
+// One hop: a workflow (or an expanded script) that delegates to a repo runner
+// hides its file list inside that runner.
+const followed = new Set();
+for (const m of corpus.matchAll(new RegExp(RUNNER.source, "g"))) {
+  const rel = m[1];
+  if (followed.has(rel) || IS_TEST_FILE.test(rel)) continue;
+  followed.add(rel);
+  try {
+    corpus += ` ${read(rel)}`;
+  } catch {
+    /* referenced but absent: nothing to add */
+  }
+}
+
+/** Exact repo-relative path tokens the corpus actually names. */
+const namedPaths = new Set(
+  [...corpus.matchAll(/[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:ts|tsx|mjs|cjs|js|sql)/g)].map((m) => m[0]),
+);
+
 const lane = (label, files) => {
-  const run = files.filter((f) => corpus.includes(f));
+  const never = files.filter((f) => !namedPaths.has(f));
   return {
     label,
     total: files.length,
-    executed: run.length,
-    never: files.length - run.length,
-    neverFiles: files.filter((f) => !corpus.includes(f)),
+    executed: files.length - never.length,
+    never: never.length,
+    neverFiles: never,
   };
 };
 
 const denoTests = lines(sh("git ls-files 'supabase/functions/**'")).filter((f) =>
   /(\.test\.ts|_test\.ts)$/.test(f),
 );
-const e2eSpecs = readdirSync(path.join(ROOT, "e2e")).filter((f) => f.endsWith(".spec.ts"));
-const harnesses = readdirSync(path.join(ROOT, "scripts")).filter(
-  (f) => /harness/.test(f) && /\.(ts|mjs)$/.test(f),
-);
-const pgtap = readdirSync(path.join(ROOT, "supabase/tests")).filter((f) => f.endsWith(".sql"));
+const e2eSpecs = lines(sh("git ls-files 'e2e/*.spec.ts'"));
+const harnesses = readdirSync(path.join(ROOT, "scripts"))
+  .filter((f) => /harness/.test(f) && /\.(ts|mjs)$/.test(f))
+  .map((f) => `scripts/${f}`);
+const pgtap = lines(sh("git ls-files 'supabase/tests/*.sql'"));
 
 const lanes = [
   lane("deno edge tests", denoTests),

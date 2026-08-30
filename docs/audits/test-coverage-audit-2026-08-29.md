@@ -34,7 +34,7 @@ Two things are true at once, and the second is the one that needs work:
   against source **text** inside scan-only files (14,251 of 87,351) — a class proven by execution
   in §3 to go red on behaviour-preserving refactors and stay green through real behaviour breaks.
   And 21 of 31 Deno edge tests, 16 of 33 runtime RLS/billing harnesses, 7 of 9 pgTAP suites, and
-  32 of 60 Playwright specs are never run by any workflow.
+  29 of 60 Playwright specs are never run by any workflow.
 
 The single highest-value action is not writing new tests. It is **running the tests that already
 exist** (§7, P2) and **measuring what they touch** (§7, P1). Both are small, both are cheap, and
@@ -208,7 +208,7 @@ chains, then matching file paths.
 | Lane                             | Total | Executed by some workflow | **Never executed** |
 | -------------------------------- | ----: | ------------------------: | -----------------: |
 | Deno edge-function tests         |    31 |                        10 |             **21** |
-| Playwright e2e specs             |    60 |                        28 |             **32** |
+| Playwright e2e specs             |    60 |                        31 |             **29** |
 | Runtime RLS / billing harnesses  |    33 |                        17 |             **16** |
 | pgTAP suites (`supabase/tests/`) |     9 |                         2 |              **7** |
 
@@ -231,7 +231,27 @@ are invisible to it. Only four workflows run `deno test`, each naming files expl
 
 Nothing warns about this. The files look like coverage in review and are inert.
 
-### 4.2 Playwright — 32 specs never run, and several are credential-free
+### 4.2 Playwright — 29 specs never run, and several are credential-free
+
+> **Corrected from 32 to 29.** The first version of this section, and the first version of
+> `scripts/measure-test-estate.mjs`, resolved "does a workflow run this spec?" by substring-matching
+> raw workflow YAML. That model was wrong in both directions and is now fixed in the script:
+>
+> - A spec named only inside a workflow's `on: … paths:` filter was counted as **executed**. A
+>   trigger filter decides _when_ a workflow runs, never _what_ it runs.
+>   `e2e/pheno-workspace-missing-evidence-anchors.spec.ts` was miscounted this way.
+> - `bun --env-file=.env run e2e:one-tent:ui` did not match a script-expansion regex that required
+>   `run` to follow the runner immediately, so `quicklog-smoke.yml`'s execution of
+>   **`e2e/one-tent-loop-golden-path-ui.spec.ts`** was invisible. That spec **does** run.
+> - A workflow that runs `bun run scripts/e2e/<runner>.mjs` hides its spec list inside that runner.
+>   The three `pheno-disabled-compare-*` specs are executed that way, and
+>   `e2e/pheno-tracker-paid-user-smoke.spec.ts` runs through
+>   `pheno-ephemeral-role-e2e.yml:90` → `test:pheno-paid-smoke:local` →
+>   `scripts/e2e/run-pheno-paid-smoke-local.mjs:253`.
+>
+> The corrected resolver matches on **exact repo-relative path equality**. That exactness is not
+> fussiness: a prototype that accepted directory and glob tokens reported all 100 lane files as
+> reached, because a bare `**` token appears somewhere in the corpus — a guard that can never fail.
 
 Authenticated specs legitimately report `blocked` without owner credentials; that is documented and
 expected. But specs that stub **all** Supabase traffic with `page.route()` could run on every PR

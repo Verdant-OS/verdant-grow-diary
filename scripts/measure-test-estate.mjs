@@ -177,7 +177,25 @@ function scriptNamesIn(text) {
     while (j < tokens.length && tokens[j].startsWith("-")) j += 1;
     if (tokens[j] !== "run") continue;
     const name = tokens[j + 1];
-    if (name && SCRIPT_NAME.test(name)) names.push(name);
+    if (!name) continue;
+    if (SCRIPT_NAME.test(name)) {
+      names.push(name);
+      continue;
+    }
+    // A workflow may interpolate a matrix value into the script name, as in
+    // `bun run e2e:ga:${{ matrix.browser }}` with browser: [chromium, webkit].
+    // Resolving the matrix properly means parsing the workflow; taking the
+    // literal prefix and reaching every script that extends it is the
+    // conservative read, and conservative here means "counts as executed",
+    // which is the safe direction for a guard that must never claim a file is
+    // dead when something runs it. Missing this chain is what made the four
+    // google-analytics specs read as never-run.
+    const prefix = name.split("${")[0];
+    if (prefix.length > 0 && SCRIPT_NAME.test(prefix)) {
+      for (const candidate of Object.keys(pkg)) {
+        if (candidate.startsWith(prefix)) names.push(candidate);
+      }
+    }
   }
   return names;
 }

@@ -34,7 +34,7 @@ Two things are true at once, and the second is the one that needs work:
   against source **text** inside scan-only files (14,251 of 87,351) — a class proven by execution
   in §3 to go red on behaviour-preserving refactors and stay green through real behaviour breaks.
   And 21 of 31 Deno edge tests, 16 of 33 runtime RLS/billing harnesses, 7 of 9 pgTAP suites, and
-  29 of 60 Playwright specs are never run by any workflow.
+  25 of 60 Playwright specs are never run by any workflow.
 
 The single highest-value action is not writing new tests. It is **running the tests that already
 exist** (§7, P2) and **measuring what they touch** (§7, P1). Both are small, both are cheap, and
@@ -208,7 +208,7 @@ chains, then matching file paths.
 | Lane                             | Total | Executed by some workflow | **Never executed** |
 | -------------------------------- | ----: | ------------------------: | -----------------: |
 | Deno edge-function tests         |    31 |                        10 |             **21** |
-| Playwright e2e specs             |    60 |                        31 |             **29** |
+| Playwright e2e specs             |    60 |                        35 |             **25** |
 | Runtime RLS / billing harnesses  |    33 |                        17 |             **16** |
 | pgTAP suites (`supabase/tests/`) |     9 |                         2 |              **7** |
 
@@ -231,9 +231,12 @@ are invisible to it. Only four workflows run `deno test`, each naming files expl
 
 Nothing warns about this. The files look like coverage in review and are inert.
 
-### 4.2 Playwright — 29 specs never run, and several are credential-free
+### 4.2 Playwright — 25 specs never run, and several are credential-free
 
-> **Corrected from 32 to 29.** The first version of this section, and the first version of
+> **Corrected 32 → 29 → 25.** The number moved twice, and the movement is the point: each
+> refinement of the resolver found another way a workflow reaches a spec. It is now cross-checked
+> against a second, independently written resolver, and the two agree file-for-file. The first
+> version of this section, and the first version of
 > `scripts/measure-test-estate.mjs`, resolved "does a workflow run this spec?" by substring-matching
 > raw workflow YAML. That model was wrong in both directions and is now fixed in the script:
 >
@@ -252,6 +255,25 @@ Nothing warns about this. The files look like coverage in review and are inert.
 > The corrected resolver matches on **exact repo-relative path equality**. That exactness is not
 > fussiness: a prototype that accepted directory and glob tokens reported all 100 lane files as
 > reached, because a bare `**` token appears somewhere in the corpus — a guard that can never fail.
+>
+> **The 29 → 25 step**, found by cross-checking against a second resolver: `google-analytics-e2e.yml`
+> runs `bun run e2e:ga:${{ matrix.browser }}` over `browser: [chromium, webkit]`, which resolves to
+> `e2e:ga:chromium` / `e2e:ga:webkit` → `e2e:ga` → **all four** `google-analytics-*.spec.ts`. A
+> matrix-interpolated script name is not a literal, so the script now takes the literal prefix and
+> counts every package script extending it. Conservative here means "counts as executed", which is
+> the safe direction for a guard that must never call a file dead while something runs it.
+>
+> The two resolvers disagreed on exactly one file, and the disagreement was settled by exhaustive
+> search rather than by preferring a number: `e2e/pheno-workspace-missing-evidence-anchors.spec.ts`
+> occurs **once** in the whole repository outside itself, at
+> `.github/workflows/pheno-disabled-compare-e2e.yml:13`, inside `on: pull_request: paths:`. It is
+> never executed, so it stays in the 25.
+>
+> **Naming is still not running.** That same workflow is marked `# dormant: deliberately main-only
+(#581)` with `branches: [main]`, so the three `pheno-disabled-compare-*` specs it runs are counted
+> as executed here and never execute on the deploy branch. This lane measures whether a workflow
+> _names_ a file. Whether that workflow is live is a different axis, owned by
+> `src/test/workflow-branch-filter-liveness.test.ts`.
 
 Authenticated specs legitimately report `blocked` without owner credentials; that is documented and
 expected. But specs that stub **all** Supabase traffic with `page.route()` could run on every PR

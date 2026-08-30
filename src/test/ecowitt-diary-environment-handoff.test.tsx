@@ -890,8 +890,12 @@ describe("evidence rules", () => {
     ['Authorization: Digest username="grower"', "[REDACTED]"],
     ['Authorization: NTLM username="grower"', "[REDACTED]"],
     ['Authorization: Negotiate opaque="x"', "[REDACTED]"],
+    ['Authorization: Digest username="grower", realm="verdant", nonce="secret"', "[REDACTED]"],
+    ['Authorization: NTLM username="grower", realm="verdant", nonce="secret"', "[REDACTED]"],
+    ['Authorization: Negotiate username="grower", realm="verdant", nonce="secret"', "[REDACTED]"],
+    ['Authorization: Basic username="grower", nonce="secret"', "[REDACTED]"],
   ] as const)(
-    "redacts the whole quoted attribute on a reserved authorization scheme: %s",
+    "redacts the whole quoted attribute list on a reserved authorization scheme: %s",
     (authorizationHeader, expected) => {
       const snap = evidenceSnapshot({
         transport: "mqtt_local_test",

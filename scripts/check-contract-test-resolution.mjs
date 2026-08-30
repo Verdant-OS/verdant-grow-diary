@@ -42,6 +42,40 @@ const TEST_DIR = join(REPO_ROOT, "src", "test");
 /** Config modules whose guards must assert on resolved values. */
 const CONFIG_FILES = ["playwright.config", "vitest.config"];
 
+/**
+ * JSON configs whose guards must assert on the PARSED object.
+ *
+ * JSON has no comments, so the comment-out defeat that motivated the rule for
+ * TS configs cannot happen here. Two others can, and do: a regex over JSON
+ * source cannot tell which of two duplicate keys wins, and — the failure
+ * actually found in this repository — it cannot tell WHICH nesting level a key
+ * sits at, so a pattern intended for one key silently matches a same-named key
+ * somewhere else entirely and passes for the wrong reason.
+ *
+ * `JSON.parse` is always available and has none of these problems, so unlike
+ * the TS configs there is no import hazard and no reason to scan.
+ */
+const JSON_CONFIG_FILES = ["package.json"];
+
+/**
+ * An assertion whose PATTERN contains a JSON key in source form — `"someKey":`.
+ * That shape is only meaningful against raw JSON text; against a parsed object
+ * you would write `obj.someKey`. It is therefore a precise signature for
+ * "asserting on JSON source", with no false positives from tests that merely
+ * read the file and then parse it.
+ */
+const ASSERTS_ON_JSON_SOURCE =
+  /(?:toMatch|toContain|\.match|\.includes)\s*\(\s*[/"'`][^\n]*\\?"[A-Za-z0-9:_@./-]+\\?"\s*:/;
+
+/** Reads the JSON config's source, directly or through a `PKG`-style constant. */
+const READS_JSON_SOURCE = (source, config) => {
+  const esc = config.replace(".", "\\.");
+  return (
+    new RegExp(`readFile(?:Sync)?[^\\n]*${esc}`).test(source) ||
+    new RegExp(`=\\s*["']${esc}["']`).test(source)
+  );
+};
+
 /** Reads the config's source text (readFileSync/readFile of the config path). */
 const READS_CONFIG_SOURCE = (source, config) =>
   new RegExp(`readFile(?:Sync)?[^\\n]*${config.replace(".", "\\.")}`).test(source);
@@ -94,13 +128,27 @@ for (const file of listTestFiles(TEST_DIR)) {
     }
     violations.push({ file: rel, config });
   }
+  for (const config of JSON_CONFIG_FILES) {
+    if (!READS_JSON_SOURCE(source, config)) continue;
+    if (!ASSERTS_ON_JSON_SOURCE.test(source)) continue; // reads it, then parses — fine
+    const justification = source.match(JUSTIFICATION_RE);
+    if (justification) {
+      justified.push({ file: rel, config, reason: justification[1].trim() });
+      continue;
+    }
+    violations.push({ file: rel, config, json: true });
+  }
 }
 
 if (violations.length > 0) {
   console.error("Contract tests must assert against RESOLVED config, not source text.\n");
   for (const v of violations) {
     console.error(`  ${v.file}`);
-    console.error(`    reads ${v.config} source but never imports it`);
+    console.error(
+      v.json
+        ? `    asserts on ${v.config} SOURCE TEXT (a "key": pattern) instead of the parsed object`
+        : `    reads ${v.config} source but never imports it`,
+    );
   }
   console.error(
     '\nFix: `const config = (await import("../../<config>")).default;` then assert on the',
@@ -114,5 +162,5 @@ for (const j of justified) {
   console.log(`[check-contract-test-resolution] justified: ${j.file} (${j.config}) — ${j.reason}`);
 }
 console.log(
-  `[check-contract-test-resolution] OK — every ${CONFIG_FILES.join("/")} guard resolves the config or declares why it cannot.`,
+  `[check-contract-test-resolution] OK — every ${[...CONFIG_FILES, ...JSON_CONFIG_FILES].join("/")} guard resolves the config or declares why it cannot.`,
 );

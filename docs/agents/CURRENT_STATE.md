@@ -1,7 +1,77 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-30 UTC (~01:15 UTC)
-**Updated by:** Claude (2026-08-30: **the `BLOCKED` marking on the parameterized `Authorization`
+**Last updated:** 2026-08-30 UTC (~02:58 UTC)
+**Updated by:** Claude (2026-08-30: **#1222 merged as `1f68d7d3`** — deploy branch is now that tip. It
+redacts the **first quoted attribute** after a `Digest`/`Negotiate`/`NTLM` scheme; **the remainder of
+the header still leaks**, and **parameterized `Basic` still leaks entirely**. Verified by execution
+against the merged tip. The **parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY /
+`BLOCKED`.** Prior header follows.)
+
+## 1. #1222 merged — deploy branch `1f68d7d3`
+
+| Field       | Value                                           | How known                           |
+| ----------- | ----------------------------------------------- | ----------------------------------- |
+| Merge SHA   | **`1f68d7d3`**                                  | verified, `git log`                 |
+| Parent      | `dd2da3404` (#1220)                             | verified, `git log`                 |
+| Shape       | **squash** — one parent; subject ends `(#1222)` | verified, parent count              |
+| Head        | **`e730f26bcdeb`**                              | **reported** — not in this clone    |
+| Dream Queen | **`PASS`**                                      | **reported** — not readable in-repo |
+
+Files: `src/lib/ecowittValidationEvidenceRules.ts`, its test, the edge mirror and
+`.sync-manifest.json`. **Zero migrations.**
+
+## 2. What #1222 fixed, and what it left
+
+`established fact`, **executed against the merged tip `1f68d7d3`** — not read from the title.
+
+The header rule now carries a scheme-and-first-attribute branch ahead of the old value tail:
+
+```
+/Authorization\s*:\s*(?:(?:Digest|Negotiate|NTLM)\s+[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*')|(?:(?:Basic|Digest|Negotiate|NTLM)\s+)?[^\s",}]+)/gi
+```
+
+That branch consumes the scheme **plus one quoted attribute**. Everything after the first comma is
+outside the match.
+
+| Input (string nested under a non-secret key)                               | Result on `1f68d7d3`                          |
+| -------------------------------------------------------------------------- | --------------------------------------------- |
+| `Authorization: Digest username="grower", realm="verdant", nonce="secret"` | `[REDACTED], realm="verdant", nonce="secret"` |
+| `Authorization: NTLM username="grower", realm="verdant", nonce="secret"`   | `[REDACTED], realm="verdant", nonce="secret"` |
+| `Authorization: Negotiate opaque="x", nonce="secret"`                      | `[REDACTED], nonce="secret"`                  |
+| `Authorization: Basic username="grower", nonce="secret"`                   | `[REDACTED]"grower", nonce="secret"`          |
+| `Authorization: NTLM TlRMTVNTUAABAAAAB4IIog==`                             | fully redacted                                |
+
+**Fixed:** the first quoted attribute after `Digest`/`Negotiate`/`NTLM` — `username` in these cases —
+is now redacted where it previously survived. That is a real narrowing.
+
+**The leftover, still leaking:**
+
+- **The remainder of the header.** `realm=` and `nonce=` and every subsequent attribute fall outside
+  the match. A short, non-hex secret in any position after the first survives.
+- **Parameterized `Basic`.** `Basic` is absent from the first-attribute branch, so it falls through to
+  the old tail, which stops at the first quote. Both `username` and `nonce` values survive.
+
+**The parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY / `BLOCKED`.** Do not
+implement. Do not touch `src/` or `supabase/`. **No further scheme is proposed here** — the scheme
+list was never the defect.
+
+**Reachability** is unchanged and narrower than it looks: the regex path runs only on a **string
+nested under a non-secret key**. A top-level string, and any value under an `Authorization`-named key,
+are replaced wholesale. Whether real EcoWitt payloads carry the leaking shape is **`NOT_MEASURED`**.
+
+**Affected surfaces** are unchanged: `redacted_raw_payload` in the clipboard evidence copy and in the
+**downloaded validation JSON**. CSV excludes the raw payload.
+
+## 3. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No publish, no republish. No EcoWitt-to-live. No rebase.**
+- **Live production** was MEASURED at `5bf4db1d` (`dirty:false`, ref `master`, GDP) on 2026-08-29. It
+  is now **several commits behind the tip** and is **not a current measurement**; re-measuring needs
+  Cheek or GDP. Claude did not take it and cannot. **A merge is not a deployment.**
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+
+**Prior update:** Claude (2026-08-30: **the `BLOCKED` marking on the parameterized `Authorization`
 slice is RESTORED** — Cheek, 2026-08-30. The #1217 closure was wrong; Codex raised it as a `P1` and
 the finding is correct. Deploy branch is now **`d4e5a7ea4`** (#1217, #1218 merged). Prior header
 follows.)

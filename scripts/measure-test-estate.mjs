@@ -148,15 +148,46 @@ const unreached = product.filter((f) => !reached.has(f));
  */
 const pkg = JSON.parse(read("package.json")).scripts ?? {};
 
-/** `bun run x`, and also `bun --env-file=.env run x`. Flags may sit between. */
-const RUN_SCRIPT = /(?:bun|bunx|npm|yarn|pnpm)(?:\s+--?[^\s]+)*\s+run\s+([A-Za-z0-9:_-]+)/g;
+const RUNNERS = new Set(["bun", "bunx", "npm", "yarn", "pnpm"]);
+const SCRIPT_NAME = /^[A-Za-z0-9:_-]+$/;
+
+/**
+ * Package-script names a command text invokes: `bun run x`, and also
+ * `bun --env-file=.env run x`, where flags sit between the runner and `run`.
+ *
+ * Tokenised, not matched with one regex. The regex form of this needed a
+ * nested quantifier over the flag run — `(?:\s+--?[^\s]+)*` — which CodeQL
+ * correctly flagged as exponential backtracking (alert 254, high). It is not
+ * theoretical: on `"bun -" + "-! -".repeat(n)` the match time grew 3.8ms ->
+ * 14.8 -> 66.2 -> 262.6 as n went 18 -> 24, i.e. 4x per 2 repetitions, on an
+ * input of 101 characters. The ambiguity is `--?` against `[^\s]+`, which can
+ * split a dash run two ways per token. Scanning tokens is linear and says what
+ * it means.
+ *
+ * Only tokens that START WITH A DASH are skipped, so `bunx vitest run <file>`
+ * is correctly NOT read as a package script — `vitest` is not a flag, and that
+ * `run` belongs to vitest.
+ */
+function scriptNamesIn(text) {
+  const names = [];
+  const tokens = text.split(/\s+/);
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (!RUNNERS.has(tokens[i])) continue;
+    let j = i + 1;
+    while (j < tokens.length && tokens[j].startsWith("-")) j += 1;
+    if (tokens[j] !== "run") continue;
+    const name = tokens[j + 1];
+    if (name && SCRIPT_NAME.test(name)) names.push(name);
+  }
+  return names;
+}
 
 const expandScript = (name, depth = 0, seen = new Set()) => {
   if (depth > 8 || !pkg[name] || seen.has(name)) return "";
   seen.add(name);
   let out = pkg[name];
-  for (const m of pkg[name].matchAll(new RegExp(RUN_SCRIPT.source, "g"))) {
-    out += ` ${expandScript(m[1], depth + 1, seen)}`;
+  for (const called of scriptNamesIn(pkg[name])) {
+    out += ` ${expandScript(called, depth + 1, seen)}`;
   }
   return out;
 };
@@ -190,8 +221,8 @@ for (const f of readdirSync(path.join(ROOT, ".github/workflows"))) {
   corpus += ` ${stripTriggerBlock(read(`.github/workflows/${f}`))}`;
 }
 // Expand package.json script chains named anywhere in the workflow bodies.
-for (const m of corpus.matchAll(new RegExp(RUN_SCRIPT.source, "g"))) {
-  corpus += ` ${expandScript(m[1])}`;
+for (const called of scriptNamesIn(corpus)) {
+  corpus += ` ${expandScript(called)}`;
 }
 // One hop: a workflow (or an expanded script) that delegates to a repo runner
 // hides its file list inside that runner.

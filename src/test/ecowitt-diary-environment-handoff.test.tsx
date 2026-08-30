@@ -905,6 +905,47 @@ describe("evidence rules", () => {
     },
   );
 
+  // #1222 closed the FIRST quoted attribute on a reserved scheme, but stopped
+  // there: the match ended at the first attribute, so every later comma-separated
+  // pair survived into `redacted_raw_payload` and the clipboard export. A short,
+  // non-hex secret in any position but the first therefore leaked, and
+  // parameterized `Basic` leaked entirely because `Basic` was absent from that
+  // branch and fell through to the value tail, which stops at the first quote.
+  // Verified RED on parent 1f68d7d3 before this fix.
+  it.each([
+    [
+      'Authorization: Digest username="grower", realm="verdant", nonce="secret"',
+      ["grower", "verdant", "secret"],
+    ],
+    [
+      'Authorization: NTLM username="grower", realm="verdant", nonce="secret"',
+      ["grower", "verdant", "secret"],
+    ],
+    [
+      'Authorization: Negotiate username="grower", realm="verdant", nonce="secret"',
+      ["grower", "verdant", "secret"],
+    ],
+    ['Authorization: Basic username="grower", nonce="secret"', ["grower", "secret"]],
+  ] as const)(
+    "redacts the whole parameterized authorization header, remainder included: %s",
+    (authorizationHeader, leakedValues) => {
+      const snap = evidenceSnapshot({
+        transport: "mqtt_local_test",
+        request_log: authorizationHeader,
+      });
+      const payload = snap.redacted_raw_payload as Record<string, unknown>;
+      const text = serializeEvidenceForClipboard(snap);
+
+      expect(payload.request_log).toBe("[REDACTED]");
+      for (const leaked of leakedValues) {
+        expect(payload.request_log, `remainder survived in: ${authorizationHeader}`).not.toContain(
+          leaked,
+        );
+        expect(text).not.toContain(leaked);
+      }
+    },
+  );
+
   it("still redacts a real header credential, and leaves benign telemetry alone", () => {
     const snap = evidenceSnapshot({
       transport: "mqtt_local_test",

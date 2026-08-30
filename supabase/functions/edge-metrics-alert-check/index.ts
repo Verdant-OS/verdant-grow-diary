@@ -492,220 +492,234 @@ function buildSimulatedBreach(spec: SimulateSpec, t: Thresholds): Breach {
   };
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  const requestId = resolveRequestId(req);
+// @ts-ignore Deno runtime entrypoint — only start the server when run directly.
+// Without this guard, importing this module to unit-test its exports binds a
+// real port as a side effect. That made the colocated test file nondeterministic
+// on CI's pinned Deno v1.x: postWebhook's retry case uses 1-2ms timers and
+// captures console output, and a live listener adds event-loop work that
+// perturbs both. Same shape as pi-ingest-readings/index.ts, which already
+// guards its Deno.serve this way.
+if (import.meta.main) {
+  Deno.serve(async (req) => {
+    if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+    const requestId = resolveRequestId(req);
 
-  if (req.method !== "GET" && req.method !== "POST") {
-    return fail(405, "method_not_allowed", "Method not allowed", requestId);
-  }
-
-  const url = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !serviceKey) {
-    log("error", "env_missing", { request_id: requestId });
-    return fail(503, "env_missing", "Service unavailable", requestId);
-  }
-
-  // Manual invocations must present an operator JWT. Scheduled pg_cron
-  // calls set the shared `x-alert-cron-secret` header instead — this
-  // lets pg_net trigger the check without carrying a user session.
-  const cronSecret = Deno.env.get("ALERT_CRON_SECRET");
-  const providedCronSecret = req.headers.get("x-alert-cron-secret");
-  const isCron = Boolean(cronSecret && providedCronSecret && providedCronSecret === cronSecret);
-
-  if (!isCron) {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return fail(401, "missing_bearer_token", "Unauthorized", requestId);
+    if (req.method !== "GET" && req.method !== "POST") {
+      return fail(405, "method_not_allowed", "Method not allowed", requestId);
     }
-    const gate = await requireOperator(authHeader, requestId);
-    if (!gate.ok) return gate.res;
-  }
 
-  const parsedBody = await parseBody(req);
-  if (parsedBody.error) {
-    return fail(400, parsedBody.error, "Invalid request body", requestId);
-  }
-  // Dry-run is strictly operator-driven; cron never carries a body.
-  const isDryRun = parsedBody.dryRun && !isCron;
+    const url = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !serviceKey) {
+      log("error", "env_missing", { request_id: requestId });
+      return fail(503, "env_missing", "Service unavailable", requestId);
+    }
 
-  const thresholds = loadThresholds();
-  const supa = createClient(url, serviceKey);
-  const since = new Date(Date.now() - thresholds.windowMinutes * 60_000).toISOString();
+    // Manual invocations must present an operator JWT. Scheduled pg_cron
+    // calls set the shared `x-alert-cron-secret` header instead — this
+    // lets pg_net trigger the check without carrying a user session.
+    const cronSecret = Deno.env.get("ALERT_CRON_SECRET");
+    const providedCronSecret = req.headers.get("x-alert-cron-secret");
+    const isCron = Boolean(cronSecret && providedCronSecret && providedCronSecret === cronSecret);
 
-  const { data, error } = await supa
-    .from("edge_function_metric_events")
-    .select("fn, outcome, observed_at")
-    .eq("event_type", "request_metric")
-    .gte("observed_at", since)
-    .limit(10000);
+    if (!isCron) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return fail(401, "missing_bearer_token", "Unauthorized", requestId);
+      }
+      const gate = await requireOperator(authHeader, requestId);
+      if (!gate.ok) return gate.res;
+    }
 
-  if (error) {
-    log("error", "query_failed", { request_id: requestId, code: error.code });
-    return fail(503, "query_failed", "Service unavailable", requestId);
-  }
+    const parsedBody = await parseBody(req);
+    if (parsedBody.error) {
+      return fail(400, parsedBody.error, "Invalid request body", requestId);
+    }
+    // Dry-run is strictly operator-driven; cron never carries a body.
+    const isDryRun = parsedBody.dryRun && !isCron;
 
-  const rows = (data ?? []) as EventRow[];
-  const realBreaches = evaluate(rows, thresholds);
-  let simulatedBreach: Breach | null = null;
-  if (isDryRun && parsedBody.simulate) {
-    simulatedBreach = buildSimulatedBreach(parsedBody.simulate, thresholds);
-    log("info", "dry_run_simulated_breach", {
-      request_id: requestId,
-      fn: simulatedBreach.fn,
-      metric: simulatedBreach.metric,
-    });
-  }
-  const breaches = simulatedBreach ? [...realBreaches, simulatedBreach] : realBreaches;
+    const thresholds = loadThresholds();
+    const supa = createClient(url, serviceKey);
+    const since = new Date(Date.now() - thresholds.windowMinutes * 60_000).toISOString();
 
-  let toFire: Breach[] = breaches;
-  let suppressed: SuppressedBreach[] = [];
-  if (breaches.length > 0 && thresholds.cooldownMinutes > 0) {
-    const pairs = Array.from(new Set(breaches.map((b) => `${b.fn}|${b.metric}`)));
-    const fns = Array.from(new Set(breaches.map((b) => b.fn)));
-    const metrics = Array.from(new Set(breaches.map((b) => b.metric)));
-    const { data: dispatchRows, error: dispatchErr } = await supa
-      .from("edge_metrics_alert_dispatches")
-      .select("fn, metric, last_fired_at")
-      .in("fn", fns)
-      .in("metric", metrics);
-    if (dispatchErr) {
-      // Cooldown is best-effort — never let a lookup failure block alerting.
-      log("warn", "cooldown_lookup_failed", {
+    const { data, error } = await supa
+      .from("edge_function_metric_events")
+      .select("fn, outcome, observed_at")
+      .eq("event_type", "request_metric")
+      .gte("observed_at", since)
+      .limit(10000);
+
+    if (error) {
+      log("error", "query_failed", { request_id: requestId, code: error.code });
+      return fail(503, "query_failed", "Service unavailable", requestId);
+    }
+
+    const rows = (data ?? []) as EventRow[];
+    const realBreaches = evaluate(rows, thresholds);
+    let simulatedBreach: Breach | null = null;
+    if (isDryRun && parsedBody.simulate) {
+      simulatedBreach = buildSimulatedBreach(parsedBody.simulate, thresholds);
+      log("info", "dry_run_simulated_breach", {
         request_id: requestId,
-        code: dispatchErr.code,
+        fn: simulatedBreach.fn,
+        metric: simulatedBreach.metric,
       });
-    } else {
-      const filtered = (dispatchRows ?? []).filter((r) =>
-        pairs.includes(`${r.fn}|${r.metric}`),
-      ) as DispatchRow[];
-      const parts = partitionByCooldown(breaches, filtered, new Date(), thresholds.cooldownMinutes);
-      toFire = parts.toFire;
-      suppressed = parts.suppressed;
     }
-  }
+    const breaches = simulatedBreach ? [...realBreaches, simulatedBreach] : realBreaches;
 
-  let webhook: Awaited<ReturnType<typeof postWebhook>> = { posted: false, attempts: [] };
-  if (isDryRun) {
-    log("info", "dry_run_evaluated", {
-      request_id: requestId,
-      fired_count: toFire.length,
-      suppressed_count: suppressed.length,
-    });
-  } else if (toFire.length > 0) {
-    webhook = await postWebhook(toFire, thresholds, log, requestId);
-    log("warn", "alert_fired", {
-      request_id: requestId,
-      breach_count: toFire.length,
-      suppressed_count: suppressed.length,
-      webhook_posted: webhook.posted,
-      webhook_status: webhook.status,
-      webhook_attempts: webhook.attempts.length,
-      webhook_gave_up_transient: webhook.gave_up_transient ?? false,
-    });
-    // Persist per-attempt history so operators can inspect scheduled /
-    // delivered / exhausted delivery attempts per breach in the UI.
-    if (webhook.attempts.length > 0) {
-      const dispatchId = crypto.randomUUID();
-      const lastIdx = webhook.attempts.length - 1;
-      const attemptRows = toFire.flatMap((b) =>
-        webhook.attempts.map((a, idx) => {
-          let outcome: "delivered" | "transient_failure" | "permanent_failure" | "exhausted";
-          if (a.ok) outcome = "delivered";
-          else if (!a.transient) outcome = "permanent_failure";
-          else if (idx === lastIdx && webhook.gave_up_transient) outcome = "exhausted";
-          else outcome = "transient_failure";
-          return {
-            dispatch_id: dispatchId,
-            fn: b.fn,
-            metric: b.metric,
-            attempt: a.attempt,
-            outcome,
-            status_code: a.status ?? null,
-            ok: a.ok,
-            transient: a.transient,
-            error: a.error ?? null,
-            delay_before_ms: a.delay_before_ms,
-            duration_ms: a.duration_ms,
-            value: b.value,
-            threshold: b.threshold,
-            requests_in_window: b.requests_in_window,
-            request_id: requestId,
-          };
-        }),
-      );
-      const { error: attemptsErr } = await supa
-        .from("edge_metrics_webhook_attempts")
-        .insert(attemptRows);
-      if (attemptsErr) {
-        log("warn", "webhook_attempts_insert_failed", {
+    let toFire: Breach[] = breaches;
+    let suppressed: SuppressedBreach[] = [];
+    if (breaches.length > 0 && thresholds.cooldownMinutes > 0) {
+      const pairs = Array.from(new Set(breaches.map((b) => `${b.fn}|${b.metric}`)));
+      const fns = Array.from(new Set(breaches.map((b) => b.fn)));
+      const metrics = Array.from(new Set(breaches.map((b) => b.metric)));
+      const { data: dispatchRows, error: dispatchErr } = await supa
+        .from("edge_metrics_alert_dispatches")
+        .select("fn, metric, last_fired_at")
+        .in("fn", fns)
+        .in("metric", metrics);
+      if (dispatchErr) {
+        // Cooldown is best-effort — never let a lookup failure block alerting.
+        log("warn", "cooldown_lookup_failed", {
           request_id: requestId,
-          code: attemptsErr.code,
+          code: dispatchErr.code,
         });
+      } else {
+        const filtered = (dispatchRows ?? []).filter((r) =>
+          pairs.includes(`${r.fn}|${r.metric}`),
+        ) as DispatchRow[];
+        const parts = partitionByCooldown(
+          breaches,
+          filtered,
+          new Date(),
+          thresholds.cooldownMinutes,
+        );
+        toFire = parts.toFire;
+        suppressed = parts.suppressed;
       }
     }
-    // Only record cooldown for breaches whose webhook actually delivered.
-    // If delivery failed transiently and we exhausted retries, leave the
-    // dispatch row untouched so the next cron pass can retry immediately
-    // instead of being silently suppressed by cooldown.
-    if (webhook.posted || !webhook.gave_up_transient) {
-      const nowIso = new Date().toISOString();
-      const upsertRows = toFire.map((b) => ({
-        fn: b.fn,
-        metric: b.metric,
-        last_fired_at: nowIso,
-        last_value: b.value,
-        last_threshold: b.threshold,
-        last_requests_in_window: b.requests_in_window,
-        updated_at: nowIso,
-      }));
-      const { error: upsertErr } = await supa
-        .from("edge_metrics_alert_dispatches")
-        .upsert(upsertRows, { onConflict: "fn,metric" });
-      if (upsertErr) {
-        log("warn", "cooldown_upsert_failed", {
-          request_id: requestId,
-          code: upsertErr.code,
-        });
-      }
-    } else {
-      log("warn", "cooldown_skipped_after_transient_failure", {
+
+    let webhook: Awaited<ReturnType<typeof postWebhook>> = { posted: false, attempts: [] };
+    if (isDryRun) {
+      log("info", "dry_run_evaluated", {
+        request_id: requestId,
+        fired_count: toFire.length,
+        suppressed_count: suppressed.length,
+      });
+    } else if (toFire.length > 0) {
+      webhook = await postWebhook(toFire, thresholds, log, requestId);
+      log("warn", "alert_fired", {
         request_id: requestId,
         breach_count: toFire.length,
+        suppressed_count: suppressed.length,
+        webhook_posted: webhook.posted,
+        webhook_status: webhook.status,
+        webhook_attempts: webhook.attempts.length,
+        webhook_gave_up_transient: webhook.gave_up_transient ?? false,
+      });
+      // Persist per-attempt history so operators can inspect scheduled /
+      // delivered / exhausted delivery attempts per breach in the UI.
+      if (webhook.attempts.length > 0) {
+        const dispatchId = crypto.randomUUID();
+        const lastIdx = webhook.attempts.length - 1;
+        const attemptRows = toFire.flatMap((b) =>
+          webhook.attempts.map((a, idx) => {
+            let outcome: "delivered" | "transient_failure" | "permanent_failure" | "exhausted";
+            if (a.ok) outcome = "delivered";
+            else if (!a.transient) outcome = "permanent_failure";
+            else if (idx === lastIdx && webhook.gave_up_transient) outcome = "exhausted";
+            else outcome = "transient_failure";
+            return {
+              dispatch_id: dispatchId,
+              fn: b.fn,
+              metric: b.metric,
+              attempt: a.attempt,
+              outcome,
+              status_code: a.status ?? null,
+              ok: a.ok,
+              transient: a.transient,
+              error: a.error ?? null,
+              delay_before_ms: a.delay_before_ms,
+              duration_ms: a.duration_ms,
+              value: b.value,
+              threshold: b.threshold,
+              requests_in_window: b.requests_in_window,
+              request_id: requestId,
+            };
+          }),
+        );
+        const { error: attemptsErr } = await supa
+          .from("edge_metrics_webhook_attempts")
+          .insert(attemptRows);
+        if (attemptsErr) {
+          log("warn", "webhook_attempts_insert_failed", {
+            request_id: requestId,
+            code: attemptsErr.code,
+          });
+        }
+      }
+      // Only record cooldown for breaches whose webhook actually delivered.
+      // If delivery failed transiently and we exhausted retries, leave the
+      // dispatch row untouched so the next cron pass can retry immediately
+      // instead of being silently suppressed by cooldown.
+      if (webhook.posted || !webhook.gave_up_transient) {
+        const nowIso = new Date().toISOString();
+        const upsertRows = toFire.map((b) => ({
+          fn: b.fn,
+          metric: b.metric,
+          last_fired_at: nowIso,
+          last_value: b.value,
+          last_threshold: b.threshold,
+          last_requests_in_window: b.requests_in_window,
+          updated_at: nowIso,
+        }));
+        const { error: upsertErr } = await supa
+          .from("edge_metrics_alert_dispatches")
+          .upsert(upsertRows, { onConflict: "fn,metric" });
+        if (upsertErr) {
+          log("warn", "cooldown_upsert_failed", {
+            request_id: requestId,
+            code: upsertErr.code,
+          });
+        }
+      } else {
+        log("warn", "cooldown_skipped_after_transient_failure", {
+          request_id: requestId,
+          breach_count: toFire.length,
+        });
+      }
+    } else if (suppressed.length > 0) {
+      log("info", "alert_suppressed_by_cooldown", {
+        request_id: requestId,
+        suppressed_count: suppressed.length,
+        cooldown_minutes: thresholds.cooldownMinutes,
+      });
+    } else {
+      log("info", "alert_check_clean", {
+        request_id: requestId,
+        window_minutes: thresholds.windowMinutes,
+        sampled: rows.length,
       });
     }
-  } else if (suppressed.length > 0) {
-    log("info", "alert_suppressed_by_cooldown", {
-      request_id: requestId,
-      suppressed_count: suppressed.length,
-      cooldown_minutes: thresholds.cooldownMinutes,
-    });
-  } else {
-    log("info", "alert_check_clean", {
-      request_id: requestId,
-      window_minutes: thresholds.windowMinutes,
-      sampled: rows.length,
-    });
-  }
 
-  return json(
-    200,
-    {
-      ok: true,
-      dry_run: isDryRun,
-      simulated: simulatedBreach,
-      window_minutes: thresholds.windowMinutes,
-      sampled_events: rows.length,
-      thresholds,
-      breaches,
-      fired: toFire,
-      suppressed,
-      webhook,
-      invoked_via: isCron ? "cron" : isDryRun ? "operator_dry_run" : "operator",
-    },
-    requestId,
-  );
-});
+    return json(
+      200,
+      {
+        ok: true,
+        dry_run: isDryRun,
+        simulated: simulatedBreach,
+        window_minutes: thresholds.windowMinutes,
+        sampled_events: rows.length,
+        thresholds,
+        breaches,
+        fired: toFire,
+        suppressed,
+        webhook,
+        invoked_via: isCron ? "cron" : isDryRun ? "operator_dry_run" : "operator",
+      },
+      requestId,
+    );
+  });
+}
 
 export const __internals = { evaluate, loadThresholds, partitionByCooldown, postWebhook, log };

@@ -67,6 +67,26 @@
       "context": "test:security-regression",
       "alwaysRuns": true,
       "why": "security-regression.yml calls itself \"the required PR gate\" in its own header, but it is absent from the ruleset above, so nothing enforces it. It ran and failed on the head of PR #769 and merged anyway. It has no path filter - it runs on every pull_request to main and verdant-grow-diary - so an absent result is not \"did not apply\", it is the silent-gate failure that workflow's own header documents."
+    },
+    {
+      "context": "test:security-db-local",
+      "alwaysRuns": false,
+      "why": "security-db-local.yml boots a disposable local Supabase stack and runs the DB-backed RLS harnesses. It is OPT-IN (workflow_dispatch run_db_security, or repo variable ENABLE_DB_SECURITY_LANE), so an absent or vacuously-skipped result is legitimate and alwaysRuns stays false. But when it DID run it was red on the head of PR #769 and that merge landed anyway - the same silent-gate class as test:security-regression, on the money/security lane. Present-and-red must now fail the audit."
+    },
+    {
+      "context": "pgTAP irrigation (feeding + watering)",
+      "alwaysRuns": false,
+      "why": "irrigation-pgtap-rls-gate.yml opens by calling itself \"Required PR gate for RLS/ACL regressions on irrigation-evidence trust boundary\", and it is absent from the ruleset - grep -c pgTAP against this file returns 0. It filters inside the workflow via a dorny/paths-filter changes job rather than a trigger-level paths block, so its jobs report skipped when no irrigation surface changed; alwaysRuns is false so that legitimate skip stays quiet."
+    },
+    {
+      "context": "irrigation harness typecheck (tsc --noEmit)",
+      "alwaysRuns": false,
+      "why": "The second job of the same self-declared required gate. It compiles the irrigation runtime harnesses through a dedicated tsconfig, so a harness that stopped compiling would otherwise land unnoticed. Same conditional skip behaviour as the pgTAP job above."
+    },
+    {
+      "context": "Deno bridge auth + handler E2E",
+      "alwaysRuns": false,
+      "why": "sensor-ingest-webhook-edge-tests.yml runs six Deno edge tests covering the bridge auth, CORS and handler boundaries for sensor-ingest-webhook, ecowitt-ingest, mint-bridge-token and revoke-bridge-token. It gates nothing today. It IS path-filtered at the trigger, so alwaysRuns is false: a PR touching no edge surface legitimately produces no result."
     }
   ],
   "mustBeGreen//": [

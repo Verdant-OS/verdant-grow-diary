@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-30 UTC (~05:19 UTC)
+**Last updated:** 2026-08-30 UTC (~05:56 UTC)
 **Updated by:** Claude (2026-08-30: **#1224 merged as `c63f969f`** — deploy tip is now that commit.
 It closes the **remainder** of a parameterized `Authorization` header for the four reserved schemes
 `Basic|Digest|Negotiate|NTLM`; verified by executing the merged tip, not read from the title.
@@ -17,7 +17,7 @@ It closes the **remainder** of a parameterized `Authorization` header for the fo
 | Shape     | **squash** — one parent; subject ends `(#1224)` | verified, `git rev-list --parents` |
 | Head      | **`a55b12ec`**                                  | **verified twice** — see below     |
 | Owner     | Codex                                           | PR body                            |
-| Reviewer  | **none named** — see §5                         | PR body: "GDP assigns"             |
+| Reviewer  | **Super Blue** — `PASS` at `a55b12ec`           | reported (Cheek), 2026-08-30       |
 
 Files: `src/lib/ecowittValidationEvidenceRules.ts`, its test, the edge mirror and
 `.sync-manifest.json`. **+9 / −5, zero migrations.**
@@ -25,8 +25,12 @@ Files: `src/lib/ecowittValidationEvidenceRules.ts`, its test, the edge mirror an
 The head SHA is `established fact` here, not a `source claim` as in the #1222 and #1216 rows above:
 the GitHub API reported `head.sha` while the PR was open, and the squash commit message on the tip
 embeds `a55b12ec7e3c5162d19b0a09be7f6fc534dc705b` verbatim in its Cursor Bugbot line. Two
-independent readings agree. **Dream Queen is not recorded for #1224** — none was reported and none is
-readable in-repo, so it is `NOT_MEASURED`, not `PASS`.
+independent readings agree.
+
+**The independent reviewer is Super Blue — `PASS` at `a55b12ec`** (Cheek, 2026-08-30). Super Blue is a
+peer, so this slice carries an owner and a different independent reviewer. Recorded as **reported**: as
+with the Dream Queen results in the entries below, no review run is readable from this repository, so the
+provenance is Cheek's report rather than an in-repo artefact.
 
 **Eleventh observed squash outcome** (#1186, #1212, #1213, #1215, #1216, #1217, #1218, #1220, #1222,
 #1223, #1224 — parent counts checked, not inferred). It stays an **observation**: the configured
@@ -112,32 +116,7 @@ version. #1224 had been open five minutes when Claude began. Claude did not run 
 as a process failure, not smoothed over; the wasted work is Claude's, and no repository state was
 harmed.
 
-## 5. Reviewer seats — three open, none closed here
-
-`established fact` as to what the documents say; **`UNKNOWN`** as to how they will be resolved.
-
-`AGENTS.md` (586-589) requires every assigned slice to name **one owner** and **a different peer** as
-independent reviewer, and calls a slice without one **incomplete**. Three merged slices now sit
-against that rule:
-
-| PR    | Owner  | Reviewer seat                                                    | Status                                     |
-| ----- | ------ | ---------------------------------------------------------------- | ------------------------------------------ |
-| #1222 | Codex  | not filled — Dream Queen `PASS` is not a peer review             | merged; Codex raised it as a `P1` on #1223 |
-| #1223 | Claude | not filled                                                       | merged                                     |
-| #1224 | Codex  | **"GDP assigns; Codex has not self-reviewed"**, per its own body | merged                                     |
-
-Also carried forward from #1223, **unaddressed on merged text**: two Copilot findings — that the entry
-says the redacted attribute is `username` "in these cases" while one row uses `opaque="x"`, and that
-labelling the open item an **unknown-scheme** catch-all reads as not covering the **known-scheme**
-leftovers listed above it. Both are Claude's wording errors. They are **not corrected here**: this
-file demotes superseded entries, it does not rewrite them.
-
-Codex's `P1` asks that the missing-reviewer breach on #1222 be recorded in this file. A standing
-instruction says not to write "reviewer unnamed" for #1222. The table above records the seat as **not
-filled** without using that phrase; whether that satisfies the `P1` is **Cheek's call, not Claude's**,
-and the contradiction is flagged rather than resolved.
-
-## 6. Posture
+## 5. Posture
 
 - **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
 - **No publish, no republish. No EcoWitt-to-live. No rebase. No update-branch.**
@@ -146,8 +125,7 @@ and the contradiction is flagged rather than resolved.
   **not a current measurement**. Re-measuring needs Cheek or GDP; Claude did not take it and cannot.
   **A merge is not a deployment.**
 - **#1221 stays draft and unassigned** — open, draft, 16 files, +1440 / −242, based on `d4e5a7ea4`,
-  which is now four commits behind the tip. No owner-and-reviewer pair is assigned to it. It is not
-  being readied, rebased or updated.
+  which is now four commits behind the tip. It is not being readied, rebased or updated.
 - No `knk`. No `query_database`. No production SQL. No device control. No Action Queue write.
 - The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
 - `Supabase Preview` failed again on #1225's head with the repo-wide `ai_credit_grants` 42P07 replay

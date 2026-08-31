@@ -1,7 +1,89 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-31 UTC (~16:24 UTC)
-**Updated by:** Codex (2026-08-31: **#1226 merged as `a26b912c`** and the deploy-branch tip is that
+**Last updated:** 2026-08-31 UTC (~19:38 UTC)
+**Updated by:** Codex (2026-08-31: **#1227 merged as `a8b4a23e`** and the deploy-branch tip is that
+exact commit. Lovable Support (Tolu) is reviewing the blocked Publish and the dirty remint; Publish
+and agent edits in the Lovable project chat remain on hold until Support writes back. The requested
+restore target is now exact GitHub object **`a8b4a23e`**, `dirty:false`. Live remains independently
+MEASURED at **`5c197f75`**, `dirty:true`; no new production measurement was taken here. Paddle live
+token creation and GGS radio capture are parked as recorded below. Prior header follows.)
+
+## 1. #1227 merged — deploy tip `a8b4a23e`
+
+`established fact`, verified from the GitHub PR record, commit graph and exact remote branch ref in
+this docs-only slice.
+
+| Field       | Value                                                            |
+| ----------- | ---------------------------------------------------------------- |
+| PR          | **#1227 MERGED**                                                 |
+| Merge SHA   | **`a8b4a23ecfca4158394cadc76a28028653eeaa34`**                   |
+| Parent      | `a26b912cc72fb484e7f36a61ed0c91c0faddc90d` (#1226)               |
+| Shape       | **squash** — one parent; subject ends `(#1227)`                  |
+| Source head | `a98d20c07b2e6587ea83fb918844fa5d45be8ae3`                       |
+| Scope       | docs restamp of #1226; `docs/agents/CURRENT_STATE.md` only       |
+| Deploy tip  | **`a8b4a23ecfca4158394cadc76a28028653eeaa34`**, exact remote ref |
+
+The deploy branch did **not** move to `5c197f75`. Do not rebase this record onto that remint and do
+not merge the remint onto `verdant-grow-diary`.
+
+## 2. Lovable Support hold — no outcome yet
+
+`session evidence`, supplied by Cheek. This restamp records the handoff without inventing a Support
+result.
+
+- Lovable Support agent **Tolu** is reviewing both the suspicious-activity Publish block and the
+  `5c197f75` dirty remint.
+- There must be **no further Publish attempt** and **no agent edit in the Lovable project chat** until
+  Support writes back.
+- The requested restore target is the current GitHub object
+  `a8b4a23ecfca4158394cadc76a28028653eeaa34`, `dirty:false` — not only the earlier `a26b912c` tip.
+- Support has not supplied an outcome in the evidence available to this slice. Do not infer that the
+  block is lifted or that production was restored.
+
+## 3. Live remains `5c197f75`, dirty remint
+
+The last independent production measurement remains
+`5c197f7516e65845209c2d3b4a3192cf5848570c`, `dirty:true`, ref `master`. This restamp did not
+re-fetch production. The remint remains on GitHub but is not the `verdant-grow-diary` deploy tip.
+
+## 4. Paddle token creation parked
+
+`session evidence`, supplied by Cheek; no Paddle or Lovable environment operation was performed in
+this slice.
+
+- Creation of a new live client-side token named `verdant-live-20260831` is **parked** because the
+  Paddle login is locked out after a password reset.
+- Do **not** revoke the existing `live_` token.
+- Do not reproduce token bytes and do not write any Lovable environment value.
+
+## 5. Spider Farmer GGS radio parked
+
+`session evidence`, supplied by Cheek and carried into this Verdant docs-only restamp without
+opening or changing the GGS repository.
+
+- `cheekhimself/Spider-Farmer-GGS-Controller-MQTT` PR **#3 MERGED** as
+  `b2ab1a6550ab6e1a7d77889eede65203f92f7485`; the shipped path is FF01 receive-only.
+- Capture remains **`NOT_MEASURED`**.
+- Advertisements matching `MELK-OA21*` and `GVH6013*` are **not GGS**. Do not connect to or promote
+  them as GGS evidence.
+- Do not use FF02, AES or a Verdant sink. Radio work is parked until Cheek uses the other PC tonight.
+
+## 6. Current locks
+
+- **Publish and Lovable project-chat agent edits are BLOCKED** pending Tolu's Support response. No
+  retry or alternate publisher path.
+- **Paddle token creation is PARKED.** Do not revoke the existing `live_` token, write token bytes or
+  change Lovable environment values.
+- **GGS radio capture is PARKED.** No FF02, AES or Verdant sink.
+- **Catch-all / Kerberos / HOBA remain BLOCKED.** Do not add a scheme or implement the unknown-scheme
+  catch-all.
+- **#1221 stays draft and unassigned.** It is not being readied, rebased, updated or merged.
+- **#1225 stays CLOSED — SUPERSEDED.** Do not reopen or rebase it.
+- **No APPLY.** Least of all `20260813030000`. No publish, production SQL or production mutation.
+- This restamp is **N=1** and stays **draft**. No ready, merge, publish, rebase or update-branch. No
+  `src/` or `supabase/` change.
+
+**Prior update:** Codex (2026-08-31: **#1226 merged as `a26b912c`** and the deploy-branch tip is that
 exact commit. Cheek unlocked one production editor Publish attempt for that GitHub object; Lovable
 blocked it with the suspicious-activity tooltip recorded below, and Codex stopped without retrying.
 Live was independently MEASURED at **`5c197f75`**, `dirty:true`, ref `master`; that Lovable remint is

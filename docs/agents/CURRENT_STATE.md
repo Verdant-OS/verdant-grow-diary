@@ -1,7 +1,91 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-30 UTC (~05:56 UTC)
-**Updated by:** Claude (2026-08-30: **#1224 merged as `c63f969f`** — deploy tip is now that commit.
+**Last updated:** 2026-08-31 UTC (~16:24 UTC)
+**Updated by:** Codex (2026-08-31: **#1226 merged as `a26b912c`** and the deploy-branch tip is that
+exact commit. Cheek unlocked one production editor Publish attempt for that GitHub object; Lovable
+blocked it with the suspicious-activity tooltip recorded below, and Codex stopped without retrying.
+Live was independently MEASURED at **`5c197f75`**, `dirty:true`, ref `master`; that Lovable remint is
+on GitHub but is **not** the `verdant-grow-diary` tip. Publish stays locked pending Lovable Support.
+Prior header follows.)
+
+## 1. #1226 merged — deploy tip `a26b912c`
+
+`established fact`, verified from the GitHub PR record, commit graph and exact remote branch ref in
+this docs-only slice.
+
+| Field       | Value                                                            |
+| ----------- | ---------------------------------------------------------------- |
+| PR          | **#1226 MERGED**                                                 |
+| Merge SHA   | **`a26b912cc72fb484e7f36a61ed0c91c0faddc90d`**                   |
+| Parent      | `c63f969f05a435e3a62dd281741d2c796dbb454e` (#1224)               |
+| Shape       | **squash** — one parent; subject ends `(#1226)`                  |
+| Source head | `0b9e15284ffb6924f0a870ee9f801f16c02e05b0`                       |
+| Scope       | docs restamp of #1224; `docs/agents/CURRENT_STATE.md` only       |
+| Deploy tip  | **`a26b912cc72fb484e7f36a61ed0c91c0faddc90d`**, exact remote ref |
+
+The deploy branch did **not** move to `5c197f75`. Do not rebase this record onto that remint and do
+not merge the remint onto `verdant-grow-diary`.
+
+## 2. Production Publish — one attempt, blocked, stopped
+
+`session evidence`, recorded from the editor attempt authorised by Cheek for exact GitHub object
+`a26b912cc72fb484e7f36a61ed0c91c0faddc90d`.
+
+- Cheek unlocked production Publish of `a26b912c`.
+- Codex made **one** Lovable editor Publish attempt.
+- The editor returned this exact tooltip:
+
+  > Publishing was blocked due to suspicious activity. Contact support if you believe this is a mistake.
+
+- Result: **FAIL**. Codex stopped. There was no retry, History restore, Ask Lovable, `send_message`,
+  Try to fix, MCP deploy, or other publisher path.
+- Cheek contacted Lovable Support on 2026-08-31 at approximately **11:07 AM CT**. Production Publish
+  stays locked until Support lifts the block.
+
+## 3. Live measurement — `5c197f75`, dirty remint, not the deploy tip
+
+`MEASURED`, supplied by Cheek from an independent read of
+`https://verdantgrowdiary.com/version.json`; this docs-only slice did not re-fetch production.
+
+| Field        | Measured value                               |
+| ------------ | -------------------------------------------- |
+| `commit`     | `5c197f7516e65845209c2d3b4a3192cf5848570c`   |
+| `dirty`      | **`true`**                                   |
+| `ref`        | `master`                                     |
+| `commitTime` | `2026-08-31T15:21:54Z` — **10:21 AM CT**     |
+| `buildTime`  | `2026-08-31T15:23:59.622Z` — **10:23 AM CT** |
+
+GitHub metadata for that SHA was independently verified in this slice without reading its patch
+body:
+
+- GitHub author and committer: `lovable-dev[bot]`; Git author and committer:
+  `gpt-engineer-app[bot]`.
+- Subject: **Hardened restore-env script**; Lovable `ai_update` edit `edt-62eccfff`.
+- Merge parents: `a26b912cc72fb484e7f36a61ed0c91c0faddc90d` and
+  `9d31447aa0c3d1aab87f0a3a9362b29d9bbdf9c9`.
+- The commit exists on GitHub. It is **not** the exact remote head of `verdant-grow-diary`; that head
+  remains `a26b912c`.
+
+The remint injected a payments token of class `live_` into tracked `.env.production` and made
+`restore-env-production-from-head` skippable when Git HEAD is missing. This record deliberately does
+not reproduce or inspect the token bytes. No revert, env edit, or restore-script patch is authorised
+by this slice.
+
+## 4. Current locks
+
+- **Publish is BLOCKED** pending Lovable Support. No retry or alternate publisher path.
+- **Catch-all / Kerberos / HOBA remain BLOCKED.** Do not add a scheme or implement the unknown-scheme
+  catch-all.
+- **#1221 stays draft and unassigned.** It is not being readied, rebased, updated or merged.
+- **#1225 stays CLOSED — SUPERSEDED.** Do not reopen or rebase it.
+- **No APPLY.** Least of all `20260813030000`. No `knk`, `query_database`, production SQL or
+  EcoWitt-to-live.
+- No History restore, Ask Lovable, `send_message`, Try to fix, MCP deploy, revert of `5c197f75`, or
+  patch to `restore-env-production-from-head`.
+- This restamp is **N=1** and stays **draft**. No ready, merge, publish, rebase or update-branch. No
+  `src/` or `supabase/` change.
+
+**Prior update:** Claude (2026-08-30: **#1224 merged as `c63f969f`** — deploy tip is now that commit.
 It closes the **remainder** of a parameterized `Authorization` header for the four reserved schemes
 `Basic|Digest|Negotiate|NTLM`; verified by executing the merged tip, not read from the title.
 **`Kerberos` and `HOBA` still leak their attribute lists** and the unknown-scheme catch-all stays

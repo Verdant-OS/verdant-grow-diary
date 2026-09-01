@@ -8,12 +8,14 @@ interface QuickLogSymptomCheckFieldsProps {
   readonly observationLocation: string;
   readonly stage: CanonicalQuickLogStage | null;
   readonly stageConfirmed: boolean;
+  readonly noSymptomsObserved: boolean;
   readonly disabled: boolean;
   readonly testIdPrefix: string;
   readonly onSymptomObservedSignChange: (value: string) => void;
   readonly onObservationLocationChange: (value: string) => void;
   readonly onStageChange: (value: CanonicalQuickLogStage | null) => void;
   readonly onStageConfirmedChange: (value: boolean) => void;
+  readonly onNoSymptomsObservedChange: (value: boolean) => void;
 }
 
 export default function QuickLogSymptomCheckFields({
@@ -21,12 +23,14 @@ export default function QuickLogSymptomCheckFields({
   observationLocation,
   stage,
   stageConfirmed,
+  noSymptomsObserved,
   disabled,
   testIdPrefix,
   onSymptomObservedSignChange,
   onObservationLocationChange,
   onStageChange,
   onStageConfirmedChange,
+  onNoSymptomsObservedChange,
 }: QuickLogSymptomCheckFieldsProps) {
   const locationField = getQuickLogActivityDetailFields("issue_observation").find(
     (field) => field.key === "observationLocation",
@@ -40,13 +44,13 @@ export default function QuickLogSymptomCheckFields({
       </p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {CANNABIS_SYMPTOM_DEFINITIONS.map((symptom) => {
-          const selected = symptomObservedSign === symptom.observedSign;
+          const selected = !noSymptomsObserved && symptomObservedSign === symptom.observedSign;
           return (
             <button
               key={symptom.id}
               type="button"
               aria-pressed={selected}
-              disabled={disabled}
+              disabled={disabled || noSymptomsObserved}
               onClick={() => onSymptomObservedSignChange(symptom.observedSign)}
               className={`min-h-[44px] rounded-md border px-3 py-2 text-left text-sm transition-colors ${
                 selected
@@ -63,6 +67,23 @@ export default function QuickLogSymptomCheckFields({
           );
         })}
       </div>
+      <label
+        className="flex min-h-[44px] items-start gap-2 rounded-md border border-border/60 p-2.5 text-xs"
+        data-testid={`${testIdPrefix}-symptom-none-row`}
+      >
+        <input
+          type="checkbox"
+          checked={noSymptomsObserved}
+          onChange={(event) => onNoSymptomsObservedChange(event.target.checked)}
+          disabled={disabled}
+          className="mt-0.5"
+          data-testid={`${testIdPrefix}-symptom-none-observed`}
+        />
+        <span>
+          I checked this plant and saw no visible symptoms. Records the check as evidence; it is not
+          a health verdict.
+        </span>
+      </label>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label

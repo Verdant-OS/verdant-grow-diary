@@ -11,7 +11,8 @@ This is a **preview-only** project. Production deployment from `main` and
 
 ## 1. Vercel Project Settings
 
-These must match `vercel.json` and the Vite app layout:
+Configure these on the Vercel project dashboard (not in `vercel.json`).
+They must match the Vite app layout:
 
 | Setting              | Value          |
 | -------------------- | -------------- |

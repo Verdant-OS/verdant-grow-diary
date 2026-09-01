@@ -537,24 +537,26 @@ Not to be rounded up by anyone quoting this document.
 
 ## 9. Validation
 
-### 9.0 Eight measurement defects found in review, and corrected
+### 9.0 Nine measurement defects found in review, and corrected
 
 The first published version of `measure-test-estate.mjs` was reviewed on PR #1219 by **Codex,
 GitHub Copilot and Cursor Bugbot independently**, and all three found defects in it. Six were real.
 Codex then reviewed **the correction itself** and found two more, one of them inside the fix for
-defect 4. All eight are recorded here rather than quietly patched, because this document's subject is
-measurement discipline and the reproducer was the part that failed it.
+defect 4 — and Cursor Bugbot then found a ninth inside the fix for _that_. All nine are recorded here
+rather than quietly patched, because this document's subject is measurement discipline and the
+reproducer was the part that failed it.
 
-| #   | Defect                                                                                                        | Effect on a published figure                                                                           |
-| --- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 1   | Measured the checked-out tree, not the revision named                                                         | The reproducer could not reproduce a pinned figure at all. Now `--rev`, read from the git object store |
-| 2   | `IMPORTS_PRODUCT` matched only `@/…`, so tests reaching product code by relative path were bucketed scan-only | scan-only **634 → 624**; substring share **16.3% → 16.1%**                                             |
-| 3   | Any path token in a workflow body counted as execution                                                        | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed  |
-| 4   | `import type` counted as a runtime edge, though the transpiler erases it                                      | reachability **98.2% → 97.8%**                                                                         |
-| 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee         | no figure moved, but the guarantee was false as written                                                |
-| 6   | Nothing tested the parser that produces these numbers                                                         | now `src/test/measure-test-estate-rules.test.ts`, 38 cases                                             |
-| 7   | The fix for 4 matched imports with a **regex**, which both invented edges and missed real ones                | reachability **97.7% → 97.8%**; imports are now read from the TypeScript compiler's own AST            |
-| 8   | §1 claimed the script reproduces _every_ headline count, but it launches no test runner                       | no figure moved; the claim is narrowed to the static counts it does derive                             |
+| #   | Defect                                                                                                            | Effect on a published figure                                                                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Measured the checked-out tree, not the revision named                                                             | The reproducer could not reproduce a pinned figure at all. Now `--rev`, read from the git object store                         |
+| 2   | `IMPORTS_PRODUCT` matched only `@/…`, so tests reaching product code by relative path were bucketed scan-only     | scan-only **634 → 624**; substring share **16.3% → 16.1%**                                                                     |
+| 3   | Any path token in a workflow body counted as execution                                                            | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed                          |
+| 4   | `import type` counted as a runtime edge, though the transpiler erases it                                          | reachability **98.2% → 97.8%**                                                                                                 |
+| 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee             | no figure moved, but the guarantee was false as written                                                                        |
+| 6   | Nothing tested the parser that produces these numbers                                                             | now `src/test/measure-test-estate-rules.test.ts`, 43 cases                                                                     |
+| 7   | The fix for 4 matched imports with a **regex**, which both invented edges and missed real ones                    | reachability **97.7% → 97.8%**; imports are now read from the TypeScript compiler's own AST                                    |
+| 8   | §1 claimed the script reproduces _every_ headline count, but it launches no test runner                           | no figure moved; the claim is narrowed to the static counts it does derive                                                     |
+| 9   | The reachability walk regex-subtracted every `vi.mock` path, contradicting the rule defect 7 had just established | no module moved on the pinned tree, but the code and the published method disagreed; the rule now lives in one tested function |
 
 Fixing 3 initially introduced two **false-DEAD** readings in the opposite direction — a YAML folded
 scalar (`run: >-`) splits one command across lines, and a `psql … \` continuation does too, so real
@@ -584,6 +586,26 @@ rule in both directions is that an edge means **the real module loads**:
 Handling those moved no published figure: every module affected was already reached by another path,
 so reachability held at 2,061 of 2,108. Eight parser cases pin the two directions.
 
+**Defect 9 is the same rule, contradicted one layer up.** Having established when a mock is an edge,
+the reachability walk still regex-subtracted _every_ `vi.mock` path from the seed set after the
+parser had classified it — so a bare `vi.mock("x")` was dropped despite auto-mocking by loading the
+module, and the repo's commonest shape, `vi.mock(spec, async () => ({ ...await vi.importActual(spec) }))`,
+was dropped even though `importActual` bypasses the registry and loads the real module. Cursor Bugbot
+caught it. The composition now lives in one tested function alongside the parser, so the figure the
+script emits cannot drift from the method this section publishes:
+
+- a `vi.mock(spec, factory)` is hoisted and replaces the module for the whole file, so even a static
+  import of it resolves to the factory — dropped, unless
+- the same file calls `vi.importActual` / `vi.importMock` on it, which bypasses the registry — kept;
+- `vi.doMock` is not hoisted and so cannot retroactively replace a module a static import already
+  loaded — kept.
+
+Measured on the pinned tree, the corrected rule seeds **exactly the same 1,636 modules** as the one
+it replaces — every module the old rule wrongly dropped was reached through another test file. So
+this fixed a wrong method that was not, on this tree, producing a wrong number. Two of its five cases
+were proven RED against the old composition (the spread-actual and bare-automock shapes each returned
+`[]`); the `vi.doMock` case is a fence, green either way.
+
 The pattern across defects 2, 4 and 7 is one thing: **each came from matching text where a parser was
 needed** — which is the failure mode §3 reports about the test estate, found again in the tool written
 to measure it.
@@ -601,7 +623,7 @@ directions are pinned by two CLI cases in the parser test file.
 Targeted tests:      src/test/timeline-grow-filter.test.ts, src/test/action-queue-row-evidence-badge.test.ts
                      → 2 files, 18 cases, all passing at baseline
                      src/test/measure-test-estate-rules.test.ts (the reproducer's own parser)
-                     → 1 file, 38 cases, 38 passed | 0 failed
+                     → 1 file, 43 cases, 43 passed | 0 failed
                      RED-before-GREEN, proven by execution: with the vulnerable
                      `execSync` form restored in place, the command-substitution
                      case failed (1 failed | 37 passed); the file was restored and

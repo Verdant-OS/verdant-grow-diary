@@ -131,15 +131,86 @@ const VITEST_LOADERS = new Set(["importActual", "importMock"]);
 const VITEST_AUTOMOCKS = new Set(["mock", "doMock"]);
 
 function loadsRealModule(call) {
-  const callee = call.expression;
-  if (!ts.isPropertyAccessExpression(callee)) return false;
-  const obj = callee.expression;
-  if (!ts.isIdentifier(obj) || (obj.text !== "vi" && obj.text !== "vitest")) return false;
-  const name = callee.name.text;
+  const name = viCallName(call);
+  if (name === null) return false;
   if (VITEST_LOADERS.has(name)) return true;
   // `vi.mock("x", factory)` never loads "x"; bare `vi.mock("x")` auto-mocks it.
   return VITEST_AUTOMOCKS.has(name) && call.arguments.length === 1;
 }
+
+/**
+ * Product modules a TEST file replaces wholesale with a `vi.mock(spec, factory)`.
+ *
+ * `vi.mock` is hoisted above the file's imports and applies to the whole module,
+ * so a static `import { x } from "./foo"` in a file that also factory-mocks
+ * "./foo" resolves to the factory — the real module never loads, and counting it
+ * as reached credits the module from the one construct that guarantees it did
+ * not run.
+ *
+ * `vi.doMock` is deliberately NOT included: it is not hoisted, so it cannot
+ * replace a module a static import already loaded. Neither is a bare
+ * `vi.mock(spec)`, which auto-mocks by loading the real module for its shape.
+ *
+ * The caller subtracts this set from a test file's edges, but must keep any
+ * specifier the same file also passes to `vi.importActual` / `vi.importMock` —
+ * those bypass the registry and load the real module, which is exactly what the
+ * repo's spread-actual pattern does.
+ */
+export function factoryMockedSpecifiers(source, fileName = "f.tsx") {
+  const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
+  const specs = [];
+  const visit = (node) => {
+    if (ts.isCallExpression(node) && isViCall(node, "mock") && node.arguments.length > 1) {
+      const arg = node.arguments[0];
+      if (ts.isStringLiteral(arg)) specs.push(arg.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return specs;
+}
+
+/** Specifiers a file loads for real regardless of any mock registered on them. */
+export function bypassesMockSpecifiers(source, fileName = "f.tsx") {
+  const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
+  const specs = [];
+  const visit = (node) => {
+    if (ts.isCallExpression(node) && VITEST_LOADERS.has(viCallName(node) ?? "")) {
+      const arg = node.arguments[0];
+      if (ts.isStringLiteral(arg)) specs.push(arg.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return specs;
+}
+
+/**
+ * The specifiers a TEST file loads for real, with Vitest's mock semantics applied.
+ *
+ * This is the rule the audit publishes for module reachability, in one place so
+ * the script cannot drift from it — an earlier version of the script subtracted
+ * every `vi.mock` path with a regex, which contradicted the parser above in two
+ * directions at once and was invisible because nothing tested the composition.
+ */
+export function testFileRuntimeSpecifiers(source, fileName = "f.tsx") {
+  const bypassed = new Set(bypassesMockSpecifiers(source, fileName));
+  const replaced = new Set(
+    factoryMockedSpecifiers(source, fileName).filter((spec) => !bypassed.has(spec)),
+  );
+  return runtimeImportSpecifiers(source, fileName).filter((spec) => !replaced.has(spec));
+}
+
+/** The method name of a `vi.*` / `vitest.*` call, or null if it is not one. */
+function viCallName(call) {
+  const callee = call.expression;
+  if (!ts.isPropertyAccessExpression(callee)) return null;
+  const obj = callee.expression;
+  if (!ts.isIdentifier(obj) || (obj.text !== "vi" && obj.text !== "vitest")) return null;
+  return callee.name.text;
+}
+
+const isViCall = (call, name) => viCallName(call) === name;
 
 /** `import type …`, or a named clause whose every binding is `type`-prefixed. */
 function isErasedImportClause(clause) {

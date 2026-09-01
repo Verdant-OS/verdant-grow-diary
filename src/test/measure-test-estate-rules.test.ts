@@ -21,6 +21,8 @@ import path from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   buildExecutableCorpus,
+  bypassesMockSpecifiers,
+  factoryMockedSpecifiers,
   classifyTest,
   commandLinesIn,
   isCommandLine,
@@ -28,6 +30,7 @@ import {
   resolveSpec,
   runtimeImportSpecifiers,
   stripTriggerBlock,
+  testFileRuntimeSpecifiers,
   // Pure rules; the script supplies all I/O.
 } from "../../scripts/lib/testEstateRules.mjs";
 
@@ -335,6 +338,54 @@ describe("import graph — vitest registry calls that really load the module", (
 
   it("ignores a same-named method on some other object", () => {
     expect(runtimeImportSpecifiers(`registry.mock("./not-vitest");`)).toEqual([]);
+  });
+});
+
+describe("reachability seeding — Vitest mock semantics, applied once", () => {
+  // The script used to regex-subtract every `vi.mock` path AFTER the parser had
+  // classified edges, which contradicted the parser in both directions and was
+  // invisible because nothing tested the composition. It lives here now.
+  const spreadActual = [
+    'import { listAlerts } from "@/lib/alerts";',
+    'vi.mock("@/lib/alerts", async () => {',
+    '  const actual = await vi.importActual<typeof import("@/lib/alerts")>("@/lib/alerts");',
+    "  return { ...actual, listAlerts: vi.fn() };",
+    "});",
+  ].join("\n");
+
+  it("keeps a factory-mocked module the same file loads via importActual", () => {
+    // The regex-subtract form dropped this — the repo's most common mock shape.
+    // The list is not deduped (nor is `runtimeImportSpecifiers`); callers set it.
+    expect([...new Set(testFileRuntimeSpecifiers(spreadActual))]).toEqual(["@/lib/alerts"]);
+  });
+
+  it("drops a module replaced wholesale, static import and all", () => {
+    const src = [
+      'import { thing } from "@/lib/replaced";',
+      'vi.mock("@/lib/replaced", () => ({ thing: vi.fn() }));',
+    ].join("\n");
+    // `vi.mock` is hoisted, so the static import resolves to the factory.
+    expect(testFileRuntimeSpecifiers(src)).toEqual([]);
+  });
+
+  it("keeps a bare `vi.mock`, which auto-mocks by loading the real module", () => {
+    expect(testFileRuntimeSpecifiers(`vi.mock("@/lib/auto");`)).toEqual(["@/lib/auto"]);
+  });
+
+  it("keeps a static import that `vi.doMock` cannot retroactively replace", () => {
+    const src = [
+      'import { thing } from "@/lib/later";',
+      'vi.doMock("@/lib/later", () => ({ thing: vi.fn() }));',
+    ].join("\n");
+    // `vi.doMock` is not hoisted; the static import already loaded the real one.
+    expect(testFileRuntimeSpecifiers(src)).toEqual(["@/lib/later"]);
+  });
+
+  it("separates the two extraction steps", () => {
+    expect(factoryMockedSpecifiers(spreadActual)).toEqual(["@/lib/alerts"]);
+    expect(bypassesMockSpecifiers(spreadActual)).toEqual(["@/lib/alerts"]);
+    expect(factoryMockedSpecifiers(`vi.mock("@/lib/auto");`)).toEqual([]);
+    expect(factoryMockedSpecifiers(`vi.doMock("@/x", () => ({}));`)).toEqual([]);
   });
 });
 

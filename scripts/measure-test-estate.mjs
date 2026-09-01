@@ -34,6 +34,7 @@ import {
   namedPathsIn,
   resolveSpec,
   runtimeImportSpecifiers,
+  testFileRuntimeSpecifiers,
 } from "./lib/testEstateRules.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -177,14 +178,11 @@ const depsOf = (f) => {
 const direct = new Set();
 for (const t of tests) {
   const s = body(t);
-  const mocked = new Set(
-    [...s.matchAll(/vi\.mock\(\s*["']([^"']+)["']/g)]
-      .map((m) => resolveSpec(m[1], t, productSet))
-      .filter(Boolean),
-  );
-  for (const spec of runtimeImportSpecifiers(s)) {
+  // Vitest mock semantics live in the rules module, not here, so the figure the
+  // script emits cannot drift from the method the audit publishes.
+  for (const spec of testFileRuntimeSpecifiers(s, t)) {
     const r = resolveSpec(spec, t, productSet);
-    if (r && !mocked.has(r)) direct.add(r);
+    if (r) direct.add(r);
   }
 }
 const reached = new Set(direct);

@@ -337,11 +337,13 @@ describe("evaluatePolicy", () => {
   it("fails when a new npm entrypoint is not declared", () => {
     const files = policyFiles({
       extra: {
-        [at("vercel.json")]: '{"installCommand":"npm install"}',
+        // Synthetic undeclared path — not the real vercel.json (dashboard settings
+        // live outside the repo config file after the projectSettings removal).
+        [at("scripts/ad-hoc-npm-install.sh")]: "npm install",
       },
     });
     expect(evaluate(files).errors.join(" ")).toContain(
-      "Undeclared npm install/ci consumer found at vercel.json",
+      "Undeclared npm install/ci consumer found at scripts/ad-hoc-npm-install.sh",
     );
   });
 
@@ -390,6 +392,23 @@ describe("evaluatePolicy", () => {
     for (const forbidden of FORBIDDEN_LOCKFILES) {
       expect(existsSync(resolve(root, forbidden)), forbidden).toBe(false);
     }
+
+    // Vercel framework/install/build/dev belong on the project dashboard.
+    // vercel.json must not reintroduce invalid `projectSettings`; npm install
+    // policy for preview stays pinned via docs/preview-deployment-verification.md.
+    const vercel = JSON.parse(readFileSync(resolve(root, "vercel.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    expect(vercel).not.toHaveProperty("projectSettings");
+    expect(JSON.stringify(vercel)).not.toContain("installCommand");
+
+    const transition = JSON.parse(
+      readFileSync(resolve(root, "config/dependency-lockfile-transition.json"), "utf8"),
+    ) as { consumerContracts: Array<{ path: string }> };
+    const consumerPaths = transition.consumerContracts.map(({ path }) => path);
+    expect(consumerPaths).not.toContain("vercel.json");
+    expect(consumerPaths).toContain("docs/preview-deployment-verification.md");
   }, 15_000);
 
   it("runs as a CLI on Windows and finds uppercase undeclared consumers", () => {

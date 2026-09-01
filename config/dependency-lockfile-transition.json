@@ -4,17 +4,9 @@
   "canonicalLockfile": "bun.lock",
   "compatibilityLockfile": "package-lock.json",
   "owner": "Verdant dependency security",
-  "reason": "package-lock.json remains synchronized while live Vercel, SEO, local setup, and preview verification entrypoints still invoke npm.",
+  "reason": "package-lock.json remains synchronized while SEO, local setup, and the Vercel preview dashboard checklist still invoke or document npm. Framework/install/build/dev for Vercel live in the project dashboard, not vercel.json.",
   "reviewBy": "2026-09-25",
   "consumerContracts": [
-    {
-      "path": "vercel.json",
-      "markers": [
-        "\"buildCommand\": \"npm run build\",",
-        "\"installCommand\": \"npm install\",",
-        "\"devCommand\": \"npm run dev\""
-      ]
-    },
     {
       "path": ".github/workflows/seo-monitoring.yml",
       "markers": ["run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund"]

@@ -1,7 +1,229 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-31 UTC (~19:38 UTC)
-**Updated by:** Codex (2026-08-31: **#1227 merged as `a8b4a23e`** and the deploy-branch tip is that
+**Last updated:** 2026-09-01 UTC (~02:13 UTC)
+**Updated by:** Claude (2026-09-01: **#1228, #1229, #1230 and #1231 are all MERGED** and the
+deploy-branch tip is **`68ad14c66a`**, exact remote ref. #1228 was the docs restamp of #1227; #1229,
+#1230 and #1231 are the first product code to land since the Support hold began. Cheek has set the
+requested Lovable restore target to exact GitHub object **`68ad14c66a`**, `dirty:false` — it was
+`a8b4a23e` in the last restamp. Live remains independently MEASURED at **`5c197f75`**, `dirty:true`;
+no new production measurement was taken here. **Production is DIVERGED from the deploy branch, not
+merely behind it** — five commits behind and **four ahead**. Publish, History restore
+and APPLY stay blocked. Tolu's Support reply is expected 2026-09-01; **do not ping**. Knowledge-library
+expansion stays HOLD and no SEO/Wikipedia program is opened here. The open trust boundary is the GGS
+radio path, still `NOT_MEASURED`, with the sniff set for ~11pm. Prior header follows.)
+
+## 1. #1228 → #1231 merged — deploy tip `68ad14c66a`
+
+`established fact`, verified in this docs-only slice from the GitHub PR records and from the local
+commit graph on the fetched remote ref. Four squashes landed in sequence on top of `a8b4a23e`.
+
+| PR        | Merge SHA    | Parent      | Files | Diff      | Subject                                                                    |
+| --------- | ------------ | ----------- | ----: | --------- | -------------------------------------------------------------------------- |
+| **#1228** | `6fd48d1c`   | `a8b4a23e`  |     1 | +84 / −2  | `docs(state): restamp after #1227 and Support hold`                        |
+| **#1229** | `47e2588a`   | `6fd48d1c`  |     5 | +189 / −3 | `fix(ai-doctor): recover Quick Log watering …`                             |
+| **#1230** | `cc1cd81af`  | `47e2588a`  |     4 | +179 / −9 | `feat(symptom-check): record a check with no visible symptoms`             |
+| **#1231** | `68ad14c66a` | `cc1cd81af` |     2 | +67 / −0  | `fix(symptom-check): clear no-symptoms box after save, switch, and start.` |
+
+Exact remote ref, read twice (`git ls-remote` and `git rev-parse origin/verdant-grow-diary`):
+
+```text
+68ad14c66a223d123d7ab263b83cec3fe5d90c8d  refs/heads/verdant-grow-diary
+```
+
+Full merge SHAs: `6fd48d1cd80fa973bcdf1e7acf7d518ecee277fa`,
+`47e2588ab514708b3ab65beefe610071afd15ec6`, `cc1cd81aff503badd2d393f91b4e1d4e1d667279`,
+`68ad14c66a223d123d7ab263b83cec3fe5d90c8d`.
+
+Every one is a **squash** — single parent, subject ending in its own PR number. The chain
+`a8b4a23e → 6fd48d1c → 47e2588a → cc1cd81af → 68ad14c66a` is linear with no merge commits.
+
+**#1229 and #1230 were both cut from `6fd48d1c`** — they were developed in parallel, not stacked, and
+GitHub recorded `base.sha` as `6fd48d1c` for each. #1230 landed second and was squashed onto #1229's
+tip. Their file sets do not intersect, so the parallel cut produced no collision; #1230's own body
+says so and the diff confirms it.
+
+**Zero migrations** in `6fd48d1c..68ad14c66a`. **`docs/agents/CURRENT_STATE.md` was not touched by
+#1229, #1230 or #1231** — the last state write was #1228, so this restamp is the first record of the
+three product merges.
+
+## 2. What the three product merges changed
+
+`established fact` for the file sets and diffstats (read from the commit graph); the behavioural
+descriptions are `source claim` from the merged PR bodies, not re-derived by executing the tip.
+
+- **#1229 — AI Doctor readiness and Timeline Memory.** A shared `resolveCanonicalDiaryEventType`
+  helper makes explicit `entry_type` authoritative and accepts `details.event_type` only on a Quick
+  Log allow-list; unknown, missing, array or malformed `details` **fail closed** as `diary_entry`,
+  and note text is never parsed. Same-day Quick Log watering can now clear `no_recent_watering`.
+  Timeline Memory keeps grouped Quick Log parents in evidence `items` but out of `displayItems`, so
+  grouped-owned history stops rendering "No plant history yet." Touches
+  `src/hooks/useTimelineMemory.ts`, `src/lib/diaryTimelineViewModel.ts`,
+  `src/lib/plantAiDoctorContextAdapter.ts` and two test files.
+- **#1230 — Symptom Check with no visible symptoms.** Records
+  `details.symptom_check_result = no_symptoms_observed`. It is deliberately **not** an `observedSign`
+  and **not** added to the symptom catalog, so guides, verification topics and evidence cards still
+  fail closed rather than inventing a "healthy" symptom. Setting both a sign and the checkbox fails
+  closed. Stage confirm still required.
+- **#1231 — sticky-checkbox leftover.** `guidedSymptomNoneObserved` previously reset only on Cancel,
+  so a later Symptom Check in the same mount could reopen with the clean-check box already on. The
+  fix clears it at five reset sites. Presenter-local React state only; validation unchanged.
+
+These are consistent with the Sensor Truth and AI Doctor fences: all three fail closed, none
+introduces telemetry, device control, an Action Queue write, or a schema change.
+
+### Review provenance for the three product merges
+
+`established fact` from the merged PR bodies; `missing evidence` for the outcome.
+
+#1229's body carries an **unticked** independent-verdict box naming Blue Dream on head `5e3c54a70`.
+#1230's carries an **unticked** independent-clone box naming Blue Dream, gated on that SHA and on
+required CI green. Both were merged by Cheek with those boxes unticked. #1231's body records that it
+exists to close a **P2 leftover raised by Super Blue on #1230**, which is evidence that #1230 did
+receive an independent read.
+
+No review artefact for any of the three is readable from this repository. Whether the Blue Dream
+verdicts were taken outside the PR is **`missing evidence`** — the checkbox state alone establishes
+neither a `PASS` nor a governance breach, and this slice does not resolve it either way.
+
+## 3. Lovable Support hold — restore target moves to `68ad14c66a`
+
+`session evidence`, supplied by Cheek. No Support outcome is invented and no Lovable surface was
+touched in this slice.
+
+- The requested restore target is now the exact GitHub object
+  **`68ad14c66a223d123d7ab263b83cec3fe5d90c8d`**, `dirty:false`. It was `a8b4a23e` in the last
+  restamp, and that earlier value is superseded. This records the target as it now stands; it does
+  not establish a standing rule that the target auto-follows the tip. A later tip needs a new
+  instruction from Cheek, not an inference from this line.
+- **Tolu's reply is expected 2026-09-01. Do not ping, chase, reopen or escalate the ticket.**
+- Publish and agent edits in the Lovable project chat stay on hold until Support writes back. No
+  retry, no History restore, no Ask Lovable, no `send_message`, no Try to fix, no MCP deploy, no
+  alternate publisher path.
+- Support has still supplied **no outcome** in the evidence available to this slice. Do not infer
+  that the block is lifted or that production was restored.
+- **The target's blast radius changed with it.** `a8b4a23e` was a docs-only restamp and could not
+  alter product behaviour. `68ad14c66a` carries #1229, #1230 and #1231 — ten changed `src/` files —
+  so executing this restore now **ships product code**, including three merges whose independent
+  review is recorded as **`missing evidence`** in section 2. Whoever executes the restore once Tolu
+  lifts the hold should read that subsection first. This slice does not resolve it and does not
+  authorise the restore.
+
+## 4. Live remains `5c197f75`, dirty remint — not re-measured here
+
+The last independent production measurement remains
+`5c197f7516e65845209c2d3b4a3192cf5848570c`, `dirty:true`, ref `master`, `commitTime`
+`2026-08-31T15:21:54Z`. **This restamp did not re-fetch production**, so that value is carried, not
+refreshed — it is a `MEASURED` reading from 2026-08-31, not a 2026-09-01 measurement.
+
+### Production is DIVERGED, not merely behind
+
+`established fact`, measured on the graph in this slice. Read both numbers — the one-directional
+"behind" count is the misreading this section exists to prevent.
+
+```text
+git rev-list --left-right --count origin/verdant-grow-diary...5c197f75
+5   4
+```
+
+**Five behind.** The remint is a **merge commit** whose first parent is `a26b912c`, so the five
+commits it lacks are `a8b4a23e` (#1227), `6fd48d1c` (#1228), `47e2588a` (#1229), `cc1cd81af` (#1230)
+and `68ad14c66a` (#1231) — note this includes #1227, which the tip carries and live does not.
+
+**Four ahead.** Production also carries four commits that exist on **no** deploy-branch SHA, reached
+through the remint's second parent `9d31447a`:
+
+```text
+5c197f7  Hardened restore-env script
+9d31447  Changes
+29ddb39  Changes
+e71d0dd  Work in progress
+```
+
+Production is therefore **not** a lagging subset of the deploy branch, and shipping the five missing
+commits would **not** reconcile it. Three of the four are opaquely titled Lovable bot commits whose
+content has had no review recorded here. Do not model production as "the deploy branch, older".
+
+**A merge is not a deployment**: none of #1229's, #1230's or #1231's behaviour is in production. The
+remint remains on GitHub and is **not** the `verdant-grow-diary` tip. Do not rebase this record onto
+it and do not merge it onto the deploy branch.
+
+## 5. Nothing new was opened here
+
+`session evidence`, supplied by Cheek. Recorded so a later reader does not mistake carried context
+for a fresh mandate.
+
+- **Codex's SEO / Wikipedia work is not restamped as a new program.** Codex's standing SEO
+  measurement-readiness and analytics-integrity assignment is unchanged and already recorded below.
+  No Wikipedia program exists in this record, and this slice does not create one.
+- **Knowledge-library expansion is `HOLD`.** No new pillar, page type, content contract, programmatic
+  cohort or article is authorized. Claude's default-strength library work stays parked.
+- **Dual-home: Slice 1 is already on the tip; Slice 2 is not approved.** Slice 1 shipped as
+  [#949](https://github.com/Verdant-OS/verdant-grow-diary/pull/949) (`741f99e1b`). That SHA was
+  **not re-verified in this slice** — the working clone is shallow and does not contain that object,
+  so the claim is carried from blocker 7 below, not independently established here.
+  **Slice 2 — the `/welcome` → `/` consolidation, 35 pinned files — remains unapproved.** Do not
+  start it.
+- **The catch-all remains `BLOCKED`.** Kerberos and HOBA still leak their attribute lists and the
+  unknown-scheme catch-all stays `OPEN` / REVIEW ONLY. Do not add a scheme or implement the catch-all.
+- **#1221 stays draft and unassigned.** Not readied, rebased, updated or merged.
+
+## 6. GGS radio is the open trust boundary — sniff at ~11pm
+
+`session evidence`, supplied by Cheek and carried into this Verdant docs-only restamp without opening
+or changing the GGS repository.
+
+- `cheekhimself/Spider-Farmer-GGS-Controller-MQTT` PR **#3 MERGED** as
+  `b2ab1a6550ab6e1a7d77889eede65203f92f7485`; the shipped path is FF01 receive-only.
+- **Capture remains `NOT_MEASURED`.** The sniff is still set for **~11pm**, on the other PC. The
+  **time zone was not stated** and is not converted here — read it as Cheek's local time
+  (`uncertainty`), not as UTC. Elsewhere this file stamps clock times `CT`.
+- Cheek's standing read, recorded here because it sets priority: **the open trust-boundary hole is
+  the GGS radio path, not a missing article.** Content work does not close a trust boundary. This is
+  a statement of priority only — the knowledge-library `HOLD` in section 5 is **unconditional** and
+  is **not** lifted by measuring the radio path.
+- Advertisements matching `MELK-OA21*` and `GVH6013*` are **not GGS**. Do not connect to them or
+  promote them as GGS evidence.
+- Do not use FF02, AES or a Verdant sink.
+
+## 7. Paddle token creation still parked
+
+`session evidence`, supplied by Cheek; no Paddle or Lovable environment operation was performed here.
+
+- Creation of a live client-side token named `verdant-live-20260831` is **parked** — the Paddle login
+  is locked out after a password reset.
+- Do **not** revoke the existing `live_` token, reproduce token bytes, or write any Lovable
+  environment value.
+- **Why the token matters, carried forward so it does not age out of the current block:** the
+  `5c197f75` remint injected a payments token of class `live_` into **tracked `.env.production`**,
+  and made `restore-env-production-from-head` **skippable when Git HEAD is missing**. Both are still
+  in the running production build — they are among the four ahead-commits in section 4. This record
+  deliberately does not reproduce or inspect the token bytes, and authorises no revert, env edit or
+  restore-script patch. It is recorded as an **open exposure**, not a resolved one.
+
+## 8. Current locks
+
+- **Publish and Lovable project-chat agent edits are BLOCKED** pending Tolu. Reply expected
+  2026-09-01; **do not ping**. No retry, History restore or alternate publisher path.
+- **No APPLY.** Least of all `20260813030000`. No `knk`, no `query_database`, no production SQL, no
+  EcoWitt-to-live, no production mutation.
+- **Knowledge-library expansion is HOLD.** No SEO/Wikipedia program is opened.
+- **Dual-home Slice 2 is unapproved.** Slice 1 is already on the tip.
+- **Catch-all / Kerberos / HOBA remain BLOCKED.**
+- **Paddle token creation is PARKED.** No revoke, no token bytes, no environment write.
+- **GGS radio capture is PARKED and `NOT_MEASURED`** until the ~11pm sniff. No FF02, AES or Verdant
+  sink.
+- **#1221 stays draft and unassigned. #1225 stays CLOSED — SUPERSEDED.** Do not reopen or rebase
+  either.
+- **Independent-review provenance for #1229 and #1230 is UNRESOLVED** and carries forward: both were
+  merged with their Blue Dream boxes unticked and no review artefact is readable from this repo. It
+  is **`missing evidence`**, not a `PASS` and not an established breach. Carry this bullet into the
+  next restamp until Cheek settles it.
+- This restamp is **N=1** and stays **draft**, on branch `claude/agent-state-paste-update-hk7enh`,
+  parented on `68ad14c66a`. No ready, merge, publish, rebase or update-branch. No `src/` or
+  `supabase/` change. **Owner: Claude. Independent reviewer, named after the SHA: Super Blue** — no
+  ready until an independent `PASS`.
+
+**Prior update:** Codex (2026-08-31: **#1227 merged as `a8b4a23e`** and the deploy-branch tip is that
 exact commit. Lovable Support (Tolu) is reviewing the blocked Publish and the dirty remint; Publish
 and agent edits in the Lovable project chat remain on hold until Support writes back. The requested
 restore target is now exact GitHub object **`a8b4a23e`**, `dirty:false`. Live remains independently

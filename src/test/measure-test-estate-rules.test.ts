@@ -384,6 +384,36 @@ describe("reachability seeding — Vitest mock semantics, applied once", () => {
     expect(testFileRuntimeSpecifiers(src)).toEqual(["@/lib/later"]);
   });
 
+  it("keeps a module the factory loads through its `importOriginal` callback", () => {
+    // Vitest passes the factory a loader for the original module. 19 test files
+    // at the pinned revision use this shape; recognising only `vi.importActual`
+    // dropped a real edge in every one of them.
+    const src = [
+      'import { trackFunnelEvent } from "@/lib/funnelAnalytics";',
+      'vi.mock("@/lib/funnelAnalytics", async (importOriginal) => {',
+      '  const real = await importOriginal<typeof import("@/lib/funnelAnalytics")>();',
+      "  return { ...real, trackFunnelEvent: spies.track };",
+      "});",
+    ].join("\n");
+    expect([...new Set(testFileRuntimeSpecifiers(src))]).toEqual(["@/lib/funnelAnalytics"]);
+  });
+
+  it("matches the callback by BINDING, not by the name `importOriginal`", () => {
+    const src = [
+      'import { a } from "@/lib/renamed";',
+      'vi.mock("@/lib/renamed", async (loadReal) => ({ ...(await loadReal()), a: vi.fn() }));',
+    ].join("\n");
+    expect([...new Set(testFileRuntimeSpecifiers(src))]).toEqual(["@/lib/renamed"]);
+  });
+
+  it("does NOT count a factory parameter that is declared and never called", () => {
+    const src = [
+      'import { x } from "@/lib/never";',
+      'vi.mock("@/lib/never", async (importOriginal) => ({ x: vi.fn() }));',
+    ].join("\n");
+    expect(testFileRuntimeSpecifiers(src)).toEqual([]);
+  });
+
   it("separates the two extraction steps", () => {
     expect(factoryMockedSpecifiers(spreadActual)).toEqual(["@/lib/alerts"]);
     expect(bypassesMockSpecifiers(spreadActual)).toEqual(["@/lib/alerts"]);

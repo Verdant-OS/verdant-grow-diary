@@ -66,8 +66,22 @@ have to be reproduced the slower way:
 - **Anything attributed to a workflow run or a check name** is read from CI, which the script cannot
   see.
 
-Everything else — file, case-site and assertion counts, the scan/hybrid/behavioural buckets, module
-reachability, and the four lane execution figures — the script derives itself.
+**What the script does derive is exactly this list**, and nothing outside it should be read as
+covered by the claim above:
+
+`testFiles` · `productModules` · `itTestCallSites` · `expectCallSites` · `skipCallSites` ·
+`onlyCallSites` · `scanOnlyFiles` · `scanOnlyExpects` · `scanOnlyCases` ·
+`scanOnlySubstringAssertions` · `hybridFiles` · `hybridExpects` · `hybridCases` ·
+`behaviouralFiles` · `behaviouralExpects` · `filesDoingFileIo` · `filesReadingSrcPaths` ·
+reachability (`direct` / `transitiveOnly` / `unreached`, with the unreached files named) · the four
+lanes' `total` / `executed` / `never` with every never-executed file named · and
+`testFilesAcrossAllLanes`.
+
+Every other number in this document was measured by hand — the 7 `@source-scan-justified`
+declarations (§3), the Quick Log counts in §6, the keyword and required-check figures in §5 and §9 —
+and each names the file or command it came from where it appears. They are `established fact` where
+so labelled, but they are **not** reproduced by one command, and a reader checking them has to
+follow the source named beside them.
 
 | Axis                        | How it was measured                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -538,15 +552,16 @@ Not to be rounded up by anyone quoting this document.
 
 ## 9. Validation
 
-### 9.0 Twelve measurement defects found in review, and corrected
+### 9.0 Fourteen measurement defects found in review, and corrected
 
 The first published version of `measure-test-estate.mjs` was reviewed on PR #1219 by **Codex,
 GitHub Copilot and Cursor Bugbot independently**, and all three found defects in it. Six were real.
 Codex then reviewed **the correction itself** and found two more, one of them inside the fix for
 defect 4 — and Cursor Bugbot then found a ninth inside the fix for _that_. A further pass by Codex
 found three more, in the assertion and file-I/O counters nobody had looked at while the import
-graph was being argued over. All twelve are recorded here rather than quietly patched, because
-this document's subject is measurement discipline and the reproducer was the part that failed it.
+graph was being argued over — and both then found a fourteenth and a thirteenth in the fixes for
+defects 8 and 9. All fourteen are recorded here rather than quietly patched, because this document's
+subject is measurement discipline and the reproducer was the part that failed it.
 
 | #   | Defect                                                                                                                                        | Effect on a published figure                                                                                                   |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -555,13 +570,15 @@ this document's subject is measurement discipline and the reproducer was the par
 | 3   | Any path token in a workflow body counted as execution                                                                                        | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed                          |
 | 4   | `import type` counted as a runtime edge, though the transpiler erases it                                                                      | reachability **98.2% → 97.8%**                                                                                                 |
 | 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee                                         | no figure moved, but the guarantee was false as written                                                                        |
-| 6   | Nothing tested the parser that produces these numbers                                                                                         | now `src/test/measure-test-estate-rules.test.ts`, 54 cases                                                                     |
+| 6   | Nothing tested the parser that produces these numbers                                                                                         | now `src/test/measure-test-estate-rules.test.ts`, 57 cases                                                                     |
 | 7   | The fix for 4 matched imports with a **regex**, which both invented edges and missed real ones                                                | reachability **97.7% → 97.8%**; imports are now read from the TypeScript compiler's own AST                                    |
 | 8   | §1 claimed the script reproduces _every_ headline count, but it launches no test runner                                                       | no figure moved; the claim is narrowed to the static counts it does derive                                                     |
 | 9   | The reachability walk regex-subtracted every `vi.mock` path, contradicting the rule defect 7 had just established                             | no module moved on the pinned tree, but the code and the published method disagreed; the rule now lives in one tested function |
 | 10  | `it` / `test` / `expect` / `toContain` counted as **text**, so `/re/.test(x)` read as a case and `"expect("` in a string read as an assertion | case sites **32,080 → 31,941**; assertions **87,351 → 87,333**; `.skip` **13 → 11**; substring assertions **14,057 → 14,054**  |
 | 11  | The file-I/O predicate matched the reader **names** anywhere, including a type member and an injected fake                                    | scan-only **624 → 622**; any-file-I/O **1,397 → 1,393**                                                                        |
 | 12  | "806 test files read a path under `src/`" was text-matched and the script never emitted it                                                    | **806 → 813**, now derived by the reproducer like every other static figure                                                    |
+| 13  | The fix for 9 recognised only `vi.importActual`, so `vi.mock(spec, async (importOriginal) => …)` — 19 files — lost a real edge                | direct/transitive **1,636/425 → 1,637/424**; total reached unchanged at 2,061 of 2,108                                         |
+| 14  | The fix for 8 still over-claimed: `--json` derives none of the `@source-scan-justified`, Quick Log, keyword or required-check figures         | no figure moved; §1 now enumerates the exact fields the script emits, and says the rest are hand-measured                      |
 
 Fixing 3 initially introduced two **false-DEAD** readings in the opposite direction — a YAML folded
 scalar (`run: >-`) splits one command across lines, and a `psql … \` continuation does too, so real
@@ -605,11 +622,18 @@ script emits cannot drift from the method this section publishes:
 - `vi.doMock` is not hoisted and so cannot retroactively replace a module a static import already
   loaded — kept.
 
-Measured on the pinned tree, the corrected rule seeds **exactly the same 1,636 modules** as the one
-it replaces — every module the old rule wrongly dropped was reached through another test file. So
-this fixed a wrong method that was not, on this tree, producing a wrong number. Two of its five cases
-were proven RED against the old composition (the spread-actual and bare-automock shapes each returned
-`[]`); the `vi.doMock` case is a fence, green either way.
+That first correction was still incomplete, which is **defect 13**: it recognised only
+`vi.importActual`, and Vitest's other way of loading the original is the factory's own callback —
+`vi.mock(spec, async (importOriginal) => ({ ...(await importOriginal()) }))`. **19 test files** at
+the pinned revision use that shape, `alert-doctor-credit-gate.test.tsx` among them, and every one of
+them lost a real edge. The callback is matched by **binding** — the factory's first parameter,
+invoked inside the factory body — not by the name `importOriginal`, which is the test author's
+choice; a parameter declared and never called loads nothing and is not a bypass.
+
+With 13 fixed, the direct/transitive split moves **1,636/425 → 1,637/424**. Total reached is
+unchanged at 2,061 of 2,108, so the published 97.8% holds either way — the correction moves a module
+from transitively-reached to directly-imported, which is what it should do. Eight cases pin the rule
+now; the `vi.doMock` and declared-but-uncalled cases are fences, green either way, and say so.
 
 **Defects 10, 11 and 12 are the same mistake in the counters**, which nobody had looked at while the
 import graph was being argued over:
@@ -632,8 +656,14 @@ replaces.
 
 The pattern across defects 2, 4, 7, 9, 10, 11 and 12 is one thing: **each came from matching text
 where a parser was needed** — which is the failure mode §3 reports about the test estate, found seven
-times over in the tool written to measure it. That is the strongest evidence in this document for its
-own central claim, and none of it was found by the author.
+times over in the tool written to measure it. Defects 13 and 14 are a second pattern, and a quieter
+one: **each was a fix that stopped one case short of the rule it was written to enforce.** Both were
+found by a reviewer re-reading the correction, not the original.
+
+Neither pattern was caught by the author. Five review rounds by three independent reviewers found
+every one of the fourteen. That is the strongest evidence in this document for its own central
+claim, and it is evidence about the author as much as about the tool: a measurement is not
+trustworthy because the person who made it checked it.
 
 **One security defect, separate from the eight above.** CodeQL alert 255 flagged the `--rev` argument
 reaching a shell: it was interpolated into an `execSync` string, and double quotes do not neutralise
@@ -648,7 +678,7 @@ directions are pinned by two CLI cases in the parser test file.
 Targeted tests:      src/test/timeline-grow-filter.test.ts, src/test/action-queue-row-evidence-badge.test.ts
                      → 2 files, 18 cases, all passing at baseline
                      src/test/measure-test-estate-rules.test.ts (the reproducer's own parser)
-                     → 1 file, 54 cases, 54 passed | 0 failed
+                     → 1 file, 57 cases, 57 passed | 0 failed
                      RED-before-GREEN, proven by execution: with the vulnerable
                      `execSync` form restored in place, the command-substitution
                      case failed (1 failed | 37 passed); the file was restored and

@@ -170,19 +170,63 @@ export function factoryMockedSpecifiers(source, fileName = "f.tsx") {
   return specs;
 }
 
-/** Specifiers a file loads for real regardless of any mock registered on them. */
+/**
+ * Specifiers a file loads for real regardless of any mock registered on them.
+ *
+ * Two shapes, and both are needed — recognising only the first silently dropped
+ * a real edge in 19 test files at the pinned revision:
+ *
+ * - `vi.importActual(spec)` / `vi.importMock(spec)`, called anywhere.
+ * - the factory callback form,
+ *   `vi.mock(spec, async (importOriginal) => ({ ...(await importOriginal()) }))`.
+ *   Vitest passes the factory a function that loads the original module. The
+ *   parameter is conventionally named `importOriginal`, but the name is the
+ *   test author's choice, so it is matched by BINDING: the factory's first
+ *   parameter, invoked somewhere inside the factory body. A parameter that is
+ *   declared and never called loads nothing and is not a bypass.
+ */
 export function bypassesMockSpecifiers(source, fileName = "f.tsx") {
   const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
   const specs = [];
   const visit = (node) => {
-    if (ts.isCallExpression(node) && VITEST_LOADERS.has(viCallName(node) ?? "")) {
-      const arg = node.arguments[0];
-      if (ts.isStringLiteral(arg)) specs.push(arg.text);
+    if (ts.isCallExpression(node)) {
+      if (VITEST_LOADERS.has(viCallName(node) ?? "")) {
+        const arg = node.arguments[0];
+        if (arg && ts.isStringLiteral(arg)) specs.push(arg.text);
+      } else if (isViCall(node, "mock") || isViCall(node, "doMock")) {
+        const [spec, factory] = node.arguments;
+        if (spec && ts.isStringLiteral(spec) && callsItsOwnFirstParameter(factory)) {
+          specs.push(spec.text);
+        }
+      }
     }
     ts.forEachChild(node, visit);
   };
   visit(sf);
   return specs;
+}
+
+/** Is `fn` a function whose first parameter is invoked inside its own body? */
+function callsItsOwnFirstParameter(fn) {
+  if (!fn || (!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn))) return false;
+  const first = fn.parameters[0];
+  if (!first || !ts.isIdentifier(first.name)) return false;
+  const name = first.name.text;
+  let called = false;
+  const visit = (node) => {
+    if (called) return;
+    if (ts.isCallExpression(node)) {
+      // `importOriginal()` and `importOriginal<T>()` alike.
+      const callee = node.expression;
+      if (ts.isIdentifier(callee) && callee.text === name) {
+        called = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(fn.body ?? fn);
+  return called;
 }
 
 /**

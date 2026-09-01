@@ -99,22 +99,26 @@ function canonicalOriginDefaultRef(rawRef, stampSha, currentGitSha) {
  * Build Output API tree under `.vercel/` — Nitro writes it mid-build and a
  * detached checkout would otherwise stamp dirty:true for publisher residue.
  * Untracked and changed source/config/Edge files must remain visible as dirty.
+ *
+ * Returns the exact `git status --porcelain` text after those excludes (may be
+ * empty). Callers decide dirty from non-empty text; Vercel builds also print
+ * the lines so the host log names the real paths when dirty:true.
  */
-function hasMeaningfulWorktreeChanges() {
+function collectMeaningfulPorcelain() {
   const excludes = [...GENERATED_STAMP_OUTPUTS];
   if (isVercelBuildEnvironment()) {
     excludes.push(".vercel", ".vercel/**");
   }
   const excludedOutputs = excludes.map((path) => `":(exclude)${path}"`).join(" ");
-  return (
-    safe(
-      () =>
-        run(`git status --porcelain --untracked-files=all -- . ${excludedOutputs}`)
-          .toString()
-          .trim(),
-      "",
-    ) !== ""
+  return safe(
+    () =>
+      run(`git status --porcelain --untracked-files=all -- . ${excludedOutputs}`).toString().trim(),
+    "",
   );
+}
+
+function hasMeaningfulWorktreeChanges() {
+  return collectMeaningfulPorcelain() !== "";
 }
 
 /**
@@ -158,7 +162,18 @@ const commitTime = safe(() =>
 // history-less snapshot everything besides those outputs is "untracked", so
 // dirty:true plus commitSource:"none" together read as "identity from
 // treeHash".)
-const dirty = hasMeaningfulWorktreeChanges();
+const meaningfulPorcelain = collectMeaningfulPorcelain();
+const dirty = meaningfulPorcelain !== "";
+if (dirty && isVercelBuildEnvironment()) {
+  // Diagnostic only — never flip dirty:false. Next Preview log must name the
+  // exact paths so excludes are not guessed.
+  console.error(
+    "stamp-version: Vercel worktree dirty — git status --porcelain (after stamp excludes):",
+  );
+  for (const line of meaningfulPorcelain.split(/\r?\n/)) {
+    console.error(line);
+  }
+}
 
 // Content identity that needs no git. Guarded: stamping must never fail
 // a build over a hashing error — degrade to null instead.

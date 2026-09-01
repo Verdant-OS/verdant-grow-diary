@@ -22,7 +22,7 @@ import { describe, expect, it, afterAll, vi } from "vitest";
 // on a contended host can individually exceed the 5s unit default. The
 // assertions stay strict; only the per-test budget is integration-sized.
 vi.setConfig({ testTimeout: 120_000 });
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -97,14 +97,21 @@ function runStamper(
 ): {
   record: Record<string, unknown>;
   stdout: string;
+  stderr: string;
 } {
-  const stdout = execFileSync("node", ["scripts/stamp-version.mjs"], {
+  const result = spawnSync("node", ["scripts/stamp-version.mjs"], {
     cwd,
     encoding: "utf8",
     env: cleanEnv(envOverrides),
   });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `stamp-version exited ${result.status}: ${result.stderr || result.stdout || ""}`,
+    );
+  }
   const record = JSON.parse(readFileSync(join(cwd, "public/version.json"), "utf8"));
-  return { record, stdout };
+  return { record, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 }
 
 function makeCommittedSandbox(additionalFiles: Record<string, string> = {}): {
@@ -423,6 +430,24 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
         VERCEL_GIT_COMMIT_REF: "verdant-grow-diary",
       }).record.dirty,
     ).toBe(true);
+  });
+
+  it("on Vercel, prints exact porcelain lines when a src file makes the tree dirty", () => {
+    const { box, sha } = makeCommittedSandbox();
+    git(box, ["checkout", "--detach", sha]);
+    writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
+
+    const { record, stderr } = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "cursor/vercel-json-remove-project-settings-0454",
+    });
+    expect(record.dirty).toBe(true);
+    expect(stderr).toContain(
+      "stamp-version: Vercel worktree dirty — git status --porcelain (after stamp excludes):",
+    );
+    expect(stderr).toMatch(/src\/components\/App\.tsx/);
+    // Still does not invent a clean stamp.
+    expect(record.version).toContain("-dirty");
   });
 
   it("prefers VERCEL_GIT_COMMIT_REF when GITHUB_REF_NAME is absent, without fabricating commit", () => {

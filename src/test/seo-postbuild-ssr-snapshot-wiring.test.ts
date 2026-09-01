@@ -34,9 +34,15 @@ describe("SEO postbuild SSR snapshot wiring", () => {
     );
     expect(POSTBUILD_RUNNER).toContain("captureArgs.push(probe.entry)");
     expect(POSTBUILD_RUNNER).toContain("./lib/serverBundleEntryProbe.mjs");
+    // Capture must share bun with generate-seo-artifacts; node spawn is banned
+    // for this import/fetch path (Vercel Node 24 vs bun SSR bundle mismatch).
+    expect(POSTBUILD_RUNNER).toContain('run("bun", captureArgs)');
+    expect(POSTBUILD_RUNNER).not.toContain('run("node", captureArgs)');
   });
 
   it("keeps the standalone snapshot command on the canonical Nitro server bundle", () => {
+    // package.json seo:snapshots is a local convenience entry; postbuild capture
+    // is spawned via bun from run-postbuild-seo.mjs (pinned above).
     expect(PACKAGE.scripts["seo:snapshots"]).toBe(CAPTURE_COMMAND);
   });
 

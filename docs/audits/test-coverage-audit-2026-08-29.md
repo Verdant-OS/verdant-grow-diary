@@ -24,16 +24,16 @@ Two things are true at once, and the second is the one that needs work:
 
 - **Breadth is genuinely good.** **3,008 test files across four lanes** — 2,908 Vitest, 60
   Playwright, 31 Deno, 9 pgTAP. The Vitest lane discovers **39,407** cases and **executes 39,217**
-  (190 skipped, §9). 98.2% of product modules are reached by some Vitest test. Zero `.only`
+  (190 skipped, §9). 97.7% of product modules are reached by some Vitest test. Zero `.only`
   anywhere. That is better than most repositories this size.
   Every per-case and per-assertion figure in this document is **Vitest-only** unless it says
   otherwise; the other three lanes are counted by file, because nothing aggregates their cases.
 - **Depth is unmeasured, and four separate lanes of already-written tests never execute.**
   There is no coverage instrumentation of any kind, so the fraction of _branches_ the suite
-  exercises is `NOT_MEASURED`. **16.3% of all Vitest assertions** are `toContain`/`toMatch` checks
-  against source **text** inside scan-only files (14,251 of 87,351) — a class proven by execution
+  exercises is `NOT_MEASURED`. **16.1% of all Vitest assertions** are `toContain`/`toMatch` checks
+  against source **text** inside scan-only files (14,042 of 87,351) — a class proven by execution
   in §3 to go red on behaviour-preserving refactors and stay green through real behaviour breaks.
-  And 21 of 31 Deno edge tests, 16 of 33 runtime RLS/billing harnesses, 7 of 9 pgTAP suites, and
+  And 21 of 31 Deno edge tests, 18 of 33 runtime RLS/billing harnesses, 7 of 9 pgTAP suites, and
   25 of 60 Playwright specs are never run by any workflow.
 
 The single highest-value action is not writing new tests. It is **running the tests that already
@@ -47,19 +47,22 @@ The calibrated verdict is at §10.
 ## 1. Method, and what it cannot tell you
 
 `established fact` unless labelled otherwise. **Every headline count below is reproduced by
-`scripts/measure-test-estate.mjs`**, committed with this audit — run `node scripts/measure-test-estate.mjs`
-(or `--json`) to re-derive them. A measurement nobody can re-run is not evidence, which is the same
+`scripts/measure-test-estate.mjs`**, committed with this audit — run
+`node scripts/measure-test-estate.mjs --rev 5d6efc9` (add `--json` for the full report) to re-derive
+them. **Every figure below is pinned to `5d6efc9`**, and the script reads that revision from the git
+object store rather than the working tree, so a different checkout, a modified file or an untracked
+one cannot move a published number. A measurement nobody can re-run is not evidence, which is the same
 defect this document is about. The two mutation experiments in §3 are the exception: they are
 described step by step because they deliberately mutate and restore a product file.
 
-| Axis                        | How it was measured                                                                       |
-| --------------------------- | ----------------------------------------------------------------------------------------- |
-| File and case counts        | `git ls-files` + regex over test sources                                                  |
-| Module reachability         | Import graph built from `@/…` and relative specifiers, BFS-seeded from test files         |
-| Test _kind_ (scan vs value) | Presence of `readFileSync`/`readdirSync` vs product imports vs `render()`                 |
-| CI execution                | Every `.github/workflows/*.yml` plus transitive expansion of `package.json` script chains |
-| Behavioural strength        | Two mutation experiments run by execution against `src/pages/Timeline.tsx` (§3)           |
-| Executed suite result       | One unsharded `npx vitest run` at `5d6efc9`, plus CI's 32 shards on the PR head (§9)      |
+| Axis                        | How it was measured                                                                                                                                                                                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| File and case counts        | `git ls-tree` at the pinned revision + regex over test sources                                                                                                                                                                                                       |
+| Module reachability         | **Runtime** import graph from `@/…` and relative specifiers, BFS-seeded from test files. `import type` / `export type` and fully type-only clauses are erased by the transpiler and excluded                                                                         |
+| Test _kind_ (scan vs value) | `readFileSync`/`readdirSync` vs product imports (alias **and relative**) vs `render()`                                                                                                                                                                               |
+| CI execution                | The **command lines** of every workflow `run:` step, plus expansion of `package.json` script chains and one hop into repo runners. A path named only in a trigger filter, a `paths-filter` allowlist, a shell array or a job summary is a mention, not an invocation |
+| Behavioural strength        | Two mutation experiments run by execution against `src/pages/Timeline.tsx` (§3)                                                                                                                                                                                      |
+| Executed suite result       | One unsharded `npx vitest run` at `5d6efc9`, plus CI's 32 shards on the PR head (§9)                                                                                                                                                                                 |
 
 **Five limits, stated up front so nothing below is over-read:**
 
@@ -123,14 +126,14 @@ import no product module and render nothing, so nothing in them observes runtime
 
 | Bucket                                                                 | Files             | Assertions         | Cases             |
 | ---------------------------------------------------------------------- | ----------------- | ------------------ | ----------------- |
-| **Scan-only** (reads files; imports no product module; never renders)  | **634** (21.8%)   | **19,049** (21.8%) | **6,330** (19.7%) |
-| Hybrid (scans files _and_ imports/renders)                             | 763               | 29,488             | —                 |
+| **Scan-only** (reads files; imports no product module; never renders)  | **623** (21.4%)   | **18,530** (21.2%) | **6,143** (19.1%) |
+| Hybrid (scans files _and_ imports/renders)                             | 774               | 30,007             | —                 |
 | Pure behavioural (no file I/O at all)                                  | 1,511 (52.0%)     | 38,814             | —                 |
 | **Any file I/O** (`readFileSync`/`readFile(`/`readdirSync`/`globSync`) | **1,397** (48.0%) | —                  | —                 |
 
-Within the scan-only bucket, **74.8% of assertions are `toContain(...)` or `toMatch(...)`** —
-14,251 substring and regex checks over file text, which is **16.3% of all 87,351 Vitest
-assertions**, not 21.8%. (21.8% is the bucket's total share of assertions; the two figures were
+Within the scan-only bucket, **75.8% of assertions are `toContain(...)` or `toMatch(...)`** —
+14,042 substring and regex checks over file text, which is **16.1% of all 87,351 Vitest
+assertions**, not 21.2%. (21.2% is the bucket's total share of assertions; the two figures were
 conflated in an earlier draft of §0.) The hybrid bucket contributes further source-text assertions
 that are `NOT_MEASURED` — its files mix scanning with real imports, and the two were not separated.
 806 test files read a path under `src/`.
@@ -209,7 +212,7 @@ chains, then matching file paths.
 | -------------------------------- | ----: | ------------------------: | -----------------: |
 | Deno edge-function tests         |    31 |                        10 |             **21** |
 | Playwright e2e specs             |    60 |                        35 |             **25** |
-| Runtime RLS / billing harnesses  |    33 |                        17 |             **16** |
+| Runtime RLS / billing harnesses  |    33 |                        15 |             **18** |
 | pgTAP suites (`supabase/tests/`) |     9 |                         2 |              **7** |
 
 ### 4.1 Edge functions — 21 dead test files
@@ -315,6 +318,7 @@ bun run scripts/run-ai-credits-rls-harness.ts
 ```
 
 **Neither is reachable from any workflow.** Also unreachable: `run-action-queue-rls-harness`,
+`run-create-feeding-event-rls-harness`, `run-quicklog-typed-payloads-harness`,
 `run-ai-credit-grow-scope-integrity-harness`, `run-ai-credit-pack-portability-harness`,
 `run-ai-doctor-review-completion-rls-harness`, `run-ai-doctor-review-evidence-receipt-rls-harness`,
 `run-free-creation-caps-rls-harness`, `run-genetics-propagation-rls-harness`,
@@ -447,7 +451,7 @@ No new tests. Three wiring changes:
 1. **Extend `scripts/check-contract-test-resolution.mjs`** from its two `CONFIG_FILES` to any test
    that `readFileSync`s a `src/**` path it never imports — keeping the existing
    `@source-scan-justified: <reason>` escape hatch, which already prints on every run.
-2. **Baseline the existing 634** into an allowlist so only _new_ violations fail. Shrink the
+2. **Baseline the existing 623** into an allowlist so only _new_ violations fail. Shrink the
    allowlist per slice; never whole-file-format a legacy test file while doing it.
 3. **Convert by consequence, not alphabetically.** First: the Quick Log write path (36 files), the
    Timeline scope pins, Action Queue evidence rendering. A converted test renders the component or
@@ -473,7 +477,7 @@ notes invite this: _"Add money/core schema gates here as they stabilise."_
 
 ### P5 — A money/security runtime lane that reports `BLOCKED`, never `PASS`
 
-Give the 16 unreachable harnesses (§4.3) a home: a disposable-stack workflow modelled on
+Give the 18 unreachable harnesses (§4.3) a home: a disposable-stack workflow modelled on
 `irrigation-pgtap-rls-gate.yml`, starting with `run-billing-rls-harness.ts` and
 `run-ai-credits-rls-harness.ts` — the two `AGENTS.md` names. Where credentials are absent the lane
 must report `BLOCKED`, never a vacuous pass; a harness that skips silently is worse than one that
@@ -518,6 +522,28 @@ Not to be rounded up by anyone quoting this document.
 ---
 
 ## 9. Validation
+
+### 9.0 Six measurement defects found in review, and corrected
+
+The first published version of `measure-test-estate.mjs` was reviewed on PR #1219 by **Codex,
+GitHub Copilot and Cursor Bugbot independently**, and all three found defects in it. Six were real.
+They are recorded here rather than quietly patched, because this document's subject is measurement
+discipline and the reproducer was the part that failed it.
+
+| #   | Defect                                                                                                        | Effect on a published figure                                                                           |
+| --- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 1   | Measured the checked-out tree, not the revision named                                                         | The reproducer could not reproduce a pinned figure at all. Now `--rev`, read from the git object store |
+| 2   | `IMPORTS_PRODUCT` matched only `@/…`, so tests reaching product code by relative path were bucketed scan-only | scan-only **634 → 623**; substring share **16.3% → 16.1%**                                             |
+| 3   | Any path token in a workflow body counted as execution                                                        | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed  |
+| 4   | `import type` counted as a runtime edge, though the transpiler erases it                                      | reachability **98.2% → 97.7%**                                                                         |
+| 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee         | no figure moved, but the guarantee was false as written                                                |
+| 6   | Nothing tested the parser that produces these numbers                                                         | now `src/test/measure-test-estate-rules.test.ts`, 23 cases                                             |
+
+Fixing 3 initially introduced two **false-DEAD** readings in the opposite direction — a YAML folded
+scalar (`run: >-`) splits one command across lines, and a `psql … \` continuation does too, so real
+invocations lost their runner token. Both are fixed and both directions are now pinned by tests. The
+lane figures for Deno (10/21), Playwright (35/25) and pgTAP (2/7) are unchanged from the previous
+publication; only the harness lane moved.
 
 ```text
 Targeted tests:      src/test/timeline-grow-filter.test.ts, src/test/action-queue-row-evidence-badge.test.ts

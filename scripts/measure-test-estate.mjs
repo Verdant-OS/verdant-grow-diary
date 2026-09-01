@@ -31,7 +31,10 @@ import path from "node:path";
 import {
   buildExecutableCorpus,
   classifyTest,
+  countCallSites,
   namedPathsIn,
+  readsFiles,
+  readsSrcPath,
   resolveSpec,
   runtimeImportSpecifiers,
   testFileRuntimeSpecifiers,
@@ -117,8 +120,6 @@ const srcOf = readBlobs(allSrc);
 const body = (f) => srcOf.get(f) ?? "";
 
 /* ---------- 1. Vitest lane: file, case and assertion counts ---------- */
-const count = (s, re) => (s.match(re) || []).length;
-
 let callSites = 0;
 let expects = 0;
 let skipCallSites = 0;
@@ -130,27 +131,33 @@ let hybridCases = 0;
 let behavioural = 0;
 let behaviouralExpects = 0;
 let anyFileIo = 0;
+let readsSrc = 0;
 let scanOnlyExpects = 0;
 let scanOnlyCases = 0;
 let scanOnlySubstring = 0;
 
 for (const t of tests) {
   const s = body(t);
-  const e = count(s, /\bexpect\(/g);
-  const c = count(s, /\bit\(|\btest\(/g);
+  // Every count below is of CALLS, parsed. Matching these by text invented 870
+  // case sites (`/re/.test(x)` reads as `test(`) and 18 assertions (`expect(`
+  // inside a string), and missed 731 real `it.skip` / `it.each` case sites.
+  const n = countCallSites(s, t);
+  const e = n.expects;
+  const c = n.cases;
   expects += e;
   callSites += c;
-  skipCallSites += count(s, /\b(it|test|describe)\.skip\(/g);
-  onlyCallSites += count(s, /\b(it|test|describe)\.only\(/g);
+  skipCallSites += n.skips;
+  onlyCallSites += n.onlys;
 
-  if (/readFileSync|readFile\(|globSync|readdirSync/.test(s)) anyFileIo += 1;
+  if (readsFiles(s, t)) anyFileIo += 1;
+  if (readsSrcPath(s, t)) readsSrc += 1;
 
   const kind = classifyTest({ source: s, file: t, productSet });
   if (kind === "scan-only") {
     scanOnly.push(t);
     scanOnlyExpects += e;
     scanOnlyCases += c;
-    scanOnlySubstring += count(s, /toContain\(/g) + count(s, /toMatch\(/g);
+    scanOnlySubstring += n.substringAssertions;
   } else if (kind === "hybrid") {
     hybrid += 1;
     hybridExpects += e;
@@ -288,6 +295,7 @@ const report = {
     behaviouralFiles: behavioural,
     behaviouralExpects,
     filesDoingFileIo: anyFileIo,
+    filesReadingSrcPaths: readsSrc,
   },
   reachability: {
     direct: direct.size,
@@ -328,6 +336,7 @@ if (process.argv.includes("--json")) {
   console.log(
     `  files doing any file I/O       ${v.filesDoingFileIo}  (${pct(v.filesDoingFileIo, v.testFiles)})`,
   );
+  console.log(`  files reading a src/ path      ${v.filesReadingSrcPaths}`);
   console.log("\nModule reachability (runtime edges only; `import type` is erased and excluded)");
   console.log(`  directly imported by a test    ${report.reachability.direct}`);
   console.log(`  transitively reached only      ${report.reachability.transitiveOnly}`);

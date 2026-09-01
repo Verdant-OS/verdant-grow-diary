@@ -237,14 +237,159 @@ function allBindingsTypeOnly(bindings) {
  * AND renders nothing. Anything that also executes product code is a hybrid.
  */
 export function classifyTest({ source, file, productSet }) {
-  const scans = /readFileSync|readFile\(|globSync|readdirSync/.test(source);
+  const scans = readsFiles(source, file);
   const renders = /\brender\s*\(/.test(source);
-  const importsProduct = runtimeImportSpecifiers(source).some(
+  const importsProduct = testFileRuntimeSpecifiers(source, file).some(
     (s) => resolveSpec(s, file, productSet) !== null,
   );
   if (!scans) return "behavioural";
   return !importsProduct && !renders ? "scan-only" : "hybrid";
 }
+
+const FS_READERS = new Set(["readFileSync", "readdirSync", "readFile", "globSync"]);
+
+/**
+ * Does this file actually CALL a filesystem reader?
+ *
+ * The predicate used to match the names anywhere in the source, which fired on
+ * a `type FsLike = { readdirSync: (p: string) => string[] }` and on injected
+ * fakes such as `{ readFileSync: (file: string) => "…" }` — declarations, not
+ * reads. Two files at the pinned revision (`run-skill-driver-probe.test.ts` and
+ * `subscriber-growth-backend-remote-verification.test.ts`) contain no call to
+ * any reader at all and were nonetheless counted in the scan-only bucket.
+ *
+ * Only a CallExpression counts, by bare name or as the property being invoked.
+ */
+export function readsFiles(source, fileName = "f.tsx") {
+  const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
+  let found = false;
+  const visit = (node) => {
+    if (found) return;
+    if (ts.isCallExpression(node)) {
+      const e = node.expression;
+      const name = ts.isIdentifier(e)
+        ? e.text
+        : ts.isPropertyAccessExpression(e)
+          ? e.name.text
+          : null;
+      if (name && FS_READERS.has(name)) {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found;
+}
+
+/**
+ * Does this file read a file AND name a path under `src/` in a string literal?
+ *
+ * The audit's "N test files read a path under `src/`" figure. String literals
+ * come from the parser so a `src/` inside a comment or an identifier does not
+ * count, and the read itself must be a real call (see `readsFiles`).
+ */
+export function readsSrcPath(source, fileName = "f.tsx") {
+  if (!readsFiles(source, fileName)) return false;
+  const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
+  let found = false;
+  const visit = (node) => {
+    if (found) return;
+    const text = ts.isStringLiteral(node)
+      ? node.text
+      : ts.isNoSubstitutionTemplateLiteral(node) ||
+          ts.isTemplateHead(node) ||
+          ts.isTemplateMiddle(node) ||
+          ts.isTemplateTail(node)
+        ? node.text
+        : null;
+    if (text !== null && text.includes("src/")) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found;
+}
+
+/** The identifier a call/property chain roots at: `it.each([…])(…)` → `it`. */
+function chainRoot(node) {
+  let cur = node;
+  for (;;) {
+    if (ts.isCallExpression(cur)) cur = cur.expression;
+    else if (ts.isTaggedTemplateExpression(cur)) cur = cur.tag;
+    else if (ts.isPropertyAccessExpression(cur)) cur = cur.expression;
+    else return ts.isIdentifier(cur) ? cur.text : null;
+  }
+}
+
+/** The modifiers on a chain: `it.skip(…)` → ["skip"]. */
+function chainModifiers(call) {
+  const out = [];
+  let cur = ts.isCallExpression(call) ? call.expression : call;
+  for (;;) {
+    if (ts.isCallExpression(cur)) cur = cur.expression;
+    else if (ts.isTaggedTemplateExpression(cur)) cur = cur.tag;
+    else if (ts.isPropertyAccessExpression(cur)) {
+      out.unshift(cur.name.text);
+      cur = cur.expression;
+    } else return out;
+  }
+}
+
+/**
+ * Assertion and case-registration call sites, counted as CALLS.
+ *
+ * Counting these by text was wrong twice over at the pinned revision:
+ *
+ * - `\btest\(` matches the `.test(` of `/re/.test(s)`, because `.` is not a
+ *   word character. That invented **870** case sites across 304 files.
+ * - the same pattern cannot see `it.skip(…)`, `it.each([…])(…)` or
+ *   `test.concurrent(…)`, which are real case sites — **731** of them.
+ * - `expect(` matched inside strings, e.g. `SPEC.indexOf("expect(seedOutput)")`,
+ *   inventing 18 assertions across four files.
+ *
+ * A case site is the OUTERMOST call whose chain roots at `it` or `test`, so
+ * `it.each([…])("name", fn)` counts once, not twice. `describe` is a suite, not
+ * a case, and is counted only for its `.skip` / `.only` modifiers.
+ */
+export function countCallSites(source, fileName = "f.tsx") {
+  const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
+  const counts = { expects: 0, cases: 0, skips: 0, onlys: 0, substringAssertions: 0 };
+  const visit = (node) => {
+    if (ts.isCallExpression(node)) {
+      const e = node.expression;
+      if (ts.isIdentifier(e) && e.text === "expect") counts.expects += 1;
+      if (ts.isPropertyAccessExpression(e) && SUBSTRING_MATCHERS.has(e.name.text)) {
+        counts.substringAssertions += 1;
+      }
+      const root = chainRoot(e);
+      if (root === "it" || root === "test") {
+        counts.cases += 1;
+        const mods = chainModifiers(node);
+        if (mods.includes("skip") || mods.includes("todo")) counts.skips += 1;
+        if (mods.includes("only")) counts.onlys += 1;
+        // Descend into the arguments only — never back down the callee chain,
+        // which would count `it.each([…])` a second time.
+        for (const arg of node.arguments) visit(arg);
+        return;
+      }
+      if (root === "describe") {
+        const mods = chainModifiers(node);
+        if (mods.includes("skip")) counts.skips += 1;
+        if (mods.includes("only")) counts.onlys += 1;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return counts;
+}
+
+/** Matchers that assert on a substring or pattern of text rather than a value. */
+const SUBSTRING_MATCHERS = new Set(["toContain", "toMatch"]);
 
 /* ------------------------------------------------------------------ *
  * Workflow execution resolution

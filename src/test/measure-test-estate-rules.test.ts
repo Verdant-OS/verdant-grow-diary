@@ -22,7 +22,10 @@ import { describe, it, expect } from "vitest";
 import {
   buildExecutableCorpus,
   bypassesMockSpecifiers,
+  countCallSites,
   factoryMockedSpecifiers,
+  readsFiles,
+  readsSrcPath,
   classifyTest,
   commandLinesIn,
   isCommandLine,
@@ -386,6 +389,74 @@ describe("reachability seeding — Vitest mock semantics, applied once", () => {
     expect(bypassesMockSpecifiers(spreadActual)).toEqual(["@/lib/alerts"]);
     expect(factoryMockedSpecifiers(`vi.mock("@/lib/auto");`)).toEqual([]);
     expect(factoryMockedSpecifiers(`vi.doMock("@/x", () => ({}));`)).toEqual([]);
+  });
+});
+
+describe("call-site counting — calls, not text", () => {
+  it("does NOT read `/re/.test(x)` as a `test(` case site", () => {
+    // 870 phantom case sites across 304 files came from exactly this: `\b`
+    // matches between `.` and `t`, so every regex `.test(` counted as a case.
+    const src = ["const ok = /pat/.test(txt);", "expect(ok).toBe(true);"].join("\n");
+    expect(countCallSites(src).cases).toBe(0);
+  });
+
+  it("does NOT read `expect(` inside a string literal as an assertion", () => {
+    expect(countCallSites(`const s = SPEC.indexOf("expect(seedOutput)");`).expects).toBe(0);
+  });
+
+  it("counts `it.skip`, `it.each` and `test.concurrent`, which text matching missed", () => {
+    const src = [
+      'it.skip("a", () => {});',
+      'it.each([1, 2])("b %i", () => {});',
+      'test.concurrent("c", () => {});',
+    ].join("\n");
+    // 731 real case sites in these shapes were invisible to `\bit\(|\btest\(`.
+    expect(countCallSites(src).cases).toBe(3);
+  });
+
+  it("counts `it.each([…])(…)` once, not twice", () => {
+    expect(countCallSites(`it.each([1])("a %i", () => {});`).cases).toBe(1);
+  });
+
+  it("counts a nested `it` inside another case's callback", () => {
+    const src = 'describe("s", () => { it("a", () => { expect(1).toBe(1); }); });';
+    const n = countCallSites(src);
+    expect([n.cases, n.expects]).toEqual([1, 1]);
+  });
+
+  it("attributes skip/only to it, test and describe alike", () => {
+    const n = countCallSites(
+      ['it.skip("a", () => {});', 'describe.skip("b", () => {});'].join("\n"),
+    );
+    expect([n.skips, n.onlys]).toEqual([2, 0]);
+  });
+
+  it("counts toContain/toMatch as calls, not occurrences", () => {
+    const src = ['expect(a).toContain("x");', 'const s = "toMatch(";'].join("\n");
+    expect(countCallSites(src).substringAssertions).toBe(1);
+  });
+});
+
+describe("file-I/O classification — a declaration is not a read", () => {
+  it("does NOT count a type member named like a reader", () => {
+    // `run-skill-driver-probe.test.ts` was bucketed scan-only on this alone.
+    expect(readsFiles("type FsLike = { readdirSync: (p: string) => string[] };")).toBe(false);
+  });
+
+  it("does NOT count an injected fake's property", () => {
+    // `subscriber-growth-backend-remote-verification.test.ts`, likewise.
+    expect(readsFiles('const fs = { readFileSync: (f: string) => "x" };')).toBe(false);
+  });
+
+  it("counts a real call, bare or as a property", () => {
+    expect(readsFiles('const t = readFileSync(p, "utf8");')).toBe(true);
+    expect(readsFiles('const t = fs.readFileSync(p, "utf8");')).toBe(true);
+  });
+
+  it("needs both a real read and a `src/` string for the src-path count", () => {
+    expect(readsSrcPath('const t = readFileSync("src/lib/a.ts", "utf8");')).toBe(true);
+    expect(readsSrcPath('const t = readFileSync("docs/a.md", "utf8");')).toBe(false);
+    expect(readsSrcPath("// reads src/lib/a.ts one day")).toBe(false);
   });
 });
 

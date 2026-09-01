@@ -20,6 +20,11 @@
 
 import { SENSOR_SNAPSHOT_STALE_THRESHOLD_MS } from "@/constants/sensorTiming";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
+import { fahrenheitToCelsius } from "@/lib/temperatureUnitPreference";
+
+/** Plausible tent air temperature in Celsius (stored/display convention). */
+const TEMP_C_PLAUSIBLE_MIN = -20;
+const TEMP_C_PLAUSIBLE_MAX = 60;
 
 /** Constitution Sensor Truth source labels for V0. */
 export type EcowittTentSnapshotV0TruthSource =
@@ -62,6 +67,7 @@ export const FORBIDDEN_SENSOR_TRUTH_SOURCE_TOKENS = [
   "mqtt",
   "esp32",
   "webhook",
+  "sim",
 ] as const;
 
 export interface EcowittTentSnapshotV0RowLike {
@@ -209,10 +215,49 @@ export function isStuckZeroOrHundredPct(value: number | null | undefined): boole
 }
 
 /**
+ * Resolve a V0 temperature reading to Celsius (repo storage/display convention).
+ *
+ * - `temperature_c` / `temp_c` / `temp`: value is already °C — never silently
+ *   reinterpret as °F (Safe-by-Design: Fahrenheit-looking C fails later at
+ *   evaluate).
+ * - `temp_f`: convert °F → °C via {@link fahrenheitToCelsius}. If conversion
+ *   cannot produce a finite number, fail closed (null).
+ *
+ * Unknown / non-temp metrics return null.
+ */
+export function resolveEcowittTentSnapshotV0TempCelsius(
+  rawMetric: string | null | undefined,
+  value: number | null | undefined,
+): { celsius: number | null; fromFahrenheit: boolean; reason: string | null } {
+  if (mapEcowittTentSnapshotV0MetricKey(rawMetric) !== "temp") {
+    return { celsius: null, fromFahrenheit: false, reason: "Not a temperature metric." };
+  }
+  const n = toFiniteNumber(value);
+  if (n === null) {
+    return { celsius: null, fromFahrenheit: false, reason: "Unparseable metric value." };
+  }
+  const key = typeof rawMetric === "string" ? rawMetric.trim().toLowerCase() : "";
+  if (key === "temp_f") {
+    const celsius = fahrenheitToCelsius(n);
+    if (!Number.isFinite(celsius)) {
+      return {
+        celsius: null,
+        fromFahrenheit: true,
+        reason: "Could not convert Fahrenheit to Celsius.",
+      };
+    }
+    return { celsius, fromFahrenheit: true, reason: null };
+  }
+  return { celsius: n, fromFahrenheit: false, reason: null };
+}
+
+/**
  * Validate a V0 metric value. Stuck RH/soil at 0 or 100 → invalid.
- * Unparseable → invalid. Temp uses Celsius storage realism when metric is temp
- * and value looks like °C (typical stored form); Fahrenheit display convert is
- * presenter-side.
+ * Unparseable → invalid.
+ *
+ * Temp expects Celsius (after {@link resolveEcowittTentSnapshotV0TempCelsius}).
+ * Implausible Celsius — including Fahrenheit-looking magnitudes on C keys —
+ * fail closed as invalid. Never accept unconverted F as healthy Live °C.
  */
 export function evaluateEcowittTentSnapshotV0Metric(
   key: EcowittTentSnapshotV0MetricKey,
@@ -223,13 +268,11 @@ export function evaluateEcowittTentSnapshotV0Metric(
   }
   switch (key) {
     case "temp": {
-      // Stored temp is Celsius in long-format rows. Allow a wide but realistic band.
-      // Values that look like Fahrenheit (>60) are still accepted here; display
-      // conversion happens in the view-model using the stored-unit convention.
-      const looksLikeC = value >= -20 && value <= 60;
-      const looksLikeF = value > 60 && value <= 110;
-      if (!looksLikeC && !looksLikeF) {
-        return { valid: false, reason: "Temperature outside plausible range." };
+      if (value < TEMP_C_PLAUSIBLE_MIN || value > TEMP_C_PLAUSIBLE_MAX) {
+        return {
+          valid: false,
+          reason: "Temperature outside plausible Celsius range.",
+        };
       }
       return { valid: true, reason: null };
     }

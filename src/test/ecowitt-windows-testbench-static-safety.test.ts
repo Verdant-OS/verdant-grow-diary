@@ -1438,18 +1438,24 @@ describe("ecowitt windows testbench — forwarding tests CI workflow", () => {
     expect(wf).toMatch(/push:/);
     expect(wf).toContain("tools/ecowitt-testbench/**");
     expect(wf).toContain("docs/ecowitt-windows-testbench.md");
+    expect(wf).toContain("src/lib/ecowittCustomHttpBridgeIngestRules.ts");
     expect(wf).toContain("src/test/ecowitt-windows-testbench-static-safety.test.ts");
+    expect(wf).toContain("src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts");
   });
 
   it("workflow runs python forwarding tests", () => {
     expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_forwarding_config/);
     expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_source_labeling/);
+    expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_ingest_readiness/);
     expect(wf).toMatch(/python3?\s+-m\s+unittest\s+test_forwarding_contract/);
   });
 
   it("workflow runs the static safety vitest suite + typecheck", () => {
     expect(wf).toContain(
       "bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts",
+    );
+    expect(wf).toContain(
+      "bunx vitest run src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts",
     );
     expect(wf).toMatch(/bun run typecheck/);
   });

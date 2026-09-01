@@ -6,13 +6,17 @@ on:
     paths:
       - "tools/ecowitt-testbench/**"
       - "docs/ecowitt-windows-testbench.md"
+      - "src/lib/ecowittCustomHttpBridgeIngestRules.ts"
       - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
+      - "src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts"
       - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
   pull_request:
     paths:
       - "tools/ecowitt-testbench/**"
       - "docs/ecowitt-windows-testbench.md"
+      - "src/lib/ecowittCustomHttpBridgeIngestRules.ts"
       - "src/test/ecowitt-windows-testbench-static-safety.test.ts"
+      - "src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts"
       - ".github/workflows/ecowitt-testbench-forwarding-tests.yml"
   workflow_dispatch:
 
@@ -76,6 +80,13 @@ jobs:
           set -o pipefail
           python3 -m unittest test_source_labeling 2>&1 | tee ../../artifacts/ecowitt-testbench-forwarding/source-labeling.log
 
+      - name: Python — ingest-readiness FIELD_MAP tests
+        working-directory: tools/ecowitt-testbench
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m unittest test_ingest_readiness 2>&1 | tee ../../artifacts/ecowitt-testbench-forwarding/ingest-readiness.log
+
       - name: Python — golden forwarding contract tests
         working-directory: tools/ecowitt-testbench
         env:
@@ -92,6 +103,12 @@ jobs:
         run: |
           set -o pipefail
           bunx vitest run src/test/ecowitt-windows-testbench-static-safety.test.ts --reporter=dot 2>&1 | tee artifacts/ecowitt-testbench-forwarding/static-safety.log
+
+      - name: Vitest — custom-HTTP ingest-readiness
+        shell: bash
+        run: |
+          set -o pipefail
+          bunx vitest run src/test/ecowitt-custom-http-bridge-ingest-readiness.test.ts --reporter=dot 2>&1 | tee artifacts/ecowitt-testbench-forwarding/ingest-readiness-vitest.log
 
       - name: Typecheck
         shell: bash

@@ -394,9 +394,9 @@ describe("evaluatePolicy", () => {
     }
 
     // vercel.json must not reintroduce illegal `projectSettings`. Top-level
-    // bun install/build/outputDirectory/bunVersion are schema-legal and pin
-    // the same package manager GitHub CI uses. npm install policy for the
-    // separate preview checklist stays pinned via docs/preview-deployment-verification.md.
+    // bunVersion/installCommand/buildCommand are schema-legal and pin the same
+    // package manager GitHub CI uses. npm install policy for the separate
+    // preview checklist stays pinned via docs/preview-deployment-verification.md.
     const vercel = JSON.parse(readFileSync(resolve(root, "vercel.json"), "utf8")) as Record<
       string,
       unknown
@@ -404,8 +404,8 @@ describe("evaluatePolicy", () => {
     expect(vercel).not.toHaveProperty("projectSettings");
     expect(vercel.installCommand).toBe("bun install --frozen-lockfile");
     expect(vercel.buildCommand).toBe("bun run build");
-    expect(vercel.outputDirectory).toBe("dist");
-    expect(vercel.bunVersion).toBe("1.3.14");
+    expect(vercel.bunVersion).toBe("1.x");
+    expect(vercel).not.toHaveProperty("outputDirectory");
 
     const transition = JSON.parse(
       readFileSync(resolve(root, "config/dependency-lockfile-transition.json"), "utf8"),

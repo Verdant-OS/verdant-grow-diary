@@ -52,4 +52,10 @@ describe("SEO postbuild SSR snapshot wiring", () => {
     // deleted candidate green.
     expect(PROBE_MODULE).toContain('resolve(".output", "server", "index.mjs")');
   });
+
+  it("keeps the Vercel Nitro Build Output API layout as a probe candidate", () => {
+    expect(PROBE_MODULE).toContain('resolve(".vercel", "output", "nitro.json")');
+    expect(PROBE_MODULE).toContain('resolve(".vercel", "output", "server", "index.mjs")');
+    expect(PROBE_MODULE).toContain('resolve(".vercel", "output", "server", "wrangler.json")');
+  });
 });

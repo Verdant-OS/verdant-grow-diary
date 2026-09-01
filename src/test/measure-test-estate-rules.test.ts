@@ -415,6 +415,20 @@ describe("reachability seeding — Vitest mock semantics, applied once", () => {
     expect(testFileRuntimeSpecifiers(src)).toEqual([]);
   });
 
+  it("emits a bypassed module even with no value import of it", () => {
+    // The bypass is an edge in its own right. A file that mocks with
+    // `importOriginal` and imports the module only as a type — or not at all —
+    // still loads the real module; filtering alone would emit nothing.
+    const typeOnly = [
+      'import type { Alert } from "@/lib/alerts";',
+      'vi.mock("@/lib/alerts", async (importOriginal) => ({ ...(await importOriginal()) }));',
+    ].join("\n");
+    expect([...new Set(testFileRuntimeSpecifiers(typeOnly))]).toEqual(["@/lib/alerts"]);
+
+    const mockOnly = 'vi.mock("@/lib/alerts", async (o) => ({ ...(await o()) }));';
+    expect([...new Set(testFileRuntimeSpecifiers(mockOnly))]).toEqual(["@/lib/alerts"]);
+  });
+
   it("separates the two extraction steps", () => {
     expect(factoryMockedSpecifiers(spreadActual)).toEqual(["@/lib/alerts"]);
     expect(bypassesMockSpecifiers(spreadActual)).toEqual(["@/lib/alerts"]);

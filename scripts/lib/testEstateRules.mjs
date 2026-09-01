@@ -242,7 +242,12 @@ export function testFileRuntimeSpecifiers(source, fileName = "f.tsx") {
   const replaced = new Set(
     factoryMockedSpecifiers(source, fileName).filter((spec) => !bypassed.has(spec)),
   );
-  return runtimeImportSpecifiers(source, fileName).filter((spec) => !replaced.has(spec));
+  const imported = runtimeImportSpecifiers(source, fileName).filter((spec) => !replaced.has(spec));
+  // A bypass is an edge in its OWN right, not merely a veto on subtraction. A
+  // file that mocks a module with `importOriginal` and imports it only as a
+  // type — or not at all — still loads the real module, and filtering alone
+  // would emit nothing for it.
+  return [...imported, ...[...bypassed].filter((spec) => !imported.includes(spec))];
 }
 
 /** The method name of a `vi.*` / `vitest.*` call, or null if it is not one. */

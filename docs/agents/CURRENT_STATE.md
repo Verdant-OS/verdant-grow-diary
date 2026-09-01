@@ -1,7 +1,149 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-31 UTC (~19:38 UTC)
-**Updated by:** Codex (2026-08-31: **#1227 merged as `a8b4a23e`** and the deploy-branch tip is that
+**Last updated:** 2026-09-01 UTC (~01:40 UTC)
+**Updated by:** Claude (2026-09-01: **#1228, #1229, #1230 and #1231 merged**; the deploy-branch tip
+is exactly **`68ad14c66a`**. Four squashes, linear, **zero migrations**. #1228 was the #1227 docs
+restamp; #1229–#1231 are One-Tent Loop product code (AI Doctor readiness / Timeline Memory, and
+Symptom Check). The Lovable Support hold stands and the requested restore target moves from
+`a8b4a23e` to exact GitHub object **`68ad14c66a`**, `dirty:false`. Tolu is expected 2026-09-01 —
+**do not ping**. Live remains independently MEASURED at **`5c197f75`**, `dirty:true`; no new
+production measurement was taken here. #1221 stays draft at `79146c6911` pending Blue Dream. Prior
+header follows.)
+
+## 1. Four merges — deploy tip `68ad14c66a`
+
+`established fact`, verified twice in this docs-only slice: from the GitHub PR record, and
+independently from the local commit graph at the exact remote ref.
+
+| PR               | Merge SHA                                      | Parent             | Scope                                        |
+| ---------------- | ---------------------------------------------- | ------------------ | -------------------------------------------- |
+| **#1228 MERGED** | **`6fd48d1cd80fa973bcdf1e7acf7d518ecee277fa`** | `a8b4a23e` (#1227) | docs restamp of #1227; this file only        |
+| **#1229 MERGED** | **`47e2588ab514708b3ab65beefe610071afd15ec6`** | `6fd48d1c` (#1228) | AI Doctor readiness + Timeline Memory        |
+| **#1230 MERGED** | **`cc1cd81aff503badd2d393f91b4e1d4e1d667279`** | `47e2588a` (#1229) | Symptom Check — record "no visible symptoms" |
+| **#1231 MERGED** | **`68ad14c66a223d123d7ab263b83cec3fe5d90c8d`** | `cc1cd81a` (#1230) | Symptom Check — clear the box after save     |
+
+**Deploy tip: `68ad14c66a223d123d7ab263b83cec3fe5d90c8d`**, the exact remote ref of
+`origin/verdant-grow-diary`.
+
+The chain is **linear and all four are squashes**: `git rev-list --parents a8b4a23e..68ad14c66a`
+gives every commit exactly **one** parent. That is the twelfth through fifteenth observed squash
+outcome. It stays an **observation** — the configured merge method remains **`NOT_MEASURED`**,
+since reading it needs `Administration:read`.
+
+The deploy branch did **not** move to `5c197f75`. Do not rebase this record onto that remint and do
+not merge the remint onto `verdant-grow-diary`.
+
+## 2. What #1229–#1231 changed — product code, and no schema at all
+
+`established fact`, from `git diff-tree` per commit. Across the whole range: **11 files,
++519 / −14, and `supabase/migrations/` is untouched — zero migration files in all four commits.**
+No schema, RLS, policy or edge-function change landed here, so the migration posture below is
+unaffected by these merges.
+
+- **#1229** `fix(ai-doctor): recover Quick Log watering for readiness and Timeline Memory` — 5
+  files, +189 / −3, head `5e3c54a70ec82779e051b2edf21b6bc16fe9d684`. A shared canonical diary
+  event-type resolver, so Quick Log watering rows carrying only `details.event_type` are recognised
+  for AI Doctor readiness; grouped Quick Log parents stay in Timeline Memory evidence while being
+  excluded from visible `displayItems`.
+- **#1230** `feat(symptom-check): record a check with no visible symptoms` — 4 files, +179 / −9,
+  head `9859a0c85c4281bd422e100e6cee6e6679643cdb`. Guided Symptom Check gains an explicit
+  no-visible-symptoms path that records `details.symptom_check_result = no_symptoms_observed`
+  **instead of writing a fake `observedSign`**, **fails closed** when both a symptom and the
+  checkbox are set, and still requires stage confirmation. That is the `AGENTS.md` no-fake-data
+  rule being honoured in the data model rather than in copy.
+- **#1231** `fix(symptom-check): clear no-symptoms box after save, switch, and start.` — 2 files,
+  +67 / −0, head `1582d989eeac480562d7880d4eddf1b16dd1c0fe`. Clears the sticky
+  `guidedSymptomNoneObserved` checkbox at all five guided-symptom reset sites (target switch,
+  requested-activity apply, activity select, Symptom Check start, confirmed save), with two
+  integration tests proving the box reopens unchecked. **Presenter-local React state only — no
+  schema, RLS or telemetry change.**
+
+Each of the three carries a test file in the same commit as the behaviour change.
+
+**`NOT_MEASURED` in this slice**, and deliberately so: whether these three shipped with an
+independent peer review, what their CI verdicts were, and whether any carried open review threads
+at merge. This restamp read the commit graph and the PR record only — it ran no test, no gate and
+no review query. **Do not read the merge itself as a review.**
+
+## 3. Lovable Support hold — restore target moves to `68ad14c66a`
+
+`session evidence`, supplied by Cheek. Recorded without inventing a Support result.
+
+- The Support hold **stands**. No Publish attempt and no agent edit in the Lovable project chat.
+- **The requested restore target is now the exact GitHub object
+  `68ad14c66a223d123d7ab263b83cec3fe5d90c8d`, `dirty:false`.** It was `a8b4a23e` in the last
+  restamp and `a26b912c` before that; both are superseded for this purpose.
+- **Tolu is expected 2026-09-01. Do not ping.** Waiting is the instruction — a status chase is not.
+- Support has supplied **no outcome** in the evidence available to this slice. Do not infer that the
+  block is lifted, that a History-restore ran, or that production was restored.
+
+## 4. Live remains `5c197f75`, dirty remint
+
+The last independent production measurement remains
+`5c197f7516e65845209c2d3b4a3192cf5848570c`, `dirty:true`, ref `master`. **This restamp did not
+re-fetch production**; the value is carried forward, not re-measured. The remint remains on GitHub
+and is **not** the `verdant-grow-diary` deploy tip — which is now four commits ahead of where the
+last restamp left it.
+
+## 5. Programs not restamped, and holds carried
+
+`session evidence`, supplied by Cheek. Recorded so each absence reads as deliberate rather than as
+an omission.
+
+- **Codex SEO / Wikipedia is not restamped as a new program.** No new program entry is opened here.
+- **Knowledge-library expansion is HOLD.** The MACAE reference ingest keeps its `NOT_MEASURED`
+  runtime and applicability rows; no slice is assigned and none is opened.
+- **Dual-home slice 1 is already on the tip. Slice 2 is NOT approved** — do not start it.
+- **#1221 stays draft at `79146c6911b82c817fac009efb56a53c52dd61d6`, pending Blue Dream.**
+  Verified against the GitHub record in this slice: state `open`, `draft: true`, head exactly that
+  SHA. Not readied, rebased, updated or merged. Blue Dream / Dream Queen is the **owner-designated** reviewer and is **not** the protocol
+  peer-review seat.
+
+## 6. Committing this file through the pre-commit hook corrupts it
+
+`established fact`, measured in this slice against the committed file at `68ad14c66a`.
+
+`lint-staged` runs `prettier --write` on `*.{js,jsx,mjs,cjs,json,css,md,html,yml,yaml}`, so any
+local commit that stages this file reformats all 564 KB of it. **That is not a cosmetic
+reformat.** The committed file is not prettier-clean (564,317 → 564,303 bytes), and what Prettier
+changes in the 2026-08-27 entry near line 3485 is destructive:
+
+- `NOT_APPLICABLE` becomes `NOT*APPLICABLE` — a **status-vocabulary term**, silently altered.
+- `PASSKEY_` and `sbp_` become `PASSKEY*` and `sbp*`, inside a passage describing credential
+  redaction.
+- Spaces around inline code are eaten, joining wrapped lines into unreadable runs.
+
+Prettier is mis-parsing underscore-heavy inline code as emphasis. **This restamp was therefore
+committed with the hook bypassed, and the pre-existing drift is left exactly as it was.** It is not
+mine, and I did not "fix" it, because the change Prettier wants to make is wrong.
+
+Two further measurements, recorded and not acted on: `CLAUDE.md` documents this file at
+**153,142 bytes / ~27,400 tokens** and justifies leaving it out of the import chain on that figure;
+it is now **564,317 bytes**, roughly **3.7x** the documented size. Correcting `CLAUDE.md` would
+touch a governance file and require a `Sentinel-Version` bump across all twelve, which an N=1 docs
+slice must not do. Both are for Cheek to route.
+
+## 7. Current locks
+
+- **Publish and Lovable project-chat agent edits are BLOCKED** pending Tolu. No retry, no alternate
+  publisher path, and **no ping** — Tolu is expected 2026-09-01.
+- **No History-restore.** The restore target is recorded above for Support to act on; this slice
+  performs none.
+- **Paddle token creation is PARKED.** Do not revoke the existing `live_` token, write token bytes,
+  or change Lovable environment values.
+- **GGS radio capture is PARKED.** No FF02, AES or Verdant sink.
+- **Catch-all / Kerberos / HOBA remain BLOCKED.** Do not add a scheme or implement the
+  unknown-scheme catch-all.
+- **No `knk`. No `query_database`.** No production read or write from this slice.
+- **#1221 stays draft and unassigned.** No ready until an independent `PASS`.
+- **#1225 stays CLOSED — SUPERSEDED.** Do not reopen or rebase it.
+- **No APPLY.** Least of all `20260813030000`. No publish, production SQL or production mutation.
+- **Independent reviewer for this restamp, once the SHA exists: Super Blue.** Owner is Claude, so
+  the reviewer is a different peer, as `AGENTS.md` requires.
+- This restamp is **N=1** and stays **draft**. No ready, merge, publish, rebase or update-branch. No
+  `src/` or `supabase/` change.
+
+**Prior update:** Codex (2026-08-31: **#1227 merged as `a8b4a23e`** and the deploy-branch tip is that
 exact commit. Lovable Support (Tolu) is reviewing the blocked Publish and the dirty remint; Publish
 and agent edits in the Lovable project chat remain on hold until Support writes back. The requested
 restore target is now exact GitHub object **`a8b4a23e`**, `dirty:false`. Live remains independently

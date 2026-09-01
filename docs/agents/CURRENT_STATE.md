@@ -6,7 +6,8 @@
 so the unticked GitHub review boxes on the earlier merges are **not** evidence that review was
 skipped. The restore SHA for Tolu moves to **`e0e0d699`**, `dirty:false` on GitHub. **Live is
 unchanged** — still the carried dirty remint **`5c197f75`**, `dirty:true`, **not re-measured here**.
-Production is **DIVERGED**, re-measured on the graph at **7 behind / 4 ahead**. **#1234 and #1235 are
+**Current production divergence is `NOT_MEASURED`**; against the _last-measured_ live SHA the graph
+relationship is **7 behind / 4 ahead**. **#1234 and #1235 are
 both CLOSED — SUPERSEDED**: three sessions built the same four-merge restamp and #1232 is the one
 that landed. Publish, History-restore and APPLY remain blocked; Tolu is expected 2026-09-01 and is
 **not** to be pinged. Prior header follows.)
@@ -56,7 +57,13 @@ this slice.
 | #1232 | **Super Blue**       | `4087da639`    | matches `head.sha` `4087da639d28e332d7fb33cc0474efcd3a1c94f6` |
 | #1233 | **Blue Dream**       | `2c0ccee105`   | matches `head.sha` `2c0ccee105e6ae56095fa888a157a7a26885d4c3` |
 
-Each names an owner and a **different** peer as independent reviewer, as `AGENTS.md` requires.
+**These are owner-designated review evidence, not the protocol peer-review seat.** Recorded as
+`source claim` (Cheek), with only the head SHAs verified here. Per CORRECTION 1 below, Blue Dream /
+Dream Queen is the owner-designated reviewer; the protocol seat is limited by `AGENTS.md` and
+`HANDOFF_PROTOCOL.md:24` to **Grok, Claude or Codex**. No alias in this file places Blue Dream or
+Super Blue in that set, and this slice did not establish the **owner** of either #1232 or #1233 from
+the PR record. So these rows are real review evidence and are **not** a claim of protocol
+peer-review compliance. Raised by Copilot on #1236; an earlier draft asserted that compliance.
 
 ### Correcting the previous slice on review provenance
 
@@ -70,8 +77,11 @@ Both facts belong on the record, and neither cancels the other:
   merged PR bodies — each carries an unticked independent-verdict line naming Blue Dream). #1231
   carries no independent-reviewer box at all; its unticked lines are test-run rows, and its body
   records a **P2 raised by Super Blue on #1230**.
-- **The independent `PASS` was given** (`session evidence`, Cheek) — the reviewers across this run of
-  merges were **Blue Dream, Super Blue and Dream Queen**.
+- **The independent `PASS` was given** (`session evidence`, Cheek) — by **Blue Dream** (recorded in
+  this file as the **same reviewer as Dream Queen**, alias confirmed by Cheek 2026-08-28, CORRECTION
+  1 below) and **Super Blue**. That is **two** reviewers, not three. An earlier draft listed Blue
+  Dream and Dream Queen separately and so overstated the count, reintroducing the very ambiguity
+  CORRECTION 1 was written to close. Raised by Copilot on #1236.
 
 **An unticked box is not evidence that a `PASS` is missing.** The checkbox is a drafting convenience
 in a PR body; it is not the review artefact and was never the system of record. Reading its state as
@@ -93,7 +103,7 @@ block is lifted or that production has been restored.
 This records the target as it now stands. It does **not** establish a standing rule that the target
 auto-follows the deploy tip; a later tip needs a fresh instruction from Cheek.
 
-## 4. Live is carried, and production is DIVERGED
+## 4. Live is carried; divergence is measured against the last-measured SHA, not production now
 
 Live remains `5c197f7516e65845209c2d3b4a3192cf5848570c`, **`dirty:true`**, ref `master`. **This slice
 did not fetch production** — the value is **carried**, not refreshed, and is not a 2026-09-01
@@ -123,8 +133,16 @@ through the remint's second parent `9d31447a`:
 e71d0dd  Work in progress
 ```
 
-Production is therefore **not** a lagging subset of the deploy branch, and shipping the seven missing
-commits would **not** reconcile it. **A merge is not a deployment.** Do not model production as "the
+As of that last measurement, production was therefore **not** a lagging subset of the deploy branch,
+and shipping the seven missing commits would **not** have reconciled it.
+
+**What this does and does not establish.** The command compares the deploy tip with `5c197f75` — the
+**last-measured** live SHA, carried from 2026-08-31 and not re-fetched here. It is a git fact about
+that SHA, **not** a measurement of production now. If production has published or reminted since,
+unobserved, the current divergence is **`NOT_MEASURED`** and these two numbers are stale. Do not
+drive a restore or deployment decision from them without a fresh production read. Raised as a P2 by
+Codex on #1236; an earlier draft stated the 7/4 relationship as current production fact, which is the
+same stale-for-current substitution this section warns about one paragraph above. **A merge is not a deployment.** Do not model production as "the
 deploy branch, older", do not rebase this record onto the remint, and do not merge the remint onto
 the deploy branch.
 
@@ -193,8 +211,12 @@ reproduced, inspected or recorded here, and none ever should be.**
 
 The `5c197f75` remint injected a payments token of class **`live_`** into **tracked
 `.env.production`**, and made `restore-env-production-from-head` **skippable when Git HEAD is
-missing**. Both are still in the running production build — they are among the four ahead-commits in
-section 4, which is why that section matters operationally and not just as bookkeeping.
+missing**. Both changes are carried by the four ahead-commits in section 4.
+
+**Current runtime presence is `NOT_MEASURED`.** This slice did not fetch production, so it cannot
+establish that either is _still_ live. What is established is narrower: the last independent
+measurement, `5c197f75` on 2026-08-31, was of a build containing them. Whether the running build
+still does requires a fresh measurement nobody has taken.
 
 Recorded as an **open exposure**. This slice authorises no revert, no env edit, no restore-script
 patch, no token revoke and no token creation. Paddle live-token creation stays parked on the login
@@ -205,10 +227,13 @@ lockout recorded below.
 - **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production SQL, no
   Lovable project-chat agent edit, no alternate publisher path, no retry.
 - **Tolu expected 2026-09-01 — do not ping.** Support outcome stays `NOT_MEASURED`.
-- **Production is DIVERGED, 7 behind / 4 ahead.** Do not describe it as merely behind. A failure to
-  re-measure is `BLOCKED`, never a product `FAIL`.
-- **An unticked GitHub review box is not missing evidence of a `PASS`.** Independent reviewers across
-  this run were Blue Dream, Super Blue and Dream Queen.
+- **Current production divergence is `NOT_MEASURED`.** Against the last-measured live SHA
+  `5c197f75` the graph relationship is 7 behind / **4 ahead** — do not describe that as merely
+  behind, and do not restate it as production's current state. A failure to re-measure is `BLOCKED`,
+  never a product `FAIL`.
+- **An unticked GitHub review box is not missing evidence of a `PASS`.** The reviewers across this
+  run were **Blue Dream (= Dream Queen — one reviewer, alias per CORRECTION 1)** and **Super Blue**.
+  Both are **owner-designated**, not the protocol peer seat.
 - **Do not reopen #1234 or #1235**, and do not port `5882c32`.
 - **Prettier:** lockfile `3.9.6` is a no-op on this file. Do not bypass the hook on a lockfile-clean
   install, do not repair historical vocabulary, and do not change the `package.json` range here.

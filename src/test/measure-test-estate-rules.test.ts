@@ -535,6 +535,30 @@ describe("render classification — a title is not a render call", () => {
   });
 });
 
+describe("product-module set — declaration files carry no runtime edge", () => {
+  // The script's own filter, restated here so a change to it fails a test
+  // rather than silently moving the reachability denominator.
+  const IS_TEST = /\.(test|spec)\.(ts|tsx)$/;
+  const isProductModule = (f: string) =>
+    !IS_TEST.test(f) && !f.startsWith("src/test/") && !f.endsWith(".d.ts");
+
+  it("excludes `.d.ts`, which the transpiler erases", () => {
+    expect(isProductModule("src/types/global-jsx.d.ts")).toBe(false);
+    expect(isProductModule("src/types/mjs-modules.d.ts")).toBe(false);
+  });
+
+  it("keeps ordinary source and still excludes tests", () => {
+    expect(isProductModule("src/lib/alerts.ts")).toBe(true);
+    expect(isProductModule("src/components/Thing.tsx")).toBe(true);
+    expect(isProductModule("src/test/alerts-foundation.test.ts")).toBe(false);
+    expect(isProductModule("src/lib/alerts.test.ts")).toBe(false);
+  });
+
+  it("does not mistake a name merely containing `.d.ts` for a declaration", () => {
+    expect(isProductModule("src/lib/a.d.tsx")).toBe(true);
+  });
+});
+
 describe("reproducer CLI — `--rev` never reaches a shell", () => {
   const SCRIPT = path.resolve(__dirname, "../../scripts/measure-test-estate.mjs");
 

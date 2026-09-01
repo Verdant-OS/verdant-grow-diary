@@ -113,7 +113,12 @@ const IS_TEST = /\.(test|spec)\.(ts|tsx)$/;
 
 const allSrc = treePaths.filter((f) => f.startsWith("src/") && /\.(ts|tsx)$/.test(f));
 const tests = allSrc.filter((f) => IS_TEST.test(f));
-const product = allSrc.filter((f) => !IS_TEST.test(f) && !f.startsWith("src/test/"));
+// `.d.ts` files are erased by the transpiler and can never be a runtime import
+// edge, so counting them as product modules puts two permanently-unreachable
+// files in the denominator and in the unreached list.
+const product = allSrc.filter(
+  (f) => !IS_TEST.test(f) && !f.startsWith("src/test/") && !f.endsWith(".d.ts"),
+);
 const productSet = new Set(product);
 
 const srcOf = readBlobs(allSrc);
@@ -305,7 +310,9 @@ const report = {
   },
   lanes: lanes.map(({ label, total, executed, never }) => ({ label, total, executed, never })),
   neverExecuted: Object.fromEntries(lanes.map((l) => [l.label, l.neverFiles])),
-  testFilesAcrossAllLanes: tests.length + denoTests.length + e2eSpecs.length + pgtap.length,
+  // The four TEST-FILE lanes only. Runtime harnesses are a fifth lane, counted
+  // in `lanes` but deliberately not here — they are scripts, not test files.
+  testFilesAcrossFourTestLanes: tests.length + denoTests.length + e2eSpecs.length + pgtap.length,
 };
 
 if (process.argv.includes("--json")) {
@@ -347,5 +354,8 @@ if (process.argv.includes("--json")) {
       `  ${l.label.padEnd(20)} total ${String(l.total).padStart(3)}  executed ${String(l.executed).padStart(3)}  NEVER ${String(l.never).padStart(3)}`,
     );
   }
-  console.log(`\nTest files across all four lanes  ${report.testFilesAcrossAllLanes}`);
+  console.log(`\nTest files across the four test lanes  ${report.testFilesAcrossFourTestLanes}`);
+  console.log(
+    `  (runtime harnesses are a fifth lane, ${report.lanes[2].total} scripts, counted above)`,
+  );
 }

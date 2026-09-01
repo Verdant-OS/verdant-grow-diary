@@ -1,7 +1,229 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-01 UTC (~01:41 UTC)
-**Updated by:** Claude (2026-09-01: **#1228, #1229, #1230 and #1231 merged**; the deploy tip is
+**Last updated:** 2026-09-01 UTC (~14:58 UTC)
+**Updated by:** Claude (2026-09-01: **#1232 and #1233 merged**; the deploy tip is
+**`e0e0d699`**. Both carry an independent `PASS` — **Super Blue** on #1232, **Blue Dream** on #1233 —
+so the unticked GitHub review boxes on the earlier merges are **not** evidence that review was
+skipped. The restore SHA for Tolu moves to **`e0e0d699`**, `dirty:false` on GitHub. **Live is
+unchanged** — still the carried dirty remint **`5c197f75`**, `dirty:true`, **not re-measured here**.
+Production is **DIVERGED**, re-measured on the graph at **7 behind / 4 ahead**. **#1234 and #1235 are
+both CLOSED — SUPERSEDED**: three sessions built the same four-merge restamp and #1232 is the one
+that landed. Publish, History-restore and APPLY remain blocked; Tolu is expected 2026-09-01 and is
+**not** to be pinged. Prior header follows.)
+
+## 1. #1232 and #1233 merged — deploy tip `e0e0d699`
+
+`established fact`, sourced from the **GitHub PR record** and cross-checked against the commit graph
+and the exact remote branch ref. Both rows are **squashes** — one parent each, verified with
+`git rev-list --parents`, subjects ending in their PR number.
+
+| PR        | Merge SHA  | Parent       | Source head | Files | Migrations | Merged (UTC)     |
+| --------- | ---------- | ------------ | ----------- | ----: | ---------: | ---------------- |
+| **#1232** | `4f272106` | `68ad14c66a` | `4087da639` |     1 |      **0** | 2026-09-01 02:02 |
+| **#1233** | `e0e0d699` | `4f272106`   | `2c0ccee10` |     1 |      **0** | 2026-09-01 02:03 |
+
+Full merge SHAs: `4f2721061214283483836d679fec8e2bd3b0e7df` and
+`e0e0d6995355aeac932b8526833ef8d8a793b4bd`.
+
+**Deploy tip: `e0e0d6995355aeac932b8526833ef8d8a793b4bd`**, read twice — `git ls-remote` and
+`git rev-parse origin/verdant-grow-diary` agree. Both were merged by `cheekhimself`.
+
+**Zero migrations across both**, checked on the range `68ad14c66a..e0e0d699` rather than assumed.
+
+**Scope, from the PR record:**
+
+- **#1232** — Claude, docs-only restamp of `CURRENT_STATE.md` for the #1228–#1231 merges. +80 / −2.
+  It is the block demoted immediately below this one.
+- **#1233** — **N=1, a single test file**: `src/test/quick-log-all-activities-integration.test.tsx`,
+  +24 / −0. It adds one integration test asserting that the leftover "no visible symptoms" checkbox
+  clears when a requested activity is applied through a `requestedActivityId` prop change, with no
+  `handleStartSymptomCheck` after the prop apply — i.e. the one path #1231's five reset sites did not
+  independently cover. **No production file was edited**; its own body records 57 passed / 0 failed
+  on the targeted run.
+
+**The same restack detail as #1230, one merge later.** #1233 was opened against base `68ad14c66a`
+(#1231) but its **landed parent is `4f272106`** (#1232): the queue restacked it onto the docs restamp.
+PR base and landed parent differ again. Anyone reconstructing this chain from PR bases alone will get
+it wrong twice in a row.
+
+## 2. Both merges carry an independent `PASS`
+
+`session evidence`, supplied by Cheek, with the head SHAs verified against the GitHub PR record in
+this slice.
+
+| PR    | Independent reviewer | `PASS` at head | Head verified                                                 |
+| ----- | -------------------- | -------------- | ------------------------------------------------------------- |
+| #1232 | **Super Blue**       | `4087da639`    | matches `head.sha` `4087da639d28e332d7fb33cc0474efcd3a1c94f6` |
+| #1233 | **Blue Dream**       | `2c0ccee105`   | matches `head.sha` `2c0ccee105e6ae56095fa888a157a7a26885d4c3` |
+
+Each names an owner and a **different** peer as independent reviewer, as `AGENTS.md` requires.
+
+### Correcting the previous slice on review provenance
+
+**This supersedes the framing in the closed #1235.** That entry recorded the independent-review
+provenance of #1229/#1230 as **`missing evidence`**, reasoning from unticked GitHub checkboxes. That
+inference was wrong and is withdrawn.
+
+Both facts belong on the record, and neither cancels the other:
+
+- **The GitHub review boxes on #1229 and #1230 are unticked** (`established fact`, read from the
+  merged PR bodies — each carries an unticked independent-verdict line naming Blue Dream). #1231
+  carries no independent-reviewer box at all; its unticked lines are test-run rows, and its body
+  records a **P2 raised by Super Blue on #1230**.
+- **The independent `PASS` was given** (`session evidence`, Cheek) — the reviewers across this run of
+  merges were **Blue Dream, Super Blue and Dream Queen**.
+
+**An unticked box is not evidence that a `PASS` is missing.** The checkbox is a drafting convenience
+in a PR body; it is not the review artefact and was never the system of record. Reading its state as
+a governance signal produced a false `missing evidence` label once already — do not repeat it. Where
+a review outcome is genuinely unknown, say so from the absence of a _reported_ verdict, never from an
+unticked box.
+
+## 3. Restore SHA for Tolu is now `e0e0d699`
+
+`session evidence`, supplied by Cheek. No Lovable surface was touched in this slice.
+
+The requested restore target moves from `68ad14c66a` (recorded in the entry below) to the current
+exact GitHub object **`e0e0d6995355aeac932b8526833ef8d8a793b4bd`**, **`dirty:false` on GitHub**.
+
+**Tolu is expected 2026-09-01. Do not ping, chase, reopen or escalate.** No Support outcome exists in
+the evidence available to this slice — that stays **`NOT_MEASURED`**. Do not infer that the Publish
+block is lifted or that production has been restored.
+
+This records the target as it now stands. It does **not** establish a standing rule that the target
+auto-follows the deploy tip; a later tip needs a fresh instruction from Cheek.
+
+## 4. Live is carried, and production is DIVERGED
+
+Live remains `5c197f7516e65845209c2d3b4a3192cf5848570c`, **`dirty:true`**, ref `master`. **This slice
+did not fetch production** — the value is **carried**, not refreshed, and is not a 2026-09-01
+measurement. Claude cannot take one.
+
+### The divergence, re-measured against this tip
+
+`established fact`, a **git** measurement taken in this slice. Read both numbers: the one-directional
+"behind" count is the misreading this subsection exists to prevent.
+
+```text
+git rev-list --left-right --count origin/verdant-grow-diary...5c197f75
+7   4
+```
+
+**Seven behind.** The deploy branch carries seven commits production does not: `a8b4a23e` (#1227),
+`6fd48d1c` (#1228), `47e2588a` (#1229), `cc1cd81af` (#1230), `68ad14c66a` (#1231), `4f272106` (#1232)
+and `e0e0d699` (#1233).
+
+**Four ahead.** Production also carries four commits that exist on **no** deploy-branch SHA, reached
+through the remint's second parent `9d31447a`:
+
+```text
+5c197f7  Hardened restore-env script
+9d31447  Changes
+29ddb39  Changes
+e71d0dd  Work in progress
+```
+
+Production is therefore **not** a lagging subset of the deploy branch, and shipping the seven missing
+commits would **not** reconcile it. **A merge is not a deployment.** Do not model production as "the
+deploy branch, older", do not rebase this record onto the remint, and do not merge the remint onto
+the deploy branch.
+
+**If this measurement cannot be taken in a later slice, that is a git or network `BLOCKED`** — record
+it as such. It is never a product `FAIL`, and an unreachable object says nothing about production.
+
+## 5. #1234 and #1235 are CLOSED — SUPERSEDED
+
+`established fact`, read from the GitHub PR record: both are `state: closed`, `merged: false`.
+
+Three sessions independently produced the **same** #1228–#1231 four-merge restamp from the same
+instruction, in parallel, none aware of the others:
+
+| PR        | Outcome                  | Head        |
+| --------- | ------------------------ | ----------- |
+| **#1232** | **MERGED** as `4f272106` | `4087da639` |
+| **#1234** | **CLOSED — SUPERSEDED**  | `7762b0e9c` |
+| **#1235** | **CLOSED — SUPERSEDED**  | `5882c32d8` |
+
+Cheek's closing instruction, recorded verbatim in effect: do not rebase, do not reopen, and the next
+restamp must cut from `e0e0d699` and record #1232/#1233 rather than re-recording #1228–#1231. **This
+entry is that restamp.** Nothing from `5882c32` was ported.
+
+This is the second time this has happened — `AGENTS.md` already records #1225 as a Claude duplicate
+of #1224. The constitution's rule is the remedy and it held once it was applied: check open and
+recent PRs in the target area **before** building, and surface a collision rather than resolving it
+unilaterally. **Only one implementation of a slice should ever merge.** This slice checked the open
+PR list first and found no competing `CURRENT_STATE.md` restamp before starting.
+
+## 6. Prettier: the lockfile is safe, the declared range is not
+
+`established fact`, measured in this slice against the base file at `68ad14c66a` (564,317 bytes) by
+running each version.
+
+| prettier | output bytes | `NOT_APPLICABLE` / `PASSKEY_` / `sbp_` |
+| -------- | -----------: | -------------------------------------- |
+| 3.7.3    |      564,303 | **corrupted**                          |
+| 3.8.0    |      564,303 | **corrupted**                          |
+| 3.9.0    |      564,317 | intact — byte-identical                |
+| 3.9.6    |      564,317 | intact — byte-identical                |
+
+On **≤ 3.8.0** Prettier mis-parses underscore-heavy inline code as emphasis and rewrites
+`` `NOT_APPLICABLE` `` to `` `NOT*APPLICABLE` `` — a **status-vocabulary term** — along with
+`` `PASSKEY_` `` and `` `sbp_` `` inside a passage about credential redaction. Fixed from **3.9.0**.
+
+**Both lockfiles resolve `prettier@3.9.6`** (`bun.lock` and `package-lock.json`). On a lockfile
+install this file is prettier-clean and the `lint-staged` `prettier --write` on `*.md` is a
+**no-op**.
+
+Consequences, and they are narrow:
+
+- **Do not bypass the pre-commit hook on a lockfile-clean install.** There is nothing to protect the
+  file from; bypassing it skips the docs-safety and type gates for no gain.
+- **Do not "repair" the historical vocabulary.** Rewriting `NOT_APPLICABLE` to `NOT*APPLICABLE` is
+  the corruption, not the fix.
+- **The hazard is the declared range, not the file.** `package.json` declares `"prettier": "^3.7.3"`,
+  a caret span covering both behaviours, so a fresh **non-lockfile** install can land in the broken
+  half and silently mangle status vocabulary. That is how two sessions reached opposite conclusions
+  about the same file on the same day. **Tightening the range is out of scope here** — it is a
+  `package.json` change, not a docs edit, and this slice must not make it.
+
+## 7. `live_` token exposure — class and location only
+
+`session evidence`, carried forward so it does not age out of the current block. **No token bytes are
+reproduced, inspected or recorded here, and none ever should be.**
+
+The `5c197f75` remint injected a payments token of class **`live_`** into **tracked
+`.env.production`**, and made `restore-env-production-from-head` **skippable when Git HEAD is
+missing**. Both are still in the running production build — they are among the four ahead-commits in
+section 4, which is why that section matters operationally and not just as bookkeeping.
+
+Recorded as an **open exposure**. This slice authorises no revert, no env edit, no restore-script
+patch, no token revoke and no token creation. Paddle live-token creation stays parked on the login
+lockout recorded below.
+
+## 8. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production SQL, no
+  Lovable project-chat agent edit, no alternate publisher path, no retry.
+- **Tolu expected 2026-09-01 — do not ping.** Support outcome stays `NOT_MEASURED`.
+- **Production is DIVERGED, 7 behind / 4 ahead.** Do not describe it as merely behind. A failure to
+  re-measure is `BLOCKED`, never a product `FAIL`.
+- **An unticked GitHub review box is not missing evidence of a `PASS`.** Independent reviewers across
+  this run were Blue Dream, Super Blue and Dream Queen.
+- **Do not reopen #1234 or #1235**, and do not port `5882c32`.
+- **Prettier:** lockfile `3.9.6` is a no-op on this file. Do not bypass the hook on a lockfile-clean
+  install, do not repair historical vocabulary, and do not change the `package.json` range here.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.**
+- **#1221 stays draft at `79146c6911`, pending Blue Dream.** Not merged, readied, rebased or updated.
+- **Knowledge-library expansion is on `HOLD`.** No Codex SEO/Wikipedia program is opened here.
+- **Dual-home slice 2 is not approved.**
+- Paddle live token creation and Spider Farmer GGS radio capture remain parked exactly as recorded in
+  the entries below; nothing in this slice touched either.
+- This slice is **N=1** and stays **draft**, on branch `claude/current-state-restamp-e0e0d699`,
+  parented on `e0e0d699`. No ready, merge, publish, rebase or update-branch. No `src/` or `supabase/`
+  change. **Owner: Claude. Independent reviewer, named after the SHA: Dream Queen** — no ready until
+  an independent `PASS`.
+
+**Prior update:** Claude (2026-09-01: **#1228, #1229, #1230 and #1231 merged**; the deploy tip is
 **`68ad14c66a`**. The restore SHA for Tolu moves to that object. **Live is unchanged** — still the
 independently MEASURED dirty remint **`5c197f75`**, not re-measured here. Publish, History-restore
 and APPLY remain blocked; Tolu is expected 2026-09-01 and is **not** to be pinged. Prior header

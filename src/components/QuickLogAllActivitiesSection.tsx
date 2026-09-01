@@ -350,6 +350,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomCheck(false);
     setGuidedSymptomStage(null);
     setGuidedSymptomStageConfirmed(false);
+    setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
     setErrorReason(null);
@@ -380,6 +381,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomCheck(false);
     setGuidedSymptomStage(null);
     setGuidedSymptomStageConfirmed(false);
+    setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
     if (requestedActivityAvailability?.disabled) {
@@ -445,6 +447,7 @@ export default function QuickLogAllActivitiesSection({
       setGuidedSymptomCheck(false);
       setGuidedSymptomStage(null);
       setGuidedSymptomStageConfirmed(false);
+      setGuidedSymptomNoneObserved(false);
       if (a.id === "watering") {
         if (externalPersistenceBlockReason) {
           setStructuredWaterError(externalPersistenceBlockReason);
@@ -494,6 +497,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomCheck(true);
     setGuidedSymptomStage(resolveGuidedSymptomStage(plantStage));
     setGuidedSymptomStageConfirmed(false);
+    setGuidedSymptomNoneObserved(false);
   }, [currentTarget, hasSymptomPlant, isMutationBlocked, plantStage]);
 
   const handleSave = useCallback(async () => {
@@ -807,6 +811,7 @@ export default function QuickLogAllActivitiesSection({
       setGuidedSymptomCheck(false);
       setGuidedSymptomStage(null);
       setGuidedSymptomStageConfirmed(false);
+      setGuidedSymptomNoneObserved(false);
       envCheckTempEntryUnitRef.current = null;
       setPhotoFile(null);
       setSelectedDraft(null);

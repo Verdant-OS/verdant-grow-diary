@@ -800,6 +800,68 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("clears the no-symptoms box after a clean Symptom Check save before the next start", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-clean-check" },
+      error: null,
+    });
+    mountSection();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-none-observed"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).toBeChecked();
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "Looked the plant over; nothing visible today." },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-stage-confirmed"));
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [name, args] = rpcMock.mock.calls[0];
+    expect(name).toBe("quicklog_save_event");
+    expect(args.p_details).toMatchObject({
+      subtype: "issue",
+      event_type: "observation",
+      observation_stage: "flower",
+      symptom_check_result: "no_symptoms_observed",
+    });
+    expect(args.p_details).not.toHaveProperty("observedSign");
+
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).not.toBeChecked();
+  });
+
+  it("clears the no-symptoms box after activity switch and after plant target switch", async () => {
+    const view = mountSection();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-none-observed"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).toBeChecked();
+
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    expect(screen.queryByTestId("quick-log-all-activities-symptom-none-observed")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).not.toBeChecked();
+
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-none-observed"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).toBeChecked();
+
+    view.rerender(
+      <MemoryRouter>
+        <QuickLogAllActivitiesSection
+          growId={GROW}
+          tentId={TENT}
+          plantId={OTHER_PLANT}
+          plantStage="flower"
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.queryByTestId("quick-log-all-activities-form")).toBeNull());
+
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).not.toBeChecked();
+  });
+
   it("Environment check → canonical nested environment_check envelope (numbers) in p_details (celsius preference)", async () => {
     // Grower has explicitly set Celsius — the manual Temperature field labels
     // and validates as °C, and "24" is a plausible room temperature entered

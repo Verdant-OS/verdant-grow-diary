@@ -4,7 +4,7 @@
   "canonicalLockfile": "bun.lock",
   "compatibilityLockfile": "package-lock.json",
   "owner": "Verdant dependency security",
-  "reason": "package-lock.json remains synchronized while SEO, local setup, and the Vercel preview dashboard checklist still invoke or document npm. Framework/install/build/dev for Vercel live in the project dashboard, not vercel.json.",
+  "reason": "package-lock.json remains synchronized while SEO, local setup, and the Vercel preview dashboard checklist still invoke or document npm. vercel.json pins bun install/build (canonical) via top-level commands — not an npm consumer.",
   "reviewBy": "2026-09-25",
   "consumerContracts": [
     {

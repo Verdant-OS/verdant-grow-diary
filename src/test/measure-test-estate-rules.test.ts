@@ -14,6 +14,10 @@
  * execution) and a FALSE-DEAD reading (a real invocation missed) are equally
  * wrong, and fixing one has twice caused the other.
  */
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   buildExecutableCorpus,
@@ -331,5 +335,36 @@ describe("import graph — vitest registry calls that really load the module", (
 
   it("ignores a same-named method on some other object", () => {
     expect(runtimeImportSpecifiers(`registry.mock("./not-vitest");`)).toEqual([]);
+  });
+});
+
+describe("reproducer CLI — `--rev` never reaches a shell", () => {
+  const SCRIPT = path.resolve(__dirname, "../../scripts/measure-test-estate.mjs");
+
+  const run = (rev: string) =>
+    spawnSync(process.execPath, [SCRIPT, "--rev", rev], {
+      cwd: path.resolve(__dirname, "../.."),
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+
+  it("does not execute a command substitution passed as a revision", () => {
+    // CodeQL alert 255: the argument used to be interpolated into an
+    // `execSync` string, where double quotes do NOT neutralise `$(…)`.
+    const probe = path.join(mkdtempSync(path.join(tmpdir(), "estate-rev-")), "pwned");
+    const result = run(`$(touch ${probe})HEAD`);
+
+    expect(existsSync(probe)).toBe(false);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("cannot resolve");
+  });
+
+  // A fence, not a regression: git already rejects this shape, so the test is
+  // green with or without the leading-dash guard. It pins the guard so a later
+  // change to how the argument is passed cannot quietly let a flag through.
+  it("rejects a revision that would be read as a git flag", () => {
+    const result = run("--upload-pack=touch");
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("cannot resolve");
   });
 });

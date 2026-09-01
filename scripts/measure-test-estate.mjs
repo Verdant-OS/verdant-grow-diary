@@ -26,7 +26,7 @@
  * The parsing lives in scripts/lib/testEstateRules.mjs and is regression-tested
  * by src/test/measure-test-estate-rules.test.ts.
  */
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import {
   buildExecutableCorpus,
@@ -37,8 +37,16 @@ import {
 } from "./lib/testEstateRules.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const sh = (cmd, opts = {}) =>
-  execSync(cmd, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28, ...opts });
+/**
+ * Run git with an ARGV ARRAY — never a shell string.
+ *
+ * `--rev` is attacker-controllable in the general case (a CI job, a wrapper
+ * script), and interpolating it into a shell command is command injection:
+ * double quotes do not stop `$(…)`, backticks or `\`. `execFileSync` with an
+ * argv array spawns git directly, so no shell ever parses the value.
+ */
+const git = (args, opts = {}) =>
+  execFileSync("git", args, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28, ...opts });
 const lines = (s) => s.trim().split("\n").filter(Boolean);
 
 /* ---------- 0. Pin the revision ---------- */
@@ -50,14 +58,19 @@ if (revArgIndex !== -1 && !REV_INPUT) {
 }
 let REV;
 try {
-  REV = sh(`git rev-parse --verify ${JSON.stringify(REV_INPUT)}^{commit}`).trim();
+  // `--` is not accepted by rev-parse before a rev, so guard the one shape
+  // that would otherwise be read as a flag rather than a revision.
+  if (REV_INPUT.startsWith("-")) throw new Error("not a revision");
+  REV = git(["rev-parse", "--verify", `${REV_INPUT}^{commit}`], {
+    stdio: ["pipe", "pipe", "ignore"], // git's own "fatal:" would precede our message
+  }).trim();
 } catch {
   console.error(`--rev: cannot resolve ${REV_INPUT} to a commit in this repository`);
   process.exit(2);
 }
 
 /** Every tracked path at REV. */
-const treePaths = lines(sh(`git ls-tree -r --name-only ${REV}`));
+const treePaths = lines(git(["ls-tree", "-r", "--name-only", REV]));
 const tracked = new Set(treePaths);
 
 /**
@@ -70,9 +83,9 @@ const tracked = new Set(treePaths);
 function readBlobs(paths) {
   const out = new Map();
   if (paths.length === 0) return out;
-  const stdout = execSync("git cat-file --batch", {
-    cwd: ROOT,
-    input: paths.map((p) => `${REV}:${p}`).join("\n") + "\n",
+  const stdout = git(["cat-file", "--batch"], {
+    encoding: "buffer",
+    input: Buffer.from(paths.map((p) => `${REV}:${p}`).join("\n") + "\n", "utf8"),
     maxBuffer: 1 << 30,
   });
   let off = 0;

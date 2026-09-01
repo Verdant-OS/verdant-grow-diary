@@ -552,7 +552,7 @@ measurement discipline and the reproducer was the part that failed it.
 | 3   | Any path token in a workflow body counted as execution                                                        | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed  |
 | 4   | `import type` counted as a runtime edge, though the transpiler erases it                                      | reachability **98.2% → 97.8%**                                                                         |
 | 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee         | no figure moved, but the guarantee was false as written                                                |
-| 6   | Nothing tested the parser that produces these numbers                                                         | now `src/test/measure-test-estate-rules.test.ts`, 36 cases                                             |
+| 6   | Nothing tested the parser that produces these numbers                                                         | now `src/test/measure-test-estate-rules.test.ts`, 38 cases                                             |
 | 7   | The fix for 4 matched imports with a **regex**, which both invented edges and missed real ones                | reachability **97.7% → 97.8%**; imports are now read from the TypeScript compiler's own AST            |
 | 8   | §1 claimed the script reproduces _every_ headline count, but it launches no test runner                       | no figure moved; the claim is narrowed to the static counts it does derive                             |
 
@@ -588,11 +588,26 @@ The pattern across defects 2, 4 and 7 is one thing: **each came from matching te
 needed** — which is the failure mode §3 reports about the test estate, found again in the tool written
 to measure it.
 
+**One security defect, separate from the eight above.** CodeQL alert 255 flagged the `--rev` argument
+reaching a shell: it was interpolated into an `execSync` string, and double quotes do not neutralise
+`$(…)`, backticks or `\`. Demonstrated rather than assumed —
+`--rev '$(touch /tmp/probe)HEAD'` created the probe file under the old form. The script now spawns
+git through `execFileSync` with an argv array, so no shell parses the value, and a leading-dash
+revision is refused before it can be read as a git flag. The same command creates nothing now, and
+`--rev 5d6efc9 --json` hashes identically before and after, so no published figure moved. Both
+directions are pinned by two CLI cases in the parser test file.
+
 ```text
 Targeted tests:      src/test/timeline-grow-filter.test.ts, src/test/action-queue-row-evidence-badge.test.ts
                      → 2 files, 18 cases, all passing at baseline
                      src/test/measure-test-estate-rules.test.ts (the reproducer's own parser)
-                     → 1 file, 36 cases, 36 passed | 0 failed
+                     → 1 file, 38 cases, 38 passed | 0 failed
+                     RED-before-GREEN, proven by execution: with the vulnerable
+                     `execSync` form restored in place, the command-substitution
+                     case failed (1 failed | 37 passed); the file was restored and
+                     verified byte-identical by sha256 before any commit. The
+                     leading-dash case is a fence, not a regression — it is green
+                     either way, and says so in the source.
 Experiment A:        1 failed | 9 passed  (behaviour-preserving refactor → false positive)
 Experiment B:        156 files, 1,925 cases, ALL PASSING with the injected precedence bug
                      (real behaviour break → false negative)

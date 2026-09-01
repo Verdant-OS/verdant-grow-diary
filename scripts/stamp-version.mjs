@@ -117,10 +117,6 @@ function collectMeaningfulPorcelain() {
   );
 }
 
-function hasMeaningfulWorktreeChanges() {
-  return collectMeaningfulPorcelain() !== "";
-}
-
 /**
  * Prefer CI / platform refs over a detached-HEAD abbrev. Never invent a ref:
  * empty platform values fall through to the git-derived canonicalization.

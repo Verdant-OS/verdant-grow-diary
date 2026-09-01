@@ -1,7 +1,85 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-31 UTC (~19:38 UTC)
-**Updated by:** Codex (2026-08-31: **#1227 merged as `a8b4a23e`** and the deploy-branch tip is that
+**Last updated:** 2026-09-01 UTC (~01:41 UTC)
+**Updated by:** Claude (2026-09-01: **#1228, #1229, #1230 and #1231 merged**; the deploy tip is
+**`68ad14c66a`**. The restore SHA for Tolu moves to that object. **Live is unchanged** — still the
+independently MEASURED dirty remint **`5c197f75`**, not re-measured here. Publish, History-restore
+and APPLY remain blocked; Tolu is expected 2026-09-01 and is **not** to be pinged. Prior header
+follows.)
+
+## 1. Four merges — deploy tip `68ad14c66a`
+
+`established fact`, sourced from the **GitHub PR record** and cross-checked against the commit graph
+and the exact remote branch ref. Every row is a **squash** — one parent each, verified with
+`git rev-list --parents`, subjects ending in their PR number.
+
+| PR        | Merge SHA    | Parent      | Source head | Files | Migrations | Merged (UTC)     |
+| --------- | ------------ | ----------- | ----------- | ----: | ---------: | ---------------- |
+| **#1228** | `6fd48d1cd`  | `a8b4a23ec` | `1f3b35706` |     1 |      **0** | 2026-08-31 20:06 |
+| **#1229** | `47e2588ab`  | `6fd48d1cd` | `5e3c54a70` |     5 |      **0** | 2026-08-31 23:52 |
+| **#1230** | `cc1cd81af`  | `47e2588ab` | `9859a0c85` |     4 |      **0** | 2026-08-31 23:55 |
+| **#1231** | `68ad14c66a` | `cc1cd81af` | `1582d989e` |     2 |      **0** | 2026-09-01 00:27 |
+
+**Deploy tip: `68ad14c66a223d123d7ab263b83cec3fe5d90c8d`**, confirmed as the exact remote
+`verdant-grow-diary` ref by `git ls-remote`. All four were merged by `cheekhimself`.
+
+**Zero migrations across all four** — checked per commit, not assumed.
+
+**One ordering detail worth having on the record.** #1230 was opened against base `6fd48d1cd`
+(#1228), but its **actual merge parent is `47e2588ab`** (#1229): the queue restacked it onto #1229
+rather than onto the base it was opened from. The PR base and the landed parent therefore differ.
+Recorded because a reader reconstructing the chain from PR bases alone would get it wrong.
+
+**Scope, from the PR record:**
+
+- **#1228** — Codex, docs-only restamp of `CURRENT_STATE.md` after #1227 and the Support hold.
+- **#1229** — canonical diary event-type resolver; AI Doctor readiness and Timeline Memory recover
+  Quick Log watering identity. `entry_type` stays authoritative; `details.event_type` is accepted
+  only on an allow-list; malformed details **fail closed**; note text is never parsed.
+- **#1230** — Guided Symptom Check gains an explicit **no visible symptoms** path, persisted as
+  `details.symptom_check_result = no_symptoms_observed`. It is **not** an `observedSign` and is
+  **not** added to the symptom catalog, so guides and evidence cards still fail closed rather than
+  inventing a "healthy" symptom. Choosing both a sign and the box fails closed.
+- **#1231** — clears the sticky `guidedSymptomNoneObserved` control at five reset sites, so a later
+  Symptom Check in the same mount no longer opens with the clean-check box already ticked. Per its
+  own PR body this closes a **P2 raised by Super Blue on #1230**.
+
+## 2. Live is unchanged — still the dirty remint `5c197f75`
+
+`source claim` as to the measurement, carried forward unchanged from the entry demoted below. **No
+production measurement was taken in this slice**, and Claude cannot take one.
+
+Live remains `5c197f7516e65845209c2d3b4a3192cf5848570c`, **`dirty:true`**, ref `master`. Four merges
+have landed on the deploy branch since, so live and the deploy tip are **further apart than before**,
+not closer. **A merge is not a deployment.** The remint is on GitHub but is **not** the
+`verdant-grow-diary` deploy tip; do not rebase this record onto it and do not merge it onto the
+deploy branch.
+
+## 3. Restore SHA for Tolu is now `68ad14c66a`
+
+The requested restore target moves from `a8b4a23e` (recorded in the entry below) to the current exact
+GitHub object **`68ad14c66a223d123d7ab263b83cec3fe5d90c8d`**.
+
+**Tolu is expected 2026-09-01. Do not ping.** No Support outcome exists in the evidence available to
+this slice — that remains **`NOT_MEASURED`**. Do not infer that the Publish block is lifted or that
+production has been restored.
+
+## 4. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production SQL, no
+  Lovable project-chat agent edit, no alternate publisher path, no retry.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Do not implement the unknown-scheme catch-all and
+  do not add a scheme.
+- **#1221 stays draft at `79146c6911`, pending Blue Dream.** It is **not merged**. Not being readied,
+  rebased, updated or merged.
+- **Knowledge-library expansion is on `HOLD`.**
+- **Dual-home slice 2 is not approved.**
+- Paddle live token creation and Spider Farmer GGS radio capture remain parked exactly as recorded in
+  the entry below; nothing in this slice touched either.
+- This slice is **draft**. **No ready until an independent `PASS`.** Reviewer after SHA:
+  **Super Blue**.
+
+**Prior update:** Codex (2026-08-31: **#1227 merged as `a8b4a23e`** and the deploy-branch tip is that
 exact commit. Lovable Support (Tolu) is reviewing the blocked Publish and the dirty remint; Publish
 and agent edits in the Lovable project chat remain on hold until Support writes back. The requested
 restore target is now exact GitHub object **`a8b4a23e`**, `dirty:false`. Live remains independently

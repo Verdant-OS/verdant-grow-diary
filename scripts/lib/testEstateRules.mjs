@@ -282,7 +282,7 @@ function allBindingsTypeOnly(bindings) {
  */
 export function classifyTest({ source, file, productSet }) {
   const scans = readsFiles(source, file);
-  const renders = /\brender\s*\(/.test(source);
+  const renders = rendersComponents(source, file);
   const importsProduct = testFileRuntimeSpecifiers(source, file).some(
     (s) => resolveSpec(s, file, productSet) !== null,
   );
@@ -291,6 +291,37 @@ export function classifyTest({ source, file, productSet }) {
 }
 
 const FS_READERS = new Set(["readFileSync", "readdirSync", "readFile", "globSync"]);
+
+/**
+ * Does this file CALL `render(…)`?
+ *
+ * `/\brender\s*\(/` matched the text anywhere, including inside a test title:
+ * `alerts-foundation.test.ts` has `it("does not auto-save alerts on render (no
+ * top-level saveAlert call)")` and never calls `render`, yet was classified
+ * hybrid rather than scan-only on that string alone.
+ */
+export function rendersComponents(source, fileName = "f.tsx") {
+  const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
+  let found = false;
+  const visit = (node) => {
+    if (found) return;
+    if (ts.isCallExpression(node)) {
+      const e = node.expression;
+      const name = ts.isIdentifier(e)
+        ? e.text
+        : ts.isPropertyAccessExpression(e)
+          ? e.name.text
+          : null;
+      if (name === "render") {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found;
+}
 
 /**
  * Does this file actually CALL a filesystem reader?
@@ -328,29 +359,79 @@ export function readsFiles(source, fileName = "f.tsx") {
 }
 
 /**
- * Does this file read a file AND name a path under `src/` in a string literal?
+ * Does this file read a path under `src/`?
  *
- * The audit's "N test files read a path under `src/`" figure. String literals
- * come from the parser so a `src/` inside a comment or an identifier does not
- * count, and the read itself must be a real call (see `readsFiles`).
+ * The path must come from the READER CALL'S OWN ARGUMENT. An earlier version
+ * combined two independent file-level predicates — "reads some file" AND "the
+ * word `src/` appears in some string" — which counted
+ * `architecture-docs.test.ts`, a file that reads `docs/architecture.md` and then
+ * asserts the document mentions two `src/test/…` paths. The `src/` was in the
+ * assertion, not the read.
+ *
+ * Literals are gathered from the argument expression, following same-file
+ * `const NAME = "literal"` bindings one level and descending into calls such as
+ * `path.join(ROOT, "src", "lib")`, so both a joined `"src/lib/x.ts"` and a
+ * segment-wise `"src"` count. A path this cannot resolve statically is NOT
+ * counted — the figure is a floor, not an estimate.
  */
 export function readsSrcPath(source, fileName = "f.tsx") {
-  if (!readsFiles(source, fileName)) return false;
   const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
+
+  // Same-file `const NAME = "literal"` bindings, for `readFileSync(DOC_PATH)`.
+  const bindings = new Map();
+  const collectBindings = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      const init = node.initializer;
+      if (ts.isStringLiteral(init) || ts.isNoSubstitutionTemplateLiteral(init)) {
+        bindings.set(node.name.text, init.text);
+      }
+    }
+    ts.forEachChild(node, collectBindings);
+  };
+  collectBindings(sf);
+
+  const literalsIn = (node, depth = 0) => {
+    if (!node || depth > 6) return [];
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return [node.text];
+    if (ts.isIdentifier(node)) {
+      const bound = bindings.get(node.text);
+      return bound === undefined ? [] : [bound];
+    }
+    if (ts.isTemplateExpression(node)) {
+      const out = [node.head.text];
+      for (const span of node.templateSpans) {
+        out.push(...literalsIn(span.expression, depth + 1), span.literal.text);
+      }
+      return out;
+    }
+    if (ts.isCallExpression(node)) {
+      // path.join(...) / path.resolve(...) and friends.
+      return node.arguments.flatMap((a) => literalsIn(a, depth + 1));
+    }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+      return [...literalsIn(node.left, depth + 1), ...literalsIn(node.right, depth + 1)];
+    }
+    return [];
+  };
+
   let found = false;
   const visit = (node) => {
     if (found) return;
-    const text = ts.isStringLiteral(node)
-      ? node.text
-      : ts.isNoSubstitutionTemplateLiteral(node) ||
-          ts.isTemplateHead(node) ||
-          ts.isTemplateMiddle(node) ||
-          ts.isTemplateTail(node)
-        ? node.text
-        : null;
-    if (text !== null && text.includes("src/")) {
-      found = true;
-      return;
+    if (ts.isCallExpression(node)) {
+      const e = node.expression;
+      const name = ts.isIdentifier(e)
+        ? e.text
+        : ts.isPropertyAccessExpression(e)
+          ? e.name.text
+          : null;
+      if (name && FS_READERS.has(name)) {
+        const parts = literalsIn(node.arguments[0]);
+        const joined = parts.join("/");
+        if (parts.some((t) => t.includes("src/")) || /(^|\/)src(\/|$)/.test(joined)) {
+          found = true;
+          return;
+        }
+      }
     }
     ts.forEachChild(node, visit);
   };

@@ -26,6 +26,7 @@ import {
   factoryMockedSpecifiers,
   readsFiles,
   readsSrcPath,
+  rendersComponents,
   classifyTest,
   commandLinesIn,
   isCommandLine,
@@ -483,10 +484,40 @@ describe("file-I/O classification — a declaration is not a read", () => {
     expect(readsFiles('const t = fs.readFileSync(p, "utf8");')).toBe(true);
   });
 
-  it("needs both a real read and a `src/` string for the src-path count", () => {
+  it("takes the src/ path from the reader call's OWN argument", () => {
     expect(readsSrcPath('const t = readFileSync("src/lib/a.ts", "utf8");')).toBe(true);
     expect(readsSrcPath('const t = readFileSync("docs/a.md", "utf8");')).toBe(false);
     expect(readsSrcPath("// reads src/lib/a.ts one day")).toBe(false);
+  });
+
+  it("does NOT count a `src/` string that is only asserted on", () => {
+    // `architecture-docs.test.ts` reads docs/architecture.md, then asserts the
+    // document mentions two `src/test/…` paths. The src/ is in the assertion.
+    const src = [
+      'const DOC_PATH = "docs/architecture.md";',
+      'const content = readFileSync(DOC_PATH, "utf8");',
+      'expect(content).toContain("src/test/ai-coach-security.test.ts");',
+    ].join("\n");
+    expect(readsSrcPath(src)).toBe(false);
+  });
+
+  it("follows a const binding and path.join segments into the read", () => {
+    expect(readsSrcPath('const P = "src/lib/a.ts";\nreadFileSync(P, "utf8");')).toBe(true);
+    expect(readsSrcPath('readFileSync(path.join(ROOT, "src", "lib", "a.ts"), "utf8");')).toBe(true);
+  });
+});
+
+describe("render classification — a title is not a render call", () => {
+  it("does NOT count `render (` inside a test title", () => {
+    // `alerts-foundation.test.ts` has exactly this and never calls render.
+    const title =
+      'it("does not auto-save alerts on render (no top-level saveAlert call)", () => {});';
+    expect(rendersComponents(title)).toBe(false);
+  });
+
+  it("counts a real render call, bare or as a property", () => {
+    expect(rendersComponents("render(<App />);")).toBe(true);
+    expect(rendersComponents("testUtils.render(<App />);")).toBe(true);
   });
 });
 

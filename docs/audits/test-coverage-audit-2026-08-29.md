@@ -163,9 +163,14 @@ import no product module and render nothing, so nothing in them observes runtime
 Within the scan-only bucket, **75.9% of assertions are `toContain(...)` or `toMatch(...)`** —
 14,054 substring and regex checks over file text, which is **16.1% of all 87,333 Vitest
 assertions**, not 21.2%. (21.2% is the bucket's total share of assertions; the two figures were
-conflated in an earlier draft of §0.) The hybrid bucket contributes further source-text assertions
+conflated in an earlier draft of §0.) Precisely, that count is **`toContain`/`toMatch` calls inside
+scan-only files**; it does not trace each matcher's receiver back to file content. Measured, **4 of
+the 14,054** assert membership in a literal array rather than matching text — `expect(["live",
+"manual", …]).toContain(p.source)` and three like it. 0.03%, so the 16.1% headline is unchanged
+either way, but the metric is named for what it counts rather than what it mostly means. The hybrid bucket contributes further source-text assertions
 that are `NOT_MEASURED` — its files mix scanning with real imports, and the two were not separated.
-813 test files read a path under `src/`.
+428 test files read a path under `src/` — counting only reads whose own path argument resolves
+to one, which is a floor: a path this cannot resolve statically is not counted.
 
 Every figure in that table is a **static count of source occurrences**, per §1 limit 4 — the ratios
 are static-against-static and hold, but they are not the runner's executed-case numbers in §9.
@@ -178,7 +183,7 @@ Names in that bucket read like behaviour tests, not like lint rules:
 `playwright-action-timeout-fence` precedent where commenting a setting out left the guard green.
 The enforcement script `scripts/check-contract-test-resolution.mjs` implements that rule — but its
 `CONFIG_FILES` constant is `["playwright.config", "vitest.config"]`. **Two files.** Nothing checks
-the 813 tests that scan `src/`. Repo-wide there are **7** `@source-scan-justified` declarations.
+the 428 tests that scan `src/`. Repo-wide there are **7** `@source-scan-justified` declarations.
 
 ### 3.2 Experiment A — a behaviour-preserving refactor turns the gate red (false positive)
 
@@ -552,7 +557,7 @@ Not to be rounded up by anyone quoting this document.
 
 ## 9. Validation
 
-### 9.0 Fourteen measurement defects found in review, and corrected
+### 9.0 Seventeen measurement defects found in review, and corrected
 
 The first published version of `measure-test-estate.mjs` was reviewed on PR #1219 by **Codex,
 GitHub Copilot and Cursor Bugbot independently**, and all three found defects in it. Six were real.
@@ -560,8 +565,9 @@ Codex then reviewed **the correction itself** and found two more, one of them in
 defect 4 — and Cursor Bugbot then found a ninth inside the fix for _that_. A further pass by Codex
 found three more, in the assertion and file-I/O counters nobody had looked at while the import
 graph was being argued over — and both then found a fourteenth and a thirteenth in the fixes for
-defects 8 and 9. All fourteen are recorded here rather than quietly patched, because this document's
-subject is measurement discipline and the reproducer was the part that failed it.
+defects 8 and 9, then three more in the fixes for 11 and 12. All seventeen are recorded here rather
+than quietly patched, because this document's subject is measurement discipline and the reproducer
+was the part that failed it.
 
 | #   | Defect                                                                                                                                        | Effect on a published figure                                                                                                   |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -570,15 +576,18 @@ subject is measurement discipline and the reproducer was the part that failed it
 | 3   | Any path token in a workflow body counted as execution                                                                                        | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed                          |
 | 4   | `import type` counted as a runtime edge, though the transpiler erases it                                                                      | reachability **98.2% → 97.8%**                                                                                                 |
 | 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee                                         | no figure moved, but the guarantee was false as written                                                                        |
-| 6   | Nothing tested the parser that produces these numbers                                                                                         | now `src/test/measure-test-estate-rules.test.ts`, 57 cases                                                                     |
+| 6   | Nothing tested the parser that produces these numbers                                                                                         | now `src/test/measure-test-estate-rules.test.ts`, 61 cases                                                                     |
 | 7   | The fix for 4 matched imports with a **regex**, which both invented edges and missed real ones                                                | reachability **97.7% → 97.8%**; imports are now read from the TypeScript compiler's own AST                                    |
 | 8   | §1 claimed the script reproduces _every_ headline count, but it launches no test runner                                                       | no figure moved; the claim is narrowed to the static counts it does derive                                                     |
 | 9   | The reachability walk regex-subtracted every `vi.mock` path, contradicting the rule defect 7 had just established                             | no module moved on the pinned tree, but the code and the published method disagreed; the rule now lives in one tested function |
 | 10  | `it` / `test` / `expect` / `toContain` counted as **text**, so `/re/.test(x)` read as a case and `"expect("` in a string read as an assertion | case sites **32,080 → 31,941**; assertions **87,351 → 87,333**; `.skip` **13 → 11**; substring assertions **14,057 → 14,054**  |
 | 11  | The file-I/O predicate matched the reader **names** anywhere, including a type member and an injected fake                                    | scan-only **624 → 622**; any-file-I/O **1,397 → 1,393**                                                                        |
-| 12  | "806 test files read a path under `src/`" was text-matched and the script never emitted it                                                    | **806 → 813**, now derived by the reproducer like every other static figure                                                    |
+| 12  | "806 test files read a path under `src/`" was text-matched and the script never emitted it                                                    | **806 → 813** (then → 428, see 16); now derived by the reproducer like every other static figure                               |
 | 13  | The fix for 9 recognised only `vi.importActual`, so `vi.mock(spec, async (importOriginal) => …)` — 19 files — lost a real edge                | direct/transitive **1,636/425 → 1,637/424**; total reached unchanged at 2,061 of 2,108                                         |
 | 14  | The fix for 8 still over-claimed: `--json` derives none of the `@source-scan-justified`, Quick Log, keyword or required-check figures         | no figure moved; §1 now enumerates the exact fields the script emits, and says the rest are hand-measured                      |
+| 15  | The `render()` predicate matched text, so `it("…on render (no top-level saveAlert call)")` read as a render                                   | 3 files classified on a string, but **no published figure moved** — all three are hybrid for a real product import anyway      |
+| 16  | `readsSrcPath` combined two independent predicates: reads _a_ file, and mentions `src/` _somewhere_                                           | **813 → 428**. The path must now come from the reader call's own argument                                                      |
+| 17  | The substring metric counts `toContain`/`toMatch` calls, not matches against file content                                                     | no figure moved; **4 of 14,054** have a literal-array receiver, and §3.1 now says so and names the metric for what it counts   |
 
 Fixing 3 initially introduced two **false-DEAD** readings in the opposite direction — a YAML folded
 scalar (`run: >-`) splits one command across lines, and a `psql … \` continuation does too, so real
@@ -660,10 +669,22 @@ times over in the tool written to measure it. Defects 13 and 14 are a second pat
 one: **each was a fix that stopped one case short of the rule it was written to enforce.** Both were
 found by a reviewer re-reading the correction, not the original.
 
-Neither pattern was caught by the author. Five review rounds by three independent reviewers found
-every one of the fourteen. That is the strongest evidence in this document for its own central
-claim, and it is evidence about the author as much as about the tool: a measurement is not
-trustworthy because the person who made it checked it.
+Defects 15, 16 and 17 close the set, and 16 is the largest single correction in it: `readsSrcPath`
+combined "reads _a_ file" with "mentions `src/` _somewhere_", counting `architecture-docs.test.ts`,
+which reads `docs/architecture.md` and then asserts that the document mentions two `src/test/…`
+paths. Requiring the path to come from the reader call's own argument takes the figure from **813 to
+428**. Defect 15 is the same text-vs-parse mistake in the `render()` predicate; it changes how three
+files are classified and moves **no** published figure, because all three are hybrid for a real
+product import regardless — the reviewer's cited example, `alerts-foundation.test.ts`, imports
+`src/lib/alerts.ts`, so the claim that it "imports no product module" is wrong even though the
+defect is real.
+
+Neither pattern was caught by the author. Six review rounds by three independent reviewers found
+every one of the seventeen. That is the strongest evidence in this document for its own central
+claim, and it is evidence about the author as much as about the tool: **a measurement is not
+trustworthy because the person who made it checked it.** Anyone quoting a figure from this document
+should note that it took six adversarial rounds to get these numbers right, and that the last round
+still moved one of them by 47%.
 
 **One security defect, separate from the eight above.** CodeQL alert 255 flagged the `--rev` argument
 reaching a shell: it was interpolated into an `execSync` string, and double quotes do not neutralise
@@ -678,7 +699,7 @@ directions are pinned by two CLI cases in the parser test file.
 Targeted tests:      src/test/timeline-grow-filter.test.ts, src/test/action-queue-row-evidence-badge.test.ts
                      → 2 files, 18 cases, all passing at baseline
                      src/test/measure-test-estate-rules.test.ts (the reproducer's own parser)
-                     → 1 file, 57 cases, 57 passed | 0 failed
+                     → 1 file, 61 cases, 61 passed | 0 failed
                      RED-before-GREEN, proven by execution: with the vulnerable
                      `execSync` form restored in place, the command-substitution
                      case failed (1 failed | 37 passed); the file was restored and

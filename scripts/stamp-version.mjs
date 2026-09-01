@@ -96,9 +96,11 @@ function canonicalOriginDefaultRef(rawRef, stampSha, currentGitSha) {
 /**
  * Generated stamp outputs are build residue, not a source mutation. Exclude
  * only those two exact tracked paths by default. On Vercel, also exclude the
- * Build Output API tree under `.vercel/` — Nitro writes it mid-build and a
- * detached checkout would otherwise stamp dirty:true for publisher residue.
- * Untracked and changed source/config/Edge files must remain visible as dirty.
+ * Build Output API tree under `.vercel/` and the repo-root `vercel.json` —
+ * MEASURED on Preview 8b30b7c9 / dpl 3Ak3RtkDD99RJSBhzqdMx6h1fAe4: Vercel
+ * rewrites vercel.json on the builder before prebuild stamp (` M vercel.json`
+ * was the sole porcelain line). Untracked and changed source/config/Edge files
+ * must remain visible as dirty.
  *
  * Returns the exact `git status --porcelain` text after those excludes (may be
  * empty). Callers decide dirty from non-empty text; Vercel builds also print
@@ -107,7 +109,7 @@ function canonicalOriginDefaultRef(rawRef, stampSha, currentGitSha) {
 function collectMeaningfulPorcelain() {
   const excludes = [...GENERATED_STAMP_OUTPUTS];
   if (isVercelBuildEnvironment()) {
-    excludes.push(".vercel", ".vercel/**");
+    excludes.push(".vercel", ".vercel/**", "vercel.json");
   }
   const excludedOutputs = excludes.map((path) => `":(exclude)${path}"`).join(" ");
   return safe(

@@ -450,6 +450,45 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
     expect(record.version).toContain("-dirty");
   });
 
+  it("on Vercel, ignores builder-rewritten vercel.json without hiding real source dirty", () => {
+    const { box, sha } = makeCommittedSandbox({
+      "vercel.json": '{"$schema":"https://openapi.vercel.sh/vercel.json","cleanUrls":true}\n',
+    });
+    git(box, ["checkout", "--detach", sha]);
+
+    // Simulate Vercel rewriting vercel.json on the builder before prebuild.
+    writeFileSync(
+      join(box, "vercel.json"),
+      '{"$schema":"https://openapi.vercel.sh/vercel.json","cleanUrls":true,"rewrittenByVercel":true}\n',
+    );
+
+    const cleanOnVercel = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "cursor/vercel-json-remove-project-settings-0454",
+    });
+    expect(cleanOnVercel.record.dirty).toBe(false);
+    expect(String(cleanOnVercel.record.version)).not.toContain("-dirty");
+    expect(cleanOnVercel.stderr).not.toContain(
+      "stamp-version: Vercel worktree dirty — git status --porcelain (after stamp excludes):",
+    );
+
+    // Non-Vercel local/CI must still surface a real vercel.json edit as dirty.
+    expect(runStamper(box).record.dirty).toBe(true);
+
+    // Source drift on Vercel still stamps dirty and dumps porcelain.
+    writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
+    const dirtySrc = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "cursor/vercel-json-remove-project-settings-0454",
+    });
+    expect(dirtySrc.record.dirty).toBe(true);
+    expect(dirtySrc.stderr).toContain(
+      "stamp-version: Vercel worktree dirty — git status --porcelain (after stamp excludes):",
+    );
+    expect(dirtySrc.stderr).toMatch(/src\/components\/App\.tsx/);
+    expect(dirtySrc.stderr).not.toMatch(/vercel\.json/);
+  });
+
   it("prefers VERCEL_GIT_COMMIT_REF when GITHUB_REF_NAME is absent, without fabricating commit", () => {
     const { box, sha } = makeCommittedSandbox();
     git(box, ["checkout", "--detach", sha]);

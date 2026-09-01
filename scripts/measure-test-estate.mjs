@@ -111,7 +111,10 @@ let skipCallSites = 0;
 let onlyCallSites = 0;
 const scanOnly = [];
 let hybrid = 0;
+let hybridExpects = 0;
+let hybridCases = 0;
 let behavioural = 0;
+let behaviouralExpects = 0;
 let anyFileIo = 0;
 let scanOnlyExpects = 0;
 let scanOnlyCases = 0;
@@ -134,8 +137,14 @@ for (const t of tests) {
     scanOnlyExpects += e;
     scanOnlyCases += c;
     scanOnlySubstring += count(s, /toContain\(/g) + count(s, /toMatch\(/g);
-  } else if (kind === "hybrid") hybrid += 1;
-  else behavioural += 1;
+  } else if (kind === "hybrid") {
+    hybrid += 1;
+    hybridExpects += e;
+    hybridCases += c;
+  } else {
+    behavioural += 1;
+    behaviouralExpects += e;
+  }
 }
 
 /* ---------- 2. Module reachability across the Vitest import graph ---------- */
@@ -263,7 +272,10 @@ const report = {
     scanOnlyCases,
     scanOnlySubstringAssertions: scanOnlySubstring,
     hybridFiles: hybrid,
+    hybridExpects,
+    hybridCases,
     behaviouralFiles: behavioural,
+    behaviouralExpects,
     filesDoingFileIo: anyFileIo,
   },
   reachability: {
@@ -300,6 +312,8 @@ if (process.argv.includes("--json")) {
     `  of those, toContain/toMatch    ${v.scanOnlySubstringAssertions}  (${pct(v.scanOnlySubstringAssertions, v.scanOnlyExpects)} of the bucket, ${pct(v.scanOnlySubstringAssertions, v.expectCallSites)} of all assertions)`,
   );
   console.log(`  hybrid / behavioural files     ${v.hybridFiles} / ${v.behaviouralFiles}`);
+  console.log(`  hybrid expects / cases         ${v.hybridExpects} / ${v.hybridCases}`);
+  console.log(`  behavioural expects            ${v.behaviouralExpects}`);
   console.log(
     `  files doing any file I/O       ${v.filesDoingFileIo}  (${pct(v.filesDoingFileIo, v.testFiles)})`,
   );

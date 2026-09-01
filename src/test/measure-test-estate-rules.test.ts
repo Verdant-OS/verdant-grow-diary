@@ -254,9 +254,82 @@ describe("import graph — `import type` is erased and creates no runtime edge",
     expect(runtimeImportSpecifiers(`import { type A, b } from "./a";`)).toEqual(["./a"]);
   });
 
+  it("finds a multiline default-plus-named import (regex matching missed it entirely)", () => {
+    const src = [
+      "import CoachAiDoctorContextPanel, {",
+      "  helperA,",
+      "  helperB,",
+      "} from '@/components/CoachAiDoctorContextPanel';",
+    ].join("\n");
+    expect(runtimeImportSpecifiers(src)).toEqual(["@/components/CoachAiDoctorContextPanel"]);
+  });
+
+  it("ignores a specifier that appears only in a comment", () => {
+    expect(runtimeImportSpecifiers("// import { fake } from './commented';")).toEqual([]);
+    expect(runtimeImportSpecifiers("/* import { f } from './block'; */")).toEqual([]);
+  });
+
+  it("ignores a specifier that appears only inside a template literal fixture", () => {
+    expect(runtimeImportSpecifiers("const t = `import { f } from './tpl';`;")).toEqual([]);
+  });
+
+  it("keeps a bare side-effect import", () => {
+    expect(runtimeImportSpecifiers(`import "./side-effect";`)).toEqual(["./side-effect"]);
+  });
+
+  it("keeps a namespace import", () => {
+    expect(runtimeImportSpecifiers(`import * as ns from "./ns";`)).toEqual(["./ns"]);
+  });
+
   it("keeps ordinary value imports, dynamic imports and require", () => {
     expect(runtimeImportSpecifiers(`import { a } from "./a";`)).toEqual(["./a"]);
     expect(runtimeImportSpecifiers(`const x = await import("./b");`)).toContain("./b");
     expect(runtimeImportSpecifiers(`const y = require("./c");`)).toContain("./c");
+  });
+
+  it("excludes `import()` in a TYPE position, which the transpiler erases", () => {
+    expect(runtimeImportSpecifiers(`type J = import("./types").Json;`)).toEqual([]);
+    expect(runtimeImportSpecifiers(`let x: typeof import("./mod");`)).toEqual([]);
+  });
+
+  it("unwraps `as`, `satisfies` and parentheses around a dynamic specifier", () => {
+    expect(runtimeImportSpecifiers(`await import("./raw?raw" as string);`)).toEqual(["./raw?raw"]);
+    expect(runtimeImportSpecifiers(`await import(("./parens"));`)).toEqual(["./parens"]);
+  });
+});
+
+describe("import graph — vitest registry calls that really load the module", () => {
+  it("counts `vi.importActual` and `vi.importMock`, which load the real module", () => {
+    expect(runtimeImportSpecifiers(`await vi.importActual("./real");`)).toEqual(["./real"]);
+    expect(runtimeImportSpecifiers(`await vi.importMock("./real");`)).toEqual(["./real"]);
+  });
+
+  it("counts a bare `vi.mock` / `vi.doMock`, which auto-mocks by loading the module", () => {
+    expect(runtimeImportSpecifiers(`vi.mock("./auto");`)).toEqual(["./auto"]);
+    expect(runtimeImportSpecifiers(`vi.doMock("./auto");`)).toEqual(["./auto"]);
+  });
+
+  it("does NOT count `vi.mock` with a factory — the real module never loads", () => {
+    expect(runtimeImportSpecifiers(`vi.mock("./replaced", () => ({ a: 1 }));`)).toEqual([]);
+    expect(runtimeImportSpecifiers(`vi.doMock("./replaced", () => ({}));`)).toEqual([]);
+  });
+
+  it("does NOT count `vi.unmock` / `vi.doUnmock`, which load nothing", () => {
+    expect(runtimeImportSpecifiers(`vi.unmock("./x"); vi.doUnmock("./x");`)).toEqual([]);
+  });
+
+  it("keeps the real module of the spread-actual mock pattern", () => {
+    const src = [
+      'vi.mock("@/lib/alerts", async () => {',
+      '  const actual = await vi.importActual<typeof import("@/lib/alerts")>("@/lib/alerts");',
+      "  return { ...actual, listAlerts: vi.fn() };",
+      "});",
+    ].join("\n");
+    // The factory form is not an edge; the importActual inside it is.
+    expect(runtimeImportSpecifiers(src)).toEqual(["@/lib/alerts"]);
+  });
+
+  it("ignores a same-named method on some other object", () => {
+    expect(runtimeImportSpecifiers(`registry.mock("./not-vitest");`)).toEqual([]);
   });
 });

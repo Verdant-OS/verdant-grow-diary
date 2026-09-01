@@ -9,7 +9,10 @@
  * pinned by a fixture in `src/test/measure-test-estate-rules.test.ts`.
  *
  * No fs, no network, no clock, no randomness — the caller injects every input.
+ * The one dependency is the TypeScript compiler, used to parse imports exactly
+ * rather than approximate them with a regex.
  */
+import ts from "typescript";
 
 /* ------------------------------------------------------------------ *
  * Import classification
@@ -52,42 +55,108 @@ function posixJoin(dir, rel) {
 }
 
 /**
- * Import specifiers a module depends on AT RUNTIME.
+ * Import specifiers a module depends on AT RUNTIME, parsed with the TypeScript
+ * compiler rather than matched with a regex.
  *
- * TypeScript `import type` / `export type` statements are erased by the
- * transpiler and create no runtime edge, so counting them inflates module
- * reachability. A fully type-only named clause (`import { type A, type B }`)
- * is erased too; a mixed clause is not. Both forms are excluded here, which
- * is what moved the published reachability figure.
+ * The regex version was wrong in BOTH directions, which is fatal for a figure
+ * published as exact. On a single fixture it missed a real multiline
+ * `import Default, { a, b } from "…"` entirely while reporting a specifier from
+ * a `//`-commented line as a runtime edge. Measured across the pinned tree, the
+ * regex missed a local specifier in 41 files and invented one in 37 others.
+ *
+ * The parser gets comments, template literals, multiline clauses and type-only
+ * syntax right by construction, because it is the same grammar the compiler
+ * uses. What it must be told, because they are library calls rather than syntax:
+ *
+ * - `typeof import("x")` and `import("x").Member` in a type position are
+ *   `ImportTypeNode`s, erased with the rest of the types. Not edges.
+ * - `vi.importActual("x")` / `vi.importMock("x")` load the real module, and a
+ *   `vi.mock("x")` / `vi.doMock("x")` with no factory auto-mocks by loading it
+ *   to derive its shape. Those are edges.
+ * - `vi.mock("x", () => …)` supplies the module wholesale and never loads the
+ *   real one, so it is NOT an edge — counting it would credit a module with
+ *   reachability from the one construct that guarantees it never ran.
+ *
+ * `import type` / `export type`, and named clauses whose every binding is
+ * `type`, are erased by the transpiler and create no runtime edge either.
  */
-export function runtimeImportSpecifiers(source) {
+export function runtimeImportSpecifiers(source, fileName = "f.tsx") {
+  const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
   const specs = [];
-  const re =
-    /(?:^|[\s;}])(?:import|export)(\s+type\b)?(\s*\{[^}]*\}|\s+[^;\n]*?)?\s*(?:from\s*)?["']([^"']+)["']/g;
-  for (const m of String(source).matchAll(re)) {
-    if (m[1]) continue; // `import type X from` / `export type { X } from`
-    const clause = m[2] ?? "";
-    if (isFullyTypeOnlyClause(clause)) continue;
-    specs.push(m[3]);
-  }
-  // `require("x")` and bare `import("x")` are always runtime.
-  for (const m of String(source).matchAll(/(?:require|import)\s*\(\s*["']([^"']+)["']/g)) {
-    specs.push(m[1]);
-  }
+  // `"x" as string`, `("x")` and `"x" satisfies T` all still name module "x".
+  const unwrap = (node) => {
+    let n = node;
+    while (
+      n &&
+      (ts.isAsExpression(n) || ts.isParenthesizedExpression(n) || ts.isSatisfiesExpression(n))
+    ) {
+      n = n.expression;
+    }
+    return n;
+  };
+  const literal = (node) => {
+    const n = unwrap(node);
+    return n && ts.isStringLiteral(n) ? n.text : null;
+  };
+
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node)) {
+      const spec = literal(node.moduleSpecifier);
+      if (spec && !isErasedImportClause(node.importClause)) specs.push(spec);
+    } else if (ts.isExportDeclaration(node)) {
+      const spec = literal(node.moduleSpecifier);
+      if (spec && !node.isTypeOnly && !allBindingsTypeOnly(node.exportClause)) specs.push(spec);
+    } else if (ts.isImportEqualsDeclaration(node)) {
+      if (ts.isExternalModuleReference(node.moduleReference)) {
+        const spec = literal(node.moduleReference.expression);
+        if (spec) specs.push(spec);
+      }
+    } else if (ts.isCallExpression(node)) {
+      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === "require";
+      const isDynamic = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      if (isRequire || isDynamic || loadsRealModule(node)) {
+        const spec = literal(node.arguments[0]);
+        if (spec) specs.push(spec);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
   return specs;
 }
 
-function isFullyTypeOnlyClause(clause) {
-  const braced = clause.match(/\{([^}]*)\}/);
-  if (!braced) return false;
-  const named = braced[1]
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (named.length === 0) return false;
-  // A default or namespace binding alongside the braces keeps it runtime.
-  if (/[A-Za-z0-9_$]\s*,\s*\{/.test(clause) || /\*\s+as\s/.test(clause)) return false;
-  return named.every((n) => /^type\s/.test(n));
+/** Vitest registry calls that load the real module rather than replace it. */
+const VITEST_LOADERS = new Set(["importActual", "importMock"]);
+/** Vitest registry calls that load the real module only when given no factory. */
+const VITEST_AUTOMOCKS = new Set(["mock", "doMock"]);
+
+function loadsRealModule(call) {
+  const callee = call.expression;
+  if (!ts.isPropertyAccessExpression(callee)) return false;
+  const obj = callee.expression;
+  if (!ts.isIdentifier(obj) || (obj.text !== "vi" && obj.text !== "vitest")) return false;
+  const name = callee.name.text;
+  if (VITEST_LOADERS.has(name)) return true;
+  // `vi.mock("x", factory)` never loads "x"; bare `vi.mock("x")` auto-mocks it.
+  return VITEST_AUTOMOCKS.has(name) && call.arguments.length === 1;
+}
+
+/** `import type …`, or a named clause whose every binding is `type`-prefixed. */
+function isErasedImportClause(clause) {
+  if (!clause) return false; // bare `import "./side-effect"` is a runtime edge
+  if (clause.isTypeOnly) return true;
+  if (clause.name) return false; // a default binding keeps it runtime
+  return allBindingsTypeOnly(clause.namedBindings);
+}
+
+function allBindingsTypeOnly(bindings) {
+  if (!bindings || !ts.isNamedImports(bindings)) {
+    if (bindings && ts.isNamedExports(bindings)) {
+      return bindings.elements.length > 0 && bindings.elements.every((e) => e.isTypeOnly);
+    }
+    return false; // namespace import/export, or nothing to inspect
+  }
+  return bindings.elements.length > 0 && bindings.elements.every((e) => e.isTypeOnly);
 }
 
 /**

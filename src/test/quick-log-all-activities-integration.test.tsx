@@ -862,6 +862,30 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).not.toBeChecked();
   });
 
+  it("clears the no-symptoms box when a requested activity is applied", async () => {
+    const view = mountSection();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-none-observed"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).toBeChecked();
+
+    view.rerender(
+      <MemoryRouter>
+        <QuickLogAllActivitiesSection
+          growId={GROW}
+          tentId={TENT}
+          plantId={PLANT}
+          plantStage="flower"
+          requestedActivityId="feeding"
+        />
+      </MemoryRouter>,
+    );
+
+    const form = await screen.findByTestId("quick-log-all-activities-form");
+    expect(form).toHaveAttribute("data-activity-id", "feeding");
+    expect(screen.queryByTestId("quick-log-all-activities-symptom-none-observed")).toBeNull();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
   it("Environment check → canonical nested environment_check envelope (numbers) in p_details (celsius preference)", async () => {
     // Grower has explicitly set Celsius — the manual Temperature field labels
     // and validates as °C, and "24" is a plausible room temperature entered

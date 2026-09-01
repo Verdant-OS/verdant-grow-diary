@@ -66,6 +66,11 @@ function run(cmd) {
 
 const GENERATED_STAMP_OUTPUTS = ["public/version.json", "src/generated/buildInfo.ts"];
 
+/** Vercel sets VERCEL=1 and/or VERCEL_ENV on every build/preview. */
+function isVercelBuildEnvironment(env = process.env) {
+  return env.VERCEL === "1" || Boolean(env.VERCEL_ENV && String(env.VERCEL_ENV).trim());
+}
+
 /**
  * Detached/headless publishers can legitimately build the exact commit that
  * origin/HEAD names. Surface that canonical branch only when both the local
@@ -90,11 +95,17 @@ function canonicalOriginDefaultRef(rawRef, stampSha, currentGitSha) {
 
 /**
  * Generated stamp outputs are build residue, not a source mutation. Exclude
- * only those two exact tracked paths; untracked and changed source/config/Edge
- * files must remain visible as dirty provenance.
+ * only those two exact tracked paths by default. On Vercel, also exclude the
+ * Build Output API tree under `.vercel/` — Nitro writes it mid-build and a
+ * detached checkout would otherwise stamp dirty:true for publisher residue.
+ * Untracked and changed source/config/Edge files must remain visible as dirty.
  */
 function hasMeaningfulWorktreeChanges() {
-  const excludedOutputs = GENERATED_STAMP_OUTPUTS.map((path) => `":(exclude)${path}"`).join(" ");
+  const excludes = [...GENERATED_STAMP_OUTPUTS];
+  if (isVercelBuildEnvironment()) {
+    excludes.push(".vercel", ".vercel/**");
+  }
+  const excludedOutputs = excludes.map((path) => `":(exclude)${path}"`).join(" ");
   return (
     safe(
       () =>
@@ -104,6 +115,21 @@ function hasMeaningfulWorktreeChanges() {
       "",
     ) !== ""
   );
+}
+
+/**
+ * Prefer CI / platform refs over a detached-HEAD abbrev. Never invent a ref:
+ * empty platform values fall through to the git-derived canonicalization.
+ */
+function resolveStampRef(rawRef, stampSha, currentGitSha, env = process.env) {
+  const githubRef = typeof env.GITHUB_REF_NAME === "string" ? env.GITHUB_REF_NAME.trim() : "";
+  if (githubRef) return githubRef;
+
+  const vercelRef =
+    typeof env.VERCEL_GIT_COMMIT_REF === "string" ? env.VERCEL_GIT_COMMIT_REF.trim() : "";
+  if (vercelRef) return vercelRef;
+
+  return canonicalOriginDefaultRef(rawRef, stampSha, currentGitSha);
 }
 
 const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
@@ -119,7 +145,7 @@ const sha = envSha ?? gitSha;
 const shortSha = sha === "unknown" ? "unknown" : sha.slice(0, 12);
 const commitSource = envSha ? "github-env" : gitSha !== "unknown" ? "git" : "none";
 const rawRef = safe(() => run("git rev-parse --abbrev-ref HEAD").toString().trim());
-const ref = process.env.GITHUB_REF_NAME ?? canonicalOriginDefaultRef(rawRef, sha, gitSha);
+const ref = resolveStampRef(rawRef, sha, gitSha);
 const commitTime = safe(() =>
   run(`git show -s --format=%cI ${sha === "unknown" ? "HEAD" : sha}`)
     .toString()

@@ -53,10 +53,12 @@ function makeTempRoot(): string {
   return root;
 }
 
-/** Env with every GITHUB_* variable removed (plus optional overrides). */
+/** Env with every GITHUB_* / VERCEL_* variable removed (plus optional overrides). */
 function cleanEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith("GITHUB_")),
+    Object.entries(process.env).filter(
+      ([k]) => !k.startsWith("GITHUB_") && !k.startsWith("VERCEL"),
+    ),
   );
   return { ...env, ...overrides };
 }
@@ -386,6 +388,72 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
 
     writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
     expect(runStamper(box).record.dirty).toBe(true);
+  });
+
+  it("on Vercel, ignores .vercel/ Build Output residue without hiding real source dirty", () => {
+    const { box, sha } = makeCommittedSandbox();
+    git(box, ["checkout", "--detach", sha]);
+
+    const vercelResidue = join(box, ".vercel", "output", "functions", "__server.func");
+    mkdirSync(vercelResidue, { recursive: true });
+    writeFileSync(join(vercelResidue, "index.mjs"), "export default {};\n");
+    writeFileSync(
+      join(box, ".vercel", "output", "nitro.json"),
+      JSON.stringify({ preset: "vercel", serverEntry: "./functions/__server.func/index.mjs" }),
+    );
+
+    // Without Vercel env, untracked .vercel/ is meaningful dirty (not gitignored).
+    expect(runStamper(box).record.dirty).toBe(true);
+
+    // With VERCEL=1, publisher residue under .vercel/ must not taint the stamp.
+    expect(
+      runStamper(box, {
+        VERCEL: "1",
+        VERCEL_GIT_COMMIT_REF: "verdant-grow-diary",
+        VERCEL_GIT_COMMIT_SHA: sha,
+      }).record.dirty,
+    ).toBe(false);
+
+    // Real source mutation still marks dirty even on Vercel.
+    writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
+    expect(
+      runStamper(box, {
+        VERCEL: "1",
+        VERCEL_ENV: "preview",
+        VERCEL_GIT_COMMIT_REF: "verdant-grow-diary",
+      }).record.dirty,
+    ).toBe(true);
+  });
+
+  it("prefers VERCEL_GIT_COMMIT_REF when GITHUB_REF_NAME is absent, without fabricating commit", () => {
+    const { box, sha } = makeCommittedSandbox();
+    git(box, ["checkout", "--detach", sha]);
+
+    const { record } = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "verdant-grow-diary",
+      VERCEL_GIT_COMMIT_SHA: sha,
+    });
+    expect(record.ref).toBe("verdant-grow-diary");
+    expect(record.commit).toBe(sha);
+    expect(record.commitSource).toBe("git");
+
+    // GITHUB_REF_NAME still wins when present.
+    expect(
+      runStamper(box, {
+        VERCEL: "1",
+        GITHUB_REF_NAME: "ci-branch",
+        VERCEL_GIT_COMMIT_REF: "verdant-grow-diary",
+      }).record.ref,
+    ).toBe("ci-branch");
+
+    // Empty Vercel ref must not invent a branch name.
+    const emptyVercelRef = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "",
+    }).record;
+    expect(emptyVercelRef.ref).toBe("HEAD");
+    expect(emptyVercelRef.commit).toBe(sha);
   });
 
   it("uses the matching canonical origin default for detached and orphan refs", () => {

@@ -24,7 +24,9 @@ import {
   bypassesMockSpecifiers,
   countCallSites,
   factoryMockedSpecifiers,
+  mockReplacedSpecifiers,
   readsFiles,
+  reachableClosure,
   readsSrcPath,
   rendersComponents,
   classifyTest,
@@ -532,6 +534,73 @@ describe("render classification — a title is not a render call", () => {
   it("counts a real render call, bare or as a property", () => {
     expect(rendersComponents("render(<App />);")).toBe(true);
     expect(rendersComponents("testUtils.render(<App />);")).toBe(true);
+  });
+});
+
+describe("reachability traversal — a mock blocks at every depth", () => {
+  // A component graph: the test seeds the page, which imports the component,
+  // which imports the hook. Mocking the hook must stop the walk at the component.
+  const graph: Record<string, string[]> = {
+    "src/pages/PlantDetail.tsx": ["src/components/ReadinessPanel.tsx"],
+    "src/components/ReadinessPanel.tsx": ["src/hooks/useLogAiDoctorReadinessToDiary.ts"],
+    "src/hooks/useLogAiDoctorReadinessToDiary.ts": ["src/lib/diaryApi.ts"],
+    "src/lib/diaryApi.ts": [],
+  };
+  const depsOf = (f: string) => graph[f] ?? [];
+  const seeds = ["src/pages/PlantDetail.tsx"];
+
+  it("does NOT re-add a module the test replaced, reached only through a component", () => {
+    // This is the whole defect: blocking at the seeds and then walking
+    // context-free put the mocked hook straight back into the reached set.
+    const reached = reachableClosure({
+      seeds,
+      blocked: new Set(["src/hooks/useLogAiDoctorReadinessToDiary.ts"]),
+      depsOf,
+    });
+    expect([...reached].sort()).toEqual([
+      "src/components/ReadinessPanel.tsx",
+      "src/pages/PlantDetail.tsx",
+    ]);
+  });
+
+  it("does not traverse THROUGH a blocked module to what lies beyond it", () => {
+    const reached = reachableClosure({
+      seeds,
+      blocked: new Set(["src/hooks/useLogAiDoctorReadinessToDiary.ts"]),
+      depsOf,
+    });
+    expect(reached.has("src/lib/diaryApi.ts")).toBe(false);
+  });
+
+  it("reaches everything when the test blocks nothing", () => {
+    expect(reachableClosure({ seeds, depsOf }).size).toBe(4);
+  });
+
+  it("keeps a module blocked by ONE test but genuinely loaded by another", () => {
+    // Per-test walks are unioned, so a module stays reached when any test
+    // loads it for real. That is the question the published figure answers.
+    const blocked = new Set(["src/hooks/useLogAiDoctorReadinessToDiary.ts"]);
+    const union = new Set([
+      ...reachableClosure({ seeds, blocked, depsOf }),
+      ...reachableClosure({ seeds, depsOf }),
+    ]);
+    expect(union.has("src/hooks/useLogAiDoctorReadinessToDiary.ts")).toBe(true);
+  });
+
+  it("terminates on a cycle", () => {
+    const cyclic = (f: string) => ({ a: ["b"], b: ["c"], c: ["a"] })[f as "a" | "b" | "c"] ?? [];
+    expect(reachableClosure({ seeds: ["a"], depsOf: cyclic }).size).toBe(3);
+  });
+
+  it("gives the seeding and traversal stages ONE definition of replaced", () => {
+    const src = [
+      'vi.mock("@/lib/replaced", () => ({}));',
+      'vi.mock("@/lib/spread", async (o) => ({ ...(await o()) }));',
+      'vi.mock("@/lib/auto");',
+    ].join("\n");
+    // Only the wholesale replacement blocks; the importOriginal spread and the
+    // bare auto-mock both load the real module.
+    expect(mockReplacedSpecifiers(src)).toEqual(["@/lib/replaced"]);
   });
 });
 

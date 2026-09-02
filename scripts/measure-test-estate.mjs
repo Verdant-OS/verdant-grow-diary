@@ -32,7 +32,9 @@ import {
   buildExecutableCorpus,
   classifyTest,
   countCallSites,
+  mockReplacedSpecifiers,
   namedPathsIn,
+  reachableClosure,
   readsFiles,
   readsSrcPath,
   resolveSpec,
@@ -178,7 +180,7 @@ const edges = new Map();
 const depsOf = (f) => {
   if (!edges.has(f)) {
     const out = new Set();
-    for (const spec of runtimeImportSpecifiers(body(f))) {
+    for (const spec of runtimeImportSpecifiers(body(f), f)) {
       const r = resolveSpec(spec, f, productSet);
       if (r) out.add(r);
     }
@@ -187,21 +189,51 @@ const depsOf = (f) => {
   return edges.get(f);
 };
 
+/**
+ * Reachability is walked PER TEST, with that test's replaced modules blocked at
+ * every depth, and the results unioned.
+ *
+ * `vi.mock` is hoisted and applies to the whole module graph of its test file,
+ * so a module the test reaches only THROUGH a component is replaced too. One
+ * context-free walk over the union of all seeds discards that: four Plant Detail
+ * tests factory-mock `@/hooks/useLogAiDoctorReadinessToDiary` and their
+ * components import it, so a global walk added it straight back. Blocking at the
+ * seeds alone is not enough — the block has to survive the traversal.
+ *
+ * Unioning per-test results keeps a module reached when ANY test loads it for
+ * real, which is the question the figure answers.
+ */
+const closure = (seeds, blocked) => reachableClosure({ seeds, blocked, depsOf });
+
 const direct = new Set();
+const reached = new Set();
+// Tests that replace nothing all share one unblocked walk: with no blocking, the
+// closure of a union equals the union of the closures, so this is exactly
+// equivalent to walking each of them separately, and vastly cheaper.
+const unblockedSeeds = new Set();
+
 for (const t of tests) {
   const s = body(t);
   // Vitest mock semantics live in the rules module, not here, so the figure the
   // script emits cannot drift from the method the audit publishes.
+  const seeds = [];
   for (const spec of testFileRuntimeSpecifiers(s, t)) {
     const r = resolveSpec(spec, t, productSet);
-    if (r) direct.add(r);
+    if (r) (direct.add(r), seeds.push(r));
   }
+  const blocked = new Set(
+    mockReplacedSpecifiers(s, t)
+      .map((spec) => resolveSpec(spec, t, productSet))
+      .filter(Boolean),
+  );
+  if (blocked.size === 0) {
+    for (const r of seeds) unblockedSeeds.add(r);
+    continue;
+  }
+  for (const m of closure(seeds, blocked)) reached.add(m);
 }
-const reached = new Set(direct);
-const stack = [...direct];
-while (stack.length) {
-  for (const d of depsOf(stack.pop())) if (!reached.has(d)) (reached.add(d), stack.push(d));
-}
+for (const m of closure(unblockedSeeds, new Set())) reached.add(m);
+
 const transitive = [...reached].filter((f) => !direct.has(f)).length;
 const unreached = product.filter((f) => !reached.has(f));
 

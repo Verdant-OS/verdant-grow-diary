@@ -238,16 +238,57 @@ function callsItsOwnFirstParameter(fn) {
  * directions at once and was invisible because nothing tested the composition.
  */
 export function testFileRuntimeSpecifiers(source, fileName = "f.tsx") {
-  const bypassed = new Set(bypassesMockSpecifiers(source, fileName));
-  const replaced = new Set(
-    factoryMockedSpecifiers(source, fileName).filter((spec) => !bypassed.has(spec)),
-  );
+  const bypassed = bypassesMockSpecifiers(source, fileName);
+  const replaced = new Set(mockReplacedSpecifiers(source, fileName));
   const imported = runtimeImportSpecifiers(source, fileName).filter((spec) => !replaced.has(spec));
   // A bypass is an edge in its OWN right, not merely a veto on subtraction. A
   // file that mocks a module with `importOriginal` and imports it only as a
   // type — or not at all — still loads the real module, and filtering alone
   // would emit nothing for it.
-  return [...imported, ...[...bypassed].filter((spec) => !imported.includes(spec))];
+  return [...imported, ...bypassed.filter((spec) => !imported.includes(spec))];
+}
+
+/**
+ * Modules this test file replaces wholesale — factory-mocked and not bypassed.
+ *
+ * These are not merely absent from the file's own edges: `vi.mock` is hoisted
+ * and applies to the WHOLE module graph of that test, so a product module the
+ * test reaches only THROUGH another product module is replaced too. A caller
+ * walking the graph must therefore block these at every depth, not just at the
+ * seeds — see the audit's §9.0 defect 21.
+ *
+ * Exported so the seeding stage and the traversal stage cannot disagree about
+ * what "replaced" means, which is how that defect arose in the first place.
+ */
+export function mockReplacedSpecifiers(source, fileName = "f.tsx") {
+  const bypassed = new Set(bypassesMockSpecifiers(source, fileName));
+  return factoryMockedSpecifiers(source, fileName).filter((spec) => !bypassed.has(spec));
+}
+
+/**
+ * Modules reachable from `seeds`, never entering anything in `blocked`.
+ *
+ * Pure: the caller injects `depsOf`, so this holds no I/O and no graph of its
+ * own. It lives here rather than in the script because the blocking rule is the
+ * published method — an earlier version blocked at the seeds and then walked
+ * context-free, which silently re-added every module a test had replaced.
+ *
+ * `blocked` is checked on entry to each neighbour, so a blocked module is
+ * neither reached nor traversed THROUGH. Seeds are taken as given: the caller
+ * has already excluded replaced modules from them.
+ */
+export function reachableClosure({ seeds, blocked = new Set(), depsOf }) {
+  const seen = new Set(seeds);
+  const stack = [...seen];
+  while (stack.length) {
+    for (const next of depsOf(stack.pop()) ?? []) {
+      if (!seen.has(next) && !blocked.has(next)) {
+        seen.add(next);
+        stack.push(next);
+      }
+    }
+  }
+  return seen;
 }
 
 /** The method name of a `vi.*` / `vitest.*` call, or null if it is not one. */

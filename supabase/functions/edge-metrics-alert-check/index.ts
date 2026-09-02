@@ -285,7 +285,12 @@ async function postWebhook(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const delayBefore = attempt === 1 ? 0 : computeBackoffMs(attempt - 1, baseDelay, maxDelay);
-    if (delayBefore > 0) {
+    if (attempt > 1) {
+      // Every retry is announced, including one whose full-jitter draw is 0 ms.
+      // Gating this on `delayBefore > 0` left zero-delay retries unlogged, and made
+      // the colocated retry test fail one run in six (two draws, P = 1/2 × 1/3, on
+      // its 1–2 ms envelope) — the intermittent red on 0861d87 and 4a0ea0605. The
+      // wait itself is still skipped when there is nothing to wait for.
       logger("info", "webhook_retry_scheduled", {
         request_id: requestId,
         attempt,
@@ -494,11 +499,10 @@ function buildSimulatedBreach(spec: SimulateSpec, t: Thresholds): Breach {
 
 // @ts-ignore Deno runtime entrypoint — only start the server when run directly.
 // Without this guard, importing this module to unit-test its exports binds a
-// real port as a side effect. That made the colocated test file nondeterministic
-// on CI's pinned Deno v1.x: postWebhook's retry case uses 1-2ms timers and
-// captures console output, and a live listener adds event-loop work that
-// perturbs both. Same shape as pi-ingest-readings/index.ts, which already
-// guards its Deno.serve this way.
+// real port as a side effect. Same shape as pi-ingest-readings/index.ts, which
+// already guards its Deno.serve this way. (An earlier version of this comment
+// blamed the listener for the retry test's intermittent red; the measured cause
+// was the zero-jitter retry log gap in postWebhook, fixed there.)
 if (import.meta.main) {
   Deno.serve(async (req) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

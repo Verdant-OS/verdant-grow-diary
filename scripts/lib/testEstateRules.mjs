@@ -958,6 +958,44 @@ export function buildExecutableCorpus({ workflowTexts, scripts = {}, readRunner 
 }
 
 /**
+ * Lane files a corpus executes, by full repo-relative path OR by unambiguous
+ * bare basename.
+ *
+ * Basename resolution is needed because runners resolve against their own
+ * root: `bunx playwright test agent-integrations-smoke.spec.ts` runs
+ * `e2e/agent-integrations-smoke.spec.ts` via playwright.config's
+ * `testDir: "./e2e"`. Requiring the prefix reported that spec as never-run
+ * while CI executed it on every matching PR.
+ *
+ * It is only safe because the corpus is COMMAND LINES ONLY: a basename that
+ * appears there is an argument to a runner, not prose in an allowlist or a
+ * job summary. The execution-manifest guard once "found" that same spec through
+ * a summary `echo` of its full path — the right answer for the wrong reason —
+ * and lost it the moment prose stopped counting. This is the right reason.
+ *
+ * AMBIGUOUS basenames are excluded and must be named in full. Two edge
+ * functions both ship a `contract.test.ts`, so a bare token could not say which
+ * one ran; resolving it to either would be a fabricated reading.
+ *
+ * Returns a new Set: `namedPaths` plus every lane file whose basename is unique
+ * across `laneFiles` and present in `namedPaths`. Pure; input Set is untouched.
+ */
+export function resolveBareBasenames({ laneFiles, namedPaths }) {
+  const basenameCount = new Map();
+  for (const f of laneFiles) {
+    const b = f.slice(f.lastIndexOf("/") + 1);
+    basenameCount.set(b, (basenameCount.get(b) ?? 0) + 1);
+  }
+  const out = new Set(namedPaths);
+  for (const f of laneFiles) {
+    if (out.has(f)) continue;
+    const b = f.slice(f.lastIndexOf("/") + 1);
+    if (basenameCount.get(b) === 1 && namedPaths.has(b)) out.add(f);
+  }
+  return out;
+}
+
+/**
  * Exact repo-relative path tokens the corpus names.
  *
  * Exact path equality only. A prototype that accepted directory prefixes and

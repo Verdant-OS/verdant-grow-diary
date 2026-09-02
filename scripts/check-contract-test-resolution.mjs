@@ -67,6 +67,19 @@ const JSON_CONFIG_FILES = ["package.json"];
 const ASSERTS_ON_JSON_SOURCE =
   /(?:toMatch|toContain|\.match|\.includes)\s*\(\s*[/"'`][^\n]*\\?"[A-Za-z0-9:_@./-]+\\?"\s*:/;
 
+/**
+ * The colon signature above is precise but not complete. A guard can assert on
+ * JSON source with a quoted key and NO colon — `expect(PACKAGE).toContain('"test:x"')`
+ * — and two harness guards did exactly that while this checker reported OK.
+ *
+ * The complete signal is simpler: a file that reads the JSON source and never
+ * calls JSON.parse has no resolved object to assert on, so every assertion it
+ * makes about that content is an assertion on text, whatever shape it takes.
+ * Measured on this repository: 28 test files read package.json source, 26
+ * parse it, and the 2 that do not are precisely the two offenders.
+ */
+const PARSES_JSON = /JSON\.parse\s*\(/;
+
 /** Reads the JSON config's source, directly or through a `PKG`-style constant. */
 const READS_JSON_SOURCE = (source, config) => {
   const esc = config.replace(".", "\\.");
@@ -130,13 +143,15 @@ for (const file of listTestFiles(TEST_DIR)) {
   }
   for (const config of JSON_CONFIG_FILES) {
     if (!READS_JSON_SOURCE(source, config)) continue;
-    if (!ASSERTS_ON_JSON_SOURCE.test(source)) continue; // reads it, then parses — fine
+    const neverParsed = !PARSES_JSON.test(source);
+    const assertsOnSource = ASSERTS_ON_JSON_SOURCE.test(source);
+    if (!neverParsed && !assertsOnSource) continue; // reads it, then parses — fine
     const justification = source.match(JUSTIFICATION_RE);
     if (justification) {
       justified.push({ file: rel, config, reason: justification[1].trim() });
       continue;
     }
-    violations.push({ file: rel, config, json: true });
+    violations.push({ file: rel, config, json: true, neverParsed });
   }
 }
 
@@ -146,7 +161,9 @@ if (violations.length > 0) {
     console.error(`  ${v.file}`);
     console.error(
       v.json
-        ? `    asserts on ${v.config} SOURCE TEXT (a "key": pattern) instead of the parsed object`
+        ? v.neverParsed
+          ? `    reads ${v.config} source and never JSON.parse()s it — every assertion on it is on text`
+          : `    asserts on ${v.config} SOURCE TEXT (a "key": pattern) instead of the parsed object`
         : `    reads ${v.config} source but never imports it`,
     );
   }
@@ -154,6 +171,12 @@ if (violations.length > 0) {
     '\nFix: `const config = (await import("../../<config>")).default;` then assert on the',
   );
   console.error("object. Reference: src/test/playwright-config-retry-policy.test.ts");
+  console.error(
+    'For package.json: `const { scripts } = JSON.parse(readFileSync("package.json", "utf8"));`',
+  );
+  console.error(
+    'then assert on `scripts["name"]`. Reference: genetics-propagation-rls-harness-static.test.ts',
+  );
   console.error("Rule: AGENTS.md > Testing Standard.");
   process.exit(1);
 }

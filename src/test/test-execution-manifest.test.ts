@@ -3,7 +3,7 @@
  *
  * The 2026-08-29 coverage audit (docs/audits/test-coverage-audit-2026-08-29.md,
  * finding F3) measured four lanes of tests that CI invoked nowhere — 21 of 31
- * colocated Deno edge tests, 25 of 60 Playwright specs, 16 of 33 runtime
+ * colocated Deno edge tests, 25 of 60 Playwright specs, 18 of 41 runtime
  * harnesses, 7 of 9 pgTAP suites. They were committed, reviewed and merged, and
  * every one of them read as coverage while supplying none.
  *
@@ -30,10 +30,14 @@ import {
   FINDING,
   auditExecutionManifest,
   buildExecutionCorpus,
+  isRuntimeHarness,
   namedPathsIn,
+  resolveBareBasenames,
   scriptNamesIn,
   stripTriggerBlock,
   // Pure logic lives beside requiredCheckAuditRules.mjs; the test supplies all the I/O.
+  // The resolver itself is the audit's (scripts/lib/testEstateRules.mjs), re-exported —
+  // one definition of "executed" and of "harness", not a fork that drifts.
 } from "../../scripts/lib/testExecutionManifestRules.mjs";
 
 const root = resolve(__dirname, "../..");
@@ -54,9 +58,10 @@ function walk(rel: string, out: string[] = []): string[] {
 
 const denoTests = walk("supabase/functions").filter((f) => /(\.test\.ts|_test\.ts)$/.test(f));
 const e2eSpecs = walk("e2e").filter((f) => /^e2e\/[^/]+\.spec\.ts$/.test(f));
-const harnesses = walk("scripts").filter(
-  (f) => /^scripts\/[^/]+$/.test(f) && /harness/.test(f) && /\.(ts|mjs)$/.test(f),
-);
+// Recursive, and `harness|db-security`, not root-level `*harness*`: the latter is the
+// rule the audit retired as defect 31 — it missed five harnesses under scripts/security/
+// and three root files named *-db-security.ts, all of which security-db-local.yml runs.
+const harnesses = walk("scripts").filter(isRuntimeHarness);
 const pgTapSuites = walk("supabase/tests").filter((f) => f.endsWith(".sql"));
 
 const LANES = [
@@ -76,7 +81,14 @@ const corpus = buildExecutionCorpus({
   scripts,
   readRunner: (rel: string) => (existsSync(join(root, rel)) ? read(rel) : null),
 });
-const namedPaths = namedPathsIn(corpus);
+// A runner resolves a bare basename against its own root — `bunx playwright test
+// agent-integrations-smoke.spec.ts` runs e2e/agent-integrations-smoke.spec.ts via
+// playwright.config's testDir. Safe only because the corpus is command lines: a bare
+// name there is a runner argument, not prose. Ambiguous basenames stay unresolved.
+const namedPaths = resolveBareBasenames({
+  laneFiles: LANES.flatMap((l) => l.files),
+  namedPaths: namedPathsIn(corpus),
+});
 
 /**
  * Every lane file nothing runs, and the checkable claim that justifies it.
@@ -214,6 +226,21 @@ function harnessExemptions(): Record<string, { class: string; reason: string }> 
   ]) {
     out[file] = { class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE, reason };
   }
+  // Named by irrigation-pgtap-rls-gate.yml ONLY in a trigger `paths:` filter and a shell
+  // dry-run allowlist — never on a command line. The forked resolver this file once used
+  // read those mentions as execution and reported both as RUN; the audit's resolver does
+  // not, and neither does any workflow. Envelope, grepped per file on this head: no opt-in
+  // gate, no production refusal, no loopback requirement. (run-quicklog-typed-payloads has a
+  // SKIP for MISSING credentials — with credentials present it runs unasked, which is the
+  // opposite of an opt-in gate.) Same P5 slice, same class.
+  const onlyMentioned =
+    "Runtime harness needing a live database and a service-role key. Named by irrigation-pgtap-rls-gate.yml only in a paths: filter and a dry-run allowlist, never executed; audit defect 31 corrected the inventory that missed it. No opt-in gate, no production refusal, no loopback check (measured). Deferred to P5 with the others.";
+  for (const file of [
+    "scripts/run-create-feeding-event-rls-harness.ts",
+    "scripts/run-quicklog-typed-payloads-harness.ts",
+  ]) {
+    out[file] = { class: EXEMPTION_CLASS.NEEDS_LIVE_DATABASE, reason: onlyMentioned };
+  }
   return out;
 }
 
@@ -253,11 +280,12 @@ describe("test execution manifest — every committed test runs, or says why not
 
   it("keeps the four lanes at or above their audited execution counts", () => {
     // Ratchet floors, not targets. The audit measured 10/31 deno, 35/60 playwright,
-    // 17/33 harness and 2/9 pgTAP as executed. Regressing below today's counts fails.
+    // 23/41 harness and 2/9 pgTAP as executed at its pinned rev; P2(a)/P2(b) then wired
+    // 19 deno files and 14 specs. Regressing below today's counts fails.
     const byLabel = Object.fromEntries(audit.lanes.map((l: { label: string }) => [l.label, l]));
     expect(byLabel["deno edge tests"].executed).toBeGreaterThanOrEqual(29);
     expect(byLabel["playwright specs"].executed).toBeGreaterThanOrEqual(49);
-    expect(byLabel["runtime harnesses"].executed).toBeGreaterThanOrEqual(17);
+    expect(byLabel["runtime harnesses"].executed).toBeGreaterThanOrEqual(23);
     expect(byLabel["pgTAP suites"].executed).toBeGreaterThanOrEqual(2);
   });
 
@@ -269,14 +297,14 @@ describe("test execution manifest — every committed test runs, or says why not
     expect(byClass[EXEMPTION_CLASS.NOT_HERMETIC] ?? 0).toBeLessThanOrEqual(8);
     expect(byClass[EXEMPTION_CLASS.RED_WHEN_RUN] ?? 0).toBeLessThanOrEqual(3);
     expect(byClass[EXEMPTION_CLASS.AWAITING_DECISION] ?? 0).toBeLessThanOrEqual(1);
-    expect(byClass[EXEMPTION_CLASS.NEEDS_LIVE_DATABASE] ?? 0).toBeLessThanOrEqual(23);
+    expect(byClass[EXEMPTION_CLASS.NEEDS_LIVE_DATABASE] ?? 0).toBeLessThanOrEqual(25);
     expect(byClass[EXEMPTION_CLASS.FLAKY] ?? 0).toBeLessThanOrEqual(1);
   });
 
   it("actually discovers all four lanes (a guard over an empty set proves nothing)", () => {
     expect(denoTests.length).toBeGreaterThan(25);
     expect(e2eSpecs.length).toBeGreaterThan(50);
-    expect(harnesses.length).toBeGreaterThan(25);
+    expect(harnesses.length).toBeGreaterThanOrEqual(41);
     expect(pgTapSuites.length).toBeGreaterThan(5);
   });
 });
@@ -300,6 +328,94 @@ describe("manifest resolver — the ways this guard could silently stop working"
     ].join("\n");
     const paths = namedPathsIn(buildExecutionCorpus({ workflowTexts: [wf] }));
     expect(paths.has("e2e/dead.spec.ts")).toBe(false);
+  });
+
+  it("does not read a commented-out command as execution", () => {
+    // The defeat AGENTS.md documents for playwright-action-timeout-fence, applied to
+    // this guard: disabling a lane by commenting out its command must NOT leave the
+    // guard green. A forked resolver that took every workflow line as evidence did.
+    const wf = [
+      "name: x",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  a:",
+      "    steps:",
+      "      - run: echo hi",
+      "      # playwright test e2e/dead.spec.ts",
+      "",
+    ].join("\n");
+    const paths = namedPathsIn(buildExecutionCorpus({ workflowTexts: [wf] }));
+    expect(paths.has("e2e/dead.spec.ts")).toBe(false);
+  });
+
+  it("does not read a path inside a shell allowlist array as execution", () => {
+    // The real case: irrigation-pgtap-rls-gate.yml holds
+    //   ALLOWLIST=( "scripts/run-create-feeding-event-rls-harness.ts" ... )
+    // inside a `run: |` block. It is data the step consults, not a command it runs.
+    // Reading it as execution reported two never-run harnesses as RUN.
+    const wf = [
+      "name: x",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  a:",
+      "    steps:",
+      "      - run: |",
+      "          ALLOWLIST=(",
+      '            "scripts/run-dead-harness.ts"',
+      "          )",
+      "          bun run test:live",
+      "",
+    ].join("\n");
+    const corpus = buildExecutionCorpus({
+      workflowTexts: [wf],
+      scripts: { "test:live": "node scripts/run-live-harness.ts" },
+    });
+    const paths = namedPathsIn(corpus);
+    expect(paths.has("scripts/run-dead-harness.ts")).toBe(false);
+    expect(paths.has("scripts/run-live-harness.ts")).toBe(true);
+  });
+
+  it("discovers nested and *-db-security harnesses, not only root-level *harness* files", () => {
+    // Defect 31 in the audit: the root-level, `harness`-in-name rule missed eight real
+    // harnesses that security-db-local.yml runs. The inventory here must not repeat it.
+    expect(harnesses).toContain("scripts/security/run-bridge-tokens-db-security.mjs");
+    expect(harnesses).toContain("scripts/run-pgmq-email-wrapper-grants-db-security.ts");
+    expect(isRuntimeHarness("scripts/security/run-profiles-db-security.mjs")).toBe(true);
+    expect(isRuntimeHarness("scripts/run-billing-rls-harness.ts")).toBe(true);
+    expect(isRuntimeHarness("scripts/lib/testEstateRules.mjs")).toBe(false);
+  });
+
+  it("resolves a bare basename on a command line to the one lane file it names", () => {
+    // `bunx playwright test agent-integrations-smoke.spec.ts` — Playwright resolves the
+    // bare name against testDir. The forked resolver reported that spec as RUN only
+    // because a job-summary `echo` mentioned its full path: right answer, wrong reason.
+    const wf = [
+      "name: x",
+      "on:",
+      "  push:",
+      "jobs:",
+      "  a:",
+      "    steps:",
+      "      - run: bunx playwright test dead.spec.ts --project=chromium-mocked",
+      "",
+    ].join("\n");
+    const named = namedPathsIn(buildExecutionCorpus({ workflowTexts: [wf] }));
+    expect(named.has("e2e/dead.spec.ts")).toBe(false); // exact-path matching alone misses it
+    const resolved = resolveBareBasenames({
+      laneFiles: ["e2e/dead.spec.ts", "e2e/other.spec.ts"],
+      namedPaths: named,
+    });
+    expect(resolved.has("e2e/dead.spec.ts")).toBe(true);
+    expect(resolved.has("e2e/other.spec.ts")).toBe(false);
+    // Ambiguous: two lane files share the basename, so a bare token cannot say which ran.
+    const ambiguous = resolveBareBasenames({
+      laneFiles: ["supabase/functions/a/contract.test.ts", "supabase/functions/b/contract.test.ts"],
+      namedPaths: new Set(["contract.test.ts"]),
+    });
+    expect(ambiguous.has("supabase/functions/a/contract.test.ts")).toBe(false);
+    expect(ambiguous.has("supabase/functions/b/contract.test.ts")).toBe(false);
   });
 
   it("keeps a path the job body genuinely runs", () => {

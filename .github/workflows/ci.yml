@@ -450,7 +450,7 @@ jobs:
       #
       # KEEP THE FILE LIST IN package.json. Do not "simplify" this by inlining
       # the paths here: src/test/v0-operating-loop-ci-guardrails.test.ts scans
-      # this file for a set of forbidden substrings, and one of the 18 paths
+      # this file for a set of forbidden substrings, and one of the 19 paths
       # contains one of them. Inlining turns that guard red on a term unrelated
       # to whatever you were changing.
       #

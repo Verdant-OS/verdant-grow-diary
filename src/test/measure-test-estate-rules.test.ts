@@ -40,7 +40,8 @@ import {
   stripTriggerBlock,
   testFileReach,
   testFileRuntimeSpecifiers,
-  // Pure rules; the script supplies all I/O.
+  // Pure rules; the script supplies all I/O.,
+  resolveBareBasenames,
 } from "../../scripts/lib/testEstateRules.mjs";
 
 const wf = (s: string) => s.replace(/\n {6}/g, "\n");
@@ -864,5 +865,48 @@ describe("reproducer CLI — `--rev` never reaches a shell", () => {
     const result = run("--upload-pack=touch");
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("cannot resolve");
+  });
+});
+
+describe("resolveBareBasenames — a runner argument names a lane file by basename", () => {
+  // `bunx playwright test agent-integrations-smoke.spec.ts` runs
+  // e2e/agent-integrations-smoke.spec.ts via testDir. Exact-path matching alone
+  // called that spec never-run while CI executed it on every matching PR.
+  it("resolves an unambiguous bare basename to its one lane file", () => {
+    const out = resolveBareBasenames({
+      laneFiles: ["e2e/a.spec.ts", "e2e/b.spec.ts"],
+      namedPaths: new Set(["a.spec.ts"]),
+    });
+    expect(out.has("e2e/a.spec.ts")).toBe(true);
+    expect(out.has("e2e/b.spec.ts")).toBe(false);
+  });
+
+  it("refuses an ambiguous basename — two lane files, one token, no fabricated reading", () => {
+    const out = resolveBareBasenames({
+      laneFiles: ["supabase/functions/x/contract.test.ts", "supabase/functions/y/contract.test.ts"],
+      namedPaths: new Set(["contract.test.ts"]),
+    });
+    expect(out.has("supabase/functions/x/contract.test.ts")).toBe(false);
+    expect(out.has("supabase/functions/y/contract.test.ts")).toBe(false);
+  });
+
+  it("keeps every full path already named, and never mutates its input", () => {
+    const named = new Set(["e2e/full.spec.ts", "stray.spec.ts"]);
+    const out = resolveBareBasenames({ laneFiles: ["e2e/full.spec.ts"], namedPaths: named });
+    expect(out.has("e2e/full.spec.ts")).toBe(true);
+    expect(out.has("stray.spec.ts")).toBe(true); // passthrough — not a lane file, not dropped
+    expect(named.size).toBe(2);
+    expect(named.has("e2e/full.spec.ts")).toBe(true);
+  });
+
+  it("is a bare-token match only — a basename inside a longer path is not one", () => {
+    // `e2e/nested/a.spec.ts` named in full must not make bare `a.spec.ts` resolve to a
+    // DIFFERENT lane file that happens to share the basename.
+    const out = resolveBareBasenames({
+      laneFiles: ["e2e/a.spec.ts", "e2e/nested/a.spec.ts"],
+      namedPaths: new Set(["e2e/nested/a.spec.ts"]),
+    });
+    expect(out.has("e2e/nested/a.spec.ts")).toBe(true);
+    expect(out.has("e2e/a.spec.ts")).toBe(false);
   });
 });

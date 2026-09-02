@@ -36,6 +36,7 @@ import {
   mockReplacedSpecifiers,
   namedPathsIn,
   reachableClosure,
+  resolveBareBasenames,
   resolveSpec,
   runtimeImportSpecifiers,
   testFileReach,
@@ -312,32 +313,14 @@ const pgtap = treePaths.filter((f) => /^supabase\/tests\/[^/]+\.sql$/.test(f));
 
 /**
  * A lane file is executed when a command names it by full repo-relative path,
- * or by bare basename.
- *
- * Basename matching is needed because runners resolve against their own root:
- * `bunx playwright test agent-integrations-smoke.spec.ts` runs
- * `e2e/agent-integrations-smoke.spec.ts` via playwright.config's
- * `testDir: "./e2e"`. Requiring the prefix reported that spec as never-run
- * while CI executed it on every matching PR.
- *
- * It is only safe because the corpus is now COMMAND LINES ONLY: a basename
- * appearing there is an argument to a runner, not prose in an allowlist.
- *
- * AMBIGUOUS basenames are excluded and must be named in full. Two edge
- * functions both ship a `contract.test.ts`, so a bare token could not say which
- * one ran; resolving it to either would be a fabricated reading.
+ * or by unambiguous bare basename — see `resolveBareBasenames` in the rules
+ * module for why that is both necessary and safe. The rule lives there, not
+ * here, so the execution-manifest guard (src/test/test-execution-manifest.test.ts)
+ * and this audit cannot disagree about what "executed" means.
  */
 const laneFiles = [...denoTests, ...e2eSpecs, ...harnesses, ...pgtap];
-const basenameCount = new Map();
-for (const f of laneFiles) {
-  const b = f.slice(f.lastIndexOf("/") + 1);
-  basenameCount.set(b, (basenameCount.get(b) ?? 0) + 1);
-}
-const laneExecuted = (f) => {
-  if (namedPaths.has(f)) return true;
-  const b = f.slice(f.lastIndexOf("/") + 1);
-  return basenameCount.get(b) === 1 && namedPaths.has(b);
-};
+const executedPaths = resolveBareBasenames({ laneFiles, namedPaths });
+const laneExecuted = (f) => executedPaths.has(f);
 
 const lane = (label, files) => {
   const never = files.filter((f) => !laneExecuted(f));

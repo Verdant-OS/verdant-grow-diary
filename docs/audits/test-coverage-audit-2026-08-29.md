@@ -75,7 +75,7 @@ covered by the claim above:
 `behaviouralFiles` · `behaviouralExpects` · `filesDoingFileIo` · `filesReadingSrcPaths` ·
 reachability (`direct` / `transitiveOnly` / `unreached`, with the unreached files named) · the four
 lanes' `total` / `executed` / `never` with every never-executed file named · and
-`testFilesAcrossAllLanes`.
+`testFilesAcrossFourTestLanes`.
 
 Every other number in this document was measured by hand — the 7 `@source-scan-justified`
 declarations (§3), the Quick Log counts in §6, the keyword and required-check figures in §5 and §9 —

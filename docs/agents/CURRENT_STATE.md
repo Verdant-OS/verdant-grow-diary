@@ -1,7 +1,170 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-02 UTC (~11:10 UTC)
-**Updated by:** GDP (2026-09-02: **#1247 MERGED as `8716d3bf`** — squash, one parent.
+**Last updated:** 2026-09-02 UTC (~15:20 UTC)
+**Updated by:** Claude (2026-09-02: **#1244 MERGED as `88372954`** — squash, one parent, the
+CURRENT_STATE restamp from `8716d3bf`. **Deploy tip = live `88372954`, `dirty:false`**,
+independently MEASURED from `https://verdantgrowdiary.com/version.json` at 15:15 UTC (~10:15 AM
+CT; `buildTime` `2026-09-02T12:41:20.798Z`). Restore SHA is **`88372954`**. **Do not ping Tolu.**
+Publisher is Vercel. No Lovable Publish. No History-restore. No APPLY. #1247 Environment Ribbon
+Tranche 1 is MERGED as `8716d3bf`; no Tranche 1b in this slice. Signup PREFLIGHT still
+**BLOCKED** (malformed Aug 24 `SUPABASE_DB_URL`); not run here, not claimed passed. Production
+Postgres is Lovable Cloud; `knkwiiywfkbqznbxwqfh` is that Cloud DB's published identity, not a
+standalone Supabase session. Stay on Paddle; live checkout off. #1174 stays draft. #1221: GitHub
+API MEASURED `draft:false`, `merged:false`, head `9f922ca54`; not changed here. The restamp below
+recorded live as `8716d3bf`; that row is **superseded**. Prior header follows.)
+
+## 1. #1244 MERGED — deploy tip `88372954`
+
+`established fact`, from the commit graph at `origin/verdant-grow-diary` after `git fetch`.
+**Squash, one parent.**
+
+| PR        | Merge SHA  | Parent     | Files | Migrations | Merged (UTC)     |
+| --------- | ---------- | ---------- | ----: | ---------: | ---------------- |
+| **#1244** | `88372954` | `8716d3bf` |     1 |      **0** | 2026-09-02 11:19 |
+
+Full merge SHA: `883729544157a21b5f43210eb59d6cb8ce02ae1b`. Parent:
+`8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd`. Subject:
+`docs(state): restamp from 8716d3bf — live MEASURED, #1247 merged (#1244)`. Author date
+`2026-09-02T11:19:36Z`. Unique file: `docs/agents/CURRENT_STATE.md` (`+125 / −2`). **Zero
+migrations.** No `src/`, no `supabase/`, no `package.json`, no `vercel.json`.
+
+**#1247 Environment Ribbon (Tranche 1) is MERGED as `8716d3bf`**, MEASURED again here from the
+graph: squash, parent `3fca5b069`, author date `2026-09-02T10:34:01Z`, **6 files, 0 migrations**
+(`git show --stat`). **No Tranche 1b in this slice.** Its file list is in the block below.
+
+## 2. Live is independently MEASURED at `88372954`
+
+Claude fetched `https://verdantgrowdiary.com/version.json` in this slice.
+
+| Field        | Value                                      |
+| ------------ | ------------------------------------------ |
+| `commit`     | `883729544157a21b5f43210eb59d6cb8ce02ae1b` |
+| `dirty`      | **`false`**                                |
+| `ref`        | `verdant-grow-diary`                       |
+| `commitTime` | `2026-09-02T11:19:36Z`                     |
+| `buildTime`  | `2026-09-02T12:41:20.798Z` (~7:41 AM CT)   |
+| `treeHash`   | `cc51a64c74d9` (short)                     |
+| server       | **Vercel** (`server: Vercel` header)       |
+| apex HTTP    | `200`                                      |
+| www HTTP     | `308` → apex `version.json`, server Vercel |
+| measured     | 2026-09-02 **15:15:36 UTC** (~10:15 AM CT) |
+| source       | `https://verdantgrowdiary.com/version.json`|
+
+**Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not carry
+`8716d3bf` as current live. One `www` attempt in this slice timed out at 20 s before the retry
+read the `308`; **a timeout, or a resolver still returning `185.158.133.1` / `5c197f75`, is a
+network miss, not a product `FAIL` and not a rollback.** Publisher is Vercel, project
+`verdant-grow-diary`. **No Lovable Publish.**
+
+## 3. Restore SHA for Tolu/Support is `88372954`
+
+If Tolu asks for a restore point, it is **`88372954`** (full oid
+`883729544157a21b5f43210eb59d6cb8ce02ae1b`). **Do not ping Tolu.** Support outcome remains
+`NOT_MEASURED`.
+
+## 4. Open PRs against the deploy branch — no other owner of this file
+
+`established fact`, MEASURED at ~15:16 UTC: GitHub API list of open PRs with base
+`verdant-grow-diary`, then
+`git diff --name-only <merge-base> <head> -- docs/agents/CURRENT_STATE.md` per head after deepening
+the clone.
+
+| PR    | Head        | Draft | Touches `CURRENT_STATE.md` |
+| ----- | ----------- | ----- | -------------------------- |
+| #1221 | `9f922ca54` | false | no                         |
+| #1181 | `3076870e6` | false | no                         |
+| #1180 | `2d2b00cb8` | false | no                         |
+| #1175 | `032c4b20e` | false | no                         |
+| #1174 | `4e52b5e5d` | true  | no                         |
+| #1153 | `030a9e8bd` | false | no                         |
+| #1151 | `dafef00ca` | false | no                         |
+| #1088 | `c79580038` | false | no                         |
+
+**No ACTIVE OWNER.** Eight open PRs; none modifies this file.
+
+**#1221 draft flag, from `GET /repos/Verdant-OS/verdant-grow-diary/pulls/1221`:** `draft: false`,
+`merged: false`, `mergeable_state: unstable`, head
+`9f922ca54a29f541e0c0cc5f24e10276d213dc02`, base `verdant-grow-diary`, 23 files, 17 commits. The
+block below says "#1221 stays draft at `79146c6911`"; **both the flag and the head are superseded
+by this API read.** #1221 was **not** readied, merged, converted, rebased or updated in this slice.
+Whether it is ready for review is Cheek's call and is not decided here.
+
+**#1174** is `draft: true` at `4e52b5e5d`, SUPERSEDED on V0 C/F hunks. Do not convert, ready or
+merge.
+
+## 5. Signup PREFLIGHT still BLOCKED — no APPLY
+
+`source claim`, carried. Signup PREFLIGHT is still **BLOCKED** on the malformed Aug 24
+`SUPABASE_DB_URL` secret. **This slice did not run PREFLIGHT and does not claim it passed.**
+
+In-app Cloud SQL presence was MEASURED in an earlier slice (`has_schema_migrations`, pinned ledger
+`20260813030000`, `signup_acquisition_attributions` present). **That is not a GitHub Actions
+PREFLIGHT receipt.** Production apply state stays `NOT_MEASURED`. **No APPLY.**
+
+## 6. Production Postgres identity
+
+`source claim`, from Cheek/GDP; not re-measured here. **There is no standalone `knk` Supabase
+session.** Production Postgres is **Lovable Cloud**; `knkwiiywfkbqznbxwqfh` is the published
+identity of that Cloud DB. **Do not hunt `supabase.orgs` for `knk`.** **Do not treat
+`bzatgtgjvuojpoxcknaa` as production.**
+
+## 7. Billing stays on Paddle
+
+`source claim`, carried. **Stay on Paddle.** Live checkout is still **off**. The entitlement spine
+is `payments-webhook` → `public.subscriptions`. No Stripe and no vendor swap is proposed in this
+file. Paddle `test_` keys and the sandbox banner remain **EXPECTED**.
+
+## 8. Vercel integrations and apex DNS
+
+Carried from GDP's dashboard read unless marked MEASURED.
+
+- **Integrations (carried):** no Lovable leftover on project `verdant-grow-diary`. Both Supabase
+  installs and Browserbase attach to the leftover `v0-no-conversation` project only. **Not
+  disconnected.**
+- **Apex DNS (carried):** the "Change Recommended" notice is Vercel's IP-range expansion
+  (recommended `A @ 216.150.1.1`). Registrar is Squarespace. **Vercel DNS not enabled. Registrar
+  not edited.**
+- **Apex A record (MEASURED, `getent hosts verdantgrowdiary.com` in this slice):**
+  `216.198.79.1`, a supported Vercel IP.
+
+## 9. Not restamped here
+
+- Copilot #1223 findings: not restamped.
+- Supabase Preview `42P07` replay collision: remains **UNSTABLE**, not `FAIL`. CI is not a product
+  fail.
+- No metrics, no subscriber counts, no CI-derived product claims.
+- The #1242 review-seat rows in the block below are history and were not re-checked here.
+
+## 10. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production
+  SQL, no Lovable project-chat agent edit, no device control, no automatic Action Queue, no
+  credentials.
+- **Publisher is Vercel**, project `verdant-grow-diary`. **Auth and DB stay Lovable Cloud.**
+  **No Lovable Publish.**
+- **Paddle: `test_` keys and the sandbox banner are EXPECTED.** Live checkout off. Stay on Paddle.
+  Do not revoke the existing `live_` token.
+- **Current production is MEASURED at `88372954`, `dirty:false`, ref `verdant-grow-diary`.**
+  Do not record it as `NOT_MEASURED`.
+- **Tolu: do not ping.** Restore SHA **`88372954`** (full oid
+  `883729544157a21b5f43210eb59d6cb8ce02ae1b`).
+- **Feed last-recipe is SHIPPED (#1241).** Do not open a slice for it.
+- **#1247 Environment Ribbon Tranche 1 is SHIPPED (`8716d3bf`).** No Tranche 1b in this slice.
+- **#1174 is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge.
+- **#1221: API MEASURED `draft:false`, `merged:false` at `9f922ca54`.** Not readied, merged,
+  rebased or updated here. Do not merge it from this slice.
+- **Signup-attribution APPLY stays owner-locked.** Production apply state is `NOT_MEASURED`.
+- **Signup PREFLIGHT still BLOCKED** (malformed Aug 24 `SUPABASE_DB_URL`). Do not claim it
+  passed.
+- **Vercel integrations and the registrar are untouched.** Vercel DNS not enabled.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays `HOLD`.
+  Plant Memory PARK. Spider Farmer GGS radio capture stays parked and `NOT_MEASURED`.
+- This slice is **N=1** and stays **draft**, on branch `claude/current-state-restamp-88372954`,
+  parented on `88372954`. Unique file `docs/agents/CURRENT_STATE.md`. No `src/`, no `supabase/`,
+  no `package.json`. No ready. No merge. No assignee. No auto-merge.
+
+
+**Prior update:** GDP (2026-09-02: **#1247 MERGED as `8716d3bf`** — squash, one parent.
 **Deploy tip = live `8716d3bf`, `dirty:false`**, independently MEASURED from
 `https://verdantgrowdiary.com/version.json` at ~6:09 AM CT (`buildTime`
 `2026-09-02T10:39:16.035Z`). Restore SHA for Lovable Support is **`8716d3bf`**. **Do not ping

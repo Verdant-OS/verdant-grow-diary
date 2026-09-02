@@ -28,7 +28,7 @@ Two things are true at once, and the second is the one that needs work:
   anywhere. That is better than most repositories this size.
   Every per-case and per-assertion figure in this document is **Vitest-only** unless it says
   otherwise; the other three lanes are counted by file, because nothing aggregates their cases.
-  **This is four lanes plus the 33 runtime harnesses, not the whole estate.** A sixth grouping —
+  **This is four lanes plus the 41 runtime harnesses, not the whole estate.** A sixth grouping —
   **21 `node:test` files under `scripts/`**, 19 of them referenced by a workflow or a `package.json`
   script — is **`NOT_MEASURED`** here: the reproducer never parses `node:test` registration, so
   neither its case count nor its never-executed status is known. Read "test estate" in this document
@@ -38,7 +38,7 @@ Two things are true at once, and the second is the one that needs work:
   exercises is `NOT_MEASURED`. **12.9% of all bare `expect(...)` calls** are `toContain`/`toMatch`
   checks against source **text** inside scan-only files (11,253 of 87,333) — a class proven by execution
   in §3 to go red on behaviour-preserving refactors and stay green through real behaviour breaks.
-  And 21 of 31 Deno edge tests, 18 of 33 runtime RLS/billing harnesses, 7 of 9 pgTAP suites, and
+  And 21 of 31 Deno edge tests, 18 of 41 runtime RLS/billing harnesses, 7 of 9 pgTAP suites, and
   25 of 60 Playwright specs are never run by any workflow.
 
 The single highest-value action is not writing new tests. It is **running the tests that already
@@ -253,7 +253,7 @@ chains, then matching file paths.
 | -------------------------------- | ----: | ------------------------: | -----------------: |
 | Deno edge-function tests         |    31 |                        10 |             **21** |
 | Playwright e2e specs             |    60 |                        35 |             **25** |
-| Runtime RLS / billing harnesses  |    33 |                        15 |             **18** |
+| Runtime RLS / billing harnesses  |    41 |                        23 |             **18** |
 | pgTAP suites (`supabase/tests/`) |     9 |                         2 |              **7** |
 
 ### 4.1 Edge functions — 21 dead test files
@@ -369,6 +369,18 @@ bun run scripts/run-ai-credits-rls-harness.ts
 
 `AGENTS.md` requires runtime harnesses for money/security paths precisely because "static scan
 tests are useful but not enough". The harnesses were written. The lane that runs them was not.
+
+**What this lane is, and is not.** The inventory matches `scripts/**` files whose name contains
+`harness` or `db-security` — a **naming convention**, not a classification by role. Both conventions
+are in real use: `run-support-forms-rls-harness.ts` at root and
+`scripts/security/run-profiles-db-security.mjs` nested. No syntactic signal separates a harness from
+the other 54 package-invoked `scripts/**` runners — artifact helpers, scanners, `vitest-controlled/`
+CLI utilities — so a few genuine runtime checks may sit outside this figure
+(`scripts/security/bridge-sensor-ingest-evidence-checks.mjs`,
+`scripts/run-irrigation-integrity-suite.mjs`, `scripts/run-ecowitt-bridge-ci-validation.mjs` are the
+plausible candidates). The total is therefore a **floor for the convention**, and the 18 never-run
+figure is the part that matters and is unaffected — every one of the eight files defect 31 added is
+executed.
 
 ### 4.4 pgTAP — the billing RLS suite is one of the seven that never run
 
@@ -564,7 +576,7 @@ Not to be rounded up by anyone quoting this document.
 
 ## 9. Validation
 
-### 9.0 Thirty measurement defects found in review, and corrected
+### 9.0 Thirty-one measurement defects found in review, and corrected
 
 The first published version of `measure-test-estate.mjs` was reviewed on PR #1219 by **Codex,
 GitHub Copilot and Cursor Bugbot independently**, and all three found defects in it. Six were real.
@@ -578,7 +590,8 @@ and three more in what the metrics were _called_. A twelfth round then found tha
 stopped at the test file and never followed its own helpers, moving four published bucket totals.
 A thirteenth and fourteenth round then found the two largest bucket errors in the set and one whole
 lane the reproducer had never parsed. A fifteenth caught the fix for 27 leaving its own figure stale
-two sections away. All thirty are recorded here rather than
+two sections away. A sixteenth found a whole lane's inventory counting by the wrong rule. All
+thirty-one are recorded here rather than
 quietly patched, because this document's subject is measurement discipline and the reproducer was
 the part that failed it.
 
@@ -603,7 +616,7 @@ the part that failed it.
 | 17  | The substring metric counts `toContain`/`toMatch` calls, not matches against file content                                                                                              | no figure moved; **4 of 14,054** have a literal-array receiver, and §3.1 now says so and names the metric for what it counts                                                                          |
 | 18  | The fix for 13 used the bypass set only to veto subtraction, so a module mocked with `importOriginal` and never value-imported still emitted no edge                                   | no module moved — each is already directly imported by another test file — but the code and the published rule disagreed                                                                              |
 | 19  | `.d.ts` files counted as product modules, though the transpiler erases them and they can never carry a runtime edge                                                                    | denominator **2,108 → 2,106**; unreached **47 → 45**; reachability **97.8% → 97.9%**                                                                                                                  |
-| 20  | `testFilesAcrossAllLanes` said "all lanes" while summing only the four test-file lanes, omitting the 33 harnesses                                                                      | no figure moved; the field is now `testFilesAcrossFourTestLanes` and the report names the fifth lane beside it                                                                                        |
+| 20  | `testFilesAcrossAllLanes` said "all lanes" while summing only the four test-file lanes, omitting the runtime-harness lane                                                              | no figure moved; the field is now `testFilesAcrossFourTestLanes` and the report names the fifth lane beside it                                                                                        |
 | 21  | The transitive walk discarded each test's mock state, re-adding modules the test had replaced                                                                                          | reached **2,061 → 2,060**; unreached **45 → 46**; reachability **97.9% → 97.8%**; the graph is now walked per test file and unioned                                                                   |
 | 22  | The `vi.doMock` exclusion was stated unconditionally, though it holds only for **static** imports                                                                                      | no figure moved — an over-blocking ceiling shifts nothing — but the rule as published was wrong, and the limit is now stated                                                                          |
 | 23  | The file-I/O metric was labelled "any file I/O" but counted only **content** readers, omitting `existsSync` / `statSync`                                                               | no figure moved; renamed `filesReadingFileContent`, and the 4 metadata-only files are recorded as deliberately excluded                                                                               |
@@ -614,6 +627,7 @@ the part that failed it.
 | 28  | `productSet` was built from `src/` alone, so a test executing a `scripts/` or `supabase/functions/` module counted as importing nothing                                                | scan-only **591 → 534** · **17,756 → 13,246** · **5,665 → 4,490**; hybrid **815 → 872** · **30,900 → 35,410** · **11,773 → 12,948**; substring **13,303 → 11,253**; **the §0 headline 15.2% → 12.9%** |
 | 29  | §0 called 3,008 files "the whole test estate" while the reproducer never parsed the `node:test` lane                                                                                   | no figure moved; 21 `node:test` files under `scripts/`, 19 workflow-referenced, are now stated as `NOT_MEASURED` rather than silently excluded                                                        |
 | 30  | Defect 27's own commit updated §3.1 and the headline but left the case total at 31,941 in §1 and limit 4, so the advertised command printed a different number than the page around it | no figure moved; both live references now read **31,965**, and the two in §9.0's rows stay as historical before/after                                                                                 |
+| 31  | The runtime-harness inventory was root-level-only and matched `harness` alone, missing eight `db-security` runners — five nested under `scripts/security/`, three at root              | harness lane **33/15 → 41/23**; **never-executed unchanged at 18**; §0's "18 of 33" becomes "18 of 41"                                                                                                |
 
 Fixing 3 initially introduced two **false-DEAD** readings in the opposite direction — a YAML folded
 scalar (`run: >-`) splits one command across lines, and a `psql … \` continuation does too, so real
@@ -824,15 +838,33 @@ Twice now the defect has been _the commit that fixed the previous defect not fin
 lesson recorded here for whoever maintains this document: when a figure moves, grep the whole file
 for it and separate the live references from the historical ones before touching either.
 
-Neither pattern was caught by the author. Fifteen review rounds by three independent reviewers found
-every one of the thirty. That is the strongest evidence in this document for its own central
+**31 is the third inventory rule that did not match the concept its prose claimed**, after 25
+(classification stopping at the test file) and 29 (the `node:test` lane). The harness filter was
+root-level-only AND `harness`-only, so it missed eight real runtime harnesses on either count: five
+under `scripts/security/` and three at root named `*-db-security.ts`, all eight invoked by
+`security-db-local.yml` through `test:*-db-security` package scripts.
+
+The direction matters. **The never-executed count does not move** — all eight are executed — so the
+lane grows and the finding shrinks: §0's "18 of 33" becomes **"18 of 41"**, 55% → 44%. §4.3's list of
+dead harnesses is unchanged, because none of the eight is on it.
+
+The fix widens the convention rather than claiming to classify by role, and §4.3 now says so
+explicitly. Measured before choosing: a widened `(harness|db-security)` match still leaves 54 other
+package-invoked `scripts/**` runners outside the lane, nearly all of them plainly not harnesses, and
+three that plausibly are. A rule that captured exactly the right set does not exist in the filenames.
+The owner was given the options — widen, enumerate in `config/`, or narrow the claim to
+`NOT_MEASURED` — and chose to widen, so the figure is now a stated floor for a stated convention
+rather than an unstated guess.
+
+Neither pattern was caught by the author. Sixteen review rounds by three independent reviewers found
+every one of the thirty-one. That is the strongest evidence in this document for its own central
 claim, and it is evidence about the author as much as about the tool: **a measurement is not
 trustworthy because the person who made it checked it.** Anyone quoting a figure from this document
-should note that it took fifteen adversarial rounds to get these numbers right, that round six still
+should note that it took sixteen adversarial rounds to get these numbers right, that round six still
 moved one of them by 47%, and that the reachability headline moved in five separate rounds
 (98.2% → 97.7% → 97.8% → 97.9% → 97.8%).
 
-What did **not** change across any of the thirty: no finding, no proposal, and not the calibrated
+What did **not** change across any of the thirty-one: no finding, no proposal, and not the calibrated
 verdict at §10. Every correction moved a figure's precision or a method's honesty, and none moved a
 conclusion. That is worth stating explicitly, because the length of this section could otherwise be
 read as the audit's substance being in doubt. It is not; its arithmetic was.

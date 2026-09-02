@@ -33,6 +33,7 @@ import {
   classifyTest,
   commandLinesIn,
   isCommandLine,
+  isRuntimeHarness,
   namedPathsIn,
   resolveSpec,
   runtimeImportSpecifiers,
@@ -355,6 +356,38 @@ describe("classification follows the test's own helpers (defect 25)", () => {
     expect(bucketOf({ scans: true, renders: false, importsProduct: false })).toBe("scan-only");
     expect(bucketOf({ scans: true, renders: false, importsProduct: true })).toBe("hybrid");
     expect(bucketOf({ scans: true, renders: true, importsProduct: false })).toBe("hybrid");
+  });
+});
+
+describe("the runtime-harness lane is a naming convention, matched at any depth (defect 31)", () => {
+  it("matches the root `*-harness` convention", () => {
+    expect(isRuntimeHarness("scripts/run-billing-rls-harness.ts")).toBe(true);
+    expect(isRuntimeHarness("scripts/run-support-forms-rls-harness.ts")).toBe(true);
+  });
+
+  it("matches the nested `db-security` convention", () => {
+    // Five real files live here; the old root-level-only rule missed all of them.
+    expect(isRuntimeHarness("scripts/security/run-profiles-db-security.mjs")).toBe(true);
+    expect(isRuntimeHarness("scripts/security/run-bridge-tokens-db-security.mjs")).toBe(true);
+  });
+
+  it("matches a root `db-security` runner that has no `harness` in its name", () => {
+    // Three real files; the old `harness`-only rule missed these even at root.
+    expect(isRuntimeHarness("scripts/run-pgmq-email-wrapper-grants-db-security.ts")).toBe(true);
+  });
+
+  it("does not sweep in other package-invoked scripts", () => {
+    // 54 such runners exist and are overwhelmingly not harnesses. The lane is a
+    // stated convention, so the predicate must stay narrow rather than guess.
+    expect(isRuntimeHarness("scripts/run-vitest-batches.mjs")).toBe(false);
+    expect(isRuntimeHarness("scripts/vitest-controlled/cli.mjs")).toBe(false);
+    expect(isRuntimeHarness("scripts/security/static-client-secret-scan.mjs")).toBe(false);
+  });
+
+  it("requires an executable extension and the scripts/ root", () => {
+    expect(isRuntimeHarness("scripts/run-billing-rls-harness.sh")).toBe(false);
+    expect(isRuntimeHarness("src/lib/harnessRules.ts")).toBe(false);
+    expect(isRuntimeHarness("docs/run-billing-rls-harness.ts")).toBe(false);
   });
 });
 

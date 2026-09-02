@@ -32,6 +32,7 @@ import {
   bucketOf,
   buildExecutableCorpus,
   countCallSites,
+  isRuntimeHarness,
   mockReplacedSpecifiers,
   namedPathsIn,
   reachableClosure,
@@ -288,9 +289,25 @@ const denoTests = treePaths.filter(
   (f) => f.startsWith("supabase/functions/") && /(\.test\.ts|_test\.ts)$/.test(f),
 );
 const e2eSpecs = treePaths.filter((f) => /^e2e\/[^/]+\.spec\.ts$/.test(f));
-const harnesses = treePaths.filter(
-  (f) => /^scripts\/[^/]+$/.test(f) && /harness/.test(f) && /\.(ts|mjs)$/.test(f),
-);
+/**
+ * Runtime harnesses: RLS, billing and DB-security runners under `scripts/`.
+ *
+ * The rule is a NAMING CONVENTION, not a role, and the audit's §0 says so. Two
+ * conventions are in use and both must match, at any depth:
+ *
+ *   scripts/run-support-forms-rls-harness.ts          `harness` in the name
+ *   scripts/security/run-profiles-db-security.mjs     `db-security`, nested
+ *
+ * The original rule was root-level-only AND `harness`-only, which missed eight
+ * real harnesses on either count: five under `scripts/security/` and three at
+ * root named `*-db-security.ts`. All eight are invoked by `security-db-local.yml`
+ * through `test:*-db-security` package scripts. See §9.0 defect 31.
+ *
+ * This is deliberately still a name match. No syntactic signal distinguishes a
+ * harness from the other 54 package-invoked `scripts/**` runners, so the audit
+ * states the convention rather than claiming to classify by role.
+ */
+const harnesses = treePaths.filter(isRuntimeHarness);
 const pgtap = treePaths.filter((f) => /^supabase\/tests\/[^/]+\.sql$/.test(f));
 
 /**

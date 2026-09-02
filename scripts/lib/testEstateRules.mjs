@@ -687,6 +687,29 @@ export function countCallSites(source, fileName = "f.tsx") {
 /** Matchers that assert on a substring or pattern of text rather than a value. */
 const SUBSTRING_MATCHERS = new Set(["toContain", "toMatch"]);
 
+/**
+ * Is this path a runtime harness — an RLS, billing or DB-security runner?
+ *
+ * A NAMING CONVENTION, not a classification by role, and the audit's §4.3 says
+ * so. Two conventions are in real use and both count, at any depth under
+ * `scripts/`:
+ *
+ *   scripts/run-support-forms-rls-harness.ts        `harness` in the name
+ *   scripts/security/run-profiles-db-security.mjs   `db-security`, nested
+ *
+ * The original rule was root-level-only AND `harness`-only, missing eight real
+ * harnesses on either count — five under `scripts/security/`, three at root
+ * named `*-db-security.ts`, all invoked by `security-db-local.yml`. See §9.0
+ * defect 31. No syntactic signal separates a harness from the other 54
+ * package-invoked `scripts/**` runners, so this is a floor for the convention
+ * rather than a claim about roles.
+ */
+export function isRuntimeHarness(path) {
+  return (
+    path.startsWith("scripts/") && /(harness|db-security)/.test(path) && /\.(ts|mjs)$/.test(path)
+  );
+}
+
 /* ------------------------------------------------------------------ *
  * Workflow execution resolution
  * ------------------------------------------------------------------ */

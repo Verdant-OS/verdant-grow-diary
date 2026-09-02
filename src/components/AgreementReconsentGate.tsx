@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AlertTriangle } from "lucide-react";
+import { AUTH_REVALIDATE_EVENT } from "@/hooks/useRequireAuth";
 
 /**
  * Blocking re-consent modal. Renders when a signed-in user is missing any
@@ -35,7 +36,7 @@ import { AlertTriangle } from "lucide-react";
  * /privacy (so the user can read what they're accepting and so signed-out
  * flows are unaffected).
  */
-const SUPPRESSED_PREFIXES = ["/auth", "/reset-password", "/terms", "/privacy", "/.lovable/"];
+const SUPPRESSED_PREFIXES = ["/auth", "/reset-password", "/terms", "/privacy", "/welcome", "/.lovable/"];
 
 export function AgreementReconsentGate() {
   const { user, loading, signOut } = useAuth();
@@ -155,7 +156,16 @@ export function AgreementReconsentGate() {
             <Button variant="ghost" onClick={() => void signOut()}>
               Sign out
             </Button>
-            <Button onClick={() => setRetryToken((t) => t + 1)}>Retry</Button>
+            <Button
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new Event(AUTH_REVALIDATE_EVENT));
+                }
+                setRetryToken((t) => t + 1);
+              }}
+            >
+              Retry
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -29,6 +29,7 @@ import {
   reachableClosure,
   readsSrcPath,
   rendersComponents,
+  bucketOf,
   classifyTest,
   commandLinesIn,
   isCommandLine,
@@ -36,6 +37,7 @@ import {
   resolveSpec,
   runtimeImportSpecifiers,
   stripTriggerBlock,
+  testFileReach,
   testFileRuntimeSpecifiers,
   // Pure rules; the script supplies all I/O.
 } from "../../scripts/lib/testEstateRules.mjs";
@@ -247,6 +249,78 @@ describe("import classification — relative specifiers are product imports too"
   it("classifies a test that does no file I/O as behavioural", () => {
     const source = `import { normalize } from "../lib/a"; it("x", () => expect(normalize()).toBe(1));`;
     expect(classifyTest({ source, file: "src/test/x.test.ts", productSet })).toBe("behavioural");
+  });
+});
+
+describe("classification follows the test's own helpers (defect 25)", () => {
+  // Mirrors the real shapes: `routeManifestSyncHarness` both reads route
+  // sources AND imports `@/lib/appRouteManifest`, so a test using it does
+  // product-touching work that its own text never shows.
+  const HELPERS: Record<string, string> = {
+    "src/test/helpers/h.ts": `
+      import { readFileSync } from "node:fs";
+      import { APP_ROUTES } from "@/lib/a";
+      export const scan = () => readFileSync("src/routes/x.tsx", "utf8") + APP_ROUTES.length;
+    `,
+    "src/test/helpers/reader.ts": `
+      import { readFileSync } from "node:fs";
+      export const read = () => readFileSync("m.sql", "utf8");
+    `,
+    "src/test/helpers/chain.ts": `export { read } from "./reader";`,
+  };
+  const productSet = new Set(["src/lib/a.ts"]);
+  const helperSet = new Set(Object.keys(HELPERS));
+  const sourceOf = (f: string) => HELPERS[f] ?? "";
+  const file = "src/test/x.test.ts";
+
+  it("counts file I/O performed inside a helper", () => {
+    const source = `
+      import { read } from "./helpers/reader";
+      it("x", () => expect(read()).toContain("needle"));
+    `;
+    // Reads nothing itself: without the helper edge this is "behavioural".
+    expect(readsFileContent(source, file)).toBe(false);
+    expect(testFileReach({ source, file, productSet, helperSet, sourceOf }).scans).toBe(true);
+  });
+
+  it("counts a product import reached only through a helper, so scan-only becomes hybrid", () => {
+    const source = `
+      import { readFileSync } from "node:fs";
+      import { scan } from "./helpers/h";
+      it("x", () => expect(readFileSync("f")).toContain(scan()));
+    `;
+    const args = { source, file, productSet, helperSet, sourceOf };
+    expect(testFileReach(args).importsProduct).toBe(true);
+    expect(classifyTest(args)).toBe("hybrid");
+    // The defect, pinned: with no helperSet the identical file reads scan-only.
+    expect(classifyTest({ source, file, productSet })).toBe("scan-only");
+  });
+
+  it("walks helpers transitively, not one level deep", () => {
+    const source = `
+      import { read } from "./helpers/chain";
+      it("x", () => expect(read()).toContain("needle"));
+    `;
+    // chain.ts re-exports reader.ts; the I/O is two edges out.
+    expect(testFileReach({ source, file, productSet, helperSet, sourceOf }).scans).toBe(true);
+  });
+
+  it("does not walk a helper the test has factory-mocked away", () => {
+    const source = `
+      vi.mock("./helpers/h", () => ({ scan: () => "stub" }));
+      import { scan } from "./helpers/h";
+      it("x", () => expect(scan()).toBe("stub"));
+    `;
+    const reach = testFileReach({ source, file, productSet, helperSet, sourceOf });
+    expect(reach.scans).toBe(false);
+    expect(reach.importsProduct).toBe(false);
+  });
+
+  it("maps a reach summary onto the three buckets", () => {
+    expect(bucketOf({ scans: false, renders: false, importsProduct: true })).toBe("behavioural");
+    expect(bucketOf({ scans: true, renders: false, importsProduct: false })).toBe("scan-only");
+    expect(bucketOf({ scans: true, renders: false, importsProduct: true })).toBe("hybrid");
+    expect(bucketOf({ scans: true, renders: true, importsProduct: false })).toBe("hybrid");
   });
 });
 

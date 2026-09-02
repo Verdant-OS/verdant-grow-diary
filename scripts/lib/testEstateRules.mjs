@@ -341,14 +341,60 @@ function allBindingsTypeOnly(bindings) {
  * `scan-only` means: reads source/fixture files AND imports no product module
  * AND renders nothing. Anything that also executes product code is a hybrid.
  */
-export function classifyTest({ source, file, productSet }) {
-  const scans = readsFileContent(source, file);
-  const renders = rendersComponents(source, file);
-  const importsProduct = testFileRuntimeSpecifiers(source, file).some(
-    (s) => resolveSpec(s, file, productSet) !== null,
-  );
+export function classifyTest({ source, file, productSet, helperSet, sourceOf }) {
+  return bucketOf(testFileReach({ source, file, productSet, helperSet, sourceOf }));
+}
+
+/** The bucket a reach summary falls in. Split out so the walk can be reused. */
+export function bucketOf({ scans, renders, importsProduct }) {
   if (!scans) return "behavioural";
   return !importsProduct && !renders ? "scan-only" : "hybrid";
+}
+
+/**
+ * What one test file reaches, following its own TEST-HELPER imports.
+ *
+ * Classifying on the test file's own text alone stops at the wrong boundary. A
+ * test that scans source through `src/test/helpers/…` does the reading in the
+ * helper, and a test that reaches a product module only through a helper still
+ * executes product code. At the pinned revision
+ * `action-detail-context-links.test.ts` imports `routeManifestSyncHarness`,
+ * which reads route sources AND imports `@/lib/appRouteManifest`; the file was
+ * filed `scan-only` because neither edge was followed. See the audit's §9.0
+ * defect 25 for the 35 files this moved and the 13 credited with no file I/O.
+ *
+ * Helpers are walked transitively. A product module is a STOPPING edge: the
+ * question is only whether one is reached, never what it goes on to pull in.
+ * Mock-replaced specifiers never appear here, so a helper the test `vi.mock`s
+ * is correctly not walked.
+ */
+export function testFileReach({ source, file, productSet, helperSet, sourceOf }) {
+  const read = (f) => (f === file ? source : (sourceOf?.(f) ?? ""));
+  const seen = new Set([file]);
+  const stack = [file];
+  let scans = false;
+  let renders = false;
+  let readsSrc = false;
+  let importsProduct = false;
+  while (stack.length) {
+    const cur = stack.pop();
+    const src = read(cur);
+    if (!scans) scans = readsFileContent(src, cur);
+    if (!renders) renders = rendersComponents(src, cur);
+    if (!readsSrc) readsSrc = readsSrcPath(src, cur);
+    for (const spec of testFileRuntimeSpecifiers(src, cur)) {
+      if (resolveSpec(spec, cur, productSet) !== null) {
+        importsProduct = true;
+        continue;
+      }
+      const helper = helperSet ? resolveSpec(spec, cur, helperSet) : null;
+      if (helper && !seen.has(helper)) {
+        seen.add(helper);
+        stack.push(helper);
+      }
+    }
+  }
+  return { scans, renders, readsSrc, importsProduct };
 }
 
 /**

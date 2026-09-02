@@ -29,16 +29,15 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import {
+  bucketOf,
   buildExecutableCorpus,
-  classifyTest,
   countCallSites,
   mockReplacedSpecifiers,
   namedPathsIn,
   reachableClosure,
-  readsFileContent,
-  readsSrcPath,
   resolveSpec,
   runtimeImportSpecifiers,
+  testFileReach,
   testFileRuntimeSpecifiers,
 } from "./lib/testEstateRules.mjs";
 
@@ -122,6 +121,11 @@ const product = allSrc.filter(
   (f) => !IS_TEST.test(f) && !f.startsWith("src/test/") && !f.endsWith(".d.ts"),
 );
 const productSet = new Set(product);
+// Test helpers are not product modules, but a test reaches product code and
+// does file I/O THROUGH them, so classification has to walk them. See defect 25.
+const helperSet = new Set(
+  allSrc.filter((f) => !IS_TEST.test(f) && f.startsWith("src/test/") && !f.endsWith(".d.ts")),
+);
 
 const srcOf = readBlobs(allSrc);
 const body = (f) => srcOf.get(f) ?? "";
@@ -156,10 +160,12 @@ for (const t of tests) {
   skipCallSites += n.skips;
   onlyCallSites += n.onlys;
 
-  if (readsFileContent(s, t)) readsContent += 1;
-  if (readsSrcPath(s, t)) readsSrc += 1;
+  // ONE walk per test: the same reach answers I/O, src-path reads and bucket.
+  const reach = testFileReach({ source: s, file: t, productSet, helperSet, sourceOf: body });
+  if (reach.scans) readsContent += 1;
+  if (reach.readsSrc) readsSrc += 1;
 
-  const kind = classifyTest({ source: s, file: t, productSet });
+  const kind = bucketOf(reach);
   if (kind === "scan-only") {
     scanOnly.push(t);
     scanOnlyExpects += e;
@@ -358,16 +364,19 @@ if (process.argv.includes("--json")) {
   console.log(
     `  it()/test() call sites         ${v.itTestCallSites}   (NOT executed cases - see the audit's limit 4)`,
   );
+  // Bare `expect(...)` calls only. Assertion-bearing utilities invoked as a
+  // PROPERTY of expect — `expect.fail(…)`, `expect.unreachable(…)` — are not
+  // counted; there are 14 at the pinned revision. See the audit's §9.0 defect 26.
   console.log(`  expect() call sites            ${v.expectCallSites}`);
   console.log(`  .skip / .only call sites       ${v.skipCallSites} / ${v.onlyCallSites}`);
   console.log(
     `  scan-only files                ${v.scanOnlyFiles}  (${pct(v.scanOnlyFiles, v.testFiles)} of test files)`,
   );
   console.log(
-    `  their expect() call sites      ${v.scanOnlyExpects}  (${pct(v.scanOnlyExpects, v.expectCallSites)} of all assertions)`,
+    `  their expect() call sites      ${v.scanOnlyExpects}  (${pct(v.scanOnlyExpects, v.expectCallSites)} of bare expect() calls)`,
   );
   console.log(
-    `  of those, toContain/toMatch    ${v.scanOnlySubstringAssertions}  (${pct(v.scanOnlySubstringAssertions, v.scanOnlyExpects)} of the bucket, ${pct(v.scanOnlySubstringAssertions, v.expectCallSites)} of all assertions)`,
+    `  of those, toContain/toMatch    ${v.scanOnlySubstringAssertions}  (${pct(v.scanOnlySubstringAssertions, v.scanOnlyExpects)} of the bucket, ${pct(v.scanOnlySubstringAssertions, v.expectCallSites)} of bare expect() calls)`,
   );
   console.log(`  hybrid / behavioural files     ${v.hybridFiles} / ${v.behaviouralFiles}`);
   console.log(`  hybrid expects / cases         ${v.hybridExpects} / ${v.hybridCases}`);

@@ -337,11 +337,13 @@ describe("evaluatePolicy", () => {
   it("fails when a new npm entrypoint is not declared", () => {
     const files = policyFiles({
       extra: {
-        [at("vercel.json")]: '{"installCommand":"npm install"}',
+        // Synthetic undeclared path — not the real vercel.json (which pins bun,
+        // not npm, via top-level installCommand).
+        [at("scripts/ad-hoc-npm-install.sh")]: "npm install",
       },
     });
     expect(evaluate(files).errors.join(" ")).toContain(
-      "Undeclared npm install/ci consumer found at vercel.json",
+      "Undeclared npm install/ci consumer found at scripts/ad-hoc-npm-install.sh",
     );
   });
 
@@ -390,6 +392,28 @@ describe("evaluatePolicy", () => {
     for (const forbidden of FORBIDDEN_LOCKFILES) {
       expect(existsSync(resolve(root, forbidden)), forbidden).toBe(false);
     }
+
+    // vercel.json must not reintroduce illegal `projectSettings`. Top-level
+    // bunVersion/installCommand/buildCommand are schema-legal and pin the same
+    // package manager GitHub CI uses. npm install policy for the separate
+    // preview checklist stays pinned via docs/preview-deployment-verification.md.
+    const vercel = JSON.parse(readFileSync(resolve(root, "vercel.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    expect(vercel).not.toHaveProperty("projectSettings");
+    expect(vercel.installCommand).toBe("bun install --frozen-lockfile");
+    expect(vercel.buildCommand).toBe("bun run build");
+    expect(vercel.bunVersion).toBe("1.x");
+    expect(vercel).not.toHaveProperty("outputDirectory");
+
+    const transition = JSON.parse(
+      readFileSync(resolve(root, "config/dependency-lockfile-transition.json"), "utf8"),
+    ) as { consumerContracts: Array<{ path: string }> };
+    const consumerPaths = transition.consumerContracts.map(({ path }) => path);
+    // bun install is not an npm consumer — keep vercel.json off the npm allowlist.
+    expect(consumerPaths).not.toContain("vercel.json");
+    expect(consumerPaths).toContain("docs/preview-deployment-verification.md");
   }, 15_000);
 
   it("runs as a CLI on Windows and finds uppercase undeclared consumers", () => {

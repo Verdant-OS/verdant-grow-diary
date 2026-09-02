@@ -1,6 +1,3024 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-28 UTC (~22:00 UTC)
+**Last updated:** 2026-09-01 UTC (~14:58 UTC)
+**Updated by:** Claude (2026-09-01: **#1232 and #1233 merged**; the deploy tip is
+**`e0e0d699`**. Both carry an independent `PASS` — **Super Blue** on #1232, **Blue Dream** on #1233 —
+so the unticked GitHub review boxes on the earlier merges are **not** evidence that review was
+skipped. The restore SHA for Tolu moves to **`e0e0d699`**, `dirty:false` on GitHub. **Live is
+unchanged** — still the carried dirty remint **`5c197f75`**, `dirty:true`, **not re-measured here**.
+**Current production divergence is `NOT_MEASURED`**; against the _last-measured_ live SHA the graph
+relationship is **7 behind / 4 ahead**. **#1234 and #1235 are
+both CLOSED — SUPERSEDED**: three sessions built the same four-merge restamp and #1232 is the one
+that landed. Publish, History-restore and APPLY remain blocked; Tolu is expected 2026-09-01 and is
+**not** to be pinged. Prior header follows.)
+
+## 1. #1232 and #1233 merged — deploy tip `e0e0d699`
+
+`established fact`, sourced from the **GitHub PR record** and cross-checked against the commit graph
+and the exact remote branch ref. Both rows are **squashes** — one parent each, verified with
+`git rev-list --parents`, subjects ending in their PR number.
+
+| PR        | Merge SHA  | Parent       | Source head | Files | Migrations | Merged (UTC)     |
+| --------- | ---------- | ------------ | ----------- | ----: | ---------: | ---------------- |
+| **#1232** | `4f272106` | `68ad14c66a` | `4087da639` |     1 |      **0** | 2026-09-01 02:02 |
+| **#1233** | `e0e0d699` | `4f272106`   | `2c0ccee10` |     1 |      **0** | 2026-09-01 02:03 |
+
+Full merge SHAs: `4f2721061214283483836d679fec8e2bd3b0e7df` and
+`e0e0d6995355aeac932b8526833ef8d8a793b4bd`.
+
+**Deploy tip: `e0e0d6995355aeac932b8526833ef8d8a793b4bd`**, read twice — `git ls-remote` and
+`git rev-parse origin/verdant-grow-diary` agree. Both were merged by `cheekhimself`.
+
+**Zero migrations across both**, checked on the range `68ad14c66a..e0e0d699` rather than assumed.
+
+**Scope, from the PR record:**
+
+- **#1232** — Claude, docs-only restamp of `CURRENT_STATE.md` for the #1228–#1231 merges. +80 / −2.
+  It is the block demoted immediately below this one.
+- **#1233** — **N=1, a single test file**: `src/test/quick-log-all-activities-integration.test.tsx`,
+  +24 / −0. It adds one integration test asserting that the leftover "no visible symptoms" checkbox
+  clears when a requested activity is applied through a `requestedActivityId` prop change, with no
+  `handleStartSymptomCheck` after the prop apply — i.e. the one path #1231's five reset sites did not
+  independently cover. **No production file was edited**; its own body records 57 passed / 0 failed
+  on the targeted run.
+
+**The same restack detail as #1230, one merge later.** #1233 was opened against base `68ad14c66a`
+(#1231) but its **landed parent is `4f272106`** (#1232): the queue restacked it onto the docs restamp.
+PR base and landed parent differ again. Anyone reconstructing this chain from PR bases alone will get
+it wrong twice in a row.
+
+## 2. Both merges carry an independent `PASS`
+
+`session evidence`, supplied by Cheek, with the head SHAs verified against the GitHub PR record in
+this slice.
+
+| PR    | Independent reviewer | `PASS` at head | Head verified                                                 |
+| ----- | -------------------- | -------------- | ------------------------------------------------------------- |
+| #1232 | **Super Blue**       | `4087da639`    | matches `head.sha` `4087da639d28e332d7fb33cc0474efcd3a1c94f6` |
+| #1233 | **Blue Dream**       | `2c0ccee105`   | matches `head.sha` `2c0ccee105e6ae56095fa888a157a7a26885d4c3` |
+
+**These are owner-designated review evidence, not the protocol peer-review seat.** Recorded as
+`source claim` (Cheek), with only the head SHAs verified here. Per CORRECTION 1 below, Blue Dream /
+Dream Queen is the owner-designated reviewer; the protocol seat is limited by `AGENTS.md` and
+`HANDOFF_PROTOCOL.md:24` to **Grok, Claude or Codex**. No alias in this file places Blue Dream or
+Super Blue in that set, and this slice did not establish the **owner** of either #1232 or #1233 from
+the PR record. So these rows are real review evidence and are **not** a claim of protocol
+peer-review compliance. Raised by Copilot on #1236; an earlier draft asserted that compliance.
+
+### Correcting the previous slice on review provenance
+
+**This supersedes the framing in the closed #1235.** That entry recorded the independent-review
+provenance of #1229/#1230 as **`missing evidence`**, reasoning from unticked GitHub checkboxes. That
+inference was wrong and is withdrawn.
+
+Both facts belong on the record, and neither cancels the other:
+
+- **The GitHub review boxes on #1229 and #1230 are unticked** (`established fact`, read from the
+  merged PR bodies — each carries an unticked independent-verdict line naming Blue Dream). #1231
+  carries no independent-reviewer box at all; its unticked lines are test-run rows, and its body
+  records a **P2 raised by Super Blue on #1230**.
+- **The independent `PASS` was given** (`session evidence`, Cheek) — by **Blue Dream** (recorded in
+  this file as the **same reviewer as Dream Queen**, alias confirmed by Cheek 2026-08-28, CORRECTION
+  1 below) and **Super Blue**. That is **two** reviewers, not three. An earlier draft listed Blue
+  Dream and Dream Queen separately and so overstated the count, reintroducing the very ambiguity
+  CORRECTION 1 was written to close. Raised by Copilot on #1236.
+
+**An unticked box is not evidence that a `PASS` is missing.** The checkbox is a drafting convenience
+in a PR body; it is not the review artefact and was never the system of record. Reading its state as
+a governance signal produced a false `missing evidence` label once already — do not repeat it. Where
+a review outcome is genuinely unknown, say so from the absence of a _reported_ verdict, never from an
+unticked box.
+
+## 3. Restore SHA for Tolu is now `e0e0d699`
+
+`session evidence`, supplied by Cheek. No Lovable surface was touched in this slice.
+
+The requested restore target moves from `68ad14c66a` (recorded in the entry below) to the current
+exact GitHub object **`e0e0d6995355aeac932b8526833ef8d8a793b4bd`**, **`dirty:false` on GitHub**.
+
+**Tolu is expected 2026-09-01. Do not ping, chase, reopen or escalate.** No Support outcome exists in
+the evidence available to this slice — that stays **`NOT_MEASURED`**. Do not infer that the Publish
+block is lifted or that production has been restored.
+
+This records the target as it now stands. It does **not** establish a standing rule that the target
+auto-follows the deploy tip; a later tip needs a fresh instruction from Cheek.
+
+## 4. Live is carried; divergence is measured against the last-measured SHA, not production now
+
+Live remains `5c197f7516e65845209c2d3b4a3192cf5848570c`, **`dirty:true`**, ref `master`. **This slice
+did not fetch production** — the value is **carried**, not refreshed, and is not a 2026-09-01
+measurement. Claude cannot take one.
+
+### The divergence, re-measured against this tip
+
+`established fact`, a **git** measurement taken in this slice. Read both numbers: the one-directional
+"behind" count is the misreading this subsection exists to prevent.
+
+```text
+git rev-list --left-right --count origin/verdant-grow-diary...5c197f75
+7   4
+```
+
+**Seven behind.** The deploy branch carries seven commits production does not: `a8b4a23e` (#1227),
+`6fd48d1c` (#1228), `47e2588a` (#1229), `cc1cd81af` (#1230), `68ad14c66a` (#1231), `4f272106` (#1232)
+and `e0e0d699` (#1233).
+
+**Four ahead.** Production also carries four commits that exist on **no** deploy-branch SHA, reached
+through the remint's second parent `9d31447a`:
+
+```text
+5c197f7  Hardened restore-env script
+9d31447  Changes
+29ddb39  Changes
+e71d0dd  Work in progress
+```
+
+As of that last measurement, production was therefore **not** a lagging subset of the deploy branch,
+and shipping the seven missing commits would **not** have reconciled it.
+
+**What this does and does not establish.** The command compares the deploy tip with `5c197f75` — the
+**last-measured** live SHA, carried from 2026-08-31 and not re-fetched here. It is a git fact about
+that SHA, **not** a measurement of production now. If production has published or reminted since,
+unobserved, the current divergence is **`NOT_MEASURED`** and these two numbers are stale. Do not
+drive a restore or deployment decision from them without a fresh production read. Raised as a P2 by
+Codex on #1236; an earlier draft stated the 7/4 relationship as current production fact, which is the
+same stale-for-current substitution this section warns about one paragraph above. **A merge is not a deployment.** Do not model production as "the
+deploy branch, older", do not rebase this record onto the remint, and do not merge the remint onto
+the deploy branch.
+
+**If this measurement cannot be taken in a later slice, that is a git or network `BLOCKED`** — record
+it as such. It is never a product `FAIL`, and an unreachable object says nothing about production.
+
+## 5. #1234 and #1235 are CLOSED — SUPERSEDED
+
+`established fact`, read from the GitHub PR record: both are `state: closed`, `merged: false`.
+
+Three sessions independently produced the **same** #1228–#1231 four-merge restamp from the same
+instruction, in parallel, none aware of the others:
+
+| PR        | Outcome                  | Head        |
+| --------- | ------------------------ | ----------- |
+| **#1232** | **MERGED** as `4f272106` | `4087da639` |
+| **#1234** | **CLOSED — SUPERSEDED**  | `7762b0e9c` |
+| **#1235** | **CLOSED — SUPERSEDED**  | `5882c32d8` |
+
+Cheek's closing instruction, recorded verbatim in effect: do not rebase, do not reopen, and the next
+restamp must cut from `e0e0d699` and record #1232/#1233 rather than re-recording #1228–#1231. **This
+entry is that restamp.** Nothing from `5882c32` was ported.
+
+This is the second time this has happened — `AGENTS.md` already records #1225 as a Claude duplicate
+of #1224. The constitution's rule is the remedy and it held once it was applied: check open and
+recent PRs in the target area **before** building, and surface a collision rather than resolving it
+unilaterally. **Only one implementation of a slice should ever merge.** This slice checked the open
+PR list first and found no competing `CURRENT_STATE.md` restamp before starting.
+
+## 6. Prettier: the lockfile is safe, the declared range is not
+
+`established fact`, measured in this slice against the base file at `68ad14c66a` (564,317 bytes) by
+running each version.
+
+| prettier | output bytes | `NOT_APPLICABLE` / `PASSKEY_` / `sbp_` |
+| -------- | -----------: | -------------------------------------- |
+| 3.7.3    |      564,303 | **corrupted**                          |
+| 3.8.0    |      564,303 | **corrupted**                          |
+| 3.9.0    |      564,317 | intact — byte-identical                |
+| 3.9.6    |      564,317 | intact — byte-identical                |
+
+On **≤ 3.8.0** Prettier mis-parses underscore-heavy inline code as emphasis and rewrites
+`` `NOT_APPLICABLE` `` to `` `NOT*APPLICABLE` `` — a **status-vocabulary term** — along with
+`` `PASSKEY_` `` and `` `sbp_` `` inside a passage about credential redaction. Fixed from **3.9.0**.
+
+**Both lockfiles resolve `prettier@3.9.6`** (`bun.lock` and `package-lock.json`). On a lockfile
+install this file is prettier-clean and the `lint-staged` `prettier --write` on `*.md` is a
+**no-op**.
+
+Consequences, and they are narrow:
+
+- **Do not bypass the pre-commit hook on a lockfile-clean install.** There is nothing to protect the
+  file from; bypassing it skips the docs-safety and type gates for no gain.
+- **Do not "repair" the historical vocabulary.** Rewriting `NOT_APPLICABLE` to `NOT*APPLICABLE` is
+  the corruption, not the fix.
+- **The hazard is the declared range, not the file.** `package.json` declares `"prettier": "^3.7.3"`,
+  a caret span covering both behaviours, so a fresh **non-lockfile** install can land in the broken
+  half and silently mangle status vocabulary. That is how two sessions reached opposite conclusions
+  about the same file on the same day. **Tightening the range is out of scope here** — it is a
+  `package.json` change, not a docs edit, and this slice must not make it.
+
+## 7. `live_` token exposure — class and location only
+
+`session evidence`, carried forward so it does not age out of the current block. **No token bytes are
+reproduced, inspected or recorded here, and none ever should be.**
+
+The `5c197f75` remint injected a payments token of class **`live_`** into **tracked
+`.env.production`**, and made `restore-env-production-from-head` **skippable when Git HEAD is
+missing**. Both changes are carried by the four ahead-commits in section 4.
+
+**Current runtime presence is `NOT_MEASURED`.** This slice did not fetch production, so it cannot
+establish that either is _still_ live. What is established is narrower: the last independent
+measurement, `5c197f75` on 2026-08-31, was of a build containing them. Whether the running build
+still does requires a fresh measurement nobody has taken.
+
+Recorded as an **open exposure**. This slice authorises no revert, no env edit, no restore-script
+patch, no token revoke and no token creation. Paddle live-token creation stays parked on the login
+lockout recorded below.
+
+## 8. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production SQL, no
+  Lovable project-chat agent edit, no alternate publisher path, no retry.
+- **Tolu expected 2026-09-01 — do not ping.** Support outcome stays `NOT_MEASURED`.
+- **Current production divergence is `NOT_MEASURED`.** Against the last-measured live SHA
+  `5c197f75` the graph relationship is 7 behind / **4 ahead** — do not describe that as merely
+  behind, and do not restate it as production's current state. A failure to re-measure is `BLOCKED`,
+  never a product `FAIL`.
+- **An unticked GitHub review box is not missing evidence of a `PASS`.** The reviewers across this
+  run were **Blue Dream (= Dream Queen — one reviewer, alias per CORRECTION 1)** and **Super Blue**.
+  Both are **owner-designated**, not the protocol peer seat.
+- **Do not reopen #1234 or #1235**, and do not port `5882c32`.
+- **Prettier:** lockfile `3.9.6` is a no-op on this file. Do not bypass the hook on a lockfile-clean
+  install, do not repair historical vocabulary, and do not change the `package.json` range here.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.**
+- **#1221 stays draft at `79146c6911`, pending Blue Dream.** Not merged, readied, rebased or updated.
+- **Knowledge-library expansion is on `HOLD`.** No Codex SEO/Wikipedia program is opened here.
+- **Dual-home slice 2 is not approved.**
+- Paddle live token creation and Spider Farmer GGS radio capture remain parked exactly as recorded in
+  the entries below; nothing in this slice touched either.
+- This slice is **N=1** and stays **draft**, on branch `claude/current-state-restamp-e0e0d699`,
+  parented on `e0e0d699`. No ready, merge, publish, rebase or update-branch. No `src/` or `supabase/`
+  change. **Owner: Claude. Independent reviewer, named after the SHA: Dream Queen** — no ready until
+  an independent `PASS`.
+
+**Prior update:** Claude (2026-09-01: **#1228, #1229, #1230 and #1231 merged**; the deploy tip is
+**`68ad14c66a`**. The restore SHA for Tolu moves to that object. **Live is unchanged** — still the
+independently MEASURED dirty remint **`5c197f75`**, not re-measured here. Publish, History-restore
+and APPLY remain blocked; Tolu is expected 2026-09-01 and is **not** to be pinged. Prior header
+follows.)
+
+## 1. Four merges — deploy tip `68ad14c66a`
+
+`established fact`, sourced from the **GitHub PR record** and cross-checked against the commit graph
+and the exact remote branch ref. Every row is a **squash** — one parent each, verified with
+`git rev-list --parents`, subjects ending in their PR number.
+
+| PR        | Merge SHA    | Parent      | Source head | Files | Migrations | Merged (UTC)     |
+| --------- | ------------ | ----------- | ----------- | ----: | ---------: | ---------------- |
+| **#1228** | `6fd48d1cd`  | `a8b4a23ec` | `1f3b35706` |     1 |      **0** | 2026-08-31 20:06 |
+| **#1229** | `47e2588ab`  | `6fd48d1cd` | `5e3c54a70` |     5 |      **0** | 2026-08-31 23:52 |
+| **#1230** | `cc1cd81af`  | `47e2588ab` | `9859a0c85` |     4 |      **0** | 2026-08-31 23:55 |
+| **#1231** | `68ad14c66a` | `cc1cd81af` | `1582d989e` |     2 |      **0** | 2026-09-01 00:27 |
+
+**Deploy tip: `68ad14c66a223d123d7ab263b83cec3fe5d90c8d`**, confirmed as the exact remote
+`verdant-grow-diary` ref by `git ls-remote`. All four were merged by `cheekhimself`.
+
+**Zero migrations across all four** — checked per commit, not assumed.
+
+**One ordering detail worth having on the record.** #1230 was opened against base `6fd48d1cd`
+(#1228), but its **actual merge parent is `47e2588ab`** (#1229): the queue restacked it onto #1229
+rather than onto the base it was opened from. The PR base and the landed parent therefore differ.
+Recorded because a reader reconstructing the chain from PR bases alone would get it wrong.
+
+**Scope, from the PR record:**
+
+- **#1228** — Codex, docs-only restamp of `CURRENT_STATE.md` after #1227 and the Support hold.
+- **#1229** — canonical diary event-type resolver; AI Doctor readiness and Timeline Memory recover
+  Quick Log watering identity. `entry_type` stays authoritative; `details.event_type` is accepted
+  only on an allow-list; malformed details **fail closed**; note text is never parsed.
+- **#1230** — Guided Symptom Check gains an explicit **no visible symptoms** path, persisted as
+  `details.symptom_check_result = no_symptoms_observed`. It is **not** an `observedSign` and is
+  **not** added to the symptom catalog, so guides and evidence cards still fail closed rather than
+  inventing a "healthy" symptom. Choosing both a sign and the box fails closed.
+- **#1231** — clears the sticky `guidedSymptomNoneObserved` control at five reset sites, so a later
+  Symptom Check in the same mount no longer opens with the clean-check box already ticked. Per its
+  own PR body this closes a **P2 raised by Super Blue on #1230**.
+
+## 2. Live is unchanged — still the dirty remint `5c197f75`
+
+`source claim` as to the measurement, carried forward unchanged from the entry demoted below. **No
+production measurement was taken in this slice**, and Claude cannot take one.
+
+Live remains `5c197f7516e65845209c2d3b4a3192cf5848570c`, **`dirty:true`**, ref `master`. Four merges
+have landed on the deploy branch since, so live and the deploy tip are **further apart than before**,
+not closer. **A merge is not a deployment.** The remint is on GitHub but is **not** the
+`verdant-grow-diary` deploy tip; do not rebase this record onto it and do not merge it onto the
+deploy branch.
+
+## 3. Restore SHA for Tolu is now `68ad14c66a`
+
+The requested restore target moves from `a8b4a23e` (recorded in the entry below) to the current exact
+GitHub object **`68ad14c66a223d123d7ab263b83cec3fe5d90c8d`**.
+
+**Tolu is expected 2026-09-01. Do not ping.** No Support outcome exists in the evidence available to
+this slice — that remains **`NOT_MEASURED`**. Do not infer that the Publish block is lifted or that
+production has been restored.
+
+## 4. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production SQL, no
+  Lovable project-chat agent edit, no alternate publisher path, no retry.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Do not implement the unknown-scheme catch-all and
+  do not add a scheme.
+- **#1221 stays draft at `79146c6911`, pending Blue Dream.** It is **not merged**. Not being readied,
+  rebased, updated or merged.
+- **Knowledge-library expansion is on `HOLD`.**
+- **Dual-home slice 2 is not approved.**
+- Paddle live token creation and Spider Farmer GGS radio capture remain parked exactly as recorded in
+  the entry below; nothing in this slice touched either.
+- This slice is **draft**. **No ready until an independent `PASS`.** Reviewer after SHA:
+  **Super Blue**.
+
+**Prior update:** Codex (2026-08-31: **#1227 merged as `a8b4a23e`** and the deploy-branch tip is that
+exact commit. Lovable Support (Tolu) is reviewing the blocked Publish and the dirty remint; Publish
+and agent edits in the Lovable project chat remain on hold until Support writes back. The requested
+restore target is now exact GitHub object **`a8b4a23e`**, `dirty:false`. Live remains independently
+MEASURED at **`5c197f75`**, `dirty:true`; no new production measurement was taken here. Paddle live
+token creation and GGS radio capture are parked as recorded below. Prior header follows.)
+
+## 1. #1227 merged — deploy tip `a8b4a23e`
+
+`established fact`, verified from the GitHub PR record, commit graph and exact remote branch ref in
+this docs-only slice.
+
+| Field       | Value                                                            |
+| ----------- | ---------------------------------------------------------------- |
+| PR          | **#1227 MERGED**                                                 |
+| Merge SHA   | **`a8b4a23ecfca4158394cadc76a28028653eeaa34`**                   |
+| Parent      | `a26b912cc72fb484e7f36a61ed0c91c0faddc90d` (#1226)               |
+| Shape       | **squash** — one parent; subject ends `(#1227)`                  |
+| Source head | `a98d20c07b2e6587ea83fb918844fa5d45be8ae3`                       |
+| Scope       | docs restamp of #1226; `docs/agents/CURRENT_STATE.md` only       |
+| Deploy tip  | **`a8b4a23ecfca4158394cadc76a28028653eeaa34`**, exact remote ref |
+
+The deploy branch did **not** move to `5c197f75`. Do not rebase this record onto that remint and do
+not merge the remint onto `verdant-grow-diary`.
+
+## 2. Lovable Support hold — no outcome yet
+
+`session evidence`, supplied by Cheek. This restamp records the handoff without inventing a Support
+result.
+
+- Lovable Support agent **Tolu** is reviewing both the suspicious-activity Publish block and the
+  `5c197f75` dirty remint.
+- There must be **no further Publish attempt** and **no agent edit in the Lovable project chat** until
+  Support writes back.
+- The requested restore target is the current GitHub object
+  `a8b4a23ecfca4158394cadc76a28028653eeaa34`, `dirty:false` — not only the earlier `a26b912c` tip.
+- Support has not supplied an outcome in the evidence available to this slice. Do not infer that the
+  block is lifted or that production was restored.
+
+## 3. Live remains `5c197f75`, dirty remint
+
+The last independent production measurement remains
+`5c197f7516e65845209c2d3b4a3192cf5848570c`, `dirty:true`, ref `master`. This restamp did not
+re-fetch production. The remint remains on GitHub but is not the `verdant-grow-diary` deploy tip.
+
+## 4. Paddle token creation parked
+
+`session evidence`, supplied by Cheek; no Paddle or Lovable environment operation was performed in
+this slice.
+
+- Creation of a new live client-side token named `verdant-live-20260831` is **parked** because the
+  Paddle login is locked out after a password reset.
+- Do **not** revoke the existing `live_` token.
+- Do not reproduce token bytes and do not write any Lovable environment value.
+
+## 5. Spider Farmer GGS radio parked
+
+`session evidence`, supplied by Cheek and carried into this Verdant docs-only restamp without
+opening or changing the GGS repository.
+
+- `cheekhimself/Spider-Farmer-GGS-Controller-MQTT` PR **#3 MERGED** as
+  `b2ab1a6550ab6e1a7d77889eede65203f92f7485`; the shipped path is FF01 receive-only.
+- Capture remains **`NOT_MEASURED`**.
+- Advertisements matching `MELK-OA21*` and `GVH6013*` are **not GGS**. Do not connect to or promote
+  them as GGS evidence.
+- Do not use FF02, AES or a Verdant sink. Radio work is parked until Cheek uses the other PC tonight.
+
+## 6. Current locks
+
+- **Publish and Lovable project-chat agent edits are BLOCKED** pending Tolu's Support response. No
+  retry or alternate publisher path.
+- **Paddle token creation is PARKED.** Do not revoke the existing `live_` token, write token bytes or
+  change Lovable environment values.
+- **GGS radio capture is PARKED.** No FF02, AES or Verdant sink.
+- **Catch-all / Kerberos / HOBA remain BLOCKED.** Do not add a scheme or implement the unknown-scheme
+  catch-all.
+- **#1221 stays draft and unassigned.** It is not being readied, rebased, updated or merged.
+- **#1225 stays CLOSED — SUPERSEDED.** Do not reopen or rebase it.
+- **No APPLY.** Least of all `20260813030000`. No publish, production SQL or production mutation.
+- This restamp is **N=1** and stays **draft**. No ready, merge, publish, rebase or update-branch. No
+  `src/` or `supabase/` change.
+
+**Prior update:** Codex (2026-08-31: **#1226 merged as `a26b912c`** and the deploy-branch tip is that
+exact commit. Cheek unlocked one production editor Publish attempt for that GitHub object; Lovable
+blocked it with the suspicious-activity tooltip recorded below, and Codex stopped without retrying.
+Live was independently MEASURED at **`5c197f75`**, `dirty:true`, ref `master`; that Lovable remint is
+on GitHub but is **not** the `verdant-grow-diary` tip. Publish stays locked pending Lovable Support.
+Prior header follows.)
+
+## 1. #1226 merged — deploy tip `a26b912c`
+
+`established fact`, verified from the GitHub PR record, commit graph and exact remote branch ref in
+this docs-only slice.
+
+| Field       | Value                                                            |
+| ----------- | ---------------------------------------------------------------- |
+| PR          | **#1226 MERGED**                                                 |
+| Merge SHA   | **`a26b912cc72fb484e7f36a61ed0c91c0faddc90d`**                   |
+| Parent      | `c63f969f05a435e3a62dd281741d2c796dbb454e` (#1224)               |
+| Shape       | **squash** — one parent; subject ends `(#1226)`                  |
+| Source head | `0b9e15284ffb6924f0a870ee9f801f16c02e05b0`                       |
+| Scope       | docs restamp of #1224; `docs/agents/CURRENT_STATE.md` only       |
+| Deploy tip  | **`a26b912cc72fb484e7f36a61ed0c91c0faddc90d`**, exact remote ref |
+
+The deploy branch did **not** move to `5c197f75`. Do not rebase this record onto that remint and do
+not merge the remint onto `verdant-grow-diary`.
+
+## 2. Production Publish — one attempt, blocked, stopped
+
+`session evidence`, recorded from the editor attempt authorised by Cheek for exact GitHub object
+`a26b912cc72fb484e7f36a61ed0c91c0faddc90d`.
+
+- Cheek unlocked production Publish of `a26b912c`.
+- Codex made **one** Lovable editor Publish attempt.
+- The editor returned this exact tooltip:
+
+  > Publishing was blocked due to suspicious activity. Contact support if you believe this is a mistake.
+
+- Result: **FAIL**. Codex stopped. There was no retry, History restore, Ask Lovable, `send_message`,
+  Try to fix, MCP deploy, or other publisher path.
+- Cheek contacted Lovable Support on 2026-08-31 at approximately **11:07 AM CT**. Production Publish
+  stays locked until Support lifts the block.
+
+## 3. Live measurement — `5c197f75`, dirty remint, not the deploy tip
+
+`MEASURED`, supplied by Cheek from an independent read of
+`https://verdantgrowdiary.com/version.json`; this docs-only slice did not re-fetch production.
+
+| Field        | Measured value                               |
+| ------------ | -------------------------------------------- |
+| `commit`     | `5c197f7516e65845209c2d3b4a3192cf5848570c`   |
+| `dirty`      | **`true`**                                   |
+| `ref`        | `master`                                     |
+| `commitTime` | `2026-08-31T15:21:54Z` — **10:21 AM CT**     |
+| `buildTime`  | `2026-08-31T15:23:59.622Z` — **10:23 AM CT** |
+
+GitHub metadata for that SHA was independently verified in this slice without reading its patch
+body:
+
+- GitHub author and committer: `lovable-dev[bot]`; Git author and committer:
+  `gpt-engineer-app[bot]`.
+- Subject: **Hardened restore-env script**; Lovable `ai_update` edit `edt-62eccfff`.
+- Merge parents: `a26b912cc72fb484e7f36a61ed0c91c0faddc90d` and
+  `9d31447aa0c3d1aab87f0a3a9362b29d9bbdf9c9`.
+- The commit exists on GitHub. It is **not** the exact remote head of `verdant-grow-diary`; that head
+  remains `a26b912c`.
+
+The remint injected a payments token of class `live_` into tracked `.env.production` and made
+`restore-env-production-from-head` skippable when Git HEAD is missing. This record deliberately does
+not reproduce or inspect the token bytes. No revert, env edit, or restore-script patch is authorised
+by this slice.
+
+## 4. Current locks
+
+- **Publish is BLOCKED** pending Lovable Support. No retry or alternate publisher path.
+- **Catch-all / Kerberos / HOBA remain BLOCKED.** Do not add a scheme or implement the unknown-scheme
+  catch-all.
+- **#1221 stays draft and unassigned.** It is not being readied, rebased, updated or merged.
+- **#1225 stays CLOSED — SUPERSEDED.** Do not reopen or rebase it.
+- **No APPLY.** Least of all `20260813030000`. No `knk`, `query_database`, production SQL or
+  EcoWitt-to-live.
+- No History restore, Ask Lovable, `send_message`, Try to fix, MCP deploy, revert of `5c197f75`, or
+  patch to `restore-env-production-from-head`.
+- This restamp is **N=1** and stays **draft**. No ready, merge, publish, rebase or update-branch. No
+  `src/` or `supabase/` change.
+
+**Prior update:** Claude (2026-08-30: **#1224 merged as `c63f969f`** — deploy tip is now that commit.
+It closes the **remainder** of a parameterized `Authorization` header for the four reserved schemes
+`Basic|Digest|Negotiate|NTLM`; verified by executing the merged tip, not read from the title.
+**`Kerberos` and `HOBA` still leak their attribute lists** and the unknown-scheme catch-all stays
+`OPEN` — REVIEW ONLY / `BLOCKED`. **#1225 was CLOSED as SUPERSEDED** — Claude built a duplicate of
+#1224. Prior header follows.)
+
+## 1. #1224 merged — deploy tip `c63f969f`
+
+| Field     | Value                                           | How known                          |
+| --------- | ----------------------------------------------- | ---------------------------------- |
+| Merge SHA | **`c63f969f`**                                  | verified, `git log`                |
+| Parent    | `622615d66` (#1223)                             | verified, `git log`                |
+| Shape     | **squash** — one parent; subject ends `(#1224)` | verified, `git rev-list --parents` |
+| Head      | **`a55b12ec`**                                  | **verified twice** — see below     |
+| Owner     | Codex                                           | PR body                            |
+| Reviewer  | **Super Blue** — `PASS` at `a55b12ec`           | reported (Cheek), 2026-08-30       |
+
+Files: `src/lib/ecowittValidationEvidenceRules.ts`, its test, the edge mirror and
+`.sync-manifest.json`. **+9 / −5, zero migrations.**
+
+The head SHA is `established fact` here, not a `source claim` as in the #1222 and #1216 rows above:
+the GitHub API reported `head.sha` while the PR was open, and the squash commit message on the tip
+embeds `a55b12ec7e3c5162d19b0a09be7f6fc534dc705b` verbatim in its Cursor Bugbot line. Two
+independent readings agree.
+
+**The independent reviewer is Super Blue — `PASS` at `a55b12ec`** (Cheek, 2026-08-30). Super Blue is a
+peer, so this slice carries an owner and a different independent reviewer. Recorded as **reported**: as
+with the Dream Queen results in the entries below, no review run is readable from this repository, so the
+provenance is Cheek's report rather than an in-repo artefact.
+
+**Eleventh observed squash outcome** (#1186, #1212, #1213, #1215, #1216, #1217, #1218, #1220, #1222,
+#1223, #1224 — parent counts checked, not inferred). It stays an **observation**: the configured
+merge method remains **`NOT_MEASURED`**, since reading it needs `Administration:read`.
+
+## 2. What #1224 closed — measured on the tip
+
+`established fact`, **executed against `c63f969f`**. The named suite is **63 passed / 0 failed** on
+this tip. The behaviour table below comes from calling `redactEvidenceValue` on the merged tip through
+a temporary probe, removed afterwards; the tree was verified clean before and after.
+
+| Input (string nested under a non-secret key)                                  | Result on `c63f969f`                      |
+| ----------------------------------------------------------------------------- | ----------------------------------------- |
+| `Authorization: Digest username="grower", realm="verdant", nonce="secret"`    | **`[REDACTED]`** — whole header           |
+| `Authorization: NTLM username="grower", realm="verdant", nonce="secret"`      | **`[REDACTED]`** — whole header           |
+| `Authorization: Negotiate username="grower", realm="verdant", nonce="secret"` | **`[REDACTED]`** — whole header           |
+| `Authorization: Negotiate opaque="x", nonce="secret"`                         | **`[REDACTED]`** — whole header           |
+| `Authorization: Basic username="grower", nonce="secret"`                      | **`[REDACTED]`** — whole header           |
+| `Authorization: NTLM TlRMTVNTUAABAAAAB4IIog==`                                | `[REDACTED]` — token-shaped pin holds     |
+| `Authorization: Bearer abc123def456ghi`                                       | `[REDACTED]` — token-shaped pin holds     |
+| `temp_f=77.4 inserted=1 humidity=55`                                          | **unchanged** — benign telemetry survives |
+| `The authorization desk is open, realm="lobby"`                               | **unchanged** — no over-reach on prose    |
+
+The shipped rule adds a repeating comma-separated attribute group and admits `Basic` into the
+parameterized branch:
+
+```
+/Authorization\s*:\s*(?:(?:Basic|Digest|Negotiate|NTLM)\s+[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*')(?:\s*,\s*[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'))*|(?:(?:Basic|Digest|Negotiate|NTLM)\s+)?[^\s",}]+)/gi
+```
+
+Both leftovers recorded in the entry demoted below are **closed**: the remainder after the first
+comma, and parameterized `Basic`.
+
+**Reachability is unchanged and still narrower than it looks:** this regex path runs only on a
+**string nested under a non-secret key**. A top-level string, and any value under an
+`Authorization`-named key, are replaced wholesale before it. Whether real EcoWitt payloads carry the
+leaking shape remains **`NOT_MEASURED`**. Affected surfaces are unchanged — `redacted_raw_payload` in
+the clipboard evidence copy and in the downloaded validation JSON; CSV excludes the raw payload.
+
+## 3. What still leaks — `BLOCKED`, and deliberately so
+
+`established fact`, same probe, same tip:
+
+| Input                                                       | Result on `c63f969f`                           |
+| ----------------------------------------------------------- | ---------------------------------------------- |
+| `Authorization: Kerberos username="grower", nonce="secret"` | `[REDACTED] username="grower", nonce="secret"` |
+| `Authorization: HOBA username="grower", nonce="secret"`     | `[REDACTED] username="grower", nonce="secret"` |
+
+The scheme word alone is consumed by the value-tail branch; the attribute list survives. The scheme
+list is **CLOSED** by design — `Basic|Digest|Negotiate|NTLM` and no more.
+
+**The parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY / `BLOCKED`.** Do not
+implement it. **Do not add `Kerberos`. Do not add `HOBA`.** Adding schemes one at a time is what
+produced #1214, #1216, #1222 and #1224; an open scheme class would consume arbitrary
+`word attr="value"` spans far from any real header. Neither direction is authorised here.
+
+## 4. #1225 CLOSED — SUPERSEDED, and Claude built the duplicate
+
+`established fact`, from the GitHub API and `git log`.
+
+Cheek closed **#1225** unmerged at 03:22:34Z: _"SUPERSEDED by #1224. Same four files, GDP-named Codex
+remainder-attr slice. Do not reopen. Do not rebase onto #1224."_ It is closed, not merged; the branch
+`claude/gdp-parameterized-remainder` is retained at `fd5b3a6ce` and **not** deleted, so the closure
+stays reversible.
+
+|         | #1224 (Codex)         | #1225 (Claude)       |
+| ------- | --------------------- | -------------------- |
+| Opened  | **03:12:39Z**         | 03:17:47Z            |
+| Parent  | `1f68d7d3`            | `1f68d7d3`           |
+| Files   | 4                     | 4 — same closed list |
+| Diff    | +9 / −5               | +73 / −4             |
+| Outcome | **merged `c63f969f`** | **closed unmerged**  |
+
+**The two `Authorization` patterns are byte-identical** — checked with `cmp`, not by eye. Both add the
+same four cases (Digest/NTLM/Negotiate remainder, parameterized `Basic`). Codex extended the existing
+`it.each` table; Claude added a separate block that additionally asserted no component value appears
+in the payload **or the clipboard text**. That extra assertion is the only behavioural difference and
+it is **not** in the shipped tests.
+
+**Why the duplicate existed.** `AGENTS.md` requires checking open PRs for overlapping work before
+starting substantial new work, and requires **surfacing** a collision rather than building a competing
+version. #1224 had been open five minutes when Claude began. Claude did not run that check. Recorded
+as a process failure, not smoothed over; the wasted work is Claude's, and no repository state was
+harmed.
+
+## 5. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No publish, no republish. No EcoWitt-to-live. No rebase. No update-branch.**
+- **Live production** was MEASURED at **`5bf4db1d`** — `dirty:false`, ref **`master`**, GDP,
+  2026-08-29. It is now **seven commits behind the deploy tip** (counted, not estimated) and is
+  **not a current measurement**. Re-measuring needs Cheek or GDP; Claude did not take it and cannot.
+  **A merge is not a deployment.**
+- **#1221 stays draft and unassigned** — open, draft, 16 files, +1440 / −242, based on `d4e5a7ea4`,
+  which is now four commits behind the tip. It is not being readied, rebased or updated.
+- No `knk`. No `query_database`. No production SQL. No device control. No Action Queue write.
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+- `Supabase Preview` failed again on #1225's head with the repo-wide `ai_credit_grants` 42P07 replay
+  collision — **fourteenth** distinct preview project. Non-required, in neither `required` nor
+  `mustBeGreen`, and no branch involved carries a migration. Not commented on, per standing
+  instruction.
+
+**Prior update:** Claude (2026-08-30: **#1222 merged as `1f68d7d3`** — deploy branch is now that tip. It
+redacts the **first quoted attribute** after a `Digest`/`Negotiate`/`NTLM` scheme; **the remainder of
+the header still leaks**, and **parameterized `Basic` still leaks entirely**. Verified by execution
+against the merged tip. The **parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY /
+`BLOCKED`.** Prior header follows.)
+
+## 1. #1222 merged — deploy branch `1f68d7d3`
+
+| Field       | Value                                           | How known                           |
+| ----------- | ----------------------------------------------- | ----------------------------------- |
+| Merge SHA   | **`1f68d7d3`**                                  | verified, `git log`                 |
+| Parent      | `dd2da3404` (#1220)                             | verified, `git log`                 |
+| Shape       | **squash** — one parent; subject ends `(#1222)` | verified, parent count              |
+| Head        | **`e730f26bcdeb`**                              | **reported** — not in this clone    |
+| Dream Queen | **`PASS`**                                      | **reported** — not readable in-repo |
+
+Files: `src/lib/ecowittValidationEvidenceRules.ts`, its test, the edge mirror and
+`.sync-manifest.json`. **Zero migrations.**
+
+## 2. What #1222 fixed, and what it left
+
+`established fact`, **executed against the merged tip `1f68d7d3`** — not read from the title.
+
+The header rule now carries a scheme-and-first-attribute branch ahead of the old value tail:
+
+```
+/Authorization\s*:\s*(?:(?:Digest|Negotiate|NTLM)\s+[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*')|(?:(?:Basic|Digest|Negotiate|NTLM)\s+)?[^\s",}]+)/gi
+```
+
+That branch consumes the scheme **plus one quoted attribute**. Everything after the first comma is
+outside the match.
+
+| Input (string nested under a non-secret key)                               | Result on `1f68d7d3`                          |
+| -------------------------------------------------------------------------- | --------------------------------------------- |
+| `Authorization: Digest username="grower", realm="verdant", nonce="secret"` | `[REDACTED], realm="verdant", nonce="secret"` |
+| `Authorization: NTLM username="grower", realm="verdant", nonce="secret"`   | `[REDACTED], realm="verdant", nonce="secret"` |
+| `Authorization: Negotiate opaque="x", nonce="secret"`                      | `[REDACTED], nonce="secret"`                  |
+| `Authorization: Basic username="grower", nonce="secret"`                   | `[REDACTED]"grower", nonce="secret"`          |
+| `Authorization: NTLM TlRMTVNTUAABAAAAB4IIog==`                             | fully redacted                                |
+
+**Fixed:** the first quoted attribute after `Digest`/`Negotiate`/`NTLM` — `username` in these cases —
+is now redacted where it previously survived. That is a real narrowing.
+
+**The leftover, still leaking:**
+
+- **The remainder of the header.** `realm=` and `nonce=` and every subsequent attribute fall outside
+  the match. A short, non-hex secret in any position after the first survives.
+- **Parameterized `Basic`.** `Basic` is absent from the first-attribute branch, so it falls through to
+  the old tail, which stops at the first quote. Both `username` and `nonce` values survive.
+
+**The parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY / `BLOCKED`.** Do not
+implement. Do not touch `src/` or `supabase/`. **No further scheme is proposed here** — the scheme
+list was never the defect.
+
+**Reachability** is unchanged and narrower than it looks: the regex path runs only on a **string
+nested under a non-secret key**. A top-level string, and any value under an `Authorization`-named key,
+are replaced wholesale. Whether real EcoWitt payloads carry the leaking shape is **`NOT_MEASURED`**.
+
+**Affected surfaces** are unchanged: `redacted_raw_payload` in the clipboard evidence copy and in the
+**downloaded validation JSON**. CSV excludes the raw payload.
+
+## 3. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No publish, no republish. No EcoWitt-to-live. No rebase.**
+- **Live production** was MEASURED at `5bf4db1d` (`dirty:false`, ref `master`, GDP) on 2026-08-29. It
+  is now **several commits behind the tip** and is **not a current measurement**; re-measuring needs
+  Cheek or GDP. Claude did not take it and cannot. **A merge is not a deployment.**
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+
+**Prior update:** Claude (2026-08-30: **the `BLOCKED` marking on the parameterized `Authorization`
+slice is RESTORED** — Cheek, 2026-08-30. The #1217 closure was wrong; Codex raised it as a `P1` and
+the finding is correct. Deploy branch is now **`d4e5a7ea4`** (#1217, #1218 merged). Prior header
+follows.)
+
+## 1. The `BLOCKED` marking is restored — the #1217 closure was wrong
+
+`established fact`, verified by reading all three sites before accepting the finding.
+
+**Status: the parameterized `Authorization` slice is `OPEN` and `BLOCKED` — no independent reviewer
+assigned.** `AGENTS.md` (586-589) requires every assigned slice to name **one owner** and **a
+different peer** as independent reviewer, and states that a slice without one is **incomplete**. This
+slice names an owner (Codex) and no reviewer, so it is **not ready to implement or ship**.
+
+**What #1217 got wrong.** It closed three `BLOCKED — no independent reviewer assigned` labels as
+"stale", on the premise that they gated Digest/Negotiate work already merged in #1214 and #1216. That
+premise is false. All three labels attach to the **parameterized** case, which is still open:
+
+| Site (in the entry demoted by #1217) | What it actually says                                                             |
+| ------------------------------------ | --------------------------------------------------------------------------------- |
+| Entry header                         | "the **parameterized case is OPEN** … `BLOCKED` — **that slice** has no reviewer" |
+| Slice paragraph                      | the `BLOCKED` block sits under "**Codex's slice — not Claude's to fix**"          |
+| Status row                           | "\| **Parameterized** Digest/Negotiate leak \| **OPEN** … `BLOCKED` … \|"         |
+
+#1214 and #1216 closed the **token-shaped** case only. They never addressed what these labels gate,
+so merging them could not make the labels stale. Closing the blocker left an assigned slice with an
+owner, no reviewer and no gate — precisely the state the constitution calls incomplete.
+
+**Provenance, recorded rather than smoothed over.** Cheek instructed the closure on 2026-08-29;
+Claude executed it, having flagged the tension but **not** having checked the staleness premise
+itself — the one part that needed checking, and checkable in the same command that located the sites.
+Codex's `P1` landed on `bfba734f6` at 23:42:30Z, **three minutes after #1217 merged** at 23:39:24Z,
+so there was no window to fix it before it shipped. Cheek instructed the restoration on 2026-08-30.
+
+**Closing the label never closed the leak, and restoring it does not fix the leak.** The parameterized
+case remains **`OPEN` — REVIEW ONLY**. Do not implement. Do not touch `src/` or `supabase/`. **Codex's
+slice.** Codex is **measure-only**; no PR unless a `FAIL` names one scheme and the blob. **Do not
+propose another `Authorization` scheme after NTLM** — the scheme list was never the defect; the value
+tail is.
+
+## 2. #1217 and #1218 merged — deploy branch `d4e5a7ea4`
+
+`established fact`, verified by `git log`, not from webhook events.
+
+| PR        | Merge SHA   | Parents | Shape      | Subject ends |
+| --------- | ----------- | ------- | ---------- | ------------ |
+| **#1217** | `fead4f502` | 1       | **squash** | `(#1217)`    |
+| **#1218** | `d4e5a7ea4` | 1       | **squash** | `(#1218)`    |
+
+#1218 is a **docs-only** read-only test-coverage audit — zero migrations, no `src/` or `supabase/`
+file. **Claude did not open, ready, enqueue or merge it.**
+
+Sixth and seventh observed squash outcomes. They stay **observations**: the configured merge method
+remains **`NOT_MEASURED`** (reading it needs `Administration:read`, which the token lacks).
+
+## 3. Actor events Claude did not perform
+
+`established fact` for the record; **`UNKNOWN`** as to cause — no explanation is inferred here.
+
+Four state changes attributed to `cheekhimself` that this session did not perform. Cheek confirmed
+the first two were not him:
+
+| When      | Event                                                            |
+| --------- | ---------------------------------------------------------------- |
+| 19:34:30Z | #1215 readied                                                    |
+| 21:53:23Z | #1215 converted to draft, silently stripping an armed auto-merge |
+| 23:39:24Z | #1217 readied, **and enqueued at 23:39:25Z — one second later**  |
+| 23:45:24Z | #1218 opened, queued and merged — a PR Claude never opened       |
+
+The first two were reversible; the last two **landed commits on the deploy branch**. Recorded because
+it bears on who is changing operating state, not as a conclusion about cause.
+
+## 4. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No publish, no republish. No EcoWitt-to-live. No rebase.**
+- **Live production was MEASURED at `5bf4db1d`** — `dirty:false`, ref `master`, GDP, 2026-08-29
+  ~22:4xZ. That is a **point-in-time reading and is now three commits behind the tip** (#1216, #1217
+  and #1218 merged after it). **It is not a current measurement**; re-measuring needs Cheek or GDP.
+  Claude did not take it and cannot.
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+- The entry demoted below carries **"No APPLY" twice** in its posture list. Redundant, not incorrect,
+  and **left as-is**: it is superseded text, and this file does not rewrite superseded entries.
+
+**Prior update:** Claude (2026-08-29: #1215 and #1216 merged; deploy branch is now **`5d6efc95a`**.
+#1216 closes **token-shaped NTLM** only — parameterized `Authorization` headers **still leak on the
+current tip across Digest, Negotiate and NTLM**, verified by execution — **OPEN, REVIEW ONLY.** Live
+production is **MEASURED at `5bf4db1d`** (`dirty:false`, ref `master`, GDP) and is **not** the deploy
+tip. Prior header follows.)
+
+## 1. #1215 and #1216 merged — deploy branch `5d6efc95a`
+
+`established fact`, verified by `git ls-remote` and `git log`, not from webhook events.
+
+| PR        | Merge SHA   | Parents | Shape                                  | Subject ends |
+| --------- | ----------- | ------- | -------------------------------------- | ------------ |
+| **#1215** | `5bf4db1d4` | 1       | **squash**; SHA equals its merge group | `(#1215)`    |
+| **#1216** | `5d6efc95a` | 1       | **squash**; SHA equals its merge group | `(#1216)`    |
+
+**#1216 detail** (`source claim`, Cheek, where not independently checkable): merged **`5d6efc95`**
+from head **`358492766`**, parent **`5bf4db1d`**, **Dream Queen `PASS`**. The merge SHA, parent and
+subject are verified here by `git log`; the **head SHA and the Dream Queen result are not** — that PR
+branch was squashed away and is not in this clone, and no Dream Queen run is readable from the
+repository. Recorded as reported, not as measured.
+
+Both went through the merge queue, #1216 stacked on #1215's group. Auto-merge stored `merge_method:
+merge` on #1215; the queue produced a squash. #1215 and #1216 are **two** separate squashes, so they
+are the **fourth and fifth observed outcomes** (#1186, #1212, #1213 were the first three). They stay
+**observations** — the configured method remains `NOT_MEASURED`; reading it needs
+`Administration:read`, which the token lacks.
+
+**Two state changes on #1215 were attributed to `cheekhimself` and were not performed by Claude:**
+the ready at 19:34:30Z, and a **draft conversion at 21:53:23Z** that silently stripped the armed
+auto-merge (GitHub does not restore auto-merge when a PR returns to ready). Cheek confirmed neither
+was him. Claude restored ready and re-armed only after that confirmation. `UNKNOWN`: what actor
+performed them.
+
+## 2. Parameterized `Authorization` — still OPEN on `5d6efc95a`
+
+`established fact`, executed against the current deploy tip, not inferred from the PR title.
+
+#1216 added `NTLM` to the scheme alternation in both the credential-pair lookahead and the header
+regex. **It did not change the value tail `[^\s",}]+`**, which stops at the first quote — so a
+parameterized header is still never consumed whole:
+
+| Input (string nested under a non-secret key)   | Result on `5d6efc95a` |
+| ---------------------------------------------- | --------------------- |
+| `Authorization: Digest username="grower", …`   | **leaks**             |
+| `Authorization: NTLM username="grower", …`     | **leaks**             |
+| `Authorization: Negotiate opaque="x", …`       | **leaks**             |
+| `Authorization: NTLM TlRMTVNTUAABAAAAB4IIog==` | fully redacted        |
+
+```
+OUT: {"request_log":"[REDACTED]\"grower\", realm=\"verdant\", nonce=\"secret\""}
+```
+
+**#1216 is the same shape of partial fix as #1214**: it closes the **token-shaped** case for one more
+scheme and leaves the parameterized case open. Adding schemes does not address the tail. Cheek,
+2026-08-29: **do not invent another Authorization scheme after NTLM.**
+
+**Reachability, unchanged and narrower than it looks.** The regex path runs only on a **string nested
+under a non-secret key**; `redactEvidenceValue` replaces a top-level string wholesale and
+`redactEvidenceNode` replaces any value under an `Authorization`-named key wholesale. Whether real
+EcoWitt payloads carry the leaking shape is **`NOT_MEASURED`**.
+
+**Affected surfaces** — `redacted_raw_payload` in the clipboard evidence copy and in the **downloaded
+validation JSON** (`buildEcowittValidationExport` → `serializeExport` →
+`EcowittIngestValidationPanel.handleConfirmExportJson`, written to disk). The CSV download excludes
+the raw payload.
+
+**Status: `OPEN` — REVIEW ONLY.** Do not implement. Do not touch `src/` or `supabase/`. **Codex's
+slice — not Claude's to fix.**
+
+**The three `BLOCKED — no independent reviewer assigned` sites in the prior entry are CLOSED as
+stale** — Cheek, 2026-08-29. They read as gating Digest/Negotiate work that has since merged
+(**#1214 as `3f95527b`**, and the **NTLM leftover as #1216**), so the gate no longer describes
+anything outstanding. Those sites are **superseded here, not rewritten**: they sit in a demoted
+entry, and this file does not edit superseded text. The parameterized case itself stays **OPEN** —
+closing the stale label does not close the leak.
+
+**Codex is measure-only on `5d6efc95`** — Cheek, 2026-08-29. **No PR unless a `FAIL` names one scheme
+and the blob.**
+
+## 3. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No republish, no publish. No APPLY. No EcoWitt-to-live.**
+- **Live production is MEASURED at `5bf4db1d`** — `dirty:false`, ref `master`, measured by **GDP**,
+  2026-08-29. This supersedes the earlier unmeasured live value carried in this entry. Claude did not
+  take this measurement and cannot.
+- **Live is one commit behind the deploy branch tip.** `5bf4db1d` is #1215's merge; the tip
+  `5d6efc95a` is #1216's. So **#1216 is merged but not published** — verifiable from `git log`, and a
+  direct instance of **a merge is not a deployment**.
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+- Branch-name conflict still open: the harness designates `claude/trustbadge-attachable-strip-2441l2`;
+  descriptive branch names are used instead.
+
+**Prior update:** Claude (2026-08-29: #1213 and #1214 merged. #1213 carried a `P1` — `20260813030000`
+listed among migrations that "remain NOT applied", corrected before merge. #1214 closes the
+Authorization redaction gap for **token-shaped** Digest/Negotiate only; the **parameterized case is
+OPEN**, verified by execution, and **`BLOCKED` — that slice has no independent reviewer assigned**.
+Prior header follows.)
+
+## 1. `20260813030000` — both senses
+
+`established fact`, read from the cited passages and the 2026-08-21 runbook.
+
+| Sense                    | State                                                                     |
+| ------------------------ | ------------------------------------------------------------------------- |
+| GitHub apply lane        | **never succeeded** — only its failed PREFLIGHT exists                    |
+| Production objects       | **applied verbatim 2026-08-21** via Lovable, md5-guarded                  |
+| Current production state | **`NOT_MEASURED`** — not re-measured here; nothing in-repo can measure it |
+| Re-applying it           | **`FORBIDDEN`** — re-issues an unguarded `handle_new_user` over the guard |
+
+A bare "remains NOT applied" for this migration is **false in the direction that licenses an APPLY**.
+The newest entry is the posture an operator reads first, and it reports no `knk` or `query_database`
+access, so a blanket claim there is the sentence that authorises the APPLY. State both senses, every
+time.
+
+`20260827010000`, `20260826100000` and `20260825233000` remain **NOT applied**, plainly.
+
+## 2. #1213 — findings and merge
+
+| Reviewer    | Finding                                       | Time      | Fixed in    |
+| ----------- | --------------------------------------------- | --------- | ----------- |
+| **Copilot** | `20260813030000` listed as bare "NOT applied" | 18:46:53Z | `a57a946ab` |
+| **Codex**   | same defect, rated **`P1`**                   | 18:48:11Z | `a57a946ab` |
+
+Both verified against the cited passages before acceptance; both threads answered and resolved.
+
+Merged **19:01:54Z**. Deploy tip `3afc2df68` → **`0e2cd02ba`**. One file, one parent, subject ends
+`(#1213)`; squash SHA **equals** the merge-group SHA. Zero open threads at merge.
+
+## 3. Required CI did not detect either defect
+
+`practical observation`.
+
+| Head        | Required CI     | Carried             |
+| ----------- | --------------- | ------------------- |
+| `87dcff867` | **35/35 green** | #1212's two defects |
+| `5d034f706` | **35/35 green** | the #1213 `P1`      |
+| `a57a946ab` | **35/35 green** | none                |
+
+CI verifies that the file parses, formats and passes the docs gates. It does not evaluate whether a
+claim is true. Every finding in this sequence was raised after a draft→ready transition, which is
+what triggers Codex review.
+
+## 4. Merge method
+
+`established fact` for the outcomes; `NOT_MEASURED` for the mechanism.
+
+Auto-merge stored `merge_method: merge` despite two explicit `SQUASH` requests — the tool response
+and GitHub's `auto_merge_enabled` event both recorded `merge`.
+
+**Observed:** #1186, #1212 and #1213 each landed as a single squash commit with `(#NNNN)` in the
+subject, each with squash SHA equal to its merge-group SHA.
+
+**Not established:** that the queue squashes regardless, that the stored field is never consulted, or
+what a future queued PR will do. Reading the configured method needs `Administration:read`, which the
+token lacks.
+
+## 5. #1214 — Codex's, merged, and only half the gap
+
+`established fact`, read from the PR and verified by execution on the deploy branch.
+
+**#1214** `codex/ecowitt-digest-negotiate-redaction-20260829`, merged **19:05:50Z** as **`3f95527bf`**.
+Four files, +14/−10, one commit. Tail of the chain **#1207 → #1209 → #1211 → #1214**.
+
+It reserves `Digest` and `Negotiate` in the credential-pair negative lookahead and adds them to the
+`Authorization:` prefix alternation, with cases added to the existing matrix and the `_shared` mirror
+regenerated.
+
+**The parameterized case is OPEN.** The value pattern is
+`/Authorization\s*:\s*(?:(?:Basic|Digest|Negotiate)\s+)?[^\s",}]+/gi`; `[^\s",}]+` stops at the first
+quote, so a parameterized header is not consumed whole:
+
+```
+IN : Authorization: Digest username="grower", realm="verdant", nonce="secret"
+OUT: [REDACTED]"grower", realm="verdant", nonce="secret"
+```
+
+RFC-shaped headers redact their sensitive parameters via the **generic hex-shape rules** (`nonce`,
+`response`, `opaque` are long hex), not via anything #1214 added; short or non-hex values survive.
+#1214's added test covers only the token-shaped form (`Digest <base64>`), which redacts fully.
+
+Affected surfaces: `redacted_raw_payload` in the clipboard evidence copy **and in the downloaded
+validation JSON** (`buildEcowittValidationExport` → `serializeExport` →
+`EcowittIngestValidationPanel.handleConfirmExportJson`, a file written to disk). The CSV download
+excludes the raw payload — `CSV_HEADER` carries no such column.
+
+Reachability, verified by execution: the regex path runs only on a **string nested under a
+non-secret key**. `redactEvidenceValue` replaces a top-level string wholesale, and
+`redactEvidenceNode` replaces any value under an `Authorization`-named key wholesale; both return
+`[redacted]` with nothing surviving. The leak needs a shape such as
+`{ request_log: "…Authorization: Digest …" }`, which serialized to the JSON download as:
+
+```
+"redacted_raw_payload": { "request_log": "POST /ingest\n[REDACTED]\"grower\", realm=\"verdant\", nonce=\"secret\"\nbody=1" }
+```
+
+Whether real EcoWitt payloads carry that shape is `NOT_MEASURED`. **Codex's slice — not Claude's to
+fix.**
+
+**`BLOCKED` — no independent reviewer assigned.** `AGENTS.md` (lines 586-589) requires every assigned
+slice to name **one owner** and **a different peer** as independent reviewer, and states that a slice
+without one is **incomplete**. This slice names an owner and no reviewer, so it is **not ready to
+implement or ship**. Codex raised this on #1215; naming the reviewer is Cheek's call, not Claude's,
+and the label records the gap rather than closing it. Cheek instructed the `BLOCKED` marking on
+2026-08-29; the reviewer assignment itself remains outstanding.
+
+No collision with this file: #1214 touches `src/lib/ecowittValidationEvidenceRules.ts`, its test, the
+mirror and the sync manifest. Its body records _"Behind tip `3afc2df68` by CURRENT_STATE.md only. Do
+not rebase"_.
+
+## 6. Assignment
+
+**The `AGENTS.md` `FORBIDDEN` alignment slice is NOT Claude's** — Cheek, 2026-08-29. Do not open,
+prepare or stage it. The gap is unchanged: two merged ledgers declare `FORBIDDEN`, the constitution
+does not, and closing it means a twelve-file `Sentinel-Version` bump under `sentinel-version-parity`.
+
+## 7. Status
+
+| Item                                | Status                                                                                                         |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| #1213 `#1212`-findings entry        | **MERGED** `0e2cd02ba` — verified on the tip by execution                                                      |
+| #1214 Digest/Negotiate redaction    | **MERGED** `3f95527bf` (Codex's). **Token-shaped only — parameterized is OPEN**                                |
+| Parameterized Digest/Negotiate leak | **OPEN** on `3f95527bf`; Codex's slice. **`BLOCKED` — no independent reviewer assigned**                       |
+| `AGENTS.md` `FORBIDDEN` gap         | **OPEN, and not Claude's to close**                                                                            |
+| Superseded `LIVE`/`FORBIDDEN` entry | its Codex `P2` stays **OPEN on purpose**; not rewritten                                                        |
+| Merge method                        | three squash outcomes observed; configured method **`NOT_MEASURED`**                                           |
+| `Supabase Preview` 42P07            | red repo-wide across **ten** distinct preview projects; non-required, not a gate                               |
+| Branch-name conflict                | **with Cheek.** Harness designates `claude/trustbadge-attachable-strip-2441l2`; descriptive names used instead |
+
+## 8. `NOT_MEASURED`
+
+- **Production.** The deploy branch is **`3f95527bf`** as of 19:05:50Z. A merge is not a deployment;
+  no publish was performed or authorized this shift. Re-verify the tip rather than citing this line.
+- **`20260813030000` current production state** — see `## 1`. Applied 2026-08-21; not re-measured
+  since; re-apply **`FORBIDDEN`**.
+- Whether real EcoWitt payloads carry **parameterized** `Authorization: Digest`/`Negotiate` headers.
+  Execution shows the sanitizer leaks non-hex quoted values in that shape; production traffic was not
+  measured, so real-world frequency is unknown.
+- The repository's configured merge method — inferred from three outcomes; the ruleset was not read.
+- Bugbot's finding-level coverage beyond the heads checked. Observed usage-limited on every head of
+  Claude's own PRs inspected — #1204 `dae0cbb8a`, #1186 (four), #1212 (three), #1213 (two), #1215 —
+  with no head found where it ran. Codex's PRs were not inspected for Bugbot state.
+
+## 9. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added.
+`AGENTS.md` untouched. No strip file touched. `vsrc` not implemented.
+
+**Prior update:** 2026-08-29 UTC (~18:25 UTC)
+**Updated by:** Claude (2026-08-29: **#1212 corrected the Bugbot coverage line — and the version
+readied for review was itself wrong, in two independent ways, on a head that was 35/35 green.**
+Copilot and Codex caught an OVERCORRECTION: I declared a true-but-unqualified claim false. A third
+Codex `P2` caught me quoting a SUPERSEDED interim note as standing guidance. All three confirmed by
+execution, fixed, and merged with zero open threads. Prior header follows.)
+
+## 1. What #1212 set out to fix, and what it got wrong
+
+`established fact`, established by reading the cited passages, not from the PR bodies.
+
+#1186's entry carried this in its `## 5` review-coverage bullet, and it went live on the deploy
+branch when #1186 merged at 16:32Z:
+
+> **Bugbot** hit the Cursor usage limit, as it did on **every head of every PR tonight**, unbroken —
+> and that one _is_ an absence.
+
+I raised it myself: Bugbot's **summary** surface had completed on #1204's `dae0cbb8a`, which sat
+against the word "unbroken". #1212 was cut to fix that.
+
+**The first cut fixed it in the wrong direction.** It declared the claim **false** and marked the row
+**Withdrawn**. That inference does not hold, and this file already said so twice.
+
+## 2. The three findings — all confirmed against the file before being accepted
+
+| #   | Reviewer       | Finding                                                                                                                         | Fixed in    |
+| --- | -------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | **Copilot**    | Summary completion does not disprove a finding-level usage-limit result; reframe around surface ambiguity                       | `8ad3aa4ce` |
+| 2   | **Codex `P2`** | Withdraws the all-head claim **without identifying any head whose finding-level review actually ran**                           | `8ad3aa4ce` |
+| 3   | **Codex `P2`** | The 2026-08-28 warning quoted as "standing" is **provisional** — its next paragraph is _"Resolved at 18:28 by a better source"_ | `9b3ce03c0` |
+
+Findings 1 and 2 are the same defect found independently. Finding 3 is **separate**.
+
+## 3. The defect: overcorrection, and the file predicted it
+
+A completed **summary** and a usage-limited **finding-level** run are **compatible outcomes**. This
+file states it twice — _"a body summary is not a finding-level pass"_ — and the second passage
+anticipates exactly the mistake:
+
+> A reader who checks #1170 against the heading above will see that block and conclude this section
+> is wrong. **It is not.**
+
+I was that reader. I found the summary in #1204's body and concluded the row was false.
+
+Read of the finding-level run, the original claim is **supported**: that run posted _"couldn't run —
+usage limit reached"_ on every head checked — `dae0cbb8a` 10:58:07Z, #1186 at 12:08:03Z / 12:16:31Z /
+12:26:14Z / 15:46:07Z, #1212's own head 17:58:51Z. **No head was found whose finding-level review
+ran**, which is precisely why withdrawal was unjustified. Its real defect is that it **named no
+surface**.
+
+**Overcorrecting a true-but-unqualified claim into a false one is not an improvement on the
+ambiguity — it is a worse defect wearing the costume of rigour.** The remedy for an unqualified
+claim is to qualify it, not reverse it.
+
+## 4. The third finding is its own lesson
+
+The line I quoted as _"a standing warning still in this file"_ sits inside a block ending
+**`Unresolved`**, and the very next paragraph is headed **"Resolved at 18:28 by a better source"** —
+the Cursor Approval Agent's _"Cursor Bugbot skipped (incomplete)"_, which closed it.
+
+So an **interim state was quoted as a rule**, inside a correction whose entire subject is not
+misreading this file's own record. The resolved conclusion is what is now cited. The `#1170` passage
+is **not** part of that superseded block and still stands.
+
+## 5. Green CI did not catch any of it — and readying is what did
+
+`practical observation`, and it is the most transferable item here.
+
+**All 35 required contexts were green on `87dcff867`**, the head carrying both defects. CI cannot
+evaluate whether a claim about review coverage is true; it can only prove the file parses, formats
+and does not trip the docs gates. **Green CI is not review**, and for a prose governance file the gap
+between the two is total.
+
+The findings arrived **only because the PR was readied** — Codex triggers on draft→ready, and before
+that moment `get_reviews` on #1212 returned empty. Had it merged from draft on the strength of 35/35,
+the deploy branch would now carry a false claim **inside a correction about false claims**.
+
+## 6. A cost I caused, recorded because it was avoidable
+
+The two fixes went out as two pushes ~90 seconds apart. The second superseded the first's in-flight
+run, so `Typecheck + production build` was **`cancelled`** on `8ad3aa4ce` and `Publish preview status
+to PR` failed as a consequence. Both are **non-required**, both were confined to the superseded head,
+and both passed clean on `9b3ce03c0`. Self-inflicted; one commit would have avoided it.
+
+## 7. Merge facts, verified by execution
+
+Tip chain: **`4e3e715ab`** (#1186, 16:32Z) → **`f5fd474ef`** (#1211, sensors) → **`3afc2df68`**
+(#1212, 18:22Z). Re-verify with `git ls-remote` rather than citing this line.
+
+- For **both** #1186 and #1212 the **squash SHA equals the merge-group SHA** — no queue
+  re-resolution; what merged is what the queue tested.
+- **#1212 merged with zero open threads** — the first of my merges this shift to do so. #1203, #1204,
+  #1206, #1208 and #1186 each landed carrying at least one open finding.
+- #1211 touched product code only and shared no file with #1212; being behind the tip was never a
+  conflict and no rebase was performed.
+
+## 8. Status
+
+| Item                                     | Status                                                                                                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| #1212 Bugbot coverage correction         | **MERGED** `3afc2df68` — verified on the tip by execution                                                                                                                            |
+| #1186 `CURRENT_STATE` corrections        | **MERGED** `4e3e715ab`, carrying one open thread by instruction                                                                                                                      |
+| `AGENTS.md` does not declare `FORBIDDEN` | **OPEN — the oldest unclosed thread of this shift.** Two merged ledgers use a status the constitution does not carry                                                                 |
+| `FORBIDDEN` alignment slice              | **proposed, NOT opened** — twelve-file `Sentinel-Version` bump; needs its own review                                                                                                 |
+| Superseded `LIVE`/`FORBIDDEN` entry      | its Codex `P2` stays **OPEN on purpose**; not rewritten                                                                                                                              |
+| Branch-name conflict                     | **with Cheek.** Harness designates `claude/trustbadge-attachable-strip-2441l2`; descriptive names used instead, since that name denotes a different slice and strip files are fenced |
+| `Supabase Preview` 42P07                 | red repo-wide across **eight** distinct preview projects; non-required, absent from the ruleset, not a gate                                                                          |
+
+## 9. `NOT_MEASURED`
+
+- **Production.** The deploy branch is **`3afc2df68`** as of 18:22Z. **A merge is not a deployment**;
+  no publish was performed or authorized this shift. Re-verify the tip rather than citing this line.
+- **Migrations — stated in both senses, because a bare "not applied" is false in the dangerous
+  direction.** `20260827010000`, `20260826100000` and `20260825233000` remain **NOT applied**, plainly.
+  **`20260813030000` is not like them**: its **GitHub apply lane never succeeded**, but its
+  **production objects were applied verbatim on 2026-08-21** through Lovable, md5-guarded. Its
+  **current** production state is **`NOT_MEASURED`**, and re-applying it is **`FORBIDDEN`** — it would
+  re-issue an unguarded `handle_new_user` over the live guard.
+
+  **Corrected 2026-08-29 after Copilot raised it on #1213.** This bullet first listed all four
+  together as bare "NOT applied" — **the identical defect this file already records me making**,
+  caught then by Copilot and Codex on #1200 and corrected at 09:55Z as _"false in the dangerous
+  direction"_. I reproduced it in the very file that documents it, one section below a passage titled
+  _"The `20260813030000` error — mine, propagated, and in the dangerous direction"_. The three-plus-one
+  split above is the form that cannot be misread; the flat list is the form that reads as licence to
+  APPLY.
+
+- Whether Bugbot's summary output derives from the **diff** or restates the **PR body**. Its content
+  appears in both, so what is established is that one surface emitted content and the other did not —
+  **not** that anything reviewed the change.
+- Whether any reader acted on the defective #1212 first cut. `87dcff867` was the PR head for roughly
+  **66 minutes** (pushed ~16:58Z, superseded by `8ad3aa4ce` at ~18:04Z), of which about **5** were as
+  a _ready_ PR — readied 17:58:39Z, first finding filed 18:01:12Z. It never reached the deploy branch.
+- How many times this file has now contradicted a passage it already contains. **No ordinal is
+  asserted**: an earlier entry miscounted exactly that kind of running total, and the count is not
+  what carries the lesson.
+
+## 10. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added.
+`AGENTS.md` untouched. No strip file touched. `vsrc` not implemented and not inferred.
+
+**Prior update:** 2026-08-29 UTC (~15:15 UTC)
+**Updated by:** Claude (2026-08-29: **#1206 shipped a real defect of mine and #1208 closed it. Two
+rows of the sandbox ledger had their answer in an INFORMAL Status cell; #1206 replaced both with
+declared labels that answer different questions, and its body claimed in bold "No claim is changed"
+— true for one row, false for two.** The worse of the two let an UNMEASURED apply state read as
+settled, in a ledger built to prevent an accidental APPLY. Prior header follows.)
+
+## 1. What #1206 actually broke
+
+`established fact`, established by diffing each row against its parent, not from either PR body.
+
+#1206's premise was that three Status cells were "informal" and should move onto declared
+vocabulary. For one row that was right. **For two rows the informal cell WAS the answer to its own
+Check**, and replacing it with a declared label moved the answer into Notes and put a different
+question's answer in its place.
+
+| Check                                 | Before #1206                              | #1206 shipped        | Wrong how                                        |
+| ------------------------------------- | ----------------------------------------- | -------------------- | ------------------------------------------------ |
+| Three claimed 20260826 applies in git | `FAIL` (as git presence)                  | **`FAIL`**           | **Correct** — `FAIL` answers "are they in git?"  |
+| Scope of claimed applies              | ``sandbox-only (`bzatgtgjvuojpoxcknaa`)`` | **`NOT_APPLICABLE`** | Denies a question that applies and has an answer |
+| Group C applied                       | `not applied; deferred per writeup`       | **`FORBIDDEN`**      | Answers "may it be performed?", not "was it?"    |
+
+**The Group C row is the one with consequence.** "Not applied" rests on the advisor writeup's claim,
+not a measurement — and that same table already draws the line (`Live knk ACL for grant_* |
+NOT_MEASURED`). A prohibition standing where an observation belongs lets an **unmeasured apply state
+read as settled**. In an anti-APPLY ledger that is the wrong direction to be wrong in.
+
+Both were filed as Codex `P2`s **while #1206 sat in the merge queue**, so the branch was locked and
+the standdown forbade restamping. #1206 merged carrying both. Their threads were marked resolved by
+someone other than me; **resolution is not repair**, and the defects were live on deploy until
+#1208.
+
+## 2. My own overclaim, and the correction
+
+#1206's description said, in bold, **"No claim is changed."** That is true for the git-presence row
+and **false for the other two** — both now assert something different from what they asserted
+before. I also wrote that the scope row "was already carrying its real status in the Notes column",
+which **inverts** what the two cells were doing: the Status held the answer, Notes held a
+consequence.
+
+That is the third internal-contradiction of this shift, after the two conflicting drift baselines on
+#1203 and the stale deploy tip. The pattern is consistent enough to name: **when a cell looks
+informal, check whether it is answering its own question before replacing it.**
+
+## 3. #1208 closed both — verified on the tip
+
+`established fact`, verified on `675e5a512` by execution.
+
+| Check                    | Status now         | Notes                                                                                            |
+| ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------ |
+| Scope of claimed applies | **`PASS`**         | Sandbox-only `bzatgtgjvuojpoxcknaa`, not knk. Evidence of the claims' scope, not their execution |
+| Group C applied          | **`NOT_MEASURED`** | Writeup says "not applied; deferred" — a claim, not a measurement                                |
+| Apply Group C            | **`FORBIDDEN`**    | Do not apply                                                                                     |
+
+The prohibition **moved onto the operation it forbids**, which is `FORBIDDEN`'s declared meaning, so
+the hard stop is stronger rather than weaker. One file, +12/-11, zero migrations, count **278**. No
+new vocabulary word was invented.
+
+## 4. #1208's first cut over-scoped, and Cheek reverted it
+
+`practical observation`, worth keeping because the correction came from the owner, not a reviewer.
+
+My first cut (`0756da6ac`) rewrote the scope Check into an asserted proposition, moved the bzat id
+into the Check column, and **added a `Claimed applies apply to knk …` → `NOT_APPLICABLE` row nobody
+asked for**. The assigned shape was narrower: keep the Check, make Status the verification result,
+keep the bzat id in Notes, one row. Aligned in `25a020e14`.
+
+**Then I left the PR description describing the reverted shape.** Copilot caught that the body
+claimed a two-row Check rewrite the diff does not contain. Fixed by editing the description only —
+no SHA change, no restamp, no rebase, queue position undisturbed. Fixing the code and forgetting the
+prose that describes it is its own failure mode, and it is now on the record twice in one shift.
+
+## 5. #1208 merged with one open thread, and that one is adjudicated
+
+`inference`, stated as a disposition rather than a defect.
+
+Copilot's residual: with the Check left open-ended (`Scope of claimed applies`), `PASS` reports
+**that** the scope was verified while **what it is** sits in Notes. The point is fair. Closing it
+needs either an invented vocabulary word or the Check rewrite the owner had just reverted — both out
+of scope — so it was explained and left open.
+
+It is categorically milder than what it replaced: `NOT_APPLICABLE` **denied a question that
+applies**, which is contradictory; `PASS` on an open-ended Check is **incomplete**, never false, with
+the answer one column away. **Trading a contradiction for a documented incompleteness is the
+improvement available inside the assigned scope.**
+
+## 6. Deploy tip chain, verified by `git log`
+
+`984dcf230` -> `ce2552983` (#1207) -> `ad80065bf` (#1206) -> `d4dc5bd6f` (#1209) -> **`675e5a512`**
+(#1208), as of **15:14Z**. **Re-verify with `git ls-remote` rather than citing this line.**
+
+Recorded without a claim attached: **#1207 and #1209 carry the same subject** —
+`fix(sensors): fail-closed multi-reading validation-evidence redaction`. Neither is Claude's and
+neither was inspected here; whether that is a re-land, a split, or a duplicate is **`UNKNOWN`**.
+
+## 7. Status
+
+| Item                            | Status                                                                            |
+| ------------------------------- | --------------------------------------------------------------------------------- |
+| #1206 sandbox-ledger vocabulary | **MERGED** `ad80065bf` — shipped two defective rows                               |
+| #1208 Status-answers-Check fix  | **MERGED** `675e5a512` — both closed, verified on the tip                         |
+| #1208's residual Copilot thread | **OPEN**, adjudicated: no invented vocab, no Check rewrite                        |
+| #1204's two `AGENTS.md` threads | **OPEN on the deploy branch** by design                                           |
+| `FORBIDDEN` in `AGENTS.md`      | **still absent** — alignment slice proposed, NOT opened                           |
+| #1186 `CURRENT_STATE`           | open; its head moves with every entry, so re-verify rather than citing a SHA here |
+
+## 8. `NOT_MEASURED`
+
+- **Production.** `675e5a512` is the deploy branch as of 15:14Z. A merge is not a deployment; no
+  publish performed or authorized.
+- Whether any operator read the `FORBIDDEN` Group C row as a settled apply state during the ~42
+  minutes it was live on deploy (13:44Z to ~14:26Z).
+- Whether Group C was in fact applied to sandbox. The ledger carries the writeup's claim only, which
+  is exactly why that row is now `NOT_MEASURED` rather than a verdict.
+- Which check dequeued #1203 at 10:13:23Z. Still `UNKNOWN`, not `NOT_MEASURED` — both surfaces were
+  measured and neither named it.
+
+## 9. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added —
+count stays **278**. `AGENTS.md` untouched. No strip file touched. No new cut opened.
+
+**Prior update:** 2026-08-29 UTC (~11:10 UTC)
+**Updated by:** Claude (2026-08-29: **#1204 merged as `d80ad94b2`, closing the Codex `P2` that #1203
+merged with open — `FORBIDDEN` is now a declared status in both apply ledgers. It merged carrying
+TWO open Copilot threads, the SEVENTH merge with an open finding, and the FIRST where that was an
+argued position rather than a race casualty.** The finding was recorded in the PR body before the
+reviewer raised it. Prior header follows.)
+
+## 1. #1204 merged — `FORBIDDEN` is a real status on the deploy branch
+
+`established fact`, verified on the deploy tip by execution, not from the PR body.
+
+Merged ~11:04Z. Deploy tip `cc0b7bd3f` -> **`d80ad94b2`**, the merge-group commit itself.
+
+| Check on the tip                                  | Result                |
+| ------------------------------------------------- | --------------------- |
+| Files changed                                     | **2**, +47/-45        |
+| Files under `supabase/migrations/`                | **0**                 |
+| Migration count                                   | **278**               |
+| `FORBIDDEN` declared in both ledger vocabularies  | **yes**, one row each |
+| `NOT_APPLICABLE` / forbidden composites remaining | **0**                 |
+
+The label as declared, identically in both files:
+
+> `FORBIDDEN` — The operation is available and must not be performed — **not** `NOT_APPLICABLE`,
+> which means the check does not apply at all.
+
+The contrast is stated **at the point of definition** so the conflation cannot be repeated by
+someone reading only the vocabulary. Every Notes cell is byte-identical to its previous text: the
+hard stop was not softened into Notes, it was promoted from a composite into a declared label.
+
+## 2. It merged carrying two open Copilot threads — and that was a decision, not a miss
+
+`established fact` for the finding; `inference` for the disposition.
+
+Copilot filed the same finding on both files
+(`discussion_r3886407209`, `discussion_r3886407189`): **`FORBIDDEN` is absent from `AGENTS.md`'s
+status vocabulary**, which declares eight values — `PASS`, `FAIL`, `BLOCKED`, `NO_BASELINE`,
+`NO_DATA`, `NOT_MEASURED`, `SKIPPED`, `NOT_APPLICABLE`. The finding is **correct**. Its remedy —
+"add it to the canonical governance vocabulary and required mirrors in the same slice" — was
+declined, for reasons in this order:
+
+1. **Scope was assigned, not chosen.** N=2, `AGENTS.md` explicitly excluded by Cheek.
+2. **"Same slice" is not a small ask.** `AGENTS.md` is one of **twelve** version-locked governance
+   files. One vocabulary row means a twelve-file `Sentinel-Version` bump under
+   `sentinel-version-parity` (PARITY, MIRROR, BUMP), plus `GEMINI.md`'s `SENTINEL-CORE` staying
+   byte-equivalent. Bundling it would have flipped this PR's own sentinel gate from _0 governance
+   files changed_ to twelve — a materially different diff than the one that went green.
+
+**The direction of the defect matters, and the reviewer's framing inverted it.** Copilot called this
+"two conflicting status contracts". Before #1204 the ledgers used `NOT_APPLICABLE` — defined as _"the
+check does not apply to this target"_ — for prohibitions. That was a **contract violation**: one word
+carrying two incompatible meanings, the dangerous one reading a hard stop as an inapplicable row.
+What exists now is a **gap**: a local label the constitution has not yet adopted, visible,
+documented, and impossible to misread as permission. Trading a collision for a documented gap is the
+improvement. A gap a reviewer can see beats a collision a reviewer cannot.
+
+Both threads were replied to and **deliberately left open**. Resolving them would have been false
+tidying — the rule is to resolve only what was addressed.
+
+**Seventh merge with an open finding**, after #1187, #1189, #1170, #1199, #1200, #1203. It is the
+first of the seven where the open finding was **known and argued in the PR body before the reviewer
+raised it**, rather than a race casualty. Severity has fallen from a live credential leak to an
+un-adopted vocabulary row.
+
+## 3. The race cost nothing on #1204 — the first clean pass of the loop
+
+`established fact`, from timestamps.
+
+| Event                            | Time      |
+| -------------------------------- | --------- |
+| Required CI green (35/35)        | 10:50:37Z |
+| Readied                          | 10:57:57Z |
+| Enqueued                         | 10:57:58Z |
+| Codex review completed **clean** | 10:58:51Z |
+| Copilot threads filed            | 10:59:51Z |
+| Merged                           | ~11:04Z   |
+
+CI was green **seven minutes before** the enqueue, and Codex cleared the exact merging SHA. The
+enqueue-then-review race still fired in form — Codex triggers on draft-marked-ready — but it cost
+nothing, because the review finished before the merge and found nothing. Contrast #1203, where the
+only reason a fix could land was an accidental 48-second dequeue.
+
+The mechanism is still unchanged and still unfixed: **separating the ready and enqueue gestures
+remains the only real remedy.** #1204 is evidence that the race is survivable when CI is already
+green and the reviewer is fast, not evidence that it is closed.
+
+## 4. `Supabase Preview` is permanently red repo-wide — four preview projects
+
+`established fact`, and new since the prior entry, which recorded only three heads of one PR.
+
+| PR    | Preview project        | Diff type | Result |
+| ----- | ---------------------- | --------- | ------ |
+| #1204 | `pxcolzcdbitqgdcpzmtv` | docs-only | 42P07  |
+| #1186 | `cssyuwfpswrztleslkkw` | docs-only | 42P07  |
+| #1203 | `litngfnnubyfrrktykqr` | docs-only | 42P07  |
+| #1202 | `rixddyzvmqlcpxjappqo` | product   | 42P07  |
+
+Byte-identical `ERROR: relation "ai_credit_grants" already exists (SQLSTATE 42P07)` across **four
+distinct preview projects**, three docs-only diffs and one product diff. Every fresh preview branch
+replays committed history from scratch and hits the same duplicate `CREATE TABLE`. The failure is a
+property of **the branch being new**, not of anything any PR changed.
+
+Already declared in `config/local-supabase-replay-compatibility.json` (canonical
+`20260721103000_ai_credit_grants.sql`, duplicate `20260721182752_4fc51714-…`, SQLSTATE named verbatim
+in its `reason`) — but that config governs the **local** replay preparer, and the **hosted Preview
+lane does not read it**. Not in the ruleset: #1202, #1203 and #1204 all merged with it red.
+
+**The consequence worth acting on eventually:** a check red on every branch regardless of content has
+stopped carrying information. Remedy is either extending the replay-compat mechanism to the hosted
+lane or retiring that lane as a check. **Not opened** — it is a slice decision, not a docs edit.
+
+## 5. Parked, and whose it is
+
+- **The `FORBIDDEN` alignment slice** — `AGENTS.md` plus the eleven mirrors, one vocabulary row, one
+  `Sentinel-Version` bump via `scripts/sync-sentinel-mirror.mjs`. Argued in #1204's body and in both
+  thread replies. **Not opened.**
+- **Three non-status cells in the sandbox ledger** — `FAIL (as git presence)`,
+  `sandbox-only (bzatgtgjvuojpoxcknaa)`, `not applied; deferred per writeup`. Same defect class,
+  flagged in #1204's body, outside its N=2 scope. Cheek: these **collide with #1204**, and now that
+  `dae0cbb8a` is merged, **GDP names that follow-up from the #1204 squash.** Not Claude's to open,
+  prepare, or stage.
+- **Review coverage on #1204**, stated per reviewer because the earlier wording inverted it:
+  **Copilot** was the only reviewer to produce findings — the two `AGENTS.md` vocabulary threads,
+  correct and still open on the deploy branch. **Codex** ran on the merging SHA `dae0cbb8a` and
+  completed **clean** at 10:58:51Z; that is a pass, and a pass is not an absence of review.
+  **Bugbot** produced **no finding-level review** — its run posted _"couldn't run — usage limit
+  reached"_ at 10:58:07Z on `dae0cbb8a`, and the `Cursor Bugbot` check concluded `neutral`. That
+  absence is real, and it is the part that matters for coverage. **But Bugbot was not silent on
+  #1204:** its **summary** surface completed on the same SHA and is still in the PR body — a
+  substantive "Low Risk" overview naming the `FORBIDDEN` / `NOT_APPLICABLE` contrast, the deliberate
+  `AGENTS.md` gap, and the prettier column padding. Two surfaces, two outcomes, one SHA.
+
+**Corrected 2026-08-29 on a follow-up branch cut from `4e3e715ab` after I raised the discrepancy
+myself — then corrected a second time on the same branch after Copilot caught the first
+correction.** The bullet above originally read _"**Bugbot** hit the Cursor usage limit, as it did on
+**every head of every PR tonight**, unbroken — and that one is an absence."_ **Its defect is that it
+is unqualified, not that it is false.** It names no surface. Read of the **finding-level** run — the
+surface that decides review coverage — it is **supported**: that run posted _"couldn't run — usage
+limit reached"_ on every head checked, `dae0cbb8a` included. Read of Bugbot as a whole, it invites
+the conclusion that nothing Bugbot-shaped happened, which the completed summary contradicts. **The
+fix is to name the surface, not to withdraw the claim.**
+
+**My first attempt at this correction asserted that "unbroken" was false — the same error one level
+up.** A completed summary and a usage-limited finding-level run are **compatible outcomes**, and this
+file already says so twice: _"a body summary is not a finding-level pass."_ The second of those
+passages carries the exact warning I then walked into — _"A reader who checks #1170 against the
+heading above will see that block and conclude this section is wrong. **It is not.**"_ I was that
+reader: I found the summary in #1204's body and concluded the row was false. Overcorrecting a
+true-but-unqualified claim into a false one is not an improvement on ambiguity; it is a worse defect
+wearing the costume of rigour. Caught by **Copilot** on #1212, confirmed against both cited passages
+before being accepted.
+
+**Scope of what the summary proves is narrower than it looks.** Its overview restates points that
+also appear in #1204's PR body, so whether it derives from the diff or from the body is
+**`NOT_MEASURED`**. What is established is that the summary surface **ran and emitted content** while
+the finding-level surface did not — not that anything reviewed the change.
+
+**Why this matters beyond the sentence — it went wrong twice, in opposite directions.** This file had
+**already** separated the two surfaces, in the **2026-08-28** entry, resolved there by a better
+source: the Cursor **Approval Agent**'s _"Cursor Bugbot skipped (incomplete)"_, reconciling a summary
+that completed against a finding-level run that did not. **That resolution is the operative
+conclusion, and it is what should be cited.** The same passage's earlier line — _"Do **not** record
+either that a finding-level review definitely ran or that it definitely did not"_ — was the
+**interim** state, marked `Unresolved` and then closed by the paragraph headed _"Resolved at 18:28 by
+a better source"_. An earlier revision of this correction quoted that interim line as standing
+guidance; **that was wrong**, raised by Codex on #1212 and verified against the passage before being
+accepted. Citing a superseded provisional note as a rule is the same error the note itself was about.
+The original bullet
+collapsed the surfaces by naming neither. The correction then over-swung and called the result false.
+Both failures share one root — **writing a reviewer's status without checking what this file had
+already concluded about that reviewer** — and both are the same defect class as the stale deploy tip
+and the inverted coverage line: **the file contradicting a passage it already contains.** No ordinal
+is asserted for how many times that has now happened this shift; an earlier entry miscounted exactly
+that kind of running total, and the count is not what carries the lesson.
+
+The transferable rule is narrower than "check your claims" and narrower than the first attempt's
+version of it: **before recording a reviewer's status, grep this file for what it already concluded
+about that reviewer — and when the answer is that two outcomes are compatible, qualify the claim
+rather than reversing it.**
+
+## 6. Status
+
+| Item                            | Status                                                                                                                     |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| #1204 `FORBIDDEN` vocabulary    | **MERGED** `d80ad94b2` — verified on the tip by execution                                                                  |
+| Two Copilot `AGENTS.md` threads | **OPEN on the deploy branch**, answered, deliberately unresolved                                                           |
+| #1203 knk ledger corrections    | **MERGED** `cc0b7bd3f`; its Codex `P2` is now closed by #1204                                                              |
+| `FORBIDDEN` alignment slice     | **proposed, NOT opened** — GDP names the next cut                                                                          |
+| Sandbox non-status cells        | **parked** — collides with #1204; GDP names it from the squash                                                             |
+| #1186 `CURRENT_STATE`           | open; **ACTIVE OWNER of `CURRENT_STATE.md`** — its head moves with every entry, so re-verify rather than citing a SHA here |
+| `Supabase Preview` 42P07        | red repo-wide, pre-existing, not a gate; one comment per PR, no more                                                       |
+
+## 7. `NOT_MEASURED`
+
+- **Production.** The deploy branch is **`984dcf230`** as of 12:14Z — #1205 merged after this entry
+  was first written, when it correctly read `d80ad94b2`. **Re-verify with `git ls-remote` rather than
+  citing this line**; it is a snapshot, and the `a95ba7d2` correction in an earlier entry is what
+  happens when it is trusted as current. A merge is not a deployment; no publish performed or
+  authorized.
+- Whether any operator ever read a `NOT_APPLICABLE` / forbidden row as inapplicable rather than
+  prohibited. Closing the ambiguity does not measure its past effect.
+- Which check dequeued #1203 at 10:13:23Z. Still `UNKNOWN`, not `NOT_MEASURED` — both surfaces were
+  measured and neither named it.
+- Whether the two captured trigger bindings carry `UPDATE OF`, `WHEN`, or schema qualification —
+  unchanged; the raw `pg_get_triggerdef` output was never preserved.
+
+## 8. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added —
+count stays **278**. `AGENTS.md` untouched. No strip file touched. No new cut opened.
+
+**Prior update:** 2026-08-29 UTC (~10:40 UTC)
+**Updated by:** Claude (2026-08-29: **#1203 merged as `cc0b7bd3f` carrying an open Codex `P2` — the
+SIXTH merge with an open finding, not the seventh as I twice reported. It also produced the first
+review fix in this entire sequence that actually landed BEFORE its own merge — and that happened by
+accident, via a 48-second merge-queue dequeue whose cause was never established.** Two of my own
+hypotheses about that dequeue were falsified by evidence before I reported them. Prior header
+follows.)
+
+## 1. #1203 merged carrying an open `P2` — and my count of the pattern was wrong
+
+`established fact`, verified on the deploy tip by execution, not from the PR body.
+
+#1203 merged between **10:34:15Z and 10:36:26Z** — `git ls-remote` showed it still queued at the
+first timestamp and the tip moved by the second. Deploy tip `353702983` -> **`cc0b7bd3f`**, which is
+the merge-group commit itself.
+
+Verified on that tip: **one** file changed, +57/-21, **zero** files under `supabase/migrations/`,
+migration count **278**, both baseline statements naming `20260721194325_f96507e6` and marking
+`20260606034030` the wrong baseline, and **zero** occurrences of the three undeclared status labels.
+
+**Correction to my own reporting.** I twice told Cheek this was the _seventh_ merge with an open
+finding. `## 4` of the prior entry names **five** — #1187, #1189, #1170, #1199, #1200 — so **#1203
+is the sixth.** The error came from adding together two series I had been tracking separately:
+occurrences of the enqueue-then-review race, and merges that carried an open finding. They overlap
+but are not the same list, and summing them inflates both.
+
+## 2. Copilot found an incomplete fix, and a defect I introduced while fixing it
+
+`established fact`, both verified against the file before either was touched, both fixed in
+`5426b9dc4` and both threads resolved.
+
+**Finding 1 — the round-1 baseline correction was half-applied.** #1203 rewrote flag 4 to compare
+against the last committed definition in migration order, but left the _"Why this is docs and not a
+migration"_ paragraph anchored on `20260606034030`. The ledger therefore stated **two different
+baselines for one question**. That is worse than the overstatement it was correcting: an operator
+reading the top of the file and one reading flag 4 would have gone off to remediate different
+things. A partial correction to a safety document can be more dangerous than no correction.
+
+**Finding 2 — my fix for a false claim introduced a fresh unmeasured one.** The safety rows I added
+used three labels the ledger's own vocabulary section does not declare, and one of them, `LIVE since
+2026-08-21`, asserts continuing current state **five rows above** a `NOT_MEASURED` row saying live
+knk state was never measured for this file. Same table, same PR, same class of error as the one
+being corrected.
+
+Both now sit inside the declared vocabulary: apply lane ever succeeded `FAIL`, applied to production
+on 2026-08-21 `PASS` (point-in-time, sourced), production objects now `NOT_MEASURED`, GitHub-APPLY
+forbidden. The hazard is undiminished — the prohibition now rests on the guard applied that day
+rather than on an unmeasured claim about the present.
+
+## 3. Codex's `P2` merged open, and its root cause is a gap in the vocabulary itself
+
+`established fact` for the measurements; `inference` for the remedy.
+
+Codex filed a `P2` at 10:30:31Z, **2m16s after the enqueue**, on the `NOT_APPLICABLE / forbidden`
+composite: `NOT_APPLICABLE` is declared, here and in `AGENTS.md`, as _"the check does not apply to
+this target"_, whereas GitHub-APPLY **does** apply and is prohibited. The finding is correct.
+
+It was **deliberately not fixed**, for reasons measured rather than asserted:
+
+| Where `NOT_APPLICABLE` / forbidden appears                      | Count |
+| --------------------------------------------------------------- | ----- |
+| The knk ledger at parent `a066ce6a8`, **before** #1203          | 2     |
+| `docs/sandbox-bzat-20260826-…-apply-ledger-operator-runbook.md` | 2     |
+| Added by #1203                                                  | 1     |
+
+Fixing one row of five leaves two files saying the same thing two ways — worse for the operator the
+finding protects. Fixing all five turns a docs-correction PR into a cross-file convention change
+nobody asked for.
+
+**The real finding is underneath it:** neither vocabulary has a label for _"this operation is real,
+available, and must not be performed."_ This ledger declares five; `AGENTS.md` declares eight. None
+of the thirteen fits. That absence is why the composite was invented here before #1203 existed — and
+why Codex's own suggested workaround, "put the prohibition in Notes", is wrong: demoting a
+prohibition to a Notes column is exactly the softening these ledgers exist to prevent.
+
+**This file does the same thing.** The two-sense table in `## 1` of the prior entry uses `LIVE` and
+`FORBIDDEN`, neither declared. Three separate documents independently invented a prohibition label
+because the constitution does not supply one. That is the case for the proposed slice — declare
+`FORBIDDEN` (_"the operation is available and must not be performed"_) in `AGENTS.md` and both
+apply-ledger runbooks, then replace all the composites — and the case for it being **its own PR**,
+reviewed as a convention change. **Not opened.** GDP names the next cut.
+
+Also recorded, because the file punishes convergence errors: this was **round three**, and each fix
+drew the next — round 1's status labels flagged, round 2's replacement for them flagged here. That
+is the documented point to stop pushing for a bot and raise once, which is what happened.
+
+## 4. The merge queue dequeued #1203 in 48 seconds and the cause was never established
+
+`established fact` for the observations; **`UNKNOWN`** for the cause, and it stays `UNKNOWN`.
+
+First enqueue 10:12:35Z. `github-merge-queue[bot]` removed it 10:13:23Z with reason `CI_FAILURE` —
+**48 seconds**, and the group ref was deleted **while three of its own workflows were still
+running** (five had completed `success`; `CI`, `Dependency & Security CI` and `Full Vitest Suite`
+were `in_progress`). So the queue did not wait for the checks it was supposedly failing on.
+
+- **No merge-group Actions workflow failed.** Eight ran on merge SHA `2c250c7c`; none concluded
+  `failure`.
+- **On the PR head, 85 check runs and exactly one `failure`** — `Supabase Preview`. All 35 required
+  contexts `success`, `test:security-regression` `success`, every reviewer check `neutral` or
+  `success`.
+- The diff was **one markdown file** with zero migrations. No lint, typecheck, test, build,
+  docs-safety or sentinel gate can change result on it, and all of them passed.
+
+Both surfaces were checked and neither names a failing check. **Which signal dequeued it is
+`UNKNOWN`** and no cause was invented. A single re-queue is the sanctioned retry; Cheek took it at
+10:28:18Z and it merged.
+
+## 5. Two hypotheses killed by evidence before they were reported
+
+`practical observation`, and the most transferable item here — both would have become confidently
+wrong lore in this file.
+
+**Hypothesis A: `Supabase Preview` had started gating the merge queue.** If true, the pinned
+`config/required-status-checks.json` (`capturedAt: 2026-08-10`) would be **stale**, and every
+"35/35 green" reading in this file — including mine an hour earlier — would be incomplete. **Killed:**
+#1202 was enqueued at 09:49Z with the _identical_ failure red on its head (Branch Error last updated
+09:27:05Z, never superseded) and **merged**. Supabase Preview does not gate this queue, and no
+ruleset drift is demonstrated.
+
+**Hypothesis B: the `ai_credit_grants` collision was new.** **Killed:** `ERROR: relation
+"ai_credit_grants" already exists (SQLSTATE 42P07)` is pre-existing committed history, already
+declared in `config/local-supabase-replay-compatibility.json` — canonical
+`20260721103000_ai_credit_grants.sql`, duplicate `20260721182752_4fc51714-…`, whose recorded
+`reason` names SQLSTATE 42P07 verbatim. Nothing to fix; the sanctioned mechanism already covers it.
+
+It reproduced identically on `dd382ffd8`, `5426b9dc4` and #1202's head, so it is **deterministic, not
+a flake**, and re-running it would establish nothing. It is an external Supabase integration check,
+so there is no means to re-run it in any case. One standing-down comment was posted and no second.
+
+## 6. The race broke once, by accident, then closed again
+
+`practical observation`. The enqueue-then-review race (`## 7` of the entry two below) held for a
+sixth time — but with an instructive interruption.
+
+The **dequeue** created the gap the race normally denies: it unlocked the branch and left a
+fifteen-minute window. In it, Copilot's two findings were filed, verified, fixed, pushed as
+`5426b9dc4`, replied to and resolved — **the first time in this entire sequence that a review fix
+landed before its own PR merged.** Every prior occurrence lost the fix to the lock.
+
+Then the ready-toggle re-fired Codex a third time on an already-cleared SHA, six seconds after the
+re-enqueue, and it found the `P2` at 10:30:31Z with the branch locked again. So the mechanism that
+finally let a fix land was **an accident, not a process change** — and the moment normal service
+resumed, the race resumed with it. Separating the ready and enqueue gestures remains the only real
+remedy.
+
+Two further mechanics worth keeping: converting a PR to draft **permanently destroys its queue
+membership** (GitHub does not restore it on ready), and the ready toggle **re-fires Codex on an
+unchanged SHA**, which is how a commit already cleared twice produced a finding on its third pass.
+
+## 7. Two reporting errors of my own in this sequence
+
+Recorded because the evidence-discipline rule applies to me first.
+
+1. **"Seventh merge with an open finding."** It is the sixth. Corrected in `## 1`.
+2. **"Four-instance convention"** in the heading of my reply on the Codex thread, where the count is
+   five. The table directly beneath it and two later references in the same comment say five, so a
+   reader gets the right number; the heading was not corrected, because a second comment on a queued
+   PR to fix a heading is noise.
+
+Also: I told Cheek the race "did not apply" to the 10:28 enqueue. It held for about two minutes.
+Stated as a qualifier at the time rather than left standing.
+
+## 8. Status
+
+| Item                               | Status                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| #1203 knk ledger corrections       | **MERGED** `cc0b7bd3f` — verified on the tip by execution                      |
+| Codex `P2` on the composite status | **OPEN on the deploy branch**, thread unresolved, deliberately not fixed       |
+| `FORBIDDEN` vocabulary slice       | **proposed, NOT opened** — GDP names the next cut                              |
+| #1186 `CURRENT_STATE`              | draft, `b00799c0a` green (ci.yml 33246617606, 10:03:41Z); this edit extends it |
+| `Supabase Preview` 42P07           | red and pre-existing; already covered by the replay-compat config; not a gate  |
+| Bugbot                             | Cursor usage limit on **every head of every PR** tonight                       |
+
+**Corrected 2026-08-29 — the `Bugbot` row above is `unqualified`, not wrong.** It names no surface.
+Of the **finding-level** run the row is **supported** — that run was usage-limited on every head
+checked. What it omits is that Bugbot's **summary** surface completed on #1204's `dae0cbb8a` and on
+#1186's `025c10852`; a completed summary is compatible with a usage-limited finding-level run, and is
+**not** a finding-level pass. The row is left in place rather than rewritten, per this file's
+annotate-don't-hide convention. See the corrected bullet in `## 5` of the newer entry above.
+
+## 9. `NOT_MEASURED`
+
+- **Production.** `cc0b7bd3f` is the deploy branch. A merge is not a deployment; no publish
+  performed or authorized.
+- Which check dequeued #1203 at 10:13:23Z. `UNKNOWN`, not `NOT_MEASURED` — both surfaces were
+  measured and neither named it.
+- Whether the `NOT_APPLICABLE` / forbidden composite has ever caused an operator to misread a row as
+  inapplicable rather than prohibited. Recording the ambiguity does not measure its effect.
+- Whether the two captured trigger bindings carry `UPDATE OF`, `WHEN`, or schema qualification —
+  unchanged from the prior entry; the raw `pg_get_triggerdef` output was never preserved.
+
+## 10. Posture
+
+No APPLY, no `knk` access, no `query_database`, no publish, no production SQL, no migration added —
+count stays **278**. No new cut opened, including the `FORBIDDEN` slice this entry argues for.
+
+**Prior update:** 2026-08-29 UTC (~09:55 UTC)
+**Updated by:** Claude (2026-08-29: **#1200 merged carrying THREE verified findings — the fifth PR
+tonight to merge with an open finding. One of them is a FALSE MIGRATION-STATE FACT that I wrote, and
+I had propagated the same wording into this file. Corrected in place below and at §11 of the prior
+entry.** #1201 also drew a `P1` that is technically true but whose remedy already exists; that chain
+has stopped converging. Prior header follows.)
+
+## 1. The `20260813030000` error — mine, propagated, and in the dangerous direction
+
+`established fact`, verified against primary sources after Copilot and Codex independently flagged it
+on #1200.
+
+I wrote `| 20260813030000 | **NOT applied** |` into the safety table of an operator ledger, and the
+same bare wording into this file's own posture line. **That is false.**
+`docs/signup-attribution-outage-operator-runbook.md` records it **applied verbatim on 2026-08-21**
+through the Lovable SQL channel at Cheek's in-session authorization, md5-guarded.
+
+The reason this is not a nit is §4757 of **this file**, titled _"`20260813030000` — 'unapplied'
+carries two meanings, and one is dangerous"_, which instructs stating which sense is meant **every
+time** and warns:
+
+> _"A reader who takes a bare 'remains unapplied' as licence to apply it has inverted the finding."_
+
+Re-applying would re-issue an **unguarded `handle_new_user`** and overwrite the live guard — a
+production incident. So I wrote the exact ambiguity this file warns against, **into a document whose
+only purpose is preventing an accidental APPLY**, and then repeated it here. The correct form, used
+from now on:
+
+| Sense                 | Status                                                             |
+| --------------------- | ------------------------------------------------------------------ |
+| GitHub apply lane     | **never succeeded** — the workflow shows only its failed PREFLIGHT |
+| Production objects    | **LIVE** since 2026-08-21 (Lovable, verbatim, md5-guarded)         |
+| GitHub-APPLY the file | **FORBIDDEN** — would overwrite the live guard                     |
+
+> **Annotated 2026-08-29 (~10:40 UTC), not rewritten.** Codex later filed a `P2` on exactly this
+> shape in the knk ledger: `LIVE` and `FORBIDDEN` are **not** declared in `AGENTS.md`'s status
+> vocabulary, and the composite `NOT_APPLICABLE` / forbidden misuses a label meaning _"does not
+> apply"_ for an operation that does apply and is prohibited. The table above is left standing
+> because the two-sense distinction it draws is correct and load-bearing; only the labels are
+> undeclared. See `## 3` of the newest entry — the root cause is that no declared vocabulary has a
+> prohibition label, which is why this file, the knk ledger and the #1142 sibling ledger each
+> invented one independently.
+
+`20260827010000`, `20260826100000` and `20260825233000` remain **NOT applied** in the plain sense.
+
+## 2. #1200 merged at 09:45Z with three findings open
+
+Deploy tip `c6e495d3c` -> **`a066ce6a8`**. All three verified by execution before being reported;
+none was pushed, because Cheek's 09:42Z standdown forbade restamping.
+
+| #   | Line     | Finding                                                                                                          | Raised by                  | Verdict                                                              |
+| --- | -------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------- |
+| 1   | 180      | bare `NOT applied` contradicts the apply record                                                                  | Copilot **and** Codex `P2` | **CONFIRMED** — §1 above                                             |
+| 2   | 105, 135 | trigger bindings are prose, not the captured `pg_get_triggerdef`; the PR body claimed both were verbatim         | Copilot                    | **CONFIRMED** — I dropped the `EXECUTE FUNCTION …()` clause          |
+| 3   | 153      | drift overstated: `referral_code` is **already** guarded in committed history, so live adds only `current_badge` | Copilot **and** Codex `P2` | **CONFIRMED** at `20260721107000:105-107` and `20260721194325:68-70` |
+
+Codex sharpened #3 beyond what I had: the comparison should run against **the last definition in
+migration order**, not `20260606034030`. Anchoring on the wrong migration is _why_ the drift came out
+one field too wide.
+
+**What the slice did get right, verified on the merged tip:** zero files under
+`supabase/migrations/`, count unchanged at **278**, and no `20260824235000` ledger migration landed.
+The conversion away from #1178's migration-file shape held, which was the point.
+
+## 3. #1201's `P1` is true, and its remedy already exists
+
+Codex on `13b3cdd98`: comment-stripping closes only one source-scan failure mode; source text cannot
+prove a matched expression **executes**.
+
+**Verified by execution.** Rendering killed (`return null`) with every token left in the file:
+
+| Suite                                                             | Result                                         |
+| ----------------------------------------------------------------- | ---------------------------------------------- |
+| #1201's source-scan                                               | **5 passed / 0 failed** — blind, as Codex says |
+| `quicklog-attachable-save-gate` + `strip-trust-badge` (rendering) | **13 failed / 20 passed** — caught it          |
+
+So the premise holds. But the remedy Codex asks for — import and render, assert resolved output — is
+**exactly what those two rendering suites already do**, and they caught the sabotage immediately.
+Doing it again in the source-scan file duplicates coverage rather than adding it.
+
+**The chain has stopped converging**, which is the reusable finding:
+
+1. #1170 `P1` — assertions match comment text -> fixed in #1199
+2. #1199 (Copilot) — only one block converted -> fixed in #1201
+3. #1201 `P1` — source scanning cannot prove execution at all -> asks for rendering
+
+Each fix drew a new finding at a wider radius. Per the standing rule, that is the point to stop
+pushing for the bot and raise once. **The honest end state is not converting these scans to renders —
+it is deleting the positive source-scans from that file** (rendering suites already prove the
+behaviour) and keeping it for the six forbidden-token absence checks, which is what source scanning
+is actually good for. That is a slice decision, not a review nit, and was not taken.
+
+## 4. Five merges with open findings
+
+`practical observation`. #1187, #1189, #1170, #1199, #1200. Severity has fallen sharply — a real
+credential leak, then a self-contradicting comment, then two test-quality items, now a false
+migration-state row in a docs ledger — but **the mechanism has never changed**: a review triggers on
+draft-marked-ready, the enqueue happens in the same gesture, and the branch lock then removes the
+only remedy. It is a workflow property, not five coincidences.
+
+## 5. Status
+
+| Item                                  | Status                                                                     |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| #1200 docs ledger                     | **MERGED** `a066ce6a8` — carries findings 1-3 above, uncorrected on deploy |
+| #1201 badge-dedupe follow-up          | ENQUEUED, 35/35 green at `13b3cdd98`, `P1` open and assessed               |
+| #1178 migration-file ledger           | **CLOSED**, superseded                                                     |
+| Correction for #1200's three findings | **drafted, NOT pushed** — Cheek's standdown holds                          |
+| `CURRENT_STATE` posture line          | **corrected in place** in this edit                                        |
+
+## 6. `NOT_MEASURED`
+
+- **Production.** `a066ce6a8` is the deploy branch. A merge is not a deployment; no publish
+  performed or authorized.
+- Whether any reader has already acted on the false `NOT applied` row between 09:45Z and its
+  correction.
+- Whether the two captured trigger bindings carry `UPDATE OF`, `WHEN`, or schema qualification that
+  the prose summaries dropped — the raw `pg_get_triggerdef` output was not preserved.
+
+**Prior update:** 2026-08-29 UTC (~07:40 UTC)
+**Updated by:** Claude (2026-08-29: **Everything in this sequence is now MERGED or CLOSED. Deploy tip
+`a95ba7d2` -> `78125d82` across FIVE merges. #1170 merged at 07:33 UTC carrying a verified Codex
+`P1` — the THIRD PR tonight to merge with an open finding, and the same merge-queue mechanism each
+time.** Prior header follows.)
+
+## 1. Five merges moved the tip, and two of my own notes were stale
+
+`established fact`, verified by `git ls-remote` and `git log`, not from memory:
+
+| Tip         | PR    | Merged  |
+| ----------- | ----- | ------- |
+| `a95ba7d2c` | #1189 | 05:40Z  |
+| `1edfa2226` | #1194 | 06:17Z  |
+| `9c7a9c650` | #1195 | 07:14Z  |
+| `e14f27284` | #1193 | 07:29Z  |
+| `dd7e732cf` | #1170 | 07:33Z  |
+| `78125d82a` | #1196 | ~07:37Z |
+
+**Correction.** For roughly half an hour I stated the tip as `a95ba7d2` in this file, in my check-in
+notes and to Cheek, after #1194 and #1195 had already moved it. Neither is mine; both landed while I
+was watching #1170's CI. The prior entry's `## 7` and `## 8` still say `a95ba7d2` and are superseded
+by this table. **The tip moves faster than a shift entry — re-verify it with `git ls-remote origin
+verdant-grow-diary` before citing it, never from a cached note.**
+
+#1194 (timeline revision-badge lanes), #1195 and #1196 (Quick Log revision-payload fail-closed, and
+the follow-up removing the silent-filter adapter) are Codex/GDP slices, not mine. #1195 was checked
+for file overlap with #1170 before it merged: **none**.
+
+## 2. #1170 merged — the sensor-truth fix is on the deploy branch
+
+`dd7e732cf`. Both halves verified on the merged deploy branch by execution, not inferred:
+
+```
+quickLogSnapshotStripAdapter.ts     persistedSensorSourceLabel        defined
+QuickLog.tsx:1276                   source: persistedSensorSourceLabel(...)   called at the save site
+QuickLogSensorSnapshotStrip.tsx:148 const attachBlocked = ...         gate live
+QuickLogSensorSnapshotStrip.tsx:199 data-attachable={...}             rendered
+```
+
+**35/35 required green, verified at 07:15Z** against `config/required-status-checks.json` rather
+than by eyeballing a summary: all 32 shards, `Lint, typecheck, test, build` (success 07:08:33Z, the
+last to land), `Preflight — edge shared-lib mirror in sync`, `test:legal-seo`, plus the `mustBeGreen`
+`test:security-regression`. The only red across all 91 checks was the non-required `Supabase Preview`
+42P07. `Browser census (public)` passed on its own at 07:05:22Z — no re-run spent this time.
+
+Codex re-reviewed `6c2afa4a` at 07:02Z and returned **`PASS`** (full audit, no changes required, and
+it explicitly declined to open a competing PR or an empty commit). Both review threads — Codex's `P1`
+and Copilot's — were **resolved by me at ~07:05Z**, against the fix on the head rather than a promise.
+
+Cheek converted it to draft at 07:12:34Z, then readied and enqueued it at 07:24Z. Neither was mine.
+
+## 3. #1170 merged CARRYING a verified `P1`, and the finding is mine
+
+Codex posted it at 07:28:09Z — **four minutes after the enqueue**, on a branch the queue had already
+locked. I could not push. It merged at 07:33:03Z with the finding open.
+
+**I verified it by execution before reporting it, and it is real.** At `6c2afa4a`, and still on
+deploy at `78125d82`, `src/test/quicklog-sensor-snapshot-badge-dedupe.test.ts:46-47` asserts:
+
+| Assertion                               | Where it actually lives                             |
+| --------------------------------------- | --------------------------------------------------- |
+| `"The advisory itself is display-only"` | `QuickLogSensorSnapshotStrip.tsx:160` — **comment** |
+| `"attachable gate"`                     | `QuickLogSensorSnapshotStrip.tsx:161` — **comment** |
+| `role="note"`                           | line 250 — real JSX                                 |
+| `"opens sensors page"`                  | lines 287, 297 — real `aria-label`s                 |
+
+Delete the gate (`attachBlocked` at 148, `data-attachable` at 199), keep the two comment lines, and
+**that test stays green**. That is the `playwright-action-timeout-fence` failure mode `AGENTS.md`
+documents by name, and the rule Codex cited is the right one.
+
+**Two corrections to the finding, both verified.** Its scope is overstated — it says the assertions
+occur "only in explanatory comments", but two of the four are real rendered output. And the gate is
+**not solely guarded by this scan**: `quicklog-attachable-save-gate.test.tsx` has 73 `expect(` calls,
+renders the real QuickLog, asserts the real persisted `p_details.sensor.source`, and was RED-proven
+at **7 failed / 12 passed** with the fix reverted. So `P1` overstates the exposure. This is
+**test-quality only — no product defect and nothing user-facing.**
+
+**It is still mine.** The prior version of that block asserted `"This does NOT change the save
+path."` — also comment-only — so I did not invent the anti-pattern. But I renegotiated that pin in
+this PR and swapped one comment assertion for two others when I could have made it behavioural.
+
+**Proposed and NOT started, pending Cheek:** a fresh branch off the current tip (the merged PR cannot
+carry it), one file, both comment assertions replaced with assertions on resolved rendered output —
+`data-attachable` and `STRIP_NON_ATTACHABLE_DESCRIPTION`, both already real. RED-proven properly:
+revert the gate and show the _new_ assertions fail where the old ones stayed green. That
+demonstration is the actual point of the change.
+
+## 4. #1177 closed on Cheek's instruction — a real collision, deliberately resolved
+
+Closed by me at 07:18:20Z on Cheek's explicit "close 1177". Not merged; branch
+`cursor/quicklog-unify-strip-non-live-e8ed` intact at `fd5d5e476` and reopenable. Reason recorded in
+comment `5461068252` so the Cursor agent does not find it silently gone.
+
+It edited **the same four files as #1170** and took the opposite position: it deleted the
+`fresh_non_live` -> `attachable = false` restamp and flipped the pins for `pi_bridge` / `sensor` /
+`realtime` and manual from `false` to `true`, deleting the test that pinned `pi_bridge
+fresh_non_live -> attachable false`.
+
+Why that combination was unsafe, verified: #1177 touched only the adapter, not `QuickLog.tsx`. Both
+landing would mean `pi_bridge` becomes attachable -> #1170's save gate attaches it ->
+`persistedSensorSourceLabel` does **not** rewrite it (canonical `live`, not `manual`/`csv`) -> it
+persists verbatim -> `timelineEvidenceDetailViewModel.normalizeSource` renders it **`unknown`**,
+because `ALLOWED_SOURCES` is `{manual, live, csv, demo, stale, invalid, unknown}` and has no
+`pi_bridge`. The same defect #1170 exists to close, re-opened for the live-alias set.
+
+**#1177's own body had already flagged the overlap** ("Collision (do not merge unilaterally) ...
+merge order matters"), which is why it was resolved by decision rather than by merge order.
+
+**What closing it discarded**, recorded so the loss is a decision and not a side effect: the
+`DEMO_USABLE_*` copy honesty, the stale-plus-unknown-transport -> Invalid coherence pins, and the
+raw-label provider chip. None are carried by #1170. If wanted, they need their own slice with the
+attachable restamp left intact.
+
+## 5. #1193 merged clean — the contract's contradiction is closed
+
+`e14f27284`, merged 07:29:38Z. Cheek readied and enqueued it at 07:23Z; Codex's review completed at
+07:24:13Z with **zero review threads**. 35/35 required green. So the skip-branch comment that #1189
+shipped self-refuting is now corrected on the deploy branch.
+
+## 6. #1186's own CI: a transient install failure, root-caused not assumed
+
+`Lint, typecheck, test, build` — a **required** context — failed on this PR's superseded head
+`b3bea84d8` (check `99067293041`). Root-caused by reading the job, not guessed: **step 6, "Install
+dependencies", failed in 2 seconds**; steps 7-41 were all `skipped` in consequence, which is why the
+build summary showed every validator `skipped` with only the job-status backstop reporting `failure`.
+This PR is docs-only and cannot break dependency installation — the same signature as the earlier
+`Full suite — batch 10/16` non-attribution.
+
+The push of `0d7106fc1` re-queued that check, which is the one sanctioned re-run, obtained by the
+push rather than spent manually. **It passed at 07:16:53Z.** Transient, confirmed, closed. This PR is
+now **35/35 green**; only red is the non-required 42P07.
+
+One process note: mid-investigation I said `failed_only` reporting "0 failed jobs of 30" contradicted
+the check run. It did not — that filter is unreliable against a run still `in_progress`. The
+authoritative read was the job's own step list.
+
+## 7. The enqueue-then-review race is structural, not bad luck — three for three
+
+`practical observation`, and the most reusable thing in this entry. Three PRs tonight merged while a
+review was still running or a finding was already open, and each time the merge-queue branch lock
+meant the fix could not be pushed:
+
+| PR    | What merged with it                                  | Severity                |
+| ----- | ---------------------------------------------------- | ----------------------- |
+| #1187 | a real `P1` redaction leak, flagged by two reviewers | genuine security defect |
+| #1189 | a comment contradicting the file's own invariant     | documentation defect    |
+| #1170 | a `P1` comment-only assertion                        | test quality only       |
+
+The severity fell each time; **the mechanism never changed.** Codex reviews trigger on
+draft-marked-ready, and the enqueue happens in the same gesture, so the review structurally cannot
+finish first. Then the lock removes the only remedy. This is a workflow property, not three
+coincidences, and it will keep costing a follow-up PR per occurrence until the ready-and-enqueue
+gestures are separated.
+
+## 8. Bugbot was effectively absent all night
+
+`practical observation`. Four consecutive finding-level misses on the Cursor usage limit — **#1187,
+#1189, #1170, #1193** — plus a fifth on #1170's re-trigger. Codex and Copilot caught every real
+defect of this sequence; Bugbot caught none, and on #1187 posted a "Low Risk" summary over a `P1` it
+never saw.
+
+The precision that matters, because it is what makes the gap easy to miss: on #1170 and #1193 a
+Cursor-authored PR-**body** overview _did_ land, naming the commit and describing the change
+accurately, while the finding-level review did not run. **A body summary is not a finding-level
+pass.** Raising the spend limit is a Cursor dashboard change, outside this agent's reach.
+
+## 9. Status
+
+| Item                                         | Status                                               |
+| -------------------------------------------- | ---------------------------------------------------- |
+| Redaction-ordering class, four instances     | **CLOSED on deploy** (#1185, #1184, #1187, #1192)    |
+| The contract pinning it                      | **MERGED** (#1189)                                   |
+| Contract's self-contradicting comment        | **MERGED** (#1193, `e14f27284`)                      |
+| Sensor-truth: non-canonical persisted source | **MERGED** (#1170, `dd7e732cf`)                      |
+| #1170's `P1` comment-only assertions         | **OPEN on deploy** — follow-up proposed, not started |
+| Strip-vs-save collision (#1177)              | **CLOSED**, not merged                               |
+| `CURRENT_STATE`                              | this file, #1186, draft, **35/35 green**             |
+
+**No known product defect remains open.** The one open item is a test-quality weakness on deploy,
+awaiting Cheek's call on the follow-up.
+
+## 10. `NOT_MEASURED`
+
+- **Production.** `78125d82` is the **deploy branch**. A merge is not a deployment; no publish has
+  been performed or authorized, so production exposure for every item above is `NOT_MEASURED`.
+- Whether any leaked string ever reached a real export, clipboard or print surface, for any of the
+  four closed redaction instances.
+- Whether any already-persisted diary row carries one of the seven non-canonical aliases — the #1170
+  fix is forward-only and nothing here inspected production data.
+- Edge-function redaction copies beyond the one mirrored file.
+
+## 11. Posture
+
+Deploy tip **`78125d82`** (re-verify before citing). `20260827010000`, `20260826100000`,
+`20260825233000` all remain **NOT applied**. **Correction, 09:55Z:** this line originally included
+`20260813030000` in that list, which is **false in the dangerous direction** — see §4757 of this same
+file, _"`20260813030000` — 'unapplied' carries two meanings, and one is dangerous"_. Only its **GitHub
+apply lane** never succeeded; the **production objects are live** (applied verbatim 2026-08-21 via
+Lovable). Copilot and Codex both caught the same wording in #1200 and both were right. Merged today: #1185, #1184, #1187,
+#1192, #1189, #1194, #1195, #1193, #1170, #1196. Closed: #1190, #1191, #1177. Open and not mine to
+advance: #1172 (`bdeb058`, draft, auto-merge disabled, parked), #1184's rebase (parked), #1183,
+#1181, #1180, #1178, #1175, #1174, #1153, #1151, #1088, #1082.
+
+**Nothing was readied, enqueued, dequeued, merged, published or applied by Claude at any point in
+this sequence.** The only outward actions taken were: PR comments, resolving two review threads on
+#1170, and closing #1177 on Cheek's explicit instruction. This edit touches this file only.
+
+**Prior update:** 2026-08-29 UTC (~07:10 UTC)
+**Updated by:** Claude (2026-08-29: **#1170's sensor-truth defect is FIXED at `6c2afa4a` — the last
+live defect of this sequence. Cheek chose option A; measuring the question I had left
+`NOT_MEASURED` made the correct fix NARROWER than option A as written, and a blanket version would
+have been actively harmful.**
+
+> **Superseded in part by the ~07:40 entry above, and left in place rather than rewritten.** Still
+> accurate: the fix itself, why it is narrower, and the Bugbot precision in its `## 5`. Now
+> **overtaken by events**: its `## 6` says #1170 and #1193 are "not merged" and calls #1170's 35/35
+> verdict `NOT_MEASURED` — both merged, and the verdict is now a measured **PASS**; its `## 7` and
+> `## 8` give the deploy tip as `a95ba7d2`, which moved five times afterwards. Read the top entry for
+> current state.
+
+## 1. The fix, and why it is narrower than what was proposed
+
+Codex (`P1`) and Copilot both raised it; both were right; verified by execution on `393dbcdc` before
+anything changed. The strip gates attachability on `normalizeSensorSource()`, but
+`buildSensorSnapshotDetails` persists `snapshot.source` **verbatim** — so the seven manual/CSV
+aliases #1170's third commit made attachable were saved with a label outside the six-label contract,
+which `timelineEvidenceDetailViewModel.normalizeSource` renders as `unknown`. **A genuinely MANUAL
+reading written to the diary and displayed as unknown provenance.**
+
+I had flagged one thing as `NOT_MEASURED` when proposing the remedy: whether anything reads the
+persisted `source` for provider identity. **Measuring it changed the fix.** It does —
+`growDiaryTimelineRules.SOURCE_DISPLAY_LABELS`:
+
+| raw source        | timeline label  | canonical form | a blanket rewrite would               |
+| ----------------- | --------------- | -------------- | ------------------------------------- |
+| `pi_bridge`       | **"Pi bridge"** | `live`         | lose provider identity                |
+| `ecowitt`         | **"EcoWitt"**   | **`invalid`**  | **persist a real reading as invalid** |
+| `node_red_bridge` | **"Node-RED"**  | **`invalid`**  | same                                  |
+
+**Blanket canonicalization would have been a WORSE sensor-truth violation than the one being
+fixed.** That is the whole case for measuring an `UNKNOWN` before acting on it rather than shipping
+the plausible version.
+
+## 2. What shipped
+
+`persistedSensorSourceLabel` in `quickLogSnapshotStripAdapter.ts` rewrites **only when the canonical
+form is `manual` or `csv`** — exactly the seven aliases this PR made attachable. They carry no
+provider identity (they render as sanitized echoes), so canonicalizing them also **improves** the
+timeline label:
+
+```text
+manual_snapshot       -> manual   timeline "Manual_snapshot" -> "Manual"
+import / imported     -> csv      timeline "Import"          -> "CSV"
+user/entry/log/diary  -> manual                              -> "Manual"
+
+pi_bridge · ecowitt · node_red_bridge · esp32_arduino · webhook · mqtt   -> UNTOUCHED
+manual · csv · live · demo · stale · invalid                             -> UNTOUCHED
+```
+
+Helper placed in the adapter, **not** `sensorSourceRules.ts`, because #1170's own body declares that
+file out of scope. Neither touched file is mirrored to `_shared`.
+
+## 3. Validation
+
+| Stage                                                     | Result                     |
+| --------------------------------------------------------- | -------------------------- |
+| **RED** — the seven alias cases vs. the unfixed save path | **7 failed \| 12 passed**  |
+| **GREEN** — after                                         | **19 passed**              |
+| quicklog / strip / sensor-source / timeline sweep         | **172 files, 2692 passed** |
+| `v0-operating-loop-contract`                              | 26/26                      |
+| `tsc --noEmit` · eslint · edge mirror                     | clean · clean · in sync    |
+
+All seven alias cases render the real QuickLog and assert on the actual persisted
+`p_details.sensor.source` — Copilot asked specifically to "cover an alias through the save-path
+test", and a helper-only unit test would not have answered that.
+
+**The `pi_bridge` case is a FENCE, not a fix** — it passes both before and after, so it is not
+evidence for the change. Stated as such on the PR rather than counted in the RED total. Its job is to
+fail if someone later widens the rewrite to reach a provider label.
+
+## 4. Deliberately NOT fixed, and why bundling it would be wrong
+
+`pi_bridge`, `realtime` and `sensor` also persist non-canonical sources. That is **pre-existing** —
+those were attachable long before #1170 — and canonicalizing them is precisely the destructive path
+in the table above. It needs a different remedy (widening `ALLOWED_SOURCES`, or a separate provider
+field) and its own reviewed slice. **`NOT_MEASURED`: whether any already-persisted diary row carries
+one of the seven aliases.** This fix is forward-only; it does not migrate existing rows, and nothing
+here inspected production data.
+
+## 5. Bugbot has now missed THREE consecutive PRs
+
+`practical observation`, recorded because a silent reviewer reads as a pass: Cursor Bugbot returned
+_"couldn't run — usage limit reached"_ on **#1187, #1189 and #1170** — every security-relevant PR of
+this sequence. On #1187 it had posted a "Low Risk" summary while Copilot and Codex both caught a real
+`P1` it never saw. Raising the spend limit is a Cursor dashboard change, outside this agent's reach.
+
+**Precision, added 07:10Z — #1170 shows the same split, and it is the misleading one.** The
+finding-level review did **not** run: the `Cursor Bugbot` check concluded `neutral` in two seconds at
+06:58:27Z, and Bugbot's own comment reads _"couldn't run — usage limit reached"_. But a
+Cursor-authored `[!NOTE] Medium Risk` overview **did** land in the PR body, naming `6c2afa4a` and
+describing `persistedSensorSourceLabel` accurately. A reader who checks #1170 against the heading
+above will see that block and conclude this section is wrong. It is not — **a body summary is not a
+finding-level pass.** This same split is already recorded further down this file for `789294c6`, and
+it makes the gap **harder to notice, not smaller**, which is the entire reason this section exists.
+
+## 6. Status — the sequence is functionally complete
+
+| Item                                         | Status                                                      |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| Redaction-ordering class, four instances     | **CLOSED on deploy** (#1185, #1184, #1187, #1192)           |
+| The contract pinning it                      | **MERGED** (#1189, `a95ba7d2`)                              |
+| Contract's self-contradicting comment        | #1193, draft, **35/35 green**                               |
+| Sensor-truth: non-canonical persisted source | **FIXED** at `6c2afa4a` — #1170, **Codex re-review `PASS`** |
+| `CURRENT_STATE`                              | this file, #1186, draft                                     |
+
+**Independent review closed the loop at 07:02Z.** Codex re-reviewed `6c2afa4a` and returned **`PASS`**
+— a full audit, no changes required, and explicitly no competing PR and no empty commit. It confirmed
+from source that the helper rewrites only canonical `manual`/`csv` results; that it leaves provider
+labels alone, naming the EcoWitt / Node-RED false-`invalid` hazard itself; that the save gate still
+requires an attachable snapshot; and that the suite asserts the real persisted
+`p_details.sensor.source` across five manual aliases, two CSV aliases and the `pi_bridge` fence. Its
+own run: **19 passed / 0 failed**, `tsc` clean. Both review threads — Codex's `P1` and Copilot's —
+are now **resolved**, each against the fix on the head rather than a promise.
+
+`6c2afa4a`'s CI was **still in flight** as this was written (runs started 06:58Z): every _completed_
+required context green, zero failures, the only red the inherited `ai_credit_grants` 42P07. **The
+35/35 verdict is `NOT_MEASURED` until that run lands** — it is not a pass yet and is not recorded as
+one.
+
+#1170 is also `behind` deploy tip `a95ba7d2` — **not** a conflict, and the merge queue rebases on
+enqueue. Deliberately not updated here: a branch push would restart the in-flight run for no gain.
+
+**No known live defect remains open and unaddressed.** #1170 is fixed, reviewed and not merged; #1193
+is green and not merged.
+
+## 7. `NOT_MEASURED` — unchanged
+
+- Whether any leaked string ever reached a real export, clipboard or print surface, for any of the
+  four closed redaction instances.
+- Whether any already-persisted diary row carries one of the seven non-canonical aliases.
+- **Production.** `a95ba7d2` is the **deploy branch**; a merge is not a deployment and no publish has
+  been performed or authorized.
+- Edge-function redaction copies beyond the one mirrored file.
+
+## 8. Posture
+
+Deploy tip **`a95ba7d2`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. Open: #1186 (`a76db59`, draft), #1193 (`cfb65d2`, draft, green), **#1170
+(`6c2afa4a`, ready-not-draft, fixed, Codex re-reviewing)**. Closed: #1190, #1191. Merged today:
+#1185, #1184, #1187, #1192, #1189. **Nothing readied, enqueued, merged, published or applied by
+Claude at any point in this sequence.** This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~05:45 UTC)
+**Updated by:** Claude (2026-08-29: **#1189 MERGED at 05:40 UTC — the ordering contract is ON THE
+DEPLOY BRANCH. Deploy tip `061eeb8c` -> `a95ba7d2`. The redaction-ordering class is closed across
+all four instances AND pinned. But #1189 shipped carrying a comment that contradicts its own
+invariant, because the merge-queue lock swallowed the fix for the SECOND time tonight.**
+
+## 1. #1189 merged — the class is now closed and pinned
+
+`a95ba7d2`. Confirmed on the merged tip: `src/test/redaction-ordering-contract.test.ts` is present
+on the deploy branch. Its last pre-merge CI run (`33234974998`, head `8766ab6c`) was **SUCCESS** —
+35/35 required, 16/16 batch lanes, public census under the cap, `Supabase Preview` skipped.
+
+Cheek readied and enqueued it at 05:29 UTC. **Codex reviewed `8766ab6c` and completed with no
+findings.** Bugbot **could not run — Cursor usage limit** — the _second_ consecutive security PR it
+has silently missed tonight (also #1187, where Copilot and Codex both caught a real `P1` it never
+saw). `practical observation`, recorded because a reviewer that is absent from every security merge
+is a coverage gap that looks like a pass.
+
+## 2. Copilot found a contradiction in the contract — and it shipped anyway
+
+**The finding is correct and the error was mine.** The skip branch asserted:
+
+> _"Nothing to keep ordered: no rule matches the shape bare, so no rule can destroy it decorated
+> either."_
+
+That is **precisely the reasoning the partial-redaction block later in the SAME FILE exists to
+refute**, and which this session disproved twice by execution — `postGrowReportRules` and
+`proofReportRedactionRules` each fired a prefix-specific rule on a shape nothing matched bare,
+consumed the NAME and stranded the VALUE.
+
+Why this is more than a stray comment: the contract's behaviour is 433 lines of matrix, but its
+_value_ is that a future reader understands why two invariants exist. **A reader of only the skip
+branch would conclude the partial-redaction block is redundant and could delete the one invariant
+that catches this class.**
+
+**The fix was written, validated and could not be pushed.** `protected branch hook declined` —
+rejected TWICE while #1189 sat in the merge queue, and #1189 merged at 05:40 UTC still locked. Not
+retried blindly, because the #1187 retry succeeded only _after_ that PR merged and landed the
+commit on a dead branch.
+
+Follow-up opened immediately, as promised on the PR: **#1193**, draft, cut fresh from `a95ba7d2`.
+Verified there — contradicting line **0 occurrences**, corrected text present, contract
+**165 passed | 20 skipped** (identical to the merged head), `tsc` and eslint clean. Comment only,
++13/-4; no assertion touched, `COVERAGE_BASELINE` untouched.
+
+## 3. THE MERGE-QUEUE LOCK HAS NOW COST TWO VALIDATED FIXES
+
+`established fact`, twice in one night, same mechanism:
+
+| PR        | What was written, validated, and could not be pushed | What merged instead                                                              |
+| --------- | ---------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **#1187** | the unlabelled-NAME redaction fix                    | a **live credential leak** two reviewers had flagged as `P1` six minutes earlier |
+| **#1189** | this comment correction                              | a contract asserting reasoning its own invariant refutes                         |
+
+The pattern: a reviewer flags a real defect, the fix is ready before the merge, and the branch lock
+rejects the push until the PR has already merged. **Neither miss was a review failure — both
+reviews worked. The gap is between "fix exists" and "fix can land".**
+
+Recorded as a standing rule for this session: on `protected branch hook declined`, report to Cheek
+**immediately**, never retry blindly. A retry that succeeds post-merge writes to a dead branch.
+
+## 4. #1190 and #1191 closed — supersession PROVEN
+
+Closed at Cheek's instruction after re-verifying, not on the strength of #1192's description. **All
+four files byte-identical to the deploy tip:**
+
+```text
+src/lib/postGrowReportRules.ts                  IDENTICAL
+src/test/post-grow-report-pdf-export.test.tsx   IDENTICAL
+src/lib/proofReportRedactionRules.ts            IDENTICAL
+src/test/proofReportRedactionRules.test.ts      IDENTICAL
+```
+
+Product **and** tests — checked separately, because a fix landing without its RED-proven pins would
+be a silent gap. Zero bytes lost. Each carries a closing comment with that evidence.
+
+## 5. Status — one live defect remains
+
+| Item                                                              | Status                                                  |
+| ----------------------------------------------------------------- | ------------------------------------------------------- |
+| Redaction-ordering class, all four instances                      | **CLOSED on deploy** (#1185, #1184, #1187, #1192)       |
+| The contract pinning it                                           | **MERGED** (#1189, `a95ba7d2`)                          |
+| Contract's self-contradicting comment                             | **OPEN** — #1193, draft, fix verified                   |
+| `CURRENT_STATE`                                                   | this file, #1186, draft                                 |
+| **Sensor-truth: non-canonical persisted `details.sensor.source`** | **OPEN AND LIVE** — #1170, **ready-NOT-draft**, unfixed |
+
+**#1170 is now the only live defect, and it is the only PR of the set that is ready rather than
+draft.** Two unresolved threads, Codex `P1` + Copilot, verified by execution: 7 manual/CSV aliases
+are attachable but persist a source outside the six-label contract, which the timeline renders as
+`unknown` — a genuinely manual reading displayed as unknown provenance. Wider than reported
+(`pi_bridge`, `realtime`, `sensor` too, **pre-existing**, not #1170's regression). Deliberately not
+fixed: both remedies are product decisions and it writes **persisted user data**. Options and a
+recommendation are on the PR.
+
+## 6. `NOT_MEASURED` — unchanged
+
+- **Whether any leaked string ever reached a real export, clipboard, or print surface**, for any of
+  the four closed instances. Closing a leak does not retroactively measure exposure.
+- **Production.** `a95ba7d2` is the **deploy branch**; a merge is not a deployment and no publish
+  has been performed or authorized.
+- Edge-function redaction copies beyond the one mirrored file.
+- `sanitizeProofReportMarkdown` bare-shape coverage, recorded in `COVERAGE_BASELINE`.
+- Mixed-case / spaced `NAME = value`, out of #1192's scope.
+
+## 7. Posture
+
+Deploy tip **`a95ba7d2`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. Open: #1186 (`af4537b`, draft), #1193 (`cfb65d2`, draft), **#1170
+(`393dbcdc`, ready-not-draft)**. Closed: #1190, #1191. Merged tonight: #1185, #1184, #1187, #1192,
+#1189. **Nothing readied, enqueued, merged, published or applied by Claude at any point.** This edit
+touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~05:25 UTC)
+**Updated by:** Claude (2026-08-29: **#1192 MERGED at 04:47 UTC — BOTH LIVE LEAKS ARE CLOSED ON THE
+DEPLOY BRANCH. Deploy tip `84d3b813` -> `061eeb8c`. #1189 is now green on production truth with
+NOTHING carried, which is the strongest state the contract can be in. #1190 and #1191 are
+superseded — proven byte-identical, not assumed.**
+
+## 1. #1192 closed both leaks — verified by execution on the merged tip
+
+`061eeb8c` — _"fix(security): redact unlabeled NAME= before Bearer on proof/secrets sanitizers"_.
+One product slice covering both sanitizers. Its own body states it **restores the `68d75444`
+product delta onto tip**, adds a header-prefixed `NAME=value` rule above Bearer/Authorization, and
+deliberately keeps **no** generic uppercase assignment rule so grow reports keep `VPD=1.2` /
+`PPFD=800`.
+
+**Probed on the merged tip, not inferred from the description:**
+
+```text
+postGrow   bearer SOME_PLAIN_NAME=…           -> [redacted]   CLOSED
+postGrow   Bearer SOME_PLAIN_NAME="…"         -> [redacted]   CLOSED
+postGrow   Authorization: SOME_PLAIN_NAME=…   -> [redacted]   CLOSED
+proofRept  Bearer MY_PASSKEY_VAR="…"          -> [redacted]   CLOSED
+proofRept  Bearer SOME_PLAIN_NAME="…"         -> [redacted]   CLOSED
+proofRept  bearer MY_API_KEY_VAR="…"          -> [redacted]   CLOSED   (the case-sensitivity gap)
+
+VPD=1.2 · "runoff EC=1.8 and VPD=1.2." · "The bearer of this report…"  -> ALL unchanged
+```
+
+Both halves matter: the leaks close **and** benign prose survives. A sanitizer that went blunt
+would be a different failure, not a fix.
+
+## 2. #1190 and #1191 are superseded — PROVEN, not assumed
+
+The supersession claim came from #1192's own body, so it was checked rather than believed:
+
+```text
+src/lib/postGrowReportRules.ts        #1190 head 93d9c2e  vs  merged 061eeb8c  ->  IDENTICAL
+src/lib/proofReportRedactionRules.ts  #1191 head 00e3e4d  vs  merged 061eeb8c  ->  IDENTICAL
+```
+
+Byte-identical on both product files. **And the regression tests shipped with the fix** — checked
+separately, because a fix landing without its RED-proven pins would be a silent gap:
+
+- `post-grow-report-pdf-export.test.tsx` — the unlabelled-name table **and** the partial-redaction
+  fence, both present on the deploy tip
+- `proofReportRedactionRules.test.ts` — the header-prefixed table, present
+
+**#1190 and #1191 remain OPEN drafts.** They are fully redundant, but closing another agent's
+merged-elsewhere work is Cheek's call, not Claude's; flagged, not actioned.
+
+## 3. #1189 — green on production truth
+
+Cheek restamped it to **`8766ab6c`**: _"tests-only restamp onto #1192 tip. Drops carried product
+files. Stay draft."_ `ci.yml` run `33234974998` **SUCCESS** at 05:13 UTC.
+
+```text
+contract on 8766ab6c, NOTHING carried:  165 passed | 20 skipped (185)
+```
+
+This is a materially better green than the one at `d25e5bf` two hours earlier. That one passed
+because the branch carried its own fixes; **this one passes against the real deploy branch**. The
+contract has become an _independent_ check — the fix came from someone else's PR, and the invariant
+confirms it closes exactly the shapes it was built to catch without over-redacting prose. That is
+the difference between a test that agrees with itself and a test that verifies the world.
+
+**Correction to the prior entry:** it recorded both leaks as `LIVE ON DEPLOY`. True when written at
+~05:00 UTC; **false since 04:47 UTC**. The window was roughly three hours from #1187's merge
+(01:58) to #1192's (04:47).
+
+## 4. The class, closed — five modules, four instances plus a counter-example that wasn't
+
+| Module                                                                      | Status         | Where                               |
+| --------------------------------------------------------------------------- | -------------- | ----------------------------------- |
+| `ecowittLocalForwardingStatus.ts`                                           | **CLOSED**     | merged `f9f4d11` (#1185)            |
+| `ecowittValidationEvidenceRules.ts`                                         | **CLOSED**     | merged `1d19c4c` (#1184)            |
+| `postGrowReportRules.ts` — labelled assignments                             | **CLOSED**     | merged `84d3b813` (#1187)           |
+| `postGrowReportRules.ts` — header-prefixed unlabelled                       | **CLOSED**     | merged `061eeb8c` (#1192)           |
+| `proofReportRedactionRules.ts` — header-prefixed                            | **CLOSED**     | merged `061eeb8c` (#1192)           |
+| `quickLogSnapshotStripAdapter` / save path — non-canonical persisted source | **OPEN, LIVE** | #1170, **ready-not-draft**, unfixed |
+
+**The redaction-ordering class is closed on the deploy branch, and #1189 pins it.** What remains is
+the _sensor-truth_ defect on #1170 — a different class, still live, and on the one PR that is ready
+rather than draft.
+
+## 5. `NOT_MEASURED` — unchanged by any of this
+
+- **Whether any leaked string ever reached a real user-facing export, clipboard, or print
+  surface**, for any of the four instances. Closing a leak does not retroactively measure its
+  exposure.
+- **Production exposure.** `061eeb8c` is the **deploy branch**; a merge is not a deployment and no
+  publish has been performed or authorized.
+- Edge-function redaction copies beyond the one mirrored file (`ecowittValidationEvidenceRules`).
+- `sanitizeProofReportMarkdown` coverage for a label inside a longer NAME **bare**, with no header
+  prefix — recorded in `COVERAGE_BASELINE`, deliberately unfixed.
+- Mixed-case / spaced `NAME = value`, explicitly out of #1192's scope.
+
+## 6. Posture
+
+Deploy tip **`061eeb8c`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. #1186 (`f008f46`), #1189 (`8766ab6c`), #1190 (`93d9c2e`) and #1191
+(`58bf2a2`) are **draft**; **#1170 (`393dbcdc`) is ready-not-draft with two unresolved P1-class
+review threads and is NOT Claude's to ready, merge or unilaterally fix**. Nothing readied,
+enqueued, merged, published or applied by Claude at any point in this sequence. This edit touches
+this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~05:00 UTC)
+**Updated by:** Claude (2026-08-29: **#1189 is GREEN at `d25e5bf` — 35/35 required — but green WITH the
+fixes carried, not green on production truth. In between it went RED in CI, and that red was the
+contract catching both live leaks through the repo's own required gate. Separately, a fifth
+sensor-truth defect was found on #1170: two reviewers, one `P1`, verified by execution, NOT fixed.**
+
+## 1. #1189 went red, then green — and the red was the point
+
+**Cheek rebased #1189 to `604d9092`** at 04:22Z: _"tests-only rebase onto #1187 tip. Drops carried
+#1187 product files. Stay draft."_ Correct about #1187 — those files are in the base at `84d3b813`
+now. But the branch was also carrying **#1190 and #1191 as dependencies**, and those are **not** in
+the base, so the rebase dropped them too.
+
+Verified on `604d9092`, not assumed:
+
+```text
+postGrowReportRules        (?:bearer|authorization) rule  ->  absent
+proofReportRedactionRules  HEADER_ASSIGNMENT_RE           ->  absent
+contract                   6 failed | 159 passed | 20 skipped
+```
+
+**CI then confirmed it on a REQUIRED check** — `Full test suite (shard 5/32)` and
+`Full suite — batch 13/16` both failed, carrying the contract's own diagnostic verbatim:
+
+> `sanitizeProofReportMarkdown produced a PARTIAL redaction: a placeholder is present, so a rule
+fired on this span, but the secret survived it. Output that looks sanitized and is not.`
+
+`established fact`: the leak is no longer only a local probe result. **The repo's own required gate
+now demonstrates it.** The batch lane's automatic retry did not change the outcome, so it is
+deterministic, not flake.
+
+**Re-merged at Cheek's instruction** → `d25e5bf`. Built ON TOP of the rebase: `604d9092` as base,
+both fix branches as merge commits. No force-push, no rebase, no resurrection of the dropped
+`#1187` history. Checked first that Cheek's test file was **byte-identical** to the one pushed at
+`68d7544`, so the partial-redaction invariant survived intact and nothing needed reconstructing.
+
+## 2. #1189 green — the fullest green of this session
+
+`ci.yml` run `33234078079` on `d25e5bf`, **conclusion `success`** at 04:43:04Z.
+
+| Lane                                                                              | Result                                                                                                                                             |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 32/32 `Full test suite (shard N/32)`                                              | **green** — shard 5, red on `604d9092`, now passes                                                                                                 |
+| `Lint, typecheck, test, build`                                                    | green                                                                                                                                              |
+| `Preflight — edge shared-lib mirror in sync`                                      | green                                                                                                                                              |
+| `test:legal-seo`                                                                  | green                                                                                                                                              |
+| `test:security-regression` (the one `mustBeGreen`)                                | green                                                                                                                                              |
+| **16/16 batch lanes**                                                             | **all green** — including `batch 13/16` (red on the prior head) and `batch 10/16`, which failed the Lovable registry 403 on every other PR tonight |
+| `Browser census (public)`                                                         | green, 6m47s — back under the 420s cap                                                                                                             |
+| `Supabase Preview`                                                                | **`skipped`** — first time in this sequence it did not fire the 42P07                                                                              |
+| CodeQL ×3, eslint, tsc, docs-safety, One-Tent Loop smoke, both edge-mirror checks | green                                                                                                                                              |
+
+**Correction to my own report:** I told Cheek `Browser census (authenticated)` was "still running".
+It finished **`cancelled`**, not passed. Not a failure, not required, and it passed on the prior head
+— but "still running" was wrong.
+
+**What this green does and does not prove.** The six failures on `604d9092` were the invariant
+catching two live leaks; they are green on `d25e5bf` **because this head carries the fixes**.
+`COVERAGE_BASELINE` is untouched and no case was pinned as expected — nothing was relaxed. So this
+is **green-with-the-fixes, not green-on-production-truth**. `84d3b813` still carries both leaks.
+
+## 3. A FIFTH defect, on #1170 — verified, NOT fixed
+
+This session was subscribed to **#1170** (`trustBadge.attachable`, from this session pre-compaction).
+It is **NOT draft** — ready, and could be enqueued. Two review threads, unresolved since 20:54Z
+yesterday: **Codex at `P1` and Copilot, independently, on the same defect.**
+
+Both are right. Verified by execution on `393dbcdc`:
+
+| snapshot source                                                          | attachable | persisted `details.sensor.source` | in the six-label contract   |
+| ------------------------------------------------------------------------ | ---------- | --------------------------------- | --------------------------- |
+| `manual`, `csv`                                                          | true       | `manual`, `csv`                   | yes                         |
+| `manual_snapshot`, `import`, `imported`, `user`, `entry`, `log`, `diary` | **true**   | raw alias, verbatim               | **NO -> renders `unknown`** |
+
+The strip gates on `normalizeSensorSource()`, but `buildSensorSnapshotDetails` persists
+`source: snapshot.source` **verbatim**, and `normalizeSource` maps anything outside
+`{live, manual, csv, demo, stale, invalid, unknown}` to `unknown`. **A genuinely manual reading is
+written to the diary with a label the timeline renders as unknown provenance** — the sensor-truth
+contract in `AGENTS.md`, not a cosmetic issue.
+
+**Wider than either reviewer said.** Same probe: `pi_bridge`, `realtime` and `sensor` persist
+non-canonical sources too — but those were **already attachable before #1170**, so they are
+**pre-existing**, not its regression. #1170's third commit (`48828dd`) widened the blast radius to
+the 7 manual/CSV aliases; the 3 live aliases are a separate slice.
+
+**Deliberately not fixed.** Both remedies are product decisions, not nits: canonicalizing at the
+save site rewrites `pi_bridge` -> `live` in persisted data (whether any consumer reads that field
+for identity is **`NOT_MEASURED`**), and restricting attachment reverses `48828dd` and breaks its
+test pins at `quicklog-strip-non-live-coherence.test.ts:225-251`. Raised once on #1170 with both
+options, the trade-offs, and a recommendation. **It is ready-not-draft and touches persisted user
+data — it should not merge on Claude's unilateral read.** Same shape as #1187 earlier tonight.
+
+## 4. Leak / defect status
+
+| Module                                                                      | Status                                               | Where                               |
+| --------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------- |
+| `ecowittLocalForwardingStatus.ts`                                           | **CLOSED**, execution-verified                       | merged `f9f4d11` (#1185)            |
+| `ecowittValidationEvidenceRules.ts`                                         | **CLOSED**, execution-verified                       | merged `1d19c4c` (#1184)            |
+| `postGrowReportRules.ts` — labelled                                         | **CLOSED**                                           | merged `84d3b813` (#1187)           |
+| `postGrowReportRules.ts` — header-prefixed unlabelled                       | **LIVE ON DEPLOY**                                   | #1190, draft, 35/35 green           |
+| `proofReportRedactionRules.ts` — header-prefixed                            | **LIVE ON DEPLOY**                                   | #1191, draft, required green        |
+| `quickLogSnapshotStripAdapter` / save path — non-canonical persisted source | **LIVE ON DEPLOY (pre-existing) + widened by #1170** | #1170, **ready-not-draft**, unfixed |
+
+## 5. Posture
+
+Deploy tip **`84d3b813`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. #1186 (`5005cac`), #1189 (`d25e5bf`), #1190 (`93d9c2e`) and #1191
+(`58bf2a2`) are **draft**; **#1170 (`393dbcdc`) is ready-not-draft and NOT mine to ready or merge**.
+Nothing readied, enqueued, merged, published or applied by Claude. One re-run spent on #1190
+(census, passed); none spent elsewhere. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~03:35 UTC)
+**Updated by:** Claude (2026-08-29: **#1187 MERGED CARRYING A LEAK that two reviewers had already
+flagged, a FOURTH instance of the class was found in the module this file called the correct
+counter-example, and my own ordering contract stayed silent on both. Two live leaks are on the
+deploy branch right now. Fixes are open in draft as #1190 and #1191.**
+
+## 1. #1187 merged with a known, reported leak — deploy tip `f9f4d11` -> `84d3b813`
+
+**Copilot AND Codex both flagged the same defect as `P1` before the merge**, six minutes before it.
+Codex, verbatim:
+
+> When a bearer-prefixed credential uses a non-allowlisted variable name, such as
+> `Bearer SOME_PLAIN_NAME=s3cretV4lue123456`, this new assignment pattern does not match; the later
+> bearer rule then consumes only `Bearer SOME_PLAIN_NAME`, leaving `[redacted]=s3cretV4lue123456` in
+> the exported report.
+
+Confirmed by execution on `9f739b4` before any change, and **re-confirmed on the merged tip
+`84d3b813`** — not carried over from the pre-merge measurement:
+
+```text
+bearer SOME_PLAIN_NAME=s3cretV4lue123456      -> [redacted]=s3cretV4lue123456       PARTIAL
+Bearer SOME_PLAIN_NAME="s3cretV4lue123456"    -> [redacted]="s3cretV4lue123456"     PARTIAL
+Authorization: SOME_PLAIN_NAME=s3cret…        -> UNCHANGED, not redacted at all
+```
+
+The `Authorization:` row is a second leak found in the same probe that **neither reviewer
+reported**: that module had no Authorization rule of any kind.
+
+**Why the fix is not on #1187.** It was committed and validated before the PR closed. The push was
+rejected — `protected branch hook declined`, the **merge-queue branch lock** — and by the time the
+retry succeeded the PR had merged at `9f739b4` and closed. `established fact`, and the same
+mechanism that blocked the #1172 correction earlier in this sequence. A merged PR cannot carry
+follow-up work, so the fix is a fresh branch: **#1190**.
+
+**Process note recorded because it will recur:** a fix in hand does not beat a queue that is already
+moving. The lock is silent from the pusher's side until it rejects.
+
+## 2. A FOURTH instance — in the module this file called the counter-example
+
+`proofReportRedactionRules.ts`. The prior entry, #1187's PR body, and my audit all cited it as the
+module that got this right. **That citation was right about ordering and wrong about coverage.**
+
+```text
+Bearer MY_PASSKEY_VAR="zz-canopy-note-77"   -> [redacted]="zz-canopy-note-77"   PARTIAL
+Bearer SOME_PLAIN_NAME="zz-canopy-note-77"  -> [redacted]="zz-canopy-note-77"   PARTIAL
+bearer MY_API_KEY_VAR="zz-canopy-note-77"   -> UNCHANGED  (BEARER_RE is case-SENSITIVE)
+```
+
+It does order `AUTH_HEADER_RE` -> pairs -> bare keywords correctly, and documents the hazard in its
+own comments. It simply **had no rule for `Bearer <name>=<value>` at all**, so `BEARER_RE` consumed
+the NAME and stranded the VALUE. Its keyword rules cannot reach the shape: they are `\b`-anchored
+(`\bapi_key\b`) and `_` is a word character, so a label inside `MY_API_KEY_VAR` matches nothing.
+
+This is a **copy-to-clipboard and print surface**. Fixed in **#1191**.
+
+## 3. My ordering contract had a hole, and it let both leaks through
+
+The coverage-calibrated ordering check (#1189, first commit) skips shapes a module does not redact
+bare, reasoning _"no rule matches it bare, so no rule can destroy it decorated."_ **That reasoning is
+wrong.** A module can deliberately not cover a shape while another of its rules still fires on the
+decorated form, consuming the NAME and stranding the VALUE — output carrying a placeholder AND the
+secret, which looks sanitized and is not.
+
+So the contract was silent on the exact leak Copilot and Codex caught. `inference` corrected to
+`established fact` by running it: 1 failure in `redactSecrets`, 5 in `sanitizeProofReportMarkdown`,
+once the new invariant was added.
+
+**The remedy — the partial-redaction invariant**, which makes NO coverage judgment:
+
+```text
+if   redact(X) contains a placeholder,
+then redact(X) must NOT still contain the secret
+```
+
+It found the fourth instance. **That is the first defect this contract has FOUND rather than
+restated.**
+
+## 4. Corrections to what this file previously said
+
+| Prior claim                                                                                      | Status                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `proofReportRedactionRules.ts` "already implements the correct order" and is the counter-example | **Half wrong.** Correct on ordering; it had the same partial-redaction leak via an uncovered shape.                                                                     |
+| The shared ordering contract is "the durable remedy" preventing a fourth instance                | **Overstated.** As first written it would not have caught #1190's leak, and a fourth instance already existed. Only the partial-redaction invariant catches this class. |
+| "Three modules independently failed to follow it"                                                | **Four.** The module they were being compared against is the fourth.                                                                                                    |
+
+## 5. Leak status — four modules
+
+| Module                                                | Leak                           | Where                     |
+| ----------------------------------------------------- | ------------------------------ | ------------------------- |
+| `ecowittLocalForwardingStatus.ts`                     | **CLOSED**, execution-verified | merged `f9f4d11` (#1185)  |
+| `ecowittValidationEvidenceRules.ts`                   | **CLOSED**, execution-verified | merged `1d19c4c` (#1184)  |
+| `postGrowReportRules.ts` — labelled assignments       | **CLOSED**                     | merged `84d3b813` (#1187) |
+| `postGrowReportRules.ts` — header-prefixed UNLABELLED | **LIVE ON DEPLOY**             | #1190, draft              |
+| `proofReportRedactionRules.ts` — header-prefixed      | **LIVE ON DEPLOY**             | #1191, draft              |
+
+**Two leaks are live on `84d3b813` right now.** Both have verified fixes in draft. Neither is
+readied, enqueued or merged — that is Cheek's call, not Claude's.
+
+## 6. CI measured at 03:30 UTC — all four PRs, best state of the session
+
+| PR              | Required 35                          | `mustBeGreen`                    | Remaining red                                                                            |
+| --------------- | ------------------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| #1190 `93d9c2e` | **35/35 GREEN**                      | `test:security-regression` green | `batch 10/16`, `Supabase Preview` — both non-required, both established non-attributable |
+| #1191 `58bf2a2` | **GREEN**                            | green                            | `Supabase Preview` only                                                                  |
+| #1189 `68d7544` | `ci.yml` run 33228299151 **SUCCESS** | —                                | none                                                                                     |
+| #1186 `be79171` | —                                    | —                                | `Supabase Preview` only                                                                  |
+
+**Non-attribution established by evidence, not assertion:**
+
+- **`Full suite — batch 10/16`** — the **`Install dependencies` step** is what failed (Lovable
+  private-registry 403s); the test step is recorded `skipped`, so no test body ran. Decisive: **15 of
+  the 16 batches on the same commit, in the same workflow run, installed and passed.**
+- **`Browser census (public)`** — a genuine near-miss worth recording. It failed on #1190 and
+  **passed** on #1191, so the easy exoneration was not available. The durations settled it: the
+  census is a SINGLE Playwright test walking every public route, against a **420s per-test cap** —
+  it took **433s** on #1190 and **406s (14 seconds of headroom)** on #1191. The one sanctioned re-run
+  **passed**. `established fact`: this check will fail intermittently on any PR in this repo
+  regardless of content. Raised once on #1190; NOT fixed — raising the cap or sharding the census
+  changes a shared CI gate and belongs in its own reviewed slice.
+- **`Supabase Preview` 42P07** — eleventh instance. Two merged migrations both create
+  `ai_credit_grants`; declared in `config/local-supabase-replay-compatibility.json`, which governs
+  **local** replay only. The hosted preview never consults it. Reported once (#1186 comment
+  5459603190, #1190, #1191); deterministic, so never re-run and never re-litigated.
+
+## 7. `NOT_MEASURED` — not to be rounded up
+
+- **Production exposure for all four modules.** Two leaks are on the **deploy branch**; a merge is
+  not a deployment and no publish has been performed or authorized.
+- Whether any leaked string ever reached a real exported report, clipboard, or print surface.
+- Edge-function redaction copies beyond the one mirrored file (`ecowittValidationEvidenceRules`).
+- `sanitizeProofReportMarkdown` coverage for a label embedded in a longer NAME **bare** (no header
+  prefix) — recorded in `COVERAGE_BASELINE`, deliberately not fixed.
+
+## 8. Posture
+
+Deploy tip **`84d3b813`**. `20260827010000`, `20260826100000`, `20260825233000` and `20260813030000`
+all remain **NOT applied**. #1186, #1189, #1190 and #1191 are **draft**; nothing readied, enqueued,
+merged, published or applied by Claude. One re-run spent on #1190 (census), none remain. This edit
+touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~01:45 UTC)
+**Updated by:** Claude (2026-08-29: **The shared ordering contract is WRITTEN — #1189, draft. The
+prior entry's "un-started" item is closed. It is a BEHAVIOURAL contract over five redaction entry
+points, proven RED at 111 failures before being restored to green. It does NOT close any leak and
+does NOT change production exposure, which stays `NOT_MEASURED` for all three.**
+
+**What it pins — one invariant, not a coverage demand:**
+
+```text
+if   redact(X)          does not contain the secret,
+then redact(PREFIX + X) must not contain the secret either.
+```
+
+Decoration must never reduce redaction. Each case **calibrates against the module's own
+undecorated behaviour first**: a shape a module does not redact bare is out of scope and its
+decorated forms are skipped; a shape it handles bare and then leaks decorated is always an
+ordering bug, never a design choice.
+
+**That separation was earned, not assumed.** A first draft conflated ordering with coverage and
+produced **13 failures against `proofReportRedactionRules.ts`** — the module the audit had already
+established as the CORRECT counter-example. Investigating rather than trusting them showed the
+failures were spurious: that module destroys nothing, its `\b`-anchored keyword rules simply never
+match a label inside a longer NAME (`\bapi_key\b` cannot see `MY_API_KEY_VAR`, because `_` is a
+word character). **Coverage, not ordering.** The per-shape calibration is the fix for that false
+signal. Recorded because the contract's first output was wrong about my own audit's key finding.
+
+**Behavioural, not a structural lint — and that was forced, not preferred.** `AGENTS.md`: _"A
+contract test over a config or module MUST import it and assert on the resolved value. Matching a
+regex against the file's source text is not permitted for this purpose."_ A lint over the pattern
+arrays cannot distinguish a live rule from a commented-out or reordered one — **the exact failure
+mode this contract exists to catch**. It calls the real entry points and never reads a source file.
+
+**RED evidence — the contract was seen failing before it was trusted.** Ordering reverted in all
+three fixed modules (each whole-assignment rule moved back below the header and bare-word label
+rules), contract unchanged:
+
+```text
+Tests  111 failed | 29 passed | 20 skipped (160)
+```
+
+All four named historical-defect cases failed, and so did the coverage calibration. Two figures in
+that run need stating precisely rather than rounded:
+
+| Module                        |  Failures | Why that number is right                                                                                                                                                                                                                                                                                   |
+| ----------------------------- | --------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sanitizeReportText`          |        30 | reverted                                                                                                                                                                                                                                                                                                   |
+| `sanitizeReportValue`         |        30 | reverted                                                                                                                                                                                                                                                                                                   |
+| `redactEvidenceValue`         |        30 | reverted                                                                                                                                                                                                                                                                                                   |
+| `redactSecrets`               | **16/24** | The 8 survivors are exactly `PASSKEY` and `API_KEY` in bare shapes — **both 7 characters**, below the `{8,}` threshold of that module's `\bbearer\s+[A-Za-z0-9._-]{8,}` rule, so nothing consumes them and the reverted order is genuinely harmless there. The class is still caught through the other 16. |
+| `sanitizeProofReportMarkdown` |     **0** | **Correct, not a gap.** It was never broken and was not reverted — it already orders its rules right and documents the hazard. The counter-example stays the counter-example.                                                                                                                              |
+
+After restoring (tree verified clean first, per the `AGENTS.md` rule against committing while a
+review experiment is mutating the working tree): `140 passed | 20 skipped`.
+
+**Two coverage gaps RECORDED, deliberately NOT fixed** — pinned in a `COVERAGE_BASELINE` so a
+change in either direction fails loudly:
+
+| Module                        | Uncovered shape                              | Status                                                                                                                                                                                        |
+| ----------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `redactSecrets`               | unlabelled NAMEs (`SOME_PLAIN_NAME=…`)       | **Deliberate.** Renders a user-facing grow report; grow telemetry shares the uppercase `NAME=value` shape, so a generic rule would redact `VPD=1.2` and `EC=1.8`. Pinned by an existing test. |
+| `sanitizeProofReportMarkdown` | label inside a longer NAME; unlabelled NAMEs | **`NOT_MEASURED` gap, recorded not fixed.** Widening it is a separate reviewed change, not something to slip into a tests-only PR.                                                            |
+
+**Known weakness, stated rather than papered over: the calibration can go QUIET.** If a module
+loses bare coverage for a shape, its ordering cases stop running instead of failing.
+`COVERAGE_BASELINE` is the mitigation, not a cure. That is a deliberate trade — demanding coverage
+was not this contract's mandate.
+
+**#1189 carries #1187's commit, and that is a real dependency, not sloppiness.** On the deploy tip
+without #1187, `redactSecrets` does not redact `PASSKEY="…"` at all, so the coverage calibration is
+**RED**. The branch was cut fresh from `1d19c4c` and #1187 merged in; diff against the deploy branch
+is exactly 3 files (#1187's 2 + the new test). Once #1187 lands, #1189 reduces to the single test
+file. Flagged at the top of the PR body.
+
+**#1189 CI is `NOT_MEASURED` — in flight, NOT green and NOT red.** On `669754c`: both edge-mirror
+preflights `success` (one is required), `Verify stabilization PR scope` skipped, production build
+`success` via the preview pipeline, **`Supabase Preview` cancelled** — the same non-required lane as
+the eight prior instances, already diagnosed and not re-litigated. The 32 shards,
+`Lint, typecheck, test, build` and `test:legal-seo` were still queued or running at the time of
+this entry. **No review comments yet.**
+
+Local validation actually run (not the full suite — stated as such in the PR body): the contract
+`140 passed | 20 skipped`; 11 sibling suites for all four modules `571 passed | 23 skipped`;
+`tsc --noEmit` exit 0; eslint clean after `prettier --write`; `verify-edge-shared-in-sync.mjs` OK
+(101 mirrored files); `check-contract-test-resolution.mjs` OK; `assert-docs-safety.mjs` PASS;
+`v0-operating-loop-contract` 26/26. The pre-commit hook was **bypassed** (it exceeded a timeout
+earlier this session) and every one of its four steps was then run explicitly instead.
+
+**Leak status unchanged by this PR:**
+
+| Module                              | Leak                           | Where                    |
+| ----------------------------------- | ------------------------------ | ------------------------ |
+| `ecowittLocalForwardingStatus.ts`   | **CLOSED**, execution-verified | merged `f9f4d11` (#1185) |
+| `ecowittValidationEvidenceRules.ts` | **CLOSED**, execution-verified | merged `1d19c4c` (#1184) |
+| `postGrowReportRules.ts`            | **STILL OPEN**                 | #1187, draft             |
+
+**Still `NOT_MEASURED` and not to be rounded up:** production exposure for all three; whether the
+leaked strings ever reached a user-facing surface; and edge-function redaction copies beyond the one
+mirrored file. The contract measures none of these — it prevents a fourth instance, it does not
+retire the first three.
+
+**Posture.** Deploy tip **`1d19c4c`**. `20260827010000`, `20260826100000`, `20260825233000` and
+`20260813030000` all remain **NOT applied**. #1186, #1187 and #1189 are **draft**; nothing readied,
+enqueued, merged or published by Claude. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~01:20 UTC)
+**Updated by:** Claude (2026-08-29: **#1184 MERGED as `1d19c4c`. TWO of the three redaction leaks
+are now closed on the deploy branch, both verified by EXECUTION. The third is still open in draft.
+Production exposure remains `NOT_MEASURED` for all three.**
+
+**#1184 merged — deploy tip `f9f4d11` -> `1d19c4c`.** Verified on the merged tip, not assumed:
+
+- **Pattern order correct in the shipping module** — the env assignment rule at line 55, above
+  `Bearer` (56), `Authorization` (57) and `PASSKEY` (58).
+- **The edge mirror carries the fix too** — `supabase/functions/_shared/lib/lib/
+ecowittValidationEvidenceRules.ts` checked directly on the tip, not inferred from CI.
+- **Re-probed by execution in a detached worktree at `1d19c4c`, through the OBJECT PATH** — the
+  shape that actually leaked, since a bare string returns `[redacted]` wholesale and yields a false
+  negative:
+
+```text
+Bearer MY_PASSKEY_VAR="…"   -> { "config_note": "Bearer [REDACTED]", "temp_f": 77.4, "note": "stable" }
+Authorization: PASSKEY="…"  -> { "config_note": "[REDACTED]", … }
+Bearer SOME_PLAIN_NAME="…"  -> { "config_note": "Bearer [REDACTED]", … }
+```
+
+All four previously-leaking inputs redact. **Benign siblings `temp_f: 77.4` and `note: "stable"`
+survive untouched**, which is what distinguishes "the leak closed" from "the redactor went blunt".
+
+**#1184 merged in the strongest state of any PR in this sequence**, recorded because it is the
+contrast case with #1169 and #1176: **35/35 required green** on the exact merging SHA `e3f79be`,
+**Codex reviewed it clean TWICE** on that same SHA, Copilot's finding fixed with its thread
+**resolved**, and both edge-mirror checks green in CI. No stale-SHA gap, no unreviewed head.
+
+**Leak status across the three modules:**
+
+| Module                              | Leak                           | Where                    |
+| ----------------------------------- | ------------------------------ | ------------------------ |
+| `ecowittLocalForwardingStatus.ts`   | **CLOSED**, execution-verified | merged `f9f4d11` (#1185) |
+| `ecowittValidationEvidenceRules.ts` | **CLOSED**, execution-verified | merged `1d19c4c` (#1184) |
+| `postGrowReportRules.ts`            | **STILL OPEN**                 | #1187, draft             |
+
+**`NOT_MEASURED` and not to be rounded up: production exposure for ALL THREE.** Two are closed on
+the **deploy branch**; the third is not merged at all. **A merge is not a deployment** — exposure
+ends only at a verified publish, and none has been performed or authorized.
+
+**Both open CURRENT_STATE-adjacent PRs are now one commit behind.** #1186 (`fea3709`) and #1187
+(`9f739b4`) are both based on `f9f4d11`. **Neither conflicts with `1d19c4c`**, so neither was
+rebased or merged forward — churning their SHAs would invalidate their CI and reviews for no content
+change. Left deliberately.
+
+**Still not written: the shared ordering contract.** The audit's central finding stands —
+`proofReportRedactionRules.ts` already implements the correct order and documents the hazard, and
+three modules independently failed to follow it. Three one-line fixes do not prevent a fourth. A
+lint rule or shared contract is the durable remedy and remains **un-started**.
+
+**Posture.** Deploy tip **`1d19c4c`**. `20260827010000`, `20260826100000`, `20260825233000` and
+`20260813030000` all remain **NOT applied**. #1186 and #1187 are **draft**; nothing readied,
+enqueued or merged by Claude. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~01:05 UTC)
+**Updated by:** Claude (2026-08-29: **The ordering audit was DONE — the first deliberate one. It
+found a THIRD instance (fixed in #1187) and, more usefully, the counter-example: this codebase
+already contained the correct pattern, documented, the whole time.**
+
+**INVENTORY — this did not exist before, and the first pass was incomplete.** A search for
+`SECRET_PATTERNS` / `SECRET_VALUE_PATTERNS` / `SENSITIVE_*PATTERN` returned **11** production
+modules. A widened search then caught a **12th**, `proofReportRedactionRules.ts`, which uses
+different constant names and which the first pass MISSED — and which turned out to be the most
+important file in the audit. Recorded because the near-miss is the lesson: an inventory built from
+one naming convention is not an inventory.
+
+**Only THREE modules meet the precondition** for this defect class — both an **assignment-style
+rule** and an **earlier rule that can consume or fragment its NAME**. The other nine have no
+assignment rule, so the class cannot apply to them.
+
+| Module                              | Status                                          |
+| ----------------------------------- | ----------------------------------------------- |
+| `ecowittLocalForwardingStatus.ts`   | **FIXED** — #1185, merged as `f9f4d11`          |
+| `ecowittValidationEvidenceRules.ts` | **FIXED** — #1184, green at `e3f79be`, unmerged |
+| `postGrowReportRules.ts`            | **FIXED** — #1187, new draft                    |
+
+**#1187 — `postGrowReportRules.ts`, two findings, both proven by execution on `f9f4d11`:**
+
+1. **ORDERING.** `\bbearer\s+…` ran before `\bBridgeToken\s*[:=]\s*\S+`, consuming the NAME:
+   `bearer BridgeToken=s3cretV4lue123456` -> `[redacted]=s3cretV4lue123456`.
+2. **COVERAGE, and NOT an ordering bug — reordering alone would not have fixed it.**
+   `SERVICE_ROLE_KEY=s3cretV4lue123456` passed through **ENTIRELY unredacted**. Two causes, both
+   verified: `\bservice_role\b` **cannot match inside `SERVICE_ROLE_KEY`** because `_` is a word
+   character so the trailing `\b` fails (checked directly: `false`), and the module had **no
+   credential-assignment rule of any kind** as a backstop (verified: 0 matches).
+
+**The design decision on #1187, which is a deliberate DIVERGENCE from the two sibling fixes.** The
+generic `[A-Z][A-Z0-9_]{2,}=` rule used in the other modules was **not** reused here. This helper
+renders a **user-facing grow report** whose stated contract is _"Preserves prose"_, and grow
+telemetry uses the identical uppercase shape — a generic rule would redact `VPD=1.2`, `PPFD=800`,
+`EC=1.8` and destroy real report content. The new rule instead **requires a credential label in the
+NAME**. Consistency across modules would have been easier and wrong. Proven: nine benign inputs,
+including uppercase telemetry, a mixed prose-and-telemetry sentence and plain prose, are
+**byte-identical** before and after.
+
+| Validation on #1187                  | Result                                         |
+| ------------------------------------ | ---------------------------------------------- |
+| RED — new tests vs. untouched module | **7 failed / 60 passed (67)**                  |
+| GREEN — after the fix                | **67 / 67**                                    |
+| post-grow + report sweep             | **92 files, 839 passed / 0 failed**            |
+| `tsc --noEmit`, eslint               | clean                                          |
+| Edge mirror                          | **not mirrored** — checked, no sync obligation |
+
+**THE COUNTER-EXAMPLE — the most transferable finding of the whole audit.**
+**`proofReportRedactionRules.ts` already implements the correct ordering AND documents this exact
+hazard in its own comments:**
+
+> _"Authorization headers first — strip whole value before any sub-pattern (e.g. `Bearer ...`) is
+> partially consumed by other rules."_
+> _"Bare keyword fallback — replaces a residual reference once any preceding `key=value` pairs have
+> been stripped."_
+
+Proven correct by execution: `Bearer access_token=<secret>` -> `Bearer [redacted]`. Its order is
+**auth headers -> pairs -> bare keywords**. So the three defects fixed in the last day were **not
+three independent mistakes** — they were **three modules that did not follow a solved, documented
+pattern already sitting in the same directory**. **That reframes the remedy: the durable fix is a
+shared ordering contract or a lint/test fence, NOT a fourth one-line move.** That fence is
+**explicitly out of scope on #1187** and is not yet written.
+
+One caveat so the counter-example is not oversold: `proofReportRedactionRules`'s protection is
+bounded by its own `SECRET_KEYWORDS` list, and inputs outside that list pass through. Its
+**ordering** is right; its **scope** is its own concern.
+
+**`NOT_MEASURED`, stated rather than assumed:** whether any of these leaked strings reach a
+user-facing surface in practice for any of the three modules; and whether edge-function copies
+beyond the one mirrored file (`ecowittValidationEvidenceRules`) carry the same lists.
+
+**Scope note on this file's own PR.** These audit entries are being appended to **#1186**, whose
+stated scope was "#1185 merged + three corrections". That is a deliberate widening: `CURRENT_STATE`
+is a single file, and a fourth parallel branch editing it would conflict rather than help.
+
+**Posture.** Deploy tip **`f9f4d11`**. **Production exposure `NOT_MEASURED` for all three leaks** —
+one merged to the deploy branch, two unmerged, and no verified publish for any. `20260827010000`,
+`20260826100000`, `20260825233000`, `20260813030000` all remain **NOT applied**. #1184, #1186 and
+#1187 are all **draft**: nothing readied, enqueued or merged. This edit touches this file only.
+Prior header follows.)
+
+**Prior update:** 2026-08-29 UTC (~00:05 UTC)
+**Updated by:** Claude (2026-08-29: **The SAME redaction-ordering defect was found in a SECOND
+module and fixed on #1184 (`e3f79be`). Two modules, one evening, two different reviewers. That is a
+PATTERN, and the audit that would close it is still `NOT_MEASURED`.**
+
+**#1184 — `ecowittValidationEvidenceRules.ts` had the identical CONSUMING case.** The branch had
+already moved the env-assignment rule above the `PASSKEY` / admin-role label patterns, fixing
+**fragmenting** — but the rule still ran **after** `Bearer` and `Authorization`, so those consumed the
+variable NAME first and the VALUE survived. Exactly the state `75a7de9` corrected in the sibling
+forwarding sanitizer three hours earlier.
+
+**Found independently, twice, and Copilot got there first.** Copilot filed it on #1184 at **22:32**;
+this session did not read that thread until **23:50**, having reached the same conclusion separately
+by execution. Recorded that way round because it is the honest order: the reviewer beat the owner to
+it by well over an hour, and the thread sat unread in between.
+
+**Proof by execution on the untouched head `a6c95f9`**, via the **object path**:
+
+```text
+{ config_note: 'Bearer MY_PASSKEY_VAR="flower-room-credential"' }
+  ->  { "config_note": "[REDACTED]=\"flower-room-credential\"" }
+```
+
+Benign sibling fields in the same call (`temp_f: 77.4`, `note: "stable"`) passed through untouched —
+which is what proves this is real substitution and a real leak, not fail-closed behaviour.
+
+**THE GOTCHA WORTH KEEPING — a naive probe of this module returns a FALSE NEGATIVE.** Called on a
+**bare string**, `redactEvidenceValue` returns `[redacted]` wholesale for _everything_, including
+benign input like `"all good, tent stable"`. The leak appears **only through the object path**, where
+per-field substitution happens. This session's first probe came back entirely clean for exactly that
+reason and nearly closed the question. **When testing a redactor, test the shape the caller actually
+passes**, not the most convenient one.
+
+**Wider than reported, again.** The consuming case needs **no credential label in the NAME at all** —
+`Bearer SOME_PLAIN_NAME="…"` leaked identically. Copilot reported it for label-carrying names;
+measurement showed the unlabelled case too. Same widening as on #1185.
+
+**Fixed in `e3f79be`,** same one-line shape: assignment rule above the header patterns as well as the
+label patterns. No new pattern, no new file, no schema. Six header-prefixed regression cases added,
+including Copilot's exact `Authorization: PASSKEY="…"`, the unlabelled plain-NAME case and a
+lowercase header, plus a fence that a real header credential still redacts and benign telemetry is
+untouched. **Edge mirror and `.sync-manifest.json` regenerated with `scripts/sync-edge-shared.mjs`,
+never by hand** — this module IS mirrored into `supabase/functions/_shared`, unlike the forwarding
+one, so that step is mandatory here.
+
+| Validation on `e3f79be`              | Result                                            |
+| ------------------------------------ | ------------------------------------------------- |
+| RED — new tests vs. untouched module | **6 failed / 40 passed (46)**                     |
+| GREEN — after the fix                | **46 / 46**                                       |
+| Broad `*ecowitt*` sweep              | **164 files, 2555 passed / 3 skipped / 0 failed** |
+| `tsc --noEmit`, eslint               | clean                                             |
+| Edge shared mirror                   | **OK — 101 files in sync**                        |
+| Edge forbidden-import scan           | OK                                                |
+
+**#1184 was brought current by MERGE, not rebase — deliberately.** `f2b02cc` merges `f9f4d11` into
+`codex/validation-panel-passkey-order-872741af`. That branch is **not one this session created**, and
+rewriting history on someone else's branch — rebase, amend or force-push — is a hard never; a merge
+commit keeps their checkout valid. It also matches the convention already on that branch, whose prior
+head `a6c95f9` was itself a base merge. Cheek asked for "the #1184 rebase"; the outcome was delivered
+by the safe mechanism and the substitution was stated rather than silently made.
+
+**Codex reviewed `e3f79be` and found nothing.** Copilot's thread is answered and **resolved**.
+
+**THE PATTERN, which is the point of this entry.** Tonight the identical ordering defect was found and
+fixed in **two separate modules** — `ecowittLocalForwardingStatus.ts` (#1185) and
+`ecowittValidationEvidenceRules.ts` (#1184) — by **two different reviewers**, neither time by a
+deliberate audit. Both fixes were the same one-line move. **Neither `SECRET_PATTERNS` nor
+`SECRET_VALUE_PATTERNS` has had a systematic ordering audit**, and no inventory exists of how many
+other modules carry a copy of this pattern list. **`NOT_MEASURED`.** Two instances found by accident
+is not evidence the class is exhausted — it is evidence that nobody has looked.
+
+**Cursor was absent from the review surface all evening.** Bugbot reported `BLOCKED — usage limit
+reached` on **every** head across #1185, #1172, #1186 and #1184. The one time its security agent did
+run, it passed a leaking SHA (recorded below). Treat Cursor as **not** currently contributing review
+coverage.
+
+**Posture.** Deploy tip **`f9f4d11`**. **Production exposure `NOT_MEASURED` for BOTH leaks** — the
+merges close them on the deploy branch; exposure ends at a verified publish, and #1184 has not even
+merged yet. `20260827010000`, `20260826100000`, `20260825233000`, `20260813030000` all remain **NOT
+applied**. #1184 is Codex's PR — the authorized fix was pushed and nothing else: no ready, no enqueue,
+no merge. This edit touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~22:50 UTC)
+**Updated by:** Claude (2026-08-28: **#1185 MERGED as `f9f4d11`. The sanitizer leak is closed on the
+deploy branch — verified by execution, not inferred. Production exposure is `NOT_MEASURED`.** This
+entry also carries **three corrections to my own earlier entries**, all raised by reviewers on #1172
+and all confirmed.
+
+**#1185 merged — `f9f4d11`.** Deploy tip `9d7b4b4` → **`f9f4d11`**. The original probe was re-run
+against the merged tip in a detached worktree: **all ten inputs that leaked on the untouched parent
+now redact**, including `Bearer SOME_PLAIN_NAME="…"`, the unlabelled case. Pattern order in the
+merged module confirms it — the env `NAME=value` rule at line 99, above `Bearer` (100),
+`Authorization` (101) and `PASSKEY` (102). Both mechanisms, **fragmenting** and **consuming**, are
+closed.
+
+**A merge is not a deployment, and this is exactly where that bites.** `f9f4d11` is the **deploy
+branch**. **Production exposure ends only at a verified publish and is `NOT_MEASURED`** until one is
+confirmed. No publish was performed and none is authorized.
+
+**Review posture at merge**, since this slice existed because #1176 lacked one: the merged head
+`d19c9ec` was reviewed by **Codex with no findings** before it was enqueued. **Copilot** found a real
+second bypass on `5bc6a917` — the header-consuming leak — fixed in `75a7de9`, with both threads
+answered and resolved. **Cursor Bugbot stayed `BLOCKED`** on the usage limit throughout. The head
+that merged was independently reviewed, which is the outcome this slice was for.
+
+**CORRECTION 1 — reviewer identity. `Dream Queen` and `Blue Dream` are the SAME reviewer.**
+Confirmed by Cheek, 2026-08-28. Earlier entries used both names with no alias recorded, which
+Copilot flagged on #1172: a reader could not tell whether one reviewer or two had reviewed, and the
+ambiguity sat directly on a **gate**. Recorded now as an established alias. **This does not change
+seat eligibility:** Blue Dream / Dream Queen is the **owner-designated reviewer**; the **protocol
+peer-review seat** is limited by `AGENTS.md` and `HANDOFF_PROTOCOL.md:24` to Grok, Claude or Codex,
+and is held by **Grok (GDP)**. A PASS from Blue Dream is a real review and is **not** that seat.
+
+**CORRECTION 2 — #1169 DID have a pre-merge independent review.** My #1172 entry claimed it "landed
+with no independent review". **False.** Blue Dream reviewed `c84a8330` in Cursor before auto-merge
+and returned **PASS**. Filed as a **P1 by Codex**, confirmed, and fixed in place at the original
+passage. Source of the error: #1172's PR **body**, which this file had already superseded, copied
+upward without checking the file against itself.
+
+**CORRECTION 3 — the exposure window was wrong at both ends.** Raised by **Copilot**. The old wording
+said the defect was live "from `a76e73ad` (#1176's merge) until #1185 lands". Both halves were wrong:
+#1176's merge marks **discovery**, not the start of exposure — the sanitizer was already vulnerable
+on the untouched parent, proven by execution — so the **start is `NOT_MEASURED`**; and #1185 landing
+closes it on the **deploy branch**, while **production exposure ends at a verified publish**, also
+`NOT_MEASURED`. This is the repo's own "a merge is not a deployment" rule, which the original wording
+broke while this same session was enforcing it on migrations and CI verdicts.
+
+All three corrections were applied **in place at the original passages**, annotated rather than
+silently rewritten, so a reader who scrolls to the old text finds the correction there.
+
+**Why these landed at all, recorded once.** #1172 merged as `9d7b4b4` while all three findings were
+open: the fix could not be pushed because the merge queue **locks the branch**
+(`protected branch hook declined`). The corrections therefore arrive as a follow-up on a fresh branch
+cut from `f9f4d11` — a merged PR cannot carry follow-up work.
+
+**Posture.** Deploy tip **`f9f4d11`**. `20260827010000`, `20260826100000`, `20260825233000` and
+`20260813030000` all remain **NOT applied**. **#1184's rebase is now unblocked** by its own condition
+(parked until #1185 lands) and has **not** been started. No publish, no SQL, no APPLY. This edit
+touches this file only. Prior header follows.)
+
+**Prior update:** 2026-08-28 UTC (~22:00 UTC)
 **Updated by:** Claude (2026-08-28: **#1185 is GREEN on all 35 required contexts at `75a7de9` — the
 first required verdict the header-bypass fix has had. The prior header recorded this axis as
 `NOT_MEASURED`; it is now measured.** Green is not approval, and the review coverage on this SHA is
@@ -150,9 +3168,14 @@ Two claims, separated by evidence grade rather than blended:
   and that is the lesson for next time.
 
 If the inference holds, #1172 would have **merged itself the moment required CI went green** — no
-human step, no review. That is the identical mechanism this file already records for **#1169**,
-which landed with **no independent review** because auto-merge fired while the handoff relay was
-still pending.
+human step, no approval gate. That is the same auto-merge mechanism that landed **#1169**.
+
+**CORRECTED 2026-08-28 ~22:50.** An earlier revision of the sentence above said #1169 "landed with
+**no independent review**". **That was false**, and it contradicted this file's own record further
+down, which states Blue Dream **DID** review #1169 at `c84a8330` pre-merge and returned **PASS**.
+Filed as a **P1 by Codex** on #1172 and confirmed. The false claim came from #1172's PR **body**
+(written 15:54), which this file had already superseded; it was propagated upward without checking
+the file against itself.
 
 #1172 was then converted to `draft=true`. Verified after by fresh read: `draft: true`,
 `auto_merge: None`, head `bdeb058`, base `7fd6a001`. **No attribution is made for who armed it** —
@@ -280,8 +3303,14 @@ all queued. **Zero red.** Non-required completed: `docs-safety`, `Config guards`
 `Analyze (python)` all `success`; `CodeQL` `neutral`; `Supabase Preview` and the irrigation/
 stabilization jobs `skipped`. No green may be carried forward from `7be3d73` or `5bc6a917`.
 
-**The leak is LIVE on the deploy branch.** It pre-exists #1185, so `7fd6a001` still leaks today.
-#1185 closes it; if #1185 does not land, the exposure remains.
+**The leak was live on the deploy branch as of this entry.** It pre-exists #1185, so `7fd6a001`
+still leaked at the time of writing.
+
+**CORRECTED 2026-08-28 ~22:50.** #1185 has since merged as **`f9f4d11`** and the deploy branch no
+longer leaks — verified by execution, all ten probe cases redact. But the "exposure remains / #1185
+closes it" framing above was **wrong in kind**, not just stale: a merge closes the defect on the
+**deploy branch**, not in production. **Production exposure ends only at a verified publish**, and
+is `NOT_MEASURED` until one is confirmed.
 
 **Still parked, explicitly not in this slice:** the three handoff questions; the mixed-case /
 spaced `NAME = value` P2 (pattern stays uppercase-only, no `\s*` around `=`); the rest of
@@ -431,9 +3460,21 @@ contains no bare `token` rule. `MY_TOKEN_VAR=` and `MY_BEARER_VAR=` were always 
 narrower statement as correct and the earlier wording as superseded.
 
 **Exposure window, stated plainly.** The defect was surfaced by a failing test during #1176 and
-fenced there **for the diagnostics export only**. It has been live on the forwarding-report path
-from `a76e73ad` (#1176's merge) until #1185 lands. That is a production surface, not a pre-merge
-note.
+fenced there **for the diagnostics export only**.
+
+**CORRECTED 2026-08-28 ~22:50, on Copilot's finding on #1172 — the original wording was wrong at
+both ends.** It said the defect "has been live on the forwarding-report path from `a76e73ad`
+(#1176's merge) until #1185 lands."
+
+- **#1176's merge marks DISCOVERY, not the start of exposure.** The sanitizer was already vulnerable
+  on the untouched parent — proven by execution on `7fd6a001`, where all ten probe inputs leaked.
+  The exposure predates #1176 by however long that ordering stood; its **start is `NOT_MEASURED`**.
+- **#1185 landing does not end production exposure.** It updates the **deploy branch**. Exposure
+  ends only after a **publish containing the fix is verified** — also `NOT_MEASURED`.
+
+This file carries "a merge is not a deployment" as a standing rule, and the original wording broke
+it — about a **security** exposure window. Recorded rather than silently rewritten, because the
+failure mode is the transferable part: applying a rule to others' claims and not to one's own.
 
 **Validation at `5f75806`.** RED then GREEN with the final test files, reverting **only** the
 production module: **10 failed / 22 passed → 32/32**. Direct consumers of the module (4 suites)

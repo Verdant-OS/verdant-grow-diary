@@ -3,8 +3,9 @@
  *
  * Single source of truth for locating the built SSR server bundle used by the
  * postbuild SEO stage. The Nitro/Vite output layout has moved between
- * `.output/server/index.mjs` and `<dist>/server/index.mjs`, so the path is
- * detected automatically rather than hard-coded:
+ * `.output/server/index.mjs`, `<dist>/server/index.mjs`, and the Vercel Nitro
+ * preset's `.vercel/output/` tree, so the path is detected automatically rather
+ * than hard-coded:
  *
  *   1. explicit override (argv / SEO_SERVER_BUNDLE_ENTRY)
  *   2. `serverEntry` declared by the build itself in nitro.json
@@ -41,6 +42,8 @@ function detectDeclaredCandidates(absoluteDist) {
   for (const nitroJsonPath of [
     join(absoluteDist, "nitro.json"),
     resolve(".output", "nitro.json"),
+    // Vercel TanStack Start / Nitro preset writes nitro.json under Build Output API.
+    resolve(".vercel", "output", "nitro.json"),
   ]) {
     const nitro = readJson(nitroJsonPath);
     const serverEntry = typeof nitro?.serverEntry === "string" ? nitro.serverEntry : null;
@@ -55,6 +58,8 @@ function detectDeclaredCandidates(absoluteDist) {
   for (const wranglerJsonPath of [
     join(absoluteDist, "server", "wrangler.json"),
     resolve(".output", "server", "wrangler.json"),
+    resolve(".vercel", "output", "server", "wrangler.json"),
+    resolve(".vercel", "output", "wrangler.json"),
   ]) {
     const wrangler = readJson(wranglerJsonPath);
     const main = typeof wrangler?.main === "string" ? wrangler.main : null;
@@ -92,6 +97,10 @@ export function probeServerBundleEntry(distDir, explicitEntry) {
       path: resolve(".output", "server", "index.mjs"),
       source: "conventional legacy Nitro layout (.output/server/index.mjs, relative to cwd)",
     },
+    {
+      path: resolve(".vercel", "output", "server", "index.mjs"),
+      source: "conventional Vercel Nitro layout (.vercel/output/server/index.mjs, relative to cwd)",
+    },
   ].filter(Boolean);
 
   // Preserve probe order while dropping duplicate absolute paths, so a
@@ -112,7 +121,6 @@ export function probeServerBundleEntry(distDir, explicitEntry) {
     detectedFrom: found ? found.source : null,
   };
 }
-
 
 /**
  * Human-readable probe table. Used both for the informational log line before

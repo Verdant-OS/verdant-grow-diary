@@ -47,6 +47,8 @@ describe("classifyDrybackSource", () => {
     expect(classifyDrybackSource("bridge")).toBe("invalid");
     expect(classifyDrybackSource("livefeed")).toBe("invalid");
     expect(classifyDrybackSource("ecowitt")).toBe("invalid");
+    expect(classifyDrybackSource("mqtt")).toBe("invalid");
+    expect(classifyDrybackSource("home_assistant")).toBe("invalid");
   });
 });
 
@@ -329,5 +331,110 @@ describe("projectDrybackSamplesForMonitoring / calibrated series", () => {
     expect(vm.seriesValueKind).toBe("raw");
     expect(vm.openWindow?.peakVwcPct).toBe(50);
     expect(vm.openWindow?.troughVwcPct).toBe(40);
+  });
+
+  it("keeps invalid-source soil samples as evidence (ecowitt/mqtt/home_assistant)", () => {
+    const w0 = hoursFrom(T0, -24);
+    const w1 = hoursFrom(T0, -2);
+    for (const source of ["ecowitt", "mqtt", "home_assistant"] as const) {
+      const vm = buildDrybackMonitoring(
+        [
+          { id: `${source}-a`, capturedAt: hoursFrom(T0, -23), vwcPct: 42, source },
+          { id: `${source}-b`, capturedAt: hoursFrom(T0, -18), vwcPct: 38, source },
+          { id: `${source}-c`, capturedAt: hoursFrom(T0, -12), vwcPct: 34, source },
+          { id: `${source}-d`, capturedAt: hoursFrom(T0, -3), vwcPct: 30, source },
+        ],
+        [
+          { id: "w0", occurredAt: w0 },
+          { id: "w1", occurredAt: w1 },
+        ],
+        { now: T0 },
+      );
+      expect(vm.status).not.toBe("empty");
+      expect(vm.emptyCopy).not.toBe(DRYBACK_EMPTY_NO_SAMPLES);
+      expect(vm.sampleCount).toBe(4);
+      expect(vm.latestClosed?.sourceClass).toBe("invalid");
+      expect(vm.latestClosed?.sourceLabel).toBe("Invalid telemetry");
+      expect(vm.latestClosed?.quality).not.toBe("usable");
+      expect(["weak", "unusable"]).toContain(vm.latestClosed?.quality);
+      expect(vm.latestClosed?.peakVwcPct).toBeNull();
+      expect(vm.latestClosed?.troughVwcPct).toBeNull();
+      expect(vm.latestClosed?.deltaPctPoints).toBeNull();
+      expect(vm.latestClosed?.durationLabel).toBeNull();
+    }
+  });
+
+  it("still rejects quality-string invalid/error and VWC 0/100 even when source is live", () => {
+    const vm = buildDrybackMonitoring(
+      [
+        { id: "q1", capturedAt: hoursFrom(T0, -5), vwcPct: 42, source: "live", quality: "invalid" },
+        { id: "q2", capturedAt: hoursFrom(T0, -4), vwcPct: 40, source: "live", quality: "error" },
+        { id: "z0", capturedAt: hoursFrom(T0, -3), vwcPct: 0, source: "live" },
+        { id: "z100", capturedAt: hoursFrom(T0, -2), vwcPct: 100, source: "live" },
+      ],
+      [{ id: "w1", occurredAt: hoursFrom(T0, -10), volumeMl: 1000 }],
+      { now: T0 },
+    );
+    expect(vm.status).toBe("empty");
+    expect(vm.emptyCopy).toBe(DRYBACK_EMPTY_NO_SAMPLES);
+    expect(vm.sampleCount).toBe(0);
+  });
+
+  it("keeps pi_bridge / live usable when they otherwise qualify", () => {
+    const w0 = hoursFrom(T0, -48);
+    const w1 = hoursFrom(T0, -12);
+    const samples = [
+      { id: "a", capturedAt: hoursFrom(T0, -47), vwcPct: 55, source: "pi_bridge" },
+      { id: "b", capturedAt: hoursFrom(T0, -40), vwcPct: 48, source: "pi_bridge" },
+      { id: "c", capturedAt: hoursFrom(T0, -30), vwcPct: 40, source: "live" },
+      { id: "d", capturedAt: hoursFrom(T0, -20), vwcPct: 35, source: "live" },
+      { id: "e", capturedAt: hoursFrom(T0, -13), vwcPct: 32, source: "live" },
+    ];
+    const vm = buildDrybackMonitoring(
+      samples,
+      [
+        { id: "w0", occurredAt: w0, volumeMl: 1800 },
+        { id: "w1", occurredAt: w1, volumeMl: 1600 },
+      ],
+      { now: T0 },
+    );
+    expect(vm.status).toBe("windows");
+    expect(vm.latestClosed?.quality).toBe("usable");
+    expect(["live"]).toContain(vm.latestClosed?.sourceClass);
+  });
+
+  it("one invalid-source sample blocks usable and Live on a live-majority window", () => {
+    const w0 = hoursFrom(T0, -48);
+    const w1 = hoursFrom(T0, -12);
+    const samples = [
+      { id: "a", capturedAt: hoursFrom(T0, -47), vwcPct: 55, source: "live" },
+      { id: "b", capturedAt: hoursFrom(T0, -40), vwcPct: 48, source: "live" },
+      { id: "c", capturedAt: hoursFrom(T0, -46), vwcPct: 90, source: "ecowitt" },
+      { id: "d", capturedAt: hoursFrom(T0, -20), vwcPct: 35, source: "live" },
+      { id: "e", capturedAt: hoursFrom(T0, -13), vwcPct: 32, source: "live" },
+    ];
+    const vm = buildDrybackMonitoring(
+      samples,
+      [
+        { id: "w0", occurredAt: w0, volumeMl: 1800 },
+        { id: "w1", occurredAt: w1, volumeMl: 1600 },
+      ],
+      { now: T0 },
+    );
+    expect(vm.status).toBe("windows");
+    expect(vm.sampleCount).toBe(5);
+    expect(vm.latestClosed?.sampleCount).toBe(5);
+    expect(vm.latestClosed?.peakVwcPct).toBe(55);
+    expect(vm.latestClosed?.troughVwcPct).toBe(32);
+    expect(vm.latestClosed?.deltaPctPoints).toBe(23);
+    expect(vm.latestClosed?.peakAt).toBe(hoursFrom(T0, -47));
+    expect(vm.latestClosed?.troughAt).toBe(hoursFrom(T0, -13));
+    expect(vm.latestClosed?.durationLabel).toBe("34h");
+    expect(vm.latestClosed?.sourceClass).toBe("invalid");
+    expect(vm.latestClosed?.sourceLabel).toBe("Invalid telemetry");
+    expect(vm.latestClosed?.sourceLabel).not.toMatch(/live/i);
+    expect(vm.latestClosed?.quality).not.toBe("usable");
+    expect(["weak", "unusable"]).toContain(vm.latestClosed?.quality);
+    expect(classifyDrybackSource("ecowitt")).toBe("invalid");
   });
 });

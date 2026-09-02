@@ -17,7 +17,7 @@ import {
   type QuickLogRevision,
 } from "@/lib/quick-log/quickLogRevisionRules";
 import {
-  adaptQuickLogRevisionDatabaseRows,
+  decodeQuickLogRevisionDatabaseRows,
   QUICKLOG_REVISION_TABLE,
 } from "@/lib/quickLogRevisionService";
 import { isMissingRetractedColumnError } from "@/lib/quick-log/retractionFilterCompat";
@@ -75,9 +75,12 @@ export function useRetractedQuickLogEntries(growId: string | null | undefined) {
         )
         .eq("kind", "retraction")
         .or(`diary_entry_id.in.(${ids.join(",")}),root_id.in.(${ids.join(",")})`);
-      const revisions = adaptQuickLogRevisionDatabaseRows(revData)
-        .map(parseQuickLogRevisionRow)
-        .filter((r): r is QuickLogRevision => r !== null);
+      const decoded = decodeQuickLogRevisionDatabaseRows(revData);
+      const revisions = decoded.ok
+        ? decoded.rows
+            .map(parseQuickLogRevisionRow)
+            .filter((r): r is QuickLogRevision => r !== null)
+        : [];
       const byDiaryId = new Map<string, QuickLogRevision>();
       for (const rev of revisions) {
         if (rev.diaryEntryId) byDiaryId.set(rev.diaryEntryId, rev);

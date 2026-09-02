@@ -10,6 +10,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecentQuickLogActivityPanel } from "@/components/QuickLogHistoryPanels";
 import QuickLogGroupedTimelineSection from "@/components/QuickLogGroupedTimelineSection";
+import FeedingHistoryPanel from "@/components/FeedingHistoryPanel";
+import PhotoHistoryPanel from "@/components/PhotoHistoryPanel";
+import WateringHistoryPanel from "@/components/WateringHistoryPanel";
 import { QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE } from "@/hooks/useQuickLogRevisionBadges";
 
 const badgeHookMock = vi.hoisted(() => ({
@@ -72,7 +75,7 @@ const HISTORY_ENTRY = {
   entry_type: "watering",
   entry_at: "2026-08-15T12:00:00.000Z",
   note: "Watered.",
-  details: { event_type: "watering" },
+  details: { event_type: "watering", origin_grow_event_id: "ge-diary-1" },
 } as const;
 
 describe("Quick Log revision badge unread honesty", () => {
@@ -185,4 +188,81 @@ describe("Quick Log revision badge unread honesty", () => {
       "ok",
     );
   });
+
+
+const FEEDING_ENTRY = {
+  id: "diary-feed-1",
+  entry_type: "feeding",
+  entry_at: "2026-08-15T12:00:00.000Z",
+  note: "Fed.",
+  details: { event_type: "feeding", origin_grow_event_id: "ge-feed-1" },
+} as const;
+
+const PHOTO_ENTRY = {
+  id: "diary-photo-1",
+  entry_type: "photo",
+  entry_at: "2026-08-15T12:00:00.000Z",
+  note: "Canopy shot.",
+  photo_url: "https://example.com/canopy.jpg",
+  details: { event_type: "photo", photo_url: "https://example.com/canopy.jpg", origin_grow_event_id: "ge-photo-1" },
+} as const;
+
+function laneCases(
+  name: string,
+  Panel: (props: { rawEntries: readonly unknown[] }) => JSX.Element | null,
+  entry: Record<string, unknown>,
+  testId: string,
+  rootId: string,
+) {
+  it(`${name}: empty-success shows no unavailable note`, () => {
+    badgeHookMock.status = "ok";
+    render(<Panel rawEntries={[entry] as never} />, { wrapper: makeWrapper() });
+    expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();
+    expect(screen.getByTestId(testId)).toHaveAttribute("data-revision-badges-status", "ok");
+  });
+
+  it(`${name}: pending hides edited chrome and does not flash the unavailable note`, () => {
+    badgeHookMock.status = "pending";
+    badgeHookMock.isLoading = true;
+    badgeHookMock.badges = new Map([[rootId, { correctionCount: 2 }]]);
+    render(<Panel rawEntries={[entry] as never} />, { wrapper: makeWrapper() });
+    expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("quicklog-entry-edited-badge")).not.toBeInTheDocument();
+    expect(screen.getByTestId(testId)).toHaveAttribute("data-revision-badges-status", "pending");
+  });
+
+  it(`${name}: unread ledger shows a quiet unavailable note, not edited chrome`, () => {
+    badgeHookMock.status = "unavailable";
+    badgeHookMock.badges = new Map([[rootId, { correctionCount: 2 }]]);
+    render(<Panel rawEntries={[entry] as never} />, { wrapper: makeWrapper() });
+    const note = screen.getByTestId("quicklog-revision-badges-unavailable");
+    expect(note).toHaveTextContent(QUICK_LOG_REVISION_BADGES_UNAVAILABLE_NOTE);
+    expect(screen.queryByTestId("quicklog-entry-edited-badge")).not.toBeInTheDocument();
+    expect(screen.getByTestId(testId)).toHaveAttribute("data-revision-badges-status", "unavailable");
+  });
+
+  it(`${name}: ok with a matching badge shows the edited chrome`, () => {
+    badgeHookMock.status = "ok";
+    badgeHookMock.badges = new Map([[rootId, { correctionCount: 2 }]]);
+    render(<Panel rawEntries={[entry] as never} />, { wrapper: makeWrapper() });
+    const badge = screen.getByTestId("quicklog-entry-edited-badge");
+    expect(badge).toBeInTheDocument();
+    expect(badge.textContent?.toLowerCase()).toMatch(/correct|edit/);
+    expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();
+    expect(screen.getByTestId(testId)).toHaveAttribute("data-revision-badges-status", "ok");
+  });
+}
+
+laneCases("feeding panel", FeedingHistoryPanel, FEEDING_ENTRY, "feeding-history-panel", "ge-feed-1");
+laneCases("photo panel", PhotoHistoryPanel, PHOTO_ENTRY, "photo-history-panel", "ge-photo-1");
+laneCases("watering panel", WateringHistoryPanel, HISTORY_ENTRY, "watering-history-panel", "ge-diary-1");
+
+it("history panel: ok with a matching badge shows the edited chrome", () => {
+  badgeHookMock.status = "ok";
+  badgeHookMock.badges = new Map([["ge-diary-1", { correctionCount: 2 }]]);
+  render(<RecentQuickLogActivityPanel rawEntries={[HISTORY_ENTRY]} />, { wrapper: makeWrapper() });
+  expect(screen.getByTestId("quicklog-entry-edited-badge")).toBeInTheDocument();
+  expect(screen.queryByTestId("quicklog-revision-badges-unavailable")).not.toBeInTheDocument();
+});
+
 });

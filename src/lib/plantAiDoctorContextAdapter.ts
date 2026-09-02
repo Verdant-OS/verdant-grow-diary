@@ -17,6 +17,7 @@ import {
   type SensorReadingRowLike,
   type PlantRowLike,
 } from "@/lib/aiDoctorContextCompiler";
+import { resolveCanonicalDiaryEventType } from "@/lib/diaryTimelineViewModel";
 
 /** Permissive shape covering the diary_entries fields we read. */
 export interface DiaryEntryRowLike {
@@ -62,7 +63,10 @@ export function diaryEntriesToGrowEventRows(
     if (!r?.entry_at) continue;
     out.push({
       occurred_at: r.entry_at,
-      event_type: r.entry_type ?? "diary_entry",
+      event_type: resolveCanonicalDiaryEventType({
+        entryType: r.entry_type,
+        details: r.details,
+      }),
       source: r.source ?? "manual",
       note: r.note ?? null,
     });

@@ -41,6 +41,10 @@ vi.mock("@/hooks/use-tents", () => ({
 vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: [] }),
 }));
+
+vi.mock("@/hooks/useRecentWateringsForVolumeDefaults", () => ({
+  useRecentWateringsForVolumeDefaults: () => ({ data: [] }),
+}));
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-1" } }),
 }));

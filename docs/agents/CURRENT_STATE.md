@@ -1,7 +1,211 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-02 UTC (~20:50 UTC)
-**Updated by:** Claude (2026-09-02: **#1251 MERGED as `c718c5b3`** — squash, one parent; the
+**Last updated:** 2026-09-02 UTC (~22:15 UTC)
+**Updated by:** Claude (2026-09-02: **#1252 MERGED as `408c4142`** and **#1255 MERGED as
+`cb8ee9fd`** — two squashes, one parent each. **Deploy tip = live `cb8ee9fd`, `dirty:false`**,
+independently MEASURED from `https://verdantgrowdiary.com/version.json` at 22:12 UTC (~5:12 PM CT;
+`buildTime` `2026-09-02T21:08:14.565Z`). Restore SHA is **`cb8ee9fd`**. **Do not ping Tolu.**
+Publisher is Vercel. No Lovable Publish. No History-restore. No APPLY. **The deploy-branch
+`Dependency & Security CI` red is CLEARED — MEASURED `success` on the push runs for `408c4142`
+(20:48 UTC) and `cb8ee9fd` (21:08 UTC)**; the `fast-uri` remediation is live. **#1254 carries this
+restamp** (draft; rebased onto `cb8ee9fd`). #1221 stays READY at `9f922ca54`, not merged. **#1256**
+is a new GDP draft (`fix(auth)`: no entitlements load on a `getUser` miss). Signup PREFLIGHT still
+**BLOCKED**; not run here, not claimed passed. Production Postgres is Lovable Cloud. Stay on Paddle;
+live checkout off. #1174 stays draft. Cheek's instruction named `408c4142e`; the tip had already
+advanced to `cb8ee9fd` (#1255, 21:00 UTC) before it arrived, so this block records the measured
+tip. The restamp below recorded live as `c718c5b3`; that row is **superseded**. Prior header
+follows.)
+
+## 1. #1252 and #1255 MERGED — deploy tip `cb8ee9fd`
+
+`established fact`, from the commit graph at `origin/verdant-grow-diary` after `git fetch` and from
+`GET /pulls/1252` and `GET /pulls/1255`. **Both squashes, one parent each.**
+
+| PR        | Merge SHA  | Parent     | Files | Migrations | Merged (UTC)     |
+| --------- | ---------- | ---------- | ----: | ---------: | ---------------- |
+| **#1252** | `408c4142` | `c718c5b3` |     6 |      **0** | 2026-09-02 20:48 |
+| **#1255** | `cb8ee9fd` | `408c4142` |     1 |      **0** | 2026-09-02 21:08 |
+
+**#1252** — `fix(deps): bump the fast-uri override to 3.1.6 for four new high advisories`. Full SHA
+`408c4142ed96eaeed220e5f8d46b1221d7360007`; squash date `20:41:33Z` (queue entry), `merged_at`
+`20:48:44Z` by Cheek; head `301014b8`, 2 commits, `+39 / −9`: `package.json` (override 3.1.5 →
+3.1.6), `bun.lock`, `package-lock.json`, `scripts/check-bun-lockfile-policy.mjs` (floor to
+3.1.6), and the two contract tests. **Zero migrations.** Claude owned it; Copilot round 2 was
+"Approval recommended" as a `COMMENTED` review; **no independent peer reviewed it** — merged by
+Cheek's decision with the protocol seat unfilled (recorded, as before).
+
+**#1255** — `build(deps): bump qs from 6.15.3 to 6.16.0`, a Dependabot PR (`dependabot[bot]`,
+branch `dependabot/npm_and_yarn/qs-6.16.0`, head `ffe233b1`), merged by Cheek at `21:08:05Z`
+through the queue (squash date `21:00:29Z`). Full SHA `cb8ee9fd810d28d781e801b4f360d4cc17fd379f`.
+One file, `package-lock.json`, `+3 / −28`. **Zero migrations.** No `src/`, no `supabase/`. It is
+the only commit on the deploy branch since `408c4142`.
+
+## 2. Live is independently MEASURED at `cb8ee9fd`
+
+Claude fetched `https://verdantgrowdiary.com/version.json` in this slice at 22:12 UTC.
+
+| Field           | Value                                                             |
+| --------------- | ----------------------------------------------------------------- |
+| `commit`        | `cb8ee9fd810d28d781e801b4f360d4cc17fd379f`                        |
+| `dirty`         | **`false`**                                                       |
+| `ref`           | `verdant-grow-diary`                                              |
+| `commitTime`    | `2026-09-02T21:00:29Z`                                            |
+| `buildTime`     | `2026-09-02T21:08:14.565Z` (~4:08 PM CT)                          |
+| `treeHashShort` | `df088158a15b` (moved from `6346c7dd1aa7` — lockfiles changed)    |
+| server          | **Vercel** (`server: Vercel`, `x-vercel-cache: HIT`, edge `iad1`) |
+| apex HTTP       | `200`                                                             |
+| www HTTP        | `308` → apex `version.json`, server Vercel                        |
+| measured        | 2026-09-02 **22:12:38 UTC** (~5:12 PM CT)                         |
+| source          | `https://verdantgrowdiary.com/version.json`                       |
+
+**Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not carry
+`c718c5b3` or `408c4142` as current live. **A handshake error, a timeout, or a resolver still
+returning `185.158.133.1` / `5c197f75` is a network miss, not a product `FAIL` and not a
+rollback.** Publisher is Vercel, project `verdant-grow-diary`. **No Lovable Publish.**
+
+## 3. The deploy-branch dependency-audit red is CLEARED — MEASURED
+
+`established fact`, from the `dependency-security-ci.yml` run list read at 22:12 UTC, and from
+running the scan locally against the tip's lockfiles.
+
+| Run                           | Event          | Head        | `Dependency & Security CI`                                                                           |
+| ----------------------------- | -------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
+| deploy-branch push            | `push`         | `cb8ee9fd`  | **success** (21:08 UTC, run `33683406512`)                                                           |
+| merge queue, #1255            | `merge_group`  | `cb8ee9fd`  | success (21:00)                                                                                      |
+| deploy-branch push            | `push`         | `408c4142`  | **success** (20:48 UTC, run `33681499667`) — the first green deploy-branch push since the advisories |
+| #1254                         | `pull_request` | `842290484` | success (20:59) — the base carried #1252                                                             |
+| last red on the deploy branch | `push`         | `c718c5b3`  | failure (20:35)                                                                                      |
+
+Local, on the tip's `package.json` / `bun.lock` / `package-lock.json` (byte-identical to
+`cb8ee9fd`): `check-dependency-security: OK — bun: 2 findings, 0 reviewed blocked, 0 unreviewed
+blocked; npm: 0 findings`. The two remaining bun findings are below the blocking severity and were
+present before the advisories. `config/dependency-security-exceptions.json` stays **empty** — the
+fix was a remediation, not an exception. GitHub's push banner at 20:55 UTC reported two moderate
+Dependabot alerts on the default branch; whether #1255 changed that count is `NOT_MEASURED` here
+(alerts were not read).
+
+## 4. #1254 — this slice, and its CI record
+
+`established fact`. Branch `claude/test-coverage-analysis-j0bz93` (recreated from `c718c5b3` after
+#1251 merged), now **rebased onto `cb8ee9fd`** — clean, no file overlap with #1252 or #1255. Three
+commits, one file: Copilot's round-1 corrections to the `860d39a9` block; the `c718c5b3` restamp
+(the block below); this block. CI on the pre-rebase head `842290484`, read at 22:12 UTC (82 check
+runs): **every ruleset-required context `success`** — 32 shards, `Lint, typecheck, test, build`
+(21:03), `Preflight — edge shared-lib mirror in sync`, `test:legal-seo`; the 16 batch lanes,
+`docs-safety`, Sentinel parity, `eslint`, `tsc --noEmit`, both `tsgo` builds, CodeQL, the security
+lanes and the deployment preview pipeline all `success`; `Dependency & Security CI` **`success`**
+(20:59, the base already carried #1252). The only red: `Supabase Preview` (§6), stood down once.
+CI on the rebased head is `NOT_MEASURED` at stamp time. Draft; peer seat unfilled; Claude does not
+ready or merge it. Unwatched at Cheek's instruction (20:58 UTC).
+
+## 5. #1221 READY at `9f922ca54` — not merged, not touched; #1256 is new
+
+`established fact`, from the open-PR list at ~22:12 UTC: **#1221** `draft: false`, head unchanged
+since 14:50 UTC, last activity 14:57; `git merge-tree` onto `cb8ee9fd` is clean; process status
+**INCOMPLETE** (no assigned peer). Not readied, merged, rebased or updated in this slice.
+
+**#1256** — `fix(auth): do not load entitlements on getUser miss`, `draft: true`, opened 22:09 UTC
+on branch `gdp/entitlements-gate-revalidation` (`inference`: GDP-authored, from the branch
+prefix), head `bc09daad2`, 3 files (`src/components/AppShell.tsx`,
+`src/hooks/useMyEntitlements.ts`, `src/test/app-shell-auth-revalidation-gate.test.ts`), no
+`docs/agents/CURRENT_STATE.md`, merge-tree clean; its dependency-audit runs were in progress at
+22:11. Not touched here; the follow-on to #1253's auth revalidation gate.
+
+## 6. Restore SHA for Tolu/Support is `cb8ee9fd`
+
+If Tolu asks for a restore point, it is **`cb8ee9fd`** (full oid
+`cb8ee9fd810d28d781e801b4f360d4cc17fd379f`). **Do not ping Tolu.** Support outcome remains
+`NOT_MEASURED`.
+
+## 7. Open PRs — no other owner of this file; Supabase Preview UNSTABLE
+
+`established fact`, MEASURED at ~22:12 UTC: GitHub API list of open PRs with base
+`verdant-grow-diary`, then `git diff --name-only <merge-base> <head> -- docs/agents/CURRENT_STATE.md`
+per fetched head.
+
+| PR    | Head        | Draft | Touches `CURRENT_STATE.md` |
+| ----- | ----------- | ----- | -------------------------- |
+| #1256 | `bc09daad2` | true  | no                         |
+| #1254 | this slice  | true  | **yes — this restamp**     |
+| #1250 | `4b6b94680` | true  | no                         |
+| #1221 | `9f922ca54` | false | no                         |
+| #1181 | `3076870e6` | false | no                         |
+| #1180 | `2d2b00cb8` | false | no                         |
+| #1175 | `032c4b20e` | false | no                         |
+| #1174 | `4e52b5e5d` | true  | no                         |
+| #1153 | `030a9e8bd` | false | no                         |
+| #1151 | `dafef00ca` | false | no                         |
+| #1088 | `c79580038` | false | no                         |
+
+**No other ACTIVE OWNER.** Eleven open PRs; only #1254, this restamp, modifies the file. **#1250**
+is a Copilot draft, not touched. **#1174** is `draft: true` at `4e52b5e5d`, SUPERSEDED on V0 C/F
+hunks. Do not convert, ready or merge.
+
+**Supabase Preview `42P07` is UNSTABLE, not `FAIL`.** MEASURED `failure` on #1254's `842290484`
+(check run `100421402702`) as on every recent head — the documented repo-wide replay collision on
+the branch project, expected on the rebased head too. Zero migrations on this branch; the check is
+absent from `config/required-status-checks.json`. Not re-run.
+
+## 8. Signup PREFLIGHT still BLOCKED — no APPLY
+
+`source claim`, carried. Signup PREFLIGHT is still **BLOCKED** on the malformed Aug 24
+`SUPABASE_DB_URL` secret. **This slice did not run PREFLIGHT and does not claim it passed.**
+Production apply state stays `NOT_MEASURED`. **No APPLY.**
+
+## 9. Carried from the blocks below, not re-measured
+
+- **Production Postgres identity** (`source claim`, Cheek/GDP): Lovable Cloud; `knkwiiywfkbqznbxwqfh`
+  is that Cloud DB's published identity, not a standalone Supabase session. Do not treat
+  `bzatgtgjvuojpoxcknaa` as production.
+- **Billing** (`source claim`): stay on Paddle; live checkout off; `test_` keys and the sandbox
+  banner are EXPECTED; the Paddle Craft catalog preflight "API keys unset" rows are owner-held and
+  non-blocking.
+- **Vercel integrations and apex DNS**: carried; nothing disconnected, Vercel DNS not enabled,
+  registrar not edited.
+- Copilot #1223 findings, the #1242 review-seat rows, #1253's summary, #1251's review round and
+  #1221's CI and review detail: history in the blocks below, not re-checked here.
+- No metrics, no subscriber counts, no CI-derived product claims.
+
+## 10. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production
+  SQL, no Lovable project-chat agent edit, no device control, no automatic Action Queue, no
+  credentials.
+- **Publisher is Vercel**, project `verdant-grow-diary`. **Auth and DB stay Lovable Cloud.**
+  **No Lovable Publish.**
+- **Paddle: `test_` keys and the sandbox banner are EXPECTED.** Live checkout off. Stay on Paddle.
+  Do not revoke the existing `live_` token.
+- **Current production is MEASURED at `cb8ee9fd`, `dirty:false`, ref `verdant-grow-diary`.**
+  Do not record it as `NOT_MEASURED`. Do not carry `c718c5b3` or `408c4142` as live.
+- **Tolu: do not ping.** Restore SHA **`cb8ee9fd`** (full oid
+  `cb8ee9fd810d28d781e801b4f360d4cc17fd379f`).
+- **The `fast-uri` dependency-audit red is CLEARED and the fix is live.** Do not carry it as an
+  open red. `config/dependency-security-exceptions.json` stays empty.
+- **#1221 is READY on GitHub at `9f922ca54`, not merged; shipping gate INCOMPLETE — no independent
+  peer assigned.** Claude does not merge it. Watch stopped at Cheek's instruction; no push planned.
+  Owner-only items it surfaced (`vars.E2E_BASE_URL`, the Cursor usage limit, the R6-C follow-up,
+  the three decisions in its PR body) stand.
+- **#1256 is a GDP draft; not touched from a Claude session.** **#1250** is a Copilot draft; not
+  touched. **#1174 is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge.
+- **#1249 is CLOSED UNMERGED, superseded by #1248. Do not reopen it. Do not rebase its commits.**
+- **Feed last-recipe is SHIPPED (#1241).** **#1247 Environment Ribbon Tranche 1 is SHIPPED.** No
+  Tranche 1b in this slice.
+- **Signup-attribution APPLY stays owner-locked.** Production apply state is `NOT_MEASURED`.
+- **Signup PREFLIGHT still BLOCKED** (malformed Aug 24 `SUPABASE_DB_URL`). Do not claim it
+  passed.
+- **Vercel integrations and the registrar are untouched.** Vercel DNS not enabled.
+- **Supabase Preview `42P07` is UNSTABLE, not `FAIL`.** Non-required; no migration on this branch.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays `HOLD`.
+  Plant Memory PARK. Spider Farmer GGS radio capture stays parked and `NOT_MEASURED`.
+- **#1242's protocol peer-review seat remains UNFILLED.** Owner-designated is not the peer seat.
+- This slice is **N=1** and stays **draft** on #1254, branch `claude/test-coverage-analysis-j0bz93`
+  rebased onto `cb8ee9fd` (three commits, one file). Unique file `docs/agents/CURRENT_STATE.md`.
+  No `src/`, no `supabase/`, no `package.json`. CI on the rebased head is `NOT_MEASURED` at stamp
+  time; on `842290484` every required context was green. Its peer seat is unfilled; merge is
+  Cheek's call. Claude does not ready, merge, assign or auto-merge.
+
+**Prior last updated:** 2026-09-02 UTC (~20:50 UTC)
+**Prior update:** Claude (2026-09-02: **#1251 MERGED as `c718c5b3`** — squash, one parent; the
 CURRENT_STATE restamp on `860d39a9`. **Deploy tip = live `c718c5b3`, `dirty:false`**, independently
 MEASURED from `https://verdantgrowdiary.com/version.json` at 20:36 and 20:47 UTC (~3:47 PM CT;
 `buildTime` `2026-09-02T20:35:36.408Z`). Restore SHA is **`c718c5b3`**. **Do not ping Tolu.**

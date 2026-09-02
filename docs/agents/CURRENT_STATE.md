@@ -130,8 +130,14 @@ Carried from GDP's dashboard read unless marked MEASURED.
 ## 9. Not restamped here
 
 - Copilot #1223 findings: not restamped.
-- Supabase Preview `42P07` replay collision: remains **UNSTABLE**, not `FAIL`. CI is not a product
-  fail.
+- **Supabase Preview `42P07` is UNSTABLE, not `FAIL`.** On this PR's head `47f698ae` the
+  `Supabase Preview` check was still `in_progress` at 15:30 UTC ("Waiting for branch action run to
+  complete"; branch project `waxvoecaejhijijernnw`, parent `bzatgtgjvuojpoxcknaa`, not production).
+  When it goes red with the repo-wide `ai_credit_grants` 42P07 replay collision, that is the
+  documented **UNSTABLE** state, not a product `FAIL` and not this PR's defect: this branch carries
+  no migration, and `Supabase Preview` is absent from `config/required-status-checks.json`
+  (`required` and `mustBeGreen`, MEASURED by grep). CI is not a product fail. Not commented on,
+  per standing instruction.
 - No metrics, no subscriber counts, no CI-derived product claims.
 - The #1242 review-seat rows in the block below are history and were not re-checked here.
 
@@ -157,6 +163,8 @@ Carried from GDP's dashboard read unless marked MEASURED.
 - **Signup PREFLIGHT still BLOCKED** (malformed Aug 24 `SUPABASE_DB_URL`). Do not claim it
   passed.
 - **Vercel integrations and the registrar are untouched.** Vercel DNS not enabled.
+- **Supabase Preview `42P07` is UNSTABLE, not `FAIL`.** Non-required; no migration on this branch.
+  Do not record it as a product fail.
 - **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays `HOLD`.
   Plant Memory PARK. Spider Farmer GGS radio capture stays parked and `NOT_MEASURED`.
 - This slice is **N=1** and stays **draft**, on branch `claude/current-state-restamp-88372954`,

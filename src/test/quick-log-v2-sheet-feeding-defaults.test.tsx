@@ -45,6 +45,10 @@ vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: mockedRows }),
 }));
 
+vi.mock("@/hooks/useRecentWateringsForVolumeDefaults", () => ({
+  useRecentWateringsForVolumeDefaults: () => ({ data: [] }),
+}));
+
 function renderSheet() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },

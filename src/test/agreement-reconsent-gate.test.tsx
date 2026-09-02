@@ -108,6 +108,15 @@ describe("AgreementReconsentGate", () => {
     expect(eqSpy).not.toHaveBeenCalled();
   });
 
+  it("is suppressed on /welcome (verify-error dialog is not shown)", async () => {
+    mockAcceptances = [];
+    mockReadError = { message: "network blip" };
+    renderGate("/welcome");
+    await waitFor(() => expect(screen.queryByTestId("agreement-reconsent-verify-error")).toBeNull());
+    expect(screen.queryByTestId("agreement-reconsent-gate")).toBeNull();
+    expect(eqSpy).not.toHaveBeenCalled();
+  });
+
   it("fails CLOSED on a read error: shows a retry/sign-out block, not access", async () => {
     mockReadError = { message: "network blip" };
     renderGate();

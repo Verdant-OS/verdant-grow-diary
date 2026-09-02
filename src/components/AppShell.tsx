@@ -227,6 +227,14 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         Loading…
       </div>
     );
+  // getUser transport/server error is not signed-out. Stay on this URL, do not
+  // mount pageContent (no private REST), do not bounce to /welcome.
+  if (authStatus === "revalidation_failed")
+    return (
+      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
+        Loading…
+      </div>
+    );
   if (!user || authStatus === "unauthenticated") return null;
 
   const unread = openAlerts.filter((a) => a.status === "open").length;

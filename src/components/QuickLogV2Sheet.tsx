@@ -483,18 +483,14 @@ export default function QuickLogV2Sheet({
 
   const recentFeedingsQ = useRecentFeedingsForDefaults({
     plantId: resolvedContext.plantId,
-    tentId: resolvedContext.tentId,
-    growId: resolvedContext.growId,
   }) as { data?: unknown[] };
   const feedingDefaults = useMemo(
     () =>
       buildFeedingDefaults({
         rawEntries: recentFeedingsQ.data ?? [],
         plantId: resolvedContext.plantId,
-        tentId: resolvedContext.tentId,
-        growId: resolvedContext.growId,
       }),
-    [recentFeedingsQ.data, resolvedContext.plantId, resolvedContext.tentId, resolvedContext.growId],
+    [recentFeedingsQ.data, resolvedContext.plantId],
   );
 
   const recentWateringsQ = useRecentWateringsForVolumeDefaults({

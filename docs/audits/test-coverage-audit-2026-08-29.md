@@ -28,10 +28,15 @@ Two things are true at once, and the second is the one that needs work:
   anywhere. That is better than most repositories this size.
   Every per-case and per-assertion figure in this document is **Vitest-only** unless it says
   otherwise; the other three lanes are counted by file, because nothing aggregates their cases.
+  **This is four lanes plus the 33 runtime harnesses, not the whole estate.** A sixth grouping —
+  **21 `node:test` files under `scripts/`**, 19 of them referenced by a workflow or a `package.json`
+  script — is **`NOT_MEASURED`** here: the reproducer never parses `node:test` registration, so
+  neither its case count nor its never-executed status is known. Read "test estate" in this document
+  as those five measured groupings. See §9.0 defect 29.
 - **Depth is unmeasured, and four separate lanes of already-written tests never execute.**
   There is no coverage instrumentation of any kind, so the fraction of _branches_ the suite
-  exercises is `NOT_MEASURED`. **15.2% of all bare `expect(...)` calls** are `toContain`/`toMatch`
-  checks against source **text** inside scan-only files (13,303 of 87,333) — a class proven by execution
+  exercises is `NOT_MEASURED`. **12.9% of all bare `expect(...)` calls** are `toContain`/`toMatch`
+  checks against source **text** inside scan-only files (11,253 of 87,333) — a class proven by execution
   in §3 to go red on behaviour-preserving refactors and stay green through real behaviour breaks.
   And 21 of 31 Deno edge tests, 18 of 33 runtime RLS/billing harnesses, 7 of 9 pgTAP suites, and
   25 of 60 Playwright specs are never run by any workflow.
@@ -149,24 +154,26 @@ Consequences, in order of severity:
 `established fact` for the counts. **`established fact`, proven by execution**, for the two
 experiments — which demonstrate the failure mode on **one** pin, in both directions. That the whole
 bucket shares the mechanism is `inference`, not measurement: what is measured is that these files
-import no product module and render nothing, so nothing in them observes runtime behaviour.
+execute no repository module and render nothing — not `src/`, not `scripts/`, not
+`supabase/functions/` — so nothing in them observes runtime behaviour.
 
 ### 3.1 The measurement
 
 | Bucket                                                                            | Files             | Assertions         | Cases             |
 | --------------------------------------------------------------------------------- | ----------------- | ------------------ | ----------------- |
-| **Scan-only** (reads files; imports no product module; never renders)             | **591** (20.3%)   | **17,756** (20.3%) | **5,641** (17.7%) |
-| Hybrid (scans files _and_ imports/renders)                                        | 815               | 30,900             | 11,773            |
+| **Scan-only** (reads files; executes no repository module; never renders)         | **534** (18.4%)   | **13,246** (15.2%) | **4,490** (14.0%) |
+| Hybrid (scans files _and_ imports/renders)                                        | 872               | 35,410             | 12,948            |
 | Pure behavioural (reads no file content)                                          | 1,502 (51.7%)     | 38,677             | —                 |
 | **Reads file content** (calls `readFileSync`/`readFile`/`readdirSync`/`globSync`) | **1,406** (48.3%) | —                  | —                 |
 
-Within the scan-only bucket, **74.9% of assertions are `toContain(...)` or `toMatch(...)`** —
-13,303 substring and regex checks over file text, which is **15.2% of all 87,333 bare
-`expect(...)` calls**, not 20.3%. (20.3% is the bucket's total share of assertions; the two figures were
+Within the scan-only bucket, **85.0% of assertions are `toContain(...)` or `toMatch(...)`** —
+11,253 substring and regex checks over file text, which is **12.9% of all 87,333 bare
+`expect(...)` calls**, not 15.2%. (15.2% is the bucket's total share of assertions; the two figures were
 conflated in an earlier draft of §0.) Precisely, that count is **`toContain`/`toMatch` calls inside
-scan-only files**; it does not trace each matcher's receiver back to file content. Measured, **4 of
-the 13,303** assert membership in a literal array rather than matching text — `expect(["live",
-"manual", …]).toContain(p.source)` and three like it. 0.03%, so the 15.2% headline is unchanged
+scan-only files**; it does not trace each matcher's receiver back to file content. Measured, **1 of
+the 11,253** asserts membership in a literal array rather than matching text — `expect(["live",
+"manual", …]).toContain(p.source)` in `one-tent-loop-safety-regression.test.ts`. It was 4 of 14,054
+when the bucket was wider; defect 28 moved the other three out. 0.01%, so the 12.9% headline is unchanged
 either way, but the metric is named for what it counts rather than what it mostly means. The hybrid bucket contributes further source-text assertions
 that are `NOT_MEASURED` — its files mix scanning with real imports, and the two were not separated.
 428 test files read a path under `src/` — counting only reads whose own path argument resolves
@@ -485,7 +492,7 @@ No new tests. Three wiring changes:
 1. **Extend `scripts/check-contract-test-resolution.mjs`** from its two `CONFIG_FILES` to any test
    that `readFileSync`s a `src/**` path it never imports — keeping the existing
    `@source-scan-justified: <reason>` escape hatch, which already prints on every run.
-2. **Baseline the existing 591** into an allowlist so only _new_ violations fail. Shrink the
+2. **Baseline the existing 534** into an allowlist so only _new_ violations fail. Shrink the
    allowlist per slice; never whole-file-format a legacy test file while doing it.
 3. **Convert by consequence, not alphabetically.** First: the Quick Log write path (36 files), the
    Timeline scope pins, Action Queue evidence rendering. A converted test renders the component or
@@ -557,7 +564,7 @@ Not to be rounded up by anyone quoting this document.
 
 ## 9. Validation
 
-### 9.0 Twenty-six measurement defects found in review, and corrected
+### 9.0 Twenty-nine measurement defects found in review, and corrected
 
 The first published version of `measure-test-estate.mjs` was reviewed on PR #1219 by **Codex,
 GitHub Copilot and Cursor Bugbot independently**, and all three found defects in it. Six were real.
@@ -569,38 +576,42 @@ defects 8 and 9, then three more in the fixes for 11 and 12, then an eighteenth 
 then two more in what was left, a twenty-first — the deepest of them — in how the graph is walked,
 and three more in what the metrics were _called_. A twelfth round then found that classification
 stopped at the test file and never followed its own helpers, moving four published bucket totals.
-All twenty-six are recorded here rather than
+A thirteenth and fourteenth round then found the two largest bucket errors in the set and one whole
+lane the reproducer had never parsed. All twenty-nine are recorded here rather than
 quietly patched, because this document's subject is measurement discipline and the reproducer was
 the part that failed it.
 
-| #   | Defect                                                                                                                                               | Effect on a published figure                                                                                                                 |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Measured the checked-out tree, not the revision named                                                                                                | The reproducer could not reproduce a pinned figure at all. Now `--rev`, read from the git object store                                       |
-| 2   | `IMPORTS_PRODUCT` matched only `@/…`, so tests reaching product code by relative path were bucketed scan-only                                        | scan-only **634 → 624**; substring share **16.3% → 16.1%**                                                                                   |
-| 3   | Any path token in a workflow body counted as execution                                                                                               | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed                                        |
-| 4   | `import type` counted as a runtime edge, though the transpiler erases it                                                                             | reachability **98.2% → 97.8%**                                                                                                               |
-| 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee                                                | no figure moved, but the guarantee was false as written                                                                                      |
-| 6   | Nothing tested the parser that produces these numbers                                                                                                | now `src/test/measure-test-estate-rules.test.ts`, 78 cases                                                                                   |
-| 7   | The fix for 4 matched imports with a **regex**, which both invented edges and missed real ones                                                       | reachability **97.7% → 97.8%**; imports are now read from the TypeScript compiler's own AST                                                  |
-| 8   | §1 claimed the script reproduces _every_ headline count, but it launches no test runner                                                              | no figure moved; the claim is narrowed to the static counts it does derive                                                                   |
-| 9   | The reachability walk regex-subtracted every `vi.mock` path, contradicting the rule defect 7 had just established                                    | no module moved on the pinned tree, but the code and the published method disagreed; the rule now lives in one tested function               |
-| 10  | `it` / `test` / `expect` / `toContain` counted as **text**, so `/re/.test(x)` read as a case and `"expect("` in a string read as an assertion        | case sites **32,080 → 31,941**; assertions **87,351 → 87,333**; `.skip` **13 → 11**; substring assertions **14,057 → 14,054**                |
-| 11  | The file-I/O predicate matched the reader **names** anywhere, including a type member and an injected fake                                           | scan-only **624 → 622**; any-file-I/O **1,397 → 1,393**                                                                                      |
-| 12  | "806 test files read a path under `src/`" was text-matched and the script never emitted it                                                           | **806 → 813** (then → 428, see 16); now derived by the reproducer like every other static figure                                             |
-| 13  | The fix for 9 recognised only `vi.importActual`, so `vi.mock(spec, async (importOriginal) => …)` — 19 files — lost a real edge                       | direct/transitive **1,636/425 → 1,637/424**; total reached unchanged at 2,061 of 2,106                                                       |
-| 14  | The fix for 8 still over-claimed: `--json` derives none of the `@source-scan-justified`, Quick Log, keyword or required-check figures                | no figure moved; §1 now enumerates the exact fields the script emits, and says the rest are hand-measured                                    |
-| 15  | The `render()` predicate matched text, so `it("…on render (no top-level saveAlert call)")` read as a render                                          | 3 files classified on a string, but **no published figure moved** — all three are hybrid for a real product import anyway                    |
-| 16  | `readsSrcPath` combined two independent predicates: reads _a_ file, and mentions `src/` _somewhere_                                                  | **813 → 428**. The path must now come from the reader call's own argument                                                                    |
-| 17  | The substring metric counts `toContain`/`toMatch` calls, not matches against file content                                                            | no figure moved; **4 of 14,054** have a literal-array receiver, and §3.1 now says so and names the metric for what it counts                 |
-| 18  | The fix for 13 used the bypass set only to veto subtraction, so a module mocked with `importOriginal` and never value-imported still emitted no edge | no module moved — each is already directly imported by another test file — but the code and the published rule disagreed                     |
-| 19  | `.d.ts` files counted as product modules, though the transpiler erases them and they can never carry a runtime edge                                  | denominator **2,108 → 2,106**; unreached **47 → 45**; reachability **97.8% → 97.9%**                                                         |
-| 20  | `testFilesAcrossAllLanes` said "all lanes" while summing only the four test-file lanes, omitting the 33 harnesses                                    | no figure moved; the field is now `testFilesAcrossFourTestLanes` and the report names the fifth lane beside it                               |
-| 21  | The transitive walk discarded each test's mock state, re-adding modules the test had replaced                                                        | reached **2,061 → 2,060**; unreached **45 → 46**; reachability **97.9% → 97.8%**; the graph is now walked per test file and unioned          |
-| 22  | The `vi.doMock` exclusion was stated unconditionally, though it holds only for **static** imports                                                    | no figure moved — an over-blocking ceiling shifts nothing — but the rule as published was wrong, and the limit is now stated                 |
-| 23  | The file-I/O metric was labelled "any file I/O" but counted only **content** readers, omitting `existsSync` / `statSync`                             | no figure moved; renamed `filesReadingFileContent`, and the 4 metadata-only files are recorded as deliberately excluded                      |
-| 24  | §1's list of emitted fields named `testFilesAcrossAllLanes`, which defect 20's rename had removed                                                    | no figure moved; the published contract pointed at a field that does not exist. All 24 names now verified against `--json` output            |
-| 25  | Classification stopped at the test file, so I/O and product imports reached **through a test helper** were invisible                                 | scan-only **622 → 591**; hybrid **771 → 815**; behavioural **1,515 → 1,502**; content reads **1,393 → 1,406**; substring **14,054 → 13,303** |
-| 26  | The assertion total was labelled "all Vitest assertions" but counts only **bare** `expect(...)` calls                                                | no figure moved; 14 `expect.fail` / `expect.unreachable` calls sit outside it, and the metric is now labelled bare `expect(...)` calls       |
+| #   | Defect                                                                                                                                               | Effect on a published figure                                                                                                                                                                          |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Measured the checked-out tree, not the revision named                                                                                                | The reproducer could not reproduce a pinned figure at all. Now `--rev`, read from the git object store                                                                                                |
+| 2   | `IMPORTS_PRODUCT` matched only `@/…`, so tests reaching product code by relative path were bucketed scan-only                                        | scan-only **634 → 624**; substring share **16.3% → 16.1%**                                                                                                                                            |
+| 3   | Any path token in a workflow body counted as execution                                                                                               | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed                                                                                                 |
+| 4   | `import type` counted as a runtime edge, though the transpiler erases it                                                                             | reachability **98.2% → 97.8%**                                                                                                                                                                        |
+| 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee                                                | no figure moved, but the guarantee was false as written                                                                                                                                               |
+| 6   | Nothing tested the parser that produces these numbers                                                                                                | now `src/test/measure-test-estate-rules.test.ts`, 78 cases                                                                                                                                            |
+| 7   | The fix for 4 matched imports with a **regex**, which both invented edges and missed real ones                                                       | reachability **97.7% → 97.8%**; imports are now read from the TypeScript compiler's own AST                                                                                                           |
+| 8   | §1 claimed the script reproduces _every_ headline count, but it launches no test runner                                                              | no figure moved; the claim is narrowed to the static counts it does derive                                                                                                                            |
+| 9   | The reachability walk regex-subtracted every `vi.mock` path, contradicting the rule defect 7 had just established                                    | no module moved on the pinned tree, but the code and the published method disagreed; the rule now lives in one tested function                                                                        |
+| 10  | `it` / `test` / `expect` / `toContain` counted as **text**, so `/re/.test(x)` read as a case and `"expect("` in a string read as an assertion        | case sites **32,080 → 31,941**; assertions **87,351 → 87,333**; `.skip` **13 → 11**; substring assertions **14,057 → 14,054**                                                                         |
+| 11  | The file-I/O predicate matched the reader **names** anywhere, including a type member and an injected fake                                           | scan-only **624 → 622**; any-file-I/O **1,397 → 1,393**                                                                                                                                               |
+| 12  | "806 test files read a path under `src/`" was text-matched and the script never emitted it                                                           | **806 → 813** (then → 428, see 16); now derived by the reproducer like every other static figure                                                                                                      |
+| 13  | The fix for 9 recognised only `vi.importActual`, so `vi.mock(spec, async (importOriginal) => …)` — 19 files — lost a real edge                       | direct/transitive **1,636/425 → 1,637/424**; total reached unchanged at 2,061 of 2,106                                                                                                                |
+| 14  | The fix for 8 still over-claimed: `--json` derives none of the `@source-scan-justified`, Quick Log, keyword or required-check figures                | no figure moved; §1 now enumerates the exact fields the script emits, and says the rest are hand-measured                                                                                             |
+| 15  | The `render()` predicate matched text, so `it("…on render (no top-level saveAlert call)")` read as a render                                          | 3 files classified on a string, but **no published figure moved** — all three are hybrid for a real product import anyway                                                                             |
+| 16  | `readsSrcPath` combined two independent predicates: reads _a_ file, and mentions `src/` _somewhere_                                                  | **813 → 428**. The path must now come from the reader call's own argument                                                                                                                             |
+| 17  | The substring metric counts `toContain`/`toMatch` calls, not matches against file content                                                            | no figure moved; **4 of 14,054** have a literal-array receiver, and §3.1 now says so and names the metric for what it counts                                                                          |
+| 18  | The fix for 13 used the bypass set only to veto subtraction, so a module mocked with `importOriginal` and never value-imported still emitted no edge | no module moved — each is already directly imported by another test file — but the code and the published rule disagreed                                                                              |
+| 19  | `.d.ts` files counted as product modules, though the transpiler erases them and they can never carry a runtime edge                                  | denominator **2,108 → 2,106**; unreached **47 → 45**; reachability **97.8% → 97.9%**                                                                                                                  |
+| 20  | `testFilesAcrossAllLanes` said "all lanes" while summing only the four test-file lanes, omitting the 33 harnesses                                    | no figure moved; the field is now `testFilesAcrossFourTestLanes` and the report names the fifth lane beside it                                                                                        |
+| 21  | The transitive walk discarded each test's mock state, re-adding modules the test had replaced                                                        | reached **2,061 → 2,060**; unreached **45 → 46**; reachability **97.9% → 97.8%**; the graph is now walked per test file and unioned                                                                   |
+| 22  | The `vi.doMock` exclusion was stated unconditionally, though it holds only for **static** imports                                                    | no figure moved — an over-blocking ceiling shifts nothing — but the rule as published was wrong, and the limit is now stated                                                                          |
+| 23  | The file-I/O metric was labelled "any file I/O" but counted only **content** readers, omitting `existsSync` / `statSync`                             | no figure moved; renamed `filesReadingFileContent`, and the 4 metadata-only files are recorded as deliberately excluded                                                                               |
+| 24  | §1's list of emitted fields named `testFilesAcrossAllLanes`, which defect 20's rename had removed                                                    | no figure moved; the published contract pointed at a field that does not exist. All 24 names now verified against `--json` output                                                                     |
+| 25  | Classification stopped at the test file, so I/O and product imports reached **through a test helper** were invisible                                 | scan-only **622 → 591**; hybrid **771 → 815**; behavioural **1,515 → 1,502**; content reads **1,393 → 1,406**; substring **14,054 → 13,303**                                                          |
+| 26  | The assertion total was labelled "all Vitest assertions" but counts only **bare** `expect(...)` calls                                                | no figure moved; 14 `expect.fail` / `expect.unreachable` calls sit outside it, and the metric is now labelled bare `expect(...)` calls                                                                |
+| 27  | A registrar selected at **runtime** — `(cond ? it : it.skip)(…)`, or bound to an identifier — returned no chain root, so the case vanished           | case sites **31,941 → 31,965**; scan-only cases **5,641 → 5,665** before defect 28 moved them again                                                                                                   |
+| 28  | `productSet` was built from `src/` alone, so a test executing a `scripts/` or `supabase/functions/` module counted as importing nothing              | scan-only **591 → 534** · **17,756 → 13,246** · **5,665 → 4,490**; hybrid **815 → 872** · **30,900 → 35,410** · **11,773 → 12,948**; substring **13,303 → 11,253**; **the §0 headline 15.2% → 12.9%** |
+| 29  | §0 called 3,008 files "the whole test estate" while the reproducer never parsed the `node:test` lane                                                 | no figure moved; 21 `node:test` files under `scripts/`, 19 workflow-referenced, are now stated as `NOT_MEASURED` rather than silently excluded                                                        |
 
 Fixing 3 initially introduced two **false-DEAD** readings in the opposite direction — a YAML folded
 scalar (`run: >-`) splits one command across lines, and a `psql … \` continuation does too, so real
@@ -771,15 +782,43 @@ gained I/O they were always doing. The walk now follows test helpers transitivel
 first product module, since reaching one is the whole question. 26, by contrast, moves nothing: it is
 a label, narrowed the same way defect 23 was, rather than a recount.
 
-Neither pattern was caught by the author. Twelve review rounds by three independent reviewers found
-every one of the twenty-six. That is the strongest evidence in this document for its own central
+**28 is the only defect in this table that moved the §0 headline**, and it moved it down: 15.2% →
+**12.9%**. `productSet` was built from `src/` alone, so 57 tests that import and execute modules
+under `scripts/` or `supabase/functions/` — `apply-*-forward-repair.test.ts`,
+`ai-credit-service-contract-effect.test.ts` and the rest — registered as importing nothing and were
+filed scan-only. An edge function is product code that happens not to live in `src/`. Classification
+now uses an **executable set** that includes those roots; reachability keeps its `src/`-only
+denominator, because "which `src/` module does a test load" is a different question from "does this
+test run repository code at all", and conflating them would have moved 97.8% for the wrong reason.
+
+Both directions matter here. The headline **overstated** the substring-assertion problem by 2.3
+points — and the bucket that remains is **more** concentrated in substring checks, 74.9% → **85.0%**.
+The qualitative finding in §3 survives defect 28 intact; the number attached to it did not. A
+knock-on worth naming: the literal-array caveat measured **4 of 14,054** when the bucket was wider
+and is now **1 of 11,253**, because three of those four files execute a module outside `src/`.
+
+27 is the third counting defect of the same family as 10 — a real registration the parser could not
+see. `(HAS_ACTION_QUEUE_TABLE ? it : it.skip)(…)` and a `const maybeIt = pwsh ? it : it.skip` alias
+both register a case; only _which_ registrar runs is conditional. Their skip state is deliberately
+**not** counted, because it is decided at runtime and `.skip` means a statically declared skip — so
+that figure stays 11 and keeps its meaning.
+
+29 is not a miscount but a **scope claim that outran the tool**. §0 said "the whole test estate" for
+a measurement that never parsed `node:test`. 21 such files live under `scripts/`, 19 referenced by a
+workflow or a `package.json` script. Collecting that lane means parsing its registration, resolving
+its runner invocations and re-deriving the never-executed analysis across it — a slice, not a
+correction. The scope claim was narrowed instead, and the lane is now stated as `NOT_MEASURED` where
+a reader will see it rather than left silently outside the number.
+
+Neither pattern was caught by the author. Fourteen review rounds by three independent reviewers found
+every one of the twenty-nine. That is the strongest evidence in this document for its own central
 claim, and it is evidence about the author as much as about the tool: **a measurement is not
 trustworthy because the person who made it checked it.** Anyone quoting a figure from this document
-should note that it took twelve adversarial rounds to get these numbers right, that round six still
+should note that it took fourteen adversarial rounds to get these numbers right, that round six still
 moved one of them by 47%, and that the reachability headline moved in five separate rounds
 (98.2% → 97.7% → 97.8% → 97.9% → 97.8%).
 
-What did **not** change across any of the twenty-six: no finding, no proposal, and not the calibrated
+What did **not** change across any of the twenty-nine: no finding, no proposal, and not the calibrated
 verdict at §10. Every correction moved a figure's precision or a method's honesty, and none moved a
 conclusion. That is worth stating explicitly, because the length of this section could otherwise be
 read as the audit's substance being in doubt. It is not; its arithmetic was.

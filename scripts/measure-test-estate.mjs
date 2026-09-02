@@ -127,6 +127,28 @@ const helperSet = new Set(
   allSrc.filter((f) => !IS_TEST.test(f) && f.startsWith("src/test/") && !f.endsWith(".d.ts")),
 );
 
+/**
+ * Modules whose import means a test EXECUTES repository code.
+ *
+ * Wider than `productSet` on purpose. Reachability answers "which `src/` module
+ * does a test load", so its denominator stays `src/`-only. Classification
+ * answers "does this test run repository code at all", and `scripts/` and
+ * `supabase/functions/` are repository code — an edge function is product code
+ * that happens not to live in `src/`. Building this from `src/` alone filed 57
+ * tests that import and run those modules as scan-only. See defect 28.
+ */
+const OUTSIDE_SRC_ROOTS = ["scripts/", "supabase/functions/"];
+const executableSet = new Set([
+  ...product,
+  ...treePaths.filter(
+    (f) =>
+      OUTSIDE_SRC_ROOTS.some((r) => f.startsWith(r)) &&
+      /\.(ts|tsx|mjs|cjs|js)$/.test(f) &&
+      !IS_TEST.test(f) &&
+      !f.endsWith(".d.ts"),
+  ),
+]);
+
 const srcOf = readBlobs(allSrc);
 const body = (f) => srcOf.get(f) ?? "";
 
@@ -161,7 +183,7 @@ for (const t of tests) {
   onlyCallSites += n.onlys;
 
   // ONE walk per test: the same reach answers I/O, src-path reads and bucket.
-  const reach = testFileReach({ source: s, file: t, productSet, helperSet, sourceOf: body });
+  const reach = testFileReach({ source: s, file: t, executableSet, helperSet, sourceOf: body });
   if (reach.scans) readsContent += 1;
   if (reach.readsSrc) readsSrc += 1;
 

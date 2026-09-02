@@ -26,13 +26,16 @@ import ts from "typescript";
  * product code through `../lib/x` were bucketed as "scan-only", a bucket the
  * audit defines as importing no product module at all. They are hybrids.
  */
-export function resolveSpec(spec, fromFile, productSet) {
+export function resolveSpec(spec, fromFile, moduleSet) {
   let base;
   if (spec.startsWith("@/")) base = `src/${spec.slice(2)}`;
   else if (spec.startsWith(".")) base = posixJoin(dirnameOf(fromFile), spec);
   else return null;
+  // No `.mjs` / `.js` candidate is needed for the executable modules outside
+  // `src/`: every real import of one carries its extension, which the bare
+  // `base` already matches. Measured — adding them moves no figure.
   for (const c of [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`]) {
-    if (productSet.has(c)) return c;
+    if (moduleSet.has(c)) return c;
   }
   return null;
 }
@@ -341,8 +344,8 @@ function allBindingsTypeOnly(bindings) {
  * `scan-only` means: reads source/fixture files AND imports no product module
  * AND renders nothing. Anything that also executes product code is a hybrid.
  */
-export function classifyTest({ source, file, productSet, helperSet, sourceOf }) {
-  return bucketOf(testFileReach({ source, file, productSet, helperSet, sourceOf }));
+export function classifyTest({ source, file, executableSet, helperSet, sourceOf }) {
+  return bucketOf(testFileReach({ source, file, executableSet, helperSet, sourceOf }));
 }
 
 /** The bucket a reach summary falls in. Split out so the walk can be reused. */
@@ -363,12 +366,20 @@ export function bucketOf({ scans, renders, importsProduct }) {
  * filed `scan-only` because neither edge was followed. See the audit's §9.0
  * defect 25 for the 35 files this moved and the 13 credited with no file I/O.
  *
- * Helpers are walked transitively. A product module is a STOPPING edge: the
+ * `executableSet` is deliberately WIDER than the reachability denominator: it
+ * adds the executable modules under `scripts/` and `supabase/functions/`. The
+ * scan-only bucket is defined by not executing product code, and a module under
+ * `supabase/functions/` is product code that happens not to live in `src/`.
+ * Building it from `src/` alone filed 57 tests that import and run those modules
+ * as scan-only — see the audit's §9.0 defect 28. Reachability keeps the
+ * `src/`-only denominator, because that is a different question.
+ *
+ * Helpers are walked transitively. An executable module is a STOPPING edge: the
  * question is only whether one is reached, never what it goes on to pull in.
  * Mock-replaced specifiers never appear here, so a helper the test `vi.mock`s
  * is correctly not walked.
  */
-export function testFileReach({ source, file, productSet, helperSet, sourceOf }) {
+export function testFileReach({ source, file, executableSet, helperSet, sourceOf }) {
   const read = (f) => (f === file ? source : (sourceOf?.(f) ?? ""));
   const seen = new Set([file]);
   const stack = [file];
@@ -383,7 +394,7 @@ export function testFileReach({ source, file, productSet, helperSet, sourceOf })
     if (!renders) renders = rendersComponents(src, cur);
     if (!readsSrc) readsSrc = readsSrcPath(src, cur);
     for (const spec of testFileRuntimeSpecifiers(src, cur)) {
-      if (resolveSpec(spec, cur, productSet) !== null) {
+      if (resolveSpec(spec, cur, executableSet) !== null) {
         importsProduct = true;
         continue;
       }
@@ -559,15 +570,54 @@ export function readsSrcPath(source, fileName = "f.tsx") {
   return found;
 }
 
-/** The identifier a call/property chain roots at: `it.each([…])(…)` → `it`. */
-function chainRoot(node) {
+/**
+ * The identifier a call/property chain roots at: `it.each([…])(…)` → `it`.
+ *
+ * Also resolves the two shapes that select a registrar at RUNTIME, which a
+ * plain chain walk returns `null` for — silently dropping the case:
+ *
+ *   (HAS_TABLE ? it : it.skip)("…", fn)          // parenthesised conditional
+ *   const maybeIt = pwsh ? it : it.skip;         // bound to an identifier
+ *   maybeIt("…", fn)
+ *
+ * Both register a case either way; only WHICH registrar runs is conditional. A
+ * conditional resolves only when both branches root at the same registrar, so a
+ * genuine `cond ? it : somethingElse` stays unresolved rather than guessed.
+ * See the audit's §9.0 defect 27 for the 24 sites this recovers.
+ */
+function chainRoot(node, aliases) {
   let cur = node;
   for (;;) {
     if (ts.isCallExpression(cur)) cur = cur.expression;
     else if (ts.isTaggedTemplateExpression(cur)) cur = cur.tag;
     else if (ts.isPropertyAccessExpression(cur)) cur = cur.expression;
-    else return ts.isIdentifier(cur) ? cur.text : null;
+    else if (ts.isParenthesizedExpression(cur)) cur = cur.expression;
+    else if (ts.isConditionalExpression(cur)) {
+      const whenTrue = chainRoot(cur.whenTrue, aliases);
+      return whenTrue !== null && whenTrue === chainRoot(cur.whenFalse, aliases) ? whenTrue : null;
+    } else if (ts.isIdentifier(cur)) {
+      return aliases?.get(cur.text) ?? cur.text;
+    } else return null;
   }
+}
+
+/**
+ * Identifiers bound to a registrar, so `maybeIt(…)` is recognised as a case.
+ *
+ * Collected in a pass before counting, because the binding can sit anywhere
+ * relative to its uses. Only `it` and `test` roots are recorded.
+ */
+function registrarAliases(sf) {
+  const aliases = new Map();
+  const visit = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      const root = chainRoot(node.initializer, aliases);
+      if (root === "it" || root === "test") aliases.set(node.name.text, root);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return aliases;
 }
 
 /** The modifiers on a chain: `it.skip(…)` → ["skip"]. */
@@ -603,6 +653,7 @@ function chainModifiers(call) {
 export function countCallSites(source, fileName = "f.tsx") {
   const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
   const counts = { expects: 0, cases: 0, skips: 0, onlys: 0, substringAssertions: 0 };
+  const aliases = registrarAliases(sf);
   const visit = (node) => {
     if (ts.isCallExpression(node)) {
       const e = node.expression;
@@ -610,7 +661,7 @@ export function countCallSites(source, fileName = "f.tsx") {
       if (ts.isPropertyAccessExpression(e) && SUBSTRING_MATCHERS.has(e.name.text)) {
         counts.substringAssertions += 1;
       }
-      const root = chainRoot(e);
+      const root = chainRoot(e, aliases);
       if (root === "it" || root === "test") {
         counts.cases += 1;
         const mods = chainModifiers(node);

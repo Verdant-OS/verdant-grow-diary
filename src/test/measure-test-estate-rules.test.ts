@@ -235,7 +235,9 @@ describe("import classification — relative specifiers are product imports too"
       import { normalize } from "../lib/sensorReadingNormalizationRules";
       it("x", () => { readFileSync("m.sql"); expect(normalize(1)).toBe(1); });
     `;
-    expect(classifyTest({ source, file: "src/test/x.test.ts", productSet })).toBe("hybrid");
+    expect(classifyTest({ source, file: "src/test/x.test.ts", executableSet: productSet })).toBe(
+      "hybrid",
+    );
   });
 
   it("still classifies a genuinely source-scanning test as scan-only", () => {
@@ -243,12 +245,16 @@ describe("import classification — relative specifiers are product imports too"
       import { readFileSync } from "node:fs";
       it("x", () => { expect(readFileSync("f")).toContain("needle"); });
     `;
-    expect(classifyTest({ source, file: "src/test/x.test.ts", productSet })).toBe("scan-only");
+    expect(classifyTest({ source, file: "src/test/x.test.ts", executableSet: productSet })).toBe(
+      "scan-only",
+    );
   });
 
   it("classifies a test that does no file I/O as behavioural", () => {
     const source = `import { normalize } from "../lib/a"; it("x", () => expect(normalize()).toBe(1));`;
-    expect(classifyTest({ source, file: "src/test/x.test.ts", productSet })).toBe("behavioural");
+    expect(classifyTest({ source, file: "src/test/x.test.ts", executableSet: productSet })).toBe(
+      "behavioural",
+    );
   });
 });
 
@@ -280,7 +286,9 @@ describe("classification follows the test's own helpers (defect 25)", () => {
     `;
     // Reads nothing itself: without the helper edge this is "behavioural".
     expect(readsFileContent(source, file)).toBe(false);
-    expect(testFileReach({ source, file, productSet, helperSet, sourceOf }).scans).toBe(true);
+    expect(
+      testFileReach({ source, file, executableSet: productSet, helperSet, sourceOf }).scans,
+    ).toBe(true);
   });
 
   it("counts a product import reached only through a helper, so scan-only becomes hybrid", () => {
@@ -289,11 +297,11 @@ describe("classification follows the test's own helpers (defect 25)", () => {
       import { scan } from "./helpers/h";
       it("x", () => expect(readFileSync("f")).toContain(scan()));
     `;
-    const args = { source, file, productSet, helperSet, sourceOf };
+    const args = { source, file, executableSet: productSet, helperSet, sourceOf };
     expect(testFileReach(args).importsProduct).toBe(true);
     expect(classifyTest(args)).toBe("hybrid");
     // The defect, pinned: with no helperSet the identical file reads scan-only.
-    expect(classifyTest({ source, file, productSet })).toBe("scan-only");
+    expect(classifyTest({ source, file, executableSet: productSet })).toBe("scan-only");
   });
 
   it("walks helpers transitively, not one level deep", () => {
@@ -302,7 +310,9 @@ describe("classification follows the test's own helpers (defect 25)", () => {
       it("x", () => expect(read()).toContain("needle"));
     `;
     // chain.ts re-exports reader.ts; the I/O is two edges out.
-    expect(testFileReach({ source, file, productSet, helperSet, sourceOf }).scans).toBe(true);
+    expect(
+      testFileReach({ source, file, executableSet: productSet, helperSet, sourceOf }).scans,
+    ).toBe(true);
   });
 
   it("does not walk a helper the test has factory-mocked away", () => {
@@ -311,9 +321,33 @@ describe("classification follows the test's own helpers (defect 25)", () => {
       import { scan } from "./helpers/h";
       it("x", () => expect(scan()).toBe("stub"));
     `;
-    const reach = testFileReach({ source, file, productSet, helperSet, sourceOf });
+    const reach = testFileReach({ source, file, executableSet: productSet, helperSet, sourceOf });
     expect(reach.scans).toBe(false);
     expect(reach.importsProduct).toBe(false);
+  });
+
+  it("counts a case registered through a runtime-selected registrar", () => {
+    // 21 real sites in action-queue-safety.test.ts use the parenthesised form
+    // and 3 in ecowitt-windows-testbench-static-safety.test.ts use the alias.
+    const paren = `(HAS_TABLE ? it : it.skip)("a", () => {}); (HAS_TABLE ? it : it.skip)("b", () => {});`;
+    const alias = `const maybeIt = pwsh ? it : it.skip; maybeIt("a", () => {}); maybeIt("b", () => {});`;
+    expect(countCallSites(paren, "f.ts").cases).toBe(2);
+    expect(countCallSites(alias, "f.ts").cases).toBe(2);
+  });
+
+  it("does not count a runtime-selected registrar as a `.skip`", () => {
+    // Which branch runs is decided at runtime, so the case is registered but
+    // its skip state is not statically knowable. Counting it would inflate a
+    // figure that means "statically declared skip".
+    const source = `(HAS_TABLE ? it : it.skip)("a", () => {});`;
+    expect(countCallSites(source, "f.ts").skips).toBe(0);
+    // The plain form still counts, so this narrowing did not blind the counter.
+    expect(countCallSites(`it.skip("a", () => {});`, "f.ts").skips).toBe(1);
+  });
+
+  it("does not treat a conditional over non-registrars as a case", () => {
+    const source = `const pick = cond ? renderA : renderB; pick("x", () => {});`;
+    expect(countCallSites(source, "f.ts").cases).toBe(0);
   });
 
   it("maps a reach summary onto the three buckets", () => {
@@ -321,6 +355,47 @@ describe("classification follows the test's own helpers (defect 25)", () => {
     expect(bucketOf({ scans: true, renders: false, importsProduct: false })).toBe("scan-only");
     expect(bucketOf({ scans: true, renders: false, importsProduct: true })).toBe("hybrid");
     expect(bucketOf({ scans: true, renders: true, importsProduct: false })).toBe("hybrid");
+  });
+});
+
+describe("executable modules outside src/ still execute product code (defect 28)", () => {
+  // `executableSet` is wider than the reachability denominator on purpose: a
+  // module under supabase/functions/ is product code that is not in src/.
+  const executableSet = new Set([
+    "src/lib/a.ts",
+    "scripts/lib/testEstateRules.mjs",
+    "supabase/functions/_shared/lib/creditRules.ts",
+  ]);
+  const file = "src/test/x.test.ts";
+
+  // A fence, not a regression: an explicit-extension path already matched the
+  // bare candidate. It pins that the wider set is reachable by a real specifier.
+  it("resolves a relative .mjs path under scripts/", () => {
+    expect(resolveSpec("../../scripts/lib/testEstateRules.mjs", file, executableSet)).toBe(
+      "scripts/lib/testEstateRules.mjs",
+    );
+  });
+
+  it("classifies a scanner that imports a scripts/ module as hybrid, not scan-only", () => {
+    const source = `
+      import { readFileSync } from "node:fs";
+      import { countCallSites } from "../../scripts/lib/testEstateRules.mjs";
+      it("x", () => { expect(readFileSync("f")).toContain(countCallSites("")); });
+    `;
+    expect(classifyTest({ source, file, executableSet })).toBe("hybrid");
+    // The defect, pinned: with a src/-only set the identical file reads scan-only.
+    expect(classifyTest({ source, file, executableSet: new Set(["src/lib/a.ts"]) })).toBe(
+      "scan-only",
+    );
+  });
+
+  it("classifies a scanner that imports an edge-function module as hybrid", () => {
+    const source = `
+      import { readFileSync } from "node:fs";
+      import { grant } from "../../supabase/functions/_shared/lib/creditRules";
+      it("x", () => { expect(readFileSync("f")).toContain(grant()); });
+    `;
+    expect(classifyTest({ source, file, executableSet })).toBe("hybrid");
   });
 });
 

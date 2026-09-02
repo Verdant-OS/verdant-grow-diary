@@ -342,7 +342,7 @@ function allBindingsTypeOnly(bindings) {
  * AND renders nothing. Anything that also executes product code is a hybrid.
  */
 export function classifyTest({ source, file, productSet }) {
-  const scans = readsFiles(source, file);
+  const scans = readsFileContent(source, file);
   const renders = rendersComponents(source, file);
   const importsProduct = testFileRuntimeSpecifiers(source, file).some(
     (s) => resolveSpec(s, file, productSet) !== null,
@@ -351,7 +351,19 @@ export function classifyTest({ source, file, productSet }) {
   return !importsProduct && !renders ? "scan-only" : "hybrid";
 }
 
-const FS_READERS = new Set(["readFileSync", "readdirSync", "readFile", "globSync"]);
+/**
+ * Readers that return file CONTENT (or a directory listing to then read).
+ *
+ * Deliberately excludes the metadata calls — `existsSync`, `statSync`,
+ * `lstatSync`, `accessSync`. They are filesystem I/O, but they read no bytes,
+ * and this set gates the scan-only bucket, which §3.1 of the audit defines as
+ * tests asserting **against source text**. A test that calls
+ * `expect(existsSync(p)).toBe(false)` asserts a file is ABSENT: it has no text
+ * to assert on, so filing it under that bucket would break the definition the
+ * headline rests on. The metric is named for content reads instead — see the
+ * audit's §9.0 defect 23, which measures the four files this excludes.
+ */
+const CONTENT_READERS = new Set(["readFileSync", "readdirSync", "readFile", "globSync"]);
 
 /**
  * Does this file CALL `render(…)`?
@@ -385,7 +397,7 @@ export function rendersComponents(source, fileName = "f.tsx") {
 }
 
 /**
- * Does this file actually CALL a filesystem reader?
+ * Does this file actually CALL a reader that returns file CONTENT?
  *
  * The predicate used to match the names anywhere in the source, which fired on
  * a `type FsLike = { readdirSync: (p: string) => string[] }` and on injected
@@ -395,8 +407,9 @@ export function rendersComponents(source, fileName = "f.tsx") {
  * any reader at all and were nonetheless counted in the scan-only bucket.
  *
  * Only a CallExpression counts, by bare name or as the property being invoked.
+ * Metadata-only calls are not content reads — see `CONTENT_READERS`.
  */
-export function readsFiles(source, fileName = "f.tsx") {
+export function readsFileContent(source, fileName = "f.tsx") {
   const sf = ts.createSourceFile(fileName, String(source), ts.ScriptTarget.Latest, false);
   let found = false;
   const visit = (node) => {
@@ -408,7 +421,7 @@ export function readsFiles(source, fileName = "f.tsx") {
         : ts.isPropertyAccessExpression(e)
           ? e.name.text
           : null;
-      if (name && FS_READERS.has(name)) {
+      if (name && CONTENT_READERS.has(name)) {
         found = true;
         return;
       }
@@ -485,7 +498,7 @@ export function readsSrcPath(source, fileName = "f.tsx") {
         : ts.isPropertyAccessExpression(e)
           ? e.name.text
           : null;
-      if (name && FS_READERS.has(name)) {
+      if (name && CONTENT_READERS.has(name)) {
         const parts = literalsIn(node.arguments[0]);
         const joined = parts.join("/");
         if (parts.some((t) => t.includes("src/")) || /(^|\/)src(\/|$)/.test(joined)) {

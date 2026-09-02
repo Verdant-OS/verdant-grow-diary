@@ -35,7 +35,7 @@ import {
   mockReplacedSpecifiers,
   namedPathsIn,
   reachableClosure,
-  readsFiles,
+  readsFileContent,
   readsSrcPath,
   resolveSpec,
   runtimeImportSpecifiers,
@@ -137,7 +137,7 @@ let hybridExpects = 0;
 let hybridCases = 0;
 let behavioural = 0;
 let behaviouralExpects = 0;
-let anyFileIo = 0;
+let readsContent = 0;
 let readsSrc = 0;
 let scanOnlyExpects = 0;
 let scanOnlyCases = 0;
@@ -156,7 +156,7 @@ for (const t of tests) {
   skipCallSites += n.skips;
   onlyCallSites += n.onlys;
 
-  if (readsFiles(s, t)) anyFileIo += 1;
+  if (readsFileContent(s, t)) readsContent += 1;
   if (readsSrcPath(s, t)) readsSrc += 1;
 
   const kind = classifyTest({ source: s, file: t, productSet });
@@ -331,7 +331,7 @@ const report = {
     hybridCases,
     behaviouralFiles: behavioural,
     behaviouralExpects,
-    filesDoingFileIo: anyFileIo,
+    filesReadingFileContent: readsContent,
     filesReadingSrcPaths: readsSrc,
   },
   reachability: {
@@ -373,7 +373,7 @@ if (process.argv.includes("--json")) {
   console.log(`  hybrid expects / cases         ${v.hybridExpects} / ${v.hybridCases}`);
   console.log(`  behavioural expects            ${v.behaviouralExpects}`);
   console.log(
-    `  files doing any file I/O       ${v.filesDoingFileIo}  (${pct(v.filesDoingFileIo, v.testFiles)})`,
+    `  files reading file content     ${v.filesReadingFileContent}  (${pct(v.filesReadingFileContent, v.testFiles)})`,
   );
   console.log(`  files reading a src/ path      ${v.filesReadingSrcPaths}`);
   console.log("\nModule reachability (runtime edges only; `import type` is erased and excluded)");

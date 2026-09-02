@@ -72,7 +72,7 @@ covered by the claim above:
 `testFiles` · `productModules` · `itTestCallSites` · `expectCallSites` · `skipCallSites` ·
 `onlyCallSites` · `scanOnlyFiles` · `scanOnlyExpects` · `scanOnlyCases` ·
 `scanOnlySubstringAssertions` · `hybridFiles` · `hybridExpects` · `hybridCases` ·
-`behaviouralFiles` · `behaviouralExpects` · `filesDoingFileIo` · `filesReadingSrcPaths` ·
+`behaviouralFiles` · `behaviouralExpects` · `filesReadingFileContent` · `filesReadingSrcPaths` ·
 reachability (`direct` / `transitiveOnly` / `unreached`, with the unreached files named) · the four
 lanes' `total` / `executed` / `never` with every never-executed file named · and
 `testFilesAcrossFourTestLanes`.
@@ -153,12 +153,12 @@ import no product module and render nothing, so nothing in them observes runtime
 
 ### 3.1 The measurement
 
-| Bucket                                                                      | Files             | Assertions         | Cases             |
-| --------------------------------------------------------------------------- | ----------------- | ------------------ | ----------------- |
-| **Scan-only** (reads files; imports no product module; never renders)       | **622** (21.4%)   | **18,525** (21.2%) | **5,912** (18.5%) |
-| Hybrid (scans files _and_ imports/renders)                                  | 771               | 29,923             | 11,396            |
-| Pure behavioural (no file I/O at all)                                       | 1,515 (52.1%)     | 38,885             | —                 |
-| **Any file I/O** (calls `readFileSync`/`readFile`/`readdirSync`/`globSync`) | **1,393** (47.9%) | —                  | —                 |
+| Bucket                                                                            | Files             | Assertions         | Cases             |
+| --------------------------------------------------------------------------------- | ----------------- | ------------------ | ----------------- |
+| **Scan-only** (reads files; imports no product module; never renders)             | **622** (21.4%)   | **18,525** (21.2%) | **5,912** (18.5%) |
+| Hybrid (scans files _and_ imports/renders)                                        | 771               | 29,923             | 11,396            |
+| Pure behavioural (reads no file content)                                          | 1,515 (52.1%)     | 38,885             | —                 |
+| **Reads file content** (calls `readFileSync`/`readFile`/`readdirSync`/`globSync`) | **1,393** (47.9%) | —                  | —                 |
 
 Within the scan-only bucket, **75.9% of assertions are `toContain(...)` or `toMatch(...)`** —
 14,054 substring and regex checks over file text, which is **16.1% of all 87,333 Vitest
@@ -557,7 +557,7 @@ Not to be rounded up by anyone quoting this document.
 
 ## 9. Validation
 
-### 9.0 Twenty-two measurement defects found in review, and corrected
+### 9.0 Twenty-four measurement defects found in review, and corrected
 
 The first published version of `measure-test-estate.mjs` was reviewed on PR #1219 by **Codex,
 GitHub Copilot and Cursor Bugbot independently**, and all three found defects in it. Six were real.
@@ -566,9 +566,10 @@ defect 4 — and Cursor Bugbot then found a ninth inside the fix for _that_. A f
 found three more, in the assertion and file-I/O counters nobody had looked at while the import
 graph was being argued over — and both then found a fourteenth and a thirteenth in the fixes for
 defects 8 and 9, then three more in the fixes for 11 and 12, then an eighteenth in the fix for 13,
-then two more in what was left, and a twenty-first — the deepest of them — in how the graph is walked.
-All twenty-one are recorded here rather than quietly patched, because this document's subject is
-measurement discipline and the reproducer was the part that failed it.
+then two more in what was left, a twenty-first — the deepest of them — in how the graph is walked,
+and three more in what the metrics were _called_. All twenty-four are recorded here rather than
+quietly patched, because this document's subject is measurement discipline and the reproducer was
+the part that failed it.
 
 | #   | Defect                                                                                                                                               | Effect on a published figure                                                                                                        |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
@@ -577,7 +578,7 @@ measurement discipline and the reproducer was the part that failed it.
 | 3   | Any path token in a workflow body counted as execution                                                                                               | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed                               |
 | 4   | `import type` counted as a runtime edge, though the transpiler erases it                                                                             | reachability **98.2% → 97.8%**                                                                                                      |
 | 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee                                                | no figure moved, but the guarantee was false as written                                                                             |
-| 6   | Nothing tested the parser that produces these numbers                                                                                                | now `src/test/measure-test-estate-rules.test.ts`, 72 cases                                                                          |
+| 6   | Nothing tested the parser that produces these numbers                                                                                                | now `src/test/measure-test-estate-rules.test.ts`, 73 cases                                                                          |
 | 7   | The fix for 4 matched imports with a **regex**, which both invented edges and missed real ones                                                       | reachability **97.7% → 97.8%**; imports are now read from the TypeScript compiler's own AST                                         |
 | 8   | §1 claimed the script reproduces _every_ headline count, but it launches no test runner                                                              | no figure moved; the claim is narrowed to the static counts it does derive                                                          |
 | 9   | The reachability walk regex-subtracted every `vi.mock` path, contradicting the rule defect 7 had just established                                    | no module moved on the pinned tree, but the code and the published method disagreed; the rule now lives in one tested function      |
@@ -594,6 +595,8 @@ measurement discipline and the reproducer was the part that failed it.
 | 20  | `testFilesAcrossAllLanes` said "all lanes" while summing only the four test-file lanes, omitting the 33 harnesses                                    | no figure moved; the field is now `testFilesAcrossFourTestLanes` and the report names the fifth lane beside it                      |
 | 21  | The transitive walk discarded each test's mock state, re-adding modules the test had replaced                                                        | reached **2,061 → 2,060**; unreached **45 → 46**; reachability **97.9% → 97.8%**; the graph is now walked per test file and unioned |
 | 22  | The `vi.doMock` exclusion was stated unconditionally, though it holds only for **static** imports                                                    | no figure moved — an over-blocking ceiling shifts nothing — but the rule as published was wrong, and the limit is now stated        |
+| 23  | The file-I/O metric was labelled "any file I/O" but counted only **content** readers, omitting `existsSync` / `statSync`                             | no figure moved; renamed `filesReadingFileContent`, and the 4 metadata-only files are recorded as deliberately excluded             |
+| 24  | §1's list of emitted fields named `testFilesAcrossAllLanes`, which defect 20's rename had removed                                                    | no figure moved; the published contract pointed at a field that does not exist. All 24 names now verified against `--json` output   |
 
 Fixing 3 initially introduced two **false-DEAD** readings in the opposite direction — a YAML folded
 scalar (`run: >-`) splits one command across lines, and a `psql … \` continuation does too, so real
@@ -739,11 +742,27 @@ here and beside the code rather than carried silently; no figure changes.
 That the generalisation went unnoticed is the same error as round 1's finding 5, where "verified" was
 written for thirteen specs when only part had been checked. It is worth naming twice.
 
-Neither pattern was caught by the author. Ten review rounds by three independent reviewers found
-every one of the twenty-two. That is the strongest evidence in this document for its own central
+**Defects 23 and 24 are about naming, and one of them is the worst kind.** 23: the metric published
+as "any file I/O" counted only readers that return **content** — `readFileSync`, `readFile`,
+`readdirSync`, `globSync` — and not `existsSync` or `statSync`. Four files at the pinned revision do
+metadata-only reads. Two remedies were available and they are not equivalent: widening the reader set
+would also re-bucket those four out of _behavioural_, because this predicate gates `classifyTest`,
+and §3.1 defines scan-only as asserting **against source text** — a test asserting `existsSync(p)` is
+`false` has no text to assert on. Widening it would file those tests under a bucket whose defining
+property they lack, in order to make a label true. **The label was narrowed instead**: the field is
+now `filesReadingFileContent`, the §3.1 row reads "reads file content", and the four excluded files
+are recorded here. No figure moves; 1,393 is correct for what it now says it counts.
+
+24 is the worst kind, because it made the document's own instructions wrong: defect 20 renamed the
+emitted JSON key and **did not update §1's list of emitted fields** — the list a reader follows to
+check the reproducibility claim — so the published contract pointed at a field that does not exist.
+Fixed, and all 24 names in that list are now verified against real `--json` output rather than by eye.
+
+Neither pattern was caught by the author. Eleven review rounds by three independent reviewers found
+every one of the twenty-four. That is the strongest evidence in this document for its own central
 claim, and it is evidence about the author as much as about the tool: **a measurement is not
 trustworthy because the person who made it checked it.** Anyone quoting a figure from this document
-should note that it took ten adversarial rounds to get these numbers right, that round six still
+should note that it took eleven adversarial rounds to get these numbers right, that round six still
 moved one of them by 47%, and that the reachability headline moved in five separate rounds
 (98.2% → 97.7% → 97.8% → 97.9% → 97.8%).
 
@@ -765,7 +784,7 @@ directions are pinned by two CLI cases in the parser test file.
 Targeted tests:      src/test/timeline-grow-filter.test.ts, src/test/action-queue-row-evidence-badge.test.ts
                      → 2 files, 18 cases, all passing at baseline
                      src/test/measure-test-estate-rules.test.ts (the reproducer's own parser)
-                     → 1 file, 72 cases, 72 passed | 0 failed
+                     → 1 file, 73 cases, 73 passed | 0 failed
                      RED-before-GREEN, proven by execution: with the vulnerable
                      `execSync` form restored in place, the command-substitution
                      case failed (1 failed | 37 passed); the file was restored and

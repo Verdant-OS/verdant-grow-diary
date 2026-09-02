@@ -25,7 +25,7 @@ import {
   countCallSites,
   factoryMockedSpecifiers,
   mockReplacedSpecifiers,
-  readsFiles,
+  readsFileContent,
   reachableClosure,
   readsSrcPath,
   rendersComponents,
@@ -502,20 +502,28 @@ describe("call-site counting — calls, not text", () => {
   });
 });
 
-describe("file-I/O classification — a declaration is not a read", () => {
+describe("file-content classification — a declaration is not a read", () => {
   it("does NOT count a type member named like a reader", () => {
     // `run-skill-driver-probe.test.ts` was bucketed scan-only on this alone.
-    expect(readsFiles("type FsLike = { readdirSync: (p: string) => string[] };")).toBe(false);
+    expect(readsFileContent("type FsLike = { readdirSync: (p: string) => string[] };")).toBe(false);
   });
 
   it("does NOT count an injected fake's property", () => {
     // `subscriber-growth-backend-remote-verification.test.ts`, likewise.
-    expect(readsFiles('const fs = { readFileSync: (f: string) => "x" };')).toBe(false);
+    expect(readsFileContent('const fs = { readFileSync: (f: string) => "x" };')).toBe(false);
+  });
+
+  it("does NOT count a metadata-only call, which reads no content", () => {
+    // `existsSync`/`statSync` are filesystem I/O but read no bytes. This gate
+    // feeds the scan-only bucket, which §3.1 defines as asserting against source
+    // TEXT — an absence check has no text to assert on. §9.0 defect 23.
+    expect(readsFileContent("expect(existsSync(p)).toBe(false);")).toBe(false);
+    expect(readsFileContent("const s = statSync(p);")).toBe(false);
   });
 
   it("counts a real call, bare or as a property", () => {
-    expect(readsFiles('const t = readFileSync(p, "utf8");')).toBe(true);
-    expect(readsFiles('const t = fs.readFileSync(p, "utf8");')).toBe(true);
+    expect(readsFileContent('const t = readFileSync(p, "utf8");')).toBe(true);
+    expect(readsFileContent('const t = fs.readFileSync(p, "utf8");')).toBe(true);
   });
 
   it("takes the src/ path from the reader call's OWN argument", () => {

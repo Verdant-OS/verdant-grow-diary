@@ -8,7 +8,7 @@ at 20:07 UTC (~3:07 PM CT; `buildTime` `2026-09-02T19:53:51.502Z`). Restore SHA 
 **Do not ping Tolu.** Publisher is Vercel. No Lovable Publish. No History-restore. No APPLY. **The
 deploy branch itself is red on the non-required `Dependency & Security CI`** — four new `fast-uri`
 advisories, `check:deps` BLOCKED on the tip's lockfiles — and **#1252 fixes it, READY at
-`301014b8`, not merged**; that is the one repo-wide red and it is not a product `FAIL`. **#1251
+`301014b8`, not merged**; that is the dependency-audit red and it is not a product `FAIL`. **#1251
 carries this restamp** (draft, rebased onto `860d39a9`). #1221 stays READY at `9f922ca54`, not
 merged. Signup PREFLIGHT still **BLOCKED**; not run here, not claimed passed. Production Postgres is
 Lovable Cloud. Stay on Paddle; live checkout off. #1174 stays draft. The restamp below recorded live
@@ -46,19 +46,19 @@ on the URL and withholds `pageContent` (no private REST) until `getUser` succeed
 Claude fetched `https://verdantgrowdiary.com/version.json` in this slice, at 19:55 and again at 20:07
 UTC; both reads agree.
 
-| Field        | Value                                                              |
-| ------------ | ------------------------------------------------------------------ |
-| `commit`     | `860d39a9263c1312dbd495feae24519bebd8dc3d`                         |
-| `dirty`      | **`false`**                                                        |
-| `ref`        | `verdant-grow-diary`                                               |
-| `commitTime` | `2026-09-02T19:45:56Z`                                             |
-| `buildTime`  | `2026-09-02T19:53:51.502Z` (~2:53 PM CT)                           |
-| `treeHash`   | `6346c7dd1aa7` (short; moved from `cc51a64c74d9` — `src/` changed) |
-| server       | **Vercel** (`server: Vercel`, `x-vercel-cache: HIT`, edge `iad1`)  |
-| apex HTTP    | `200`                                                              |
-| www HTTP     | `308` → apex `version.json`, server Vercel                         |
-| measured     | 2026-09-02 **20:07:49 UTC** (~3:07 PM CT)                          |
-| source       | `https://verdantgrowdiary.com/version.json`                        |
+| Field           | Value                                                             |
+| --------------- | ----------------------------------------------------------------- |
+| `commit`        | `860d39a9263c1312dbd495feae24519bebd8dc3d`                        |
+| `dirty`         | **`false`**                                                       |
+| `ref`           | `verdant-grow-diary`                                              |
+| `commitTime`    | `2026-09-02T19:45:56Z`                                            |
+| `buildTime`     | `2026-09-02T19:53:51.502Z` (~2:53 PM CT)                          |
+| `treeHashShort` | `6346c7dd1aa7` (moved from `cc51a64c74d9` — `src/` changed)       |
+| server          | **Vercel** (`server: Vercel`, `x-vercel-cache: HIT`, edge `iad1`) |
+| apex HTTP       | `200`                                                             |
+| www HTTP        | `308` → apex `version.json`, server Vercel                        |
+| measured        | 2026-09-02 **20:07:49 UTC** (~3:07 PM CT)                         |
+| source          | `https://verdantgrowdiary.com/version.json`                       |
 
 **Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not carry
 `a4c9466f` as current live. One apex attempt at 20:06 UTC failed in the TLS handshake
@@ -96,7 +96,10 @@ shows it; a further re-run is not evidence. Do not add an entry to
 `established fact`, from `GET /pulls/1252`, its reviews, and the check runs on `301014b8`, read
 ~20:05 UTC. Opened at Cheek's instruction ("bump fast-uri", 16:47 UTC); readied by Cheek at 19:19
 UTC ("ready #1252"); Claude's watch on it was stopped at Cheek's instruction at 19:31 UTC — **not
-touched from this session after that; recorded here from reads only.**
+touched from this session after that; recorded here from reads only.** GitHub `draft:false` is the
+MEASURED fact; the process status per `AGENTS.md` (Agent Role Routing: an owned slice without a
+named independent reviewer is incomplete, and no code ships without peer review) is
+**INCOMPLETE — independent peer seat unfilled**. Ready on GitHub is not cleared to ship.
 
 | PR        | State                           | Head       | Base                         | Commits | Files | +/−      | Migrations |
 | --------- | ------------------------------- | ---------- | ---------------------------- | ------: | ----: | -------- | ---------: |
@@ -137,7 +140,8 @@ Merge-base `88372954`; the tip has moved by two squashes since (#1248 docs-only,
 files, none of which #1221 touches); `git merge-tree` onto `860d39a9` is clean, and clean against
 #1252's head too (both touch `package.json`, disjoint sections). Its CI, review and peer-seat facts
 are as recorded in §4 of the block below and were not re-read here: 35 of 35 required green on that
-head, nine review rounds, no assigned peer. Not readied, merged, rebased or updated in this slice.
+head, nine review rounds, no assigned peer — the same **INCOMPLETE** process status as #1252 (§4).
+Not readied, merged, rebased or updated in this slice.
 
 ## 6. Restore SHA for Tolu/Support is `860d39a9`
 
@@ -211,10 +215,12 @@ Production apply state stays `NOT_MEASURED`. **No APPLY.**
   `860d39a9263c1312dbd495feae24519bebd8dc3d`).
 - **The deploy-branch `Dependency & Security CI` red is non-required and repo-wide until #1252
   lands.** Do not record it as a product `FAIL`. Do not add a dependency-security exception for it.
-- **#1252 is READY at `301014b8`, not merged.** Claude does not merge it; the merge queue and Cheek
-  do. No assigned peer is recorded. Unwatched at Cheek's instruction; no push planned.
-- **#1221 is READY at `9f922ca54`, not merged.** Claude does not merge it. No assigned peer is
-  recorded. Watch stopped at Cheek's instruction; no push planned. Owner-only items it surfaced
+- **#1252 is READY on GitHub at `301014b8`, not merged; shipping gate INCOMPLETE — no independent
+  peer assigned.** Claude does not merge it; the merge queue and Cheek do. Unwatched at Cheek's
+  instruction; no push planned.
+- **#1221 is READY on GitHub at `9f922ca54`, not merged; shipping gate INCOMPLETE — no independent
+  peer assigned.** Claude does not merge it. Watch stopped at Cheek's instruction; no push planned.
+  Owner-only items it surfaced
   (`vars.E2E_BASE_URL`, the Cursor usage limit, the R6-C follow-up, the three decisions in its PR
   body) are listed in the block below and stand.
 - **#1249 is CLOSED UNMERGED, superseded by #1248. Do not reopen it. Do not rebase its commits.**
@@ -234,7 +240,8 @@ Production apply state stays `NOT_MEASURED`. **No APPLY.**
   **rebased onto `860d39a9`** (the `a4c9466f` restamp is its first commit, this block its second).
   Unique file `docs/agents/CURRENT_STATE.md`. No `src/`, no `supabase/`, no `package.json`. CI on
   this head is `NOT_MEASURED` at stamp time; on the pre-rebase head `13a8112ac` every required
-  context was green. No ready. No merge. No assignee. No auto-merge.
+  context was green. Cheek readied #1251 at 20:24 UTC; its own peer seat is likewise unfilled, and
+  merge is Cheek's call. Claude does not ready, merge, assign or auto-merge.
 
 **Prior last updated:** 2026-09-02 UTC (~16:30 UTC)
 **Prior update:** Claude (2026-09-02: **#1248 MERGED as `a4c9466f`** — squash, one parent, the
@@ -298,19 +305,19 @@ not a product `FAIL`, stood down once in a comment on that PR.
 Claude fetched `https://verdantgrowdiary.com/version.json` in this slice, twice (16:19 and 16:24
 UTC); both reads agree.
 
-| Field        | Value                                                             |
-| ------------ | ----------------------------------------------------------------- |
-| `commit`     | `a4c9466fe76aa6328e39661bef75434880cbe263`                        |
-| `dirty`      | **`false`**                                                       |
-| `ref`        | `verdant-grow-diary`                                              |
-| `commitTime` | `2026-09-02T15:45:36Z`                                            |
-| `buildTime`  | `2026-09-02T15:51:21.129Z` (~10:51 AM CT)                         |
-| `treeHash`   | `cc51a64c74d9` (short)                                            |
-| server       | **Vercel** (`server: Vercel`, `x-vercel-cache: HIT`, edge `iad1`) |
-| apex HTTP    | `200`                                                             |
-| www HTTP     | `308` → apex `version.json`, server Vercel                        |
-| measured     | 2026-09-02 **16:24:08 UTC** (~11:24 AM CT)                        |
-| source       | `https://verdantgrowdiary.com/version.json`                       |
+| Field           | Value                                                             |
+| --------------- | ----------------------------------------------------------------- |
+| `commit`        | `a4c9466fe76aa6328e39661bef75434880cbe263`                        |
+| `dirty`         | **`false`**                                                       |
+| `ref`           | `verdant-grow-diary`                                              |
+| `commitTime`    | `2026-09-02T15:45:36Z`                                            |
+| `buildTime`     | `2026-09-02T15:51:21.129Z` (~10:51 AM CT)                         |
+| `treeHashShort` | `cc51a64c74d9`                                                    |
+| server          | **Vercel** (`server: Vercel`, `x-vercel-cache: HIT`, edge `iad1`) |
+| apex HTTP       | `200`                                                             |
+| www HTTP        | `308` → apex `version.json`, server Vercel                        |
+| measured        | 2026-09-02 **16:24:08 UTC** (~11:24 AM CT)                        |
+| source          | `https://verdantgrowdiary.com/version.json`                       |
 
 **Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not carry
 `88372954` as current live. `inference`: the short `treeHash` is identical to the `88372954`

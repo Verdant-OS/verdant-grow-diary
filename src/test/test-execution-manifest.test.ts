@@ -490,34 +490,45 @@ describe("manifest resolver — the ways this guard could silently stop working"
     expect(namedPathsIn(corpus).has("e2e/hopped.spec.ts")).toBe(true);
   });
 
-  it("the Playwright lane contains every file Playwright itself lists (Codex + Vercel, #1221 round 5)", () => {
-    // Resolved, not inferred: ask the installed Playwright what it would run under the
-    // committed config, and require every listed file to be a lane member. A root-level
-    // `e2e/*.spec.ts` filter passed this suite while `playwright test --list` showed a
-    // nested spec — the guard was green for a file it could not see.
-    const res = spawnSync(
-      process.execPath,
-      [
-        join(root, "node_modules/@playwright/test/cli.js"),
-        "test",
-        "--list",
-        "--project=chromium-mocked",
-        "--reporter=json",
-      ],
-      { cwd: root, encoding: "utf8", timeout: 120_000, maxBuffer: 64 * 1024 * 1024 },
-    );
-    expect(res.status, res.stderr).toBe(0);
-    const report = JSON.parse(res.stdout) as { suites?: unknown[] };
-    const listed = new Set<string>();
-    const visit = (suite: { file?: string; suites?: unknown[] }) => {
-      for (const child of suite.suites ?? []) visit(child as { file?: string; suites?: unknown[] });
-      if (suite.file) listed.add(`${PLAYWRIGHT_TEST_DIR}/${suite.file.replace(/\\/g, "/")}`);
-    };
-    for (const suite of report.suites ?? []) visit(suite as { file?: string; suites?: unknown[] });
-    expect(listed.size).toBeGreaterThan(0);
-    const missing = [...listed].filter((f) => !e2eSpecs.includes(f)).sort();
-    expect(missing, "files Playwright would run that the lane does not contain").toEqual([]);
-  });
+  // The discovery spawns Playwright, which transpiles every spec: 2–3 s here, measured
+  // at 3.1 s by Codex, and seen exceeding Vitest's default 5 s under concurrent suite
+  // load (round 7). The test's own budget must exceed the child's 120 s allowance, so
+  // a slow runner produces a lane mismatch or a spawn error — never a bare timeout.
+  const PLAYWRIGHT_LIST_TEST_TIMEOUT_MS = 130_000;
+  it(
+    "the Playwright lane contains every file Playwright itself lists (Codex + Vercel, #1221 round 5)",
+    () => {
+      // Resolved, not inferred: ask the installed Playwright what it would run under the
+      // committed config, and require every listed file to be a lane member. A root-level
+      // `e2e/*.spec.ts` filter passed this suite while `playwright test --list` showed a
+      // nested spec — the guard was green for a file it could not see.
+      const res = spawnSync(
+        process.execPath,
+        [
+          join(root, "node_modules/@playwright/test/cli.js"),
+          "test",
+          "--list",
+          "--project=chromium-mocked",
+          "--reporter=json",
+        ],
+        { cwd: root, encoding: "utf8", timeout: 120_000, maxBuffer: 64 * 1024 * 1024 },
+      );
+      expect(res.status, res.stderr).toBe(0);
+      const report = JSON.parse(res.stdout) as { suites?: unknown[] };
+      const listed = new Set<string>();
+      const visit = (suite: { file?: string; suites?: unknown[] }) => {
+        for (const child of suite.suites ?? [])
+          visit(child as { file?: string; suites?: unknown[] });
+        if (suite.file) listed.add(`${PLAYWRIGHT_TEST_DIR}/${suite.file.replace(/\\/g, "/")}`);
+      };
+      for (const suite of report.suites ?? [])
+        visit(suite as { file?: string; suites?: unknown[] });
+      expect(listed.size).toBeGreaterThan(0);
+      const missing = [...listed].filter((f) => !e2eSpecs.includes(f)).sort();
+      expect(missing, "files Playwright would run that the lane does not contain").toEqual([]);
+    },
+    PLAYWRIGHT_LIST_TEST_TIMEOUT_MS,
+  );
 
   it("does not count a step disabled with `if: ${{ false }}` as an invocation (Codex, #1221 round 6)", () => {
     const corpus = buildExecutionCorpus({

@@ -104,7 +104,7 @@ touched from this session after that; recorded here from reads only.**
 
 Change: `overrides.fast-uri` 3.1.5 → 3.1.6 (same major; 3.1.6 published 2026-08-23, past the 24 h
 `minimumReleaseAge` guard); `bun.lock` regenerated with `bun install --lockfile-only`;
-`package-lock.json` with `npm install --package-lock-only` (npm also stamps `"dev": true` on 29
+`package-lock.json` with npm's package-lock-only install (npm also stamps `"dev": true` on 29
 optional platform binaries — tooling output, not hand edits); the Phase A contract pins (`[3, 1, 6]`
 and the overrides pin) and, from Copilot round 1, `PACKAGE_LOCK_SECURITY_FLOORS["fast-uri"]` in
 `scripts/check-bun-lockfile-policy.mjs` to `"3.1.6"` with a regression row. Every moved pin was seen

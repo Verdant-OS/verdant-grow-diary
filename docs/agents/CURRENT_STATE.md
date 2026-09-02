@@ -1,14 +1,17 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-02 UTC (~02:55 UTC)
+**Last updated:** 2026-09-02 UTC (~04:15 UTC)
 **Updated by:** Claude (2026-09-02: **five merges since `d9ad904` — deploy tip is `aab55387`**, every
 row a squash with zero migrations. **The production publisher is now Vercel**, project
-`verdant-grow-diary`, **not Lovable Publish**; auth is still Lovable Cloud. **Live was MEASURED at
-`ff35bd94`, `dirty:false`, ref `verdant-grow-diary`, server Vercel**, on 2026-09-01 at ~5:38 PM CT,
-with the signed-in Water prefill confirmed `PASS`. That measurement predates three of the five
-merges, so **current production is `NOT_MEASURED`** — a merge is not a deployment. The restore SHA
-for Tolu is **`ff35bd94`**; Tolu is **not** to be pinged. Publish, History-restore and APPLY remain
-blocked. Prior header follows.)
+`verdant-grow-diary`, **not Lovable Publish**; auth is still Lovable Cloud. **Live is independently
+MEASURED at `aab55387`, `dirty:false`, ref `verdant-grow-diary`, server Vercel**, on 2026-09-01 at
+~9:33 PM CT (`buildTime` 2026-09-02T02:33:03.954Z) from `https://verdantgrowdiary.com/version.json`.
+**Current production is MEASURED**, not `NOT_MEASURED`. **#1183 MERGED as `aab55387` C/F fail-closed
+is on live.** Restore SHA for Tolu/Support is **`aab55387`** (full oid
+`aab55387cd2e12272689a0078b77e198e7cb40fa`); Tolu is **not** to be pinged. **#1174 is draft,
+SUPERSEDED on V0 C/F hunks; do not convert or merge.** The earlier `ff35bd94` ~5:38 PM CT Water
+prefill walk is historical provenance, not current live. Feed last-recipe prefill is **not** shipped.
+Publish, History-restore and APPLY remain blocked. Prior header follows.)
 
 ## 1. Five merges since `d9ad904` — deploy tip `aab55387`
 
@@ -34,51 +37,63 @@ the PR record alone. Every row is a **squash** — one parent each, confirmed wi
 - **#1082** — EcoWitt tent Snapshot V0 post-merge QA, **tests only**.
 - **#1238** — Claude, docs-only correction of five review findings from #1236. This is the PR the
   previous block was waiting on; it landed and its branch is deleted.
-- **#1183** — EcoWitt V0 Safe-by-Design C/F fail-closed plus `temp_f` convert.
+- **#1183** — EcoWitt V0 Safe-by-Design C/F fail-closed plus `temp_f` convert. **MERGED as
+  `aab55387`; C/F fail-closed is on live.**
 
-## 2. The publisher is Vercel, and live was MEASURED at `ff35bd94`
+## 2. The publisher is Vercel, and live is MEASURED at `aab55387`
 
-`source claim`, supplied by Cheek from an independent measurement, recorded with its provenance and
-timestamp rather than restated as current fact.
+`source claim`, supplied by Cheek from an independent measurement of
+`https://verdantgrowdiary.com/version.json`, recorded with its provenance and timestamp.
 
 - **Production publisher is Vercel**, project `verdant-grow-diary` — **not Lovable Publish**. Every
   earlier entry in this file that reasons about a Lovable publish path is superseded on that point.
 - **Auth is still Lovable Cloud.**
-- Live apex `https://verdantgrowdiary.com` measured **`ff35bd94`**, **`dirty:false`**, ref
-  `verdant-grow-diary`, server **Vercel**, on **2026-09-01 at ~5:38 PM CT**.
-- Signed-in **Water prefill `PASS`** at that measurement — `#SG-01`, Volume 200, "Prefilled from last
-  watering".
+- Live apex `https://verdantgrowdiary.com` is independently MEASURED at **`aab55387`** (full oid
+  `aab55387cd2e12272689a0078b77e198e7cb40fa`), **`dirty:false`**, ref **`verdant-grow-diary`**,
+  server **Vercel**, on **2026-09-01 at ~9:33 PM CT** (`buildTime` **2026-09-02T02:33:03.954Z**).
+- **Current production is MEASURED.** Do not record it as `NOT_MEASURED`. A merge is not a
+  deployment, but this SHA was fetched from live `version.json` after #1183 landed, so the deploy
+  tip and live match.
+- **#1183 MERGED as `aab55387` C/F fail-closed is on live.**
 
-**This supersedes the carried `5c197f75` dirty remint.** The previous block recorded live as
-`5c197f75`, `dirty:true`. It is not that any more, and the change is a republish, not a rollback.
-**A network miss against `185.158.133.1` / `5c197f75` is not evidence of a rollback** and must not be
-recorded as one.
+**Historical provenance, not current live:** apex was previously MEASURED at **`ff35bd94`**,
+**`dirty:false`**, ref `verdant-grow-diary`, server **Vercel**, on **2026-09-01 at ~5:38 PM CT**,
+with signed-in **Water prefill `PASS`** (`#SG-01`, Volume 200, "Prefilled from last watering").
+That walk predates #1082, #1238 and #1183. Keep it as the Water-prefill evidence trail; it is
+**not** the restore SHA and **not** current live.
 
-**Current production is `NOT_MEASURED` in this slice.** The `ff35bd94` measurement predates #1082,
-#1238 and #1183. Against that last-measured live SHA the deploy tip is **3 ahead / 0 behind** —
-`ff35bd94` is an ancestor of `aab55387`, verified with `git merge-base --is-ancestor`. That is a git
-fact about two objects, **not** a statement about what production is serving now. Whether Vercel has
-deployed those three merges was not fetched here.
+**This supersedes the carried `5c197f75` dirty remint** and the later `ff35bd94` reading as
+*current* live. `5c197f75`, `dirty:true`, is not live any more, and the change is a republish, not
+a rollback. **A network miss against `185.158.133.1` / `5c197f75` is not evidence of a rollback**
+and must not be recorded as one.
 
-## 3. Restore SHA for Tolu is `ff35bd94`
+The graph fact that `ff35bd94` is an ancestor of `aab55387` remains true (`git merge-base
+--is-ancestor`); it is no longer a reason to call production `NOT_MEASURED`.
 
-`source claim`, per Cheek. If Tolu asks for a restore point, it is **`ff35bd94`**. **Do not ping
-Tolu.** Support outcome remains `NOT_MEASURED`.
+## 3. Restore SHA for Tolu/Support is `aab55387`
+
+`source claim`, per Cheek. If Tolu asks for a restore point, it is **`aab55387`** (full oid
+`aab55387cd2e12272689a0078b77e198e7cb40fa`). **Do not ping Tolu.** Support outcome remains
+`NOT_MEASURED`. Do not give `ff35bd94` as the restore SHA; that object is historical live from the
+~5:38 PM CT Water prefill walk.
 
 ## 4. Current locks
 
 - **No Lovable Publish. No History-restore. No Lovable-agent-write. No APPLY. No `knk`. No
   `query_database`.** No device control, no automatic Action Queue write, no credential handling, no
   `live_` value in `.env.production`.
-- **Current production is `NOT_MEASURED`.** 3 ahead / 0 behind is the graph relationship to the
-  last-measured live SHA, not production's current state. A failure to re-measure is `BLOCKED`, never
-  a product `FAIL`.
+- **Current production is MEASURED at `aab55387`, `dirty:false`, ref `verdant-grow-diary`.** Do not
+  record it as `NOT_MEASURED`. A failure to re-measure would be `BLOCKED`, never a product `FAIL`;
+  this slice did re-measure.
 - **Do not treat a network miss (`185.158.133.1` / `5c197f75`) as a rollback.**
-- **Tolu: do not ping.** Restore SHA `ff35bd94`.
+- **Tolu: do not ping.** Restore SHA `aab55387` (full oid `aab55387cd2e12272689a0078b77e198e7cb40fa`).
+- **#1174 is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready, or merge it. #1183 is the
+  landed C/F fail-closed and is on live.
 - **#1221 stays draft at `79146c6911`.** Not merged, readied, rebased or updated.
 - **#1219 is open and not this slice.** Its head is `f6424d7`, all 35 required checks green, three
   verified reviewer findings held for Cheek's direction rather than auto-fixed.
-- **Codex owns the Feed last-recipe prefill.** Not to be taken here.
+- **Codex owns the Feed last-recipe prefill.** Not to be taken here. **Do not claim Feed last-recipe
+  shipped.**
 - **Do not restamp, rebase or reopen #1238.** It is merged; this block replaces it as the head entry.
 - **An unticked GitHub review box is not missing evidence of a `PASS`.** Blue Dream (= Dream Queen —
   one reviewer, alias per CORRECTION 1) and Super Blue are **owner-designated**, not the protocol peer

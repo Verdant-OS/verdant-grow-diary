@@ -56,6 +56,14 @@ it("x", () => {
   expect(SCRIPTS["test:x"]).toBe("bun run x");
 });
 `,
+  dollar: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const $PKG = readFileSync("package.json", "utf8");
+it("x", () => {
+  expect($PKG).toContain('"test:x"');
+});
+`,
 };
 
 /** Run the checker against a repo containing exactly one test file. */
@@ -88,5 +96,15 @@ describe("check-contract-test-resolution — package.json guards must assert on 
   it("accepts a guard that parses the package and asserts on the object", () => {
     const { status, out } = runChecker("resolved");
     expect(status, out).toBe(0);
+  });
+
+  it("still catches a raw assertion when the bound identifier holds a regex metacharacter", () => {
+    // FENCE, green before and after: the identifier is interpolated into a RegExp, and
+    // `$` is the one metacharacter the identifier grammar admits. CodeQL (alert 256,
+    // high) flagged the escape for handling `$` alone; it is now a complete escape.
+    // This pins that the binding is still found and still flagged, whatever the escape.
+    const { status, out } = runChecker("dollar");
+    expect(status, out).toBe(1);
+    expect(out).toContain("$PKG");
   });
 });

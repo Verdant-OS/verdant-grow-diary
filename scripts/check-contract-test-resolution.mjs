@@ -39,6 +39,16 @@ import { join, relative } from "node:path";
 const REPO_ROOT = process.cwd();
 const TEST_DIR = join(REPO_ROOT, "src", "test");
 
+/**
+ * Escape a string for literal use inside a RegExp. Every metacharacter, not a
+ * chosen subset: CodeQL js/incomplete-sanitization (alert 256, high, on #1221)
+ * flagged an escape that handled `$` alone. The identifiers and config names
+ * interpolated below cannot contain the others today — that is a fact about
+ * the current callers, not a property of this function, and the function
+ * should not depend on it.
+ */
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 /** Config modules whose guards must assert on resolved values. */
 const CONFIG_FILES = ["playwright.config", "vitest.config"];
 
@@ -95,7 +105,7 @@ const PARSES_JSON = /JSON\.parse\s*\(/;
  * package.json read, 0 assert on the bound variable after the two conversions.
  */
 const PACKAGE_READ_BINDINGS = (source, config) => {
-  const esc = config.replace(".", "\\.");
+  const esc = escapeRegExp(config);
   const direct = new RegExp(
     `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\([^\\n]*${esc}[^\\n]*\\)\\s*;`,
     "g",
@@ -110,7 +120,7 @@ const PACKAGE_READ_BINDINGS = (source, config) => {
   return [...ids];
 };
 const ASSERTS_ON_BINDING = (source, id) => {
-  const e = id.replace(/\$/g, "\\$");
+  const e = escapeRegExp(id);
   return new RegExp(
     `expect\\(\\s*${e}\\s*\\)|\\b${e}\\.(?:includes|match|indexOf|search|startsWith|endsWith)\\s*\\(`,
   ).test(source);
@@ -118,7 +128,7 @@ const ASSERTS_ON_BINDING = (source, id) => {
 
 /** Reads the JSON config's source, directly or through a `PKG`-style constant. */
 const READS_JSON_SOURCE = (source, config) => {
-  const esc = config.replace(".", "\\.");
+  const esc = escapeRegExp(config);
   return (
     new RegExp(`readFile(?:Sync)?[^\\n]*${esc}`).test(source) ||
     new RegExp(`=\\s*["']${esc}["']`).test(source)
@@ -127,11 +137,11 @@ const READS_JSON_SOURCE = (source, config) => {
 
 /** Reads the config's source text (readFileSync/readFile of the config path). */
 const READS_CONFIG_SOURCE = (source, config) =>
-  new RegExp(`readFile(?:Sync)?[^\\n]*${config.replace(".", "\\.")}`).test(source);
+  new RegExp(`readFile(?:Sync)?[^\\n]*${escapeRegExp(config)}`).test(source);
 
 /** Imports the config module (static or dynamic). */
 const IMPORTS_CONFIG = (source, config) =>
-  new RegExp(`(?:import\\s*\\(|from\\s*)["'][^"']*${config.replace(".", "\\.")}["']`).test(source);
+  new RegExp(`(?:import\\s*\\(|from\\s*)["'][^"']*${escapeRegExp(config)}["']`).test(source);
 
 function listTestFiles(dir) {
   const out = [];

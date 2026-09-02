@@ -32,6 +32,7 @@ import {
   bucketOf,
   buildExecutableCorpus,
   countCallSites,
+  isPlaywrightSpec,
   isRuntimeHarness,
   mockReplacedSpecifiers,
   namedPathsIn,
@@ -289,7 +290,8 @@ const namedPaths = namedPathsIn(corpus);
 const denoTests = treePaths.filter(
   (f) => f.startsWith("supabase/functions/") && /(\.test\.ts|_test\.ts)$/.test(f),
 );
-const e2eSpecs = treePaths.filter((f) => /^e2e\/[^/]+\.spec\.ts$/.test(f));
+// Playwright's testMatch under testDir at any depth, shared with the manifest guard.
+const e2eSpecs = treePaths.filter((f) => isPlaywrightSpec(f));
 /**
  * Runtime harnesses: RLS, billing and DB-security runners under `scripts/`.
  *

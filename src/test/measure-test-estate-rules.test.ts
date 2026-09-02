@@ -33,10 +33,12 @@ import {
   classifyTest,
   commandLinesIn,
   isCommandLine,
+  isPlaywrightSpec,
   isRuntimeHarness,
   namedPathsIn,
   resolveSpec,
   runtimeImportSpecifiers,
+  stripDisabledBlocks,
   stripJsComments,
   stripTriggerBlock,
   testFileReach,
@@ -960,5 +962,104 @@ describe("runner bodies — a comment is not an invocation (Codex, #1221 round 4
     expect(stripJsComments("")).toBe("");
     expect(stripJsComments(null)).toBe("");
     expect(stripJsComments("/* unterminated")).toBe("");
+  });
+});
+
+describe("Playwright lane discovery — testMatch under testDir, at any depth (Codex + Vercel, #1221 round 5)", () => {
+  // Both the audit and the manifest guard filtered `^e2e/[^/]+\.spec\.ts$`. Playwright's
+  // testDir is "./e2e" and its default testMatch is `**\/*.@(spec|test).?(c|m)[jt]s?(x)`,
+  // scanned recursively — so a spec in a subdirectory, or a `.spec.tsx`, was run by
+  // Playwright and invisible to the guard. Reproduced: `e2e/zz-nested/dead.spec.ts` was
+  // listed by `playwright test --list` while the manifest suite stayed green.
+  it("accepts a spec at any depth and every extension Playwright matches", () => {
+    expect(isPlaywrightSpec("e2e/root.spec.ts")).toBe(true);
+    expect(isPlaywrightSpec("e2e/mobile/nested.spec.ts")).toBe(true);
+    expect(isPlaywrightSpec("e2e/a/b/c/deep.test.ts")).toBe(true);
+    expect(isPlaywrightSpec("e2e/component.spec.tsx")).toBe(true);
+    expect(isPlaywrightSpec("e2e/legacy.spec.mjs")).toBe(true);
+    expect(isPlaywrightSpec("e2e/legacy.test.cjs")).toBe(true);
+  });
+
+  it("rejects helpers, fixtures, the auth setup file, node_modules, and files outside testDir", () => {
+    expect(isPlaywrightSpec("e2e/helpers/session.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e/fixtures/plant.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e/auth.setup.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e/node_modules/pkg/x.spec.ts")).toBe(false);
+    expect(isPlaywrightSpec("src/test/unit.spec.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e-old/x.spec.ts")).toBe(false);
+  });
+
+  it("honours a configured testDir, with or without the ./ prefix and trailing slash", () => {
+    expect(isPlaywrightSpec("tests/x.spec.ts", "./tests/")).toBe(true);
+    expect(isPlaywrightSpec("e2e/x.spec.ts", "./tests")).toBe(false);
+    expect(isPlaywrightSpec(null as unknown as string)).toBe(false);
+  });
+});
+
+describe("statically disabled steps and jobs are not execution evidence (Codex, #1221 round 6)", () => {
+  // `if: ${{ false }}` (or `if: false`) disables a step or a whole job without deleting
+  // it. The corpus took every `run:` line as evidence, so a lane switched off that way
+  // still read as executed. Only a LITERAL false is decidable statically; expressions
+  // that happen to be false at runtime are not, and are left alone.
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - name: dead step",
+    "        if: ${{ false }}",
+    "        run: bunx playwright test e2e/dead-step.spec.ts",
+    "      - name: live step",
+    "        if: always()",
+    "        run: bunx playwright test e2e/live.spec.ts",
+    "  b:",
+    "    if: false",
+    "    steps:",
+    "      - run: bunx playwright test e2e/dead-job.spec.ts",
+    "      - run: bunx playwright test e2e/dead-job-two.spec.ts",
+    "  c:",
+    "    if: env.FLAG == 'false'",
+    "    steps:",
+    "      - run: bunx playwright test e2e/live-expr.spec.ts",
+    "",
+  ].join("\n");
+
+  it("drops a step and a job disabled with a literal false, keeps their siblings", () => {
+    const paths = pathsOf(y);
+    expect(paths.has("e2e/dead-step.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dead-job.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dead-job-two.spec.ts")).toBe(false);
+    expect(paths.has("e2e/live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/live-expr.spec.ts")).toBe(true);
+  });
+
+  it("recognises every literal-false spelling and no expression", () => {
+    for (const cond of [
+      "false",
+      "${{ false }}",
+      "'false'",
+      '"false"',
+      "'${{ false }}'",
+      "${{false}}",
+    ]) {
+      const w = `jobs:\n  a:\n    steps:\n      - if: ${cond}\n        run: bunx playwright test e2e/x.spec.ts\n`;
+      expect(pathsOf(w).has("e2e/x.spec.ts"), cond).toBe(false);
+    }
+    for (const cond of [
+      "always()",
+      "${{ !cancelled() }}",
+      "github.ref == 'false'",
+      "steps.x.outputs.ok == 'false'",
+    ]) {
+      const w = `jobs:\n  a:\n    steps:\n      - if: ${cond}\n        run: bunx playwright test e2e/x.spec.ts\n`;
+      expect(pathsOf(w).has("e2e/x.spec.ts"), cond).toBe(true);
+    }
+  });
+
+  it("preserves line count, is idempotent, and is null-safe", () => {
+    const out = stripDisabledBlocks(y);
+    expect(out.split("\n")).toHaveLength(y.split("\n").length);
+    expect(stripDisabledBlocks(out)).toBe(out);
+    expect(stripDisabledBlocks(null)).toBe("");
+    expect(stripDisabledBlocks("")).toBe("");
   });
 });

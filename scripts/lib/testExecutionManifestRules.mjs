@@ -35,10 +35,12 @@
 import {
   buildExecutableCorpus,
   expandScript,
+  isPlaywrightSpec,
   isRuntimeHarness,
   namedPathsIn,
   resolveBareBasenames,
   scriptNamesIn,
+  stripDisabledBlocks,
   stripJsComments,
   stripTriggerBlock,
 } from "./testEstateRules.mjs";
@@ -46,10 +48,12 @@ import {
 export {
   buildExecutableCorpus,
   expandScript,
+  isPlaywrightSpec,
   isRuntimeHarness,
   namedPathsIn,
   resolveBareBasenames,
   scriptNamesIn,
+  stripDisabledBlocks,
   stripJsComments,
   stripTriggerBlock,
 };

@@ -55,6 +55,7 @@ on:
       - "e2e/**"
       - "src/**"
       - "playwright.config.ts"
+      - "vite.config.ts"
       - "package.json"
       - "bun.lock"
       - "bun.lockb"

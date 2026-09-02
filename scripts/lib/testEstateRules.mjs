@@ -765,6 +765,60 @@ export function isCommandLine(line) {
  * executes. Counting it reported 32 unrun Playwright specs when the truth
  * was 25.
  */
+/**
+ * Only a LITERAL false is statically decidable: `false`, `${{ false }}`, and their
+ * quoted forms. `env.X == 'false'` may be false at runtime but cannot be known here
+ * and is left alone.
+ */
+const LITERAL_FALSE_IF =
+  /^\s*(?:-\s+)?if:\s*(?:\$\{\{\s*false\s*\}\}|false|'false'|"false"|'\$\{\{\s*false\s*\}\}'|"\$\{\{\s*false\s*\}\}")\s*(?:#.*)?$/;
+
+/**
+ * Workflow text with every step or job disabled by a literal-false `if:` blanked.
+ *
+ * `if: ${{ false }}` switches a step (or a whole job) off without deleting it, and
+ * the corpus took its `run:` lines as evidence all the same — so a lane disabled
+ * that way still read as executed (Codex, #1221 round 6). The owning block is the
+ * nearest preceding non-blank line with a smaller indent (the step's `- ` item or
+ * the job's key), and it runs until the next non-blank line at that indent or less.
+ * Blanked lines stay as empty lines, so line numbers are preserved. Idempotent.
+ */
+export function stripDisabledBlocks(text) {
+  const lines = String(text ?? "").split("\n");
+  const indentOf = (l) => l.length - l.trimStart().length;
+  const skippable = (l) => l.trim() === "" || l.trim().startsWith("#");
+  const drop = new Set();
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!LITERAL_FALSE_IF.test(lines[i])) continue;
+    // `- if: false` inline: the item line is its own owner, at the dash's indent.
+    const inline = /^\s*-\s+if:/.test(lines[i]);
+    let owner = inline ? i : -1;
+    let ownerIndent = inline ? lines[i].indexOf("-") : 0;
+    if (!inline) {
+      const ifIndent = indentOf(lines[i]);
+      for (let j = i - 1; j >= 0; j -= 1) {
+        if (skippable(lines[j])) continue;
+        if (indentOf(lines[j]) < ifIndent) {
+          owner = j;
+          ownerIndent = indentOf(lines[j]);
+          break;
+        }
+      }
+      if (owner === -1) continue;
+    }
+    drop.add(owner);
+    for (let k = owner + 1; k < lines.length; k += 1) {
+      if (skippable(lines[k])) {
+        drop.add(k);
+        continue;
+      }
+      if (indentOf(lines[k]) <= ownerIndent) break;
+      drop.add(k);
+    }
+  }
+  return lines.map((l, i) => (drop.has(i) ? "" : l)).join("\n");
+}
+
 export function stripTriggerBlock(text) {
   const out = [];
   let inTrigger = false;
@@ -931,6 +985,21 @@ export function expandScript(name, scripts, depth = 0, seen = new Set()) {
 const RUNNER_PATH = /(?:^|[\s"'`])((?:scripts|e2e|tools)\/[A-Za-z0-9_./-]+\.(?:mjs|cjs|js|ts))/g;
 const IS_TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/;
 
+/**
+ * A file Playwright will run: under `testDir`, at ANY depth, matching Playwright's
+ * default testMatch (`**\/*.@(spec|test).?(c|m)[jt]s?(x)`) and its default ignore of
+ * node_modules. The audit and the manifest guard both filtered root-level
+ * `e2e/*.spec.ts`, so a spec in a subdirectory — which `playwright test --list`
+ * shows and CI runs — was invisible to both (Codex and the Vercel reviewer, #1221
+ * round 5). `auth.setup.ts` is not a spec: only the `setup` project's explicit
+ * testMatch names it. `testDir` accepts Playwright's own spelling (`./e2e`).
+ */
+export function isPlaywrightSpec(rel, testDir = "e2e") {
+  if (typeof rel !== "string") return false;
+  const root = String(testDir).replace(/^\.\//, "").replace(/\/+$/, "");
+  return rel.startsWith(`${root}/`) && !rel.includes("/node_modules/") && IS_TEST_FILE.test(rel);
+}
+
 /** Tokens after which a `/` opens a regex literal rather than dividing. */
 const REGEX_MAY_FOLLOW_PUNCTUATOR = new Set([..."(,=:[!&|?{};+-*%<>~^"]);
 const REGEX_MAY_FOLLOW_KEYWORD = new Set([
@@ -1064,8 +1133,9 @@ export function stripJsComments(source) {
 /**
  * Everything CI actually executes, as one text corpus.
  *
- * Three sources, in order: workflow COMMAND LINES only; the package scripts
- * those name, expanded; and one hop into repo runner scripts those name. A
+ * Three sources, in order: workflow COMMAND LINES only, with steps and jobs
+ * disabled by a literal-false `if:` removed first; the package scripts those
+ * name, expanded; and one hop into repo runner scripts those name. A
  * runner script's body is taken with its comments stripped (stripJsComments):
  * a path literal there is a spec list being executed, not prose, while a
  * commented-out command is the same comment-out defeat commandLinesIn closes
@@ -1074,7 +1144,9 @@ export function stripJsComments(source) {
  */
 export function buildExecutableCorpus({ workflowTexts, scripts = {}, readRunner = () => null }) {
   const scriptNames = Object.keys(scripts);
-  let corpus = workflowTexts.map((t) => commandLinesIn(stripTriggerBlock(t)).join("\n")).join("\n");
+  let corpus = workflowTexts
+    .map((t) => commandLinesIn(stripDisabledBlocks(stripTriggerBlock(t))).join("\n"))
+    .join("\n");
   for (const called of scriptNamesIn(corpus, scriptNames)) {
     corpus += ` ${expandScript(called, scripts)}`;
   }

@@ -91,7 +91,7 @@
     {
       "context": "Mocked E2E closure (15 previously unrun specs)",
       "alwaysRuns": false,
-      "why": "mocked-e2e-unwired-closure.yml runs the 15 credential-free Playwright specs that no workflow invoked before P2(b) of the coverage remediation (#1221). It was created by the same PR whose P4 widened this list, and then left ungated by it: red on a matching PR reported but did not block an admin/bypass merge, and this audit could not see it. It IS path-filtered at the trigger (e2e/**, src/**, playwright.config.ts, package.json, the lockfiles, itself), so alwaysRuns is false: a PR touching none of those legitimately produces no result. Codex, round 3 on #1221."
+      "why": "mocked-e2e-unwired-closure.yml runs the 15 credential-free Playwright specs that no workflow invoked before P2(b) of the coverage remediation (#1221). It was created by the same PR whose P4 widened this list, and then left ungated by it: red on a matching PR reported but did not block an admin/bypass merge, and this audit could not see it. It IS path-filtered at the trigger (e2e/**, src/**, playwright.config.ts, vite.config.ts, package.json, the lockfiles, itself), so alwaysRuns is false: a PR touching none of those legitimately produces no result. Codex, round 3 on #1221; vite.config.ts added in round 6 because the lane boots the app through `bunx vite`."
     }
   ],
   "mustBeGreen//": [

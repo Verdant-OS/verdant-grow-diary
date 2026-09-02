@@ -23,6 +23,7 @@
  * reason. Removing one is free. The ratchet only turns one way.
  */
 import { describe, it, expect } from "vitest";
+import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 import {
@@ -30,6 +31,7 @@ import {
   FINDING,
   auditExecutionManifest,
   buildExecutionCorpus,
+  isPlaywrightSpec,
   isRuntimeHarness,
   namedPathsIn,
   resolveBareBasenames,
@@ -57,7 +59,16 @@ function walk(rel: string, out: string[] = []): string[] {
 }
 
 const denoTests = walk("supabase/functions").filter((f) => /(\.test\.ts|_test\.ts)$/.test(f));
-const e2eSpecs = walk("e2e").filter((f) => /^e2e\/[^/]+\.spec\.ts$/.test(f));
+// Resolved from the committed config, not assumed: Playwright's testDir is "./e2e" and
+// its default testMatch is recursive, so the lane is every spec at any depth beneath
+// it (isPlaywrightSpec). A root-level `e2e/*.spec.ts` filter left a nested spec —
+// listed and run by Playwright — invisible to this guard (Codex + Vercel, #1221 round 5).
+const PLAYWRIGHT_TEST_DIR = String(
+  (await import("../../playwright.config")).default.testDir ?? "e2e",
+)
+  .replace(/^\.\//, "")
+  .replace(/\/+$/, "");
+const e2eSpecs = walk(PLAYWRIGHT_TEST_DIR).filter((f) => isPlaywrightSpec(f, PLAYWRIGHT_TEST_DIR));
 // Recursive, and `harness|db-security`, not root-level `*harness*`: the latter is the
 // rule the audit retired as defect 31 — it missed five harnesses under scripts/security/
 // and three root files named *-db-security.ts, all of which security-db-local.yml runs.
@@ -477,6 +488,54 @@ describe("manifest resolver — the ways this guard could silently stop working"
         rel === "scripts/run-x.mjs" ? "spawn('playwright', ['e2e/hopped.spec.ts'])" : null,
     });
     expect(namedPathsIn(corpus).has("e2e/hopped.spec.ts")).toBe(true);
+  });
+
+  it("the Playwright lane contains every file Playwright itself lists (Codex + Vercel, #1221 round 5)", () => {
+    // Resolved, not inferred: ask the installed Playwright what it would run under the
+    // committed config, and require every listed file to be a lane member. A root-level
+    // `e2e/*.spec.ts` filter passed this suite while `playwright test --list` showed a
+    // nested spec — the guard was green for a file it could not see.
+    const res = spawnSync(
+      process.execPath,
+      [
+        join(root, "node_modules/@playwright/test/cli.js"),
+        "test",
+        "--list",
+        "--project=chromium-mocked",
+        "--reporter=json",
+      ],
+      { cwd: root, encoding: "utf8", timeout: 120_000, maxBuffer: 64 * 1024 * 1024 },
+    );
+    expect(res.status, res.stderr).toBe(0);
+    const report = JSON.parse(res.stdout) as { suites?: unknown[] };
+    const listed = new Set<string>();
+    const visit = (suite: { file?: string; suites?: unknown[] }) => {
+      for (const child of suite.suites ?? []) visit(child as { file?: string; suites?: unknown[] });
+      if (suite.file) listed.add(`${PLAYWRIGHT_TEST_DIR}/${suite.file.replace(/\\/g, "/")}`);
+    };
+    for (const suite of report.suites ?? []) visit(suite as { file?: string; suites?: unknown[] });
+    expect(listed.size).toBeGreaterThan(0);
+    const missing = [...listed].filter((f) => !e2eSpecs.includes(f)).sort();
+    expect(missing, "files Playwright would run that the lane does not contain").toEqual([]);
+  });
+
+  it("does not count a step disabled with `if: ${{ false }}` as an invocation (Codex, #1221 round 6)", () => {
+    const corpus = buildExecutionCorpus({
+      workflowTexts: [
+        [
+          "jobs:",
+          "  a:",
+          "    steps:",
+          "      - name: switched off",
+          "        if: ${{ false }}",
+          "        run: bunx playwright test e2e/dead.spec.ts",
+          "      - run: bunx playwright test e2e/live.spec.ts",
+          "",
+        ].join("\n"),
+      ],
+    });
+    expect(namedPathsIn(corpus).has("e2e/live.spec.ts")).toBe(true);
+    expect(namedPathsIn(corpus).has("e2e/dead.spec.ts")).toBe(false);
   });
 
   it("does not treat a command commented out inside a runner as an invocation (Codex, #1221 round 4)", () => {

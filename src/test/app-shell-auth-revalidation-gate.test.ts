@@ -24,4 +24,8 @@ describe("AppShell auth revalidation gate (#588)", () => {
     // Must not re-introduce the cache-only enable.
     expect(APP_SHELL).not.toMatch(/enabled:\s*!loading && !!user\s*}/);
   });
+
+  it("withholds pageContent on revalidation_failed (no welcome bounce)", () => {
+    expect(APP_SHELL).toMatch(/authStatus === ["']revalidation_failed["']/);
+  });
 });

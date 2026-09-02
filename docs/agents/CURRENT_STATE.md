@@ -81,8 +81,10 @@ on 8 of the last 30 deploy-branch runs) and is green on this head.
 
 **`APPROVED` review count on #1221: one, by a bot.** `HANDOFF_PROTOCOL.md:24` limits the protocol
 peer seat to Grok, Claude or Codex, and an owner cannot review their own slice; Claude owns #1221.
-**No named peer has reviewed it.** Same situation as #1242 (§4 of the prior stamp): recorded, not a
-request to block or revert.
+**No assigned peer is recorded.** The Codex connector's nine automated passes are review
+activity, not an assignment: `HANDOFF_PROTOCOL.md:17-25` needs a different Grok, Claude or Codex
+peer designated for the slice, and none is. Same situation as #1242 (§4 of the prior stamp):
+recorded, not a request to block or revert.
 
 Findings: **16 distinct**, 15 fixed and 1 raised once. Every accepted finding was reproduced before
 acceptance and seen RED before its fix. The one left open by design is Codex round 6 "R6-C"
@@ -161,6 +163,7 @@ not claim PREFLIGHT passed.** **No APPLY.**
   parented on `883729544`. Unique file `docs/agents/CURRENT_STATE.md`. No `src/`, no
   `supabase/`, no `package.json`. No ready. No merge.
 
+**Prior last updated:** 2026-09-02 UTC (~11:10 UTC)
 **Prior update:** GDP (2026-09-02: **#1247 MERGED as `8716d3bf`** — squash, one parent.
 **Deploy tip = live `8716d3bf`, `dirty:false`**, independently MEASURED from
 `https://verdantgrowdiary.com/version.json` at ~6:09 AM CT (`buildTime`

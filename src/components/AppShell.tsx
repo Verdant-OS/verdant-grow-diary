@@ -58,7 +58,12 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     location.hash,
   );
   const { status: authStatus } = useRequireAuth(signedOutRedirect);
-  const { loading: entitlementLoading, entitlement } = useMyEntitlements();
+  // Same trust gate as alerts: a cached user while getUser() missed
+  // (revalidation_failed) must not fire GET /rest/v1/subscriptions or
+  // user_roles. Presentation-only, but still private REST.
+  const { loading: entitlementLoading, entitlement } = useMyEntitlements({
+    enabled: authStatus === "authenticated",
+  });
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
   // Gated on a server-validated session: a cached user while getUser() is

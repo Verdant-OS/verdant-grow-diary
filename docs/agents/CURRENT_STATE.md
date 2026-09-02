@@ -55,7 +55,7 @@ RLS, no migration, no `vercel.json`.**
 | `CodeQL` | `success` — settled, not the `neutral` placeholder |
 | `Config guards assert resolved values` · `docs-safety` · `eslint` · `tsc --noEmit` · `tsgo --noEmit + vite build` | `success` |
 | `GA E2E (chromium)` · `GA E2E (webkit)` · `Browser census (public)` | `success` |
-| `Browser census (authenticated)` | in progress at 15:03 — `NOT_MEASURED` here |
+| `Browser census (authenticated)` | `success` — settled 15:24 UTC (read again after the 15:03 pass)|
 | `Supabase Preview` | `failure` — repo-wide 42P07 `ai_credit_grants` replay; in neither `required` nor `mustBeGreen`; no PR-side fix exists |
 | `Quick Log Playwright smoke` | `failure` — `vars.E2E_BASE_URL` still names `verdantgrowdiary-com.lovable.app` (404); owner-held; red on every head here and the last 9 deploy-branch pushes |
 | Cursor Bugbot · Cursor Security Agent · Cursor Approval Agent | `neutral` — Cursor usage limit reached on the owner account; did not run |

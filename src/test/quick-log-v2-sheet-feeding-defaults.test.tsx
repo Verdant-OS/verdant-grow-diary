@@ -1,10 +1,10 @@
 /**
  * QuickLogV2Sheet — Last Feeding Defaults prefill integration.
  *
- * Verifies that when the Feed action is selected and recent feedings exist,
- * the form prefills with safe defaults and shows the "Prefilled from last
- * feeding" label. When no defaults exist, the form stays blank and the
- * label is not shown. Save payload always reflects current form values.
+ * Verifies fail-closed last-same-plant recipe prefill: a usable plant
+ * feeding shows "Prefilled from last feeding"; no last feeding, another
+ * plant, or a malformed recipe leaves the form blank and required. Save
+ * payload always reflects current form values. Never auto-submits.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -43,6 +43,10 @@ vi.mock("@/lib/writeFeedingTypedEvent", () => ({
 let mockedRows: unknown[] = [];
 vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: mockedRows }),
+}));
+
+vi.mock("@/hooks/useRecentWateringsForVolumeDefaults", () => ({
+  useRecentWateringsForVolumeDefaults: () => ({ data: [] }),
 }));
 
 function renderSheet() {
@@ -226,5 +230,73 @@ describe("QuickLogV2Sheet — Last Feeding Defaults", () => {
     expect(payload.nutrient_line_id).toBe("flower-week-1");
     expect(payload.products).toEqual([{ name: "Base A", amount: 3, unit: "ml_per_l" }]);
     expect(payload.volume_ml).toBe(900);
+  });
+
+  it("does not prefill from another plant's feeding", () => {
+    mockedRows = [
+      {
+        id: "other-plant",
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-2",
+        event_type: "feeding",
+        entry_at: "2026-06-10T12:00:00.000Z",
+        details: {
+          nutrients: [{ name: "Other", amount: 9, unit: "ml_per_l" }],
+          nutrient_line_id: "other-line",
+        },
+      },
+    ];
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    expect(screen.queryByTestId("qlv2-feeding-defaults-label")).toBeNull();
+    expect((screen.getByLabelText("Nutrient line") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Product 1 name") as HTMLInputElement).value).toBe("");
+  });
+
+  it("does not prefill a missing or malformed recipe", () => {
+    mockedRows = [
+      {
+        id: "malformed",
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+        event_type: "feeding",
+        entry_at: "2026-06-10T12:00:00.000Z",
+        details: { nutrients: "oops", nutrient_line_id: "x" },
+      },
+    ];
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    expect(screen.queryByTestId("qlv2-feeding-defaults-label")).toBeNull();
+    expect((screen.getByLabelText("Nutrient line") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Product 1 name") as HTMLInputElement).value).toBe("");
+  });
+
+  it("does not auto-submit when last feeding prefills the recipe", async () => {
+    mockedRows = [
+      {
+        id: "feed-1",
+        grow_id: "grow-1",
+        tent_id: "tent-1",
+        plant_id: "plant-1",
+        event_type: "feeding",
+        entry_at: "2026-06-10T12:00:00.000Z",
+        details: {
+          nutrients: [{ name: "Base A", amount: 2, unit: "ml_per_l" }],
+          nutrient_line_id: "veg-week-3",
+        },
+      },
+    ];
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-feeding-defaults-label")).toBeInTheDocument(),
+    );
+    expect(writeFeedingMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByTestId("qlv2-error")).toBeInTheDocument());
+    expect(writeFeedingMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("qlv2-feeding-review-needs-input")).toBeInTheDocument();
   });
 });

@@ -90,6 +90,12 @@ import {
 } from "@/lib/feedingDefaultsViewModel";
 import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 import {
+  applyWateringVolumeDefaultsToForm,
+  buildWateringVolumeDefaults,
+  WATERING_VOLUME_DEFAULTS_LABEL,
+} from "@/lib/wateringVolumeDefaultsViewModel";
+import { useRecentWateringsForVolumeDefaults } from "@/hooks/useRecentWateringsForVolumeDefaults";
+import {
   EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM,
   buildQuickLogMaturityEvidenceDetails,
   quickLogMaturityEvidenceReasonToMessage,
@@ -305,6 +311,7 @@ export default function QuickLogV2Sheet({
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoChecking, setVideoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   const [wateringRetryPending, setWateringRetryPending] = useState(false);
   const [wateringSubmissionLocked, setWateringSubmissionLocked] = useState(false);
@@ -476,18 +483,26 @@ export default function QuickLogV2Sheet({
 
   const recentFeedingsQ = useRecentFeedingsForDefaults({
     plantId: resolvedContext.plantId,
-    tentId: resolvedContext.tentId,
-    growId: resolvedContext.growId,
   }) as { data?: unknown[] };
   const feedingDefaults = useMemo(
     () =>
       buildFeedingDefaults({
         rawEntries: recentFeedingsQ.data ?? [],
         plantId: resolvedContext.plantId,
-        tentId: resolvedContext.tentId,
-        growId: resolvedContext.growId,
       }),
-    [recentFeedingsQ.data, resolvedContext.plantId, resolvedContext.tentId, resolvedContext.growId],
+    [recentFeedingsQ.data, resolvedContext.plantId],
+  );
+
+  const recentWateringsQ = useRecentWateringsForVolumeDefaults({
+    plantId: resolvedContext.plantId,
+  }) as { data?: unknown[] };
+  const wateringVolumeDefaults = useMemo(
+    () =>
+      buildWateringVolumeDefaults({
+        rawEntries: recentWateringsQ.data ?? [],
+        plantId: resolvedContext.plantId,
+      }),
+    [recentWateringsQ.data, resolvedContext.plantId],
   );
 
   const isLoadingContext = Boolean(plantsQ.isLoading || tentsQ.isLoading);
@@ -591,6 +606,7 @@ export default function QuickLogV2Sheet({
       wateringTempEntryUnitRef.current = null;
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
+      setWateringVolumeDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
       setPostSave(null);
@@ -625,6 +641,28 @@ export default function QuickLogV2Sheet({
     }));
     setFeedingDefaultsApplied(true);
   }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
+
+  // One-shot prefill of Water volume from the plant's most recent watering
+  // that recorded a positive volume. Fail closed: never invent 200/500/pot
+  // size. Never overwrite a grower-typed volume. Never touch Feed.
+  useEffect(() => {
+    if (!open) return;
+    if (form.action !== "water") return;
+    if (wateringVolumeDefaultsApplied) return;
+    if (!wateringVolumeDefaults.defaults) return;
+    if (wateringForm.volumeMl.trim() !== "") return;
+    setWateringForm((previous) => ({
+      ...previous,
+      volumeMl: applyWateringVolumeDefaultsToForm(wateringVolumeDefaults).volumeMl,
+    }));
+    setWateringVolumeDefaultsApplied(true);
+  }, [
+    open,
+    form.action,
+    wateringVolumeDefaults,
+    wateringVolumeDefaultsApplied,
+    wateringForm.volumeMl,
+  ]);
 
   // Idempotent: the note field receives value updates from multiple event
   // paths (onChange + onInput + onCompositionEnd + onBlur), which often
@@ -703,6 +741,7 @@ export default function QuickLogV2Sheet({
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      setWateringVolumeDefaultsApplied(false);
     }
     // Entering feed → maturity evidence surface hides; clear its draft
     // so stale plant-maturity notes don't get retained under the hood. Feed
@@ -1364,6 +1403,7 @@ export default function QuickLogV2Sheet({
     keepWateringSubmissionLockedRef.current = false;
     setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
     setFeedingDefaultsApplied(false);
+    setWateringVolumeDefaultsApplied(false);
     resetPhotoSelection();
     resetVideoSelection();
   }
@@ -1666,6 +1706,15 @@ export default function QuickLogV2Sheet({
 
           {form.action === "water" && (
             <div className="space-y-2">
+              {wateringVolumeDefaultsApplied && wateringVolumeDefaults.label && (
+                <div
+                  data-testid="qlv2-watering-volume-defaults-label"
+                  className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-sm text-muted-foreground"
+                  role="note"
+                >
+                  {WATERING_VOLUME_DEFAULTS_LABEL}
+                </div>
+              )}
               <QuickLogWateringForm
                 value={wateringForm}
                 context={wateringContext}

@@ -1,7 +1,1220 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-08-29 UTC (~22:43 UTC)
-**Updated by:** Claude (2026-08-29: #1215 and #1216 merged; deploy branch is now **`5d6efc95a`**.
+**Last updated:** 2026-09-02 UTC (~11:10 UTC)
+**Updated by:** GDP (2026-09-02: **#1247 MERGED as `8716d3bf`** — squash, one parent.
+**Deploy tip = live `8716d3bf`, `dirty:false`**, independently MEASURED from
+`https://verdantgrowdiary.com/version.json` at ~6:09 AM CT (`buildTime`
+`2026-09-02T10:39:16.035Z`). Restore SHA for Lovable Support is **`8716d3bf`**. **Do not ping
+Tolu.** Publisher is Vercel. No Lovable Publish. No History-restore. No APPLY. **#1242's
+protocol peer-review seat remains UNFILLED** (zero `APPROVED` reviews; still true). Signup
+PREFLIGHT still **BLOCKED** (`malformed_database_url`; `knk` not in this Supabase login). Do
+not claim PREFLIGHT passed. Feed last-recipe prefill IS shipped (#1241). Paddle `test_` /
+sandbox banner EXPECTED. #1174 stays draft. #1221 stays draft. The restamp below recorded
+live as `3e0c61f2`; that row is **superseded**. Prior header follows.)
+
+## 1. #1247 MERGED — deploy tip `8716d3bf`
+
+`established fact`, from the commit graph. **Squash, one parent, not a two-parent merge.**
+
+| PR        | Merge SHA   | Parent      | Files | Migrations | Merged (UTC)     |
+| --------- | ----------- | ----------- | ----: | ---------: | ---------------- |
+| **#1247** | `8716d3bf`  | `3fca5b069` |     6 |      **0** | 2026-09-02 10:34 |
+
+Full merge SHA: `8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd`. Parent:
+`3fca5b069265d941ccb868f114840c45e5ded5e5` (deploy tip before this squash). Subject:
+`feat(dashboard): 24h environment ribbon with provenance band (Tranche 1) (#1247)`. Author
+date `2026-09-02T10:34:01Z`. **Zero migrations.** No `package.json`. No `vercel.json`. No
+`docs/agents/CURRENT_STATE.md` in the merge.
+
+Unique files (6): `src/components/EnvironmentRibbon.tsx`,
+`src/lib/environmentRibbonViewModel.ts`, `src/pages/Dashboard.tsx`, `src/styles.css`,
+`src/test/environment-ribbon-view-model.test.ts`, `src/test/environment-ribbon.test.tsx`.
+`+1368 / −1`, from `git show --stat` on the merge object. No `supabase/`.
+
+Two squash merges sit between #1243's restamp (`74f226740`) and #1247, from `git log`
+`3e0c61f2..8716d3bf`. Subjects only — no file counts invented here:
+
+- **#1245** `a3d064542` — `fix(ci): stay-draft signup PREFLIGHT CA materialize (PEM or compact base64)`
+- **#1246** `3fca5b069` — `fix(signup): record identity_reason_code when production URL is rejected`
+
+`CURRENT_STATE.md` last changed at `74f226740` (#1243). #1244 did not land on the default
+branch.
+
+## 2. Live is independently MEASURED at `8716d3bf`
+
+GDP fetched `https://verdantgrowdiary.com/version.json` after the merge.
+
+| Field       | Value                                      |
+| ----------- | ------------------------------------------ |
+| `commit`    | `8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd` |
+| `dirty`     | **`false`**                                |
+| `ref`       | `verdant-grow-diary`                       |
+| server      | **Vercel**                                 |
+| `buildTime` | `2026-09-02T10:39:16.035Z` (~5:39 AM CT)   |
+| measured    | 2026-09-02 ~**6:09 AM CT**                 |
+| source      | `https://verdantgrowdiary.com/version.json`|
+
+**Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not
+carry `3e0c61f2` as current live. **A resolver still returning `185.158.133.1` / `5c197f75`
+is a network miss, not a rollback.** Publisher is Vercel, project `verdant-grow-diary`.
+**No Lovable Publish.**
+
+## 3. Restore SHA for Tolu/Support is `8716d3bf`
+
+If Tolu asks for a restore point, it is **`8716d3bf`** (full oid
+`8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd`). **Do not ping Tolu.** Support outcome remains
+`NOT_MEASURED`.
+
+## 4. #1242's protocol peer-review seat remains UNFILLED
+
+`established fact`, kept from #1244 and re-checked against the GitHub review objects on
+#1242. **Still true.** `gh api .../pulls/1242/reviews` returns one row:
+`copilot-pull-request-reviewer[bot]` / `COMMENTED`. **`APPROVED` review count on #1242:
+zero.**
+
+The table below is **carried** from #1244's measurement at head `cc7b8e7ed` (connector pass
+and three Cursor `neutral` check runs). This restamp re-checked the review objects, not the
+check-run conclusions.
+
+| Reviewer                                   | Result                                               | Fills the peer seat?                         |
+| ------------------------------------------ | ---------------------------------------------------- | -------------------------------------------- |
+| `copilot-pull-request-reviewer`            | review state `COMMENTED` — 4/4 files, **0 comments** | **No** — its own text says so                |
+| `chatgpt-codex-connector`                  | Code Review completed, **0 findings**                | **No** — a connector pass is not an approval |
+| `Cursor Bugbot`                            | check conclusion **`neutral`**                       | **No** — neutral means it did not run        |
+| `Cursor Security Agent: Security Reviewer` | check conclusion **`neutral`**                       | **No** — did not run                         |
+| `Cursor Approval Agent`                    | check conclusion **`neutral`**                       | **No** — did not run                         |
+
+The block below records _Blue Dream **PASS** on `cc7b8e7ed`_. That is **not contradicted
+here**. **Blue Dream (= Dream Queen) is owner-designated, not the protocol peer seat.**
+`HANDOFF_PROTOCOL.md:24` limits the protocol peer seat to **Grok, Claude or Codex**, and an
+owner cannot review their own slice. Claude owned #1242. **No named peer reviewed it, and it
+merged.** This records what happened. It is **not** a request to revert or re-review #1242.
+
+## 5. Signup PREFLIGHT still BLOCKED
+
+`source claim`, carried. This slice did **not** run PREFLIGHT and did **not** run `knk`.
+Signup PREFLIGHT is still **BLOCKED** (`malformed_database_url`; `knk` not in this Supabase
+login). **Do not claim PREFLIGHT passed.** **No APPLY.**
+
+## 6. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production
+  SQL, no Lovable project-chat agent edit, no device control, no automatic Action Queue, no
+  credentials.
+- **Publisher is Vercel**, project `verdant-grow-diary`. **Auth and DB stay Lovable Cloud.**
+  **No Lovable Publish.**
+- **Paddle: `test_` keys and the sandbox banner are EXPECTED.** Not a defect. Do not revoke
+  the existing `live_` token.
+- **Current production is MEASURED at `8716d3bf`, `dirty:false`, ref `verdant-grow-diary`.**
+  Do not record it as `NOT_MEASURED`.
+- **Tolu: do not ping.** Restore SHA **`8716d3bf`** (full oid
+  `8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd`).
+- **Feed last-recipe is SHIPPED (#1241).** Do not open a slice for it.
+- **#1174 is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge.
+- **#1221 stays draft at `79146c6911`.** Not merged, readied, rebased or updated.
+- **Signup-attribution APPLY stays owner-locked.** Production apply state is `NOT_MEASURED`.
+- **Signup PREFLIGHT still BLOCKED** (`malformed_database_url`; `knk` not in this Supabase
+  login). Do not claim it passed.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays `HOLD`.
+  Plant Memory PARK. Spider Farmer GGS radio capture stays parked and `NOT_MEASURED`.
+- **#1242's protocol peer-review seat remains UNFILLED.** Owner-designated is not the peer
+  seat. A `neutral` check did not run.
+- This slice is **N=1** and stays **draft**, on branch `claude/test-coverage-analysis-j0bz93`,
+  parented on `8716d3bf`. GDP hosted this restamp of Claude's #1244 onto tip. Unique file
+  `docs/agents/CURRENT_STATE.md`. No `src/`, no `supabase/`, no `package.json`. No ready.
+  No merge.
+
+**Prior update:** GDP (2026-09-02: **#1242 MERGED as `3e0c61f2`** — two-parent merge, not a squash.
+**Deploy tip = live `3e0c61f2`, `dirty:false`**, independently MEASURED from
+`https://verdantgrowdiary.com/version.json` at ~12:56 AM CT (`buildTime`
+`2026-09-02T05:54:28.167Z`). Restore SHA for Lovable Support is **`3e0c61f2`**. **Do not ping
+Tolu.** Feed last-recipe prefill IS shipped (#1241). Paddle `test_` / sandbox banner EXPECTED. The
+restamp below carried live as `aab55387` / production `NOT_MEASURED`; that row is **superseded**.
+#1174 stays draft. #1221 stays draft. No Publish. No History-restore. No APPLY. Prior header
+follows.)
+
+## 1. #1242 MERGED — deploy tip `3e0c61f2`
+
+`established fact`, from the GitHub merge object. **Two parents, not a squash.**
+
+| PR        | Merge SHA    | Parents                                         | Files | Migrations | Merged (UTC)     |
+| --------- | ------------ | ----------------------------------------------- | ----: | ---------: | ---------------- |
+| **#1242** | `3e0c61f2`   | `c6a6c87dd` + `cc7b8e7ed`                       |     4 |      **0** | 2026-09-02 05:54 |
+
+Full merge SHA: `3e0c61f2bbbb0586ca4a03807dddafd490c3904d`. Parents:
+`c6a6c87ddad670c32914d3bc2e5b4b7181956efc` (deploy tip before this merge) and
+`cc7b8e7edf271edb6fcfa00d2f2d7a66cdfa525b` (reviewed head). Blue Dream **PASS** on `cc7b8e7ed`.
+GDP GitHub-only merged. **Zero migrations.** No `package.json`. No `vercel.json`.
+
+Unique files (4): `docs/audits/test-coverage-audit-2026-08-29.md`,
+`scripts/lib/testEstateRules.mjs`, `scripts/measure-test-estate.mjs`,
+`src/test/measure-test-estate-rules.test.ts`. No product `src/` UI, no `supabase/`.
+
+The prior three since `aab55387` remain as recorded in the demoted block (#1240, #1219, #1241),
+each a squash. This restamp does **not** re-count the 41/23/18 harness figures; those stay on
+#1242 / Blue Dream's file-existence check.
+
+## 2. Live is independently MEASURED at `3e0c61f2`
+
+GDP fetched `https://verdantgrowdiary.com/version.json` after the merge.
+
+| Field      | Value                                                      |
+| ---------- | ---------------------------------------------------------- |
+| `commit`   | `3e0c61f2bbbb0586ca4a03807dddafd490c3904d`                 |
+| `dirty`    | **`false`**                                                |
+| `ref`      | `verdant-grow-diary`                                       |
+| server     | **Vercel**                                                 |
+| `buildTime`| `2026-09-02T05:54:28.167Z` (~12:54 AM CT)                  |
+| measured   | 2026-09-02 ~**12:56 AM CT**                                |
+| source     | `https://verdantgrowdiary.com/version.json`                |
+
+**Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not carry
+`aab55387` or `c6a6c87d` as current live. **A resolver still returning `185.158.133.1` /
+`5c197f75` is a network miss, not a rollback.**
+
+## 3. Restore SHA for Tolu/Support is `3e0c61f2`
+
+If Tolu asks for a restore point, it is **`3e0c61f2`** (full oid
+`3e0c61f2bbbb0586ca4a03807dddafd490c3904d`). **Do not ping Tolu.** Support outcome remains
+`NOT_MEASURED`.
+
+## 4. Feed shipped; last-recipe happy-path `NOT_MEASURED`
+
+#1241 shipped plant-only fail-closed last-recipe prefill. Apex signed-in smoke on this live SHA:
+Starter Grow and leftover E2E grows have **0 feeding events**. Empty Nutrients on `#SG-01` is
+fail-closed **PASS**. Happy-path prefill remains **`NOT_MEASURED`** (nothing to prefill from).
+Nothing submitted.
+
+Water last-volume prefill remains shipped (#1239). Paddle `test_` keys and the sandbox banner are
+**EXPECTED**.
+
+## 5. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production SQL,
+  no Lovable project-chat agent edit, no device control, no automatic Action Queue, no credentials.
+- **Publisher is Vercel**, project `verdant-grow-diary`. **Auth and DB stay Lovable Cloud.**
+- **Paddle: `test_` keys and the sandbox banner are EXPECTED.** Not a defect. Do not revoke the
+  existing `live_` token.
+- **Current production is MEASURED at `3e0c61f2`, `dirty:false`, ref `verdant-grow-diary`.** Do not
+  record it as `NOT_MEASURED`.
+- **Tolu: do not ping.** Restore SHA **`3e0c61f2`** (full oid
+  `3e0c61f2bbbb0586ca4a03807dddafd490c3904d`).
+- **Feed last-recipe is SHIPPED (#1241).** Do not open a slice for it.
+- **#1174 is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge.
+- **#1221 stays draft at `79146c6911`.** Not merged, readied, rebased or updated.
+- **Signup-attribution APPLY stays owner-locked.** Production apply state is `NOT_MEASURED`.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays `HOLD`.
+  Plant Memory PARK. Spider Farmer GGS radio capture stays parked and `NOT_MEASURED`.
+- This slice is **N=1** and stays **draft**, on branch `claude/current-state-restamp-c6a6c87`,
+  parented on `3e0c61f2`. GDP hosted this amend of Claude's restamp. Unique file
+  `docs/agents/CURRENT_STATE.md`. No `src/`, no `supabase/`, no `package.json`. No ready until an
+  independent `PASS`.
+
+**Prior update:** Claude (2026-09-02: **three merges since `aab55387` — deploy tip is `c6a6c87dd`**,
+each a squash with zero migrations. **Feed last-recipe prefill IS shipped** — #1241, `c6a6c87dd`;
+the entry below this one says it is not, and that line is **superseded**. **Paddle is on `test_`
+keys with the sandbox banner showing — that is the EXPECTED state, not a defect.** Live stays the
+carried MEASURED `aab55387` reading from ~9:33 PM CT; **this slice did not re-fetch production**, and
+three merges have landed since, so **current production is `NOT_MEASURED`** again. Restore SHA for
+Tolu/Support is unchanged at **`aab55387`**; Tolu is **not** to be pinged. #1174 stays draft and
+SUPERSEDED; #1221 stays draft. Publish, History-restore and APPLY remain blocked. Prior header
+follows.)
+
+## 1. Three merges since `aab55387` — deploy tip `c6a6c87dd`
+
+`established fact`, sourced from the commit graph at the exact remote ref and cross-checked against
+the GitHub PR record. Each row is a **squash** — one parent, subject ending in its PR number.
+
+| PR        | Merge SHA   | Parent     | Files | Migrations | Merged (UTC)     |
+| --------- | ----------- | ---------- | ----: | ---------: | ---------------- |
+| **#1240** | `94d1d6bc`  | `aab55387` |     1 |      **0** | 2026-09-02 04:16 |
+| **#1219** | `44b0cc25`  | `94d1d6bc` |     4 |      **0** | 2026-09-02 04:17 |
+| **#1241** | `c6a6c87dd` | `44b0cc25` |     5 |      **0** | 2026-09-02 04:29 |
+
+Full merge SHAs: `94d1d6bc08f0f31a1479940b58538b067dc70f06`,
+`44b0cc258eb72dec60e1b51550dd7ecc5ba05988`, `c6a6c87ddad670c32914d3bc2e5b4b7181956efc`.
+
+**Deploy tip: `c6a6c87ddad670c32914d3bc2e5b4b7181956efc`**, read twice — `git ls-remote` and
+`git rev-parse origin/verdant-grow-diary` agree. **Zero migrations across all three**, checked on the
+range `aab55387..c6a6c87dd` rather than assumed. No `package.json` change in the range either.
+
+**Scope, from the graph:**
+
+- **#1240** — the restamp this block demotes. `docs/agents/CURRENT_STATE.md` only, +107 / −1.
+- **#1219** — coverage-audit corrections plus its reproducer: `docs/audits/test-coverage-audit-2026-08-29.md`,
+  `scripts/lib/testEstateRules.mjs`, `scripts/measure-test-estate.mjs` and
+  `src/test/measure-test-estate-rules.test.ts`. No `src/` product file.
+- **#1241** — **Feed last-recipe prefill.** `src/lib/feedingDefaultsViewModel.ts`,
+  `src/hooks/useRecentFeedingsForDefaults.ts`, `src/components/QuickLogV2Sheet.tsx` and two test
+  files. +155 / −109. Same view-model / hook / sheet / targeted-test shape as #1239's Water prefill.
+
+## 2. Feed last-recipe prefill IS shipped — correcting the entry below
+
+`established fact`, from the commit graph.
+
+The entry demoted immediately below this one ends with: _"Feed last-recipe prefill is **not**
+shipped."_ That was true when it was written at ~04:15 UTC. **#1241 merged at 04:29 UTC**, fourteen
+minutes later, and shipped exactly that feature. **The line is superseded — do not carry it forward,
+and do not open a Feed last-recipe slice.** It is done.
+
+This is the ordinary way a shift report goes stale: a forward-looking "not yet" sentence outlives the
+merge that answers it. It is recorded rather than silently overwritten so the sequence stays legible.
+
+**Feed and Water prefill are now both shipped**, by the same pattern: a pure `*ViewModel` for the
+defaults, a `useRecent*` hook for the read, and `QuickLogV2Sheet` as the presenter. #1239 did Water
+volume; #1241 did the Feed recipe.
+
+## 3. Paddle is on `test_` with the sandbox banner — EXPECTED, not a defect
+
+`source claim`, supplied by Cheek as the current expected condition. Not measured in this slice.
+
+- Paddle is running **`test_` keys**, and the **sandbox banner is showing**.
+- **This is the expected state.** A sandbox banner on the live apex is **not** a defect, **not** a
+  regression, and **not** a reason to open a slice or escalate.
+- It follows from the standing park recorded below: live client-side token creation
+  (`verdant-live-20260831`) is blocked on the Paddle login lockout, so the app stays on sandbox
+  credentials until that is cleared.
+- Unchanged and still binding: **do not revoke the existing `live_` token**, do not reproduce token
+  bytes, and do not write any environment value. The `live_`-class exposure in tracked
+  `.env.production` is recorded below and is a separate, still-open item.
+
+Recorded because its absence was the one gap that survived #1240: without it, a reader meeting the
+sandbox banner in production has no way to tell an expected condition from a payments regression.
+
+## 4. Live is carried, and current production is `NOT_MEASURED` again
+
+Live remains the independently MEASURED reading recorded by #1240:
+
+| Field    | Value                                                               |
+| -------- | ------------------------------------------------------------------- |
+| `commit` | `aab55387cd2e12272689a0078b77e198e7cb40fa`                          |
+| `dirty`  | **`false`**                                                         |
+| `ref`    | `verdant-grow-diary`                                                |
+| server   | **Vercel**                                                          |
+| measured | 2026-09-01 ~**9:33 PM CT** (`buildTime` `2026-09-02T02:33:03.954Z`) |
+| source   | `https://verdantgrowdiary.com/version.json`                         |
+
+**This slice did not fetch production.** That value is **carried**, not refreshed.
+
+**Current production is `NOT_MEASURED`.** The `aab55387` reading now predates three merges — #1240,
+#1219 and #1241 — so it is no longer a statement about what the apex is serving. Against that
+last-measured SHA the deploy tip is **3 ahead / 0 behind**, verified with
+`git rev-list --left-right --count c6a6c87dd...aab55387`; `aab55387` is an ancestor of the tip. That
+is a git fact about two objects, **not** a claim about production now. Whether Vercel has deployed
+the three is unmeasured here.
+
+**A merge is not a deployment.** A failure to re-measure is `BLOCKED`, never a product `FAIL`, and a
+resolver still serving `185.158.133.1` / `5c197f75` is a **network miss, not a rollback**.
+
+## 5. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production SQL, no
+  Lovable project-chat agent edit, no alternate publisher path.
+- **Publisher is Vercel**, project `verdant-grow-diary`. **Auth and DB stay Lovable Cloud.**
+- **Paddle: `test_` keys and the sandbox banner are EXPECTED.** Not a defect. Live token creation
+  stays parked on the login lockout; do not revoke the existing `live_` token.
+- **Current production is `NOT_MEASURED`.** 3 ahead / 0 behind is the graph relationship to the
+  last-measured live SHA `aab55387`, not production's current state.
+- **Tolu: do not ping.** Restore SHA stays **`aab55387`** (full oid
+  `aab55387cd2e12272689a0078b77e198e7cb40fa`).
+- **Feed last-recipe is SHIPPED (#1241).** Do not open a slice for it.
+- **#1174 is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge it; #1183 is the
+  landed C/F fail-closed.
+- **#1221 stays draft at `79146c6911`.** Not merged, readied, rebased or updated.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays `HOLD`.
+  Dual-home slice 2 is not approved. Spider Farmer GGS radio capture stays parked and `NOT_MEASURED`.
+- **An unticked GitHub review box is not missing evidence of a `PASS`**, and Blue Dream = Dream Queen
+  is one reviewer, owner-designated — not the protocol peer seat, which `HANDOFF_PROTOCOL.md:24`
+  limits to Grok, Claude or Codex.
+- This slice is **N=1** and stays **draft**, on branch `claude/current-state-restamp-c6a6c87`,
+  parented on `c6a6c87dd`. No ready, merge, publish, rebase or update-branch. No `src/`, no
+  `supabase/`, no `package.json`. **Owner: Claude**; the protocol peer seat needs **Codex or Grok**
+  and this slice does not claim it is filled. No ready until an independent `PASS`.
+
+**Prior update:** Claude (2026-09-02: **five merges since `d9ad904` — deploy tip is `aab55387`**, every
+row a squash with zero migrations. **The production publisher is now Vercel**, project
+`verdant-grow-diary`, **not Lovable Publish**; auth is still Lovable Cloud. **Live is independently
+MEASURED at `aab55387`, `dirty:false`, ref `verdant-grow-diary`, server Vercel**, on 2026-09-01 at
+~9:33 PM CT (`buildTime` 2026-09-02T02:33:03.954Z) from `https://verdantgrowdiary.com/version.json`.
+**Current production is MEASURED**, not `NOT_MEASURED`. **#1183 MERGED as `aab55387` C/F fail-closed
+is on live.** Restore SHA for Tolu/Support is **`aab55387`** (full oid
+`aab55387cd2e12272689a0078b77e198e7cb40fa`); Tolu is **not** to be pinged. **#1174 is draft,
+SUPERSEDED on V0 C/F hunks; do not convert or merge.** The earlier `ff35bd94` ~5:38 PM CT Water
+prefill walk is historical provenance, not current live. Feed last-recipe prefill is **not** shipped.
+Publish, History-restore and APPLY remain blocked. Prior header follows.)
+
+## 1. Five merges since `d9ad904` — deploy tip `aab55387`
+
+`established fact`, verified in this slice against the commit graph on the exact remote ref, not from
+the PR record alone. Every row is a **squash** — one parent each, confirmed with
+`git rev-list --parents`, subjects ending in their PR number — and the five form one linear chain.
+
+| PR        | Merge SHA    | Parent       | Files | Migrations | Merged (UTC)     |
+| --------- | ------------ | ------------ | ----: | ---------: | ---------------- |
+| **#1237** | `281823e2d4` | `d9ad904a16` |    10 |      **0** | 2026-09-01 17:27 |
+| **#1239** | `ff35bd941d` | `281823e2d4` |    14 |      **0** | 2026-09-01 22:27 |
+| **#1082** | `949c566a9e` | `ff35bd941d` |     2 |      **0** | 2026-09-02 01:55 |
+| **#1238** | `90224886b0` | `949c566a9e` |     1 |      **0** | 2026-09-02 01:59 |
+| **#1183** | `aab55387cd` | `90224886b0` |     3 |      **0** | 2026-09-02 02:26 |
+
+**Deploy tip: `aab55387cd`.** **Zero migrations across all five**, checked on the range
+`d9ad904a16..aab55387` rather than assumed.
+
+**Scope, from the commit record:**
+
+- **#1237** — dropped invalid `projectSettings` from `vercel.json`.
+- **#1239** — Quick Log prefills Water volume from the last plant watering.
+- **#1082** — EcoWitt tent Snapshot V0 post-merge QA, **tests only**.
+- **#1238** — Claude, docs-only correction of five review findings from #1236. This is the PR the
+  previous block was waiting on; it landed and its branch is deleted.
+- **#1183** — EcoWitt V0 Safe-by-Design C/F fail-closed plus `temp_f` convert. **MERGED as
+  `aab55387`; C/F fail-closed is on live.**
+
+## 2. The publisher is Vercel, and live is MEASURED at `aab55387`
+
+`source claim`, supplied by Cheek from an independent measurement of
+`https://verdantgrowdiary.com/version.json`, recorded with its provenance and timestamp.
+
+- **Production publisher is Vercel**, project `verdant-grow-diary` — **not Lovable Publish**. Every
+  earlier entry in this file that reasons about a Lovable publish path is superseded on that point.
+- **Auth is still Lovable Cloud.**
+- Live apex `https://verdantgrowdiary.com` is independently MEASURED at **`aab55387`** (full oid
+  `aab55387cd2e12272689a0078b77e198e7cb40fa`), **`dirty:false`**, ref **`verdant-grow-diary`**,
+  server **Vercel**, on **2026-09-01 at ~9:33 PM CT** (`buildTime` **2026-09-02T02:33:03.954Z**).
+- **Current production is MEASURED.** Do not record it as `NOT_MEASURED`. A merge is not a
+  deployment, but this SHA was fetched from live `version.json` after #1183 landed, so the deploy
+  tip and live match.
+- **#1183 MERGED as `aab55387` C/F fail-closed is on live.**
+
+**Historical provenance, not current live:** apex was previously MEASURED at **`ff35bd94`**,
+**`dirty:false`**, ref `verdant-grow-diary`, server **Vercel**, on **2026-09-01 at ~5:38 PM CT**,
+with signed-in **Water prefill `PASS`** (`#SG-01`, Volume 200, "Prefilled from last watering").
+That walk predates #1082, #1238 and #1183. Keep it as the Water-prefill evidence trail; it is
+**not** the restore SHA and **not** current live.
+
+**This supersedes the carried `5c197f75` dirty remint** and the later `ff35bd94` reading as
+_current_ live. `5c197f75`, `dirty:true`, is not live any more, and the change is a republish, not
+a rollback. **A network miss against `185.158.133.1` / `5c197f75` is not evidence of a rollback**
+and must not be recorded as one.
+
+The graph fact that `ff35bd94` is an ancestor of `aab55387` remains true (`git merge-base
+--is-ancestor`); it is no longer a reason to call production `NOT_MEASURED`.
+
+## 3. Restore SHA for Tolu/Support is `aab55387`
+
+`source claim`, per Cheek. If Tolu asks for a restore point, it is **`aab55387`** (full oid
+`aab55387cd2e12272689a0078b77e198e7cb40fa`). **Do not ping Tolu.** Support outcome remains
+`NOT_MEASURED`. Do not give `ff35bd94` as the restore SHA; that object is historical live from the
+~5:38 PM CT Water prefill walk.
+
+## 4. Current locks
+
+- **No Lovable Publish. No History-restore. No Lovable-agent-write. No APPLY. No `knk`. No
+  `query_database`.** No device control, no automatic Action Queue write, no credential handling, no
+  `live_` value in `.env.production`.
+- **Current production is MEASURED at `aab55387`, `dirty:false`, ref `verdant-grow-diary`.** Do not
+  record it as `NOT_MEASURED`. A failure to re-measure would be `BLOCKED`, never a product `FAIL`;
+  this slice did re-measure.
+- **Do not treat a network miss (`185.158.133.1` / `5c197f75`) as a rollback.**
+- **Tolu: do not ping.** Restore SHA `aab55387` (full oid `aab55387cd2e12272689a0078b77e198e7cb40fa`).
+- **#1174 is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready, or merge it. #1183 is the
+  landed C/F fail-closed and is on live.
+- **#1221 stays draft at `79146c6911`.** Not merged, readied, rebased or updated.
+- **#1219 is open and not this slice.** Its head is `f6424d7`, all 35 required checks green, three
+  verified reviewer findings held for Cheek's direction rather than auto-fixed.
+- **Codex owns the Feed last-recipe prefill.** Not to be taken here. **Do not claim Feed last-recipe
+  shipped.**
+- **Do not restamp, rebase or reopen #1238.** It is merged; this block replaces it as the head entry.
+- **An unticked GitHub review box is not missing evidence of a `PASS`.** Blue Dream (= Dream Queen —
+  one reviewer, alias per CORRECTION 1) and Super Blue are **owner-designated**, not the protocol peer
+  seat.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays on `HOLD`.
+  Dual-home slice 2 is not approved. Paddle live token creation and Spider Farmer GGS radio capture
+  remain parked exactly as recorded below.
+- This slice is **N=1** and stays **draft**, on branch `claude/current-state-restamp-aab5538`,
+  parented on `aab55387`. No ready, merge, publish, rebase or update-branch. No `src/` or `supabase/`
+  change. **Owner: Claude. Independent reviewer: Codex or Grok** — the protocol peer seat, unfilled;
+  no ready until an independent `PASS`.
+
+**Prior update:** 2026-09-01 UTC (~14:58 UTC)
+**Updated by:** Claude (2026-09-01: **#1232 and #1233 merged**; the deploy tip is
+**`e0e0d699`**. Both carry an independent `PASS` — **Super Blue** on #1232, **Blue Dream** on #1233 —
+so the unticked GitHub review boxes on the earlier merges are **not** evidence that review was
+skipped. The restore SHA for Tolu moves to **`e0e0d699`**, `dirty:false` on GitHub. **Live is
+unchanged** — still the carried dirty remint **`5c197f75`**, `dirty:true`, **not re-measured here**.
+**Current production divergence is `NOT_MEASURED`**; against the _last-measured_ live SHA the graph
+relationship is **7 behind / 4 ahead**. **#1234 and #1235 are
+both CLOSED — SUPERSEDED**: three sessions built the same four-merge restamp and #1232 is the one
+that landed. Publish, History-restore and APPLY remain blocked; Tolu is expected 2026-09-01 and is
+**not** to be pinged. Prior header follows.)
+
+## 1. #1232 and #1233 merged — deploy tip `e0e0d699`
+
+`established fact`, sourced from the **GitHub PR record** and cross-checked against the commit graph
+and the exact remote branch ref. Both rows are **squashes** — one parent each, verified with
+`git rev-list --parents`, subjects ending in their PR number.
+
+| PR        | Merge SHA  | Parent       | Source head | Files | Migrations | Merged (UTC)     |
+| --------- | ---------- | ------------ | ----------- | ----: | ---------: | ---------------- |
+| **#1232** | `4f272106` | `68ad14c66a` | `4087da639` |     1 |      **0** | 2026-09-01 02:02 |
+| **#1233** | `e0e0d699` | `4f272106`   | `2c0ccee10` |     1 |      **0** | 2026-09-01 02:03 |
+
+Full merge SHAs: `4f2721061214283483836d679fec8e2bd3b0e7df` and
+`e0e0d6995355aeac932b8526833ef8d8a793b4bd`.
+
+**Deploy tip: `e0e0d6995355aeac932b8526833ef8d8a793b4bd`**, read twice — `git ls-remote` and
+`git rev-parse origin/verdant-grow-diary` agree. Both were merged by `cheekhimself`.
+
+**Zero migrations across both**, checked on the range `68ad14c66a..e0e0d699` rather than assumed.
+
+**Scope, from the PR record:**
+
+- **#1232** — Claude, docs-only restamp of `CURRENT_STATE.md` for the #1228–#1231 merges. +80 / −2.
+  It is the block demoted immediately below this one.
+- **#1233** — **N=1, a single test file**: `src/test/quick-log-all-activities-integration.test.tsx`,
+  +24 / −0. It adds one integration test asserting that the leftover "no visible symptoms" checkbox
+  clears when a requested activity is applied through a `requestedActivityId` prop change, with no
+  `handleStartSymptomCheck` after the prop apply — i.e. the one path #1231's five reset sites did not
+  independently cover. **No production file was edited**; its own body records 57 passed / 0 failed
+  on the targeted run.
+
+**The same restack detail as #1230, one merge later.** #1233 was opened against base `68ad14c66a`
+(#1231) but its **landed parent is `4f272106`** (#1232): the queue restacked it onto the docs restamp.
+PR base and landed parent differ again. Anyone reconstructing this chain from PR bases alone will get
+it wrong twice in a row.
+
+## 2. Both merges carry an independent `PASS`
+
+`session evidence`, supplied by Cheek, with the head SHAs verified against the GitHub PR record in
+this slice.
+
+| PR    | Independent reviewer | `PASS` at head | Head verified                                                 |
+| ----- | -------------------- | -------------- | ------------------------------------------------------------- |
+| #1232 | **Super Blue**       | `4087da639`    | matches `head.sha` `4087da639d28e332d7fb33cc0474efcd3a1c94f6` |
+| #1233 | **Blue Dream**       | `2c0ccee105`   | matches `head.sha` `2c0ccee105e6ae56095fa888a157a7a26885d4c3` |
+
+**These are owner-designated review evidence, not the protocol peer-review seat.** Recorded as
+`source claim` (Cheek), with only the head SHAs verified here. Per CORRECTION 1 below, Blue Dream /
+Dream Queen is the owner-designated reviewer; the protocol seat is limited by `AGENTS.md` and
+`HANDOFF_PROTOCOL.md:24` to **Grok, Claude or Codex**. No alias in this file places Blue Dream or
+Super Blue in that set, and this slice did not establish the **owner** of either #1232 or #1233 from
+the PR record. So these rows are real review evidence and are **not** a claim of protocol
+peer-review compliance. Raised by Copilot on #1236; an earlier draft asserted that compliance.
+
+### Correcting the previous slice on review provenance
+
+**This supersedes the framing in the closed #1235.** That entry recorded the independent-review
+provenance of #1229/#1230 as **`missing evidence`**, reasoning from unticked GitHub checkboxes. That
+inference was wrong and is withdrawn.
+
+Both facts belong on the record, and neither cancels the other:
+
+- **The GitHub review boxes on #1229 and #1230 are unticked** (`established fact`, read from the
+  merged PR bodies — each carries an unticked independent-verdict line naming Blue Dream). #1231
+  carries no independent-reviewer box at all; its unticked lines are test-run rows, and its body
+  records a **P2 raised by Super Blue on #1230**.
+- **The independent `PASS` was given** (`session evidence`, Cheek) — by **Blue Dream** (recorded in
+  this file as the **same reviewer as Dream Queen**, alias confirmed by Cheek 2026-08-28, CORRECTION
+  1 below) and **Super Blue**. That is **two** reviewers, not three. An earlier draft listed Blue
+  Dream and Dream Queen separately and so overstated the count, reintroducing the very ambiguity
+  CORRECTION 1 was written to close. Raised by Copilot on #1236.
+
+**An unticked box is not evidence that a `PASS` is missing.** The checkbox is a drafting convenience
+in a PR body; it is not the review artefact and was never the system of record. Reading its state as
+a governance signal produced a false `missing evidence` label once already — do not repeat it. Where
+a review outcome is genuinely unknown, say so from the absence of a _reported_ verdict, never from an
+unticked box.
+
+## 3. Restore SHA for Tolu is now `e0e0d699`
+
+`session evidence`, supplied by Cheek. No Lovable surface was touched in this slice.
+
+The requested restore target moves from `68ad14c66a` (recorded in the entry below) to the current
+exact GitHub object **`e0e0d6995355aeac932b8526833ef8d8a793b4bd`**, **`dirty:false` on GitHub**.
+
+**Tolu is expected 2026-09-01. Do not ping, chase, reopen or escalate.** No Support outcome exists in
+the evidence available to this slice — that stays **`NOT_MEASURED`**. Do not infer that the Publish
+block is lifted or that production has been restored.
+
+This records the target as it now stands. It does **not** establish a standing rule that the target
+auto-follows the deploy tip; a later tip needs a fresh instruction from Cheek.
+
+## 4. Live is carried; divergence is measured against the last-measured SHA, not production now
+
+Live remains `5c197f7516e65845209c2d3b4a3192cf5848570c`, **`dirty:true`**, ref `master`. **This slice
+did not fetch production** — the value is **carried**, not refreshed, and is not a 2026-09-01
+measurement. Claude cannot take one.
+
+### The divergence, re-measured against this tip
+
+`established fact`, a **git** measurement taken in this slice. Read both numbers: the one-directional
+"behind" count is the misreading this subsection exists to prevent.
+
+```text
+git rev-list --left-right --count origin/verdant-grow-diary...5c197f75
+7   4
+```
+
+**Seven behind.** The deploy branch carries seven commits production does not: `a8b4a23e` (#1227),
+`6fd48d1c` (#1228), `47e2588a` (#1229), `cc1cd81af` (#1230), `68ad14c66a` (#1231), `4f272106` (#1232)
+and `e0e0d699` (#1233).
+
+**Four ahead.** Production also carries four commits that exist on **no** deploy-branch SHA, reached
+through the remint's second parent `9d31447a`:
+
+```text
+5c197f7  Hardened restore-env script
+9d31447  Changes
+29ddb39  Changes
+e71d0dd  Work in progress
+```
+
+As of that last measurement, production was therefore **not** a lagging subset of the deploy branch,
+and shipping the seven missing commits would **not** have reconciled it.
+
+**What this does and does not establish.** The command compares the deploy tip with `5c197f75` — the
+**last-measured** live SHA, carried from 2026-08-31 and not re-fetched here. It is a git fact about
+that SHA, **not** a measurement of production now. If production has published or reminted since,
+unobserved, the current divergence is **`NOT_MEASURED`** and these two numbers are stale. Do not
+drive a restore or deployment decision from them without a fresh production read. Raised as a P2 by
+Codex on #1236; an earlier draft stated the 7/4 relationship as current production fact, which is the
+same stale-for-current substitution this section warns about one paragraph above. **A merge is not a deployment.** Do not model production as "the
+deploy branch, older", do not rebase this record onto the remint, and do not merge the remint onto
+the deploy branch.
+
+**If this measurement cannot be taken in a later slice, that is a git or network `BLOCKED`** — record
+it as such. It is never a product `FAIL`, and an unreachable object says nothing about production.
+
+## 5. #1234 and #1235 are CLOSED — SUPERSEDED
+
+`established fact`, read from the GitHub PR record: both are `state: closed`, `merged: false`.
+
+Three sessions independently produced the **same** #1228–#1231 four-merge restamp from the same
+instruction, in parallel, none aware of the others:
+
+| PR        | Outcome                  | Head        |
+| --------- | ------------------------ | ----------- |
+| **#1232** | **MERGED** as `4f272106` | `4087da639` |
+| **#1234** | **CLOSED — SUPERSEDED**  | `7762b0e9c` |
+| **#1235** | **CLOSED — SUPERSEDED**  | `5882c32d8` |
+
+Cheek's closing instruction, recorded verbatim in effect: do not rebase, do not reopen, and the next
+restamp must cut from `e0e0d699` and record #1232/#1233 rather than re-recording #1228–#1231. **This
+entry is that restamp.** Nothing from `5882c32` was ported.
+
+This is the second time this has happened — `AGENTS.md` already records #1225 as a Claude duplicate
+of #1224. The constitution's rule is the remedy and it held once it was applied: check open and
+recent PRs in the target area **before** building, and surface a collision rather than resolving it
+unilaterally. **Only one implementation of a slice should ever merge.** This slice checked the open
+PR list first and found no competing `CURRENT_STATE.md` restamp before starting.
+
+## 6. Prettier: the lockfile is safe, the declared range is not
+
+`established fact`, measured in this slice against the base file at `68ad14c66a` (564,317 bytes) by
+running each version.
+
+| prettier | output bytes | `NOT_APPLICABLE` / `PASSKEY_` / `sbp_` |
+| -------- | -----------: | -------------------------------------- |
+| 3.7.3    |      564,303 | **corrupted**                          |
+| 3.8.0    |      564,303 | **corrupted**                          |
+| 3.9.0    |      564,317 | intact — byte-identical                |
+| 3.9.6    |      564,317 | intact — byte-identical                |
+
+On **≤ 3.8.0** Prettier mis-parses underscore-heavy inline code as emphasis and rewrites
+`` `NOT_APPLICABLE` `` to `` `NOT*APPLICABLE` `` — a **status-vocabulary term** — along with
+`` `PASSKEY_` `` and `` `sbp_` `` inside a passage about credential redaction. Fixed from **3.9.0**.
+
+**Both lockfiles resolve `prettier@3.9.6`** (`bun.lock` and `package-lock.json`). On a lockfile
+install this file is prettier-clean and the `lint-staged` `prettier --write` on `*.md` is a
+**no-op**.
+
+Consequences, and they are narrow:
+
+- **Do not bypass the pre-commit hook on a lockfile-clean install.** There is nothing to protect the
+  file from; bypassing it skips the docs-safety and type gates for no gain.
+- **Do not "repair" the historical vocabulary.** Rewriting `NOT_APPLICABLE` to `NOT*APPLICABLE` is
+  the corruption, not the fix.
+- **The hazard is the declared range, not the file.** `package.json` declares `"prettier": "^3.7.3"`,
+  a caret span covering both behaviours, so a fresh **non-lockfile** install can land in the broken
+  half and silently mangle status vocabulary. That is how two sessions reached opposite conclusions
+  about the same file on the same day. **Tightening the range is out of scope here** — it is a
+  `package.json` change, not a docs edit, and this slice must not make it.
+
+## 7. `live_` token exposure — class and location only
+
+`session evidence`, carried forward so it does not age out of the current block. **No token bytes are
+reproduced, inspected or recorded here, and none ever should be.**
+
+The `5c197f75` remint injected a payments token of class **`live_`** into **tracked
+`.env.production`**, and made `restore-env-production-from-head` **skippable when Git HEAD is
+missing**. Both changes are carried by the four ahead-commits in section 4.
+
+**Current runtime presence is `NOT_MEASURED`.** This slice did not fetch production, so it cannot
+establish that either is _still_ live. What is established is narrower: the last independent
+measurement, `5c197f75` on 2026-08-31, was of a build containing them. Whether the running build
+still does requires a fresh measurement nobody has taken.
+
+Recorded as an **open exposure**. This slice authorises no revert, no env edit, no restore-script
+patch, no token revoke and no token creation. Paddle live-token creation stays parked on the login
+lockout recorded below.
+
+## 8. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production SQL, no
+  Lovable project-chat agent edit, no alternate publisher path, no retry.
+- **Tolu expected 2026-09-01 — do not ping.** Support outcome stays `NOT_MEASURED`.
+- **Current production divergence is `NOT_MEASURED`.** Against the last-measured live SHA
+  `5c197f75` the graph relationship is 7 behind / **4 ahead** — do not describe that as merely
+  behind, and do not restate it as production's current state. A failure to re-measure is `BLOCKED`,
+  never a product `FAIL`.
+- **An unticked GitHub review box is not missing evidence of a `PASS`.** The reviewers across this
+  run were **Blue Dream (= Dream Queen — one reviewer, alias per CORRECTION 1)** and **Super Blue**.
+  Both are **owner-designated**, not the protocol peer seat.
+- **Do not reopen #1234 or #1235**, and do not port `5882c32`.
+- **Prettier:** lockfile `3.9.6` is a no-op on this file. Do not bypass the hook on a lockfile-clean
+  install, do not repair historical vocabulary, and do not change the `package.json` range here.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.**
+- **#1221 stays draft at `79146c6911`, pending Blue Dream.** Not merged, readied, rebased or updated.
+- **Knowledge-library expansion is on `HOLD`.** No Codex SEO/Wikipedia program is opened here.
+- **Dual-home slice 2 is not approved.**
+- Paddle live token creation and Spider Farmer GGS radio capture remain parked exactly as recorded in
+  the entries below; nothing in this slice touched either.
+- This slice is **N=1** and stays **draft**, on branch `claude/current-state-restamp-e0e0d699`,
+  parented on `e0e0d699`. No ready, merge, publish, rebase or update-branch. No `src/` or `supabase/`
+  change. **Owner: Claude. Independent reviewer, named after the SHA: Dream Queen** — no ready until
+  an independent `PASS`.
+
+**Prior update:** Claude (2026-09-01: **#1228, #1229, #1230 and #1231 merged**; the deploy tip is
+**`68ad14c66a`**. The restore SHA for Tolu moves to that object. **Live is unchanged** — still the
+independently MEASURED dirty remint **`5c197f75`**, not re-measured here. Publish, History-restore
+and APPLY remain blocked; Tolu is expected 2026-09-01 and is **not** to be pinged. Prior header
+follows.)
+
+## 1. Four merges — deploy tip `68ad14c66a`
+
+`established fact`, sourced from the **GitHub PR record** and cross-checked against the commit graph
+and the exact remote branch ref. Every row is a **squash** — one parent each, verified with
+`git rev-list --parents`, subjects ending in their PR number.
+
+| PR        | Merge SHA    | Parent      | Source head | Files | Migrations | Merged (UTC)     |
+| --------- | ------------ | ----------- | ----------- | ----: | ---------: | ---------------- |
+| **#1228** | `6fd48d1cd`  | `a8b4a23ec` | `1f3b35706` |     1 |      **0** | 2026-08-31 20:06 |
+| **#1229** | `47e2588ab`  | `6fd48d1cd` | `5e3c54a70` |     5 |      **0** | 2026-08-31 23:52 |
+| **#1230** | `cc1cd81af`  | `47e2588ab` | `9859a0c85` |     4 |      **0** | 2026-08-31 23:55 |
+| **#1231** | `68ad14c66a` | `cc1cd81af` | `1582d989e` |     2 |      **0** | 2026-09-01 00:27 |
+
+**Deploy tip: `68ad14c66a223d123d7ab263b83cec3fe5d90c8d`**, confirmed as the exact remote
+`verdant-grow-diary` ref by `git ls-remote`. All four were merged by `cheekhimself`.
+
+**Zero migrations across all four** — checked per commit, not assumed.
+
+**One ordering detail worth having on the record.** #1230 was opened against base `6fd48d1cd`
+(#1228), but its **actual merge parent is `47e2588ab`** (#1229): the queue restacked it onto #1229
+rather than onto the base it was opened from. The PR base and the landed parent therefore differ.
+Recorded because a reader reconstructing the chain from PR bases alone would get it wrong.
+
+**Scope, from the PR record:**
+
+- **#1228** — Codex, docs-only restamp of `CURRENT_STATE.md` after #1227 and the Support hold.
+- **#1229** — canonical diary event-type resolver; AI Doctor readiness and Timeline Memory recover
+  Quick Log watering identity. `entry_type` stays authoritative; `details.event_type` is accepted
+  only on an allow-list; malformed details **fail closed**; note text is never parsed.
+- **#1230** — Guided Symptom Check gains an explicit **no visible symptoms** path, persisted as
+  `details.symptom_check_result = no_symptoms_observed`. It is **not** an `observedSign` and is
+  **not** added to the symptom catalog, so guides and evidence cards still fail closed rather than
+  inventing a "healthy" symptom. Choosing both a sign and the box fails closed.
+- **#1231** — clears the sticky `guidedSymptomNoneObserved` control at five reset sites, so a later
+  Symptom Check in the same mount no longer opens with the clean-check box already ticked. Per its
+  own PR body this closes a **P2 raised by Super Blue on #1230**.
+
+## 2. Live is unchanged — still the dirty remint `5c197f75`
+
+`source claim` as to the measurement, carried forward unchanged from the entry demoted below. **No
+production measurement was taken in this slice**, and Claude cannot take one.
+
+Live remains `5c197f7516e65845209c2d3b4a3192cf5848570c`, **`dirty:true`**, ref `master`. Four merges
+have landed on the deploy branch since, so live and the deploy tip are **further apart than before**,
+not closer. **A merge is not a deployment.** The remint is on GitHub but is **not** the
+`verdant-grow-diary` deploy tip; do not rebase this record onto it and do not merge it onto the
+deploy branch.
+
+## 3. Restore SHA for Tolu is now `68ad14c66a`
+
+The requested restore target moves from `a8b4a23e` (recorded in the entry below) to the current exact
+GitHub object **`68ad14c66a223d123d7ab263b83cec3fe5d90c8d`**.
+
+**Tolu is expected 2026-09-01. Do not ping.** No Support outcome exists in the evidence available to
+this slice — that remains **`NOT_MEASURED`**. Do not infer that the Publish block is lifted or that
+production has been restored.
+
+## 4. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production SQL, no
+  Lovable project-chat agent edit, no alternate publisher path, no retry.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Do not implement the unknown-scheme catch-all and
+  do not add a scheme.
+- **#1221 stays draft at `79146c6911`, pending Blue Dream.** It is **not merged**. Not being readied,
+  rebased, updated or merged.
+- **Knowledge-library expansion is on `HOLD`.**
+- **Dual-home slice 2 is not approved.**
+- Paddle live token creation and Spider Farmer GGS radio capture remain parked exactly as recorded in
+  the entry below; nothing in this slice touched either.
+- This slice is **draft**. **No ready until an independent `PASS`.** Reviewer after SHA:
+  **Super Blue**.
+
+**Prior update:** Codex (2026-08-31: **#1227 merged as `a8b4a23e`** and the deploy-branch tip is that
+exact commit. Lovable Support (Tolu) is reviewing the blocked Publish and the dirty remint; Publish
+and agent edits in the Lovable project chat remain on hold until Support writes back. The requested
+restore target is now exact GitHub object **`a8b4a23e`**, `dirty:false`. Live remains independently
+MEASURED at **`5c197f75`**, `dirty:true`; no new production measurement was taken here. Paddle live
+token creation and GGS radio capture are parked as recorded below. Prior header follows.)
+
+## 1. #1227 merged — deploy tip `a8b4a23e`
+
+`established fact`, verified from the GitHub PR record, commit graph and exact remote branch ref in
+this docs-only slice.
+
+| Field       | Value                                                            |
+| ----------- | ---------------------------------------------------------------- |
+| PR          | **#1227 MERGED**                                                 |
+| Merge SHA   | **`a8b4a23ecfca4158394cadc76a28028653eeaa34`**                   |
+| Parent      | `a26b912cc72fb484e7f36a61ed0c91c0faddc90d` (#1226)               |
+| Shape       | **squash** — one parent; subject ends `(#1227)`                  |
+| Source head | `a98d20c07b2e6587ea83fb918844fa5d45be8ae3`                       |
+| Scope       | docs restamp of #1226; `docs/agents/CURRENT_STATE.md` only       |
+| Deploy tip  | **`a8b4a23ecfca4158394cadc76a28028653eeaa34`**, exact remote ref |
+
+The deploy branch did **not** move to `5c197f75`. Do not rebase this record onto that remint and do
+not merge the remint onto `verdant-grow-diary`.
+
+## 2. Lovable Support hold — no outcome yet
+
+`session evidence`, supplied by Cheek. This restamp records the handoff without inventing a Support
+result.
+
+- Lovable Support agent **Tolu** is reviewing both the suspicious-activity Publish block and the
+  `5c197f75` dirty remint.
+- There must be **no further Publish attempt** and **no agent edit in the Lovable project chat** until
+  Support writes back.
+- The requested restore target is the current GitHub object
+  `a8b4a23ecfca4158394cadc76a28028653eeaa34`, `dirty:false` — not only the earlier `a26b912c` tip.
+- Support has not supplied an outcome in the evidence available to this slice. Do not infer that the
+  block is lifted or that production was restored.
+
+## 3. Live remains `5c197f75`, dirty remint
+
+The last independent production measurement remains
+`5c197f7516e65845209c2d3b4a3192cf5848570c`, `dirty:true`, ref `master`. This restamp did not
+re-fetch production. The remint remains on GitHub but is not the `verdant-grow-diary` deploy tip.
+
+## 4. Paddle token creation parked
+
+`session evidence`, supplied by Cheek; no Paddle or Lovable environment operation was performed in
+this slice.
+
+- Creation of a new live client-side token named `verdant-live-20260831` is **parked** because the
+  Paddle login is locked out after a password reset.
+- Do **not** revoke the existing `live_` token.
+- Do not reproduce token bytes and do not write any Lovable environment value.
+
+## 5. Spider Farmer GGS radio parked
+
+`session evidence`, supplied by Cheek and carried into this Verdant docs-only restamp without
+opening or changing the GGS repository.
+
+- `cheekhimself/Spider-Farmer-GGS-Controller-MQTT` PR **#3 MERGED** as
+  `b2ab1a6550ab6e1a7d77889eede65203f92f7485`; the shipped path is FF01 receive-only.
+- Capture remains **`NOT_MEASURED`**.
+- Advertisements matching `MELK-OA21*` and `GVH6013*` are **not GGS**. Do not connect to or promote
+  them as GGS evidence.
+- Do not use FF02, AES or a Verdant sink. Radio work is parked until Cheek uses the other PC tonight.
+
+## 6. Current locks
+
+- **Publish and Lovable project-chat agent edits are BLOCKED** pending Tolu's Support response. No
+  retry or alternate publisher path.
+- **Paddle token creation is PARKED.** Do not revoke the existing `live_` token, write token bytes or
+  change Lovable environment values.
+- **GGS radio capture is PARKED.** No FF02, AES or Verdant sink.
+- **Catch-all / Kerberos / HOBA remain BLOCKED.** Do not add a scheme or implement the unknown-scheme
+  catch-all.
+- **#1221 stays draft and unassigned.** It is not being readied, rebased, updated or merged.
+- **#1225 stays CLOSED — SUPERSEDED.** Do not reopen or rebase it.
+- **No APPLY.** Least of all `20260813030000`. No publish, production SQL or production mutation.
+- This restamp is **N=1** and stays **draft**. No ready, merge, publish, rebase or update-branch. No
+  `src/` or `supabase/` change.
+
+**Prior update:** Codex (2026-08-31: **#1226 merged as `a26b912c`** and the deploy-branch tip is that
+exact commit. Cheek unlocked one production editor Publish attempt for that GitHub object; Lovable
+blocked it with the suspicious-activity tooltip recorded below, and Codex stopped without retrying.
+Live was independently MEASURED at **`5c197f75`**, `dirty:true`, ref `master`; that Lovable remint is
+on GitHub but is **not** the `verdant-grow-diary` tip. Publish stays locked pending Lovable Support.
+Prior header follows.)
+
+## 1. #1226 merged — deploy tip `a26b912c`
+
+`established fact`, verified from the GitHub PR record, commit graph and exact remote branch ref in
+this docs-only slice.
+
+| Field       | Value                                                            |
+| ----------- | ---------------------------------------------------------------- |
+| PR          | **#1226 MERGED**                                                 |
+| Merge SHA   | **`a26b912cc72fb484e7f36a61ed0c91c0faddc90d`**                   |
+| Parent      | `c63f969f05a435e3a62dd281741d2c796dbb454e` (#1224)               |
+| Shape       | **squash** — one parent; subject ends `(#1226)`                  |
+| Source head | `0b9e15284ffb6924f0a870ee9f801f16c02e05b0`                       |
+| Scope       | docs restamp of #1224; `docs/agents/CURRENT_STATE.md` only       |
+| Deploy tip  | **`a26b912cc72fb484e7f36a61ed0c91c0faddc90d`**, exact remote ref |
+
+The deploy branch did **not** move to `5c197f75`. Do not rebase this record onto that remint and do
+not merge the remint onto `verdant-grow-diary`.
+
+## 2. Production Publish — one attempt, blocked, stopped
+
+`session evidence`, recorded from the editor attempt authorised by Cheek for exact GitHub object
+`a26b912cc72fb484e7f36a61ed0c91c0faddc90d`.
+
+- Cheek unlocked production Publish of `a26b912c`.
+- Codex made **one** Lovable editor Publish attempt.
+- The editor returned this exact tooltip:
+
+  > Publishing was blocked due to suspicious activity. Contact support if you believe this is a mistake.
+
+- Result: **FAIL**. Codex stopped. There was no retry, History restore, Ask Lovable, `send_message`,
+  Try to fix, MCP deploy, or other publisher path.
+- Cheek contacted Lovable Support on 2026-08-31 at approximately **11:07 AM CT**. Production Publish
+  stays locked until Support lifts the block.
+
+## 3. Live measurement — `5c197f75`, dirty remint, not the deploy tip
+
+`MEASURED`, supplied by Cheek from an independent read of
+`https://verdantgrowdiary.com/version.json`; this docs-only slice did not re-fetch production.
+
+| Field        | Measured value                               |
+| ------------ | -------------------------------------------- |
+| `commit`     | `5c197f7516e65845209c2d3b4a3192cf5848570c`   |
+| `dirty`      | **`true`**                                   |
+| `ref`        | `master`                                     |
+| `commitTime` | `2026-08-31T15:21:54Z` — **10:21 AM CT**     |
+| `buildTime`  | `2026-08-31T15:23:59.622Z` — **10:23 AM CT** |
+
+GitHub metadata for that SHA was independently verified in this slice without reading its patch
+body:
+
+- GitHub author and committer: `lovable-dev[bot]`; Git author and committer:
+  `gpt-engineer-app[bot]`.
+- Subject: **Hardened restore-env script**; Lovable `ai_update` edit `edt-62eccfff`.
+- Merge parents: `a26b912cc72fb484e7f36a61ed0c91c0faddc90d` and
+  `9d31447aa0c3d1aab87f0a3a9362b29d9bbdf9c9`.
+- The commit exists on GitHub. It is **not** the exact remote head of `verdant-grow-diary`; that head
+  remains `a26b912c`.
+
+The remint injected a payments token of class `live_` into tracked `.env.production` and made
+`restore-env-production-from-head` skippable when Git HEAD is missing. This record deliberately does
+not reproduce or inspect the token bytes. No revert, env edit, or restore-script patch is authorised
+by this slice.
+
+## 4. Current locks
+
+- **Publish is BLOCKED** pending Lovable Support. No retry or alternate publisher path.
+- **Catch-all / Kerberos / HOBA remain BLOCKED.** Do not add a scheme or implement the unknown-scheme
+  catch-all.
+- **#1221 stays draft and unassigned.** It is not being readied, rebased, updated or merged.
+- **#1225 stays CLOSED — SUPERSEDED.** Do not reopen or rebase it.
+- **No APPLY.** Least of all `20260813030000`. No `knk`, `query_database`, production SQL or
+  EcoWitt-to-live.
+- No History restore, Ask Lovable, `send_message`, Try to fix, MCP deploy, revert of `5c197f75`, or
+  patch to `restore-env-production-from-head`.
+- This restamp is **N=1** and stays **draft**. No ready, merge, publish, rebase or update-branch. No
+  `src/` or `supabase/` change.
+
+**Prior update:** Claude (2026-08-30: **#1224 merged as `c63f969f`** — deploy tip is now that commit.
+It closes the **remainder** of a parameterized `Authorization` header for the four reserved schemes
+`Basic|Digest|Negotiate|NTLM`; verified by executing the merged tip, not read from the title.
+**`Kerberos` and `HOBA` still leak their attribute lists** and the unknown-scheme catch-all stays
+`OPEN` — REVIEW ONLY / `BLOCKED`. **#1225 was CLOSED as SUPERSEDED** — Claude built a duplicate of
+#1224. Prior header follows.)
+
+## 1. #1224 merged — deploy tip `c63f969f`
+
+| Field     | Value                                           | How known                          |
+| --------- | ----------------------------------------------- | ---------------------------------- |
+| Merge SHA | **`c63f969f`**                                  | verified, `git log`                |
+| Parent    | `622615d66` (#1223)                             | verified, `git log`                |
+| Shape     | **squash** — one parent; subject ends `(#1224)` | verified, `git rev-list --parents` |
+| Head      | **`a55b12ec`**                                  | **verified twice** — see below     |
+| Owner     | Codex                                           | PR body                            |
+| Reviewer  | **Super Blue** — `PASS` at `a55b12ec`           | reported (Cheek), 2026-08-30       |
+
+Files: `src/lib/ecowittValidationEvidenceRules.ts`, its test, the edge mirror and
+`.sync-manifest.json`. **+9 / −5, zero migrations.**
+
+The head SHA is `established fact` here, not a `source claim` as in the #1222 and #1216 rows above:
+the GitHub API reported `head.sha` while the PR was open, and the squash commit message on the tip
+embeds `a55b12ec7e3c5162d19b0a09be7f6fc534dc705b` verbatim in its Cursor Bugbot line. Two
+independent readings agree.
+
+**The independent reviewer is Super Blue — `PASS` at `a55b12ec`** (Cheek, 2026-08-30). Super Blue is a
+peer, so this slice carries an owner and a different independent reviewer. Recorded as **reported**: as
+with the Dream Queen results in the entries below, no review run is readable from this repository, so the
+provenance is Cheek's report rather than an in-repo artefact.
+
+**Eleventh observed squash outcome** (#1186, #1212, #1213, #1215, #1216, #1217, #1218, #1220, #1222,
+#1223, #1224 — parent counts checked, not inferred). It stays an **observation**: the configured
+merge method remains **`NOT_MEASURED`**, since reading it needs `Administration:read`.
+
+## 2. What #1224 closed — measured on the tip
+
+`established fact`, **executed against `c63f969f`**. The named suite is **63 passed / 0 failed** on
+this tip. The behaviour table below comes from calling `redactEvidenceValue` on the merged tip through
+a temporary probe, removed afterwards; the tree was verified clean before and after.
+
+| Input (string nested under a non-secret key)                                  | Result on `c63f969f`                      |
+| ----------------------------------------------------------------------------- | ----------------------------------------- |
+| `Authorization: Digest username="grower", realm="verdant", nonce="secret"`    | **`[REDACTED]`** — whole header           |
+| `Authorization: NTLM username="grower", realm="verdant", nonce="secret"`      | **`[REDACTED]`** — whole header           |
+| `Authorization: Negotiate username="grower", realm="verdant", nonce="secret"` | **`[REDACTED]`** — whole header           |
+| `Authorization: Negotiate opaque="x", nonce="secret"`                         | **`[REDACTED]`** — whole header           |
+| `Authorization: Basic username="grower", nonce="secret"`                      | **`[REDACTED]`** — whole header           |
+| `Authorization: NTLM TlRMTVNTUAABAAAAB4IIog==`                                | `[REDACTED]` — token-shaped pin holds     |
+| `Authorization: Bearer abc123def456ghi`                                       | `[REDACTED]` — token-shaped pin holds     |
+| `temp_f=77.4 inserted=1 humidity=55`                                          | **unchanged** — benign telemetry survives |
+| `The authorization desk is open, realm="lobby"`                               | **unchanged** — no over-reach on prose    |
+
+The shipped rule adds a repeating comma-separated attribute group and admits `Basic` into the
+parameterized branch:
+
+```
+/Authorization\s*:\s*(?:(?:Basic|Digest|Negotiate|NTLM)\s+[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*')(?:\s*,\s*[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'))*|(?:(?:Basic|Digest|Negotiate|NTLM)\s+)?[^\s",}]+)/gi
+```
+
+Both leftovers recorded in the entry demoted below are **closed**: the remainder after the first
+comma, and parameterized `Basic`.
+
+**Reachability is unchanged and still narrower than it looks:** this regex path runs only on a
+**string nested under a non-secret key**. A top-level string, and any value under an
+`Authorization`-named key, are replaced wholesale before it. Whether real EcoWitt payloads carry the
+leaking shape remains **`NOT_MEASURED`**. Affected surfaces are unchanged — `redacted_raw_payload` in
+the clipboard evidence copy and in the downloaded validation JSON; CSV excludes the raw payload.
+
+## 3. What still leaks — `BLOCKED`, and deliberately so
+
+`established fact`, same probe, same tip:
+
+| Input                                                       | Result on `c63f969f`                           |
+| ----------------------------------------------------------- | ---------------------------------------------- |
+| `Authorization: Kerberos username="grower", nonce="secret"` | `[REDACTED] username="grower", nonce="secret"` |
+| `Authorization: HOBA username="grower", nonce="secret"`     | `[REDACTED] username="grower", nonce="secret"` |
+
+The scheme word alone is consumed by the value-tail branch; the attribute list survives. The scheme
+list is **CLOSED** by design — `Basic|Digest|Negotiate|NTLM` and no more.
+
+**The parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY / `BLOCKED`.** Do not
+implement it. **Do not add `Kerberos`. Do not add `HOBA`.** Adding schemes one at a time is what
+produced #1214, #1216, #1222 and #1224; an open scheme class would consume arbitrary
+`word attr="value"` spans far from any real header. Neither direction is authorised here.
+
+## 4. #1225 CLOSED — SUPERSEDED, and Claude built the duplicate
+
+`established fact`, from the GitHub API and `git log`.
+
+Cheek closed **#1225** unmerged at 03:22:34Z: _"SUPERSEDED by #1224. Same four files, GDP-named Codex
+remainder-attr slice. Do not reopen. Do not rebase onto #1224."_ It is closed, not merged; the branch
+`claude/gdp-parameterized-remainder` is retained at `fd5b3a6ce` and **not** deleted, so the closure
+stays reversible.
+
+|         | #1224 (Codex)         | #1225 (Claude)       |
+| ------- | --------------------- | -------------------- |
+| Opened  | **03:12:39Z**         | 03:17:47Z            |
+| Parent  | `1f68d7d3`            | `1f68d7d3`           |
+| Files   | 4                     | 4 — same closed list |
+| Diff    | +9 / −5               | +73 / −4             |
+| Outcome | **merged `c63f969f`** | **closed unmerged**  |
+
+**The two `Authorization` patterns are byte-identical** — checked with `cmp`, not by eye. Both add the
+same four cases (Digest/NTLM/Negotiate remainder, parameterized `Basic`). Codex extended the existing
+`it.each` table; Claude added a separate block that additionally asserted no component value appears
+in the payload **or the clipboard text**. That extra assertion is the only behavioural difference and
+it is **not** in the shipped tests.
+
+**Why the duplicate existed.** `AGENTS.md` requires checking open PRs for overlapping work before
+starting substantial new work, and requires **surfacing** a collision rather than building a competing
+version. #1224 had been open five minutes when Claude began. Claude did not run that check. Recorded
+as a process failure, not smoothed over; the wasted work is Claude's, and no repository state was
+harmed.
+
+## 5. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No publish, no republish. No EcoWitt-to-live. No rebase. No update-branch.**
+- **Live production** was MEASURED at **`5bf4db1d`** — `dirty:false`, ref **`master`**, GDP,
+  2026-08-29. It is now **seven commits behind the deploy tip** (counted, not estimated) and is
+  **not a current measurement**. Re-measuring needs Cheek or GDP; Claude did not take it and cannot.
+  **A merge is not a deployment.**
+- **#1221 stays draft and unassigned** — open, draft, 16 files, +1440 / −242, based on `d4e5a7ea4`,
+  which is now four commits behind the tip. It is not being readied, rebased or updated.
+- No `knk`. No `query_database`. No production SQL. No device control. No Action Queue write.
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+- `Supabase Preview` failed again on #1225's head with the repo-wide `ai_credit_grants` 42P07 replay
+  collision — **fourteenth** distinct preview project. Non-required, in neither `required` nor
+  `mustBeGreen`, and no branch involved carries a migration. Not commented on, per standing
+  instruction.
+
+**Prior update:** Claude (2026-08-30: **#1222 merged as `1f68d7d3`** — deploy branch is now that tip. It
+redacts the **first quoted attribute** after a `Digest`/`Negotiate`/`NTLM` scheme; **the remainder of
+the header still leaks**, and **parameterized `Basic` still leaks entirely**. Verified by execution
+against the merged tip. The **parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY /
+`BLOCKED`.** Prior header follows.)
+
+## 1. #1222 merged — deploy branch `1f68d7d3`
+
+| Field       | Value                                           | How known                           |
+| ----------- | ----------------------------------------------- | ----------------------------------- |
+| Merge SHA   | **`1f68d7d3`**                                  | verified, `git log`                 |
+| Parent      | `dd2da3404` (#1220)                             | verified, `git log`                 |
+| Shape       | **squash** — one parent; subject ends `(#1222)` | verified, parent count              |
+| Head        | **`e730f26bcdeb`**                              | **reported** — not in this clone    |
+| Dream Queen | **`PASS`**                                      | **reported** — not readable in-repo |
+
+Files: `src/lib/ecowittValidationEvidenceRules.ts`, its test, the edge mirror and
+`.sync-manifest.json`. **Zero migrations.**
+
+## 2. What #1222 fixed, and what it left
+
+`established fact`, **executed against the merged tip `1f68d7d3`** — not read from the title.
+
+The header rule now carries a scheme-and-first-attribute branch ahead of the old value tail:
+
+```
+/Authorization\s*:\s*(?:(?:Digest|Negotiate|NTLM)\s+[A-Za-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*')|(?:(?:Basic|Digest|Negotiate|NTLM)\s+)?[^\s",}]+)/gi
+```
+
+That branch consumes the scheme **plus one quoted attribute**. Everything after the first comma is
+outside the match.
+
+| Input (string nested under a non-secret key)                               | Result on `1f68d7d3`                          |
+| -------------------------------------------------------------------------- | --------------------------------------------- |
+| `Authorization: Digest username="grower", realm="verdant", nonce="secret"` | `[REDACTED], realm="verdant", nonce="secret"` |
+| `Authorization: NTLM username="grower", realm="verdant", nonce="secret"`   | `[REDACTED], realm="verdant", nonce="secret"` |
+| `Authorization: Negotiate opaque="x", nonce="secret"`                      | `[REDACTED], nonce="secret"`                  |
+| `Authorization: Basic username="grower", nonce="secret"`                   | `[REDACTED]"grower", nonce="secret"`          |
+| `Authorization: NTLM TlRMTVNTUAABAAAAB4IIog==`                             | fully redacted                                |
+
+**Fixed:** the first quoted attribute after `Digest`/`Negotiate`/`NTLM` — `username` in these cases —
+is now redacted where it previously survived. That is a real narrowing.
+
+**The leftover, still leaking:**
+
+- **The remainder of the header.** `realm=` and `nonce=` and every subsequent attribute fall outside
+  the match. A short, non-hex secret in any position after the first survives.
+- **Parameterized `Basic`.** `Basic` is absent from the first-attribute branch, so it falls through to
+  the old tail, which stops at the first quote. Both `username` and `nonce` values survive.
+
+**The parameterized unknown-scheme catch-all stays `OPEN` — REVIEW ONLY / `BLOCKED`.** Do not
+implement. Do not touch `src/` or `supabase/`. **No further scheme is proposed here** — the scheme
+list was never the defect.
+
+**Reachability** is unchanged and narrower than it looks: the regex path runs only on a **string
+nested under a non-secret key**. A top-level string, and any value under an `Authorization`-named key,
+are replaced wholesale. Whether real EcoWitt payloads carry the leaking shape is **`NOT_MEASURED`**.
+
+**Affected surfaces** are unchanged: `redacted_raw_payload` in the clipboard evidence copy and in the
+**downloaded validation JSON**. CSV excludes the raw payload.
+
+## 3. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No publish, no republish. No EcoWitt-to-live. No rebase.**
+- **Live production** was MEASURED at `5bf4db1d` (`dirty:false`, ref `master`, GDP) on 2026-08-29. It
+  is now **several commits behind the tip** and is **not a current measurement**; re-measuring needs
+  Cheek or GDP. Claude did not take it and cannot. **A merge is not a deployment.**
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+
+**Prior update:** Claude (2026-08-30: **the `BLOCKED` marking on the parameterized `Authorization`
+slice is RESTORED** — Cheek, 2026-08-30. The #1217 closure was wrong; Codex raised it as a `P1` and
+the finding is correct. Deploy branch is now **`d4e5a7ea4`** (#1217, #1218 merged). Prior header
+follows.)
+
+## 1. The `BLOCKED` marking is restored — the #1217 closure was wrong
+
+`established fact`, verified by reading all three sites before accepting the finding.
+
+**Status: the parameterized `Authorization` slice is `OPEN` and `BLOCKED` — no independent reviewer
+assigned.** `AGENTS.md` (586-589) requires every assigned slice to name **one owner** and **a
+different peer** as independent reviewer, and states that a slice without one is **incomplete**. This
+slice names an owner (Codex) and no reviewer, so it is **not ready to implement or ship**.
+
+**What #1217 got wrong.** It closed three `BLOCKED — no independent reviewer assigned` labels as
+"stale", on the premise that they gated Digest/Negotiate work already merged in #1214 and #1216. That
+premise is false. All three labels attach to the **parameterized** case, which is still open:
+
+| Site (in the entry demoted by #1217) | What it actually says                                                             |
+| ------------------------------------ | --------------------------------------------------------------------------------- |
+| Entry header                         | "the **parameterized case is OPEN** … `BLOCKED` — **that slice** has no reviewer" |
+| Slice paragraph                      | the `BLOCKED` block sits under "**Codex's slice — not Claude's to fix**"          |
+| Status row                           | "\| **Parameterized** Digest/Negotiate leak \| **OPEN** … `BLOCKED` … \|"         |
+
+#1214 and #1216 closed the **token-shaped** case only. They never addressed what these labels gate,
+so merging them could not make the labels stale. Closing the blocker left an assigned slice with an
+owner, no reviewer and no gate — precisely the state the constitution calls incomplete.
+
+**Provenance, recorded rather than smoothed over.** Cheek instructed the closure on 2026-08-29;
+Claude executed it, having flagged the tension but **not** having checked the staleness premise
+itself — the one part that needed checking, and checkable in the same command that located the sites.
+Codex's `P1` landed on `bfba734f6` at 23:42:30Z, **three minutes after #1217 merged** at 23:39:24Z,
+so there was no window to fix it before it shipped. Cheek instructed the restoration on 2026-08-30.
+
+**Closing the label never closed the leak, and restoring it does not fix the leak.** The parameterized
+case remains **`OPEN` — REVIEW ONLY**. Do not implement. Do not touch `src/` or `supabase/`. **Codex's
+slice.** Codex is **measure-only**; no PR unless a `FAIL` names one scheme and the blob. **Do not
+propose another `Authorization` scheme after NTLM** — the scheme list was never the defect; the value
+tail is.
+
+## 2. #1217 and #1218 merged — deploy branch `d4e5a7ea4`
+
+`established fact`, verified by `git log`, not from webhook events.
+
+| PR        | Merge SHA   | Parents | Shape      | Subject ends |
+| --------- | ----------- | ------- | ---------- | ------------ |
+| **#1217** | `fead4f502` | 1       | **squash** | `(#1217)`    |
+| **#1218** | `d4e5a7ea4` | 1       | **squash** | `(#1218)`    |
+
+#1218 is a **docs-only** read-only test-coverage audit — zero migrations, no `src/` or `supabase/`
+file. **Claude did not open, ready, enqueue or merge it.**
+
+Sixth and seventh observed squash outcomes. They stay **observations**: the configured merge method
+remains **`NOT_MEASURED`** (reading it needs `Administration:read`, which the token lacks).
+
+## 3. Actor events Claude did not perform
+
+`established fact` for the record; **`UNKNOWN`** as to cause — no explanation is inferred here.
+
+Four state changes attributed to `cheekhimself` that this session did not perform. Cheek confirmed
+the first two were not him:
+
+| When      | Event                                                            |
+| --------- | ---------------------------------------------------------------- |
+| 19:34:30Z | #1215 readied                                                    |
+| 21:53:23Z | #1215 converted to draft, silently stripping an armed auto-merge |
+| 23:39:24Z | #1217 readied, **and enqueued at 23:39:25Z — one second later**  |
+| 23:45:24Z | #1218 opened, queued and merged — a PR Claude never opened       |
+
+The first two were reversible; the last two **landed commits on the deploy branch**. Recorded because
+it bears on who is changing operating state, not as a conclusion about cause.
+
+## 4. Posture
+
+- **No APPLY.** Least of all `20260813030000` — see the standing two-sense record below.
+- **No publish, no republish. No EcoWitt-to-live. No rebase.**
+- **Live production was MEASURED at `5bf4db1d`** — `dirty:false`, ref `master`, GDP, 2026-08-29
+  ~22:4xZ. That is a **point-in-time reading and is now three commits behind the tip** (#1216, #1217
+  and #1218 merged after it). **It is not a current measurement**; re-measuring needs Cheek or GDP.
+  Claude did not take it and cannot.
+- The `AGENTS.md` `FORBIDDEN` alignment slice is **not Claude's** — Cheek, 2026-08-29.
+- The entry demoted below carries **"No APPLY" twice** in its posture list. Redundant, not incorrect,
+  and **left as-is**: it is superseded text, and this file does not rewrite superseded entries.
+
+**Prior update:** Claude (2026-08-29: #1215 and #1216 merged; deploy branch is now **`5d6efc95a`**.
 #1216 closes **token-shaped NTLM** only — parameterized `Authorization` headers **still leak on the
 current tip across Digest, Negotiate and NTLM**, verified by execution — **OPEN, REVIEW ONLY.** Live
 production is **MEASURED at `5bf4db1d`** (`dirty:false`, ref `master`, GDP) and is **not** the deploy

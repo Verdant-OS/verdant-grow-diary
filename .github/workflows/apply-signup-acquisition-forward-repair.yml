@@ -279,9 +279,37 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          printf '%s' "$SUPABASE_DB_CA_CERT_B64" | base64 --decode > "$SUPABASE_DB_CA_CERT_PATH"
+          write_ca_materialize_failure() {
+            echo "::error::SUPABASE_DB_CA_CERT_B64 is not valid PEM or base64 certificate material for CA materialize."
+            printf '%s\n' \
+              '### Signup-acquisition forward-repair delivery' \
+              '' \
+              '**Status:** BLOCKED - production CA materialize rejected' \
+              '' \
+              'Reason code: ca_materialize_invalid_secret' \
+              'The protected CA secret is present but is not valid PEM or compact base64 certificate material.' \
+              'No database process was started. No certificate or credential is included.' \
+              > "$REPORT_PATH"
+            printf '%s\n' \
+              '{"schema_version":1,"tool":"apply-signup-acquisition-forward-repair","target_env":"production","outcome":"ca_materialize_rejected","reason_code":"ca_materialize_invalid_secret"}' \
+              > "$AUDIT_PATH"
+          }
+          ca_materialized=0
+          if printf '%s' "$SUPABASE_DB_CA_CERT_B64" | grep -Fq 'BEGIN CERTIFICATE'; then
+            printf '%s' "$SUPABASE_DB_CA_CERT_B64" > "$SUPABASE_DB_CA_CERT_PATH"
+            ca_materialized=1
+          elif printf '%s' "$SUPABASE_DB_CA_CERT_B64" | tr -d '[:space:]' | base64 --decode > "$SUPABASE_DB_CA_CERT_PATH" 2>/dev/null; then
+            ca_materialized=1
+          fi
+          if [ "$ca_materialized" -ne 1 ]; then
+            write_ca_materialize_failure
+            exit 1
+          fi
           chmod 600 "$SUPABASE_DB_CA_CERT_PATH"
-          openssl x509 -in "$SUPABASE_DB_CA_CERT_PATH" -noout
+          if ! openssl x509 -in "$SUPABASE_DB_CA_CERT_PATH" -noout; then
+            write_ca_materialize_failure
+            exit 1
+          fi
 
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client

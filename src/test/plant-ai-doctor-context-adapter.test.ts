@@ -11,6 +11,8 @@ import {
   manualSensorLogsToReadingRows,
   fahrenheitToCelsius,
 } from "@/lib/plantAiDoctorContextAdapter";
+import { buildTimelineEvidenceReadinessView } from "@/lib/timelineEvidenceReadinessViewModel";
+import { resolveCanonicalDiaryEventType } from "@/lib/diaryTimelineViewModel";
 
 const NOW = new Date("2026-06-10T12:00:00Z");
 const HOUR = 3600 * 1000;
@@ -78,6 +80,79 @@ describe("plantAiDoctorContextAdapter", () => {
     expect(ctx.source_tags).toContain("manual");
     expect(ctx.source_tags).not.toContain("live");
     expect(ctx.recent_grow_events.length).toBe(1);
+  });
+
+  it("recovers watering from details.event_type when entry_type is absent", () => {
+    const rows = diaryEntriesToGrowEventRows([
+      { entry_at: ago(HOUR), details: { event_type: "watering" }, note: "200ml" },
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe("watering");
+  });
+
+  it("keeps explicit entry_type over details.event_type", () => {
+    const rows = diaryEntriesToGrowEventRows([
+      {
+        entry_at: ago(HOUR),
+        entry_type: "observation",
+        details: { event_type: "watering" },
+      },
+    ]);
+    expect(rows[0].event_type).toBe("observation");
+  });
+
+  it("fails closed on unknown or malformed details.event_type", () => {
+    expect(
+      diaryEntriesToGrowEventRows([
+        { entry_at: ago(HOUR), details: { event_type: "not-a-type" } },
+      ])[0].event_type,
+    ).toBe("diary_entry");
+    expect(
+      diaryEntriesToGrowEventRows([
+        { entry_at: ago(HOUR), details: { event_type: ["watering"] } },
+      ])[0].event_type,
+    ).toBe("diary_entry");
+    expect(
+      diaryEntriesToGrowEventRows([{ entry_at: ago(HOUR), details: ["watering"] }])[0].event_type,
+    ).toBe("diary_entry");
+    expect(
+      diaryEntriesToGrowEventRows([{ entry_at: ago(HOUR), details: null }])[0].event_type,
+    ).toBe("diary_entry");
+  });
+
+  it("does not parse note text as event identity", () => {
+    const rows = diaryEntriesToGrowEventRows([
+      { entry_at: ago(HOUR), note: "watering 200ml", details: { event_type: "observation" } },
+    ]);
+    expect(rows[0].event_type).toBe("observation");
+    expect(
+      resolveCanonicalDiaryEventType({ details: { event_type: "watering" }, entryType: null }),
+    ).toBe("watering");
+    expect(
+      resolveCanonicalDiaryEventType({ entryType: "feeding", details: { event_type: "watering" } }),
+    ).toBe("feeding");
+  });
+
+  it("same-day watering from details increments readiness and never invents strain", () => {
+    const ctx = buildPlantAiDoctorContext({
+      plant: {
+        id: "p1",
+        name: "Plant A",
+        stage: "veg",
+        grow_id: "g1",
+        tent_id: "t1",
+      },
+      diaryEntries: [{ entry_at: ago(HOUR), details: { event_type: "watering" }, note: "200ml" }],
+      manualSensorLogs: [],
+      now: NOW,
+    });
+    const view = buildTimelineEvidenceReadinessView(ctx);
+    expect(view.counts.recentWatering).toBe(1);
+    expect(view.missing.map((flag) => flag.code)).not.toContain("no_recent_watering");
+    expect(ctx.strain == null || ctx.strain === "").toBe(true);
+    expect(
+      ctx.sensor_groups.every((group) => group.source !== "live" || group.sample_count === 0),
+    ).toBe(true);
   });
 
   it("static guard: adapter imports no Supabase/network/write helpers", async () => {

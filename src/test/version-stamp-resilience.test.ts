@@ -22,7 +22,7 @@ import { describe, expect, it, afterAll, vi } from "vitest";
 // on a contended host can individually exceed the 5s unit default. The
 // assertions stay strict; only the per-test budget is integration-sized.
 vi.setConfig({ testTimeout: 120_000 });
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -53,10 +53,12 @@ function makeTempRoot(): string {
   return root;
 }
 
-/** Env with every GITHUB_* variable removed (plus optional overrides). */
+/** Env with every GITHUB_* / VERCEL_* variable removed (plus optional overrides). */
 function cleanEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith("GITHUB_")),
+    Object.entries(process.env).filter(
+      ([k]) => !k.startsWith("GITHUB_") && !k.startsWith("VERCEL"),
+    ),
   );
   return { ...env, ...overrides };
 }
@@ -95,14 +97,21 @@ function runStamper(
 ): {
   record: Record<string, unknown>;
   stdout: string;
+  stderr: string;
 } {
-  const stdout = execFileSync("node", ["scripts/stamp-version.mjs"], {
+  const result = spawnSync("node", ["scripts/stamp-version.mjs"], {
     cwd,
     encoding: "utf8",
     env: cleanEnv(envOverrides),
   });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(
+      `stamp-version exited ${result.status}: ${result.stderr || result.stdout || ""}`,
+    );
+  }
   const record = JSON.parse(readFileSync(join(cwd, "public/version.json"), "utf8"));
-  return { record, stdout };
+  return { record, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 }
 
 function makeCommittedSandbox(additionalFiles: Record<string, string> = {}): {
@@ -386,6 +395,129 @@ describe("stamper with real git identity (legacy behavior preserved)", () => {
 
     writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
     expect(runStamper(box).record.dirty).toBe(true);
+  });
+
+  it("on Vercel, ignores .vercel/ Build Output residue without hiding real source dirty", () => {
+    const { box, sha } = makeCommittedSandbox();
+    git(box, ["checkout", "--detach", sha]);
+
+    const vercelResidue = join(box, ".vercel", "output", "functions", "__server.func");
+    mkdirSync(vercelResidue, { recursive: true });
+    writeFileSync(join(vercelResidue, "index.mjs"), "export default {};\n");
+    writeFileSync(
+      join(box, ".vercel", "output", "nitro.json"),
+      JSON.stringify({ preset: "vercel", serverEntry: "./functions/__server.func/index.mjs" }),
+    );
+
+    // Without Vercel env, untracked .vercel/ is meaningful dirty (not gitignored).
+    expect(runStamper(box).record.dirty).toBe(true);
+
+    // With VERCEL=1, publisher residue under .vercel/ must not taint the stamp.
+    expect(
+      runStamper(box, {
+        VERCEL: "1",
+        VERCEL_GIT_COMMIT_REF: "verdant-grow-diary",
+        VERCEL_GIT_COMMIT_SHA: sha,
+      }).record.dirty,
+    ).toBe(false);
+
+    // Real source mutation still marks dirty even on Vercel.
+    writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
+    expect(
+      runStamper(box, {
+        VERCEL: "1",
+        VERCEL_ENV: "preview",
+        VERCEL_GIT_COMMIT_REF: "verdant-grow-diary",
+      }).record.dirty,
+    ).toBe(true);
+  });
+
+  it("on Vercel, prints exact porcelain lines when a src file makes the tree dirty", () => {
+    const { box, sha } = makeCommittedSandbox();
+    git(box, ["checkout", "--detach", sha]);
+    writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
+
+    const { record, stderr } = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "cursor/vercel-json-remove-project-settings-0454",
+    });
+    expect(record.dirty).toBe(true);
+    expect(stderr).toContain(
+      "stamp-version: Vercel worktree dirty — git status --porcelain (after stamp excludes):",
+    );
+    expect(stderr).toMatch(/src\/components\/App\.tsx/);
+    // Still does not invent a clean stamp.
+    expect(record.version).toContain("-dirty");
+  });
+
+  it("on Vercel, ignores builder-rewritten vercel.json without hiding real source dirty", () => {
+    const { box, sha } = makeCommittedSandbox({
+      "vercel.json": '{"$schema":"https://openapi.vercel.sh/vercel.json","cleanUrls":true}\n',
+    });
+    git(box, ["checkout", "--detach", sha]);
+
+    // Simulate Vercel rewriting vercel.json on the builder before prebuild.
+    writeFileSync(
+      join(box, "vercel.json"),
+      '{"$schema":"https://openapi.vercel.sh/vercel.json","cleanUrls":true,"rewrittenByVercel":true}\n',
+    );
+
+    const cleanOnVercel = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "cursor/vercel-json-remove-project-settings-0454",
+    });
+    expect(cleanOnVercel.record.dirty).toBe(false);
+    expect(String(cleanOnVercel.record.version)).not.toContain("-dirty");
+    expect(cleanOnVercel.stderr).not.toContain(
+      "stamp-version: Vercel worktree dirty — git status --porcelain (after stamp excludes):",
+    );
+
+    // Non-Vercel local/CI must still surface a real vercel.json edit as dirty.
+    expect(runStamper(box).record.dirty).toBe(true);
+
+    // Source drift on Vercel still stamps dirty and dumps porcelain.
+    writeFileSync(join(box, "src/components/App.tsx"), "export const x = 2;\n");
+    const dirtySrc = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "cursor/vercel-json-remove-project-settings-0454",
+    });
+    expect(dirtySrc.record.dirty).toBe(true);
+    expect(dirtySrc.stderr).toContain(
+      "stamp-version: Vercel worktree dirty — git status --porcelain (after stamp excludes):",
+    );
+    expect(dirtySrc.stderr).toMatch(/src\/components\/App\.tsx/);
+    expect(dirtySrc.stderr).not.toMatch(/vercel\.json/);
+  });
+
+  it("prefers VERCEL_GIT_COMMIT_REF when GITHUB_REF_NAME is absent, without fabricating commit", () => {
+    const { box, sha } = makeCommittedSandbox();
+    git(box, ["checkout", "--detach", sha]);
+
+    const { record } = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "verdant-grow-diary",
+      VERCEL_GIT_COMMIT_SHA: sha,
+    });
+    expect(record.ref).toBe("verdant-grow-diary");
+    expect(record.commit).toBe(sha);
+    expect(record.commitSource).toBe("git");
+
+    // GITHUB_REF_NAME still wins when present.
+    expect(
+      runStamper(box, {
+        VERCEL: "1",
+        GITHUB_REF_NAME: "ci-branch",
+        VERCEL_GIT_COMMIT_REF: "verdant-grow-diary",
+      }).record.ref,
+    ).toBe("ci-branch");
+
+    // Empty Vercel ref must not invent a branch name.
+    const emptyVercelRef = runStamper(box, {
+      VERCEL: "1",
+      VERCEL_GIT_COMMIT_REF: "",
+    }).record;
+    expect(emptyVercelRef.ref).toBe("HEAD");
+    expect(emptyVercelRef.commit).toBe(sha);
   });
 
   it("uses the matching canonical origin default for detached and orphan refs", () => {

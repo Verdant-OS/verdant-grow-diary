@@ -219,6 +219,7 @@ export default function QuickLogAllActivitiesSection({
   const [guidedSymptomCheck, setGuidedSymptomCheck] = useState(false);
   const [guidedSymptomStage, setGuidedSymptomStage] = useState<CanonicalQuickLogStage | null>(null);
   const [guidedSymptomStageConfirmed, setGuidedSymptomStageConfirmed] = useState(false);
+  const [guidedSymptomNoneObserved, setGuidedSymptomNoneObserved] = useState(false);
   const { user } = useAuth();
   // Photo activity: a real image is REQUIRED before Save — a photo entry with
   // no image must never be confirmable. Uploaded to the private diary-photos
@@ -349,6 +350,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomCheck(false);
     setGuidedSymptomStage(null);
     setGuidedSymptomStageConfirmed(false);
+    setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
     setErrorReason(null);
@@ -379,6 +381,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomCheck(false);
     setGuidedSymptomStage(null);
     setGuidedSymptomStageConfirmed(false);
+    setGuidedSymptomNoneObserved(false);
     envCheckTempEntryUnitRef.current = null;
     setPhotoFile(null);
     if (requestedActivityAvailability?.disabled) {
@@ -444,6 +447,7 @@ export default function QuickLogAllActivitiesSection({
       setGuidedSymptomCheck(false);
       setGuidedSymptomStage(null);
       setGuidedSymptomStageConfirmed(false);
+      setGuidedSymptomNoneObserved(false);
       if (a.id === "watering") {
         if (externalPersistenceBlockReason) {
           setStructuredWaterError(externalPersistenceBlockReason);
@@ -493,6 +497,7 @@ export default function QuickLogAllActivitiesSection({
     setGuidedSymptomCheck(true);
     setGuidedSymptomStage(resolveGuidedSymptomStage(plantStage));
     setGuidedSymptomStageConfirmed(false);
+    setGuidedSymptomNoneObserved(false);
   }, [currentTarget, hasSymptomPlant, isMutationBlocked, plantStage]);
 
   const handleSave = useCallback(async () => {
@@ -603,13 +608,16 @@ export default function QuickLogAllActivitiesSection({
       Object.assign(extraDetails, activityDetails);
     }
     if (guidedSymptomCheck && selected.id === "issue_observation") {
-      const symptom = findCannabisSymptomByObservedSign(detailValues.observedSign);
+      const symptom = guidedSymptomNoneObserved
+        ? null
+        : findCannabisSymptomByObservedSign(detailValues.observedSign);
       const guidedValidation = validateGuidedSymptomCheck({
         plantId,
         symptomId: symptom?.id ?? null,
         stage: guidedSymptomStage,
         stageConfirmed: guidedSymptomStageConfirmed,
         observationLocation: detailValues.observationLocation,
+        noSymptomsObserved: guidedSymptomNoneObserved,
       });
       if (!guidedValidation.ok) {
         const failure = guidedValidation as { readonly ok: false; readonly reason: string };
@@ -803,6 +811,7 @@ export default function QuickLogAllActivitiesSection({
       setGuidedSymptomCheck(false);
       setGuidedSymptomStage(null);
       setGuidedSymptomStageConfirmed(false);
+      setGuidedSymptomNoneObserved(false);
       envCheckTempEntryUnitRef.current = null;
       setPhotoFile(null);
       setSelectedDraft(null);
@@ -846,6 +855,7 @@ export default function QuickLogAllActivitiesSection({
     guidedSymptomCheck,
     guidedSymptomStage,
     guidedSymptomStageConfirmed,
+    guidedSymptomNoneObserved,
   ]);
 
   const noContext = !growId;
@@ -981,6 +991,7 @@ export default function QuickLogAllActivitiesSection({
               observationLocation={detailValues.observationLocation ?? ""}
               stage={guidedSymptomStage}
               stageConfirmed={guidedSymptomStageConfirmed}
+              noSymptomsObserved={guidedSymptomNoneObserved}
               disabled={mutationBlocked}
               testIdPrefix={testIdPrefix}
               onSymptomObservedSignChange={(value) =>
@@ -994,6 +1005,12 @@ export default function QuickLogAllActivitiesSection({
                 setGuidedSymptomStageConfirmed(false);
               }}
               onStageConfirmedChange={setGuidedSymptomStageConfirmed}
+              onNoSymptomsObservedChange={(value) => {
+                setGuidedSymptomNoneObserved(value);
+                if (value) {
+                  setDetailValues((previous) => ({ ...previous, observedSign: "" }));
+                }
+              }}
             />
           ) : (
             getQuickLogActivityDetailFields(selected.id, activeEnvCheckTempUnit).length > 0 && (
@@ -1322,7 +1339,8 @@ export default function QuickLogAllActivitiesSection({
                 (guidedSymptomCheck &&
                   selected.id === "issue_observation" &&
                   (!hasSymptomPlant ||
-                    !findCannabisSymptomByObservedSign(detailValues.observedSign) ||
+                    (!guidedSymptomNoneObserved &&
+                      !findCannabisSymptomByObservedSign(detailValues.observedSign)) ||
                     !guidedSymptomStage ||
                     !guidedSymptomStageConfirmed))
               }
@@ -1341,6 +1359,7 @@ export default function QuickLogAllActivitiesSection({
                 setGuidedSymptomCheck(false);
                 setGuidedSymptomStage(null);
                 setGuidedSymptomStageConfirmed(false);
+                setGuidedSymptomNoneObserved(false);
                 setErrorReason(null);
                 setErrorForActivity(null);
               }}

@@ -1,7 +1,130 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-02 UTC (~05:56 UTC)
-**Updated by:** GDP (2026-09-02: **#1242 MERGED as `3e0c61f2`** — two-parent merge, not a squash.
+**Last updated:** 2026-09-02 UTC (~11:10 UTC)
+**Updated by:** GDP (2026-09-02: **#1247 MERGED as `8716d3bf`** — squash, one parent.
+**Deploy tip = live `8716d3bf`, `dirty:false`**, independently MEASURED from
+`https://verdantgrowdiary.com/version.json` at ~6:09 AM CT (`buildTime`
+`2026-09-02T10:39:16.035Z`). Restore SHA for Lovable Support is **`8716d3bf`**. **Do not ping
+Tolu.** Publisher is Vercel. No Lovable Publish. No History-restore. No APPLY. **#1242's
+protocol peer-review seat remains UNFILLED** (zero `APPROVED` reviews; still true). Signup
+PREFLIGHT still **BLOCKED** (`malformed_database_url`; `knk` not in this Supabase login). Do
+not claim PREFLIGHT passed. Feed last-recipe prefill IS shipped (#1241). Paddle `test_` /
+sandbox banner EXPECTED. #1174 stays draft. #1221 stays draft. The restamp below recorded
+live as `3e0c61f2`; that row is **superseded**. Prior header follows.)
+
+## 1. #1247 MERGED — deploy tip `8716d3bf`
+
+`established fact`, from the commit graph. **Squash, one parent, not a two-parent merge.**
+
+| PR        | Merge SHA   | Parent      | Files | Migrations | Merged (UTC)     |
+| --------- | ----------- | ----------- | ----: | ---------: | ---------------- |
+| **#1247** | `8716d3bf`  | `3fca5b069` |     6 |      **0** | 2026-09-02 10:34 |
+
+Full merge SHA: `8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd`. Parent:
+`3fca5b069265d941ccb868f114840c45e5ded5e5` (deploy tip before this squash). Subject:
+`feat(dashboard): 24h environment ribbon with provenance band (Tranche 1) (#1247)`. Author
+date `2026-09-02T10:34:01Z`. **Zero migrations.** No `package.json`. No `vercel.json`. No
+`docs/agents/CURRENT_STATE.md` in the merge.
+
+Unique files (6): `src/components/EnvironmentRibbon.tsx`,
+`src/lib/environmentRibbonViewModel.ts`, `src/pages/Dashboard.tsx`, `src/styles.css`,
+`src/test/environment-ribbon-view-model.test.ts`, `src/test/environment-ribbon.test.tsx`.
+`+1368 / −1`, from `git show --stat` on the merge object. No `supabase/`.
+
+Two squash merges sit between #1243's restamp (`74f226740`) and #1247, from `git log`
+`3e0c61f2..8716d3bf`. Subjects only — no file counts invented here:
+
+- **#1245** `a3d064542` — `fix(ci): stay-draft signup PREFLIGHT CA materialize (PEM or compact base64)`
+- **#1246** `3fca5b069` — `fix(signup): record identity_reason_code when production URL is rejected`
+
+`CURRENT_STATE.md` last changed at `74f226740` (#1243). #1244 did not land on the default
+branch.
+
+## 2. Live is independently MEASURED at `8716d3bf`
+
+GDP fetched `https://verdantgrowdiary.com/version.json` after the merge.
+
+| Field       | Value                                      |
+| ----------- | ------------------------------------------ |
+| `commit`    | `8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd` |
+| `dirty`     | **`false`**                                |
+| `ref`       | `verdant-grow-diary`                       |
+| server      | **Vercel**                                 |
+| `buildTime` | `2026-09-02T10:39:16.035Z` (~5:39 AM CT)   |
+| measured    | 2026-09-02 ~**6:09 AM CT**                 |
+| source      | `https://verdantgrowdiary.com/version.json`|
+
+**Current production is MEASURED. Tip = live.** Do not record it as `NOT_MEASURED`. Do not
+carry `3e0c61f2` as current live. **A resolver still returning `185.158.133.1` / `5c197f75`
+is a network miss, not a rollback.** Publisher is Vercel, project `verdant-grow-diary`.
+**No Lovable Publish.**
+
+## 3. Restore SHA for Tolu/Support is `8716d3bf`
+
+If Tolu asks for a restore point, it is **`8716d3bf`** (full oid
+`8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd`). **Do not ping Tolu.** Support outcome remains
+`NOT_MEASURED`.
+
+## 4. #1242's protocol peer-review seat remains UNFILLED
+
+`established fact`, kept from #1244 and re-checked against the GitHub review objects on
+#1242. **Still true.** `gh api .../pulls/1242/reviews` returns one row:
+`copilot-pull-request-reviewer[bot]` / `COMMENTED`. **`APPROVED` review count on #1242:
+zero.**
+
+The table below is **carried** from #1244's measurement at head `cc7b8e7ed` (connector pass
+and three Cursor `neutral` check runs). This restamp re-checked the review objects, not the
+check-run conclusions.
+
+| Reviewer                                   | Result                                               | Fills the peer seat?                         |
+| ------------------------------------------ | ---------------------------------------------------- | -------------------------------------------- |
+| `copilot-pull-request-reviewer`            | review state `COMMENTED` — 4/4 files, **0 comments** | **No** — its own text says so                |
+| `chatgpt-codex-connector`                  | Code Review completed, **0 findings**                | **No** — a connector pass is not an approval |
+| `Cursor Bugbot`                            | check conclusion **`neutral`**                       | **No** — neutral means it did not run        |
+| `Cursor Security Agent: Security Reviewer` | check conclusion **`neutral`**                       | **No** — did not run                         |
+| `Cursor Approval Agent`                    | check conclusion **`neutral`**                       | **No** — did not run                         |
+
+The block below records _Blue Dream **PASS** on `cc7b8e7ed`_. That is **not contradicted
+here**. **Blue Dream (= Dream Queen) is owner-designated, not the protocol peer seat.**
+`HANDOFF_PROTOCOL.md:24` limits the protocol peer seat to **Grok, Claude or Codex**, and an
+owner cannot review their own slice. Claude owned #1242. **No named peer reviewed it, and it
+merged.** This records what happened. It is **not** a request to revert or re-review #1242.
+
+## 5. Signup PREFLIGHT still BLOCKED
+
+`source claim`, carried. This slice did **not** run PREFLIGHT and did **not** run `knk`.
+Signup PREFLIGHT is still **BLOCKED** (`malformed_database_url`; `knk` not in this Supabase
+login). **Do not claim PREFLIGHT passed.** **No APPLY.**
+
+## 6. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production
+  SQL, no Lovable project-chat agent edit, no device control, no automatic Action Queue, no
+  credentials.
+- **Publisher is Vercel**, project `verdant-grow-diary`. **Auth and DB stay Lovable Cloud.**
+  **No Lovable Publish.**
+- **Paddle: `test_` keys and the sandbox banner are EXPECTED.** Not a defect. Do not revoke
+  the existing `live_` token.
+- **Current production is MEASURED at `8716d3bf`, `dirty:false`, ref `verdant-grow-diary`.**
+  Do not record it as `NOT_MEASURED`.
+- **Tolu: do not ping.** Restore SHA **`8716d3bf`** (full oid
+  `8716d3bfcd8aba5c95a4a2479aa1cd890b22dddd`).
+- **Feed last-recipe is SHIPPED (#1241).** Do not open a slice for it.
+- **#1174 is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge.
+- **#1221 stays draft at `79146c6911`.** Not merged, readied, rebased or updated.
+- **Signup-attribution APPLY stays owner-locked.** Production apply state is `NOT_MEASURED`.
+- **Signup PREFLIGHT still BLOCKED** (`malformed_database_url`; `knk` not in this Supabase
+  login). Do not claim it passed.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays `HOLD`.
+  Plant Memory PARK. Spider Farmer GGS radio capture stays parked and `NOT_MEASURED`.
+- **#1242's protocol peer-review seat remains UNFILLED.** Owner-designated is not the peer
+  seat. A `neutral` check did not run.
+- This slice is **N=1** and stays **draft**, on branch `claude/test-coverage-analysis-j0bz93`,
+  parented on `8716d3bf`. GDP hosted this restamp of Claude's #1244 onto tip. Unique file
+  `docs/agents/CURRENT_STATE.md`. No `src/`, no `supabase/`, no `package.json`. No ready.
+  No merge.
+
+**Prior update:** GDP (2026-09-02: **#1242 MERGED as `3e0c61f2`** — two-parent merge, not a squash.
 **Deploy tip = live `3e0c61f2`, `dirty:false`**, independently MEASURED from
 `https://verdantgrowdiary.com/version.json` at ~12:56 AM CT (`buildTime`
 `2026-09-02T05:54:28.167Z`). Restore SHA for Lovable Support is **`3e0c61f2`**. **Do not ping

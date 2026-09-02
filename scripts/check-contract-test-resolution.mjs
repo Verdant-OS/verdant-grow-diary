@@ -80,6 +80,42 @@ const ASSERTS_ON_JSON_SOURCE =
  */
 const PARSES_JSON = /JSON\.parse\s*\(/;
 
+/**
+ * Both signals above are file-level, and Codex showed the gap on #1221 (round
+ * 3): a file that JSON.parses something UNRELATED satisfies PARSES_JSON, and a
+ * raw `expect(PACKAGE).toContain('"test:x"')` has no colon, so the checker
+ * exited 0 on exactly the shape the rule forbids.
+ *
+ * The precise signal is bound to the READ, not the file: find each identifier
+ * the package source is assigned to, then ask whether that identifier is what an
+ * assertion consumes. `expect(PACKAGE)`, `PACKAGE.includes(...)`,
+ * `PACKAGE.match(...)`, `PACKAGE.indexOf(...)` are assertions on text whatever
+ * their pattern looks like; `JSON.parse(PACKAGE)` is the only legitimate
+ * consumer. Measured on this repository before adding it: 28 test files bind a
+ * package.json read, 0 assert on the bound variable after the two conversions.
+ */
+const PACKAGE_READ_BINDINGS = (source, config) => {
+  const esc = config.replace(".", "\\.");
+  const direct = new RegExp(
+    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\([^\\n]*${esc}[^\\n]*\\)\\s*;`,
+    "g",
+  );
+  const viaConst = new RegExp(
+    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\(\\s*(?:PKG|PACKAGE_JSON|PACKAGE_PATH|PKG_PATH|pkgPath|packagePath)\\b[^\\n]*\\)\\s*;`,
+    "g",
+  );
+  const ids = new Set();
+  for (const m of source.matchAll(direct)) ids.add(m[1]);
+  for (const m of source.matchAll(viaConst)) ids.add(m[1]);
+  return [...ids];
+};
+const ASSERTS_ON_BINDING = (source, id) => {
+  const e = id.replace(/\$/g, "\\$");
+  return new RegExp(
+    `expect\\(\\s*${e}\\s*\\)|\\b${e}\\.(?:includes|match|indexOf|search|startsWith|endsWith)\\s*\\(`,
+  ).test(source);
+};
+
 /** Reads the JSON config's source, directly or through a `PKG`-style constant. */
 const READS_JSON_SOURCE = (source, config) => {
   const esc = config.replace(".", "\\.");
@@ -145,13 +181,16 @@ for (const file of listTestFiles(TEST_DIR)) {
     if (!READS_JSON_SOURCE(source, config)) continue;
     const neverParsed = !PARSES_JSON.test(source);
     const assertsOnSource = ASSERTS_ON_JSON_SOURCE.test(source);
-    if (!neverParsed && !assertsOnSource) continue; // reads it, then parses — fine
+    const rawBinding = PACKAGE_READ_BINDINGS(source, config).find((id) =>
+      ASSERTS_ON_BINDING(source, id),
+    );
+    if (!neverParsed && !assertsOnSource && !rawBinding) continue; // parsed, asserted on the object
     const justification = source.match(JUSTIFICATION_RE);
     if (justification) {
       justified.push({ file: rel, config, reason: justification[1].trim() });
       continue;
     }
-    violations.push({ file: rel, config, json: true, neverParsed });
+    violations.push({ file: rel, config, json: true, neverParsed, rawBinding });
   }
 }
 
@@ -161,9 +200,11 @@ if (violations.length > 0) {
     console.error(`  ${v.file}`);
     console.error(
       v.json
-        ? v.neverParsed
-          ? `    reads ${v.config} source and never JSON.parse()s it — every assertion on it is on text`
-          : `    asserts on ${v.config} SOURCE TEXT (a "key": pattern) instead of the parsed object`
+        ? v.rawBinding
+          ? `    asserts on \`${v.rawBinding}\`, the raw ${v.config} source it read, instead of the parsed object`
+          : v.neverParsed
+            ? `    reads ${v.config} source and never JSON.parse()s it — every assertion on it is on text`
+            : `    asserts on ${v.config} SOURCE TEXT (a "key": pattern) instead of the parsed object`
         : `    reads ${v.config} source but never imports it`,
     );
   }

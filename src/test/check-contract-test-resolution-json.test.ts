@@ -14,6 +14,13 @@
  *   resolved   parses the package and asserts on the object. The only shape that
  *              satisfies AGENTS.md > "Contract tests must assert against resolved
  *              values, not source text".
+ *   multiline  the `bypass` shape with the read call wrapped across lines, as
+ *              prettier writes any call over 100 columns. The read binding was
+ *              matched with `[^\n]*`, so a wrapped read bound nothing and the
+ *              checker exited 0 — Codex, #1221 round 4. Matching is now bounded
+ *              by the statement, not the line.
+ *   multilineResolved  the `resolved` shape wrapped the same way: the widening
+ *              must not turn a compliant guard into a false positive.
  *
  * @source-scan-justified: this file EMBEDS the forbidden shapes as spawn fixtures for the
  * checker itself (see FIXTURES below). It reads no package.json of its own; the strings
@@ -64,6 +71,34 @@ it("x", () => {
   expect($PKG).toContain('"test:x"');
 });
 `,
+  multiline: `
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { expect, it } from "vitest";
+const PACKAGE = readFileSync(
+  resolve(process.cwd(), "package.json"),
+  "utf8",
+);
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(PACKAGE).toContain('"test:x"');
+});
+`,
+  multilineResolved: `
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { expect, it } from "vitest";
+const SCRIPTS = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), "package.json"),
+    "utf8",
+  ),
+).scripts;
+it("x", () => {
+  expect(SCRIPTS["test:x"]).toBe("bun run x");
+});
+`,
 };
 
 /** Run the checker against a repo containing exactly one test file. */
@@ -106,5 +141,17 @@ describe("check-contract-test-resolution — package.json guards must assert on 
     const { status, out } = runChecker("dollar");
     expect(status, out).toBe(1);
     expect(out).toContain("$PKG");
+  });
+
+  it("rejects the raw assertion when the package read is wrapped across lines (Codex, #1221 round 4)", () => {
+    const { status, out } = runChecker("multiline");
+    expect(status, out).toBe(1);
+    expect(out).toContain("multiline.test.ts");
+    expect(out).toContain("PACKAGE");
+  });
+
+  it("accepts a resolved guard whose read is wrapped across lines — the widening adds no false positive", () => {
+    const { status, out } = runChecker("multilineResolved");
+    expect(status, out).toBe(0);
   });
 });

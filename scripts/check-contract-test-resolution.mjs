@@ -103,15 +103,22 @@ const PARSES_JSON = /JSON\.parse\s*\(/;
  * their pattern looks like; `JSON.parse(PACKAGE)` is the only legitimate
  * consumer. Measured on this repository before adding it: 28 test files bind a
  * package.json read, 0 assert on the bound variable after the two conversions.
+ *
+ * The read is matched within its STATEMENT (`[^;]*?`, closed by `);`), not its
+ * line. The round-3 form used `[^\n]*`, and prettier wraps any call past 100
+ * columns — so the same bypass shape with the read on three lines bound nothing
+ * and the checker exited 0 (Codex, #1221 round 4). Measured before widening: no
+ * present reader in src/test was missed by the single-line form; the gap was
+ * open to the next wrapped read, not to any existing one.
  */
 const PACKAGE_READ_BINDINGS = (source, config) => {
   const esc = escapeRegExp(config);
   const direct = new RegExp(
-    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\([^\\n]*${esc}[^\\n]*\\)\\s*;`,
+    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\([^;]*?${esc}[^;]*?\\)\\s*;`,
     "g",
   );
   const viaConst = new RegExp(
-    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\(\\s*(?:PKG|PACKAGE_JSON|PACKAGE_PATH|PKG_PATH|pkgPath|packagePath)\\b[^\\n]*\\)\\s*;`,
+    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\(\\s*(?:PKG|PACKAGE_JSON|PACKAGE_PATH|PKG_PATH|pkgPath|packagePath)\\b[^;]*?\\)\\s*;`,
     "g",
   );
   const ids = new Set();
@@ -126,22 +133,22 @@ const ASSERTS_ON_BINDING = (source, id) => {
   ).test(source);
 };
 
-/** Reads the JSON config's source, directly or through a `PKG`-style constant. */
+/** Reads the JSON config's source, directly or through a `PKG`-style constant (statement-bounded). */
 const READS_JSON_SOURCE = (source, config) => {
   const esc = escapeRegExp(config);
   return (
-    new RegExp(`readFile(?:Sync)?[^\\n]*${esc}`).test(source) ||
+    new RegExp(`readFile(?:Sync)?[^;]*?${esc}`).test(source) ||
     new RegExp(`=\\s*["']${esc}["']`).test(source)
   );
 };
 
-/** Reads the config's source text (readFileSync/readFile of the config path). */
+/** Reads the config's source text (readFileSync/readFile of the config path), wrapped or not. */
 const READS_CONFIG_SOURCE = (source, config) =>
-  new RegExp(`readFile(?:Sync)?[^\\n]*${escapeRegExp(config)}`).test(source);
+  new RegExp(`readFile(?:Sync)?[^;]*?${escapeRegExp(config)}`).test(source);
 
 /** Imports the config module (static or dynamic). */
 const IMPORTS_CONFIG = (source, config) =>
-  new RegExp(`(?:import\\s*\\(|from\\s*)["'][^"']*${escapeRegExp(config)}["']`).test(source);
+  new RegExp(`(?:import\\s*\\(\\s*|from\\s*)["'][^"']*${escapeRegExp(config)}["']`).test(source);
 
 function listTestFiles(dir) {
   const out = [];

@@ -479,6 +479,27 @@ describe("manifest resolver — the ways this guard could silently stop working"
     expect(namedPathsIn(corpus).has("e2e/hopped.spec.ts")).toBe(true);
   });
 
+  it("does not treat a command commented out inside a runner as an invocation (Codex, #1221 round 4)", () => {
+    // The one-hop runner body was appended WHOLE, so a runner carrying
+    // `// bunx playwright test e2e/dead.spec.ts` marked the spec executed — the
+    // same comment-out defeat F1 closed for workflow bodies, one hop further in.
+    const corpus = buildExecutionCorpus({
+      workflowTexts: ["jobs:\n  a:\n    steps:\n      - run: node scripts/run-x.mjs\n"],
+      readRunner: (rel: string) =>
+        rel === "scripts/run-x.mjs"
+          ? [
+              "// bunx playwright test e2e/dead.spec.ts",
+              "/* bunx vitest run src/test/dead.test.ts */",
+              "spawn('playwright', ['e2e/live.spec.ts'])",
+            ].join("\n")
+          : null,
+    });
+    const paths = namedPathsIn(corpus);
+    expect(paths.has("e2e/live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dead.spec.ts")).toBe(false);
+    expect(paths.has("src/test/dead.test.ts")).toBe(false);
+  });
+
   it("reports an undeclared unreached file, and stops once it is declared", () => {
     const lanes = [{ label: "l", files: ["e2e/ghost.spec.ts"] }];
     const bare = auditExecutionManifest({ lanes, namedPaths: new Set(), exemptions: {} });

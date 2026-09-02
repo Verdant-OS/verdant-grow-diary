@@ -931,14 +931,146 @@ export function expandScript(name, scripts, depth = 0, seen = new Set()) {
 const RUNNER_PATH = /(?:^|[\s"'`])((?:scripts|e2e|tools)\/[A-Za-z0-9_./-]+\.(?:mjs|cjs|js|ts))/g;
 const IS_TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/;
 
+/** Tokens after which a `/` opens a regex literal rather than dividing. */
+const REGEX_MAY_FOLLOW_PUNCTUATOR = new Set([..."(,=:[!&|?{};+-*%<>~^"]);
+const REGEX_MAY_FOLLOW_KEYWORD = new Set([
+  "return",
+  "typeof",
+  "instanceof",
+  "in",
+  "of",
+  "new",
+  "delete",
+  "void",
+  "throw",
+  "case",
+  "do",
+  "else",
+  "yield",
+  "await",
+]);
+
+/**
+ * JavaScript source with its comments removed; strings and regex literals kept.
+ *
+ * A runner body is execution evidence one hop from a workflow, and a command
+ * commented out inside one — `// bunx playwright test e2e/x.spec.ts` — is the
+ * same comment-out defeat commandLinesIn closes for workflow bodies, one hop
+ * further in (Codex, #1221 round 4). Strings are kept because a path literal in
+ * a runner IS a spec list being executed: an allowlist array, a spawn argument.
+ * Every newline survives, so line-oriented readers keep their numbering.
+ *
+ * A `/` opens a regex literal only where a division cannot stand — after a
+ * punctuator or a keyword, or at the start of input — so `/https?:\/\//` is
+ * not read as a line comment and `a / b / c` is not read as a regex. An
+ * unterminated comment runs to end of input; an unterminated string or regex
+ * ends at its line. Template-literal `${}` nesting is not modelled: a backtick
+ * inside an interpolation ends the literal early. Deterministic; null-safe.
+ */
+export function stripJsComments(source) {
+  const src = source == null ? "" : String(source);
+  const n = src.length;
+  let out = "";
+  let i = 0;
+  let prevToken = ""; // last significant token: a word, a punctuator, or a literal marker
+  let inWord = false;
+
+  if (src.startsWith("#!")) {
+    const eol = src.indexOf("\n");
+    const end = eol === -1 ? n : eol;
+    out += src.slice(0, end);
+    i = end;
+  }
+
+  const regexMayFollow = () =>
+    prevToken === "" ||
+    REGEX_MAY_FOLLOW_PUNCTUATOR.has(prevToken) ||
+    REGEX_MAY_FOLLOW_KEYWORD.has(prevToken);
+
+  while (i < n) {
+    const c = src[i];
+    const next = src[i + 1];
+
+    if (c === "/" && next === "/") {
+      const eol = src.indexOf("\n", i);
+      i = eol === -1 ? n : eol;
+      continue;
+    }
+    if (c === "/" && next === "*") {
+      const close = src.indexOf("*/", i + 2);
+      const end = close === -1 ? n : close + 2;
+      out += src.slice(i, end).replace(/[^\n]/g, "");
+      i = end;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {
+      let j = i + 1;
+      while (j < n && src[j] !== c) {
+        if (src[j] === "\\") j += 1;
+        else if (c !== "`" && src[j] === "\n") break;
+        j += 1;
+      }
+      const end = Math.min(j + 1, n);
+      out += src.slice(i, end);
+      prevToken = "string";
+      inWord = false;
+      i = end;
+      continue;
+    }
+    if (c === "/" && regexMayFollow()) {
+      let j = i + 1;
+      let inClass = false;
+      let close = -1;
+      while (j < n && src[j] !== "\n") {
+        const ch = src[j];
+        if (ch === "\\") {
+          j += 2;
+          continue;
+        }
+        if (ch === "[") inClass = true;
+        else if (ch === "]") inClass = false;
+        else if (ch === "/" && !inClass) {
+          close = j;
+          break;
+        }
+        j += 1;
+      }
+      if (close !== -1) {
+        let end = close + 1;
+        while (end < n && /[A-Za-z]/.test(src[end])) end += 1;
+        out += src.slice(i, end);
+        prevToken = "regex";
+        inWord = false;
+        i = end;
+        continue;
+      }
+    }
+
+    out += c;
+    if (/\s/.test(c)) {
+      inWord = false;
+    } else if (/[A-Za-z0-9_$]/.test(c)) {
+      prevToken = inWord ? prevToken + c : c;
+      inWord = true;
+    } else {
+      prevToken = c;
+      inWord = false;
+    }
+    i += 1;
+  }
+  return out;
+}
+
 /**
  * Everything CI actually executes, as one text corpus.
  *
  * Three sources, in order: workflow COMMAND LINES only; the package scripts
  * those name, expanded; and one hop into repo runner scripts those name. A
- * runner script's own body is taken whole — a path literal there is a spec
- * list being executed, not prose. One hop only: arbitrary depth turns any
- * transitive mention into "executed".
+ * runner script's body is taken with its comments stripped (stripJsComments):
+ * a path literal there is a spec list being executed, not prose, while a
+ * commented-out command is the same comment-out defeat commandLinesIn closes
+ * for workflow bodies. One hop only: arbitrary depth turns any transitive
+ * mention into "executed".
  */
 export function buildExecutableCorpus({ workflowTexts, scripts = {}, readRunner = () => null }) {
   const scriptNames = Object.keys(scripts);
@@ -952,7 +1084,7 @@ export function buildExecutableCorpus({ workflowTexts, scripts = {}, readRunner 
     if (followed.has(rel) || IS_TEST_FILE.test(rel)) continue;
     followed.add(rel);
     const bodyText = readRunner(rel);
-    if (typeof bodyText === "string") corpus += ` ${bodyText}`;
+    if (typeof bodyText === "string") corpus += ` ${stripJsComments(bodyText)}`;
   }
   return corpus;
 }

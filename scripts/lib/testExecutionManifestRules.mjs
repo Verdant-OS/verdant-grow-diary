@@ -39,6 +39,7 @@ import {
   namedPathsIn,
   resolveBareBasenames,
   scriptNamesIn,
+  stripJsComments,
   stripTriggerBlock,
 } from "./testEstateRules.mjs";
 
@@ -49,6 +50,7 @@ export {
   namedPathsIn,
   resolveBareBasenames,
   scriptNamesIn,
+  stripJsComments,
   stripTriggerBlock,
 };
 

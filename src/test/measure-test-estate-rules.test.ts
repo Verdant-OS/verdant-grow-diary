@@ -37,6 +37,7 @@ import {
   namedPathsIn,
   resolveSpec,
   runtimeImportSpecifiers,
+  stripJsComments,
   stripTriggerBlock,
   testFileReach,
   testFileRuntimeSpecifiers,
@@ -908,5 +909,56 @@ describe("resolveBareBasenames — a runner argument names a lane file by basena
     });
     expect(out.has("e2e/nested/a.spec.ts")).toBe(true);
     expect(out.has("e2e/a.spec.ts")).toBe(false);
+  });
+});
+
+describe("runner bodies — a comment is not an invocation (Codex, #1221 round 4)", () => {
+  // The one-hop runner body was appended to the corpus WHOLE, so a runner carrying
+  // `// bunx playwright test e2e/dead.spec.ts` marked the spec executed: the same
+  // comment-out defeat F1 closed for workflow bodies, one hop further in.
+  it("strips line and block comments but keeps strings, template literals and regex literals", () => {
+    const src = [
+      'const url = "https://example.test/e2e/kept-in-string.spec.ts"; // playwright test e2e/line-comment.spec.ts',
+      "/* bunx vitest run src/test/block-comment.test.ts",
+      "   spans lines */",
+      "const tpl = `bunx playwright test e2e/kept-in-template.spec.ts`;",
+      "const re = /https?:\\/\\//; run('e2e/kept-after-regex.spec.ts');",
+      "const s = 'it\\'s // not a comment e2e/kept-in-single.spec.ts';",
+    ].join("\n");
+    const out = stripJsComments(src);
+    expect(out).toContain("e2e/kept-in-string.spec.ts");
+    expect(out).toContain("e2e/kept-in-template.spec.ts");
+    expect(out).toContain("e2e/kept-after-regex.spec.ts");
+    expect(out).toContain("e2e/kept-in-single.spec.ts");
+    expect(out).not.toContain("e2e/line-comment.spec.ts");
+    expect(out).not.toContain("src/test/block-comment.test.ts");
+    // Line structure survives, so line-oriented consumers keep their numbering.
+    expect(out.split("\n")).toHaveLength(src.split("\n").length);
+  });
+
+  it("a command commented out inside a runner does not mark its spec executed", () => {
+    const runner = [
+      "// bunx playwright test e2e/dead-line.spec.ts",
+      "/* bunx playwright test e2e/dead-block.spec.ts */",
+      "spawn('bunx', ['playwright', 'test', 'e2e/live.spec.ts']);",
+    ].join("\n");
+    const paths = namedPathsIn(
+      buildExecutableCorpus({
+        workflowTexts: ["jobs:\n  a:\n    steps:\n      - run: node scripts/run-x.mjs\n"],
+        readRunner: (rel: string) => (rel === "scripts/run-x.mjs" ? runner : null),
+      }),
+    );
+    expect(paths.has("e2e/live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dead-line.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dead-block.spec.ts")).toBe(false);
+  });
+
+  it("is idempotent, deterministic, and null-safe", () => {
+    const src = "a(); // c\n/* d */ b();";
+    expect(stripJsComments(stripJsComments(src))).toBe(stripJsComments(src));
+    expect(stripJsComments(src)).toBe(stripJsComments(src));
+    expect(stripJsComments("")).toBe("");
+    expect(stripJsComments(null)).toBe("");
+    expect(stripJsComments("/* unterminated")).toBe("");
   });
 });

@@ -147,9 +147,24 @@ function loadsRealModule(call) {
  * as reached credits the module from the one construct that guarantees it did
  * not run.
  *
- * `vi.doMock` is deliberately NOT included: it is not hoisted, so it cannot
- * replace a module a static import already loaded. Neither is a bare
- * `vi.mock(spec)`, which auto-mocks by loading the real module for its shape.
+ * A bare `vi.mock(spec)` is NOT included: it auto-mocks by loading the real
+ * module for its shape.
+ *
+ * `vi.doMock(spec, factory)` is not included either, and that exclusion is
+ * NARROWER than it first appears — stated precisely because an earlier version
+ * of this comment over-generalised it. `doMock` is not hoisted, so it genuinely
+ * cannot replace a module a STATIC import already loaded. But it does replace
+ * one dynamically imported after it:
+ *
+ *     vi.doMock("@/lib/growRepo", () => ({ … }));
+ *     const repo = await import("@/lib/growRepo");   // resolves to the factory
+ *
+ * Modelling that needs statement ordering, which this does not do, so such a
+ * specifier is still reported as an edge. Measured at the pinned revision: 12
+ * test files use the pattern, and blocking every `doMock` unconditionally — an
+ * over-blocking ceiling — moves NO module, because each is genuinely loaded by
+ * some other test. The published figure is therefore unaffected; the limitation
+ * is recorded rather than silently carried. See the audit's §9.0 defect 22.
  *
  * The caller subtracts this set from a test file's edges, but must keep any
  * specifier the same file also passes to `vi.importActual` / `vi.importMock` —

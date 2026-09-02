@@ -557,7 +557,7 @@ Not to be rounded up by anyone quoting this document.
 
 ## 9. Validation
 
-### 9.0 Twenty-one measurement defects found in review, and corrected
+### 9.0 Twenty-two measurement defects found in review, and corrected
 
 The first published version of `measure-test-estate.mjs` was reviewed on PR #1219 by **Codex,
 GitHub Copilot and Cursor Bugbot independently**, and all three found defects in it. Six were real.
@@ -577,7 +577,7 @@ measurement discipline and the reproducer was the part that failed it.
 | 3   | Any path token in a workflow body counted as execution                                                                                               | runtime harnesses **17/16 → 15/18**; two harnesses no workflow invokes had been published as executed                               |
 | 4   | `import type` counted as a runtime edge, though the transpiler erases it                                                                             | reachability **98.2% → 97.8%**                                                                                                      |
 | 5   | Workflow and harness inventories used `readdirSync`, breaking the stated tracked-files-only guarantee                                                | no figure moved, but the guarantee was false as written                                                                             |
-| 6   | Nothing tested the parser that produces these numbers                                                                                                | now `src/test/measure-test-estate-rules.test.ts`, 71 cases                                                                          |
+| 6   | Nothing tested the parser that produces these numbers                                                                                                | now `src/test/measure-test-estate-rules.test.ts`, 72 cases                                                                          |
 | 7   | The fix for 4 matched imports with a **regex**, which both invented edges and missed real ones                                                       | reachability **97.7% → 97.8%**; imports are now read from the TypeScript compiler's own AST                                         |
 | 8   | §1 claimed the script reproduces _every_ headline count, but it launches no test runner                                                              | no figure moved; the claim is narrowed to the static counts it does derive                                                          |
 | 9   | The reachability walk regex-subtracted every `vi.mock` path, contradicting the rule defect 7 had just established                                    | no module moved on the pinned tree, but the code and the published method disagreed; the rule now lives in one tested function      |
@@ -593,6 +593,7 @@ measurement discipline and the reproducer was the part that failed it.
 | 19  | `.d.ts` files counted as product modules, though the transpiler erases them and they can never carry a runtime edge                                  | denominator **2,108 → 2,106**; unreached **47 → 45**; reachability **97.8% → 97.9%**                                                |
 | 20  | `testFilesAcrossAllLanes` said "all lanes" while summing only the four test-file lanes, omitting the 33 harnesses                                    | no figure moved; the field is now `testFilesAcrossFourTestLanes` and the report names the fifth lane beside it                      |
 | 21  | The transitive walk discarded each test's mock state, re-adding modules the test had replaced                                                        | reached **2,061 → 2,060**; unreached **45 → 46**; reachability **97.9% → 97.8%**; the graph is now walked per test file and unioned |
+| 22  | The `vi.doMock` exclusion was stated unconditionally, though it holds only for **static** imports                                                    | no figure moved — an over-blocking ceiling shifts nothing — but the rule as published was wrong, and the limit is now stated        |
 
 Fixing 3 initially introduced two **false-DEAD** readings in the opposite direction — a YAML folded
 scalar (`run: >-`) splits one command across lines, and a `psql … \` continuation does too, so real
@@ -633,8 +634,9 @@ script emits cannot drift from the method this section publishes:
 - a `vi.mock(spec, factory)` is hoisted and replaces the module for the whole file, so even a static
   import of it resolves to the factory — dropped, unless
 - the same file calls `vi.importActual` / `vi.importMock` on it, which bypasses the registry — kept;
-- `vi.doMock` is not hoisted and so cannot retroactively replace a module a static import already
-  loaded — kept.
+- `vi.doMock(spec, factory)` is not hoisted and so cannot retroactively replace a module a **static**
+  import already loaded — kept. That exclusion is narrower than it reads, and defect 22 states the
+  limit.
 
 That first correction was still incomplete, which is **defect 13**: it recognised only
 `vi.importActual`, and Vitest's other way of loading the original is the factory's own callback —
@@ -699,7 +701,7 @@ the denominator and the unreached list: **2,108 → 2,106**, unreached **47 → 
 test-file lanes; the 3,008 is right for what it counts, so the field was renamed rather than the
 figure changed, and the report now names the fifth lane beside it.
 
-**Defect 21 is the deepest, and the last.** Defects 9, 13 and 18 established when a `vi.mock` leaves
+**Defect 21 is the deepest.** Defects 9, 13 and 18 established when a `vi.mock` leaves
 the real module loaded, and applied that rule to the graph's **seeds**. The traversal then ignored it.
 `vi.mock` is hoisted and governs the whole module graph of its test file, so a module the test reaches
 only _through_ a component is replaced too — and a single context-free walk over the union of all
@@ -717,11 +719,31 @@ Effect: reached **2,061 → 2,060**, unreached **45 → 46**, reachability **97.
 `useLogAiDoctorReadinessToDiary` joins the unreached list. Six cases pin the traversal, two of them
 proven RED against the context-free walk, which reached the mocked hook _and_ the module beyond it.
 
-Neither pattern was caught by the author. Nine review rounds by three independent reviewers found
-every one of the twenty-one. That is the strongest evidence in this document for its own central
+**Defect 22 is the smallest, and the only one that moves nothing at all.** The `vi.doMock` exclusion
+above was published as a flat rule. It is sound for a static import — `doMock` is not hoisted, so it
+cannot replace what has already loaded — but `doMock` exists precisely to replace a module imported
+_after_ it, and that half went unsaid:
+
+```ts
+vi.doMock("@/lib/growRepo", () => ({ … }));
+const repo = await import("@/lib/growRepo"); // resolves to the factory
+```
+
+`manual-sensor-reading-entry.test.ts` does exactly this, and the specifier is still reported as an
+edge. Modelling it needs statement ordering, which these rules do not do. Measured before deciding
+what to do about it: **12** test files use the pattern, and blocking every `doMock` unconditionally —
+a deliberately over-blocking ceiling — moves **no** module, because each is genuinely loaded by some
+other test. So the correct ordering-aware rule cannot move one either. The limitation is recorded
+here and beside the code rather than carried silently; no figure changes.
+
+That the generalisation went unnoticed is the same error as round 1's finding 5, where "verified" was
+written for thirteen specs when only part had been checked. It is worth naming twice.
+
+Neither pattern was caught by the author. Ten review rounds by three independent reviewers found
+every one of the twenty-two. That is the strongest evidence in this document for its own central
 claim, and it is evidence about the author as much as about the tool: **a measurement is not
 trustworthy because the person who made it checked it.** Anyone quoting a figure from this document
-should note that it took nine adversarial rounds to get these numbers right, that round six still
+should note that it took ten adversarial rounds to get these numbers right, that round six still
 moved one of them by 47%, and that the reachability headline moved in five separate rounds
 (98.2% → 97.7% → 97.8% → 97.9% → 97.8%).
 
@@ -743,7 +765,7 @@ directions are pinned by two CLI cases in the parser test file.
 Targeted tests:      src/test/timeline-grow-filter.test.ts, src/test/action-queue-row-evidence-badge.test.ts
                      → 2 files, 18 cases, all passing at baseline
                      src/test/measure-test-estate-rules.test.ts (the reproducer's own parser)
-                     → 1 file, 71 cases, 71 passed | 0 failed
+                     → 1 file, 72 cases, 72 passed | 0 failed
                      RED-before-GREEN, proven by execution: with the vulnerable
                      `execSync` form restored in place, the command-substitution
                      case failed (1 failed | 37 passed); the file was restored and

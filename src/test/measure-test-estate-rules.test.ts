@@ -378,6 +378,10 @@ describe("reachability seeding — Vitest mock semantics, applied once", () => {
     expect(testFileRuntimeSpecifiers(`vi.mock("@/lib/auto");`)).toEqual(["@/lib/auto"]);
   });
 
+  // `doMock` is not hoisted, so it cannot replace what a static import already
+  // loaded. It CAN replace a module dynamically imported after it; modelling
+  // that needs statement ordering, which these rules do not do — see §9.0
+  // defect 22, measured to move no module.
   it("keeps a static import that `vi.doMock` cannot retroactively replace", () => {
     const src = [
       'import { thing } from "@/lib/later";',
@@ -429,6 +433,20 @@ describe("reachability seeding — Vitest mock semantics, applied once", () => {
 
     const mockOnly = 'vi.mock("@/lib/alerts", async (o) => ({ ...(await o()) }));';
     expect([...new Set(testFileRuntimeSpecifiers(mockOnly))]).toEqual(["@/lib/alerts"]);
+  });
+
+  it("DOCUMENTS the known limit: a dynamic import after `vi.doMock` still counts", () => {
+    // Not an endorsement — a pin on a limitation the audit states at §9.0
+    // defect 22. `doMock` DOES replace a module imported after it, so the real
+    // answer here is []. Modelling that needs statement ordering, which these
+    // rules do not do. Measured: 12 files use the pattern and an over-blocking
+    // ceiling moves no module, so no published figure depends on this.
+    // If ordering is ever modelled, this expectation should flip to [].
+    const src = [
+      'vi.doMock("@/lib/growRepo", () => ({ fetchGrow: vi.fn() }));',
+      'const repo = await import("@/lib/growRepo");',
+    ].join("\n");
+    expect([...new Set(testFileRuntimeSpecifiers(src))]).toEqual(["@/lib/growRepo"]);
   });
 
   it("separates the two extraction steps", () => {

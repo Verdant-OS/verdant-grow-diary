@@ -1,7 +1,167 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-02 UTC (~11:10 UTC)
-**Updated by:** GDP (2026-09-02: **#1247 MERGED as `8716d3bf`** — squash, one parent.
+**Last updated:** 2026-09-02 UTC (~15:30 UTC)
+**Updated by:** Claude (2026-09-02: **#1221 is READY FOR REVIEW at `9f922ca54` — not draft, not
+merged.** Readied by Cheek at ~11:26 UTC; 17 commits on base `883729544`; eight review rounds
+fixed, the ninth clean; **35 of 35 required checks green** on that head. **Deploy tip = live
+`883729544`, `dirty:false`**, independently MEASURED from `https://verdantgrowdiary.com/version.json`
+at 15:22 UTC (`buildTime` `2026-09-02T12:41:20.798Z`). Restore SHA for Lovable Support is
+**`883729544`**. **Do not ping Tolu.** Publisher is Vercel. No Lovable Publish. No History-restore.
+No APPLY. **#1242's and #1221's protocol peer-review seats remain UNFILLED** — a bot approval does
+not fill one. Signup PREFLIGHT still **BLOCKED** (`malformed_database_url`; `knk` not in this
+Supabase login). Do not claim PREFLIGHT passed. Feed last-recipe prefill IS shipped (#1241). Paddle
+`test_` / sandbox banner EXPECTED. #1174 stays draft. The restamp below recorded live as `8716d3bf`
+and #1221 as draft at `79146c6911`; both rows are **superseded**. Prior header follows.)
+
+## 1. #1221 is READY FOR REVIEW at `9f922ca54` — not merged
+
+`established fact`, from the PR object and the commit graph, measured ~15:25 UTC.
+
+| PR | State | Head | Base (= deploy tip) | Commits | Files | +/− | Migrations |
+| --- | --- | --- | --- | ---: | ---: | --- | ---: |
+| **#1221** | open, **ready** (`draft:false`) | `9f922ca54` | `883729544` | 17 | 23 | +2,371 / −285 | **0** |
+
+Title: `ci: execute the tests that exist but never ran, and stop the lanes going dead again (P2,
+P3, P4, P5)`. Owner Claude, branch `claude/test-coverage-remediation-p2-p5`. The merge-base is the
+deploy tip, so there is nothing to merge in. Cheek readied it at ~11:26 UTC (Codex's first
+ready-triggered pass landed 11:33 UTC). **Not merged, and Claude does not merge it** — merge is
+Cheek's call through the merge queue, and its protocol peer seat is unfilled (§3).
+
+Heads pushed today, first-parent, newest first: `9f922ca54` 14:50 (round 8) · `190771e83` 14:35
+(round 7) · `df4e8b773` 14:23 (rounds 5–6) · `0535db15f` 14:19 (retry fix) · `21a17c276` 13:51
+(round 4) · `4a0ea0605` 13:34 (CodeQL 256) · `f1ac539af` 13:22 (round 3) · `9680ec17d` 13:08 (round
+2) · `508d00eca` 06:26 (base merged in). The prior stamp's `79146c6911` is nine heads back.
+
+What it ships, unchanged in substance since round 1 (details in the PR body): the 19 colocated Deno
+edge tests into the required job (248 cases, no network permission); a `Mocked E2E closure`
+workflow running 15 previously unrun Playwright specs; the execution-manifest guard — every file in
+the four non-Vitest lanes is RUN or DECLARED, with exemption classes pinned at exact counts (25 / 8 /
+3 / 1 / 0); the contract-resolution checker extended to `package.json`; six contexts in
+`mustBeGreen` (a mirror of the ruleset, not a ruleset change); the runtime-harness lane spec at
+**HOLD**; and two source fixes — zero-delay webhook retries are now logged in
+`edge-metrics-alert-check`, and four mocked specs stub `user_agreement_acceptances`. **No schema, no
+RLS, no migration, no `vercel.json`.**
+
+## 2. CI on `9f922ca54` — 35 of 35 required green
+
+`established fact`, from the check runs read at ~15:03 UTC.
+
+| Check(s) | Result |
+| --- | --- |
+| 32 × `Full test suite (shard n/32)` | all `success` |
+| `Lint, typecheck, test, build` | `success` (15:01) — carries the Deno lane, 248 cases |
+| `Preflight — edge shared-lib mirror in sync` · `test:legal-seo` | `success` |
+| `mustBeGreen` (6): security-regression · security-db-local · pgTAP irrigation · irrigation typecheck · Deno bridge · Mocked E2E closure | all `success` |
+| `CodeQL` | `success` — settled, not the `neutral` placeholder |
+| `Config guards assert resolved values` · `docs-safety` · `eslint` · `tsc --noEmit` · `tsgo --noEmit + vite build` | `success` |
+| `GA E2E (chromium)` · `GA E2E (webkit)` · `Browser census (public)` | `success` |
+| `Browser census (authenticated)` | in progress at 15:03 — `NOT_MEASURED` here |
+| `Supabase Preview` | `failure` — repo-wide 42P07 `ai_credit_grants` replay; in neither `required` nor `mustBeGreen`; no PR-side fix exists |
+| `Quick Log Playwright smoke` | `failure` — `vars.E2E_BASE_URL` still names `verdantgrowdiary-com.lovable.app` (404); owner-held; red on every head here and the last 9 deploy-branch pushes |
+| Cursor Bugbot · Cursor Security Agent · Cursor Approval Agent | `neutral` — Cursor usage limit reached on the owner account; did not run |
+
+The one intermittent **required** red this branch ever showed — the `edge-metrics` retry test, red
+on `0861d87` and `4a0ea0605`, green between — is root-caused and fixed in `0535db15f`: zero-jitter
+retries went unlogged, P = 1/6 per run; 0 of 24 after. `GA E2E (webkit)` was red once on `190771e83`
+(WebKit consent-banner timing; green on 30 of 30 recent deploy-branch runs) and is green on this
+head. `Browser census (public)` was red on `df4e8b773` (the deploy-branch click-census timeout, red
+on 8 of the last 30 deploy-branch runs) and is green on this head.
+
+## 3. Review state — nine rounds; the protocol peer seat is UNFILLED
+
+`established fact`, from the 16 review objects and 18 review threads on #1221.
+
+| Reviewer | Result | Fills the peer seat? |
+| --- | --- | --- |
+| `chatgpt-codex-connector` (Codex) | 9 passes, `COMMENTED`; 11 P2 findings over rounds 1–8; round 9 on `9f922ca54` **0 findings** | **No** — a connector pass is not an approval |
+| `copilot-pull-request-reviewer` | `COMMENTED` "Changes recommended" on `508d00e`, 4 findings, all fixed | **No** |
+| Vercel Agent Review | 1 finding, a duplicate of Codex round 5; marked resolved by `df4e8b773` | **No** |
+| CodeQL (`github-advanced-security`) | alert 256 on `f1ac539af`, fixed in `4a0ea0605` | **No** |
+| `cursor[bot]` Cursor Approval Agent | **`APPROVED`** on `f1ac539af`; an earlier approval on `508d00e` was `DISMISSED` as stale | **No** — a bot approval is not a Grok/Claude/Codex peer |
+
+**`APPROVED` review count on #1221: one, by a bot.** `HANDOFF_PROTOCOL.md:24` limits the protocol
+peer seat to Grok, Claude or Codex, and an owner cannot review their own slice; Claude owns #1221.
+**No named peer has reviewed it.** Same situation as #1242 (§4 of the prior stamp): recorded, not a
+request to block or revert.
+
+Findings: **16 distinct**, 15 fixed and 1 raised once. Every accepted finding was reproduced before
+acceptance and seen RED before its fix. The one left open by design is Codex round 6 "R6-C"
+(`PRRT_kwDOSc4h5c6eiLnL`): a path literal in a runner body that never reaches a process invocation
+still reads as executed. Measured bound: 6 of 104 executed lane files rely solely on a runner body,
+via 3 runners. The proposed close is a declaration in the runner, not a fourth heuristic — a
+follow-up slice for Cheek to assign. 17 of 18 threads resolved.
+
+One record correction on the PR, not hidden: the commit message of `190771e83` claims a RED that
+did not occur; the real RED→GREEN is in the round-7 comment and the PR body. Not force-pushed.
+
+## 4. Live is independently MEASURED at `883729544`
+
+Claude fetched `https://verdantgrowdiary.com/version.json` at 15:22 UTC.
+
+| Field | Value |
+| --- | --- |
+| `commit` | `883729544157a21b5f43210eb59d6cb8ce02ae1b` |
+| `dirty` | **`false`** |
+| `ref` | `verdant-grow-diary` |
+| server | **Vercel** |
+| `buildTime` | `2026-09-02T12:41:20.798Z` (~7:41 AM CT) |
+| `commitTime` | `2026-09-02T11:19:36Z` |
+| measured | 2026-09-02 15:22 UTC |
+| source | `https://verdantgrowdiary.com/version.json` |
+
+**Tip = live.** `883729544` is #1244's squash (`docs(state): restamp from 8716d3bf — live
+MEASURED, #1247 merged`), one parent, and the only merge since `8716d3bf`; the deploy branch has
+not moved since. Do not carry `8716d3bf` as current live. **A resolver still returning
+`185.158.133.1` / `5c197f75` is a network miss, not a rollback.** Publisher is Vercel, project
+`verdant-grow-diary`. **No Lovable Publish.**
+
+## 5. Restore SHA for Tolu/Support is `883729544`
+
+If Tolu asks for a restore point, it is **`883729544`** (full oid
+`883729544157a21b5f43210eb59d6cb8ce02ae1b`). **Do not ping Tolu.** Support outcome remains
+`NOT_MEASURED`.
+
+## 6. Signup PREFLIGHT still BLOCKED
+
+`source claim`, carried. This slice did **not** run PREFLIGHT and did **not** run `knk`. Signup
+PREFLIGHT is still **BLOCKED** (`malformed_database_url`; `knk` not in this Supabase login). **Do
+not claim PREFLIGHT passed.** **No APPLY.**
+
+## 7. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production
+  SQL, no Lovable project-chat agent edit, no device control, no automatic Action Queue, no
+  credentials.
+- **Publisher is Vercel**, project `verdant-grow-diary`. **Auth and DB stay Lovable Cloud.**
+  **No Lovable Publish.**
+- **Paddle: `test_` keys and the sandbox banner are EXPECTED.** Not a defect. Do not revoke
+  the existing `live_` token.
+- **Current production is MEASURED at `883729544`, `dirty:false`, ref `verdant-grow-diary`.**
+  Do not record it as `NOT_MEASURED`. Do not carry `8716d3bf` as live.
+- **Tolu: do not ping.** Restore SHA **`883729544`** (full oid
+  `883729544157a21b5f43210eb59d6cb8ce02ae1b`).
+- **Feed last-recipe is SHIPPED (#1241).** Do not open a slice for it.
+- **#1174 is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge.
+- **#1221 is READY at `9f922ca54`, not merged.** Claude does not merge it; the merge queue and
+  Cheek do. Its protocol peer seat is unfilled. Claude's watch on it was stopped at Cheek's
+  instruction; a new push there would restart review, and none is planned.
+- **Owner-only items surfaced by #1221:** `vars.E2E_BASE_URL` (retired Lovable host; the
+  authenticated Playwright lane is dead until it changes); the Cursor usage limit; the R6-C
+  runner-declaration follow-up; and three decisions in the PR body — the
+  `SUPABASE_SERVICE_ROLE_KEY` contract (`awaiting-decision`), the `vite.config` host `::` the
+  guard forbids but the resolved config sets, and P5 HOLD.
+- **Signup-attribution APPLY stays owner-locked.** Production apply state is `NOT_MEASURED`.
+- **Signup PREFLIGHT still BLOCKED** (`malformed_database_url`; `knk` not in this Supabase
+  login). Do not claim it passed.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays `HOLD`.
+  Plant Memory PARK. Spider Farmer GGS radio capture stays parked and `NOT_MEASURED`.
+- **#1242's protocol peer-review seat remains UNFILLED.** Owner-designated is not the peer
+  seat. A `neutral` check did not run.
+- This slice is **N=1** and stays **draft**, on branch `claude/test-coverage-analysis-j0bz93`,
+  parented on `883729544`. Unique file `docs/agents/CURRENT_STATE.md`. No `src/`, no
+  `supabase/`, no `package.json`. No ready. No merge.
+
+**Prior update:** GDP (2026-09-02: **#1247 MERGED as `8716d3bf`** — squash, one parent.
 **Deploy tip = live `8716d3bf`, `dirty:false`**, independently MEASURED from
 `https://verdantgrowdiary.com/version.json` at ~6:09 AM CT (`buildTime`
 `2026-09-02T10:39:16.035Z`). Restore SHA for Lovable Support is **`8716d3bf`**. **Do not ping

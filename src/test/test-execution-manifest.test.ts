@@ -20,7 +20,8 @@
  * this guards against, so an exemption is a written claim, not an off switch.
  *
  * Adding an exemption is deliberately a visible diff that names a class and a
- * reason. Removing one is free. The ratchet only turns one way.
+ * reason, and its class count pinned below. Removing one lowers the pin in the same
+ * diff; adding one raises it. Either way the change is visible where it is reviewed.
  */
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
@@ -300,16 +301,23 @@ describe("test execution manifest — every committed test runs, or says why not
     expect(byLabel["pgTAP suites"].executed).toBeGreaterThanOrEqual(2);
   });
 
-  it("caps each exemption class at today's count, so the list can only shrink", () => {
+  it("pins each exemption class at today's exact count — growth and shrinkage are both visible edits here", () => {
+    // A `<=` ceiling drifts: FLAKY had a ceiling of 1 with zero entries, so a newly dead
+    // file declared flaky would have been admitted with this test still green (Codex,
+    // #1221 round 8) — and any class re-opens the same gap the moment an entry is removed
+    // without lowering its cap. Exact counts close the class: adding an exemption means
+    // raising a number in this file, in the same diff, where a reviewer sees it.
     const byClass: Record<string, number> = {};
     for (const entry of Object.values(EXEMPTIONS)) {
       byClass[entry.class] = (byClass[entry.class] ?? 0) + 1;
     }
-    expect(byClass[EXEMPTION_CLASS.NOT_HERMETIC] ?? 0).toBeLessThanOrEqual(8);
-    expect(byClass[EXEMPTION_CLASS.RED_WHEN_RUN] ?? 0).toBeLessThanOrEqual(3);
-    expect(byClass[EXEMPTION_CLASS.AWAITING_DECISION] ?? 0).toBeLessThanOrEqual(1);
-    expect(byClass[EXEMPTION_CLASS.NEEDS_LIVE_DATABASE] ?? 0).toBeLessThanOrEqual(25);
-    expect(byClass[EXEMPTION_CLASS.FLAKY] ?? 0).toBeLessThanOrEqual(1);
+    expect(byClass).toEqual({
+      [EXEMPTION_CLASS.NEEDS_LIVE_DATABASE]: 25,
+      [EXEMPTION_CLASS.NOT_HERMETIC]: 8,
+      [EXEMPTION_CLASS.RED_WHEN_RUN]: 3,
+      [EXEMPTION_CLASS.AWAITING_DECISION]: 1,
+    });
+    expect(byClass[EXEMPTION_CLASS.FLAKY] ?? 0).toBe(0);
   });
 
   it("actually discovers all four lanes (a guard over an empty set proves nothing)", () => {

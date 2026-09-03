@@ -1639,6 +1639,53 @@ export default function QuickLogV2Sheet({
             <QuickLogTargetPanel panel={targetPanel} />
           </div>
 
+          {/* Hoisted above Action and the media pickers: on a plant-scoped
+              draft the 3-tap status (open, tap a chip, Save) is the first
+              control the grower reaches. Gating and the save path are unchanged. */}
+          {showResponseCheck && (
+            <div
+              role="group"
+              aria-label="Plant response check"
+              data-testid="qlv2-response-chips"
+              className="grid gap-2"
+            >
+              <p className="text-sm font-medium">How did the plant respond?</p>
+              <div className="flex flex-wrap gap-2">
+                {RESPONSE_CHECK_STATUSES.map((status) => (
+                  <Button
+                    key={status}
+                    type="button"
+                    variant={selectedResponseStatus === status ? "default" : "outline"}
+                    size="sm"
+                    disabled={
+                      wateringSubmissionLocked ||
+                      (responseCheckOverflowByStatus.get(status) === true &&
+                        selectedResponseStatus !== status)
+                    }
+                    aria-pressed={selectedResponseStatus === status}
+                    data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
+                    onClick={() => {
+                      const next = applyResponseCheck(form.note, status);
+                      // Belt and braces: the chip is already disabled in this
+                      // case, but never let a programmatic write exceed the
+                      // limit the save path enforces.
+                      if (next.length > NOTE_LIMIT) return;
+                      chipAuthoredStatusRef.current = status;
+                      setField("note", next);
+                    }}
+                  >
+                    {status}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {everyResponseCheckOverflows
+                  ? "Your note is too long to add a response line. Shorten it first."
+                  : "Better/Same/Worse records the plant response, not the grow action."}
+              </p>
+            </div>
+          )}
+
           <div>
             <Label>Action</Label>
             <div
@@ -1897,50 +1944,6 @@ export default function QuickLogV2Sheet({
                   Checking video before save…
                 </p>
               )}
-            </div>
-          )}
-
-          {showResponseCheck && (
-            <div
-              role="group"
-              aria-label="Plant response check"
-              data-testid="qlv2-response-chips"
-              className="grid gap-2"
-            >
-              <p className="text-sm font-medium">How did the plant respond?</p>
-              <div className="flex flex-wrap gap-2">
-                {RESPONSE_CHECK_STATUSES.map((status) => (
-                  <Button
-                    key={status}
-                    type="button"
-                    variant={selectedResponseStatus === status ? "default" : "outline"}
-                    size="sm"
-                    disabled={
-                      wateringSubmissionLocked ||
-                      (responseCheckOverflowByStatus.get(status) === true &&
-                        selectedResponseStatus !== status)
-                    }
-                    aria-pressed={selectedResponseStatus === status}
-                    data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
-                    onClick={() => {
-                      const next = applyResponseCheck(form.note, status);
-                      // Belt and braces: the chip is already disabled in this
-                      // case, but never let a programmatic write exceed the
-                      // limit the save path enforces.
-                      if (next.length > NOTE_LIMIT) return;
-                      chipAuthoredStatusRef.current = status;
-                      setField("note", next);
-                    }}
-                  >
-                    {status}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {everyResponseCheckOverflows
-                  ? "Your note is too long to add a response line. Shorten it first."
-                  : "Better/Same/Worse records the plant response, not the grow action."}
-              </p>
             </div>
           )}
 

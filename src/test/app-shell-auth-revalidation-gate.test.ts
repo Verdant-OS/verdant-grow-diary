@@ -28,8 +28,14 @@ describe("AppShell auth revalidation gate (#588)", () => {
   it("withholds pageContent on revalidation_failed (no welcome bounce)", () => {
     expect(APP_SHELL).toMatch(/authStatus === ["']revalidation_failed["']/);
   });
-  it("gates useMyEntitlements on authenticated, not cache alone", () => {
-    expect(APP_SHELL).toMatch(/useMyEntitlements\(\{/);
-    expect(APP_SHELL).toMatch(/enabled:\s*authStatus === ["']authenticated["']/);
+  it("gates useMyEntitlements on sessionReady, the same trust gate as alerts (#1256 P2)", () => {
+    expect(APP_SHELL).toMatch(/useMyEntitlements\(\{\s*enabled:\s*sessionReady,?\s*\}\)/);
+    // sessionReady must be declared before the entitlements call reads it.
+    const sessionReadyAt = APP_SHELL.indexOf("const sessionReady =");
+    expect(sessionReadyAt).toBeGreaterThan(-1);
+    expect(sessionReadyAt).toBeLessThan(APP_SHELL.indexOf("useMyEntitlements({"));
+    // Must not regress to the narrower authStatus-only gate, nor to an ungated call.
+    expect(APP_SHELL).not.toMatch(/enabled:\s*authStatus === ["']authenticated["']/);
+    expect(APP_SHELL).not.toMatch(/useMyEntitlements\(\)/);
   });
 });

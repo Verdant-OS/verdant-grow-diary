@@ -108,7 +108,47 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
   );
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => applySession(s));
+    let disposed = false;
+    // Every session-bearing event bumps this; only the newest reconciliation
+    // may act on its answer, so a slower read never overrides a later event.
+    let reconcileSeq = 0;
+
+    // The auth client relays SIGNED_IN / TOKEN_REFRESHED between same-origin
+    // tabs over a BroadcastChannel and hands the OTHER tab's session to this
+    // listener without saving it. With `storage: sessionStorage` this tab may
+    // hold nothing: getUser(), REST and edge calls then run signed-out while
+    // `user` claims otherwise (measured on the deploy branch, 2026-09-03).
+    // So confirm the client holds a session at all; if it holds none, the
+    // relayed identity is dropped again. The read resolves in microtasks,
+    // ahead of the render React schedules for the first apply, so no render
+    // commits the relayed identity.
+    //
+    // The event is still applied synchronously first: the identity fence must
+    // run before React commits, and /auth navigates the moment
+    // signInWithPassword resolves, which auth-js only does after this
+    // callback returns. The read is never awaited inside the callback.
+    // INITIAL_SESSION and a null session are the client's own answers.
+    const reconcileWithClientSession = async (seq: number) => {
+      let held: Session | null;
+      try {
+        const { data } = await supabase.auth.getSession();
+        held = data?.session ?? null;
+      } catch {
+        // The client cannot read its own store: a client fault, not a
+        // cross-tab signal. Keep the delivered session; a later event still
+        // corrects it (see the initial-read failure contract below).
+        return;
+      }
+      if (disposed || seq !== reconcileSeq) return;
+      if (held === null) applySession(null);
+    };
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      applySession(s);
+      if (s !== null && event !== "INITIAL_SESSION") {
+        void reconcileWithClientSession(++reconcileSeq);
+      }
+    });
     supabase.auth
       .getSession()
       .then(({ data }) => {
@@ -124,7 +164,10 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
       .finally(() => {
         setLoading(false);
       });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      disposed = true;
+      sub.subscription.unsubscribe();
+    };
   }, [applySession]);
 
   useEffect(() => {

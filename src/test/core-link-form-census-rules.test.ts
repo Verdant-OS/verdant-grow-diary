@@ -559,14 +559,14 @@ describe("core link and form census rules", () => {
     ).toBeUndefined();
   });
 
-  it("expects signed-out links to auth routes to land on the welcome gate", () => {
+  it("expects signed-out links to auth routes to land on the sign-in screen, not the marketing landing", () => {
     const routes = [
       { path: "/pheno-hunts/:id/compare", access: "public" },
       { path: "/pheno-hunts/:id/workspace", access: "auth" },
     ] as const;
 
     expect(expectedCensusNavigationPath("/pheno-hunts/hunt-1/workspace", routes, false)).toBe(
-      "/welcome",
+      "/auth",
     );
     expect(expectedCensusNavigationPath("/pheno-hunts/hunt-1/workspace", routes, true)).toBe(
       "/pheno-hunts/hunt-1/workspace",

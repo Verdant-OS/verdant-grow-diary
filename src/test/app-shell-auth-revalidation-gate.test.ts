@@ -25,8 +25,21 @@ describe("AppShell auth revalidation gate (#588)", () => {
     expect(APP_SHELL).not.toMatch(/enabled:\s*!loading && !!user\s*}/);
   });
 
-  it("withholds pageContent on revalidation_failed (no welcome bounce)", () => {
+  it("withholds pageContent on revalidation_failed (no welcome bounce), but never as a dead end", () => {
     expect(APP_SHELL).toMatch(/authStatus === ["']revalidation_failed["']/);
+    const start = APP_SHELL.indexOf('if (authStatus === "revalidation_failed")');
+    const end = APP_SHELL.indexOf('if (!user || authStatus === "unauthenticated") return null;');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const branch = APP_SHELL.slice(start, end);
+    // Still fail-closed for private REST: no page content, no Outlet, no bounce.
+    expect(branch).not.toMatch(/pageContent|<Outlet|nav\(|navigate\(/);
+    // But recoverable: a Retry that re-runs getUser and an explicit sign-out,
+    // not a bare Loading shell the grower can never leave.
+    expect(branch).toMatch(/data-testid="app-shell-revalidation-failed"/);
+    expect(branch).toMatch(/AUTH_REVALIDATE_EVENT/);
+    expect(branch).toMatch(/SignOutConfirmDialog/);
+    expect(branch).not.toMatch(/Loading…/);
   });
   it("gates useMyEntitlements on sessionReady, the same trust gate as alerts (#1256 P2)", () => {
     expect(APP_SHELL).toMatch(/useMyEntitlements\(\{\s*enabled:\s*sessionReady,?\s*\}\)/);

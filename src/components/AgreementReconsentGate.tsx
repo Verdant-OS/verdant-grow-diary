@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { AUTH_REVALIDATE_EVENT } from "@/hooks/useRequireAuth";
 
 /**
@@ -32,11 +32,13 @@ import { AUTH_REVALIDATE_EVENT } from "@/hooks/useRequireAuth";
  * accepting or signing out — the whole point is to require agreement
  * before further use of the app.
  *
- * The VERIFY-ERROR block (the acceptance read failed) is different: it is
- * recoverable. Retry re-runs the read with the dialog kept open, Close and
- * Escape dismiss it without signing out, and a dismissal is re-checked on
- * the next page so it is never a permanent bypass. Nothing on that path
- * signs the grower out or claims consent; a read error still grants nothing.
+ * The VERIFY-ERROR state (the acceptance read failed) is different: it is
+ * fail-OPEN. We do not know the grower's consent status, so nothing is
+ * granted or written, but the route underneath keeps rendering: a read error
+ * must not trap a signed-in grower behind a modal. It renders as a
+ * non-blocking banner with Retry (re-runs the read, banner stays mounted)
+ * and Close (hides it for this page; the next page re-checks, so it is never
+ * a permanent bypass). No sign-out control lives on that path.
  *
  * Routes where the modal is suppressed: /auth, /reset-password, /terms,
  * /privacy (so the user can read what they're accepting and so signed-out
@@ -184,58 +186,45 @@ export function AgreementReconsentGate() {
   if (!open) return null;
 
   if (verifyErrorOpen) {
-    // Fail-closed block: we could not read acceptance status, so we neither
-    // grant access nor claim specific pending agreements. Unlike the consent
-    // form below, this block is recoverable: Retry re-runs the read, and
-    // Close / Escape dismiss it (re-checked on the next page). Neither path
-    // signs the grower out; Sign out is an explicit choice and stays last.
+    // Fail-OPEN, see the header note. Retry re-runs the read; Close hides the
+    // banner for this page only. Neither signs the grower out, and neither
+    // claims consent: gaps stay unknown until a read succeeds.
     return (
-      <Dialog
-        open={open}
-        onOpenChange={(next) => {
-          if (!next) dismissVerifyError();
-        }}
+      <div
+        role="status"
+        aria-live="polite"
+        data-testid="agreement-reconsent-verify-error"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 p-3 shadow-lg backdrop-blur"
       >
-        <DialogContent
-          className="sm:max-w-lg"
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-          aria-labelledby="reconsent-verify-title"
-          aria-describedby="reconsent-verify-description"
-          data-testid="agreement-reconsent-verify-error"
-        >
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
-              <DialogTitle id="reconsent-verify-title">
-                Couldn&apos;t verify your agreements
-              </DialogTitle>
-            </div>
-            <DialogDescription id="reconsent-verify-description">
-              We couldn&apos;t confirm which agreements you&apos;ve accepted. Retry, or close this
-              and carry on; we&apos;ll check again when you open another page.
-            </DialogDescription>
-          </DialogHeader>
-          {verifyAttempts > 1 ? (
-            <p
-              role="status"
-              aria-live="polite"
-              className="text-sm text-muted-foreground"
-              data-testid="agreement-reconsent-verify-attempts"
-            >
-              Still couldn&apos;t verify (attempt {verifyAttempts}).
-            </p>
-          ) : null}
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="ghost" onClick={() => void signOut()} disabled={checking}>
-              Sign out
-            </Button>
-            <Button onClick={retryVerify} disabled={checking}>
-              {checking ? "Retrying…" : "Retry"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-2 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+          <p className="min-w-[12rem] flex-1 text-foreground">
+            Couldn&apos;t verify your agreements. Retry, or keep going; we&apos;ll check again when
+            you open another page.
+            {verifyAttempts > 1 ? (
+              <span
+                data-testid="agreement-reconsent-verify-attempts"
+                className="text-muted-foreground"
+              >
+                {" "}
+                Still couldn&apos;t verify (attempt {verifyAttempts}).
+              </span>
+            ) : null}
+          </p>
+          <Button type="button" size="sm" onClick={retryVerify} disabled={checking}>
+            {checking ? "Retrying…" : "Retry"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-label="Close"
+            onClick={dismissVerifyError}
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </Button>
+        </div>
+      </div>
     );
   }
 

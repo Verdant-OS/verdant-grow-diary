@@ -21,6 +21,7 @@ import { MemoryRouter, useNavigate } from "@/lib/react-router-compat";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { CURRENT_AGREEMENT_LIST } from "@/constants/agreements";
 import { RECORD_OWN_AGREEMENT_ACCEPTANCES_RPC } from "@/lib/agreementAcceptanceService";
+import { AUTH_REVALIDATE_EVENT } from "@/hooks/useRequireAuth";
 
 const CURRENT_ROWS = CURRENT_AGREEMENT_LIST.map((a) => ({
   agreement_type: a.type,
@@ -219,6 +220,27 @@ describe("AgreementReconsentGate verify-error recovery", () => {
     );
     expect(screen.queryByTestId("agreement-reconsent-gate")).toBeNull();
     expect(signOutSpy).not.toHaveBeenCalled();
+  });
+
+  it("Retry re-runs only the acceptance read: it never triggers auth revalidation", async () => {
+    // Auth revalidation flips useRequireAuth to loading and AppShell swaps the
+    // route for its loading shell, which unmounts the page and discards local
+    // state. A fail-open banner must not do that to the grower on Retry.
+    const revalidate = vi.fn();
+    window.addEventListener(AUTH_REVALIDATE_EVENT, revalidate);
+    try {
+      mockReadError = { message: "network blip" };
+      renderGate();
+      await verifyErrorBanner();
+
+      await userEvent.click(screen.getByRole("button", { name: /^retry$/i }));
+      await waitFor(() => expect(eqSpy).toHaveBeenCalledTimes(2));
+
+      expect(revalidate).not.toHaveBeenCalled();
+      expect(signOutSpy).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(AUTH_REVALIDATE_EVENT, revalidate);
+    }
   });
 
   it("keeps the banner mounted and Retry disabled while a Retry read is in flight", async () => {

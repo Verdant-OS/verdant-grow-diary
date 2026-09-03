@@ -24,7 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AlertTriangle, X } from "lucide-react";
-import { AUTH_REVALIDATE_EVENT } from "@/hooks/useRequireAuth";
 
 /**
  * Blocking re-consent modal. Renders when a signed-in user is missing any
@@ -94,9 +93,10 @@ export function AgreementReconsentGate() {
         .eq("user_id", userId);
       if (cancelled) return;
       if (err) {
-        // Fail CLOSED for consent: a read error must never grant access as if
-        // the user were current. Block with a retry / sign-out state instead of
-        // treating an unverified user as consented.
+        // The read failed, so consent status is UNKNOWN: gaps stay null, nothing
+        // is written, and the grower is never treated as consented. The route
+        // keeps rendering (fail-open, see the header note) behind a retryable
+        // banner; a later successful read decides.
         setVerifyError(true);
         setVerifyAttempts((n) => n + 1);
         setGaps(null);
@@ -138,12 +138,11 @@ export function AgreementReconsentGate() {
 
   function retryVerify() {
     if (checking) return;
-    // Let the protected layout re-validate the session too (getUser), then
-    // re-run the acceptance read. The dialog stays mounted while it runs so
-    // the grower sees "Retrying" instead of a flash of nothing.
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event(AUTH_REVALIDATE_EVENT));
-    }
+    // Re-run the acceptance read only. Deliberately NOT an auth revalidation:
+    // that flips useRequireAuth to loading and AppShell swaps the route for its
+    // loading shell, unmounting the page under a banner that promised to stay
+    // out of the way. Session recovery has its own Retry in AppShell. The
+    // banner stays mounted while the read runs so the grower sees "Retrying".
     setRetryToken((t) => t + 1);
   }
 
@@ -194,7 +193,7 @@ export function AgreementReconsentGate() {
         role="status"
         aria-live="polite"
         data-testid="agreement-reconsent-verify-error"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 p-3 shadow-lg backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-lg backdrop-blur"
       >
         <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-2 text-sm">
           <AlertTriangle className="h-4 w-4 shrink-0 text-primary" aria-hidden />

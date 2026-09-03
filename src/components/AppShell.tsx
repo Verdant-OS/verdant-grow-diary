@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useHydrated } from "@/hooks/useHydrated";
-import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
 import { buildSignedOutRedirect } from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
@@ -236,11 +236,44 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       </div>
     );
   // getUser transport/server error is not signed-out. Stay on this URL, do not
-  // mount pageContent (no private REST), do not bounce to /welcome.
+  // mount pageContent (no private REST), do not bounce to /welcome. But never
+  // a dead end either: a bare loading shell left a grower with no way out.
+  // Retry re-runs getUser through the same event the agreements gate uses;
+  // sign-out stays an explicit choice behind the usual confirmation.
   if (authStatus === "revalidation_failed")
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted-foreground">
-        Loading…
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="app-shell-revalidation-failed"
+          className="w-full max-w-md space-y-3 rounded-md border border-border bg-muted/30 p-4 text-sm"
+        >
+          <p className="font-medium text-foreground">We couldn&apos;t confirm your session.</p>
+          <p className="text-muted-foreground">
+            Retry to check again. Signing out ends your session on every device, so use it only if
+            Retry keeps failing.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new Event(AUTH_REVALIDATE_EVENT));
+                }
+              }}
+            >
+              Retry
+            </Button>
+            <SignOutConfirmDialog
+              trigger={
+                <Button type="button" variant="ghost">
+                  Sign out
+                </Button>
+              }
+            />
+          </div>
+        </div>
       </div>
     );
   if (!user || authStatus === "unauthenticated") return null;

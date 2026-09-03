@@ -11,11 +11,10 @@ import { Link } from "@/lib/react-router-compat";
 
 import {
   buildPlantDetailWhatsMissing,
-  type PlantDetailWhatsMissingInput,
+  derivePlantDetailActivitySignals,
+  PLANT_ACTIVITY_UNAVAILABLE_COPY,
 } from "@/lib/plantDetailWhatsMissing";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
-import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
-import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -40,44 +39,20 @@ function dispatchQuickLog(detail: Record<string, unknown> = {}) {
   );
 }
 
-function deriveSignals(
-  plantId: string | null | undefined,
-  hasPlantPhoto: boolean,
-  rawRows: readonly unknown[] | null | undefined,
-): Pick<
-  PlantDetailWhatsMissingInput,
-  "hasTimelineEntries" | "hasRecentPhoto" | "hasSensorSnapshot" | "hasRecentWateringOrFeed"
-> {
-  const rows = buildPlantRecentActivity(rawRows ?? [], { plantId: plantId ?? null, limit: 10 });
-
-  const hasTimelineEntries = rows.length > 0;
-  let hasRecentPhoto = hasPlantPhoto;
-  let hasSensorSnapshot = false;
-  let hasRecentWateringOrFeed = false;
-
-  for (const r of rows) {
-    if (r.hasPhoto) hasRecentPhoto = true;
-    if (r.hasSnapshot) hasSensorSnapshot = true;
-    const cat = classifyTimelineEntry({ eventType: r.eventType });
-    if (cat === "watering" || cat === "feeding") hasRecentWateringOrFeed = true;
-  }
-
-  return { hasTimelineEntries, hasRecentPhoto, hasSensorSnapshot, hasRecentWateringOrFeed };
-}
-
 export default function PlantDetailWhatsMissing({
   plantId,
   growId,
   stage,
   hasPlantPhoto = false,
 }: PlantDetailWhatsMissingProps) {
-  const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
+  const { data: rawRows, isLoading, isError } = usePlantRecentActivity(plantId ?? null);
 
   const signals = useMemo(() => {
-    return deriveSignals(plantId, hasPlantPhoto, rawRows ?? []);
-  }, [plantId, hasPlantPhoto, rawRows]);
+    return isError ? null : derivePlantDetailActivitySignals(plantId, hasPlantPhoto, rawRows);
+  }, [plantId, hasPlantPhoto, rawRows, isError]);
 
   const prompts = useMemo(() => {
+    if (!signals) return [];
     return buildPlantDetailWhatsMissing({
       plantId,
       growId,
@@ -114,6 +89,14 @@ export default function PlantDetailWhatsMissing({
           ))}
           <span className="sr-only">Loading missing context prompts…</span>
         </ul>
+      ) : !signals ? (
+        <p
+          data-testid="plant-detail-whats-missing-unavailable"
+          role="status"
+          className="text-sm text-muted-foreground"
+        >
+          {PLANT_ACTIVITY_UNAVAILABLE_COPY}
+        </p>
       ) : prompts.length === 0 ? (
         <div
           data-testid="plant-detail-whats-missing-solid"

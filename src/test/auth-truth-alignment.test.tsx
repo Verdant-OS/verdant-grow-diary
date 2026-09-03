@@ -175,6 +175,15 @@ function IdentityLog() {
   return null;
 }
 
+const signInScreenIdentities: Array<string | null> = [];
+
+/** Records every identity React committed a render for on the sign-in screen. */
+function SignInScreenIdentityLog() {
+  const { user, loading } = useAuth();
+  if (!loading) signInScreenIdentities.push(user?.id ?? null);
+  return null;
+}
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
@@ -193,6 +202,7 @@ beforeEach(() => {
   window.sessionStorage.clear();
   mocks.listeners.length = 0;
   renderedIdentities.length = 0;
+  signInScreenIdentities.length = 0;
   mocks.getSession.mockReset();
   mocks.getUser.mockReset();
   mocks.signOut.mockReset();
@@ -370,6 +380,71 @@ describe("useRequireAuth at the protected boundary", () => {
     },
   );
 
+  it("redirects on a rejection only once the local sign-out confirms the session is gone", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: apiError(401, "invalid JWT") });
+    const signOut = pending<{ error: null }>();
+    mocks.signOut.mockReturnValue(signOut.promise);
+    const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT), {
+      wrapper: hookWrapper("/grows"),
+    });
+
+    await waitFor(() => expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    // /logout is still in flight: no redirect may carry the rejected identity
+    // onto /auth, whose signed-in branch would bounce it straight back here.
+    expect(result.current.status).toBe("loading");
+    expect(screen.getByTestId("location")).toHaveTextContent("/grows");
+
+    await act(async () => {
+      deliver("SIGNED_OUT", null);
+      signOut.resolve({ error: null });
+    });
+    await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
+    expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows");
+  });
+
+  it("keeps a rejection whose local sign-out returns { error } as revalidation_failed: no bounce", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: apiError(401, "invalid JWT") });
+    mocks.signOut.mockResolvedValue({ error: apiError(500, "logout failed") });
+    const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT), {
+      wrapper: hookWrapper("/grows"),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("revalidation_failed"));
+    expect(mocks.signOut).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("location")).toHaveTextContent("/grows");
+  });
+
+  it("keeps a rejection whose local sign-out rejects as revalidation_failed: no bounce", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: apiError(403, "forbidden") });
+    mocks.signOut.mockRejectedValue(new TypeError("Failed to fetch"));
+    const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT), {
+      wrapper: hookWrapper("/grows"),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("revalidation_failed"));
+    expect(screen.getByTestId("location")).toHaveTextContent("/grows");
+  });
+
+  it("bounds the local sign-out too, and a late confirmation still redirects", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: apiError(401, "invalid JWT") });
+    const signOut = pending<{ error: null }>();
+    mocks.signOut.mockReturnValue(signOut.promise);
+    const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT, { timeoutMs: 25 }), {
+      wrapper: hookWrapper("/grows"),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("revalidation_failed"));
+    expect(screen.getByTestId("location")).toHaveTextContent("/grows");
+
+    await act(async () => {
+      deliver("SIGNED_OUT", null);
+      signOut.resolve({ error: null });
+    });
+    await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
+    expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows");
+  });
+
   it("keeps a transport rejection as revalidation_failed: no bounce, no sign-out", async () => {
     mocks.getUser.mockRejectedValue(new TypeError("Failed to fetch"));
     const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT), {
@@ -450,6 +525,7 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
               element={
                 <div data-testid="sign-in-screen">
                   <Probe />
+                  <SignInScreenIdentityLog />
                   <GoTo to="/grows" />
                 </div>
               }
@@ -496,6 +572,12 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
   it("a stale session the server rejects is cleared: no cached 'Signed in' outlives the 401", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-stale") }, error: null });
     mocks.getUser.mockResolvedValue({ data: { user: null }, error: apiError(401, "invalid JWT") });
+    // /logout is a round trip; auth-js raises SIGNED_OUT only once it settles.
+    mocks.signOut.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      deliver("SIGNED_OUT", null);
+      return { error: null };
+    });
     renderApp("/grows");
 
     await waitFor(() =>
@@ -503,8 +585,26 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
     );
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
     expect(await screen.findByTestId("sign-in-screen")).toHaveTextContent("signed-out");
+    // The sign-in screen never rendered the rejected identity, not even while
+    // /logout was in flight — that render is what /auth would bounce back.
+    expect(signInScreenIdentities).not.toContain("u-stale");
     expect(screen.queryByTestId("protected-child")).toBeNull();
     expect(screen.queryByTestId("auth-status-indicator")).toBeNull();
+  });
+
+  it("a rejected session whose local sign-out fails stays on the session card, never the sign-in screen", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-stale") }, error: null });
+    mocks.getUser.mockResolvedValue({ data: { user: null }, error: apiError(401, "invalid JWT") });
+    // The client could not remove its session: no SIGNED_OUT is raised.
+    mocks.signOut.mockResolvedValue({ error: apiError(500, "logout failed") });
+    renderApp("/grows");
+
+    expect(await screen.findByTestId("app-shell-revalidation-failed")).toBeInTheDocument();
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(screen.getByTestId("location")).toHaveTextContent("/grows");
+    expect(screen.queryByTestId("sign-in-screen")).toBeNull();
+    expect(screen.queryByTestId("protected-child")).toBeNull();
+    expect(signInScreenIdentities).toEqual([]);
   });
 
   it("a session the server confirms mounts the protected page as signed in", async () => {

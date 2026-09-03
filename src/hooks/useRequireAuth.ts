@@ -12,12 +12,14 @@
 //   session_not_found, after removing the local session) or the auth server
 //   rejected the bearer (401 / 403)
 // - a rejected bearer is dropped from THIS tab (local sign-out) so no cached
-//   identity — "Signed in", "Open dashboard" — outlives the rejection
+//   identity — "Signed in", "Open dashboard" — outlives the rejection; the
+//   redirect waits for the client to confirm the local session is gone, and a
+//   sign-out that fails, rejects or hangs is revalidation_failed instead
 // - a getUser transport/server error is revalidation_failed, not signed-out:
 //   do not dump a cached session onto the marketing page
-// - the wait is bounded: a getUser that never settles becomes
-//   revalidation_failed instead of a permanent loading shell; a late answer
-//   still applies
+// - the wait is bounded: a getUser (or the local sign-out after a rejection)
+//   that never settles becomes revalidation_failed instead of a permanent
+//   loading shell; a late answer still applies
 // See docs/auth-security.md.
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "@/lib/react-router-compat";
@@ -30,7 +32,8 @@ export type RequireAuthStatus =
 export const AUTH_REVALIDATE_EVENT = "verdant:auth-revalidate";
 
 /**
- * Upper bound on one getUser round-trip. Past it the status is
+ * Upper bound on one round-trip: the getUser call, and again the local
+ * sign-out that follows a rejected bearer. Past it the status is
  * revalidation_failed (recoverable through `retry` and AUTH_REVALIDATE_EVENT),
  * so a request that never settles cannot pin the shell on a bare loading
  * state. A late answer still applies.
@@ -90,52 +93,72 @@ export function useRequireAuth(
   useEffect(() => {
     let cancelled = false;
     let settled = false;
+    let bound: ReturnType<typeof setTimeout> | undefined;
+
+    // Past the bound the shell shows revalidation_failed instead of a bare
+    // loading state. The bound is re-armed for the sign-out phase below.
+    const armBound = () => {
+      clearTimeout(bound);
+      bound = setTimeout(() => {
+        if (cancelled || settled) return;
+        setStatus("revalidation_failed");
+      }, timeoutMs);
+    };
+    // Exactly one outcome applies per run; a late one still applies after the
+    // bound elapsed, nothing applies after cleanup.
+    const settle = (apply: () => void) => {
+      if (cancelled || settled) return;
+      settled = true;
+      clearTimeout(bound);
+      apply();
+    };
     const redirectUnauthenticated = () => {
-      if (cancelled) return;
       setStatus("unauthenticated");
       nav(redirectTo, { replace: true });
     };
+    const revalidationFailed = () => setStatus("revalidation_failed");
 
     setStatus("loading");
-    const bound = setTimeout(() => {
-      if (cancelled || settled) return;
-      setStatus("revalidation_failed");
-    }, timeoutMs);
+    armBound();
 
     void supabase.auth.getUser().then(
       ({ data, error }) => {
         if (cancelled) return;
-        settled = true;
-        clearTimeout(bound);
         if (error) {
           const failure = classifyRevalidationFailure(error);
           if (failure === "transport") {
-            setStatus("revalidation_failed");
+            settle(revalidationFailed);
             return;
           }
-          if (failure === "session_rejected") {
-            // Drop the bearer the server refused from THIS tab only. Fire and
-            // forget: the redirect must not wait on /logout, and the SIGNED_OUT
-            // it raises reaches AuthProvider, which clears the cached identity.
-            void Promise.resolve()
-              .then(() => supabase.auth.signOut({ scope: "local" }))
-              .catch(() => undefined);
+          if (failure === "session_missing") {
+            settle(redirectUnauthenticated);
+            return;
           }
-          redirectUnauthenticated();
+          // session_rejected: drop the bearer the server refused from THIS tab
+          // before leaving. Redirect only once the client confirms the local
+          // session is gone ({ error: null }): the auth client raises
+          // SIGNED_OUT to AuthProvider on the way, so the signed-out landing
+          // never renders the rejected identity, not even while /logout is in
+          // flight. A sign-out that returns { error } (auth-js does not throw
+          // on its common failure path), rejects or never settles may have
+          // left the session in place, so it is revalidation_failed — Retry /
+          // Sign out — never a redirect carrying a stale "Signed in".
+          armBound();
+          void Promise.resolve()
+            .then(() => supabase.auth.signOut({ scope: "local" }))
+            .then(
+              (result) => settle(result?.error ? revalidationFailed : redirectUnauthenticated),
+              () => settle(revalidationFailed),
+            );
           return;
         }
         if (!data?.user) {
-          redirectUnauthenticated();
+          settle(redirectUnauthenticated);
           return;
         }
-        setStatus("authenticated");
+        settle(() => setStatus("authenticated"));
       },
-      () => {
-        if (cancelled) return;
-        settled = true;
-        clearTimeout(bound);
-        setStatus("revalidation_failed");
-      },
+      () => settle(revalidationFailed),
     );
     return () => {
       cancelled = true;

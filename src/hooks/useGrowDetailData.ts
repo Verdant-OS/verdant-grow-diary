@@ -17,11 +17,12 @@
  * Read-only: no .insert/.update/.delete/.upsert/.rpc. No ai-coach call.
  * No device-control surface. No elevated keys. RLS enforces ownership.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import { alertDetailPath } from "@/lib/routes";
+import { applyPostgrestAbortSignal } from "@/lib/supabaseAbort";
 import {
   type CountValue,
   type GrowStatus,
@@ -58,6 +59,9 @@ import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterComp
 
 /** Bounded dedupe window for merging diary rows with the grow_events spine. */
 const ACTIVITY_MERGE_WINDOW = 1000;
+
+/** Maximum time the primary grow row may keep the whole page loading. */
+const GROW_DETAIL_LOAD_TIMEOUT_MS = 8000;
 
 type MergeDiaryRow = ConnectedActivationDiaryEntryRow;
 type MergeGrowEventRow = ConnectedActivationGrowEventRow & { note?: string | null };
@@ -159,6 +163,18 @@ export const EMPTY_COUNTS: GrowCounts = {
   alertsWarning: 0,
 };
 
+const UNAVAILABLE_COUNTS: GrowCounts = {
+  plants: "unavailable",
+  tents: "unavailable",
+  diary: "unavailable",
+  actionsPending: "unavailable",
+  actionsTotal: "unavailable",
+  auditEvents: "unavailable",
+  alertsOpen: "unavailable",
+  alertsCritical: "unavailable",
+  alertsWarning: "unavailable",
+};
+
 export type RecentState =
   { status: "loading" } | { status: "ok"; items: RecentItem[] } | { status: "unavailable" };
 
@@ -189,30 +205,89 @@ export function useGrowDetailData(): UseGrowDetailData {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState(false);
 
-  const [counts, setCounts] = useState<GrowCounts>(EMPTY_COUNTS);
-  const [recent, setRecent] = useState<RecentState>({ status: "loading" });
+  const [counts, setCounts] = useState<GrowCounts>(UNAVAILABLE_COUNTS);
+  const [recent, setRecentState] = useState<RecentState>({ status: "loading" });
   const [outcomes, setOutcomes] = useState<GrowOutcomesState>(EMPTY_GROW_OUTCOMES_STATE);
   const [soleTentId, setSoleTentId] = useState<string | null>(null);
-  const [status, setStatus] = useState<GrowStatus>({
-    level: "good",
-    reason: "Loading…",
-    pending: 0,
-    highestRisk: "none",
-    lastDiaryAt: null,
-  });
+  const [status, setStatus] = useState<GrowStatus>(UNAVAILABLE_STATUS);
+  const loadGeneration = useRef(0);
+  const growRowAbortController = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
-    if (!user || !growId) return;
+    const generation = ++loadGeneration.current;
+    const isCurrentLoad = () => generation === loadGeneration.current;
+    const setRecent = (next: RecentState) => {
+      if (isCurrentLoad()) setRecentState(next);
+    };
+    growRowAbortController.current?.abort();
+    growRowAbortController.current = null;
+
+    // These sections load after the primary row. Keep their placeholders
+    // explicitly unknown so releasing the grow header never implies measured
+    // zeroes or a healthy status while related reads are still pending.
+    setCounts(UNAVAILABLE_COUNTS);
+    setRecent({ status: "loading" });
+    setOutcomes(EMPTY_GROW_OUTCOMES_STATE);
+    setStatus(UNAVAILABLE_STATUS);
+
+    if (!user) {
+      setGrow(null);
+      setLoading(false);
+      setNotFound(false);
+      setError(true);
+      setSoleTentId(null);
+      return;
+    }
+    if (!growId) {
+      setGrow(null);
+      setLoading(false);
+      setNotFound(true);
+      setError(false);
+      setSoleTentId(null);
+      return;
+    }
+
     setLoading(true);
     setNotFound(false);
     setError(false);
     setSoleTentId(null);
 
-    const { data, error: gErr } = await supabase
-      .from("grows")
-      .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at,notes")
-      .eq("id", growId)
-      .maybeSingle();
+    const controller = new AbortController();
+    growRowAbortController.current = controller;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    let growResult: { data: unknown; error: unknown };
+    try {
+      const growQuery = supabase
+        .from("grows")
+        .select("id,name,stage,grow_type,is_archived,started_at,created_at,updated_at,notes")
+        .eq("id", growId)
+        .maybeSingle();
+      const growRequest = applyPostgrestAbortSignal(growQuery, controller.signal);
+      const timeout = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          const timeoutError = new Error("Grow detail request timed out.");
+          timeoutError.name = "TimeoutError";
+          reject(timeoutError);
+          controller.abort();
+        }, GROW_DETAIL_LOAD_TIMEOUT_MS);
+      });
+      growResult = await Promise.race([growRequest, timeout]);
+    } catch {
+      if (!isCurrentLoad()) return;
+      setGrow(null);
+      setNotFound(false);
+      setError(true);
+      setLoading(false);
+      return;
+    } finally {
+      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+      if (growRowAbortController.current === controller) {
+        growRowAbortController.current = null;
+      }
+    }
+
+    if (!isCurrentLoad()) return;
+    const { data, error: gErr } = growResult;
     if (gErr) {
       setGrow(null);
       setError(true);
@@ -227,6 +302,9 @@ export function useGrowDetailData(): UseGrowDetailData {
     }
 
     setGrow(data as GrowRow);
+    // The primary row is enough to render the grow header and navigation.
+    // Related sections below retain their own loading/unavailable states.
+    setLoading(false);
 
     // Read-only count queries. Any failure degrades to "unavailable".
     type CountQuery = {
@@ -268,6 +346,7 @@ export function useGrowDetailData(): UseGrowDetailData {
     let tentIds: string[] = [];
     try {
       const tentLookup = await supabase.from("tents").select("id").eq("grow_id", growId!);
+      if (!isCurrentLoad()) return;
       tErr = tentLookup.error;
       tentIds = tErr
         ? []
@@ -276,6 +355,7 @@ export function useGrowDetailData(): UseGrowDetailData {
             .filter((id): id is string => typeof id === "string" && id.length > 0);
       setSoleTentId(tErr ? null : pickSoleLoadedId(tentIds));
     } catch (err) {
+      if (!isCurrentLoad()) return;
       tErr = err;
       setSoleTentId(null);
     }
@@ -317,6 +397,7 @@ export function useGrowDetailData(): UseGrowDetailData {
       countFrom("alerts", (q) => q.eq("status", "open").eq("severity", "critical")),
       countFrom("alerts", (q) => q.eq("status", "open").eq("severity", "warning")),
     ]);
+    if (!isCurrentLoad()) return;
 
     // Merge the grow_events spine into the diary/activity counter. A plain
     // Quick Log save has no diary companion, so diary_entries alone hides it;
@@ -358,6 +439,7 @@ export function useGrowDetailData(): UseGrowDetailData {
       // Keep the plain diary count — degraded, never inflated.
     }
 
+    if (!isCurrentLoad()) return;
     setCounts({
       plants,
       tents,
@@ -396,6 +478,7 @@ export function useGrowDetailData(): UseGrowDetailData {
           .order("created_at", { ascending: false })
           .limit(5),
       ]);
+      if (!isCurrentLoad()) return;
 
       if (diaryRes.error || growEventsRes.error || eventsRes.error || alertEventsRes.error) {
         setRecent({ status: "unavailable" });
@@ -438,6 +521,7 @@ export function useGrowDetailData(): UseGrowDetailData {
             .from("action_queue")
             .select("id,suggested_change,reason")
             .in("id", actionIds);
+          if (!isCurrentLoad()) return;
           parents = Object.fromEntries(
             (pRows ?? []).map((p) => [
               p.id,
@@ -471,6 +555,7 @@ export function useGrowDetailData(): UseGrowDetailData {
             .from("alerts")
             .select("id,title,severity,metric,status")
             .in("id", alertIds);
+          if (!isCurrentLoad()) return;
           alertParents = Object.fromEntries(
             (aRows ?? []).map((a) => [
               a.id,
@@ -541,10 +626,12 @@ export function useGrowDetailData(): UseGrowDetailData {
             : lastDiaryOnlyAt
           : (lastDiaryOnlyAt ?? lastManualEventAt);
 
+      if (!isCurrentLoad()) return;
       const pending = actionsPending;
       const { level, reason } = deriveStatus({ pending, highestRisk, lastDiaryAt });
       setStatus({ level, reason, pending, highestRisk, lastDiaryAt });
     } catch {
+      if (!isCurrentLoad()) return;
       setStatus(UNAVAILABLE_STATUS);
     }
 
@@ -558,6 +645,7 @@ export function useGrowDetailData(): UseGrowDetailData {
         .eq("details->>event_type", "action_outcome")
         .order("entry_at", { ascending: false })
         .limit(20);
+      if (!isCurrentLoad()) return;
       if (outcomeErr) {
         setOutcomes({
           status: "unavailable",
@@ -575,6 +663,7 @@ export function useGrowDetailData(): UseGrowDetailData {
         });
       }
     } catch {
+      if (!isCurrentLoad()) return;
       setOutcomes({
         status: "unavailable",
         summary: EMPTY_GROW_OUTCOME_SUMMARY,
@@ -582,12 +671,15 @@ export function useGrowDetailData(): UseGrowDetailData {
         learning: EMPTY_LEARNING_REPORT,
       });
     }
-
-    setLoading(false);
   }, [user, growId]);
 
   useEffect(() => {
-    load();
+    void load();
+    return () => {
+      loadGeneration.current += 1;
+      growRowAbortController.current?.abort();
+      growRowAbortController.current = null;
+    };
   }, [load]);
 
   return {

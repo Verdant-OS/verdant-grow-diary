@@ -193,7 +193,11 @@ export function AgreementReconsentGate() {
         role="status"
         aria-live="polite"
         data-testid="agreement-reconsent-verify-error"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-lg backdrop-blur"
+        // Mobile: clear MobileNav (bottom-2 + 4rem bar) and AppShell's Quick
+        // Log FAB (bottom 5rem + safe-area, 3.5rem tall) so the banner never
+        // covers primary navigation; z-40 keeps it under modal overlays (z-50).
+        // md+: the nav is hidden, so the banner sits on the bottom edge.
+        className="fixed inset-x-0 bottom-[calc(8.5rem+env(safe-area-inset-bottom))] z-40 border-t border-border bg-background/95 p-3 shadow-lg backdrop-blur md:bottom-0 md:pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
       >
         <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-2 text-sm">
           <AlertTriangle className="h-4 w-4 shrink-0 text-primary" aria-hidden />

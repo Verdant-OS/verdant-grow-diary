@@ -222,6 +222,22 @@ describe("AgreementReconsentGate verify-error recovery", () => {
     expect(signOutSpy).not.toHaveBeenCalled();
   });
 
+  it("stacks above the mobile navigation and the Quick Log FAB, and under modal overlays", async () => {
+    // MobileNav is fixed at bottom-2 with a 4rem bar (z-30) and AppShell's
+    // Quick Log FAB sits at bottom 5rem + safe-area (z-40, h-14). A banner
+    // pinned to bottom-0 at z-50 covered both, so the "non-blocking" state
+    // blocked primary navigation on phones. On md+ the nav is hidden, so the
+    // banner may sit on the bottom edge there.
+    mockReadError = { message: "network blip" };
+    renderGate();
+    const banner = await verifyErrorBanner();
+    expect(banner).toHaveClass("bottom-[calc(8.5rem+env(safe-area-inset-bottom))]");
+    expect(banner).toHaveClass("md:bottom-0");
+    expect(banner).toHaveClass("z-40");
+    expect(banner).not.toHaveClass("bottom-0");
+    expect(banner).not.toHaveClass("z-50");
+  });
+
   it("Retry re-runs only the acceptance read: it never triggers auth revalidation", async () => {
     // Auth revalidation flips useRequireAuth to loading and AppShell swaps the
     // route for its loading shell, which unmounts the page and discards local

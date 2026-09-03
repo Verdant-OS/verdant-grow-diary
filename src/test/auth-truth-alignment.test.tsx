@@ -5,8 +5,8 @@
  * "Signed in" / "Open dashboard" while no `sb-*-auth-token` existed in this
  * tab's sessionStorage, no /auth/v1/token or /auth/v1/user call fired,
  * /rest/v1/user_agreement_acceptances returned 401 and get-paddle-price
- * returned auth_required; /grows and /dashboard cold entry bounced to
- * /welcome?redirectTo=.
+ * returned auth_required; /grows and /dashboard cold entry bounced to the
+ * signed-out landing with redirectTo preserved.
  *
  * MECHANISM (read from @supabase/auth-js 2.111.0, GoTrueClient.js): the auth
  * client relays SIGNED_IN / TOKEN_REFRESHED between same-origin tabs over a
@@ -22,8 +22,12 @@
  * server-rejected session as signed-out (redirectTo preserved), a transport
  * failure as revalidation_failed, and a hung getUser as bounded.
  *
- * The redirect-producing layer is AppShell (`buildSignedOutRedirect`, landing
- * `/welcome`), not the hook's `/auth` default parameter.
+ * The redirect-producing layer is AppShell (`buildSignedOutRedirect`), not the
+ * hook's `/auth` default parameter. Since the signed-out re-entry slice the
+ * landing it builds is the sign-in screen, `/auth?redirectTo=<destination>`
+ * (measured live on 94f9c631: the marketing /welcome read as "I don't have an
+ * account" to a returning grower). Anonymous visits to / and /welcome stay
+ * marketing; sign-out still exits to /welcome.
  */
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -200,10 +204,10 @@ beforeEach(() => {
 });
 
 describe("the redirect-producing layer", () => {
-  it("is AppShell's buildSignedOutRedirect landing on /welcome, not the hook's /auth default", () => {
-    expect(SIGNED_OUT_LANDING).toBe("/welcome");
-    expect(GROWS_SIGNED_OUT).toBe("/welcome?redirectTo=%2Fgrows");
-    expect(buildSignedOutRedirect("/dashboard")).toBe("/welcome?redirectTo=%2Fdashboard");
+  it("is AppShell's buildSignedOutRedirect landing on the sign-in screen with redirectTo, not the hook's bare /auth default", () => {
+    expect(SIGNED_OUT_LANDING).toBe("/auth");
+    expect(GROWS_SIGNED_OUT).toBe("/auth?redirectTo=%2Fgrows");
+    expect(buildSignedOutRedirect("/dashboard")).toBe("/auth?redirectTo=%2Fdashboard");
   });
 });
 
@@ -339,7 +343,7 @@ describe("useRequireAuth at the protected boundary", () => {
 
     await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/welcome?redirectTo=%2Fgrows"),
+      expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows"),
     );
     // Nothing to clear: the client holds no session, so no local sign-out
     // (whose SIGNED_OUT would be relayed to the tab that does hold one).
@@ -359,7 +363,7 @@ describe("useRequireAuth at the protected boundary", () => {
 
       await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
       await waitFor(() =>
-        expect(screen.getByTestId("location")).toHaveTextContent("/welcome?redirectTo=%2Fgrows"),
+        expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows"),
       );
       expect(mocks.signOut).toHaveBeenCalledTimes(1);
       expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
@@ -442,9 +446,9 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
           <IdentityLog />
           <Routes>
             <Route
-              path="/welcome"
+              path="/auth"
               element={
-                <div data-testid="public-landing">
+                <div data-testid="sign-in-screen">
                   <Probe />
                   <GoTo to="/grows" />
                 </div>
@@ -465,11 +469,11 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
     );
   }
 
-  it("a relayed identity with no client session lands on /welcome?redirectTo=%2Fgrows, never as signed in", async () => {
+  it("a relayed identity with no client session lands on /auth?redirectTo=%2Fgrows, never as signed in", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     mocks.getUser.mockResolvedValue({ data: { user: null }, error: SESSION_MISSING });
-    renderApp("/welcome");
-    expect(await screen.findByTestId("public-landing")).toHaveTextContent("signed-out");
+    renderApp("/auth");
+    expect(await screen.findByTestId("sign-in-screen")).toHaveTextContent("signed-out");
 
     await relayFromOtherTab("SIGNED_IN", sessionFor("u-relayed"));
     await waitFor(() => expect(mocks.getSession).toHaveBeenCalledTimes(2));
@@ -480,11 +484,11 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/welcome?redirectTo=%2Fgrows"),
+      expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows"),
     );
     expect(screen.queryByTestId("protected-child")).toBeNull();
     expect(screen.queryByText(/^Loading/)).toBeNull();
-    expect(screen.getByTestId("public-landing")).toHaveTextContent("signed-out");
+    expect(screen.getByTestId("sign-in-screen")).toHaveTextContent("signed-out");
     expect(renderedIdentities).not.toContain("u-relayed");
     expect(mocks.signOut).not.toHaveBeenCalled();
   });
@@ -495,10 +499,10 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
     renderApp("/grows");
 
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/welcome?redirectTo=%2Fgrows"),
+      expect(screen.getByTestId("location")).toHaveTextContent("/auth?redirectTo=%2Fgrows"),
     );
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
-    expect(await screen.findByTestId("public-landing")).toHaveTextContent("signed-out");
+    expect(await screen.findByTestId("sign-in-screen")).toHaveTextContent("signed-out");
     expect(screen.queryByTestId("protected-child")).toBeNull();
     expect(screen.queryByTestId("auth-status-indicator")).toBeNull();
   });

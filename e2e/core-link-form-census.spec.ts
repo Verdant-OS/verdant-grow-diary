@@ -1637,10 +1637,7 @@ async function settleRouteReadsBeforeLinkAudit(page: Page, sourcePath: string) {
     if (!state) {
       throw new Error(`${sourcePath} lost the mocked-read lifecycle tracker`);
     }
-    if (
-      state.pending === 0 &&
-      state.now - state.lastActivityAt >= ROUTE_READ_QUIET_WINDOW_MS
-    ) {
+    if (state.pending === 0 && state.now - state.lastActivityAt >= ROUTE_READ_QUIET_WINDOW_MS) {
       expect(
         new URL(page.url()).pathname,
         `${sourcePath} changed routes while its mocked reads were settling`,
@@ -1745,7 +1742,7 @@ async function clickEverySafeInternalHref(
         // query). `expectedPathname === classification.pathname` confirms the
         // destination was NOT rewritten: on the signed-out lane
         // expectedCensusNavigationPath redirects protected targets to
-        // /welcome, and a fragment link clicked from /welcome would otherwise
+        // /auth, and a fragment link clicked from /auth would otherwise
         // look same-page and be asserted for an anchor the redirect never
         // carries.
         const expectedHash = link.classification.hash;

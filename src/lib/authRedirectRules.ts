@@ -17,8 +17,21 @@ import { APP_ROUTES } from "@/lib/appRouteManifest";
 
 export const DEFAULT_AUTH_REDIRECT = "/";
 
-/** Where AppShell sends signed-out visitors (the public landing). */
-export const SIGNED_OUT_LANDING = "/welcome";
+/**
+ * Where AppShell sends a signed-out visitor who hit a protected route: the
+ * sign-in screen, with the destination preserved as `redirectTo` (see
+ * buildSignedOutRedirect). Measured live on 94f9c631 (tokenless tab): landing
+ * on the full marketing /welcome read as "I don't have an account" to a
+ * returning grower. Anonymous visits to / and /welcome stay marketing, and
+ * sign-out still exits to /welcome (authSessionExitRules).
+ */
+export const SIGNED_OUT_LANDING = "/auth";
+
+/**
+ * The public marketing entry. Never a return-to destination: a grower who was
+ * bounced from it, or from the root, is sent to the plain sign-in screen.
+ */
+export const PUBLIC_MARKETING_LANDING = "/welcome";
 
 const DANGEROUS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
@@ -33,7 +46,7 @@ export function sanitizeAuthRedirect(
 
   if (typeof value !== "string") return safeFallback;
   // Reject control chars / whitespace / null bytes anywhere.
-  // eslint-disable-next-line no-control-regex -- deliberately match C0 control chars + DEL (plus whitespace) to reject them
+
   if (/[\s\u0000-\u001f\u007f]/.test(value)) return safeFallback;
   if (value.length === 0 || value.length > 512) return safeFallback;
   if (!value.startsWith("/")) return safeFallback;
@@ -89,12 +102,20 @@ export function resolveKnownRouteReturnTo(value: unknown): string | null {
   return sanitized;
 }
 
+/** True when `returnTo` is `landing` itself, with or without a query or hash. */
+function isLandingLocation(returnTo: string, landing: string): boolean {
+  return (
+    returnTo === landing || returnTo.startsWith(`${landing}?`) || returnTo.startsWith(`${landing}#`)
+  );
+}
+
 /**
  * Signed-out redirect target for the protected-route boundary. Preserves the
  * intended in-app location — path, query, AND hash (e.g.
- * /sensors#manual-reading) — as a `redirectTo` query param on the landing
- * path so /auth can restore it after sign-in. Only when the location is a
- * known manifest route (never raw attacker-controllable strings).
+ * /sensors#manual-reading) — as a `redirectTo` query param on the sign-in
+ * screen, which restores it after sign-in. Only when the location is a known
+ * manifest route (never raw attacker-controllable strings), and never the
+ * root, the sign-in screen itself (no self-loop) or the marketing landing.
  */
 export function buildSignedOutRedirect(
   pathname: string,
@@ -105,9 +126,8 @@ export function buildSignedOutRedirect(
   if (
     !returnTo ||
     returnTo === DEFAULT_AUTH_REDIRECT ||
-    returnTo === SIGNED_OUT_LANDING ||
-    returnTo.startsWith(`${SIGNED_OUT_LANDING}?`) ||
-    returnTo.startsWith(`${SIGNED_OUT_LANDING}#`)
+    isLandingLocation(returnTo, SIGNED_OUT_LANDING) ||
+    isLandingLocation(returnTo, PUBLIC_MARKETING_LANDING)
   ) {
     return SIGNED_OUT_LANDING;
   }

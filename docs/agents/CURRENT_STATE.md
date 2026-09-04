@@ -1,7 +1,262 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-02 UTC (~20:12 UTC)
-**Updated by:** Claude (2026-09-02: **#1253 MERGED as `860d39a9`** — squash, one parent; `fix(auth)`:
+**Last updated:** 2026-09-04 UTC (~15:50 UTC)
+**Updated by:** Claude (2026-09-04: **twenty-three merges since the last stamp; deploy tip =
+`763e703f0`**, and **live is independently MEASURED at `763e703f0`, `dirty:false`**, read from
+`https://verdantgrowdiary.com/version.json` at 15:49:43 UTC (`buildTime`
+`2026-09-04T15:48:53.588Z`). **Tip = live.** Restore SHA is **`763e703f0`**. **Do not ping Tolu.**
+Publisher is **Vercel** — measured, not carried (`server: Vercel`, `x-vercel-cache: HIT`, edge
+`iad1`). No Lovable Publish. No History-restore. No APPLY. **Zero migrations across all
+twenty-three merges.** The `860d39a9` block below recorded `#1252` as READY-not-merged and the
+deploy branch as red on `Dependency & Security CI`; **both rows are superseded** — `#1252` merged
+as `408c4142` and the audit lane is green again. **`#1254`, the previous restamp, is CLOSED as
+SUPERSEDED** at Cheek's instruction; its `#1252` / `#1255` rows are folded into §5 below and
+labelled as carried, not re-measured. Signup PREFLIGHT still **BLOCKED**; not run here, not claimed
+passed. Stay on Paddle; live checkout off. Prior header follows.)
+
+## 1. Twenty-three merges since the last stamp — deploy tip `763e703f0`
+
+`established fact`, from `git rev-list c718c5b3a..origin/verdant-grow-diary` after `git fetch`,
+measured 15:49 UTC. The last stamped block sits on `860d39a9`, delivered by `#1251`
+(`c718c5b3a`); everything below it is unstamped until now.
+
+| #     | Merge SHA   | Merged (UTC)     | Files | Migrations | Subject                                          |
+| ----- | ----------- | ---------------- | ----: | ---------: | ------------------------------------------------ |
+| #1252 | `408c4142e` | 2026-09-02 20:41 |     6 |          0 | `fast-uri` override → 3.1.6 (four high advisories) |
+| #1255 | `cb8ee9fd8` | 2026-09-02 21:00 |     1 |          0 | Dependabot `qs` 6.15.3 → 6.16.0                  |
+| #1256 | `b4cbd54f5` | 2026-09-02 22:23 |     4 |          0 | do not load entitlements on `getUser` miss       |
+| #1257 | `92a67bf2c` | 2026-09-03 00:42 |     4 |          0 | gate AppShell entitlements on `sessionReady`     |
+| #1258 | `697c78649` | 2026-09-03 01:44 |     2 |          0 | honour plant-only `/doctor?plantId=` carry       |
+| #1259 | `ac3dada08` | 2026-09-03 04:31 |     3 |          0 | hoist plant-scoped Better/Same/Worse in V2 sheet |
+| #1260 | `549fb9817` | 2026-09-03 04:58 |     5 |          0 | saved status check-in counts as recent activity  |
+| #1261 | `da4825cae` | 2026-09-03 05:02 |     2 |          0 | agreements verify-error retries without sign-out |
+| #1262 | `8fbd0bb0c` | 2026-09-03 17:05 |     4 |          0 | verify-error fails open; `revalidation_failed`   |
+| #1263 | `94f9c631a` | 2026-09-03 18:26 |     3 |          0 | expose only a client-held session                |
+| #1264 | `ce4a87f62` | 2026-09-03 19:21 |     2 |          0 | fail closed on null plant activity               |
+| #1265 | `70154eaba` | 2026-09-03 19:59 |    10 |          0 | signed-out re-entry lands on `/auth?redirectTo`  |
+| #1267 | `9f15ca323` | 2026-09-03 22:33 |     2 |          0 | bound grow detail loading                        |
+| #1266 | `f5eed61d8` | 2026-09-03 23:26 |     2 |          0 | confirm local sign-out before leaving for `/auth` |
+| #1268 | `aba373892` | 2026-09-04 00:43 |     2 |          0 | stale Quick Log empty-note hint after save       |
+| #1269 | `85bcdd353` | 2026-09-04 01:34 |     2 |          0 | clear saved hint on Log another                  |
+| #1270 | `ef7cec687` | 2026-09-04 03:24 |     2 |          0 | reconcile a relayed session to this tab's bearer |
+| #1272 | `d686efaac` | 2026-09-04 05:41 |     3 |          0 | route mobile Quick Log FAB to shared dialog      |
+| #1271 | `7530893d9` | 2026-09-04 06:11 |     2 |          0 | tell auth, gateway and config apart              |
+| #1273 | `d0d76c80a` | 2026-09-04 13:50 |     3 |          0 | stop blaming the connection for a status-less error |
+| #1274 | `bef83862c` | 2026-09-04 14:27 |     2 |          0 | require both transport signals                   |
+| #1275 | `440d196a4` | 2026-09-04 15:25 |     1 |          0 | enforce the both-signals contract (tests only)   |
+| #1276 | `763e703f0` | 2026-09-04 15:40 |     3 |          0 | make checkout recovery match its cause           |
+
+Full tip oid: `763e703f08b99866715472702b5e5957693915f7`. **Zero migrations across the whole span**
+(`git diff --name-only c718c5b3a 763e703f0 -- 'supabase/migrations/*'` returns nothing), and **no
+commit in the span touches `docs/agents/CURRENT_STATE.md`** — which is why the file was
+twenty-three merges stale. `#1266` and `#1267`, and `#1271` and `#1272`, merged out of numeric
+order; the table is in commit order, not PR order.
+
+## 2. Live is independently MEASURED at `763e703f0`
+
+Claude read `https://verdantgrowdiary.com/version.json` twice in this slice, across a tip change,
+and both reads showed tip = live.
+
+| Field           | Value                                                        |
+| --------------- | ------------------------------------------------------------ |
+| `commit`        | `763e703f08b99866715472702b5e5957693915f7`                   |
+| `dirty`         | **`false`**                                                  |
+| `ref`           | `verdant-grow-diary`                                         |
+| `commitTime`    | `2026-09-04T15:40:30Z`                                       |
+| `buildTime`     | `2026-09-04T15:48:53.588Z`                                   |
+| `treeHashShort` | `5dfc8aa933a2`                                               |
+| server          | **Vercel** (`server: Vercel`, `x-vercel-cache: HIT`, `iad1`) |
+| apex HTTP       | `200`                                                        |
+| www HTTP        | `308` → apex `version.json`                                  |
+| measured        | 2026-09-04 **15:49:43 UTC**                                  |
+
+An earlier read at **15:45:47 UTC** returned `440d196a4ad1e1de0eb93981ab459fa5f2b5f5ef`,
+`dirty:false`, `buildTime 2026-09-04T15:38:01.289Z`, `treeHashShort 7b7d0dbe2b60` — that was the
+tip at the time (`#1275`), and `#1276` landed between the two reads. **Both reads agree that the
+publisher deploys the deploy branch automatically and that tip = live.**
+
+**Current production is MEASURED. Do not record it as `NOT_MEASURED`.** Do not carry `860d39a9`,
+`cb8ee9fd` or `440d196a4` as current live.
+
+**Publisher correction, measured rather than carried.** `CLAUDE.md`'s codebase-orientation section
+states "Lovable is the production publisher" and that `vercel.json` does not govern production.
+Both live reads returned `server: Vercel` with `x-vercel-cache: HIT` from edge `iad1`. This file's
+prior blocks already said Vercel; the measurement confirms them and **`CLAUDE.md` is wrong on this
+point**. Reasoning about production redirects or headers from `CLAUDE.md` will produce wrong
+answers. Correcting `CLAUDE.md` is a governance-file edit and therefore a separate slice — it would
+bump all twelve `Sentinel-Version` files — and is **not done here**.
+
+## 3. The checkout price-error chain — four Claude merges, one slice
+
+`established fact`, from the commit graph and the PR bodies; owner Claude, slice
+CHECKOUT_PRICE_ERROR_TRUTH, assigned by Cheek.
+
+`#1271` `7530893d9` → `#1273` `d0d76c80a` → `#1274` `bef83862c` → `#1275` `440d196a4`. Each PR
+closed review findings raised on the one before it, and each became a **new** PR because the
+reviewer's findings landed two to four minutes before the merge and `AGENTS.md` forbids reusing a
+merged PR.
+
+What shipped: `getPaddlePriceId` no longer throws a bare `Error` when `get-paddle-price` fails
+without a recognised JSON code. Every failure is fail-closed and classified — server-declared
+reasons (`unknown_plan`, `price_not_configured`, `price_resolution_unavailable`, `plan_sold_out`,
+`pack_requires_monthly_plan`, `auth_required`) plus three client-assigned ones read from HTTP
+status only when no body code is readable (`price_gateway_unavailable`, `price_request_failed`,
+`price_response_unusable`). Client-assigned tokens are never accepted off the wire. Because every
+failure now throws the typed error, every failure reaches the calm inline branch and emits
+`checkout_catalog_unavailable` with a distinct `reason` — the observability half, with no edit to
+the hook, the analytics schema, or any UI file. Reason tokens stay telemetry-only.
+
+`#1275` is tests-only: it closed a hole where the `#1274` "both signals" contract could be reverted
+to a name-only check with all 28 tests still green. Proven by mutation, not by a RED-on-parent
+(the parent already carried the fix): name-only mutant + merged tests = 28 passed; the same mutant
++ `#1275`'s tests = 2 failed; real predicate + `#1275`'s tests = 29 passed.
+
+**No live Paddle flip, no payments change, no secrets, no env vars** in any of the four.
+
+## 4. `#1276` — the Pricing recovery panel — MERGED, Codex's slice
+
+`established fact`, from `GET /pulls/1276` and the commit graph. **Owner: Codex**, branch
+`codex/pricing-recovery-title-truth`, head `eaa45e316e`, merged as `763e703f0` at ~15:40 UTC,
+N=3 files, +298 / −91, 0 migrations. Claude did **not** implement it and did not push to it.
+
+It closes the deferred finding carried by `#1271`–`#1275`: the recovery panel rendered one
+launch-list heading for every cause. It now branches — transient gateway/request/unusable get one
+retry action and no launch-list framing or form; configuration and environment-unavailable keep the
+existing launch-list recovery; `auth_required` saves the plan intent, awaits `signOut()`, then
+opens real sign-in rather than retrying the same stale bearer. `blockedReasonCode` is threaded out
+of `usePaddleCheckout`; the cause mapping is **inlined in `Pricing.tsx`**, not a rules module.
+Claude verified all three of those from the diff before the merge (`usePaddleCheckout.ts:61`/`:104`/
+`:298`; `Pricing.tsx:229-247` and `:864`).
+
+**A near-miss worth recording.** Claude was assigned this same panel as a slice and began designing
+it while `#1276` was already open. The collision was missed because the open-PR audit reused a PR
+list captured earlier in the session instead of re-listing; `#1276` had been created after that
+snapshot. Cheek caught it. **Re-list open PRs from the API before every collision claim — a
+carried list is not evidence.**
+
+## 5. `#1254` CLOSED as SUPERSEDED — its facts folded here
+
+`established fact`: `#1254` (`docs(state): restamp on cb8ee9fd`, branch
+`claude/test-coverage-analysis-j0bz93`, head `796f943831e`, 3 commits, +465 / −36, one file) was
+**closed unmerged** at Cheek's instruction at ~15:47 UTC. It was still `mergeable` and clean
+against the tip, but **20 commits behind**: landing it would have added blocks describing
+`408c4142` and `cb8ee9fd` at the head of a file whose branch had moved twenty-three merges on.
+**Do not reopen it. Do not rebase its commits.** One current block is the truthful shape.
+
+Folded from its body, **`source claim`, carried and NOT re-measured by this slice** — Claude did
+not re-read those merges, re-run that dependency scan, or re-measure live at those tips:
+
+- **`#1252` merged as `408c4142`** — `overrides.fast-uri` 3.1.5 → 3.1.6 against four high
+  advisories (GHSA-5jgf-p345-68v8, GHSA-f65p-4m7j-42xc, GHSA-fph4-wmhf-6fwf, GHSA-jqff-g426-hqxp);
+  6 files, +39 / −9, 0 migrations; `merged_at` 2026-09-02 20:48:44 UTC.
+- **`#1255` merged as `cb8ee9fd`** — Dependabot `qs` 6.15.3 → 6.16.0, `package-lock.json` only,
+  +3 / −28, 0 migrations; `merged_at` 2026-09-02 21:08:05 UTC.
+- **The deploy-branch `Dependency & Security CI` red is cleared.** `#1254` recorded the
+  deploy-branch push runs on `408c4142` and `cb8ee9fd` both `success`. Independently, Claude
+  measured the `Lockfile policy, dependency audit, typecheck, build, tests` lane **`success`** on
+  `#1275`'s head `7d5f0971` at 15:20 UTC — a PR head, not a deploy-branch push, so it corroborates
+  rather than re-measures. `config/dependency-security-exceptions.json` is still empty; do not add
+  an entry.
+- The Dependabot alert count after `#1255` remains **`NOT_MEASURED`** — alerts were not read, then
+  or now.
+
+## 6. Restore SHA for Tolu/Support is `763e703f0`
+
+If Tolu asks for a restore point, it is **`763e703f0`** (full oid
+`763e703f08b99866715472702b5e5957693915f7`). **Do not ping Tolu.** Support outcome remains
+`NOT_MEASURED`.
+
+## 7. Open PRs — no other owner of this file
+
+`established fact`, MEASURED at 15:50 UTC: GitHub API list of open PRs with base
+`verdant-grow-diary`, then `git diff --name-only <merge-base> <head> -- docs/agents/CURRENT_STATE.md`
+per fetched head.
+
+| PR    | Head        | Draft | Touches `CURRENT_STATE.md` |
+| ----- | ----------- | ----- | -------------------------- |
+| #1250 | `4b6b94680` | true  | no                         |
+| #1221 | `9f922ca54` | false | no                         |
+| #1181 | `3076870e6` | false | no                         |
+| #1180 | `2d2b00cb8` | false | no                         |
+| #1175 | `032c4b20e` | false | no                         |
+| #1174 | `4e52b5e5d` | true  | no                         |
+| #1153 | `030a9e8bd` | false | no                         |
+| #1151 | `dafef00ca` | false | no                         |
+| #1088 | `c79580038` | false | no                         |
+
+**Nine open PRs; none touches this file. No other ACTIVE OWNER.** This restamp is the only writer.
+`#1250` is a Copilot draft, not touched. `#1174` is `draft: true`, SUPERSEDED on V0 C/F hunks — do
+not convert, ready or merge. `#1221` stays READY at `9f922ca54`, not merged, not touched; its peer
+seat is still unfilled.
+
+**`Supabase Preview` `42P07` remains UNSTABLE, not `FAIL`.** MEASURED `failure` on `#1273`,
+`#1274` and `#1275`'s heads, each `relation "ai_credit_grants" already exists (SQLSTATE 42P07)` at
+statement 0 — the documented repo-wide replay collision, catalogued as a `compatibility_noops`
+entry in `config/local-supabase-replay-compatibility.json` (canonical
+`20260721103000_ai_credit_grants.sql`, duplicate `20260721182752_4fc51714-…sql`). Zero migrations
+on any of those branches; the check is absent from `config/required-status-checks.json`. It is
+deterministic, not flaky — do not re-run it, and do not "fix" it by editing merged migration
+history.
+
+## 8. Signup PREFLIGHT still BLOCKED — no APPLY
+
+`source claim`, carried. Signup PREFLIGHT is still **BLOCKED** on the malformed Aug 24
+`SUPABASE_DB_URL` secret. **This slice did not run PREFLIGHT and does not claim it passed.**
+Production apply state stays `NOT_MEASURED`. **No APPLY.**
+
+## 9. Carried from the blocks below, not re-measured
+
+- **Production Postgres identity** (`source claim`, Cheek/GDP): Lovable Cloud;
+  `knkwiiywfkbqznbxwqfh` is that Cloud DB's published identity, not a standalone Supabase session.
+  Do not treat `bzatgtgjvuojpoxcknaa` as production.
+- **Billing** (`source claim`): stay on Paddle; live checkout off; `test_` keys and the sandbox
+  banner are EXPECTED. The Paddle Craft catalog preflight reported all seven sandbox entries "not
+  verified — API key unset" on `#1274` and `#1275` (owner-held read-scope secrets; non-blocking).
+- **Vercel integrations and apex DNS**: carried; nothing disconnected, Vercel DNS not enabled,
+  registrar not edited.
+- `#1221`'s CI and review detail, the `#1242` review-seat rows, and the Copilot `#1223` findings:
+  history in the blocks below, not re-checked here.
+- No metrics, no subscriber counts, no CI-derived product claims.
+
+## 10. Current locks
+
+- **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production
+  SQL, no Lovable project-chat agent edit, no device control, no automatic Action Queue, no
+  credentials.
+- **Publisher is Vercel** — MEASURED this slice, project `verdant-grow-diary`. **Auth and DB stay
+  Lovable Cloud. No Lovable Publish.** `CLAUDE.md` says Lovable publishes; it is wrong and is not
+  corrected here (governance-file edit = twelve-file `Sentinel-Version` bump = its own slice).
+- **Paddle: `test_` keys and the sandbox banner are EXPECTED.** Live checkout off. Stay on Paddle.
+  Do not revoke the existing `live_` token.
+- **Current production is MEASURED at `763e703f0`, `dirty:false`, ref `verdant-grow-diary`.**
+  Do not record it as `NOT_MEASURED`. Do not carry `860d39a9`, `cb8ee9fd` or `440d196a4` as live.
+- **Tolu: do not ping.** Restore SHA **`763e703f0`**.
+- **The `860d39a9` block's `Dependency & Security CI` red row is SUPERSEDED.** `#1252` landed as
+  `408c4142`. Do not add an entry to `config/dependency-security-exceptions.json`.
+- **`#1254` is CLOSED UNMERGED, superseded by this block. Do not reopen it. Do not rebase its
+  commits.**
+- **`#1276` is MERGED (`763e703f0`) and was Codex's slice, not Claude's.** Do not re-implement the
+  recovery panel. There is no `checkoutRecoveryPanelRules.ts`; the cause mapping is inlined in
+  `Pricing.tsx` deliberately.
+- **Re-list open PRs from the API before any collision claim.** A PR list carried from earlier in a
+  session is not evidence; that error nearly produced a competing implementation of `#1276`.
+- **`#1221` is READY at `9f922ca54`, not merged.** Claude does not merge it. Peer seat unfilled.
+- **`#1174` is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge. **`#1250`** is
+  a Copilot draft; not touched.
+- **Signup-attribution APPLY stays owner-locked.** Production apply state is `NOT_MEASURED`.
+- **Signup PREFLIGHT still BLOCKED** (malformed Aug 24 `SUPABASE_DB_URL`). Do not claim it passed.
+- **Vercel integrations and the registrar are untouched.** Vercel DNS not enabled.
+- **`Supabase Preview` `42P07` is UNSTABLE, not `FAIL`.** Deterministic; do not re-run, do not edit
+  merged migration history to chase it.
+- **Catch-all / Kerberos / HOBA remain `BLOCKED`.** Knowledge-library expansion stays `HOLD`.
+  Plant Memory PARK. Spider Farmer GGS radio capture stays parked and `NOT_MEASURED`.
+- This slice is **N=1** and stays **draft**, branch
+  `claude/checkout-price-error-observability-kxv6y9` restarted from `763e703f0`. Unique file
+  `docs/agents/CURRENT_STATE.md`. No `src/`, no `supabase/`, no `package.json`, no governance file.
+  CI on this head is `NOT_MEASURED` at stamp time. No ready. No merge. No auto-merge.
+
+**Prior last updated:** 2026-09-02 UTC (~20:12 UTC)
+**Prior update:** Claude (2026-09-02: **#1253 MERGED as `860d39a9`** — squash, one parent; `fix(auth)`:
 signed-in growers are no longer bounced to `/welcome` when `getUser` misses. **Deploy tip = live
 `860d39a9`, `dirty:false`**, independently MEASURED from `https://verdantgrowdiary.com/version.json`
 at 20:07 UTC (~3:07 PM CT; `buildTime` `2026-09-02T19:53:51.502Z`). Restore SHA is **`860d39a9`**.

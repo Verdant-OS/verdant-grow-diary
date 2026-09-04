@@ -270,6 +270,34 @@ describe("getPaddlePriceId — every failure is classified, never generic", () =
     expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_gateway_unavailable");
   });
 
+  // Copilot round 1: a missing `context.status` is not evidence the device is
+  // offline. An invoke error with no context at all reached the transport
+  // branch and told the grower to check their connection — wrong advice for
+  // a malformed or already-consumed reply. Only a real fetch failure earns
+  // that message now.
+  it("does not blame the connection for a status-less error that is not a transport failure", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsHttpError", message: "context went missing" },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+    expect((err as Error).message).not.toMatch(/connection/i);
+  });
+
+  it("still names a real transport failure as such", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsFetchError", context: new TypeError("Failed to fetch") },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_request_failed");
+    expect((err as Error).message).toMatch(/connection/i);
+  });
+
   it("classifies a 2xx that carries no paddleId as an unusable response", async () => {
     invokeMock.mockResolvedValueOnce({ data: {}, error: null });
 
@@ -350,19 +378,42 @@ describe("catalog copy — auth, gateway and config tell the grower different th
     }
   });
 
-  it("new branch copy leaks no reason token, env var name, or status code", () => {
+  // Copilot round 1 (nit): checking each message only against its OWN token
+  // still passes if the auth copy leaks `price_gateway_unavailable`. Cross-
+  // check every message against the COMPLETE reason vocabulary instead.
+  it("no catalog message leaks ANY reason token, env var name, or status code", () => {
+    const ALL_REASONS: readonly PaddleCheckoutCatalogReason[] = [
+      "unknown_plan",
+      "price_not_configured",
+      "price_resolution_unavailable",
+      "plan_sold_out",
+      "pack_requires_monthly_plan",
+      "auth_required",
+      "price_gateway_unavailable",
+      "price_request_failed",
+      "price_response_unusable",
+    ];
+    const TELEMETRY_ONLY_TOKENS = [...ALL_REASONS, "checkout_env_unavailable"];
+
+    for (const reason of ALL_REASONS) {
+      const msg = getPaddleCheckoutCatalogMessage(reason);
+      for (const token of TELEMETRY_ONLY_TOKENS) {
+        expect(msg, `message for "${reason}" leaked token "${token}"`).not.toContain(token);
+      }
+      expect(msg).not.toMatch(/PADDLE_PRICE_/);
+      expect(msg).not.toMatch(/env(ironment)? var/i);
+      expect(msg).not.toMatch(/\b(401|403|404|500|502|503)\b/);
+    }
+  });
+
+  it("new branch copy names no token, JWT, or provider", () => {
     for (const reason of [
       "auth_required",
       "price_gateway_unavailable",
       "price_request_failed",
       "price_response_unusable",
     ] as const) {
-      const msg = getPaddleCheckoutCatalogMessage(reason);
-      expect(msg).not.toMatch(/PADDLE_PRICE_/);
-      expect(msg).not.toMatch(/env(ironment)? var/i);
-      expect(msg).not.toMatch(reason);
-      expect(msg).not.toMatch(/\b(401|403|404|500|502|503)\b/);
-      expect(msg).not.toMatch(/token|JWT|Paddle\b/i);
+      expect(getPaddleCheckoutCatalogMessage(reason)).not.toMatch(/token|JWT|Paddle\b/i);
     }
   });
 });

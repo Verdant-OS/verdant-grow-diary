@@ -197,15 +197,38 @@ function readEdgeFunctionStatus(error: unknown): number | null {
 }
 
 /**
+ * True only for the genuine transport case. supabase-js raises
+ * `FunctionsFetchError` when the request never received an HTTP response,
+ * and puts the underlying network error — an `Error`, not a `Response` — in
+ * `context`.
+ *
+ * WHY THIS IS SEPARATE FROM "no status": a missing `context.status` is NOT
+ * evidence that the device is offline. An error with no `context` at all, a
+ * malformed context, or any unexpected throw from the client also lands
+ * there, and telling that grower to "check your connection" sends them to
+ * fix something that is not broken. Only a real fetch failure earns that
+ * message; everything else is a reply we cannot act on.
+ */
+function isTransportFailure(error: unknown): boolean {
+  const name = (error as { name?: unknown } | null | undefined)?.name;
+  if (name === "FunctionsFetchError") return true;
+  const ctx = (error as { context?: unknown } | null | undefined)?.context;
+  return ctx instanceof Error;
+}
+
+/**
  * Fail-closed classification for a resolver failure that declared no reason
  * of its own. Total by construction: every input maps to exactly one
  * reason, so no failure can fall through to an unclassified state.
  */
-function classifyUndeclaredPriceFailure(status: number | null): PaddleCheckoutCatalogReason {
-  if (status === null) return "price_request_failed";
+function classifyUndeclaredPriceFailure(
+  status: number | null,
+  transport: boolean,
+): PaddleCheckoutCatalogReason {
   if (status === 401) return "auth_required";
-  if (status >= 500) return "price_gateway_unavailable";
-  return "price_response_unusable";
+  if (status !== null && status >= 500) return "price_gateway_unavailable";
+  if (status !== null) return "price_response_unusable";
+  return transport ? "price_request_failed" : "price_response_unusable";
 }
 
 /** Best-effort extraction of the sanitized `{ error: "..." }` code returned
@@ -298,7 +321,7 @@ export async function getPaddlePriceId(priceId: string): Promise<string> {
     const reason =
       (await extractCatalogReason(data, error)) ??
       (error
-        ? classifyUndeclaredPriceFailure(readEdgeFunctionStatus(error))
+        ? classifyUndeclaredPriceFailure(readEdgeFunctionStatus(error), isTransportFailure(error))
         : // 2xx with no price id: the resolver claimed success and gave us
           // nothing to open a checkout with.
           "price_response_unusable");

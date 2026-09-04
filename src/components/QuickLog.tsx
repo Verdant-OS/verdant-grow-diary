@@ -255,6 +255,39 @@ interface Props {
   successMessage?: string;
 }
 
+function quickLogDraftHandoffKeyPart(value: unknown): string | number | boolean | null {
+  if (typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return null;
+}
+
+function quickLogDraftHandoffKey(prefill?: QuickLogPrefill | null): string | null {
+  if (!prefill) return null;
+  try {
+    return JSON.stringify([
+      quickLogDraftHandoffKeyPart(prefill.plantId),
+      quickLogDraftHandoffKeyPart(prefill.plantName),
+      quickLogDraftHandoffKeyPart(prefill.growId),
+      quickLogDraftHandoffKeyPart(prefill.tentId),
+      quickLogDraftHandoffKeyPart(prefill.eventType),
+      quickLogDraftHandoffKeyPart(prefill.activityId),
+      quickLogDraftHandoffKeyPart(prefill.suggestSnapshot),
+      quickLogDraftHandoffKeyPart(prefill.note),
+      quickLogDraftHandoffKeyPart(prefill.source),
+      quickLogDraftHandoffKeyPart(prefill.photoCount),
+      quickLogDraftHandoffKeyPart(prefill.preset),
+      quickLogDraftHandoffKeyPart(prefill.phenoHuntId),
+      quickLogDraftHandoffKeyPart(prefill.phenoEvidenceGoal),
+      quickLogDraftHandoffKeyPart(prefill.wateringVolumeMl),
+      quickLogDraftHandoffKeyPart(prefill.publicStarterDraftId),
+      quickLogDraftHandoffKeyPart(prefill.publicStarterDraftUpdatedAt),
+      quickLogDraftHandoffKeyPart(prefill.suppressPlantDefault),
+    ]);
+  } catch {
+    return null;
+  }
+}
+
 const QUICK_OBSERVATION_CHIPS = [
   { label: "Watered", text: "Watered today." },
   { label: "Fed", text: "Fed today." },
@@ -403,6 +436,7 @@ export default function QuickLog({
   const [wateringError, setWateringError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedTarget, setSavedTarget] = useState<SavedTarget | null>(null);
+  const [savedDraftHandoffKey, setSavedDraftHandoffKey] = useState<string | null>(null);
   const [earlyMilestone, setEarlyMilestone] = useState<EarlyStageMilestone | null>(null);
   const [earlyVigor, setEarlyVigor] = useState<EarlyStageVigor | null>(null);
   const [earlyNotes, setEarlyNotes] = useState<string>("");
@@ -471,6 +505,7 @@ export default function QuickLog({
   const lastFailedSaveSigRef = useRef<string | null>(null);
 
   const prefillRequestKey = quickLogPrefillTargetKey(prefill);
+  const draftHandoffKey = quickLogDraftHandoffKey(prefill);
   const namedPrefillQueryError =
     prefillRequestKey !== null && (plantsQuery.isError || tentsQuery.isError);
   const namedPrefillQueryPending =
@@ -830,6 +865,7 @@ export default function QuickLog({
    */
   const handleAllActivitiesSaveSuccess = useCallback(
     (result: QuickLogAllActivitiesSaveSuccess) => {
+      if (draftHandoffKey !== null) setSavedDraftHandoffKey(draftHandoffKey);
       consumeReviewedPublicStarterDraft();
       const plantId = result.target.plantId;
       if (!plantId) return;
@@ -843,7 +879,7 @@ export default function QuickLog({
         user?.id ?? null,
       );
     },
-    [consumeReviewedPublicStarterDraft, user?.id],
+    [consumeReviewedPublicStarterDraft, draftHandoffKey, user?.id],
   );
 
   // Slice A2: re-enable stage defaulting ONLY when the grower actively switches
@@ -1037,6 +1073,7 @@ export default function QuickLog({
     setWateringError(null);
     setSaveError(null);
     setSavedTarget(null);
+    setSavedDraftHandoffKey(null);
     setEarlyMilestone(null);
     setEarlyVigor(null);
     setEarlyNotes("");
@@ -1213,6 +1250,7 @@ export default function QuickLog({
       return;
     }
     const saveTarget = Object.freeze({ ...editorTarget.target });
+    const saveDraftHandoffKey = draftHandoffKey;
     const saveStage = stage;
     const saveStageWasUserTouched = stageUserTouchedRef.current;
     const saveEventType = effectiveEventType;
@@ -1442,6 +1480,7 @@ export default function QuickLog({
         },
         user?.id ?? null,
       );
+      setSavedDraftHandoffKey(saveDraftHandoffKey);
       setSavedTarget({
         id: savePlant.id,
         name: plantLabel,
@@ -1543,6 +1582,8 @@ export default function QuickLog({
         ? "plant details"
         : "tent details";
   const selectedResponseStatus = readResponseCheckStatus(note);
+  const emptyDraftNoteWasSaved =
+    draftHandoffKey !== null && savedDraftHandoffKey === draftHandoffKey;
 
   return (
     <Dialog
@@ -1661,7 +1702,7 @@ export default function QuickLog({
                       {draftPreview.noteSummary}
                     </p>
                   ) : null}
-                  {draftPreview.emptyNoteHint ? (
+                  {draftPreview.emptyNoteHint && !emptyDraftNoteWasSaved ? (
                     <p
                       data-testid="quick-log-draft-preview-empty-note"
                       className="text-[11px] text-muted-foreground italic"

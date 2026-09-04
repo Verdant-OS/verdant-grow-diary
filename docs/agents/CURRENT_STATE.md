@@ -224,8 +224,9 @@ per fetched head.
 | #1088 | `c79580038` | false | no                         |
 
 **Nine open PRs; none touches this file. No other ACTIVE OWNER.** This restamp is the only writer.
-`#1250` is a Copilot draft, not touched. `#1174` is `draft: true`, SUPERSEDED on V0 C/F hunks — do
-not convert, ready or merge. `#1221` stays READY at `9f922ca54`, not merged, not touched; its peer
+**`#1250` is on HOLD** (Cheek, this slice) — a Copilot draft, `fix(ci): surface migration-drift
+preflight detail when probe never runs`. Not touched, not readied, not merged. `#1174` is
+`draft: true`, SUPERSEDED on V0 C/F hunks — do not convert, ready or merge. `#1221` stays READY at `9f922ca54`, not merged, not touched; its peer
 seat is still unfilled.
 
 **`Supabase Preview` `42P07` remains UNSTABLE, not `FAIL`.** MEASURED `failure` on `#1273`,
@@ -236,6 +237,20 @@ entry in `config/local-supabase-replay-compatibility.json` (canonical
 on any of those branches; the check is absent from `config/required-status-checks.json`. It is
 deterministic, not flaky — do not re-run it, and do not "fix" it by editing merged migration
 history.
+
+It appeared again on **this restamp's own head** `436aa6c27`, twice: check runs `101087628694`
+(15:59:24) and `101087833335` (16:00:06), both `failure`, both the identical `42P07`. The second
+was the Supabase integration's own re-run, not a requested one — two runs on a byte-identical tree
+reaching the same conclusion, which is the determinism claim measured rather than asserted. This PR
+is **one Markdown file**: zero `supabase/` files, zero migrations, zero non-Markdown files. A
+restamp of a state document cannot collide two SQL files dated 2026-07-21. **UNSTABLE, not `FAIL`**;
+stood down once on the PR, no second comment, no further re-run.
+
+Route note, because it cuts against the earlier pattern: on `d0d76c80a`, `bef83862c` and
+`7d5f0971` the bot reported *"Service health check failed"* **before** the branch error, while on
+`436aa6c27` Deployments went **green** first (Database / Services / APIs ✅) and only then
+Migrations failed. Same end state, different route — so **neither the warning nor the green
+deployment predicts this lane**; only its own conclusion does.
 
 ## 8. Signup PREFLIGHT still BLOCKED — no APPLY
 
@@ -256,6 +271,22 @@ Production apply state stays `NOT_MEASURED`. **No APPLY.**
 - `#1221`'s CI and review detail, the `#1242` review-seat rows, and the Copilot `#1223` findings:
   history in the blocks below, not re-checked here.
 - No metrics, no subscriber counts, no CI-derived product claims.
+
+**Measurement status set by THIS fire, not carried:**
+
+- **Video 3 authenticated walk — `BLOCKED`, SIGNED_OUT.** `source claim`, Cheek, this slice: it
+  needs owner re-authentication. Claude did not attempt it, holds no credential for it, and makes
+  no claim about its outcome. Not `FAIL`, not `NOT_MEASURED` — **`BLOCKED`**, because a named
+  dependency prevents the measurement.
+- **Pricing cause-aware recovery UI — `LIVE_UI` `NOT_MEASURED` this fire.** `#1276`'s panel is
+  merged and sits on the live tip, but Claude did **not** drive the deployed UI: no browser, no
+  signed-in session, no forced `auth_required` / gateway / configuration failure against
+  production. What is established is that the code is on the branch and the branch is live (§2);
+  how the panel actually renders to a grower is **unmeasured**. Do not read §4 as a behavioural
+  pass.
+- **The three `#1276` findings in §4 are `established fact` against merged source** and separately
+  **`LIVE_UI` `NOT_MEASURED`** — verified by reading `763e703f0`, never by exercising
+  production.
 
 ## 10. Current locks
 
@@ -280,8 +311,11 @@ Production apply state stays `NOT_MEASURED`. **No APPLY.**
 - **Re-list open PRs from the API before any collision claim.** A PR list carried from earlier in a
   session is not evidence; that error nearly produced a competing implementation of `#1276`.
 - **`#1221` is READY at `9f922ca54`, not merged.** Claude does not merge it. Peer seat unfilled.
-- **`#1174` is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge. **`#1250`** is
-  a Copilot draft; not touched.
+- **`#1174` is draft, SUPERSEDED on V0 C/F hunks.** Do not convert, ready or merge.
+- **`#1250` is on HOLD** (Cheek, this slice). Copilot draft; not touched, not readied, not merged.
+- **Video 3 authenticated walk is `BLOCKED` SIGNED_OUT** pending owner re-auth. Do not claim it ran.
+- **The Pricing cause-aware recovery UI is `LIVE_UI` `NOT_MEASURED`.** Merged and on the live tip;
+  nobody has driven the deployed panel. Do not report it as behaviourally verified.
 - **Signup-attribution APPLY stays owner-locked.** Production apply state is `NOT_MEASURED`.
 - **Signup PREFLIGHT still BLOCKED** (malformed Aug 24 `SUPABASE_DB_URL`). Do not claim it passed.
 - **Vercel integrations and the registrar are untouched.** Vercel DNS not enabled.

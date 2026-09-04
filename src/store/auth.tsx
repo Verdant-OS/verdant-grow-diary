@@ -117,9 +117,14 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
     // tabs over a BroadcastChannel and hands the OTHER tab's session to this
     // listener without saving it. With `storage: sessionStorage` this tab may
     // hold nothing: getUser(), REST and edge calls then run signed-out while
-    // `user` claims otherwise (measured on the deploy branch, 2026-09-03).
-    // So confirm the client holds a session at all; if it holds none, the
-    // relayed identity is dropped again. The read resolves in microtasks,
+    // `user` claims otherwise (measured on the deploy branch, 2026-09-03). Or
+    // it may hold a DIFFERENT session — another account, or an older token of
+    // the same account — which every request keeps using.
+    // So the session this client actually holds is the one React exposes:
+    // the delivered session is compared with the client's own read by bearer
+    // (the access token is what every request carries, so it is the identity
+    // that must agree with the UI) and, when they differ, replaced by what
+    // the client holds (null included). The read resolves in microtasks,
     // ahead of the render React schedules for the first apply, so no render
     // commits the relayed identity.
     //
@@ -128,7 +133,8 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
     // signInWithPassword resolves, which auth-js only does after this
     // callback returns. The read is never awaited inside the callback.
     // INITIAL_SESSION and a null session are the client's own answers.
-    const reconcileWithClientSession = async (seq: number) => {
+    const sameBearer = (a: Session, b: Session) => a.access_token === b.access_token;
+    const reconcileWithClientSession = async (seq: number, delivered: Session) => {
       let held: Session | null;
       try {
         const { data } = await supabase.auth.getSession();
@@ -140,13 +146,13 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
         return;
       }
       if (disposed || seq !== reconcileSeq) return;
-      if (held === null) applySession(null);
+      if (held === null || !sameBearer(held, delivered)) applySession(held);
     };
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       applySession(s);
       if (s !== null && event !== "INITIAL_SESSION") {
-        void reconcileWithClientSession(++reconcileSeq);
+        void reconcileWithClientSession(++reconcileSeq, s);
       }
     });
     supabase.auth

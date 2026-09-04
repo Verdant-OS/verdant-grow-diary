@@ -11,7 +11,7 @@ import {
 import { useAuth } from "@/store/auth";
 import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { toast } from "@/hooks/use-toast";
-import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import { buildCreditPackSuccessUrl, sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import {
   buildCheckoutPlanReturnPath,
   consumePlanIntent,
@@ -222,7 +222,14 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
           customData: { userId: user.id },
           settings: {
             displayMode: "overlay",
-            successUrl: options.successUrl || defaultSuccessUrl(),
+            successUrl:
+              options.successUrl ||
+              (CREDIT_PACKS.some((pack) => pack.sku === options.priceId)
+                ? buildCreditPackSuccessUrl(
+                    window.location.origin,
+                    new URLSearchParams(location.search).get("returnTo"),
+                  )
+                : defaultSuccessUrl()),
             allowLogout: false,
             variant: "one-page",
           },
@@ -272,7 +279,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     [location.pathname, location.search, navigate, user],
   );
 
-  // Slice C: auto-resume a pending plan intent EXACTLY ONCE after auth.
+  // Slice C: auto-resume a pending checkout intent EXACTLY ONCE after auth.
   // Guarded with a ref so React StrictMode's double-invoke, rerenders, and
   // rapid re-mounts cannot re-open the overlay. `consumePlanIntent` is
   // itself destructive (read + delete), so the storage-side guarantee is

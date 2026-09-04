@@ -66,7 +66,12 @@ _Enforcement:_ regeneration overwrite; `TREE_HASH_ROOTS` participation for the M
 convenience for the grower, never an authorization control — **RLS is the boundary** (see AC-2.2).
 Adding a route without a manifest entry is drift.
 _Source:_ `src/lib/appRouteManifest.ts:52,70-88`. `established fact`.
-_Enforcement:_ a test cross-checks the manifest against the mounted tree.
+_Enforcement:_ **partial.** The sync harness cross-checks the mounted **URL set**, and
+`findAccessGroupMismatches` (`src/test/helpers/routeManifestSyncHarness.ts:243-260`) checks only that
+`/operator/`-shaped paths carry `operator` or `internal`. **No test compares a route's declared
+`access` against the layout it actually sits in**, so moving an authenticated route out of `_app`
+into a public root file keeps the URL, keeps a stale `access: "auth"`, and stays green. Access-value
+parity is unenforced.
 
 **AC-1.4 — `vite.config.ts` stays a thin wrapper over the Lovable preset.**
 `@lovable.dev/vite-tanstack-config` already supplies TanStack devtools, `tanstackStart`,
@@ -107,8 +112,12 @@ _Enforcement:_ `convention only`, plus the in-file comment.
 ## 2. Data, trust boundary, and Supabase
 
 **AC-2.1 — Hosted Supabase is the data platform: Postgres, Auth, RLS, RPC, and Edge Functions.**
-Client access is `@supabase/supabase-js` with `@supabase/ssr`; server logic that must not be
-client-trusted lives in Deno edge functions under `supabase/functions/`.
+Client access is `@supabase/supabase-js` with `@supabase/ssr`. Server-trusted logic lives in **two**
+places, not one: Deno edge functions under `supabase/functions/`, and `SECURITY DEFINER` database
+RPCs defined by migrations — `quicklog_save_manual`, `action_queue_create`, `ai_credit_spend` and
+others, some invoked directly from the client (`src/lib/actionQueueCreateService.ts:43`) and guarded
+by `auth.uid()` inside the function body. Treating edge functions as the only trusted server layer
+would direct new work away from half the existing boundary.
 _Source:_ `package.json` dependencies; `supabase/functions/` (34 functions plus `_shared`).
 `established fact`.
 
@@ -152,10 +161,18 @@ _Source:_ `AGENTS.md`; drift inventory in `docs/codebase-map.md`. `established f
 the drift counts are `source claim` carried from the map and not re-measured here.
 _Enforcement:_ `convention only`.
 
-**AC-3.3 — User-facing copy is data, not markup.**
-Strings live in `src/constants/*Copy.ts` / `*Messages.ts` or as `as const` exports in rules modules,
-so tests can pin exact wording.
-_Source:_ `src/constants/`. `established fact`.
+**AC-3.3 — Copy that is pinned, reused, or safety-bearing is data, not markup.**
+Such strings live in `src/constants/*Copy.ts` / `*Messages.ts` or as `as const` exports in rules
+modules, so tests can pin exact wording.
+
+**Scope, narrowed to what is true.** This is not a blanket rule and never was: the stamped tree keeps
+ordinary presentational prose inline in JSX across many pages — `src/pages/GuidesIndex.tsx:57-68` is
+a representative example, not an outlier. Stating the invariant unqualified would declare most
+existing presentation code noncompliant and produce misleading review guidance. The boundary is
+purpose, not location: **copy a test pins, copy reused across surfaces, and copy that carries a
+safety or entitlement claim** belong in constants. One-off page prose may stay inline.
+_Source:_ `src/constants/`; inline-copy boundary observed at `src/pages/GuidesIndex.tsx:57-68`.
+`established fact` for the constants pattern; `inference` for the boundary.
 
 **AC-3.4 — Component code routes through the react-router compat shim, not TanStack Router
 directly.**
@@ -313,28 +330,57 @@ _Source:_ `supabase/functions/ai-doctor-review/index.ts:2,14,179-180,515-516,575
 **AC-5.4 — Credits are metered server-side before the model call, with idempotency, and refunded on
 failure.**
 `ai_credit_spend` is called with a UUID-validated `p_idempotency_key` before inference; a failed
-call reverses through `ai_credit_refund` with its own key; a replayed key resolves to a calm
-`idempotency_conflict` status rather than a crash or a double charge. Reversals are append-only.
-_Source:_ `supabase/functions/ai-doctor-review/index.ts:335-338,382-388,405-408,443,595`.
-`established fact`.
+call reverses through `ai_credit_refund` with its own key. Reversals are append-only.
 
-**AC-5.5 — AI Doctor writes no operational rows and controls no devices.**
-No `ai_doctor_sessions`, `alerts`, `action_queue` or `sensor_readings` writes; no equipment or
-device control. It may _suggest_ an Action Queue item; it may not create one (AC-7.1).
-_Source:_ `supabase/functions/ai-doctor-review/index.ts:8-9`. `established fact`.
+**A legitimate replay is not a conflict, and the two must not be conflated.**
+`classifyAiDoctorCreditSpend` resolves a same-key replay to **`cached`**, **`pending`** or
+**`stale`**; only an _incompatible_ reuse — the RPC returning `reason === "idempotency_key_conflict"`
+— takes the **`conflict`** branch. Retry protocols must be written against those four outcomes.
+Describing every replay as a conflict would hand future client and retry work the wrong contract.
+_Source:_ `supabase/functions/ai-doctor-review/index.ts:335-338,382-388,405-408,443,595`;
+`src/lib/aiDoctorCreditReplayRules.ts:18-23,63,70,84,89,92`. `established fact`.
 
-**AC-5.6 — Sensor readings reaching model context keep their trust labels, and only `ok` readings
-contribute current values.**
+**AC-5.5 — AI Doctor writes no cultivation or queue rows, and controls no devices. It does write
+billing, receipt and measurement rows.**
+The boundary is specific: no `ai_doctor_sessions`, `alerts`, `action_queue` or `sensor_readings`
+writes, and no equipment or device control. It may _suggest_ an Action Queue item; it may not create
+one (AC-7.1).
+
+It is **not** a no-write endpoint, and calling it one would hide real persistence from a privacy or
+data-flow audit. Through RPCs it writes the credit ledger (`ai_credit_spend`, `ai_credit_refund`),
+finalizes results and evidence receipts (`ai_doctor_finalize_review`), and records a completion row
+(`record_ai_doctor_review_completion`).
+_Source:_ `supabase/functions/ai-doctor-review/index.ts:8-9` for the prohibition;
+`:233,382,405,595` for the writes it does perform. `established fact`.
+
+**AC-5.6 — Sensor readings reaching model context keep their trust labels. Once a row carries an
+explicit quality, only `ok` contributes current values.**
+
+**The null case is a deliberate compatibility exception, not an oversight.**
+`hasUsablePersistedQuality` returns `true` when `quality` is `null` or `undefined`, so older rows
+predating quality classification still contribute. Writing "only `ok` contributes" would erase that
+and invite a future refactor to silently drop legacy sensor evidence. Changing this behaviour is a
+separate safety-reviewed slice, not a tidy-up.
+
 Grounding is reject-only: the backstop refuses ungrounded output rather than rewriting it.
-_Source:_ `supabase/functions/_shared/lib/lib/aiDoctorCurrentSensorSnapshotRules.ts:116,194`;
+_Source:_ `src/lib/aiDoctorCurrentSensorSnapshotRules.ts` — `hasUsablePersistedQuality`;
+`supabase/functions/_shared/lib/lib/aiDoctorCurrentSensorSnapshotRules.ts:116,194`;
 `aiDoctorReviewGroundingRules.ts:10`. `established fact`.
 
-**AC-5.7 — Output is cautious by construction and states what it does not know.**
+**AC-5.7 — Output must be cautious and state what it does not know. The output _shape_ is enforced;
+the _calibration_ is not.**
 The response contract includes confidence, evidence, missing information, what not to do, and a risk
-level. A one-photo diagnosis is never presented as certain, and missing context is named rather than
-guessed.
+level, and the grounding validator rejects absolute-certainty wording.
+
+**The one-photo ceiling is convention, not construction.** No photo-count or visual-evidence
+cardinality signal reaches the confidence decision: the packet carries photo activity only as a
+generic `recentEvents` category, and `packetHasAffirmativeEvidence`
+(`src/lib/aiDoctorReviewGroundingRules.ts:519-525`) accepts any non-empty recent-event list toward a
+`high` result. Calling this "cautious by construction" would mask an unguarded safety rule. An
+enforceable cardinality signal plus a confidence cap is the fix, and it is deferred (§13).
 _Source:_ `AGENTS.md` AI Doctor Rules; `docs/ai-doctor-output-contract.md`,
-`docs/ai-doctor-safety-contract.md`. `established fact`.
+`docs/ai-doctor-safety-contract.md`; `src/lib/aiDoctorReviewGroundingRules.ts:519-525`.
+`established fact` for the shape; `established fact` for the absent ceiling.
 
 **AC-5.8 — Evidence receipts do not participate in authorization or pricing.**
 The receipt records what the review was based on. Its HMAC is not used to authorize a call, price
@@ -448,23 +494,43 @@ workdir at replay time. The committed file is never modified. Check this config 
 any correction — the defect may already be handled, in which case the correct change is none.
 _Source:_ `config/local-supabase-replay-compatibility.json`; `AGENTS.md`. `established fact`.
 
-**AC-9.3 — A merge is not a deployment, and a committed migration is not an applied one.**
-Publishing ships frontend and edge functions; migrations reach an environment through a separate
-apply path. Never infer applied schema from repository presence.
-_Source:_ `AGENTS.md`; `CLAUDE.md` repository traps. `established fact`.
+**AC-9.3 — A merge is not a deployment, a committed migration is not an applied one, and a
+published frontend is not deployed edge code.**
+Never infer applied schema, or deployed function code, from repository presence.
+
+**Three artifacts, three different paths, none of them a merge:**
+
+| Artifact       | How it reaches an environment                                                                                                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend       | the publish/build path                                                                                                                                                                                   |
+| Migrations     | a separate operator apply path                                                                                                                                                                           |
+| Edge functions | **manual `supabase functions deploy`** — `package.json` exposes `deploy:functions`, `deploy:functions:all` and `sb:functions:deploy`, and **no workflow under `.github/workflows/` invokes any of them** |
+
+An earlier draft said publishing "ships frontend and edge functions". No repository evidence supports
+it, and a release operator relying on it could publish a frontend expecting newer edge code while the
+backend stays stale. **Edge-function deployment is verified per environment, separately, and is
+`NOT_MEASURED` from the repository alone.**
+_Source:_ `package.json` deploy scripts; absence established by grep over `.github/workflows/` at the
+stamped SHA; `AGENTS.md`. `established fact` for the scripts and for the absence.
 
 ---
 
 ## 10. Statistical methods are bounded by evidence
 
-**AC-10.1 — VPD drift uses an EWMA, and its parameters are pinned.**
+**AC-10.1 — VPD drift uses an EWMA with fixed default parameters. They are documented here, not pinned by a test.**
 `DEFAULT_VPD_DRIFT_ALPHA = 0.3` and `DEFAULT_VPD_DRIFT_MIN_READINGS = 6`, with the recurrence
 `ewma = α·v + (1−α)·ewma` and classifications `insufficient` / `in_band` / `sustained_high` /
-`sustained_low`. Alpha is clamped to `(0, 1]` and falls back to the default. The module is mirrored
-into `_shared` per AC-2.3. **Do not silently move α to 0.2.**
+`sustained_low`. An α outside `(0, 1]` is **replaced with the default** — a fallback, not a clamp: an
+input of `5` becomes `0.3`, not `1`. The module is mirrored into `_shared` per AC-2.3. **Do not
+silently move α to 0.2.**
 _Source:_ `src/lib/vpdDriftRules.ts:56-57,64-70,86`;
 `supabase/functions/_shared/lib/lib/vpdDriftRules.ts`. `established fact`.
-_Enforcement:_ pinned by `src/test/vpd-drift-ewma.test.ts`.
+_Enforcement:_ **`convention only` — the parameter is NOT pinned.** An earlier draft claimed
+`src/test/vpd-drift-ewma.test.ts` pinned it. It does not: that file never references `alpha`,
+`DEFAULT_VPD_DRIFT_ALPHA` or `0.3`, and its classification cases are broad enough to keep passing if
+the default moved to 0.2. Claiming a pin that does not exist is the precise failure this document
+exists to prevent, so it is corrected rather than quietly dropped. An exact resolved-value assertion
+is proposed as **T6** in §11.
 
 **AC-10.2 — Nelson Rules and Modified Z-Score / MAD are NOT implemented, and must never be
 described as implemented.**
@@ -491,8 +557,8 @@ a clause omitted from this table would be an unstated gap rather than an account
 | AC-8.4                                                                                            | ESLint                                                                                                     | **gated**           |
 | AC-9.1                                                                                            | `Published migration integrity` CI check                                                                   | **gated**           |
 | AC-4.6                                                                                            | `scripts/sensor-safety-check.mjs` — wording heuristic over `src/lib/sensor` + `src/components/sensor` only | **partially gated** |
-| AC-10.1                                                                                           | `src/test/vpd-drift-ewma.test.ts`                                                                          | **pinned**          |
-| AC-1.3                                                                                            | manifest-vs-tree cross-check test                                                                          | **pinned**          |
+| AC-10.1                                                                                           | **nothing** — `src/test/vpd-drift-ewma.test.ts` does not assert α; T6 is the proposed pin                  | **unenforced**      |
+| AC-1.3                                                                                            | manifest-vs-tree **URL-set** parity + `/operator/` shape only; `access`-value parity unenforced            | **partially gated** |
 | AC-1.1, AC-1.2                                                                                    | build / regeneration                                                                                       | structural          |
 | AC-5.2                                                                                            | no code path from the request body to the model constants                                                  | structural          |
 | AC-5.4                                                                                            | UUID validation of a **client-supplied** key plus atomic RPC semantics — see the note below                | validated input     |
@@ -500,7 +566,8 @@ a clause omitted from this table would be an unstated gap rather than an account
 | AC-2.2, AC-6.1, AC-6.4                                                                            | RLS and server-side checks at runtime; no static gate proves the client cannot be trusted                  | runtime boundary    |
 | AC-1.4 – AC-1.7, AC-2.4, AC-3.1 – AC-3.4, AC-4.3 – AC-4.5, AC-6.2, AC-8.2, AC-8.3, AC-9.2, AC-9.3 | comment and review                                                                                         | `convention only`   |
 | AC-4.1, AC-4.2                                                                                    | no gate proves the vocabulary is not widened; T2/T3 are the proposed cover                                 | **unenforced**      |
-| AC-5.5, AC-5.7, AC-6.5, AC-7.1, AC-7.2, AC-7.3, AC-10.2, AC-10.3                                  | product-safety commitments held by review and by the absence of the code that would break them             | **unenforced**      |
+| AC-5.5, AC-6.5, AC-7.1, AC-7.2, AC-7.3, AC-10.2, AC-10.3                                          | product-safety commitments held by review and by the absence of the code that would break them             | **unenforced**      |
+| AC-5.7                                                                                            | output **shape** enforced by the tool schema and grounding validator; **calibration unenforced**           | **partially gated** |
 
 **On AC-5.4, corrected.** An earlier draft grouped it with AC-5.2 as "no code path from request body
 to constant or key". That is wrong: `idempotencyKey` **does** come from the request
@@ -518,6 +585,8 @@ input, and conflating them records the wrong trust boundary.
 | T3  | No module outside the two canonical files declares a sensor-source union literal, with the two known drifts allowlisted so the count can shrink but not grow | AC-4.3        |
 | T4  | `MODEL` and `MODEL_TIER` are module constants and not request-derived                                                                                        | AC-5.2        |
 | T5  | Zero occurrences of Nelson / modified-Z / MAD across `src/` and `supabase/`                                                                                  | AC-10.2       |
+| T6  | `DEFAULT_VPD_DRIFT_ALPHA === 0.3`, `DEFAULT_VPD_DRIFT_MIN_READINGS === 6`, and one exact numeric recurrence step                                             | AC-10.1       |
+| T7  | Every route's declared `access` matches the layout it is mounted under, for all four groups — not just `/operator/`                                          | AC-1.3        |
 
 **Each test needs the technique its claim actually admits — they are not all import tests.**
 
@@ -527,6 +596,8 @@ input, and conflating them records the wrong trust boundary.
 | T3   | **source / AST scan**    | Sensor-source unions are **type-level and erased at runtime**. No import can observe a declaration that does not exist in the emitted output; finding declarations outside the canonical files needs AST |
 | T4   | **import + source scan** | Importing can assert the constants' values, but it cannot prove a **negative** — that no request field reaches model selection. That half is a source/AST claim                                          |
 | T5   | **source scan**          | Proving a token is **absent** is exactly what scanning is good for                                                                                                                                       |
+| T6   | **resolved import**      | Both are exported runtime numbers; assert the values and one hand-computed EWMA step so a default change fails loudly                                                                                    |
+| T7   | **route-tree traversal** | Access group is a property of the mounted layout, so the check must walk the tree, not the manifest alone                                                                                                |
 
 **`scripts/check-contract-test-resolution.mjs` does not apply to any of these.** It flags only tests
 that read the source of `playwright.config` or `vitest.config` without importing them
@@ -565,6 +636,7 @@ Not rejected — sequenced.
 | Consolidating `docs/architecture.md`, `docs/grow-os-architecture.md`, `docs/grow-diary-architecture.md` | All three predate or contradict the current stack in places; retiring them is a separate reviewed slice |
 | Enumerating the remaining sensor-source union re-declarations                                           | Bounded by T3 rather than by hand                                                                       |
 | Renaming `BillingSubscriptionRow` (AC-6.1 hazard)                                                       | Cosmetic; touches entitlement types, so it wants its own diff                                           |
+| An enforceable visual-evidence cardinality signal plus a confidence cap for AI Doctor (AC-5.7)          | Safety-bearing; needs a packet-shape change, so it is its own reviewed slice                            |
 | Making the AC-4.5 pin bidirectional, or restating its comment                                           | Small, but it changes a safety-adjacent normalizer                                                      |
 | **Authoritative Release Topology Specification**                                                        | §14 — blocked on evidence this contract does not have                                                   |
 
@@ -574,21 +646,25 @@ Not rejected — sequenced.
 
 Stated as unknowns rather than omitted, so nobody reads silence as agreement.
 
-- **Publisher identity is unresolved.** `CLAUDE.md` states Lovable is the production publisher;
-  `docs/agents/CURRENT_STATE.md` carries Vercel as a source claim while explicitly retracting an
-  earlier header-based proof. Serving infrastructure and publisher identity are different claims and
-  only the former has ever been measured. One piece of repository evidence bears on it and is
-  recorded here without being treated as decisive: `scripts/stamp-version.mjs` states that "the
-  production publisher (Lovable) sometimes builds from a history-less snapshot — a freshly
-  `git init`-ed directory with zero commits and no `GITHUB_*` env (observed 2026-08-05, when
-  production served `commit: "unknown"`)", which is behaviour a Git-connected host build would not
-  produce. That is a dated `source claim` plus one observation, not a measurement of who publishes
-  today. **`NOT_MEASURED`.**
-- **The build-target-to-serving path is unexplained.** The Lovable preset configures Nitro with
-  **Cloudflare as the default target** and emits `dist/server/index.mjs`, and `vite.config.ts`
-  warns about Cloudflare asset serving — while production responses have been measured as served
-  through Vercel. How one reaches the other is **`NOT_MEASURED`**, and it is the central question the
-  Release Topology Specification must answer. This contract deliberately declines to guess.
+**Release topology is deliberately not settled here, and the dated evidence for it lives elsewhere.**
+An earlier draft of this section recorded current hosting observations and publisher evidence
+directly. That contradicted this document's own header — production axes are absent, and
+`docs/agents/CURRENT_STATE.md` is strictly disjoint — and would have made a permanent contract go
+stale every time the operating picture moved. Only the durable rules stay:
+
+- **Publisher identity is not established by response headers.** Serving infrastructure and publisher
+  identity are different claims; measuring the first says nothing about the second. Repository
+  documents currently disagree (`CLAUDE.md` names Lovable; `docs/agents/CURRENT_STATE.md` carries
+  Vercel as a source claim while retracting an earlier header-based proof), and one dated
+  repository observation in `scripts/stamp-version.mjs` bears on it. **The evidence and its dates
+  belong in `docs/agents/CURRENT_STATE.md`, not here.** The durable requirement: **measure the
+  publish trigger before asserting a publisher.** `NOT_MEASURED`.
+- **The build target is not the serving target, and neither may be assumed from the other.** The
+  Lovable preset configures Nitro against one target while production is served through another;
+  reconciling them requires deployment metadata this repository does not contain. The durable
+  requirement: **a release topology claim is measured or it is `NOT_MEASURED`** — never inferred from
+  build configuration, response headers, or tip-equals-live parity. Resolving it is the Release
+  Topology Specification's job (§13).
 - **Applied production schema is `NOT_MEASURED`** here and belongs to `docs/agents/CURRENT_STATE.md` (AC-9.3).
 - **Per-table RLS policy state** is owned by migrations, not by this file.
 - **Runtime drift among the ~90 unenumerated sensor-source union literals** is `NOT_MEASURED`; two

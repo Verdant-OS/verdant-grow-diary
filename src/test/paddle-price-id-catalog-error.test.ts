@@ -230,6 +230,11 @@ describe("getPaddlePriceId — every failure is classified, never generic", () =
     expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_gateway_unavailable");
   });
 
+  // This plain object is also the dual-realm fallback's only positive case: it
+  // cannot be an `instanceof FunctionsFetchError` match, so reaching
+  // `price_request_failed` proves the name-and-shape path still works. A
+  // second test with this same input was removed rather than kept as a
+  // near-duplicate of it.
   it("classifies a transport failure with no HTTP response as the request branch", async () => {
     invokeMock.mockResolvedValueOnce({
       data: null,
@@ -315,18 +320,6 @@ describe("getPaddlePriceId — every failure is classified, never generic", () =
     expect(real.context).toBeInstanceOf(Error);
   });
 
-  // The dual-realm fallback: a stand-in that cannot be an `instanceof` match
-  // still counts as transport, but only when BOTH signals agree.
-  it("accepts a name-and-shape stand-in that cannot be an instanceof match", async () => {
-    invokeMock.mockResolvedValueOnce({
-      data: null,
-      error: { name: "FunctionsFetchError", context: new TypeError("Failed to fetch") },
-    });
-
-    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
-    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_request_failed");
-  });
-
   // REGRESSION: the fallback used to accept EITHER signal, so any error that
   // merely held an `Error` in `context` — an unrelated wrapper, a malformed
   // FunctionsHttpError — was labelled a network fault and the grower was told
@@ -337,6 +330,26 @@ describe("getPaddlePriceId — every failure is classified, never generic", () =
       data: null,
       error: { name: "FunctionsHttpError", context: new TypeError("context went missing") },
     });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+    expect((err as Error).message).not.toMatch(/connection/i);
+  });
+
+  // REGRESSION, and the one the suite was missing: the *inverse* single signal
+  // — the right name with no usable `Error` in `context`. Without this, dropping
+  // the context check and matching on name alone left all 28 tests green
+  // (measured), so the "both signals" contract was documented but unenforced.
+  //
+  // Neither context carries a numeric `status`; otherwise the status branch
+  // would classify the failure before the transport predicate is consulted,
+  // and this would silently stop testing what it claims to.
+  it.each([
+    ["no context at all", { name: "FunctionsFetchError" }],
+    ["a context that is not an Error", { name: "FunctionsFetchError", context: { detail: "x" } }],
+  ])("does not treat the fetch-error name alone as transport evidence — %s", async (_label, e) => {
+    invokeMock.mockResolvedValueOnce({ data: null, error: e });
 
     const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
     expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);

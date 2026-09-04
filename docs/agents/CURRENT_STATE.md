@@ -128,6 +128,45 @@ of `usePaddleCheckout`; the cause mapping is **inlined in `Pricing.tsx`**, not a
 Claude verified all three of those from the diff before the merge (`usePaddleCheckout.ts:61`/`:104`/
 `:298`; `Pricing.tsx:229-247` and `:864`).
 
+### `#1276` merged with three verified findings still open — all now LIVE
+
+`established fact`. Copilot and Codex both reported on `eaa45e316e` at **15:44–15:45 UTC**; the PR
+merged at **15:48:44 UTC**, roughly three minutes later, with none of the three addressed. Claude
+verified each against the **merged** source at `763e703f0` — these are not relayed bot claims:
+
+1. **Plan intent is persisted before the sign-out it depends on** (`src/pages/Pricing.tsx:349`).
+   `handleCheckoutReauthentication` calls `savePlanIntent(rawSku)` and *then* `await signOut()`;
+   the `catch` only calls `setReauthenticating(false)`. A rejected sign-out therefore leaves a
+   valid one-shot intent in `sessionStorage` (`verdant.checkout.planIntent.v1`, 15-minute TTL,
+   destructive consume). A later Pricing mount in that same tab — including one after a *different*
+   account signs in — consumes it and auto-opens a paid checkout overlay the current grower never
+   selected. **Not an entitlement grant** (billing stays server-authoritative via the webhook) and
+   the plan is allowlist-constrained, but it is an unrequested billing surface. Fix is small: save
+   only after `signOut()` resolves, or clear in the catch.
+2. **Credit-pack selections are silently discarded through re-authentication**
+   (`src/pages/Pricing.tsx:349`, Codex **P2**). `savePlanIntent` returns `false` for anything
+   outside `KNOWN_PLAN_INTENTS` (`pro_monthly`, `pro_annual`, `craft_monthly`, `craft_annual`,
+   `founder_lifetime`), and `buildCheckoutPlanReturnPath` deletes a non-allowlisted `?plan=`.
+   `get-paddle-price` answers `auth_required` before it inspects the SKU, so a grower buying
+   `credit_pack_50` / `credit_pack_150` on an expired JWT reaches this branch and comes back from
+   sign-in to generic Pricing with their top-up forgotten.
+3. **The new hook contract is untested at the layer that produces it**
+   (`src/hooks/usePaddleCheckout.ts`). `blockedReasonCode` appears in exactly **one** test file,
+   `src/test/pricing-checkout-blocked-no-reason-leak.test.tsx`, which **mocks**
+   `usePaddleCheckout` — so no test drives the real hook. A hook that always returned `null` would
+   keep every page test green while routing every failure back to configuration recovery. This is
+   the same defect class `#1275` closed for `isTransportFailure`, one layer up.
+
+**Owner: Codex**, per the `#1276` handoff block. `#1276` is merged, so per `AGENTS.md` it cannot
+carry the fixes — they need a new slice. **Claude did not push to `codex/pricing-recovery-title-truth`
+and does not adopt this slice without assignment.** Cheek's to route.
+
+**This is the fourth consecutive PR in this area where reviewer findings landed two to four minutes
+before the merge.** `#1271`, `#1273`, `#1274` and now `#1276`. Codex and Copilot only review on the
+*ready* transition, which in practice is also the enqueue. Holding the enqueue until the reviewer
+checks report would let each round's findings land inside the PR that raised them instead of
+chaining another. Recorded as an operating observation; the call is Cheek's.
+
 **A near-miss worth recording.** Claude was assigned this same panel as a slice and began designing
 it while `#1276` was already open. The collision was missed because the open-PR audit reused a PR
 list captured earlier in the session instead of re-listing; `#1276` had been created after that

@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-04 UTC (~15:50 UTC)
+**Last updated:** 2026-09-04 UTC (~16:20 UTC)
 **Updated by:** Claude (2026-09-04: **twenty-three merges since the last stamp; deploy tip =
 `763e703f0`**, and **live is independently MEASURED at `763e703f0`, `dirty:false`**, read from
 `https://verdantgrowdiary.com/version.json` at 15:49:43 UTC (`buildTime`
@@ -20,7 +20,7 @@ passed. Stay on Paddle; live checkout off. Prior header follows.)
 measured 15:49 UTC. The last stamped block sits on `860d39a9`, delivered by `#1251`
 (`c718c5b3a`); everything below it is unstamped until now.
 
-| #     | Merge SHA   | Merged (UTC)     | Files | Migrations | Subject                                          |
+| #     | Merge SHA   | Commit (UTC)     | Files | Migrations | Subject                                          |
 | ----- | ----------- | ---------------- | ----: | ---------: | ------------------------------------------------ |
 | #1252 | `408c4142e` | 2026-09-02 20:41 |     6 |          0 | `fast-uri` override → 3.1.6 (four high advisories) |
 | #1255 | `cb8ee9fd8` | 2026-09-02 21:00 |     1 |          0 | Dependabot `qs` 6.15.3 → 6.16.0                  |
@@ -46,11 +46,20 @@ measured 15:49 UTC. The last stamped block sits on `860d39a9`, delivered by `#12
 | #1275 | `440d196a4` | 2026-09-04 15:25 |     1 |          0 | enforce the both-signals contract (tests only)   |
 | #1276 | `763e703f0` | 2026-09-04 15:40 |     3 |          0 | make checkout recovery match its cause           |
 
-Full tip oid: `763e703f08b99866715472702b5e5957693915f7`. **Zero migrations across the whole span**
-(`git diff --name-only c718c5b3a 763e703f0 -- 'supabase/migrations/*'` returns nothing), and **no
-commit in the span touches `docs/agents/CURRENT_STATE.md`** — which is why the file was
-twenty-three merges stale. `#1266` and `#1267`, and `#1271` and `#1272`, merged out of numeric
-order; the table is in commit order, not PR order.
+Full tip oid: `763e703f08b99866715472702b5e5957693915f7`.
+
+**The `Commit (UTC)` column is the squash commit timestamp, not `merged_at`** — they differ by
+minutes because the merge queue commits before GitHub records the merge (`#1276`: commit 15:40:30,
+`merged_at` 15:48:44). Read it as commit order, which is also the table's sort order, not as a
+merge-time series. `#1266` / `#1267` and `#1271` / `#1272` merged out of numeric order.
+
+**Zero migrations across the whole span**, established **history-aware** rather than from an
+endpoint diff: `git rev-list --count c718c5b3a..763e703f0 -- 'supabase/migrations/*'` returns **0**,
+and so does the same walk over all of `supabase/*`. That form inspects every commit's touched
+paths, so an add-then-remove or a rename inside the span could not hide from it — a plain
+`git diff A B` could. The per-commit column above was computed the same way and agrees on all 23
+rows. Likewise **no commit in the span touches `docs/agents/CURRENT_STATE.md`**, which is why the
+file was twenty-three merges stale.
 
 ## 2. Live is independently MEASURED at `763e703f0`
 
@@ -72,19 +81,33 @@ and both reads showed tip = live.
 
 An earlier read at **15:45:47 UTC** returned `440d196a4ad1e1de0eb93981ab459fa5f2b5f5ef`,
 `dirty:false`, `buildTime 2026-09-04T15:38:01.289Z`, `treeHashShort 7b7d0dbe2b60` — that was the
-tip at the time (`#1275`), and `#1276` landed between the two reads. **Both reads agree that the
-publisher deploys the deploy branch automatically and that tip = live.**
+tip at the time (`#1275`), and `#1276` landed between the two reads. **Both reads show tip = live**
+— at two different tips, minutes apart.
+
+That is parity at two points in time. It is **not** evidence that deployment is automatic: a manual
+or externally triggered publish would produce the same two readings. **Whether the deploy is
+automatic is `NOT_MEASURED`** — no deployment-trigger metadata was inspected. Do not infer a
+pipeline from parity.
 
 **Current production is MEASURED. Do not record it as `NOT_MEASURED`.** Do not carry `860d39a9`,
 `cb8ee9fd` or `440d196a4` as current live.
 
-**Publisher correction, measured rather than carried.** `CLAUDE.md`'s codebase-orientation section
-states "Lovable is the production publisher" and that `vercel.json` does not govern production.
-Both live reads returned `server: Vercel` with `x-vercel-cache: HIT` from edge `iad1`. This file's
-prior blocks already said Vercel; the measurement confirms them and **`CLAUDE.md` is wrong on this
-point**. Reasoning about production redirects or headers from `CLAUDE.md` will produce wrong
-answers. Correcting `CLAUDE.md` is a governance-file edit and therefore a separate slice — it would
-bump all twelve `Sentinel-Version` files — and is **not done here**.
+**Serving infrastructure vs publisher identity — two different claims, and only one is measured.**
+
+- **Served through Vercel — MEASURED.** Both live reads returned `server: Vercel`,
+  `x-vercel-cache: HIT`, edge `iad1`. That establishes the response path and nothing more.
+- **Who initiates the publish — `NOT_MEASURED`.** Response headers cannot answer it. A Lovable
+  publication can be *hosted* by Vercel and would return exactly these headers. No deployment
+  metadata, build log or trigger record was inspected in this slice.
+
+An earlier draft of this block read the headers as proof that `CLAUDE.md`'s "Lovable is the
+production publisher" line is wrong. **That was an overreach and is retracted here.** The headers
+measure hosting; the publisher question stays open. This file's prior blocks assert Vercel as
+publisher — that remains a **`source claim` carried from earlier sessions**, not something this
+slice measured, and `CLAUDE.md` says the opposite. **The contradiction is unresolved and neither
+document should be treated as settled on it.** Resolving it needs deployment-trigger metadata; and
+editing `CLAUDE.md` would be a governance-file change bumping all twelve `Sentinel-Version` files,
+so it is its own slice either way. **Not done here.**
 
 ## 3. The checkout price-error chain — four Claude merges, one slice
 
@@ -116,7 +139,8 @@ to a name-only check with all 28 tests still green. Proven by mutation, not by a
 ## 4. `#1276` — the Pricing recovery panel — MERGED, Codex's slice
 
 `established fact`, from `GET /pulls/1276` and the commit graph. **Owner: Codex**, branch
-`codex/pricing-recovery-title-truth`, head `eaa45e316e`, merged as `763e703f0` at ~15:40 UTC,
+`codex/pricing-recovery-title-truth`, head `eaa45e316e`, merged as `763e703f0`, `merged_at`
+**15:48:44 UTC** (the squash commit is stamped 15:40:30 — see §1 on that gap),
 N=3 files, +298 / −91, 0 migrations. Claude did **not** implement it and did not push to it.
 
 It closes the deferred finding carried by `#1271`–`#1275`: the recovery panel rendered one
@@ -272,13 +296,13 @@ Production apply state stays `NOT_MEASURED`. **No APPLY.**
   history in the blocks below, not re-checked here.
 - No metrics, no subscriber counts, no CI-derived product claims.
 
-**Measurement status set by THIS fire, not carried:**
+**Measurement status set by THIS slice, not carried:**
 
 - **Video 3 authenticated walk — `BLOCKED`, SIGNED_OUT.** `source claim`, Cheek, this slice: it
   needs owner re-authentication. Claude did not attempt it, holds no credential for it, and makes
   no claim about its outcome. Not `FAIL`, not `NOT_MEASURED` — **`BLOCKED`**, because a named
   dependency prevents the measurement.
-- **Pricing cause-aware recovery UI — `LIVE_UI` `NOT_MEASURED` this fire.** `#1276`'s panel is
+- **Pricing cause-aware recovery UI — `LIVE_UI` `NOT_MEASURED` this slice.** `#1276`'s panel is
   merged and sits on the live tip, but Claude did **not** drive the deployed UI: no browser, no
   signed-in session, no forced `auth_required` / gateway / configuration failure against
   production. What is established is that the code is on the branch and the branch is live (§2);
@@ -293,9 +317,12 @@ Production apply state stays `NOT_MEASURED`. **No APPLY.**
 - **No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No production
   SQL, no Lovable project-chat agent edit, no device control, no automatic Action Queue, no
   credentials.
-- **Publisher is Vercel** — MEASURED this slice, project `verdant-grow-diary`. **Auth and DB stay
-  Lovable Cloud. No Lovable Publish.** `CLAUDE.md` says Lovable publishes; it is wrong and is not
-  corrected here (governance-file edit = twelve-file `Sentinel-Version` bump = its own slice).
+- **Production is SERVED through Vercel — MEASURED** (`server: Vercel`, `x-vercel-cache: HIT`,
+  edge `iad1`), project `verdant-grow-diary`. **Who initiates the publish is `NOT_MEASURED`** —
+  headers cannot answer it and no deploy metadata was read. This file's prior blocks say Vercel
+  publishes (`source claim`, carried); `CLAUDE.md` says Lovable does. **Unresolved — do not cite
+  either as settled, and do not "correct" `CLAUDE.md` on header evidence alone.**
+- **Auth and DB stay Lovable Cloud. No Lovable Publish.**
 - **Paddle: `test_` keys and the sandbox banner are EXPECTED.** Live checkout off. Stay on Paddle.
   Do not revoke the existing `live_` token.
 - **Current production is MEASURED at `763e703f0`, `dirty:false`, ref `verdant-grow-diary`.**

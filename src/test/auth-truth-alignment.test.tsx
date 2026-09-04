@@ -175,6 +175,15 @@ function IdentityLog() {
   return null;
 }
 
+const renderedTokens: string[] = [];
+
+/** Renders the access token AuthProvider exposes, so a relayed token would be visible. */
+function TokenProbe() {
+  const { session } = useAuth();
+  if (session) renderedTokens.push(session.access_token);
+  return <div data-testid="token">{session?.access_token ?? "none"}</div>;
+}
+
 const signInScreenIdentities: Array<string | null> = [];
 
 /** Records every identity React committed a render for on the sign-in screen. */
@@ -203,6 +212,7 @@ beforeEach(() => {
   mocks.listeners.length = 0;
   renderedIdentities.length = 0;
   signInScreenIdentities.length = 0;
+  renderedTokens.length = 0;
   mocks.getSession.mockReset();
   mocks.getUser.mockReset();
   mocks.signOut.mockReset();
@@ -270,6 +280,39 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     expect(await screen.findByText("u-own")).toBeInTheDocument();
     await waitFor(() => expect(mocks.getSession).toHaveBeenCalledTimes(2));
     expect(screen.getByTestId("probe")).toHaveTextContent("u-own");
+  });
+
+  it("keeps this tab's own session when a SIGNED_IN for another account is relayed", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    renderProvider();
+    expect(await screen.findByText("u-own")).toBeInTheDocument();
+
+    await relayFromOtherTab("SIGNED_IN", sessionFor("u-relayed"));
+
+    // This client still holds u-own, so every request runs as u-own: React must too.
+    await waitFor(() => expect(mocks.getSession).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId("probe")).toHaveTextContent("u-own"));
+    expect(renderedIdentities).not.toContain("u-relayed");
+  });
+
+  it("keeps this tab's own token when a TOKEN_REFRESHED for the same account is relayed", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    render(
+      <AuthProvider>
+        <Probe />
+        <TokenProbe />
+      </AuthProvider>,
+    );
+    expect(await screen.findByTestId("token")).toHaveTextContent("access-u-own");
+
+    await relayFromOtherTab("TOKEN_REFRESHED", {
+      ...sessionFor("u-own"),
+      access_token: "access-other-tab",
+    });
+
+    await waitFor(() => expect(mocks.getSession).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId("token")).toHaveTextContent("access-u-own"));
+    expect(renderedTokens).not.toContain("access-other-tab");
   });
 
   it("still applies a session-bearing event synchronously (identity fence and post-sign-in navigation contract)", async () => {

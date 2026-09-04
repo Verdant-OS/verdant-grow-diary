@@ -31,11 +31,25 @@ import { AlertTriangle } from "lucide-react";
  * accepting or signing out — the whole point is to require agreement
  * before further use of the app.
  *
+ * The VERIFY-ERROR state (the acceptance read failed) is different: it is
+ * fail-OPEN. We do not know the grower's consent status, so nothing is
+ * granted or written, but the route underneath keeps rendering: a read error
+ * must not trap a signed-in grower behind a modal or dump them on marketing.
+ * It renders as a non-blocking banner with Retry (re-runs the read, banner
+ * stays mounted while the read is in flight).
+ *
  * Routes where the modal is suppressed: /auth, /reset-password, /terms,
- * /privacy (so the user can read what they're accepting and so signed-out
- * flows are unaffected).
+ * /privacy, /welcome (so the user can read what they're accepting, signed-out
+ * flows are unaffected, and a verify miss never blocks the landing page).
  */
-const SUPPRESSED_PREFIXES = ["/auth", "/reset-password", "/terms", "/privacy", "/.lovable/"];
+const SUPPRESSED_PREFIXES = [
+  "/auth",
+  "/reset-password",
+  "/terms",
+  "/privacy",
+  "/welcome",
+  "/.lovable/",
+];
 
 export function AgreementReconsentGate() {
   const { user, loading, signOut } = useAuth();
@@ -71,9 +85,8 @@ export function AgreementReconsentGate() {
         .eq("user_id", userId);
       if (cancelled) return;
       if (err) {
-        // Fail CLOSED for consent: a read error must never grant access as if
-        // the user were current. Block with a retry / sign-out state instead of
-        // treating an unverified user as consented.
+        // Fail OPEN for a read error: do not grant consent, and do not trap a
+        // signed-in grower behind a modal. Retry re-runs this read.
         setVerifyError(true);
         setGaps(null);
         setChecking(false);
@@ -93,8 +106,15 @@ export function AgreementReconsentGate() {
     // Keyed on userId (a primitive), not the user object — see note above.
   }, [userId, loading, suppressed, retryToken]);
 
-  const open =
-    !!user && !loading && !suppressed && !checking && (verifyError || (gaps?.length ?? 0) > 0);
+  const consentOpen = !!user && !loading && !suppressed && !checking && (gaps?.length ?? 0) > 0;
+  // Stay mounted while a retry is in flight so Retry does not look like a
+  // dismiss-then-return. A real gap after a successful read uses consentOpen.
+  const verifyErrorOpen = !!user && !loading && !suppressed && verifyError && !consentOpen;
+
+  function retryVerify() {
+    if (checking) return;
+    setRetryToken((t) => t + 1);
+  }
 
   async function onAccept() {
     if (!user || submitting) return;
@@ -123,51 +143,45 @@ export function AgreementReconsentGate() {
     setAccept(false);
   }
 
-  if (!open) return null;
-
-  if (verifyError) {
-    // Fail-closed block: we could not read acceptance status, so we neither
-    // grant access nor claim specific pending agreements. Retry or sign out.
+  if (verifyErrorOpen) {
     return (
-      <Dialog open={open}>
-        <DialogContent
-          className="sm:max-w-lg"
-          onEscapeKeyDown={(e) => e.preventDefault()}
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onInteractOutside={(e) => e.preventDefault()}
-          aria-labelledby="reconsent-verify-title"
-          aria-describedby="reconsent-verify-description"
-          data-testid="agreement-reconsent-verify-error"
-        >
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-primary" aria-hidden />
-              <DialogTitle id="reconsent-verify-title">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-labelledby="reconsent-verify-title"
+        aria-describedby="reconsent-verify-description"
+        data-testid="agreement-reconsent-verify-error"
+        className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background/95 px-4 py-3 shadow-sm"
+      >
+        <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
+            <div>
+              <p id="reconsent-verify-title" className="font-medium text-foreground">
                 Couldn&apos;t verify your agreements
-              </DialogTitle>
+              </p>
+              <p id="reconsent-verify-description" className="text-sm text-muted-foreground">
+                We couldn&apos;t confirm which agreements you&apos;ve accepted. Retry; this does not
+                sign you out.
+              </p>
             </div>
-            <DialogDescription id="reconsent-verify-description">
-              We couldn&apos;t confirm which agreements you&apos;ve accepted. Please retry, or sign
-              out and back in.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="ghost" onClick={() => void signOut()}>
-              Sign out
-            </Button>
-            <Button onClick={() => setRetryToken((t) => t + 1)}>Retry</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+          <Button type="button" onClick={retryVerify} disabled={checking}>
+            {checking ? "Retrying…" : "Retry"}
+          </Button>
+        </div>
+      </div>
     );
   }
+
+  if (!consentOpen) return null;
 
   if (!gaps) return null;
 
   const anyPrior = gaps.some((g) => g.previouslyAcceptedVersion !== null);
 
   return (
-    <Dialog open={open}>
+    <Dialog open={consentOpen}>
       <DialogContent
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg"
         onEscapeKeyDown={(e) => e.preventDefault()}

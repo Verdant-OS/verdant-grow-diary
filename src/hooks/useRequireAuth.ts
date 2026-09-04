@@ -7,19 +7,39 @@
 // Safety:
 // - never reads tokens out of storage directly
 // - never logs the user object
-// - redirects unauthenticated users to /auth
+// - redirects only when getUser settles with no user (true signed-out)
+// - a getUser transport/server error is revalidation_failed, not signed-out:
+//   do not dump a cached session onto the marketing page
 // See docs/auth-security.md.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
 
-export type RequireAuthStatus = "loading" | "authenticated" | "unauthenticated";
+export type RequireAuthStatus =
+  "loading" | "authenticated" | "unauthenticated" | "revalidation_failed";
+
+/** Gate Retry (and other recoveries) re-run getUser without a marketing bounce. */
+export const AUTH_REVALIDATE_EVENT = "verdant:auth-revalidate";
 
 export function useRequireAuth(redirectTo: string = "/auth"): {
   status: RequireAuthStatus;
+  retry: () => void;
 } {
   const nav = useNavigate();
   const [status, setStatus] = useState<RequireAuthStatus>("loading");
+  const [retryToken, setRetryToken] = useState(0);
+
+  const retry = useCallback(() => {
+    setRetryToken((t) => t + 1);
+  }, []);
+
+  useEffect(() => {
+    function onRevalidate() {
+      setRetryToken((t) => t + 1);
+    }
+    window.addEventListener(AUTH_REVALIDATE_EVENT, onRevalidate);
+    return () => window.removeEventListener(AUTH_REVALIDATE_EVENT, onRevalidate);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,25 +49,32 @@ export function useRequireAuth(redirectTo: string = "/auth"): {
       nav(redirectTo, { replace: true });
     };
 
+    setStatus("loading");
     void supabase.auth.getUser().then(
       ({ data, error }) => {
-        if (error || !data?.user) {
+        if (cancelled) return;
+        if (error) {
+          // A server/transport error is not proof of signed-out. Stay put so a
+          // cached session is not dumped onto /welcome. AppShell withholds
+          // private REST until a later retry authenticates.
+          setStatus("revalidation_failed");
+          return;
+        }
+        if (!data?.user) {
           redirectUnauthenticated();
           return;
         }
-        if (cancelled) return;
         setStatus("authenticated");
       },
       () => {
-        // A transport/runtime rejection cannot be trusted as authenticated.
-        // Fail closed without exposing the underlying error or user data.
-        redirectUnauthenticated();
+        if (cancelled) return;
+        setStatus("revalidation_failed");
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [nav, redirectTo]);
+  }, [nav, redirectTo, retryToken]);
 
-  return { status };
+  return { status, retry };
 }

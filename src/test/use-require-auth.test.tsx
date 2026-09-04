@@ -1,7 +1,8 @@
 // useRequireAuth: calls supabase.auth.getUser on mount, redirects on
-// unauthenticated, reports authenticated otherwise.
-import { describe, it, expect, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+// unauthenticated, reports authenticated otherwise. A getUser error is
+// revalidation_failed (stay on the protected URL), not a marketing bounce.
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import type { ReactNode } from "react";
 
@@ -17,21 +18,34 @@ vi.mock("@/lib/react-router-compat", async () => {
   return { ...actual, useNavigate: () => navMock };
 });
 
-import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
 
 const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
 
+/** Live bounce target AppShell used to hand the hook for /grows. */
+const GROWS_SIGNED_OUT = "/welcome?redirectTo=%2Fgrows";
+
 describe("useRequireAuth", () => {
-  it("redirects unauthenticated user to /auth", async () => {
+  beforeEach(() => {
     navMock.mockClear();
+    getUserMock.mockReset();
+  });
+
+  it("redirects unauthenticated user to /auth", async () => {
     getUserMock.mockResolvedValue({ data: { user: null }, error: null });
     const { result } = renderHook(() => useRequireAuth("/auth"), { wrapper });
     await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
     expect(navMock).toHaveBeenCalledWith("/auth", { replace: true });
   });
 
+  it("true signed-out still bounces to /welcome (no user, no getUser error)", async () => {
+    getUserMock.mockResolvedValue({ data: { user: null }, error: null });
+    const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
+    expect(navMock).toHaveBeenCalledWith(GROWS_SIGNED_OUT, { replace: true });
+  });
+
   it("reports authenticated when getUser returns a user", async () => {
-    navMock.mockClear();
     getUserMock.mockResolvedValue({
       data: { user: { id: "u-1" } },
       error: null,
@@ -41,25 +55,63 @@ describe("useRequireAuth", () => {
     expect(navMock).not.toHaveBeenCalled();
   });
 
-  it("redirects on getUser error", async () => {
-    navMock.mockClear();
+  it("does not bounce to /welcome on getUser error (revalidation_failed, not signed-out)", async () => {
     getUserMock.mockResolvedValue({
       data: { user: null },
       error: { message: "bad jwt" },
     });
-    const { result } = renderHook(() => useRequireAuth("/auth"), { wrapper });
-    await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
-    expect(navMock).toHaveBeenCalledWith("/auth", { replace: true });
+    const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe("revalidation_failed"));
+    expect(navMock).not.toHaveBeenCalled();
   });
 
-  it("fails closed when getUser rejects", async () => {
-    navMock.mockClear();
+  it("fails closed without a marketing bounce when getUser rejects", async () => {
     getUserMock.mockRejectedValue(new TypeError("Failed to fetch"));
 
-    const { result } = renderHook(() => useRequireAuth("/auth"), { wrapper });
+    const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT), { wrapper });
 
-    await waitFor(() => expect(result.current.status).toBe("unauthenticated"));
-    expect(navMock).toHaveBeenCalledTimes(1);
-    expect(navMock).toHaveBeenCalledWith("/auth", { replace: true });
+    await waitFor(() => expect(result.current.status).toBe("revalidation_failed"));
+    expect(navMock).not.toHaveBeenCalled();
+  });
+
+  it("retry re-runs getUser after a transport error and stays off /welcome", async () => {
+    getUserMock
+      .mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: "bad jwt" },
+      })
+      .mockResolvedValue({
+        data: { user: { id: "u-1" } },
+        error: null,
+      });
+    const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe("revalidation_failed"));
+    const callsBeforeRetry = getUserMock.mock.calls.length;
+
+    act(() => {
+      result.current.retry();
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("authenticated"));
+    expect(getUserMock.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
+    expect(navMock).not.toHaveBeenCalled();
+  });
+
+  it("AUTH_REVALIDATE_EVENT re-runs getUser the same way Retry does", async () => {
+    getUserMock.mockRejectedValueOnce(new TypeError("Failed to fetch")).mockResolvedValue({
+      data: { user: { id: "u-1" } },
+      error: null,
+    });
+    const { result } = renderHook(() => useRequireAuth(GROWS_SIGNED_OUT), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe("revalidation_failed"));
+    const callsBeforeRetry = getUserMock.mock.calls.length;
+
+    act(() => {
+      window.dispatchEvent(new Event(AUTH_REVALIDATE_EVENT));
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("authenticated"));
+    expect(getUserMock.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
+    expect(navMock).not.toHaveBeenCalled();
   });
 });

@@ -57,7 +57,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     location.search,
     location.hash,
   );
-  const { status: authStatus } = useRequireAuth(signedOutRedirect);
+  const { status: authStatus, retry: retryAuth } = useRequireAuth(signedOutRedirect);
   const { loading: entitlementLoading, entitlement } = useMyEntitlements();
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
@@ -225,6 +225,37 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center text-muted-foreground">
         Loading…
+      </div>
+    );
+  // getUser transport/server error is not signed-out. Stay on this URL, do not
+  // mount pageContent (no private REST), do not bounce to /welcome. Retry
+  // re-runs getUser; sign-out stays an explicit choice behind confirmation.
+  if (authStatus === "revalidation_failed")
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="app-shell-revalidation-failed"
+          className="w-full max-w-md space-y-3 rounded-md border border-border bg-muted/30 p-4 text-sm"
+        >
+          <p className="font-medium text-foreground">We couldn&apos;t confirm your session.</p>
+          <p className="text-muted-foreground">
+            Retry to check again. Signing out is only needed if Retry keeps failing.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => retryAuth()}>
+              Retry
+            </Button>
+            <SignOutConfirmDialog
+              trigger={
+                <Button type="button" variant="ghost">
+                  Sign out
+                </Button>
+              }
+            />
+          </div>
+        </div>
       </div>
     );
   if (!user || authStatus === "unauthenticated") return null;

@@ -24,4 +24,20 @@ describe("AppShell auth revalidation gate (#588)", () => {
     // Must not re-introduce the cache-only enable.
     expect(APP_SHELL).not.toMatch(/enabled:\s*!loading && !!user\s*}/);
   });
+
+  it("withholds pageContent on revalidation_failed (no welcome bounce), but never as a dead end", () => {
+    expect(APP_SHELL).toMatch(/authStatus === ["']revalidation_failed["']/);
+    const start = APP_SHELL.indexOf('if (authStatus === "revalidation_failed")');
+    const end = APP_SHELL.indexOf('if (!user || authStatus === "unauthenticated") return null;');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const branch = APP_SHELL.slice(start, end);
+    // Still fail-closed for private REST: no page content, no Outlet, no bounce.
+    expect(branch).not.toMatch(/pageContent|<Outlet|nav\(|navigate\(/);
+    // Recoverable: Retry re-runs getUser; sign-out stays explicit.
+    expect(branch).toMatch(/data-testid="app-shell-revalidation-failed"/);
+    expect(branch).toMatch(/retryAuth\(/);
+    expect(branch).toMatch(/SignOutConfirmDialog/);
+    expect(branch).not.toMatch(/Loading…/);
+  });
 });

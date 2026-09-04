@@ -512,7 +512,9 @@ describe("ordering and safety constraints at the seams", () => {
     const app = readAllRouteModuleSources();
     const shell = read("src/components/AppShell.tsx");
     expect(app).not.toContain("useCheckoutReturnCompletionTracking");
-    expect(shell).toMatch(/const \{ status: authStatus \} = useRequireAuth\(signedOutRedirect\)/);
+    expect(shell).toMatch(
+      /const \{ status: authStatus, retry: retryAuth \} = useRequireAuth\(signedOutRedirect\)/,
+    );
     expect(shell).toMatch(
       /const \{ loading: entitlementLoading, entitlement \} = useMyEntitlements\(\)/,
     );

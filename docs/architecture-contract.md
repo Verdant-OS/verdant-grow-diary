@@ -180,9 +180,14 @@ currently correct but not structurally protected.
 live · manual · csv · demo · stale · invalid
 ```
 
-Nothing else is a source. Unknown or missing input resolves to `invalid`, never to `live` or any
-other healthy label, and only `live` is healthy — `manual` and `csv` are trusted-as-entered but are
-not live data.
+These six are the canonical vocabulary: every source **read** by the application resolves to one of
+them. Unknown or missing input resolves to `invalid`, never to `live` or any other healthy label,
+and only `live` is healthy — `manual` and `csv` are trusted-as-entered but are not live data.
+
+**One stored value sits outside this set** and is not an oversight: the first-party Pi ingest
+function writes `pi_bridge`, which the read path normalizes to `live`. AC-4.4 states that exception
+in full. Read AC-4.1 as the contract for the resolved vocabulary, and AC-4.4 as the one admitted
+divergence in what is stored.
 _Source:_ `src/lib/sensor/sensorSourceRules.ts:16,86`;
 `src/constants/sensorIngestProvenance.ts:15`. `established fact`.
 
@@ -191,11 +196,21 @@ vocabulary.**
 `source` answers "how should Verdant treat this reading". Vendor, transport, bridge, app, protocol
 and device identity answer "how did it arrive", and belong in `raw_payload` or the provenance
 registry — `SENSOR_PROVENANCE_TRANSPORTS`, `SENSOR_PROVENANCE_APPS`. Collapsing the two would let a
-vendor name imply health. `NON_CANONICAL_SOURCE_ALIASES` names eighteen tokens
-(`home_assistant`, `mqtt`, `pi_bridge`, `eco_witt`, `unknown`, …) that must never be **stored** as a
-source.
-_Source:_ `src/constants/sensorIngestProvenance.ts:1-13,26-70`; reasoning adjudicated in
-`docs/audits/architecture-audit-adjudication-2026-08-21.md` §5. `established fact`.
+vendor name imply health.
+
+`NON_CANONICAL_SOURCE_ALIASES` names eighteen tokens (`home_assistant`, `mqtt`, `pi_bridge`,
+`eco_witt`, `unknown`, …) that generic ingest must not accept as a source.
+
+**Scope, stated precisely, because it is narrower than the list implies.** The reject-list is
+reachable only through `isNonCanonicalSourceAlias`, whose sole non-test consumer is
+`src/lib/sensorIngestProvenanceRules.ts:111`. That is a pure module under `src/`, so the rule binds
+the **generic ingest and client paths**. It does **not** bind the edge functions, which cannot
+import from `src/lib` at all (AC-2.3) and do not carry a mirrored copy of this check. AC-4.4 records
+the first-party path that writes one of these tokens directly.
+_Source:_ `src/constants/sensorIngestProvenance.ts:1-13,26-70`;
+`src/lib/sensorIngestProvenanceRules.ts:111`; consumer set established by grep at the stamped SHA.
+Reasoning adjudicated in `docs/audits/architecture-audit-adjudication-2026-08-21.md` §5.
+`established fact`.
 
 **AC-4.3 — One canonical union. Every other module derives from it.**
 
@@ -221,16 +236,32 @@ _Source:_ measured by grep at the stamped SHA. `established fact` for the declar
 drifts; `inference` for the risk assessment.
 _Enforcement:_ **none today.** T3 in §11 is the proposed gate.
 
-**AC-4.4 — `pi_bridge → live` is the one sanctioned transport-to-trust mapping, and it is named
-here rather than left in a comment.**
-`sensorSourceRules.ALIAS` maps `pi_bridge` to `live` for badge purposes, on the grounds that the
-first-party bridge is trust-live. This is deliberate and is not a defect — the ingest reject-list
-(AC-4.2) and the read-path normalizer are different layers, and `pi_bridge` is forbidden as a
-_stored_ value while still normalizing on read. It is recorded here because it is the single case
-where a transport name reaches the healthy label, and a contract that left it implicit would make
-the next such request look like precedent. **It is an exception, not a pattern. Adding a second one
-requires an approved slice.**
-_Source:_ `src/lib/sensor/sensorSourceRules.ts:23-27`. `established fact`.
+**AC-4.4 — `pi_bridge` is a stored non-canonical source that the read path promotes to `live`. It
+is the one sanctioned transport-to-trust exception, and it spans write and read.**
+
+The first-party Pi ingest edge function writes the token directly into the row:
+`source: "pi_bridge"` at `supabase/functions/pi-ingest-readings/index.ts:454` and
+`.../commitBatch.ts:130`, whose row type fixes `source: "pi_bridge"` at `commitBatch.ts:40`. So
+`pi_bridge` reaches `sensor_readings.source` as a **stored value**, outside the six of AC-4.1 and
+outside the reach of AC-4.2's reject-list (that list binds `src/` only — see its scope note). On
+read, `sensorSourceRules.ALIAS` maps it to `live`, and `isHealthySensorSource` treats `live` as the
+only healthy source. A transport name therefore reaches the healthy label across both layers, not
+merely as a badge.
+
+This is deliberate — the first-party bridge is trusted as live telemetry — and it is **not** recorded
+here as a defect. It is recorded because it is the single place where the vendor-name-implies-health
+collapse that AC-4.2 forbids is actually permitted, and a contract that left it implicit would let
+the next such request cite it as precedent. **It is an exception, not a pattern. Adding a second
+one, or extending this one to a third-party bridge, requires an approved slice.**
+
+> An earlier draft of this clause claimed `pi_bridge` was "forbidden as a stored value while still
+> normalizing on read". That was **wrong in the direction that matters** — it described the write
+> path as prohibited when a first-party function performs it — and is corrected here rather than
+> quietly reworded.
+
+_Source:_ `supabase/functions/pi-ingest-readings/index.ts:454`,
+`supabase/functions/pi-ingest-readings/commitBatch.ts:40,130`;
+`src/lib/sensor/sensorSourceRules.ts:23-27,86`. `established fact`.
 
 **AC-4.5 — The `TRUST_LIVE_ALIASES` pin is one-directional, and the comment beside it overstates
 what it enforces.**
@@ -449,20 +480,34 @@ _Source:_ measured at the stamped SHA; `docs/audits/architecture-audit-adjudicat
 
 ## 11. Enforcement map
 
-Honest accounting of which clauses are held by a gate and which by convention.
+Honest accounting of which clauses are held by a gate and which by convention. **Every one of the 47
+clauses appears below**, because §0.2 promises each clause names the mechanism that keeps it true;
+a clause omitted from this table would be an unstated gap rather than an accounted one.
 
-| Clause                                                            | Enforcement                                                                                               | Kind              |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------- |
-| AC-2.3                                                            | `scripts/check-no-src-lib-imports.mjs`, `scripts/verify-edge-shared-in-sync.mjs` (prebuild + required CI) | **gated**         |
-| AC-4.6                                                            | `scripts/sensor-safety-check.mjs` (docs-safety runner, pre-commit)                                        | **gated**         |
-| AC-8.1                                                            | `scripts/check-bun-lockfile-policy.mjs`                                                                   | **gated**         |
-| AC-8.4                                                            | ESLint                                                                                                    | **gated**         |
-| AC-9.1                                                            | `Published migration integrity` CI check                                                                  | **gated**         |
-| AC-10.1                                                           | `src/test/vpd-drift-ewma.test.ts`                                                                         | **pinned**        |
-| AC-1.3                                                            | manifest-vs-tree cross-check test                                                                         | **pinned**        |
-| AC-1.1, AC-1.2                                                    | build / regeneration                                                                                      | structural        |
-| AC-5.2, AC-5.4                                                    | no code path from request body to constant or key                                                         | structural        |
-| AC-1.4 – AC-1.7, AC-2.4, AC-3.2 – AC-3.4, AC-4.3 – AC-4.5, AC-6.2 | comment and review                                                                                        | `convention only` |
+| Clause                                                                                            | Enforcement                                                                                                | Kind                |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------- |
+| AC-2.3                                                                                            | `scripts/check-no-src-lib-imports.mjs`, `scripts/verify-edge-shared-in-sync.mjs` (prebuild + required CI)  | **gated**           |
+| AC-8.1                                                                                            | `scripts/check-bun-lockfile-policy.mjs`                                                                    | **gated**           |
+| AC-8.4                                                                                            | ESLint                                                                                                     | **gated**           |
+| AC-9.1                                                                                            | `Published migration integrity` CI check                                                                   | **gated**           |
+| AC-4.6                                                                                            | `scripts/sensor-safety-check.mjs` — wording heuristic over `src/lib/sensor` + `src/components/sensor` only | **partially gated** |
+| AC-10.1                                                                                           | `src/test/vpd-drift-ewma.test.ts`                                                                          | **pinned**          |
+| AC-1.3                                                                                            | manifest-vs-tree cross-check test                                                                          | **pinned**          |
+| AC-1.1, AC-1.2                                                                                    | build / regeneration                                                                                       | structural          |
+| AC-5.2                                                                                            | no code path from the request body to the model constants                                                  | structural          |
+| AC-5.4                                                                                            | UUID validation of a **client-supplied** key plus atomic RPC semantics — see the note below                | validated input     |
+| AC-2.1, AC-5.1, AC-5.3, AC-5.6, AC-5.8, AC-6.3                                                    | shape of the code as written; a change would be visible in review, not caught by a gate                    | structural          |
+| AC-2.2, AC-6.1, AC-6.4                                                                            | RLS and server-side checks at runtime; no static gate proves the client cannot be trusted                  | runtime boundary    |
+| AC-1.4 – AC-1.7, AC-2.4, AC-3.1 – AC-3.4, AC-4.3 – AC-4.5, AC-6.2, AC-8.2, AC-8.3, AC-9.2, AC-9.3 | comment and review                                                                                         | `convention only`   |
+| AC-4.1, AC-4.2                                                                                    | no gate proves the vocabulary is not widened; T2/T3 are the proposed cover                                 | **unenforced**      |
+| AC-5.5, AC-5.7, AC-6.5, AC-7.1, AC-7.2, AC-7.3, AC-10.2, AC-10.3                                  | product-safety commitments held by review and by the absence of the code that would break them             | **unenforced**      |
+
+**On AC-5.4, corrected.** An earlier draft grouped it with AC-5.2 as "no code path from request body
+to constant or key". That is wrong: `idempotencyKey` **does** come from the request
+(`ai-doctor-review/index.ts:335-338` validates `request.idempotencyKey` as a UUID, and `:388` passes
+it to `p_idempotency_key`). Its safety comes from validation plus the atomic credit RPC, not from
+being server-constant. AC-5.2's boundary is genuinely structural; AC-5.4's is validated client
+input, and conflating them records the wrong trust boundary.
 
 **Proposed gates.** These do not exist yet and are named so the gap is visible rather than implied:
 
@@ -474,10 +519,20 @@ Honest accounting of which clauses are held by a gate and which by convention.
 | T4  | `MODEL` and `MODEL_TIER` are module constants and not request-derived                                                                                        | AC-5.2        |
 | T5  | Zero occurrences of Nelson / modified-Z / MAD across `src/` and `supabase/`                                                                                  | AC-10.2       |
 
-T2–T4 must `await import()` the module and assert on the resolved object. A regex over source text
-cannot distinguish a live setting from a commented-out one and is rejected by
-`scripts/check-contract-test-resolution.mjs`. T5 is the sanctioned use of source scanning: proving a
-token is **absent**.
+**Each test needs the technique its claim actually admits — they are not all import tests.**
+
+| Test | Technique                | Why                                                                                                                                                                                                      |
+| ---- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T2   | **resolved import**      | Both are runtime `as const` arrays, so the values exist at runtime and can be compared as objects                                                                                                        |
+| T3   | **source / AST scan**    | Sensor-source unions are **type-level and erased at runtime**. No import can observe a declaration that does not exist in the emitted output; finding declarations outside the canonical files needs AST |
+| T4   | **import + source scan** | Importing can assert the constants' values, but it cannot prove a **negative** — that no request field reaches model selection. That half is a source/AST claim                                          |
+| T5   | **source scan**          | Proving a token is **absent** is exactly what scanning is good for                                                                                                                                       |
+
+**`scripts/check-contract-test-resolution.mjs` does not apply to any of these.** It flags only tests
+that read the source of `playwright.config` or `vitest.config` without importing them
+(`CONFIG_FILES = ["playwright.config", "vitest.config"]`). Citing it as the reason T2–T4 must import
+was wrong: the underlying principle — verify effective configuration by resolving it, and use
+scanning only to prove absence or structure — is what governs here, not that checker's scope.
 
 ---
 
@@ -491,7 +546,7 @@ Rejected means decided, with a reason. Re-proposing one requires new evidence, n
 | **Modified Z-Score / MAD**                             | **REJECTED** | Same class of assumption violation; no evidence of need, and no implementation to preserve                                                                                                                       |
 | **Moving VPD α from 0.3 to 0.2**                       | **REJECTED** | Named explicitly in the 2026-08-21 adjudication as a change not to make silently. α is a tuned, test-pinned parameter                                                                                            |
 | **Next.js migration**                                  | **REJECTED** | No source pressure. TanStack Start SSR is working, `server-only` is already banned as a foreign idiom (AC-8.4), and the cost is the whole route tree and the 683-file shim                                       |
-| **Drizzle**                                            | **REJECTED** | Would sit beside 272 migrations of append-only history and generated Supabase types; introduces a second schema truth                                                                                            |
+| **Drizzle**                                            | **REJECTED** | Would sit beside an append-only migration history and generated Supabase types; introduces a second schema truth                                                                                                 |
 | **tRPC**                                               | **REJECTED** | Server functions plus edge functions already cover the seam, and RLS — not a typed RPC layer — is the boundary that matters (AC-2.2)                                                                             |
 | **Auth migration off Supabase Auth**                   | **REJECTED** | Auth, RLS, and `auth.uid()` are one system. Replacing the first breaks the authorization model                                                                                                                   |
 | **Collapsing vendor/transport into `source`**          | **REJECTED** | Directly contradicts AC-4.2. Would let a vendor name imply health                                                                                                                                                |
@@ -552,5 +607,13 @@ Stated as unknowns rather than omitted, so nobody reads silence as agreement.
 4. Removing a clause requires stating what replaced it. A clause that is merely inconvenient is not
    obsolete.
 5. This file carries no `Sentinel-Version` and is not one of the twelve governance files. Editing it
-   alone requires no parity bump. Do not add a version header — that would pull it into the parity
-   gate and make every future amendment a twelve-file change.
+   alone requires no parity bump.
+
+   **Why, stated correctly.** `scripts/check-sentinel-version-parity.mjs` iterates a fixed
+   `ALL = [CANONICAL, ...MIRRORS]` array naming exactly those twelve files (`:31-45`), so adding a
+   version header here would **not**, on its own, pull this file into the parity gate — an earlier
+   draft claimed it would, and that was factually wrong. The reason to leave the header off is
+   different and weaker: a `Sentinel-Version` line signals governance-file status this document does
+   not have, and invites a future editor to add it to `MIRRORS` and turn every amendment into a
+   twelve-file change. Adding this file to that list is a deliberate decision for Cheek, not a side
+   effect of a header.

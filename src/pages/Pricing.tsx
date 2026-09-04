@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "@/lib/react-router-compat";
-import { resolvePricingPlanPreselect } from "@/lib/pricingPlanPreselect";
+import {
+  resolvePricingCreditPackPreselect,
+  resolvePricingPlanPreselect,
+} from "@/lib/pricingPlanPreselect";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Check,
@@ -179,6 +182,7 @@ export default function Pricing() {
   // Legacy `/billing/:plan` redirects here with this exact contract.
   // NEVER auto-opens Paddle — the grower must click a Pricing CTA.
   const preselect = resolvePricingPlanPreselect(searchParams.get("plan"));
+  const preselectedCreditPack = resolvePricingCreditPackPreselect(searchParams.get("plan"));
   const paidInterestLeadSource = resolvePaidInterestLeadSource(searchParams);
   const freeSignupPath = buildAttributedSignupPath({
     source: resolvePaidAcquisitionSource(searchParams) ?? "pricing_page",
@@ -200,8 +204,7 @@ export default function Pricing() {
   // auth-return query is the only seed because a resumed pack can fail again
   // before a click repopulates this ref; its next recovery must stay on that
   // pack. A plan preselection remains insufficient evidence of an attempt.
-  const authReturnPackSku = CREDIT_PACKS.find((pack) => pack.sku === searchParams.get("plan"))?.sku;
-  const lastCheckoutSkuRef = useRef<string | null>(authReturnPackSku ?? null);
+  const lastCheckoutSkuRef = useRef<string | null>(preselectedCreditPack);
   // Which SKU the current blockedReason belongs to. A runtime checkout failure
   // is specific to the SKU that failed and must not make the others inert.
   const [blockedSku, setBlockedSku] = useState<string | null>(null);
@@ -408,15 +411,21 @@ export default function Pricing() {
   }, []);
 
   useEffect(() => {
-    if (location.hash !== "#buy-credits") {
+    const surfaceRequest =
+      location.hash === "#buy-credits"
+        ? location.hash
+        : preselectedCreditPack
+          ? `query:${preselectedCreditPack}`
+          : null;
+    if (!surfaceRequest) {
       handledCreditPacksHashRef.current = null;
       return;
     }
-    if (handledCreditPacksHashRef.current === location.hash) return;
+    if (handledCreditPacksHashRef.current === surfaceRequest) return;
     const target = creditPacksRef.current;
     if (!target) return;
 
-    handledCreditPacksHashRef.current = location.hash;
+    handledCreditPacksHashRef.current = surfaceRequest;
     if (typeof target.scrollIntoView === "function") {
       try {
         target.scrollIntoView({
@@ -440,7 +449,7 @@ export default function Pricing() {
         // A failed focus must not turn an in-page navigation aid into an error.
       }
     }
-  }, [location.hash]);
+  }, [location.hash, preselectedCreditPack]);
 
   useEffect(() => {
     if (!blockedReason) {
@@ -1016,7 +1025,12 @@ export default function Pricing() {
             <div
               key={pack.sku}
               data-testid={`pricing-credit-pack-${pack.sku}`}
-              className="rounded-2xl border border-border/60 bg-card/40 backdrop-blur p-6 flex flex-col items-start min-w-0"
+              data-preselected={preselectedCreditPack === pack.sku ? "true" : undefined}
+              className={`rounded-2xl border bg-card/40 backdrop-blur p-6 flex flex-col items-start min-w-0 ${
+                preselectedCreditPack === pack.sku
+                  ? "border-primary ring-2 ring-primary/30"
+                  : "border-border/60"
+              }`}
             >
               <p className="text-3xl md:text-4xl font-display font-bold">{pack.credits}</p>
               <p className="text-sm text-muted-foreground">AI Doctor credits</p>

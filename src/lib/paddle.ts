@@ -12,6 +12,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsFetchError } from "@supabase/supabase-js";
 import {
   resolvePaddleCheckoutEnvironment,
   classifyPaddleToken,
@@ -200,7 +201,9 @@ function readEdgeFunctionStatus(error: unknown): number | null {
  * True only for the genuine transport case. supabase-js raises
  * `FunctionsFetchError` when the request never received an HTTP response,
  * and puts the underlying network error — an `Error`, not a `Response` — in
- * `context`.
+ * `context` (verified against `@supabase/functions-js` 2.111.0:
+ * `FunctionsClient` throws `new FunctionsFetchError(fetchError)`, and the
+ * sibling `FunctionsHttpError` / `FunctionsRelayError` carry a `Response`).
  *
  * WHY THIS IS SEPARATE FROM "no status": a missing `context.status` is NOT
  * evidence that the device is offline. An error with no `context` at all, a
@@ -208,10 +211,19 @@ function readEdgeFunctionStatus(error: unknown): number | null {
  * there, and telling that grower to "check your connection" sends them to
  * fix something that is not broken. Only a real fetch failure earns that
  * message; everything else is a reply we cannot act on.
+ *
+ * WHY BOTH SIGNALS, NEVER EITHER: matching the exported class is the
+ * primary test. The name/shape fallback exists only for a stand-in that
+ * cannot be an `instanceof` match — a plain object from a mock, or a second
+ * copy of supabase-js in a bundle putting the real class in another realm —
+ * and it requires the discriminator *and* the context shape together. An
+ * unrelated wrapper that merely happens to hold an `Error` in `context` is
+ * not transport evidence, and must stay `price_response_unusable`.
  */
 function isTransportFailure(error: unknown): boolean {
+  if (error instanceof FunctionsFetchError) return true;
   const name = (error as { name?: unknown } | null | undefined)?.name;
-  if (name === "FunctionsFetchError") return true;
+  if (name !== "FunctionsFetchError") return false;
   const ctx = (error as { context?: unknown } | null | undefined)?.context;
   return ctx instanceof Error;
 }

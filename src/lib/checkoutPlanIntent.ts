@@ -29,28 +29,15 @@
  */
 
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { PAID_PLAN_ALLOWLIST, PAID_PLAN_IDS, type PaidPlanId } from "@/lib/paidPlanAllowlist";
 
-export type PlanIntentId =
-  | "pro_monthly"
-  | "pro_annual"
-  | "craft_monthly"
-  | "craft_annual"
-  | "founder_lifetime"
-  | "credit_pack_50"
-  | "credit_pack_150";
+export type PlanIntentId = PaidPlanId;
 
-const KNOWN_PLAN_INTENTS: ReadonlyArray<PlanIntentId> = [
-  "pro_monthly",
-  "pro_annual",
-  "craft_monthly",
-  "craft_annual",
-  "founder_lifetime",
-  "credit_pack_50",
-  "credit_pack_150",
-];
+/** Canonical identity exported so consumers/tests cannot drift onto a second list. */
+export const PLAN_INTENT_IDS: readonly PlanIntentId[] = PAID_PLAN_IDS;
 
 export function isKnownPlanIntent(value: unknown): value is PlanIntentId {
-  return typeof value === "string" && (KNOWN_PLAN_INTENTS as ReadonlyArray<string>).includes(value);
+  return typeof value === "string" && PAID_PLAN_ALLOWLIST.has(value);
 }
 
 /**

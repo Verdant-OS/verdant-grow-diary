@@ -1175,6 +1175,7 @@ export default function QuickLog({
     setWateringError(null);
     setSaveError(null);
     setSavedTarget(null);
+    setSavedDraftHandoffKey(null);
     setEarlyMilestone(null);
     setEarlyVigor(null);
     setEarlyNotes("");

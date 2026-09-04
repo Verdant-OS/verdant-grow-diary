@@ -338,22 +338,38 @@ export default function Pricing() {
   async function handleCheckoutReauthentication() {
     if (reauthenticating) return;
     const rawSku = lastCheckoutSkuRef.current ?? interestPlan;
-    const returnPath = buildCheckoutPlanReturnPath({
+    const sanitizedReturn = buildCheckoutPlanReturnPath({
       pathname: location.pathname,
       search: location.search,
       plan: rawSku,
     });
+    // Credit packs are not plan intents: `savePlanIntent` rejects them and
+    // `buildCheckoutPlanReturnPath` strips a non-allowlisted `?plan=`, so a pack
+    // buyer used to come back from sign-in to generic Pricing with their top-up
+    // forgotten (get-paddle-price answers `auth_required` before it inspects the
+    // SKU, so packs do reach this branch). Send them back to the pack section
+    // instead. Deliberately NOT auto-resumed: re-opening a pack checkout without
+    // the grower asking is the surface the fix below exists to close.
+    const returnPath = CREDIT_PACKS.some((pack) => pack.sku === rawSku)
+      ? `${sanitizedReturn}#buy-credits`
+      : sanitizedReturn;
 
-    // Save before clearing the stale session. The hook consumes this intent
-    // once after the grower signs in again and returns to Pricing.
-    savePlanIntent(rawSku);
     setReauthenticating(true);
     try {
       await signOut();
+      // Persist ONLY after the stale session is actually gone. Saving first left
+      // a live one-shot intent behind whenever `signOut()` rejected — the catch
+      // below does not navigate, so the grower stays on Pricing with a
+      // consumable intent in sessionStorage (15-minute TTL). The next mount in
+      // that tab consumes it and auto-opens checkout, including after a
+      // different account signs in. The intent must not outlive a handoff that
+      // never happened.
+      savePlanIntent(rawSku);
       dismissBlocked();
       navigate(`/auth?mode=signin&redirectTo=${encodeURIComponent(returnPath)}`);
     } catch {
-      // Keep the auth recovery visible if local sign-out cannot complete.
+      // Keep the auth recovery visible if local sign-out cannot complete. No
+      // intent was written, so nothing to clean up.
       setReauthenticating(false);
     }
   }

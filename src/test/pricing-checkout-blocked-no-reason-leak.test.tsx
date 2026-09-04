@@ -260,8 +260,12 @@ describe("Pricing blocked checkout — sanitized reason-code leak guard", () => 
     fireEvent.click(getByTestId("pricing-cta-craft-annual"));
     fireEvent.click(getByTestId("pricing-checkout-sign-in"));
 
-    expect(peekPlanIntent()).toBe("craft_annual");
+    // RENEGOTIATED with the behaviour change: this used to assert the intent was
+    // already stored here, i.e. BEFORE `signOut()` settled. That ordering is the
+    // defect — a rejected sign-out left a consumable intent behind. The pin is
+    // kept and inverted so the old ordering cannot come back.
     expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(peekPlanIntent()).toBeNull();
     expect(getByTestId("location-probe")).toHaveTextContent("/pricing");
     expect(signOutGate.resolve).toBeTypeOf("function");
     signOutGate.resolve?.();
@@ -270,8 +274,62 @@ describe("Pricing blocked checkout — sanitized reason-code leak guard", () => 
         "/auth?mode=signin&redirectTo=%2Fpricing%3Fplan%3Dcraft_annual",
       );
     });
+    // ...and it IS stored once the handoff actually happened.
+    expect(peekPlanIntent()).toBe("craft_annual");
     expect(openCheckoutMock).not.toHaveBeenCalled();
     assertNoReasonTokensLeaked(container.innerHTML);
+  });
+
+  // #1278 finding 1. A rejected sign-out does not navigate, so the grower stays
+  // on Pricing. If the intent were written first it would sit in sessionStorage
+  // (15-minute TTL, destructive consume) and the next mount in that tab would
+  // auto-open checkout — including after a DIFFERENT account signs in, since the
+  // key is per-tab and not account-scoped. Billing stays server-authoritative so
+  // this grants nothing, but it is a paid surface nobody asked for.
+  it("writes no plan intent when the sign-out handoff fails", async () => {
+    signOutMock.mockRejectedValueOnce(new Error("sign-out failed"));
+    currentBlockedReasonCode = "auth_required";
+    currentBlockedReason = getPaddleCheckoutCatalogMessage("auth_required");
+
+    const { getByTestId } = renderPricing();
+
+    fireEvent.click(getByTestId("pricing-cta-craft-annual"));
+    fireEvent.click(getByTestId("pricing-checkout-sign-in"));
+
+    await waitFor(() => {
+      expect(signOutMock).toHaveBeenCalledTimes(1);
+    });
+    // No intent, and no navigation: the handoff never happened, so nothing may
+    // survive it.
+    expect(peekPlanIntent()).toBeNull();
+    expect(getByTestId("location-probe")).toHaveTextContent("/pricing");
+    // The recovery panel stays visible so the grower can try again.
+    expect(getByTestId("pricing-checkout-recovery")).toBeTruthy();
+  });
+
+  // #1278 finding 2 (Codex P2). get-paddle-price answers `auth_required` before
+  // it inspects the SKU, so credit packs reach this branch too — but packs are
+  // not plan intents: savePlanIntent rejects them and buildCheckoutPlanReturnPath
+  // strips a non-allowlisted `?plan=`. Without the anchor the grower returns from
+  // sign-in to generic Pricing with their top-up forgotten.
+  it("returns a credit-pack buyer to the pack section through re-authentication", async () => {
+    currentBlockedReasonCode = "auth_required";
+    currentBlockedReason = getPaddleCheckoutCatalogMessage("auth_required");
+
+    const { getByTestId } = renderPricing();
+
+    fireEvent.click(getByTestId("pricing-cta-credit_pack_50"));
+    fireEvent.click(getByTestId("pricing-checkout-sign-in"));
+
+    await waitFor(() => {
+      expect(getByTestId("location-probe")).toHaveTextContent(
+        "/auth?mode=signin&redirectTo=%2Fpricing%23buy-credits",
+      );
+    });
+    // Packs are deliberately NOT auto-resumed — re-opening a paid pack checkout
+    // unasked is the surface finding 1 exists to close. The anchor returns the
+    // selection without reopening it.
+    expect(peekPlanIntent()).toBeNull();
   });
 
   it("does not render the recovery panel or leak tokens when checkout is healthy", () => {

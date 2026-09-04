@@ -206,6 +206,83 @@ describe("usePaddleCheckout — catalog-unavailable calm state", () => {
  * now visible in the funnel") was untested at the layer that does the
  * emitting.
  */
+// #1278 finding 3. `blockedReasonCode` was asserted in exactly ONE test file —
+// `pricing-checkout-blocked-no-reason-leak.test.tsx` — and that file mocks this
+// hook. So nothing drove the real implementation: a hook that always returned
+// `null` would keep every page test green while routing every failure back to
+// configuration recovery, silently undoing the cause-aware panel. These tests
+// exercise the real hook. Verified by mutation: stub the returned code to `null`
+// and all four below fail.
+describe("usePaddleCheckout — blockedReasonCode is produced, and cleared", () => {
+  it("populates the sanitized reason code on a catalog failure", async () => {
+    state.resolverError = {
+      reason: "auth_required",
+      message:
+        "Verdant couldn't confirm you're still signed in, so checkout didn't open. Please sign in again, then choose your plan.",
+    };
+
+    const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+    await act(async () => {
+      await result.current.openCheckout({ priceId: "pro_monthly" });
+    });
+
+    expect(result.current.blockedReasonCode).toBe("auth_required");
+  });
+
+  it("carries each client-classified reason through to the code, not just the message", async () => {
+    for (const reason of [
+      "price_gateway_unavailable",
+      "price_request_failed",
+      "price_response_unusable",
+    ] as const) {
+      state.resolverError = { reason, message: `calm copy for ${reason}` };
+      const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+      await act(async () => {
+        await result.current.openCheckout({ priceId: "pro_annual" });
+      });
+      expect(result.current.blockedReasonCode).toBe(reason);
+    }
+  });
+
+  it("clears the code on dismiss", async () => {
+    state.resolverError = {
+      reason: "price_not_configured",
+      message: "This plan isn't set up for checkout yet.",
+    };
+
+    const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+    await act(async () => {
+      await result.current.openCheckout({ priceId: "craft_monthly" });
+    });
+    expect(result.current.blockedReasonCode).toBe("price_not_configured");
+
+    act(() => {
+      result.current.dismissBlocked();
+    });
+    expect(result.current.blockedReasonCode).toBeNull();
+    expect(result.current.blockedReason).toBeNull();
+  });
+
+  it("clears the code on a fresh attempt, so a stale cause cannot frame a new failure", async () => {
+    state.resolverError = {
+      reason: "auth_required",
+      message: "sign in again",
+    };
+    const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+    await act(async () => {
+      await result.current.openCheckout({ priceId: "pro_monthly" });
+    });
+    expect(result.current.blockedReasonCode).toBe("auth_required");
+
+    // Next attempt succeeds: the panel must not still claim an auth problem.
+    state.resolverError = null;
+    await act(async () => {
+      await result.current.openCheckout({ priceId: "pro_monthly" });
+    });
+    expect(result.current.blockedReasonCode).toBeNull();
+  });
+});
+
 describe("usePaddleCheckout — client-classified reasons stay calm AND reportable", () => {
   const CASES = [
     {

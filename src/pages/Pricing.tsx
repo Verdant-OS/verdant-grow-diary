@@ -195,11 +195,13 @@ export default function Pricing() {
   // which is exactly how a failed pack retry became a subscription checkout.
   // The launch-list form keeps reading `interestPlan` state, so a pack id can
   // never reach SubscriberInterestForm, which collects interest in *plans*.
-  // Starts null on purpose: "no attempt has been made yet" must be
-  // distinguishable from "pro_annual was attempted". Seeding it with
-  // interestPlan would attribute an unattributed failure to whichever plan
-  // happens to be preselected.
-  const lastCheckoutSkuRef = useRef<string | null>(null);
+  // Starts null for an ordinary visit: "no attempt has been made yet" must be
+  // distinguishable from "pro_annual was attempted". An exact pack in the
+  // auth-return query is the only seed because a resumed pack can fail again
+  // before a click repopulates this ref; its next recovery must stay on that
+  // pack. A plan preselection remains insufficient evidence of an attempt.
+  const authReturnPackSku = CREDIT_PACKS.find((pack) => pack.sku === searchParams.get("plan"))?.sku;
+  const lastCheckoutSkuRef = useRef<string | null>(authReturnPackSku ?? null);
   // Which SKU the current blockedReason belongs to. A runtime checkout failure
   // is specific to the SKU that failed and must not make the others inert.
   const [blockedSku, setBlockedSku] = useState<string | null>(null);
@@ -344,12 +346,13 @@ export default function Pricing() {
       plan: rawSku,
     });
 
-    // Save before clearing the stale session. The hook consumes this intent
-    // once after the grower signs in again and returns to Pricing.
-    savePlanIntent(rawSku);
     setReauthenticating(true);
     try {
       await signOut();
+      // Persist only after the stale bearer is actually gone. A rejected
+      // sign-out must not leave an intent that can auto-open checkout later.
+      // The hook consumes this once after sign-in returns to Pricing.
+      savePlanIntent(rawSku);
       dismissBlocked();
       navigate(`/auth?mode=signin&redirectTo=${encodeURIComponent(returnPath)}`);
     } catch {
@@ -358,9 +361,10 @@ export default function Pricing() {
     }
   }
 
-  // One-time AI credit-pack checkout. Packs are not plans, so this bypasses the
-  // plan-intent state and opens checkout for the pack SKU directly. Same
-  // canonical checkout hook — this stays inside Pricing.tsx (checkout ownership).
+  // One-time AI credit-pack checkout. Packs are not plans, so the initial click
+  // opens the pack SKU directly. Only an auth-recovery handoff persists the
+  // exact allowlisted SKU for one-shot resume. Same canonical checkout hook —
+  // this stays inside Pricing.tsx (checkout ownership).
   function handleBuyPack(sku: string) {
     // Presentation is not the authority (get-paddle-price repeats this gate),
     // but never start a checkout the current verified entitlement cannot use.

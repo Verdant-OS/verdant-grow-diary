@@ -397,24 +397,24 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         {/* Mobile floating + */}
         <button
           onClick={() => {
-            if (mobileQuickLogTarget) {
-              setOpenLog(false);
-              setPrefill(null);
-              setLegacyQuickLogSession((session) => session + 1);
-              setStructuredOpenIntent(null);
-              // Freeze the evidence available at the grower's tap. A plant
-              // query that settles later may improve the NEXT launch, but it
-              // cannot retarget this open sheet and erase its draft.
-              setMobileLaunchTargetKey(mobileQuickLogTarget);
-              setOpenScopedLog(true);
-            } else {
-              setOpenScopedLog(false);
-              setMobileLaunchTargetKey(null);
-              setStructuredOpenIntent(null);
-              const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
-              setPrefill(routePlantId ? { plantId: routePlantId } : null);
-              setOpenLog(true);
-            }
+            const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
+            const mobileQuickLogPrefill: QuickLogPrefill | null = mobileQuickLogTarget?.startsWith(
+              "plant:",
+            )
+              ? { plantId: mobileQuickLogTarget.slice("plant:".length) }
+              : mobileQuickLogTarget?.startsWith("tent:")
+                ? { tentId: mobileQuickLogTarget.slice("tent:".length) }
+                : routePlantId
+                  ? { plantId: routePlantId }
+                  : null;
+
+            // Every mobile + enters the same QuickLog dialog as the plant
+            // action row. Structured V2 intents keep their event-only path.
+            setOpenScopedLog(false);
+            setMobileLaunchTargetKey(null);
+            setStructuredOpenIntent(null);
+            setPrefill(mobileQuickLogPrefill);
+            setOpenLog(true);
           }}
           aria-label="Open Quick Log"
           data-testid="mobile-quick-log-fab"

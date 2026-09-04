@@ -37,7 +37,14 @@ type CatalogReason =
   | "price_not_configured"
   | "price_resolution_unavailable"
   | "plan_sold_out"
-  | "pack_requires_monthly_plan";
+  | "pack_requires_monthly_plan"
+  // Client-classified additions. These reach the hook exactly like the
+  // server-declared ones, so the calm-state and telemetry contract must
+  // hold for them too — that is what the block at the bottom pins.
+  | "auth_required"
+  | "price_gateway_unavailable"
+  | "price_request_failed"
+  | "price_response_unusable";
 
 const state = {
   resolverError: null as null | { reason: CatalogReason; message: string } | "generic",
@@ -88,12 +95,27 @@ function wrapper({ children }: { children: ReactNode }) {
   return <MemoryRouter initialEntries={["/pricing"]}>{children}</MemoryRouter>;
 }
 
+// Real trackFunnelEvent runs here (funnelAnalytics is deliberately NOT
+// mocked), so asserting on gtag exercises sanitizeFunnelParams and
+// enforceFunnelEventSchema for real — proving the new reason tokens
+// actually survive the ≤32-char / no-whitespace / key-allowlist filters
+// rather than being silently dropped.
+const gtagMock = vi.fn();
+
 beforeEach(() => {
   navigateMock.mockReset();
   toastMock.mockReset();
+  gtagMock.mockReset();
   state.resolverError = null;
+  (window as any).gtag = gtagMock;
   (window as any).Paddle = { Checkout: { open: vi.fn() } };
 });
+
+function catalogUnavailableEvents() {
+  return gtagMock.mock.calls.filter(
+    (call) => call[0] === "event" && call[1] === "checkout_catalog_unavailable",
+  );
+}
 
 describe("usePaddleCheckout — catalog-unavailable calm state", () => {
   it("price_resolution_unavailable (missing Craft price env var) lands as inline blockedReason, no destructive toast", async () => {
@@ -173,5 +195,75 @@ describe("usePaddleCheckout — catalog-unavailable calm state", () => {
     expect(result.current.blockedReason).toBe(
       "Checkout couldn't open. You can leave your email for one availability notice instead.",
     );
+  });
+});
+
+/**
+ * Copilot round 1: the motivating regression is the MISSING
+ * `checkout_catalog_unavailable` event, but nothing asserted the hook emits
+ * it for the newly classified reasons — the mock union above did not even
+ * contain them. Without this block, the PR's core claim ("every failure is
+ * now visible in the funnel") was untested at the layer that does the
+ * emitting.
+ */
+describe("usePaddleCheckout — client-classified reasons stay calm AND reportable", () => {
+  const CASES = [
+    {
+      reason: "auth_required" as const,
+      plan: "pro_monthly",
+      message:
+        "Verdant couldn't confirm you're still signed in, so checkout didn't open. Please sign in again, then choose your plan.",
+    },
+    {
+      reason: "price_gateway_unavailable" as const,
+      plan: "pro_annual",
+      message:
+        "Checkout couldn't be reached just now, and nothing was charged. Please try again in a moment.",
+    },
+    {
+      reason: "price_request_failed" as const,
+      plan: "craft_monthly",
+      message:
+        "Verdant couldn't reach checkout from this device, and nothing was charged. Check your connection, then try again.",
+    },
+    {
+      reason: "price_response_unusable" as const,
+      plan: "craft_annual",
+      message:
+        "Checkout didn't return what Verdant needs to continue, and nothing was charged. Please try again in a moment.",
+    },
+  ];
+
+  for (const testCase of CASES) {
+    it(`${testCase.reason}: emits checkout_catalog_unavailable, calm blockedReason, no destructive toast`, async () => {
+      state.resolverError = { reason: testCase.reason, message: testCase.message };
+
+      const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+      await act(async () => {
+        await result.current.openCheckout({ priceId: testCase.plan });
+      });
+
+      // 1. Reported — the half that was silent before this change.
+      const events = catalogUnavailableEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0][2]).toMatchObject({ plan: testCase.plan, reason: testCase.reason });
+
+      // 2. Calm, not destructive.
+      expect(toastMock).not.toHaveBeenCalled();
+      expect(result.current.blockedReason).toBe(testCase.message);
+      expect(result.current.loading).toBe(false);
+    });
+  }
+
+  it("never routes a client-classified failure through the destructive toast", async () => {
+    for (const testCase of CASES) {
+      toastMock.mockReset();
+      state.resolverError = { reason: testCase.reason, message: testCase.message };
+      const { result } = renderHook(() => usePaddleCheckout(), { wrapper });
+      await act(async () => {
+        await result.current.openCheckout({ priceId: testCase.plan });
+      });
+      expect(toastMock, `${testCase.reason} toasted`).not.toHaveBeenCalled();
+    }
   });
 });

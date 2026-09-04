@@ -464,6 +464,50 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(screen.queryByTestId("quick-log-draft-preview-empty-note")).not.toBeInTheDocument();
   });
 
+  it("restores the empty Note handoff hint when Log another starts a fresh draft", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValue(pending.promise);
+    renderQuickLog({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+      eventType: "observation",
+      suggestSnapshot: true,
+    });
+
+    expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toHaveTextContent(
+      /note field is empty/i,
+    );
+    prepareMainNote();
+    act(() => submitForm(mainForm()));
+    await waitFor(() =>
+      expect(harness.rpc).toHaveBeenCalledWith(
+        "quicklog_save_manual",
+        expect.objectContaining({
+          p_target_type: "plant",
+          p_target_id: "p1",
+          p_action: "note",
+          p_note: "Main form observation",
+        }),
+      ),
+    );
+
+    await act(async () => {
+      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      await pending.promise;
+    });
+
+    const logAnother = await screen.findByTestId("quick-log-post-save-another");
+    expect(screen.queryByTestId("quick-log-draft-preview-empty-note")).not.toBeInTheDocument();
+
+    fireEvent.click(logAnother);
+
+    expect(screen.getByTestId("quicklog-note")).toHaveValue("");
+    expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toHaveTextContent(
+      /note field is empty/i,
+    );
+  });
+
   it("names the disabled main Save as Saving while the shared lock is active", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);

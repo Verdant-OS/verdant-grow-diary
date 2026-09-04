@@ -5,9 +5,11 @@
  * to be the calm, grower-facing message produced by
  * `getPaddleCheckoutCatalogMessage(...)`. The sanitized reason enum tokens
  * (`unknown_plan`, `price_not_configured`, `price_resolution_unavailable`,
- * `plan_sold_out`, `pack_requires_monthly_plan`, plus the env-unavailable
- * telemetry token `checkout_env_unavailable`) are telemetry-only and must
- * never appear in the rendered DOM.
+ * `plan_sold_out`, `pack_requires_monthly_plan`, `auth_required`,
+ * `price_gateway_unavailable`, `price_request_failed`,
+ * `price_response_unusable`, plus the env-unavailable telemetry token
+ * `checkout_env_unavailable`) are telemetry-only and must never appear in
+ * the rendered DOM.
  *
  * This test drives the Pricing page through every catalog reason and asserts:
  *   1. The recovery panel is rendered.
@@ -16,14 +18,17 @@
  *      DOM (including data-* attributes, aria-labels, and button text).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "@/lib/react-router-compat";
+import { render, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
 import { getPaddleCheckoutCatalogMessage, type PaddleCheckoutCatalogReason } from "@/lib/paddle";
+import { peekPlanIntent } from "@/lib/checkoutPlanIntent";
 
 const openCheckoutMock = vi.fn(async () => {});
 const dismissBlockedMock = vi.fn();
+const signOutMock = vi.fn(async () => {});
 
 let currentBlockedReason: string | null = null;
+let currentBlockedReasonCode: PaddleCheckoutCatalogReason | null = null;
 let currentUnavailableMessage: string | null = null;
 
 vi.mock("@/hooks/usePaddleCheckout", () => ({
@@ -33,13 +38,19 @@ vi.mock("@/hooks/usePaddleCheckout", () => ({
     environment: "sandbox" as const,
     unavailableMessage: currentUnavailableMessage,
     blockedReason: currentBlockedReason,
+    blockedReasonCode: currentBlockedReasonCode,
     dismissBlocked: dismissBlockedMock,
   }),
 }));
 
 vi.mock("@/hooks/usePageSeo", () => ({ usePageSeo: () => {} }));
 vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "paid-grower" }, session: null, loading: false }),
+  useAuth: () => ({
+    user: { id: "paid-grower" },
+    session: null,
+    loading: false,
+    signOut: signOutMock,
+  }),
 }));
 vi.mock("@/hooks/useMyEntitlements", () => ({
   useMyEntitlements: () => ({
@@ -78,7 +89,9 @@ vi.mock("@/hooks/useFounderSlotsRemaining", () => ({
     soldOut: false,
   }),
 }));
-vi.mock("@/components/SubscriberInterestForm", () => ({ default: () => null }));
+vi.mock("@/components/SubscriberInterestForm", () => ({
+  default: () => <div data-testid="subscriber-interest-form" />,
+}));
 
 import Pricing from "@/pages/Pricing";
 
@@ -88,6 +101,10 @@ const REASON_TOKENS: readonly string[] = [
   "price_resolution_unavailable",
   "plan_sold_out",
   "pack_requires_monthly_plan",
+  "auth_required",
+  "price_gateway_unavailable",
+  "price_request_failed",
+  "price_response_unusable",
   "checkout_env_unavailable",
   "runtime_failure",
   "environment_unavailable",
@@ -99,12 +116,22 @@ const CATALOG_REASONS: readonly PaddleCheckoutCatalogReason[] = [
   "price_resolution_unavailable",
   "plan_sold_out",
   "pack_requires_monthly_plan",
+  "auth_required",
+  "price_gateway_unavailable",
+  "price_request_failed",
+  "price_response_unusable",
 ];
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-probe">{`${location.pathname}${location.search}`}</output>;
+}
 
 function renderPricing() {
   return render(
     <MemoryRouter initialEntries={["/pricing"]}>
       <Pricing />
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
@@ -120,15 +147,19 @@ function assertNoReasonTokensLeaked(html: string) {
 describe("Pricing blocked checkout — sanitized reason-code leak guard", () => {
   beforeEach(() => {
     currentBlockedReason = null;
+    currentBlockedReasonCode = null;
     currentUnavailableMessage = null;
     openCheckoutMock.mockClear();
     dismissBlockedMock.mockClear();
+    signOutMock.mockClear();
+    window.sessionStorage.clear();
   });
 
   for (const reason of CATALOG_REASONS) {
     it(`renders human copy but no reason token for "${reason}"`, () => {
       const humanCopy = getPaddleCheckoutCatalogMessage(reason);
       currentBlockedReason = humanCopy;
+      currentBlockedReasonCode = reason;
 
       const { container, getByTestId } = renderPricing();
 
@@ -154,6 +185,92 @@ describe("Pricing blocked checkout — sanitized reason-code leak guard", () => 
 
     expect(getByTestId("pricing-checkout-recovery")).toBeTruthy();
     expect(container.textContent ?? "").toContain(currentUnavailableMessage);
+    expect(
+      screen.getByRole("heading", { name: "Checkout isn't ready here yet. Get one launch email." }),
+    ).toBeTruthy();
+    expect(screen.getByTestId("subscriber-interest-form")).toBeTruthy();
+    assertNoReasonTokensLeaked(container.innerHTML);
+  });
+
+  for (const reason of [
+    "price_gateway_unavailable",
+    "price_request_failed",
+    "price_response_unusable",
+  ] as const) {
+    it(`${reason}: renders a retry-only transient panel`, () => {
+      currentBlockedReasonCode = reason;
+      currentBlockedReason = getPaddleCheckoutCatalogMessage(reason);
+
+      const { container, getByTestId, queryByTestId, queryByText } = renderPricing();
+      const panel = getByTestId("pricing-checkout-recovery");
+
+      expect(
+        within(panel).getByRole("heading", { name: "Checkout needs another try." }),
+      ).toBeTruthy();
+      expect(queryByText("Checkout isn't ready here yet. Get one launch email.")).toBeNull();
+      expect(within(panel).getAllByRole("button")).toHaveLength(1);
+      expect(getByTestId("pricing-checkout-retry")).toHaveTextContent("Try again");
+      expect(queryByTestId("pricing-checkout-choose-another-plan")).toBeNull();
+      expect(queryByTestId("pricing-checkout-dismiss")).toBeNull();
+      expect(queryByTestId("pricing-checkout-sign-in")).toBeNull();
+      expect(queryByTestId("subscriber-interest-form")).toBeNull();
+      assertNoReasonTokensLeaked(container.innerHTML);
+    });
+  }
+
+  it("configuration failure keeps the launch-list recovery", () => {
+    currentBlockedReasonCode = "price_not_configured";
+    currentBlockedReason = getPaddleCheckoutCatalogMessage("price_not_configured");
+
+    const { container, getByTestId } = renderPricing();
+
+    expect(
+      screen.getByRole("heading", {
+        name: "Checkout isn't ready here yet. Get one launch email.",
+      }),
+    ).toBeTruthy();
+    expect(getByTestId("subscriber-interest-form")).toBeTruthy();
+    assertNoReasonTokensLeaked(container.innerHTML);
+  });
+
+  it("auth_required saves the plan, signs out the stale bearer, and opens real sign-in", async () => {
+    const signOutGate: { resolve?: () => void } = {};
+    signOutMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          signOutGate.resolve = resolve;
+        }),
+    );
+    currentBlockedReasonCode = "auth_required";
+    currentBlockedReason = getPaddleCheckoutCatalogMessage("auth_required");
+
+    const { container, getByTestId, queryByTestId, queryByText } = renderPricing();
+    const panel = getByTestId("pricing-checkout-recovery");
+
+    expect(
+      within(panel).getByRole("heading", { name: "Sign in again to continue checkout." }),
+    ).toBeTruthy();
+    expect(within(panel).getAllByRole("button")).toHaveLength(1);
+    expect(queryByText("Checkout isn't ready here yet. Get one launch email.")).toBeNull();
+    expect(queryByTestId("pricing-checkout-retry")).toBeNull();
+    expect(queryByTestId("subscriber-interest-form")).toBeNull();
+
+    // The auth handoff must preserve the SKU the grower actually selected,
+    // not whichever cadence was the page default when it mounted.
+    fireEvent.click(getByTestId("pricing-cta-craft-annual"));
+    fireEvent.click(getByTestId("pricing-checkout-sign-in"));
+
+    expect(peekPlanIntent()).toBe("craft_annual");
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(getByTestId("location-probe")).toHaveTextContent("/pricing");
+    expect(signOutGate.resolve).toBeTypeOf("function");
+    signOutGate.resolve?.();
+    await waitFor(() => {
+      expect(getByTestId("location-probe")).toHaveTextContent(
+        "/auth?mode=signin&redirectTo=%2Fpricing%3Fplan%3Dcraft_annual",
+      );
+    });
+    expect(openCheckoutMock).not.toHaveBeenCalled();
     assertNoReasonTokensLeaked(container.innerHTML);
   });
 

@@ -8,6 +8,7 @@
  * calm inline message, not a generic "Failed to resolve price".
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { FunctionsFetchError } from "@supabase/supabase-js";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke: vi.fn() } },
@@ -287,7 +288,36 @@ describe("getPaddlePriceId — every failure is classified, never generic", () =
     expect((err as Error).message).not.toMatch(/connection/i);
   });
 
+  // Instantiates the REAL exported class rather than a hand-built lookalike.
+  // A synthetic `{ name, context }` fixture restates the implementation's own
+  // assumptions, so it would keep passing even if the installed supabase-js
+  // changed shape — leaving the dependency contract this branch rests on
+  // untested. Same convention as `customer-portal-lifetime-only.test.ts` and
+  // `ggs-real-payload-commit.test.ts`, which construct `FunctionsHttpError`.
   it("still names a real transport failure as such", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: new FunctionsFetchError(new TypeError("Failed to fetch")),
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_request_failed");
+    expect((err as Error).message).toMatch(/connection/i);
+  });
+
+  // Pins the library shape itself, so a supabase-js upgrade that renamed the
+  // class or moved the network cause out of `context` fails here — loudly, in
+  // this file — instead of silently degrading grower copy in production.
+  it("pins the supabase-js contract the transport branch depends on", () => {
+    const real = new FunctionsFetchError(new TypeError("Failed to fetch"));
+    expect(real).toBeInstanceOf(Error);
+    expect(real.name).toBe("FunctionsFetchError");
+    expect(real.context).toBeInstanceOf(Error);
+  });
+
+  // The dual-realm fallback: a stand-in that cannot be an `instanceof` match
+  // still counts as transport, but only when BOTH signals agree.
+  it("accepts a name-and-shape stand-in that cannot be an instanceof match", async () => {
     invokeMock.mockResolvedValueOnce({
       data: null,
       error: { name: "FunctionsFetchError", context: new TypeError("Failed to fetch") },
@@ -295,7 +325,34 @@ describe("getPaddlePriceId — every failure is classified, never generic", () =
 
     const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
     expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_request_failed");
-    expect((err as Error).message).toMatch(/connection/i);
+  });
+
+  // REGRESSION: the fallback used to accept EITHER signal, so any error that
+  // merely held an `Error` in `context` — an unrelated wrapper, a malformed
+  // FunctionsHttpError — was labelled a network fault and the grower was told
+  // to check a connection that was fine. That is the same wrong-cause advice
+  // this whole slice exists to remove, so the fallback now needs both.
+  it("does not treat an unrelated error with an Error context as a transport failure", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsHttpError", context: new TypeError("context went missing") },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect(err).toBeInstanceOf(PaddleCheckoutCatalogUnavailableError);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+    expect((err as Error).message).not.toMatch(/connection/i);
+  });
+
+  it("does not treat an unnamed error with an Error context as a transport failure", async () => {
+    invokeMock.mockResolvedValueOnce({
+      data: null,
+      error: { context: new TypeError("some wrapper") },
+    });
+
+    const err = await getPaddlePriceId("pro_monthly").catch((e) => e);
+    expect((err as PaddleCheckoutCatalogUnavailableError).reason).toBe("price_response_unusable");
+    expect((err as Error).message).not.toMatch(/connection/i);
   });
 
   it("classifies a 2xx that carries no paddleId as an unusable response", async () => {

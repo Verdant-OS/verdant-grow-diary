@@ -125,6 +125,15 @@ import {
   resolveRecentTargetSuggestion,
 } from "@/lib/quickLogRecentTargetSuggestion";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
+import {
+  GROW_WALK_FOLLOW_UP_OPTIONS,
+  GROW_WALK_MISSINGNESS_OPTIONS,
+  GROW_WALK_RISK_OPTIONS,
+  GROW_WALK_VISIT_MODES,
+  resolveGrowWalkPlantPrompts,
+  type GrowWalkVisitMode,
+} from "@/lib/growWalkContracts";
 import {
   fahrenheitToCelsius,
   getTemperatureUnitSymbol,
@@ -313,6 +322,7 @@ export default function QuickLogV2Sheet({
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
   const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
+  const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
   const [wateringRetryPending, setWateringRetryPending] = useState(false);
   const [wateringSubmissionLocked, setWateringSubmissionLocked] = useState(false);
   // Synchronous in-flight guard. The save-state flags are React
@@ -463,6 +473,20 @@ export default function QuickLogV2Sheet({
       }),
     [resolvedTarget, plants, tents, grows],
   );
+  const targetStage =
+    resolvedTarget.ok && resolvedTarget.targetType === "plant"
+      ? ((plants as Array<{ id?: string; stage?: string | null }>).find(
+          (plant) => plant.id === resolvedTarget.plantId,
+        )?.stage ?? null)
+      : resolvedTarget.ok && resolvedTarget.targetType === "tent"
+        ? ((tents as Array<{ id?: string; stage?: string | null }>).find(
+            (tent) => tent.id === resolvedTarget.tentId,
+          )?.stage ?? null)
+        : null;
+  const growWalkPrompts = resolveGrowWalkPlantPrompts({
+    targetType: resolvedTarget.ok ? (resolvedTarget.targetType ?? null) : null,
+    stage: targetStage,
+  });
   const wateringContext = useMemo(
     () =>
       buildQuickLogWateringContext({
@@ -590,6 +614,7 @@ export default function QuickLogV2Sheet({
     // the previous draft. A stale completion can never repopulate the sheet.
     resetVideoSelection();
     if (open) {
+      setVisitMode("fast_check");
       setForm({
         ...EMPTY_QUICKLOG_V2_FORM,
         selectedKey: defaultTargetKey ?? null,
@@ -1388,6 +1413,7 @@ export default function QuickLogV2Sheet({
       ...EMPTY_QUICKLOG_V2_FORM,
       selectedKey: prev.selectedKey,
     }));
+    setVisitMode("fast_check");
     manualTempEntryUnitRef.current = null;
     // Same reason as the open reset: "Log another" begins a new draft, and its
     // note is empty, so no chip has authored anything in it yet.
@@ -1638,6 +1664,183 @@ export default function QuickLogV2Sheet({
             )}
             <QuickLogTargetPanel panel={targetPanel} />
           </div>
+
+          <section
+            aria-labelledby="qlv2-visit-mode-heading"
+            data-testid="qlv2-guided-grow-walk"
+            data-visit-mode={visitMode}
+            className="rounded-lg border border-border/60 bg-secondary/10 p-3 space-y-3"
+          >
+            <div>
+              <h3 id="qlv2-visit-mode-heading" className="text-sm font-semibold">
+                Field Edition visit
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Start fast. Open a guided walk only when it helps.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label="Visit mode">
+              {GROW_WALK_VISIT_MODES.map((mode) => (
+                <Button
+                  key={mode.id}
+                  type="button"
+                  size="sm"
+                  variant={visitMode === mode.id ? "default" : "outline"}
+                  aria-pressed={visitMode === mode.id}
+                  data-testid={`qlv2-visit-mode-${mode.id}`}
+                  onClick={() => setVisitMode(mode.id)}
+                >
+                  {mode.label}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {GROW_WALK_VISIT_MODES.find((mode) => mode.id === visitMode)?.description}
+            </p>
+
+            {visitMode !== "fast_check" && !resolvedTarget.ok && (
+              <p role="status" data-testid="qlv2-grow-walk-identity-blocked" className="text-sm">
+                Choose a verified plant or tent before starting this guided walk.
+              </p>
+            )}
+
+            {visitMode !== "fast_check" && resolvedTarget.ok && (
+              <div className="space-y-4" data-testid="qlv2-grow-walk-backbone">
+                <p
+                  role="status"
+                  data-testid="qlv2-grow-walk-nonpersist-disclosure"
+                  className="text-xs text-muted-foreground"
+                >
+                  Guided control selections (light phase, visit reason, doorway scan, risk,
+                  follow-up) apply to this visit only and are not saved. Put anything durable in the
+                  accurate note below.
+                </p>
+                <div className="rounded-md border border-border/60 p-3 text-xs text-muted-foreground">
+                  <p className="font-medium text-foreground">Identity confirmed</p>
+                  <p>Date/time: recorded when you save.</p>
+                  {growWalkPrompts.showStage && <p>Stage: {targetStage || "Unknown"}.</p>}
+                  {growWalkPrompts.showSex && (
+                    <p data-testid="qlv2-grow-walk-sex-prompt">Sex: confirm only if visible.</p>
+                  )}
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <label>
+                      Light phase
+                      <select
+                        aria-label="Light phase"
+                        defaultValue="Unknown"
+                        className="mt-1 w-full rounded-md border border-input bg-background px-2 py-2 text-foreground"
+                      >
+                        <option>Day / lights on</option>
+                        <option>Night / lights off</option>
+                        <option>Not applicable</option>
+                        <option>Unknown</option>
+                      </select>
+                    </label>
+                    <label>
+                      Visit reason
+                      <select
+                        aria-label="Visit reason"
+                        defaultValue="Routine check"
+                        className="mt-1 w-full rounded-md border border-input bg-background px-2 py-2 text-foreground"
+                      >
+                        <option>Routine check</option>
+                        <option>Follow-up</option>
+                        <option>Concern</option>
+                        <option>Alert verification</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium">Doorway scan</legend>
+                  <label className="text-xs text-muted-foreground" htmlFor="qlv2-doorway-status">
+                    Record what you actually checked
+                  </label>
+                  <select
+                    id="qlv2-doorway-status"
+                    aria-label="Doorway scan"
+                    defaultValue="Not checked"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    {GROW_WALK_MISSINGNESS_OPTIONS.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </fieldset>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Sensor snapshot or no trusted reading</p>
+                  <QuickLogSensorSnapshotStrip
+                    tentId={resolvedTarget.tentId ?? null}
+                    attached={false}
+                  />
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" data-testid="qlv2-no-trusted-reading" />
+                    No trusted reading
+                  </label>
+                </div>
+
+                {resolvedTarget.targetType === "plant" && (
+                  <fieldset className="space-y-2">
+                    <legend className="text-sm font-medium">Canopy / plant scan</legend>
+                    <select
+                      aria-label="Canopy or plant scan status"
+                      defaultValue="Not checked"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      {GROW_WALK_MISSINGNESS_OPTIONS.map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </fieldset>
+                )}
+
+                <div className="rounded-md border border-border/60 p-3 text-sm space-y-1">
+                  <p className="font-medium">Closeout in the accurate note below</p>
+                  <p>Observation · Interpretation · Action · What not to change</p>
+                  <p className="text-xs text-muted-foreground">
+                    Suggestions stay advisory. Nothing is sent to the approval-required Action Queue
+                    automatically.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm">
+                    Risk
+                    <select
+                      aria-label="Grow walk risk"
+                      defaultValue="Routine"
+                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2"
+                    >
+                      {GROW_WALK_RISK_OPTIONS.map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-sm">
+                    Follow-up
+                    <select
+                      aria-label="Grow walk follow-up"
+                      defaultValue="Next visit"
+                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2"
+                    >
+                      {GROW_WALK_FOLLOW_UP_OPTIONS.map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {visitMode !== "routine_walk" && (
+                  <p className="rounded-md border border-border/60 bg-muted/30 p-2 text-xs text-muted-foreground">
+                    {visitMode === "deep_evidence_walk"
+                      ? "Deep Evidence Walk fields are coming later. Use this backbone without inventing missing evidence."
+                      : "Alert Walk details are coming later. Verify the alert in person before changing anything."}
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
 
           {/* Hoisted above Action and the media pickers: on a plant-scoped
               draft the 3-tap status (open, tap a chip, Save) is the first

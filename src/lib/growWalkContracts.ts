@@ -1,5 +1,52 @@
 import type { McpSensorReading } from "./operatorAccountReadModels";
 
+/** Field Edition modes shown inside the existing Quick Log sheet. */
+export const GROW_WALK_VISIT_MODES = [
+  {
+    id: "fast_check",
+    label: "Fast Check",
+    description: "One accurate note. Save in under 90 seconds.",
+  },
+  { id: "routine_walk", label: "Routine Walk", description: "A calm doorway-to-closeout check." },
+  {
+    id: "deep_evidence_walk",
+    label: "Deep Evidence Walk",
+    description: "Evidence shell for a later, fuller review.",
+  },
+  {
+    id: "alert_walk",
+    label: "Alert Walk",
+    description: "Verify an alert in person before changing anything.",
+  },
+] as const;
+
+export const GROW_WALK_MISSINGNESS_OPTIONS = [
+  "Checked",
+  "Concern",
+  "Not checked",
+  "Not measured",
+  "Not applicable",
+  "Unknown",
+] as const;
+
+export const GROW_WALK_RISK_OPTIONS = ["Routine", "Watch", "Act today", "Urgent"] as const;
+export const GROW_WALK_FOLLOW_UP_OPTIONS = ["24 hours", "72 hours", "Next visit"] as const;
+
+export type GrowWalkVisitMode = (typeof GROW_WALK_VISIT_MODES)[number]["id"];
+
+/** Contextual prompts only; absence never implies a healthy plant. */
+export function resolveGrowWalkPlantPrompts(input: {
+  targetType: GrowWalkTargetType | null;
+  stage: string | null | undefined;
+}): { showStage: boolean; showSex: boolean } {
+  if (input.targetType !== "plant") return { showStage: false, showSex: false };
+  const stage = (input.stage ?? "").trim().toLowerCase();
+  return {
+    showStage: true,
+    showSex: /pre[- ]?flower|transition|flower|bloom/.test(stage),
+  };
+}
+
 /** Versioned, read-only receipt shape for the signed-in Grow Walk. */
 export const GROW_WALK_CONTEXT_VERSION = "grow-walk-v0.1" as const;
 

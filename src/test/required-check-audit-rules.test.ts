@@ -73,6 +73,41 @@ describe("config/required-status-checks.json", () => {
     for (const context of MUST_BE_GREEN) expect(required.has(context)).toBe(false);
   });
 
+  it("lists every self-declared gate that the ruleset does not actually enforce", () => {
+    // Six workflows call themselves a required gate or stop-ship check, or were
+    // created by this remediation to run coverage nothing else runs; only ci.yml
+    // has a job name in `required`. The other five are coverage holes, and
+    // `required-check-audit.yml` can only catch a hole that is declared. The
+    // closure lane is the one P2(b) added — a PR that wires 15 specs and then
+    // leaves its own job ungated repeats exactly what P4 exists to close
+    // (Codex, round 3 on #1221).
+    for (const context of [
+      "test:security-regression",
+      "test:security-db-local",
+      "pgTAP irrigation (feeding + watering)",
+      "irrigation harness typecheck (tsc --noEmit)",
+      "Deno bridge auth + handler E2E",
+      "Mocked E2E closure (15 previously unrun specs)",
+    ]) {
+      expect(MUST_BE_GREEN).toContain(context);
+      expect(PINNED.required).not.toContain(context);
+    }
+  });
+
+  it("marks the opt-in and path-filtered lanes conditional, so a legitimate skip is not a red", () => {
+    const entries = normalizeMustBeGreen(PINNED.mustBeGreen);
+    for (const context of [
+      "test:security-db-local",
+      "pgTAP irrigation (feeding + watering)",
+      "irrigation harness typecheck (tsc --noEmit)",
+      "Deno bridge auth + handler E2E",
+      "Mocked E2E closure (15 previously unrun specs)",
+    ]) {
+      const entry = entries.find((e: { context: string }) => e.context === context);
+      expect(entry?.alwaysRuns).toBe(false);
+    }
+  });
+
   it("lists test:security-regression as a coverage hole, not a ruleset gate", () => {
     // The workflow's own header calls it "the required PR gate". It is not in
     // the ruleset, so nothing enforces it — that is the whole point of the list.
@@ -622,9 +657,20 @@ describe("auditRequiredChecks — PR #769 regression (real evidence)", () => {
   };
   const AT_MERGE = { ...AT_FINAL_STATE, mergedAt: PR_769.mergedAt };
 
-  it("reading final state alone, flags the red shard and the ungated security gate", () => {
+  it("reading final state alone, flags the red shard and BOTH ungated security gates", () => {
     // What the audit sees with no merge timestamp: the right outcome, but it
     // credits results that only landed after the merge.
+    //
+    // This count was 2 until `test:security-db-local` joined `mustBeGreen`.
+    // Widening that list did not change the audit's logic; it changed what the
+    // audit can see. #769 shipped TWO ungated red checks, not one, and the
+    // second was invisible for as long as the list omitted it. Renegotiated
+    // here in the same commit as the config change, per CLAUDE.md.
+    //
+    // The other three contexts added alongside it produce no finding on this
+    // fixture and that is correct: the two irrigation jobs are `skipped`
+    // (NOT_MEASURED) and `Deno bridge auth + handler E2E` is absent (MISSING),
+    // and a conditional entry fails only on FAIL.
     const result = auditRequiredChecks({
       pinned: PINNED,
       checkRuns: PR_769.checkRuns,
@@ -634,7 +680,23 @@ describe("auditRequiredChecks — PR #769 regression (real evidence)", () => {
     const failing = result.failingFindings.map((f) => f.context);
     expect(failing).toContain("Full test suite (shard 26/32)");
     expect(failing).toContain("test:security-regression");
-    expect(result.failingFindings).toHaveLength(2);
+    expect(failing).toContain("test:security-db-local");
+    expect(result.failingFindings).toHaveLength(3);
+  });
+
+  it("stays quiet about conditional gates that skipped or never reported on #769", () => {
+    // The guard against the obvious failure mode of widening `mustBeGreen`:
+    // a path-filtered or opt-in lane that legitimately did not apply must not
+    // become a false red, or the audit gets switched off within a week.
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: PR_769.checkRuns,
+      prResolution: AT_FINAL_STATE,
+    });
+    const failing = result.failingFindings.map((f) => f.context);
+    expect(failing).not.toContain("pgTAP irrigation (feeding + watering)");
+    expect(failing).not.toContain("irrigation harness typecheck (tsc --noEmit)");
+    expect(failing).not.toContain("Deno bridge auth + handler E2E");
   });
 
   it("read as of the merge, shows the truth: nothing had finished (Copilot, PR #818)", () => {

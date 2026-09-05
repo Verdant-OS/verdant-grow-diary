@@ -8,7 +8,7 @@
  *  - Done / Dismiss append a durable `Checkpoint status:` marker on that
  *    diary note through the existing diary_entries.update path.
  *  - Same-angle opens existing Quick Log with checkpoint as note prefill
- *    only (verdant:open-quicklog); grower still saves.
+ *    stamped `[same-angle]` (verdant:open-quicklog); grower still saves.
  *
  * No Action Queue. No new RPC/migration.
  */
@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { supabase } from "@/integrations/supabase/client";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { stampSlot } from "@/lib/evidencePhotoSlotRules";
 import {
   appendCheckpointClearMarker,
   buildCheckpointFollowUpNotePrefill,
@@ -114,7 +115,7 @@ export default function PendingCheckpointBanner({
 
   const openSameAngle = useCallback(() => {
     if (!pending) return;
-    const note = buildCheckpointFollowUpNotePrefill(pending.text);
+    const note = stampSlot(buildCheckpointFollowUpNotePrefill(pending.text), "same-angle");
     window.dispatchEvent(
       new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
         detail: {

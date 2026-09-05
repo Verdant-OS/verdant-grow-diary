@@ -2078,8 +2078,10 @@ test.describe("core link and form census", () => {
     page,
   }) => {
     // This exhaustive lane now proves a fresh quiet window after every route,
-    // click-source revisit, and destination; keep that work below the 40m job ceiling.
-    test.setTimeout(420_000);
+    // click-source revisit, and destination. Hosted runners have crossed the
+    // former seven-minute ceiling while the same zero-retry census remained
+    // hermetic and passed locally, so retain a bounded margin below the 40m job.
+    test.setTimeout(600_000);
     const report = await runLaneCensus(page, "public", PUBLIC_CORE_CENSUS_ROUTES);
     expect(report.routeAudits).toHaveLength(PUBLIC_CORE_CENSUS_ROUTES.length);
     expect(report.linkAudits.length).toBeGreaterThan(0);
@@ -2089,7 +2091,11 @@ test.describe("core link and form census", () => {
   test("audits every scheduled authenticated page, visible field, and safe internal link", async ({
     page,
   }) => {
-    test.setTimeout(1_800_000);
+    // The exact PR head completed this unchanged zero-retry census locally in
+    // 27.7m, while the hosted runner reached the former 30m test ceiling in
+    // the same click sweep. Keep a bounded 5m variance margin below the
+    // unchanged 40m job ceiling without reducing routes, assertions, or reads.
+    test.setTimeout(2_100_000);
     const report = await runLaneCensus(page, "authenticated", AUTHENTICATED_CORE_CENSUS_ROUTES);
     expect(report.routeAudits).toHaveLength(AUTHENTICATED_CORE_CENSUS_ROUTES.length);
     expect(report.fieldAudits.length).toBeGreaterThan(0);

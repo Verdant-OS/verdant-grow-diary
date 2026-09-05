@@ -7,6 +7,7 @@
  */
 
 import { useState } from "react";
+import { Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import {
@@ -18,6 +19,13 @@ import {
   resolveGrowWalkPlantPrompts,
   type GrowWalkVisitMode,
 } from "@/lib/growWalkContracts";
+import {
+  EVIDENCE_PHOTO_SLOT_LABELS,
+  V0_VISIBLE_SLOTS,
+  stampSlot,
+  type EvidencePhotoSlot,
+} from "@/lib/evidencePhotoSlotRules";
+import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 
 export type GuidedGrowWalkTargetType = "plant" | "tent" | null;
 
@@ -82,6 +90,24 @@ export default function GuidedGrowWalkPanel({
     setCloseoutInterpretation("");
     setCloseoutAction("");
     setCloseoutNextCheckpoint("");
+  }
+
+  function openEvidencePhotoSlot(slot: EvidencePhotoSlot) {
+    const stamped = stampSlot("", slot);
+    // Prefer existing note path when already inside Quick Log; otherwise open QL.
+    if (onApplyCloseoutToNote) {
+      onApplyCloseoutToNote(stamped);
+      return;
+    }
+    window.dispatchEvent(
+      new CustomEvent(PLANT_QUICKLOG_PREFILL_EVENT, {
+        detail: {
+          eventType: "observation",
+          note: stamped,
+          source: "evidence-photo-slot",
+        },
+      }),
+    );
   }
 
   return (
@@ -334,11 +360,37 @@ export default function GuidedGrowWalkPanel({
               </select>
             </label>
           </div>
-          {visitMode !== "routine_walk" && (
+          {visitMode === "deep_evidence_walk" && (
+            <div
+              className="rounded-md border border-border/60 bg-muted/30 p-3 space-y-2"
+              data-testid={`${testIdPrefix}-evidence-photo-slots`}
+            >
+              <p className="text-xs text-muted-foreground">
+                Evidence photo slots. Skip allowed — no placeholder images. Opens the existing Quick
+                Log note/photo path with a slot stamp in the caption.
+              </p>
+              <div className="flex min-w-0 flex-wrap gap-2">
+                {V0_VISIBLE_SLOTS.map((slot) => (
+                  <Button
+                    key={slot}
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="min-h-11 gap-1"
+                    data-testid={`${testIdPrefix}-evidence-photo-slot-${slot}`}
+                    onClick={() => openEvidencePhotoSlot(slot)}
+                  >
+                    <Camera className="h-3.5 w-3.5" aria-hidden />
+                    {EVIDENCE_PHOTO_SLOT_LABELS[slot]}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+          {visitMode === "alert_walk" && (
             <p className="rounded-md border border-border/60 bg-muted/30 p-2 text-xs text-muted-foreground">
-              {visitMode === "deep_evidence_walk"
-                ? "Deep Evidence Walk fields are coming later. Use this backbone without inventing missing evidence."
-                : "Alert Walk details are coming later. Verify the alert in person before changing anything."}
+              Alert Walk details are coming later. Verify the alert in person before changing
+              anything.
             </p>
           )}
         </div>

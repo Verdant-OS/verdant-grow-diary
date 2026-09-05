@@ -332,13 +332,14 @@ test.describe("Plant Detail Symptom Check — local mocked branch proof", () => 
     await acceptReconsentGateIfShown(page);
     await expect(page.getByRole("heading", { name: FAKE_PLANT.name, exact: true })).toBeVisible();
 
-    // Open the actual full Quick Log dialog from Plant Detail. Choosing Note
-    // only establishes the verified plant target; the grower still explicitly
-    // starts and confirms Symptom Check before any write can occur.
-    await page.getByTestId("global-fast-add-trigger").click();
-    await page.getByTestId("global-fast-add-action-diary_note").click();
+    // Open the grower Quick Log sheet from AppShell header (same Field Edition
+    // first-paint path as plant Quick Log). Route prefill carries Plant Detail
+    // identity; the grower still explicitly starts and confirms Symptom Check
+    // under All activity types before any write can occur.
+    await page.getByTestId("header-quick-log-trigger").click();
     const dialog = page.getByRole("dialog", { name: /quick log/i });
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByTestId("ql-guided-grow-walk")).toBeVisible();
     await expect(dialog.getByTestId("quick-log-target-plant")).toContainText(FAKE_PLANT.name);
 
     const symptomPrefix = "quick-log-dialog-all-activities";

@@ -56,6 +56,7 @@ const REQUIRED_PUBLIC = [
   "/sensors/csv-preview",
   "/internal/contextual-pheno-comparison-demo",
   "/internal/demo-proof-walkthrough",
+  "/internal/demo-advanced-nutrients-feeding",
   "/internal/pheno-hunt-demo",
   "/pheno-comparison",
   "/pheno-expression-showcase",

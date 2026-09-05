@@ -14,7 +14,6 @@ import MobileNav from "./MobileNav";
 import QuickLog, { type QuickLogPrefill } from "./QuickLog";
 import QuickLogV2Sheet from "./QuickLogV2Sheet";
 import BrandLogo from "./BrandLogo";
-import GlobalFastAddButton from "./GlobalFastAddButton";
 import AuthStatusIndicator from "./AuthStatusIndicator";
 import SignOutConfirmDialog from "./SignOutConfirmDialog";
 import VerificationPendingBanner from "./VerificationPendingBanner";
@@ -101,6 +100,26 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     location.pathname,
     tentQuickLogTargetEvidence,
   );
+
+  // Header + and mobile FAB share one entry: open the grower QuickLog sheet
+  // (Field Edition visit modes first). Do not route through the legacy
+  // 8-type GlobalFastAdd preset menu.
+  const openGrowerQuickLog = useCallback(() => {
+    const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
+    const quickLogPrefill: QuickLogPrefill | null = mobileQuickLogTarget?.startsWith("plant:")
+      ? { plantId: mobileQuickLogTarget.slice("plant:".length) }
+      : mobileQuickLogTarget?.startsWith("tent:")
+        ? { tentId: mobileQuickLogTarget.slice("tent:".length) }
+        : routePlantId
+          ? { plantId: routePlantId }
+          : null;
+
+    setOpenScopedLog(false);
+    setMobileLaunchTargetKey(null);
+    setStructuredOpenIntent(null);
+    setPrefill(quickLogPrefill);
+    setOpenLog(true);
+  }, [location.pathname, mobileQuickLogTarget]);
 
   // This shell lives inside the route-level Suspense boundary. Tracking here
   // waits for server-auth revalidation and the paid entitlement read as well
@@ -338,13 +357,20 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   <Search className="h-4 w-4" />
                 </Button>
                 {/* Quick Log is the single grower-facing logging entry
-                    point on desktop. The dropdown surfaces event-type
-                    presets (diary note, watering, feeding, training,
-                    photo, environment, diagnosis, harvest) and opens the
-                    existing Quick Log sheet via the wired window event.
-                    The previous standalone "Quick log" button has been
-                    removed to eliminate duplicate add/log CTAs. */}
-                <GlobalFastAddButton className="hidden md:inline-flex" />
+                    point on desktop. Opens the same grower QuickLog sheet
+                    as the plant action path and mobile FAB (Field Edition
+                    visit modes first). Legacy activity types stay inside
+                    that sheet under "All activity types". */}
+                <button
+                  type="button"
+                  onClick={openGrowerQuickLog}
+                  aria-label="Quick Log"
+                  data-testid="header-quick-log-trigger"
+                  className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-4 min-h-11 min-w-11 text-sm font-medium hover:bg-secondary/70 active:bg-secondary/80 transition focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
+                >
+                  <Plus className="h-5 w-5" aria-hidden="true" />
+                  Quick Log
+                </button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -394,28 +420,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           </main>
         </div>
 
-        {/* Mobile floating + */}
+        {/* Mobile floating + — same grower QuickLog entry as header/+ */}
         <button
-          onClick={() => {
-            const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
-            const mobileQuickLogPrefill: QuickLogPrefill | null = mobileQuickLogTarget?.startsWith(
-              "plant:",
-            )
-              ? { plantId: mobileQuickLogTarget.slice("plant:".length) }
-              : mobileQuickLogTarget?.startsWith("tent:")
-                ? { tentId: mobileQuickLogTarget.slice("tent:".length) }
-                : routePlantId
-                  ? { plantId: routePlantId }
-                  : null;
-
-            // Every mobile + enters the same QuickLog dialog as the plant
-            // action row. Structured V2 intents keep their event-only path.
-            setOpenScopedLog(false);
-            setMobileLaunchTargetKey(null);
-            setStructuredOpenIntent(null);
-            setPrefill(mobileQuickLogPrefill);
-            setOpenLog(true);
-          }}
+          type="button"
+          onClick={openGrowerQuickLog}
           aria-label="Open Quick Log"
           data-testid="mobile-quick-log-fab"
           className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full gradient-leaf text-primary-foreground shadow-elevated transition hover:scale-105 active:scale-95 glow-accent md:hidden"

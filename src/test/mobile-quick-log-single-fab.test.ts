@@ -52,23 +52,25 @@ describe("mobile Quick Log — single FAB", () => {
     expect(APP_SHELL).toMatch(
       /resolveMobileQuickLogTarget\([\s\S]{0,100}location\.pathname,[\s\S]{0,100}tentQuickLogTargetEvidence[\s\S]{0,20}\)/,
     );
-    const fabHandler =
+    // Header and FAB share openGrowerQuickLog — same grower QuickLog sheet.
+    const openHandler =
       APP_SHELL.match(
-        /<button\s+onClick=\{\(\) => \{([\s\S]*?)\}\}\s+aria-label="Open Quick Log"/,
+        /const openGrowerQuickLog = useCallback\(\(\) => \{([\s\S]*?)\}, \[location\.pathname, mobileQuickLogTarget\]\);/,
       )?.[1] ?? "";
-
-    expect(fabHandler).not.toBe("");
-    expect(fabHandler).toContain("const mobileQuickLogPrefill: QuickLogPrefill | null");
-    expect(fabHandler).toMatch(/mobileQuickLogTarget\?\.startsWith\(\s*"plant:",?\s*\)/);
-    expect(fabHandler).toMatch(/mobileQuickLogTarget\?\.startsWith\(\s*"tent:",?\s*\)/);
-    expect(fabHandler).toContain('mobileQuickLogTarget.slice("plant:".length)');
-    expect(fabHandler).toContain('mobileQuickLogTarget.slice("tent:".length)');
-    expect(fabHandler).toContain("resolvePlantQuickLogRouteTarget(location.pathname)");
-    expect(fabHandler).toMatch(
-      /setOpenScopedLog\(false\)[\s\S]*setPrefill\(mobileQuickLogPrefill\)[\s\S]*setOpenLog\(true\)/,
+    expect(openHandler).not.toBe("");
+    expect(APP_SHELL).toMatch(
+      /onClick=\{openGrowerQuickLog\}[\s\S]{0,200}data-testid="mobile-quick-log-fab"/,
     );
-    expect(fabHandler).not.toContain("setOpenScopedLog(true)");
-    expect(fabHandler).not.toContain("setMobileLaunchTargetKey(mobileQuickLogTarget)");
+    expect(openHandler).toMatch(/mobileQuickLogTarget\?\.startsWith\(\s*"plant:",?\s*\)/);
+    expect(openHandler).toMatch(/mobileQuickLogTarget\?\.startsWith\(\s*"tent:",?\s*\)/);
+    expect(openHandler).toContain('mobileQuickLogTarget.slice("plant:".length)');
+    expect(openHandler).toContain('mobileQuickLogTarget.slice("tent:".length)');
+    expect(openHandler).toContain("resolvePlantQuickLogRouteTarget(location.pathname)");
+    expect(openHandler).toMatch(
+      /setOpenScopedLog\(false\)[\s\S]*setPrefill\(quickLogPrefill\)[\s\S]*setOpenLog\(true\)/,
+    );
+    expect(openHandler).not.toContain("setOpenScopedLog(true)");
+    expect(openHandler).not.toContain("setMobileLaunchTargetKey(mobileQuickLogTarget)");
 
     // Structured Water intents still own the separately-authorized V2 path;
     // removing the FAB split must not delete that event listener or sheet.

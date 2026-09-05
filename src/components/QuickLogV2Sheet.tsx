@@ -1662,6 +1662,13 @@ export default function QuickLogV2Sheet({
             targetType={resolvedTarget.ok ? (resolvedTarget.targetType ?? null) : null}
             stage={targetStage}
             testIdPrefix="qlv2"
+            onApplyCloseoutToNote={(composed) => {
+              setForm((previous) => {
+                const existing = previous.note.trimEnd();
+                const nextNote = existing ? `${existing}\n\n${composed}` : composed;
+                return previous.note === nextNote ? previous : { ...previous, note: nextNote };
+              });
+            }}
           />
 
           {/* Hoisted above Action and the media pickers: on a plant-scoped

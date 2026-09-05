@@ -6,6 +6,7 @@
  * Reuses growWalkContracts — do not duplicate mode tables here.
  */
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
 import {
@@ -13,6 +14,7 @@ import {
   GROW_WALK_MISSINGNESS_OPTIONS,
   GROW_WALK_RISK_OPTIONS,
   GROW_WALK_VISIT_MODES,
+  composeGrowWalkCloseoutNote,
   resolveGrowWalkPlantPrompts,
   type GrowWalkVisitMode,
 } from "@/lib/growWalkContracts";
@@ -32,6 +34,8 @@ export interface GuidedGrowWalkPanelProps {
    * keep passing. Grower Quick Log should pass `ql`.
    */
   testIdPrefix?: string;
+  /** When Apply closeout is used, receives the composed Obs|Interp|Action note text. */
+  onApplyCloseoutToNote?: (composed: string) => void;
 }
 
 export default function GuidedGrowWalkPanel({
@@ -42,6 +46,7 @@ export default function GuidedGrowWalkPanel({
   targetType = null,
   stage = null,
   testIdPrefix = "qlv2",
+  onApplyCloseoutToNote,
 }: GuidedGrowWalkPanelProps) {
   const growWalkPrompts = resolveGrowWalkPlantPrompts({
     targetType,
@@ -49,6 +54,30 @@ export default function GuidedGrowWalkPanel({
   });
   const headingId = `${testIdPrefix}-visit-mode-heading`;
   const doorwayId = `${testIdPrefix}-doorway-status`;
+  const closeoutCheckpointListId = `${testIdPrefix}-closeout-checkpoint-list`;
+
+  const [closeoutObservation, setCloseoutObservation] = useState("");
+  const [closeoutInterpretation, setCloseoutInterpretation] = useState("");
+  const [closeoutAction, setCloseoutAction] = useState("");
+  const [closeoutNextCheckpoint, setCloseoutNextCheckpoint] = useState("");
+  const [closeoutObservationRequired, setCloseoutObservationRequired] = useState(false);
+
+  function handleApplyCloseout() {
+    const observation = closeoutObservation.trim();
+    if (!observation) {
+      setCloseoutObservationRequired(true);
+      return;
+    }
+    setCloseoutObservationRequired(false);
+    const composed = composeGrowWalkCloseoutNote({
+      observation,
+      interpretation: closeoutInterpretation,
+      action: closeoutAction,
+      nextCheckpoint: closeoutNextCheckpoint,
+    });
+    if (!composed) return;
+    onApplyCloseoutToNote?.(composed);
+  }
 
   return (
     <section
@@ -103,7 +132,7 @@ export default function GuidedGrowWalkPanel({
           >
             Guided control selections (light phase, visit reason, doorway scan, risk, follow-up)
             apply to this visit only and are not saved. Put anything durable in the accurate note
-            below.
+            below. Closeout fields apply to the note only when you use Apply closeout to note.
           </p>
           <div className="rounded-md border border-border/60 p-3 text-xs text-muted-foreground">
             <p className="font-medium text-foreground">Identity confirmed</p>
@@ -185,13 +214,93 @@ export default function GuidedGrowWalkPanel({
             </fieldset>
           )}
 
-          <div className="rounded-md border border-border/60 p-3 text-sm space-y-1">
-            <p className="font-medium">Closeout in the accurate note below</p>
-            <p>Observation · Interpretation · Action · What not to change</p>
-            <p className="text-xs text-muted-foreground">
-              Suggestions stay advisory. Nothing is sent to the approval-required Action Queue
-              automatically.
-            </p>
+          <div
+            className="rounded-md border border-border/60 p-3 text-sm space-y-3"
+            data-testid={`${testIdPrefix}-grow-walk-closeout`}
+          >
+            <div className="space-y-1">
+              <p className="font-medium">Closeout</p>
+              <p className="text-xs text-muted-foreground">
+                Observation · Interpretation · Action. Suggestions stay advisory. Nothing is sent to
+                the approval-required Action Queue automatically.
+              </p>
+            </div>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Observation</span>
+              <textarea
+                aria-label="Closeout observation"
+                data-testid={`${testIdPrefix}-closeout-observation`}
+                value={closeoutObservation}
+                onChange={(e) => {
+                  setCloseoutObservation(e.target.value);
+                  if (closeoutObservationRequired && e.target.value.trim()) {
+                    setCloseoutObservationRequired(false);
+                  }
+                }}
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="What you actually saw or checked"
+              />
+            </label>
+            {closeoutObservationRequired && (
+              <p
+                role="status"
+                data-testid={`${testIdPrefix}-closeout-observation-required`}
+                className="text-xs text-muted-foreground"
+              >
+                Add an observation before applying closeout to the note.
+              </p>
+            )}
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Interpretation</span>
+              <textarea
+                aria-label="Closeout interpretation"
+                data-testid={`${testIdPrefix}-closeout-interpretation`}
+                value={closeoutInterpretation}
+                onChange={(e) => setCloseoutInterpretation(e.target.value)}
+                rows={2}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="Mark uncertainty; no keeper claims"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Action</span>
+              <textarea
+                aria-label="Closeout action"
+                data-testid={`${testIdPrefix}-closeout-action`}
+                value={closeoutAction}
+                onChange={(e) => setCloseoutAction(e.target.value)}
+                rows={2}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="none tonight | exact reversible task"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Next checkpoint</span>
+              <input
+                aria-label="Closeout next checkpoint"
+                data-testid={`${testIdPrefix}-closeout-next-checkpoint`}
+                list={closeoutCheckpointListId}
+                value={closeoutNextCheckpoint}
+                onChange={(e) => setCloseoutNextCheckpoint(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="24 hours / 72 hours / Next visit / free text"
+              />
+              <datalist id={closeoutCheckpointListId}>
+                {GROW_WALK_FOLLOW_UP_OPTIONS.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
+            </label>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              data-testid={`${testIdPrefix}-apply-closeout`}
+              onClick={handleApplyCloseout}
+            >
+              Apply closeout to note
+            </Button>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">

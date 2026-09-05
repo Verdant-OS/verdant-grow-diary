@@ -1646,6 +1646,13 @@ export default function QuickLog({
             (stage.trim().length > 0 ? stage : null)
           }
           testIdPrefix="ql"
+          onApplyCloseoutToNote={(composed) => {
+            setNote((previous) => {
+              const existing = previous.trimEnd();
+              if (!existing) return composed;
+              return `${existing}\n\n${composed}`;
+            });
+          }}
         />
 
         {/* Shared v1a activity surface — consumes canonical

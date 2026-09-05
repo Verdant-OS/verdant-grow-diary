@@ -77,6 +77,11 @@ export default function GuidedGrowWalkPanel({
     });
     if (!composed) return;
     onApplyCloseoutToNote?.(composed);
+    // Clear local closeout fields so a second Apply cannot double-append.
+    setCloseoutObservation("");
+    setCloseoutInterpretation("");
+    setCloseoutAction("");
+    setCloseoutNextCheckpoint("");
   }
 
   return (

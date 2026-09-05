@@ -1,9 +1,11 @@
 /**
  * QUICKLOG_GUIDED_WALK_ON_GROWER_PATH — Field Edition visit modes on legacy QuickLog.
+ * QUICKLOG_FIELD_EDITION_FIRST_ON_GROWER_PATH — first-paint order on plant Quick Log.
  *
- * Live FAIL: Guided Walk shipped only inside QuickLogV2Sheet (#1283). Growers open
- * legacy QuickLog via PlantDetailQuickActions / mobile FAB, so visit modes never
- * appeared on the grower path. This file pins the shared panel on QuickLog.
+ * Live FAIL (measured on 2feef02): plant Quick Log / plant action painted legacy
+ * "All activity types" first; FAB/header Quick Log already showed Field Edition
+ * visit modes. #1285 mounted GuidedGrowWalkPanel below QuickLogAllActivitiesSection.
+ * This file pins Field Edition (ql-* visit modes) ahead of All activity types.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -82,6 +84,11 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
+/** True when `earlier` comes before `later` in document order. */
+function isBeforeInDocument(earlier: HTMLElement, later: HTMLElement): boolean {
+  return (earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
 describe("Grower Quick Log Field Edition visit modes", () => {
   it("shows visit modes with Fast Check pressed by default", () => {
     renderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1" });
@@ -91,6 +98,29 @@ describe("Grower Quick Log Field Edition visit modes", () => {
     expect(screen.getByTestId("ql-visit-mode-deep_evidence_walk")).toBeInTheDocument();
     expect(screen.getByTestId("ql-visit-mode-alert_walk")).toBeInTheDocument();
     expect(screen.queryByTestId("ql-grow-walk-backbone")).not.toBeInTheDocument();
+  });
+
+  it("plant-path first paint shows Field Edition visit modes before All activity types", () => {
+    renderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1" });
+
+    const fieldEdition = screen.getByTestId("ql-guided-grow-walk");
+    const fastCheck = screen.getByTestId("ql-visit-mode-fast_check");
+    const allActivities = screen.getByTestId("quick-log-dialog-all-activities");
+
+    expect(fieldEdition).toBeInTheDocument();
+    expect(fastCheck).toHaveAttribute("aria-pressed", "true");
+    expect(allActivities).toBeInTheDocument();
+    expect(screen.getByText("All activity types")).toBeInTheDocument();
+
+    expect(isBeforeInDocument(fieldEdition, allActivities)).toBe(true);
+    expect(isBeforeInDocument(fastCheck, allActivities)).toBe(true);
+    for (const modeId of [
+      "ql-visit-mode-routine_walk",
+      "ql-visit-mode-deep_evidence_walk",
+      "ql-visit-mode-alert_walk",
+    ] as const) {
+      expect(isBeforeInDocument(screen.getByTestId(modeId), allActivities)).toBe(true);
+    }
   });
 
   it("fails the guided identity closed until a verified plant/tent exists", () => {

@@ -196,7 +196,9 @@ describe("prebuild wires restore first (compose with later verify)", () => {
     expect(
       prebuildCommands.indexOf("node scripts/restore-env-production-from-head.mjs"),
     ).toBeLessThan(prebuildCommands.indexOf("node scripts/assert-paddle-production-sandbox.mjs"));
-    // #1126 may later append verify-publish-provenance; do not require it here.
-    expect(prebuildCommands).not.toContain("node scripts/verify-publish-provenance.mjs");
+    expect(prebuildCommands.at(-1)).toBe("node scripts/verify-publish-provenance.mjs");
+    expect(prebuildCommands.indexOf("node scripts/stamp-version.mjs")).toBeLessThan(
+      prebuildCommands.indexOf("node scripts/verify-publish-provenance.mjs"),
+    );
   });
 });

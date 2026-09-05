@@ -34,6 +34,7 @@ import PhotoDiagnosisReviewDialog from "@/components/PhotoDiagnosisReviewDialog"
 import PlantDetailRecentActivityRecap from "@/components/PlantDetailRecentActivityRecap";
 import PlantDetailRecentActionResponse from "@/components/PlantDetailRecentActionResponse";
 import PlantPendingOutcomeNotice from "@/components/PlantPendingOutcomeNotice";
+import PendingCheckpointBanner from "@/components/PendingCheckpointBanner";
 import PlantDetailHarvestWatchCard from "@/components/PlantDetailHarvestWatchCard";
 import { usePlantGalleryPhotoCount } from "@/hooks/usePlantGalleryPhotoCount";
 import PlantDetailHarvestEvidenceReportMount from "@/components/PlantDetailHarvestEvidenceReportMount";
@@ -704,6 +705,12 @@ export default function PlantDetail() {
             setQuickLogFocusResponse(true);
             setQuickLogOpen(true);
           }}
+        />
+        <PendingCheckpointBanner
+          plantId={plant.id}
+          plantName={plant.name}
+          growId={plant.growId ?? null}
+          tentId={plant.tentId ?? null}
         />
         <PlantPendingOutcomeNotice growId={plant.growId ?? null} plantId={plant.id} />
         <PlantDetailRecentActionResponse growId={plant.growId ?? null} plantId={plant.id} />

@@ -196,4 +196,47 @@ describe("Quick Log Obs|Interp|Action guided closeout", () => {
       ].join("\n"),
     );
   });
+
+  it("clears Obs|Interp|Action|Next after Apply so a second Apply does not double-append", () => {
+    renderQuickLog({ plantId: "p1", growId: "g1", tentId: "t1" });
+    fireEvent.click(screen.getByTestId("ql-visit-mode-routine_walk"));
+
+    const note = screen.getByTestId("quicklog-note") as HTMLTextAreaElement;
+    fireEvent.change(note, { target: { value: "Seed note" } });
+
+    fireEvent.change(screen.getByTestId("ql-closeout-observation"), {
+      target: { value: "Edges curling" },
+    });
+    fireEvent.change(screen.getByTestId("ql-closeout-interpretation"), {
+      target: { value: "Could be VPD; uncertain" },
+    });
+    fireEvent.change(screen.getByTestId("ql-closeout-action"), {
+      target: { value: "none tonight" },
+    });
+    fireEvent.change(screen.getByTestId("ql-closeout-next-checkpoint"), {
+      target: { value: "Next visit" },
+    });
+    fireEvent.click(screen.getByTestId("ql-apply-closeout"));
+
+    const afterFirst = note.value;
+    expect(afterFirst).toContain("Observation: Edges curling");
+
+    const obs = screen.getByTestId("ql-closeout-observation") as HTMLTextAreaElement;
+    const interp = screen.getByTestId("ql-closeout-interpretation") as HTMLTextAreaElement;
+    const action = screen.getByTestId("ql-closeout-action") as HTMLTextAreaElement;
+    const next = screen.getByTestId("ql-closeout-next-checkpoint") as HTMLInputElement;
+    expect(obs.value).toBe("");
+    expect(interp.value).toBe("");
+    expect(action.value).toBe("");
+    expect(next.value).toBe("");
+    expect(screen.queryByTestId("ql-closeout-observation-required")).not.toBeInTheDocument();
+
+    // Second Apply with empty fields soft-blocks; note stays unchanged (no double-append).
+    fireEvent.click(screen.getByTestId("ql-apply-closeout"));
+    expect(screen.getByTestId("ql-closeout-observation-required")).toHaveAttribute(
+      "role",
+      "status",
+    );
+    expect(note.value).toBe(afterFirst);
+  });
 });

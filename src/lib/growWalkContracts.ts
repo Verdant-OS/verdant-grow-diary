@@ -268,3 +268,23 @@ export interface GrowWalkContext {
     readonly truncatedLanes: readonly GrowWalkEvidenceLane[];
   };
 }
+
+/** Pure closeout note composer for guided Obs|Interp|Action fields. Omits empty optional sections; never invents content. */
+export function composeGrowWalkCloseoutNote(input: {
+  observation: string;
+  interpretation?: string;
+  action?: string;
+  nextCheckpoint?: string;
+}): string {
+  const observation = (input.observation ?? "").trim();
+  const interpretation = (input.interpretation ?? "").trim();
+  const action = (input.action ?? "").trim();
+  const nextCheckpoint = (input.nextCheckpoint ?? "").trim();
+
+  const lines: string[] = [];
+  if (observation) lines.push(`Observation: ${observation}`);
+  if (interpretation) lines.push(`Interpretation: ${interpretation}`);
+  if (action) lines.push(`Action: ${action}`);
+  if (nextCheckpoint) lines.push(`Next checkpoint: ${nextCheckpoint}`);
+  return lines.join("\n").trim();
+}

@@ -423,6 +423,91 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("Quick Log shared in-flight coordination", () => {
+  it("removes the empty Note handoff hint after a child Note saves", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValue(pending.promise);
+    renderQuickLog({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+      eventType: "observation",
+      suggestSnapshot: true,
+    });
+
+    expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toHaveTextContent(
+      /note field is empty/i,
+    );
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-picker-note"));
+    const childNote = await screen.findByTestId("quick-log-dialog-all-activities-note");
+    fireEvent.change(childNote, { target: { value: "Plant A looks steady" } });
+    fireEvent.click(screen.getByTestId("quick-log-dialog-all-activities-save"));
+    await waitFor(() =>
+      expect(harness.rpc).toHaveBeenCalledWith(
+        "quicklog_save_manual",
+        expect.objectContaining({
+          p_target_type: "plant",
+          p_target_id: "p1",
+          p_action: "note",
+          p_note: "Plant A looks steady",
+        }),
+      ),
+    );
+
+    await act(async () => {
+      pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });
+      await pending.promise;
+    });
+
+    expect(
+      await screen.findByTestId("quick-log-dialog-all-activities-saved-item"),
+    ).toHaveTextContent("Plant note");
+    expect(screen.queryByTestId("quick-log-draft-preview-empty-note")).not.toBeInTheDocument();
+  });
+
+  it("restores the empty Note handoff hint when Log another starts a fresh draft", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValue(pending.promise);
+    renderQuickLog({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+      eventType: "observation",
+      suggestSnapshot: true,
+    });
+
+    expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toHaveTextContent(
+      /note field is empty/i,
+    );
+    prepareMainNote();
+    act(() => submitForm(mainForm()));
+    await waitFor(() =>
+      expect(harness.rpc).toHaveBeenCalledWith(
+        "quicklog_save_manual",
+        expect.objectContaining({
+          p_target_type: "plant",
+          p_target_id: "p1",
+          p_action: "note",
+          p_note: "Main form observation",
+        }),
+      ),
+    );
+
+    await act(async () => {
+      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      await pending.promise;
+    });
+
+    const logAnother = await screen.findByTestId("quick-log-post-save-another");
+    expect(screen.queryByTestId("quick-log-draft-preview-empty-note")).not.toBeInTheDocument();
+
+    fireEvent.click(logAnother);
+
+    expect(screen.getByTestId("quicklog-note")).toHaveValue("");
+    expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toHaveTextContent(
+      /note field is empty/i,
+    );
+  });
+
   it("names the disabled main Save as Saving while the shared lock is active", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);
@@ -579,7 +664,14 @@ describe("Quick Log shared in-flight coordination", () => {
   it("locks the parent and close path while a child save holds its captured target", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);
-    const view = renderQuickLog();
+    const view = renderQuickLog({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+      eventType: "observation",
+      suggestSnapshot: true,
+    });
+    expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toBeInTheDocument();
     const childSave = await prepareChildNote();
 
     fireEvent.click(childSave);
@@ -595,7 +687,13 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(screen.getByTestId("quick-log-save")).toBeDisabled();
 
     act(() => {
-      view.rerenderQuickLog({ plantId: "p2", growId: "g2", tentId: "t2" });
+      view.rerenderQuickLog({
+        plantId: "p2",
+        growId: "g2",
+        tentId: "t2",
+        eventType: "observation",
+        suggestSnapshot: true,
+      });
     });
     const inFlightTarget = screen.getByTestId("quick-log-target-card");
     expect(inFlightTarget).toHaveAttribute("data-target-plant-id", "p1");
@@ -620,14 +718,60 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(
       screen.queryByTestId("quick-log-dialog-all-activities-saved-item"),
     ).not.toBeInTheDocument();
+    expect(screen.getByTestId("quick-log-draft-preview-empty-note")).toBeInTheDocument();
     await waitFor(() => expectParentSelectorsLocked(false));
     expect(screen.getByTestId("quick-log-save")).toBeEnabled();
+  });
+
+  it("does not let a late main save hide a newer target's empty Note hint", async () => {
+    const pending = deferredRpc();
+    harness.rpc.mockReturnValue(pending.promise);
+    const view = renderQuickLog({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+      eventType: "observation",
+      suggestSnapshot: true,
+    });
+    expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toBeInTheDocument();
+    prepareMainNote();
+    act(() => submitForm(mainForm()));
+    await waitFor(() =>
+      expect(harness.rpc).toHaveBeenCalledWith(
+        "quicklog_save_manual",
+        expect.objectContaining({ p_target_type: "plant", p_target_id: "p1" }),
+      ),
+    );
+
+    act(() => {
+      view.rerenderQuickLog({
+        plantId: "p2",
+        growId: "g2",
+        tentId: "t2",
+        eventType: "observation",
+        suggestSnapshot: true,
+      });
+    });
+
+    await act(async () => {
+      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      await pending.promise;
+    });
+
+    expect(screen.getByTestId("quick-log-draft-preview-empty-note")).toBeInTheDocument();
   });
 
   it("releases the parent and close path after a child save failure", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);
-    const view = renderQuickLog();
+    const view = renderQuickLog({
+      plantId: "p1",
+      growId: "g1",
+      tentId: "t1",
+      eventType: "observation",
+      suggestSnapshot: true,
+    });
+    expect(await screen.findByTestId("quick-log-draft-preview-empty-note")).toBeInTheDocument();
     const childSave = await prepareChildNote();
 
     fireEvent.click(childSave);
@@ -640,6 +784,7 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(await screen.findByTestId("quick-log-dialog-all-activities-error")).toHaveTextContent(
       /save failed/i,
     );
+    expect(screen.getByTestId("quick-log-draft-preview-empty-note")).toBeInTheDocument();
     await waitFor(() => expectParentSelectorsLocked(false));
     expect(screen.getByTestId("quick-log-save")).toBeEnabled();
 

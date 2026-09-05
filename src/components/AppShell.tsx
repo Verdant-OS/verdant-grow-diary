@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useHydrated } from "@/hooks/useHydrated";
-import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
 import { buildSignedOutRedirect } from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
@@ -57,14 +57,22 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     location.search,
     location.hash,
   );
-  const { status: authStatus, retry: retryAuth } = useRequireAuth(signedOutRedirect);
-  const { loading: entitlementLoading, entitlement } = useMyEntitlements();
+  const { status: authStatus } = useRequireAuth(signedOutRedirect);
+  // One server-validated session gate for every private REST read this shell
+  // issues: a cached user while getUser() is still settling, missed
+  // (revalidation_failed) or is about to redirect must not fire any of them.
+  const sessionReady = !loading && !!user && authStatus === "authenticated";
+  // Same trust gate as alerts (#1256 P2): the entitlements read is
+  // presentation-only, but GET /rest/v1/subscriptions and user_roles are
+  // still private REST.
+  const { loading: entitlementLoading, entitlement } = useMyEntitlements({
+    enabled: sessionReady,
+  });
   // Real persisted alerts (open only). RLS-scoped to the signed-in user.
   // Replaces the prior mock badge to remove the demo-vs-live mismatch.
   // Gated on a server-validated session: a cached user while getUser() is
   // still settling (or about to redirect) must not fire GET /rest/v1/alerts —
   // the never-healthy E2E spec forbids that request along the redirect path.
-  const sessionReady = !loading && !!user && authStatus === "authenticated";
   const { alerts: openAlerts } = useAlertsList({ status: "open" }, { enabled: sessionReady });
   const nav = useNavigate();
   const [openLog, setOpenLog] = useState(false);
@@ -228,8 +236,10 @@ export default function AppShell({ children }: { children?: ReactNode }) {
       </div>
     );
   // getUser transport/server error is not signed-out. Stay on this URL, do not
-  // mount pageContent (no private REST), do not bounce to /welcome. Retry
-  // re-runs getUser; sign-out stays an explicit choice behind confirmation.
+  // mount pageContent (no private REST), do not bounce to /welcome. But never
+  // a dead end either: a bare loading shell left a grower with no way out.
+  // Retry re-runs getUser through the same event the agreements gate uses;
+  // sign-out stays an explicit choice behind the usual confirmation.
   if (authStatus === "revalidation_failed")
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -241,10 +251,18 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         >
           <p className="font-medium text-foreground">We couldn&apos;t confirm your session.</p>
           <p className="text-muted-foreground">
-            Retry to check again. Signing out is only needed if Retry keeps failing.
+            Retry to check again. Signing out ends your session on every device, so use it only if
+            Retry keeps failing.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={() => retryAuth()}>
+            <Button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new Event(AUTH_REVALIDATE_EVENT));
+                }
+              }}
+            >
               Retry
             </Button>
             <SignOutConfirmDialog
@@ -379,24 +397,24 @@ export default function AppShell({ children }: { children?: ReactNode }) {
         {/* Mobile floating + */}
         <button
           onClick={() => {
-            if (mobileQuickLogTarget) {
-              setOpenLog(false);
-              setPrefill(null);
-              setLegacyQuickLogSession((session) => session + 1);
-              setStructuredOpenIntent(null);
-              // Freeze the evidence available at the grower's tap. A plant
-              // query that settles later may improve the NEXT launch, but it
-              // cannot retarget this open sheet and erase its draft.
-              setMobileLaunchTargetKey(mobileQuickLogTarget);
-              setOpenScopedLog(true);
-            } else {
-              setOpenScopedLog(false);
-              setMobileLaunchTargetKey(null);
-              setStructuredOpenIntent(null);
-              const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
-              setPrefill(routePlantId ? { plantId: routePlantId } : null);
-              setOpenLog(true);
-            }
+            const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
+            const mobileQuickLogPrefill: QuickLogPrefill | null = mobileQuickLogTarget?.startsWith(
+              "plant:",
+            )
+              ? { plantId: mobileQuickLogTarget.slice("plant:".length) }
+              : mobileQuickLogTarget?.startsWith("tent:")
+                ? { tentId: mobileQuickLogTarget.slice("tent:".length) }
+                : routePlantId
+                  ? { plantId: routePlantId }
+                  : null;
+
+            // Every mobile + enters the same QuickLog dialog as the plant
+            // action row. Structured V2 intents keep their event-only path.
+            setOpenScopedLog(false);
+            setMobileLaunchTargetKey(null);
+            setStructuredOpenIntent(null);
+            setPrefill(mobileQuickLogPrefill);
+            setOpenLog(true);
           }}
           aria-label="Open Quick Log"
           data-testid="mobile-quick-log-fab"

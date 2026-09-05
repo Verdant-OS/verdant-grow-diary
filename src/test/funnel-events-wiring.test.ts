@@ -516,8 +516,9 @@ describe("ordering and safety constraints at the seams", () => {
       /const \{ status: authStatus, retry: retryAuth \} = useRequireAuth\(signedOutRedirect\)/,
     );
     expect(shell).toMatch(
-      /const \{ loading: entitlementLoading, entitlement \} = useMyEntitlements\(\)/,
+      /const \{ loading: entitlementLoading, entitlement \} = useMyEntitlements\(\{\s*enabled:\s*sessionReady,?\s*\}\)/,
     );
+    expect(shell).not.toMatch(/useMyEntitlements\(\)/);
     expect(shell).toMatch(/authStatus === "authenticated"/);
     expect(shell).toMatch(/!entitlementLoading/);
     expect(shell).toMatch(/entitlement\.isActive/);

@@ -115,6 +115,44 @@ describe("D7 chips — target gating", () => {
   });
 });
 
+/** True when `a` comes before `b` in document order. */
+function precedes(a: Element, b: Element): boolean {
+  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
+describe("D7 chips — hoisted to the top of the sheet", () => {
+  it("renders the chips right after Target and before Action, Photo, Video and Note", () => {
+    renderSheet("plant:plant-1");
+
+    const chips = screen.getByTestId("qlv2-response-chips");
+    const target = screen.getByLabelText("Target");
+    const action = screen.getByRole("group", { name: "Quick Log action type" });
+    const photo = screen.getByTestId("qlv2-photo-attachment");
+    const video = screen.getByTestId("qlv2-video-attachment");
+
+    expect(precedes(target, chips)).toBe(true);
+    expect(precedes(chips, action)).toBe(true);
+    expect(precedes(chips, photo)).toBe(true);
+    expect(precedes(chips, video)).toBe(true);
+    expect(precedes(chips, noteTextarea())).toBe(true);
+  });
+
+  it("stays first on a Water draft, and Feed still withholds it", async () => {
+    renderSheet("plant:plant-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Water" }));
+    const chips = screen.getByTestId("qlv2-response-chips");
+    const action = screen.getByRole("group", { name: "Quick Log action type" });
+    expect(precedes(chips, action)).toBe(true);
+    expect(precedes(chips, screen.getByTestId("qlv2-photo-attachment"))).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Feed" }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("qlv2-response-chips")).not.toBeInTheDocument(),
+    );
+  });
+});
+
 describe("D7 chips — selection and payload", () => {
   it("marks the chosen chip pressed and writes the exact response line", async () => {
     renderSheet("plant:plant-1");

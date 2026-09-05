@@ -137,6 +137,27 @@ describe("D7 — V2 sheet response-check chips", () => {
     expect(SHEET).toContain('data-testid="qlv2-response-chips"');
   });
 
+  it("hoists the chip row to the top: after Target, before Action, Photo, Video and Note", () => {
+    // The 3-tap status (open plant-scoped, tap a chip, Save) is the first
+    // control the grower reaches. It sits under Target, which names the plant
+    // the response describes, and above the action group and both media
+    // pickers it used to be buried beneath.
+    const chips = SHEET.indexOf('data-testid="qlv2-response-chips"');
+    const target = SHEET.indexOf('htmlFor="qlv2-target"');
+    const action = SHEET.indexOf('aria-label="Quick Log action type"');
+    const photo = SHEET.indexOf('data-testid="qlv2-photo-attachment"');
+    const video = SHEET.indexOf('data-testid="qlv2-video-attachment"');
+    const note = SHEET.indexOf('htmlFor="qlv2-note"');
+    for (const index of [chips, target, action, photo, video, note]) {
+      expect(index).toBeGreaterThan(-1);
+    }
+    expect(chips).toBeGreaterThan(target);
+    expect(chips).toBeLessThan(action);
+    expect(chips).toBeLessThan(photo);
+    expect(chips).toBeLessThan(video);
+    expect(chips).toBeLessThan(note);
+  });
+
   it("locks the chips during an in-flight watering submission, like the note", () => {
     // Pin updated (not loosened): the disabled expression gained the overflow
     // clause, so `wateringSubmissionLocked` is now the FIRST term of a

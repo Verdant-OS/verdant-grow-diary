@@ -1,6 +1,6 @@
 /**
  * checkoutPlanIntent — pure helper for a **typed, allowlisted, one-shot**
- * plan intent that survives the /auth round-trip.
+ * checkout intent that survives the /auth round-trip.
  *
  * Problem shape:
  *   1. Signed-out user clicks "Upgrade to Pro (annual)" on /pricing.
@@ -29,27 +29,23 @@
  */
 
 import { sanitizeAuthRedirect } from "@/lib/authRedirectRules";
+import { PAID_PLAN_ALLOWLIST, PAID_PLAN_IDS, type PaidPlanId } from "@/lib/paidPlanAllowlist";
 
-export type PlanIntentId =
-  "pro_monthly" | "pro_annual" | "craft_monthly" | "craft_annual" | "founder_lifetime";
+export type PlanIntentId = PaidPlanId;
 
-const KNOWN_PLAN_INTENTS: ReadonlyArray<PlanIntentId> = [
-  "pro_monthly",
-  "pro_annual",
-  "craft_monthly",
-  "craft_annual",
-  "founder_lifetime",
-];
+/** Canonical identity exported so consumers/tests cannot drift onto a second list. */
+export const PLAN_INTENT_IDS: readonly PlanIntentId[] = PAID_PLAN_IDS;
 
 export function isKnownPlanIntent(value: unknown): value is PlanIntentId {
-  return typeof value === "string" && (KNOWN_PLAN_INTENTS as ReadonlyArray<string>).includes(value);
+  return typeof value === "string" && PAID_PLAN_ALLOWLIST.has(value);
 }
 
 /**
- * Preserve the selected plan in the signed-in return URL as well as
+ * Preserve the selected plan or credit pack in the signed-in return URL as well as
  * sessionStorage. Email confirmation commonly opens a new tab, where the
  * original tab's sessionStorage is unavailable; the allowlisted `?plan=`
- * value keeps Pricing preselected without auto-opening checkout.
+ * value keeps plan preselection or the exact pack recovery identity without
+ * auto-opening checkout from the query string alone.
  */
 export function buildCheckoutPlanReturnPath(input: {
   pathname: unknown;
@@ -103,7 +99,7 @@ function safeStorage(): PlanIntentStorage | null {
 }
 
 /**
- * Save a plan intent. Unknown plan ids are silently rejected — the allowlist
+ * Save a checkout intent. Unknown ids are silently rejected — the allowlist
  * is the security boundary; callers should not need to pre-validate.
  * Returns true when persisted, false otherwise.
  */

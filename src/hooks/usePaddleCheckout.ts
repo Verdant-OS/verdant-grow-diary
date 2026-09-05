@@ -6,11 +6,12 @@ import {
   getCheckoutUnavailableMessage,
   PaddleCheckoutUnavailableError,
   PaddleCheckoutCatalogUnavailableError,
+  type PaddleCheckoutCatalogReason,
 } from "@/lib/paddle";
 import { useAuth } from "@/store/auth";
 import { useLocation, useNavigate } from "@/lib/react-router-compat";
 import { toast } from "@/hooks/use-toast";
-import { sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
+import { buildCreditPackSuccessUrl, sanitizeCheckoutReturnTo } from "@/lib/checkoutReturnTo";
 import {
   buildCheckoutPlanReturnPath,
   consumePlanIntent,
@@ -56,6 +57,8 @@ export interface UsePaddleCheckoutResult {
    * by `dismissBlocked()`.
    */
   blockedReason: string | null;
+  /** Sanitized catalog reason for cause-aware recovery UI. Never render it. */
+  blockedReasonCode: PaddleCheckoutCatalogReason | null;
   dismissBlocked: () => void;
 }
 
@@ -98,6 +101,9 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [blockedReason, setBlockedReason] = useState<string | null>(null);
+  const [blockedReasonCode, setBlockedReasonCode] = useState<PaddleCheckoutCatalogReason | null>(
+    null,
+  );
 
   // Track mount state so the Paddle `checkout.closed` cancel handler (which
   // fires asynchronously from Paddle.js after the modal actually closes)
@@ -127,7 +133,10 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     [unavailable],
   );
 
-  const dismissBlocked = useCallback(() => setBlockedReason(null), []);
+  const dismissBlocked = useCallback(() => {
+    setBlockedReason(null);
+    setBlockedReasonCode(null);
+  }, []);
 
   const openCheckout = useCallback(
     async (options: OpenCheckoutOptions) => {
@@ -135,6 +144,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
       // here, we must not detour the user to /auth and then dead-end.
       const env = resolvePaddleCheckout();
       if (env !== "sandbox") {
+        setBlockedReasonCode(null);
         setBlockedReason(getCheckoutUnavailableMessage());
         return;
       }
@@ -161,6 +171,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
 
       setLoading(true);
       setBlockedReason(null);
+      setBlockedReasonCode(null);
       // Funnel ping: an authenticated grower initiated checkout. Fires
       // before price resolution on purpose — a blocked or sold-out
       // resolution is exactly the drop-off the funnel needs to see.
@@ -211,7 +222,14 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
           customData: { userId: user.id },
           settings: {
             displayMode: "overlay",
-            successUrl: options.successUrl || defaultSuccessUrl(),
+            successUrl:
+              options.successUrl ||
+              (CREDIT_PACKS.some((pack) => pack.sku === options.priceId)
+                ? buildCreditPackSuccessUrl(
+                    window.location.origin,
+                    new URLSearchParams(location.search).get("returnTo"),
+                  )
+                : defaultSuccessUrl()),
             allowLogout: false,
             variant: "one-page",
           },
@@ -241,8 +259,12 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
             plan: options.priceId,
             reason: reasonToken,
           });
+          setBlockedReasonCode(
+            err instanceof PaddleCheckoutCatalogUnavailableError ? err.reason : null,
+          );
           setBlockedReason(err.message);
         } else {
+          setBlockedReasonCode(null);
           setBlockedReason(CHECKOUT_RECOVERY_MESSAGE);
           toast({
             title: "Checkout unavailable",
@@ -257,7 +279,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     [location.pathname, location.search, navigate, user],
   );
 
-  // Slice C: auto-resume a pending plan intent EXACTLY ONCE after auth.
+  // Slice C: auto-resume a pending checkout intent EXACTLY ONCE after auth.
   // Guarded with a ref so React StrictMode's double-invoke, rerenders, and
   // rapid re-mounts cannot re-open the overlay. `consumePlanIntent` is
   // itself destructive (read + delete), so the storage-side guarantee is
@@ -280,6 +302,7 @@ export function usePaddleCheckout(): UsePaddleCheckoutResult {
     unavailable,
     unavailableMessage,
     blockedReason,
+    blockedReasonCode,
     dismissBlocked,
   };
 }

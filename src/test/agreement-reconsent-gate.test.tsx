@@ -5,20 +5,23 @@
  * behavior itself, which is security-critical:
  *   - blocks a signed-in user who is missing a current-version agreement,
  *   - does NOT block when the user is current,
- *   - is suppressed on /auth and /welcome (and other read-first routes),
+ *   - is suppressed on /auth (and other read-first routes),
  *   - fails OPEN on a read error: a non-blocking banner (not a dialog) with
- *     Retry, the route underneath stays usable, nothing is granted or written,
- *     and a successful retry that then finds a real gap shows the consent form,
+ *     Retry and Close, the route underneath stays usable, nothing is granted
+ *     or written, there is no sign-out control on that path, a dismissal is
+ *     re-checked on the next page, and the consent form itself stays a
+ *     blocking, non-dismissible dialog,
  *   - records acceptance via record_own_agreement_acceptances (auth.uid() only;
  *     no client-trusted user_id on the write path).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "@/lib/react-router-compat";
+import { MemoryRouter, useNavigate } from "@/lib/react-router-compat";
 import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { CURRENT_AGREEMENT_LIST } from "@/constants/agreements";
 import { RECORD_OWN_AGREEMENT_ACCEPTANCES_RPC } from "@/lib/agreementAcceptanceService";
+import { AUTH_REVALIDATE_EVENT } from "@/hooks/useRequireAuth";
 
 const CURRENT_ROWS = CURRENT_AGREEMENT_LIST.map((a) => ({
   agreement_type: a.type,
@@ -67,12 +70,27 @@ beforeEach(() => {
   eqSpy.mockImplementation(() => Promise.resolve({ data: mockAcceptances, error: mockReadError }));
   rpcSpy.mockClear();
   signOutSpy.mockClear();
+  outsideClick.mockClear();
 });
+
+/** In-app navigation, the way a grower moves between pages (no remount). */
+function GoTo({ to }: { to: string }) {
+  const nav = useNavigate();
+  return (
+    <button type="button" onClick={() => nav(to)}>
+      go {to}
+    </button>
+  );
+}
+
+/** Stands in for the authenticated route rendered next to the gate. */
+const outsideClick = vi.fn();
 
 function renderGate(pathname = "/dashboard") {
   return render(
     <MemoryRouter initialEntries={[pathname]}>
-      <button type="button" data-testid="outside-control">
+      <GoTo to="/plants" />
+      <button type="button" data-testid="outside-control" onClick={outsideClick}>
         Protected route control
       </button>
       <AgreementReconsentGate />
@@ -118,7 +136,7 @@ describe("AgreementReconsentGate", () => {
     expect(eqSpy).not.toHaveBeenCalled();
   });
 
-  it("is suppressed on /welcome (verify-error is not shown on marketing)", async () => {
+  it("is suppressed on /welcome (verify-error dialog is not shown)", async () => {
     mockAcceptances = [];
     mockReadError = { message: "network blip" };
     renderGate("/welcome");
@@ -129,16 +147,30 @@ describe("AgreementReconsentGate", () => {
     expect(eqSpy).not.toHaveBeenCalled();
   });
 
+  it("blocks a real consent gap with a modal dialog: the route is hidden behind it", async () => {
+    mockAcceptances = [];
+    renderGate();
+    expect(await screen.findByTestId("agreement-reconsent-gate")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(routeHiddenBehindModal()).toBe(true);
+  });
+
   it("fails OPEN on a read error: a non-blocking banner, no consent form, no sign-out control", async () => {
     mockReadError = { message: "network blip" };
-    renderGate("/grows");
+    renderGate();
     const banner = await verifyErrorBanner();
     expect(banner).toHaveAttribute("role", "status");
+    // Not a dialog: the authenticated route underneath renders and stays usable.
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(routeHiddenBehindModal()).toBe(false);
+    await userEvent.click(screen.getByTestId("outside-control"));
+    expect(outsideClick).toHaveBeenCalledTimes(1);
+    // Nothing is granted or written: no acceptance form, no acceptance RPC.
     expect(screen.queryByTestId("agreement-reconsent-gate")).toBeNull();
     expect(rpcSpy).not.toHaveBeenCalled();
+    // The fail-open path offers Retry and Close only; sign-out is never on it.
     expect(screen.getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
     expect(signOutSpy).not.toHaveBeenCalled();
   });
@@ -173,10 +205,11 @@ describe("AgreementReconsentGate", () => {
 describe("AgreementReconsentGate verify-error recovery", () => {
   it("Retry re-runs the acceptance read and clears the banner once the read succeeds", async () => {
     mockReadError = { message: "network blip" };
-    renderGate("/grows");
+    renderGate();
     await verifyErrorBanner();
     expect(eqSpy).toHaveBeenCalledTimes(1);
 
+    // The transient failure clears; the grower is current.
     mockReadError = null;
     mockAcceptances = CURRENT_ROWS;
     await userEvent.click(screen.getByRole("button", { name: /^retry$/i }));
@@ -189,11 +222,51 @@ describe("AgreementReconsentGate verify-error recovery", () => {
     expect(signOutSpy).not.toHaveBeenCalled();
   });
 
-  it("keeps the banner mounted and Retry disabled while a Retry read is in flight", async () => {
+  it("stacks above the mobile navigation and the Quick Log FAB, and under modal overlays", async () => {
+    // MobileNav is fixed at bottom-2 with a 4rem bar (z-30) and AppShell's
+    // Quick Log FAB sits at bottom 5rem + safe-area (z-40, h-14). A banner
+    // pinned to bottom-0 at z-50 covered both, so the "non-blocking" state
+    // blocked primary navigation on phones. On md+ the nav is hidden, so the
+    // banner may sit on the bottom edge there.
     mockReadError = { message: "network blip" };
-    renderGate("/grows");
+    renderGate();
+    const banner = await verifyErrorBanner();
+    expect(banner).toHaveClass("bottom-[calc(8.5rem+env(safe-area-inset-bottom))]");
+    expect(banner).toHaveClass("md:bottom-0");
+    expect(banner).toHaveClass("z-40");
+    expect(banner).not.toHaveClass("bottom-0");
+    expect(banner).not.toHaveClass("z-50");
+  });
+
+  it("Retry re-runs only the acceptance read: it never triggers auth revalidation", async () => {
+    // Auth revalidation flips useRequireAuth to loading and AppShell swaps the
+    // route for its loading shell, which unmounts the page and discards local
+    // state. A fail-open banner must not do that to the grower on Retry.
+    const revalidate = vi.fn();
+    window.addEventListener(AUTH_REVALIDATE_EVENT, revalidate);
+    try {
+      mockReadError = { message: "network blip" };
+      renderGate();
+      await verifyErrorBanner();
+
+      await userEvent.click(screen.getByRole("button", { name: /^retry$/i }));
+      await waitFor(() => expect(eqSpy).toHaveBeenCalledTimes(2));
+
+      expect(revalidate).not.toHaveBeenCalled();
+      expect(signOutSpy).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener(AUTH_REVALIDATE_EVENT, revalidate);
+    }
+  });
+
+  it("keeps the banner mounted and Retry disabled while a Retry read is in flight", async () => {
+    // Guards the regression itself: an open condition that hides the banner
+    // while the read runs makes a retry look like nothing happened.
+    mockReadError = { message: "network blip" };
+    renderGate();
     await verifyErrorBanner();
 
+    // Hold the retried read open; nothing settles until this test says so.
     let settle: (value: { data: unknown[]; error: unknown }) => void = () => {};
     eqSpy.mockImplementationOnce(
       () =>
@@ -206,29 +279,93 @@ describe("AgreementReconsentGate verify-error recovery", () => {
 
     expect(screen.getByTestId("agreement-reconsent-verify-error")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /retrying/i })).toBeDisabled();
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(signOutSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /^retry$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
+    // Still fail-open while it runs: the route stays usable.
+    await userEvent.click(screen.getByTestId("outside-control"));
+    expect(outsideClick).toHaveBeenCalledTimes(1);
 
+    // The read succeeds: the banner clears without ever having unmounted.
     await act(async () => {
       settle({ data: CURRENT_ROWS, error: null });
     });
     await waitFor(() =>
       expect(screen.queryByTestId("agreement-reconsent-verify-error")).toBeNull(),
     );
+    expect(screen.queryByTestId("agreement-reconsent-gate")).toBeNull();
+    expect(signOutSpy).not.toHaveBeenCalled();
   });
 
-  it("a Retry that then finds a real gap shows the complete-agreements form, not marketing", async () => {
+  it("a Retry that fails again keeps the banner, counts the attempt, and never signs out", async () => {
     mockReadError = { message: "network blip" };
-    renderGate("/grows");
+    renderGate();
+    await verifyErrorBanner();
+    expect(screen.queryByTestId("agreement-reconsent-verify-attempts")).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: /^retry$/i }));
+    await waitFor(() => expect(eqSpy).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId("agreement-reconsent-verify-attempts")).toHaveTextContent(
+      /attempt 2/i,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^retry$/i }));
+    await waitFor(() => expect(eqSpy).toHaveBeenCalledTimes(3));
+    expect(await screen.findByTestId("agreement-reconsent-verify-attempts")).toHaveTextContent(
+      /attempt 3/i,
+    );
+
+    expect(screen.getByTestId("agreement-reconsent-verify-error")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByTestId("agreement-reconsent-gate")).toBeNull();
+    expect(signOutSpy).not.toHaveBeenCalled();
+  });
+
+  it("Close dismisses the banner without signing out and without claiming consent", async () => {
+    mockReadError = { message: "network blip" };
+    renderGate();
     await verifyErrorBanner();
 
+    await userEvent.click(screen.getByRole("button", { name: /^close$/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("agreement-reconsent-verify-error")).toBeNull(),
+    );
+    // Dismissing is not consent: no acceptance form, no acceptance write, no sign-out.
+    expect(screen.queryByTestId("agreement-reconsent-gate")).toBeNull();
+    expect(rpcSpy).not.toHaveBeenCalled();
+    expect(signOutSpy).not.toHaveBeenCalled();
+    expect(eqSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a dismissal is re-checked on the next page: a real gap then blocks as before", async () => {
+    mockReadError = { message: "network blip" };
+    renderGate();
+    await verifyErrorBanner();
+    await userEvent.click(screen.getByRole("button", { name: /^close$/i }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("agreement-reconsent-verify-error")).toBeNull(),
+    );
+
+    // The read works again on the next page, and finds no acceptances on file.
     mockReadError = null;
     mockAcceptances = [];
-    await userEvent.click(screen.getByRole("button", { name: /^retry$/i }));
+    await userEvent.click(screen.getByRole("button", { name: "go /plants" }));
 
+    await waitFor(() => expect(eqSpy).toHaveBeenCalledTimes(2));
     expect(await screen.findByTestId("agreement-reconsent-gate")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.queryByTestId("agreement-reconsent-verify-error")).toBeNull();
+    expect(signOutSpy).not.toHaveBeenCalled();
+  });
+
+  it("the consent form itself is not dismissible: Close is inert on the acceptance gate", async () => {
+    mockAcceptances = [];
+    renderGate();
+    await screen.findByTestId("agreement-reconsent-gate");
+
+    await userEvent.click(screen.getByRole("button", { name: /^close$/i }));
+
+    expect(screen.getByTestId("agreement-reconsent-gate")).toBeInTheDocument();
+    expect(rpcSpy).not.toHaveBeenCalled();
     expect(signOutSpy).not.toHaveBeenCalled();
   });
 });

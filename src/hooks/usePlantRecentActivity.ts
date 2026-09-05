@@ -18,7 +18,10 @@ export async function fetchPlantRecentActivityRows(plantId: string) {
   });
 
   if (error) throw error;
-  return data ?? [];
+  if (!Array.isArray(data)) {
+    throw new Error("Plant recent activity is unavailable.");
+  }
+  return data;
 }
 
 export function usePlantRecentActivity(plantId: string | null | undefined) {

@@ -83,6 +83,8 @@ import {
   quickLogPlantHelperText,
 } from "@/lib/quickLogPlantOptionRules";
 import QuickLogSensorSnapshotStrip from "@/components/QuickLogSensorSnapshotStrip";
+import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
+import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
 import EventTypeSelector from "@/components/EventTypeSelector";
 import {
   clearPublicQuickLogStarterDraft,
@@ -404,6 +406,8 @@ export default function QuickLog({
   // Once touched, stale prefill metadata must never override the current form.
   const eventTypeUserTouchedRef = useRef(false);
   const [plantId, setPlantId] = useState<string>("");
+  /** Field Edition visit mode — presentation-only; never part of save payloads. */
+  const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
   const [dismissedBlockedPrefillKey, setDismissedBlockedPrefillKey] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState(false);
   const [remindAt, setRemindAt] = useState<string>("");
@@ -666,6 +670,11 @@ export default function QuickLog({
   }, [open, recentTargetRecord, recentSuggestionClockMs]);
   const showRecentTargetSuggestion =
     !prefillNamesPlant && !recentSuggestionDismissed && !plantId && recentTargetSuggestion !== null;
+
+  useEffect(() => {
+    // Match V2 sheet open reset: a fresh dialog session always starts on Fast Check.
+    if (open) setVisitMode("fast_check");
+  }, [open]);
 
   useEffect(() => {
     if (!open || saveLocked) return;
@@ -1058,6 +1067,7 @@ export default function QuickLog({
     eventTypeUserTouchedRef.current = false;
     setEventType("observation");
     setPlantId("");
+    setVisitMode("fast_check");
     setDismissedBlockedPrefillKey(null);
     setRecentSuggestionDismissed(false);
     setStage("");
@@ -1165,6 +1175,7 @@ export default function QuickLog({
     setShowMore(false);
     eventTypeUserTouchedRef.current = true;
     setEventType("observation");
+    setVisitMode("fast_check");
     setSnapshot(false);
     snapshotUserTouchedRef.current = false;
     setRemindAt("");
@@ -2165,6 +2176,19 @@ export default function QuickLog({
                 </span>
               </div>
             )}
+
+            <GuidedGrowWalkPanel
+              visitMode={visitMode}
+              onVisitModeChange={setVisitMode}
+              targetOk={!!resolvedTarget}
+              tentId={resolvedTarget?.tentId ?? null}
+              targetType={resolvedTarget ? "plant" : null}
+              stage={
+                (resolvedTargetPlant as { stage?: string | null } | null)?.stage ??
+                (stage.trim().length > 0 ? stage : null)
+              }
+              testIdPrefix="ql"
+            />
 
             <section
               data-testid="quick-log-truth-section"

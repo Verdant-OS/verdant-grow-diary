@@ -1631,11 +1631,29 @@ export default function QuickLog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Field Edition first paint — presentation order only. Visit modes
+            must own the grower Quick Log surface ahead of the legacy
+            "All activity types" menu; save payloads and idempotency are
+            unchanged. Fast Check remains the default visitMode. */}
+        <GuidedGrowWalkPanel
+          visitMode={visitMode}
+          onVisitModeChange={setVisitMode}
+          targetOk={!!resolvedTarget}
+          tentId={resolvedTarget?.tentId ?? null}
+          targetType={resolvedTarget ? "plant" : null}
+          stage={
+            (resolvedTargetPlant as { stage?: string | null } | null)?.stage ??
+            (stage.trim().length > 0 ? stage : null)
+          }
+          testIdPrefix="ql"
+        />
+
         {/* Shared v1a activity surface — consumes canonical
             QUICK_LOG_ACTIVITY_DEFINITIONS. Additive to the existing
             note/photo/watering flow below; every save routes through
             useQuickLogActivitySave and dispatches
-            verdant:entry-created only on confirmed success. */}
+            verdant:entry-created only on confirmed success. Kept reachable
+            below Field Edition; must not own first paint. */}
         <QuickLogAllActivitiesSection
           growId={resolvedTarget?.growId ?? activeGrow?.id ?? null}
           tentId={resolvedTarget?.tentId ?? null}
@@ -2176,19 +2194,6 @@ export default function QuickLog({
                 </span>
               </div>
             )}
-
-            <GuidedGrowWalkPanel
-              visitMode={visitMode}
-              onVisitModeChange={setVisitMode}
-              targetOk={!!resolvedTarget}
-              tentId={resolvedTarget?.tentId ?? null}
-              targetType={resolvedTarget ? "plant" : null}
-              stage={
-                (resolvedTargetPlant as { stage?: string | null } | null)?.stage ??
-                (stage.trim().length > 0 ? stage : null)
-              }
-              testIdPrefix="ql"
-            />
 
             <section
               data-testid="quick-log-truth-section"

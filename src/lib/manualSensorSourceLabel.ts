@@ -4,6 +4,9 @@
  * from (handheld meter, EcoWitt console, SensorPush, etc.) without
  * ever making a manual entry look live.
  *
+ * Non-manual ingest tokens go through `resolveSensorSourceDisplayCanon`
+ * so vendor/bridge/app names never render as the Source label.
+ *
  * No I/O, no React, no Supabase. Deterministic.
  *
  * Storage contract:
@@ -13,6 +16,8 @@
  *    `ecowitt-gateway`). The `source` column stays `manual` — the
  *    presence of a device note never upgrades a row to live.
  */
+
+import { formatSensorSourceDisplayLabel } from "@/lib/sensorSourceDisplayCanon";
 
 export const MANUAL_DEVICE_ID_PREFIX = "manual:";
 
@@ -99,32 +104,18 @@ export function extractManualDeviceNote(deviceId: string | null | undefined): st
 
 export type SensorSourceForLabel = "live" | "manual" | "sim" | "diary" | "unavailable" | string;
 
-const BASE_SOURCE_LABELS: Record<string, string> = {
-  live: "Live sensor",
-  manual: MANUAL_READING_LABEL,
+/**
+ * Snapshot-layer labels that are not ingest source tokens. Kept here so
+ * Dashboard / chart presenters retain their historical wording for these
+ * aggregate classifications without treating bridge/app names as Source.
+ */
+const SNAPSHOT_LAYER_LABELS: Readonly<Record<string, string>> = {
   sim: "Simulated",
   diary: "Diary snapshot",
   unavailable: "Unavailable",
   // Snapshot classification for rows whose source is not a recognized
-  // trust value — data exists but no trust path verified it. Distinct
-  // from "Unavailable" (no data at all) and never a live claim.
+  // trust value. Distinct from "Unavailable" and never a live claim.
   unverified: "Unverified source",
-  // V1 webhook ingest sources. None of these are "live" by default —
-  // freshness is derived on read; UI must still apply the stale guard.
-  webhook_generic: "Webhook",
-  pi_bridge: "Pi bridge",
-  node_red_bridge: "Node-RED bridge",
-  esp32_arduino: "ESP32",
-  esp32_arduino_sht31: "ESP32 (SHT31)",
-  esp32_esphome: "ESPHome",
-  esp32_mqtt_bridge: "MQTT bridge",
-  home_assistant_bridge: "Home Assistant",
-  ha_forwarded: "Home Assistant",
-  // Contract-aligned generic transport labels (V1.1+).
-  ecowitt: "EcoWitt",
-  mqtt: "MQTT bridge",
-  csv: "CSV import",
-  webhook: "Webhook",
 };
 
 /**
@@ -132,6 +123,9 @@ const BASE_SOURCE_LABELS: Record<string, string> = {
  * safe device note, returns e.g. "Manual reading · EcoWitt WH45 CO2/THP Monitor".
  *
  * Never returns "Live" / "Synced" / "Connected" for a manual source.
+ * Never returns vendor/bridge/app names (`pi_bridge`, `home_assistant`, …)
+ * as the Source label — those belong in provenance via
+ * `resolveSensorSourceDisplayCanon`.
  */
 export function formatSensorSourceLabel(input: {
   source: SensorSourceForLabel | null | undefined;
@@ -139,11 +133,20 @@ export function formatSensorSourceLabel(input: {
   deviceId?: string | null;
 }): string {
   const src = (input.source ?? "unavailable") as string;
-  const base = BASE_SOURCE_LABELS[src] ?? "Unavailable";
-  if (src !== "manual") return base;
-  const note =
-    normalizeManualSourceNote(input.deviceNote ?? null) ??
-    extractManualDeviceNote(input.deviceId ?? null);
-  if (!note) return MANUAL_READING_LABEL;
-  return `${MANUAL_READING_LABEL} · ${note}`;
+
+  if (src === "manual") {
+    const note =
+      normalizeManualSourceNote(input.deviceNote ?? null) ??
+      extractManualDeviceNote(input.deviceId ?? null);
+    if (!note) return MANUAL_READING_LABEL;
+    return `${MANUAL_READING_LABEL} · ${note}`;
+  }
+
+  if (src in SNAPSHOT_LAYER_LABELS) {
+    return SNAPSHOT_LAYER_LABELS[src]!;
+  }
+
+  // Display canon: normalize → one of six canonical Source labels.
+  // Bridge/vendor/app tokens become provenance, not Source.
+  return formatSensorSourceDisplayLabel(src);
 }

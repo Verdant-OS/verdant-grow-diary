@@ -5,6 +5,15 @@ import {
 } from "./expenseCalc";
 import type { GrowHelpToolkitState } from "./growHelpToolkitState";
 import {
+  MEASURED_MIXED_EC_SOURCE,
+  MEASURED_MIXED_EC_SOURCE_LABEL,
+  expenseExportReadiness,
+  expenseWaterReadiness,
+  isValidMeasuredMixedEc,
+  lightExportReadiness,
+  shouldExportInjectorPlan,
+} from "./growHelpToolkitReadiness";
+import {
   calculateDliFromPlanningPpfd,
   calculateEnergyCostPerMol,
   calculateLightCycleEnergy,
@@ -101,11 +110,24 @@ export function createGrowHelpExportSnapshot(
   };
 
   const { cycle, nutrient, light, expense } = state;
-  const cycleDays = (cycle.vegDays ?? 0) + (cycle.flowerDays ?? 0);
+  const cycleDays =
+    cycle.vegDays !== null && cycle.flowerDays !== null ? cycle.vegDays + cycle.flowerDays : 0;
   add("Cycle", "Vegetative phase", cycle.vegDays ?? "Not entered", "days", "grower-entered");
   add("Cycle", "Flower phase", cycle.flowerDays ?? "Not entered", "days", "grower-entered");
-  add("Cycle", "Vegetative photoperiod", cycle.vegPhotoperiodHours, "h/day", "shared Cycle bar");
-  add("Cycle", "Flower photoperiod", cycle.flowerPhotoperiodHours, "h/day", "shared Cycle bar");
+  add(
+    "Cycle",
+    "Vegetative photoperiod",
+    cycle.vegPhotoperiodHours ?? "Not entered",
+    "h/day",
+    "shared Cycle bar",
+  );
+  add(
+    "Cycle",
+    "Flower photoperiod",
+    cycle.flowerPhotoperiodHours ?? "Not entered",
+    "h/day",
+    "shared Cycle bar",
+  );
   add(
     "Cycle",
     "Electricity rate",
@@ -206,6 +228,15 @@ export function createGrowHelpExportSnapshot(
         "PPM700 = EC × 700",
       );
     }
+    if (isValidMeasuredMixedEc(nutrient.measuredMixedEc)) {
+      add(
+        "Nutrient recipe",
+        "Measured mixed EC",
+        nutrient.measuredMixedEc,
+        "mS/cm EC",
+        `${MEASURED_MIXED_EC_SOURCE_LABEL}; source=${MEASURED_MIXED_EC_SOURCE}`,
+      );
+    }
   } else if (nutrient.mode === "c1v1") {
     const v1 = tryValue(() =>
       calculateC1V1(nutrient.c1 as number, nutrient.c2 as number, nutrient.v2 as number),
@@ -240,11 +271,11 @@ export function createGrowHelpExportSnapshot(
         part.formula,
       ),
     );
-    if (nutrient.injectorEnabled) {
+    if (shouldExportInjectorPlan(nutrient)) {
       const injector = tryValue(() =>
         calculateInjectorPlan(
           nutrient.stockGramsPerGallon as number,
-          nutrient.injectorRatio,
+          nutrient.injectorRatio as number,
           reservoir,
         ),
       );
@@ -282,446 +313,455 @@ export function createGrowHelpExportSnapshot(
     }
   }
 
-  const canopyArea = tryValue(() =>
-    state.unitSystem === "us"
-      ? areaM2FromFeet(light.canopyLength as number, light.canopyWidth as number)
-      : areaM2(light.canopyLength as number, light.canopyWidth as number),
-  );
-  const fixturePpf = tryValue(() =>
-    resolveFixturePpf({
-      mode: light.ppfMode,
-      ppfMicromolesPerSecond: light.ppfPerFixture as number,
-      actualWatts: light.actualWattsPerFixture as number,
-      efficacyMicromolesPerJoule: light.efficacy as number,
-    }),
-  );
-  if (canopyArea !== null) {
-    add("Light plan", "Canopy area", fixed(canopyArea), "m²", "area = length × width");
+  const lightReady = lightExportReadiness(light, cycle);
+  if (!lightReady.ready) {
     add(
+      "Notes",
       "Light plan",
-      "Canopy area",
-      fixed(canopyArea / M2_PER_FT2),
-      "ft²",
-      "ft² = m² ÷ 0.09290304",
+      "Incomplete — not exported",
+      "",
+      `required inputs missing: ${lightReady.missing.join(", ") || "unknown"}`,
     );
-  }
-  if (fixturePpf) {
-    add(
-      "Light plan",
-      fixturePpf.estimated ? "Estimated PPF per fixture" : "PPF per fixture",
-      fixed(fixturePpf.ppf),
-      "µmol/s",
-      fixturePpf.formula,
+  } else {
+    const canopyArea = tryValue(() =>
+      state.unitSystem === "us"
+        ? areaM2FromFeet(light.canopyLength as number, light.canopyWidth as number)
+        : areaM2(light.canopyLength as number, light.canopyWidth as number),
     );
-  }
-  if (canopyArea !== null && fixturePpf) {
-    const plannedPpfd = tryValue(() =>
-      planningAveragePpfd(
-        fixturePpf.ppf,
-        light.fixtureCount,
-        canopyArea,
-        light.canopyEfficiencyPercent / 100,
-      ),
+    const fixturePpf = tryValue(() =>
+      resolveFixturePpf({
+        mode: light.ppfMode,
+        ppfMicromolesPerSecond: light.ppfPerFixture as number,
+        actualWatts: light.actualWattsPerFixture as number,
+        efficacyMicromolesPerJoule: light.efficacy as number,
+      }),
     );
-    if (plannedPpfd !== null) {
-      const photoperiod =
-        light.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours;
+    if (canopyArea !== null) {
+      add("Light plan", "Canopy area", fixed(canopyArea), "m²", "area = length × width");
       add(
         "Light plan",
-        "Planning average PPFD",
-        fixed(plannedPpfd, 0),
-        "µmol/m²/s",
-        "PPFD = (PPF × fixtures × efficiency) ÷ area m²",
-      );
-      add(
-        "Light plan",
-        "Planning DLI",
-        fixed(calculateDliFromPlanningPpfd(plannedPpfd, photoperiod)),
-        "mol/m²/day",
-        "DLI = PPFD × hours × 0.0036",
+        "Canopy area",
+        fixed(canopyArea / M2_PER_FT2),
+        "ft²",
+        "ft² = m² ÷ 0.09290304",
       );
     }
-    const targetPpfd = tryValue(() =>
+    if (fixturePpf) {
+      add(
+        "Light plan",
+        fixturePpf.estimated ? "Estimated PPF per fixture" : "PPF per fixture",
+        fixed(fixturePpf.ppf),
+        "µmol/s",
+        fixturePpf.formula,
+      );
+    }
+    if (canopyArea !== null && fixturePpf) {
+      const plannedPpfd = tryValue(() =>
+        planningAveragePpfd(
+          fixturePpf.ppf,
+          light.fixtureCount as number,
+          canopyArea,
+          (light.canopyEfficiencyPercent as number) / 100,
+        ),
+      );
+      if (plannedPpfd !== null) {
+        const photoperiod =
+          light.stage === "veg"
+            ? (cycle.vegPhotoperiodHours as number)
+            : (cycle.flowerPhotoperiodHours as number);
+        add(
+          "Light plan",
+          "Planning average PPFD",
+          fixed(plannedPpfd, 0),
+          "µmol/m²/s",
+          "PPFD = (PPF × fixtures × efficiency) ÷ area m²",
+        );
+        add(
+          "Light plan",
+          "Planning DLI",
+          fixed(calculateDliFromPlanningPpfd(plannedPpfd, photoperiod)),
+          "mol/m²/day",
+          "DLI = PPFD × hours × 0.0036",
+        );
+      }
+      const targetPpfd = tryValue(() =>
+        light.targetMode === "ppfd"
+          ? (light.targetPpfd as number)
+          : ppfdForTargetDli(
+              light.targetDli as number,
+              light.stage === "veg"
+                ? (cycle.vegPhotoperiodHours as number)
+                : (cycle.flowerPhotoperiodHours as number),
+            ),
+      );
+      const fixtureTarget =
+        targetPpfd === null
+          ? null
+          : tryValue(() =>
+              fixturesNeeded(
+                targetPpfd,
+                canopyArea,
+                fixturePpf.ppf,
+                (light.canopyEfficiencyPercent as number) / 100,
+              ),
+            );
+      if (fixtureTarget) {
+        add(
+          "Light plan",
+          "Fixtures needed (raw)",
+          fixed(fixtureTarget.raw),
+          "fixtures",
+          fixtureTarget.formula,
+        );
+        add(
+          "Light plan",
+          "Fixtures needed (rounded up)",
+          fixtureTarget.roundedUp,
+          "fixtures",
+          "ceil(raw fixtures)",
+        );
+      }
+    }
+    const inverse = tryValue(() =>
+      inverseSquarePpfd(
+        light.chartPpfd as number,
+        light.chartHeight as number,
+        light.newHeight as number,
+      ),
+    );
+    if (inverse !== null) {
+      add(
+        "Light plan",
+        "Inverse-square PPFD estimate",
+        fixed(inverse, 0),
+        "µmol/m²/s",
+        "PPFDnew = PPFDchart × (hchart ÷ hnew)²",
+      );
+    }
+    const targetForHeight = tryValue(() =>
       light.targetMode === "ppfd"
         ? (light.targetPpfd as number)
         : ppfdForTargetDli(
             light.targetDli as number,
-            light.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours,
+            light.stage === "veg"
+              ? (cycle.vegPhotoperiodHours as number)
+              : (cycle.flowerPhotoperiodHours as number),
           ),
     );
-    const fixtureTarget =
-      targetPpfd === null
+    const height =
+      targetForHeight === null
         ? null
         : tryValue(() =>
-            fixturesNeeded(
-              targetPpfd,
-              canopyArea,
-              fixturePpf.ppf,
-              light.canopyEfficiencyPercent / 100,
+            solveInverseSquareHeight(
+              light.chartPpfd as number,
+              light.chartHeight as number,
+              targetForHeight,
             ),
           );
-    if (fixtureTarget) {
+    if (height !== null) {
       add(
         "Light plan",
-        "Fixtures needed (raw)",
-        fixed(fixtureTarget.raw),
-        "fixtures",
-        fixtureTarget.formula,
+        "Estimated target height",
+        fixed(height),
+        light.heightUnit,
+        "hnew = hchart × √(PPFDchart ÷ PPFDtarget)",
+      );
+    }
+    const uniformity = tryValue(() =>
+      calculateUniformity({
+        center: light.fivePoint.center as number,
+        frontLeft: light.fivePoint.frontLeft as number,
+        frontRight: light.fivePoint.frontRight as number,
+        backLeft: light.fivePoint.backLeft as number,
+        backRight: light.fivePoint.backRight as number,
+      }),
+    );
+    if (uniformity) {
+      add(
+        "Light plan",
+        "Five-point average",
+        fixed(uniformity.average, 0),
+        "µmol/m²/s",
+        "average = Σ five readings ÷ 5",
       );
       add(
         "Light plan",
-        "Fixtures needed (rounded up)",
-        fixtureTarget.roundedUp,
-        "fixtures",
-        "ceil(raw fixtures)",
+        "Uniformity Umin/Uavg",
+        uniformity.uminOverUavg === null ? "Not available" : fixed(uniformity.uminOverUavg, 3),
+        "ratio",
+        uniformity.formula,
+      );
+    }
+    const lightEnergy =
+      light.actualWattsPerFixture !== null &&
+      cycle.vegDays !== null &&
+      cycle.flowerDays !== null &&
+      cycle.electricityRate !== null
+        ? tryValue(() =>
+            calculateLightCycleEnergy({
+              actualWattsPerFixture: light.actualWattsPerFixture as number,
+              fixtureCount: light.fixtureCount as number,
+              vegHoursPerDay: cycle.vegPhotoperiodHours as number,
+              vegDays: cycle.vegDays as number,
+              flowerHoursPerDay: cycle.flowerPhotoperiodHours as number,
+              flowerDays: cycle.flowerDays as number,
+              ratePerKwh: cycle.electricityRate as number,
+            }),
+          )
+        : null;
+    if (lightEnergy) {
+      add(
+        "Light plan",
+        "Fixture cycle energy",
+        fixed(lightEnergy.cycleKwh),
+        "kWh",
+        lightEnergy.formula,
+      );
+      add(
+        "Light plan",
+        "Fixture cycle electricity",
+        fixed(lightEnergy.cycleCost),
+        cycle.currency,
+        "cost = kWh × rate",
+      );
+    }
+    const lightEnergyCostPerMol =
+      fixturePpf && lightEnergy
+        ? tryValue(() =>
+            calculateEnergyCostPerMol({
+              ppfPerFixture: fixturePpf.ppf,
+              fixtureCount: light.fixtureCount as number,
+              vegHoursPerDay: cycle.vegPhotoperiodHours as number,
+              vegDays: cycle.vegDays as number,
+              flowerHoursPerDay: cycle.flowerPhotoperiodHours as number,
+              flowerDays: cycle.flowerDays as number,
+              cycleElectricityCost: lightEnergy.cycleCost,
+            }),
+          )
+        : null;
+    if (lightEnergyCostPerMol && fixturePpf) {
+      add(
+        "Light plan",
+        fixturePpf.estimated ? "Estimated fixture-output photons" : "Fixture-output photons",
+        fixed(lightEnergyCostPerMol.photonMoles),
+        "mol/cycle",
+        lightEnergyCostPerMol.formula,
+      );
+      add(
+        "Light plan",
+        fixturePpf.estimated
+          ? "Estimated electricity cost per fixture-output mol"
+          : "Electricity cost per fixture-output mol",
+        fixed(lightEnergyCostPerMol.costPerMol, 6),
+        `${cycle.currency}/mol`,
+        lightEnergyCostPerMol.formula,
       );
     }
   }
-  const inverse = tryValue(() =>
-    inverseSquarePpfd(
-      light.chartPpfd as number,
-      light.chartHeight as number,
-      light.newHeight as number,
-    ),
-  );
-  if (inverse !== null) {
-    add(
-      "Light plan",
-      "Inverse-square PPFD estimate",
-      fixed(inverse, 0),
-      "µmol/m²/s",
-      "PPFDnew = PPFDchart × (hchart ÷ hnew)²",
-    );
-  }
-  const targetForHeight = tryValue(() =>
-    light.targetMode === "ppfd"
-      ? (light.targetPpfd as number)
-      : ppfdForTargetDli(
-          light.targetDli as number,
-          light.stage === "veg" ? cycle.vegPhotoperiodHours : cycle.flowerPhotoperiodHours,
-        ),
-  );
-  const height =
-    targetForHeight === null
-      ? null
-      : tryValue(() =>
-          solveInverseSquareHeight(
-            light.chartPpfd as number,
-            light.chartHeight as number,
-            targetForHeight,
-          ),
-        );
-  if (height !== null) {
-    add(
-      "Light plan",
-      "Estimated target height",
-      fixed(height),
-      light.heightUnit,
-      "hnew = hchart × √(PPFDchart ÷ PPFDtarget)",
-    );
-  }
-  const uniformity = tryValue(() =>
-    calculateUniformity({
-      center: light.fivePoint.center as number,
-      frontLeft: light.fivePoint.frontLeft as number,
-      frontRight: light.fivePoint.frontRight as number,
-      backLeft: light.fivePoint.backLeft as number,
-      backRight: light.fivePoint.backRight as number,
-    }),
-  );
-  if (uniformity) {
-    add(
-      "Light plan",
-      "Five-point average",
-      fixed(uniformity.average, 0),
-      "µmol/m²/s",
-      "average = Σ five readings ÷ 5",
-    );
-    add(
-      "Light plan",
-      "Uniformity Umin/Uavg",
-      uniformity.uminOverUavg === null ? "Not available" : fixed(uniformity.uminOverUavg, 3),
-      "ratio",
-      uniformity.formula,
-    );
-  }
-  const lightEnergy = tryValue(() =>
-    calculateLightCycleEnergy({
-      actualWattsPerFixture: light.actualWattsPerFixture as number,
-      fixtureCount: light.fixtureCount,
-      vegHoursPerDay: cycle.vegPhotoperiodHours,
-      vegDays: cycle.vegDays as number,
-      flowerHoursPerDay: cycle.flowerPhotoperiodHours,
-      flowerDays: cycle.flowerDays as number,
-      ratePerKwh: cycle.electricityRate as number,
-    }),
-  );
-  if (lightEnergy) {
-    add(
-      "Light plan",
-      "Fixture cycle energy",
-      fixed(lightEnergy.cycleKwh),
-      "kWh",
-      lightEnergy.formula,
-    );
-    add(
-      "Light plan",
-      "Fixture cycle electricity",
-      fixed(lightEnergy.cycleCost),
-      cycle.currency,
-      "cost = kWh × rate",
-    );
-  }
-  const lightEnergyCostPerMol =
-    fixturePpf && lightEnergy
-      ? tryValue(() =>
-          calculateEnergyCostPerMol({
-            ppfPerFixture: fixturePpf.ppf,
-            fixtureCount: light.fixtureCount,
-            vegHoursPerDay: cycle.vegPhotoperiodHours,
-            vegDays: cycle.vegDays as number,
-            flowerHoursPerDay: cycle.flowerPhotoperiodHours,
-            flowerDays: cycle.flowerDays as number,
-            cycleElectricityCost: lightEnergy.cycleCost,
-          }),
-        )
-      : null;
-  if (lightEnergyCostPerMol && fixturePpf) {
-    add(
-      "Light plan",
-      fixturePpf.estimated ? "Estimated fixture-output photons" : "Fixture-output photons",
-      fixed(lightEnergyCostPerMol.photonMoles),
-      "mol/cycle",
-      lightEnergyCostPerMol.formula,
-    );
-    add(
-      "Light plan",
-      fixturePpf.estimated
-        ? "Estimated electricity cost per fixture-output mol"
-        : "Electricity cost per fixture-output mol",
-      fixed(lightEnergyCostPerMol.costPerMol, 6),
-      `${cycle.currency}/mol`,
-      lightEnergyCostPerMol.formula,
-    );
-  }
 
+  const waterReadiness = expenseWaterReadiness(expense);
   const waterStarted =
     expense.waterPricePerGallon !== null ||
     expense.waterGallonsPerChange !== null ||
     expense.waterChangesPerWeek !== null;
-  const completeWater =
-    !waterStarted ||
-    (expense.waterPricePerGallon !== null &&
-      expense.waterGallonsPerChange !== null &&
-      expense.waterChangesPerWeek !== null);
-  const completeExpense =
-    cycleDays > 0 &&
-    cycle.electricityRate !== null &&
-    completeWater &&
-    expense.devices.every(
-      (row) =>
-        row.actualWatts !== null &&
-        (row.vegHoursPerDay ?? cycle.vegPhotoperiodHours) > 0 &&
-        (row.flowerHoursPerDay ?? cycle.flowerPhotoperiodHours) > 0,
-    ) &&
-    expense.nutrients.every((row) =>
-      row.pricingMode === "manual_weekly"
-        ? row.manualWeeklyCost !== null
-        : row.packagePrice !== null && row.usableAmount !== null && row.usagePerWeek !== null,
-    ) &&
-    expense.setup.every((row) => row.amount !== null) &&
-    expense.recurring.every((row) => row.amount !== null);
-  const expenseSummary = completeExpense
-    ? tryValue(() =>
-        calculateExpenseSummary({
-          devices: expense.devices.map((row) => ({
-            id: row.id,
-            name: row.name,
-            actualWatts: row.actualWatts as number,
-            quantity: row.quantity,
-            vegHoursPerDay: row.vegHoursPerDay ?? cycle.vegPhotoperiodHours,
-            flowerHoursPerDay: row.flowerHoursPerDay ?? cycle.flowerPhotoperiodHours,
-            vegDays: row.vegDaysOverride ?? (cycle.vegDays as number),
-            flowerDays: row.flowerDaysOverride ?? (cycle.flowerDays as number),
-            linkedFromLight: row.linkedFromLight,
-          })),
-          nutrients: expense.nutrients.map((row) => ({
-            id: row.id,
-            name: row.name,
-            pricingMode: row.pricingMode,
-            packagePrice: row.packagePrice ?? 0,
-            usableAmount: row.usableAmount ?? 1,
-            unit: row.unit,
-            usagePerWeek: row.usagePerWeek ?? 0,
-            manualWeeklyCost: row.manualWeeklyCost ?? undefined,
-            linkedFromRecipe: row.linkedFromRecipe,
-          })),
-          water: waterStarted
-            ? {
-                pricePerGallon: expense.waterPricePerGallon as number,
-                gallonsPerReservoirChange: expense.waterGallonsPerChange as number,
-                changesPerWeek: expense.waterChangesPerWeek as number,
-              }
-            : {
-                pricePerGallon: 0,
-                gallonsPerReservoirChange: 0,
-                changesPerWeek: 0,
-              },
-          setup: expense.setup.map((row) => ({ ...row, amount: row.amount as number })),
-          recurring: expense.recurring.map((row) => ({ ...row, amount: row.amount as number })),
-          electricityRate: cycle.electricityRate as number,
-          cycleDays,
-          driedSaleableGrams: expense.driedSaleableGrams,
-          amortizationCycles: expense.amortizationCycles,
-          compareAtPricePerGram: expense.compareAtPricePerGram,
-        }),
-      )
-    : null;
-  expenseSummary?.deviceResults.forEach((device) => {
-    add("Cost sheet", `${device.name} cycle energy`, fixed(device.cycleKwh), "kWh", device.formula);
-    add(
-      "Cost sheet",
-      `${device.name} cycle cost`,
-      fixed(device.cycleCost),
-      cycle.currency,
-      "cost = kWh × rate",
-    );
-  });
-  if (expenseSummary) {
-    expenseSummary.nutrientResults.forEach((nutrientCost, index) => {
-      add(
-        "Cost sheet",
-        `Nutrient · ${nutrientCost.name || `Item ${index + 1}`}`,
-        fixed(nutrientCost.cycleCost),
-        `${cycle.currency}/cycle`,
-        nutrientCost.pricingMode === "manual_weekly"
-          ? "cycle cost = user-entered weekly cost × cycle days ÷ 7"
-          : nutrientCost.formula,
-      );
-    });
-    if (waterStarted) {
-      const waterVolumeUnit = state.unitSystem === "metric" ? "L" : "gal";
-      add(
-        "Cost sheet",
-        "Water · reservoir changes",
-        fixed(expenseSummary.waterResult.cycleCost),
-        `${cycle.currency}/cycle`,
-        `water cost = ${cycle.currency}/${waterVolumeUnit} × ${waterVolumeUnit}/change × changes/week × cycle weeks`,
-      );
-    }
-    expense.setup.forEach((setupItem, index) => {
-      add(
-        "Cost sheet",
-        `Setup · ${setupItem.name || `Item ${index + 1}`}`,
-        fixed(setupItem.amount as number),
-        cycle.currency,
-        "one-time setup cost = grower-entered item amount",
-      );
-    });
-    expense.recurring.forEach((recurringItem, index) => {
-      const amount = recurringItem.amount as number;
-      const normalizedCycleCost =
-        recurringItem.basis === "month" ? amount * (cycleDays / 30) : amount;
-      add(
-        "Cost sheet",
-        `Recurring · ${recurringItem.name || `Item ${index + 1}`} (${recurringItem.basis === "month" ? "per month" : "per cycle"})`,
-        fixed(normalizedCycleCost),
-        `${cycle.currency}/cycle`,
-        recurringItem.basis === "month"
-          ? "normalized cycle cost = grower-entered cost/month × cycle days ÷ 30"
-          : "normalized cycle cost = grower-entered cost/cycle",
-      );
-    });
-    add(
-      "Cost sheet",
-      "Operating cycle",
-      fixed(expenseSummary.operatingCycleCost),
-      cycle.currency,
-      "electricity + nutrients + water + recurring",
-    );
-    add(
-      "Cost sheet",
-      "First cycle including setup",
-      fixed(expenseSummary.firstCycleCost),
-      cycle.currency,
-      "operating + one-time setup",
-    );
-    add(
-      "Cost sheet",
-      `Setup amortized over ${expense.amortizationCycles} cycles`,
-      fixed(expenseSummary.amortizedCycleCost),
-      cycle.currency,
-      expenseSummary.formula,
-    );
-    add(
-      "Cost sheet",
-      "30-day operating",
-      fixed(expenseSummary.thirtyDayOperatingCost),
-      cycle.currency,
-      "normalized operating costs over 30 days",
-    );
-    add(
-      "Cost sheet",
-      "365-day operating",
-      fixed(expenseSummary.yearlyOperatingCost),
-      cycle.currency,
-      "normalized operating costs over 365 days",
-    );
-    if (expenseSummary.firstCycleUnitCosts) {
-      addUnitCosts("First-cycle", expenseSummary.firstCycleUnitCosts);
-    }
-    if (expenseSummary.operatingUnitCosts) {
-      addUnitCosts("Operating-only", expenseSummary.operatingUnitCosts);
-    }
-    if (expenseSummary.amortizedUnitCosts) {
-      addUnitCosts("Setup-amortized", expenseSummary.amortizedUnitCosts);
-    }
-    if (expenseSummary.compareAtHarvestValue !== null) {
-      add(
-        "Cost sheet",
-        "User-entered comparison value",
-        fixed(expenseSummary.compareAtHarvestValue),
-        cycle.currency,
-        EXPENSE_COMPARISON_FORMULAS.comparisonValue,
-      );
-    }
-    if (expenseSummary.operatingCycleSavings !== null) {
-      add(
-        "Cost sheet",
-        "Operating-cycle savings",
-        fixed(expenseSummary.operatingCycleSavings),
-        `${cycle.currency}/cycle`,
-        EXPENSE_COMPARISON_FORMULAS.operatingSavings,
-      );
-    }
-    if (expenseSummary.operatingRoiPercent !== null) {
-      add(
-        "Cost sheet",
-        "Operating ROI",
-        fixed(expenseSummary.operatingRoiPercent),
-        "%",
-        EXPENSE_COMPARISON_FORMULAS.operatingRoi,
-      );
-    }
-    if (expenseSummary.setupPaybackCycles !== null) {
-      add(
-        "Cost sheet",
-        "Setup payback",
-        fixed(expenseSummary.setupPaybackCycles),
-        "cycles",
-        EXPENSE_COMPARISON_FORMULAS.setupPayback,
-      );
-    }
-  }
-
-  if (waterStarted && !completeWater) {
+  const expenseReady = expenseExportReadiness(expense, cycle);
+  if (!expenseReady.ready) {
     add(
       "Notes",
       "Cost sheet",
       "Incomplete — not exported",
       "",
-      "complete water price, volume per change, and changes per week",
+      waterStarted && !waterReadiness.ready
+        ? "complete water price, volume per change, and changes per week"
+        : `required inputs missing: ${expenseReady.missing.join(", ") || "unknown"}`,
     );
+  } else {
+    const expenseSummary = tryValue(() =>
+      calculateExpenseSummary({
+        devices: expense.devices.map((row) => ({
+          id: row.id,
+          name: row.name,
+          actualWatts: row.actualWatts as number,
+          quantity: row.quantity as number,
+          vegHoursPerDay: row.vegHoursPerDay ?? (cycle.vegPhotoperiodHours as number),
+          flowerHoursPerDay: row.flowerHoursPerDay ?? (cycle.flowerPhotoperiodHours as number),
+          vegDays: row.vegDaysOverride ?? (cycle.vegDays as number),
+          flowerDays: row.flowerDaysOverride ?? (cycle.flowerDays as number),
+          linkedFromLight: row.linkedFromLight,
+        })),
+        nutrients: expense.nutrients.map((row) => ({
+          id: row.id,
+          name: row.name,
+          pricingMode: row.pricingMode,
+          packagePrice: row.packagePrice ?? 0,
+          usableAmount: row.usableAmount ?? 1,
+          unit: row.unit,
+          usagePerWeek: row.usagePerWeek ?? 0,
+          manualWeeklyCost: row.manualWeeklyCost ?? undefined,
+          linkedFromRecipe: row.linkedFromRecipe,
+        })),
+        water: waterStarted
+          ? {
+              pricePerGallon: expense.waterPricePerGallon as number,
+              gallonsPerReservoirChange: expense.waterGallonsPerChange as number,
+              changesPerWeek: expense.waterChangesPerWeek as number,
+            }
+          : {
+              pricePerGallon: 0,
+              gallonsPerReservoirChange: 0,
+              changesPerWeek: 0,
+            },
+        setup: expense.setup.map((row) => ({ ...row, amount: row.amount as number })),
+        recurring: expense.recurring.map((row) => ({ ...row, amount: row.amount as number })),
+        electricityRate: cycle.electricityRate as number,
+        cycleDays,
+        driedSaleableGrams: expense.driedSaleableGrams,
+        amortizationCycles: expense.amortizationCycles as number,
+        compareAtPricePerGram: expense.compareAtPricePerGram,
+      }),
+    );
+    expenseSummary?.deviceResults.forEach((device) => {
+      add(
+        "Cost sheet",
+        `${device.name} cycle energy`,
+        fixed(device.cycleKwh),
+        "kWh",
+        device.formula,
+      );
+      add(
+        "Cost sheet",
+        `${device.name} cycle cost`,
+        fixed(device.cycleCost),
+        cycle.currency,
+        "cost = kWh × rate",
+      );
+    });
+    if (expenseSummary) {
+      expenseSummary.nutrientResults.forEach((nutrientCost, index) => {
+        add(
+          "Cost sheet",
+          `Nutrient · ${nutrientCost.name || `Item ${index + 1}`}`,
+          fixed(nutrientCost.cycleCost),
+          `${cycle.currency}/cycle`,
+          nutrientCost.pricingMode === "manual_weekly"
+            ? "cycle cost = user-entered weekly cost × cycle days ÷ 7"
+            : nutrientCost.formula,
+        );
+      });
+      if (waterStarted) {
+        const waterVolumeUnit = state.unitSystem === "metric" ? "L" : "gal";
+        add(
+          "Cost sheet",
+          "Water · reservoir changes",
+          fixed(expenseSummary.waterResult.cycleCost),
+          `${cycle.currency}/cycle`,
+          `water cost = ${cycle.currency}/${waterVolumeUnit} × ${waterVolumeUnit}/change × changes/week × cycle weeks`,
+        );
+      }
+      expense.setup.forEach((setupItem, index) => {
+        add(
+          "Cost sheet",
+          `Setup · ${setupItem.name || `Item ${index + 1}`}`,
+          fixed(setupItem.amount as number),
+          cycle.currency,
+          "one-time setup cost = grower-entered item amount",
+        );
+      });
+      expense.recurring.forEach((recurringItem, index) => {
+        const amount = recurringItem.amount as number;
+        const normalizedCycleCost =
+          recurringItem.basis === "month" ? amount * (cycleDays / 30) : amount;
+        add(
+          "Cost sheet",
+          `Recurring · ${recurringItem.name || `Item ${index + 1}`} (${recurringItem.basis === "month" ? "per month" : "per cycle"})`,
+          fixed(normalizedCycleCost),
+          `${cycle.currency}/cycle`,
+          recurringItem.basis === "month"
+            ? "normalized cycle cost = grower-entered cost/month × cycle days ÷ 30"
+            : "normalized cycle cost = grower-entered cost/cycle",
+        );
+      });
+      add(
+        "Cost sheet",
+        "Operating cycle",
+        fixed(expenseSummary.operatingCycleCost),
+        cycle.currency,
+        "electricity + nutrients + water + recurring",
+      );
+      add(
+        "Cost sheet",
+        "First cycle including setup",
+        fixed(expenseSummary.firstCycleCost),
+        cycle.currency,
+        "operating + one-time setup",
+      );
+      add(
+        "Cost sheet",
+        `Setup amortized over ${expense.amortizationCycles} cycles`,
+        fixed(expenseSummary.amortizedCycleCost),
+        cycle.currency,
+        expenseSummary.formula,
+      );
+      add(
+        "Cost sheet",
+        "30-day operating",
+        fixed(expenseSummary.thirtyDayOperatingCost),
+        cycle.currency,
+        "normalized operating costs over 30 days",
+      );
+      add(
+        "Cost sheet",
+        "365-day operating",
+        fixed(expenseSummary.yearlyOperatingCost),
+        cycle.currency,
+        "normalized operating costs over 365 days",
+      );
+      if (expenseSummary.firstCycleUnitCosts) {
+        addUnitCosts("First-cycle", expenseSummary.firstCycleUnitCosts);
+      }
+      if (expenseSummary.operatingUnitCosts) {
+        addUnitCosts("Operating-only", expenseSummary.operatingUnitCosts);
+      }
+      if (expenseSummary.amortizedUnitCosts) {
+        addUnitCosts("Setup-amortized", expenseSummary.amortizedUnitCosts);
+      }
+      if (expenseSummary.compareAtHarvestValue !== null) {
+        add(
+          "Cost sheet",
+          "User-entered comparison value",
+          fixed(expenseSummary.compareAtHarvestValue),
+          cycle.currency,
+          EXPENSE_COMPARISON_FORMULAS.comparisonValue,
+        );
+      }
+      if (expenseSummary.operatingCycleSavings !== null) {
+        add(
+          "Cost sheet",
+          "Operating-cycle savings",
+          fixed(expenseSummary.operatingCycleSavings),
+          `${cycle.currency}/cycle`,
+          EXPENSE_COMPARISON_FORMULAS.operatingSavings,
+        );
+      }
+      if (expenseSummary.operatingRoiPercent !== null) {
+        add(
+          "Cost sheet",
+          "Operating ROI",
+          fixed(expenseSummary.operatingRoiPercent),
+          "%",
+          EXPENSE_COMPARISON_FORMULAS.operatingRoi,
+        );
+      }
+      if (expenseSummary.setupPaybackCycles !== null) {
+        add(
+          "Cost sheet",
+          "Setup payback",
+          fixed(expenseSummary.setupPaybackCycles),
+          "cycles",
+          EXPENSE_COMPARISON_FORMULAS.setupPayback,
+        );
+      }
+    }
   }
 
   add("Notes", "Privacy", "Local browser only", "", "calculator state is not uploaded");

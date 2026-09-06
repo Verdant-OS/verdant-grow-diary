@@ -2,9 +2,9 @@
  * AppShell Quick Log consolidation guard.
  *
  * Verdant exposes a single grower-facing logging entry point: Quick Log.
- * Header + and mobile FAB both open the grower QuickLog sheet (Field Edition
- * first). This static guard ensures the duplicate CTA does not return and
- * that entry does not reopen the legacy 8-type preset menu.
+ * Header + and mobile FAB both open QuickLogV2Sheet (Field Edition first).
+ * This static guard ensures the duplicate CTA does not return and that entry
+ * does not reopen the legacy 8-type preset menu.
  */
 
 import { describe, it, expect } from "vitest";
@@ -35,9 +35,13 @@ describe("AppShell — Quick Log is the single grower-facing logging CTA", () =>
     expect(APP_SHELL_SRC).not.toMatch(/\bFast Add\b/);
   });
 
-  it("header and FAB share openGrowerQuickLog into the existing Quick Log sheet", () => {
+  it("header and FAB share openGrowerQuickLog into QuickLogV2Sheet", () => {
     expect(APP_SHELL_SRC).toContain("openGrowerQuickLog");
+    expect(APP_SHELL_SRC).toContain("setOpenScopedLog(true)");
+    expect(APP_SHELL_SRC).toContain("setMobileLaunchTargetKey(launchTargetKey)");
+    expect(APP_SHELL_SRC).toContain("<QuickLogV2Sheet");
     expect(APP_SHELL_SRC).toContain("PLANT_QUICKLOG_PREFILL_EVENT");
+    // Legacy QuickLog remains mounted for prefill/start-screen paths only.
     expect(APP_SHELL_SRC).toContain("<QuickLog");
     expect(APP_SHELL_SRC).toMatch(/data-testid="header-quick-log-trigger"/);
     expect(APP_SHELL_SRC).toMatch(/data-testid="mobile-quick-log-fab"/);

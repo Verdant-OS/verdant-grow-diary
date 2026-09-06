@@ -9,8 +9,8 @@
  *
  * These static-scan tests lock in:
  *   - exactly one mobile Quick Log FAB (AppShell), aria-label "Open Quick Log"
- *   - Plant/Tent Detail targets route that FAB into the shared QuickLog Dialog
- *   - QuickLogV2Sheet stays available only for its structured event path
+ *   - Plant/Tent Detail targets route that FAB into QuickLogV2Sheet
+ *   - QuickLogV2Sheet remains the grower entry (header + mobile FAB) and structured Water path
  *   - QuickLogV2Fab is hidden on mobile (desktop-only)
  *   - desktop Quick Log behavior is preserved (md:inline-flex)
  *   - the UUID guard on manual sensor saves remains in place
@@ -32,8 +32,10 @@ describe("mobile Quick Log — single FAB", () => {
     expect(APP_SHELL).toMatch(/aria-label="Open Quick Log"/);
   });
 
-  it("maps a valid Plant Detail route id into the shared QuickLog prefill", () => {
-    expect(APP_SHELL).toMatch(/: routePlantId\s*\?\s*\{ plantId: routePlantId \}\s*:\s*null;/);
+  it("maps a valid Plant Detail route id into the V2 plant: launch target", () => {
+    expect(APP_SHELL).toMatch(
+      /mobileQuickLogTarget \?\? \(routePlantId \? `plant:\$\{routePlantId\}` : null\)/,
+    );
   });
 
   it("AppShell mobile FAB is guarded by md:hidden", () => {
@@ -48,11 +50,11 @@ describe("mobile Quick Log — single FAB", () => {
     expect(QUICK_LOG_FAB).toMatch(/md:bottom-/);
   });
 
-  it("routes the AppShell mobile FAB into QuickLog, never QuickLogV2Sheet", () => {
+  it("routes the AppShell mobile FAB into QuickLogV2Sheet with route target keys", () => {
     expect(APP_SHELL).toMatch(
       /resolveMobileQuickLogTarget\([\s\S]{0,100}location\.pathname,[\s\S]{0,100}tentQuickLogTargetEvidence[\s\S]{0,20}\)/,
     );
-    // Header and FAB share openGrowerQuickLog — same grower QuickLog sheet.
+    // Header and FAB share openGrowerQuickLog — same QuickLogV2Sheet entry.
     const openHandler =
       APP_SHELL.match(
         /const openGrowerQuickLog = useCallback\(\(\) => \{([\s\S]*?)\}, \[location\.pathname, mobileQuickLogTarget\]\);/,
@@ -61,19 +63,17 @@ describe("mobile Quick Log — single FAB", () => {
     expect(APP_SHELL).toMatch(
       /onClick=\{openGrowerQuickLog\}[\s\S]{0,200}data-testid="mobile-quick-log-fab"/,
     );
-    expect(openHandler).toMatch(/mobileQuickLogTarget\?\.startsWith\(\s*"plant:",?\s*\)/);
-    expect(openHandler).toMatch(/mobileQuickLogTarget\?\.startsWith\(\s*"tent:",?\s*\)/);
-    expect(openHandler).toContain('mobileQuickLogTarget.slice("plant:".length)');
-    expect(openHandler).toContain('mobileQuickLogTarget.slice("tent:".length)');
     expect(openHandler).toContain("resolvePlantQuickLogRouteTarget(location.pathname)");
     expect(openHandler).toMatch(
-      /setOpenScopedLog\(false\)[\s\S]*setPrefill\(quickLogPrefill\)[\s\S]*setOpenLog\(true\)/,
+      /mobileQuickLogTarget \?\? \(routePlantId \? `plant:\$\{routePlantId\}` : null\)/,
     );
-    expect(openHandler).not.toContain("setOpenScopedLog(true)");
-    expect(openHandler).not.toContain("setMobileLaunchTargetKey(mobileQuickLogTarget)");
+    expect(openHandler).toContain("setMobileLaunchTargetKey(launchTargetKey)");
+    expect(openHandler).toContain("setOpenScopedLog(true)");
+    expect(openHandler).toContain("setOpenLog(false)");
+    expect(openHandler).not.toContain("setOpenLog(true)");
+    expect(openHandler).not.toContain("setPrefill(quickLogPrefill)");
 
-    // Structured Water intents still own the separately-authorized V2 path;
-    // removing the FAB split must not delete that event listener or sheet.
+    // Structured Water intents still share the same V2 sheet; keep listener + sheet.
     expect(APP_SHELL).toContain("window.addEventListener(QUICK_LOG_V2_OPEN_EVENT");
     expect(APP_SHELL.match(/<QuickLogV2Sheet\b/g) ?? []).toHaveLength(1);
   });

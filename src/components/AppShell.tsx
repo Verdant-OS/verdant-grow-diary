@@ -101,24 +101,24 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     tentQuickLogTargetEvidence,
   );
 
-  // Header + and mobile FAB share one entry: open the grower QuickLog sheet
-  // (Field Edition visit modes first). Do not route through the legacy
-  // 8-type GlobalFastAdd preset menu.
+  // Header + and mobile FAB share one entry: open QuickLogV2Sheet with a
+  // route-derived tent:/plant: launch target when on Tent/Plant Detail.
+  // Field Edition visit modes live inside V2 (same as TentDetail FAB). Do not
+  // route through the legacy 8-type GlobalFastAdd preset menu or legacy
+  // QuickLog for this grower entry — other paths (prefill event, start-screen
+  // intent) may still open legacy when they need activity-type flows.
   const openGrowerQuickLog = useCallback(() => {
     const routePlantId = resolvePlantQuickLogRouteTarget(location.pathname);
-    const quickLogPrefill: QuickLogPrefill | null = mobileQuickLogTarget?.startsWith("plant:")
-      ? { plantId: mobileQuickLogTarget.slice("plant:".length) }
-      : mobileQuickLogTarget?.startsWith("tent:")
-        ? { tentId: mobileQuickLogTarget.slice("tent:".length) }
-        : routePlantId
-          ? { plantId: routePlantId }
-          : null;
+    const launchTargetKey = mobileQuickLogTarget ?? (routePlantId ? `plant:${routePlantId}` : null);
 
-    setOpenScopedLog(false);
-    setMobileLaunchTargetKey(null);
+    // Close and remount-reset legacy Quick Log in the same state transition
+    // before opening V2, so two modal focus locks can never remain active.
+    setOpenLog(false);
+    setPrefill(null);
+    setLegacyQuickLogSession((session) => session + 1);
     setStructuredOpenIntent(null);
-    setPrefill(quickLogPrefill);
-    setOpenLog(true);
+    setMobileLaunchTargetKey(launchTargetKey);
+    setOpenScopedLog(true);
   }, [location.pathname, mobileQuickLogTarget]);
 
   // This shell lives inside the route-level Suspense boundary. Tracking here
@@ -357,10 +357,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
                   <Search className="h-4 w-4" />
                 </Button>
                 {/* Quick Log is the single grower-facing logging entry
-                    point on desktop. Opens the same grower QuickLog sheet
-                    as the plant action path and mobile FAB (Field Edition
-                    visit modes first). Legacy activity types stay inside
-                    that sheet under "All activity types". */}
+                    point on desktop. Opens QuickLogV2Sheet (Field Edition
+                    visit modes first) with the same route target as the
+                    mobile FAB / TentDetail desktop FAB. */}
                 <button
                   type="button"
                   onClick={openGrowerQuickLog}
@@ -420,7 +419,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
           </main>
         </div>
 
-        {/* Mobile floating + — same grower QuickLog entry as header/+ */}
+        {/* Mobile floating + — same QuickLogV2 entry as header/+ */}
         <button
           type="button"
           onClick={openGrowerQuickLog}

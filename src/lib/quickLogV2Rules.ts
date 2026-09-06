@@ -140,3 +140,120 @@ export function shouldShowVolumeField(action: QuickLogV2Action): boolean {
 export function isPhotoSavingSupported(): boolean {
   return true;
 }
+
+/** Show type-to-filter inside Target Select when the list is this long or longer. */
+export const QUICK_LOG_V2_TARGET_FILTER_THRESHOLD = 8;
+
+export function formatQuickLogV2TargetOptionLabel(option: QuickLogV2TargetOption): string {
+  return `${option.type === "tent" ? "Tent" : "Plant"} · ${option.label}`;
+}
+
+/**
+ * Tent-scoped Target context from open intent / selected key.
+ * Route registration already lands as `defaultTargetKey` (`tent:<id>`).
+ */
+export function resolveQuickLogV2TentContextId(
+  openOrSelectedKey: string | null | undefined,
+): string | null {
+  if (typeof openOrSelectedKey !== "string") return null;
+  const match = /^tent:(.+)$/.exec(openOrSelectedKey.trim());
+  if (!match) return null;
+  const tentId = match[1];
+  return tentId.length > 0 ? tentId : null;
+}
+
+export interface TentScopedQuickLogV2TargetPartitions {
+  tentId: string | null;
+  inTentPlants: QuickLogV2TargetOption[];
+  other: QuickLogV2TargetOption[];
+  /** Flat order: in-tent plants first, then remaining options (tents kept). */
+  ordered: QuickLogV2TargetOption[];
+}
+
+/**
+ * Prioritize plants assigned to `tentId` without dropping tent targets.
+ * When `tentId` is null, returns the input order unchanged.
+ */
+export function partitionQuickLogV2TargetOptionsForTent(
+  options: QuickLogV2TargetOption[],
+  tentId: string | null | undefined,
+): TentScopedQuickLogV2TargetPartitions {
+  if (!tentId) {
+    return {
+      tentId: null,
+      inTentPlants: [],
+      other: options.slice(),
+      ordered: options.slice(),
+    };
+  }
+  const inTentPlants: QuickLogV2TargetOption[] = [];
+  const other: QuickLogV2TargetOption[] = [];
+  for (const option of options) {
+    if (option.type === "plant" && option.tentId === tentId) {
+      inTentPlants.push(option);
+    } else {
+      other.push(option);
+    }
+  }
+  return {
+    tentId,
+    inTentPlants,
+    other,
+    ordered: [...inTentPlants, ...other],
+  };
+}
+
+/** Case-insensitive type-to-filter against the visible Target label. */
+export function filterQuickLogV2TargetOptions(
+  options: QuickLogV2TargetOption[],
+  query: string | null | undefined,
+): QuickLogV2TargetOption[] {
+  const needle = typeof query === "string" ? query.trim().toLowerCase() : "";
+  if (!needle) return options.slice();
+  return options.filter((option) =>
+    formatQuickLogV2TargetOptionLabel(option).toLowerCase().includes(needle),
+  );
+}
+
+export interface ResolveTentScopedQuickLogPlantSelectionInput {
+  tentId: string | null | undefined;
+  options: QuickLogV2TargetOption[];
+  /** Current draft key. Plant selections are never overridden. */
+  selectedKey: string | null | undefined;
+  /** Recent plant id when it should be preferred inside this tent. */
+  recentPlantId?: string | null;
+}
+
+/**
+ * When tent context is active and no plant is selected yet:
+ * 1) prefer a recent plant that belongs to the tent
+ * 2) else auto-select when exactly one plant is in that tent
+ */
+export function resolveTentScopedQuickLogPlantSelection(
+  input: ResolveTentScopedQuickLogPlantSelectionInput,
+): string | null {
+  const tentId = typeof input.tentId === "string" && input.tentId.length > 0 ? input.tentId : null;
+  if (!tentId) return null;
+
+  const selected = typeof input.selectedKey === "string" ? input.selectedKey.trim() : "";
+  if (selected.startsWith("plant:")) return null;
+
+  const plantsInTent = input.options.filter(
+    (option) => option.type === "plant" && option.tentId === tentId,
+  );
+  if (plantsInTent.length === 0) return null;
+
+  const recentPlantId =
+    typeof input.recentPlantId === "string" && input.recentPlantId.length > 0
+      ? input.recentPlantId
+      : null;
+  if (recentPlantId && plantsInTent.some((plant) => plant.id === recentPlantId)) {
+    return `plant:${recentPlantId}`;
+  }
+
+  if (plantsInTent.length === 1) {
+    return `plant:${plantsInTent[0].id}`;
+  }
+
+  return null;
+}

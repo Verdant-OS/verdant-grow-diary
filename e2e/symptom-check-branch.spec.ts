@@ -328,15 +328,14 @@ test.describe("Plant Detail Symptom Check — local mocked branch proof", () => 
     await seedClearlyFakeSession(page);
     await installFailClosedNetworkMock(page, state);
 
-    await page.goto(`/plants/${FAKE_PLANT_ID}`);
+    // Header/+ now opens QuickLogV2Sheet. Symptom Check still lives in legacy
+    // QuickLog under All activity types — open that sheet via the start-screen
+    // intent so Plant Detail identity is prefills and Field Edition first paint
+    // remains available for the guided symptom path.
+    await page.goto(`/plants/${FAKE_PLANT_ID}?open=quick-log`);
     await acceptReconsentGateIfShown(page);
     await expect(page.getByRole("heading", { name: FAKE_PLANT.name, exact: true })).toBeVisible();
 
-    // Open the grower Quick Log sheet from AppShell header (same Field Edition
-    // first-paint path as plant Quick Log). Route prefill carries Plant Detail
-    // identity; the grower still explicitly starts and confirms Symptom Check
-    // under All activity types before any write can occur.
-    await page.getByTestId("header-quick-log-trigger").click();
     const dialog = page.getByRole("dialog", { name: /quick log/i });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByTestId("ql-guided-grow-walk")).toBeVisible();

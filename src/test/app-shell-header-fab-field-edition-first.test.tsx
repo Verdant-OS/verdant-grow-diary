@@ -1,10 +1,7 @@
 /**
- * QUICKLOG_HEADER_FAB_FIELD_EDITION_FIRST — header/+ and FAB open grower
- * QuickLog with Field Edition visit modes before any legacy activity chooser.
- *
- * Live FAIL (measured signed-in on 8990f84): plant Quick Log first paint PASS
- * after #1286, but header "+ Quick Log" still opened the legacy
- * "Choose what you want to log." 8-type GlobalFastAdd menu.
+ * QUICKLOG_HEADER_FAB_FIELD_EDITION_FIRST — header/+ and FAB open
+ * QuickLogV2Sheet with Field Edition visit modes (same contract as TentDetail
+ * FAB). Legacy activity chooser / GlobalFastAdd must not appear.
  */
 import { type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -73,7 +70,7 @@ vi.mock("@/components/SubscriptionPastDueBanner", () => ({
 vi.mock("@/components/GlobalSearchDialog", () => ({ default: () => null }));
 vi.mock("@/components/LegalFooterLinks", () => ({ default: () => null }));
 vi.mock("@/components/BrandLogo", () => ({ default: () => null }));
-vi.mock("@/components/QuickLogV2Sheet", () => ({ default: () => null }));
+vi.mock("@/components/QuickLog", () => ({ default: () => null }));
 
 vi.mock("@/store/grows", () => ({
   useGrows: () => ({
@@ -85,7 +82,15 @@ vi.mock("@/store/grows", () => ({
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
-    data: [{ id: "p1", name: "PlantA", tent_id: "t1", grow_id: "g1", stage: "flowering" }],
+    data: [
+      {
+        id: "40000000-0000-4000-8000-000000000001",
+        name: "PlantA",
+        tent_id: "t1",
+        grow_id: "g1",
+        stage: "flowering",
+      },
+    ],
   }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
@@ -101,11 +106,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: v
 
 import AppShell from "@/components/AppShell";
 
-const PLANT_PATH = "/plants/p1";
-
-function isBeforeInDocument(earlier: HTMLElement, later: HTMLElement): boolean {
-  return (earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-}
+const PLANT_PATH = "/plants/40000000-0000-4000-8000-000000000001";
 
 function renderShell(pathname = PLANT_PATH) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -141,7 +142,7 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("AppShell header/FAB Field Edition first paint", () => {
-  it("header Quick Log opens Field Edition visit modes before All activity types", () => {
+  it("header Quick Log opens V2 Field Edition visit modes (Fast Check default)", () => {
     renderShell(PLANT_PATH);
 
     expect(screen.queryByTestId("global-fast-add-menu")).not.toBeInTheDocument();
@@ -152,24 +153,20 @@ describe("AppShell header/FAB Field Edition first paint", () => {
     expect(screen.queryByTestId("global-fast-add-menu")).not.toBeInTheDocument();
     expect(screen.queryByText("Choose what you want to log.")).not.toBeInTheDocument();
 
-    const fieldEdition = screen.getByTestId("ql-guided-grow-walk");
-    const fastCheck = screen.getByTestId("ql-visit-mode-fast_check");
-    const allActivities = screen.getByTestId("quick-log-dialog-all-activities");
+    const fieldEdition = screen.getByTestId("qlv2-guided-grow-walk");
+    const fastCheck = screen.getByTestId("qlv2-visit-mode-fast_check");
 
+    expect(fieldEdition).toBeInTheDocument();
     expect(fastCheck).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("All activity types")).toBeInTheDocument();
-    expect(isBeforeInDocument(fieldEdition, allActivities)).toBe(true);
-    expect(isBeforeInDocument(fastCheck, allActivities)).toBe(true);
-    for (const modeId of [
-      "ql-visit-mode-routine_walk",
-      "ql-visit-mode-deep_evidence_walk",
-      "ql-visit-mode-alert_walk",
-    ] as const) {
-      expect(isBeforeInDocument(screen.getByTestId(modeId), allActivities)).toBe(true);
-    }
+    expect(screen.getByTestId("qlv2-visit-mode-routine_walk")).toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-visit-mode-deep_evidence_walk")).toBeInTheDocument();
+    expect(screen.getByTestId("qlv2-visit-mode-alert_walk")).toBeInTheDocument();
+    // Legacy All-activity-types sheet must not own this grower entry.
+    expect(screen.queryByTestId("quick-log-dialog-all-activities")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ql-guided-grow-walk")).not.toBeInTheDocument();
   });
 
-  it("mobile FAB opens the same Field Edition first paint", () => {
+  it("mobile FAB opens the same V2 Field Edition first paint", () => {
     renderShell(PLANT_PATH);
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
@@ -177,12 +174,11 @@ describe("AppShell header/FAB Field Edition first paint", () => {
     expect(screen.queryByTestId("global-fast-add-menu")).not.toBeInTheDocument();
     expect(screen.queryByText("Choose what you want to log.")).not.toBeInTheDocument();
 
-    const fieldEdition = screen.getByTestId("ql-guided-grow-walk");
-    const fastCheck = screen.getByTestId("ql-visit-mode-fast_check");
-    const allActivities = screen.getByTestId("quick-log-dialog-all-activities");
+    const fieldEdition = screen.getByTestId("qlv2-guided-grow-walk");
+    const fastCheck = screen.getByTestId("qlv2-visit-mode-fast_check");
 
+    expect(fieldEdition).toBeInTheDocument();
     expect(fastCheck).toHaveAttribute("aria-pressed", "true");
-    expect(isBeforeInDocument(fieldEdition, allActivities)).toBe(true);
-    expect(isBeforeInDocument(fastCheck, allActivities)).toBe(true);
+    expect(screen.queryByTestId("quick-log-dialog-all-activities")).not.toBeInTheDocument();
   });
 });

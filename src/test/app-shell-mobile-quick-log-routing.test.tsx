@@ -133,6 +133,7 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 function TestContent() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [bump, setBump] = useState(0);
   const targetEvidence = tentTargetEvidenceMock() as {
     tentId: string;
     soleActivePlantId: string | null;
@@ -147,6 +148,7 @@ function TestContent() {
       <span data-testid="current-search">{location.search}</span>
       <span data-testid="current-hash">{location.hash}</span>
       <span data-testid="current-key">{location.key}</span>
+      <span data-testid="evidence-bump">{bump}</span>
       <Link to="/settings">Leave tent</Link>
       <Link to="/dashboard">Open dashboard</Link>
       <Link to={`/tents/${SECOND_TENT_ID}`}>Open second tent</Link>
@@ -159,6 +161,13 @@ function TestContent() {
       </button>
       <button type="button" onClick={() => navigate(-1)}>
         Go back
+      </button>
+      <button
+        type="button"
+        data-testid="refresh-tent-evidence"
+        onClick={() => setBump((n) => n + 1)}
+      >
+        Refresh tent evidence
       </button>
     </div>
   );
@@ -240,19 +249,24 @@ describe("AppShell mobile Quick Log routing", () => {
     expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-plant-id", "legacy-plant");
   });
 
-  it("closes an already-open V2 sheet before the unscoped mobile FAB opens legacy Quick Log", async () => {
+  it("replaces a typed Water intent with the unscoped grower V2 entry from the mobile FAB", async () => {
     renderAt("/settings");
     dispatchRuntimeEvent(
       new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, {
         detail: { targetKey: "plant:typed-plant", action: "water" },
       }),
     );
-    expect(screen.getByTestId("scoped-quick-log")).toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      "plant:typed-plant",
+    );
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-action", "water");
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
-    await waitFor(() => expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument());
-    expect(screen.getAllByTestId("legacy-quick-log")).toHaveLength(1);
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-target-key", "");
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-action", "note");
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
   it("ignores invalid typed detail and does not open V2", () => {
@@ -265,22 +279,29 @@ describe("AppShell mobile Quick Log routing", () => {
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
   });
 
-  it("opens the same QuickLog Dialog and closes V2 from a targeted mobile FAB", async () => {
+  it("replaces a typed Water intent with the tent-scoped grower V2 entry from the mobile FAB", async () => {
     renderAt(`/tents/${TENT_ID}`);
     dispatchRuntimeEvent(
       new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, {
         detail: { targetKey: "plant:typed-plant", action: "water" },
       }),
     );
-    expect(screen.getByTestId("scoped-quick-log")).toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      "plant:typed-plant",
+    );
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
-    await waitFor(() => expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument());
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-tent-id", TENT_ID);
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-action", "note");
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
-  it("clears a closed typed target before opening QuickLog from the targeted mobile FAB", () => {
+  it("clears a closed typed target before opening tent-scoped V2 from the mobile FAB", () => {
     renderAt(`/tents/${TENT_ID}`);
     dispatchRuntimeEvent(
       new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, {
@@ -297,8 +318,12 @@ describe("AppShell mobile Quick Log routing", () => {
     expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-tent-id", TENT_ID);
-    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-action", "note");
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
   it("discards a typed Water intent when navigating between unscoped routes", async () => {
@@ -323,8 +348,9 @@ describe("AppShell mobile Quick Log routing", () => {
     expect(screen.getByTestId("scoped-quick-log-state")).toHaveAttribute("data-action", "note");
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
-    expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument();
-    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-target-key", "");
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-action", "note");
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
   it("discards typed Water across same-path push, replace, and back navigations", async () => {
@@ -390,16 +416,19 @@ describe("AppShell mobile Quick Log routing", () => {
     await expectFreshClosedState();
   });
 
-  it("opens QuickLog with tent prefill from a zero-plant Tent Detail route", () => {
+  it("opens V2 with tent: target from a zero-plant Tent Detail route", () => {
     renderAt(`/tents/${TENT_ID}`);
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-tent-id", TENT_ID);
-    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
-  it("opens QuickLog with plant prefill when Tent Detail proves one active plant", () => {
+  it("opens V2 with plant: target when Tent Detail proves one active plant", () => {
     tentTargetEvidenceMock.mockReturnValue({
       tentId: TENT_ID,
       soleActivePlantId: PLANT_ID,
@@ -408,11 +437,14 @@ describe("AppShell mobile Quick Log routing", () => {
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-plant-id", PLANT_ID);
-    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `plant:${PLANT_ID}`,
+    );
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
-  it("opens QuickLog with tent prefill when Tent Detail reports multiple active plants", () => {
+  it("opens V2 with tent: target when Tent Detail reports multiple active plants", () => {
     tentTargetEvidenceMock.mockReturnValue({
       tentId: TENT_ID,
       soleActivePlantId: null,
@@ -421,51 +453,75 @@ describe("AppShell mobile Quick Log routing", () => {
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-tent-id", TENT_ID);
-    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
-  it("keeps the launched QuickLog prefill stable when sole-plant evidence settles later", () => {
-    const view = renderAt(`/tents/${TENT_ID}`);
+  it("keeps the launched V2 target stable when sole-plant evidence settles later", () => {
+    renderAt(`/tents/${TENT_ID}`);
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-tent-id", TENT_ID);
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
 
     tentTargetEvidenceMock.mockReturnValue({
       tentId: TENT_ID,
       soleActivePlantId: PLANT_ID,
     });
-    view.rerender(shellAt(`/tents/${TENT_ID}`));
+    fireEvent.click(screen.getByTestId("refresh-tent-evidence"));
 
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-tent-id", TENT_ID);
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-plant-id", "");
-    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    // Launch target is frozen at open; late evidence must not rewrite the open sheet.
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
-  it("preserves the existing unscoped Quick Log fallback away from Tent Detail", () => {
+  it("preserves the unscoped V2 fallback away from Tent/Plant Detail", () => {
     renderAt("/settings");
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
-    expect(screen.getByTestId("legacy-quick-log")).toBeInTheDocument();
-    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-target-key", "");
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
-  it("binds the Plant Detail mobile FAB to the valid plant UUID in the route", () => {
+  it("binds the Plant Detail mobile FAB to plant:<uuid> for V2", () => {
     renderAt(`/plants/${PLANT_ID}`);
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-plant-id", PLANT_ID);
-    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `plant:${PLANT_ID}`,
+    );
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
-  it("fails closed to unscoped Quick Log for an invalid Plant Detail id", () => {
+  it("fails closed to unscoped V2 for an invalid Plant Detail id", () => {
     renderAt("/plants/not-a-uuid");
 
     fireEvent.click(screen.getByTestId("mobile-quick-log-fab"));
 
-    expect(screen.getByTestId("legacy-quick-log")).toHaveAttribute("data-plant-id", "");
-    expect(screen.queryByTestId("scoped-quick-log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute("data-target-key", "");
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
+  });
+
+  it("header Quick Log opens the same tent-scoped V2 target as the mobile FAB", () => {
+    renderAt(`/tents/${TENT_ID}`);
+
+    fireEvent.click(screen.getByTestId("header-quick-log-trigger"));
+
+    expect(screen.getByTestId("scoped-quick-log")).toHaveAttribute(
+      "data-target-key",
+      `tent:${TENT_ID}`,
+    );
+    expect(screen.queryByTestId("legacy-quick-log")).not.toBeInTheDocument();
   });
 
   it("honors and consumes the saved Quick Log start-screen intent", async () => {

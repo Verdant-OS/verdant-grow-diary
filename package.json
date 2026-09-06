@@ -326,6 +326,7 @@
     "probe:migration-drift": "node scripts/probe-migration-drift.mjs"
   },
   "dependencies": {
+    "@amplitude/unified": "^1",
     "@hookform/resolvers": "^5.2.2",
     "@lovable.dev/cloud-auth-js": "^1.1.2",
     "@lovable.dev/mcp-js": "0.24.0",

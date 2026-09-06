@@ -20,6 +20,7 @@ import { AgreementReconsentGate } from "@/components/AgreementReconsentGate";
 import { useGoogleAnalyticsPageViews } from "@/hooks/useGoogleAnalyticsPageViews";
 import { useAnalyticsConsent } from "@/hooks/useAnalyticsConsent";
 import { loadGoogleAnalytics } from "@/lib/googleAnalyticsLoader";
+import { loadAmplitude } from "@/lib/amplitudeLoader";
 import { AnalyticsConsentBanner } from "@/components/AnalyticsConsentBanner";
 import FunnelEventDbSink from "@/components/FunnelEventDbSink";
 import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdentityTransitionFence";
@@ -155,7 +156,10 @@ function AnalyticsShell() {
   const { decision } = useAnalyticsConsent();
 
   useEffect(() => {
-    if (decision === "granted") loadGoogleAnalytics();
+    if (decision === "granted") {
+      loadGoogleAnalytics();
+      loadAmplitude();
+    }
   }, [decision]);
 
   useGoogleAnalyticsPageViews();

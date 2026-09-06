@@ -5,6 +5,8 @@ import {
   ROOT_ENTRY_PRE_HYDRATION_SURFACE,
   shouldTrackRootLandingPageView,
 } from "@/lib/rootEntryRules";
+import { trackViewedHomePage } from "@/lib/amplitudeLoader";
+import { readAnalyticsConsent, subscribeToAnalyticsConsent } from "@/lib/analyticsConsent";
 
 // Keep the signed-out apex light: the protected shell and dashboard chunks are
 // only requested after AuthProvider resolves an authenticated user.
@@ -36,6 +38,15 @@ export default function RootEntry() {
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     setHydrated(true);
+  }, []);
+
+  // Amplitude: exactly one Viewed Home Page after consent + init path.
+  useEffect(() => {
+    const maybeTrack = () => {
+      if (readAnalyticsConsent() === "granted") trackViewedHomePage();
+    };
+    maybeTrack();
+    return subscribeToAnalyticsConsent(maybeTrack);
   }, []);
 
   const rootEntryState = {

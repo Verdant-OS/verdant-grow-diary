@@ -8,7 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -29,11 +31,18 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
 import {
   buildQuickLogV2TargetOptions,
+  filterQuickLogV2TargetOptions,
+  formatQuickLogV2TargetOptionLabel,
   isStaleQuickLogV2TargetSelection,
+  partitionQuickLogV2TargetOptionsForTent,
   resolveQuickLogV2Target,
+  resolveQuickLogV2TentContextId,
+  resolveTentScopedQuickLogPlantSelection,
   EMPTY_QUICKLOG_V2_FORM,
+  QUICK_LOG_V2_TARGET_FILTER_THRESHOLD,
   type QuickLogV2FormState,
   type QuickLogV2Action,
+  type QuickLogV2TargetOption,
   type ResolvedQuickLogV2Target,
 } from "@/lib/quickLogV2Rules";
 import {
@@ -293,7 +302,23 @@ export default function QuickLogV2Sheet({
     });
   }
 
-  const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
+  // Seed from open props on first paint so tent:/plant: defaultTargetKey is
+  // not briefly empty — that vacancy previously let sole-plant auto-select
+  // rewrite an explicit tent: open target before the open-reset effect ran.
+  const [form, setForm] = useState<QuickLogV2FormState>(() =>
+    open
+      ? {
+          ...EMPTY_QUICKLOG_V2_FORM,
+          selectedKey: defaultTargetKey ?? null,
+          action: defaultAction,
+        }
+      : EMPTY_QUICKLOG_V2_FORM,
+  );
+  // Type-to-filter for long Target lists. Reset on close/reopen so a prior
+  // query cannot hide options on the next open.
+  const [targetFilterQuery, setTargetFilterQuery] = useState("");
+  // One-shot tent-scoped plant auto-select per open (sole plant / recent-in-tent).
+  const [tentPlantAutoApplied, setTentPlantAutoApplied] = useState(false);
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
     EMPTY_QUICKLOG_FEEDING_FORM,
   );
@@ -368,7 +393,40 @@ export default function QuickLogV2Sheet({
   const wateringTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
   const feedingTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
 
-  const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
+  const baseOptions = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
+
+  // Tent context from open intent / selected tent key (route registration
+  // already arrives as defaultTargetKey `tent:<id>`).
+  const tentContextId = useMemo(() => {
+    return (
+      resolveQuickLogV2TentContextId(defaultTargetKey) ??
+      resolveQuickLogV2TentContextId(form.selectedKey)
+    );
+  }, [defaultTargetKey, form.selectedKey]);
+
+  const tentScopedPartitions = useMemo(
+    () => partitionQuickLogV2TargetOptionsForTent(baseOptions, tentContextId),
+    [baseOptions, tentContextId],
+  );
+
+  const options = tentScopedPartitions.ordered;
+
+  const filteredTargetOptions = useMemo(
+    () => filterQuickLogV2TargetOptions(options, targetFilterQuery),
+    [options, targetFilterQuery],
+  );
+
+  const filteredInTentPlants = useMemo(() => {
+    if (!tentContextId) return [] as QuickLogV2TargetOption[];
+    return filterQuickLogV2TargetOptions(tentScopedPartitions.inTentPlants, targetFilterQuery);
+  }, [tentContextId, tentScopedPartitions.inTentPlants, targetFilterQuery]);
+
+  const filteredOtherTargets = useMemo(() => {
+    if (!tentContextId) return filteredTargetOptions;
+    return filterQuickLogV2TargetOptions(tentScopedPartitions.other, targetFilterQuery);
+  }, [tentContextId, tentScopedPartitions.other, targetFilterQuery, filteredTargetOptions]);
+
+  const showTargetFilter = options.length > QUICK_LOG_V2_TARGET_FILTER_THRESHOLD;
 
   const resolvedTarget = useMemo(
     () => resolveQuickLogV2Target(options, form.selectedKey),
@@ -633,9 +691,53 @@ export default function QuickLogV2Sheet({
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       setRecentSuggestionDismissed(false);
+      setTargetFilterQuery("");
+      setTentPlantAutoApplied(false);
       resetPhotoSelection();
+    } else {
+      setTargetFilterQuery("");
+      setTentPlantAutoApplied(false);
     }
   }, [open, defaultTargetKey, defaultAction]);
+
+  // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
+  // Only when selectedKey is still empty/unset — never rewrite an explicit
+  // tent:<id> (or plant:) target. One-shot per open so a grower who later
+  // picks the tent again is not forced.
+  useEffect(() => {
+    if (!open || contextBlocked || tentPlantAutoApplied) return;
+    const recentPlantId = recentTargetSuggestion?.plantId ?? recentTargetRecord?.plantId ?? null;
+    // During the open-reset tick, form.selectedKey can still be the previous
+    // render's empty value while defaultTargetKey already carries an explicit
+    // tent:/plant: open target. Prefer that pending key so sole auto-select
+    // cannot race-rewrite tent:<id> → plant:<id>.
+    const draftKey =
+      typeof form.selectedKey === "string" && form.selectedKey.trim().length > 0
+        ? form.selectedKey
+        : (defaultTargetKey ?? null);
+    const nextKey = resolveTentScopedQuickLogPlantSelection({
+      tentId: tentContextId,
+      options,
+      selectedKey: draftKey,
+      recentPlantId,
+    });
+    setTentPlantAutoApplied(true);
+    if (!nextKey || nextKey === draftKey) return;
+    if (videoValidationInFlightRef.current) resetVideoSelection();
+    setForm((prev) => ({ ...prev, selectedKey: nextKey }));
+    setLocalError(null);
+    setSaveStatus("");
+  }, [
+    open,
+    contextBlocked,
+    tentPlantAutoApplied,
+    tentContextId,
+    options,
+    form.selectedKey,
+    defaultTargetKey,
+    recentTargetSuggestion,
+    recentTargetRecord,
+  ]);
 
   // One-shot prefill of the feeding form with last-used defaults. Runs only
   // when the Feed action is active, the form is still pristine, defaults
@@ -1566,13 +1668,73 @@ export default function QuickLogV2Sheet({
                   }
                 />
               </SelectTrigger>
-              <SelectContent>
-                {options.map((o) => (
-                  <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
-                    {o.type === "tent" ? "Tent · " : "Plant · "}
-                    {o.label}
-                  </SelectItem>
-                ))}
+              <SelectContent
+                data-testid="qlv2-target-content"
+                // Keep filter focus from collapsing the list (Radix Select).
+                onCloseAutoFocus={(event) => {
+                  if (showTargetFilter && targetFilterQuery.trim()) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                {showTargetFilter && (
+                  <div
+                    className="sticky top-0 z-10 bg-popover p-2 border-b border-border/60"
+                    // Pointer/keyboard must not dismiss or steal Select typeahead.
+                    onPointerDown={(event) => event.preventDefault()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <Input
+                      value={targetFilterQuery}
+                      onChange={(event) => setTargetFilterQuery(event.target.value)}
+                      placeholder="Filter plants or tents…"
+                      aria-label="Filter Quick Log targets"
+                      data-testid="qlv2-target-filter"
+                      className="h-9"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+                {tentContextId ? (
+                  <>
+                    {filteredInTentPlants.length > 0 && (
+                      <SelectGroup data-testid="qlv2-target-group-in-tent">
+                        <SelectLabel>In this tent</SelectLabel>
+                        {filteredInTentPlants.map((o) => (
+                          <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                            {formatQuickLogV2TargetOptionLabel(o)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {filteredOtherTargets.length > 0 && (
+                      <SelectGroup data-testid="qlv2-target-group-other">
+                        <SelectLabel>Other</SelectLabel>
+                        {filteredOtherTargets.map((o) => (
+                          <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                            {formatQuickLogV2TargetOptionLabel(o)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </>
+                ) : (
+                  filteredTargetOptions.map((o) => (
+                    <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                      {formatQuickLogV2TargetOptionLabel(o)}
+                    </SelectItem>
+                  ))
+                )}
+                {showTargetFilter &&
+                  filteredTargetOptions.length === 0 &&
+                  targetFilterQuery.trim() !== "" && (
+                    <div
+                      className="px-2 py-3 text-sm text-muted-foreground"
+                      data-testid="qlv2-target-filter-empty"
+                    >
+                      No matching targets.
+                    </div>
+                  )}
               </SelectContent>
             </Select>
             <p id="qlv2-target-help" className="mt-1 text-sm text-muted-foreground">

@@ -140,3 +140,128 @@ export function shouldShowVolumeField(action: QuickLogV2Action): boolean {
 export function isPhotoSavingSupported(): boolean {
   return true;
 }
+
+/** Show type-to-filter inside Target Select when the list is this long or longer. */
+export const QUICK_LOG_V2_TARGET_FILTER_THRESHOLD = 8;
+
+export function formatQuickLogV2TargetOptionLabel(option: QuickLogV2TargetOption): string {
+  return `${option.type === "tent" ? "Tent" : "Plant"} · ${option.label}`;
+}
+
+/**
+ * Tent-scoped Target context from open intent / selected key.
+ * Route registration already lands as `defaultTargetKey` (`tent:<id>`).
+ */
+export function resolveQuickLogV2TentContextId(
+  openOrSelectedKey: string | null | undefined,
+): string | null {
+  if (typeof openOrSelectedKey !== "string") return null;
+  const match = /^tent:(.+)$/.exec(openOrSelectedKey.trim());
+  if (!match) return null;
+  const tentId = match[1];
+  return tentId.length > 0 ? tentId : null;
+}
+
+export interface TentScopedQuickLogV2TargetPartitions {
+  tentId: string | null;
+  inTentPlants: QuickLogV2TargetOption[];
+  other: QuickLogV2TargetOption[];
+  /** Flat order: in-tent plants first, then remaining options (tents kept). */
+  ordered: QuickLogV2TargetOption[];
+}
+
+/**
+ * Prioritize plants assigned to `tentId` without dropping tent targets.
+ * When `tentId` is null, returns the input order unchanged.
+ */
+export function partitionQuickLogV2TargetOptionsForTent(
+  options: QuickLogV2TargetOption[],
+  tentId: string | null | undefined,
+): TentScopedQuickLogV2TargetPartitions {
+  if (!tentId) {
+    return {
+      tentId: null,
+      inTentPlants: [],
+      other: options.slice(),
+      ordered: options.slice(),
+    };
+  }
+  const inTentPlants: QuickLogV2TargetOption[] = [];
+  const other: QuickLogV2TargetOption[] = [];
+  for (const option of options) {
+    if (option.type === "plant" && option.tentId === tentId) {
+      inTentPlants.push(option);
+    } else {
+      other.push(option);
+    }
+  }
+  return {
+    tentId,
+    inTentPlants,
+    other,
+    ordered: [...inTentPlants, ...other],
+  };
+}
+
+/** Case-insensitive type-to-filter against the visible Target label. */
+export function filterQuickLogV2TargetOptions(
+  options: QuickLogV2TargetOption[],
+  query: string | null | undefined,
+): QuickLogV2TargetOption[] {
+  const needle = typeof query === "string" ? query.trim().toLowerCase() : "";
+  if (!needle) return options.slice();
+  return options.filter((option) =>
+    formatQuickLogV2TargetOptionLabel(option).toLowerCase().includes(needle),
+  );
+}
+
+export interface ResolveTentScopedQuickLogPlantSelectionInput {
+  tentId: string | null | undefined;
+  options: QuickLogV2TargetOption[];
+  /**
+   * Current draft key. Auto-select only fills an empty/unset key.
+   * Explicit `tent:<id>` (or any non-empty selection) is never rewritten.
+   */
+  selectedKey: string | null | undefined;
+  /** Recent plant id when it should be preferred inside this tent. */
+  recentPlantId?: string | null;
+}
+
+/**
+ * When tent context is active and selectedKey is still empty/unset:
+ * 1) prefer a recent plant that belongs to the tent
+ * 2) else auto-select when exactly one plant is in that tent
+ *
+ * Fence: never rewrite an explicit `tent:<id>` (or plant:/any non-empty key).
+ * Tent open intent may still supply tentContextId via defaultTargetKey while
+ * the draft target stays a tent the grower (or test) chose.
+ */
+export function resolveTentScopedQuickLogPlantSelection(
+  input: ResolveTentScopedQuickLogPlantSelectionInput,
+): string | null {
+  const tentId = typeof input.tentId === "string" && input.tentId.length > 0 ? input.tentId : null;
+  if (!tentId) return null;
+
+  const selected = typeof input.selectedKey === "string" ? input.selectedKey.trim() : "";
+  // Explicit tent/plant (or any other) selection must not be rewritten.
+  if (selected.length > 0) return null;
+
+  const plantsInTent = input.options.filter(
+    (option) => option.type === "plant" && option.tentId === tentId,
+  );
+  if (plantsInTent.length === 0) return null;
+
+  const recentPlantId =
+    typeof input.recentPlantId === "string" && input.recentPlantId.length > 0
+      ? input.recentPlantId
+      : null;
+  if (recentPlantId && plantsInTent.some((plant) => plant.id === recentPlantId)) {
+    return `plant:${recentPlantId}`;
+  }
+
+  if (plantsInTent.length === 1) {
+    return `plant:${plantsInTent[0].id}`;
+  }
+
+  return null;
+}

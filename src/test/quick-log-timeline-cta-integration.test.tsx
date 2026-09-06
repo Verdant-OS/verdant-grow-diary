@@ -160,6 +160,15 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
     expect(rpcMock.mock.calls.length).toBe(rpcBefore);
   });
 
+  it("keeps explicit tent: open target (sole-plant auto-select must not rewrite)", async () => {
+    renderSheet("tent:tent-1");
+    await waitFor(() => {
+      expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toHaveTextContent(
+        "Tent 1",
+      );
+    });
+  });
+
   it("tent target routes to grow-scoped Timeline without plantId", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: true, grow_event_id: null, environment_event_id: null },

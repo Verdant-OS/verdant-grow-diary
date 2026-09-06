@@ -198,7 +198,33 @@ describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
     expect(filterQuickLogV2TargetOptions(options, "   ")).toEqual(options);
   });
 
-  it("auto-selects the sole plant in tent when no plant is selected yet", () => {
+  it("auto-selects the sole plant in tent when selectedKey is still empty", () => {
+    const soleOptions: QuickLogV2TargetOption[] = [
+      { type: "tent", id: "clones", label: "Clones", tentId: "clones", growId: "g1" },
+      { type: "plant", id: "c1", label: "Clone A", tentId: "clones", growId: "g1" },
+    ];
+    expect(
+      resolveTentScopedQuickLogPlantSelection({
+        tentId: "clones",
+        options: soleOptions,
+        selectedKey: null,
+        recentPlantId: null,
+      }),
+    ).toBe("plant:c1");
+  });
+
+  it("prefers a recent plant that belongs to the tent over sole-plant logic", () => {
+    expect(
+      resolveTentScopedQuickLogPlantSelection({
+        tentId: "veg-b",
+        options,
+        selectedKey: null,
+        recentPlantId: "sg2",
+      }),
+    ).toBe("plant:sg2");
+  });
+
+  it("does not rewrite an explicit tent: selectedKey to a plant via sole auto-select", () => {
     const soleOptions: QuickLogV2TargetOption[] = [
       { type: "tent", id: "clones", label: "Clones", tentId: "clones", growId: "g1" },
       { type: "plant", id: "c1", label: "Clone A", tentId: "clones", growId: "g1" },
@@ -210,10 +236,10 @@ describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
         selectedKey: "tent:clones",
         recentPlantId: null,
       }),
-    ).toBe("plant:c1");
+    ).toBeNull();
   });
 
-  it("prefers a recent plant that belongs to the tent over sole-plant logic", () => {
+  it("does not rewrite an explicit tent: selectedKey even when a recent plant is in the tent", () => {
     expect(
       resolveTentScopedQuickLogPlantSelection({
         tentId: "veg-b",
@@ -221,7 +247,7 @@ describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
         selectedKey: "tent:veg-b",
         recentPlantId: "sg2",
       }),
-    ).toBe("plant:sg2");
+    ).toBeNull();
   });
 
   it("does not override an existing plant selection", () => {
@@ -240,7 +266,7 @@ describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
       resolveTentScopedQuickLogPlantSelection({
         tentId: "veg-b",
         options,
-        selectedKey: "tent:veg-b",
+        selectedKey: null,
         recentPlantId: "c1",
       }),
     ).toBeNull();

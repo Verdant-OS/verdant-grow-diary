@@ -218,16 +218,23 @@ export function filterQuickLogV2TargetOptions(
 export interface ResolveTentScopedQuickLogPlantSelectionInput {
   tentId: string | null | undefined;
   options: QuickLogV2TargetOption[];
-  /** Current draft key. Plant selections are never overridden. */
+  /**
+   * Current draft key. Auto-select only fills an empty/unset key.
+   * Explicit `tent:<id>` (or any non-empty selection) is never rewritten.
+   */
   selectedKey: string | null | undefined;
   /** Recent plant id when it should be preferred inside this tent. */
   recentPlantId?: string | null;
 }
 
 /**
- * When tent context is active and no plant is selected yet:
+ * When tent context is active and selectedKey is still empty/unset:
  * 1) prefer a recent plant that belongs to the tent
  * 2) else auto-select when exactly one plant is in that tent
+ *
+ * Fence: never rewrite an explicit `tent:<id>` (or plant:/any non-empty key).
+ * Tent open intent may still supply tentContextId via defaultTargetKey while
+ * the draft target stays a tent the grower (or test) chose.
  */
 export function resolveTentScopedQuickLogPlantSelection(
   input: ResolveTentScopedQuickLogPlantSelectionInput,
@@ -236,7 +243,8 @@ export function resolveTentScopedQuickLogPlantSelection(
   if (!tentId) return null;
 
   const selected = typeof input.selectedKey === "string" ? input.selectedKey.trim() : "";
-  if (selected.startsWith("plant:")) return null;
+  // Explicit tent/plant (or any other) selection must not be rewritten.
+  if (selected.length > 0) return null;
 
   const plantsInTent = input.options.filter(
     (option) => option.type === "plant" && option.tentId === tentId,

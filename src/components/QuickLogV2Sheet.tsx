@@ -302,7 +302,18 @@ export default function QuickLogV2Sheet({
     });
   }
 
-  const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
+  // Seed from open props on first paint so tent:/plant: defaultTargetKey is
+  // not briefly empty — that vacancy previously let sole-plant auto-select
+  // rewrite an explicit tent: open target before the open-reset effect ran.
+  const [form, setForm] = useState<QuickLogV2FormState>(() =>
+    open
+      ? {
+          ...EMPTY_QUICKLOG_V2_FORM,
+          selectedKey: defaultTargetKey ?? null,
+          action: defaultAction,
+        }
+      : EMPTY_QUICKLOG_V2_FORM,
+  );
   // Type-to-filter for long Target lists. Reset on close/reopen so a prior
   // query cannot hide options on the next open.
   const [targetFilterQuery, setTargetFilterQuery] = useState("");
@@ -690,18 +701,28 @@ export default function QuickLogV2Sheet({
   }, [open, defaultTargetKey, defaultAction]);
 
   // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
-  // One-shot per open so a grower who later picks the tent again is not forced.
+  // Only when selectedKey is still empty/unset — never rewrite an explicit
+  // tent:<id> (or plant:) target. One-shot per open so a grower who later
+  // picks the tent again is not forced.
   useEffect(() => {
     if (!open || contextBlocked || tentPlantAutoApplied) return;
     const recentPlantId = recentTargetSuggestion?.plantId ?? recentTargetRecord?.plantId ?? null;
+    // During the open-reset tick, form.selectedKey can still be the previous
+    // render's empty value while defaultTargetKey already carries an explicit
+    // tent:/plant: open target. Prefer that pending key so sole auto-select
+    // cannot race-rewrite tent:<id> → plant:<id>.
+    const draftKey =
+      typeof form.selectedKey === "string" && form.selectedKey.trim().length > 0
+        ? form.selectedKey
+        : (defaultTargetKey ?? null);
     const nextKey = resolveTentScopedQuickLogPlantSelection({
       tentId: tentContextId,
       options,
-      selectedKey: form.selectedKey,
+      selectedKey: draftKey,
       recentPlantId,
     });
     setTentPlantAutoApplied(true);
-    if (!nextKey || nextKey === form.selectedKey) return;
+    if (!nextKey || nextKey === draftKey) return;
     if (videoValidationInFlightRef.current) resetVideoSelection();
     setForm((prev) => ({ ...prev, selectedKey: nextKey }));
     setLocalError(null);
@@ -713,6 +734,7 @@ export default function QuickLogV2Sheet({
     tentContextId,
     options,
     form.selectedKey,
+    defaultTargetKey,
     recentTargetSuggestion,
     recentTargetRecord,
   ]);

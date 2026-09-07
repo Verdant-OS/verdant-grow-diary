@@ -150,6 +150,39 @@ describe("quickLogV2Rules — archived/merged plant target hardening", () => {
   });
 });
 
+describe("quickLogV2Rules — exclude unlinked grow targets", () => {
+  it("omits tents and plants with null/blank grow_id from selectable options", () => {
+    const tents = [
+      { id: "flower-tent", name: "Flower Tent", grow_id: "mcdonalds" },
+      { id: "orphan-flower", name: "Flower", grow_id: null },
+      { id: "blank-grow", name: "Blank Grow Tent", grow_id: "   " },
+    ];
+    const plants = [
+      { id: "m1", name: "McDonalds", tent_id: "flower-tent", grow_id: "mcdonalds" },
+      { id: "loose", name: "Loose Plant", tent_id: "orphan-flower", grow_id: null },
+    ];
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
+    expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual([
+      "plant:m1",
+      "tent:flower-tent",
+    ]);
+    expect(opts.find((o) => o.id === "orphan-flower")).toBeUndefined();
+    expect(opts.find((o) => o.id === "blank-grow")).toBeUndefined();
+    expect(opts.find((o) => o.id === "loose")).toBeUndefined();
+  });
+
+  it("cannot resolve a stale selection key for an unlinked tent", () => {
+    const tents = [
+      { id: "flower-tent", name: "Flower Tent", grow_id: "mcdonalds" },
+      { id: "orphan-flower", name: "Flower", grow_id: null },
+    ];
+    const opts = buildQuickLogV2TargetOptions(tents as any, [] as any);
+    const r = resolveQuickLogV2Target(opts, "tent:orphan-flower");
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("selection_not_found");
+  });
+});
+
 describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
   const scopedTents = [
     { id: "veg-b", name: "Veg B", grow_id: "g1" },

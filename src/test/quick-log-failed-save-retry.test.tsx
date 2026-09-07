@@ -33,6 +33,10 @@ vi.mock("@/hooks/use-tents", () => ({
     data: [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }],
   }),
 }));
+
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1" }] }),
+}));
 vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: [] }),
 }));

@@ -125,6 +125,32 @@ describe("OnboardingProgressPill — seeded states", () => {
 });
 
 describe("OnboardingChecklistCard — Got it dismiss", () => {
+  it("hides Add plant CTA when a persisted plant already exists under connected scope", () => {
+    renderPair({
+      ...base,
+      growCount: 1,
+      tentCount: 0,
+      plantCount: 1,
+      connectedScope: {
+        growId: "grow-a",
+        tentId: null,
+        plantId: null,
+      },
+      firstLogEvidenceStatus: "ok",
+      firstLogEvidenceCount: 0,
+    });
+
+    const plantStep = screen.getByTestId("onboarding-step-add_plant");
+    expect(plantStep.getAttribute("data-complete")).toBe("true");
+    expect(plantStep.querySelector("a")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add plant" })).toBeNull();
+
+    const tentStep = screen.getByTestId("onboarding-step-add_tent");
+    expect(tentStep.getAttribute("data-complete")).toBe("false");
+    expect(screen.getByRole("button", { name: "Add tent" })).toBeTruthy();
+    expect(screen.getByTestId("onboarding-progress-pill")).toHaveTextContent(/2 of 5 steps done/i);
+  });
+
   it("hands the exact connected Grow, Tent, and Plant to Quick Log", () => {
     const detailSpy = vi.fn();
     const listener = (event: Event) => detailSpy((event as CustomEvent).detail);

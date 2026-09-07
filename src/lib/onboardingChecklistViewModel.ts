@@ -102,7 +102,14 @@ export function buildOnboardingChecklistViewModel(
   const scope = input.connectedScope ?? null;
   const hasGrow = hasConnectedScope ? !!scope?.growId : (input.growCount ?? 0) > 0;
   const hasTent = hasConnectedScope ? !!scope?.tentId : (input.tentCount ?? 0) > 0;
-  const hasPlant = hasConnectedScope ? !!scope?.plantId : (input.plantCount ?? 0) > 0;
+  // Persisted plant rows complete the plant step even when the connected
+  // graph has not yet resolved a plantId (legacy null grow_id, empty
+  // preferred grow, or plant awaiting tent assignment). Never show
+  // "Add your first plant" as incomplete when plants already exist.
+  const persistedPlantCount = input.plantCount ?? 0;
+  const hasPlant = hasConnectedScope
+    ? !!scope?.plantId || persistedPlantCount > 0
+    : persistedPlantCount > 0;
   const firstLogStatus = input.firstLogEvidenceStatus ?? "ok";
   const hasFirstLog = hasConnectedScope
     ? firstLogStatus === "ok" && (input.firstLogEvidenceCount ?? 0) > 0
@@ -155,7 +162,11 @@ export function buildOnboardingChecklistViewModel(
     {
       key: "add_plant",
       title: "Add your first plant",
-      description: "Plant memory starts the moment you add it.",
+      description: hasPlant
+        ? "Plant memory is already on this grow."
+        : hasTent
+          ? "Plant memory starts the moment you add it."
+          : "Add a tent first, then connect your first plant.",
       href: routes.add_plant,
       ctaLabel: "Add plant",
       complete: hasPlant,

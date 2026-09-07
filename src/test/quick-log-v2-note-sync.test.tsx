@@ -14,7 +14,7 @@
  * preview rule (covered by quick-log-note-sync.test.tsx).
  *
  * Mocks mirror quick-log-v2-refresh-sheet.test.tsx: supabase.rpc, use-plants,
- * use-tents, sonner. No real network, no auth, no writes.
+ * use-tents, @/store/grows (visible grow roster), sonner. No real network, no auth, no writes.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
@@ -39,6 +39,10 @@ vi.mock("@/hooks/use-tents", () => ({
   useTents: () => ({
     data: [{ id: "tent-1", name: "Tent 1", grow_id: "grow-1" }],
   }),
+}));
+
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1" }] }),
 }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },

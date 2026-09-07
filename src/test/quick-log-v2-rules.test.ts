@@ -3,6 +3,7 @@ import {
   buildQuickLogV2TargetOptions,
   filterQuickLogV2TargetOptions,
   formatQuickLogV2TargetOptionLabel,
+  isResolvableQuickLogGrowId,
   isStaleQuickLogV2TargetSelection,
   partitionQuickLogV2TargetOptionsForTent,
   resolveQuickLogV2Target,
@@ -27,14 +28,14 @@ const plants = [
 
 describe("quickLogV2Rules", () => {
   it("builds target options, skipping archived", () => {
-    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, ["g1"]);
     expect(opts.find((o) => o.id === "t3")).toBeUndefined();
     expect(opts.find((o) => o.id === "p3")).toBeUndefined();
     expect(opts.length).toBe(4);
   });
 
   it("resolves selected plant target to that plant id (not first)", () => {
-    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, ["g1"]);
     const r = resolveQuickLogV2Target(opts, "plant:p2");
     expect(r.ok).toBe(true);
     expect(r.targetType).toBe("plant");
@@ -44,7 +45,7 @@ describe("quickLogV2Rules", () => {
   });
 
   it("resolves selected tent target with plantId null", () => {
-    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, ["g1"]);
     const r = resolveQuickLogV2Target(opts, "tent:t2");
     expect(r.ok).toBe(true);
     expect(r.targetType).toBe("tent");
@@ -54,21 +55,21 @@ describe("quickLogV2Rules", () => {
   });
 
   it("rejects when nothing selected (no first-loaded fallback)", () => {
-    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, ["g1"]);
     const r = resolveQuickLogV2Target(opts, null);
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("no_selection");
   });
 
   it("rejects unknown selection key", () => {
-    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, ["g1"]);
     const r = resolveQuickLogV2Target(opts, "plant:nope");
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("selection_not_found");
   });
 
   it("distinguishes a stale target from an incomplete target draft", () => {
-    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, ["g1"]);
 
     expect(isStaleQuickLogV2TargetSelection(resolveQuickLogV2Target(opts, null))).toBe(false);
     expect(isStaleQuickLogV2TargetSelection(resolveQuickLogV2Target(opts, "plant:nope"))).toBe(
@@ -126,63 +127,127 @@ describe("quickLogV2Rules — archived/merged plant target hardening", () => {
   ];
 
   it("excludes plants soft-archived via archived_at even when is_archived is unset", () => {
-    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any);
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, ["g1"]);
     expect(opts.find((o) => o.id === "p2")).toBeUndefined();
   });
 
   it("excludes merged plants (merged_into_plant_id set, is_archived false)", () => {
-    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any);
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, ["g1"]);
     expect(opts.find((o) => o.id === "p3")).toBeUndefined();
   });
 
   it("still offers the active plant and its tent", () => {
-    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any);
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, ["g1"]);
     expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual(["plant:p1", "tent:t1"]);
   });
 
   it("resolver cannot resolve a merged plant selection (no stale-key escape)", () => {
     // Even if a stale UI selection key for a merged plant survives in form
     // state, resolution must fail closed rather than write against it.
-    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any);
+    const opts = buildQuickLogV2TargetOptions(hardeningTents as any, hardeningPlants as any, ["g1"]);
     const r = resolveQuickLogV2Target(opts, "plant:p3");
     expect(r.ok).toBe(false);
     expect(r.reason).toBe("selection_not_found");
   });
 });
 
-describe("quickLogV2Rules — exclude unlinked grow targets", () => {
-  it("omits tents and plants with null/blank grow_id from selectable options", () => {
+describe("quickLogV2Rules — exclude unlinked / dangling grow targets", () => {
+  const visibleMcdonalds = ["mcdonalds"] as const;
+
+  it("omits tents and plants with null grow_id from selectable options", () => {
     const tents = [
       { id: "flower-tent", name: "Flower Tent", grow_id: "mcdonalds" },
       { id: "orphan-flower", name: "Flower", grow_id: null },
-      { id: "blank-grow", name: "Blank Grow Tent", grow_id: "   " },
     ];
     const plants = [
       { id: "m1", name: "McDonalds", tent_id: "flower-tent", grow_id: "mcdonalds" },
       { id: "loose", name: "Loose Plant", tent_id: "orphan-flower", grow_id: null },
     ];
-    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any);
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, visibleMcdonalds);
     expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual([
       "plant:m1",
       "tent:flower-tent",
     ]);
     expect(opts.find((o) => o.id === "orphan-flower")).toBeUndefined();
-    expect(opts.find((o) => o.id === "blank-grow")).toBeUndefined();
     expect(opts.find((o) => o.id === "loose")).toBeUndefined();
   });
 
-  it("cannot resolve a stale selection key for an unlinked tent", () => {
+  it("omits tents with blank/whitespace grow_id from selectable options", () => {
+    const tents = [
+      { id: "flower-tent", name: "Flower Tent", grow_id: "mcdonalds" },
+      { id: "blank-grow", name: "Blank Grow Tent", grow_id: "   " },
+    ];
+    const opts = buildQuickLogV2TargetOptions(tents as any, [] as any, visibleMcdonalds);
+    expect(opts.map((o) => `${o.type}:${o.id}`)).toEqual(["tent:flower-tent"]);
+    expect(opts.find((o) => o.id === "blank-grow")).toBeUndefined();
+  });
+
+  it("omits tents whose grow_id is dangling (UUID present but not in visible roster)", () => {
+    // Live FAIL tip 87b3b322: Tent · Flower still offered with Grow "No grow
+    // linked" because hasLinkedGrowId only dropped null/blank — dangling
+    // grow_ids (Seedling, E2E*, Starter Tent, Male Tent, orphan Flower) still
+    // entered buildQuickLogV2TargetOptions while McDonald's Flower Tent was OK.
+    const tents = [
+      { id: "flower-tent", name: "Flower Tent", grow_id: "mcdonalds" },
+      { id: "orphan-flower", name: "Flower", grow_id: "dangling-grow-uuid" },
+      { id: "seedling", name: "Seedling", grow_id: "missing-grow-1" },
+      { id: "e2e-junk", name: "E2E Tent", grow_id: "missing-grow-2" },
+    ];
+    const plants = [
+      { id: "m1", name: "McDonalds", tent_id: "flower-tent", grow_id: "mcdonalds" },
+      { id: "ghost", name: "Ghost Plant", tent_id: "orphan-flower", grow_id: "dangling-grow-uuid" },
+    ];
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, visibleMcdonalds);
+    expect(opts.map((o) => `${o.type}:${o.id}`).sort()).toEqual([
+      "plant:m1",
+      "tent:flower-tent",
+    ]);
+    expect(opts.find((o) => o.id === "orphan-flower")).toBeUndefined();
+    expect(opts.find((o) => o.id === "seedling")).toBeUndefined();
+    expect(opts.find((o) => o.id === "e2e-junk")).toBeUndefined();
+    expect(opts.find((o) => o.id === "ghost")).toBeUndefined();
+  });
+
+  it("keeps linked McDonald's Flower Tent when grow is in the visible roster", () => {
+    const tents = [{ id: "flower-tent", name: "Flower Tent", grow_id: "mcdonalds" }];
+    const opts = buildQuickLogV2TargetOptions(tents as any, [] as any, visibleMcdonalds);
+    expect(opts).toEqual([
+      {
+        type: "tent",
+        id: "flower-tent",
+        label: "Flower Tent",
+        tentId: "flower-tent",
+        growId: "mcdonalds",
+      },
+    ]);
+  });
+
+  it("isResolvableQuickLogGrowId fails closed for null, blank, and dangling ids", () => {
+    const visible = new Set(["mcdonalds"]);
+    expect(isResolvableQuickLogGrowId("mcdonalds", visible)).toBe(true);
+    expect(isResolvableQuickLogGrowId(null, visible)).toBe(false);
+    expect(isResolvableQuickLogGrowId("   ", visible)).toBe(false);
+    expect(isResolvableQuickLogGrowId("dangling-grow-uuid", visible)).toBe(false);
+    expect(isResolvableQuickLogGrowId("mcdonalds", ["mcdonalds"])).toBe(true);
+  });
+
+  it("cannot resolve a stale selection key for an unlinked or dangling tent", () => {
     const tents = [
       { id: "flower-tent", name: "Flower Tent", grow_id: "mcdonalds" },
       { id: "orphan-flower", name: "Flower", grow_id: null },
+      { id: "dangling-flower", name: "Flower", grow_id: "dangling-grow-uuid" },
     ];
-    const opts = buildQuickLogV2TargetOptions(tents as any, [] as any);
-    const r = resolveQuickLogV2Target(opts, "tent:orphan-flower");
-    expect(r.ok).toBe(false);
-    expect(r.reason).toBe("selection_not_found");
+    const opts = buildQuickLogV2TargetOptions(tents as any, [] as any, visibleMcdonalds);
+    expect(resolveQuickLogV2Target(opts, "tent:orphan-flower")).toEqual({
+      ok: false,
+      reason: "selection_not_found",
+    });
+    expect(resolveQuickLogV2Target(opts, "tent:dangling-flower").ok).toBe(false);
+    expect(resolveQuickLogV2Target(opts, "tent:dangling-flower").reason).toBe(
+      "selection_not_found",
+    );
   });
 });
-
 describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
   const scopedTents = [
     { id: "veg-b", name: "Veg B", grow_id: "g1" },
@@ -195,7 +260,7 @@ describe("quickLogV2Rules — tent-scoped Target picker helpers", () => {
     { id: "orphan", name: "Loose", tent_id: null, grow_id: "g1" },
   ];
 
-  const options = buildQuickLogV2TargetOptions(scopedTents as any, scopedPlants as any);
+  const options = buildQuickLogV2TargetOptions(scopedTents as any, scopedPlants as any, ["g1"]);
 
   it("resolves tent context from tent: keys only", () => {
     expect(resolveQuickLogV2TentContextId("tent:veg-b")).toBe("veg-b");

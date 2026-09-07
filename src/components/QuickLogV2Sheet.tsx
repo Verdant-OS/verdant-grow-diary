@@ -393,7 +393,21 @@ export default function QuickLogV2Sheet({
   const wateringTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
   const feedingTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
 
-  const baseOptions = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
+  // Visible grow roster gates Target Select: dangling grow_id rows (UUID
+  // present but grow not in useGrows()) must not appear — live FAIL tip
+  // 87b3b322 offered Tent · Flower with Grow "No grow linked".
+  const { grows } = useGrows();
+  const visibleGrowIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of grows ?? []) {
+      if (typeof g?.id === "string" && g.id.trim().length > 0) ids.add(g.id.trim());
+    }
+    return ids;
+  }, [grows]);
+  const baseOptions = useMemo(
+    () => buildQuickLogV2TargetOptions(tents, plants, visibleGrowIds),
+    [tents, plants, visibleGrowIds],
+  );
 
   // Tent context from open intent / selected tent key (route registration
   // already arrives as defaultTargetKey `tent:<id>`).
@@ -432,7 +446,6 @@ export default function QuickLogV2Sheet({
     () => resolveQuickLogV2Target(options, form.selectedKey),
     [options, form.selectedKey],
   );
-  const { grows } = useGrows();
   // A remembered plant is an offer on a genuinely global/null-target open,
   // never an implicit default. Pair the record with the account key that
   // produced it so an account switch fails closed during the effect boundary.

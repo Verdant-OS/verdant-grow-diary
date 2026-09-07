@@ -222,6 +222,23 @@ describe("quickLogV2Rules — exclude unlinked / dangling grow targets", () => {
     ]);
   });
 
+  it("returns zero options when visibleGrowIds is an empty Set (fail-closed empty roster)", () => {
+    // Soft P2 #1300 follow-up: empty useGrows() roster must not surface Target
+    // Select options even when tents/plants carry non-blank grow_ids (linked or
+    // dangling). Fail closed — same fence as dangling omit, empty membership.
+    const tents = [
+      { id: "flower-tent", name: "Flower Tent", grow_id: "mcdonalds" },
+      { id: "orphan-flower", name: "Flower", grow_id: "dangling-grow-uuid" },
+    ];
+    const plants = [
+      { id: "m1", name: "McDonalds", tent_id: "flower-tent", grow_id: "mcdonalds" },
+      { id: "ghost", name: "Ghost Plant", tent_id: "orphan-flower", grow_id: "dangling-grow-uuid" },
+    ];
+    const opts = buildQuickLogV2TargetOptions(tents as any, plants as any, new Set());
+    expect(opts).toEqual([]);
+    expect(opts).toHaveLength(0);
+  });
+
   it("isResolvableQuickLogGrowId fails closed for null, blank, and dangling ids", () => {
     const visible = new Set(["mcdonalds"]);
     expect(isResolvableQuickLogGrowId("mcdonalds", visible)).toBe(true);

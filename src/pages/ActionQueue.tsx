@@ -61,8 +61,13 @@ import {
   actionsPath,
   aiDoctorSessionDetailPath,
   alertDetailPath,
-  timelinePath,
 } from "@/lib/routes";
+import {
+  ACTION_QUEUE_EMPTY_SENSORS_CTA_LABEL,
+  ACTION_QUEUE_EMPTY_TIMELINE_CTA_LABEL,
+  buildActionQueueEmptySensorsHref,
+  buildActionQueueEmptyTimelineHref,
+} from "@/lib/actionQueueEmptyNextStepsRules";
 import ActionQueueDetailDrawer from "@/components/ActionQueueDetailDrawer";
 import ActionQueueLoadingSkeleton from "@/components/ActionQueueLoadingSkeleton";
 import ActionQueueTraceStatusAnnouncer from "@/components/ActionQueueTraceStatusAnnouncer";
@@ -1488,18 +1493,18 @@ export default function ActionQueue() {
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Link
-                        to={timelinePath()}
+                        to={buildActionQueueEmptyTimelineHref({ growId: effectiveGrowId })}
                         className="text-xs text-primary hover:underline rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         data-testid="action-queue-empty-next-steps-timeline"
                       >
-                        View Timeline
+                        {ACTION_QUEUE_EMPTY_TIMELINE_CTA_LABEL}
                       </Link>
                       <Link
-                        to="/sensors"
+                        to={buildActionQueueEmptySensorsHref({ growId: effectiveGrowId })}
                         className="text-xs text-primary hover:underline rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         data-testid="action-queue-empty-next-steps-sensors"
                       >
-                        Add Sensor Snapshot
+                        {ACTION_QUEUE_EMPTY_SENSORS_CTA_LABEL}
                       </Link>
                     </div>
                   </div>

@@ -16,6 +16,8 @@ import {
   buildPlantTentMovePayload,
   buildRemovePlantFromTentPayload,
   buildArchivePlantPayload,
+  buildRestorePlantPayload,
+  resolvePlantArchiveMenuAction,
 } from "@/lib/plantTentRelationshipRules";
 
 const ROOT = resolve(__dirname, "../..");
@@ -113,11 +115,23 @@ describe("plantTentRelationshipRules · payload helpers", () => {
     expect(buildArchivePlantPayload("p1")).toEqual({ is_archived: true });
   });
 
+  it("buildRestorePlantPayload only clears is_archived", () => {
+    expect(buildRestorePlantPayload("p1")).toEqual({ is_archived: false });
+  });
+
+  it("resolvePlantArchiveMenuAction offers Restore for archived, Archive for active", () => {
+    expect(resolvePlantArchiveMenuAction(true)).toBe("restore");
+    expect(resolvePlantArchiveMenuAction(false)).toBe("archive");
+    expect(resolvePlantArchiveMenuAction(null)).toBe("archive");
+    expect(resolvePlantArchiveMenuAction(undefined)).toBe("archive");
+  });
+
   it("payload helpers never include user_id / grow_id / strain / stage", () => {
     for (const p of [
       buildPlantTentMovePayload("p1", "t1") as Record<string, unknown>,
       buildRemovePlantFromTentPayload("p1") as Record<string, unknown>,
       buildArchivePlantPayload("p1") as Record<string, unknown>,
+      buildRestorePlantPayload("p1") as Record<string, unknown>,
     ]) {
       expect(p).not.toHaveProperty("user_id");
       expect(p).not.toHaveProperty("grow_id");
@@ -182,7 +196,7 @@ describe("PlantDetail · Edit / Move / Remove / Archive action row", () => {
   });
 });
 
-describe("PlantCardActionsMenu · separate Remove vs Archive", () => {
+describe("PlantCardActionsMenu · separate Remove vs Archive / Restore", () => {
   it("Remove from Tent uses tent_id:null and shows confirmation", () => {
     expect(ACTIONS_MENU).toContain("Remove this plant from this tent?");
     expect(ACTIONS_MENU).toContain("buildRemovePlantFromTentPayload");
@@ -191,6 +205,14 @@ describe("PlantCardActionsMenu · separate Remove vs Archive", () => {
   it("Archive uses is_archived:true and asks for confirmation", () => {
     expect(ACTIONS_MENU).toContain("buildArchivePlantPayload");
     expect(ACTIONS_MENU).toMatch(/Archive .{0,40}\?/);
+  });
+
+  it("Restore uses is_archived:false and asks for confirmation", () => {
+    expect(ACTIONS_MENU).toContain("buildRestorePlantPayload");
+    expect(ACTIONS_MENU).toContain("resolvePlantArchiveMenuAction");
+    expect(ACTIONS_MENU).toMatch(/Restore .{0,40}\?/);
+    expect(ACTIONS_MENU).toContain('data-testid="plant-card-action-restore"');
+    expect(ACTIONS_MENU).toContain('data-testid="plant-detail-restore-plant"');
   });
 
   it("does not call .delete on the plants table (uses archive instead)", () => {

@@ -27,6 +27,7 @@ import {
   Move,
   Unlink,
   Archive,
+  RotateCcw,
   GitMerge,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,6 +39,8 @@ import { plantDetailPath } from "@/lib/routes";
 import {
   buildArchivePlantPayload,
   buildRemovePlantFromTentPayload,
+  buildRestorePlantPayload,
+  resolvePlantArchiveMenuAction,
 } from "@/lib/plantTentRelationshipRules";
 
 interface Plant {
@@ -63,11 +66,11 @@ interface Props {
 }
 
 /**
- * Plant management actions: View / Edit / Move / Remove from tent / Archive.
+ * Plant management actions: View / Edit / Move / Remove from tent / Archive or Restore.
  *
  * Remove from Tent only nulls `plants.tent_id`. Archive only sets
- * `plants.is_archived = true`. Diary entries, photos, and sensor readings
- * are intentionally untouched.
+ * `plants.is_archived = true`. Restore only sets `plants.is_archived = false`.
+ * Diary entries, photos, and sensor readings are intentionally untouched.
  *
  * Out of scope: alerts, Action Queue, sensors, automation, device control.
  */
@@ -75,7 +78,9 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
   const qc = useQueryClient();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState(false);
   const [busy, setBusy] = useState(false);
+  const archiveMenuAction = resolvePlantArchiveMenuAction(plant.isArchived);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ["plants"] });
@@ -113,6 +118,22 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
       return;
     }
     toast.success("Plant archived");
+    invalidate();
+  }
+
+  async function restorePlant() {
+    setBusy(true);
+    const { error } = await supabase
+      .from("plants")
+      .update(buildRestorePlantPayload(plant.id) as never)
+      .eq("id", plant.id);
+    setBusy(false);
+    setConfirmRestore(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Plant restored");
     invalidate();
   }
 
@@ -160,8 +181,77 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={confirmRestore} onOpenChange={setConfirmRestore}>
+        <AlertDialogContent data-testid="confirm-restore-plant">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore {plant.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Restoring brings the plant back into your active lists. Logs, photos, and diary
+              history stay intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              onClick={restorePlant}
+              data-testid="confirm-restore-plant-submit"
+            >
+              Restore plant
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
+
+  const archiveOrRestoreRowButton =
+    archiveMenuAction === "restore" ? (
+      <Button
+        size="sm"
+        variant="outline"
+        className="gap-1"
+        onClick={() => setConfirmRestore(true)}
+        data-testid="plant-detail-restore-plant"
+      >
+        <RotateCcw className="h-4 w-4" /> Restore Plant
+      </Button>
+    ) : (
+      <Button
+        size="sm"
+        variant="outline"
+        className="gap-1 text-destructive hover:text-destructive"
+        onClick={() => setConfirmArchive(true)}
+        data-testid="plant-detail-archive-plant"
+      >
+        <Archive className="h-4 w-4" /> Archive Plant
+      </Button>
+    );
+
+  const archiveOrRestoreMenuItem =
+    archiveMenuAction === "restore" ? (
+      <DropdownMenuItem
+        onSelect={(e) => {
+          e.preventDefault();
+          setConfirmRestore(true);
+        }}
+        data-testid="plant-card-action-restore"
+      >
+        <RotateCcw className="h-4 w-4 mr-2" /> Restore Plant
+      </DropdownMenuItem>
+    ) : (
+      <DropdownMenuItem
+        className="text-destructive focus:text-destructive"
+        onSelect={(e) => {
+          e.preventDefault();
+          setConfirmArchive(true);
+        }}
+        data-testid="plant-card-action-archive"
+      >
+        <Archive className="h-4 w-4 mr-2" /> Archive Plant
+      </DropdownMenuItem>
+    );
 
   if (variant === "row") {
     return (
@@ -226,15 +316,7 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
             </Button>
           }
         />
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1 text-destructive hover:text-destructive"
-          onClick={() => setConfirmArchive(true)}
-          data-testid="plant-detail-archive-plant"
-        >
-          <Archive className="h-4 w-4" /> Archive Plant
-        </Button>
+        {archiveOrRestoreRowButton}
         {confirmDialogs}
       </div>
     );
@@ -318,16 +400,7 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
             }
           />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onSelect={(e) => {
-              e.preventDefault();
-              setConfirmArchive(true);
-            }}
-            data-testid="plant-card-action-archive"
-          >
-            <Archive className="h-4 w-4 mr-2" /> Archive Plant
-          </DropdownMenuItem>
+          {archiveOrRestoreMenuItem}
         </DropdownMenuContent>
       </DropdownMenu>
       {confirmDialogs}

@@ -118,6 +118,18 @@ import {
 import { adaptOriginatingTimelineEventsFromRow } from "@/lib/originatingTimelineEventAdapter";
 import { useGrows } from "@/store/grows";
 
+/**
+ * Narrow cast for `action_queue_transition` (typing may lag generated Database
+ * types). Call through the client object — never extract the client's `rpc`
+ * method into a free function. supabase-js implements rpc as
+ * `return this.rest.rpc(...)`; an unbound extract leaves `this` undefined and
+ * throws "Cannot read properties of undefined (reading 'rest')" (same class as
+ * #1304).
+ */
+type UntypedActionQueueRpcClient = {
+  rpc: (fn: string, args: unknown) => PromiseLike<{ data: unknown; error: unknown }>;
+};
+
 type Status = ActionStatus;
 type EventType = ActionEventType;
 type Kind = TransitionKind;
@@ -431,12 +443,10 @@ export default function ActionDetail() {
       expectedStatus: current.status,
       note,
     });
-    const { data, error } = await (
-      supabase.rpc as unknown as (
-        fn: string,
-        args: unknown,
-      ) => Promise<{ data: unknown; error: unknown }>
-    )("action_queue_transition", rpcArgs);
+    const { data, error } = await (supabase as unknown as UntypedActionQueueRpcClient).rpc(
+      "action_queue_transition",
+      rpcArgs,
+    );
     const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
     if (error || !result || result.ok !== true) {
       if (isMissingActionQueueTransitionRpcError(error)) {

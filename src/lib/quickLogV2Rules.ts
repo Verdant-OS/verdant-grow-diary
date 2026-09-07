@@ -36,17 +36,42 @@ function hasLinkedGrowId(growId: string | null | undefined): boolean {
   return typeof growId === "string" && growId.trim().length > 0;
 }
 
+function toVisibleGrowIdSet(
+  visibleGrowIds: ReadonlySet<string> | readonly string[],
+): ReadonlySet<string> {
+  return visibleGrowIds instanceof Set ? visibleGrowIds : new Set(visibleGrowIds);
+}
+
+/**
+ * Fail-closed grow resolvability for Quick Log V2 Target Select.
+ * A grow_id is selectable only when non-blank AND present in the visible
+ * `useGrows()` roster. Dangling UUIDs (row has grow_id but grow not in the
+ * roster) must not enter options — otherwise the panel shows
+ * "No grow linked" for junk tents (Seedling, E2E*, Starter Tent, etc.).
+ */
+export function isResolvableQuickLogGrowId(
+  growId: string | null | undefined,
+  visibleGrowIds: ReadonlySet<string> | readonly string[],
+): boolean {
+  if (!hasLinkedGrowId(growId)) return false;
+  const id = (growId as string).trim();
+  return toVisibleGrowIdSet(visibleGrowIds).has(id);
+}
+
 export function buildQuickLogV2TargetOptions(
   tents: TentLike[],
   plants: PlantLike[],
+  visibleGrowIds: ReadonlySet<string> | readonly string[],
 ): QuickLogV2TargetOption[] {
+  const visible = toVisibleGrowIdSet(visibleGrowIds);
   const out: QuickLogV2TargetOption[] = [];
   for (const t of tents) {
     if (t?.is_archived) continue;
     if (!t?.id) continue;
-    // Fail closed: orphan tents with no grow cannot be selected (live FAIL:
-    // "Tent · Flower" showed Grow "No grow linked" and accepted env saves).
-    if (!hasLinkedGrowId(t.grow_id)) continue;
+    // Fail closed: null/blank grow_id OR dangling grow_id (not in visible
+    // roster) cannot be selected (live FAIL: "Tent · Flower" with Grow
+    // "No grow linked" while McDonald's Flower Tent was the real target).
+    if (!isResolvableQuickLogGrowId(t.grow_id, visible)) continue;
     out.push({
       type: "tent",
       id: t.id,
@@ -60,9 +85,9 @@ export function buildQuickLogV2TargetOptions(
     // soft-archived (archived_at), and merged plants are never targets.
     if (!p?.id) continue;
     if (isInactiveQuickLogPlant(p)) continue;
-    // Same grow-link fence as tents — plant rows without a grow are not
-    // selectable write targets.
-    if (!hasLinkedGrowId(p.grow_id)) continue;
+    // Same resolvable-grow fence as tents — unlinked or dangling grow_id
+    // rows are not selectable write targets.
+    if (!isResolvableQuickLogGrowId(p.grow_id, visible)) continue;
     out.push({
       type: "plant",
       id: p.id,

@@ -14,6 +14,7 @@ import {
   type SignupAcquisitionRpcClient,
 } from "@/lib/oauthSignupAcquisitionRules";
 import { flushPendingReferralRedeem, type ReferralRedeemClient } from "@/lib/referralRedeem";
+import { consumeOAuthHashSessionIfPresent } from "@/lib/oauthHashSessionConsumeRules";
 
 interface Ctx {
   user: User | null;
@@ -155,21 +156,46 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
         void reconcileWithClientSession(++reconcileSeq, s);
       }
     });
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
+
+    // Google / managed OAuth returns to the public origin with
+    // `#access_token=...&refresh_token=...`. Consume that hash into a
+    // sessionStorage session BEFORE the initial getSession so
+    // OAuthPostAuthRedirect can see `user` and honor pending redirectTo.
+    // Fail closed: malformed hashes are cleared without inventing a session.
+    void (async () => {
+      try {
+        if (typeof window !== "undefined") {
+          await consumeOAuthHashSessionIfPresent({
+            hash: window.location.hash,
+            pathname: window.location.pathname,
+            search: window.location.search,
+            setSession: async (tokens) => {
+              const { error } = await supabase.auth.setSession(tokens);
+              return { error };
+            },
+            replaceState: (url) => {
+              window.history.replaceState(window.history.state, "", url);
+            },
+          });
+        }
+      } catch {
+        // Hash consume must never block auth bootstrap.
+      }
+      if (disposed) return;
+      try {
+        const { data } = await supabase.auth.getSession();
         applySession(data.session);
-      })
-      .catch(() => {
+      } catch {
         // A rejected initial session read (network failure, corrupt storage)
         // must resolve to signed-out instead of leaving the apex and every
         // AppShell route on a permanent loading screen. onAuthStateChange
         // still delivers the real session if one materializes later.
         applySession(null);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      } finally {
+        if (!disposed) setLoading(false);
+      }
+    })();
+
     return () => {
       disposed = true;
       sub.subscription.unsubscribe();

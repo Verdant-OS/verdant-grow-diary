@@ -32,6 +32,10 @@ export interface TentLike {
   is_archived?: boolean;
 }
 
+function hasLinkedGrowId(growId: string | null | undefined): boolean {
+  return typeof growId === "string" && growId.trim().length > 0;
+}
+
 export function buildQuickLogV2TargetOptions(
   tents: TentLike[],
   plants: PlantLike[],
@@ -40,6 +44,9 @@ export function buildQuickLogV2TargetOptions(
   for (const t of tents) {
     if (t?.is_archived) continue;
     if (!t?.id) continue;
+    // Fail closed: orphan tents with no grow cannot be selected (live FAIL:
+    // "Tent · Flower" showed Grow "No grow linked" and accepted env saves).
+    if (!hasLinkedGrowId(t.grow_id)) continue;
     out.push({
       type: "tent",
       id: t.id,
@@ -53,6 +60,9 @@ export function buildQuickLogV2TargetOptions(
     // soft-archived (archived_at), and merged plants are never targets.
     if (!p?.id) continue;
     if (isInactiveQuickLogPlant(p)) continue;
+    // Same grow-link fence as tents — plant rows without a grow are not
+    // selectable write targets.
+    if (!hasLinkedGrowId(p.grow_id)) continue;
     out.push({
       type: "plant",
       id: p.id,

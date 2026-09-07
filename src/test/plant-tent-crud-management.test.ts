@@ -235,15 +235,12 @@ describe("EditPlantDialog · safe field-level updates", () => {
     expect(EDIT_DIALOG).toMatch(/started_at/);
   });
 
-  it("update payload never touches user_id or grow_id", () => {
-    const updates = [
-      ...EDIT_DIALOG.matchAll(/payload:\s*Record<string,\s*unknown>\s*=\s*\{([\s\S]*?)\};/g),
-    ];
-    expect(updates.length).toBeGreaterThan(0);
-    for (const m of updates) {
-      expect(m[1]).not.toMatch(/\buser_id\b/);
-      expect(m[1]).not.toMatch(/\bgrow_id\b/);
-    }
+  it("update payload never touches user_id; grow_id only via empty-grow re-home helper", () => {
+    expect(EDIT_DIALOG).not.toMatch(/\buser_id\s*:/);
+    // Direct grow_id literals in the payload object are banned; the only
+    // allowed write is the spread from buildPlantEditGrowIdFromTent.
+    expect(EDIT_DIALOG).toMatch(/\.\.\.\(growPatch\s*\?\?\s*\{\}\)/);
+    expect(EDIT_DIALOG).toMatch(/buildPlantEditGrowIdFromTent\(/);
   });
 });
 

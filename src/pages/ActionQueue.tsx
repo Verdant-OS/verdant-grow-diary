@@ -94,6 +94,8 @@ import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+  ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS,
+  settleActionQueueRpcAvailabilityOnCheckTimeout,
   type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
 import { ActionQueueRpcStatusPill } from "@/components/ActionQueueRpcStatusPill";
@@ -424,8 +426,24 @@ export default function ActionQueue() {
   // placeholder instead of a stale/assumed green. Flips to "available" only
   // when a transition actually succeeds, and to "unavailable" when a
   // transition fails with a missing-RPC signal (persistent banner + red pill).
+  // Fail-closed: if still "unknown" after ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS
+  // (empty queue / hung probe), settle to "unavailable" so the spinner never hangs.
   const [rpcAvailability, setRpcAvailability] = useState<ActionQueueRpcAvailability>("unknown");
   const rpcUnavailable = rpcAvailability === "unavailable";
+
+  // Bounded availability check: without a settling transition (common when the
+  // queue has zero actions), "unknown" would otherwise spin forever. After the
+  // timeout budget, fail closed to "unavailable" (banner + retry). Restart the
+  // timer whenever we re-enter "unknown" (refresh / retry / transient reset).
+  useEffect(() => {
+    if (rpcAvailability !== "unknown") return;
+    const handle = window.setTimeout(() => {
+      setRpcAvailability((prev) =>
+        settleActionQueueRpcAvailabilityOnCheckTimeout(prev, true),
+      );
+    }, ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS);
+    return () => window.clearTimeout(handle);
+  }, [rpcAvailability]);
 
   // Load existing approve/reject diary trace rows for the open drawer
   // row. Pure read; never inserts.

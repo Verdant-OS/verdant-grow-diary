@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   isMissingActionQueueTransitionRpcError,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+  ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS,
+  settleActionQueueRpcAvailabilityOnCheckTimeout,
 } from "@/lib/actionQueueRpcAvailability";
 import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 
@@ -140,5 +142,39 @@ describe("safeActionQueueFailureCopy rpc_missing reason", () => {
       expect(text).not.toMatch(/action_queue_transition/);
       expect(text).not.toMatch(/PGRST|42883|postgrest/i);
     }
+  });
+});
+
+describe("settleActionQueueRpcAvailabilityOnCheckTimeout", () => {
+  it("fails closed: unknown + timedOut → unavailable", () => {
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("unknown", true)).toBe(
+      "unavailable",
+    );
+  });
+
+  it("keeps the checking placeholder before the timeout elapses", () => {
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("unknown", false)).toBe(
+      "unknown",
+    );
+  });
+
+  it("never overwrites a settled available or unavailable state", () => {
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("available", true)).toBe(
+      "available",
+    );
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("available", false)).toBe(
+      "available",
+    );
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("unavailable", true)).toBe(
+      "unavailable",
+    );
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("unavailable", false)).toBe(
+      "unavailable",
+    );
+  });
+
+  it("pins the check timeout budget to ~3–5s", () => {
+    expect(ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS).toBeGreaterThanOrEqual(3000);
+    expect(ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS).toBeLessThanOrEqual(5000);
   });
 });

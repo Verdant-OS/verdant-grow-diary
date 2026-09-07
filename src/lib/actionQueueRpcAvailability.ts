@@ -154,3 +154,30 @@ export const ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY = {
   title: "Action transitions are available",
   label: "Transitions ready",
 } as const;
+
+/**
+ * Time (ms) after which an unresolved "unknown" RPC availability check
+ * fails closed to "unavailable". Stops a forever "Checking availability"
+ * spinner when no transition attempt settles the state (e.g. empty queue
+ * with zero approve/reject/complete attempts).
+ *
+ * Budget is intentionally short (~3–5s): long enough for a healthy
+ * first-paint settle, short enough that growers are never stranded on
+ * the checking placeholder.
+ */
+export const ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS = 4000;
+
+/**
+ * Fail-closed settle for the Action Queue transition-RPC availability pill.
+ *
+ * When the check timer elapses while still `"unknown"`, promote to
+ * `"unavailable"`. Settled `"available"` / `"unavailable"` states are
+ * preserved (evidence-honest — never overwrite proven status).
+ */
+export function settleActionQueueRpcAvailabilityOnCheckTimeout(
+  availability: ActionQueueRpcAvailability,
+  timedOut: boolean,
+): ActionQueueRpcAvailability {
+  if (timedOut && availability === "unknown") return "unavailable";
+  return availability;
+}

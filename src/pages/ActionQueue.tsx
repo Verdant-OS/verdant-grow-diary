@@ -153,6 +153,18 @@ import {
 
 import { Input } from "@/components/ui/input";
 
+/**
+ * Narrow cast for `action_queue_transition` (typing may lag generated Database
+ * types). Call through the client object — never extract the client's `rpc`
+ * method into a free function. supabase-js implements rpc as
+ * `return this.rest.rpc(...)`; an unbound extract leaves `this` undefined and
+ * throws "Cannot read properties of undefined (reading 'rest')" (same class as
+ * #1304).
+ */
+type UntypedActionQueueRpcClient = {
+  rpc: (fn: string, args: unknown) => PromiseLike<{ data: unknown; error: unknown }>;
+};
+
 type Status = ActionStatus;
 type EventType = ActionEventType;
 
@@ -438,9 +450,7 @@ export default function ActionQueue() {
   useEffect(() => {
     if (rpcAvailability !== "unknown") return;
     const handle = window.setTimeout(() => {
-      setRpcAvailability((prev) =>
-        settleActionQueueRpcAvailabilityOnCheckTimeout(prev, true),
-      );
+      setRpcAvailability((prev) => settleActionQueueRpcAvailabilityOnCheckTimeout(prev, true));
     }, ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS);
     return () => window.clearTimeout(handle);
   }, [rpcAvailability]);
@@ -752,12 +762,10 @@ export default function ActionQueue() {
       expectedStatus: row.status,
       note,
     });
-    const { data, error } = await (
-      supabase.rpc as unknown as (
-        fn: string,
-        args: unknown,
-      ) => Promise<{ data: unknown; error: unknown }>
-    )("action_queue_transition", rpcArgs);
+    const { data, error } = await (supabase as unknown as UntypedActionQueueRpcClient).rpc(
+      "action_queue_transition",
+      rpcArgs,
+    );
     const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
     if (error || !result || result.ok !== true) {
       // Distinguish "backend RPC missing" from a normal transient failure so
@@ -1043,11 +1051,7 @@ export default function ActionQueue() {
         current="action-queue"
         ids={{
           growId: effectiveGrowId,
-          actionId: pickFirstLoadedId([
-            drawerRow?.id,
-            focusedActionId,
-            highlightedActionId,
-          ]),
+          actionId: pickFirstLoadedId([drawerRow?.id, focusedActionId, highlightedActionId]),
           alertId: alertContextId,
         }}
         testId="action-queue-one-tent-loop-next-step-card"

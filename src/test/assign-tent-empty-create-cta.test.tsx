@@ -1,17 +1,14 @@
 /**
- * ASSIGN_TENT_EMPTY_CREATE_CTA
+ * ASSIGN_TENT_EMPTY_CREATE_CTA / ASSIGN_TENT_EMPTY_CREATE_CTA_LIVE_MISS
  *
- * Fixture P0 (Golden Venom): Assign/Move to tent modal shows only
- * "No tents available in this grow." with no Create tent escape hatch when
- * the plant's grow has zero tents (and the owner has no other tents to
- * fall back to). Dead-end modal.
- *
- * Pins: empty-tents assign modal exposes a grow-preserving Create tent CTA
- * wired to CreateTentDialog with the same growId.
+ * Empty Assign/Move modal must expose a grow-preserving Create tent escape
+ * hatch (plain Button + sibling CreateTentDialog), not a nested DialogTrigger
+ * inside Assign's Dialog (live MEASURED miss on Plants → Move).
  */
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const mocks = vi.hoisted(() => ({
@@ -19,8 +16,12 @@ const mocks = vi.hoisted(() => ({
   tentQueryRuns: 0,
   tentRows: [] as Array<Record<string, unknown>>,
   tentRowsByCall: null as Array<Array<Record<string, unknown>>> | null,
-  dialogOnOpenChange: null as ((open: boolean) => void) | null,
-  createTentDefaultGrowIds: [] as Array<string | undefined>,
+  /** AssignTentDialog's onOpenChange (first Dialog without controlled open=false). */
+  assignOnOpenChange: null as ((open: boolean) => void) | null,
+  createTentProps: [] as Array<{
+    defaultGrowId?: string;
+    open?: boolean;
+  }>,
 }));
 
 vi.mock("@/store/auth", () => ({
@@ -68,12 +69,20 @@ vi.mock("@/components/ui/dialog", () => {
   );
   const Dialog = ({
     children,
+    open,
     onOpenChange,
   }: {
     children?: ReactNode;
+    open?: boolean;
     onOpenChange?: (open: boolean) => void;
   }) => {
-    mocks.dialogOnOpenChange = onOpenChange ?? null;
+    // Capture Assign's uncontrolled handler (open starts undefined/false until opened).
+    if (open === undefined || open === false) {
+      if (onOpenChange && !mocks.assignOnOpenChange) {
+        mocks.assignOnOpenChange = onOpenChange;
+      }
+    }
+    if (open === false) return null;
     return <>{children}</>;
   };
   return {
@@ -102,9 +111,20 @@ vi.mock("@/components/ui/select", () => {
 });
 
 vi.mock("@/components/CreateTentDialog", () => ({
-  default: ({ defaultGrowId, trigger }: { defaultGrowId?: string; trigger?: ReactNode }) => {
-    mocks.createTentDefaultGrowIds.push(defaultGrowId);
-    return <>{trigger ?? <span>Create tent</span>}</>;
+  default: ({
+    defaultGrowId,
+    open,
+  }: {
+    defaultGrowId?: string;
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+  }) => {
+    mocks.createTentProps.push({ defaultGrowId, open });
+    return (
+      <div data-testid="create-tent-dialog-stub" data-grow-id={defaultGrowId ?? ""}>
+        Create tent dialog ({defaultGrowId})
+      </div>
+    );
   },
 }));
 
@@ -119,23 +139,23 @@ function openDialog(growId: string | null) {
       <AssignTentDialog plantId="plant-1" growId={growId} currentTentId={null} />
     </QueryClientProvider>,
   );
-  if (!mocks.dialogOnOpenChange) throw new Error("Dialog never received onOpenChange");
-  act(() => mocks.dialogOnOpenChange?.(true));
+  if (!mocks.assignOnOpenChange) throw new Error("Assign Dialog never received onOpenChange");
+  act(() => mocks.assignOnOpenChange?.(true));
   return result;
 }
 
 beforeEach(() => {
   mocks.tentFilters.length = 0;
   mocks.tentQueryRuns = 0;
-  mocks.dialogOnOpenChange = null;
+  mocks.assignOnOpenChange = null;
   mocks.tentRowsByCall = null;
   mocks.tentRows = [];
-  mocks.createTentDefaultGrowIds.length = 0;
+  mocks.createTentProps.length = 0;
 });
 
 describe("AssignTentDialog · empty grow Create tent CTA", () => {
-  it("exposes Create tent CTA scoped to the plant grow when no tents exist", async () => {
-    // Grow-scoped query empty, owner fallback also empty → dead-end without CTA.
+  it("exposes Create tent button and opens sibling CreateTentDialog for the plant grow", async () => {
+    const user = userEvent.setup();
     mocks.tentRowsByCall = [[], []];
     openDialog("one-tent-golden-run");
 
@@ -144,9 +164,21 @@ describe("AssignTentDialog · empty grow Create tent CTA", () => {
     expect(screen.getByText("No tents available in this grow.")).toBeInTheDocument();
 
     const cta = await screen.findByTestId("assign-tent-create-tent-cta");
-    expect(cta).toBeInTheDocument();
     expect(cta).toHaveAttribute("data-grow-id", "one-tent-golden-run");
-    expect(mocks.createTentDefaultGrowIds).toContain("one-tent-golden-run");
+    const button = screen.getByTestId("assign-tent-create-tent-button");
+    expect(button).toHaveTextContent("Create tent");
+
+    // Sibling CreateTentDialog must not mount until the plain Button is clicked
+    // (avoids nested DialogTrigger-inside-Dialog).
+    expect(mocks.createTentProps).toHaveLength(0);
+    expect(screen.queryByTestId("create-tent-dialog-stub")).toBeNull();
+
+    await user.click(button);
+    expect(await screen.findByTestId("create-tent-dialog-stub")).toHaveAttribute(
+      "data-grow-id",
+      "one-tent-golden-run",
+    );
+    expect(mocks.createTentProps.some((p) => p.defaultGrowId === "one-tent-golden-run")).toBe(true);
   });
 
   it("does not mount Create tent CTA when the grow has selectable tents", async () => {
@@ -157,5 +189,6 @@ describe("AssignTentDialog · empty grow Create tent CTA", () => {
     expect(await screen.findByTestId("assign-tent-select")).toBeInTheDocument();
     expect(screen.queryByTestId("assign-tent-create-tent-cta")).toBeNull();
     expect(screen.queryByTestId("assign-tent-empty")).toBeNull();
+    expect(screen.queryByTestId("assign-tent-create-tent-button")).toBeNull();
   });
 });

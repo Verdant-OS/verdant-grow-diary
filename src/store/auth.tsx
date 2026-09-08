@@ -14,7 +14,11 @@ import {
   type SignupAcquisitionRpcClient,
 } from "@/lib/oauthSignupAcquisitionRules";
 import { flushPendingReferralRedeem, type ReferralRedeemClient } from "@/lib/referralRedeem";
-import { consumeOAuthHashSessionIfPresent } from "@/lib/oauthHashSessionConsumeRules";
+import {
+  consumeOAuthHashSessionIfPresent,
+  takeOAuthReturnHashStash,
+  type OAuthHashStashHolder,
+} from "@/lib/oauthHashSessionConsumeRules";
 
 interface Ctx {
   user: User | null;
@@ -158,15 +162,19 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
     });
 
     // Google / managed OAuth returns to the public origin with
-    // `#access_token=...&refresh_token=...`. Consume that hash into a
-    // sessionStorage session BEFORE the initial getSession so
-    // OAuthPostAuthRedirect can see `user` and honor pending redirectTo.
-    // Fail closed: malformed hashes are cleared without inventing a session.
+    // `#access_token=...&refresh_token=...`. The document-head wipe may
+    // already have stashed and stripped that hash before first paint.
+    // Consume in-memory tokens into a sessionStorage session BEFORE the
+    // initial getSession so OAuthPostAuthRedirect can see `user` and honor
+    // pending redirectTo. Fail closed: malformed hashes are cleared without
+    // inventing a session. Never log the hash or tokens.
     void (async () => {
       try {
         if (typeof window !== "undefined") {
+          const stashedHash = takeOAuthReturnHashStash(window as OAuthHashStashHolder);
           await consumeOAuthHashSessionIfPresent({
             hash: window.location.hash,
+            stashedHash,
             pathname: window.location.pathname,
             search: window.location.search,
             setSession: async (tokens) => {

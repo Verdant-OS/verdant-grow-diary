@@ -4,9 +4,10 @@
  *
  * Managed OAuth (Lovable) redirects back to `window.location.origin` with
  * `#access_token=...&refresh_token=...` (or `#error=...`). The SPA must
- * parse those fragments, call `setSession`, and clear the hash without a
- * full reload so `OAuthPostAuthRedirect` can honor a pending redirectTo
- * once `user` exists.
+ * parse those fragments, wipe the hash via replaceState immediately, then
+ * call `setSession` from in-memory tokens so `OAuthPostAuthRedirect` can
+ * honor a pending redirectTo once `user` exists. Tokens must not remain
+ * in `location.hash` (or the current history URL) after app JS runs.
  *
  * Fail closed: never invent sessions from malformed or missing tokens.
  * Does not weaken open-redirect sanitizers — this module only strips the
@@ -134,45 +135,88 @@ export function clearOAuthHashFromAddressBar(
   }
 }
 
+export function hashLooksLikeOAuthReturn(hash: unknown): boolean {
+  return parseOAuthHashFragment(typeof hash === "string" ? hash : "").kind !== "none";
+}
+
+/**
+ * One-shot in-memory stash used by the before-paint wipe script so consume
+ * can still call setSession after location.hash is already empty.
+ * Never log this key's value.
+ */
+export const OAUTH_RETURN_HASH_STASH_KEY = "__VERDANT_OAUTH_RETURN_HASH__" as const;
+
+export type OAuthHashStashHolder = {
+  [OAUTH_RETURN_HASH_STASH_KEY]?: unknown;
+};
+
+export function takeOAuthReturnHashStash(holder: OAuthHashStashHolder): string | null {
+  const raw = holder[OAUTH_RETURN_HASH_STASH_KEY];
+  try {
+    delete holder[OAUTH_RETURN_HASH_STASH_KEY];
+  } catch {
+    try {
+      holder[OAUTH_RETURN_HASH_STASH_KEY] = undefined;
+    } catch {
+      // Ignore stash holders that reject delete/assign.
+    }
+  }
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
+export function resolveOAuthHashSource(locationHash: unknown, stashedHash: unknown): string {
+  if (typeof stashedHash === "string" && stashedHash.length > 0) return stashedHash;
+  return typeof locationHash === "string" ? locationHash : "";
+}
+
+/**
+ * Tiny blocking head script: stash an OAuth-looking hash, then replaceState
+ * before first paint. Must stay import-free so it can run before module graph.
+ * Detection mirrors parseOAuthHashFragment's oauth-looking keys.
+ */
+export const OAUTH_HASH_EARLY_WIPE_SCRIPT =
+  '(function(){try{var h=location.hash||"";if(h.indexOf("access_token=")<0&&h.indexOf("refresh_token=")<0&&h.indexOf("error=")<0)return;window.' +
+  OAUTH_RETURN_HASH_STASH_KEY +
+  '=h;history.replaceState(history.state,"",location.pathname+location.search);}catch(e){}})();';
+
 export type OAuthHashSetSession = (
   tokens: OAuthHashSessionTokens,
 ) => Promise<{ error: unknown } | null | undefined>;
 
 /**
- * Parse → setSession (when tokens are valid) → always clear OAuth-looking hash.
- * Fail closed on malformed / provider error / setSession failure: clear hash,
- * never invent a session.
+ * Parse → wipe hash (replaceState, synchronous) → setSession from in-memory
+ * tokens. Fail closed on malformed / provider error / setSession failure:
+ * hash is already gone; never invent a session.
+ *
+ * Prefer `stashedHash` from the before-paint wipe when location.hash is empty.
  */
 export async function consumeOAuthHashSessionIfPresent(deps: {
   readonly hash: string;
+  readonly stashedHash?: string | null;
   readonly pathname: string;
   readonly search: string;
   readonly setSession: OAuthHashSetSession;
   readonly replaceState: (url: string) => void;
 }): Promise<OAuthHashConsumeOutcome> {
-  const parsed = parseOAuthHashFragment(deps.hash);
+  const sourceHash = resolveOAuthHashSource(deps.hash, deps.stashedHash);
+  const parsed = parseOAuthHashFragment(sourceHash);
   if (parsed.kind === "none") return "noop";
 
-  const clear = () => {
-    clearOAuthHashFromAddressBar(
-      { pathname: deps.pathname, search: deps.search, hash: deps.hash },
-      deps.replaceState,
-    );
-  };
+  // Wipe first so tokens do not sit in the address bar for setSession latency.
+  clearOAuthHashFromAddressBar(
+    { pathname: deps.pathname, search: deps.search, hash: sourceHash },
+    deps.replaceState,
+  );
 
   if (!shouldAttemptOAuthHashSessionConsume(parsed)) {
-    clear();
     return "cleared_without_session";
   }
 
   try {
     const result = await deps.setSession(parsed.tokens);
-    const error =
-      result && typeof result === "object" && "error" in result ? result.error : null;
-    clear();
+    const error = result && typeof result === "object" && "error" in result ? result.error : null;
     return error ? "cleared_without_session" : "consumed";
   } catch {
-    clear();
     return "cleared_without_session";
   }
 }

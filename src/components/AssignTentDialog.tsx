@@ -41,6 +41,12 @@ interface Props {
   growId?: string | null;
   currentTentId?: string | null;
   trigger?: React.ReactNode;
+  /**
+   * Optional controlled open for callers that lift this dialog out of a
+   * DropdownMenu (Plants list Move) so the menu can close without unmounting.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -53,12 +59,26 @@ interface Props {
  * Sensor readings, alerts, Action Queue, automation, and device control remain
  * out of scope.
  */
-export default function AssignTentDialog({ plantId, growId, currentTentId, trigger }: Props) {
+export default function AssignTentDialog({
+  plantId,
+  growId,
+  currentTentId,
+  trigger,
+  open: openProp,
+  onOpenChange,
+}: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const isControlled = openProp !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = isControlled ? openProp : uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const [selected, setSelected] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [createTentOpen, setCreateTentOpen] = useState(false);
 
   const isMove = Boolean(currentTentId);
 
@@ -232,116 +252,137 @@ export default function AssignTentDialog({ plantId, growId, currentTentId, trigg
   }
 
   const ctaLabel = isMove ? "Move Plant" : "Assign to tent";
+  // Controlled Plants-list Move owns a menu item and omits DialogTrigger so the
+  // dialog can live outside DropdownMenuContent (menu closes on select).
+  const showTrigger = trigger !== undefined || !isControlled;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1"
-            data-testid={isMove ? "plant-detail-move-tent" : "plant-detail-assign-tent"}
-          >
-            <Move className="h-4 w-4" /> {ctaLabel}
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="glass max-w-md" data-testid="assign-tent-dialog">
-        <DialogHeader>
-          <DialogTitle className="font-display">
-            {isMove ? "Move Plant" : "Assign to tent"}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        {showTrigger ? (
+          <DialogTrigger asChild>
+            {trigger ?? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                data-testid={isMove ? "plant-detail-move-tent" : "plant-detail-assign-tent"}
+              >
+                <Move className="h-4 w-4" /> {ctaLabel}
+              </Button>
+            )}
+          </DialogTrigger>
+        ) : null}
+        <DialogContent className="glass max-w-md" data-testid="assign-tent-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {isMove ? "Move Plant" : "Assign to tent"}
+            </DialogTitle>
+          </DialogHeader>
 
-        {tentsPending ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : others.length === 0 && current.length === 0 ? (
-          <div className="grid gap-3" data-testid="assign-tent-empty">
-            <p className="text-sm text-muted-foreground">
-              {growId && !usedGrowFallback
-                ? "No tents available in this grow."
-                : "No tents available."}
-            </p>
-            {growId ? (
-              <div data-testid="assign-tent-create-tent-cta" data-grow-id={growId}>
-                <CreateTentDialog
-                  defaultGrowId={growId}
-                  onCreated={async (tent: CreatedTent) => {
-                    await qc.invalidateQueries({
-                      queryKey: ["plant-detail", "eligible-tents", plantId, growId],
-                    });
-                    setSelected(tent.id);
-                  }}
-                  trigger={
-                    <Button type="button" className="gradient-leaf text-primary-foreground gap-1">
-                      <Plus className="h-4 w-4" /> Create tent
-                    </Button>
-                  }
-                />
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <form onSubmit={submit} className="grid gap-3">
-            <div>
-              <Label>Tent</Label>
-              <Select value={selected} onValueChange={setSelected}>
-                <SelectTrigger data-testid="assign-tent-select">
-                  <SelectValue placeholder="Pick a tent" />
-                </SelectTrigger>
-                <SelectContent>
-                  {others.length > 0 && (
-                    <SelectGroup>
-                      <SelectLabel>Tents in this grow</SelectLabel>
-                      {others.map((t) => (
-                        <SelectItem
-                          key={t.id}
-                          value={t.id}
-                          data-testid={`assign-tent-option-${t.id}`}
-                        >
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  )}
-                  {current.length > 0 && (
-                    <SelectGroup>
-                      <SelectLabel>Current Tent</SelectLabel>
-                      {current.map((t) => (
-                        <SelectItem
-                          key={t.id}
-                          value={t.id}
-                          disabled
-                          data-testid={`assign-tent-option-current-${t.id}`}
-                        >
-                          {t.name} — current tent
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  )}
-                </SelectContent>
-              </Select>
-              {isMove && current[0]?.name && (
-                <p
-                  className="text-xs text-muted-foreground mt-1"
-                  data-testid="assign-tent-previous-tent"
-                >
-                  Previous Tent: {current[0].name}
-                </p>
-              )}
+          {tentsPending ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : others.length === 0 && current.length === 0 ? (
+            <div className="grid gap-3" data-testid="assign-tent-empty">
+              <p className="text-sm text-muted-foreground">
+                {growId && !usedGrowFallback
+                  ? "No tents available in this grow."
+                  : "No tents available."}
+              </p>
+              {growId ? (
+                <div data-testid="assign-tent-create-tent-cta" data-grow-id={growId}>
+                  {/*
+                    Plain Button — do not nest CreateTentDialog's DialogTrigger
+                    inside this Dialog. Live MEASURED miss: grow-scoped empty
+                    copy rendered while the nested Create tent trigger did not
+                    appear (Assign open under Plants → Move dropdown).
+                  */}
+                  <Button
+                    type="button"
+                    className="gradient-leaf text-primary-foreground gap-1"
+                    data-testid="assign-tent-create-tent-button"
+                    onClick={() => setCreateTentOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" /> Create tent
+                  </Button>
+                </div>
+              ) : null}
             </div>
-            <Button
-              type="submit"
-              disabled={busy || !selected}
-              className="gradient-leaf text-primary-foreground"
-              data-testid="assign-tent-submit"
-            >
-              {isMove ? "Move Plant" : "Assign plant"}
-            </Button>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+          ) : (
+            <form onSubmit={submit} className="grid gap-3">
+              <div>
+                <Label>Tent</Label>
+                <Select value={selected} onValueChange={setSelected}>
+                  <SelectTrigger data-testid="assign-tent-select">
+                    <SelectValue placeholder="Pick a tent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {others.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Tents in this grow</SelectLabel>
+                        {others.map((t) => (
+                          <SelectItem
+                            key={t.id}
+                            value={t.id}
+                            data-testid={`assign-tent-option-${t.id}`}
+                          >
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {current.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Current Tent</SelectLabel>
+                        {current.map((t) => (
+                          <SelectItem
+                            key={t.id}
+                            value={t.id}
+                            disabled
+                            data-testid={`assign-tent-option-current-${t.id}`}
+                          >
+                            {t.name} — current tent
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+                {isMove && current[0]?.name && (
+                  <p
+                    className="text-xs text-muted-foreground mt-1"
+                    data-testid="assign-tent-previous-tent"
+                  >
+                    Previous Tent: {current[0].name}
+                  </p>
+                )}
+              </div>
+              <Button
+                type="submit"
+                disabled={busy || !selected}
+                className="gradient-leaf text-primary-foreground"
+                data-testid="assign-tent-submit"
+              >
+                {isMove ? "Move Plant" : "Assign plant"}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      {growId && createTentOpen ? (
+        <CreateTentDialog
+          defaultGrowId={growId}
+          open={createTentOpen}
+          onOpenChange={setCreateTentOpen}
+          onCreated={async (tent: CreatedTent) => {
+            await qc.invalidateQueries({
+              queryKey: ["plant-detail", "eligible-tents", plantId, growId],
+            });
+            setSelected(tent.id);
+            setCreateTentOpen(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

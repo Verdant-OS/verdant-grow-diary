@@ -79,6 +79,8 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
+  /** Lifted Assign/Move dialog — must not live inside DropdownMenuContent. */
+  const [assignOpen, setAssignOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const archiveMenuAction = resolvePlantArchiveMenuAction(plant.isArchived);
 
@@ -356,19 +358,12 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
               </DropdownMenuItem>
             }
           />
-          <AssignTentDialog
-            plantId={plant.id}
-            growId={plant.growId ?? null}
-            currentTentId={plant.tentId ?? null}
-            trigger={
-              <DropdownMenuItem
-                onSelect={(e) => e.preventDefault()}
-                data-testid="plant-card-action-move"
-              >
-                <Move className="h-4 w-4 mr-2" /> Move Plant
-              </DropdownMenuItem>
-            }
-          />
+          <DropdownMenuItem
+            onSelect={() => setAssignOpen(true)}
+            data-testid="plant-card-action-move"
+          >
+            <Move className="h-4 w-4 mr-2" /> Move Plant
+          </DropdownMenuItem>
           {plant.tentId && (
             <DropdownMenuItem
               onSelect={(e) => {
@@ -403,6 +398,13 @@ export default function PlantCardActionsMenu({ plant, variant = "menu", hideView
           {archiveOrRestoreMenuItem}
         </DropdownMenuContent>
       </DropdownMenu>
+      <AssignTentDialog
+        plantId={plant.id}
+        growId={plant.growId ?? null}
+        currentTentId={plant.tentId ?? null}
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+      />
       {confirmDialogs}
     </>
   );

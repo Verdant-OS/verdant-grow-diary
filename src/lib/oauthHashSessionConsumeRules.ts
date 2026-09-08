@@ -150,8 +150,24 @@ export type OAuthHashStashHolder = {
   [OAUTH_RETURN_HASH_STASH_KEY]?: unknown;
 };
 
-export function takeOAuthReturnHashStash(holder: OAuthHashStashHolder): string | null {
+/**
+ * Survives AuthProvider `take()` and React remounts so `/reset-password`
+ * can still diagnose recovery/error hashes after the one-shot window stash
+ * is consumed. Never log this value.
+ */
+let retainedOAuthReturnHash: string | null = null;
+
+function readStashHolder(holder: OAuthHashStashHolder): string | null {
   const raw = holder[OAUTH_RETURN_HASH_STASH_KEY];
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
+export function peekOAuthReturnHashStash(holder: OAuthHashStashHolder): string | null {
+  return readStashHolder(holder) ?? retainedOAuthReturnHash;
+}
+
+export function takeOAuthReturnHashStash(holder: OAuthHashStashHolder): string | null {
+  const raw = readStashHolder(holder);
   try {
     delete holder[OAUTH_RETURN_HASH_STASH_KEY];
   } catch {
@@ -161,7 +177,13 @@ export function takeOAuthReturnHashStash(holder: OAuthHashStashHolder): string |
       // Ignore stash holders that reject delete/assign.
     }
   }
-  return typeof raw === "string" && raw.length > 0 ? raw : null;
+  if (raw) retainedOAuthReturnHash = raw;
+  return raw;
+}
+
+/** Test isolation only — production never needs to forget a just-consumed return hash. */
+export function clearOAuthReturnHashRetention(): void {
+  retainedOAuthReturnHash = null;
 }
 
 export function resolveOAuthHashSource(locationHash: unknown, stashedHash: unknown): string {
@@ -175,7 +197,7 @@ export function resolveOAuthHashSource(locationHash: unknown, stashedHash: unkno
  * Detection mirrors parseOAuthHashFragment's oauth-looking keys.
  */
 export const OAUTH_HASH_EARLY_WIPE_SCRIPT =
-  '(function(){try{var h=location.hash||"";if(h.indexOf("access_token=")<0&&h.indexOf("refresh_token=")<0&&h.indexOf("error=")<0)return;window.' +
+  '(function(){try{var h=location.hash||"";if(!h)return;var q=h.charAt(0)==="#"?h.slice(1):h;var p=new URLSearchParams(q);if(!p.has("access_token")&&!p.has("refresh_token")&&!p.has("error"))return;window.' +
   OAUTH_RETURN_HASH_STASH_KEY +
   '=h;history.replaceState(history.state,"",location.pathname+location.search);}catch(e){}})();';
 
@@ -203,10 +225,17 @@ export async function consumeOAuthHashSessionIfPresent(deps: {
   if (parsed.kind === "none") return "noop";
 
   // Wipe first so tokens do not sit in the address bar for setSession latency.
-  clearOAuthHashFromAddressBar(
+  const wiped = clearOAuthHashFromAddressBar(
     { pathname: deps.pathname, search: deps.search, hash: sourceHash },
     deps.replaceState,
   );
+  // `deps.hash` is the live address bar. A successful before-paint wipe leaves
+  // it empty even if this second replaceState throws. Only abort setSession
+  // when the address bar still holds an OAuth-looking fragment.
+  const addressBarStillHasOAuth = parseOAuthHashFragment(deps.hash).kind !== "none";
+  if (!wiped && addressBarStillHasOAuth) {
+    return "cleared_without_session";
+  }
 
   if (!shouldAttemptOAuthHashSessionConsume(parsed)) {
     return "cleared_without_session";

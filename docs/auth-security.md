@@ -73,16 +73,24 @@ unchanged; no `service_role`; no SSR cookie rewrite):
 1. **Before first paint** — `OAUTH_HASH_EARLY_WIPE_SCRIPT` is a blocking
    inline script in document `<head>` (`src/routes/__root.tsx`, before
    `</head>` / body). If the hash looks like an OAuth return
-   (`access_token=`, `refresh_token=`, or `error=`), the script copies
+   (`access_token`, `refresh_token`, or `error` as exact
+   `URLSearchParams` keys — not a substring match), the script copies
    it into a one-shot in-memory `window` slot and `history.replaceState`s
    to path + search with no fragment. Hosted SSR may emit meta/CSS ahead
    of this script inside `<head>`; it still runs before body parse.
 2. **Before `setSession`** — `consumeOAuthHashSessionIfPresent` parses
    (preferring the before-paint stash when `location.hash` is already
    empty), wipes the hash synchronously, then awaits `setSession` with
-   tokens held only in memory. Malformed and provider-error hashes are
-   cleared without inventing a session.
-3. **Never log** `location.hash`, `access_token`, `refresh_token`, or
+   tokens held only in memory. If `replaceState` cannot confirm the wipe
+   **and** the live address bar still holds an OAuth-looking fragment,
+   consume aborts without `setSession`. Malformed and provider-error
+   hashes are cleared without inventing a session.
+3. **`/reset-password`** — recovery and error hashes use the same
+   fragment shape. `ResetPassword` peeks the stash (including a
+   take-surviving retention copy) before diagnosing, and waits briefly
+   for `getSession()` when session tokens were present so AuthProvider
+   consume can finish first.
+4. **Never log** `location.hash`, `access_token`, `refresh_token`, or
    full session payloads.
 
 ### Why PKCE / auth-code is not switched in this slice

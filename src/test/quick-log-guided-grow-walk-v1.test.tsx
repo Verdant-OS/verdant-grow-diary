@@ -10,6 +10,7 @@ import {
   GROW_WALK_VISIT_MODES,
   resolveGrowWalkPlantPrompts,
 } from "@/lib/growWalkContracts";
+import { QUICK_LOG_V2_EMPTY_CONTENT_HELPER } from "@/lib/quickLogV2Rules";
 
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
@@ -91,6 +92,14 @@ describe("Quick Log Field Edition progressive disclosure", () => {
       "true",
     );
     expect(screen.getByLabelText("Note (optional)")).toBeInTheDocument();
+    // Empty note fails closed — Save stays disabled until useful content exists.
+    expect(screen.getByTestId("qlv2-save")).toBeDisabled();
+    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+      QUICK_LOG_V2_EMPTY_CONTENT_HELPER,
+    );
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Fast check — canopy posture looks steady." },
+    });
     expect(screen.getByTestId("qlv2-save")).toBeEnabled();
     expect(screen.queryByTestId("qlv2-grow-walk-backbone")).not.toBeInTheDocument();
   });

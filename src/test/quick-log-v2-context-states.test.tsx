@@ -142,6 +142,20 @@ describe("QuickLogV2Sheet — Save requires an explicit plant or tent target", (
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("LIVE MISS #1310: note text without a plant/tent target keeps Save disabled (no toast/RPC)", () => {
+    renderSheet();
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Has note text but no plant or tent selected." },
+    });
+    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+      "Choose a plant or tent before saving.",
+    );
+    const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
   it("disables Save when a plant target is selected but note content is empty", () => {
     renderSheet("plant:plant-1");
     expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(

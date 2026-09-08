@@ -68,6 +68,14 @@ function renderSheet(defaultTargetKey: string) {
   );
 }
 
+/** Note action with real content so the empty-content gate lets Save fire. */
+function prepareNoteSave() {
+  fireEvent.click(screen.getByRole("button", { name: "Note" }));
+  fireEvent.change(screen.getByLabelText("Note (optional)"), {
+    target: { value: "Retry path — leaf posture held after watering." },
+  });
+}
+
 beforeEach(() => {
   rpcMock.mockReset();
   toastSuccess.mockReset();
@@ -81,7 +89,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
       error: null,
     });
     renderSheet("plant:plant-1");
-    fireEvent.click(screen.getByRole("button", { name: "Note" }));
+    prepareNoteSave();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(screen.getByTestId("qlv2-error")).toBeInTheDocument());
@@ -99,7 +107,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         error: null,
       });
     renderSheet("plant:plant-1");
-    fireEvent.click(screen.getByRole("button", { name: "Note" }));
+    prepareNoteSave();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
@@ -124,7 +132,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         error: null,
       });
     renderSheet("plant:plant-1");
-    fireEvent.click(screen.getByRole("button", { name: "Note" }));
+    prepareNoteSave();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(screen.getByTestId("qlv2-save-retry")).toBeInTheDocument());
 
@@ -159,7 +167,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         error: null,
       });
     renderSheet("plant:plant-1");
-    fireEvent.click(screen.getByRole("button", { name: "Note" }));
+    prepareNoteSave();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     return waitFor(() => expect(screen.getByTestId("qlv2-save-retry")).toBeInTheDocument()).then(
       async () => {

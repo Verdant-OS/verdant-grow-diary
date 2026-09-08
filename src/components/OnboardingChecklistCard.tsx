@@ -44,9 +44,19 @@ export default function OnboardingChecklistCard({ vm }: { vm: OnboardingChecklis
     );
   }
 
-  // Plant memory ends get-started framing. Keep a clear Add tent next-step
-  // when the tent is still missing — without the 5-step onboarding shell.
-  if (!vm.shouldShowGetStartedShell) {
+  // Belt-and-suspenders against residual live miss: never render the
+  // first-time get-started shell once plant memory is on the grow.
+  // Trust primaryFrame / shouldShowGetStartedShell, and also refuse the
+  // shell when the plant step is already complete or an operating
+  // next-step is present (inconsistent VM / rolling-deploy drift).
+  const plantStepComplete = vm.steps.some((s) => s.key === "add_plant" && s.complete);
+  const showGetStartedShell =
+    vm.primaryFrame === "get_started" &&
+    vm.shouldShowGetStartedShell &&
+    !plantStepComplete &&
+    !vm.operatingNextStep;
+
+  if (!showGetStartedShell) {
     if (!vm.operatingNextStep) {
       return null;
     }

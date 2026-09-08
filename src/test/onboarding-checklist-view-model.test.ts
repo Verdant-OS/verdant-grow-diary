@@ -103,7 +103,7 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
     const vm = buildOnboardingChecklistViewModel({
       growCount: 9,
       tentCount: 9,
-      plantCount: 9,
+      plantCount: 0,
       diaryEntryCount: 9,
       sensorReadingCount: 0,
       connectedScope: {
@@ -128,6 +128,48 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
     expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")?.href).toBe(
       "/tents?growId=grow%20with%20spaces&intent=one_tent_activation",
     );
+  });
+
+  it("marks add_plant complete when persisted plants exist even if connected plantId is null", () => {
+    const vm = buildOnboardingChecklistViewModel({
+      growCount: 1,
+      tentCount: 0,
+      plantCount: 1,
+      diaryEntryCount: 0,
+      sensorReadingCount: 0,
+      connectedScope: {
+        growId: "grow-a",
+        tentId: null,
+        plantId: null,
+      },
+      firstLogEvidenceCount: 0,
+      firstLogEvidenceStatus: "ok",
+    });
+
+    const plantStep = vm.steps.find((s) => s.key === "add_plant");
+    expect(plantStep?.complete).toBe(true);
+    expect(plantStep?.title).toBe("Add your first plant");
+    expect(vm.steps.find((s) => s.key === "add_tent")?.complete).toBe(false);
+    expect(vm.completeCount).toBe(2);
+    expect(vm.shouldShowChecklist).toBe(true);
+  });
+
+  it("does not treat zero plantCount as plant-complete under an empty connected scope", () => {
+    const vm = buildOnboardingChecklistViewModel({
+      growCount: 1,
+      tentCount: 1,
+      plantCount: 0,
+      diaryEntryCount: 0,
+      sensorReadingCount: 0,
+      connectedScope: {
+        growId: "grow-a",
+        tentId: "tent-a",
+        plantId: null,
+      },
+      firstLogEvidenceCount: 0,
+      firstLogEvidenceStatus: "ok",
+    });
+    expect(vm.steps.find((s) => s.key === "add_plant")?.complete).toBe(false);
   });
 
   it("preserves the exact connected tent through the Add snapshot handoff", () => {

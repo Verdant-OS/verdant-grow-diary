@@ -232,7 +232,11 @@ export function buildOnboardingChecklistViewModel(
   // Plant memory ends first-time get-started framing. Remaining incomplete
   // steps (tent / log / sensor) stay on the progress pill and, when the tent
   // is missing, as a compact operating next-step — not the 5-step shell.
-  const shouldShowGetStartedShell = !isFullyActivated && !hasPlant;
+  // Invariant: never allow get-started once the plant step is complete —
+  // that residual live miss (shell + crossed "Add your first plant") is the
+  // abandonment frame this slice closes.
+  const plantStepComplete = steps.some((s) => s.key === "add_plant" && s.complete);
+  const shouldShowGetStartedShell = !isFullyActivated && !hasPlant && !plantStepComplete;
   const operatingNextStep: OnboardingOperatingNextStep | null =
     hasPlant && !hasTent
       ? {

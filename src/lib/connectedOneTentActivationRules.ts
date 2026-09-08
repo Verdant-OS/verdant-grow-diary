@@ -274,9 +274,14 @@ export function selectConnectedOneTentGraph(
       return compareText(a.id, b.id);
     })[0]?.id ?? null;
 
-  const plantId = tentId
+  // Tent-linked plants win when a tent exists. When the grow has plants but
+  // no tent yet (live One-Tent miss: plant memory before first tent), still
+  // surface a grow-attributed plantId so connected-scope framing cannot miss
+  // plant memory that only exists as tentless rows.
+  const tentLinkedPlantId = tentId
     ? (plants.find((plant) => plant.growId === growId && plant.tentId === tentId)?.id ?? null)
     : null;
+  const plantId = tentLinkedPlantId ?? pickGrowAttributedTentlessPlantId(input?.plants, growId);
 
   return {
     growId,
@@ -286,6 +291,28 @@ export function selectConnectedOneTentGraph(
     hasTent: tentId !== null,
     hasPlant: plantId !== null,
   };
+}
+
+/**
+ * Grow-attributed plants with no tent yet. Lexical id tie-break.
+ * Does not invent a tent; does not attribute cross-grow rows.
+ */
+function pickGrowAttributedTentlessPlantId(
+  rows: SelectConnectedOneTentGraphInput["plants"],
+  growId: string,
+): string | null {
+  const candidates: string[] = [];
+  for (const row of rows ?? []) {
+    const id = nonBlankId(row?.id);
+    const rowGrowId = nonBlankId(row?.growId);
+    const tentId = nonBlankId(row?.tentId);
+    if (!id || tentId) continue;
+    if (rowGrowId !== growId) continue;
+    candidates.push(id);
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort(compareText);
+  return candidates[0] ?? null;
 }
 
 /** Build dependency-safe, query-encoded routes for the guided handoff. */

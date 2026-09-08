@@ -186,6 +186,52 @@ describe("buildGuidedActionChecklist", () => {
     expect(items.every((i) => !i.ctaHref.startsWith("/quick-log"))).toBe(true);
   });
 
+  /**
+   * Golden Toad HOST PACKET — LIVE MISS on fixture Golden Run plants.
+   * Sibling "Add note" / "Add sensor snapshot" already use this daily-check
+   * pattern; Next diary watering/photo CTAs must match it and never land on
+   * https://verdantgrowdiary.com/quick-log.
+   */
+  it("pins Golden Run fixture plantIds onto daily-check CTAs (HOST PACKET)", () => {
+    const BREAK = {
+      id: "7c33c797-331f-4788-866d-63551e94ceb6",
+      name: "BREAK-4pm-2",
+      tentId: "t1",
+      stage: "veg",
+    } as const;
+    const JUNK = {
+      id: "108481fb-dee8-4997-8d61-c5f4f4425bae",
+      name: "JUNK-HUNT-20260907",
+      tentId: "t1",
+      stage: "veg",
+    } as const;
+
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [BREAK, JUNK],
+        tents: [TENT_1],
+        latestReadingByTent: {
+          t1: {
+            capturedAt: new Date(NOW - 5 * 60_000).toISOString(),
+            source: "live",
+            quality: "ok",
+          },
+        },
+      }),
+    );
+
+    const breakWater = items.find((i) => i.id === `cadence:water:${BREAK.id}`);
+    const breakPhoto = items.find((i) => i.id === `cadence:photo:${BREAK.id}`);
+    const junkWater = items.find((i) => i.id === `cadence:water:${JUNK.id}`);
+    const junkPhoto = items.find((i) => i.id === `cadence:photo:${JUNK.id}`);
+
+    expect(breakWater?.ctaHref).toBe(`/daily-check?plantId=${BREAK.id}&from=dashboard&method=note`);
+    expect(breakPhoto?.ctaHref).toBe(`/daily-check?plantId=${BREAK.id}&from=dashboard&method=note`);
+    expect(junkWater?.ctaHref).toBe(`/daily-check?plantId=${JUNK.id}&from=dashboard&method=note`);
+    expect(junkPhoto?.ctaHref).toBe(`/daily-check?plantId=${JUNK.id}&from=dashboard&method=note`);
+    expect(items.every((i) => !i.ctaHref.includes("/quick-log"))).toBe(true);
+  });
+
   it("routes sensor CTAs through daily-check with a plant in that tent", () => {
     const items = buildGuidedActionChecklist(
       makeInput({

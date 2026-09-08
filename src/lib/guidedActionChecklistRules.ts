@@ -14,6 +14,9 @@
  * Plant- and tent-scoped diary CTAs must never point at the public
  * `/quick-log` starter — that path drops grow/plant context and is an
  * abandonment dead-end for signed-in growers (ONBOARDING_QUICKLOG_CTA_PUBLIC_MISROUTE).
+ * LIVE FAIL land: `https://verdantgrowdiary.com/quick-log` (no growId/plantId).
+ * Match sibling dashboard pattern:
+ * `/daily-check?plantId=<id>&from=dashboard&method=<note|sensor>`.
  *
  * All time is injectable via `now` for tests.
  */

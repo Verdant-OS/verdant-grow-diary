@@ -176,6 +176,40 @@ export function isPhotoSavingSupported(): boolean {
   return true;
 }
 
+/**
+ * Honest empty-content gate for Quick Log V2 note saves.
+ *
+ * Water volume and Feed recipe fields have their own validators. Note action
+ * previously allowed a target-only save with an empty body (live FAIL: toast
+ * "Saved to your diary" / "Log saved" with nothing logged). Critical content
+ * is a note, companion media, manual sensor reading, or maturity evidence.
+ * Water/feed return false here so those paths stay on their own fences.
+ */
+export interface QuickLogV2CriticalContentInput {
+  action: QuickLogV2Action;
+  note: string;
+  temperatureC: string;
+  humidityPct: string;
+  vpdKpa: string;
+  hasPhoto: boolean;
+  hasVideo: boolean;
+  hasMaturityEvidence: boolean;
+}
+
+export function isQuickLogV2CriticalContentMissing(input: QuickLogV2CriticalContentInput): boolean {
+  if (input.action !== "note") return false;
+  if ((input.note ?? "").trim().length > 0) return false;
+  if (input.hasPhoto || input.hasVideo) return false;
+  if (input.hasMaturityEvidence) return false;
+  if ((input.temperatureC ?? "").trim().length > 0) return false;
+  if ((input.humidityPct ?? "").trim().length > 0) return false;
+  if ((input.vpdKpa ?? "").trim().length > 0) return false;
+  return true;
+}
+
+export const QUICK_LOG_V2_EMPTY_CONTENT_HELPER =
+  "Add a note, photo, or reading before saving." as const;
+
 /** Show type-to-filter inside Target Select when the list is this long or longer. */
 export const QUICK_LOG_V2_TARGET_FILTER_THRESHOLD = 8;
 

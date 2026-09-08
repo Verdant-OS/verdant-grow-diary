@@ -5,8 +5,11 @@
  */
 
 import type { QuickLogV2Action, ResolvedQuickLogV2Target } from "./quickLogV2Rules";
+import { isQuickLogV2CriticalContentMissing } from "./quickLogV2Rules";
 import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReadingNormalizationRules";
 import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
+import { hasQuickLogMaturityEvidence } from "./quickLogMaturityEvidenceRules";
+import type { QuickLogMaturityEvidenceFormState } from "./quickLogMaturityEvidenceRules";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -46,6 +49,14 @@ export interface BuildQuickLogV2PayloadInput {
   /** Stage tag; normalized here — unknown/blank values are simply omitted. */
   stage?: string | null;
   idempotencyKey: string;
+  /**
+   * Companion photo/video selected on the sheet. Media is not part of the
+   * RPC payload shape, but it counts as critical content for note saves so
+   * an empty-note photo log can still persist after the empty-content gate.
+   */
+  hasCompanionMedia?: boolean;
+  /** Optional maturity form; non-empty evidence also satisfies the content gate. */
+  maturityEvidenceForm?: QuickLogMaturityEvidenceFormState | null;
 }
 
 export type BuildResult =
@@ -110,6 +121,24 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
   }
 
   const note = (input.note ?? "").trim();
+  const hasMaturityEvidence =
+    input.details != null ||
+    (input.maturityEvidenceForm != null && hasQuickLogMaturityEvidence(input.maturityEvidenceForm));
+  if (
+    isQuickLogV2CriticalContentMissing({
+      action,
+      note,
+      temperatureC: input.temperatureC ?? "",
+      humidityPct: input.humidityPct ?? "",
+      vpdKpa: input.vpdKpa ?? "",
+      hasPhoto: input.hasCompanionMedia === true,
+      hasVideo: false,
+      hasMaturityEvidence,
+    })
+  ) {
+    return { ok: false, reason: "empty_content" };
+  }
+
   return {
     ok: true,
     payload: {

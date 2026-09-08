@@ -125,9 +125,9 @@ describe("D7 — V2 sheet response-check chips", () => {
     );
   });
 
-  it("never pre-fills the note — the optional-note contract is preserved", () => {
-    // A default/auto-applied status would break quick-log-v2-note-sync's
-    // "Note then Save with nothing entered yields p_note null" contract.
+  it("never pre-fills the note — empty content stays grower-authored", () => {
+    // A default/auto-applied status would invent diary content and bypass the
+    // empty-content fail-closed gate (QUICKLOG_EMPTY_CONTENT_FAIL_CLOSED).
     expect(SHEET).not.toMatch(/useEffect[\s\S]{0,200}applyResponseCheck/);
     expect(SHEET).not.toMatch(/note:\s*buildResponseCheckLine/);
   });

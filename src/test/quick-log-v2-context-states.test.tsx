@@ -142,16 +142,33 @@ describe("QuickLogV2Sheet — Save requires an explicit plant or tent target", (
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("enables Save when a plant target is selected (note action)", () => {
+  it("disables Save when a plant target is selected but note content is empty", () => {
     renderSheet("plant:plant-1");
+    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+      "Add a note, photo, or reading before saving.",
+    );
+    const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("enables Save when a plant target is selected and a note is entered", () => {
+    renderSheet("plant:plant-1");
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Slight droop" },
+    });
     expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
       "Ready to save when this log matches what happened.",
     );
     expect((screen.getByTestId("qlv2-save") as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("enables Save when a tent target is selected (note action)", () => {
+  it("enables Save when a tent target is selected and a note is entered", () => {
     renderSheet("tent:tent-1");
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Canopy check" },
+    });
     expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
       "Ready to save when this log matches what happened.",
     );

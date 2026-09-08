@@ -40,6 +40,8 @@ import {
   resolveTentScopedQuickLogPlantSelection,
   EMPTY_QUICKLOG_V2_FORM,
   QUICK_LOG_V2_TARGET_FILTER_THRESHOLD,
+  QUICK_LOG_V2_EMPTY_CONTENT_HELPER,
+  isQuickLogV2CriticalContentMissing,
   type QuickLogV2FormState,
   type QuickLogV2Action,
   type QuickLogV2TargetOption,
@@ -107,6 +109,7 @@ import { useRecentWateringsForVolumeDefaults } from "@/hooks/useRecentWateringsF
 import {
   EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM,
   buildQuickLogMaturityEvidenceDetails,
+  hasQuickLogMaturityEvidence,
   quickLogMaturityEvidenceReasonToMessage,
   type QuickLogMaturityEvidenceFormState,
 } from "@/lib/quickLogMaturityEvidenceRules";
@@ -604,6 +607,16 @@ export default function QuickLogV2Sheet({
   const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
   const noteLength = form.note.length;
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
+  const criticalContentMissing = isQuickLogV2CriticalContentMissing({
+    action: form.action,
+    note: form.note,
+    temperatureC: form.temperatureC,
+    humidityPct: form.humidityPct,
+    vpdKpa: form.vpdKpa,
+    hasPhoto: photoFile !== null,
+    hasVideo: videoFile !== null,
+    hasMaturityEvidence: hasQuickLogMaturityEvidence(maturityEvidenceForm),
+  });
   const showMaturityEvidence =
     form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
   // Better/Same/Worse records the PLANT's response, so it is offered only
@@ -642,6 +655,7 @@ export default function QuickLogV2Sheet({
         hasNoTargets,
         selectedTargetMissing,
         volumeMissing,
+        criticalContentMissing,
         saving: saving || feedingSaving || wateringSaving,
       });
 
@@ -1113,6 +1127,23 @@ export default function QuickLogV2Sheet({
       return;
     }
 
+    if (
+      !pendingWateringSubmission &&
+      isQuickLogV2CriticalContentMissing({
+        action: form.action,
+        note: form.note,
+        temperatureC: form.temperatureC,
+        humidityPct: form.humidityPct,
+        vpdKpa: form.vpdKpa,
+        hasPhoto: photoFile !== null,
+        hasVideo: videoFile !== null,
+        hasMaturityEvidence: hasQuickLogMaturityEvidence(maturityEvidenceForm),
+      })
+    ) {
+      setLocalError(QUICK_LOG_V2_EMPTY_CONTENT_HELPER);
+      return;
+    }
+
     if (!pendingWateringSubmission && form.action === "feed") {
       if (!resolved.growId) {
         setLocalError(feedingFormReasonToHelper("grow_id:missing"));
@@ -1330,6 +1361,8 @@ export default function QuickLogV2Sheet({
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
         details: maturityDetails,
+        maturityEvidenceForm,
+        hasCompanionMedia: Boolean(submissionPhotoFile || submissionVideoFile),
         idempotencyKey: saveIdempotencyKeyRef.current,
       });
       if (built.ok !== true) {
@@ -2398,7 +2431,8 @@ export default function QuickLogV2Sheet({
                       videoChecking ||
                       (contextBlocked && !wateringRetryPending) ||
                       (selectedTargetMissing && !wateringRetryPending) ||
-                      (selectedTargetStale && !wateringRetryPending)
+                      (selectedTargetStale && !wateringRetryPending) ||
+                      (criticalContentMissing && !wateringRetryPending)
                     }
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"
@@ -2426,6 +2460,7 @@ function getSaveHelperMessage(input: {
   hasNoTargets: boolean;
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
+  criticalContentMissing: boolean;
   saving: boolean;
 }): string {
   if (input.saving) return "Saving your Quick Log…";
@@ -2434,6 +2469,7 @@ function getSaveHelperMessage(input: {
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
+  if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;
   return "Ready to save when this log matches what happened.";
 }
 

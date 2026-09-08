@@ -79,6 +79,9 @@ function clickWater() {
 
 function clickNote() {
   fireEvent.click(screen.getByRole("button", { name: "Note" }));
+  fireEvent.change(screen.getByLabelText("Note (optional)"), {
+    target: { value: "Observation for refresh test" },
+  });
 }
 
 function clickSave() {

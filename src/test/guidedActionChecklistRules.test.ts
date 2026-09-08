@@ -172,6 +172,132 @@ describe("buildGuidedActionChecklist", () => {
     expect(ids).toEqual(["cadence:photo:p1", "cadence:water:p1"]);
   });
 
+  it("routes plant cadence CTAs to authenticated daily-check with plantId (never public /quick-log)", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [PLANT_A],
+        latestReadingByTent: {},
+      }),
+    );
+    const water = items.find((i) => i.id === "cadence:water:p1");
+    const photo = items.find((i) => i.id === "cadence:photo:p1");
+    expect(water?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=note");
+    expect(photo?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=note");
+    expect(items.every((i) => !i.ctaHref.startsWith("/quick-log"))).toBe(true);
+  });
+
+  /**
+   * Golden Toad HOST PACKET — LIVE MISS on fixture Golden Run plants.
+   * Sibling "Add note" / "Add sensor snapshot" already use this daily-check
+   * pattern; Next diary watering/photo CTAs must match it and never land on
+   * https://verdantgrowdiary.com/quick-log.
+   */
+  it("pins Golden Run fixture plantIds onto daily-check CTAs (HOST PACKET)", () => {
+    const BREAK = {
+      id: "7c33c797-331f-4788-866d-63551e94ceb6",
+      name: "BREAK-4pm-2",
+      tentId: "t1",
+      stage: "veg",
+    } as const;
+    const JUNK = {
+      id: "108481fb-dee8-4997-8d61-c5f4f4425bae",
+      name: "JUNK-HUNT-20260907",
+      tentId: "t1",
+      stage: "veg",
+    } as const;
+
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [BREAK, JUNK],
+        tents: [TENT_1],
+        latestReadingByTent: {
+          t1: {
+            capturedAt: new Date(NOW - 5 * 60_000).toISOString(),
+            source: "live",
+            quality: "ok",
+          },
+        },
+      }),
+    );
+
+    const breakWater = items.find((i) => i.id === `cadence:water:${BREAK.id}`);
+    const breakPhoto = items.find((i) => i.id === `cadence:photo:${BREAK.id}`);
+    const junkWater = items.find((i) => i.id === `cadence:water:${JUNK.id}`);
+    const junkPhoto = items.find((i) => i.id === `cadence:photo:${JUNK.id}`);
+
+    expect(breakWater?.ctaHref).toBe(`/daily-check?plantId=${BREAK.id}&from=dashboard&method=note`);
+    expect(breakPhoto?.ctaHref).toBe(`/daily-check?plantId=${BREAK.id}&from=dashboard&method=note`);
+    expect(junkWater?.ctaHref).toBe(`/daily-check?plantId=${JUNK.id}&from=dashboard&method=note`);
+    expect(junkPhoto?.ctaHref).toBe(`/daily-check?plantId=${JUNK.id}&from=dashboard&method=note`);
+    expect(items.every((i) => !i.ctaHref.includes("/quick-log"))).toBe(true);
+  });
+
+  it("routes sensor CTAs through daily-check with a plant in that tent", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [PLANT_A],
+        tents: [TENT_1],
+        latestReadingByTent: { t1: null },
+        diaryEntries: [
+          entry({
+            id: "e1",
+            plantId: "p1",
+            eventType: "watering",
+            createdAt: new Date(NOW - 60 * 60_000).toISOString(),
+          }),
+          entry({
+            id: "e2",
+            plantId: "p1",
+            eventType: "photo",
+            createdAt: new Date(NOW - 60 * 60_000).toISOString(),
+            photoUrl: "u",
+          }),
+        ],
+      }),
+    );
+    const sensor = items.find((i) => i.id === "sensor:t1");
+    expect(sensor?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=sensor");
+    expect(sensor?.ctaHref).not.toMatch(/\/quick-log/);
+  });
+
+  it("keeps tent-only sensor CTA on authenticated daily-check when the tent has no plants", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [],
+        tents: [TENT_1],
+        latestReadingByTent: { t1: null },
+      }),
+    );
+    const sensor = items.find((i) => i.id === "sensor:t1");
+    expect(sensor?.ctaHref).toBe("/daily-check?from=dashboard");
+    expect(sensor?.ctaHref).not.toMatch(/\/quick-log/);
+  });
+
+  it("routes flower trichome CTAs to authenticated daily-check with plantId", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [PLANT_FLOWER],
+        diaryEntries: [
+          entry({
+            id: "e1",
+            plantId: "p2",
+            eventType: "watering",
+            createdAt: new Date(NOW - 60_000).toISOString(),
+          }),
+          entry({
+            id: "e2",
+            plantId: "p2",
+            eventType: "photo",
+            createdAt: new Date(NOW - 60_000).toISOString(),
+            photoUrl: "u",
+          }),
+        ],
+      }),
+    );
+    const trichome = items.find((i) => i.id === "stage:trichome:p2");
+    expect(trichome?.ctaHref).toBe("/daily-check?plantId=p2&from=dashboard&method=note");
+  });
+
   it("emits cadence items when the last log is beyond the window", () => {
     const items = buildGuidedActionChecklist(
       makeInput({

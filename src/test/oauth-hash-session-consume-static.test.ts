@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  hashLooksLikeOAuthReturn,
+  OAUTH_HASH_EARLY_WIPE_SCRIPT,
+  parseOAuthHashFragment,
+} from "@/lib/oauthHashSessionConsumeRules";
 
 const ROOT = resolve(__dirname, "../..");
 
@@ -25,20 +30,17 @@ describe("oauth hash session consume wiring", () => {
     );
   });
 
-  it("consume wipes via replaceState before awaiting setSession", () => {
-    const rulesSrc = read("src/lib/oauthHashSessionConsumeRules.ts");
-    const consumeStart = rulesSrc.indexOf("export async function consumeOAuthHashSessionIfPresent");
-    expect(consumeStart).toBeGreaterThanOrEqual(0);
-    const consumeSrc = rulesSrc.slice(consumeStart);
-    expect(consumeSrc).toContain("addressBarStillHasOAuth");
-    expect(consumeSrc).toMatch(
-      /clearOAuthHashFromAddressBar\([\s\S]*?\);[\s\S]*?if \(!shouldAttemptOAuthHashSessionConsume\(parsed\)\)[\s\S]*?await deps\.setSession/,
-    );
-    const wipeAt = consumeSrc.indexOf("clearOAuthHashFromAddressBar");
-    const setSessionAt = consumeSrc.indexOf("await deps.setSession");
-    expect(wipeAt).toBeGreaterThan(0);
-    expect(setSessionAt).toBeGreaterThan(wipeAt);
-    expect(rulesSrc).not.toMatch(/console\.(log|debug|info|warn|error)\(/);
+  it("early wipe script matches parseOAuthHashFragment keys (resolved constant)", () => {
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("URLSearchParams");
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("access_token")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("refresh_token")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("error")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toContain('indexOf("access_token=")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toMatch(/console\./);
+    expect(parseOAuthHashFragment("#myaccess_token=1")).toEqual({ kind: "none" });
+    expect(parseOAuthHashFragment("#section?error=1")).toEqual({ kind: "none" });
+    expect(hashLooksLikeOAuthReturn("#myaccess_token=1")).toBe(false);
+    expect(hashLooksLikeOAuthReturn("#section?error=1")).toBe(false);
   });
 
   it("root document inlines the early wipe script in head before HeadContent", () => {

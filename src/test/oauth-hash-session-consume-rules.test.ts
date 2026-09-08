@@ -53,6 +53,8 @@ describe("oauthHashSessionConsumeRules", () => {
     expect(parseOAuthHashFragment("#")).toEqual({ kind: "none" });
     expect(parseOAuthHashFragment("#plant-ai-doctor-review")).toEqual({ kind: "none" });
     expect(parseOAuthHashFragment("#foo=bar&baz=1")).toEqual({ kind: "none" });
+    expect(parseOAuthHashFragment("#myaccess_token=1")).toEqual({ kind: "none" });
+    expect(parseOAuthHashFragment("#section?error=1")).toEqual({ kind: "none" });
     expect(parseOAuthHashFragment(null)).toEqual({ kind: "none" });
     expect(parseOAuthHashFragment(undefined)).toEqual({ kind: "none" });
   });
@@ -338,6 +340,23 @@ describe("oauthHashSessionConsumeRules", () => {
     expect(window.location.hash).toContain("error=");
     Function(OAUTH_HASH_EARLY_WIPE_SCRIPT)();
     expect(window.location.hash).toContain("section");
+    expect(
+      (window as unknown as Record<string, unknown>)[OAUTH_RETURN_HASH_STASH_KEY],
+    ).toBeUndefined();
+  });
+
+  it("early wipe script leaves near-miss fragments that are not OAuth param names", () => {
+    const href = window.location.href.split("#")[0] ?? window.location.href;
+    window.history.replaceState(window.history.state, "", `${href}#myaccess_token=1`);
+    Function(OAUTH_HASH_EARLY_WIPE_SCRIPT)();
+    expect(window.location.hash).toContain("myaccess_token");
+    expect(
+      (window as unknown as Record<string, unknown>)[OAUTH_RETURN_HASH_STASH_KEY],
+    ).toBeUndefined();
+
+    window.history.replaceState(window.history.state, "", `${href}#section?error=1`);
+    Function(OAUTH_HASH_EARLY_WIPE_SCRIPT)();
+    expect(window.location.hash).toContain("section?error=1");
     expect(
       (window as unknown as Record<string, unknown>)[OAUTH_RETURN_HASH_STASH_KEY],
     ).toBeUndefined();

@@ -49,6 +49,8 @@ import {
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
 import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
+import { useAlertLinkedTargetEvidence } from "@/hooks/useAlertLinkedTargetEvidence";
+import { buildAlertTargetPresenterInput } from "@/lib/alertTargetContextRules";
 import {
   actionDetailPath,
   aiDoctorSessionDetailPath,
@@ -160,6 +162,18 @@ export default function AlertDetail() {
 
   const { events } = useAlertEvents(alertId ?? null, eventsKey);
   const targetNames = useAlertTargetNames();
+  const linkedTargets = useAlertLinkedTargetEvidence(alert ? [alert] : []);
+  const targetInput = buildAlertTargetPresenterInput({
+    tentId: alert?.tent_id,
+    plantId: alert?.plant_id,
+    growId: alert?.grow_id,
+    tentNameById: targetNames.tentNameById,
+    plantNameById: targetNames.plantNameById,
+    linkedEvidence: alert ? (linkedTargets.evidenceByAlertId.get(alert.id) ?? []) : [],
+    singleTentIdByGrowId: targetNames.singleTentIdByGrowId,
+    namesLoading: targetNames.status === "loading",
+    idsLoading: linkedTargets.idsLoading,
+  });
 
   const runStatusChange = async (
     event_type: "acknowledged" | "resolved" | "dismissed" | "reopened",
@@ -552,18 +566,17 @@ export default function AlertDetail() {
                 </dd>
               </div>
               <AlertTargetContext
-                tentId={alert.tent_id}
-                plantId={alert.plant_id}
-                tentName={
-                  alert.tent_id ? (targetNames.tentNameById.get(alert.tent_id) ?? null) : null
-                }
-                plantName={
-                  alert.plant_id ? (targetNames.plantNameById.get(alert.plant_id) ?? null) : null
-                }
-                namesLoading={targetNames.status === "loading"}
+                tentId={targetInput.tentId}
+                plantId={targetInput.plantId}
+                tentName={targetInput.tentName}
+                plantName={targetInput.plantName}
+                namesLoading={targetInput.namesLoading}
+                idsLoading={targetInput.idsLoading}
+                linkedEvidence={targetInput.linkedEvidence}
+                singleTentId={targetInput.singleTentId}
                 variant="detailed"
-                tentHref={alert.tent_id ? tentDetailPath(alert.tent_id) : null}
-                plantHref={alert.plant_id ? plantDetailPath(alert.plant_id) : null}
+                tentHref={targetInput.tentId ? tentDetailPath(targetInput.tentId) : null}
+                plantHref={targetInput.plantId ? plantDetailPath(targetInput.plantId) : null}
               />
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                 <dt className="uppercase tracking-wider text-muted-foreground">First seen</dt>

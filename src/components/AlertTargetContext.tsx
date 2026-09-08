@@ -45,6 +45,9 @@ export function AlertTargetContext({
   tentName,
   plantName,
   namesLoading,
+  idsLoading,
+  linkedEvidence,
+  singleTentId,
   variant = "compact",
   tentHref,
   plantHref,
@@ -55,6 +58,9 @@ export function AlertTargetContext({
     tentName,
     plantName,
     namesLoading,
+    idsLoading,
+    linkedEvidence,
+    singleTentId,
   });
 
   if (variant === "compact") {

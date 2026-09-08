@@ -1,5 +1,5 @@
 import { Link } from "@/lib/react-router-compat";
-import { CheckCircle2, Circle, Sprout, X } from "lucide-react";
+import { CheckCircle2, Circle, Sprout, Tent, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { OnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
@@ -13,9 +13,14 @@ import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
  * `onboardingChecklistViewModel`. The card never fetches data, never
  * writes anything, and never blocks the dashboard.
  *
- * Local-only dismiss: the "Got it" button hides this card via a
- * localStorage-backed preference. The Dashboard still renders the
- * compact `OnboardingProgressPill` so users are not stranded.
+ * Framing rules:
+ *  - Fully activated → compact “memory active” line.
+ *  - No plants yet → first-time “Get your grow started” shell (dismissible).
+ *  - Plants present + tent missing → compact Add tent next-step (not get-started).
+ *  - Plants present + tent present → nothing from this card (operating dashboard).
+ *
+ * Local-only dismiss applies only to the get-started shell. The Dashboard
+ * still renders the compact `OnboardingProgressPill` so users are not stranded.
  */
 export default function OnboardingChecklistCard({ vm }: { vm: OnboardingChecklistViewModel }) {
   const { isDismissed, dismiss } = useOnboardingChecklistDismissed();
@@ -34,6 +39,33 @@ export default function OnboardingChecklistCard({ vm }: { vm: OnboardingChecklis
         </div>
         <Button asChild size="sm" variant="outline">
           <Link to="/invite">Invite a grower</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  // Plant memory ends get-started framing. Keep a clear Add tent next-step
+  // when the tent is still missing — without the 5-step onboarding shell.
+  if (!vm.shouldShowGetStartedShell) {
+    if (!vm.operatingNextStep) {
+      return null;
+    }
+    const next = vm.operatingNextStep;
+    return (
+      <div
+        data-testid="onboarding-operating-next-step"
+        data-next-step-key={next.key}
+        className="rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex items-start gap-2 min-w-0">
+          <Tent className="h-4 w-4 text-primary mt-0.5 shrink-0" aria-hidden="true" />
+          <div className="min-w-0">
+            <div className="font-medium">{next.title}</div>
+            <p className="text-xs text-muted-foreground mt-0.5">{next.description}</p>
+          </div>
+        </div>
+        <Button asChild size="sm" variant="outline" className="shrink-0">
+          <Link to={next.href}>{next.ctaLabel}</Link>
         </Button>
       </div>
     );

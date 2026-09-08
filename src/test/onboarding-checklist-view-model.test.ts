@@ -54,7 +54,10 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
     expect(vm.completeCount).toBe(3);
     expect(vm.steps.find((s) => s.key === "first_log")?.complete).toBe(false);
     expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")?.complete).toBe(false);
-    expect(vm.shouldShowChecklist).toBe(true);
+    // Plant memory ends get-started framing; remaining steps stay on the pill.
+    expect(vm.shouldShowChecklist).toBe(false);
+    expect(vm.shouldShowGetStartedShell).toBe(false);
+    expect(vm.primaryFrame).toBe("operating");
   });
 
   it("a diary entry establishes plant memory but does not replace sensor truth", () => {
@@ -69,7 +72,8 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
     expect(vm.steps.find((s) => s.key === "first_sensor_snapshot")?.complete).toBe(false);
     expect(vm.completeCount).toBe(4);
     expect(vm.isFullyActivated).toBe(false);
-    expect(vm.shouldShowChecklist).toBe(true);
+    expect(vm.shouldShowChecklist).toBe(false);
+    expect(vm.primaryFrame).toBe("operating");
   });
 
   it("a sensor reading establishes sensor truth but does not replace plant memory", () => {
@@ -151,7 +155,11 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
     expect(plantStep?.title).toBe("Add your first plant");
     expect(vm.steps.find((s) => s.key === "add_tent")?.complete).toBe(false);
     expect(vm.completeCount).toBe(2);
-    expect(vm.shouldShowChecklist).toBe(true);
+    // Plants present → operating frame; Add tent stays as compact next-step.
+    expect(vm.shouldShowChecklist).toBe(false);
+    expect(vm.shouldShowGetStartedShell).toBe(false);
+    expect(vm.primaryFrame).toBe("operating");
+    expect(vm.operatingNextStep?.key).toBe("add_tent");
   });
 
   it("does not treat zero plantCount as plant-complete under an empty connected scope", () => {

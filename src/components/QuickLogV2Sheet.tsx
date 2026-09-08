@@ -2397,6 +2397,7 @@ export default function QuickLogV2Sheet({
                       wateringSaving ||
                       videoChecking ||
                       (contextBlocked && !wateringRetryPending) ||
+                      (selectedTargetMissing && !wateringRetryPending) ||
                       (selectedTargetStale && !wateringRetryPending)
                     }
                     aria-describedby="qlv2-save-helper"

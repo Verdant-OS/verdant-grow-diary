@@ -204,6 +204,7 @@ export default function QuickLogAllActivitiesSection({
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
     [growId, plantId, tentId],
   );
+  const hasStructuredWaterTarget = Boolean(currentTarget.plantId || currentTarget.tentId);
   const hasSymptomPlant = hasGuidedSymptomPlant(plantId);
   const currentTargetKey = useMemo(() => buildQuickLogTargetKey(currentTarget), [currentTarget]);
   const previousTargetKeyRef = useRef(currentTargetKey);
@@ -330,9 +331,11 @@ export default function QuickLogAllActivitiesSection({
   const requestedActivityAvailability = useMemo(
     () =>
       requestedActivity
-        ? evaluateQuickLogActivityAvailability(requestedActivity, plantStage)
+        ? evaluateQuickLogActivityAvailability(requestedActivity, plantStage, {
+            hasStructuredWaterTarget,
+          })
         : null,
-    [plantStage, requestedActivity],
+    [hasStructuredWaterTarget, plantStage, requestedActivity],
   );
 
   useEffect(() => {
@@ -415,8 +418,13 @@ export default function QuickLogAllActivitiesSection({
   const detailNumbersInvalid = detailNumberValidations.some((v) => !v.ok);
   const firstDetailNumberError = detailNumberValidations.find((v) => !v.ok)?.error ?? null;
   const selectedAvailability = useMemo(
-    () => (selected ? evaluateQuickLogActivityAvailability(selected.id, plantStage) : null),
-    [plantStage, selected],
+    () =>
+      selected
+        ? evaluateQuickLogActivityAvailability(selected.id, plantStage, {
+            hasStructuredWaterTarget,
+          })
+        : null,
+    [hasStructuredWaterTarget, plantStage, selected],
   );
 
   const requiresNote = useMemo(() => {
@@ -917,6 +925,7 @@ export default function QuickLogAllActivitiesSection({
         disabled={mutationBlocked}
         selectedId={selected?.id ?? null}
         plantStage={plantStage}
+        hasStructuredWaterTarget={hasStructuredWaterTarget}
         testIdPrefix={`${testIdPrefix}-picker`}
       />
 

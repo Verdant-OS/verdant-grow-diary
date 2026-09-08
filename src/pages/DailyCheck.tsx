@@ -78,6 +78,7 @@ import {
   resolveDailyCheckPlantSelection,
   type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
+import { resolveDailyCheckActivityTarget } from "@/lib/dailyCheckWaterContextRules";
 import {
   DAILY_CHECK_NOTE_SAVED_TOAST,
   DAILY_CHECK_SENSOR_SAVED_TOAST,
@@ -236,14 +237,20 @@ export default function DailyCheck() {
   );
   const selectedPlantTentId = resolveCompatibleAssignedTentId(selectedPlant, selectableTents);
   const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";
+  const activityTarget = resolveDailyCheckActivityTarget({
+    plantId: selectedPlant?.id ?? null,
+    plantAssignedTentId: routeIdentityPending ? routeTentId : selectedPlantTentId,
+    standaloneTentId: selectedStandaloneTentId,
+    firstSelectableTentId: selectableTents[0]?.id ?? null,
+    routeTentId,
+    plantResolutionStatus: plantResolution.status,
+  });
   // A selected plant owns the tent context. Derive this synchronously so an
   // untented plant can never render one frame against a previously selected or
-  // default tent while the state-synchronizing effect catches up.
-  const effectiveTentId = routeIdentityPending
-    ? routeTentId
-    : renderedPlantId
-      ? selectedPlantTentId
-      : selectedStandaloneTentId;
+  // default tent while the state-synchronizing effect catches up. When no
+  // plant is selected, carry an explicit tent or the first selectable tent
+  // on the same paint so Water is not a Choose-plant/tent trap.
+  const effectiveTentId = activityTarget.tentId ?? "";
   const requestedStep = routeIdentityPending ? routeStep : step;
   const renderedStep = requestedStep === "manual" && !effectiveTentId ? "select" : requestedStep;
   const requestedQuickLogOpen = routeIdentityPending ? routeStep === "quicklog" : quickLogOpen;
@@ -575,8 +582,8 @@ export default function DailyCheck() {
       <div className="mb-4 w-full min-w-0">
         <QuickLogAllActivitiesSection
           growId={growId}
-          tentId={effectiveTentId || null}
-          plantId={selectedPlant?.id ?? null}
+          tentId={activityTarget.tentId}
+          plantId={activityTarget.plantId}
           plantStage={(selectedPlant as { stage?: unknown } | null)?.stage ?? null}
           testIdPrefix="daily-check-all-activities"
           // D5: Daily Check is a real plant-scoped save surface. Without this

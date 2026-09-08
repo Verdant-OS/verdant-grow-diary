@@ -70,11 +70,13 @@ tokens (tests use synthetic stand-ins only).
 Mitigations in this repo (defense in depth; sessionStorage auth is
 unchanged; no `service_role`; no SSR cookie rewrite):
 
-1. **Before first paint** — `OAUTH_HASH_EARLY_WIPE_SCRIPT` is the first
-   child of `<head>` in `src/routes/__root.tsx`. If the hash looks like
-   an OAuth return (`access_token=`, `refresh_token=`, or `error=`), the
-   script copies it into a one-shot in-memory `window` slot and
-   `history.replaceState`s to path + search with no fragment.
+1. **Before first paint** — `OAUTH_HASH_EARLY_WIPE_SCRIPT` is a blocking
+   inline script in document `<head>` (`src/routes/__root.tsx`, before
+   `</head>` / body). If the hash looks like an OAuth return
+   (`access_token=`, `refresh_token=`, or `error=`), the script copies
+   it into a one-shot in-memory `window` slot and `history.replaceState`s
+   to path + search with no fragment. Hosted SSR may emit meta/CSS ahead
+   of this script inside `<head>`; it still runs before body parse.
 2. **Before `setSession`** — `consumeOAuthHashSessionIfPresent` parses
    (preferring the before-paint stash when `location.hash` is already
    empty), wipes the hash synchronously, then awaits `setSession` with

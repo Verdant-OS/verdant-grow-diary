@@ -40,7 +40,7 @@ describe("oauth hash session consume wiring", () => {
     expect(rulesSrc).not.toMatch(/console\.(log|debug|info|warn|error)\(/);
   });
 
-  it("root document runs the early wipe script as the first head child", () => {
+  it("root document inlines the early wipe script in head before HeadContent", () => {
     const rootSrc = read("src/routes/__root.tsx");
     expect(rootSrc).toContain("OAUTH_HASH_EARLY_WIPE_SCRIPT");
     expect(rootSrc).toMatch(

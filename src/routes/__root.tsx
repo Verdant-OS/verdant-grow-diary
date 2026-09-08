@@ -186,8 +186,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <script
-          // First child of <head>: stash+strip OAuth implicit-flow fragments
-          // before CSS/body paint. Constant lives in oauthHashSessionConsumeRules.
+          // Blocking <head> script: stash+strip OAuth implicit-flow fragments
+          // before body parse. Constant lives in oauthHashSessionConsumeRules.
+          // SSR may emit meta/CSS earlier in <head>; this still runs before body.
           dangerouslySetInnerHTML={{ __html: OAUTH_HASH_EARLY_WIPE_SCRIPT }}
         />
         <HeadContent />

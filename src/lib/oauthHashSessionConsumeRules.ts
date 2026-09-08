@@ -124,6 +124,7 @@ export function clearOAuthHashFromAddressBar(
   locationLike: OAuthHashLocationLike,
   replaceState: (url: string) => void,
 ): boolean {
+  if (shouldPreserveAuthCallbackHash(locationLike.hash)) return false;
   const parsed = parseOAuthHashFragment(locationLike.hash);
   if (parsed.kind === "none") return false;
   const url = urlWithoutHash(locationLike.pathname, locationLike.search);
@@ -145,6 +146,43 @@ export function hashLooksLikeOAuthReturn(hash: unknown): boolean {
  * Never log this key's value.
  */
 export const OAUTH_RETURN_HASH_STASH_KEY = "__VERDANT_OAUTH_RETURN_HASH__" as const;
+
+/**
+ * GoTrue implicit-callback types that must keep the full fragment in the
+ * address bar. Session OAuth (Google SSO) has access/refresh and no `type`
+ * (or only `token_type=bearer`) and still gets wiped.
+ */
+export const AUTH_CALLBACK_HASH_PRESERVE_TYPES = [
+  "recovery",
+  "signup",
+  "invite",
+  "magiclink",
+  "email_change",
+] as const;
+
+export type AuthCallbackHashPreserveType = (typeof AUTH_CALLBACK_HASH_PRESERVE_TYPES)[number];
+
+const AUTH_CALLBACK_HASH_PRESERVE_TYPE_SET: ReadonlySet<string> = new Set(
+  AUTH_CALLBACK_HASH_PRESERVE_TYPES,
+);
+
+function readAuthCallbackType(hash: unknown): string {
+  if (typeof hash !== "string" || hash.length === 0) return "";
+  const raw = stripHashPrefix(hash);
+  if (!raw) return "";
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(raw);
+  } catch {
+    return "";
+  }
+  return (params.get("type") ?? "").trim().toLowerCase();
+}
+
+/** True when the fragment is a recovery/signup (etc.) callback that ResetPassword needs. */
+export function shouldPreserveAuthCallbackHash(hash: unknown): boolean {
+  return AUTH_CALLBACK_HASH_PRESERVE_TYPE_SET.has(readAuthCallbackType(hash));
+}
 
 export type OAuthHashStashHolder = {
   [OAUTH_RETURN_HASH_STASH_KEY]?: unknown;
@@ -194,10 +232,18 @@ export function resolveOAuthHashSource(locationHash: unknown, stashedHash: unkno
 /**
  * Tiny blocking head script: stash an OAuth-looking hash, then replaceState
  * before first paint. Must stay import-free so it can run before module graph.
- * Detection mirrors parseOAuthHashFragment's oauth-looking keys.
+ * Detection mirrors parseOAuthHashFragment's oauth-looking keys, then skips
+ * type=recovery/signup (and sibling GoTrue callbacks) so ResetPassword can
+ * still read the tokenized fragment.
  */
+const AUTH_CALLBACK_PRESERVE_TYPE_SCRIPT_CHECK = AUTH_CALLBACK_HASH_PRESERVE_TYPES.map(
+  (type) => `t==="${type}"`,
+).join("||");
+
 export const OAUTH_HASH_EARLY_WIPE_SCRIPT =
-  '(function(){try{var h=location.hash||"";if(!h)return;var q=h.charAt(0)==="#"?h.slice(1):h;var p=new URLSearchParams(q);if(!p.has("access_token")&&!p.has("refresh_token")&&!p.has("error"))return;window.' +
+  '(function(){try{var h=location.hash||"";if(!h)return;var q=h.charAt(0)==="#"?h.slice(1):h;var p=new URLSearchParams(q);if(!p.has("access_token")&&!p.has("refresh_token")&&!p.has("error"))return;var t=(p.get("type")||"").toLowerCase();if(' +
+  AUTH_CALLBACK_PRESERVE_TYPE_SCRIPT_CHECK +
+  ")return;window." +
   OAUTH_RETURN_HASH_STASH_KEY +
   '=h;history.replaceState(history.state,"",location.pathname+location.search);}catch(e){}})();';
 
@@ -221,6 +267,7 @@ export async function consumeOAuthHashSessionIfPresent(deps: {
   readonly replaceState: (url: string) => void;
 }): Promise<OAuthHashConsumeOutcome> {
   const sourceHash = resolveOAuthHashSource(deps.hash, deps.stashedHash);
+  if (shouldPreserveAuthCallbackHash(sourceHash)) return "noop";
   const parsed = parseOAuthHashFragment(sourceHash);
   if (parsed.kind === "none") return "noop";
 

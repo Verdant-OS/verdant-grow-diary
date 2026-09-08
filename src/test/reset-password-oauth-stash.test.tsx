@@ -78,6 +78,28 @@ describe("ResetPassword — OAuth hash stash after before-paint wipe", () => {
     renderReset();
     expect(await screen.findByLabelText("New password")).toBeInTheDocument();
     expect(screen.queryByTestId("reset-link-missing")).toBeNull();
+    expect(screen.queryByText(ACCESS)).toBeNull();
+    expect(screen.queryByText(REFRESH)).toBeNull();
+    expect(calls).toBeGreaterThanOrEqual(3);
+  });
+
+  it("waits for getSession after a live tokenized recovery hash left in the address bar", async () => {
+    let calls = 0;
+    vi.mocked(supabase.auth.getSession).mockImplementation(async () => {
+      calls += 1;
+      if (calls < 3) return { data: { session: null } } as never;
+      return { data: { session: { user: { id: "u1" } } } } as never;
+    });
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `/reset-password#access_token=${ACCESS}&refresh_token=${REFRESH}&type=recovery`,
+    );
+    renderReset();
+    expect(await screen.findByLabelText("New password")).toBeInTheDocument();
+    expect(screen.queryByTestId("reset-link-missing")).toBeNull();
+    expect(screen.queryByText(ACCESS)).toBeNull();
+    expect(screen.queryByText(REFRESH)).toBeNull();
     expect(calls).toBeGreaterThanOrEqual(3);
   });
 });

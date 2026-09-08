@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  AUTH_CALLBACK_HASH_PRESERVE_TYPES,
   clearOAuthHashFromAddressBar,
   clearOAuthReturnHashRetention,
   consumeOAuthHashSessionIfPresent,
@@ -9,6 +10,7 @@ import {
   parseOAuthHashFragment,
   resolveOAuthHashSource,
   shouldAttemptOAuthHashSessionConsume,
+  shouldPreserveAuthCallbackHash,
   peekOAuthReturnHashStash,
   takeOAuthReturnHashStash,
   urlWithoutHash,
@@ -305,12 +307,74 @@ describe("oauthHashSessionConsumeRules", () => {
     expect(hashLooksLikeOAuthReturn("#section?next=error=value")).toBe(false);
   });
 
+  it("preserves tokenized recovery and signup hashes (do not wipe or consume)", async () => {
+    const recoveryHash = hashWith({
+      access_token: ACCESS,
+      refresh_token: REFRESH,
+      type: "recovery",
+    });
+    const signupHash = hashWith({
+      access_token: ACCESS,
+      refresh_token: REFRESH,
+      type: "signup",
+    });
+    expect(shouldPreserveAuthCallbackHash(recoveryHash)).toBe(true);
+    expect(shouldPreserveAuthCallbackHash(signupHash)).toBe(true);
+    expect(shouldPreserveAuthCallbackHash(hashWith({ type: "recovery" }))).toBe(true);
+    expect(
+      shouldPreserveAuthCallbackHash(
+        hashWith({ error: "access_denied", error_code: "otp_expired", type: "recovery" }),
+      ),
+    ).toBe(true);
+    expect(
+      shouldPreserveAuthCallbackHash(
+        hashWith({ access_token: ACCESS, refresh_token: REFRESH, token_type: "bearer" }),
+      ),
+    ).toBe(false);
+
+    const replaceState = vi.fn();
+    expect(
+      clearOAuthHashFromAddressBar(
+        { pathname: "/reset-password", search: "", hash: recoveryHash },
+        replaceState,
+      ),
+    ).toBe(false);
+    expect(replaceState).not.toHaveBeenCalled();
+
+    const setSession = vi.fn();
+    await expect(
+      consumeOAuthHashSessionIfPresent({
+        hash: recoveryHash,
+        pathname: "/reset-password",
+        search: "",
+        setSession,
+        replaceState,
+      }),
+    ).resolves.toBe("noop");
+    expect(setSession).not.toHaveBeenCalled();
+    expect(replaceState).not.toHaveBeenCalled();
+
+    await expect(
+      consumeOAuthHashSessionIfPresent({
+        hash: signupHash,
+        pathname: "/",
+        search: "",
+        setSession,
+        replaceState,
+      }),
+    ).resolves.toBe("noop");
+    expect(setSession).not.toHaveBeenCalled();
+  });
+
   it("early wipe script stashes then strips an OAuth hash without logging", () => {
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain(OAUTH_RETURN_HASH_STASH_KEY);
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("URLSearchParams");
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("access_token")');
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("refresh_token")');
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("error")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.get("type")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("recovery");
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("signup");
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toContain('indexOf("error=")');
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("history.replaceState");
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toMatch(/console\./);
@@ -332,6 +396,40 @@ describe("oauthHashSessionConsumeRules", () => {
     expect(stashHolder[OAUTH_RETURN_HASH_STASH_KEY]).toContain("access_token=");
     expect(stashHolder[OAUTH_RETURN_HASH_STASH_KEY]).toContain("refresh_token=");
     delete stashHolder[OAUTH_RETURN_HASH_STASH_KEY];
+  });
+
+  it("early wipe script leaves tokenized recovery and signup hashes in the address bar", () => {
+    const href = window.location.href.split("#")[0] ?? window.location.href;
+    const recovery = `#access_token=${ACCESS}&refresh_token=${REFRESH}&type=recovery`;
+    window.history.replaceState(window.history.state, "", `${href}${recovery}`);
+    Function(OAUTH_HASH_EARLY_WIPE_SCRIPT)();
+    expect(window.location.hash).toContain("type=recovery");
+    expect(window.location.hash).toContain("access_token=");
+    expect(window.location.hash).toContain("refresh_token=");
+    expect(
+      (window as unknown as Record<string, unknown>)[OAUTH_RETURN_HASH_STASH_KEY],
+    ).toBeUndefined();
+
+    const signup = `#access_token=${ACCESS}&refresh_token=${REFRESH}&type=signup`;
+    window.history.replaceState(window.history.state, "", `${href}${signup}`);
+    Function(OAUTH_HASH_EARLY_WIPE_SCRIPT)();
+    expect(window.location.hash).toContain("type=signup");
+    expect(window.location.hash).toContain("access_token=");
+    expect(
+      (window as unknown as Record<string, unknown>)[OAUTH_RETURN_HASH_STASH_KEY],
+    ).toBeUndefined();
+
+    window.history.replaceState(window.history.state, "", `${href}#type=recovery`);
+    Function(OAUTH_HASH_EARLY_WIPE_SCRIPT)();
+    expect(window.location.hash).toBe("#type=recovery");
+    expect(
+      (window as unknown as Record<string, unknown>)[OAUTH_RETURN_HASH_STASH_KEY],
+    ).toBeUndefined();
+    expect(AUTH_CALLBACK_HASH_PRESERVE_TYPES).toEqual(
+      expect.arrayContaining(["recovery", "signup"]),
+    );
+
+    window.history.replaceState(window.history.state, "", href);
   });
 
   it("early wipe script leaves non-OAuth anchors that merely contain error=", () => {

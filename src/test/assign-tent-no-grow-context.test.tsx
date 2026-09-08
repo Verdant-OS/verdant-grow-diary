@@ -125,6 +125,13 @@ vi.mock("@/components/ui/select", () => {
   };
 });
 
+// AssignTentDialog nests CreateTentDialog on the empty-grow escape hatch.
+// This suite does not exercise that CTA; stub it so Link/router hard-stops
+// inside the real create dialog cannot crash these picker/filter assertions.
+vi.mock("@/components/CreateTentDialog", () => ({
+  default: () => null,
+}));
+
 import AssignTentDialog from "@/components/AssignTentDialog";
 
 /** Render, then open the dialog the way a grower would. */

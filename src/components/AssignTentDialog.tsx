@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Move } from "lucide-react";
+import { Move, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   buildPlantTentMovementDetails,
@@ -28,6 +28,7 @@ import {
 } from "@/lib/plantTentMovementRules";
 import { getEligibleTentsForPlantMove } from "@/lib/plantTentRelationshipRules";
 import { buildPlantEditGrowIdFromTent } from "@/lib/plantEditSaveRules";
+import CreateTentDialog, { type CreatedTent } from "@/components/CreateTentDialog";
 
 interface TentRow {
   id: string;
@@ -61,7 +62,7 @@ export default function AssignTentDialog({ plantId, growId, currentTentId, trigg
 
   const isMove = Boolean(currentTentId);
 
-  const { data: rows = [], isLoading } = useQuery({
+  const { data: rows = [], isPending: tentsPending } = useQuery({
     queryKey: ["plant-detail", "eligible-tents", plantId, growId ?? null],
     enabled: open,
     queryFn: async (): Promise<TentRow[]> => {
@@ -253,14 +254,34 @@ export default function AssignTentDialog({ plantId, growId, currentTentId, trigg
           </DialogTitle>
         </DialogHeader>
 
-        {isLoading ? (
+        {tentsPending ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : others.length === 0 && current.length === 0 ? (
-          <p className="text-sm text-muted-foreground" data-testid="assign-tent-empty">
-            {growId && !usedGrowFallback
-              ? "No tents available in this grow."
-              : "No tents available."}
-          </p>
+          <div className="grid gap-3" data-testid="assign-tent-empty">
+            <p className="text-sm text-muted-foreground">
+              {growId && !usedGrowFallback
+                ? "No tents available in this grow."
+                : "No tents available."}
+            </p>
+            {growId ? (
+              <div data-testid="assign-tent-create-tent-cta" data-grow-id={growId}>
+                <CreateTentDialog
+                  defaultGrowId={growId}
+                  onCreated={async (tent: CreatedTent) => {
+                    await qc.invalidateQueries({
+                      queryKey: ["plant-detail", "eligible-tents", plantId, growId],
+                    });
+                    setSelected(tent.id);
+                  }}
+                  trigger={
+                    <Button type="button" className="gradient-leaf text-primary-foreground gap-1">
+                      <Plus className="h-4 w-4" /> Create tent
+                    </Button>
+                  }
+                />
+              </div>
+            ) : null}
+          </div>
         ) : (
           <form onSubmit={submit} className="grid gap-3">
             <div>

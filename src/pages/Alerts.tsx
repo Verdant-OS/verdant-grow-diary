@@ -40,7 +40,12 @@ import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
-import { deriveAlertTargetContext } from "@/lib/alertTargetContextRules";
+import { useAlertLinkedTargetEvidence } from "@/hooks/useAlertLinkedTargetEvidence";
+import {
+  buildAlertTargetPresenterInput,
+  deriveAlertTargetContext,
+  type AlertTargetContextInput,
+} from "@/lib/alertTargetContextRules";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
 import { useAlertsLinkedActionCounts } from "@/hooks/useAlertsLinkedActionCounts";
 import {
@@ -126,6 +131,7 @@ export default function Alerts() {
     severity: severityFilter,
   });
   const targetNames = useAlertTargetNames();
+  const linkedTargets = useAlertLinkedTargetEvidence(alerts);
 
   // Deterministic grow ids that currently have an open alert. Feeds the
   // unscoped Alerts header fallback so an alerting grow is preferred over
@@ -427,13 +433,17 @@ export default function Alerts() {
                     <AlertCard
                       key={a.id}
                       alert={a}
-                      tentName={
-                        a.tent_id ? (targetNames.tentNameById.get(a.tent_id) ?? null) : null
-                      }
-                      plantName={
-                        a.plant_id ? (targetNames.plantNameById.get(a.plant_id) ?? null) : null
-                      }
-                      namesLoading={targetNames.status === "loading"}
+                      targetInput={buildAlertTargetPresenterInput({
+                        tentId: a.tent_id,
+                        plantId: a.plant_id,
+                        growId: a.grow_id,
+                        tentNameById: targetNames.tentNameById,
+                        plantNameById: targetNames.plantNameById,
+                        linkedEvidence: linkedTargets.evidenceByAlertId.get(a.id) ?? [],
+                        singleTentIdByGrowId: targetNames.singleTentIdByGrowId,
+                        namesLoading: targetNames.status === "loading",
+                        idsLoading: linkedTargets.idsLoading,
+                      })}
                       linkedSummary={linkedActionCounts.get(a.id)}
                       onAcknowledge={handleAcknowledge}
                       onResolve={handleResolve}
@@ -486,9 +496,7 @@ type AlertActionHandler = (id: string, growId: string, prev: AlertStatusRow) => 
 
 interface AlertCardProps {
   alert: AlertRow;
-  tentName: string | null;
-  plantName: string | null;
-  namesLoading: boolean;
+  targetInput: AlertTargetContextInput;
   linkedSummary: ReturnType<ReturnType<typeof useAlertsLinkedActionCounts>["get"]>;
   onAcknowledge: AlertActionHandler;
   onResolve: AlertActionHandler;
@@ -497,9 +505,7 @@ interface AlertCardProps {
 
 function AlertCard({
   alert: a,
-  tentName,
-  plantName,
-  namesLoading,
+  targetInput,
   linkedSummary,
   onAcknowledge,
   onResolve,
@@ -510,13 +516,7 @@ function AlertCard({
   const sourceLabel = formatAlertSourceLabel(a.source);
   const severityLabel = SEVERITY_LABEL[a.severity] ?? "Info";
   const statusLabel = STATUS_LABEL[a.status] ?? "Open";
-  const target = deriveAlertTargetContext({
-    tentId: a.tent_id,
-    plantId: a.plant_id,
-    tentName,
-    plantName,
-    namesLoading,
-  });
+  const target = deriveAlertTargetContext(targetInput);
   const ariaLabel = buildAlertRowAriaLabel({
     severity: a.severity,
     status: a.status,
@@ -583,11 +583,14 @@ function AlertCard({
         </div>
         <p className="text-xs text-muted-foreground">{a.reason}</p>
         <AlertTargetContext
-          tentId={a.tent_id}
-          plantId={a.plant_id}
-          tentName={tentName}
-          plantName={plantName}
-          namesLoading={namesLoading}
+          tentId={targetInput.tentId}
+          plantId={targetInput.plantId}
+          tentName={targetInput.tentName}
+          plantName={targetInput.plantName}
+          namesLoading={targetInput.namesLoading}
+          idsLoading={targetInput.idsLoading}
+          linkedEvidence={targetInput.linkedEvidence}
+          singleTentId={targetInput.singleTentId}
           variant="compact"
         />
         <AlertWhyContext alert={a} variant="compact" />

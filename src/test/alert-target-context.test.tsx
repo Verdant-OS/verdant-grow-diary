@@ -20,6 +20,8 @@ import {
   ALERT_TARGET_PREFIX,
   ALERT_TARGET_UNAVAILABLE_TEXT,
   deriveAlertTargetContext,
+  linkedEvidenceLookupIds,
+  resolveAlertTargetIds,
   sanitizeAlertTargetLabel,
 } from "@/lib/alertTargetContextRules";
 import { AlertTargetContext } from "@/components/AlertTargetContext";
@@ -35,6 +37,40 @@ describe("sanitizeAlertTargetLabel", () => {
     expect(sanitizeAlertTargetLabel("")).toBeNull();
     expect(sanitizeAlertTargetLabel("   ")).toBeNull();
     expect(sanitizeAlertTargetLabel("f3d73a5a-312d-48a0-b953-97481393f2a8")).toBeNull();
+  });
+});
+
+describe("resolveAlertTargetIds", () => {
+  it("prefers alert columns, then linked evidence, then sole tent", () => {
+    expect(
+      resolveAlertTargetIds({
+        tentId: "tent-alert",
+        plantId: null,
+        linkedEvidence: [{ tentId: "tent-snap", plantId: "plant-snap" }],
+        singleTentId: "tent-sole",
+      }),
+    ).toEqual({
+      tentId: "tent-alert",
+      plantId: "plant-snap",
+      tentSource: "alert",
+      plantSource: "linked_evidence",
+    });
+  });
+});
+
+describe("linkedEvidenceLookupIds", () => {
+  it("keeps sensor_snapshot and diary_entry ids and drops other types", () => {
+    expect(
+      linkedEvidenceLookupIds([
+        {
+          id: "81d0274d-3782-459a-804d-5ffeea475b25",
+          type: "sensor_snapshot",
+          source: "manual",
+        },
+        { id: "diary-1", type: "diary_entry", source: "manual" },
+        { id: "photo-1", type: "photo", source: "manual" },
+      ]),
+    ).toEqual(["81d0274d-3782-459a-804d-5ffeea475b25", "diary-1"]);
   });
 });
 
@@ -109,6 +145,89 @@ describe("deriveAlertTargetContext", () => {
     expect(t.kind).toBe("unavailable");
     expect(t.text).toBe(ALERT_TARGET_UNAVAILABLE_TEXT);
   });
+
+  it("7. alert tent_id beats linked tent; missing plant_id still fills from snapshot", () => {
+    const t = deriveAlertTargetContext({
+      tentId: "tent-alert",
+      plantId: null,
+      tentName: "Alert Tent",
+      plantName: "Keeper A",
+      linkedEvidence: [{ tentId: "tent-snap", plantId: "plant-snap" }],
+    });
+    expect(t.kind).toBe("located");
+    expect(t.tentId).toBe("tent-alert");
+    expect(t.plantId).toBe("plant-snap");
+    expect(t.text).toBe("Tent: Alert Tent · Plant: Keeper A");
+    expect(t.text).not.toContain("tent-snap");
+  });
+
+  it("8. missing ids + linked snapshot tent/plant → located copy, never UUID", () => {
+    const t = deriveAlertTargetContext({
+      tentId: null,
+      plantId: null,
+      tentName: "One-Tent",
+      plantName: "Keeper A",
+      linkedEvidence: [
+        {
+          tentId: "81d0274d-3782-459a-804d-5ffeea475b25",
+          plantId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        },
+      ],
+    });
+    expect(t.kind).toBe("located");
+    expect(t.tentId).toBe("81d0274d-3782-459a-804d-5ffeea475b25");
+    expect(t.plantId).toBe("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+    expect(t.text).toBe("Tent: One-Tent · Plant: Keeper A");
+    expect(t.text).not.toContain("81d0274d");
+    expect(t.text).not.toContain("aaaaaaaa-bbbb");
+  });
+
+  it("9. missing ids + no linked evidence → unavailable", () => {
+    const t = deriveAlertTargetContext({
+      tentId: null,
+      plantId: null,
+      linkedEvidence: [],
+      singleTentId: null,
+    });
+    expect(t.kind).toBe("unavailable");
+    expect(t.text).toBe(ALERT_TARGET_UNAVAILABLE_TEXT);
+  });
+
+  it("10. missing ids + conflicting linked tents fail closed (no sole-tent guess)", () => {
+    const t = deriveAlertTargetContext({
+      tentId: null,
+      plantId: null,
+      tentName: "Should ignore",
+      linkedEvidence: [{ tentId: "tent-a" }, { tentId: "tent-b" }],
+      singleTentId: "tent-only",
+    });
+    expect(t.kind).toBe("unavailable");
+    expect(t.text).toBe(ALERT_TARGET_UNAVAILABLE_TEXT);
+  });
+
+  it("11. missing ids + sole tent fallback when no linked evidence", () => {
+    const t = deriveAlertTargetContext({
+      tentId: null,
+      plantId: null,
+      tentName: "One-Tent",
+      singleTentId: "tent-only",
+    });
+    expect(t.kind).toBe("located");
+    expect(t.tentId).toBe("tent-only");
+    expect(t.text).toBe("Tent: One-Tent");
+  });
+
+  it("12. missing column ids while evidence is loading → loading, not unavailable or sole-tent", () => {
+    const t = deriveAlertTargetContext({
+      tentId: null,
+      plantId: null,
+      singleTentId: "tent-only",
+      idsLoading: true,
+    });
+    expect(t.kind).toBe("loading");
+    expect(t.text).toBe(ALERT_TARGET_LOADING_TEXT);
+    expect(t.tentId).toBeNull();
+  });
 });
 
 describe("AlertTargetContext presenter", () => {
@@ -122,11 +241,20 @@ describe("AlertTargetContext presenter", () => {
     expect(node.textContent).toContain("Tent: One-Tent");
   });
 
-  it("compact variant on missing ids shows fail-closed unavailable copy", () => {
-    render(<AlertTargetContext tentId={null} plantId={null} variant="compact" />);
+  it("compact variant uses linked snapshot tent when alert ids are missing", () => {
+    render(
+      <AlertTargetContext
+        tentId={null}
+        plantId={null}
+        tentName="One-Tent"
+        linkedEvidence={[{ tentId: "tent-1", plantId: null }]}
+        variant="compact"
+      />,
+    );
     const node = screen.getByTestId("alert-target-compact");
-    expect(node.getAttribute("data-kind")).toBe("unavailable");
-    expect(node.textContent).toContain(ALERT_TARGET_UNAVAILABLE_TEXT);
+    expect(node.getAttribute("data-kind")).toBe("located");
+    expect(node.textContent).toContain("Tent: One-Tent");
+    expect(node.textContent).not.toContain(ALERT_TARGET_UNAVAILABLE_TEXT);
   });
 
   it("detailed variant always renders Tent and Plant rows", () => {
@@ -199,6 +327,10 @@ describe("alert row aria includes target text when provided", () => {
 
 const RULES_SRC = readFileSync(resolve(__dirname, "../lib/alertTargetContextRules.ts"), "utf8");
 const HOOK_SRC = readFileSync(resolve(__dirname, "../hooks/useAlertTargetNames.ts"), "utf8");
+const EVIDENCE_HOOK_SRC = readFileSync(
+  resolve(__dirname, "../hooks/useAlertLinkedTargetEvidence.ts"),
+  "utf8",
+);
 const COMP_SRC = readFileSync(resolve(__dirname, "../components/AlertTargetContext.tsx"), "utf8");
 const LIST_SRC = readFileSync(resolve(__dirname, "../pages/Alerts.tsx"), "utf8");
 const DETAIL_SRC = readFileSync(resolve(__dirname, "../pages/AlertDetail.tsx"), "utf8");
@@ -207,14 +339,15 @@ describe("wiring — list and detail always surface target context", () => {
   it("Alerts list renders AlertTargetContext compact on each card", () => {
     expect(LIST_SRC).toMatch(/<AlertTargetContext[\s\S]*variant=["']compact["']/);
     expect(LIST_SRC).toMatch(/useAlertTargetNames\(/);
+    expect(LIST_SRC).toMatch(/useAlertLinkedTargetEvidence\(/);
   });
 
   it("Alert detail always renders tent/plant rows (no silent omit)", () => {
     expect(DETAIL_SRC).toMatch(/<AlertTargetContext[\s\S]*variant=["']detailed["']/);
     expect(DETAIL_SRC).not.toMatch(/\{alert\.tent_id && \(/);
     expect(DETAIL_SRC).not.toMatch(/\{alert\.plant_id && \(/);
-    expect(DETAIL_SRC).toMatch(/tentDetailPath\(alert\.tent_id\)/);
-    expect(DETAIL_SRC).toMatch(/plantDetailPath\(alert\.plant_id\)/);
+    expect(DETAIL_SRC).toMatch(/tentDetailPath\(targetInput\.tentId\)/);
+    expect(DETAIL_SRC).toMatch(/plantDetailPath\(targetInput\.plantId\)/);
   });
 });
 
@@ -222,6 +355,7 @@ describe("static safety", () => {
   for (const [name, src] of [
     ["alertTargetContextRules.ts", RULES_SRC],
     ["useAlertTargetNames.ts", HOOK_SRC],
+    ["useAlertLinkedTargetEvidence.ts", EVIDENCE_HOOK_SRC],
     ["AlertTargetContext.tsx", COMP_SRC],
   ] as const) {
     it(`${name}: no alert writes / action_queue / service_role / AI / device-control`, () => {
@@ -240,7 +374,17 @@ describe("static safety", () => {
   }
 
   it("hook is read-only selects of id,name", () => {
-    expect(HOOK_SRC).toMatch(/\.from\(["']tents["']\)\.select\(["']id,name["']\)/);
+    expect(HOOK_SRC).toMatch(/\.from\(["']tents["']\)\.select\(["']id,name,grow_id["']\)/);
     expect(HOOK_SRC).toMatch(/\.from\(["']plants["']\)\.select\(["']id,name["']\)/);
+  });
+
+  it("evidence hook is read-only selects of linked snapshot/diary ids", () => {
+    expect(EVIDENCE_HOOK_SRC).toMatch(
+      /\.from\(["']sensor_readings["']\)\.select\(["']id,tent_id["']\)/,
+    );
+    expect(EVIDENCE_HOOK_SRC).toMatch(
+      /\.from\(["']diary_entries["']\)\.select\(["']id,tent_id,plant_id["']\)/,
+    );
+    expect(EVIDENCE_HOOK_SRC).not.toMatch(/raw_payload/);
   });
 });

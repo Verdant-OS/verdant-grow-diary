@@ -17,6 +17,7 @@ import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { formatGrowDisplayLabel } from "@/lib/growDisplayLabel";
+import { AlertTargetContext } from "@/components/AlertTargetContext";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
 import { ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY } from "@/lib/originatingTimelineEventRules";
@@ -47,6 +48,7 @@ import {
   type AlertStatusRow,
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
+import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
 import {
   actionDetailPath,
   aiDoctorSessionDetailPath,
@@ -157,6 +159,7 @@ export default function AlertDetail() {
   }, [load]);
 
   const { events } = useAlertEvents(alertId ?? null, eventsKey);
+  const targetNames = useAlertTargetNames();
 
   const runStatusChange = async (
     event_type: "acknowledged" | "resolved" | "dismissed" | "reopened",
@@ -548,32 +551,20 @@ export default function AlertDetail() {
                   </Link>
                 </dd>
               </div>
-              {alert.tent_id && (
-                <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
-                  <dt className="uppercase tracking-wider text-muted-foreground">Tent</dt>
-                  <dd className="font-medium">
-                    <Link
-                      to={tentDetailPath(alert.tent_id)}
-                      className="text-primary hover:underline"
-                    >
-                      {alert.tent_id}
-                    </Link>
-                  </dd>
-                </div>
-              )}
-              {alert.plant_id && (
-                <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
-                  <dt className="uppercase tracking-wider text-muted-foreground">Plant</dt>
-                  <dd className="font-medium">
-                    <Link
-                      to={plantDetailPath(alert.plant_id)}
-                      className="text-primary hover:underline"
-                    >
-                      {alert.plant_id}
-                    </Link>
-                  </dd>
-                </div>
-              )}
+              <AlertTargetContext
+                tentId={alert.tent_id}
+                plantId={alert.plant_id}
+                tentName={
+                  alert.tent_id ? (targetNames.tentNameById.get(alert.tent_id) ?? null) : null
+                }
+                plantName={
+                  alert.plant_id ? (targetNames.plantNameById.get(alert.plant_id) ?? null) : null
+                }
+                namesLoading={targetNames.status === "loading"}
+                variant="detailed"
+                tentHref={alert.tent_id ? tentDetailPath(alert.tent_id) : null}
+                plantHref={alert.plant_id ? plantDetailPath(alert.plant_id) : null}
+              />
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                 <dt className="uppercase tracking-wider text-muted-foreground">First seen</dt>
                 <dd>{fmt(alert.first_seen_at)}</dd>

@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearOAuthHashFromAddressBar,
+  clearOAuthReturnHashRetention,
   consumeOAuthHashSessionIfPresent,
   hashLooksLikeOAuthReturn,
   OAUTH_HASH_EARLY_WIPE_SCRIPT,
@@ -8,6 +9,7 @@ import {
   parseOAuthHashFragment,
   resolveOAuthHashSource,
   shouldAttemptOAuthHashSessionConsume,
+  peekOAuthReturnHashStash,
   takeOAuthReturnHashStash,
   urlWithoutHash,
 } from "@/lib/oauthHashSessionConsumeRules";
@@ -21,6 +23,10 @@ function hashWith(params: Record<string, string>): string {
 }
 
 describe("oauthHashSessionConsumeRules", () => {
+  beforeEach(() => {
+    clearOAuthReturnHashRetention();
+  });
+
   it("parses access_token + refresh_token from an OAuth return hash", () => {
     const parsed = parseOAuthHashFragment(
       hashWith({
@@ -47,6 +53,8 @@ describe("oauthHashSessionConsumeRules", () => {
     expect(parseOAuthHashFragment("#")).toEqual({ kind: "none" });
     expect(parseOAuthHashFragment("#plant-ai-doctor-review")).toEqual({ kind: "none" });
     expect(parseOAuthHashFragment("#foo=bar&baz=1")).toEqual({ kind: "none" });
+    expect(parseOAuthHashFragment("#myaccess_token=1")).toEqual({ kind: "none" });
+    expect(parseOAuthHashFragment("#section?error=1")).toEqual({ kind: "none" });
     expect(parseOAuthHashFragment(null)).toEqual({ kind: "none" });
     expect(parseOAuthHashFragment(undefined)).toEqual({ kind: "none" });
   });
@@ -273,11 +281,19 @@ describe("oauthHashSessionConsumeRules", () => {
         refresh_token: REFRESH,
       }),
     };
+    expect(peekOAuthReturnHashStash(holder)).toBe(
+      hashWith({ access_token: ACCESS, refresh_token: REFRESH }),
+    );
     expect(takeOAuthReturnHashStash(holder)).toBe(
       hashWith({ access_token: ACCESS, refresh_token: REFRESH }),
     );
     expect(holder[OAUTH_RETURN_HASH_STASH_KEY]).toBeUndefined();
     expect(takeOAuthReturnHashStash(holder)).toBeNull();
+    expect(peekOAuthReturnHashStash(holder)).toBe(
+      hashWith({ access_token: ACCESS, refresh_token: REFRESH }),
+    );
+    clearOAuthReturnHashRetention();
+    expect(peekOAuthReturnHashStash(holder)).toBeNull();
     expect(
       resolveOAuthHashSource("", hashWith({ access_token: ACCESS, refresh_token: REFRESH })),
     ).toBe(hashWith({ access_token: ACCESS, refresh_token: REFRESH }));
@@ -286,12 +302,16 @@ describe("oauthHashSessionConsumeRules", () => {
       hashLooksLikeOAuthReturn(hashWith({ access_token: ACCESS, refresh_token: REFRESH })),
     ).toBe(true);
     expect(hashLooksLikeOAuthReturn("#section")).toBe(false);
+    expect(hashLooksLikeOAuthReturn("#section?next=error=value")).toBe(false);
   });
 
   it("early wipe script stashes then strips an OAuth hash without logging", () => {
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain(OAUTH_RETURN_HASH_STASH_KEY);
-    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("access_token=");
-    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("refresh_token=");
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("URLSearchParams");
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("access_token")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("refresh_token")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("error")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toContain('indexOf("error=")');
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("history.replaceState");
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toMatch(/console\./);
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toMatch(/fetch\(/);
@@ -312,5 +332,71 @@ describe("oauthHashSessionConsumeRules", () => {
     expect(stashHolder[OAUTH_RETURN_HASH_STASH_KEY]).toContain("access_token=");
     expect(stashHolder[OAUTH_RETURN_HASH_STASH_KEY]).toContain("refresh_token=");
     delete stashHolder[OAUTH_RETURN_HASH_STASH_KEY];
+  });
+
+  it("early wipe script leaves non-OAuth anchors that merely contain error=", () => {
+    const href = window.location.href.split("#")[0] ?? window.location.href;
+    window.history.replaceState(window.history.state, "", `${href}#section?next=error=value`);
+    expect(window.location.hash).toContain("error=");
+    Function(OAUTH_HASH_EARLY_WIPE_SCRIPT)();
+    expect(window.location.hash).toContain("section");
+    expect(
+      (window as unknown as Record<string, unknown>)[OAUTH_RETURN_HASH_STASH_KEY],
+    ).toBeUndefined();
+  });
+
+  it("early wipe script leaves near-miss fragments that are not OAuth param names", () => {
+    const href = window.location.href.split("#")[0] ?? window.location.href;
+    window.history.replaceState(window.history.state, "", `${href}#myaccess_token=1`);
+    Function(OAUTH_HASH_EARLY_WIPE_SCRIPT)();
+    expect(window.location.hash).toContain("myaccess_token");
+    expect(
+      (window as unknown as Record<string, unknown>)[OAUTH_RETURN_HASH_STASH_KEY],
+    ).toBeUndefined();
+
+    window.history.replaceState(window.history.state, "", `${href}#section?error=1`);
+    Function(OAUTH_HASH_EARLY_WIPE_SCRIPT)();
+    expect(window.location.hash).toContain("section?error=1");
+    expect(
+      (window as unknown as Record<string, unknown>)[OAUTH_RETURN_HASH_STASH_KEY],
+    ).toBeUndefined();
+  });
+
+  it("does not call setSession when replaceState cannot wipe a live OAuth hash", async () => {
+    const setSession = vi.fn().mockResolvedValue({ error: null });
+    const replaceState = vi.fn(() => {
+      throw new Error("replaceState blocked");
+    });
+    await expect(
+      consumeOAuthHashSessionIfPresent({
+        hash: hashWith({ access_token: ACCESS, refresh_token: REFRESH }),
+        pathname: "/",
+        search: "",
+        setSession,
+        replaceState,
+      }),
+    ).resolves.toBe("cleared_without_session");
+    expect(setSession).not.toHaveBeenCalled();
+  });
+
+  it("still setSessions from stash when the address bar is already clean and replaceState throws", async () => {
+    const setSession = vi.fn().mockResolvedValue({ error: null });
+    const replaceState = vi.fn(() => {
+      throw new Error("replaceState blocked");
+    });
+    await expect(
+      consumeOAuthHashSessionIfPresent({
+        hash: "",
+        stashedHash: hashWith({ access_token: ACCESS, refresh_token: REFRESH }),
+        pathname: "/",
+        search: "",
+        setSession,
+        replaceState,
+      }),
+    ).resolves.toBe("consumed");
+    expect(setSession).toHaveBeenCalledWith({
+      access_token: ACCESS,
+      refresh_token: REFRESH,
+    });
   });
 });

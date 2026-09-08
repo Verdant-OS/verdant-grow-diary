@@ -30,6 +30,7 @@ describe("oauth hash session consume wiring", () => {
     const consumeStart = rulesSrc.indexOf("export async function consumeOAuthHashSessionIfPresent");
     expect(consumeStart).toBeGreaterThanOrEqual(0);
     const consumeSrc = rulesSrc.slice(consumeStart);
+    expect(consumeSrc).toContain("addressBarStillHasOAuth");
     expect(consumeSrc).toMatch(
       /clearOAuthHashFromAddressBar\([\s\S]*?\);[\s\S]*?if \(!shouldAttemptOAuthHashSessionConsume\(parsed\)\)[\s\S]*?await deps\.setSession/,
     );
@@ -47,6 +48,14 @@ describe("oauth hash session consume wiring", () => {
       /<head>\s*<script[\s\S]*?dangerouslySetInnerHTML=\{\{\s*__html:\s*OAUTH_HASH_EARLY_WIPE_SCRIPT\s*\}\}[\s\S]*?\/>\s*<HeadContent \/>/,
     );
     expect(rootSrc).not.toMatch(/console\.(log|debug|info)\(/);
+  });
+
+  it("ResetPassword diagnoses from the before-paint stash, not a wiped location.hash", () => {
+    const resetSrc = read("src/pages/ResetPassword.tsx");
+    expect(resetSrc).toContain("peekOAuthReturnHashStash");
+    expect(resetSrc).toContain("capturedHashRef");
+    expect(resetSrc).toContain("shouldAttemptOAuthHashSessionConsume");
+    expect(resetSrc).toContain("diagnoseResetLink");
   });
 
   it("does not rely on editing the auto-generated Lovable OAuth shim or supabase client", () => {

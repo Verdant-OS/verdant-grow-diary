@@ -6,12 +6,12 @@
  * textarea value — across typing, paste, native input dispatch, IME
  * composition, and blur-before-save.
  *
- * CONTRACT CAUTION (do not change): the V2 note is OPTIONAL. An empty or
- * whitespace-only note saves with p_note = null (see quickLogV2SavePayload).
- * These tests verify synchronization only — they do NOT make the note
- * required, and they do not touch harvest, stage defaults, target panel, or
- * post-save reset behavior. Legacy QuickLog keeps its own note-required
- * preview rule (covered by quick-log-note-sync.test.tsx).
+ * Empty-content gate (QUICKLOG_EMPTY_CONTENT_FAIL_CLOSED): a note action with
+ * a selected target but no note / media / reading must not persist. These
+ * tests verify synchronization of entered notes; empty-body fail-closed is
+ * covered by quick-log-v2-empty-content-fail-closed.test.tsx and the payload
+ * builder. Legacy QuickLog keeps its own note-required preview rule
+ * (covered by quick-log-note-sync.test.tsx).
  *
  * Mocks mirror quick-log-v2-refresh-sheet.test.tsx: supabase.rpc, use-plants,
  * use-tents, @/store/grows (visible grow roster), sonner. No real network, no auth, no writes.
@@ -145,12 +145,13 @@ describe("QuickLogV2Sheet note → save payload sync", () => {
     expect(await savedNote()).toBe("Filled on blur");
   });
 
-  it("empty note keeps the existing OPTIONAL contract: saves with p_note null", async () => {
+  it("empty note with no other content fails closed: Save disabled, no RPC", async () => {
     renderSheet();
     clickNoteAction();
-    // No note entered at all — V2 allows this; do not regress it to required.
-    clickSave();
-    expect(await savedNote()).toBeNull();
+    const save = screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.click(save);
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 });
 
@@ -176,11 +177,16 @@ describe("quickLogV2SavePayload note contract (pure)", () => {
     if (r.ok) expect(r.payload.p_note).toBe("keep this exact text");
   });
 
-  it("empty and whitespace-only notes stay OPTIONAL (p_note null, still ok)", () => {
+  it("empty and whitespace-only notes without other content fail closed", () => {
     for (const note of ["", "   ", "\t\n"]) {
       const r = buildQuickLogV2SavePayload({ ...base, note });
-      expect(r.ok).toBe(true);
-      if (r.ok) expect(r.payload.p_note).toBeNull();
+      expect(r).toEqual({ ok: false, reason: "empty_content" });
     }
+  });
+
+  it("empty note with companion media still persists p_note null", () => {
+    const r = buildQuickLogV2SavePayload({ ...base, note: "", hasCompanionMedia: true });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.payload.p_note).toBeNull();
   });
 });

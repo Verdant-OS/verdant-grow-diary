@@ -109,6 +109,10 @@ function getToastAction(): {
 
 function clickNote() {
   fireEvent.click(screen.getByRole("button", { name: "Note" }));
+  // Empty-content gate: Save stays disabled until critical note content exists.
+  fireEvent.change(screen.getByLabelText("Note (optional)"), {
+    target: { value: "Timeline CTA — canopy check logged." },
+  });
 }
 function clickSave() {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -218,7 +222,8 @@ describe("Quick Log → Timeline CTA (photo success)", () => {
     storageUpload.mockResolvedValue({ data: { path: "p" }, error: null });
 
     renderSheet("plant:plant-1");
-    clickNote();
+    // Photo alone satisfies critical content; open Note without requiring typed text.
+    fireEvent.click(screen.getByRole("button", { name: "Note" }));
 
     // Inject a photo file through the hidden library input.
     const libInput = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;

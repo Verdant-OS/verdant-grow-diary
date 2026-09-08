@@ -9,12 +9,17 @@
  * snapshots, and open alerts, it returns a deterministic ranked list of
  * next actionable items the grower should consider capturing. Presenters
  * render this list and deep-link the grower into the appropriate existing
- * screen (Quick Log, Alerts, Plant Detail). The grower still saves.
+ * authenticated screen (Daily Check, Alerts). The grower still saves.
+ *
+ * Plant- and tent-scoped diary CTAs must never point at the public
+ * `/quick-log` starter — that path drops grow/plant context and is an
+ * abandonment dead-end for signed-in growers (ONBOARDING_QUICKLOG_CTA_PUBLIC_MISROUTE).
  *
  * All time is injectable via `now` for tests.
  */
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import type { NormalizedDiaryEntry } from "@/lib/diaryEntryRules";
+import { buildDailyCheckEntryHref } from "@/lib/dailyCheckPostSubmitRules";
 
 export type GuidedActionItemKind =
   "sensor_context" | "cadence" | "alert_followup" | "stage_transition";
@@ -182,6 +187,35 @@ function formatAge(ms: number): string {
   return `${hours}h`;
 }
 
+/** Authenticated Daily Check deep-link for a known plant (diary / note path). */
+function plantDailyCheckHref(plantId: string): string {
+  return buildDailyCheckEntryHref({
+    plantId,
+    source: "dashboard",
+    method: "note",
+  });
+}
+
+/**
+ * Authenticated Daily Check deep-link for a tent sensor gap.
+ * Prefers a plant already assigned to the tent (stable id order); when the
+ * tent has no plants, still stays on `/daily-check` — never public `/quick-log`.
+ */
+function tentSensorDailyCheckHref(tentId: string, plants: readonly GuidedChecklistPlant[]): string {
+  const plantInTent = plants
+    .filter((p) => p.tentId === tentId)
+    .slice()
+    .sort((a, b) => a.id.localeCompare(b.id))[0];
+  if (plantInTent) {
+    return buildDailyCheckEntryHref({
+      plantId: plantInTent.id,
+      source: "dashboard",
+      method: "sensor",
+    });
+  }
+  return "/daily-check?from=dashboard";
+}
+
 /**
  * Deterministic sort:
  *   1. priority ascending
@@ -241,7 +275,7 @@ export function buildGuidedActionChecklist(
       title: `Capture a fresh reading for ${tent.name}`,
       reason: describeStaleReason(reading, now),
       ctaLabel: "Log snapshot",
-      ctaHref: "/quick-log",
+      ctaHref: tentSensorDailyCheckHref(tent.id, plants),
       plantId: null,
       tentId: tent.id,
     });
@@ -264,7 +298,7 @@ export function buildGuidedActionChecklist(
             ? "No watering or feeding logged for this plant yet."
             : `No watering or feeding in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: "/quick-log",
+        ctaHref: plantDailyCheckHref(plant.id),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -280,7 +314,7 @@ export function buildGuidedActionChecklist(
         title: `Capture a fresh photo of ${plant.name}`,
         reason: lastPhoto == null ? "No photo captured for this plant yet." : `No photo in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: "/quick-log",
+        ctaHref: plantDailyCheckHref(plant.id),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -301,7 +335,7 @@ export function buildGuidedActionChecklist(
               ? `${plant.name} is in flower — no trichome or pistil note yet.`
               : `${plant.name} is in flower — last trichome/pistil note ${age} ago.`,
           ctaLabel: "Log observation",
-          ctaHref: "/quick-log",
+          ctaHref: plantDailyCheckHref(plant.id),
           plantId: plant.id,
           tentId: plant.tentId,
         });

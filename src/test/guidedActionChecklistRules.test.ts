@@ -172,6 +172,86 @@ describe("buildGuidedActionChecklist", () => {
     expect(ids).toEqual(["cadence:photo:p1", "cadence:water:p1"]);
   });
 
+  it("routes plant cadence CTAs to authenticated daily-check with plantId (never public /quick-log)", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [PLANT_A],
+        latestReadingByTent: {},
+      }),
+    );
+    const water = items.find((i) => i.id === "cadence:water:p1");
+    const photo = items.find((i) => i.id === "cadence:photo:p1");
+    expect(water?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=note");
+    expect(photo?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=note");
+    expect(items.every((i) => !i.ctaHref.startsWith("/quick-log"))).toBe(true);
+  });
+
+  it("routes sensor CTAs through daily-check with a plant in that tent", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [PLANT_A],
+        tents: [TENT_1],
+        latestReadingByTent: { t1: null },
+        diaryEntries: [
+          entry({
+            id: "e1",
+            plantId: "p1",
+            eventType: "watering",
+            createdAt: new Date(NOW - 60 * 60_000).toISOString(),
+          }),
+          entry({
+            id: "e2",
+            plantId: "p1",
+            eventType: "photo",
+            createdAt: new Date(NOW - 60 * 60_000).toISOString(),
+            photoUrl: "u",
+          }),
+        ],
+      }),
+    );
+    const sensor = items.find((i) => i.id === "sensor:t1");
+    expect(sensor?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=sensor");
+    expect(sensor?.ctaHref).not.toMatch(/\/quick-log/);
+  });
+
+  it("keeps tent-only sensor CTA on authenticated daily-check when the tent has no plants", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [],
+        tents: [TENT_1],
+        latestReadingByTent: { t1: null },
+      }),
+    );
+    const sensor = items.find((i) => i.id === "sensor:t1");
+    expect(sensor?.ctaHref).toBe("/daily-check?from=dashboard");
+    expect(sensor?.ctaHref).not.toMatch(/\/quick-log/);
+  });
+
+  it("routes flower trichome CTAs to authenticated daily-check with plantId", () => {
+    const items = buildGuidedActionChecklist(
+      makeInput({
+        plants: [PLANT_FLOWER],
+        diaryEntries: [
+          entry({
+            id: "e1",
+            plantId: "p2",
+            eventType: "watering",
+            createdAt: new Date(NOW - 60_000).toISOString(),
+          }),
+          entry({
+            id: "e2",
+            plantId: "p2",
+            eventType: "photo",
+            createdAt: new Date(NOW - 60_000).toISOString(),
+            photoUrl: "u",
+          }),
+        ],
+      }),
+    );
+    const trichome = items.find((i) => i.id === "stage:trichome:p2");
+    expect(trichome?.ctaHref).toBe("/daily-check?plantId=p2&from=dashboard&method=note");
+  });
+
   it("emits cadence items when the last log is beyond the window", () => {
     const items = buildGuidedActionChecklist(
       makeInput({

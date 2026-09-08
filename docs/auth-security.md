@@ -53,11 +53,54 @@ What `sessionStorage` does **not** do:
 5. Treat RLS as the **real** access boundary. The browser session only
    identifies the caller; the database decides what they can read/write.
 
+## OAuth return fragment (implicit-flow hash)
+
+Google / managed OAuth (`lovable.auth.signInWithOAuth`) returns to the
+public app origin with an implicit-flow URL fragment:
+
+```text
+https://verdantgrowdiary.com/#access_token=…&refresh_token=…
+```
+
+Those values are credentials. They must not remain in `location.hash` or
+the current history URL after application JavaScript runs, and they must
+never be logged, screenshot-captioned, or copied into tests as live
+tokens (tests use synthetic stand-ins only).
+
+Mitigations in this repo (defense in depth; sessionStorage auth is
+unchanged; no `service_role`; no SSR cookie rewrite):
+
+1. **Before first paint** — `OAUTH_HASH_EARLY_WIPE_SCRIPT` is the first
+   child of `<head>` in `src/routes/__root.tsx`. If the hash looks like
+   an OAuth return (`access_token=`, `refresh_token=`, or `error=`), the
+   script copies it into a one-shot in-memory `window` slot and
+   `history.replaceState`s to path + search with no fragment.
+2. **Before `setSession`** — `consumeOAuthHashSessionIfPresent` parses
+   (preferring the before-paint stash when `location.hash` is already
+   empty), wipes the hash synchronously, then awaits `setSession` with
+   tokens held only in memory. Malformed and provider-error hashes are
+   cleared without inventing a session.
+3. **Never log** `location.hash`, `access_token`, `refresh_token`, or
+   full session payloads.
+
+### Why PKCE / auth-code is not switched in this slice
+
+`Auth.tsx` initiates Google SSO through the **auto-generated** Lovable
+shim (`src/integrations/lovable/index.ts` → `createLovableAuth()`), not
+`supabase.auth.signInWithOAuth`. Setting `auth.flowType: "pkce"` on
+`src/integrations/supabase/client.ts` would not change the managed
+OAuth redirect, which still returns `access_token` / `refresh_token` in
+the fragment. Editing that generated shim is out of scope. A future
+slice can move Google SSO onto a PKCE/code exchange **if** Lovable
+managed OAuth (or a first-party Supabase provider config) exposes
+`?code=` without breaking the existing Google button. Until then, wipe
+first is the fail-closed mitigation.
+
 ## Rules
 
 - **Never** expose or import `SUPABASE_SERVICE_ROLE_KEY` from `src/`.
-- **Never** log `session`, `access_token`, `refresh_token`, or full
-  user objects.
+- **Never** log `session`, `access_token`, `refresh_token`,
+  `location.hash`, or full user objects.
 - **Never** trust a client-supplied `user_id` as an access decision.
   Client filters on `user_id` are UX/performance hints only; RLS
   policies in Postgres are the security boundary.

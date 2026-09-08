@@ -22,11 +22,11 @@ The Supabase client is configured with `storage: sessionStorage`
 
 ### Tradeoffs
 
-| Storage          | Survives tab close? | Survives browser restart? | Readable by injected JS (XSS)? |
-| ---------------- | ------------------- | ------------------------- | ------------------------------ |
-| `localStorage`   | Yes                 | Yes                       | Yes                            |
-| `sessionStorage` | No                  | No                        | Yes                            |
-| `httpOnly` cookie| Yes (server-bound)  | Yes                       | No (not readable from JS)      |
+| Storage           | Survives tab close? | Survives browser restart? | Readable by injected JS (XSS)? |
+| ----------------- | ------------------- | ------------------------- | ------------------------------ |
+| `localStorage`    | Yes                 | Yes                       | Yes                            |
+| `sessionStorage`  | No                  | No                        | Yes                            |
+| `httpOnly` cookie | Yes (server-bound)  | Yes                       | No (not readable from JS)      |
 
 Why `sessionStorage`:
 

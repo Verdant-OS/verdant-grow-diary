@@ -175,9 +175,9 @@ export function resolveOAuthHashSource(locationHash: unknown, stashedHash: unkno
  * Detection mirrors parseOAuthHashFragment's oauth-looking keys.
  */
 export const OAUTH_HASH_EARLY_WIPE_SCRIPT =
-  "(function(){try{var h=location.hash||\"\";if(h.indexOf(\"access_token=\")<0&&h.indexOf(\"refresh_token=\")<0&&h.indexOf(\"error=\")<0)return;window." +
+  '(function(){try{var h=location.hash||"";if(h.indexOf("access_token=")<0&&h.indexOf("refresh_token=")<0&&h.indexOf("error=")<0)return;window.' +
   OAUTH_RETURN_HASH_STASH_KEY +
-  "=h;history.replaceState(history.state,\"\",location.pathname+location.search);}catch(e){}})();";
+  '=h;history.replaceState(history.state,"",location.pathname+location.search);}catch(e){}})();';
 
 export type OAuthHashSetSession = (
   tokens: OAuthHashSessionTokens,
@@ -214,8 +214,7 @@ export async function consumeOAuthHashSessionIfPresent(deps: {
 
   try {
     const result = await deps.setSession(parsed.tokens);
-    const error =
-      result && typeof result === "object" && "error" in result ? result.error : null;
+    const error = result && typeof result === "object" && "error" in result ? result.error : null;
     return error ? "cleared_without_session" : "consumed";
   } catch {
     return "cleared_without_session";

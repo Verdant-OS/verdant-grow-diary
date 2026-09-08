@@ -38,9 +38,7 @@ describe("oauthHashSessionConsumeRules", () => {
   });
 
   it("accepts a hash without a leading #", () => {
-    const parsed = parseOAuthHashFragment(
-      `access_token=${ACCESS}&refresh_token=${REFRESH}`,
-    );
+    const parsed = parseOAuthHashFragment(`access_token=${ACCESS}&refresh_token=${REFRESH}`);
     expect(parsed.kind).toBe("session");
   });
 
@@ -54,19 +52,17 @@ describe("oauthHashSessionConsumeRules", () => {
   });
 
   it("fails closed on missing, empty, short, or overlong tokens", () => {
+    expect(parseOAuthHashFragment(hashWith({ access_token: ACCESS }))).toEqual({
+      kind: "malformed",
+    });
+    expect(parseOAuthHashFragment(hashWith({ refresh_token: REFRESH }))).toEqual({
+      kind: "malformed",
+    });
+    expect(parseOAuthHashFragment(hashWith({ access_token: "", refresh_token: REFRESH }))).toEqual({
+      kind: "malformed",
+    });
     expect(
-      parseOAuthHashFragment(hashWith({ access_token: ACCESS })),
-    ).toEqual({ kind: "malformed" });
-    expect(
-      parseOAuthHashFragment(hashWith({ refresh_token: REFRESH })),
-    ).toEqual({ kind: "malformed" });
-    expect(
-      parseOAuthHashFragment(hashWith({ access_token: "", refresh_token: REFRESH })),
-    ).toEqual({ kind: "malformed" });
-    expect(
-      parseOAuthHashFragment(
-        hashWith({ access_token: "short", refresh_token: REFRESH }),
-      ),
+      parseOAuthHashFragment(hashWith({ access_token: "short", refresh_token: REFRESH })),
     ).toEqual({ kind: "malformed" });
     expect(
       parseOAuthHashFragment(
@@ -282,13 +278,13 @@ describe("oauthHashSessionConsumeRules", () => {
     );
     expect(holder[OAUTH_RETURN_HASH_STASH_KEY]).toBeUndefined();
     expect(takeOAuthReturnHashStash(holder)).toBeNull();
-    expect(resolveOAuthHashSource("", hashWith({ access_token: ACCESS, refresh_token: REFRESH }))).toBe(
-      hashWith({ access_token: ACCESS, refresh_token: REFRESH }),
-    );
+    expect(
+      resolveOAuthHashSource("", hashWith({ access_token: ACCESS, refresh_token: REFRESH })),
+    ).toBe(hashWith({ access_token: ACCESS, refresh_token: REFRESH }));
     expect(resolveOAuthHashSource("#plant-ai-doctor-review", null)).toBe("#plant-ai-doctor-review");
-    expect(hashLooksLikeOAuthReturn(hashWith({ access_token: ACCESS, refresh_token: REFRESH }))).toBe(
-      true,
-    );
+    expect(
+      hashLooksLikeOAuthReturn(hashWith({ access_token: ACCESS, refresh_token: REFRESH })),
+    ).toBe(true);
     expect(hashLooksLikeOAuthReturn("#section")).toBe(false);
   });
 

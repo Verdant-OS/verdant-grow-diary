@@ -30,6 +30,9 @@ describe("oauth hash session consume wiring", () => {
     const consumeStart = rulesSrc.indexOf("export async function consumeOAuthHashSessionIfPresent");
     expect(consumeStart).toBeGreaterThanOrEqual(0);
     const consumeSrc = rulesSrc.slice(consumeStart);
+    expect(consumeSrc).toMatch(
+      /clearOAuthHashFromAddressBar\([\s\S]*?\);[\s\S]*?if \(!shouldAttemptOAuthHashSessionConsume\(parsed\)\)[\s\S]*?await deps\.setSession/,
+    );
     const wipeAt = consumeSrc.indexOf("clearOAuthHashFromAddressBar");
     const setSessionAt = consumeSrc.indexOf("await deps.setSession");
     expect(wipeAt).toBeGreaterThan(0);

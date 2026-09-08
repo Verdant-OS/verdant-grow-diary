@@ -35,6 +35,12 @@ describe("oauth hash session consume wiring", () => {
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("access_token")');
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("refresh_token")');
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.has("error")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain('p.get("type")');
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("recovery");
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("signup");
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("invite");
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("magiclink");
+    expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).toContain("email_change");
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toContain('indexOf("access_token=")');
     expect(OAUTH_HASH_EARLY_WIPE_SCRIPT).not.toMatch(/console\./);
     expect(parseOAuthHashFragment("#myaccess_token=1")).toEqual({ kind: "none" });

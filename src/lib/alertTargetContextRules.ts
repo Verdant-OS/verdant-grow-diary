@@ -11,8 +11,7 @@ import { looksLikeUuid } from "@/lib/growDisplayLabel";
 
 export const ALERT_TARGET_PREFIX = "Target:";
 
-export const ALERT_TARGET_UNAVAILABLE_TEXT =
-  "Target tent and plant unavailable for this alert.";
+export const ALERT_TARGET_UNAVAILABLE_TEXT = "Target tent and plant unavailable for this alert.";
 
 export const ALERT_TARGET_LOADING_TEXT = "Loading tent and plant names…";
 

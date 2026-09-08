@@ -552,19 +552,19 @@ export default function AlertDetail() {
                 </dd>
               </div>
               <AlertTargetContext
-                  tentId={alert.tent_id}
-                  plantId={alert.plant_id}
-                  tentName={
-                    alert.tent_id ? (targetNames.tentNameById.get(alert.tent_id) ?? null) : null
-                  }
-                  plantName={
-                    alert.plant_id ? (targetNames.plantNameById.get(alert.plant_id) ?? null) : null
-                  }
-                  namesLoading={targetNames.status === "loading"}
-                  variant="detailed"
-                  tentHref={alert.tent_id ? tentDetailPath(alert.tent_id) : null}
-                  plantHref={alert.plant_id ? plantDetailPath(alert.plant_id) : null}
-                />
+                tentId={alert.tent_id}
+                plantId={alert.plant_id}
+                tentName={
+                  alert.tent_id ? (targetNames.tentNameById.get(alert.tent_id) ?? null) : null
+                }
+                plantName={
+                  alert.plant_id ? (targetNames.plantNameById.get(alert.plant_id) ?? null) : null
+                }
+                namesLoading={targetNames.status === "loading"}
+                variant="detailed"
+                tentHref={alert.tent_id ? tentDetailPath(alert.tent_id) : null}
+                plantHref={alert.plant_id ? plantDetailPath(alert.plant_id) : null}
+              />
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                 <dt className="uppercase tracking-wider text-muted-foreground">First seen</dt>
                 <dd>{fmt(alert.first_seen_at)}</dd>

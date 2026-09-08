@@ -160,7 +160,9 @@ describe("AlertTargetContext presenter", () => {
       </MemoryRouter>,
     );
     expect(screen.getByTestId("alert-detail-tent-label").textContent).toBe("One-Tent");
-    expect(screen.getByTestId("alert-detail-tent-label").getAttribute("href")).toBe("/tents/tent-1");
+    expect(screen.getByTestId("alert-detail-tent-label").getAttribute("href")).toBe(
+      "/tents/tent-1",
+    );
     expect(screen.getByTestId("alert-detail-plant-label").textContent).toBe("Keeper A");
     expect(screen.getByTestId("alert-detail-plant-label").getAttribute("href")).toBe(
       "/plants/plant-1",

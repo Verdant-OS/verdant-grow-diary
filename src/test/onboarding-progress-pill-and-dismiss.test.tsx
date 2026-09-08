@@ -90,7 +90,8 @@ describe("OnboardingProgressPill — seeded states", () => {
     const pill = screen.getByTestId("onboarding-progress-pill");
     expect(pill).toHaveTextContent(/4 of 5 steps done/i);
     expect(pill.getAttribute("data-activated")).toBe("false");
-    expect(screen.getByTestId("onboarding-checklist-card")).toBeTruthy();
+    // Plant memory → operating frame; get-started shell stays hidden.
+    expect(screen.queryByTestId("onboarding-checklist-card")).toBeNull();
   });
 
   it("sensor reading alone leaves plant memory incomplete", () => {
@@ -140,22 +141,23 @@ describe("OnboardingChecklistCard — Got it dismiss", () => {
       firstLogEvidenceCount: 0,
     });
 
-    const plantStep = screen.getByTestId("onboarding-step-add_plant");
-    expect(plantStep.getAttribute("data-complete")).toBe("true");
-    expect(plantStep.querySelector("a")).toBeNull();
+    // Get-started shell must not dominate once plant memory exists.
+    expect(screen.queryByTestId("onboarding-checklist-card")).toBeNull();
+    expect(screen.queryByText(/Get your grow started/i)).toBeNull();
+    expect(screen.queryByTestId("onboarding-step-add_plant")).toBeNull();
     expect(screen.queryByRole("button", { name: "Add plant" })).toBeNull();
 
-    const tentStep = screen.getByTestId("onboarding-step-add_tent");
-    expect(tentStep.getAttribute("data-complete")).toBe("false");
-    expect(screen.getByRole("button", { name: "Add tent" })).toBeTruthy();
+    const next = screen.getByTestId("onboarding-operating-next-step");
+    expect(next.getAttribute("data-next-step-key")).toBe("add_tent");
+    expect(screen.getByRole("link", { name: /Add tent/i })).toBeTruthy();
     expect(screen.getByTestId("onboarding-progress-pill")).toHaveTextContent(/2 of 5 steps done/i);
   });
 
-  it("hands the exact connected Grow, Tent, and Plant to Quick Log", () => {
-    const detailSpy = vi.fn();
-    const listener = (event: Event) => detailSpy((event as CustomEvent).detail);
-    window.addEventListener("verdant:open-quicklog", listener);
-    renderPair({
+  it("hands the exact connected Grow, Tent, and Plant to Quick Log via the step prefill", () => {
+    // Plant memory suppresses the get-started shell, so the Open Quick Log CTA
+    // is no longer rendered there. Prefill + href remain on the first_log step
+    // for any presenter that still surfaces that step.
+    const input = {
       ...base,
       growCount: 9,
       tentCount: 9,
@@ -165,15 +167,18 @@ describe("OnboardingChecklistCard — Got it dismiss", () => {
         tentId: "tent-one",
         plantId: "plant-one",
       },
-      firstLogEvidenceStatus: "ok",
+      firstLogEvidenceStatus: "ok" as const,
       firstLogEvidenceCount: 0,
-    });
+    };
+    renderPair(input);
+    expect(screen.queryByTestId("onboarding-checklist-card")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open Quick Log" })).toBeNull();
 
-    const button = screen.getByRole("button", { name: "Open Quick Log" });
-    expect(button.closest("a")?.getAttribute("href")).toBe("/dashboard?growId=grow%20%2F%20one");
-    fireEvent.click(button);
-    expect(detailSpy).toHaveBeenCalledTimes(1);
-    expect(detailSpy).toHaveBeenCalledWith(
+    const vm = buildOnboardingChecklistViewModel(input);
+    expect(vm.shouldShowGetStartedShell).toBe(false);
+    const firstLog = vm.steps.find((s) => s.key === "first_log");
+    expect(firstLog?.href).toBe("/dashboard?growId=grow%20%2F%20one");
+    expect(firstLog?.quickLogPrefill).toEqual(
       expect.objectContaining({
         growId: "grow / one",
         tentId: "tent-one",
@@ -181,7 +186,6 @@ describe("OnboardingChecklistCard — Got it dismiss", () => {
         eventType: "observation",
       }),
     );
-    window.removeEventListener("verdant:open-quicklog", listener);
   });
 
   it("renders the checklist card by default for unactivated users", () => {

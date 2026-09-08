@@ -9,7 +9,9 @@
  * checked One-Tent scope so unrelated rows cannot fake activation.
  *
  *   - the ordered list of checklist items + complete/incomplete state
- *   - whether the checklist should be shown at all
+ *   - whether the first-time get-started checklist shell should be shown
+ *   - whether plant memory forces an operating primary frame
+ *   - a compact Add tent next-step when plants exist but tents do not
  *   - whether the user is fully activated
  *
  * Canonical activation rule:
@@ -65,18 +67,50 @@ export interface OnboardingChecklistInput {
   firstLogEvidenceStatus?: "idle" | "loading" | "ok" | "unavailable";
 }
 
+/**
+ * Compact operating next-step shown after plant memory exists.
+ * Never framed as first-time “Get your grow started.”
+ */
+export interface OnboardingOperatingNextStep {
+  key: "add_tent";
+  title: string;
+  description: string;
+  href: string;
+  ctaLabel: string;
+}
+
+export type OnboardingPrimaryFrame = "get_started" | "operating";
+
 export interface OnboardingChecklistViewModel {
   steps: OnboardingStep[];
   completeCount: number;
   totalCount: number;
   isFullyActivated: boolean;
-  /** True only when at least one step is still incomplete. */
+  /**
+   * True only for the first-time get-started checklist shell.
+   * Plant memory (≥1 plant) forces this false — growers with plants are past
+   * “get started,” even if tent / log / sensor steps remain.
+   */
   shouldShowChecklist: boolean;
+  /** Alias of shouldShowChecklist — explicit name for framing tests. */
+  shouldShowGetStartedShell: boolean;
+  /** Dashboard primary frame: get-started shell vs operating. */
+  primaryFrame: OnboardingPrimaryFrame;
+  /**
+   * When plant memory exists but a tent is still missing, surface a single
+   * Add tent next-step without the 5-step get-started shell.
+   */
+  operatingNextStep: OnboardingOperatingNextStep | null;
   /** Friendly copy used by the card. Kept here so tests can assert it. */
   intro: string;
   honestyNote: string;
   completedHeadline: string;
 }
+
+export const ONBOARDING_OPERATING_ADD_TENT_TITLE = "Add a tent for this grow";
+
+export const ONBOARDING_OPERATING_ADD_TENT_DESCRIPTION =
+  "Plant memory is already on this grow. Add a tent so environment can attach.";
 
 export const ONBOARDING_INTRO =
   "Connect one real grow, tent, and plant. Then preserve what you did and what the room measured.";
@@ -195,13 +229,30 @@ export function buildOnboardingChecklistViewModel(
   const completeCount = steps.filter((s) => s.complete).length;
   const totalCount = steps.length;
   const isFullyActivated = completeCount === totalCount;
+  // Plant memory ends first-time get-started framing. Remaining incomplete
+  // steps (tent / log / sensor) stay on the progress pill and, when the tent
+  // is missing, as a compact operating next-step — not the 5-step shell.
+  const shouldShowGetStartedShell = !isFullyActivated && !hasPlant;
+  const operatingNextStep: OnboardingOperatingNextStep | null =
+    hasPlant && !hasTent
+      ? {
+          key: "add_tent",
+          title: ONBOARDING_OPERATING_ADD_TENT_TITLE,
+          description: ONBOARDING_OPERATING_ADD_TENT_DESCRIPTION,
+          href: routes.add_tent,
+          ctaLabel: "Add tent",
+        }
+      : null;
 
   return {
     steps,
     completeCount,
     totalCount,
     isFullyActivated,
-    shouldShowChecklist: !isFullyActivated,
+    shouldShowChecklist: shouldShowGetStartedShell,
+    shouldShowGetStartedShell,
+    primaryFrame: shouldShowGetStartedShell ? "get_started" : "operating",
+    operatingNextStep,
     intro: ONBOARDING_INTRO,
     honestyNote: ONBOARDING_HONESTY_NOTE,
     completedHeadline: ONBOARDING_COMPLETED_HEADLINE,

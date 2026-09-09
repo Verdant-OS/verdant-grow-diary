@@ -8,9 +8,11 @@ import { describe, it, expect } from "vitest";
 import {
   buildPlantAiDoctorContext,
   diaryEntriesToGrowEventRows,
-  manualSensorLogsToReadingRows,
   fahrenheitToCelsius,
+  manualSensorLogsToReadingRows,
+  tentManualSensorRowsToPlantSensorLogs,
 } from "@/lib/plantAiDoctorContextAdapter";
+import { buildPlantSensorContextAuditView } from "@/lib/plantSensorContextAuditViewModel";
 import { buildTimelineEvidenceReadinessView } from "@/lib/timelineEvidenceReadinessViewModel";
 import { resolveCanonicalDiaryEventType } from "@/lib/diaryTimelineViewModel";
 
@@ -153,6 +155,110 @@ describe("plantAiDoctorContextAdapter", () => {
     expect(
       ctx.sensor_groups.every((group) => group.source !== "live" || group.sample_count === 0),
     ).toBe(true);
+  });
+
+  it("includes assigned-tent manual sensor_readings when plant diary snapshots are empty", () => {
+    const capturedAt = ago(HOUR);
+    const ctx = buildPlantAiDoctorContext({
+      plant: {
+        id: "p1",
+        name: "Plant A",
+        stage: "veg",
+        grow_id: "g1",
+        tent_id: "t1",
+      },
+      diaryEntries: [],
+      manualSensorLogs: [],
+      tentId: "t1",
+      tentSensorRows: [
+        {
+          tent_id: "t1",
+          source: "manual",
+          quality: "ok",
+          metric: "temp_f",
+          value: 75,
+          captured_at: capturedAt,
+        },
+        {
+          tent_id: "t1",
+          source: "manual",
+          quality: "ok",
+          metric: "humidity",
+          value: 60,
+          captured_at: capturedAt,
+        },
+        {
+          tent_id: "t1",
+          source: "manual",
+          quality: "ok",
+          metric: "vpd",
+          value: 1,
+          captured_at: capturedAt,
+        },
+      ],
+      now: NOW,
+    });
+    expect(ctx.source_tags).toContain("manual");
+    expect(ctx.source_tags).not.toContain("live");
+    expect(ctx.sensor_groups.some((group) => group.sample_count > 0)).toBe(true);
+  });
+
+  it("maps remasure 76°F / 58% RH tent manuals into plant sensor audit context", () => {
+    const capturedAt = ago(HOUR);
+    const logs = tentManualSensorRowsToPlantSensorLogs(
+      [
+        {
+          tent_id: "t1",
+          source: "manual",
+          quality: null,
+          metric: "temp_f",
+          value: 76,
+          captured_at: capturedAt,
+        },
+        {
+          tent_id: "t1",
+          source: "manual",
+          quality: null,
+          metric: "humidity",
+          value: 58,
+          captured_at: capturedAt,
+        },
+      ],
+      "t1",
+    );
+    const view = buildPlantSensorContextAuditView(logs, NOW);
+    expect(view.status).not.toBe("missing");
+    expect(view.message).not.toMatch(/No plant-level manual sensor snapshots found/);
+    expect(view.latestCapturedAt).toBe(capturedAt);
+    expect(view.metrics.map((metric) => metric.label)).toEqual(
+      expect.arrayContaining(["Temperature", "Humidity"]),
+    );
+  });
+
+  it("ignores tent manual rows from a different tent", () => {
+    const ctx = buildPlantAiDoctorContext({
+      plant: {
+        id: "p1",
+        name: "Plant A",
+        stage: "veg",
+        grow_id: "g1",
+        tent_id: "t1",
+      },
+      diaryEntries: [],
+      manualSensorLogs: [],
+      tentId: "t1",
+      tentSensorRows: [
+        {
+          tent_id: "other-tent",
+          source: "manual",
+          metric: "temp_f",
+          value: 75,
+          captured_at: ago(HOUR),
+        },
+      ],
+      now: NOW,
+    });
+    expect(ctx.source_tags).not.toContain("manual");
   });
 
   it("static guard: adapter imports no Supabase/network/write helpers", async () => {

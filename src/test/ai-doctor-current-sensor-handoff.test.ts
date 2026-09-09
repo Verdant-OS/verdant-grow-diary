@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAiDoctorCurrentSensorSnapshot,
   classifyAiDoctorCurrentSensorEvidence,
+  currentSensorEvidenceIsFreshLive,
   selectAiDoctorSensorEvidenceClassification,
   type AiDoctorCurrentSensorRowLike,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
@@ -254,7 +255,7 @@ describe("buildAiDoctorCurrentSensorSnapshot", () => {
 });
 
 describe("AI Doctor current sensor evidence classification", () => {
-  it("grants usable only to fresh provenance-filtered live rows", () => {
+  it("grants usable to fresh provenance-filtered live or manual rows", () => {
     const physical = {
       ...row("temperature_c", 25),
       raw_payload: PHYSICAL_ECOWITT_RAW_PAYLOAD,
@@ -272,7 +273,56 @@ describe("AI Doctor current sensor evidence classification", () => {
     expect(
       classifyAiDoctorCurrentSensorEvidence([row("temperature_c", 25, "manual")], { now: NOW })
         .status,
-    ).toBe("needs_review");
+    ).toBe("usable");
+    expect(
+      classifyAiDoctorCurrentSensorEvidence([row("temperature_c", 25, "manual")], { now: NOW })
+        .label,
+    ).toBe("Latest manual snapshot accepted.");
+  });
+
+  it("treats a fresh Golden Run-shaped tent manual snapshot as usable Doctor evidence", () => {
+    const capturedAt = "2026-07-17T11:58:00.000Z";
+    const rows = [
+      row("temp_f", 75, "manual", capturedAt, "temp"),
+      row("humidity", 60, "manual", capturedAt, "rh"),
+      row("vpd", 1, "manual", capturedAt, "vpd"),
+    ];
+    const classified = classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW });
+    expect(classified.status).toBe("usable");
+    expect(classified.reason).toBe("fresh_accepted");
+    expect(classified.isHealthyEvidence).toBe(true);
+    expect(currentSensorEvidenceIsFreshLive(rows, { now: NOW })).toBe(false);
+  });
+
+  it("treats the remasure 76°F / 58% RH tent manual save as usable, not none_inserted", () => {
+    const capturedAt = "2026-09-09T16:48:00.000Z";
+    const now = new Date("2026-09-09T16:50:00.000Z");
+    const rows = [
+      row("temp_f", 76, "manual", capturedAt, "temp"),
+      row("humidity", 58, "manual", capturedAt, "rh"),
+    ];
+    const classified = classifyAiDoctorCurrentSensorEvidence(rows, { now });
+    expect(classified.status).toBe("usable");
+    expect(classified.reason).toBe("fresh_accepted");
+    expect(classified.reason).not.toBe("none_inserted");
+    expect(classified.isHealthyEvidence).toBe(true);
+
+    const auditNoneInserted = classificationFromStatusResult({
+      status: "needs_review",
+      reasonCode: "none_accepted",
+    });
+    const selected = selectAiDoctorSensorEvidenceClassification(classified, auditNoneInserted);
+    expect(selected.status).toBe("usable");
+    expect(selected.reason).not.toBe("none_inserted");
+  });
+
+  it("does not treat a usable manual snapshot as live-bridge presence", () => {
+    expect(
+      currentSensorEvidenceIsFreshLive([row("temperature_c", 25, "manual")], { now: NOW }),
+    ).toBe(false);
+    expect(currentSensorEvidenceIsFreshLive([row("temperature_c", 25, "live")], { now: NOW })).toBe(
+      true,
+    );
   });
 
   it("never lets an audit-only usable fallback override filtered row-level no-data", () => {

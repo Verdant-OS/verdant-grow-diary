@@ -16,11 +16,16 @@ import PlantSensorContextAuditPanel from "@/components/PlantSensorContextAuditPa
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
+import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import {
   buildPlantAiDoctorContext,
+  mergePlantAndTentManualSensorLogs,
+  tentManualSensorRowsToPlantSensorLogs,
   type DiaryEntryRowLike,
   type ManualSensorLogLike,
 } from "@/lib/plantAiDoctorContextAdapter";
+import { AI_DOCTOR_CURRENT_SENSOR_ROW_CAP } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import { isUuid } from "@/lib/isUuid";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
@@ -51,6 +56,9 @@ export interface PlantDetailAiDoctorContextReadinessMountProps {
   potSize?: string | null;
 }
 
+/** Stable empty identity so tent-unscoped plants do not recompile context every render. */
+const NO_TENT_MANUAL_ROWS: never[] = [];
+
 function FallbackShell({ testId, message }: { testId: string; message: string }) {
   return (
     <section
@@ -77,8 +85,25 @@ export default function PlantDetailAiDoctorContextReadinessMount({
   const recentActivity = usePlantRecentActivity(plantId);
   const manualLogs = usePlantManualSensorLogs(plantId);
   const alerts = usePlantAssignedTentAlerts(tentId, growId);
+  const tentUuid = isUuid(tentId) ? tentId : null;
+  const tentReadings = useSensorReadingsByTents(
+    tentUuid ? [tentUuid] : [],
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    ["manual"],
+  );
+  const tentSensorStatus = tentUuid
+    ? (tentReadings.statusByTent[tentUuid] ?? "loading")
+    : "success";
+  const tentSensorFailed = tentSensorStatus === "error" || tentSensorStatus === "refresh_error";
+  const tentSensorRows =
+    tentUuid && !tentSensorFailed
+      ? (tentReadings.byTent[tentUuid] ?? NO_TENT_MANUAL_ROWS)
+      : NO_TENT_MANUAL_ROWS;
 
-  const isLoading = recentActivity.isLoading || manualLogs.isLoading;
+  const isLoading =
+    recentActivity.isLoading ||
+    manualLogs.isLoading ||
+    Boolean(tentUuid && tentSensorStatus === "loading");
 
   const plantRow: PlantRowLike = useMemo(
     () => ({
@@ -105,6 +130,8 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         plant: plantRow,
         diaryEntries: diary,
         manualSensorLogs: logs,
+        tentSensorRows,
+        tentId: tentUuid ?? tentId,
       });
       return { context, error: null as Error | null };
     } catch (e) {
@@ -113,7 +140,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         error: e instanceof Error ? e : new Error("Failed to compile AI Doctor context"),
       };
     }
-  }, [plantRow, recentActivity.data, manualLogs.data]);
+  }, [plantRow, recentActivity.data, manualLogs.data, tentSensorRows, tentUuid, tentId]);
 
   // NOTE: All hooks below MUST be called unconditionally on every render.
   // Previously `useMemo(auditIdentity)` and `useCallback(openManualSensorEntry)`
@@ -207,7 +234,10 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     );
   }
 
-  const auditLogs = (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>;
+  const auditLogs = mergePlantAndTentManualSensorLogs(
+    (manualLogs.data ?? []) as ReadonlyArray<ManualSensorLog>,
+    tentManualSensorRowsToPlantSensorLogs(tentSensorRows, tentUuid ?? tentId),
+  );
 
   const safeOpenPhoto = growId && tentId ? () => openQuickLogActivity("photo") : undefined;
   const safeOpenFeeding = growId && tentId ? () => openQuickLogActivity("feeding") : undefined;

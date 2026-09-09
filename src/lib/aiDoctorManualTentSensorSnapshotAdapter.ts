@@ -55,9 +55,40 @@ function nowEpoch(value: number | Date): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-function recognizedMetric(value: unknown): ManualCorrectionMetric | null {
-  if (typeof value !== "string" || !RECOGNIZED_METRICS.has(value)) return null;
-  return value as ManualCorrectionMetric;
+function hasUsablePersistedQuality(row: AiDoctorManualTentSensorRowLike): boolean {
+  if (row.quality === null || row.quality === undefined) return true;
+  return typeof row.quality === "string" && row.quality.trim().toLowerCase() === "ok";
+}
+
+/**
+ * Map persisted Quick Log / sensor_readings metric names onto the
+ * correction allow-list. `temp_f` / `humidity` are the live save keys;
+ * temperature is converted to °C before plausibility so 76°F is not
+ * scored as an implausible Celsius value.
+ */
+function canonicalizeRecognizedMetric(
+  value: unknown,
+  numeric: unknown,
+): { metric: ManualCorrectionMetric; value: number } | null {
+  if (typeof value !== "string" || typeof numeric !== "number" || !Number.isFinite(numeric)) {
+    return null;
+  }
+  const metric = value.trim().toLowerCase();
+  if (metric === "temperature_c") return { metric: "temperature_c", value: numeric };
+  if (metric === "temp_f" || metric === "temperature_f") {
+    return { metric: "temperature_c", value: ((numeric - 32) * 5) / 9 };
+  }
+  if (metric === "humidity_pct" || metric === "humidity") {
+    return { metric: "humidity_pct", value: numeric };
+  }
+  if (metric === "vpd_kpa" || metric === "vpd") return { metric: "vpd_kpa", value: numeric };
+  if (metric === "co2_ppm" || metric === "co2") return { metric: "co2_ppm", value: numeric };
+  if (metric === "soil_moisture_pct" || metric === "soil_moisture") {
+    return { metric: "soil_moisture_pct", value: numeric };
+  }
+  if (metric === "ppfd") return { metric: "ppfd", value: numeric };
+  if (!RECOGNIZED_METRICS.has(metric)) return null;
+  return { metric: metric as ManualCorrectionMetric, value: numeric };
 }
 
 function isPlausibleMetric(metric: ManualCorrectionMetric, value: unknown): boolean {
@@ -91,12 +122,14 @@ export function manualTentSensorRowsToAiDoctorContextSnapshots(
 
   const groups = new Map<number, ObservationGroup>();
   for (const row of rows ?? []) {
-    if (!row || row.tent_id !== options.tentId || row.source !== "manual" || row.quality !== "ok") {
+    if (!row || row.tent_id !== options.tentId || row.source !== "manual") {
       continue;
     }
+    if (!hasUsablePersistedQuality(row)) continue;
 
-    const metric = recognizedMetric(row.metric);
-    if (!metric) continue;
+    const canonical = canonicalizeRecognizedMetric(row.metric, row.value);
+    if (!canonical) continue;
+    const metric = canonical.metric;
 
     const rawTime = resolveSensorObservationTime(row);
     if (rawTime === null) continue;
@@ -116,7 +149,7 @@ export function manualTentSensorRowsToAiDoctorContextSnapshots(
       groups.set(atMs, group);
     }
 
-    if (isPlausibleMetric(metric, row.value)) {
+    if (isPlausibleMetric(metric, canonical.value)) {
       group.hasPlausibleMetric = true;
     } else {
       group.hasInvalidRecognizedMetric = true;

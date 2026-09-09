@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   isMissingActionQueueTransitionRpcError,
+  areActionQueueTransitionMutationsBlocked,
   ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
   ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
@@ -152,7 +153,8 @@ describe("safeActionQueueFailureCopy rpc_missing reason", () => {
       expect(text).not.toMatch(/no status was updated/i);
       expect(text).not.toMatch(/queue is unchanged/i);
     }
-    expect(body).toMatch(/If a decision succeeds, that status is saved/i);
+    expect(body).toMatch(/paused until you refresh the queue/i);
+    expect(body).toMatch(/No new status will be saved from those buttons/i);
     expect(ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY).toMatch(/That decision was not saved/i);
   });
 });
@@ -176,17 +178,37 @@ describe("settleActionQueueRpcAvailabilityOnCheckTimeout", () => {
   });
 });
 
+describe("areActionQueueTransitionMutationsBlocked", () => {
+  it("blocks only the proven unavailable state", () => {
+    expect(areActionQueueTransitionMutationsBlocked("unavailable")).toBe(true);
+    expect(areActionQueueTransitionMutationsBlocked("unknown")).toBe(false);
+    expect(areActionQueueTransitionMutationsBlocked("available")).toBe(false);
+  });
+});
+
 describe("ActionQueue list page does not invent an RPC outage", () => {
   it("does not auto-timeout unknown availability into unavailable", () => {
     expect(ACTION_QUEUE_PAGE).not.toMatch(/settleActionQueueRpcAvailabilityOnCheckTimeout/);
     expect(ACTION_QUEUE_PAGE).not.toMatch(/ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS/);
   });
 
-  it("does not hide approve/reject/complete behind the unavailable banner", () => {
-    expect(ACTION_QUEUE_PAGE).not.toMatch(/disabled=\{[^}]*rpcUnavailable/);
-    expect(ACTION_DETAIL_PAGE).not.toMatch(/disabled=\{[^}]*rpcUnavailable/);
-    expect(ACTION_QUEUE_PAGE).toMatch(/const disabled = busyId === row\.id;/);
-    expect(ACTION_DETAIL_PAGE).toMatch(/disabled=\{busy\}/);
+  it("fail-closes approve/reject/simulate/cancel/complete while the unavailable banner is showing", () => {
+    expect(ACTION_QUEUE_PAGE).toMatch(
+      /const disabled = busyId === row\.id \|\| transitionMutationsBlocked/,
+    );
+    expect(ACTION_QUEUE_PAGE).toMatch(
+      /if \(areActionQueueTransitionMutationsBlocked\(rpcAvailability\)\) \{/,
+    );
+    expect(ACTION_DETAIL_PAGE).toMatch(/const disabled = busy \|\| rpcUnavailable/);
+    expect(ACTION_DETAIL_PAGE).toMatch(
+      /if \(areActionQueueTransitionMutationsBlocked\(rpcAvailability\)\) \{/,
+    );
+    const queueRpcIdx = ACTION_QUEUE_PAGE.indexOf(
+      "if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) {",
+    );
+    const queueCallIdx = ACTION_QUEUE_PAGE.indexOf('"action_queue_transition"');
+    expect(queueRpcIdx).toBeGreaterThan(-1);
+    expect(queueCallIdx).toBeGreaterThan(queueRpcIdx);
   });
 
   it("dismisses the sticky outage toast after a successful mutation", () => {

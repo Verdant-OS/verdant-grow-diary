@@ -53,9 +53,12 @@ import {
 import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
+  areActionQueueTransitionMutationsBlocked,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
   ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+  ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON,
   ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
+  type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
@@ -231,8 +234,8 @@ export default function ActionDetail() {
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // Persistent flag for a missing/renamed `action_queue_transition` RPC.
-  const [rpcUnavailable, setRpcUnavailable] = useState(false);
+  const [rpcAvailability, setRpcAvailability] = useState<ActionQueueRpcAvailability>("unknown");
+  const rpcUnavailable = areActionQueueTransitionMutationsBlocked(rpcAvailability);
   const [dialog, setDialog] = useState<Kind | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [sourceAlertStatus, setSourceAlertStatus] = useState<string | null>(null);
@@ -438,6 +441,14 @@ export default function ActionDetail() {
     kind: TransitionKind,
     note?: string,
   ): Promise<boolean> {
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) {
+      toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
+        id: ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
+        description: ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+        duration: 10000,
+      });
+      return false;
+    }
     setBusy(true);
     const rpcArgs = buildActionQueueTransitionRpcArgs({
       actionQueueId: current.id,
@@ -452,7 +463,7 @@ export default function ActionDetail() {
     const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
     if (error || !result || result.ok !== true) {
       if (isMissingActionQueueTransitionRpcError(error)) {
-        setRpcUnavailable(true);
+        setRpcAvailability("unavailable");
         console.warn(
           JSON.stringify({
             event: "action_queue_transition_rpc_unavailable",
@@ -474,6 +485,7 @@ export default function ActionDetail() {
         (result.reason === "status_conflict" || result.reason === "action_not_found");
       if (shouldReload) await load();
       setBusy(false);
+      setRpcAvailability("unknown");
       toast.error(safeActionQueueFailureCopy("transition", error ?? result));
       return false;
     }
@@ -489,7 +501,7 @@ export default function ActionDetail() {
     }
     setBusy(false);
     toast.dismiss(ACTION_QUEUE_TRANSITION_RPC_TOAST_ID);
-    if (rpcUnavailable) setRpcUnavailable(false);
+    setRpcAvailability("available");
     await load();
     return true;
   }
@@ -540,12 +552,14 @@ export default function ActionDetail() {
 
   function openDialog(kind: Kind) {
     if (!row || isTerminal(row.status)) return;
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) return;
     setNoteDraft("");
     setDialog(kind);
   }
 
   async function confirmDialog() {
     if (!row || !dialog) return;
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) return;
     const note = normalizeNote(noteDraft);
     const kind = dialog;
     setDialog(null);
@@ -671,8 +685,19 @@ export default function ActionDetail() {
         >
           <AlertTriangle className="h-4 w-4" aria-hidden="true" />
           <AlertTitle>{ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title}</AlertTitle>
-          <AlertDescription className="mt-1">
-            {ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body}
+          <AlertDescription className="mt-1 space-y-2">
+            <p>{ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body}</p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setRpcAvailability("unknown");
+                void load();
+              }}
+              data-testid="action-detail-transition-rpc-unavailable-retry"
+            >
+              Refresh action
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -984,13 +1009,18 @@ export default function ActionDetail() {
 
         {!isTerminalStatus(row.status) &&
           (() => {
-            const disabledReason = busy ? "Saving — please wait" : null;
+            const disabled = busy || rpcUnavailable;
+            const disabledReason = rpcUnavailable
+              ? ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON
+              : busy
+                ? "Saving — please wait"
+                : null;
             return (
               <div className="mt-4 flex min-w-0 flex-wrap gap-2">
                 {canApprove(row.status) && (
                   <Button
                     size="sm"
-                    disabled={busy}
+                    disabled={disabled}
                     onClick={() => openDialog("approve")}
                     className="gradient-leaf min-h-11 min-w-0 whitespace-normal text-primary-foreground sm:min-h-9"
                     data-testid="action-detail-approve"
@@ -1004,7 +1034,7 @@ export default function ActionDetail() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={busy}
+                    disabled={disabled}
                     onClick={() => openDialog("simulate")}
                     className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
                     data-testid="action-detail-simulate"
@@ -1018,7 +1048,7 @@ export default function ActionDetail() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={busy}
+                    disabled={disabled}
                     onClick={() => openDialog("complete")}
                     className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
                     data-testid="action-detail-complete"
@@ -1032,7 +1062,7 @@ export default function ActionDetail() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    disabled={busy}
+                    disabled={disabled}
                     onClick={() => openDialog("reject")}
                     className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
                     data-testid="action-detail-reject"
@@ -1046,7 +1076,7 @@ export default function ActionDetail() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    disabled={busy}
+                    disabled={disabled}
                     onClick={() => openDialog("cancel")}
                     className="min-h-11 min-w-0 whitespace-normal sm:min-h-9"
                     data-testid="action-detail-cancel"
@@ -1193,7 +1223,12 @@ export default function ActionDetail() {
                 <Button variant="ghost" onClick={cancelDialog}>
                   Cancel
                 </Button>
-                <Button onClick={confirmDialog}>{meta.confirmLabel}</Button>
+                <Button
+                  onClick={confirmDialog}
+                  disabled={areActionQueueTransitionMutationsBlocked(rpcAvailability)}
+                >
+                  {meta.confirmLabel}
+                </Button>
               </DialogFooter>
             </>
           )}

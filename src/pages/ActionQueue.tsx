@@ -98,8 +98,10 @@ import {
 import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
+  areActionQueueTransitionMutationsBlocked,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
   ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+  ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON,
   ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
   type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
@@ -446,6 +448,7 @@ export default function ActionQueue() {
   // on healthy backends (empty Needs Review + "Transitions unavailable").
   const [rpcAvailability, setRpcAvailability] = useState<ActionQueueRpcAvailability>("unknown");
   const rpcUnavailable = rpcAvailability === "unavailable";
+  const transitionMutationsBlocked = areActionQueueTransitionMutationsBlocked(rpcAvailability);
 
   // Load existing approve/reject diary trace rows for the open drawer
   // row. Pure read; never inserts.
@@ -747,6 +750,14 @@ export default function ActionQueue() {
   }
 
   async function transition(row: ActionRow, kind: TransitionKind, note?: string): Promise<boolean> {
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) {
+      toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
+        id: ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
+        description: ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+        duration: 10000,
+      });
+      return false;
+    }
     setBusyId(row.id);
     const rpcArgs = buildActionQueueTransitionRpcArgs({
       actionQueueId: row.id,
@@ -817,6 +828,7 @@ export default function ActionQueue() {
   function openNoteDialog(row: ActionRow, kind: TransitionKind) {
     // SECURITY: terminal states cannot be transitioned again.
     if (isTerminalStatus(row.status)) return;
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) return;
     setNoteDraft("");
     setNoteDialog({ row, kind });
   }
@@ -824,6 +836,7 @@ export default function ActionQueue() {
   // SECURITY: each branch only flips status + writes audit. No device commands.
   async function confirmNoteDialog() {
     if (!noteDialog) return;
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) return;
     const { row, kind } = noteDialog;
     const note = normalizeNote(noteDraft);
     setNoteDialog(null);
@@ -1652,8 +1665,12 @@ export default function ActionQueue() {
                       </div>
                       <div className="mt-3 flex min-w-0 flex-wrap gap-2">
                         {(() => {
-                          const disabled = busyId === row.id;
-                          const disabledReason = disabled ? "Saving — please wait" : null;
+                          const disabled = busyId === row.id || transitionMutationsBlocked;
+                          const disabledReason = transitionMutationsBlocked
+                            ? ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON
+                            : disabled
+                              ? "Saving — please wait"
+                              : null;
                           return (
                             <>
                               <Button
@@ -1866,8 +1883,12 @@ export default function ActionQueue() {
                           {row.action_type}
                         </h3>
                         {(() => {
-                          const disabled = busyId === row.id;
-                          const disabledReason = disabled ? "Saving — please wait" : null;
+                          const disabled = busyId === row.id || transitionMutationsBlocked;
+                          const disabledReason = transitionMutationsBlocked
+                            ? ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON
+                            : disabled
+                              ? "Saving — please wait"
+                              : null;
                           return (
                             <>
                               {canComplete(row.status) && (
@@ -2002,7 +2023,12 @@ export default function ActionQueue() {
                 <Button variant="ghost" onClick={cancelNoteDialog}>
                   Cancel
                 </Button>
-                <Button onClick={confirmNoteDialog}>{meta.confirmLabel}</Button>
+                <Button
+                  onClick={confirmNoteDialog}
+                  disabled={areActionQueueTransitionMutationsBlocked(rpcAvailability)}
+                >
+                  {meta.confirmLabel}
+                </Button>
               </DialogFooter>
             </>
           )}
@@ -2018,7 +2044,10 @@ export default function ActionQueue() {
         lookups={{
           growsById: Object.fromEntries(grows.map((g) => [g.id, { name: g.name }])),
         }}
-        busy={!!drawerRow && busyId === drawerRow.id}
+        busy={
+          !!drawerRow &&
+          (busyId === drawerRow.id || areActionQueueTransitionMutationsBlocked(rpcAvailability))
+        }
         loading={drawerHistoryLoading && drawerHistory === null}
         canApprove={!!drawerRow && canApproveAction(drawerRow.status)}
         canReject={!!drawerRow && canRejectAction(drawerRow.status)}

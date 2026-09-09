@@ -121,19 +121,24 @@ export const ACTION_QUEUE_TRANSITION_RPC_TOAST_ID =
 /**
  * Grower-safe copy for the missing-RPC / unconfirmed-service state.
  *
- * Golden Run (AUTH_BANKED): Safer Cancel committed approved → cancelled while
- * this banner was visible. Never claim the queue is unchanged or that no
- * status was updated — other transitions on the same RPC can still succeed.
- * Device commands remain never sent from this queue.
+ * Golden Run reconfirmed: Cancel still committed pending_approval → cancelled
+ * while this banner was visible. Availability and mutations must share one
+ * gate — when this banner is shown, approve/reject/simulate/cancel/complete
+ * are paused. Refresh returns to "unknown" so a later attempt can prove the
+ * backend. Equipment control is never sent from this queue.
  */
 export const ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY = {
   title: "Action updates are temporarily unavailable",
-  label: "Retry failed saves",
+  label: "Updates paused",
   body:
-    "Verdant could not confirm the service that records some approve, reject, and complete decisions. " +
-    "Try the button again. If a decision succeeds, that status is saved. " +
-    "This queue never sends device commands.",
+    "Approve, reject, simulate, cancel, and complete are paused until you refresh the queue. " +
+    "No new status will be saved from those buttons while this message is showing. " +
+    "This queue never sends equipment control.",
 } as const;
+
+/** aria/title reason when transition buttons are fail-closed with the banner. */
+export const ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON =
+  "Updates paused — refresh the queue, then try again.";
 
 /**
  * Toast copy after one transition call failed. Scoped to that attempt only.
@@ -155,6 +160,16 @@ export const ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY =
  * Evidence-honest: we never optimistically flip to "available" without proof.
  */
 export type ActionQueueRpcAvailability = "unknown" | "available" | "unavailable";
+
+/**
+ * True only for proven missing-RPC `"unavailable"`. `"unknown"` and
+ * `"available"` must leave mutations enabled so a healthy queue can save.
+ */
+export function areActionQueueTransitionMutationsBlocked(
+  availability: ActionQueueRpcAvailability,
+): boolean {
+  return availability === "unavailable";
+}
 
 /**
  * Grower-safe copy for the interim "we don't know yet" state. Kept short so it

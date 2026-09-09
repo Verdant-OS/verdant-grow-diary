@@ -18,7 +18,7 @@ describe("ActionQueueRpcStatusPill", () => {
     render(<ActionQueueRpcStatusPill availability="unknown" />);
     const pill = screen.getByTestId("action-queue-transition-rpc-status-pill");
     expect(pill).toHaveAttribute("data-state", "unknown");
-    expect(pill).toHaveAttribute("aria-busy", "true");
+    expect(pill).toHaveAttribute("aria-busy", "false");
     expect(pill).toHaveAttribute("title", ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.title);
     expect(pill).toHaveTextContent(ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.label);
     expect(

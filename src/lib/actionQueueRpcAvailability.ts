@@ -141,10 +141,14 @@ export type ActionQueueRpcAvailability = "unknown" | "available" | "unavailable"
 /**
  * Grower-safe copy for the interim "we don't know yet" state. Kept short so it
  * fits in a status pill without truncation on mobile.
+ *
+ * This is NOT an in-flight probe. The list page does not call the transition
+ * RPC until the grower actually approves, rejects, edits, or completes. Copy
+ * must not claim a check is running, and must not look like an outage.
  */
 export const ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY = {
-  title: "Checking action updates…",
-  label: "Checking availability",
+  title: "Action transitions have not been confirmed yet",
+  label: "Not confirmed yet",
 } as const;
 
 /**
@@ -156,28 +160,19 @@ export const ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY = {
 } as const;
 
 /**
- * Time (ms) after which an unresolved "unknown" RPC availability check
- * fails closed to "unavailable". Stops a forever "Checking availability"
- * spinner when no transition attempt settles the state (e.g. empty queue
- * with zero approve/reject/complete attempts).
+ * Settle helper for an unresolved availability timer.
  *
- * Budget is intentionally short (~3–5s): long enough for a healthy
- * first-paint settle, short enough that growers are never stranded on
- * the checking placeholder.
- */
-export const ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS = 4000;
-
-/**
- * Fail-closed settle for the Action Queue transition-RPC availability pill.
+ * Absence of a transition attempt is not evidence that the backend is down.
+ * `"unknown"` must stay `"unknown"` when a timer elapses — promoting it to
+ * `"unavailable"` painted a false outage (banner + "Transitions unavailable")
+ * on healthy queues, including empty Needs Review lists.
  *
- * When the check timer elapses while still `"unknown"`, promote to
- * `"unavailable"`. Settled `"available"` / `"unavailable"` states are
- * preserved (evidence-honest — never overwrite proven status).
+ * `"unavailable"` is reserved for `isMissingActionQueueTransitionRpcError`
+ * after a real RPC call. Settled `"available"` / `"unavailable"` stay put.
  */
 export function settleActionQueueRpcAvailabilityOnCheckTimeout(
   availability: ActionQueueRpcAvailability,
-  timedOut: boolean,
+  _timedOut: boolean,
 ): ActionQueueRpcAvailability {
-  if (timedOut && availability === "unknown") return "unavailable";
   return availability;
 }

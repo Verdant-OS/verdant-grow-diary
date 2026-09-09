@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleDashed } from "lucide-react";
 import {
   ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY,
   ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY,
@@ -40,7 +40,7 @@ export function ActionQueueRpcStatusPill({ availability }: ActionQueueRpcStatusP
     <span
       role="status"
       aria-live="polite"
-      aria-busy={availability === "unknown"}
+      aria-busy="false"
       data-testid="action-queue-transition-rpc-status-pill"
       data-state={availability}
       title={pillTitle}
@@ -59,8 +59,8 @@ export function ActionQueueRpcStatusPill({ availability }: ActionQueueRpcStatusP
           data-testid="action-queue-transition-rpc-status-pill-icon-available"
         />
       ) : (
-        <Loader2
-          className="h-3 w-3 animate-spin"
+        <CircleDashed
+          className="h-3 w-3"
           aria-hidden="true"
           data-testid="action-queue-transition-rpc-status-pill-icon-checking"
         />

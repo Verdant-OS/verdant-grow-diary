@@ -66,7 +66,7 @@ function hasUsablePersistedQuality(row: AiDoctorManualTentSensorRowLike): boolea
  * temperature is converted to °C before plausibility so 76°F is not
  * scored as an implausible Celsius value.
  */
-function canonicalizeRecognizedMetric(
+export function canonicalizeRecognizedMetric(
   value: unknown,
   numeric: unknown,
 ): { metric: ManualCorrectionMetric; value: number } | null {
@@ -91,7 +91,7 @@ function canonicalizeRecognizedMetric(
   return { metric: metric as ManualCorrectionMetric, value: numeric };
 }
 
-function isPlausibleMetric(metric: ManualCorrectionMetric, value: unknown): boolean {
+export function isPlausibleMetric(metric: ManualCorrectionMetric, value: unknown): boolean {
   if (typeof value !== "number" || !Number.isFinite(value)) return false;
   if (metric === "ppfd") return isPpfdValid(value);
   if (!classifyManualMetric(metric, value).valid) return false;
@@ -103,6 +103,39 @@ function isPlausibleMetric(metric: ManualCorrectionMetric, value: unknown): bool
     return false;
   }
   return true;
+}
+
+export type DoctorTentCanonicalMetric = ManualCorrectionMetric | "ph" | "ec";
+
+/**
+ * Canonicalize tent `sensor_readings` metric names for plant Doctor
+ * compiler/audit projection. Reuses the correction allow-list, then
+ * keeps pH / EC which that list does not carry.
+ */
+export function canonicalizeDoctorTentSensorMetric(
+  value: unknown,
+  numeric: unknown,
+): { metric: DoctorTentCanonicalMetric; value: number } | null {
+  const recognized = canonicalizeRecognizedMetric(value, numeric);
+  if (recognized) return recognized;
+  if (typeof value !== "string" || typeof numeric !== "number" || !Number.isFinite(numeric)) {
+    return null;
+  }
+  const metric = value.trim().toLowerCase();
+  if (metric === "ph") return { metric: "ph", value: numeric };
+  if (metric === "ec" || metric === "soil_ec" || metric === "soil_ec_ms_cm") {
+    return { metric: "ec", value: numeric };
+  }
+  return null;
+}
+
+export function isPlausibleDoctorTentMetric(
+  metric: DoctorTentCanonicalMetric,
+  value: number,
+): boolean {
+  if (metric === "ph") return classifyManualMetric("ph", value).valid;
+  if (metric === "ec") return classifyManualMetric("soil_ec", value).valid;
+  return isPlausibleMetric(metric, value);
 }
 
 export function manualTentSensorRowsToAiDoctorContextSnapshots(

@@ -41,6 +41,10 @@ let manualLogsState: { data?: unknown; isLoading: boolean } = {
   isLoading: false,
 };
 let alertsState: { rows: ReadonlyArray<{ id: string; status?: string }> } = { rows: [] };
+let tentReadingsState: {
+  byTent: Record<string, unknown[]>;
+  statusByTent: Record<string, string>;
+} = { byTent: {}, statusByTent: {} };
 
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
   PLANT_RECENT_ACTIVITY_LIMIT: 10,
@@ -61,6 +65,24 @@ vi.mock("@/hooks/usePlantAssignedTentAlerts", () => ({
     error: null,
   }),
 }));
+vi.mock("@/hooks/use-sensor-readings", () => ({
+  useSensorReadingsByTents: (tentIds: string[]) => {
+    const byTent: Record<string, unknown[]> = {};
+    const statusByTent: Record<string, string> = {};
+    for (const id of tentIds) {
+      byTent[id] = tentReadingsState.byTent[id] ?? [];
+      statusByTent[id] = tentReadingsState.statusByTent[id] ?? "success";
+    }
+    return {
+      byTent,
+      statusByTent,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+      retryTent: vi.fn(),
+    };
+  },
+}));
 
 const baseProps = {
   plantId: "p1",
@@ -75,6 +97,7 @@ beforeEach(() => {
   recentActivityState = { data: [], isLoading: false };
   manualLogsState = { data: [], isLoading: false };
   alertsState = { rows: [] };
+  tentReadingsState = { byTent: {}, statusByTent: {} };
   fetchSpy.mockClear();
 });
 
@@ -164,6 +187,55 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
     expect(
       screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-fallback"),
     ).toBeTruthy();
+  });
+
+  it("surfaces a fresh tent-scoped manual snapshot when plant diary logs are empty", () => {
+    const capturedAt = ago(5 * 60 * 1000);
+    const tentId = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e77";
+    tentReadingsState = {
+      byTent: {
+        [tentId]: [
+          {
+            tent_id: tentId,
+            source: "manual",
+            quality: "ok",
+            metric: "temp_f",
+            value: 75,
+            captured_at: capturedAt,
+          },
+          {
+            tent_id: tentId,
+            source: "manual",
+            quality: "ok",
+            metric: "humidity",
+            value: 60,
+            captured_at: capturedAt,
+          },
+          {
+            tent_id: tentId,
+            source: "manual",
+            quality: "ok",
+            metric: "vpd",
+            value: 1,
+            captured_at: capturedAt,
+          },
+        ],
+      },
+      statusByTent: { [tentId]: "success" },
+    };
+    manualLogsState = { data: [], isLoading: false };
+
+    render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} tentId={tentId} />);
+
+    expect(screen.getByTestId("plant-sensor-context-audit-message").textContent).not.toMatch(
+      /No plant-level manual sensor snapshots found/,
+    );
+    expect(screen.getByTestId("plant-sensor-context-audit-latest").textContent).not.toMatch(
+      /None/i,
+    );
+    expect(screen.getByTestId("plant-sensor-context-audit-status").textContent).not.toMatch(
+      /Missing/i,
+    );
   });
 
   it("static guard: mount source imports no Supabase/network/write helpers", async () => {

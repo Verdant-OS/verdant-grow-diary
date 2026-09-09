@@ -13,7 +13,7 @@
     "src/lib/aiDoctorContextViewModel.ts": "7ad91e0c9181ddc86355de503db0c5b205ca7f92ffbe09779b60e6d5c573652e",
     "src/lib/aiDoctorCreditReplayRules.ts": "55c948e68e1f444b482b8d7e3a772553057dcf76ad1d2b95c737bdfbe463936b",
     "src/lib/aiDoctorCsvHistoryContextRules.ts": "ca2dffde07396178405e75b077d25b28a4b6c6badb8759d30649aac7f414fe87",
-    "src/lib/aiDoctorCurrentSensorSnapshotRules.ts": "1fee67e66c772e08155b53e04ae979b6502f2fe6c66cea63853f40161287ffd6",
+    "src/lib/aiDoctorCurrentSensorSnapshotRules.ts": "3d1d0686137d9ad10404df4ec6958306926b0d155b3ffe3da1e3a671507b1e07",
     "src/lib/aiDoctorEnvironmentCheckRules.ts": "2a53ccec5b83ffa941d343cb83b63eff33baf9519acc92140e4251486b156b46",
     "src/lib/aiDoctorImportedHistoryPromptRules.ts": "700905b4624844c393eab1ede66b5385ed2836c3d70065ad0d011d6796c3ed51",
     "src/lib/aiDoctorManualTentSensorSnapshotAdapter.ts": "d0fb1453eda3947cbc438834d2b6d5718aaf8693dfb176a11720b9993b1a5373",

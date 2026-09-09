@@ -327,6 +327,41 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
     });
   });
 
+  it("treats a fresh tent manual snapshot as healthy Doctor evidence without a live bridge", () => {
+    currentSensorState.rows = [
+      {
+        metric: "temp_f",
+        value: 75,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        source: "manual",
+        quality: "ok",
+      },
+      {
+        metric: "humidity",
+        value: 60,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        source: "manual",
+        quality: "ok",
+      },
+      {
+        metric: "vpd",
+        value: 1,
+        captured_at: new Date(Date.now() - 60_000).toISOString(),
+        source: "manual",
+        quality: "ok",
+      },
+    ];
+    setBridge(null, null);
+    renderCard();
+    const panel = screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel");
+    expect(panel.getAttribute("data-status")).toBe("usable");
+    expect(panel.getAttribute("data-mode")).toBe("healthy");
+    expect(panel.getAttribute("data-counts-as-healthy")).toBe("true");
+    expect(
+      screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-status").textContent,
+    ).not.toMatch(/needs review/i);
+  });
+
   it("never lets an audit success plus a test packet raise readiness", () => {
     currentSensorState.rows = [
       {

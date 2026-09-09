@@ -311,9 +311,28 @@ export function buildAiDoctorCurrentSensorSnapshot(
 }
 
 /**
+ * True only when current tent rows project a fresh live snapshot.
+ * Fresh valid manual readings can be usable Doctor evidence without
+ * claiming live-bridge presence.
+ */
+export function currentSensorEvidenceIsFreshLive(
+  rows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
+  options: { now?: Date } = {},
+): boolean {
+  const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, options);
+  return Boolean(
+    snapshot && snapshot.annotation.source === "live" && snapshot.annotation.stale === false,
+  );
+}
+
+/**
  * Convert the provenance-filtered current-row projection into the shared
  * Sensor Snapshot Status Contract used by AI Doctor readiness and audit
  * persistence. Transport success alone is intentionally insufficient.
+ *
+ * Fresh valid `manual` rows are eligible Doctor evidence. They must not be
+ * parked in `needs_review` (that status is treated as unsafe / unused for
+ * recommendations). They still never count as live-bridge presence.
  */
 export function classifyAiDoctorCurrentSensorEvidence(
   rows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
@@ -327,14 +346,16 @@ export function classifyAiDoctorCurrentSensorEvidence(
     result = { status: "invalid", reasonCode: "malformed_payload" };
   } else if (snapshot.annotation.stale) {
     result = { status: "stale", reasonCode: "stale_timestamp" };
-  } else if (snapshot.annotation.source !== "live") {
-    // Manual evidence stays useful context but never becomes healthy live
-    // bridge evidence for the readiness score.
-    result = { status: "needs_review", reasonCode: "none_accepted" };
-  } else {
+  } else if (snapshot.annotation.source === "live" || snapshot.annotation.source === "manual") {
     result = { status: "usable", reasonCode: "fresh_accept" };
+  } else {
+    result = { status: "needs_review", reasonCode: "none_accepted" };
   }
-  return classificationFromStatusResult(result);
+  const classification = classificationFromStatusResult(result);
+  if (result.status === "usable" && snapshot?.annotation.source === "manual") {
+    return { ...classification, label: "Latest manual snapshot accepted." };
+  }
+  return classification;
 }
 
 /**

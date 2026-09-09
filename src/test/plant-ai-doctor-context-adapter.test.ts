@@ -155,6 +155,78 @@ describe("plantAiDoctorContextAdapter", () => {
     ).toBe(true);
   });
 
+  it("includes assigned-tent manual sensor_readings when plant diary snapshots are empty", () => {
+    const capturedAt = ago(HOUR);
+    const ctx = buildPlantAiDoctorContext({
+      plant: {
+        id: "p1",
+        name: "Plant A",
+        stage: "veg",
+        grow_id: "g1",
+        tent_id: "t1",
+      },
+      diaryEntries: [],
+      manualSensorLogs: [],
+      tentId: "t1",
+      tentSensorRows: [
+        {
+          tent_id: "t1",
+          source: "manual",
+          quality: "ok",
+          metric: "temp_f",
+          value: 75,
+          captured_at: capturedAt,
+        },
+        {
+          tent_id: "t1",
+          source: "manual",
+          quality: "ok",
+          metric: "humidity",
+          value: 60,
+          captured_at: capturedAt,
+        },
+        {
+          tent_id: "t1",
+          source: "manual",
+          quality: "ok",
+          metric: "vpd",
+          value: 1,
+          captured_at: capturedAt,
+        },
+      ],
+      now: NOW,
+    });
+    expect(ctx.source_tags).toContain("manual");
+    expect(ctx.source_tags).not.toContain("live");
+    expect(ctx.sensor_groups.some((group) => group.sample_count > 0)).toBe(true);
+  });
+
+  it("ignores tent manual rows from a different tent", () => {
+    const ctx = buildPlantAiDoctorContext({
+      plant: {
+        id: "p1",
+        name: "Plant A",
+        stage: "veg",
+        grow_id: "g1",
+        tent_id: "t1",
+      },
+      diaryEntries: [],
+      manualSensorLogs: [],
+      tentId: "t1",
+      tentSensorRows: [
+        {
+          tent_id: "other-tent",
+          source: "manual",
+          metric: "temp_f",
+          value: 75,
+          captured_at: ago(HOUR),
+        },
+      ],
+      now: NOW,
+    });
+    expect(ctx.source_tags).not.toContain("manual");
+  });
+
   it("static guard: adapter imports no Supabase/network/write helpers", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("src/lib/plantAiDoctorContextAdapter.ts", "utf8");

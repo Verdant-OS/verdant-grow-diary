@@ -17,8 +17,14 @@ import {
   type SensorReadingRowLike,
   type PlantRowLike,
 } from "@/lib/aiDoctorContextCompiler";
+import {
+  canonicalizeDoctorTentSensorMetric,
+  isPlausibleDoctorTentMetric,
+  type DoctorTentCanonicalMetric,
+} from "@/lib/aiDoctorManualTentSensorSnapshotAdapter";
 import { resolveCanonicalDiaryEventType } from "@/lib/diaryTimelineViewModel";
 import type { ManualSensorLog } from "@/lib/manualSensorChronologyDeltaRules";
+import { PPFD_UNIT_LONG } from "@/lib/ppfdRules";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 
 /** Permissive shape covering the diary_entries fields we read. */
@@ -157,15 +163,46 @@ function tentRowHasUsableQuality(row: TentManualSensorRowLike): boolean {
   return typeof row.quality === "string" && row.quality.trim().toLowerCase() === "ok";
 }
 
-function tentMetricKey(row: TentManualSensorRowLike): string {
-  return typeof row.metric === "string" ? row.metric.trim().toLowerCase() : "";
-}
-
 function tentFiniteValue(row: TentManualSensorRowLike): number | null {
   if (row.value === null || row.value === undefined) return null;
   if (typeof row.value === "string" && row.value.trim().length === 0) return null;
   const n = typeof row.value === "number" ? row.value : Number(row.value);
   return Number.isFinite(n) ? n : null;
+}
+
+const DOCTOR_TENT_COMPILER_UNITS: Record<DoctorTentCanonicalMetric, string> = {
+  temperature_c: "C",
+  humidity_pct: "%",
+  vpd_kpa: "kPa",
+  co2_ppm: "ppm",
+  soil_moisture_pct: "%",
+  ppfd: PPFD_UNIT_LONG,
+  ph: "pH",
+  ec: "mS/cm",
+};
+
+function assignPlantAuditMetric(
+  metrics: ManualSensorLog["metrics"],
+  metric: DoctorTentCanonicalMetric,
+  value: number,
+): void {
+  if (metric === "temperature_c") {
+    metrics.temp_f = Math.round((value * 9) / 5 + 32);
+    return;
+  }
+  if (metric === "humidity_pct") {
+    metrics.humidity_percent = value;
+    return;
+  }
+  if (metric === "ph") {
+    metrics.ph = value;
+    return;
+  }
+  if (metric === "ec") {
+    metrics.ec = value;
+    return;
+  }
+  (metrics as Record<string, number>)[metric] = value;
 }
 
 /**
@@ -188,29 +225,16 @@ export function tentManualSensorRowsToReadingRows(
     const captured_at = tentRowTimestamp(row);
     const value = tentFiniteValue(row);
     if (!captured_at || value === null) continue;
-    const metric = tentMetricKey(row);
-    if (metric === "temperature_c") {
-      out.push({ metric: "temperature_c", value, unit: "C", captured_at, source: "manual" });
-    } else if (metric === "temp_f" || metric === "temperature_f") {
-      const tempC = fahrenheitToCelsius(value);
-      if (tempC !== null) {
-        out.push({
-          metric: "temperature_c",
-          value: tempC,
-          unit: "C",
-          captured_at,
-          source: "manual",
-        });
-      }
-    } else if (metric === "humidity_pct" || metric === "humidity") {
-      out.push({ metric: "humidity_pct", value, unit: "%", captured_at, source: "manual" });
-    } else if (metric === "vpd_kpa" || metric === "vpd") {
-      out.push({ metric: "vpd_kpa", value, unit: "kPa", captured_at, source: "manual" });
-    } else if (metric === "ph") {
-      out.push({ metric: "ph", value, unit: "pH", captured_at, source: "manual" });
-    } else if (metric === "ec") {
-      out.push({ metric: "ec", value, unit: "mS/cm", captured_at, source: "manual" });
-    }
+    const canonical = canonicalizeDoctorTentSensorMetric(row.metric, value);
+    if (!canonical) continue;
+    if (!isPlausibleDoctorTentMetric(canonical.metric, canonical.value)) continue;
+    out.push({
+      metric: canonical.metric,
+      value: canonical.value,
+      unit: DOCTOR_TENT_COMPILER_UNITS[canonical.metric],
+      captured_at,
+      source: "manual",
+    });
   }
   return out;
 }
@@ -234,23 +258,15 @@ export function tentManualSensorRowsToPlantSensorLogs(
     const capturedAt = tentRowTimestamp(row);
     const value = tentFiniteValue(row);
     if (!capturedAt || value === null) continue;
-    const metric = tentMetricKey(row);
+    const canonical = canonicalizeDoctorTentSensorMetric(row.metric, value);
+    if (!canonical) continue;
+    if (!isPlausibleDoctorTentMetric(canonical.metric, canonical.value)) continue;
     let metrics = groups.get(capturedAt);
     if (!metrics) {
       metrics = {};
       groups.set(capturedAt, metrics);
     }
-    if (metric === "temperature_c") {
-      metrics.temp_f = Math.round((value * 9) / 5 + 32);
-    } else if (metric === "temp_f" || metric === "temperature_f") {
-      metrics.temp_f = value;
-    } else if (metric === "humidity_pct" || metric === "humidity") {
-      metrics.humidity_percent = value;
-    } else if (metric === "ph") {
-      metrics.ph = value;
-    } else if (metric === "ec") {
-      metrics.ec = value;
-    }
+    assignPlantAuditMetric(metrics, canonical.metric, canonical.value);
   }
   return [...groups.entries()].map(([capturedAt, metrics]) => ({
     capturedAt,

@@ -22,7 +22,6 @@ import {
 import {
   classifyFreshness,
   evaluateMetric,
-  SENSOR_FRESH_WINDOW_MINUTES,
   type SensorMetricKey,
 } from "@/lib/latestSensorSnapshotRules";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
@@ -272,10 +271,9 @@ export function buildAiDoctorCurrentSensorSnapshot(
   const invalidSnapshot = freshness.freshness === "invalid" || readings.length === 0;
   if (invalidSnapshot) annotationInput.source = "invalid";
 
-  const context = buildAiSensorSnapshotContext(annotationInput, {
-    now,
-    staleThresholdMs: SENSOR_FRESH_WINDOW_MINUTES * 60 * 1000,
-  });
+  // Source-aware stale window (manual 24h, live 15m). Overriding with the
+  // live-only 15-minute constant parked valid tent manuals as stale.
+  const context = buildAiSensorSnapshotContext(annotationInput, { now });
   const invalidNote =
     invalidCount > 0
       ? "One or more current sensor values were omitted because they failed plausibility validation."

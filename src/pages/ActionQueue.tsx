@@ -98,9 +98,11 @@ import {
 import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
+  areActionQueueTransitionMutationsBlocked,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
-  ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS,
-  settleActionQueueRpcAvailabilityOnCheckTimeout,
+  ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+  ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON,
+  ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
   type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
 import { ActionQueueRpcStatusPill } from "@/components/ActionQueueRpcStatusPill";
@@ -439,26 +441,14 @@ export default function ActionQueue() {
   } | null>(null);
   const [retryingTrace, setRetryingTrace] = useState(false);
   // Tri-state availability for the `action_queue_transition` RPC. Starts as
-  // "unknown" so the status pill renders an honest "Checking availability"
-  // placeholder instead of a stale/assumed green. Flips to "available" only
-  // when a transition actually succeeds, and to "unavailable" when a
-  // transition fails with a missing-RPC signal (persistent banner + red pill).
-  // Fail-closed: if still "unknown" after ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS
-  // (empty queue / hung probe), settle to "unavailable" so the spinner never hangs.
+  // "unknown" — no probe runs until the grower actually transitions. Flips to
+  // "available" only when a transition succeeds, and to "unavailable" only
+  // when a transition fails with a missing-RPC signal (persistent banner).
+  // Do not timeout "unknown" into "unavailable": that painted a false outage
+  // on healthy backends (empty Needs Review + "Transitions unavailable").
   const [rpcAvailability, setRpcAvailability] = useState<ActionQueueRpcAvailability>("unknown");
   const rpcUnavailable = rpcAvailability === "unavailable";
-
-  // Bounded availability check: without a settling transition (common when the
-  // queue has zero actions), "unknown" would otherwise spin forever. After the
-  // timeout budget, fail closed to "unavailable" (banner + retry). Restart the
-  // timer whenever we re-enter "unknown" (refresh / retry / transient reset).
-  useEffect(() => {
-    if (rpcAvailability !== "unknown") return;
-    const handle = window.setTimeout(() => {
-      setRpcAvailability((prev) => settleActionQueueRpcAvailabilityOnCheckTimeout(prev, true));
-    }, ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS);
-    return () => window.clearTimeout(handle);
-  }, [rpcAvailability]);
+  const transitionMutationsBlocked = areActionQueueTransitionMutationsBlocked(rpcAvailability);
 
   // Load existing approve/reject diary trace rows for the open drawer
   // row. Pure read; never inserts.
@@ -760,6 +750,14 @@ export default function ActionQueue() {
   }
 
   async function transition(row: ActionRow, kind: TransitionKind, note?: string): Promise<boolean> {
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) {
+      toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
+        id: ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
+        description: ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+        duration: 10000,
+      });
+      return false;
+    }
     setBusyId(row.id);
     const rpcArgs = buildActionQueueTransitionRpcArgs({
       actionQueueId: row.id,
@@ -787,8 +785,8 @@ export default function ActionQueue() {
           }),
         );
         toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
-          id: "action-queue-transition-rpc-unavailable",
-          description: ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body,
+          id: ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
+          description: ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
           duration: 10000,
         });
         setBusyId(null);
@@ -816,7 +814,9 @@ export default function ActionQueue() {
       else setTraceFailure((prev) => (prev?.actionId === row.id ? null : prev));
     }
     setBusyId(null);
-    // Successful transition proves the RPC is reachable.
+    // Successful transition proves the RPC is reachable. Dismiss any stale
+    // outage toast — Golden Run cancel succeeded while that copy still showed.
+    toast.dismiss(ACTION_QUEUE_TRANSITION_RPC_TOAST_ID);
     setRpcAvailability("available");
     await load();
     if (drawerRow && drawerRow.id === row.id) {
@@ -828,6 +828,7 @@ export default function ActionQueue() {
   function openNoteDialog(row: ActionRow, kind: TransitionKind) {
     // SECURITY: terminal states cannot be transitioned again.
     if (isTerminalStatus(row.status)) return;
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) return;
     setNoteDraft("");
     setNoteDialog({ row, kind });
   }
@@ -835,6 +836,7 @@ export default function ActionQueue() {
   // SECURITY: each branch only flips status + writes audit. No device commands.
   async function confirmNoteDialog() {
     if (!noteDialog) return;
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) return;
     const { row, kind } = noteDialog;
     const note = normalizeNote(noteDraft);
     setNoteDialog(null);
@@ -1074,8 +1076,9 @@ export default function ActionQueue() {
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  // Manual refresh re-probes RPC state: show the interim
-                  // placeholder until the next transition proves availability.
+                  // Manual refresh reloads the list. Do not claim the
+                  // transition RPC was probed — availability stays unknown
+                  // until the next real approve/reject/complete call.
                   setRpcAvailability("unknown");
                   void load();
                 }}
@@ -1662,8 +1665,12 @@ export default function ActionQueue() {
                       </div>
                       <div className="mt-3 flex min-w-0 flex-wrap gap-2">
                         {(() => {
-                          const disabled = busyId === row.id;
-                          const disabledReason = disabled ? "Saving — please wait" : null;
+                          const disabled = busyId === row.id || transitionMutationsBlocked;
+                          const disabledReason = transitionMutationsBlocked
+                            ? ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON
+                            : disabled
+                              ? "Saving — please wait"
+                              : null;
                           return (
                             <>
                               <Button
@@ -1876,8 +1883,12 @@ export default function ActionQueue() {
                           {row.action_type}
                         </h3>
                         {(() => {
-                          const disabled = busyId === row.id;
-                          const disabledReason = disabled ? "Saving — please wait" : null;
+                          const disabled = busyId === row.id || transitionMutationsBlocked;
+                          const disabledReason = transitionMutationsBlocked
+                            ? ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON
+                            : disabled
+                              ? "Saving — please wait"
+                              : null;
                           return (
                             <>
                               {canComplete(row.status) && (
@@ -2012,7 +2023,12 @@ export default function ActionQueue() {
                 <Button variant="ghost" onClick={cancelNoteDialog}>
                   Cancel
                 </Button>
-                <Button onClick={confirmNoteDialog}>{meta.confirmLabel}</Button>
+                <Button
+                  onClick={confirmNoteDialog}
+                  disabled={areActionQueueTransitionMutationsBlocked(rpcAvailability)}
+                >
+                  {meta.confirmLabel}
+                </Button>
               </DialogFooter>
             </>
           )}
@@ -2028,7 +2044,10 @@ export default function ActionQueue() {
         lookups={{
           growsById: Object.fromEntries(grows.map((g) => [g.id, { name: g.name }])),
         }}
-        busy={!!drawerRow && busyId === drawerRow.id}
+        busy={
+          !!drawerRow &&
+          (busyId === drawerRow.id || areActionQueueTransitionMutationsBlocked(rpcAvailability))
+        }
         loading={drawerHistoryLoading && drawerHistory === null}
         canApprove={!!drawerRow && canApproveAction(drawerRow.status)}
         canReject={!!drawerRow && canRejectAction(drawerRow.status)}

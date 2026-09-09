@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { classifyAiDoctorCurrentSensorEvidence } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { buildPlantDetailAiDoctorReadiness } from "@/lib/plantDetailAiDoctorReadiness";
 import { classifyAuditRow } from "@/lib/sensorSnapshotStatusContract";
 
@@ -72,6 +73,39 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
     expect(r.sensorEvidence.mode).toBe("unsafe");
     expect(r.sensorEvidence.isUnsafe).toBe(true);
     expect(r.sensorEvidence.countsAsHealthyEvidence).toBe(false);
+  });
+
+  it("remasure 76°F / 58% RH current manuals are not parked as needs-review", () => {
+    const capturedAt = minutesAgo(2);
+    const classified = classifyAiDoctorCurrentSensorEvidence(
+      [
+        {
+          metric: "temp_f",
+          value: 76,
+          captured_at: capturedAt,
+          source: "manual",
+          quality: null,
+        },
+        {
+          metric: "humidity",
+          value: 58,
+          captured_at: capturedAt,
+          source: "manual",
+          quality: null,
+        },
+      ],
+      { now: NOW },
+    );
+    const r = buildPlantDetailAiDoctorReadiness({
+      ...baseInput,
+      sensorSnapshot: classified,
+    });
+    expect(classified.status).toBe("usable");
+    expect(classified.reason).not.toBe("none_inserted");
+    expect(r.sensorEvidence.mode).toBe("healthy");
+    expect(r.sensorEvidence.isUnsafe).toBe(false);
+    expect(r.sensorEvidence.label).not.toMatch(/needs review — not used for recommendations/i);
+    expect(r.missing.find((m) => m.kind === "no_sensor_snapshot")).toBeUndefined();
   });
 
   it("needs_review is blocked as evidence", () => {

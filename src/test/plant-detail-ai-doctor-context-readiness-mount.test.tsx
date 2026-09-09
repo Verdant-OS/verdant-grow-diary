@@ -238,6 +238,44 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
     );
   });
 
+  it("surfaces the remasure 76°F / 58% RH tent save when diary manuals are empty", () => {
+    const capturedAt = ago(5 * 60 * 1000);
+    const tentId = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e77";
+    tentReadingsState = {
+      byTent: {
+        [tentId]: [
+          {
+            tent_id: tentId,
+            source: "manual",
+            quality: null,
+            metric: "temp_f",
+            value: 76,
+            captured_at: capturedAt,
+          },
+          {
+            tent_id: tentId,
+            source: "manual",
+            quality: null,
+            metric: "humidity",
+            value: 58,
+            captured_at: capturedAt,
+          },
+        ],
+      },
+      statusByTent: { [tentId]: "success" },
+    };
+    manualLogsState = { data: [], isLoading: false };
+
+    render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} tentId={tentId} />);
+
+    expect(screen.getByTestId("plant-sensor-context-audit-message").textContent).not.toMatch(
+      /No plant-level manual sensor snapshots found/,
+    );
+    expect(screen.getByTestId("plant-sensor-context-audit-latest").textContent).not.toMatch(
+      /None/i,
+    );
+  });
+
   it("static guard: mount source imports no Supabase/network/write helpers", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("src/components/PlantDetailAiDoctorContextReadinessMount.tsx", "utf8");

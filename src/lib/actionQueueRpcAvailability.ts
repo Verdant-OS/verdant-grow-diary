@@ -112,16 +112,34 @@ export function isMissingActionQueueTransitionRpcError(
 }
 
 /**
- * Grower-safe copy for the missing-RPC state. Deliberately avoids echoing
- * backend error text or naming internal functions.
+ * Sticky toast id for transition-RPC availability. Dismissed on a later
+ * successful mutation so a 10s outage toast cannot outlive a saved cancel.
+ */
+export const ACTION_QUEUE_TRANSITION_RPC_TOAST_ID =
+  "action-queue-transition-rpc-unavailable" as const;
+
+/**
+ * Grower-safe copy for the missing-RPC / unconfirmed-service state.
+ *
+ * Golden Run (AUTH_BANKED): Safer Cancel committed approved → cancelled while
+ * this banner was visible. Never claim the queue is unchanged or that no
+ * status was updated — other transitions on the same RPC can still succeed.
+ * Device commands remain never sent from this queue.
  */
 export const ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY = {
   title: "Action updates are temporarily unavailable",
+  label: "Retry failed saves",
   body:
-    "The backend service that records approve, reject, and complete decisions isn't responding right now. " +
-    "Your queue is unchanged — no status was updated and no device commands were sent. " +
-    "Support has been notified. Please try again in a few minutes.",
+    "Verdant could not confirm the service that records some approve, reject, and complete decisions. " +
+    "Try the button again. If a decision succeeds, that status is saved. " +
+    "This queue never sends device commands.",
 } as const;
+
+/**
+ * Toast copy after one transition call failed. Scoped to that attempt only.
+ */
+export const ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY =
+  "That decision was not saved. Check the action status before retrying. No device command was sent.";
 
 /**
  * Tri-state availability of the `action_queue_transition` RPC.

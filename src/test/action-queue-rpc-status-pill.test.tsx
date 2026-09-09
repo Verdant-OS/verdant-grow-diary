@@ -53,7 +53,7 @@ describe("ActionQueueRpcStatusPill", () => {
     expect(pill).toHaveAttribute("data-state", "unavailable");
     expect(pill).toHaveAttribute("aria-busy", "false");
     expect(pill).toHaveAttribute("title", ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title);
-    expect(pill).toHaveTextContent("Transitions unavailable");
+    expect(pill).toHaveTextContent(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.label);
     expect(pill.className).toContain("text-destructive");
     expect(
       screen.getByTestId("action-queue-transition-rpc-status-pill-icon-unavailable"),

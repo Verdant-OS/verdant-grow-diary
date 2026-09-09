@@ -99,6 +99,8 @@ import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+  ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+  ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
   type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
 import { ActionQueueRpcStatusPill } from "@/components/ActionQueueRpcStatusPill";
@@ -772,8 +774,8 @@ export default function ActionQueue() {
           }),
         );
         toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
-          id: "action-queue-transition-rpc-unavailable",
-          description: ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body,
+          id: ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
+          description: ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
           duration: 10000,
         });
         setBusyId(null);
@@ -801,7 +803,9 @@ export default function ActionQueue() {
       else setTraceFailure((prev) => (prev?.actionId === row.id ? null : prev));
     }
     setBusyId(null);
-    // Successful transition proves the RPC is reachable.
+    // Successful transition proves the RPC is reachable. Dismiss any stale
+    // outage toast — Golden Run cancel succeeded while that copy still showed.
+    toast.dismiss(ACTION_QUEUE_TRANSITION_RPC_TOAST_ID);
     setRpcAvailability("available");
     await load();
     if (drawerRow && drawerRow.id === row.id) {

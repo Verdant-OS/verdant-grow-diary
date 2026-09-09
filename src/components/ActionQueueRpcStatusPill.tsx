@@ -31,7 +31,7 @@ export function ActionQueueRpcStatusPill({ availability }: ActionQueueRpcStatusP
         : ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.title;
   const pillLabel =
     availability === "unavailable"
-      ? "Transitions unavailable"
+      ? ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.label
       : availability === "available"
         ? ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY.label
         : ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY.label;

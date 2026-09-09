@@ -54,6 +54,8 @@ import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+  ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+  ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
 } from "@/lib/actionQueueRpcAvailability";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
@@ -460,8 +462,8 @@ export default function ActionDetail() {
           }),
         );
         toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
-          id: "action-queue-transition-rpc-unavailable",
-          description: ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body,
+          id: ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
+          description: ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
           duration: 10000,
         });
         setBusy(false);
@@ -486,6 +488,7 @@ export default function ActionDetail() {
       });
     }
     setBusy(false);
+    toast.dismiss(ACTION_QUEUE_TRANSITION_RPC_TOAST_ID);
     if (rpcUnavailable) setRpcUnavailable(false);
     await load();
     return true;

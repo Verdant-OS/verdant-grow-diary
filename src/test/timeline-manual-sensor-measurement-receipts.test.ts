@@ -110,7 +110,12 @@ describe("diaryEntryHasMeasurementEvidence — QL environment family", () => {
 
 describe("mergeTimelineMeasurementDisplayEntries", () => {
   it("surfaces the sensor receipt beside existing diary measurements without duplicating ids", () => {
-    const diary = [
+    const diary: Array<{
+      id: string;
+      entry_at: string;
+      details: Record<string, unknown>;
+      note: string;
+    }> = [
       {
         id: "diary-old",
         entry_at: "2026-09-01T12:00:00.000Z",

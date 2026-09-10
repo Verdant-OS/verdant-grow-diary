@@ -65,9 +65,15 @@ export function diaryEntryHasMeasurementEvidence(entry: {
   return hasManualHandheldReadings(entry?.note ?? null);
 }
 
+function persistedQualityIsUsable(quality: string | null | undefined): boolean {
+  const normalized = (quality ?? "ok").trim().toLowerCase();
+  return normalized === "ok" || normalized === "";
+}
+
 function toSensorReadingRow(row: ManualSensorTimelineMetricRow): SensorReadingRow | null {
   const valueNum = typeof row.value === "number" ? row.value : Number(row.value);
   if (!Number.isFinite(valueNum) || !row.tent_id || !row.ts) return null;
+  if (!persistedQualityIsUsable(row.quality)) return null;
   return {
     id: "",
     tent_id: row.tent_id,
@@ -133,9 +139,16 @@ export function manualSensorReadingsToTimelineEntries(
     const humidityPct = observed.includes("rh") ? reading.rh : null;
     const vpdKpa = observed.includes("vpd") ? reading.vpd : null;
 
-    const snapshot: Record<string, unknown> = { source: "manual" };
+    const snapshot: Record<string, unknown> = { source: "manual", ts: capturedAt };
     if (tempF !== null) snapshot.temp_f = tempF;
     if (humidityPct !== null) snapshot.humidity_percent = humidityPct;
+
+    const sensorSnapshot: Record<string, unknown> = { source: "manual", ts: capturedAt };
+    if (observed.includes("temp") && Number.isFinite(reading.temp)) {
+      sensorSnapshot.temp_c = reading.temp;
+    }
+    if (humidityPct !== null) sensorSnapshot.rh = humidityPct;
+    if (vpdKpa !== null) sensorSnapshot.vpd_kpa = vpdKpa;
 
     receipts.push({
       id: `${TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX}${reading.tentId}:${capturedAt}`,
@@ -147,6 +160,7 @@ export function manualSensorReadingsToTimelineEntries(
         source: "manual",
         tent_id: reading.tentId,
         manual_sensor_snapshot: snapshot,
+        sensor_snapshot: sensorSnapshot,
       },
       entry_at: capturedAt,
       plant_id: null,

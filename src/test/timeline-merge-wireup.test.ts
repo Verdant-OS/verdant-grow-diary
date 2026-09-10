@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
+import { findSupabaseTableWrites } from "@/test/helpers/supabaseTableWriteScan";
 
 const TIMELINE_SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
 
@@ -60,9 +61,7 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
   it("reads manual sensor_readings as a supplemental Timeline source", () => {
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']sensor_readings["']\s*\)/);
     expect(TIMELINE_SRC).toMatch(/eq\(\s*["']source["']\s*,\s*["']manual["']\s*\)/);
-    expect(TIMELINE_SRC).not.toMatch(
-      /from\(\s*["']sensor_readings["']\s*\)[\s\S]{0,200}\.(insert|update|delete|upsert)\s*\(/,
-    );
+    expect(findSupabaseTableWrites(TIMELINE_SRC, "sensor_readings", "Timeline.tsx")).toEqual([]);
   });
 
   it("gates supplemental tents and sensor_readings on directoryGrowId like the owner directory", () => {
@@ -70,6 +69,24 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*directoryGrowId\s*\)/);
     expect(TIMELINE_SRC).toMatch(
       /\[activeGrowId,\s*activeReadKey,\s*directoryGrowId,\s*timelineDateRangeBounds,\s*user\]/,
+    );
+  });
+
+  it("does not apply a stale sensor-read catch to a newer request", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /catch\s*\{[\s\S]{0,80}!isCurrentRequest\(\)[\s\S]{0,160}setManualSensorMeasurementEntries\(\[\]\)/,
+    );
+  });
+
+  it("keeps derived sensor receipts out of the recent Quick Log / calendar diary lane", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /displayEntries[\s\S]{0,80}\.filter\(\s*\(e\)\s*=>\s*!isTimelineSensorDerivedDiaryId\(\s*e\.id\s*\)/,
+    );
+  });
+
+  it("counts Detailed diary without mixing sensor receipts into entriesTotal", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /filtered\.filter\(\(e\)\s*=>\s*!isTimelineSensorDerivedDiaryId\(e\.id\)\)\.length/,
     );
   });
 

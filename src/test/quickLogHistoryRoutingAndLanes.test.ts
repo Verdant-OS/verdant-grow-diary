@@ -30,6 +30,7 @@ import {
   type QuickLogHardwareReadings,
 } from "@/lib/quickLogHardwareReadingsRules";
 import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
+import { findSupabaseTableWrites } from "@/test/helpers/supabaseTableWriteScan";
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
@@ -302,7 +303,7 @@ describe("Logs page wiring (Timeline.tsx)", () => {
     expect(surface).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|service_role/i);
     expect(surface).not.toMatch(/\bactuator\b|\brelay\b|device[_-]?control/i);
     expect(surface).not.toMatch(/supabase\.functions\.invoke/);
-    expect(surface).not.toMatch(/from\(["']sensor_readings["']\)\s*\.(insert|update|delete|upsert)/);
+    expect(findSupabaseTableWrites(surface, "sensor_readings")).toEqual([]);
     expect(surface).not.toMatch(/action_queue\.insert|alerts\.insert/);
   });
 });

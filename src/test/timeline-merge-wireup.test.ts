@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { mergeTimelineSources } from "@/lib/timelineMergeRules";
+import { findSupabaseTableWrites } from "@/test/helpers/supabaseTableWriteScan";
 
 const TIMELINE_SRC = readFileSync(resolve(__dirname, "../pages/Timeline.tsx"), "utf8");
 
@@ -60,9 +61,7 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
   it("reads manual sensor_readings as a supplemental Timeline source", () => {
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']sensor_readings["']\s*\)/);
     expect(TIMELINE_SRC).toMatch(/eq\(\s*["']source["']\s*,\s*["']manual["']\s*\)/);
-    expect(TIMELINE_SRC).not.toMatch(
-      /from\(\s*["']sensor_readings["']\s*\)[\s\S]{0,200}\.(insert|update|delete|upsert)\s*\(/,
-    );
+    expect(findSupabaseTableWrites(TIMELINE_SRC, "sensor_readings", "Timeline.tsx")).toEqual([]);
   });
 
   it("gates supplemental tents and sensor_readings on directoryGrowId like the owner directory", () => {

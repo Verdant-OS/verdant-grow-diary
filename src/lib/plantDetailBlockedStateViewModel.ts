@@ -10,7 +10,8 @@
  *   - loading-slow : bounded retryable surface after the load timeout
  *   - error        : explicit fetch failure
  *   - archived     : plant resolved but archived/merged (not active)
- *   - not-found    : plant query settled with no row
+ *   - not-found    : plant query settled with no row, or URL/query growId
+ *                    is present and does not match the plant's grow_id
  *
  * "Back to tent" is offered whenever a safe tent route can be resolved
  * (either from the loaded plant or from a caller-supplied context tent id),
@@ -75,6 +76,12 @@ export interface DerivePlantDetailBlockedStateInput {
    * carries a tent id. Non-string values are coerced away defensively.
    */
   contextTentId?: string | null;
+  /**
+   * Grow scope from the URL/query (`?growId=`). When present and the plant
+   * has resolved, a mismatch vs `plant.growId` / `plant.grow_id` fail-closes
+   * as not-found. Absent or blank growId preserves the existing contract.
+   */
+  contextGrowId?: string | null;
 }
 
 const PLANTS_FALLBACK: PlantDetailBlockedStateAction = {
@@ -89,6 +96,40 @@ function readPlantTentId(p?: ArchivedPlantLike | null): string | null {
   const candidate = (p as { tentId?: unknown }).tentId ?? (p as { tent_id?: unknown }).tent_id;
   return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
 }
+
+function trimId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+export function readPlantGrowId(p?: ArchivedPlantLike | null): string | null {
+  if (!p) return null;
+  const candidate = (p as { growId?: unknown }).growId ?? (p as { grow_id?: unknown }).grow_id;
+  return trimId(candidate);
+}
+
+/**
+ * URL/query growId is a scope claim. When it is present and does not match
+ * the resolved plant's grow, plant detail must fail closed as not-found.
+ * Missing or blank query growId is not a mismatch.
+ */
+export function isPlantDetailGrowScopeMismatch(
+  plant: ArchivedPlantLike | null | undefined,
+  contextGrowId?: string | null,
+): boolean {
+  const requested = trimId(contextGrowId);
+  if (!requested) return false;
+  return readPlantGrowId(plant) !== requested;
+}
+
+const NOT_FOUND_VIEW = {
+  kind: "not-found" as const,
+  testId: "plant-detail-not-found",
+  title: "Plant not found",
+  description: "This plant isn't in your tracked plants yet.",
+  showRetry: false,
+};
 
 function tentBack(tentId: string): PlantDetailBlockedStateAction {
   return {
@@ -118,14 +159,29 @@ export function resolveBackContext(input: DerivePlantDetailBlockedStateInput): {
 /**
  * Deterministic blocked-state view derivation.
  *
- * Returns `null` for non-blocked load states (`loading` and `ready`) so
- * the presenter can fall through to its existing skeleton / full render.
+ * Returns `null` for non-blocked load states (`loading` and matching
+ * `ready`) so the presenter can fall through to its existing skeleton /
+ * full render. A ready plant with a present, mismatched query growId is
+ * treated as not-found and never falls through to the plant body.
  */
 export function derivePlantDetailBlockedStateView(
   input: DerivePlantDetailBlockedStateInput,
 ): PlantDetailBlockedStateView | null {
   const { loadState, plant } = input;
-  const { primary, secondary } = resolveBackContext(input);
+  const growScopeMismatch =
+    loadState === "ready" && isPlantDetailGrowScopeMismatch(plant, input.contextGrowId);
+  const backInput: DerivePlantDetailBlockedStateInput = growScopeMismatch
+    ? { loadState: "not-found", plant: null, contextTentId: null }
+    : input;
+  const { primary, secondary } = resolveBackContext(backInput);
+
+  if (growScopeMismatch) {
+    return {
+      ...NOT_FOUND_VIEW,
+      primaryBack: primary,
+      secondaryBack: secondary,
+    };
+  }
 
   switch (loadState) {
     case "loading-slow":
@@ -152,11 +208,7 @@ export function derivePlantDetailBlockedStateView(
       };
     case "not-found":
       return {
-        kind: "not-found",
-        testId: "plant-detail-not-found",
-        title: "Plant not found",
-        description: "This plant isn't in your tracked plants yet.",
-        showRetry: false,
+        ...NOT_FOUND_VIEW,
         primaryBack: primary,
         secondaryBack: secondary,
       };

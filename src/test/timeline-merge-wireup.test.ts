@@ -65,6 +65,14 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     );
   });
 
+  it("gates supplemental tents and sensor_readings on directoryGrowId like the owner directory", () => {
+    expect(TIMELINE_SRC).toMatch(/if\s*\(\s*directoryGrowId\s*\)\s*\{/);
+    expect(TIMELINE_SRC).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*directoryGrowId\s*\)/);
+    expect(TIMELINE_SRC).toMatch(
+      /\[activeGrowId,\s*activeReadKey,\s*directoryGrowId,\s*timelineDateRangeBounds,\s*user\]/,
+    );
+  });
+
   it("still fetches both diary_entries and grow_events from supabase", () => {
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']diary_entries["']\s*\)/);
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']grow_events["']\s*\)/);

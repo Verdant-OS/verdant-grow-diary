@@ -430,9 +430,7 @@ export default function Timeline() {
   const [entries, setEntries] = useState<Entry[]>([]);
   // Tent Manual Snapshots live in `sensor_readings`, not diary_entries.
   // Read-side receipts only — never a second write path.
-  const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>(
-    [],
-  );
+  const [manualSensorMeasurementEntries, setManualSensorMeasurementEntries] = useState<Entry[]>([]);
   // Keyset pagination (audit M1): the diary is unbounded but the page used
   // to silently cap at the newest 100 rows and report "Showing 100 of 100".
   const [entriesTotal, setEntriesTotal] = useState<number | null>(null);
@@ -588,6 +586,15 @@ export default function Timeline() {
   });
   const activeReadKeyRef = useRef(activeReadKey);
   activeReadKeyRef.current = activeReadKey;
+
+  // Same fail-closed grow-list gate as the owner name directory: no
+  // supplemental tents / sensor_readings while ownership proof is
+  // pending or the grow list read failed. Core diary/grow_events still
+  // key off activeGrowId; these receipts must not.
+  const directoryGrowId =
+    !growsLoading && !growsError && activeGrowId && grows.some((grow) => grow.id === activeGrowId)
+      ? activeGrowId
+      : null;
 
   // One-shot seed of tent filter from URL params written by the Quick
   // Log → Timeline continuity link. Plant is canonical URL state above.
@@ -831,60 +838,65 @@ export default function Timeline() {
             markPartial("alert_events");
           }
         })(),
-        (async () => {
-          try {
-            const tentsResult = await supabase
-              .from("tents")
-              .select("id")
-              .eq("grow_id", activeGrowId);
-            if (!isCurrentRequest()) return;
-            if (tentsResult.error || !Array.isArray(tentsResult.data)) {
-              markPartial("manual_sensor_readings");
-              setManualSensorMeasurementEntries([]);
-              return;
-            }
-            const tentIds = tentsResult.data
-              .map((row) => (typeof row.id === "string" ? row.id : null))
-              .filter((id): id is string => Boolean(id));
-            if (tentIds.length === 0) {
-              setManualSensorMeasurementEntries([]);
-              return;
-            }
-            let sensorQuery = supabase
-              .from("sensor_readings")
-              .select(
-                "id,tent_id,metric,value,source,ts,captured_at,quality,user_id,created_at,device_id",
-              )
-              .in("tent_id", tentIds)
-              .eq("source", "manual")
-              .order("captured_at", { ascending: false, nullsFirst: false })
-              .order("ts", { ascending: false })
-              .limit(200);
-            if (timelineDateRangeBounds.startIso) {
-              sensorQuery = sensorQuery.gte("ts", timelineDateRangeBounds.startIso);
-            }
-            if (timelineDateRangeBounds.endIso) {
-              sensorQuery = sensorQuery.lte("ts", timelineDateRangeBounds.endIso);
-            }
-            const sensorResult = await sensorQuery;
-            if (!isCurrentRequest()) return;
-            if (sensorResult.error || !Array.isArray(sensorResult.data)) {
-              markPartial("manual_sensor_readings");
-              setManualSensorMeasurementEntries([]);
-              return;
-            }
-            setManualSensorMeasurementEntries(
-              manualSensorReadingsToTimelineEntries(
-                sensorResult.data as ManualSensorTimelineMetricRow[],
-                new Date(),
-              ) as Entry[],
-            );
-          } catch {
-            markPartial("manual_sensor_readings");
-            setManualSensorMeasurementEntries([]);
-          }
-        })(),
       );
+
+      if (directoryGrowId) {
+        supplementalTasks.push(
+          (async () => {
+            try {
+              const tentsResult = await supabase
+                .from("tents")
+                .select("id")
+                .eq("grow_id", directoryGrowId);
+              if (!isCurrentRequest()) return;
+              if (tentsResult.error || !Array.isArray(tentsResult.data)) {
+                markPartial("manual_sensor_readings");
+                setManualSensorMeasurementEntries([]);
+                return;
+              }
+              const tentIds = tentsResult.data
+                .map((row) => (typeof row.id === "string" ? row.id : null))
+                .filter((id): id is string => Boolean(id));
+              if (tentIds.length === 0) {
+                setManualSensorMeasurementEntries([]);
+                return;
+              }
+              let sensorQuery = supabase
+                .from("sensor_readings")
+                .select(
+                  "id,tent_id,metric,value,source,ts,captured_at,quality,user_id,created_at,device_id",
+                )
+                .in("tent_id", tentIds)
+                .eq("source", "manual")
+                .order("captured_at", { ascending: false, nullsFirst: false })
+                .order("ts", { ascending: false })
+                .limit(200);
+              if (timelineDateRangeBounds.startIso) {
+                sensorQuery = sensorQuery.gte("ts", timelineDateRangeBounds.startIso);
+              }
+              if (timelineDateRangeBounds.endIso) {
+                sensorQuery = sensorQuery.lte("ts", timelineDateRangeBounds.endIso);
+              }
+              const sensorResult = await sensorQuery;
+              if (!isCurrentRequest()) return;
+              if (sensorResult.error || !Array.isArray(sensorResult.data)) {
+                markPartial("manual_sensor_readings");
+                setManualSensorMeasurementEntries([]);
+                return;
+              }
+              setManualSensorMeasurementEntries(
+                manualSensorReadingsToTimelineEntries(
+                  sensorResult.data as ManualSensorTimelineMetricRow[],
+                  new Date(),
+                ) as Entry[],
+              );
+            } catch {
+              markPartial("manual_sensor_readings");
+              setManualSensorMeasurementEntries([]);
+            }
+          })(),
+        );
+      }
 
       await Promise.all(supplementalTasks);
       if (isCurrentRequest()) setSupplementalLoading(false);
@@ -895,7 +907,7 @@ export default function Timeline() {
       setCoreRead({ status: "error", readKey: requestedReadKey });
       setLoading(false);
     }
-  }, [activeGrowId, activeReadKey, timelineDateRangeBounds, user]);
+  }, [activeGrowId, activeReadKey, directoryGrowId, timelineDateRangeBounds, user]);
 
   /**
    * Keyset "Load older" — fetches the next page strictly before the oldest
@@ -1090,15 +1102,8 @@ export default function Timeline() {
   // Archived/merged plants and tents disappear from the active-entity
   // queries but their diary history remains. This read-only directory
   // (includes is_archived rows) keeps filter labels on real names.
-  // Gated on a resolved grow scope so a rejected/invalid scope issues
-  // no reads at all, matching the page's fail-closed read policy.
-  const directoryGrowId =
-    !growsLoading &&
-    !growsError &&
-    activeGrowId &&
-    grows.some((grow) => grow.id === activeGrowId)
-      ? activeGrowId
-      : null;
+  // Gated on directoryGrowId so a pending/failed grow list issues no
+  // owner-directory reads, matching the page's fail-closed read policy.
   const { plantNamesById, plantTentIdsById, tentNamesById } = useTimelineNameDirectory(
     user,
     directoryGrowId,
@@ -2227,7 +2232,8 @@ export default function Timeline() {
         <AlertEventsSection events={alertEvents} />
       </div>
 
-      {pageReadView.kind === "ready_empty" || (displayEntries.length > 0 && filtered.length === 0) ? (
+      {pageReadView.kind === "ready_empty" ||
+      (displayEntries.length > 0 && filtered.length === 0) ? (
         <TimelineEmptyState
           view={
             resolveTimelineEmptyState({
@@ -2437,29 +2443,31 @@ export default function Timeline() {
                                 </span>
                                 {!isTimelineSensorDerivedDiaryId(e.id) ? (
                                   <>
-                                <button
-                                  type="button"
-                                  onClick={(ev) => {
-                                    ev.stopPropagation();
-                                    setEditingId(e.id);
-                                  }}
-                                  aria-label="Edit entry"
-                                  className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                  Edit
-                                </button>
-                                <DiaryEntryRemoveButton
-                                  entry={{ id: e.id, photoUrl: e.photo_url, kind: "diary" }}
-                                  viewer={{ currentUserId: user }}
-                                  plantName={plantName}
-                                  plantId={e.plant_id ?? null}
-                                  tentId={e.tent_id ?? null}
-                                  showFollowUp
-                                  onRemoved={(removedId) => {
-                                    setEntries((rows) => rows.filter((r) => r.id !== removedId));
-                                  }}
-                                />
+                                    <button
+                                      type="button"
+                                      onClick={(ev) => {
+                                        ev.stopPropagation();
+                                        setEditingId(e.id);
+                                      }}
+                                      aria-label="Edit entry"
+                                      className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                      Edit
+                                    </button>
+                                    <DiaryEntryRemoveButton
+                                      entry={{ id: e.id, photoUrl: e.photo_url, kind: "diary" }}
+                                      viewer={{ currentUserId: user }}
+                                      plantName={plantName}
+                                      plantId={e.plant_id ?? null}
+                                      tentId={e.tent_id ?? null}
+                                      showFollowUp
+                                      onRemoved={(removedId) => {
+                                        setEntries((rows) =>
+                                          rows.filter((r) => r.id !== removedId),
+                                        );
+                                      }}
+                                    />
                                   </>
                                 ) : null}
                               </div>

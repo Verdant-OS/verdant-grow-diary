@@ -14,7 +14,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -25,16 +25,18 @@ import {
 
 // --- Pure rules ------------------------------------------------------------
 describe("parseDailyCheckMethodHint", () => {
-  it("parses 'note' and 'sensor' (case-insensitive)", () => {
+  it("parses 'note', 'sensor', 'watering', and 'photo' (case-insensitive)", () => {
     expect(parseDailyCheckMethodHint("note")).toBe("note");
     expect(parseDailyCheckMethodHint("Sensor")).toBe("sensor");
     expect(parseDailyCheckMethodHint("  NOTE ")).toBe("note");
+    expect(parseDailyCheckMethodHint("watering")).toBe("watering");
+    expect(parseDailyCheckMethodHint("Photo")).toBe("photo");
   });
   it("returns null for unknown, empty, or missing values", () => {
     expect(parseDailyCheckMethodHint(null)).toBeNull();
     expect(parseDailyCheckMethodHint(undefined)).toBeNull();
     expect(parseDailyCheckMethodHint("")).toBeNull();
-    expect(parseDailyCheckMethodHint("photo")).toBeNull();
+    expect(parseDailyCheckMethodHint("bogus")).toBeNull();
     expect(parseDailyCheckMethodHint("both")).toBeNull();
   });
 });
@@ -58,6 +60,22 @@ describe("buildDailyCheckEntryHref", () => {
         method: "sensor",
       }),
     ).toBe("/daily-check?plantId=p1&from=dashboard&method=sensor");
+    expect(
+      buildDailyCheckEntryHref({
+        plantId: "p1",
+        growId: "g1",
+        source: "dashboard",
+        method: "watering",
+      }),
+    ).toBe("/daily-check?plantId=p1&from=dashboard&method=watering&growId=g1");
+    expect(
+      buildDailyCheckEntryHref({
+        plantId: "p1",
+        growId: "g1",
+        source: "dashboard",
+        method: "photo",
+      }),
+    ).toBe("/daily-check?plantId=p1&from=dashboard&method=photo&growId=g1");
   });
 });
 
@@ -231,8 +249,38 @@ describe("DailyCheck · ?method= handling", () => {
     expect(ql.getAttribute("data-open")).toBe("0");
   });
 
+  it("method=photo opens QuickLog and selects Photo on All activity types", async () => {
+    renderRoute("/daily-check?plantId=p1&from=dashboard&method=photo&growId=g1");
+    const choose = await screen.findByTestId("daily-grow-check-choose");
+    expect(choose.getAttribute("data-method-hint")).toBe("photo");
+    const ql = await screen.findByTestId("mock-quicklog");
+    expect(ql.getAttribute("data-open")).toBe("1");
+    const photo = await screen.findByTestId("daily-check-all-activities-picker-photo");
+    await waitFor(() => expect(photo.getAttribute("aria-pressed")).toBe("true"));
+    expect(
+      (await screen.findByTestId("daily-check-all-activities-form")).getAttribute(
+        "data-activity-id",
+      ),
+    ).toBe("photo");
+  });
+
+  it("method=watering opens the structured water sheet, not method=note", async () => {
+    const opened: unknown[] = [];
+    const listener = (event: Event) => opened.push((event as CustomEvent).detail);
+    window.addEventListener("verdant:open-quicklog-v2", listener);
+    renderRoute("/daily-check?plantId=p1&from=dashboard&method=watering&growId=g1");
+    const choose = await screen.findByTestId("daily-grow-check-choose");
+    expect(choose.getAttribute("data-method-hint")).toBe("watering");
+    await screen.findByTestId("daily-check-all-activities-picker-watering");
+    try {
+      await waitFor(() => expect(opened).toEqual([{ targetKey: "plant:p1", action: "water" }]));
+    } finally {
+      window.removeEventListener("verdant:open-quicklog-v2", listener);
+    }
+  });
+
   it("invalid/missing method falls back safely (no focus, no dialog)", async () => {
-    renderRoute("/daily-check?plantId=p1&from=dashboard&method=photo");
+    renderRoute("/daily-check?plantId=p1&from=dashboard&method=bogus");
     const choose = await screen.findByTestId("daily-grow-check-choose");
     expect(choose.getAttribute("data-method-hint")).toBe("");
     expect(

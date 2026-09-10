@@ -181,8 +181,12 @@ describe("buildGuidedActionChecklist", () => {
     );
     const water = items.find((i) => i.id === "cadence:water:p1");
     const photo = items.find((i) => i.id === "cadence:photo:p1");
-    expect(water?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=note&growId=grow-a");
-    expect(photo?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=note&growId=grow-a");
+    expect(water?.ctaHref).toBe(
+      "/daily-check?plantId=p1&from=dashboard&method=watering&growId=grow-a",
+    );
+    expect(photo?.ctaHref).toBe(
+      "/daily-check?plantId=p1&from=dashboard&method=photo&growId=grow-a",
+    );
     expect(items.every((i) => !i.ctaHref.startsWith("/quick-log"))).toBe(true);
   });
 
@@ -226,16 +230,16 @@ describe("buildGuidedActionChecklist", () => {
     const junkPhoto = items.find((i) => i.id === `cadence:photo:${JUNK.id}`);
 
     expect(breakWater?.ctaHref).toBe(
-      `/daily-check?plantId=${BREAK.id}&from=dashboard&method=note&growId=grow-a`,
+      `/daily-check?plantId=${BREAK.id}&from=dashboard&method=watering&growId=grow-a`,
     );
     expect(breakPhoto?.ctaHref).toBe(
-      `/daily-check?plantId=${BREAK.id}&from=dashboard&method=note&growId=grow-a`,
+      `/daily-check?plantId=${BREAK.id}&from=dashboard&method=photo&growId=grow-a`,
     );
     expect(junkWater?.ctaHref).toBe(
-      `/daily-check?plantId=${JUNK.id}&from=dashboard&method=note&growId=grow-a`,
+      `/daily-check?plantId=${JUNK.id}&from=dashboard&method=watering&growId=grow-a`,
     );
     expect(junkPhoto?.ctaHref).toBe(
-      `/daily-check?plantId=${JUNK.id}&from=dashboard&method=note&growId=grow-a`,
+      `/daily-check?plantId=${JUNK.id}&from=dashboard&method=photo&growId=grow-a`,
     );
     expect(items.every((i) => !i.ctaHref.includes("/quick-log"))).toBe(true);
   });

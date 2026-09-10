@@ -884,13 +884,23 @@ export default function Timeline() {
                 setManualSensorMeasurementEntries([]);
                 return;
               }
-              setManualSensorMeasurementEntries(
-                manualSensorReadingsToTimelineEntries(
-                  sensorResult.data as ManualSensorTimelineMetricRow[],
-                  new Date(),
-                ) as Entry[],
+              let receipts = manualSensorReadingsToTimelineEntries(
+                sensorResult.data as ManualSensorTimelineMetricRow[],
+                new Date(),
               );
+              if (timelineDateRangeBounds.startIso) {
+                receipts = receipts.filter(
+                  (row) => row.entry_at >= timelineDateRangeBounds.startIso!,
+                );
+              }
+              if (timelineDateRangeBounds.endIso) {
+                receipts = receipts.filter(
+                  (row) => row.entry_at <= timelineDateRangeBounds.endIso!,
+                );
+              }
+              setManualSensorMeasurementEntries(receipts as Entry[]);
             } catch {
+              if (!isCurrentRequest()) return;
               markPartial("manual_sensor_readings");
               setManualSensorMeasurementEntries([]);
             }
@@ -1253,29 +1263,31 @@ export default function Timeline() {
   // shape so the existing RecentQuickLogActivityPanel normalizer
   // continues to see the same fields it always has.
   const recentLaneRawEntries = useMemo(() => {
-    const diaryInputs = displayEntries.map((e) => {
-      const details = (e.details ?? null) as Record<string, unknown> | null;
-      const grow_event_id =
-        details && typeof details["grow_event_id"] === "string"
-          ? (details["grow_event_id"] as string)
-          : null;
-      const linked_grow_event_id =
-        details && typeof details["linked_grow_event_id"] === "string"
-          ? (details["linked_grow_event_id"] as string)
-          : null;
-      return {
-        id: e.id,
-        entry_at: e.entry_at,
-        plant_id: e.plant_id,
-        tent_id: e.tent_id,
-        stage: resolveTimelineDiaryEntryStage(e),
-        note: e.note,
-        photo_url: e.photo_url,
-        details,
-        grow_event_id,
-        linked_grow_event_id,
-      };
-    });
+    const diaryInputs = displayEntries
+      .filter((e) => !isTimelineSensorDerivedDiaryId(e.id))
+      .map((e) => {
+        const details = (e.details ?? null) as Record<string, unknown> | null;
+        const grow_event_id =
+          details && typeof details["grow_event_id"] === "string"
+            ? (details["grow_event_id"] as string)
+            : null;
+        const linked_grow_event_id =
+          details && typeof details["linked_grow_event_id"] === "string"
+            ? (details["linked_grow_event_id"] as string)
+            : null;
+        return {
+          id: e.id,
+          entry_at: e.entry_at,
+          plant_id: e.plant_id,
+          tent_id: e.tent_id,
+          stage: resolveTimelineDiaryEntryStage(e),
+          note: e.note,
+          photo_url: e.photo_url,
+          details,
+          grow_event_id,
+          linked_grow_event_id,
+        };
+      });
     // One confirmed Quick Log save fans out into up to three persisted rows
     // (watering/observation spine + same-instant environment sibling + diary
     // companion). Collapse that write topology before the merge so the
@@ -1914,7 +1926,9 @@ export default function Timeline() {
           data-testid="timeline-results-count"
           aria-live="polite"
         >
-          Detailed diary: showing {filtered.length} of {entriesTotal ?? entries.length}{" "}
+          Detailed diary: showing{" "}
+          {filtered.filter((e) => !isTimelineSensorDerivedDiaryId(e.id)).length} of{" "}
+          {entriesTotal ?? entries.length}{" "}
           {(entriesTotal ?? entries.length) === 1 ? "entry" : "entries"}
           {entriesTotal !== null && entriesTotal > entries.length
             ? ` (${entries.length} loaded)`

@@ -73,6 +73,24 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     );
   });
 
+  it("does not apply a stale sensor-read catch to a newer request", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /catch\s*\{[\s\S]{0,80}!isCurrentRequest\(\)[\s\S]{0,160}setManualSensorMeasurementEntries\(\[\]\)/,
+    );
+  });
+
+  it("keeps derived sensor receipts out of the recent Quick Log / calendar diary lane", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /displayEntries[\s\S]{0,80}\.filter\(\s*\(e\)\s*=>\s*!isTimelineSensorDerivedDiaryId\(\s*e\.id\s*\)/,
+    );
+  });
+
+  it("counts Detailed diary without mixing sensor receipts into entriesTotal", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /filtered\.filter\(\(e\)\s*=>\s*!isTimelineSensorDerivedDiaryId\(e\.id\)\)\.length/,
+    );
+  });
+
   it("still fetches both diary_entries and grow_events from supabase", () => {
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']diary_entries["']\s*\)/);
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']grow_events["']\s*\)/);

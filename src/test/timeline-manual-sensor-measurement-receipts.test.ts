@@ -48,6 +48,12 @@ describe("manualSensorReadingsToTimelineEntries", () => {
     });
     const snap = receipt.details.manual_sensor_snapshot as { temp_f: number };
     expect(snap.temp_f).toBeCloseTo(76, 5);
+    expect(receipt.details.sensor_snapshot).toMatchObject({
+      source: "manual",
+      rh: 58,
+    });
+    const canonical = receipt.details.sensor_snapshot as { temp_c: number };
+    expect(canonical.temp_c).toBeCloseTo(fahrenheitToCelsius(76), 5);
     expect(receipt.note).toContain("76");
     expect(receipt.note).toContain("58% RH");
     expect(isTimelineSensorDerivedDiaryId(receipt.id)).toBe(true);
@@ -62,6 +68,20 @@ describe("manualSensorReadingsToTimelineEntries", () => {
       { ...metricRow("temperature_c", tempC), source: "csv" },
     ];
     expect(manualSensorReadingsToTimelineEntries(rows, NOW)).toEqual([]);
+  });
+
+  it("excludes invalid/degraded/stale quality so they are not ordinary receipts", () => {
+    const tempC = fahrenheitToCelsius(76);
+    expect(
+      manualSensorReadingsToTimelineEntries(
+        [
+          { ...metricRow("temperature_c", tempC), quality: "invalid" },
+          { ...metricRow("humidity_pct", 58), quality: "degraded" },
+          { ...metricRow("temperature_c", tempC), quality: "stale" },
+        ],
+        NOW,
+      ),
+    ).toEqual([]);
   });
 
   it("returns [] for null, empty, and metric-less groups", () => {

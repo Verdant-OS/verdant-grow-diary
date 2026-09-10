@@ -112,7 +112,7 @@ import {
 } from "@/lib/growDiaryTimelineRules";
 import { parseDiaryPhotoDisplayReferenceFromRow } from "@/lib/diaryPhotoDisplayRules";
 import {
-  diaryEntryHasMeasurementEvidence,
+  diaryEntryBelongsInTimelineMeasurements,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
@@ -311,8 +311,9 @@ function entryKinds(e: Entry): EventFilter[] {
   const kinds: EventFilter[] = ["note"];
   if (e.photo_url) kinds.push("photo");
   // Diary measurement keys, QL environment envelopes, and tent
-  // `sensor_readings` (source=manual) projected as receipts.
-  if (diaryEntryHasMeasurementEvidence(e)) kinds.push("measurement");
+  // `sensor_readings` (source=manual) projected as receipts. Stale-drawer
+  // manuals use the same LIVE window as the evidence drawer badge.
+  if (diaryEntryBelongsInTimelineMeasurements(e, new Date())) kinds.push("measurement");
   const eventType =
     e.details && typeof (e.details as Record<string, unknown>).event_type === "string"
       ? ((e.details as Record<string, unknown>).event_type as string)

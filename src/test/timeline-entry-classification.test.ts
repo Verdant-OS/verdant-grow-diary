@@ -125,9 +125,9 @@ describe("classifyRelativeTimelineFilter delegates to shared helper", () => {
 });
 
 describe("Shared helper wiring — no duplicated classification tables", () => {
-  it("Timeline.tsx classifies Measurements via diaryEntryHasMeasurementEvidence", () => {
+  it("Timeline.tsx classifies Measurements via diaryEntryBelongsInTimelineMeasurements", () => {
     expect(TIMELINE_PAGE).toMatch(/from\s+["']@\/lib\/timelineManualSensorMeasurementRules["']/);
-    expect(TIMELINE_PAGE).toMatch(/diaryEntryHasMeasurementEvidence/);
+    expect(TIMELINE_PAGE).toMatch(/diaryEntryBelongsInTimelineMeasurements/);
     expect(TIMELINE_PAGE).toMatch(/manualSensorReadingsToTimelineEntries/);
   });
 

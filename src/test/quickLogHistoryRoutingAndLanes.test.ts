@@ -289,8 +289,8 @@ describe("Logs page wiring (Timeline.tsx)", () => {
     expect(aqIdx).toBeGreaterThan(recentIdx);
   });
 
-  it("measurement filter uses diaryEntryHasMeasurementEvidence (keys, event types, handheld notes)", () => {
-    expect(TIMELINE).toMatch(/diaryEntryHasMeasurementEvidence\(e\)/);
+  it("measurement filter uses diaryEntryBelongsInTimelineMeasurements (stale-drawer manuals excluded)", () => {
+    expect(TIMELINE).toMatch(/diaryEntryBelongsInTimelineMeasurements\(e,/);
   });
 
   it("dedupes recent Quick Log companion rows in pure rules", () => {

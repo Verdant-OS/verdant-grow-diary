@@ -88,6 +88,135 @@ export function isTimelineManualSensorReceiptFresh(capturedAt: string, now: Date
   return now.getTime() - capturedMs <= LIVE_CURRENT_STATE_STALE_MS;
 }
 
+const NON_SENSOR_MEASUREMENT_DETAIL_KEYS: ReadonlySet<string> = new Set([
+  "ph",
+  "ec",
+  "runoff",
+  "watering",
+]);
+
+function asDetailRecord(
+  details: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+  return details;
+}
+
+function readDrawerSensorSnapshotObject(
+  details: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!details) return null;
+  // Same keys as timelineEvidenceDetailViewModel.readSensor — that is
+  // the object the drawer uses for the "Stale snapshot" badge.
+  for (const key of ["sensor_snapshot", "sensor"] as const) {
+    const raw = details[key];
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      return raw as Record<string, unknown>;
+    }
+  }
+  return null;
+}
+
+function readTimelineSensorSnapshotObject(
+  details: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const drawerSnap = readDrawerSensorSnapshotObject(details);
+  if (drawerSnap) return drawerSnap;
+  if (!details) return null;
+  const raw = details.manual_sensor_snapshot;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  return null;
+}
+
+function snapshotCapturedAtIso(
+  entry: { entry_at?: string | null },
+  snap: Record<string, unknown> | null,
+): string | null {
+  for (const value of [snap?.ts, snap?.captured_at, entry.entry_at]) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function snapshotSourceKind(
+  details: Record<string, unknown> | null,
+  snap: Record<string, unknown> | null,
+): string {
+  const raw = snap?.source ?? details?.source;
+  return typeof raw === "string" ? raw.trim().toLowerCase() : "";
+}
+
+/**
+ * Same age rule as the evidence drawer "Stale snapshot" badge
+ * (`timelineEvidenceDetailViewModel` / `LIVE_CURRENT_STATE_STALE_MS`).
+ * Missing capture time is stale — never guessed fresh.
+ */
+export function timelineEntryWouldBadgeStaleSnapshot(
+  entry: {
+    entry_at?: string | null;
+    details?: Record<string, unknown> | null;
+  },
+  now: Date,
+): boolean {
+  const details = asDetailRecord(entry.details ?? null);
+  const snap = readDrawerSensorSnapshotObject(details);
+  if (!snap) return false;
+  const capturedAt = snapshotCapturedAtIso(entry, snap);
+  if (!capturedAt) return true;
+  return !isTimelineManualSensorReceiptFresh(capturedAt, now);
+}
+
+function hasNonSensorMeasurementDetails(details: Record<string, unknown> | null): boolean {
+  if (!details) return false;
+  return Object.keys(details).some((key) => NON_SENSOR_MEASUREMENT_DETAIL_KEYS.has(key));
+}
+
+/**
+ * Manual sensor snapshot rows (projected receipts or diary-shaped copies).
+ * Watering / pH / EC / runoff keys stay ordinary Measurements even when an
+ * attached snapshot is stale.
+ */
+export function isTimelineManualSensorMeasurementRow(entry: {
+  id?: string | null;
+  details?: Record<string, unknown> | null;
+}): boolean {
+  if (isTimelineSensorDerivedDiaryId(entry.id)) return true;
+  const details = asDetailRecord(entry.details ?? null);
+  if (hasNonSensorMeasurementDetails(details)) return false;
+  const snap = readTimelineSensorSnapshotObject(details);
+  const source = snapshotSourceKind(details, snap);
+  if (source === "live" || source === "csv" || source === "demo") return false;
+  if (snap) return source === "" || source === "manual";
+  const eventType =
+    typeof details?.event_type === "string" ? details.event_type.toLowerCase().trim() : "";
+  return MEASUREMENT_EVENT_TYPES.has(eventType);
+}
+
+/**
+ * Grow Timeline Measurements membership. Evidence alone is not enough:
+ * manuals the drawer would badge "Stale snapshot" must not appear there.
+ */
+export function diaryEntryBelongsInTimelineMeasurements(
+  entry: {
+    id?: string | null;
+    details?: Record<string, unknown> | null;
+    note?: string | null;
+    entry_at?: string | null;
+  },
+  now: Date = new Date(),
+): boolean {
+  if (!diaryEntryHasMeasurementEvidence(entry)) return false;
+  if (
+    isTimelineManualSensorMeasurementRow(entry) &&
+    timelineEntryWouldBadgeStaleSnapshot(entry, now)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function toSensorReadingRow(row: ManualSensorTimelineMetricRow): SensorReadingRow | null {
   const valueNum = typeof row.value === "number" ? row.value : Number(row.value);
   if (!Number.isFinite(valueNum) || !row.tent_id || !row.ts) return null;
@@ -170,7 +299,7 @@ export function manualSensorReadingsToTimelineEntries(
     if (humidityPct !== null) sensorSnapshot.rh = humidityPct;
     if (vpdKpa !== null) sensorSnapshot.vpd_kpa = vpdKpa;
 
-    receipts.push({
+    const receipt: TimelineManualSensorReceipt = {
       id: `${TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX}${reading.tentId}:${capturedAt}`,
       note: buildReceiptNote({ tempF, humidityPct, vpdKpa }),
       photo_url: null,
@@ -185,7 +314,10 @@ export function manualSensorReadingsToTimelineEntries(
       entry_at: capturedAt,
       plant_id: null,
       tent_id: reading.tentId,
-    });
+    };
+    // Re-check the built snapshot ts the drawer reads, not only grouped status.
+    if (!diaryEntryBelongsInTimelineMeasurements(receipt, now)) continue;
+    receipts.push(receipt);
   }
 
   return receipts.sort((a, b) => {

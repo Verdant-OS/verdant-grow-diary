@@ -166,6 +166,63 @@ describe("manualSensorReadingsToTimelineEntries", () => {
     expect(diaryEntryBelongsInTimelineMeasurements(pin1Sibling, now)).toBe(false);
   });
 
+  it("excludes Golden Toad Pin1 live QL persist shape (manual_sensor_snapshot, no ts, no sensor_snapshot)", () => {
+    const capturedAt = "2026-09-10T00:37:25.988+00:00";
+    const now = new Date("2026-09-10T05:01:00.000Z");
+    const livePairs = [
+      [72, 56],
+      [73, 57],
+      [74, 55],
+      [76, 58],
+      [75, 60],
+    ] as const;
+    for (const [tempF, rh] of livePairs) {
+      const liveRow = {
+        id: `toad-pin1-live-${tempF}-${rh}`,
+        note: `Manual sensor snapshot: ${tempF}°F, ${rh}% RH`,
+        entry_at: capturedAt,
+        details: {
+          event_type: "quick_log",
+          plant_id: "4cad3cae-plant",
+          tent_id: TENT,
+          manual_sensor_snapshot: {
+            temp_f: tempF,
+            humidity_percent: rh,
+            ph: null,
+            ec: null,
+            source: "manual",
+          },
+        },
+      };
+      expect(diaryEntryHasMeasurementEvidence(liveRow)).toBe(true);
+      expect(diaryEntryBelongsInTimelineMeasurements(liveRow, now)).toBe(false);
+    }
+  });
+
+  it("excludes a QL v2 companion snap that stores captured_at instead of ts", () => {
+    const capturedAt = "2026-09-10T00:37:25.988+00:00";
+    const now = new Date("2026-09-10T05:01:00.000Z");
+    expect(
+      diaryEntryBelongsInTimelineMeasurements(
+        {
+          id: "toad-pin1-captured-at-only",
+          note: "Manual sensor snapshot: 72°F, 56% RH",
+          entry_at: capturedAt,
+          details: {
+            event_type: "environment_check",
+            source: "manual",
+            sensor_snapshot: {
+              source: "manual",
+              captured_at: capturedAt,
+              metrics: { temp_c: fahrenheitToCelsius(72), rh: 56 },
+            },
+          },
+        },
+        now,
+      ),
+    ).toBe(false);
+  });
+
   it("still includes a quality-ok manual inside the Stale snapshot window", () => {
     const tempC = fahrenheitToCelsius(72);
     expect(isTimelineManualSensorReceiptFresh(CAPTURED, NOW)).toBe(true);
@@ -190,6 +247,27 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         NOW,
       ),
     ).toBe(true);
+    expect(
+      diaryEntryBelongsInTimelineMeasurements(
+        {
+          id: "fresh-ql-persist-manual",
+          note: "Manual sensor snapshot: 72°F, 56% RH",
+          entry_at: CAPTURED,
+          details: {
+            event_type: "quick_log",
+            tent_id: TENT,
+            manual_sensor_snapshot: {
+              temp_f: 72,
+              humidity_percent: 56,
+              ph: null,
+              ec: null,
+              source: "manual",
+            },
+          },
+        },
+        NOW,
+      ),
+    ).toBe(true);
   });
 
   it("keeps watering Measurements when an attached manual snapshot is stale", () => {
@@ -205,6 +283,27 @@ describe("manualSensorReadingsToTimelineEntries", () => {
             event_type: "watering",
             watering: { volume_ml: 100 },
             sensor_snapshot: { source: "manual", ts: capturedAt, temp_c: 22.2, rh: 56 },
+          },
+        },
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      diaryEntryBelongsInTimelineMeasurements(
+        {
+          id: "watering-with-stale-ql-envelope",
+          note: "watered",
+          entry_at: capturedAt,
+          details: {
+            event_type: "watering",
+            watering: { volume_ml: 100 },
+            manual_sensor_snapshot: {
+              temp_f: 72,
+              humidity_percent: 56,
+              ph: null,
+              ec: null,
+              source: "manual",
+            },
           },
         },
         now,

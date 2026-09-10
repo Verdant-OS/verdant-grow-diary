@@ -149,8 +149,13 @@ function snapshotSourceKind(
 }
 
 /**
- * Same age rule as the evidence drawer "Stale snapshot" badge
- * (`timelineEvidenceDetailViewModel` / `LIVE_CURRENT_STATE_STALE_MS`).
+ * Same age rule as Timeline list cards (`sensor_snapshot` / `sensor` /
+ * `manual_sensor_snapshot`, then `ts` / `captured_at` / `entry_at`) and
+ * the evidence drawer "Stale snapshot" badge (`LIVE_CURRENT_STATE_STALE_MS`).
+ *
+ * Quick Log persist shape is `details.manual_sensor_snapshot` with no
+ * `ts` — the list ages those rows off `entry_at`. Membership must use that
+ * same object, not only the drawer's `sensor_snapshot`/`sensor` keys.
  * Missing capture time is stale — never guessed fresh.
  */
 export function timelineEntryWouldBadgeStaleSnapshot(
@@ -161,7 +166,7 @@ export function timelineEntryWouldBadgeStaleSnapshot(
   now: Date,
 ): boolean {
   const details = asDetailRecord(entry.details ?? null);
-  const snap = readDrawerSensorSnapshotObject(details);
+  const snap = readTimelineSensorSnapshotObject(details);
   if (!snap) return false;
   const capturedAt = snapshotCapturedAtIso(entry, snap);
   if (!capturedAt) return true;

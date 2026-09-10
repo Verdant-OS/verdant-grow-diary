@@ -257,6 +257,7 @@ export default function PlantDetail() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const contextTentId = searchParams.get("tentId");
+  const contextGrowId = searchParams.get("growId");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const { data: tent } = useGrowTent(plant?.tentId);
   const { openGroups, setGroupOpen, revealAndNavigate } = usePlantDetailDisclosureNavigation({
@@ -319,6 +320,7 @@ export default function PlantDetail() {
     loadState,
     plant: plant ?? null,
     contextTentId,
+    contextGrowId,
   });
 
   if (loadState === "loading") {

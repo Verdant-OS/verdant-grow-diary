@@ -316,6 +316,37 @@ describe("AI Doctor current sensor evidence classification", () => {
     expect(selected.reason).not.toBe("none_inserted");
   });
 
+  it("keeps a 16-minute-old valid tent manual usable under the 24h manual window", () => {
+    const capturedAt = "2026-07-17T11:44:00.000Z";
+    const rows = [
+      row("temperature_c", 24, "manual", capturedAt, "temp"),
+      row("humidity_pct", 55, "manual", capturedAt, "rh"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(snapshot?.readings.length).toBeGreaterThan(0);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+  });
+
+  it("marks a 25-hour-old tent manual stale", () => {
+    const capturedAt = "2026-07-16T11:00:00.000Z";
+    const rows = [
+      row("temperature_c", 24, "manual", capturedAt, "temp"),
+      row("humidity_pct", 55, "manual", capturedAt, "rh"),
+    ];
+    expect(buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW })?.annotation.stale).toBe(true);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("stale");
+  });
+
+  it("still marks a 16-minute-old live snapshot stale", () => {
+    const capturedAt = "2026-07-17T11:44:00.000Z";
+    expect(
+      classifyAiDoctorCurrentSensorEvidence([row("temperature_c", 24, "live", capturedAt)], {
+        now: NOW,
+      }).status,
+    ).toBe("stale");
+  });
+
   it("does not treat a usable manual snapshot as live-bridge presence", () => {
     expect(
       currentSensorEvidenceIsFreshLive([row("temperature_c", 25, "manual")], { now: NOW }),

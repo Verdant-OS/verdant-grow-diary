@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import {
+  diaryEntryBelongsInTimelineMeasurements,
   diaryEntryHasMeasurementEvidence,
   isTimelineManualSensorPersistedQualityUsable,
   isTimelineManualSensorReceiptFresh,
@@ -45,7 +46,9 @@ describe("manualSensorReadingsToTimelineEntries", () => {
     const tempC = fahrenheitToCelsius(76);
     const rows = [metricRow("temperature_c", tempC), metricRow("humidity_pct", 58)];
     const receipts = manualSensorReadingsToTimelineEntries(rows, NOW);
-    const measurements = receipts.filter((entry) => diaryEntryHasMeasurementEvidence(entry));
+    const measurements = receipts.filter((entry) =>
+      diaryEntryBelongsInTimelineMeasurements(entry, NOW),
+    );
 
     expect(measurements).toHaveLength(1);
     const receipt = measurements[0];
@@ -113,6 +116,56 @@ describe("manualSensorReadingsToTimelineEntries", () => {
     ).toEqual([]);
   });
 
+  it("excludes a diary-shaped Pin 1 row from Measurements even when evidence keys still match", () => {
+    const capturedAt = "2026-09-10T00:37:25.988+00:00";
+    const now = new Date("2026-09-10T05:01:00.000Z");
+    const pin1Diary = {
+      id: "7c2f0e1a-4b33-4d91-9c0e-stale-manual-pin1",
+      note: "Manual sensor snapshot: 72°F, 56% RH",
+      entry_at: capturedAt,
+      details: {
+        event_type: "measurement",
+        source: "manual",
+        sensor_snapshot: {
+          source: "manual",
+          ts: capturedAt,
+          temp_c: fahrenheitToCelsius(72),
+          rh: 56,
+        },
+        manual_sensor_snapshot: {
+          source: "manual",
+          ts: capturedAt,
+          temp_f: 72,
+          humidity_percent: 56,
+        },
+      },
+    };
+    expect(diaryEntryHasMeasurementEvidence(pin1Diary)).toBe(true);
+    expect(diaryEntryBelongsInTimelineMeasurements(pin1Diary, now)).toBe(false);
+
+    const pin1Sibling = {
+      ...pin1Diary,
+      id: "8d3f1f2b-5c44-4e02-8d1f-stale-manual-pin1b",
+      note: "Manual sensor snapshot: 73°F, 57% RH",
+      details: {
+        ...pin1Diary.details,
+        sensor_snapshot: {
+          source: "manual",
+          ts: capturedAt,
+          temp_c: fahrenheitToCelsius(73),
+          rh: 57,
+        },
+        manual_sensor_snapshot: {
+          source: "manual",
+          ts: capturedAt,
+          temp_f: 73,
+          humidity_percent: 57,
+        },
+      },
+    };
+    expect(diaryEntryBelongsInTimelineMeasurements(pin1Sibling, now)).toBe(false);
+  });
+
   it("still includes a quality-ok manual inside the Stale snapshot window", () => {
     const tempC = fahrenheitToCelsius(72);
     expect(isTimelineManualSensorReceiptFresh(CAPTURED, NOW)).toBe(true);
@@ -122,6 +175,41 @@ describe("manualSensorReadingsToTimelineEntries", () => {
         NOW,
       ),
     ).toHaveLength(1);
+    expect(
+      diaryEntryBelongsInTimelineMeasurements(
+        {
+          id: `${TIMELINE_MANUAL_SENSOR_RECEIPT_ID_PREFIX}${TENT}:${CAPTURED}`,
+          note: "Manual sensor snapshot: 72°F, 56% RH",
+          entry_at: CAPTURED,
+          details: {
+            event_type: "measurement",
+            source: "manual",
+            sensor_snapshot: { source: "manual", ts: CAPTURED, temp_c: tempC, rh: 56 },
+          },
+        },
+        NOW,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps watering Measurements when an attached manual snapshot is stale", () => {
+    const capturedAt = "2026-09-10T00:37:25.988+00:00";
+    const now = new Date("2026-09-10T05:01:00.000Z");
+    expect(
+      diaryEntryBelongsInTimelineMeasurements(
+        {
+          id: "watering-with-stale-snap",
+          note: "watered",
+          entry_at: capturedAt,
+          details: {
+            event_type: "watering",
+            watering: { volume_ml: 100 },
+            sensor_snapshot: { source: "manual", ts: capturedAt, temp_c: 22.2, rh: 56 },
+          },
+        },
+        now,
+      ),
+    ).toBe(true);
   });
 
   it("returns [] for null, empty, and metric-less groups", () => {
@@ -188,7 +276,9 @@ describe("mergeTimelineMeasurementDisplayEntries", () => {
       NOW,
     );
     const merged = mergeTimelineMeasurementDisplayEntries(diary, sensor);
-    const measurements = merged.filter((entry) => diaryEntryHasMeasurementEvidence(entry));
+    const measurements = merged.filter((entry) =>
+      diaryEntryBelongsInTimelineMeasurements(entry, NOW),
+    );
     expect(measurements.map((row) => row.id)).toEqual([sensor[0].id, "diary-old"]);
   });
 });

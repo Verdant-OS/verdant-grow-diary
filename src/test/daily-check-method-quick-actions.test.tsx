@@ -20,7 +20,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import {
   buildDailyCheckEntryHref,
+  isQuickLogDailyCheckMethodHint,
   parseDailyCheckMethodHint,
+  searchParamsFromCompatLocation,
 } from "@/lib/dailyCheckPostSubmitRules";
 
 // --- Pure rules ------------------------------------------------------------
@@ -38,6 +40,46 @@ describe("parseDailyCheckMethodHint", () => {
     expect(parseDailyCheckMethodHint("")).toBeNull();
     expect(parseDailyCheckMethodHint("bogus")).toBeNull();
     expect(parseDailyCheckMethodHint("both")).toBeNull();
+  });
+});
+
+describe("searchParamsFromCompatLocation", () => {
+  it("reads method from loc.search when the query is split correctly", () => {
+    const params = searchParamsFromCompatLocation({
+      pathname: "/daily-check",
+      search: "?plantId=p1&from=dashboard&method=watering&growId=g1",
+    });
+    expect(params.get("method")).toBe("watering");
+    expect(params.get("growId")).toBe("g1");
+  });
+
+  it("reads method from a query embedded in pathname (TanStack Link constraint)", () => {
+    const params = searchParamsFromCompatLocation({
+      pathname: "/daily-check?plantId=p1&from=dashboard&method=photo&growId=g1",
+      search: "",
+    });
+    expect(params.get("method")).toBe("photo");
+    expect(params.get("plantId")).toBe("p1");
+    expect(params.get("growId")).toBe("g1");
+  });
+
+  it("lets loc.search override a duplicate key from the pathname query", () => {
+    const params = searchParamsFromCompatLocation({
+      pathname: "/daily-check?method=note&growId=g1",
+      search: "?method=watering",
+    });
+    expect(params.get("method")).toBe("watering");
+    expect(params.get("growId")).toBe("g1");
+  });
+});
+
+describe("isQuickLogDailyCheckMethodHint", () => {
+  it("opens the note dialog only for method=note, not watering or photo", () => {
+    expect(isQuickLogDailyCheckMethodHint("note")).toBe(true);
+    expect(isQuickLogDailyCheckMethodHint("photo")).toBe(false);
+    expect(isQuickLogDailyCheckMethodHint("watering")).toBe(false);
+    expect(isQuickLogDailyCheckMethodHint("sensor")).toBe(false);
+    expect(isQuickLogDailyCheckMethodHint(null)).toBe(false);
   });
 });
 
@@ -97,11 +139,16 @@ vi.mock("@/hooks/useGrowData", () => ({
       { id: "p1", name: "Sour D", tentId: "t1", growId: "g1", isArchived: false, lastNote: "" },
       { id: "p2", name: "Blue Dream", tentId: "t1", growId: "g1", isArchived: false, lastNote: "" },
     ],
+    isLoading: false,
   }),
-  useGrowTents: () => ({ data: [{ id: "t1", name: "Tent A" }] }),
+  useGrowTents: () => ({ data: [{ id: "t1", name: "Tent A" }], isLoading: false }),
+}));
+vi.mock("@/hooks/useAlertsList", () => ({
+  useAlertsList: () => ({ status: "ok", alerts: [], error: null, reload: () => {} }),
 }));
 
 import DashboardDailyGrowCheckPanel from "@/components/DashboardDailyGrowCheckPanel";
+import GuidedActionChecklistPanel from "@/components/GuidedActionChecklistPanel";
 
 function renderPanel() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -149,6 +196,37 @@ describe("Dashboard panel · quick method actions", () => {
     expect(
       within(checked).queryByTestId("dashboard-daily-grow-check-panel-row-actions"),
     ).toBeNull();
+  });
+});
+
+describe("GuidedActionChecklistPanel · rendered watering/photo hrefs (pins A/B)", () => {
+  function renderChecklist() {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <GuidedActionChecklistPanel scopedGrowId="g1" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("Log the next watering CTA href carries method=watering and growId", async () => {
+    renderChecklist();
+    const link = await screen.findByTestId("guided-action-checklist-cta-cadence:water:p2");
+    expect(link.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=watering&growId=g1",
+    );
+    expect(link.getAttribute("href")).not.toMatch(/method=note/);
+  });
+
+  it("Capture a fresh photo CTA href carries method=photo and growId", async () => {
+    renderChecklist();
+    const link = await screen.findByTestId("guided-action-checklist-cta-cadence:photo:p2");
+    expect(link.getAttribute("href")).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=photo&growId=g1",
+    );
+    expect(link.getAttribute("href")).not.toMatch(/method=note/);
   });
 });
 
@@ -249,12 +327,17 @@ describe("DailyCheck · ?method= handling", () => {
     expect(ql.getAttribute("data-open")).toBe("0");
   });
 
-  it("method=photo opens QuickLog and selects Photo on All activity types", async () => {
+  it("method=photo selects Photo QL and does not open the note Quick Log dialog", async () => {
     renderRoute("/daily-check?plantId=p1&from=dashboard&method=photo&growId=g1");
     const choose = await screen.findByTestId("daily-grow-check-choose");
     expect(choose.getAttribute("data-method-hint")).toBe("photo");
+    expect(
+      within(choose)
+        .getByTestId("daily-grow-check-choose-quicklog")
+        .getAttribute("data-method-focused"),
+    ).toBe("0");
     const ql = await screen.findByTestId("mock-quicklog");
-    expect(ql.getAttribute("data-open")).toBe("1");
+    expect(ql.getAttribute("data-open")).toBe("0");
     const photo = await screen.findByTestId("daily-check-all-activities-picker-photo");
     await waitFor(() => expect(photo.getAttribute("aria-pressed")).toBe("true"));
     expect(
@@ -272,6 +355,7 @@ describe("DailyCheck · ?method= handling", () => {
     const choose = await screen.findByTestId("daily-grow-check-choose");
     expect(choose.getAttribute("data-method-hint")).toBe("watering");
     await screen.findByTestId("daily-check-all-activities-picker-watering");
+    expect(screen.getByTestId("mock-quicklog").getAttribute("data-open")).toBe("0");
     try {
       await waitFor(() => expect(opened).toEqual([{ targetKey: "plant:p1", action: "water" }]));
     } finally {
@@ -356,6 +440,11 @@ describe("safety scans", () => {
     expect(page).not.toMatch(/methodHint[\s\S]{0,200}\.insert\(/);
     expect(page).not.toMatch(/methodHint[\s\S]{0,200}dispatchEvent/);
     expect(page).not.toMatch(/setLastSubmittedAt\(.*methodHint/);
+  });
+
+  it("DailyCheck reads method from search + query-in-pathname", () => {
+    const page = readSrc("pages/DailyCheck.tsx");
+    expect(page).toMatch(/searchParamsFromCompatLocation\(loc\)/);
   });
 
   it("Dashboard does not fabricate a local 'checked today' state", () => {

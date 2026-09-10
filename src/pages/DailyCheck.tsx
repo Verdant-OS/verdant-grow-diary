@@ -94,6 +94,7 @@ import {
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
   parseDailyCheckMethodHint,
+  searchParamsFromCompatLocation,
   isQuickLogDailyCheckMethodHint,
   dailyCheckMethodToActivityId,
   resolveDailyCheckPostSubmitHref,
@@ -124,7 +125,7 @@ import {
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();
-  return useMemo(() => new URLSearchParams(loc.search).get(name), [loc.search, name]);
+  return useMemo(() => searchParamsFromCompatLocation(loc).get(name), [loc, name]);
 }
 
 function resolveCompatibleAssignedTentId(

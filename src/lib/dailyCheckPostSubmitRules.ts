@@ -47,14 +47,19 @@ export function parseDailyCheckEntrySource(
 
 /**
  * Recognized values for `?method=` quick-action hint. Pure UX prioritization
- * hint; the Daily Check page uses it only to focus the matching option.
- * Unknown / missing values resolve to `null` so the page falls back to
- * the existing default selector. The page never auto-submits based on
- * this hint and never silently picks a tent.
+ * hint; the Daily Check page uses it to focus the matching option and to
+ * select watering/photo activity editors. Unknown / missing values resolve
+ * to `null` so the page falls back to the existing default selector. The page
+ * never auto-submits based on this hint and never silently picks a tent.
  */
-export type DailyCheckMethodHint = "note" | "sensor";
+export type DailyCheckMethodHint = "note" | "sensor" | "watering" | "photo";
 
-const ALLOWED_METHODS: ReadonlyArray<DailyCheckMethodHint> = ["note", "sensor"];
+const ALLOWED_METHODS: ReadonlyArray<DailyCheckMethodHint> = [
+  "note",
+  "sensor",
+  "watering",
+  "photo",
+];
 
 export function parseDailyCheckMethodHint(
   raw: string | null | undefined,
@@ -64,6 +69,21 @@ export function parseDailyCheckMethodHint(
   return (ALLOWED_METHODS as ReadonlyArray<string>).includes(v)
     ? (v as DailyCheckMethodHint)
     : null;
+}
+
+/** Diary methods that open the plant Quick Log dialog (not sensor snapshot, not V2 water). */
+export function isQuickLogDailyCheckMethodHint(
+  hint: DailyCheckMethodHint | null | undefined,
+): hint is "note" | "photo" {
+  return hint === "note" || hint === "photo";
+}
+
+/** Map a diary method hint onto the All-activity editor, when one applies. */
+export function dailyCheckMethodToActivityId(
+  hint: DailyCheckMethodHint | null | undefined,
+): "watering" | "photo" | null {
+  if (hint === "watering" || hint === "photo") return hint;
+  return null;
 }
 
 /**

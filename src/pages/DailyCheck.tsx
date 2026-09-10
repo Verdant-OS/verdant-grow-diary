@@ -94,6 +94,8 @@ import {
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
   parseDailyCheckMethodHint,
+  isQuickLogDailyCheckMethodHint,
+  dailyCheckMethodToActivityId,
   resolveDailyCheckPostSubmitHref,
 } from "@/lib/dailyCheckPostSubmitRules";
 import { toast } from "sonner";
@@ -223,11 +225,12 @@ export default function DailyCheck() {
     ],
   );
   const routeStep: DailyGrowCheckStep =
-    methodHint === "note" && routePlant
+    isQuickLogDailyCheckMethodHint(methodHint) && routePlant
       ? "quicklog"
       : methodHint === "sensor" && routePlant && routeTentId
         ? "manual"
         : "select";
+  const requestedActivityId = dailyCheckMethodToActivityId(methodHint);
   const routeIdentityPending = appliedRouteIdentity !== routeIdentity;
   const renderedPlantId = routeIdentityPending ? routePlantId : plantId;
 
@@ -592,6 +595,7 @@ export default function DailyCheck() {
           plantId={activityTarget.plantId}
           plantStage={(selectedPlant as { stage?: unknown } | null)?.stage ?? null}
           testIdPrefix="daily-check-all-activities"
+          requestedActivityId={requestedActivityId}
           // D5: Daily Check is a real plant-scoped save surface. Without this
           // the remembered target goes stale here, so an unscoped Quick Log
           // would offer an OLDER plant than the one just logged. Only a save
@@ -851,11 +855,11 @@ export default function DailyCheck() {
                 <Button
                   variant="outline"
                   className={`h-auto min-h-11 w-full min-w-0 flex-col items-start gap-1 whitespace-normal py-3 text-left ${
-                    methodHint === "note" ? "ring-2 ring-primary" : ""
+                    isQuickLogDailyCheckMethodHint(methodHint) ? "ring-2 ring-primary" : ""
                   }`}
                   data-testid="daily-grow-check-choose-quicklog"
-                  data-method-focused={methodHint === "note" ? "1" : "0"}
-                  aria-pressed={methodHint === "note"}
+                  data-method-focused={isQuickLogDailyCheckMethodHint(methodHint) ? "1" : "0"}
+                  aria-pressed={isQuickLogDailyCheckMethodHint(methodHint)}
                   disabled={!selectedPlant}
                   onClick={openSelectedPlantQuickLog}
                 >
@@ -1328,6 +1332,7 @@ export default function DailyCheck() {
               plantId: selectedPlant?.id ?? null,
               growId,
               tentId: effectiveTentId || null,
+              activityId: requestedActivityId,
             }}
           />
         </>

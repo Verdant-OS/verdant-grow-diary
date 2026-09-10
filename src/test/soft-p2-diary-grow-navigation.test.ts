@@ -56,9 +56,9 @@ describe("Soft P2 weekly batch: diary navigation", () => {
     }
   });
   it.each([
-    ["A", "water"],
-    ["B", "photo"],
-  ])("%s dashboard diary %s CTA retains the same growId", (_pin, action) => {
+    ["A", "water", "watering"],
+    ["B", "photo", "photo"],
+  ])("%s dashboard diary %s CTA retains growId and method=%s", (_pin, action, method) => {
     const item = buildGuidedActionChecklist(fixture).find(
       (entry) => entry.id === `cadence:${action}:${PLANT}`,
     )!;
@@ -67,6 +67,8 @@ describe("Soft P2 weekly batch: diary navigation", () => {
     expect(url.searchParams.get("plantId")).toBe(PLANT);
     expect(url.searchParams.get("from")).toBe("dashboard");
     expect(url.searchParams.get("growId")).toBe(GROW);
+    expect(url.searchParams.get("method")).toBe(method);
+    expect(url.searchParams.get("method")).not.toBe("note");
   });
 
   it("preserves existing entry and return contracts when no growId was supplied", () => {

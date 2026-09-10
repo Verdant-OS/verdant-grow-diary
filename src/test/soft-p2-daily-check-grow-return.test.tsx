@@ -71,6 +71,33 @@ function renderRoute(source = "dashboard") {
 }
 
 describe("Soft P2 weekly batch: Daily Check return", () => {
+  it("D cancel/back keeps growId when the watering diary CTA query is already correct", async () => {
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter
+          initialEntries={[
+            `/daily-check?plantId=${PLANT}&from=dashboard&method=watering&growId=${GROW}`,
+          ]}
+        >
+          <DailyCheck />
+          <WaterSheetHost />
+          <Probe />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const before = screen.getByTestId("destination").textContent!;
+    const urlBefore = new URL(before, "https://fixture.invalid");
+    expect(urlBefore.searchParams.get("growId")).toBe(GROW);
+    expect(urlBefore.searchParams.get("method")).toBe("watering");
+    await screen.findByTestId("daily-check-all-activities-picker-watering");
+    expect(screen.getByTestId("destination").textContent).toBe(before);
+    await act(async () => fireEvent.click(screen.getByRole("link", { name: "Dashboard" })));
+    const url = new URL(screen.getByTestId("destination").textContent!, "https://fixture.invalid");
+    expect(url.searchParams.get("growId")).toBe(GROW);
+  });
+
   it("D watering page back link retains the originating grow instead of the active grow", async () => {
     renderRoute();
     const openWater = vi.fn();

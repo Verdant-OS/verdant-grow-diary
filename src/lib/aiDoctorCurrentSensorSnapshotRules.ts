@@ -19,6 +19,7 @@ import {
   type AiSensorSnapshotSource,
   type AiSensorSnapshotTrust,
 } from "@/lib/aiSensorSnapshotContextRules";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import {
   classifyFreshness,
   evaluateMetric,
@@ -216,23 +217,43 @@ function appendUnique(values: readonly string[], addition: string | null): strin
   return Array.from(new Set(addition ? [...values, addition] : values)).sort();
 }
 
-/**
- * Select the newest bounded live/manual sensor cohort and project only safe,
- * source-preserving values into the AI Doctor packet shape.
- */
-export function buildAiDoctorCurrentSensorSnapshot(
-  rows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
-  options: { now?: Date } = {},
+function snapshotIsUsableDoctorEvidence(snapshot: AiDoctorCurrentSensorSnapshot): boolean {
+  if (snapshot.severity === "invalid") return false;
+  if (snapshot.annotation.source !== "live" && snapshot.annotation.source !== "manual") {
+    return false;
+  }
+  return snapshot.annotation.stale === false && snapshot.readings.length > 0;
+}
+
+function preferAiDoctorCurrentSensorSnapshot(
+  live: AiDoctorCurrentSensorSnapshot | null,
+  manual: AiDoctorCurrentSensorSnapshot | null,
 ): AiDoctorCurrentSensorSnapshot | null {
-  const candidates = (rows ?? []).map(toCandidate).filter((row): row is Candidate => row !== null);
+  if (live && snapshotIsUsableDoctorEvidence(live)) return live;
+  if (manual && snapshotIsUsableDoctorEvidence(manual)) return manual;
+  if (!live) return manual;
+  if (!manual) return live;
+  const liveMs = Date.parse(live.capturedAt);
+  const manualMs = Date.parse(manual.capturedAt);
+  if (liveMs !== manualMs) return liveMs > manualMs ? live : manual;
+  return live;
+}
+
+/**
+ * Project one source-preserving cohort. Callers must pass candidates that
+ * already share a single source so a stale live row cannot steal the snapshot
+ * from an in-window tent manual.
+ */
+function buildAiDoctorCurrentSensorSnapshotFromCandidates(
+  candidates: Candidate[],
+  now: Date,
+): AiDoctorCurrentSensorSnapshot | null {
   if (candidates.length === 0) return null;
   candidates.sort(compareCandidates);
 
   const newest = candidates[0];
   const cohort = candidates.filter(
-    (row) =>
-      row.source === newest.source &&
-      newest.atMs - row.atMs <= AI_DOCTOR_CURRENT_SENSOR_COHERENCE_MS,
+    (row) => newest.atMs - row.atMs <= AI_DOCTOR_CURRENT_SENSOR_COHERENCE_MS,
   );
 
   // First row wins for each normalized packet field because the cohort is
@@ -266,14 +287,17 @@ export function buildAiDoctorCurrentSensorSnapshot(
 
   readings.sort((a, b) => a.field.localeCompare(b.field));
 
-  const now = options.now ?? new Date();
   const freshness = classifyFreshness(newest.atIso, now);
   const invalidSnapshot = freshness.freshness === "invalid" || readings.length === 0;
   if (invalidSnapshot) annotationInput.source = "invalid";
 
-  // Source-aware stale window (manual 24h, live 15m). Overriding with the
-  // live-only 15-minute constant parked valid tent manuals as stale.
-  const context = buildAiSensorSnapshotContext(annotationInput, { now });
+  // Source-aware stale window (manual 24h, live 15m). Pass the canon window
+  // explicitly so a caller cannot accidentally park manuals on the live 15m
+  // default. Do not let a stale live cohort mask an in-window manual.
+  const context = buildAiSensorSnapshotContext(annotationInput, {
+    now,
+    staleThresholdMs: resolveCurrentStateStaleWindowMs(newest.source),
+  });
   const invalidNote =
     invalidCount > 0
       ? "One or more current sensor values were omitted because they failed plausibility validation."
@@ -306,6 +330,32 @@ export function buildAiDoctorCurrentSensorSnapshot(
       missingInformationHints: [...context.missingInformationHints].sort(),
     },
   };
+}
+
+/**
+ * Select bounded live/manual sensor evidence and project only safe,
+ * source-preserving values into the AI Doctor packet shape.
+ *
+ * Usable live wins. Otherwise a usable in-window tent manual wins, even when
+ * a newer live row is already past the 15-minute live window. Manuals stay
+ * `source=manual` and never count as live-bridge presence.
+ */
+export function buildAiDoctorCurrentSensorSnapshot(
+  rows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
+  options: { now?: Date } = {},
+): AiDoctorCurrentSensorSnapshot | null {
+  const candidates = (rows ?? []).map(toCandidate).filter((row): row is Candidate => row !== null);
+  if (candidates.length === 0) return null;
+  const now = options.now ?? new Date();
+  const live = buildAiDoctorCurrentSensorSnapshotFromCandidates(
+    candidates.filter((row) => row.source === "live"),
+    now,
+  );
+  const manual = buildAiDoctorCurrentSensorSnapshotFromCandidates(
+    candidates.filter((row) => row.source === "manual"),
+    now,
+  );
+  return preferAiDoctorCurrentSensorSnapshot(live, manual);
 }
 
 /**

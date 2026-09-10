@@ -5,9 +5,12 @@
  * Does not invent live metrics. Rows are insert-equivalent fixtures.
  */
 import { describe, expect, it } from "vitest";
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 import {
   diaryEntryHasMeasurementEvidence,
+  isTimelineManualSensorPersistedQualityUsable,
+  isTimelineManualSensorReceiptFresh,
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
@@ -16,17 +19,24 @@ import {
 
 const TENT = "11111111-1111-4111-8111-111111111111";
 const CAPTURED = "2026-09-09T18:46:00.000Z";
-const NOW = new Date("2026-09-09T20:00:00.000Z");
+/** Inside the Timeline "Stale snapshot" window (15 minutes). */
+const NOW = new Date("2026-09-09T18:51:00.000Z");
 
-function metricRow(metric: string, value: number, source = "manual") {
+function metricRow(
+  metric: string,
+  value: number,
+  source = "manual",
+  extras: { quality?: string; ts?: string; captured_at?: string } = {},
+) {
+  const ts = extras.ts ?? CAPTURED;
   return {
     tent_id: TENT,
     metric,
     value,
     source,
-    ts: CAPTURED,
-    captured_at: CAPTURED,
-    quality: "ok",
+    ts,
+    captured_at: extras.captured_at ?? ts,
+    quality: extras.quality ?? "ok",
   };
 }
 
@@ -72,16 +82,46 @@ describe("manualSensorReadingsToTimelineEntries", () => {
 
   it("excludes invalid/degraded/stale quality so they are not ordinary receipts", () => {
     const tempC = fahrenheitToCelsius(76);
+    for (const quality of ["invalid", "degraded", "stale", " STALE ", "Invalid"] as const) {
+      expect(isTimelineManualSensorPersistedQualityUsable(quality)).toBe(false);
+      expect(
+        manualSensorReadingsToTimelineEntries(
+          [
+            metricRow("temperature_c", tempC, "manual", { quality }),
+            metricRow("humidity_pct", 58, "manual", { quality }),
+          ],
+          NOW,
+        ),
+      ).toEqual([]);
+    }
+  });
+
+  it("excludes a quality-ok manual the evidence drawer would badge Stale snapshot (Toad Pin 1)", () => {
+    const tempC = fahrenheitToCelsius(72);
+    const capturedAt = "2026-09-10T00:37:25.988+00:00";
+    const now = new Date("2026-09-10T05:01:00.000Z");
+    expect(now.getTime() - Date.parse(capturedAt)).toBeGreaterThan(LIVE_CURRENT_STATE_STALE_MS);
+    expect(isTimelineManualSensorReceiptFresh(capturedAt, now)).toBe(false);
     expect(
       manualSensorReadingsToTimelineEntries(
         [
-          { ...metricRow("temperature_c", tempC), quality: "invalid" },
-          { ...metricRow("humidity_pct", 58), quality: "degraded" },
-          { ...metricRow("temperature_c", tempC), quality: "stale" },
+          metricRow("temperature_c", tempC, "manual", { ts: capturedAt, quality: "ok" }),
+          metricRow("humidity_pct", 56, "manual", { ts: capturedAt, quality: "ok" }),
         ],
-        NOW,
+        now,
       ),
     ).toEqual([]);
+  });
+
+  it("still includes a quality-ok manual inside the Stale snapshot window", () => {
+    const tempC = fahrenheitToCelsius(72);
+    expect(isTimelineManualSensorReceiptFresh(CAPTURED, NOW)).toBe(true);
+    expect(
+      manualSensorReadingsToTimelineEntries(
+        [metricRow("temperature_c", tempC), metricRow("humidity_pct", 56)],
+        NOW,
+      ),
+    ).toHaveLength(1);
   });
 
   it("returns [] for null, empty, and metric-less groups", () => {

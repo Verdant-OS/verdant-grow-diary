@@ -12,6 +12,7 @@
 import { groupSensorReadingRows } from "@/lib/growAdapters";
 import type { SensorReadingRow } from "@/lib/db";
 import { hasManualHandheldReadings } from "@/lib/quickLogHistoryRules";
+import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
 import { tempFFromC } from "@/lib/temperatureUnits";
 import {
   MEASUREMENT_DETAIL_KEYS,
@@ -65,15 +66,32 @@ export function diaryEntryHasMeasurementEvidence(entry: {
   return hasManualHandheldReadings(entry?.note ?? null);
 }
 
-function persistedQualityIsUsable(quality: string | null | undefined): boolean {
+/**
+ * Persisted `sensor_readings.quality` allowed on a Timeline measurement
+ * receipt. Missing / blank follows the #1328 default of `ok`.
+ */
+export function isTimelineManualSensorPersistedQualityUsable(
+  quality: string | null | undefined,
+): boolean {
   const normalized = (quality ?? "ok").trim().toLowerCase();
   return normalized === "ok" || normalized === "";
+}
+
+/**
+ * Same current-state window Timeline cards and the evidence drawer use for
+ * the "Stale snapshot" badge (`LIVE_CURRENT_STATE_STALE_MS`). A 4-hour-old
+ * manual with quality=ok still trips that badge; Measurements must not list it.
+ */
+export function isTimelineManualSensorReceiptFresh(capturedAt: string, now: Date): boolean {
+  const capturedMs = new Date(capturedAt).getTime();
+  if (!Number.isFinite(capturedMs)) return false;
+  return now.getTime() - capturedMs <= LIVE_CURRENT_STATE_STALE_MS;
 }
 
 function toSensorReadingRow(row: ManualSensorTimelineMetricRow): SensorReadingRow | null {
   const valueNum = typeof row.value === "number" ? row.value : Number(row.value);
   if (!Number.isFinite(valueNum) || !row.tent_id || !row.ts) return null;
-  if (!persistedQualityIsUsable(row.quality)) return null;
+  if (!isTimelineManualSensorPersistedQualityUsable(row.quality)) return null;
   return {
     id: "",
     tent_id: row.tent_id,
@@ -134,6 +152,8 @@ export function manualSensorReadingsToTimelineEntries(
 
     const capturedAt = reading.capturedAt || reading.ts;
     if (!capturedAt || !reading.tentId) continue;
+    if (reading.status !== "usable") continue;
+    if (!isTimelineManualSensorReceiptFresh(capturedAt, now)) continue;
 
     const tempF = observed.includes("temp") ? tempFFromC(reading.temp) : null;
     const humidityPct = observed.includes("rh") ? reading.rh : null;

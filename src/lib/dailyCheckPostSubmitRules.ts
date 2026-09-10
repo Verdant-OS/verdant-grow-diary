@@ -71,11 +71,35 @@ export function parseDailyCheckMethodHint(
     : null;
 }
 
-/** Diary methods that open the plant Quick Log dialog (not sensor snapshot, not V2 water). */
+/**
+ * Read query params from a react-router compat location.
+ *
+ * TanStack Link keeps the query inside `to`, so the committed pathname can
+ * be `/daily-check?plantId=…&method=watering` while `search` is empty. Daily
+ * Check must still see `method` (and plantId/from) from that embedded query.
+ * When both sides carry the same key, `search` wins.
+ */
+export function searchParamsFromCompatLocation(location: {
+  pathname?: string | null;
+  search?: string | null;
+}): URLSearchParams {
+  const path = typeof location.pathname === "string" ? location.pathname : "";
+  const search = typeof location.search === "string" ? location.search : "";
+  const pathQueryIndex = path.indexOf("?");
+  const fromPath = pathQueryIndex >= 0 ? path.slice(pathQueryIndex + 1).split("#")[0] : "";
+  const fromSearch = (search.startsWith("?") ? search.slice(1) : search).split("#")[0];
+  const merged = new URLSearchParams(fromPath);
+  for (const [key, value] of new URLSearchParams(fromSearch)) {
+    merged.set(key, value);
+  }
+  return merged;
+}
+
+/** Diary methods that open the plant Quick Log note dialog (not V2 water, not Photo QL). */
 export function isQuickLogDailyCheckMethodHint(
   hint: DailyCheckMethodHint | null | undefined,
-): hint is "note" | "photo" {
-  return hint === "note" || hint === "photo";
+): hint is "note" {
+  return hint === "note";
 }
 
 /** Map a diary method hint onto the All-activity editor, when one applies. */

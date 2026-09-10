@@ -191,9 +191,10 @@ function formatAge(ms: number): string {
 }
 
 /** Authenticated Daily Check deep-link for a known plant (diary / note path). */
-function plantDailyCheckHref(plantId: string): string {
+function plantDailyCheckHref(plantId: string, growId: string): string {
   return buildDailyCheckEntryHref({
     plantId,
+    growId,
     source: "dashboard",
     method: "note",
   });
@@ -301,7 +302,7 @@ export function buildGuidedActionChecklist(
             ? "No watering or feeding logged for this plant yet."
             : `No watering or feeding in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: plantDailyCheckHref(plant.id),
+        ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -317,7 +318,7 @@ export function buildGuidedActionChecklist(
         title: `Capture a fresh photo of ${plant.name}`,
         reason: lastPhoto == null ? "No photo captured for this plant yet." : `No photo in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: plantDailyCheckHref(plant.id),
+        ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -338,7 +339,7 @@ export function buildGuidedActionChecklist(
               ? `${plant.name} is in flower — no trichome or pistil note yet.`
               : `${plant.name} is in flower — last trichome/pistil note ${age} ago.`,
           ctaLabel: "Log observation",
-          ctaHref: plantDailyCheckHref(plant.id),
+          ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId),
           plantId: plant.id,
           tentId: plant.tentId,
         });

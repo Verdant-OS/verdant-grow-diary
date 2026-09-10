@@ -13,6 +13,7 @@
  * src/test/daily-check-post-submit.test.tsx.
  */
 import { formatHarvestSavedBreakdownDetail } from "@/lib/harvestDetailsRules";
+import { withGrowId } from "@/lib/routes";
 
 export const DAILY_CHECK_SUCCESS_TITLE = "Today's check was logged";
 export const DAILY_CHECK_SUCCESS_BODY =
@@ -72,13 +73,14 @@ export function parseDailyCheckMethodHint(
  */
 export function buildDailyCheckEntryHref(input: {
   plantId: string;
+  growId?: string | null;
   source?: DailyCheckEntrySource | null;
   method?: DailyCheckMethodHint | null;
 }): string {
   let href = `/daily-check?plantId=${input.plantId}`;
   if (input.source) href += `&from=${input.source}`;
   if (input.method) href += `&method=${input.method}`;
-  return href;
+  return withGrowId(href, input.growId);
 }
 
 export interface DailyCheckPostSubmitAction {
@@ -89,6 +91,8 @@ export interface DailyCheckPostSubmitAction {
 }
 
 export interface DailyCheckPostSubmitInput {
+  /** Explicit incoming URL scope; never substitute the workspace's active grow. */
+  growId?: string | null;
   /** Plant currently selected on the Daily Check page, if any. */
   plantId: string | null | undefined;
   /** Where the grower opened Daily Check from, if recognized. */
@@ -96,6 +100,7 @@ export interface DailyCheckPostSubmitInput {
 }
 
 export interface DailyCheckPostSubmitReturnInput {
+  growId?: string | null;
   plantId: string | null | undefined;
   source?: DailyCheckEntrySource | null;
   fallbackHref?: string | null;
@@ -115,10 +120,10 @@ export function resolveDailyCheckPostSubmitHref(input: DailyCheckPostSubmitRetur
   const source = input.source ?? null;
   const fallbackHref = input.fallbackHref || "/";
 
-  if (source === "plant-detail" && plantId) return `/plants/${plantId}`;
-  if (source === "plants") return "/plants";
-  if (source === "dashboard") return "/";
-  return fallbackHref;
+  if (source === "plant-detail" && plantId) return withGrowId(`/plants/${plantId}`, input.growId);
+  if (source === "plants") return withGrowId("/plants", input.growId);
+  if (source === "dashboard") return withGrowId("/", input.growId);
+  return withGrowId(fallbackHref, input.growId);
 }
 
 /**
@@ -143,14 +148,14 @@ export function buildDailyCheckPostSubmitActions(
     const plants: DailyCheckPostSubmitAction = {
       key: "plants",
       label: "Back to Plants",
-      href: "/plants",
+      href: withGrowId("/plants", input.growId),
       primary: true,
     };
     if (!plantId) return [plants];
     const plant: DailyCheckPostSubmitAction = {
       key: "plant",
       label: "View Plant",
-      href: `/plants/${plantId}`,
+      href: withGrowId(`/plants/${plantId}`, input.growId),
       primary: false,
     };
     return [plants, plant];
@@ -161,7 +166,7 @@ export function buildDailyCheckPostSubmitActions(
   const dashboard: DailyCheckPostSubmitAction = {
     key: "dashboard",
     label: "Back to Dashboard",
-    href: "/",
+    href: withGrowId("/", input.growId),
     primary: !plantPrimary,
   };
 
@@ -172,7 +177,7 @@ export function buildDailyCheckPostSubmitActions(
   const plant: DailyCheckPostSubmitAction = {
     key: "plant",
     label: plantPrimary ? "Back to Plant" : "View Plant",
-    href: `/plants/${plantId}`,
+    href: withGrowId(`/plants/${plantId}`, input.growId),
     primary: plantPrimary,
   };
 

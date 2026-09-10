@@ -390,17 +390,20 @@ export default function DailyCheck() {
       buildDailyCheckPostSubmitActions({
         plantId: selectedPlant?.id ?? null,
         source: entrySource,
+        growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource],
+    [selectedPlant?.id, entrySource, urlGrowId],
   );
   const postSubmitHref = useMemo(
     () =>
       resolveDailyCheckPostSubmitHref({
         plantId: selectedPlant?.id ?? null,
         source: entrySource,
+        growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource],
+    [selectedPlant?.id, entrySource, urlGrowId],
   );
+  const scopedBackAction = urlGrowId ? postSubmitActions.find((action) => action.primary) : null;
 
   const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
   const savedItems = useMemo(
@@ -461,8 +464,11 @@ export default function DailyCheck() {
   return (
     <div className="mx-auto w-full min-w-0 max-w-2xl pb-24" data-testid="daily-grow-check-page">
       <Button asChild variant="ghost" size="sm" className="mb-3 min-h-11 whitespace-normal">
-        <Link to="/">
-          <ArrowLeft className="h-4 w-4" /> Dashboard
+        <Link to={scopedBackAction?.href ?? "/"}>
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {scopedBackAction && scopedBackAction.key !== "dashboard"
+            ? scopedBackAction.label
+            : "Dashboard"}
         </Link>
       </Button>
       <PageHeader

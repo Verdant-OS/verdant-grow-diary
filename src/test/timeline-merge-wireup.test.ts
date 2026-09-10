@@ -52,6 +52,27 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:entry-created["']/);
   });
 
+  it("refetches when a tent Manual Snapshot lands in sensor_readings", () => {
+    expect(TIMELINE_SRC).toMatch(/verdant:sensor-reading-created/);
+    expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:sensor-reading-created["']/);
+  });
+
+  it("reads manual sensor_readings as a supplemental Timeline source", () => {
+    expect(TIMELINE_SRC).toMatch(/from\(\s*["']sensor_readings["']\s*\)/);
+    expect(TIMELINE_SRC).toMatch(/eq\(\s*["']source["']\s*,\s*["']manual["']\s*\)/);
+    expect(TIMELINE_SRC).not.toMatch(
+      /from\(\s*["']sensor_readings["']\s*\)[\s\S]{0,200}\.(insert|update|delete|upsert)\s*\(/,
+    );
+  });
+
+  it("gates supplemental tents and sensor_readings on directoryGrowId like the owner directory", () => {
+    expect(TIMELINE_SRC).toMatch(/if\s*\(\s*directoryGrowId\s*\)\s*\{/);
+    expect(TIMELINE_SRC).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*directoryGrowId\s*\)/);
+    expect(TIMELINE_SRC).toMatch(
+      /\[activeGrowId,\s*activeReadKey,\s*directoryGrowId,\s*timelineDateRangeBounds,\s*user\]/,
+    );
+  });
+
   it("still fetches both diary_entries and grow_events from supabase", () => {
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']diary_entries["']\s*\)/);
     expect(TIMELINE_SRC).toMatch(/from\(\s*["']grow_events["']\s*\)/);

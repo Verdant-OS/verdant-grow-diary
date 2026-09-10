@@ -72,6 +72,9 @@ vi.mock("@/integrations/supabase/client", () => {
         spec.filters.push({ op: "lt", column, value });
         return query;
       },
+      in() {
+        return query;
+      },
       order() {
         return query;
       },
@@ -295,7 +298,10 @@ function expectNoTimelineContinuation() {
 function expectNoTimelineDirectoryReads() {
   const directoryReads = harness.executeQuery.mock.calls
     .map(([spec]) => spec as QuerySpec)
-    .filter((spec) => spec.table === "plants" || spec.table === "tents");
+    .filter(
+      (spec) =>
+        spec.table === "plants" || spec.table === "tents" || spec.table === "sensor_readings",
+    );
   expect(directoryReads).toHaveLength(0);
 }
 
@@ -397,6 +403,9 @@ describe("Timeline mounted read-state boundary", () => {
         };
       }
       if (spec.table === "tents") {
+        if (spec.columns === "id") {
+          return { data: [], error: null };
+        }
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
         expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
         expect(spec.columns).toBe("id,name,grow_id");

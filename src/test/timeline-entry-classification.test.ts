@@ -67,6 +67,8 @@ describe("classifyTimelineEntry — new event types", () => {
     ["measurement", "measurement"],
     ["manual_snapshot", "measurement"],
     ["sensor_snapshot", "measurement"],
+    ["environment", "measurement"],
+    ["environment_check", "measurement"],
     ["reminder", "reminder"],
     ["action_followup", "reminder"],
   ];
@@ -123,9 +125,10 @@ describe("classifyRelativeTimelineFilter delegates to shared helper", () => {
 });
 
 describe("Shared helper wiring — no duplicated classification tables", () => {
-  it("Timeline.tsx imports MEASUREMENT_DETAIL_KEYS from the shared helper", () => {
-    expect(TIMELINE_PAGE).toMatch(/from\s+["']@\/lib\/timelineEntryClassification["']/);
-    expect(TIMELINE_PAGE).toMatch(/MEASUREMENT_DETAIL_KEYS/);
+  it("Timeline.tsx classifies Measurements via diaryEntryHasMeasurementEvidence", () => {
+    expect(TIMELINE_PAGE).toMatch(/from\s+["']@\/lib\/timelineManualSensorMeasurementRules["']/);
+    expect(TIMELINE_PAGE).toMatch(/diaryEntryHasMeasurementEvidence/);
+    expect(TIMELINE_PAGE).toMatch(/manualSensorReadingsToTimelineEntries/);
   });
 
   it("Timeline.tsx does not define a local MEASUREMENT_KEYS table", () => {

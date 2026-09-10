@@ -358,7 +358,7 @@ describe("Timeline page source — anchor + label + leak guards", () => {
     expect(TIMELINE).not.toMatch(/functions\s*\.\s*invoke\s*\(/);
     expect(TIMELINE).not.toMatch(/\bai-doctor-review\b/);
     expect(TIMELINE).not.toMatch(/\bai-coach\b/);
-    expect(TIMELINE).not.toMatch(/sensor_readings/);
+    expect(TIMELINE).not.toMatch(/from\(["']sensor_readings["']\)\s*\.(insert|update|delete|upsert)/);
     expect(TIMELINE).not.toMatch(/action_queue\.insert/);
     expect(TIMELINE).not.toMatch(
       /\b(turn|activate)\b.*\b(fan|light|pump|heater|humidifier|dehumidifier)\b/i,

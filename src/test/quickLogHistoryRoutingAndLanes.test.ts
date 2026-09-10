@@ -288,8 +288,8 @@ describe("Logs page wiring (Timeline.tsx)", () => {
     expect(aqIdx).toBeGreaterThan(recentIdx);
   });
 
-  it("measurement filter detects handheld readings in note text", () => {
-    expect(TIMELINE).toMatch(/hasManualHandheldReadings\(e\.note\)/);
+  it("measurement filter uses diaryEntryHasMeasurementEvidence (keys, event types, handheld notes)", () => {
+    expect(TIMELINE).toMatch(/diaryEntryHasMeasurementEvidence\(e\)/);
   });
 
   it("dedupes recent Quick Log companion rows in pure rules", () => {
@@ -302,7 +302,7 @@ describe("Logs page wiring (Timeline.tsx)", () => {
     expect(surface).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|service_role/i);
     expect(surface).not.toMatch(/\bactuator\b|\brelay\b|device[_-]?control/i);
     expect(surface).not.toMatch(/supabase\.functions\.invoke/);
-    expect(surface).not.toMatch(/sensor_readings/);
+    expect(surface).not.toMatch(/from\(["']sensor_readings["']\)\s*\.(insert|update|delete|upsert)/);
     expect(surface).not.toMatch(/action_queue\.insert|alerts\.insert/);
   });
 });

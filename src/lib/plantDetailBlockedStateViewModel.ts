@@ -28,6 +28,10 @@ import {
 } from "@/lib/archivedPlantVisibilityRules";
 import { plantsPath, tentDetailPath, plantDetailPath } from "@/lib/routes";
 import type { PlantDetailLoadState } from "@/lib/plantDetailLoadTimeoutRules";
+import { isQueryGrowScopeMismatch, readEntityGrowId } from "@/lib/detailGrowScopeRules";
+
+export const readPlantGrowId = readEntityGrowId;
+export const isPlantDetailGrowScopeMismatch = isQueryGrowScopeMismatch;
 
 export type PlantDetailBlockedStateKind = "loading-slow" | "error" | "archived" | "not-found";
 
@@ -95,32 +99,6 @@ function readPlantTentId(p?: ArchivedPlantLike | null): string | null {
   if (!p) return null;
   const candidate = (p as { tentId?: unknown }).tentId ?? (p as { tent_id?: unknown }).tent_id;
   return typeof candidate === "string" && candidate.length > 0 ? candidate : null;
-}
-
-function trimId(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-export function readPlantGrowId(p?: ArchivedPlantLike | null): string | null {
-  if (!p) return null;
-  const candidate = (p as { growId?: unknown }).growId ?? (p as { grow_id?: unknown }).grow_id;
-  return trimId(candidate);
-}
-
-/**
- * URL/query growId is a scope claim. When it is present and does not match
- * the resolved plant's grow, plant detail must fail closed as not-found.
- * Missing or blank query growId is not a mismatch.
- */
-export function isPlantDetailGrowScopeMismatch(
-  plant: ArchivedPlantLike | null | undefined,
-  contextGrowId?: string | null,
-): boolean {
-  const requested = trimId(contextGrowId);
-  if (!requested) return false;
-  return readPlantGrowId(plant) !== requested;
 }
 
 const NOT_FOUND_VIEW = {

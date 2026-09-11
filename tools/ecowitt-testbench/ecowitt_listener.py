@@ -90,51 +90,22 @@ app = Flask(__name__)
 # Normalization
 # ---------------------------------------------------------------------------
 
-# Keep existing FIELD_MAP names, then accept extra grow channels onto those
-# same canonical metric names (first parseable candidate wins). Do not invent
-# columns. leafwetness* / tf_ch* / WH52 EC stay in metadata.raw_payload only.
+# Keep only the listener's configured channels. Other tent/probe channels stay
+# in metadata.raw_payload until an explicit per-listener routing map exists.
 FIELD_MAP = {
     "temp_f": (
         "temp1f",
         "tempf",
         "tempinf",
-        "temp2f",
-        "temp3f",
-        "temp4f",
-        "temp5f",
-        "temp6f",
-        "temp7f",
-        "temp8f",
     ),
     "humidity_percent": (
         "humidity1",
         "humidity",
         "humidityin",
-        "humidity2",
-        "humidity3",
-        "humidity4",
-        "humidity5",
-        "humidity6",
-        "humidity7",
-        "humidity8",
     ),
     "soil_moisture_pct": (
         "soilmoisture1",
         "soilmoisture2",
-        "soilmoisture3",
-        "soilmoisture4",
-        "soilmoisture5",
-        "soilmoisture6",
-        "soilmoisture7",
-        "soilmoisture8",
-        "soilmoisture9",
-        "soilmoisture10",
-        "soilmoisture11",
-        "soilmoisture12",
-        "soilmoisture13",
-        "soilmoisture14",
-        "soilmoisture15",
-        "soilmoisture16",
     ),
     "co2_ppm": ("co2", "co2in", "co2_ppm"),
 }
@@ -157,9 +128,9 @@ def normalize_metrics(payload: Dict[str, Any]) -> Dict[str, Optional[float]]:
     """Map known EcoWitt fields into Verdant canonical metric names.
 
     Unknown / missing / malformed values become ``None`` so downstream
-    code can flag them — they are never treated as healthy. Extra grow
-    channels (temp2f…temp8f, humidity2…8, soilmoisture3+) are accepted
-    onto the same canonical names when earlier candidates are absent.
+    code can flag them — they are never treated as healthy. Unconfigured
+    grow channels remain in the raw payload and are not attributed to this
+    listener's configured tent or probe.
     """
     metrics: Dict[str, Optional[float]] = {}
     # Case-insensitive key lookup so gateway firmware casing variants still map.

@@ -61,13 +61,13 @@ class FieldMapIngestReadinessTests(unittest.TestCase):
         self.assertNotIn("temp9f", FIELD_MAP["temp_f"])
         self.assertNotIn("humidity9", FIELD_MAP["humidity_percent"])
 
-    def test_extra_channels_accepted_onto_canonical_names(self):
-        self.assertIn("temp2f", FIELD_MAP["temp_f"])
-        self.assertIn("temp8f", FIELD_MAP["temp_f"])
-        self.assertIn("humidity2", FIELD_MAP["humidity_percent"])
-        self.assertIn("humidity8", FIELD_MAP["humidity_percent"])
-        self.assertIn("soilmoisture3", FIELD_MAP["soil_moisture_pct"])
-        self.assertIn("soilmoisture16", FIELD_MAP["soil_moisture_pct"])
+    def test_unconfigured_channels_stay_raw_only(self):
+        self.assertNotIn("temp2f", FIELD_MAP["temp_f"])
+        self.assertNotIn("temp8f", FIELD_MAP["temp_f"])
+        self.assertNotIn("humidity2", FIELD_MAP["humidity_percent"])
+        self.assertNotIn("humidity8", FIELD_MAP["humidity_percent"])
+        self.assertNotIn("soilmoisture3", FIELD_MAP["soil_moisture_pct"])
+        self.assertNotIn("soilmoisture16", FIELD_MAP["soil_moisture_pct"])
 
     def test_multi_channel_demo_normalizes_primary_metrics(self):
         metrics = normalize_metrics(MULTI_CHANNEL_DEMO)
@@ -77,7 +77,7 @@ class FieldMapIngestReadinessTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["soil_moisture_pct"], 33.0)
         self.assertAlmostEqual(metrics["co2_ppm"], 721.0)
 
-    def test_extra_channel_fills_when_primary_absent(self):
+    def test_unconfigured_channel_does_not_fill_primary_when_absent(self):
         metrics = normalize_metrics(
             {
                 "temp2f": "70",
@@ -86,9 +86,9 @@ class FieldMapIngestReadinessTests(unittest.TestCase):
                 "co2in": "800",
             }
         )
-        self.assertAlmostEqual(metrics["temp_f"], 70.0)
-        self.assertAlmostEqual(metrics["humidity_percent"], 50.0)
-        self.assertAlmostEqual(metrics["soil_moisture_pct"], 41.0)
+        self.assertIsNone(metrics["temp_f"])
+        self.assertIsNone(metrics["humidity_percent"])
+        self.assertIsNone(metrics["soil_moisture_pct"])
         self.assertAlmostEqual(metrics["co2_ppm"], 800.0)
 
     def test_indoor_hub_maps_when_outdoor_absent(self):

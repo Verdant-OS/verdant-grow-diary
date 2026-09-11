@@ -16,8 +16,10 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  assertSameQuickLogFixtureBoundary,
   fixturePageRelationshipMatchesExpected,
   validateFixtureEnv,
+  validateQuickLogFixturePage,
   pageTextMatchesFixture,
   isLikelyRealPlantUrl,
 } from "../../e2e/lib/fixtureSafety";
@@ -105,6 +107,82 @@ describe("Disposable E2E fixture safety helpers", () => {
     expect(isLikelyRealPlantUrl("https://www.verdantgrowdiary.com/plants/x")).toBe(true);
     expect(isLikelyRealPlantUrl("")).toBe(false);
     expect(isLikelyRealPlantUrl("https://staging.example.com/plants/x")).toBe(false);
+  });
+
+  it("rejects a resolved production redirect before reading the page DOM", async () => {
+    const privateRouteId = "private-route-id";
+    let domRead = false;
+    const page = {
+      url: () => `https://verdantgrowdiary.com/plants/${privateRouteId}`,
+      getByRole: () => {
+        domRead = true;
+        throw new Error("DOM must not be read after a production redirect");
+      },
+    } as unknown as Parameters<typeof validateQuickLogFixturePage>[0];
+
+    let thrown: unknown;
+    try {
+      await validateQuickLogFixturePage(page, VALID_ENV);
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toMatch(/production Verdant host|write-producing smoke/i);
+    expect((thrown as Error).message).not.toContain(privateRouteId);
+    expect(domRead).toBe(false);
+  });
+
+  it("accepts a second target in the same fixture grow and tent", () => {
+    expect(() =>
+      assertSameQuickLogFixtureBoundary(
+        { growId: "grow-a", tentId: "tent-a" },
+        { growId: "grow-a", tentId: "tent-a" },
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects a same-grow target in another tent", () => {
+    expect(() =>
+      assertSameQuickLogFixtureBoundary(
+        { growId: "grow-a", tentId: "tent-a" },
+        { growId: "grow-a", tentId: "tent-b" },
+      ),
+    ).toThrow(/tent/i);
+  });
+
+  it("rejects another grow even when the tent id matches", () => {
+    expect(() =>
+      assertSameQuickLogFixtureBoundary(
+        { growId: "grow-a", tentId: "tent-a" },
+        { growId: "grow-b", tentId: "tent-a" },
+      ),
+    ).toThrow(/grow/i);
+  });
+
+  it("reports both fixture-boundary violations without exposing identifiers", () => {
+    let thrown: unknown;
+    try {
+      assertSameQuickLogFixtureBoundary(
+        { growId: "private-grow-a", tentId: "private-tent-a" },
+        { growId: "private-grow-b", tentId: "private-tent-b" },
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toMatch(/grow[\s\S]*tent/i);
+    expect((thrown as Error).message).not.toMatch(/private-(?:grow|tent)-[ab]/);
+  });
+
+  it("fails closed when the initial fixture boundary is unavailable", () => {
+    expect(() =>
+      assertSameQuickLogFixtureBoundary(null, {
+        growId: "grow-a",
+        tentId: "tent-a",
+      }),
+    ).toThrow(/initial.*unavailable/i);
   });
 
   it("pageTextMatchesFixture requires E2E/Test markers and expected tent+plant; grow optional", () => {
@@ -358,7 +436,7 @@ describe("Workflow: fixture verification gates smoke", () => {
     expect(smoke).toContain("await expect(targetOption).toHaveCount(1)");
     expect(smoke).not.toContain("exactAccessibleNameOptions");
     expect(smoke).not.toContain("new RegExp(TARGET_NAME");
-    expect(smoke).toMatch(/selectedTarget\.growId\s*!==\s*initialTarget\.growId/);
+    expect(smoke).toContain("assertSameQuickLogFixtureBoundary(initialTarget, selectedTarget)");
     expect(smoke).toContain("One-Tent Loop card's CTA dispatches the canonical global prefill");
     expect(smoke).not.toContain("simplified Target/Action/Photo");
     expect(checklist).toContain("second plant in the same tent/grow");

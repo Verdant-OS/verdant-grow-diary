@@ -9,9 +9,15 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
-import { classifyAiDoctorCurrentSensorEvidence } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import {
+  classifyAiDoctorCurrentSensorEvidence,
+  selectAiDoctorSensorEvidenceClassification,
+} from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { buildPlantDetailAiDoctorReadiness } from "@/lib/plantDetailAiDoctorReadiness";
-import { classifyAuditRow } from "@/lib/sensorSnapshotStatusContract";
+import {
+  classificationFromStatusResult,
+  classifyAuditRow,
+} from "@/lib/sensorSnapshotStatusContract";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
 const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
@@ -106,6 +112,65 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
     expect(r.sensorEvidence.isUnsafe).toBe(false);
     expect(r.sensorEvidence.label).not.toMatch(/needs review — not used for recommendations/i);
     expect(r.missing.find((m) => m.kind === "no_sensor_snapshot")).toBeUndefined();
+  });
+
+  it("Golden Toad Pin1: ~9h manuals must not be 'outside the stale window' / cautionary-only", () => {
+    const capturedAt = hoursAgo(9);
+    const classified = classifyAiDoctorCurrentSensorEvidence(
+      [
+        { metric: "temp_f", value: 75, captured_at: capturedAt, source: "manual", quality: null },
+        { metric: "humidity", value: 60, captured_at: capturedAt, source: "manual", quality: null },
+        { metric: "vpd", value: 1, captured_at: capturedAt, source: "manual", quality: null },
+      ],
+      { now: NOW },
+    );
+    const staleLiveAudit = classificationFromStatusResult({
+      status: "stale",
+      reasonCode: "stale_timestamp",
+    });
+    const selected = selectAiDoctorSensorEvidenceClassification(classified, staleLiveAudit);
+    const r = buildPlantDetailAiDoctorReadiness({
+      ...baseInput,
+      sensorSnapshot: selected,
+    });
+    expect(classified.status).toBe("usable");
+    expect(selected.status).toBe("usable");
+    expect(r.sensorEvidence.mode).toBe("healthy");
+    expect(r.sensorEvidence.isCautionary).toBe(false);
+    expect(r.sensorEvidence.label).not.toMatch(/outside the stale window/i);
+    expect(r.sensorEvidence.label).not.toMatch(/cautionary context only/i);
+  });
+
+  it("Golden Toad Pin1: stale live rows must not force cautionary copy over a 9h tent manual", () => {
+    const classified = classifyAiDoctorCurrentSensorEvidence(
+      [
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: minutesAgo(16),
+          source: "live",
+          quality: null,
+        },
+        { metric: "temp_f", value: 75, captured_at: hoursAgo(9), source: "manual", quality: null },
+        {
+          metric: "humidity",
+          value: 60,
+          captured_at: hoursAgo(9),
+          source: "manual",
+          quality: null,
+        },
+        { metric: "vpd", value: 1, captured_at: hoursAgo(9), source: "manual", quality: null },
+      ],
+      { now: NOW },
+    );
+    const r = buildPlantDetailAiDoctorReadiness({
+      ...baseInput,
+      sensorSnapshot: classified,
+    });
+    expect(classified.status).toBe("usable");
+    expect(r.sensorEvidence.mode).toBe("healthy");
+    expect(r.sensorEvidence.label).not.toMatch(/outside the stale window/i);
+    expect(r.sensorEvidence.label).not.toMatch(/cautionary context only/i);
   });
 
   it("needs_review is blocked as evidence", () => {

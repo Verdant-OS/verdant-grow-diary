@@ -1,4 +1,4 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig, devices, type ReporterDescription } from "@playwright/test";
 
 /**
  * Minimal Playwright config for Verdant Grow OS authenticated smoke tests.
@@ -13,6 +13,12 @@ import { defineConfig, devices } from "@playwright/test";
  * Run locally:
  *   E2E_TEST_EMAIL=... E2E_TEST_PASSWORD=... E2E_BASE_URL=http://localhost:5173 \
  *     bunx playwright test
+ *
+ * Optional TestDino live streaming (no post-run upload):
+ *   TESTDINO_TOKEN=... bunx playwright test
+ * If bunx is missing, `npx playwright test` is the same command.
+ * Leave TESTDINO_TOKEN unset in CI unless Cheek adds a secret — the
+ * TestDino reporter is added only when the env var is non-empty.
  */
 // Treat an empty / whitespace-only E2E_BASE_URL the same as unset — a missing
 // GitHub Actions var referenced via `env:` arrives as "" and must fall back to
@@ -43,6 +49,19 @@ const TRACE_MODE: "off" | "on-first-retry" | "retain-on-failure" = process.env.E
   ? "off"
   : "on-first-retry";
 
+// TestDino streams results during the run. The package prints a hard
+// configuration error (then no-ops) when the token is missing, so we only
+// attach the reporter when TESTDINO_TOKEN is set. Token is never hardcoded.
+const testdinoToken = process.env.TESTDINO_TOKEN?.trim();
+const reporters: ReporterDescription[] = [
+  ["list"],
+  ["html", { open: "never" }],
+  ["json", { outputFile: "e2e/results/playwright-report.json" }],
+];
+if (testdinoToken) {
+  reporters.push(["@testdino/playwright", { token: process.env.TESTDINO_TOKEN }]);
+}
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
@@ -57,11 +76,7 @@ export default defineConfig({
   // artifact paths in the CI job summary. With tracing disabled on
   // real-auth runs (see `use` below), the report contains only
   // screenshots/videos — no network headers.
-  reporter: [
-    ["list"],
-    ["html", { open: "never" }],
-    ["json", { outputFile: "e2e/results/playwright-report.json" }],
-  ],
+  reporter: reporters,
   use: {
     baseURL: BASE_URL,
     // Bound every action (click/fill/press). Playwright's default is 0 =

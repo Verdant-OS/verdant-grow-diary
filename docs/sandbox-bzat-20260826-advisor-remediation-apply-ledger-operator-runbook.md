@@ -5,13 +5,14 @@
 Use these labels literally. Do not translate missing knk credentials into a product
 failure.
 
-| Status | Meaning in this ledger |
-| ---------------- | -------------------------------------------------------------------- |
-| `PASS` | Direct evidence verified the check |
-| `FAIL` | Direct evidence verified a defect |
-| `BLOCKED` | Access, permission, credential, or dependency prevented verification |
-| `NOT_MEASURED` | The metric was not measured; this is never a perfect score |
-| `NOT_APPLICABLE` | The check does not apply to this target |
+| Status           | Meaning in this ledger                                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `PASS`           | Direct evidence verified the check                                                                                           |
+| `FAIL`           | Direct evidence verified a defect                                                                                            |
+| `BLOCKED`        | Access, permission, credential, or dependency prevented verification                                                         |
+| `NOT_MEASURED`   | The metric was not measured; this is never a perfect score                                                                   |
+| `NOT_APPLICABLE` | The check does not apply to this target                                                                                      |
+| `FORBIDDEN`      | The operation is available and must not be performed — **not** `NOT_APPLICABLE`, which means the check does not apply at all |
 
 ## What this file is
 
@@ -32,9 +33,9 @@ It is **not**:
 
 ## Target project
 
-| Field | Value |
-| ----- | ----- |
-| Target | `bzatgtgjvuojpoxcknaa` (personal-dashboard **sandbox**) |
+| Field      | Value                                                     |
+| ---------- | --------------------------------------------------------- |
+| Target     | `bzatgtgjvuojpoxcknaa` (personal-dashboard **sandbox**)   |
 | Not target | Production Lovable Cloud `knkwiiywfkbqznbxwqfh` (**knk**) |
 
 Advisor writeup named sandbox bzat as Production. That naming is recorded here as a
@@ -68,11 +69,11 @@ claim. It does **not** introduce those files.
 
 ## HARD STOP — collision fences
 
-| PR | Role | This ledger |
-| -- | ---- | ----------- |
+| PR        | Role                                                                                 | This ledger                                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | **#1113** | **ACTIVE OWNER** of sandbox migration-file restore on project `bzatgtgjvuojpoxcknaa` | Untouched. A docs ledger must not take that PR. Adding `20260826*` under `supabase/migrations/` would collide and would be Preview-replayed. |
-| **#1137** | OPEN REVIEW ONLY — restored-history tooling | Untouched. |
-| **#1120** | Migration-file ledger for different knk objects | Wrong artifact type for this work. Do not copy that pattern. |
+| **#1137** | OPEN REVIEW ONLY — restored-history tooling                                          | Untouched.                                                                                                                                   |
+| **#1120** | Migration-file ledger for different knk objects                                      | Wrong artifact type for this work. Do not copy that pattern.                                                                                 |
 
 ## Repo facts (verified on tip; do not treat as knk live ACL)
 
@@ -135,17 +136,18 @@ The advisor writeup said **Group C was DEFERRED**.
 
 ## Safety / validation
 
-| Check | Status | Notes |
-| ----- | ------ | ----- |
-| Repo ACL: client `EXECUTE` on `grant_lovable_credits` / `grant_lovable_credit_pack` | `PASS` | Git shows REVOKE PUBLIC/anon/authenticated; GRANT service_role only |
-| Claim "anon key can mint credits" as git fact | `FAIL` | Contradicted by git ACL + absence of app `.rpc` mint path |
-| Live knk ACL for grant_* | `NOT_MEASURED` | No knk credential measurement in this ledger |
-| Three claimed 20260826 applies in git | `FAIL` (as git presence) | 0 hits on tip; last migration is `20260825233000_…` |
-| Scope of claimed applies | sandbox-only (`bzatgtgjvuojpoxcknaa`) | `NOT_APPLICABLE` to knk apply |
-| Apply this ledger to knk | `NOT_APPLICABLE` / forbidden | Explicit hard stop |
-| Preview-replay this ledger as migration | `NOT_APPLICABLE` / forbidden | Docs record only |
-| Group C applied | not applied; deferred per writeup | Do not apply |
-| Product / publish PASS | `NOT_APPLICABLE` | Docs ledger only; no publish |
+| Check                                                                               | Status             | Notes                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repo ACL: client `EXECUTE` on `grant_lovable_credits` / `grant_lovable_credit_pack` | `PASS`             | Git shows REVOKE PUBLIC/anon/authenticated; GRANT service_role only                                                                                                       |
+| Claim "anon key can mint credits" as git fact                                       | `FAIL`             | Contradicted by git ACL + absence of app `.rpc` mint path                                                                                                                 |
+| Live knk ACL for grant_*                                                            | `NOT_MEASURED`     | No knk credential measurement in this ledger                                                                                                                              |
+| Three claimed 20260826 applies in git                                               | **`FAIL`**         | As git presence: 0 hits on tip; last migration is `20260825233000_…`                                                                                                      |
+| Scope of claimed applies                                                            | **`PASS`**         | Sandbox-only: `bzatgtgjvuojpoxcknaa`, not knk `knkwiiywfkbqznbxwqfh`. Verified from the writeup, which is direct evidence of the claims' scope and not of their execution |
+| Apply this ledger to knk                                                            | **`FORBIDDEN`**    | Explicit hard stop                                                                                                                                                        |
+| Preview-replay this ledger as migration                                             | **`FORBIDDEN`**    | Docs record only                                                                                                                                                          |
+| Group C applied                                                                     | **`NOT_MEASURED`** | Writeup says "not applied; deferred". That is a claim, not a live-state measurement, and this ledger takes none                                                           |
+| Apply Group C                                                                       | **`FORBIDDEN`**    | Do not apply                                                                                                                                                              |
+| Product / publish PASS                                                              | `NOT_APPLICABLE`   | Docs ledger only; no publish                                                                                                                                              |
 
 **Verdict:** `PASS` on repo ACL for `grant_*` client `EXECUTE`; `NOT_MEASURED` on knk;
 sandbox-only for the three claimed applies.

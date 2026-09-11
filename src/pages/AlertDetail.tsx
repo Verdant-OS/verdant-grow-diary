@@ -17,6 +17,7 @@ import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { formatGrowDisplayLabel } from "@/lib/growDisplayLabel";
+import { AlertTargetContext } from "@/components/AlertTargetContext";
 import { AlertWhyContext } from "@/components/AlertWhyContext";
 import EvidenceLinkageBadges from "@/components/EvidenceLinkageBadges";
 import { ALERT_REVIEW_EVIDENCE_NOT_LINKED_COPY } from "@/lib/originatingTimelineEventRules";
@@ -47,6 +48,9 @@ import {
   type AlertStatusRow,
 } from "@/lib/alerts";
 import { useAlertEvents } from "@/hooks/useAlertEvents";
+import { useAlertTargetNames } from "@/hooks/useAlertTargetNames";
+import { useAlertLinkedTargetEvidence } from "@/hooks/useAlertLinkedTargetEvidence";
+import { buildAlertTargetPresenterInput } from "@/lib/alertTargetContextRules";
 import {
   actionDetailPath,
   aiDoctorSessionDetailPath,
@@ -157,6 +161,19 @@ export default function AlertDetail() {
   }, [load]);
 
   const { events } = useAlertEvents(alertId ?? null, eventsKey);
+  const targetNames = useAlertTargetNames();
+  const linkedTargets = useAlertLinkedTargetEvidence(alert ? [alert] : []);
+  const targetInput = buildAlertTargetPresenterInput({
+    tentId: alert?.tent_id,
+    plantId: alert?.plant_id,
+    growId: alert?.grow_id,
+    tentNameById: targetNames.tentNameById,
+    plantNameById: targetNames.plantNameById,
+    linkedEvidence: alert ? (linkedTargets.evidenceByAlertId.get(alert.id) ?? []) : [],
+    singleTentIdByGrowId: targetNames.singleTentIdByGrowId,
+    namesLoading: targetNames.status === "loading",
+    idsLoading: linkedTargets.idsLoading,
+  });
 
   const runStatusChange = async (
     event_type: "acknowledged" | "resolved" | "dismissed" | "reopened",
@@ -548,32 +565,19 @@ export default function AlertDetail() {
                   </Link>
                 </dd>
               </div>
-              {alert.tent_id && (
-                <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
-                  <dt className="uppercase tracking-wider text-muted-foreground">Tent</dt>
-                  <dd className="font-medium">
-                    <Link
-                      to={tentDetailPath(alert.tent_id)}
-                      className="text-primary hover:underline"
-                    >
-                      {alert.tent_id}
-                    </Link>
-                  </dd>
-                </div>
-              )}
-              {alert.plant_id && (
-                <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
-                  <dt className="uppercase tracking-wider text-muted-foreground">Plant</dt>
-                  <dd className="font-medium">
-                    <Link
-                      to={plantDetailPath(alert.plant_id)}
-                      className="text-primary hover:underline"
-                    >
-                      {alert.plant_id}
-                    </Link>
-                  </dd>
-                </div>
-              )}
+              <AlertTargetContext
+                tentId={targetInput.tentId}
+                plantId={targetInput.plantId}
+                tentName={targetInput.tentName}
+                plantName={targetInput.plantName}
+                namesLoading={targetInput.namesLoading}
+                idsLoading={targetInput.idsLoading}
+                linkedEvidence={targetInput.linkedEvidence}
+                singleTentId={targetInput.singleTentId}
+                variant="detailed"
+                tentHref={targetInput.tentId ? tentDetailPath(targetInput.tentId) : null}
+                plantHref={targetInput.plantId ? plantDetailPath(targetInput.plantId) : null}
+              />
               <div className="rounded-lg border border-border/40 bg-secondary/20 p-2">
                 <dt className="uppercase tracking-wider text-muted-foreground">First seen</dt>
                 <dd>{fmt(alert.first_seen_at)}</dd>

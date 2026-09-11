@@ -16,6 +16,7 @@ import {
   buildPlantQuickLogPrefill,
   type PlantQuickLogPrefill,
 } from "@/lib/plantQuickLogPrefillRules";
+import { buildConnectedActivationRoutes } from "@/lib/connectedOneTentActivationRules";
 import { actionsPath, alertsPath, timelinePath } from "@/lib/routes";
 
 export type OneTentLoopStep =
@@ -193,10 +194,19 @@ export function resolveOneTentLoopNextStep(
 
   switch (current) {
     case "grow":
-      // CTA is "Open tent" — must route to an actual tent, never self-link
-      // back to Grow Detail. When no tentId is selected, stay disabled so
-      // the operator is not misled into thinking a tent is opened.
-      if (tentId) return enable(base, `/tents/${tentId}`);
+      // CTA is "Open tent" when a tent is already known — never self-link
+      // back to Grow Detail. When the grow itself is selected (route or
+      // explicit id) but no tent is known yet, advance with the same
+      // grow-scoped Add tent activation path onboarding uses. Do not
+      // strand the grower with "unavailable until this record is selected"
+      // while they are already on that grow's detail page.
+      if (normalizedTentId) return enable(base, `/tents/${normalizedTentId}`);
+      if (normalizedGrowId) {
+        return {
+          ...enable(base, buildConnectedActivationRoutes({ growId: normalizedGrowId }).addTent),
+          ctaLabel: "Add tent",
+        };
+      }
       return base;
     case "tent":
       // CTA is "Open plant" — must route to an actual plant, never self-link

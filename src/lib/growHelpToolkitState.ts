@@ -15,8 +15,10 @@ export interface CycleInputs {
   name: string;
   vegDays: number | null;
   flowerDays: number | null;
-  vegPhotoperiodHours: number;
-  flowerPhotoperiodHours: number;
+  /** Explicitly missing when cleared; do not restore a default on blur/reload. */
+  vegPhotoperiodHours: number | null;
+  /** Explicitly missing when cleared; do not restore a default on blur/reload. */
+  flowerPhotoperiodHours: number | null;
   electricityRate: number | null;
   currency: string;
 }
@@ -69,7 +71,8 @@ export interface NutrientInputs {
   drySaltRows: DrySaltInput[];
   injectorEnabled: boolean;
   stockGramsPerGallon: number | null;
-  injectorRatio: number;
+  /** Explicitly missing when cleared; do not restore a default on blur/reload. */
+  injectorRatio: number | null;
   converterKind: NutrientStrengthInputKind;
   converterValue: number | null;
 }
@@ -87,11 +90,13 @@ export interface LightInputs {
   canopyLength: number | null;
   canopyWidth: number | null;
   ppfMode: "ppf" | "watts";
-  fixtureCount: number;
+  /** Explicitly missing when cleared; do not restore a default on blur/reload. */
+  fixtureCount: number | null;
   ppfPerFixture: number | null;
   actualWattsPerFixture: number | null;
   efficacy: number | null;
-  canopyEfficiencyPercent: number;
+  /** Explicitly missing when cleared; do not restore a default on blur/reload. */
+  canopyEfficiencyPercent: number | null;
   targetMode: "ppfd" | "dli";
   targetPpfd: number | null;
   targetDli: number | null;
@@ -107,7 +112,8 @@ export interface ExpenseDeviceInputState {
   id: string;
   name: string;
   actualWatts: number | null;
-  quantity: number;
+  /** Explicitly missing when cleared; do not restore a default on blur/reload. */
+  quantity: number | null;
   vegHoursPerDay: number | null;
   flowerHoursPerDay: number | null;
   vegDaysOverride: number | null;
@@ -146,7 +152,8 @@ export interface ExpenseInputs {
   setup: SimpleCostInputState[];
   recurring: RecurringCostInputState[];
   driedSaleableGrams: number | null;
-  amortizationCycles: number;
+  /** Explicitly missing when cleared; do not restore a default on blur/reload. */
+  amortizationCycles: number | null;
   compareAtPricePerGram: number | null;
 }
 
@@ -321,7 +328,7 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       id: asString(row.id, `device-${index + 1}`),
       name: asString(row.name, `Device ${index + 1}`),
       actualWatts: asNullableNumber(row.actualWatts, null),
-      quantity: asNumber(row.quantity, 1),
+      quantity: asNullableNumber(row.quantity, 1),
       vegHoursPerDay: asNullableNumber(row.vegHoursPerDay, null),
       flowerHoursPerDay: asNullableNumber(row.flowerHoursPerDay, null),
       vegDaysOverride: asNullableNumber(row.vegDaysOverride, null),
@@ -363,8 +370,11 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       name: asString(cycle.name, defaults.cycle.name),
       vegDays: asNullableNumber(cycle.vegDays, defaults.cycle.vegDays),
       flowerDays: asNullableNumber(cycle.flowerDays, defaults.cycle.flowerDays),
-      vegPhotoperiodHours: asNumber(cycle.vegPhotoperiodHours, defaults.cycle.vegPhotoperiodHours),
-      flowerPhotoperiodHours: asNumber(
+      vegPhotoperiodHours: asNullableNumber(
+        cycle.vegPhotoperiodHours,
+        defaults.cycle.vegPhotoperiodHours,
+      ),
+      flowerPhotoperiodHours: asNullableNumber(
         cycle.flowerPhotoperiodHours,
         defaults.cycle.flowerPhotoperiodHours,
       ),
@@ -401,7 +411,7 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       drySaltRows: drySaltRows.length > 0 ? drySaltRows : defaults.nutrient.drySaltRows,
       injectorEnabled: asBoolean(nutrient.injectorEnabled, defaults.nutrient.injectorEnabled),
       stockGramsPerGallon: asNullableNumber(nutrient.stockGramsPerGallon, null),
-      injectorRatio: asNumber(nutrient.injectorRatio, defaults.nutrient.injectorRatio),
+      injectorRatio: asNullableNumber(nutrient.injectorRatio, defaults.nutrient.injectorRatio),
       converterKind: asEnum(
         nutrient.converterKind,
         ["ec", "ppm500", "ppm700", "cf"] as const,
@@ -414,11 +424,11 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       canopyLength: asNullableNumber(light.canopyLength, null),
       canopyWidth: asNullableNumber(light.canopyWidth, null),
       ppfMode: asEnum(light.ppfMode, ["ppf", "watts"] as const, defaults.light.ppfMode),
-      fixtureCount: asNumber(light.fixtureCount, defaults.light.fixtureCount),
+      fixtureCount: asNullableNumber(light.fixtureCount, defaults.light.fixtureCount),
       ppfPerFixture: asNullableNumber(light.ppfPerFixture, null),
       actualWattsPerFixture: asNullableNumber(light.actualWattsPerFixture, null),
       efficacy: asNullableNumber(light.efficacy, null),
-      canopyEfficiencyPercent: asNumber(
+      canopyEfficiencyPercent: asNullableNumber(
         light.canopyEfficiencyPercent,
         defaults.light.canopyEfficiencyPercent,
       ),
@@ -447,7 +457,10 @@ export function normalizeGrowHelpToolkitState(value: unknown): GrowHelpToolkitSt
       setup,
       recurring,
       driedSaleableGrams: asNullableNumber(expense.driedSaleableGrams, null),
-      amortizationCycles: asNumber(expense.amortizationCycles, defaults.expense.amortizationCycles),
+      amortizationCycles: asNullableNumber(
+        expense.amortizationCycles,
+        defaults.expense.amortizationCycles,
+      ),
       compareAtPricePerGram: asNullableNumber(expense.compareAtPricePerGram, null),
     },
   };

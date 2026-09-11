@@ -141,6 +141,244 @@ describe("training breakdown", () => {
   });
 });
 
+describe("VGD-AUD-005 — one logical activity per linked diary/event pair", () => {
+  const trainingDiary = [
+    diary("training-note", "2026-07-02", {
+      event_type: "training",
+      linked_grow_event_id: "training-event",
+    }),
+    diary("defoliation-note", "2026-07-03", {
+      event_type: "training",
+      subtype: "defoliation",
+      linked_grow_event_id: "defoliation-event",
+    }),
+  ];
+  const trainingEvents = [
+    { id: "training-event", event_type: "training", occurred_at: "2026-07-02T10:00:00Z" },
+    { id: "defoliation-event", event_type: "training", occurred_at: "2026-07-03T10:00:00Z" },
+  ];
+
+  it("counts linked training and defoliation once with their diary subtypes", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({ diaryEntries: trainingDiary, growEvents: trainingEvents }),
+    );
+    expect(vm.header.totalInRange).toBe(2);
+    expect(vm.training.count).toBe(2);
+    expect(vm.training.byType).toEqual([
+      { token: "training", count: 1 },
+      { token: "defoliation", count: 1 },
+    ]);
+  });
+
+  it.each([
+    { details: { linked_grow_event_id: " note-event " } },
+    { details: { grow_event_id: "note-event" } },
+    { linked_grow_event_id: "note-event" },
+    { grow_event_id: "note-event" },
+  ])("counts a note companion once using canonical link aliases: %j", (link) => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        diaryEntries: [{ ...diary("note", "2026-07-02", {}), ...link }],
+        growEvents: [
+          { id: "note-event", event_type: "observation", occurred_at: "2026-07-02T10:00:00Z" },
+        ],
+      }),
+    );
+    expect(vm.header.totalInRange).toBe(1);
+  });
+
+  it("retains diary-only evidence even when its linked parent was not fetched", () => {
+    const vm = buildDiaryRangeReport(baseInput({ diaryEntries: trainingDiary }));
+    expect(vm.header.totalInRange).toBe(2);
+    expect(vm.training.count).toBe(2);
+    expect(vm.training.byType).toEqual([
+      { token: "training", count: 1 },
+      { token: "defoliation", count: 1 },
+    ]);
+  });
+
+  it("preserves diary amounts, nutrient details, photos and the original input", () => {
+    const input = baseInput({
+      diaryEntries: [
+        {
+          ...diary("water", "2026-07-02", {
+            event_type: "watering",
+            linked_grow_event_id: "water-event",
+            watering_amount_ml: 250,
+          }),
+          note: "Measured watering note",
+        },
+        {
+          ...diary(
+            "feed",
+            "2026-07-03",
+            {
+              event_type: "feeding",
+              linked_grow_event_id: "feed-event",
+              ph: 6.1,
+              ec: 1.4,
+              nutrients: [{ name: "Logged nutrient", amount: 2, unit: "ml" }],
+            },
+            "https://signed.example/qa.jpg",
+          ),
+          note: "Grower feeding note",
+        },
+      ],
+      growEvents: [
+        {
+          id: "water-event",
+          event_type: "watering",
+          occurred_at: "2026-07-02T10:00:00Z",
+          note: "Spine note",
+        },
+        { id: "feed-event", event_type: "feeding", occurred_at: "2026-07-03T10:00:00Z" },
+      ],
+    });
+    const original = JSON.stringify(input);
+    const vm = buildDiaryRangeReport(input);
+    expect(vm.header.totalInRange).toBe(2);
+    expect(vm.watering).toMatchObject({
+      count: 1,
+      totalMl: 250,
+      entries: [{ detailLabel: "250 ml" }],
+    });
+    expect(vm.feeding).toMatchObject({
+      count: 1,
+      phRange: { min: 6.1, max: 6.1 },
+      ecRange: { min: 1.4, max: 1.4 },
+      nutrients: ["Logged nutrient"],
+      entries: [{ detailLabel: "pH 6.1" }],
+    });
+    expect(vm.photos).toMatchObject({
+      totalCount: 1,
+      items: [{ id: "feed", url: "https://signed.example/qa.jpg" }],
+    });
+    expect(JSON.stringify(input)).toBe(original);
+    expect(buildDiaryRangeReport(input)).toEqual(vm);
+  });
+
+  it("uses a matched event category only when diary classification is absent", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        diaryEntries: [
+          diary("water", "2026-07-02", {
+            linked_grow_event_id: "water-event",
+            event_type: " ",
+            watering_amount_ml: 125,
+          }),
+        ],
+        growEvents: [
+          { id: "water-event", event_type: "watering", occurred_at: "2026-07-02T10:00:00Z" },
+        ],
+      }),
+    );
+    expect(vm.header.totalInRange).toBe(1);
+    expect(vm.watering).toMatchObject({ count: 1, totalMl: 125 });
+  });
+
+  it("reconciles only after inclusive date filtering without hiding in-range evidence", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        diaryEntries: [
+          diary("start", "2026-07-01", {
+            event_type: "training",
+            linked_grow_event_id: "start-event",
+          }),
+          diary("end", "2026-07-10", {
+            event_type: "training",
+            subtype: "defoliation",
+            linked_grow_event_id: "end-event",
+          }),
+          diary("outside", "2026-06-30", {
+            event_type: "training",
+            linked_grow_event_id: "inside-event",
+          }),
+        ],
+        growEvents: [
+          { id: "start-event", event_type: "training", occurred_at: "2026-07-01T00:00:00.000Z" },
+          { id: "end-event", event_type: "training", occurred_at: "2026-07-11T00:00:00.000Z" },
+          { id: "inside-event", event_type: "training", occurred_at: "2026-07-10T23:59:59.999Z" },
+        ],
+      }),
+    );
+    expect(vm.header.totalInRange).toBe(3);
+    expect(vm.training.count).toBe(3);
+    expect(vm.training.byType).toEqual([
+      { token: "training", count: 2 },
+      { token: "defoliation", count: 1 },
+    ]);
+  });
+
+  it("excludes another grow before matching links or counting invalid timestamps", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        grow: { id: GROW_UUID, name: "Selected grow" },
+        diaryEntries: [
+          { ...trainingDiary[0], grow_id: GROW_UUID },
+          { ...trainingDiary[1], grow_id: "other-grow", entry_at: null },
+        ],
+        growEvents: [
+          { ...trainingEvents[0], grow_id: GROW_UUID },
+          { ...trainingEvents[1], grow_id: "other-grow" },
+        ],
+      }),
+    );
+    expect(vm.header).toMatchObject({ totalInRange: 1, excludedNoTimestamp: 0 });
+    expect(vm.training.count).toBe(1);
+  });
+
+  it("does not reconcile explicit links across different grow identities", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        diaryEntries: [{ ...trainingDiary[0], grow_id: GROW_UUID }],
+        growEvents: [{ ...trainingEvents[0], grow_id: "other-grow" }],
+      }),
+    );
+    expect(vm.header.totalInRange).toBe(2);
+  });
+
+  it("keeps unmatched events and ignores malformed links or coincident timestamps", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        diaryEntries: [
+          diary("note", "2026-07-02", {
+            linked_grow_event_id: { id: "event" },
+            grow_event_id: " ",
+          }),
+        ],
+        growEvents: [{ id: "event", event_type: "training", occurred_at: "2026-07-02T10:00:00Z" }],
+      }),
+    );
+    expect(vm.header.totalInRange).toBe(2);
+    expect(vm.training.count).toBe(1);
+  });
+
+  it("does not double-count harvest quantities carried by linked representations", () => {
+    const details = {
+      event_type: "harvest",
+      linked_grow_event_id: "harvest-event",
+      harvest: { wet_weight_grams: 500, dry_weight_grams: 100 },
+    };
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        diaryEntries: [diary("harvest-diary", "2026-07-05", details)],
+        growEvents: [
+          {
+            id: "harvest-event",
+            event_type: "harvest",
+            occurred_at: "2026-07-05T10:00:00Z",
+            details,
+          },
+        ],
+      }),
+    );
+    expect(vm.header.totalInRange).toBe(1);
+    expect(vm.harvest.entries).toHaveLength(1);
+    expect(vm.harvest.totalWetGrams).toBe(500);
+    expect(vm.harvest.totalDryGrams).toBe(100);
+  });
+});
+
 describe("environment — provenance honesty", () => {
   it("aggregates metrics and rolls up sources through the canonical normalizer", () => {
     const vm = buildDiaryRangeReport(

@@ -122,7 +122,10 @@ export default function EditTentDialog({ tent, trigger }: Props) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="glass max-w-md" data-testid="edit-tent-dialog">
+      <DialogContent
+        className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]"
+        data-testid="edit-tent-dialog"
+      >
         <DialogHeader>
           <DialogTitle className="font-display">Edit tent</DialogTitle>
         </DialogHeader>

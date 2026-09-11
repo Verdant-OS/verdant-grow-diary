@@ -27,7 +27,7 @@ describe("Founder static social document build contract", () => {
       STATIC_PUBLIC_SEO_DOCUMENTS.find((document) => document.path === "/founder")?.fileName,
     ).toBe("founder/index.html");
     expect(VERCEL.rewrites?.[0]).toEqual({
-      source: "/((?!assets/).*)",
+      source: "/((?!assets/|~oauth).*)",
       destination: "/",
     });
   });

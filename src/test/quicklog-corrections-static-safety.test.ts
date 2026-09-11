@@ -137,6 +137,7 @@ describe("operational readers exclude retracted diary rows at the query", () => 
     ["src/hooks/usePhenoEvidenceCaptureContext.ts", 1],
     ["src/lib/phenoEvidenceReceiptService.ts", 1],
     ["src/hooks/useRecentFeedingsForDefaults.ts", 1],
+    ["src/hooks/useRecentWateringsForVolumeDefaults.ts", 1],
     ["src/components/PlantSensorSourceBreakdownCard.tsx", 1],
     ["src/lib/actionFollowUpExistingPhotoService.ts", 1],
     ["supabase/functions/ai-coach/index.ts", 1],

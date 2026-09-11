@@ -13,7 +13,13 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const CI_KEYS = ["CI", "E2E_TEST_EMAIL", "PLAYWRIGHT_RETRIES", "E2E_BASE_URL"] as const;
+const CI_KEYS = [
+  "CI",
+  "E2E_TEST_EMAIL",
+  "PLAYWRIGHT_RETRIES",
+  "E2E_BASE_URL",
+  "TESTDINO_TOKEN",
+] as const;
 
 async function loadConfig() {
   vi.resetModules();

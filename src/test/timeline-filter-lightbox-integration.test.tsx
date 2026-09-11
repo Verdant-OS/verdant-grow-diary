@@ -28,6 +28,7 @@ import {
   findTimelinePhotoIndexById,
 } from "@/lib/timelinePhotoLightboxRules";
 import TimelinePhotoLightbox from "@/components/TimelinePhotoLightbox";
+import { findSupabaseTableWrites } from "@/test/helpers/supabaseTableWriteScan";
 
 type Row = {
   id: string;
@@ -358,7 +359,7 @@ describe("Timeline page source — anchor + label + leak guards", () => {
     expect(TIMELINE).not.toMatch(/functions\s*\.\s*invoke\s*\(/);
     expect(TIMELINE).not.toMatch(/\bai-doctor-review\b/);
     expect(TIMELINE).not.toMatch(/\bai-coach\b/);
-    expect(TIMELINE).not.toMatch(/sensor_readings/);
+    expect(findSupabaseTableWrites(TIMELINE, "sensor_readings", "Timeline.tsx")).toEqual([]);
     expect(TIMELINE).not.toMatch(/action_queue\.insert/);
     expect(TIMELINE).not.toMatch(
       /\b(turn|activate)\b.*\b(fan|light|pump|heater|humidifier|dehumidifier)\b/i,

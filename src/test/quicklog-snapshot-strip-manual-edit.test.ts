@@ -57,10 +57,10 @@ describe("quickLogSnapshotStripAdapter — manual edit action + captured label",
       temperatureUnit: "celsius",
     });
     expect(v.status).toBe("usable");
-    expect(v.action).toEqual(MANUAL_SNAPSHOT_EDIT_ACTION);
     expect(v.action.kind).toBe("edit");
+    expect(v.action).toEqual(MANUAL_SNAPSHOT_EDIT_ACTION);
     if (v.action.kind === "edit") {
-      expect(v.action.href).toBe("/sensors#manual-reading");
+      expect(v.action.href).toBe("/sensors?tentIntent=required#manual-reading");
       expect(v.action.label).toBe("Edit manual readings");
     }
   });

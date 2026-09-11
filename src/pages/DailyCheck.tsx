@@ -78,6 +78,7 @@ import {
   resolveDailyCheckPlantSelection,
   type DailyCheckPlantResolution,
 } from "@/lib/dailyCheckPlantSelectionRules";
+import { resolveDailyCheckActivityTarget } from "@/lib/dailyCheckWaterContextRules";
 import {
   DAILY_CHECK_NOTE_SAVED_TOAST,
   DAILY_CHECK_SENSOR_SAVED_TOAST,
@@ -93,6 +94,9 @@ import {
   formatDailyCheckLoggedAt,
   parseDailyCheckEntrySource,
   parseDailyCheckMethodHint,
+  searchParamsFromCompatLocation,
+  isQuickLogDailyCheckMethodHint,
+  dailyCheckMethodToActivityId,
   resolveDailyCheckPostSubmitHref,
 } from "@/lib/dailyCheckPostSubmitRules";
 import { toast } from "sonner";
@@ -121,7 +125,7 @@ import {
 
 function useQueryParam(name: string): string | null {
   const loc = useLocation();
-  return useMemo(() => new URLSearchParams(loc.search).get(name), [loc.search, name]);
+  return useMemo(() => searchParamsFromCompatLocation(loc).get(name), [loc, name]);
 }
 
 function resolveCompatibleAssignedTentId(
@@ -222,11 +226,12 @@ export default function DailyCheck() {
     ],
   );
   const routeStep: DailyGrowCheckStep =
-    methodHint === "note" && routePlant
+    isQuickLogDailyCheckMethodHint(methodHint) && routePlant
       ? "quicklog"
       : methodHint === "sensor" && routePlant && routeTentId
         ? "manual"
         : "select";
+  const requestedActivityId = dailyCheckMethodToActivityId(methodHint);
   const routeIdentityPending = appliedRouteIdentity !== routeIdentity;
   const renderedPlantId = routeIdentityPending ? routePlantId : plantId;
 
@@ -236,14 +241,20 @@ export default function DailyCheck() {
   );
   const selectedPlantTentId = resolveCompatibleAssignedTentId(selectedPlant, selectableTents);
   const selectedStandaloneTentId = selectableTents.some((tent) => tent.id === tentId) ? tentId : "";
+  const activityTarget = resolveDailyCheckActivityTarget({
+    plantId: selectedPlant?.id ?? null,
+    plantAssignedTentId: routeIdentityPending ? routeTentId : selectedPlantTentId,
+    standaloneTentId: selectedStandaloneTentId,
+    firstSelectableTentId: selectableTents[0]?.id ?? null,
+    routeTentId,
+    plantResolutionStatus: plantResolution.status,
+  });
   // A selected plant owns the tent context. Derive this synchronously so an
   // untented plant can never render one frame against a previously selected or
-  // default tent while the state-synchronizing effect catches up.
-  const effectiveTentId = routeIdentityPending
-    ? routeTentId
-    : renderedPlantId
-      ? selectedPlantTentId
-      : selectedStandaloneTentId;
+  // default tent while the state-synchronizing effect catches up. When no
+  // plant is selected, carry an explicit tent or the first selectable tent
+  // on the same paint so Water is not a Choose-plant/tent trap.
+  const effectiveTentId = activityTarget.tentId ?? "";
   const requestedStep = routeIdentityPending ? routeStep : step;
   const renderedStep = requestedStep === "manual" && !effectiveTentId ? "select" : requestedStep;
   const requestedQuickLogOpen = routeIdentityPending ? routeStep === "quicklog" : quickLogOpen;
@@ -383,17 +394,20 @@ export default function DailyCheck() {
       buildDailyCheckPostSubmitActions({
         plantId: selectedPlant?.id ?? null,
         source: entrySource,
+        growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource],
+    [selectedPlant?.id, entrySource, urlGrowId],
   );
   const postSubmitHref = useMemo(
     () =>
       resolveDailyCheckPostSubmitHref({
         plantId: selectedPlant?.id ?? null,
         source: entrySource,
+        growId: urlGrowId,
       }),
-    [selectedPlant?.id, entrySource],
+    [selectedPlant?.id, entrySource, urlGrowId],
   );
+  const scopedBackAction = urlGrowId ? postSubmitActions.find((action) => action.primary) : null;
 
   const loggedAtLabel = useMemo(() => formatDailyCheckLoggedAt(lastSubmittedAt), [lastSubmittedAt]);
   const savedItems = useMemo(
@@ -454,8 +468,11 @@ export default function DailyCheck() {
   return (
     <div className="mx-auto w-full min-w-0 max-w-2xl pb-24" data-testid="daily-grow-check-page">
       <Button asChild variant="ghost" size="sm" className="mb-3 min-h-11 whitespace-normal">
-        <Link to="/">
-          <ArrowLeft className="h-4 w-4" /> Dashboard
+        <Link to={scopedBackAction?.href ?? "/"}>
+          <ArrowLeft className="h-4 w-4" />{" "}
+          {scopedBackAction && scopedBackAction.key !== "dashboard"
+            ? scopedBackAction.label
+            : "Dashboard"}
         </Link>
       </Button>
       <PageHeader
@@ -575,10 +592,11 @@ export default function DailyCheck() {
       <div className="mb-4 w-full min-w-0">
         <QuickLogAllActivitiesSection
           growId={growId}
-          tentId={effectiveTentId || null}
-          plantId={selectedPlant?.id ?? null}
+          tentId={activityTarget.tentId}
+          plantId={activityTarget.plantId}
           plantStage={(selectedPlant as { stage?: unknown } | null)?.stage ?? null}
           testIdPrefix="daily-check-all-activities"
+          requestedActivityId={requestedActivityId}
           // D5: Daily Check is a real plant-scoped save surface. Without this
           // the remembered target goes stale here, so an unscoped Quick Log
           // would offer an OLDER plant than the one just logged. Only a save
@@ -838,11 +856,11 @@ export default function DailyCheck() {
                 <Button
                   variant="outline"
                   className={`h-auto min-h-11 w-full min-w-0 flex-col items-start gap-1 whitespace-normal py-3 text-left ${
-                    methodHint === "note" ? "ring-2 ring-primary" : ""
+                    isQuickLogDailyCheckMethodHint(methodHint) ? "ring-2 ring-primary" : ""
                   }`}
                   data-testid="daily-grow-check-choose-quicklog"
-                  data-method-focused={methodHint === "note" ? "1" : "0"}
-                  aria-pressed={methodHint === "note"}
+                  data-method-focused={isQuickLogDailyCheckMethodHint(methodHint) ? "1" : "0"}
+                  aria-pressed={isQuickLogDailyCheckMethodHint(methodHint)}
                   disabled={!selectedPlant}
                   onClick={openSelectedPlantQuickLog}
                 >
@@ -1315,6 +1333,7 @@ export default function DailyCheck() {
               plantId: selectedPlant?.id ?? null,
               growId,
               tentId: effectiveTentId || null,
+              activityId: requestedActivityId,
             }}
           />
         </>

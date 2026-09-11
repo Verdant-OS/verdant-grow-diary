@@ -8,7 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -29,11 +31,20 @@ import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 
 import {
   buildQuickLogV2TargetOptions,
+  filterQuickLogV2TargetOptions,
+  formatQuickLogV2TargetOptionLabel,
   isStaleQuickLogV2TargetSelection,
+  partitionQuickLogV2TargetOptionsForTent,
   resolveQuickLogV2Target,
+  resolveQuickLogV2TentContextId,
+  resolveTentScopedQuickLogPlantSelection,
   EMPTY_QUICKLOG_V2_FORM,
+  QUICK_LOG_V2_TARGET_FILTER_THRESHOLD,
+  QUICK_LOG_V2_EMPTY_CONTENT_HELPER,
+  isQuickLogV2CriticalContentMissing,
   type QuickLogV2FormState,
   type QuickLogV2Action,
+  type QuickLogV2TargetOption,
   type ResolvedQuickLogV2Target,
 } from "@/lib/quickLogV2Rules";
 import {
@@ -90,8 +101,15 @@ import {
 } from "@/lib/feedingDefaultsViewModel";
 import { useRecentFeedingsForDefaults } from "@/hooks/useRecentFeedingsForDefaults";
 import {
+  applyWateringVolumeDefaultsToForm,
+  buildWateringVolumeDefaults,
+  WATERING_VOLUME_DEFAULTS_LABEL,
+} from "@/lib/wateringVolumeDefaultsViewModel";
+import { useRecentWateringsForVolumeDefaults } from "@/hooks/useRecentWateringsForVolumeDefaults";
+import {
   EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM,
   buildQuickLogMaturityEvidenceDetails,
+  hasQuickLogMaturityEvidence,
   quickLogMaturityEvidenceReasonToMessage,
   type QuickLogMaturityEvidenceFormState,
 } from "@/lib/quickLogMaturityEvidenceRules";
@@ -119,6 +137,8 @@ import {
   resolveRecentTargetSuggestion,
 } from "@/lib/quickLogRecentTargetSuggestion";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
+import GuidedGrowWalkPanel from "@/components/GuidedGrowWalkPanel";
+import { type GrowWalkVisitMode } from "@/lib/growWalkContracts";
 import {
   fahrenheitToCelsius,
   getTemperatureUnitSymbol,
@@ -285,7 +305,23 @@ export default function QuickLogV2Sheet({
     });
   }
 
-  const [form, setForm] = useState<QuickLogV2FormState>(EMPTY_QUICKLOG_V2_FORM);
+  // Seed from open props on first paint so tent:/plant: defaultTargetKey is
+  // not briefly empty — that vacancy previously let sole-plant auto-select
+  // rewrite an explicit tent: open target before the open-reset effect ran.
+  const [form, setForm] = useState<QuickLogV2FormState>(() =>
+    open
+      ? {
+          ...EMPTY_QUICKLOG_V2_FORM,
+          selectedKey: defaultTargetKey ?? null,
+          action: defaultAction,
+        }
+      : EMPTY_QUICKLOG_V2_FORM,
+  );
+  // Type-to-filter for long Target lists. Reset on close/reopen so a prior
+  // query cannot hide options on the next open.
+  const [targetFilterQuery, setTargetFilterQuery] = useState("");
+  // One-shot tent-scoped plant auto-select per open (sole plant / recent-in-tent).
+  const [tentPlantAutoApplied, setTentPlantAutoApplied] = useState(false);
   const [feedingForm, setFeedingForm] = useState<QuickLogFeedingFormState>(
     EMPTY_QUICKLOG_FEEDING_FORM,
   );
@@ -305,7 +341,9 @@ export default function QuickLogV2Sheet({
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [videoChecking, setVideoChecking] = useState(false);
   const [feedingDefaultsApplied, setFeedingDefaultsApplied] = useState(false);
+  const [wateringVolumeDefaultsApplied, setWateringVolumeDefaultsApplied] = useState(false);
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
+  const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
   const [wateringRetryPending, setWateringRetryPending] = useState(false);
   const [wateringSubmissionLocked, setWateringSubmissionLocked] = useState(false);
   // Synchronous in-flight guard. The save-state flags are React
@@ -358,13 +396,59 @@ export default function QuickLogV2Sheet({
   const wateringTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
   const feedingTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
 
-  const options = useMemo(() => buildQuickLogV2TargetOptions(tents, plants), [tents, plants]);
+  // Visible grow roster gates Target Select: dangling grow_id rows (UUID
+  // present but grow not in useGrows()) must not appear — live FAIL tip
+  // 87b3b322 offered Tent · Flower with Grow "No grow linked".
+  const { grows } = useGrows();
+  const visibleGrowIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of grows ?? []) {
+      if (typeof g?.id === "string" && g.id.trim().length > 0) ids.add(g.id.trim());
+    }
+    return ids;
+  }, [grows]);
+  const baseOptions = useMemo(
+    () => buildQuickLogV2TargetOptions(tents, plants, visibleGrowIds),
+    [tents, plants, visibleGrowIds],
+  );
+
+  // Tent context from open intent / selected tent key (route registration
+  // already arrives as defaultTargetKey `tent:<id>`).
+  const tentContextId = useMemo(() => {
+    return (
+      resolveQuickLogV2TentContextId(defaultTargetKey) ??
+      resolveQuickLogV2TentContextId(form.selectedKey)
+    );
+  }, [defaultTargetKey, form.selectedKey]);
+
+  const tentScopedPartitions = useMemo(
+    () => partitionQuickLogV2TargetOptionsForTent(baseOptions, tentContextId),
+    [baseOptions, tentContextId],
+  );
+
+  const options = tentScopedPartitions.ordered;
+
+  const filteredTargetOptions = useMemo(
+    () => filterQuickLogV2TargetOptions(options, targetFilterQuery),
+    [options, targetFilterQuery],
+  );
+
+  const filteredInTentPlants = useMemo(() => {
+    if (!tentContextId) return [] as QuickLogV2TargetOption[];
+    return filterQuickLogV2TargetOptions(tentScopedPartitions.inTentPlants, targetFilterQuery);
+  }, [tentContextId, tentScopedPartitions.inTentPlants, targetFilterQuery]);
+
+  const filteredOtherTargets = useMemo(() => {
+    if (!tentContextId) return filteredTargetOptions;
+    return filterQuickLogV2TargetOptions(tentScopedPartitions.other, targetFilterQuery);
+  }, [tentContextId, tentScopedPartitions.other, targetFilterQuery, filteredTargetOptions]);
+
+  const showTargetFilter = options.length > QUICK_LOG_V2_TARGET_FILTER_THRESHOLD;
 
   const resolvedTarget = useMemo(
     () => resolveQuickLogV2Target(options, form.selectedKey),
     [options, form.selectedKey],
   );
-  const { grows } = useGrows();
   // A remembered plant is an offer on a genuinely global/null-target open,
   // never an implicit default. Pair the record with the account key that
   // produced it so an account switch fails closed during the effect boundary.
@@ -456,6 +540,16 @@ export default function QuickLogV2Sheet({
       }),
     [resolvedTarget, plants, tents, grows],
   );
+  const targetStage =
+    resolvedTarget.ok && resolvedTarget.targetType === "plant"
+      ? ((plants as Array<{ id?: string; stage?: string | null }>).find(
+          (plant) => plant.id === resolvedTarget.plantId,
+        )?.stage ?? null)
+      : resolvedTarget.ok && resolvedTarget.targetType === "tent"
+        ? ((tents as Array<{ id?: string; stage?: string | null }>).find(
+            (tent) => tent.id === resolvedTarget.tentId,
+          )?.stage ?? null)
+        : null;
   const wateringContext = useMemo(
     () =>
       buildQuickLogWateringContext({
@@ -476,18 +570,26 @@ export default function QuickLogV2Sheet({
 
   const recentFeedingsQ = useRecentFeedingsForDefaults({
     plantId: resolvedContext.plantId,
-    tentId: resolvedContext.tentId,
-    growId: resolvedContext.growId,
   }) as { data?: unknown[] };
   const feedingDefaults = useMemo(
     () =>
       buildFeedingDefaults({
         rawEntries: recentFeedingsQ.data ?? [],
         plantId: resolvedContext.plantId,
-        tentId: resolvedContext.tentId,
-        growId: resolvedContext.growId,
       }),
-    [recentFeedingsQ.data, resolvedContext.plantId, resolvedContext.tentId, resolvedContext.growId],
+    [recentFeedingsQ.data, resolvedContext.plantId],
+  );
+
+  const recentWateringsQ = useRecentWateringsForVolumeDefaults({
+    plantId: resolvedContext.plantId,
+  }) as { data?: unknown[] };
+  const wateringVolumeDefaults = useMemo(
+    () =>
+      buildWateringVolumeDefaults({
+        rawEntries: recentWateringsQ.data ?? [],
+        plantId: resolvedContext.plantId,
+      }),
+    [recentWateringsQ.data, resolvedContext.plantId],
   );
 
   const isLoadingContext = Boolean(plantsQ.isLoading || tentsQ.isLoading);
@@ -505,6 +607,16 @@ export default function QuickLogV2Sheet({
   const selectedTargetStale = isStaleQuickLogV2TargetSelection(resolvedTarget);
   const noteLength = form.note.length;
   const volumeMissing = form.action === "water" && wateringForm.volumeMl.trim() === "";
+  const criticalContentMissing = isQuickLogV2CriticalContentMissing({
+    action: form.action,
+    note: form.note,
+    temperatureC: form.temperatureC,
+    humidityPct: form.humidityPct,
+    vpdKpa: form.vpdKpa,
+    hasPhoto: photoFile !== null,
+    hasVideo: videoFile !== null,
+    hasMaturityEvidence: hasQuickLogMaturityEvidence(maturityEvidenceForm),
+  });
   const showMaturityEvidence =
     form.action !== "feed" && resolvedTarget.ok && resolvedTarget.targetType === "plant";
   // Better/Same/Worse records the PLANT's response, so it is offered only
@@ -543,6 +655,7 @@ export default function QuickLogV2Sheet({
         hasNoTargets,
         selectedTargetMissing,
         volumeMissing,
+        criticalContentMissing,
         saving: saving || feedingSaving || wateringSaving,
       });
 
@@ -575,6 +688,7 @@ export default function QuickLogV2Sheet({
     // the previous draft. A stale completion can never repopulate the sheet.
     resetVideoSelection();
     if (open) {
+      setVisitMode("fast_check");
       setForm({
         ...EMPTY_QUICKLOG_V2_FORM,
         selectedKey: defaultTargetKey ?? null,
@@ -591,6 +705,7 @@ export default function QuickLogV2Sheet({
       wateringTempEntryUnitRef.current = null;
       setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
       setFeedingDefaultsApplied(false);
+      setWateringVolumeDefaultsApplied(false);
       setLocalError(null);
       setSaveStatus("");
       setPostSave(null);
@@ -603,9 +718,53 @@ export default function QuickLogV2Sheet({
       idempotencyKeyRef.current = 1;
       saveIdempotencyKeyRef.current = newQuickLogSaveKey();
       setRecentSuggestionDismissed(false);
+      setTargetFilterQuery("");
+      setTentPlantAutoApplied(false);
       resetPhotoSelection();
+    } else {
+      setTargetFilterQuery("");
+      setTentPlantAutoApplied(false);
     }
   }, [open, defaultTargetKey, defaultAction]);
+
+  // Tent-scoped plant pick: prefer recent-in-tent, else sole plant in tent.
+  // Only when selectedKey is still empty/unset — never rewrite an explicit
+  // tent:<id> (or plant:) target. One-shot per open so a grower who later
+  // picks the tent again is not forced.
+  useEffect(() => {
+    if (!open || contextBlocked || tentPlantAutoApplied) return;
+    const recentPlantId = recentTargetSuggestion?.plantId ?? recentTargetRecord?.plantId ?? null;
+    // During the open-reset tick, form.selectedKey can still be the previous
+    // render's empty value while defaultTargetKey already carries an explicit
+    // tent:/plant: open target. Prefer that pending key so sole auto-select
+    // cannot race-rewrite tent:<id> → plant:<id>.
+    const draftKey =
+      typeof form.selectedKey === "string" && form.selectedKey.trim().length > 0
+        ? form.selectedKey
+        : (defaultTargetKey ?? null);
+    const nextKey = resolveTentScopedQuickLogPlantSelection({
+      tentId: tentContextId,
+      options,
+      selectedKey: draftKey,
+      recentPlantId,
+    });
+    setTentPlantAutoApplied(true);
+    if (!nextKey || nextKey === draftKey) return;
+    if (videoValidationInFlightRef.current) resetVideoSelection();
+    setForm((prev) => ({ ...prev, selectedKey: nextKey }));
+    setLocalError(null);
+    setSaveStatus("");
+  }, [
+    open,
+    contextBlocked,
+    tentPlantAutoApplied,
+    tentContextId,
+    options,
+    form.selectedKey,
+    defaultTargetKey,
+    recentTargetSuggestion,
+    recentTargetRecord,
+  ]);
 
   // One-shot prefill of the feeding form with last-used defaults. Runs only
   // when the Feed action is active, the form is still pristine, defaults
@@ -625,6 +784,28 @@ export default function QuickLogV2Sheet({
     }));
     setFeedingDefaultsApplied(true);
   }, [open, form.action, feedingDefaults, feedingDefaultsApplied, feedingForm]);
+
+  // One-shot prefill of Water volume from the plant's most recent watering
+  // that recorded a positive volume. Fail closed: never invent 200/500/pot
+  // size. Never overwrite a grower-typed volume. Never touch Feed.
+  useEffect(() => {
+    if (!open) return;
+    if (form.action !== "water") return;
+    if (wateringVolumeDefaultsApplied) return;
+    if (!wateringVolumeDefaults.defaults) return;
+    if (wateringForm.volumeMl.trim() !== "") return;
+    setWateringForm((previous) => ({
+      ...previous,
+      volumeMl: applyWateringVolumeDefaultsToForm(wateringVolumeDefaults).volumeMl,
+    }));
+    setWateringVolumeDefaultsApplied(true);
+  }, [
+    open,
+    form.action,
+    wateringVolumeDefaults,
+    wateringVolumeDefaultsApplied,
+    wateringForm.volumeMl,
+  ]);
 
   // Idempotent: the note field receives value updates from multiple event
   // paths (onChange + onInput + onCompositionEnd + onBlur), which often
@@ -703,6 +884,7 @@ export default function QuickLogV2Sheet({
     if (prev === "water") {
       setWateringForm(EMPTY_QUICKLOG_WATERING_FORM);
       wateringTempEntryUnitRef.current = null;
+      setWateringVolumeDefaultsApplied(false);
     }
     // Entering feed → maturity evidence surface hides; clear its draft
     // so stale plant-maturity notes don't get retained under the hood. Feed
@@ -945,6 +1127,23 @@ export default function QuickLogV2Sheet({
       return;
     }
 
+    if (
+      !pendingWateringSubmission &&
+      isQuickLogV2CriticalContentMissing({
+        action: form.action,
+        note: form.note,
+        temperatureC: form.temperatureC,
+        humidityPct: form.humidityPct,
+        vpdKpa: form.vpdKpa,
+        hasPhoto: photoFile !== null,
+        hasVideo: videoFile !== null,
+        hasMaturityEvidence: hasQuickLogMaturityEvidence(maturityEvidenceForm),
+      })
+    ) {
+      setLocalError(QUICK_LOG_V2_EMPTY_CONTENT_HELPER);
+      return;
+    }
+
     if (!pendingWateringSubmission && form.action === "feed") {
       if (!resolved.growId) {
         setLocalError(feedingFormReasonToHelper("grow_id:missing"));
@@ -1162,6 +1361,8 @@ export default function QuickLogV2Sheet({
         humidityPct: form.humidityPct,
         vpdKpa: form.vpdKpa,
         details: maturityDetails,
+        maturityEvidenceForm,
+        hasCompanionMedia: Boolean(submissionPhotoFile || submissionVideoFile),
         idempotencyKey: saveIdempotencyKeyRef.current,
       });
       if (built.ok !== true) {
@@ -1349,6 +1550,7 @@ export default function QuickLogV2Sheet({
       ...EMPTY_QUICKLOG_V2_FORM,
       selectedKey: prev.selectedKey,
     }));
+    setVisitMode("fast_check");
     manualTempEntryUnitRef.current = null;
     // Same reason as the open reset: "Log another" begins a new draft, and its
     // note is empty, so no chip has authored anything in it yet.
@@ -1364,6 +1566,7 @@ export default function QuickLogV2Sheet({
     keepWateringSubmissionLockedRef.current = false;
     setMaturityEvidenceForm(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
     setFeedingDefaultsApplied(false);
+    setWateringVolumeDefaultsApplied(false);
     resetPhotoSelection();
     resetVideoSelection();
   }
@@ -1511,13 +1714,73 @@ export default function QuickLogV2Sheet({
                   }
                 />
               </SelectTrigger>
-              <SelectContent>
-                {options.map((o) => (
-                  <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
-                    {o.type === "tent" ? "Tent · " : "Plant · "}
-                    {o.label}
-                  </SelectItem>
-                ))}
+              <SelectContent
+                data-testid="qlv2-target-content"
+                // Keep filter focus from collapsing the list (Radix Select).
+                onCloseAutoFocus={(event) => {
+                  if (showTargetFilter && targetFilterQuery.trim()) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                {showTargetFilter && (
+                  <div
+                    className="sticky top-0 z-10 bg-popover p-2 border-b border-border/60"
+                    // Pointer/keyboard must not dismiss or steal Select typeahead.
+                    onPointerDown={(event) => event.preventDefault()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  >
+                    <Input
+                      value={targetFilterQuery}
+                      onChange={(event) => setTargetFilterQuery(event.target.value)}
+                      placeholder="Filter plants or tents…"
+                      aria-label="Filter Quick Log targets"
+                      data-testid="qlv2-target-filter"
+                      className="h-9"
+                      autoComplete="off"
+                    />
+                  </div>
+                )}
+                {tentContextId ? (
+                  <>
+                    {filteredInTentPlants.length > 0 && (
+                      <SelectGroup data-testid="qlv2-target-group-in-tent">
+                        <SelectLabel>In this tent</SelectLabel>
+                        {filteredInTentPlants.map((o) => (
+                          <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                            {formatQuickLogV2TargetOptionLabel(o)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {filteredOtherTargets.length > 0 && (
+                      <SelectGroup data-testid="qlv2-target-group-other">
+                        <SelectLabel>Other</SelectLabel>
+                        {filteredOtherTargets.map((o) => (
+                          <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                            {formatQuickLogV2TargetOptionLabel(o)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </>
+                ) : (
+                  filteredTargetOptions.map((o) => (
+                    <SelectItem key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                      {formatQuickLogV2TargetOptionLabel(o)}
+                    </SelectItem>
+                  ))
+                )}
+                {showTargetFilter &&
+                  filteredTargetOptions.length === 0 &&
+                  targetFilterQuery.trim() !== "" && (
+                    <div
+                      className="px-2 py-3 text-sm text-muted-foreground"
+                      data-testid="qlv2-target-filter-empty"
+                    >
+                      No matching targets.
+                    </div>
+                  )}
               </SelectContent>
             </Select>
             <p id="qlv2-target-help" className="mt-1 text-sm text-muted-foreground">
@@ -1599,6 +1862,70 @@ export default function QuickLogV2Sheet({
             <QuickLogTargetPanel panel={targetPanel} />
           </div>
 
+          <GuidedGrowWalkPanel
+            visitMode={visitMode}
+            onVisitModeChange={setVisitMode}
+            targetOk={resolvedTarget.ok}
+            tentId={resolvedTarget.ok ? (resolvedTarget.tentId ?? null) : null}
+            targetType={resolvedTarget.ok ? (resolvedTarget.targetType ?? null) : null}
+            stage={targetStage}
+            testIdPrefix="qlv2"
+            onApplyCloseoutToNote={(composed) => {
+              setForm((previous) => {
+                const existing = previous.note.trimEnd();
+                const nextNote = existing ? `${existing}\n\n${composed}` : composed;
+                return previous.note === nextNote ? previous : { ...previous, note: nextNote };
+              });
+            }}
+          />
+
+          {/* Hoisted above Action and the media pickers: on a plant-scoped
+              draft the 3-tap status (open, tap a chip, Save) is the first
+              control the grower reaches. Gating and the save path are unchanged. */}
+          {showResponseCheck && (
+            <div
+              role="group"
+              aria-label="Plant response check"
+              data-testid="qlv2-response-chips"
+              className="grid gap-2"
+            >
+              <p className="text-sm font-medium">How did the plant respond?</p>
+              <div className="flex flex-wrap gap-2">
+                {RESPONSE_CHECK_STATUSES.map((status) => (
+                  <Button
+                    key={status}
+                    type="button"
+                    variant={selectedResponseStatus === status ? "default" : "outline"}
+                    size="sm"
+                    disabled={
+                      wateringSubmissionLocked ||
+                      (responseCheckOverflowByStatus.get(status) === true &&
+                        selectedResponseStatus !== status)
+                    }
+                    aria-pressed={selectedResponseStatus === status}
+                    data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
+                    onClick={() => {
+                      const next = applyResponseCheck(form.note, status);
+                      // Belt and braces: the chip is already disabled in this
+                      // case, but never let a programmatic write exceed the
+                      // limit the save path enforces.
+                      if (next.length > NOTE_LIMIT) return;
+                      chipAuthoredStatusRef.current = status;
+                      setField("note", next);
+                    }}
+                  >
+                    {status}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {everyResponseCheckOverflows
+                  ? "Your note is too long to add a response line. Shorten it first."
+                  : "Better/Same/Worse records the plant response, not the grow action."}
+              </p>
+            </div>
+          )}
+
           <div>
             <Label>Action</Label>
             <div
@@ -1666,6 +1993,15 @@ export default function QuickLogV2Sheet({
 
           {form.action === "water" && (
             <div className="space-y-2">
+              {wateringVolumeDefaultsApplied && wateringVolumeDefaults.label && (
+                <div
+                  data-testid="qlv2-watering-volume-defaults-label"
+                  className="rounded-md border border-border/60 bg-secondary/30 px-3 py-2 text-sm text-muted-foreground"
+                  role="note"
+                >
+                  {WATERING_VOLUME_DEFAULTS_LABEL}
+                </div>
+              )}
               <QuickLogWateringForm
                 value={wateringForm}
                 context={wateringContext}
@@ -1848,50 +2184,6 @@ export default function QuickLogV2Sheet({
                   Checking video before save…
                 </p>
               )}
-            </div>
-          )}
-
-          {showResponseCheck && (
-            <div
-              role="group"
-              aria-label="Plant response check"
-              data-testid="qlv2-response-chips"
-              className="grid gap-2"
-            >
-              <p className="text-sm font-medium">How did the plant respond?</p>
-              <div className="flex flex-wrap gap-2">
-                {RESPONSE_CHECK_STATUSES.map((status) => (
-                  <Button
-                    key={status}
-                    type="button"
-                    variant={selectedResponseStatus === status ? "default" : "outline"}
-                    size="sm"
-                    disabled={
-                      wateringSubmissionLocked ||
-                      (responseCheckOverflowByStatus.get(status) === true &&
-                        selectedResponseStatus !== status)
-                    }
-                    aria-pressed={selectedResponseStatus === status}
-                    data-testid={`qlv2-response-chip-${status.toLowerCase()}`}
-                    onClick={() => {
-                      const next = applyResponseCheck(form.note, status);
-                      // Belt and braces: the chip is already disabled in this
-                      // case, but never let a programmatic write exceed the
-                      // limit the save path enforces.
-                      if (next.length > NOTE_LIMIT) return;
-                      chipAuthoredStatusRef.current = status;
-                      setField("note", next);
-                    }}
-                  >
-                    {status}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {everyResponseCheckOverflows
-                  ? "Your note is too long to add a response line. Shorten it first."
-                  : "Better/Same/Worse records the plant response, not the grow action."}
-              </p>
             </div>
           )}
 
@@ -2138,7 +2430,9 @@ export default function QuickLogV2Sheet({
                       wateringSaving ||
                       videoChecking ||
                       (contextBlocked && !wateringRetryPending) ||
-                      (selectedTargetStale && !wateringRetryPending)
+                      (selectedTargetMissing && !wateringRetryPending) ||
+                      (selectedTargetStale && !wateringRetryPending) ||
+                      (criticalContentMissing && !wateringRetryPending)
                     }
                     aria-describedby="qlv2-save-helper"
                     data-testid="qlv2-save"
@@ -2166,6 +2460,7 @@ function getSaveHelperMessage(input: {
   hasNoTargets: boolean;
   selectedTargetMissing: boolean;
   volumeMissing: boolean;
+  criticalContentMissing: boolean;
   saving: boolean;
 }): string {
   if (input.saving) return "Saving your Quick Log…";
@@ -2174,6 +2469,7 @@ function getSaveHelperMessage(input: {
   if (input.hasNoTargets) return "Add a plant or tent before saving a Quick Log.";
   if (input.selectedTargetMissing) return "Choose a plant or tent before saving.";
   if (input.volumeMissing) return "Watering logs need a volume before they can save.";
+  if (input.criticalContentMissing) return QUICK_LOG_V2_EMPTY_CONTENT_HELPER;
   return "Ready to save when this log matches what happened.";
 }
 

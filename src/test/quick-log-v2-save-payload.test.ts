@@ -21,7 +21,7 @@ function base(overrides = {}) {
     resolved: okTarget,
     action: "note" as const,
     volumeMl: "",
-    note: "",
+    note: "check-in",
     temperatureC: "",
     humidityPct: "",
     vpdKpa: "",
@@ -73,17 +73,49 @@ describe("quickLogV2SavePayload", () => {
   });
 
   it("water requires positive volume", () => {
-    expect(buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "" })).ok).toBe(false);
-    expect(buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "0" })).ok).toBe(false);
-    expect(buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "-5" })).ok).toBe(false);
-    expect(buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "abc" })).ok).toBe(false);
+    expect(buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "", note: "" })).ok).toBe(
+      false,
+    );
+    expect(buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "0", note: "" })).ok).toBe(
+      false,
+    );
+    expect(buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "-5", note: "" })).ok).toBe(
+      false,
+    );
+    expect(
+      buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "abc", note: "" })).ok,
+    ).toBe(false);
   });
 
-  it("water with valid volume passes", () => {
-    const r = buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "500" }));
+  it("water with valid volume passes (note remains optional for watering)", () => {
+    const r = buildQuickLogV2SavePayload(base({ action: "water", volumeMl: "500", note: "" }));
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error("expected ok");
     expect(r.payload.p_volume_ml).toBe(500);
+  });
+
+  it("note action with empty body and no other content fails closed", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "" }));
+    expect(r).toEqual({ ok: false, reason: "empty_content" });
+    expect(buildQuickLogV2SavePayload(base({ note: "   " }))).toEqual({
+      ok: false,
+      reason: "empty_content",
+    });
+  });
+
+  it("empty note with companion media still builds (media is critical content)", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "", hasCompanionMedia: true }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_note).toBeNull();
+  });
+
+  it("empty note with a manual reading still builds", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "", temperatureC: "24.5" }));
+    expect(r.ok).toBe(true);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.payload.p_note).toBeNull();
+    expect(r.payload.p_temperature_c).toBe(24.5);
   });
 
   it("entered sensors flow through", () => {

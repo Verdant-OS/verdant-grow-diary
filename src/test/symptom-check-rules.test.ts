@@ -5,6 +5,7 @@ import {
   validateGuidedSymptomCheck,
 } from "@/lib/symptomCheckRules";
 import { STAGES } from "@/lib/grow";
+import { findCannabisSymptomByObservedSign } from "@/constants/cannabisSymptomTypes";
 
 describe("guided Symptom Check rules", () => {
   it("prefills only the canonical Quick Log stage vocabulary", () => {
@@ -105,6 +106,113 @@ describe("guided Symptom Check rules", () => {
       });
     },
   );
+
+  it("records a clean check without inventing a symptom sign", () => {
+    expect(
+      validateGuidedSymptomCheck({
+        plantId: "plant-1",
+        symptomId: null,
+        stage: "flower",
+        stageConfirmed: true,
+        noSymptomsObserved: true,
+      }),
+    ).toEqual({
+      ok: true,
+      stage: "flower",
+      details: {
+        observation_stage: "flower",
+        symptom_check_result: "no_symptoms_observed",
+      },
+    });
+  });
+
+  it("keeps a clean check out of the symptom vocabulary", () => {
+    const result = validateGuidedSymptomCheck({
+      plantId: "plant-1",
+      symptomId: null,
+      stage: "veg",
+      stageConfirmed: true,
+      noSymptomsObserved: true,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.details).not.toHaveProperty("observedSign");
+    expect(findCannabisSymptomByObservedSign(result.details.symptom_check_result)).toBeNull();
+  });
+
+  it("still requires a confirmed stage for a clean check", () => {
+    expect(
+      validateGuidedSymptomCheck({
+        plantId: "plant-1",
+        symptomId: null,
+        stage: "veg",
+        stageConfirmed: false,
+        noSymptomsObserved: true,
+      }),
+    ).toEqual({
+      ok: false,
+      reason: "Confirm the stage before saving this Symptom Check.",
+    });
+    expect(
+      validateGuidedSymptomCheck({
+        plantId: "plant-1",
+        symptomId: null,
+        stage: null,
+        stageConfirmed: true,
+        noSymptomsObserved: true,
+      }),
+    ).toEqual({ ok: false, reason: "Choose the plant's current stage." });
+  });
+
+  it("fails closed when a symptom and no visible symptoms are both set", () => {
+    expect(
+      validateGuidedSymptomCheck({
+        plantId: "plant-1",
+        symptomId: "spots",
+        stage: "veg",
+        stageConfirmed: true,
+        noSymptomsObserved: true,
+      }),
+    ).toEqual({
+      ok: false,
+      reason: "Choose a visible sign or mark no visible symptoms, not both.",
+    });
+  });
+
+  it("keeps requiring a sign when no visible symptoms is not set", () => {
+    for (const draft of [{ noSymptomsObserved: false }, {}, { noSymptomsObserved: undefined }]) {
+      expect(
+        validateGuidedSymptomCheck({
+          plantId: "plant-1",
+          symptomId: null,
+          stage: "veg",
+          stageConfirmed: true,
+          ...draft,
+        }),
+      ).toEqual({ ok: false, reason: "Choose the visible sign you observed." });
+    }
+  });
+
+  it("carries an optional location on a clean check", () => {
+    expect(
+      validateGuidedSymptomCheck({
+        plantId: "plant-1",
+        symptomId: null,
+        stage: "veg",
+        stageConfirmed: true,
+        noSymptomsObserved: true,
+        observationLocation: "upper_growth",
+      }),
+    ).toEqual({
+      ok: true,
+      stage: "veg",
+      details: {
+        observation_stage: "veg",
+        symptom_check_result: "no_symptoms_observed",
+        observationLocation: "upper_growth",
+      },
+    });
+  });
 
   it("builds a grow-scoped timeline link and only anchors a safe returned id", () => {
     expect(buildSymptomTimelineHref("grow 1", "event-1")).toBe(

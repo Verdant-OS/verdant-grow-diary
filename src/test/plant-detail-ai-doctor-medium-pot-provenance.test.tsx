@@ -53,6 +53,16 @@ vi.mock("@/hooks/usePlantAssignedTentAlerts", () => ({
     error: null,
   }),
 }));
+vi.mock("@/hooks/use-sensor-readings", () => ({
+  useSensorReadingsByTents: () => ({
+    byTent: {},
+    statusByTent: {},
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+    retryTent: vi.fn(),
+  }),
+}));
 
 beforeEach(() => {
   fetchSpy.mockClear();

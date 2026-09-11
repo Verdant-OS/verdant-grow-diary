@@ -181,6 +181,32 @@ describe("buildAiSensorSnapshotContext — staleThresholdMs edges", () => {
   it("default threshold constant matches 15 minutes (live canon)", () => {
     expect(DEFAULT_AI_SENSOR_STALE_THRESHOLD_MS).toBe(15 * 60 * 1000);
   });
+
+  it("source-aware canon: 16-minute and 9-hour manuals are not stale; 25-hour manuals are", () => {
+    const sixteenMin = buildAiSensorSnapshotContext(
+      { source: "manual", captured_at: capturedAtMsAgo(16 * 60 * 1000), ...baseReadings },
+      { now: NOW },
+    );
+    const nineHours = buildAiSensorSnapshotContext(
+      { source: "manual", captured_at: capturedAtMsAgo(9 * 60 * 60 * 1000), ...baseReadings },
+      { now: NOW },
+    );
+    const twentyFiveHours = buildAiSensorSnapshotContext(
+      { source: "manual", captured_at: capturedAtMsAgo(25 * 60 * 60 * 1000), ...baseReadings },
+      { now: NOW },
+    );
+    expect(sixteenMin.stale).toBe(false);
+    expect(nineHours.stale).toBe(false);
+    expect(twentyFiveHours.stale).toBe(true);
+  });
+
+  it("source-aware canon: 16-minute live is stale", () => {
+    const r = buildAiSensorSnapshotContext(
+      { source: "live", captured_at: capturedAtMsAgo(16 * 60 * 1000), ...baseReadings },
+      { now: NOW },
+    );
+    expect(r.stale).toBe(true);
+  });
 });
 
 // =========================================================

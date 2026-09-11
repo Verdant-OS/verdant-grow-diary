@@ -150,7 +150,14 @@ function fetchEntitlementSnapshot(
   return tracked;
 }
 
-export function useMyEntitlements(): UseMyEntitlementsResult {
+export function useMyEntitlements(
+  options?: { enabled?: boolean },
+): UseMyEntitlementsResult {
+  // Default true: existing callers stay presentation-only and still load.
+  // AppShell passes enabled: authStatus === "authenticated" so a cached
+  // user during getUser miss (revalidation_failed) cannot fire
+  // GET /rest/v1/subscriptions or user_roles.
+  const enabled = options?.enabled !== false;
   const { user, loading: authLoading } = useAuth();
   // Key loads on user id, never the session user object reference. TOKEN_REFRESHED
   // replaces the user object while keeping the same id (#564).
@@ -219,8 +226,14 @@ export function useMyEntitlements(): UseMyEntitlementsResult {
 
   useEffect(() => {
     if (authLoading) return;
+    if (!enabled) return;
     void doLoad();
-  }, [authLoading, doLoad]);
+  }, [authLoading, doLoad, enabled]);
 
-  return { loading, lookupFailed, entitlement, refetch: doLoad };
+  const refetch = useCallback(async (): Promise<boolean> => {
+    if (!enabled) return false;
+    return doLoad();
+  }, [enabled, doLoad]);
+
+  return { loading, lookupFailed, entitlement, refetch };
 }

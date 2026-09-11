@@ -28,6 +28,7 @@ import { renderErrorPage } from "@/lib/error-page";
 import appCss from "@/styles.css?url";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
 import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
+import { OAUTH_HASH_EARLY_WIPE_SCRIPT } from "@/lib/oauthHashSessionConsumeRules";
 
 const SITE_URL = "https://verdantgrowdiary.com";
 const SITE_NAME = "Verdant Grow Diary";
@@ -184,6 +185,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
+        <script
+          // Blocking <head> script: stash+strip OAuth implicit-flow fragments
+          // before body parse. Constant lives in oauthHashSessionConsumeRules.
+          // SSR may emit meta/CSS earlier in <head>; this still runs before body.
+          dangerouslySetInnerHTML={{ __html: OAUTH_HASH_EARLY_WIPE_SCRIPT }}
+        />
         <HeadContent />
       </head>
       <body>

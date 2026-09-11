@@ -10,6 +10,10 @@ export interface QuickLogV2SaveResult {
   growEventId?: string | null;
   environmentEventId?: string | null;
   reused?: boolean;
+  /** Confirmed Note text; null represents a note-free observation. */
+  persistedNote?: string | null;
+  /** A recognized structured rejection before any logical event write. */
+  definitiveRejected?: boolean;
 }
 
 interface RpcResponse {
@@ -27,7 +31,25 @@ export interface QuickLogV2SaveOptions {
    * grower-authored Quick Log activation.
    */
   telemetryIntent?: QuickLogSuccessInput;
+  /** Resolve an uncertain Note save against its persisted event before success. */
+  verifyPersistedNote?: boolean;
 }
+
+// These normal RPC responses are emitted before the manual event insert.
+// Missing/malformed replies, exceptions, save_failed and receipt failures do
+// not establish non-commit and must retain the caller's original submission.
+const DEFINITIVE_MANUAL_REJECTIONS = new Set([
+  "not_authenticated",
+  "invalid_idempotency_key",
+  "invalid_target_type",
+  "missing_target_id",
+  "unsupported_action",
+  "invalid_volume",
+  "invalid_details",
+  "invalid_logged_at",
+  "target_not_owned",
+  "grow_not_owned",
+]);
 
 export function useQuickLogV2Save() {
   const [saving, setSaving] = useState(false);
@@ -57,7 +79,51 @@ export function useQuickLogV2Save() {
         if (!r.ok) {
           const reason = r.reason || "save_failed";
           setError(reason);
-          return { ok: false, reason };
+          return {
+            ok: false,
+            reason,
+            ...(r.ok === false && DEFINITIVE_MANUAL_REJECTIONS.has(reason)
+              ? { definitiveRejected: true }
+              : {}),
+          };
+        }
+        let persistedNote: string | null | undefined;
+        if (payload.p_action === "note") {
+          // A new successful atomic RPC confirms the submitted text. A reused
+          // key does not: manual-save deliberately returns its original row
+          // even if a caller supplies different text. Resolve that row before
+          // reporting success for retries or reuse.
+          persistedNote = payload.p_note;
+          if (r.reused === true || options.verifyPersistedNote === true) {
+            if (!r.grow_event_id) {
+              setError("receipt_unverified");
+              return { ok: false, reason: "receipt_unverified" };
+            }
+            const { data: event, error: readError } = await supabase
+              .from("grow_events")
+              .select("id,note,plant_id,tent_id")
+              .eq("id", r.grow_event_id)
+              .maybeSingle();
+            if (readError || !event) {
+              setError("receipt_unverified");
+              return { ok: false, reason: "receipt_unverified" };
+            }
+            const targetId = payload.p_target_type === "plant" ? event.plant_id : event.tent_id;
+            if (event.id !== r.grow_event_id || targetId !== payload.p_target_id) {
+              setError("receipt_mismatch");
+              return { ok: false, reason: "receipt_mismatch" };
+            }
+            if (event.note !== payload.p_note) {
+              setError("receipt_mismatch");
+              return {
+                ok: false,
+                reason: "receipt_mismatch",
+                growEventId: event.id,
+                persistedNote: event.note,
+              };
+            }
+            persistedNote = event.note;
+          }
         }
         if (options.telemetryIntent !== undefined) {
           trackQuickLogSuccess(options.telemetryIntent, { reused: r.reused === true });
@@ -67,6 +133,7 @@ export function useQuickLogV2Save() {
           growEventId: r.grow_event_id ?? null,
           environmentEventId: r.environment_event_id ?? null,
           reused: r.reused === true,
+          ...(persistedNote !== undefined ? { persistedNote } : {}),
         };
       } catch (thrown) {
         const reason = classifyQuickLogThrownSaveError(thrown);

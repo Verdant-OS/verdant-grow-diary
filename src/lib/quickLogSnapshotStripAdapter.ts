@@ -28,6 +28,12 @@ import {
   formatTemperatureDisplay,
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
+import {
+  buildSensorsTentRouteHref,
+  SENSORS_TENT_INTENT_MODE_QUERY_PARAM,
+  SENSORS_TENT_INTENT_MODE_REQUIRED,
+  SENSORS_TENT_ROUTE,
+} from "@/lib/sensorRouteTentIntentRules";
 
 export type QuickLogSnapshotStripStatus = "usable" | "stale" | "invalid" | "no_data";
 
@@ -97,38 +103,84 @@ export const DEMO_USABLE_TITLE = "Demo sensor context";
 export const DEMO_USABLE_DESCRIPTION =
   "Sample data will be labeled demo — never treated as live sensor context.";
 
-const SENSORS_HREF = "/sensors";
 /**
  * Deep-link fragment for the Manual Sensor Reading anchor inside
  * `/sensors` (see `<section id="manual-reading">` in `src/pages/Sensors.tsx`).
- * Used by the "Add snapshot" CTA so growers who have no snapshot yet
- * can enter a manual reading in one tap without hunting for the form.
- * The manual entry surface labels the reading `source: manual` — this
- * link never claims to add live data.
+ * Unscoped. Prefer `buildQuickLogStripSensorsHref` for strip CTAs so
+ * Sensors cannot silently select another tent.
  */
 export const MANUAL_SNAPSHOT_ENTRY_HREF = "/sensors#manual-reading";
+
+export interface BuildQuickLogStripSensorsHrefOptions {
+  /** Append the Manual Sensor Reading anchor for add/edit. */
+  hash?: "manual-reading";
+}
+
+/**
+ * Tent-scoped Sensors handoff for the Quick Log strip.
+ *
+ * Valid UUID → `/sensors?tentId=<id>&tentIntent=required`.
+ * Missing/malformed tent → `/sensors?tentIntent=required` (fail closed:
+ * Sensors will not pick another tent's form). Never returns bare
+ * `/sensors` or `/sensors#manual-reading`.
+ */
+export function buildQuickLogStripSensorsHref(
+  tentId: unknown,
+  options: BuildQuickLogStripSensorsHrefOptions = {},
+): string {
+  const scoped = buildSensorsTentRouteHref(tentId, { requireExactMatch: true });
+  const base =
+    scoped === SENSORS_TENT_ROUTE
+      ? `${SENSORS_TENT_ROUTE}?${SENSORS_TENT_INTENT_MODE_QUERY_PARAM}=${SENSORS_TENT_INTENT_MODE_REQUIRED}`
+      : scoped;
+  return options.hash === "manual-reading" ? `${base}#manual-reading` : base;
+}
 
 /**
  * Edit action shown only when the current snapshot's source is `manual`.
  * Never surfaced for `live`, `sim`, `demo`, `csv`, `stale`, or unknown —
  * editing must never be used to overwrite live-ingest telemetry.
  */
-export const MANUAL_SNAPSHOT_EDIT_ACTION: QuickLogSnapshotStripAction = {
-  kind: "edit",
-  label: "Edit manual readings",
-  href: MANUAL_SNAPSHOT_ENTRY_HREF,
-};
+export function buildManualSnapshotEditAction(tentId: unknown): QuickLogSnapshotStripAction {
+  return {
+    kind: "edit",
+    label: "Edit manual readings",
+    href: buildQuickLogStripSensorsHref(tentId, { hash: "manual-reading" }),
+  };
+}
 
-function actionFor(status: QuickLogSnapshotStripStatus): QuickLogSnapshotStripAction {
+/**
+ * Unscoped edit action kept for tests that pin kind/label. Href is the
+ * fail-closed required-intent URL, never a silent default-tent form.
+ */
+export const MANUAL_SNAPSHOT_EDIT_ACTION: QuickLogSnapshotStripAction =
+  buildManualSnapshotEditAction(null);
+
+function actionFor(
+  status: QuickLogSnapshotStripStatus,
+  tentId: unknown,
+): QuickLogSnapshotStripAction {
   switch (status) {
     case "usable":
       return { kind: "none" };
     case "stale":
-      return { kind: "refresh", label: "Refresh snapshot", href: SENSORS_HREF };
+      return {
+        kind: "refresh",
+        label: "Refresh snapshot",
+        href: buildQuickLogStripSensorsHref(tentId),
+      };
     case "invalid":
-      return { kind: "review", label: "Review sensor intake", href: SENSORS_HREF };
+      return {
+        kind: "review",
+        label: "Review sensor intake",
+        href: buildQuickLogStripSensorsHref(tentId),
+      };
     case "no_data":
-      return { kind: "add", label: "Add snapshot", href: MANUAL_SNAPSHOT_ENTRY_HREF };
+      return {
+        kind: "add",
+        label: "Add snapshot",
+        href: buildQuickLogStripSensorsHref(tentId, { hash: "manual-reading" }),
+      };
   }
 }
 
@@ -216,6 +268,8 @@ export interface BuildQuickLogStripArgs {
   loading?: boolean;
   /** Selected plant has a tent assignment. False ⇒ no_data. */
   hasTent?: boolean;
+  /** Verified tent for outgoing Sensors hrefs. Missing/malformed fail closed. */
+  tentId?: unknown;
   /**
    * Whether the grower currently has "Attach sensor snapshot" toggled on.
    * Defaults to true to preserve existing presenter callers (tests).
@@ -243,6 +297,7 @@ export function buildQuickLogSnapshotStrip(
     snapshot,
     loading = false,
     hasTent = true,
+    tentId = null,
     attached = true,
     now = new Date(),
     temperatureUnit,
@@ -262,7 +317,7 @@ export function buildQuickLogSnapshotStrip(
       capturedAtLabel: null,
       ageLabel: null,
       metrics: [],
-      action: actionFor("no_data"),
+      action: actionFor("no_data", tentId),
       classification,
       providerLabel: null,
       trustBadge: classifySnapshotTrustBadge({ empty: true, source: snapshot?.source ?? null }),
@@ -299,7 +354,9 @@ export function buildQuickLogSnapshotStrip(
   const description = usableButDetached
     ? "Toggle “Attach sensor snapshot” to include it in this log."
     : DESCRIPTIONS[status];
-  const baseAction = usableButDetached ? actionFor("no_data" as const) : actionFor(status);
+  const baseAction = usableButDetached
+    ? actionFor("no_data" as const, tentId)
+    : actionFor(status, tentId);
   // When the resolved snapshot is a MANUAL reading and the strip is not
   // in a detached-toggle state, prefer the edit action so growers can
   // correct/update the manual reading directly. Never applied for live,
@@ -307,7 +364,7 @@ export function buildQuickLogSnapshotStrip(
   const finalAction: QuickLogSnapshotStripAction = usableButDetached
     ? { kind: "none" }
     : src === "manual" && (status === "usable" || status === "stale")
-      ? MANUAL_SNAPSHOT_EDIT_ACTION
+      ? buildManualSnapshotEditAction(tentId)
       : baseAction;
 
   return {
@@ -355,6 +412,8 @@ export interface BuildQuickLogStripFromTentStateArgs {
   status: LatestTentSensorSnapshotStatus;
   snapshot: StrictSensorSnapshot;
   hasTent: boolean;
+  /** Verified tent for outgoing Sensors hrefs. Missing/malformed fail closed. */
+  tentId?: unknown;
   attached?: boolean;
   now?: Date;
   /**
@@ -467,6 +526,7 @@ export function buildQuickLogStripFromTentState(
     status: loaderStatus,
     snapshot,
     hasTent,
+    tentId = null,
     attached = true,
     now = new Date(),
     temperatureUnit,
@@ -493,7 +553,7 @@ export function buildQuickLogStripFromTentState(
       capturedAtLabel: null,
       ageLabel: null,
       metrics: [],
-      action: actionFor("no_data"),
+      action: actionFor("no_data", tentId),
       classification: synthClassification("no_data", "No sensor data yet"),
       providerLabel: null,
       trustBadge: classifySnapshotTrustBadge({ empty: true, source: snapshot.source ?? null }),
@@ -560,12 +620,12 @@ export function buildQuickLogStripFromTentState(
         : DESCRIPTIONS[status];
   const baseAction: QuickLogSnapshotStripAction = usableButDetached
     ? { kind: "none" }
-    : actionFor(status);
+    : actionFor(status, tentId);
   const action: QuickLogSnapshotStripAction =
     !usableButDetached &&
     snapshot.source === "manual" &&
     (status === "usable" || status === "stale")
-      ? MANUAL_SNAPSHOT_EDIT_ACTION
+      ? buildManualSnapshotEditAction(tentId)
       : baseAction;
 
   const classification = {

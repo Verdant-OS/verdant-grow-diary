@@ -32,8 +32,10 @@ import {
 import {
   AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
   AI_DOCTOR_CURRENT_SENSOR_SOURCES,
+  AI_DOCTOR_MANUAL_SENSOR_SOURCES,
   classifyAiDoctorCurrentSensorEvidence,
   currentSensorEvidenceIsFreshLive,
+  mergeAiDoctorCurrentSensorWindows,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
@@ -225,30 +227,33 @@ function PlantDetailAiDoctorLiveReviewScope({
   // query prevents a high-frequency current stream from crowding history
   // out, and prevents historical rows from being mistaken for the latest
   // live/manual snapshot.
-  const { byTent: currentReadingsByTent, statusByTent: currentSensorStatusByTent } =
-    useSensorReadingsByTents(
-      isUuid(tentId) ? [tentId] : [],
-      AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
-      AI_DOCTOR_CURRENT_SENSOR_SOURCES,
-    );
-  // Current-sensor status drives both the start-gate hold and the fail-closed
-  // guard below, derived once so "pending" and "failed" share one source of
-  // truth. Non-UUID tents can't have live rows, so their read is "success".
-  const currentSensorStatus = isUuid(tentId)
-    ? (currentSensorStatusByTent[tentId] ?? "loading")
+  const tentIds = isUuid(tentId) ? [tentId] : [];
+  const mixedWindow = useSensorReadingsByTents(
+    tentIds,
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    AI_DOCTOR_CURRENT_SENSOR_SOURCES,
+  );
+  const manualWindow = useSensorReadingsByTents(
+    tentIds,
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    AI_DOCTOR_MANUAL_SENSOR_SOURCES,
+  );
+  const mixedStatus = isUuid(tentId) ? (mixedWindow.statusByTent[tentId] ?? "loading") : "success";
+  const manualStatus = isUuid(tentId)
+    ? (manualWindow.statusByTent[tentId] ?? "loading")
     : "success";
-  // Fail closed: a failed initial or refresh current-sensor read must not
-  // present TanStack's retained cached rows to the model as current evidence.
-  const currentSensorFailed =
-    currentSensorStatus === "error" || currentSensorStatus === "refresh_error";
-  const currentSensorRows =
-    tentId && !currentSensorFailed
-      ? (currentReadingsByTent[tentId] ?? NO_TENT_SENSOR_ROWS)
+  const mixedFailed = mixedStatus === "error" || mixedStatus === "refresh_error";
+  const manualFailed = manualStatus === "error" || manualStatus === "refresh_error";
+  const mixedRows =
+    tentId && !mixedFailed
+      ? (mixedWindow.byTent[tentId] ?? NO_TENT_SENSOR_ROWS)
       : NO_TENT_SENSOR_ROWS;
-  // Hold the start gate while current truth is loading or imported-history
-  // evidence is unresolved. A failed history read now requires an explicit
-  // grower choice before omission can reach a paid AI request.
-  const currentSensorPending = currentSensorStatus === "loading";
+  const manualRows =
+    tentId && !manualFailed
+      ? (manualWindow.byTent[tentId] ?? NO_TENT_SENSOR_ROWS)
+      : NO_TENT_SENSOR_ROWS;
+  const currentSensorRows = mergeAiDoctorCurrentSensorWindows(mixedRows, manualRows);
+  const currentSensorPending = mixedStatus === "loading" || manualStatus === "loading";
   const sensorContextBlocked =
     currentSensorPending || queryHistoryRecovery.blocksReview || queryRootZoneRecovery.blocksReview;
 

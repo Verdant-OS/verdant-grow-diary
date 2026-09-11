@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   type QuickLogFeedingFormState,
+  EMPTY_FEEDING_PRODUCT_ROW,
   feedingFormReasonToHelper,
 } from "@/lib/quickLogFeedingFormViewModel";
 import { buildFeedingReview } from "@/lib/quickLogFeedingReviewViewModel";
@@ -60,7 +61,7 @@ export default function AnVerdantFeedingDemo(): JSX.Element {
         setForm((current) => ({
           ...current,
           products: current.products.map((row) =>
-            row.name === product.name ? { ...row, name: "" } : row,
+            row.name === product.name ? { ...EMPTY_FEEDING_PRODUCT_ROW } : row,
           ),
         }));
         return prev.filter((id) => id !== productId);

@@ -21,7 +21,7 @@ import {
   type QuickLogRevisionBadge,
 } from "@/lib/quick-log/quickLogRevisionRules";
 import {
-  adaptQuickLogRevisionDatabaseRows,
+  decodeQuickLogRevisionDatabaseRows,
   QUICKLOG_REVISION_TABLE,
 } from "@/lib/quickLogRevisionService";
 
@@ -61,8 +61,10 @@ export function useQuickLogRevisionBadges(rootIds: readonly string[]) {
           .in("root_id", ids)
           .order("revision_no", { ascending: true });
         if (error) return EMPTY_UNAVAILABLE;
+        const decoded = decodeQuickLogRevisionDatabaseRows(data);
+        if (!decoded.ok) return EMPTY_UNAVAILABLE;
         return {
-          badges: buildQuickLogRevisionBadges(adaptQuickLogRevisionDatabaseRows(data)),
+          badges: buildQuickLogRevisionBadges(decoded.rows),
           status: "ok",
         };
       } catch {

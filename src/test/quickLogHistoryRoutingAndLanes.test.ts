@@ -30,6 +30,7 @@ import {
   type QuickLogHardwareReadings,
 } from "@/lib/quickLogHardwareReadingsRules";
 import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
+import { findSupabaseTableWrites } from "@/test/helpers/supabaseTableWriteScan";
 
 const ROOT = resolve(__dirname, "../..");
 const TIMELINE = readFileSync(resolve(ROOT, "src/pages/Timeline.tsx"), "utf8");
@@ -288,8 +289,8 @@ describe("Logs page wiring (Timeline.tsx)", () => {
     expect(aqIdx).toBeGreaterThan(recentIdx);
   });
 
-  it("measurement filter detects handheld readings in note text", () => {
-    expect(TIMELINE).toMatch(/hasManualHandheldReadings\(e\.note\)/);
+  it("measurement filter uses diaryEntryBelongsInTimelineMeasurements (stale-drawer manuals excluded)", () => {
+    expect(TIMELINE).toMatch(/diaryEntryBelongsInTimelineMeasurements\(e,/);
   });
 
   it("dedupes recent Quick Log companion rows in pure rules", () => {
@@ -302,7 +303,7 @@ describe("Logs page wiring (Timeline.tsx)", () => {
     expect(surface).not.toMatch(/mqtt|home[\s_-]?assistant|pi[\s_-]?bridge|webhook|service_role/i);
     expect(surface).not.toMatch(/\bactuator\b|\brelay\b|device[_-]?control/i);
     expect(surface).not.toMatch(/supabase\.functions\.invoke/);
-    expect(surface).not.toMatch(/sensor_readings/);
+    expect(findSupabaseTableWrites(surface, "sensor_readings")).toEqual([]);
     expect(surface).not.toMatch(/action_queue\.insert|alerts\.insert/);
   });
 });

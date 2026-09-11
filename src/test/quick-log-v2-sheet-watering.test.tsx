@@ -90,6 +90,10 @@ vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: [] }),
 }));
 
+vi.mock("@/hooks/useRecentWateringsForVolumeDefaults", () => ({
+  useRecentWateringsForVolumeDefaults: () => ({ data: [] }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: (...args: unknown[]) => toastSuccess(...args),

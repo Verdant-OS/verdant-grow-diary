@@ -317,6 +317,16 @@ describe("production Supabase CA workflow boundary", () => {
     const job = parsed.jobs.apply;
 
     expectProtectedCaWorkflow(job, "verdant-production-solo-founder");
+    const materialize = materializeStep(job);
+    expect(materialize?.run).toContain("BEGIN CERTIFICATE");
+    expect(materialize?.run).toContain(
+      "tr -d '[:space:]' | base64 --decode > \"$SUPABASE_DB_CA_CERT_PATH\"",
+    );
+    expect(materialize?.run).toContain("::error::");
+    expect(materialize?.run).toContain("ca_materialize_invalid_secret");
+    expect(materialize?.run).toContain('> "$REPORT_PATH"');
+    expect(materialize?.run).toContain('> "$AUDIT_PATH"');
+    expect(materialize?.run).not.toMatch(/\becho\s+"\$SUPABASE_DB_CA_CERT_B64"/);
     const runner = job.steps.find(
       (step) => step.name === "Run the environment-gated signup-acquisition repair gate",
     );

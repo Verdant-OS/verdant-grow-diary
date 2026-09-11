@@ -110,11 +110,17 @@ describe("CI / package wiring cannot drop the guard", () => {
   const script = readFileSync(join(ROOT, "scripts/check-no-src-lib-imports.mjs"), "utf8");
 
   it("package.json prebuild + predeploy + check script invoke the guard", () => {
-    expect(pkg).toMatch(/check-no-src-lib-imports\.mjs/);
-    expect(pkg).toMatch(/"check:no-src-lib-imports"/);
-    expect(pkg).toMatch(/"prebuild":\s*"[^"]*check-no-src-lib-imports\.mjs/);
-    expect(pkg).toMatch(/"predeploy:functions":\s*"[^"]*check-no-src-lib-imports\.mjs/);
-    expect(pkg).toMatch(/"predeploy:functions:all":\s*"[^"]*check-no-src-lib-imports\.mjs/);
+    // Asserted on the PARSED manifest. The previous source regexes could not
+    // distinguish `scripts.prebuild` from any other key spelled "prebuild"
+    // elsewhere in the file, and matched a substring of the value rather than
+    // proving the guard is actually invoked by that script.
+    const scripts = JSON.parse(pkg).scripts as Record<string, string>;
+    expect(scripts["check:no-src-lib-imports"]).toBeTruthy();
+    for (const name of ["prebuild", "predeploy:functions", "predeploy:functions:all"]) {
+      expect(scripts[name], `${name} must invoke the guard`).toContain(
+        "check-no-src-lib-imports.mjs",
+      );
+    }
   });
 
   it("CI preflight, deployment-preview, and edge-shared-sync run the guard", () => {

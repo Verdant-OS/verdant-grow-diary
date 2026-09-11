@@ -7,7 +7,12 @@ const HARNESS = readFileSync(
   resolve(ROOT, "scripts/run-ai-doctor-sessions-rls-harness.ts"),
   "utf8",
 );
-const PACKAGE = readFileSync(resolve(ROOT, "package.json"), "utf8");
+// Resolved, not scanned — see scripts/check-contract-test-resolution.mjs; a quoted key
+// with no colon asserted on raw package.json text while the checker reported OK.
+const SCRIPTS = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")).scripts as Record<
+  string,
+  string
+>;
 const WORKFLOW = readFileSync(resolve(ROOT, ".github/workflows/security-db-local.yml"), "utf8");
 
 describe("AI Doctor sessions runtime RLS harness contract", () => {
@@ -121,9 +126,17 @@ describe("AI Doctor sessions runtime RLS harness contract", () => {
   });
 
   it("is exposed through an opt-in package command and the local DB workflow", () => {
-    expect(PACKAGE).toContain('"test:ai-doctor-sessions-rls"');
-    expect(PACKAGE).toContain('"test:ai-doctor-sessions-rls:local-lane"');
-    expect(PACKAGE).toContain("bun run test:ai-doctor-sessions-rls:local-lane");
+    expect(SCRIPTS["test:ai-doctor-sessions-rls"]).toBe(
+      "bun run scripts/run-ai-doctor-sessions-rls-harness.ts",
+    );
+    expect(SCRIPTS["test:ai-doctor-sessions-rls:local-lane"]).toBe(
+      "bun run scripts/run-ai-doctor-sessions-rls-harness.ts --confirm-local-security-lane",
+    );
+    expect(
+      Object.values(SCRIPTS).some((v) =>
+        v.includes("bun run test:ai-doctor-sessions-rls:local-lane"),
+      ),
+    ).toBe(true);
     expect(WORKFLOW).toContain('AI_DOCTOR_SESSIONS_RLS_HARNESS: "1"');
     expect(WORKFLOW).toContain("bun run test:ai-doctor-sessions-rls");
   });

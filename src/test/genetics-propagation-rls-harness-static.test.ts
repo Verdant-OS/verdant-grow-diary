@@ -75,15 +75,16 @@ describe("genetics propagation RLS harness (static)", () => {
   });
 
   it("exposes package aliases but does NOT join test:security-db-local", () => {
-    const pkg = read(PKG);
-    expect(pkg).toMatch(
-      /"test:genetics-propagation-rls": "bun run scripts\/run-genetics-propagation-rls-harness\.ts"/,
+    // Asserted on the PARSED manifest, not its source text. A regex over JSON
+    // source cannot tell which nesting level a key sits at, so a pattern meant
+    // for `scripts["test:security-db-local"]` would match a same-named key
+    // anywhere in the file and pass for the wrong reason.
+    const scripts = JSON.parse(read(PKG)).scripts as Record<string, string>;
+    expect(scripts["test:genetics-propagation-rls"]).toBe(`bun run ${HARNESS}`);
+    expect(scripts["test:genetics-propagation-rls:local-lane"]).toBe(
+      `bun run ${HARNESS} --confirm-local-security-lane`,
     );
-    expect(pkg).toMatch(
-      /"test:genetics-propagation-rls:local-lane": "bun run scripts\/run-genetics-propagation-rls-harness\.ts --confirm-local-security-lane"/,
-    );
-    const securityLane = pkg.match(/"test:security-db-local":\s*"([^"]*)"/);
-    expect(securityLane).toBeTruthy();
-    expect(securityLane![1]).not.toMatch(/genetics-propagation/);
+    expect(scripts["test:security-db-local"]).toBeTruthy();
+    expect(scripts["test:security-db-local"]).not.toMatch(/genetics-propagation/);
   });
 });

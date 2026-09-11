@@ -263,6 +263,56 @@ describe("actionQueueTransitions — shared rules", () => {
       parseActionQueueTransitionRpcResult({ ...base, transitioned_at: "next Thursday" }, rpcArgs),
     ).toBeNull();
   });
+
+  it("parses a JSON-string success payload (PostgREST text wrapping)", () => {
+    const encoded = JSON.stringify({
+      ok: true,
+      action_queue_id: actionId,
+      previous_status: "pending_approval",
+      new_status: "approved",
+      event_id: eventId,
+      transitioned_at: "2030-01-01T00:00:00.000Z",
+      reused: false,
+    });
+    expect(parseActionQueueTransitionRpcResult(encoded, rpcArgs)).toEqual({
+      ok: true,
+      action_queue_id: actionId,
+      previous_status: "pending_approval",
+      new_status: "approved",
+      event_id: eventId,
+      transitioned_at: "2030-01-01T00:00:00.000Z",
+      reused: false,
+    });
+  });
+
+  it("accepts Postgres-style timestamps with space separator or +00 offset", () => {
+    const base = {
+      ok: true,
+      action_queue_id: actionId,
+      previous_status: "pending_approval",
+      new_status: "approved",
+      event_id: eventId,
+      reused: false,
+    };
+    expect(
+      parseActionQueueTransitionRpcResult(
+        { ...base, transitioned_at: "2030-01-01 00:00:00+00" },
+        rpcArgs,
+      )?.ok,
+    ).toBe(true);
+    expect(
+      parseActionQueueTransitionRpcResult(
+        { ...base, transitioned_at: "2030-01-01T00:00:00.123456+00" },
+        rpcArgs,
+      )?.ok,
+    ).toBe(true);
+    expect(
+      parseActionQueueTransitionRpcResult(
+        { ...base, transitioned_at: "2030-01-01T00:00:00+00:00" },
+        rpcArgs,
+      )?.ok,
+    ).toBe(true);
+  });
 });
 
 describe("actionQueueTransitions — safety surface", () => {

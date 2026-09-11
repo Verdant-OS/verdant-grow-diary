@@ -145,11 +145,13 @@ export interface PartitionDoctorEntryOptionsInput {
   plants?: readonly AiDoctorEntryPlant[] | null;
   tentId?: string | null;
   /**
-   * Plant carried from Timeline through Sensors (D-B6 handoff). Untrusted:
-   * it is honoured only when it names a plant the grower actually owns AND
-   * that plant sits in the carried tent. It reorders and labels; it NEVER
-   * selects. "Verdant will not guess which plant you mean" is doctrine, and
-   * a carried intent is still the grower's to confirm.
+   * Plant carried from Timeline through Sensors, or a plant-only
+   * `/doctor?plantId=` intent (D-B6 handoff). Untrusted.
+   *
+   * When a tent IS carried, honour only if the plant is one of the
+   * grower's own options AND sits in that tent. When no tent is
+   * carried, honour if the plant is already in the loaded options.
+   * It reorders and labels; it NEVER selects.
    */
   carriedPlantId?: string | null;
 }
@@ -194,14 +196,34 @@ export function partitionDoctorEntryOptionsByTent(
   const tentId = trimmed(input?.tentId);
   const requestedPlantId = trimmed(input?.carriedPlantId);
 
-  if (!tentId || options.length === 0) {
-    // A carried plant with no usable tent/options cannot be offered — say so
-    // when an intent was present. Absent intent stays quiet.
+  if (options.length === 0) {
+    // Nothing to offer. A carried intent still has to be named, never dropped.
     return {
       inScope: [],
       others: options,
       carriedPlantOptionId: null,
       hasUnavailableCarriedPlant: !!requestedPlantId,
+    };
+  }
+
+  if (!tentId) {
+    // Plant-only `/doctor?plantId=` is a request, not a grant. If the plant
+    // is already in the loaded options, label and order it first. Never
+    // auto-select. Missing from the loaded set stays unavailable.
+    const match = requestedPlantId
+      ? (options.find((option) => option && option.id === requestedPlantId) ?? null)
+      : null;
+    const others = match
+      ? [
+          ...options.filter((option) => option.id === requestedPlantId),
+          ...options.filter((option) => option.id !== requestedPlantId),
+        ]
+      : options;
+    return {
+      inScope: [],
+      others,
+      carriedPlantOptionId: match ? requestedPlantId : null,
+      hasUnavailableCarriedPlant: !!requestedPlantId && !match,
     };
   }
 

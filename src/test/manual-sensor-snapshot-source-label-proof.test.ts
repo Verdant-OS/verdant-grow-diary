@@ -228,7 +228,7 @@ describe("manual sensor snapshot — Quick Log CTA deep link", () => {
     expect(v.status).toBe("no_data");
     expect(v.action.kind).toBe("add");
     if (v.action.kind === "add") {
-      expect(v.action.href).toBe("/sensors#manual-reading");
+      expect(v.action.href).toBe("/sensors?tentIntent=required#manual-reading");
       expect(v.action.label).toBe("Add snapshot");
     }
   });
@@ -244,7 +244,7 @@ describe("manual sensor snapshot — Quick Log CTA deep link", () => {
     expect(v.status).toBe("no_data");
     expect(v.action.kind).toBe("add");
     if (v.action.kind === "add") {
-      expect(v.action.href).toBe("/sensors#manual-reading");
+      expect(v.action.href).toBe("/sensors?tentIntent=required#manual-reading");
     }
   });
 
@@ -259,7 +259,7 @@ describe("manual sensor snapshot — Quick Log CTA deep link", () => {
     expect(v.status).toBe("usable");
     expect(v.action.kind).toBe("edit");
     if (v.action.kind === "edit") {
-      expect(v.action.href).toBe("/sensors#manual-reading");
+      expect(v.action.href).toBe("/sensors?tentIntent=required#manual-reading");
       expect(v.action.label).toBe("Edit manual readings");
     }
   });

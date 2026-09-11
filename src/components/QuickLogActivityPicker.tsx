@@ -30,6 +30,11 @@ export interface QuickLogActivityPickerProps {
   selectedId?: QuickLogActivityId | null;
   /** Current selected-plant stage. Missing/unrecognized context fails closed. */
   plantStage?: unknown;
+  /**
+   * When false, Watering stays visible but disabled until a plant or tent is
+   * chosen. Default true so callers that already proved a target stay open.
+   */
+  hasStructuredWaterTarget?: boolean;
   /** Test-id prefix for the grid; defaults to "quick-log-activity". */
   testIdPrefix?: string;
 }
@@ -115,10 +120,15 @@ export default function QuickLogActivityPicker({
   hiddenIds,
   selectedId,
   plantStage,
+  hasStructuredWaterTarget = true,
   testIdPrefix = "quick-log-activity",
 }: QuickLogActivityPickerProps) {
   const [additionalExpanded, setAdditionalExpanded] = useState(false);
-  const view = buildQuickLogActivityPickerViewModel({ plantStage, hiddenIds });
+  const view = buildQuickLogActivityPickerViewModel({
+    plantStage,
+    hiddenIds,
+    hasStructuredWaterTarget,
+  });
   const selectedIsAdditional = view.additionalActivities.some(
     ({ activity }) => activity.id === selectedId,
   );

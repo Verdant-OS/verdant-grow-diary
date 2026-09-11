@@ -145,7 +145,7 @@ describe("AssignTentDialog · movement timeline event", () => {
     expect(DIALOG).toMatch(/invalidateQueries\(\{\s*queryKey:\s*\["diary_entries"\]/);
   });
 
-  it("only updates plants.tent_id (no user_id / grow_id / strain / stage / notes)", () => {
+  it("updates plants.tent_id; grow_id only via empty-grow re-home helper", () => {
     const plantUpdates = [
       ...DIALOG.matchAll(/\.from\(["']plants["']\)\s*\.update\(\s*\{([^}]*)\}\s*\)/g),
     ];
@@ -153,10 +153,11 @@ describe("AssignTentDialog · movement timeline event", () => {
     const payload = plantUpdates[0][1];
     expect(payload).toMatch(/tent_id/);
     expect(payload).not.toMatch(/\buser_id\b/);
-    expect(payload).not.toMatch(/\bgrow_id\b/);
     expect(payload).not.toMatch(/\bstrain\b/);
     expect(payload).not.toMatch(/\bstage\b/);
     expect(payload).not.toMatch(/\bnotes\b/);
+    expect(DIALOG).toMatch(/buildPlantEditGrowIdFromTent\(/);
+    expect(DIALOG).toMatch(/\.\.\.\(growPatch\s*\?\?\s*\{\}\)/);
   });
 
   it("does NOT write sensor_readings / alerts / action_queue when moving a plant", () => {

@@ -13,6 +13,7 @@
  * src/test/daily-check-post-submit.test.tsx.
  */
 import { formatHarvestSavedBreakdownDetail } from "@/lib/harvestDetailsRules";
+import { withGrowId } from "@/lib/routes";
 
 export const DAILY_CHECK_SUCCESS_TITLE = "Today's check was logged";
 export const DAILY_CHECK_SUCCESS_BODY =
@@ -46,14 +47,19 @@ export function parseDailyCheckEntrySource(
 
 /**
  * Recognized values for `?method=` quick-action hint. Pure UX prioritization
- * hint; the Daily Check page uses it only to focus the matching option.
- * Unknown / missing values resolve to `null` so the page falls back to
- * the existing default selector. The page never auto-submits based on
- * this hint and never silently picks a tent.
+ * hint; the Daily Check page uses it to focus the matching option and to
+ * select watering/photo activity editors. Unknown / missing values resolve
+ * to `null` so the page falls back to the existing default selector. The page
+ * never auto-submits based on this hint and never silently picks a tent.
  */
-export type DailyCheckMethodHint = "note" | "sensor";
+export type DailyCheckMethodHint = "note" | "sensor" | "watering" | "photo";
 
-const ALLOWED_METHODS: ReadonlyArray<DailyCheckMethodHint> = ["note", "sensor"];
+const ALLOWED_METHODS: ReadonlyArray<DailyCheckMethodHint> = [
+  "note",
+  "sensor",
+  "watering",
+  "photo",
+];
 
 export function parseDailyCheckMethodHint(
   raw: string | null | undefined,
@@ -66,19 +72,59 @@ export function parseDailyCheckMethodHint(
 }
 
 /**
+ * Read query params from a react-router compat location.
+ *
+ * TanStack Link keeps the query inside `to`, so the committed pathname can
+ * be `/daily-check?plantId=…&method=watering` while `search` is empty. Daily
+ * Check must still see `method` (and plantId/from) from that embedded query.
+ * When both sides carry the same key, `search` wins.
+ */
+export function searchParamsFromCompatLocation(location: {
+  pathname?: string | null;
+  search?: string | null;
+}): URLSearchParams {
+  const path = typeof location.pathname === "string" ? location.pathname : "";
+  const search = typeof location.search === "string" ? location.search : "";
+  const pathQueryIndex = path.indexOf("?");
+  const fromPath = pathQueryIndex >= 0 ? path.slice(pathQueryIndex + 1).split("#")[0] : "";
+  const fromSearch = (search.startsWith("?") ? search.slice(1) : search).split("#")[0];
+  const merged = new URLSearchParams(fromPath);
+  for (const [key, value] of new URLSearchParams(fromSearch)) {
+    merged.set(key, value);
+  }
+  return merged;
+}
+
+/** Diary methods that open the plant Quick Log note dialog (not V2 water, not Photo QL). */
+export function isQuickLogDailyCheckMethodHint(
+  hint: DailyCheckMethodHint | null | undefined,
+): hint is "note" {
+  return hint === "note";
+}
+
+/** Map a diary method hint onto the All-activity editor, when one applies. */
+export function dailyCheckMethodToActivityId(
+  hint: DailyCheckMethodHint | null | undefined,
+): "watering" | "photo" | null {
+  if (hint === "watering" || hint === "photo") return hint;
+  return null;
+}
+
+/**
  * Build a `/daily-check` href for a given plant + entry source. Keeps the
  * existing `?plantId=` contract backward compatible — `from` and `method`
  * are appended only when known.
  */
 export function buildDailyCheckEntryHref(input: {
   plantId: string;
+  growId?: string | null;
   source?: DailyCheckEntrySource | null;
   method?: DailyCheckMethodHint | null;
 }): string {
   let href = `/daily-check?plantId=${input.plantId}`;
   if (input.source) href += `&from=${input.source}`;
   if (input.method) href += `&method=${input.method}`;
-  return href;
+  return withGrowId(href, input.growId);
 }
 
 export interface DailyCheckPostSubmitAction {
@@ -89,6 +135,8 @@ export interface DailyCheckPostSubmitAction {
 }
 
 export interface DailyCheckPostSubmitInput {
+  /** Explicit incoming URL scope; never substitute the workspace's active grow. */
+  growId?: string | null;
   /** Plant currently selected on the Daily Check page, if any. */
   plantId: string | null | undefined;
   /** Where the grower opened Daily Check from, if recognized. */
@@ -96,6 +144,7 @@ export interface DailyCheckPostSubmitInput {
 }
 
 export interface DailyCheckPostSubmitReturnInput {
+  growId?: string | null;
   plantId: string | null | undefined;
   source?: DailyCheckEntrySource | null;
   fallbackHref?: string | null;
@@ -115,10 +164,10 @@ export function resolveDailyCheckPostSubmitHref(input: DailyCheckPostSubmitRetur
   const source = input.source ?? null;
   const fallbackHref = input.fallbackHref || "/";
 
-  if (source === "plant-detail" && plantId) return `/plants/${plantId}`;
-  if (source === "plants") return "/plants";
-  if (source === "dashboard") return "/";
-  return fallbackHref;
+  if (source === "plant-detail" && plantId) return withGrowId(`/plants/${plantId}`, input.growId);
+  if (source === "plants") return withGrowId("/plants", input.growId);
+  if (source === "dashboard") return withGrowId("/", input.growId);
+  return withGrowId(fallbackHref, input.growId);
 }
 
 /**
@@ -143,14 +192,14 @@ export function buildDailyCheckPostSubmitActions(
     const plants: DailyCheckPostSubmitAction = {
       key: "plants",
       label: "Back to Plants",
-      href: "/plants",
+      href: withGrowId("/plants", input.growId),
       primary: true,
     };
     if (!plantId) return [plants];
     const plant: DailyCheckPostSubmitAction = {
       key: "plant",
       label: "View Plant",
-      href: `/plants/${plantId}`,
+      href: withGrowId(`/plants/${plantId}`, input.growId),
       primary: false,
     };
     return [plants, plant];
@@ -161,7 +210,7 @@ export function buildDailyCheckPostSubmitActions(
   const dashboard: DailyCheckPostSubmitAction = {
     key: "dashboard",
     label: "Back to Dashboard",
-    href: "/",
+    href: withGrowId("/", input.growId),
     primary: !plantPrimary,
   };
 
@@ -172,7 +221,7 @@ export function buildDailyCheckPostSubmitActions(
   const plant: DailyCheckPostSubmitAction = {
     key: "plant",
     label: plantPrimary ? "Back to Plant" : "View Plant",
-    href: `/plants/${plantId}`,
+    href: withGrowId(`/plants/${plantId}`, input.growId),
     primary: plantPrimary,
   };
 

@@ -232,6 +232,17 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("requested watering opens the structured V2 sheet instead of an inline note form", async () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    mountSection({ requestedActivityId: "watering" });
+    await waitFor(() => expect(events).toHaveLength(1));
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    expect(events[0].detail).toEqual({ targetKey: "plant:plant-1", action: "water" });
+    expect(screen.queryByTestId("quick-log-all-activities-form")).not.toBeInTheDocument();
+  });
+
   it("reapplies a requested editor after its target resolves asynchronously", async () => {
     const view = mountSection({
       growId: null,
@@ -1051,10 +1062,16 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     noGrow.unmount();
 
     mountSection({ plantId: null, tentId: null });
-    selectActivity("watering");
-    expect(screen.getByTestId("quick-log-all-activities-structured-water-error")).toHaveTextContent(
-      /choose a plant or tent/i,
-    );
+    const watering = screen.getByTestId("quick-log-all-activities-picker-watering");
+    expect(watering).toBeDisabled();
+    expect(watering).toHaveAttribute("data-activity-enabled", "false");
+    expect(
+      screen.getByTestId("quick-log-all-activities-picker-watering-disabled-reason"),
+    ).toHaveTextContent(/choose a plant or tent before logging water/i);
+    fireEvent.click(watering);
+    expect(
+      screen.queryByTestId("quick-log-all-activities-structured-water-error"),
+    ).not.toBeInTheDocument();
 
     window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
     expect(events).toHaveLength(0);
@@ -1225,6 +1242,21 @@ describe("QuickLogAllActivitiesSection — failure paths", () => {
     // User cancels without saving.
     fireEvent.click(screen.getByTestId("quick-log-all-activities-cancel"));
     expect(screen.queryByTestId("quick-log-all-activities-saved")).toBeNull();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("Watering from tent-only Daily Check context emits a tent targetKey", () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+
+    mountSection({ plantId: null, tentId: "tent-1", growId: "grow-1" });
+    selectActivity("watering");
+
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    expect(events).toHaveLength(1);
+    expect(events[0].detail).toEqual({ targetKey: "tent:tent-1", action: "water" });
+    expect(screen.queryByTestId("quick-log-all-activities-structured-water-error")).toBeNull();
     expect(rpcMock).not.toHaveBeenCalled();
   });
 

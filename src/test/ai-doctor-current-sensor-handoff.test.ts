@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAiDoctorCurrentSensorSnapshot,
   classifyAiDoctorCurrentSensorEvidence,
+  currentSensorEvidenceIsFreshLive,
   selectAiDoctorSensorEvidenceClassification,
   type AiDoctorCurrentSensorRowLike,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
@@ -254,7 +255,7 @@ describe("buildAiDoctorCurrentSensorSnapshot", () => {
 });
 
 describe("AI Doctor current sensor evidence classification", () => {
-  it("grants usable only to fresh provenance-filtered live rows", () => {
+  it("grants usable to fresh provenance-filtered live or manual rows", () => {
     const physical = {
       ...row("temperature_c", 25),
       raw_payload: PHYSICAL_ECOWITT_RAW_PAYLOAD,
@@ -272,7 +273,119 @@ describe("AI Doctor current sensor evidence classification", () => {
     expect(
       classifyAiDoctorCurrentSensorEvidence([row("temperature_c", 25, "manual")], { now: NOW })
         .status,
-    ).toBe("needs_review");
+    ).toBe("usable");
+    expect(
+      classifyAiDoctorCurrentSensorEvidence([row("temperature_c", 25, "manual")], { now: NOW })
+        .label,
+    ).toBe("Latest manual snapshot accepted.");
+  });
+
+  it("treats a fresh Golden Run-shaped tent manual snapshot as usable Doctor evidence", () => {
+    const capturedAt = "2026-07-17T11:58:00.000Z";
+    const rows = [
+      row("temp_f", 75, "manual", capturedAt, "temp"),
+      row("humidity", 60, "manual", capturedAt, "rh"),
+      row("vpd", 1, "manual", capturedAt, "vpd"),
+    ];
+    const classified = classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW });
+    expect(classified.status).toBe("usable");
+    expect(classified.reason).toBe("fresh_accepted");
+    expect(classified.isHealthyEvidence).toBe(true);
+    expect(currentSensorEvidenceIsFreshLive(rows, { now: NOW })).toBe(false);
+  });
+
+  it("treats the remasure 76°F / 58% RH tent manual save as usable, not none_inserted", () => {
+    const capturedAt = "2026-09-09T16:48:00.000Z";
+    const now = new Date("2026-09-09T16:50:00.000Z");
+    const rows = [
+      row("temp_f", 76, "manual", capturedAt, "temp"),
+      row("humidity", 58, "manual", capturedAt, "rh"),
+    ];
+    const classified = classifyAiDoctorCurrentSensorEvidence(rows, { now });
+    expect(classified.status).toBe("usable");
+    expect(classified.reason).toBe("fresh_accepted");
+    expect(classified.reason).not.toBe("none_inserted");
+    expect(classified.isHealthyEvidence).toBe(true);
+
+    const auditNoneInserted = classificationFromStatusResult({
+      status: "needs_review",
+      reasonCode: "none_accepted",
+    });
+    const selected = selectAiDoctorSensorEvidenceClassification(classified, auditNoneInserted);
+    expect(selected.status).toBe("usable");
+    expect(selected.reason).not.toBe("none_inserted");
+  });
+
+  it("keeps a 16-minute-old valid tent manual usable under the 24h manual window", () => {
+    const capturedAt = "2026-07-17T11:44:00.000Z";
+    const rows = [
+      row("temperature_c", 24, "manual", capturedAt, "temp"),
+      row("humidity_pct", 55, "manual", capturedAt, "rh"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(snapshot?.readings.length).toBeGreaterThan(0);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+  });
+
+  it("keeps a 9-hour-old Golden Run tent manual usable under the 24h manual window", () => {
+    const capturedAt = "2026-07-17T03:00:00.000Z";
+    const rows = [
+      row("temp_f", 75, "manual", capturedAt, "temp"),
+      row("humidity", 60, "manual", capturedAt, "rh"),
+      row("vpd", 1, "manual", capturedAt, "vpd"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.source).toBe("manual");
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(snapshot?.readings.length).toBeGreaterThan(0);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+    expect(currentSensorEvidenceIsFreshLive(rows, { now: NOW })).toBe(false);
+  });
+
+  it("does not let a stale live row mask a 9-hour in-window tent manual", () => {
+    const liveStaleAt = "2026-07-17T11:44:00.000Z";
+    const manualAt = "2026-07-17T03:00:00.000Z";
+    const rows = [
+      row("temperature_c", 24, "live", liveStaleAt, "live-temp"),
+      row("humidity_pct", 55, "live", liveStaleAt, "live-rh"),
+      row("temp_f", 75, "manual", manualAt, "manual-temp"),
+      row("humidity", 60, "manual", manualAt, "manual-rh"),
+      row("vpd", 1, "manual", manualAt, "manual-vpd"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.source).toBe("manual");
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+    expect(currentSensorEvidenceIsFreshLive(rows, { now: NOW })).toBe(false);
+  });
+
+  it("marks a 25-hour-old tent manual stale", () => {
+    const capturedAt = "2026-07-16T11:00:00.000Z";
+    const rows = [
+      row("temperature_c", 24, "manual", capturedAt, "temp"),
+      row("humidity_pct", 55, "manual", capturedAt, "rh"),
+    ];
+    expect(buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW })?.annotation.stale).toBe(true);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("stale");
+  });
+
+  it("still marks a 16-minute-old live snapshot stale", () => {
+    const capturedAt = "2026-07-17T11:44:00.000Z";
+    expect(
+      classifyAiDoctorCurrentSensorEvidence([row("temperature_c", 24, "live", capturedAt)], {
+        now: NOW,
+      }).status,
+    ).toBe("stale");
+  });
+
+  it("does not treat a usable manual snapshot as live-bridge presence", () => {
+    expect(
+      currentSensorEvidenceIsFreshLive([row("temperature_c", 25, "manual")], { now: NOW }),
+    ).toBe(false);
+    expect(currentSensorEvidenceIsFreshLive([row("temperature_c", 25, "live")], { now: NOW })).toBe(
+      true,
+    );
   });
 
   it("never lets an audit-only usable fallback override filtered row-level no-data", () => {

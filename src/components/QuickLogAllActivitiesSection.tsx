@@ -204,6 +204,7 @@ export default function QuickLogAllActivitiesSection({
     () => buildQuickLogTargetIdentity({ growId, tentId, plantId }),
     [growId, plantId, tentId],
   );
+  const hasStructuredWaterTarget = Boolean(currentTarget.plantId || currentTarget.tentId);
   const hasSymptomPlant = hasGuidedSymptomPlant(plantId);
   const currentTargetKey = useMemo(() => buildQuickLogTargetKey(currentTarget), [currentTarget]);
   const previousTargetKeyRef = useRef(currentTargetKey);
@@ -330,10 +331,31 @@ export default function QuickLogAllActivitiesSection({
   const requestedActivityAvailability = useMemo(
     () =>
       requestedActivity
-        ? evaluateQuickLogActivityAvailability(requestedActivity, plantStage)
+        ? evaluateQuickLogActivityAvailability(requestedActivity, plantStage, {
+            hasStructuredWaterTarget,
+          })
         : null,
-    [plantStage, requestedActivity],
+    [hasStructuredWaterTarget, plantStage, requestedActivity],
   );
+
+  const openStructuredWater = useCallback((): boolean => {
+    if (externalPersistenceBlockReason) {
+      setStructuredWaterError(externalPersistenceBlockReason);
+      return false;
+    }
+    if (!growId) {
+      setStructuredWaterError("Missing grow context. Nothing opened.");
+      return false;
+    }
+    const intent = buildQuickLogV2OpenIntent({ plantId, tentId, action: "water" });
+    if (!intent || typeof window === "undefined") {
+      setStructuredWaterError("Choose a plant or tent before logging Water.");
+      return false;
+    }
+    onBeforeStructuredWaterOpen?.();
+    window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
+    return true;
+  }, [externalPersistenceBlockReason, growId, onBeforeStructuredWaterOpen, plantId, tentId]);
 
   useEffect(() => {
     if (previousTargetKeyRef.current === currentTargetKey) return;
@@ -388,10 +410,16 @@ export default function QuickLogAllActivitiesSection({
       setSelectedDraft(null);
       return;
     }
+    if (requestedActivity === "watering") {
+      setSelectedDraft(null);
+      openStructuredWater();
+      return;
+    }
     setSelectedDraft(bindQuickLogActivityDraft(requestedActivity, currentTarget));
     setNote(requestedNote ?? "");
   }, [
     currentTarget,
+    openStructuredWater,
     requestedActivity,
     requestedActivityAvailability?.disabled,
     requestedActivityRequestKey,
@@ -415,8 +443,13 @@ export default function QuickLogAllActivitiesSection({
   const detailNumbersInvalid = detailNumberValidations.some((v) => !v.ok);
   const firstDetailNumberError = detailNumberValidations.find((v) => !v.ok)?.error ?? null;
   const selectedAvailability = useMemo(
-    () => (selected ? evaluateQuickLogActivityAvailability(selected.id, plantStage) : null),
-    [plantStage, selected],
+    () =>
+      selected
+        ? evaluateQuickLogActivityAvailability(selected.id, plantStage, {
+            hasStructuredWaterTarget,
+          })
+        : null,
+    [hasStructuredWaterTarget, plantStage, selected],
   );
 
   const requiresNote = useMemo(() => {
@@ -449,21 +482,7 @@ export default function QuickLogAllActivitiesSection({
       setGuidedSymptomStageConfirmed(false);
       setGuidedSymptomNoneObserved(false);
       if (a.id === "watering") {
-        if (externalPersistenceBlockReason) {
-          setStructuredWaterError(externalPersistenceBlockReason);
-          return;
-        }
-        if (!growId) {
-          setStructuredWaterError("Missing grow context. Nothing opened.");
-          return;
-        }
-        const intent = buildQuickLogV2OpenIntent({ plantId, tentId, action: "water" });
-        if (!intent || typeof window === "undefined") {
-          setStructuredWaterError("Choose a plant or tent before logging Water.");
-          return;
-        }
-        onBeforeStructuredWaterOpen?.();
-        window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_OPEN_EVENT, { detail: intent }));
+        openStructuredWater();
         return;
       }
       setSelectedDraft(bindQuickLogActivityDraft(a.id, currentTarget));
@@ -475,15 +494,7 @@ export default function QuickLogAllActivitiesSection({
       envCheckTempEntryUnitRef.current = null;
       setPhotoFile(null);
     },
-    [
-      currentTarget,
-      externalPersistenceBlockReason,
-      growId,
-      isMutationBlocked,
-      onBeforeStructuredWaterOpen,
-      plantId,
-      tentId,
-    ],
+    [currentTarget, isMutationBlocked, openStructuredWater],
   );
 
   const handleStartSymptomCheck = useCallback(() => {
@@ -917,6 +928,7 @@ export default function QuickLogAllActivitiesSection({
         disabled={mutationBlocked}
         selectedId={selected?.id ?? null}
         plantStage={plantStage}
+        hasStructuredWaterTarget={hasStructuredWaterTarget}
         testIdPrefix={`${testIdPrefix}-picker`}
       />
 

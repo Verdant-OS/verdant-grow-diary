@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useSearchParams } from "@/lib/react-router-compat";
-import { resolvePricingPlanPreselect } from "@/lib/pricingPlanPreselect";
+import { Link, useLocation, useNavigate, useSearchParams } from "@/lib/react-router-compat";
+import {
+  resolvePricingCreditPackPreselect,
+  resolvePricingPlanPreselect,
+} from "@/lib/pricingPlanPreselect";
 import { usePageSeo } from "@/hooks/usePageSeo";
 import {
   Check,
@@ -56,6 +59,7 @@ import { useMyEntitlements } from "@/hooks/useMyEntitlements";
 import { creditPackBlockedCopy, resolveCreditPackPurchaseGate } from "@/lib/creditPackEligibility";
 import { buildCreditPackSuccessUrl } from "@/lib/checkoutReturnTo";
 import { isReducedMotionPreferred } from "@/lib/useTimelineHighlightAutoScroll";
+import { buildCheckoutPlanReturnPath, savePlanIntent } from "@/lib/checkoutPlanIntent";
 
 type BillingPeriod = "monthly" | "annual";
 
@@ -160,8 +164,9 @@ const COMPARISON_ROWS: Row[] = [
 
 export default function Pricing() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const {
     entitlement,
     loading: entitlementLoading,
@@ -177,6 +182,7 @@ export default function Pricing() {
   // Legacy `/billing/:plan` redirects here with this exact contract.
   // NEVER auto-opens Paddle — the grower must click a Pricing CTA.
   const preselect = resolvePricingPlanPreselect(searchParams.get("plan"));
+  const preselectedCreditPack = resolvePricingCreditPackPreselect(searchParams.get("plan"));
   const paidInterestLeadSource = resolvePaidInterestLeadSource(searchParams);
   const freeSignupPath = buildAttributedSignupPath({
     source: resolvePaidAcquisitionSource(searchParams) ?? "pricing_page",
@@ -193,11 +199,12 @@ export default function Pricing() {
   // which is exactly how a failed pack retry became a subscription checkout.
   // The launch-list form keeps reading `interestPlan` state, so a pack id can
   // never reach SubscriberInterestForm, which collects interest in *plans*.
-  // Starts null on purpose: "no attempt has been made yet" must be
-  // distinguishable from "pro_annual was attempted". Seeding it with
-  // interestPlan would attribute an unattributed failure to whichever plan
-  // happens to be preselected.
-  const lastCheckoutSkuRef = useRef<string | null>(null);
+  // Starts null for an ordinary visit: "no attempt has been made yet" must be
+  // distinguishable from "pro_annual was attempted". An exact pack in the
+  // auth-return query is the only seed because a resumed pack can fail again
+  // before a click repopulates this ref; its next recovery must stay on that
+  // pack. A plan preselection remains insufficient evidence of an attempt.
+  const lastCheckoutSkuRef = useRef<string | null>(preselectedCreditPack);
   // Which SKU the current blockedReason belongs to. A runtime checkout failure
   // is specific to the SKU that failed and must not make the others inert.
   const [blockedSku, setBlockedSku] = useState<string | null>(null);
@@ -209,6 +216,7 @@ export default function Pricing() {
   const interestPlanRef = useRef<SubscriberInterestPlanId>(interestPlan);
   interestPlanRef.current = interestPlan;
   const [recoveryRequested, setRecoveryRequested] = useState(false);
+  const [reauthenticating, setReauthenticating] = useState(false);
   const recoveryRef = useRef<HTMLElement>(null);
   const creditPacksRef = useRef<HTMLElement>(null);
   const handledCreditPacksHashRef = useRef<string | null>(null);
@@ -218,9 +226,36 @@ export default function Pricing() {
     environment: checkoutEnvironment,
     unavailableMessage,
     blockedReason,
+    blockedReasonCode,
     dismissBlocked,
   } = usePaddleCheckout();
   const checkoutRecoveryReason = blockedReason ?? unavailableMessage;
+  const checkoutRecoveryKind =
+    blockedReasonCode === "auth_required"
+      ? "auth"
+      : blockedReasonCode === "price_gateway_unavailable" ||
+          blockedReasonCode === "price_request_failed" ||
+          blockedReasonCode === "price_response_unusable"
+        ? "transient"
+        : "configuration";
+  const checkoutRecoveryPanelCopy =
+    checkoutRecoveryKind === "auth"
+      ? {
+          ariaLabel: "Checkout sign-in recovery",
+          eyebrow: "Sign-in required",
+          title: "Sign in again to continue checkout.",
+        }
+      : checkoutRecoveryKind === "transient"
+        ? {
+            ariaLabel: "Checkout retry",
+            eyebrow: "Checkout interrupted",
+            title: "Checkout needs another try.",
+          }
+        : {
+            ariaLabel: "Paid plan launch list",
+            eyebrow: "Paid plan update",
+            title: "Checkout isn't ready here yet. Get one launch email.",
+          };
 
   /**
    * Is THIS sku blocked?
@@ -305,9 +340,34 @@ export default function Pricing() {
       : undefined;
   }
 
-  // One-time AI credit-pack checkout. Packs are not plans, so this bypasses the
-  // plan-intent state and opens checkout for the pack SKU directly. Same
-  // canonical checkout hook — this stays inside Pricing.tsx (checkout ownership).
+  async function handleCheckoutReauthentication() {
+    if (reauthenticating) return;
+    const rawSku = lastCheckoutSkuRef.current ?? interestPlan;
+    const returnPath = buildCheckoutPlanReturnPath({
+      pathname: location.pathname,
+      search: location.search,
+      plan: rawSku,
+    });
+
+    setReauthenticating(true);
+    try {
+      await signOut();
+      // Persist only after the stale bearer is actually gone. A rejected
+      // sign-out must not leave an intent that can auto-open checkout later.
+      // The hook consumes this once after sign-in returns to Pricing.
+      savePlanIntent(rawSku);
+      dismissBlocked();
+      navigate(`/auth?mode=signin&redirectTo=${encodeURIComponent(returnPath)}`);
+    } catch {
+      // Keep the auth recovery visible if local sign-out cannot complete.
+      setReauthenticating(false);
+    }
+  }
+
+  // One-time AI credit-pack checkout. Packs are not plans, so the initial click
+  // opens the pack SKU directly. Only an auth-recovery handoff persists the
+  // exact allowlisted SKU for one-shot resume. Same canonical checkout hook —
+  // this stays inside Pricing.tsx (checkout ownership).
   function handleBuyPack(sku: string) {
     // Presentation is not the authority (get-paddle-price repeats this gate),
     // but never start a checkout the current verified entitlement cannot use.
@@ -351,15 +411,21 @@ export default function Pricing() {
   }, []);
 
   useEffect(() => {
-    if (location.hash !== "#buy-credits") {
+    const surfaceRequest =
+      location.hash === "#buy-credits"
+        ? location.hash
+        : preselectedCreditPack
+          ? `query:${preselectedCreditPack}`
+          : null;
+    if (!surfaceRequest) {
       handledCreditPacksHashRef.current = null;
       return;
     }
-    if (handledCreditPacksHashRef.current === location.hash) return;
+    if (handledCreditPacksHashRef.current === surfaceRequest) return;
     const target = creditPacksRef.current;
     if (!target) return;
 
-    handledCreditPacksHashRef.current = location.hash;
+    handledCreditPacksHashRef.current = surfaceRequest;
     if (typeof target.scrollIntoView === "function") {
       try {
         target.scrollIntoView({
@@ -383,7 +449,7 @@ export default function Pricing() {
         // A failed focus must not turn an in-page navigation aid into an error.
       }
     }
-  }, [location.hash]);
+  }, [location.hash, preselectedCreditPack]);
 
   useEffect(() => {
     if (!blockedReason) {
@@ -781,101 +847,122 @@ export default function Pricing() {
       {checkoutRecoveryReason && (
         <section
           ref={recoveryRef}
-          id="subscriber-interest"
+          id={
+            checkoutRecoveryKind === "configuration" ? "subscriber-interest" : "checkout-recovery"
+          }
           tabIndex={-1}
-          aria-label="Paid plan launch list"
+          aria-label={checkoutRecoveryPanelCopy.ariaLabel}
           data-testid="pricing-checkout-recovery"
           className="px-6 pb-12 max-w-3xl mx-auto"
         >
           <div className="rounded-2xl border border-primary/35 bg-card/40 p-6 md:p-8">
             <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Paid plan update
+              {checkoutRecoveryPanelCopy.eyebrow}
             </p>
             <h2 className="mt-2 font-display text-2xl font-semibold">
-              Checkout isn't ready here yet. Get one launch email.
+              {checkoutRecoveryPanelCopy.title}
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">{checkoutRecoveryReason}</p>
             {blockedReason && (
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  data-testid="pricing-checkout-retry"
-                  disabled={checkoutLoading}
-                  onClick={() => {
-                    // Retry the SKU that actually failed. This read used to be
-                    // lastCheckoutPlanRef, which credit-pack clicks never
-                    // wrote, so a failed "Buy 50 credits" ($9) retried its
-                    // initial value — interestPlan, default pro_annual — and
-                    // opened a $99/yr subscription checkout instead.
-                    const rawSku = lastCheckoutSkuRef.current ?? interestPlan;
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(rawSku);
-                    trackPricingEvent("pricing_checkout_recovery_retry", {
-                      plan,
-                      source: "recovery_panel",
-                    });
-                    trackFunnelEvent("checkout_recovery_retry", { plan });
-                    dismissBlocked();
-                    void openCheckout({
-                      priceId: rawSku,
-                      successUrl: packSuccessUrlFor(rawSku),
-                    });
-                  }}
-                >
-                  Try again
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  data-testid="pricing-checkout-choose-another-plan"
-                  onClick={() => {
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(
-                      lastCheckoutSkuRef.current ?? interestPlan,
-                    );
-                    trackPricingEvent("pricing_checkout_recovery_choose_another_plan", {
-                      plan,
-                      source: "recovery_panel",
-                    });
-                    trackFunnelEvent("checkout_recovery_choose_another_plan", { plan });
-                    dismissBlocked();
-                    setRecoveryRequested(false);
-                    const grid =
-                      typeof document !== "undefined"
-                        ? document.getElementById("pricing-plans")
-                        : null;
-                    grid?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    (grid as HTMLElement | null)?.focus?.();
-                  }}
-                >
-                  Choose another plan
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  data-testid="pricing-checkout-dismiss"
-                  onClick={() => {
-                    const plan = sanitizeCheckoutRecoveryPlanSlug(
-                      lastCheckoutSkuRef.current ?? interestPlan,
-                    );
-                    trackPricingEvent("pricing_checkout_recovery_dismissed", {
-                      plan,
-                      source: "recovery_panel",
-                    });
-                    trackFunnelEvent("checkout_recovery_dismissed", { plan });
-                    dismissBlocked();
-                    setRecoveryRequested(false);
-                  }}
-                >
-                  Dismiss
-                </Button>
+                {checkoutRecoveryKind === "auth" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="pricing-checkout-sign-in"
+                    disabled={reauthenticating}
+                    onClick={() => void handleCheckoutReauthentication()}
+                  >
+                    {reauthenticating ? "Opening sign in…" : "Sign in again"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="pricing-checkout-retry"
+                    disabled={checkoutLoading}
+                    onClick={() => {
+                      // Retry the SKU that actually failed. This read used to be
+                      // lastCheckoutPlanRef, which credit-pack clicks never
+                      // wrote, so a failed "Buy 50 credits" ($9) retried its
+                      // initial value — interestPlan, default pro_annual — and
+                      // opened a $99/yr subscription checkout instead.
+                      const rawSku = lastCheckoutSkuRef.current ?? interestPlan;
+                      const plan = sanitizeCheckoutRecoveryPlanSlug(rawSku);
+                      trackPricingEvent("pricing_checkout_recovery_retry", {
+                        plan,
+                        source: "recovery_panel",
+                      });
+                      trackFunnelEvent("checkout_recovery_retry", { plan });
+                      dismissBlocked();
+                      void openCheckout({
+                        priceId: rawSku,
+                        successUrl: packSuccessUrlFor(rawSku),
+                      });
+                    }}
+                  >
+                    Try again
+                  </Button>
+                )}
+                {checkoutRecoveryKind === "configuration" && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-testid="pricing-checkout-choose-another-plan"
+                      onClick={() => {
+                        const plan = sanitizeCheckoutRecoveryPlanSlug(
+                          lastCheckoutSkuRef.current ?? interestPlan,
+                        );
+                        trackPricingEvent("pricing_checkout_recovery_choose_another_plan", {
+                          plan,
+                          source: "recovery_panel",
+                        });
+                        trackFunnelEvent("checkout_recovery_choose_another_plan", { plan });
+                        dismissBlocked();
+                        setRecoveryRequested(false);
+                        const grid =
+                          typeof document !== "undefined"
+                            ? document.getElementById("pricing-plans")
+                            : null;
+                        grid?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        (grid as HTMLElement | null)?.focus?.();
+                      }}
+                    >
+                      Choose another plan
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      data-testid="pricing-checkout-dismiss"
+                      onClick={() => {
+                        const plan = sanitizeCheckoutRecoveryPlanSlug(
+                          lastCheckoutSkuRef.current ?? interestPlan,
+                        );
+                        trackPricingEvent("pricing_checkout_recovery_dismissed", {
+                          plan,
+                          source: "recovery_panel",
+                        });
+                        trackFunnelEvent("checkout_recovery_dismissed", { plan });
+                        dismissBlocked();
+                        setRecoveryRequested(false);
+                      }}
+                    >
+                      Dismiss
+                    </Button>
+                  </>
+                )}
               </div>
             )}
-            <div className="mt-5">
-              <SubscriberInterestForm planId={interestPlan} leadSource={paidInterestLeadSource} />
-            </div>
+            {checkoutRecoveryKind === "configuration" && (
+              <div className="mt-5">
+                <SubscriberInterestForm planId={interestPlan} leadSource={paidInterestLeadSource} />
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -938,7 +1025,12 @@ export default function Pricing() {
             <div
               key={pack.sku}
               data-testid={`pricing-credit-pack-${pack.sku}`}
-              className="rounded-2xl border border-border/60 bg-card/40 backdrop-blur p-6 flex flex-col items-start min-w-0"
+              data-preselected={preselectedCreditPack === pack.sku ? "true" : undefined}
+              className={`rounded-2xl border bg-card/40 backdrop-blur p-6 flex flex-col items-start min-w-0 ${
+                preselectedCreditPack === pack.sku
+                  ? "border-primary ring-2 ring-primary/30"
+                  : "border-border/60"
+              }`}
             >
               <p className="text-3xl md:text-4xl font-display font-bold">{pack.credits}</p>
               <p className="text-sm text-muted-foreground">AI Doctor credits</p>

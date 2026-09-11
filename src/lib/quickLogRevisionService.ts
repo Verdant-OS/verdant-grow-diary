@@ -12,6 +12,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
+  parseQuickLogRevisionRow,
   validateQuickLogCorrection,
   type QuickLogCorrectionChanges,
   type QuickLogRevisionReasonCode,
@@ -122,11 +123,28 @@ export function adaptQuickLogRevisionDatabaseRow(value: unknown): QuickLogRevisi
   return row;
 }
 
-export function adaptQuickLogRevisionDatabaseRows(data: unknown): QuickLogRevisionRow[] {
-  if (!Array.isArray(data)) return [];
-  return data
-    .map(adaptQuickLogRevisionDatabaseRow)
-    .filter((row): row is QuickLogRevisionRow => row !== null);
+export type QuickLogRevisionRowsDecodeResult =
+  { ok: true; rows: QuickLogRevisionRow[] } | { ok: false };
+
+/**
+ * Decode a complete physical revision-row response for confidence-bearing UI.
+ * A non-array payload or one rejected row makes the entire response unreadable;
+ * partial rows are never exposed as a trustworthy ledger result.
+ */
+export function decodeQuickLogRevisionDatabaseRows(
+  data: unknown,
+): QuickLogRevisionRowsDecodeResult {
+  if (!Array.isArray(data)) return { ok: false };
+
+  const rows: QuickLogRevisionRow[] = [];
+  for (const value of data) {
+    const row = adaptQuickLogRevisionDatabaseRow(value);
+    if (row === null || parseQuickLogRevisionRow(row) === null) {
+      return { ok: false };
+    }
+    rows.push(row);
+  }
+  return { ok: true, rows };
 }
 
 function parseRpcResult(data: unknown): QuickLogRevisionWriteResult {

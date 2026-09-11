@@ -120,6 +120,43 @@ export function selectDiaryTimelineEmptyState(
 }
 
 /**
+ * Canonical Quick Log types recoverable from details.event_type when
+ * diary_entries.entry_type is absent. Same allow-list as diaryEntryRules.
+ * Note text is never used.
+ */
+const CANONICAL_QUICK_LOG_EVENT_TYPES = new Set([
+  "observation",
+  "watering",
+  "feeding",
+  "photo",
+  "environment",
+  "training",
+  "harvest",
+  "cure_check",
+]);
+
+export function resolveCanonicalDiaryEventType(input: {
+  entryType?: string | null;
+  details?: unknown;
+}): string {
+  const explicit =
+    typeof input.entryType === "string" && input.entryType.trim().length > 0
+      ? input.entryType.trim()
+      : null;
+  if (explicit) return explicit;
+
+  const details = input.details;
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    return "diary_entry";
+  }
+  const raw = (details as { event_type?: unknown }).event_type;
+  if (typeof raw === "string" && CANONICAL_QUICK_LOG_EVENT_TYPES.has(raw)) {
+    return raw;
+  }
+  return "diary_entry";
+}
+
+/**
  * Resolve a display label for a timeline entry kind. Stable, friendly,
  * and never "Live" unless the source is actually live.
  *

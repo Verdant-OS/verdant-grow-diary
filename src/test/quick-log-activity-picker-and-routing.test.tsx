@@ -340,6 +340,59 @@ describe("useQuickLogActivitySave — routing", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ["min 8 after trim", "  abcdefgh  ", "abcdefgh"],
+    ["max 200 after trim", `  ${"k".repeat(200)}  `, "k".repeat(200)],
+  ] as const)(
+    "event route trims %s and forwards p_idempotency_key",
+    async (_label, rawKey, trimmed) => {
+      rpcMock.mockResolvedValueOnce({
+        data: { ok: true, grow_event_id: "e-trim" },
+        error: null,
+      });
+      const { result } = renderHook(() => useQuickLogActivitySave());
+      let res!: Awaited<ReturnType<typeof result.current.save>>;
+      await act(async () => {
+        res = await result.current.save({
+          activityId: "training",
+          growId: "g1",
+          idempotencyKey: rawKey,
+        });
+      });
+      expect(res.ok).toBe(true);
+      expect(rpcMock).toHaveBeenCalledTimes(1);
+      const [name, payload] = rpcMock.mock.calls[0];
+      expect(name).toBe("quicklog_save_event");
+      expect(payload.p_idempotency_key).toBe(trimmed);
+    },
+  );
+
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["empty", ""],
+    ["short (<8)", "short"],
+    ["whitespace-only", " ".repeat(8)],
+    ["trimmed-short", "  short  "],
+    ["overlong (>200)", "x".repeat(201)],
+    ["trimmed-overlong", `  ${"x".repeat(201)}  `],
+  ] as const)(
+    "event route fail-closes %s idempotency key without RPC",
+    async (_label, idempotencyKey) => {
+      const { result } = renderHook(() => useQuickLogActivitySave());
+      let res!: Awaited<ReturnType<typeof result.current.save>>;
+      await act(async () => {
+        res = await result.current.save({
+          activityId: "training",
+          growId: "g1",
+          ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+        });
+      });
+      expect(res).toEqual({ ok: false, reason: "missing_idempotency_key" });
+      expect(rpcMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("event route requires an idempotency key", async () => {
     const { result } = renderHook(() => useQuickLogActivitySave());
     let res!: Awaited<ReturnType<typeof result.current.save>>;

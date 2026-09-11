@@ -1,19 +1,18 @@
 /**
- * feedingDefaultsViewModel — pure helper that derives "last used" feeding
- * defaults for the QuickLogV2 Feed surface from recent diary rows.
+ * feedingDefaultsViewModel — pure helper that derives a last-feeding
+ * recipe prefill for the QuickLogV2 Feed surface from recent diary rows.
  *
  * Hard rules:
- *   - Pure. No I/O. No React. No Supabase. No randomness. No time injection
- *     required (deterministic regardless of input order).
- *   - READ-ONLY default derivation. Never writes, never normalizes the save
- *     path, never invents products or doses.
- *   - Only prefills SAFE REPEAT fields: `lineId` + `products` (name / amount
- *     string / unit). Measured outcome fields (pH, EC in/out, runoff *,
- *     water temp) are ALWAYS left blank in the returned defaults.
- *   - Demo / stale / invalid rows are skipped when their provenance is
- *     present in `details.extras.source` / `details.sensorSnapshot.state`.
- *   - Malformed details / non-feeding events / amount-less products are
- *     ignored.
+ *   - Pure. No I/O. No React. No Supabase. No randomness. Deterministic.
+ *   - READ-ONLY default derivation. Never writes, never submits a log.
+ *   - Prefills ONLY the last same-plant feeding recipe: `lineId` + `products`
+ *     (name / amount string / unit). Never invents a recipe, manufacturer
+ *     chart, or Advanced Nutrients schedule.
+ *   - Measured outcome fields (pH, EC in/out, runoff *, water temp) stay blank.
+ *   - Plant scope only. Tent/grow fallbacks are banned — another plant's
+ *     recipe must not leak into this form (fail closed).
+ *   - Demo / stale / invalid provenance is skipped when present.
+ *   - Missing / malformed recipes are ignored. Watering rows are ignored.
  */
 
 import {
@@ -32,20 +31,18 @@ export const FEEDING_DEFAULTS_LABEL = "Prefilled from last feeding" as const;
 
 const UNTRUSTED_PROVENANCE = new Set(["demo", "stale", "invalid", "fixture", "mock"]);
 
-export type FeedingDefaultsScope = "plant" | "tent" | "grow";
+export type FeedingDefaultsScope = "plant";
 
 export interface FeedingDefaultsInput {
   rawEntries: readonly unknown[];
   plantId?: string | null;
-  tentId?: string | null;
-  growId?: string | null;
 }
 
 export interface FeedingDefaultsResult {
   /**
    * Partial Quick Log Feeding form state. Only `lineId` + `products` are
    * populated. Caller merges with `EMPTY_QUICKLOG_FEEDING_FORM` to render.
-   * `null` when no safe default exists.
+   * `null` when no safe plant-scoped prior recipe exists.
    */
   defaults: Pick<QuickLogFeedingFormState, "lineId" | "products"> | null;
   scope: FeedingDefaultsScope | null;
@@ -126,17 +123,14 @@ function toProductRows(entry: NormalizedDiaryEntry): QuickLogFeedingFormProductR
   return rows;
 }
 
-function buildFromEntry(
-  entry: NormalizedDiaryEntry,
-  scope: FeedingDefaultsScope,
-): FeedingDefaultsResult | null {
+function buildFromEntry(entry: NormalizedDiaryEntry): FeedingDefaultsResult | null {
   const lineId = resolveLineId(entry);
   if (!lineId) return null;
   const products = toProductRows(entry);
   if (products.length === 0) return null;
   return {
     defaults: { lineId, products },
-    scope,
+    scope: "plant",
     sourceEntryId: entry.id,
     label: FEEDING_DEFAULTS_LABEL,
   };
@@ -146,40 +140,24 @@ export function buildFeedingDefaults(input: FeedingDefaultsInput): FeedingDefaul
   if (!input || !Array.isArray(input.rawEntries) || input.rawEntries.length === 0) {
     return EMPTY_RESULT;
   }
+
+  const plantId = pickString(input.plantId ?? null);
+  // Fail closed without an explicit plant — tent/grow recipes are not safe
+  // defaults for a feeding log that may target a different plant.
+  if (!plantId) return EMPTY_RESULT;
+
   const normalized = normalizeDiaryEntries({ rawEntries: input.rawEntries });
   if (normalized.length === 0) return EMPTY_RESULT;
 
   const sorted = sortDiaryEntriesNewestFirst(normalized);
-  const feedingsAll = sorted.filter(isFeedingEntry).filter((e) => !isUntrusted(e));
+  for (const entry of sorted) {
+    if (entry.plantId !== plantId) continue;
+    if (!isFeedingEntry(entry)) continue;
+    if (isUntrusted(entry)) continue;
+    const result = buildFromEntry(entry);
+    if (result) return result;
+  }
 
-  const plantId = pickString(input.plantId ?? null);
-  const tentId = pickString(input.tentId ?? null);
-  const growId = pickString(input.growId ?? null);
-
-  if (plantId) {
-    for (const e of feedingsAll) {
-      if (e.plantId === plantId) {
-        const r = buildFromEntry(e, "plant");
-        if (r) return r;
-      }
-    }
-  }
-  if (tentId) {
-    for (const e of feedingsAll) {
-      if (e.tentId === tentId) {
-        const r = buildFromEntry(e, "tent");
-        if (r) return r;
-      }
-    }
-  }
-  if (growId) {
-    for (const e of feedingsAll) {
-      if (e.growId === growId) {
-        const r = buildFromEntry(e, "grow");
-        if (r) return r;
-      }
-    }
-  }
   return EMPTY_RESULT;
 }
 

@@ -32,6 +32,33 @@ const MAC_RE = /\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b/g;
 
 const BEARER_RE = /\bBearer\s+[A-Za-z0-9._-]+/g;
 
+/**
+ * Header-prefixed ASSIGNMENT — `Bearer NAME=value`, `authorization: NAME=value`.
+ *
+ * Must run before BEARER_RE, which matches only `Bearer <token>` and therefore
+ * consumes the NAME while leaving the VALUE behind:
+ *
+ *   Bearer MY_PASSKEY_VAR="secret"  ->  [redacted]="secret"
+ *
+ * That is a PARTIAL redaction: output that looks sanitized while the
+ * credential survives, so nothing prompts a reader to look closer. It is the
+ * same defect fixed in `ecowittLocalForwardingStatus` (#1185),
+ * `ecowittValidationEvidenceRules` (#1184) and `postGrowReportRules` (#1187,
+ * #1190) — this module was cited in that audit as the correct counter-example,
+ * and it is, for the shapes SECRET_PAIR_RES covers. It had no rule for this
+ * one.
+ *
+ * The keyword pair rules cannot close this: they are `\b`-anchored
+ * (`\bapi_key\b`) and `_` is a word character, so a label inside
+ * `MY_API_KEY_VAR` matches nothing. The header prefix is what makes an
+ * arbitrary NAME safe to redact here.
+ *
+ * Case-insensitive on purpose: BEARER_RE is case-SENSITIVE, so a lowercase
+ * `bearer NAME=value` was passing through completely untouched.
+ */
+const HEADER_ASSIGNMENT_RE =
+  /\b(?:bearer|authorization)\b\s*:?\s*[A-Za-z0-9._-]+\s*[:=]\s*["'`]?[^\s"'`,;&]+["'`]?/gi;
+
 const JWT_RE = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
 
 const LONG_HEX_RE = /\b[0-9a-fA-F]{32,}\b/g;
@@ -95,6 +122,9 @@ export function sanitizeProofReportMarkdown(input: string): string {
   // Authorization headers first — strip whole value before any sub-pattern
   // (e.g. `Bearer ...`) is partially consumed by other rules.
   out = out.replace(AUTH_HEADER_RE, REDACTED_PLACEHOLDER);
+  // Header-prefixed assignments next, before BEARER_RE below can consume the
+  // NAME and strand the VALUE. See HEADER_ASSIGNMENT_RE.
+  out = out.replace(HEADER_ASSIGNMENT_RE, REDACTED_PLACEHOLDER);
   // Order matters: strip key=value pairs next so the placeholder doesn't
   // immediately get re-stripped by the bare keyword pass.
   for (const re of SECRET_PAIR_RES) out = out.replace(re, REDACTED_PLACEHOLDER);

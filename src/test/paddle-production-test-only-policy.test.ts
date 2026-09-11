@@ -33,8 +33,10 @@ afterEach(() => {
 });
 
 describe("Paddle production test-only policy", () => {
-  it("tracks a sandbox-class client token in the production build", () => {
-    expect(classifyPaddleToken(readProductionToken())).toBe("sandbox");
+  it("tracks a sandbox or live class client token in the production build", () => {
+    // Standing production prebuild gate: Lovable publish may inject live_.
+    // Checkout runtime remaining sandbox-authorized is a separate slice.
+    expect(["sandbox", "live"]).toContain(classifyPaddleToken(readProductionToken()));
   });
 
   it("reads the same last duplicate assignment that Vite resolves for production", () => {

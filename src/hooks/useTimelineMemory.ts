@@ -104,6 +104,35 @@ function diaryRowToDiaryItem(
   };
 }
 
+function groupedParentToDiaryItem(entry: QuickLogTimelineEntry): TimelineDiaryItem | null {
+  if (entry.kind !== "grouped" && entry.kind !== "action") return null;
+  const action = entry.action;
+  if (typeof action.id !== "string" || action.id.length === 0) return null;
+  if (typeof action.occurredAt !== "string" || action.occurredAt.length === 0) return null;
+  if (action.kind !== "water" && action.kind !== "note") return null;
+  return {
+    kind: "diary",
+    key: `quicklog-parent-${action.id}`,
+    occurredAt: action.occurredAt,
+    eventType: action.kind === "water" ? "watering" : "observation",
+    hasPhoto: false,
+    note: action.noteText ?? null,
+  };
+}
+
+function mergeTimelineMemoryItems(values: readonly TimelineMemoryItem[]): TimelineMemoryItem[] {
+  const byKey = new Map<string, TimelineMemoryItem>();
+  for (const item of values) {
+    if (!byKey.has(item.key)) byKey.set(item.key, item);
+  }
+  return [...byKey.values()].sort((a, b) => {
+    if (a.occurredAt > b.occurredAt) return -1;
+    if (a.occurredAt < b.occurredAt) return 1;
+    if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
+    return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+  });
+}
+
 function rowToManualSnapshotItem(row: ManualSnapshotDiaryRow): TimelineManualSnapshotItem | null {
   const rec = diaryRowToManualSnapshotRecord(row);
   if (!rec) return null;
@@ -368,9 +397,15 @@ export function useTimelineMemory(
           return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
         });
 
+      const groupedParentItems: TimelineDiaryItem[] = [];
+      for (const entry of actionEntries) {
+        const parentItem = groupedParentToDiaryItem(entry);
+        if (parentItem) groupedParentItems.push(parentItem);
+      }
+
       sortItems(displayItems);
       return {
-        items: sortItems([...displayItems, ...companionItems]),
+        items: sortItems([...displayItems, ...companionItems, ...groupedParentItems]),
         displayItems,
         companionItems,
         companionEvidenceUnavailable,
@@ -379,8 +414,15 @@ export function useTimelineMemory(
   });
   const baseDisplayItems = query.data?.displayItems ?? [];
   const companionItems = query.data?.companionItems ?? [];
+  const groupedParentItems: TimelineDiaryItem[] = [];
+  if (groupedTimeline.status === "success" && Array.isArray(groupedTimeline.data)) {
+    for (const entry of groupedTimeline.data) {
+      const parentItem = groupedParentToDiaryItem(entry);
+      if (parentItem) groupedParentItems.push(parentItem);
+    }
+  }
   return {
-    items: query.data?.items ?? [],
+    items: mergeTimelineMemoryItems([...(query.data?.items ?? []), ...groupedParentItems]),
     displayItems: buildTimelineMemoryDisplayItems(
       baseDisplayItems,
       companionItems,

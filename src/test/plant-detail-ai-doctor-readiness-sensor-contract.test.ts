@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { classifyAiDoctorCurrentSensorEvidence } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { buildPlantDetailAiDoctorReadiness } from "@/lib/plantDetailAiDoctorReadiness";
 import { classifyAuditRow } from "@/lib/sensorSnapshotStatusContract";
 
@@ -72,6 +73,80 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
     expect(r.sensorEvidence.mode).toBe("unsafe");
     expect(r.sensorEvidence.isUnsafe).toBe(true);
     expect(r.sensorEvidence.countsAsHealthyEvidence).toBe(false);
+  });
+
+  it("remasure 76°F / 58% RH current manuals are not parked as needs-review", () => {
+    const capturedAt = minutesAgo(2);
+    const classified = classifyAiDoctorCurrentSensorEvidence(
+      [
+        {
+          metric: "temp_f",
+          value: 76,
+          captured_at: capturedAt,
+          source: "manual",
+          quality: null,
+        },
+        {
+          metric: "humidity",
+          value: 58,
+          captured_at: capturedAt,
+          source: "manual",
+          quality: null,
+        },
+      ],
+      { now: NOW },
+    );
+    const r = buildPlantDetailAiDoctorReadiness({
+      ...baseInput,
+      sensorSnapshot: classified,
+    });
+    expect(classified.status).toBe("usable");
+    expect(classified.reason).not.toBe("none_inserted");
+    expect(r.sensorEvidence.mode).toBe("healthy");
+    expect(r.sensorEvidence.isUnsafe).toBe(false);
+    expect(r.sensorEvidence.label).not.toMatch(/needs review — not used for recommendations/i);
+    expect(r.missing.find((m) => m.kind === "no_sensor_snapshot")).toBeUndefined();
+  });
+
+  it("9-hour valid tent manuals are usable Doctor evidence, not cautionary stale copy", () => {
+    const capturedAt = hoursAgo(9);
+    const classified = classifyAiDoctorCurrentSensorEvidence(
+      [
+        { metric: "temp_f", value: 75, captured_at: capturedAt, source: "manual", quality: null },
+        { metric: "humidity", value: 60, captured_at: capturedAt, source: "manual", quality: null },
+        { metric: "vpd", value: 1, captured_at: capturedAt, source: "manual", quality: null },
+      ],
+      { now: NOW },
+    );
+    const r = buildPlantDetailAiDoctorReadiness({
+      ...baseInput,
+      sensorSnapshot: classified,
+    });
+    expect(classified.status).toBe("usable");
+    expect(r.sensorEvidence.mode).toBe("healthy");
+    expect(r.sensorEvidence.mode).not.toBe("cautionary");
+    expect(r.sensorEvidence.label).not.toMatch(/outside the stale window/i);
+  });
+
+  it("stale live tent rows do not produce cautionary copy when a 9-hour manual is usable", () => {
+    const liveAt = minutesAgo(16);
+    const manualAt = hoursAgo(9);
+    const classified = classifyAiDoctorCurrentSensorEvidence(
+      [
+        { metric: "temperature_c", value: 24, captured_at: liveAt, source: "live", quality: "ok" },
+        { metric: "humidity_pct", value: 55, captured_at: liveAt, source: "live", quality: "ok" },
+        { metric: "temp_f", value: 75, captured_at: manualAt, source: "manual", quality: null },
+        { metric: "humidity", value: 60, captured_at: manualAt, source: "manual", quality: null },
+      ],
+      { now: NOW },
+    );
+    const r = buildPlantDetailAiDoctorReadiness({
+      ...baseInput,
+      sensorSnapshot: classified,
+    });
+    expect(classified.status).toBe("usable");
+    expect(r.sensorEvidence.mode).not.toBe("cautionary");
+    expect(r.sensorEvidence.label).not.toMatch(/outside the stale window/i);
   });
 
   it("needs_review is blocked as evidence", () => {

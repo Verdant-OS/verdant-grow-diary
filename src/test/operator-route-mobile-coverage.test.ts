@@ -20,7 +20,7 @@ const protectedListed = new Set(extractStringArray(spec, "PROTECTED_MOBILE_ROUTE
 const publicListed = new Set(extractStringArray(spec, "PUBLIC_MOBILE_ROUTES"));
 // Fixture-only demo surfaces deliberately mounted OUTSIDE AppShell (render
 // signed-out by design; asserted for zero private REST hits instead of an
-// /auth redirect). Pinned below to exactly these two routes so real
+// /auth redirect). Pinned below to exactly these three routes so real
 // operator/internal pages can never quietly migrate into this bucket.
 // Route Metadata Truth v1: the manifest now labels them `public` (matching
 // their actual routing); their mobile coverage stays in this dedicated
@@ -28,6 +28,7 @@ const publicListed = new Set(extractStringArray(spec, "PUBLIC_MOBILE_ROUTES"));
 const ALLOWED_UNAUTH_FIXTURE_ROUTES = [
   "/internal/contextual-pheno-comparison-demo",
   "/internal/demo-proof-walkthrough",
+  "/internal/demo-advanced-nutrients-feeding",
 ] as const;
 const fixtureListed = new Set(extractStringArray(spec, "UNAUTH_FIXTURE_ROUTES"));
 
@@ -53,7 +54,7 @@ describe("Mobile route-protection coverage guardrail", () => {
     expect(missing, `Missing mobile coverage for: ${missing.join(", ")}`).toEqual([]);
   });
 
-  it("UNAUTH_FIXTURE_ROUTES is pinned to exactly the two fixture-only demo surfaces", () => {
+  it("UNAUTH_FIXTURE_ROUTES is pinned to exactly the three fixture-only demo surfaces", () => {
     expect([...fixtureListed].sort()).toEqual([...ALLOWED_UNAUTH_FIXTURE_ROUTES].sort());
     // And none of them may also appear in the protected or public buckets.
     for (const p of fixtureListed) {

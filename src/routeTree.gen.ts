@@ -78,6 +78,7 @@ import { Route as GuidesIndexRouteImport } from './routes/guides.index'
 import { Route as GuidesSlugRouteImport } from './routes/guides.$slug'
 import { Route as GuidesGrowStageCareGuideRouteImport } from './routes/guides.grow-stage-care-guide'
 import { Route as InternalContextualPhenoComparisonDemoRouteImport } from './routes/internal.contextual-pheno-comparison-demo'
+import { Route as InternalDemoAdvancedNutrientsFeedingRouteImport } from './routes/internal.demo-advanced-nutrients-feeding'
 import { Route as InternalDemoProofWalkthroughRouteImport } from './routes/internal.demo-proof-walkthrough'
 import { Route as InternalPhenoHuntDemoRouteImport } from './routes/internal.pheno-hunt-demo'
 import { Route as PartnersCsvPreviewRouteImport } from './routes/partners.csv-preview'
@@ -500,6 +501,12 @@ const InternalContextualPhenoComparisonDemoRoute =
   InternalContextualPhenoComparisonDemoRouteImport.update({
     id: '/internal/contextual-pheno-comparison-demo',
     path: '/internal/contextual-pheno-comparison-demo',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const InternalDemoAdvancedNutrientsFeedingRoute =
+  InternalDemoAdvancedNutrientsFeedingRouteImport.update({
+    id: '/internal/demo-advanced-nutrients-feeding',
+    path: '/internal/demo-advanced-nutrients-feeding',
     getParentRoute: () => rootRouteImport,
   } as any)
 const InternalDemoProofWalkthroughRoute =
@@ -1001,6 +1008,7 @@ export interface FileRoutesByFullPath {
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
+  '/internal/demo-advanced-nutrients-feeding': typeof InternalDemoAdvancedNutrientsFeedingRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
@@ -1147,6 +1155,7 @@ export interface FileRoutesByTo {
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
+  '/internal/demo-advanced-nutrients-feeding': typeof InternalDemoAdvancedNutrientsFeedingRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
@@ -1297,6 +1306,7 @@ export interface FileRoutesById {
   '/guides/$slug': typeof GuidesSlugRoute
   '/guides/grow-stage-care-guide': typeof GuidesGrowStageCareGuideRoute
   '/internal/contextual-pheno-comparison-demo': typeof InternalContextualPhenoComparisonDemoRoute
+  '/internal/demo-advanced-nutrients-feeding': typeof InternalDemoAdvancedNutrientsFeedingRoute
   '/internal/demo-proof-walkthrough': typeof InternalDemoProofWalkthroughRoute
   '/internal/pheno-hunt-demo': typeof InternalPhenoHuntDemoRoute
   '/partners/csv-preview': typeof PartnersCsvPreviewRoute
@@ -1446,6 +1456,7 @@ export interface FileRouteTypes {
     | '/guides/$slug'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
+    | '/internal/demo-advanced-nutrients-feeding'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
     | '/partners/csv-preview'
@@ -1592,6 +1603,7 @@ export interface FileRouteTypes {
     | '/guides/$slug'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
+    | '/internal/demo-advanced-nutrients-feeding'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
     | '/partners/csv-preview'
@@ -1741,6 +1753,7 @@ export interface FileRouteTypes {
     | '/guides/$slug'
     | '/guides/grow-stage-care-guide'
     | '/internal/contextual-pheno-comparison-demo'
+    | '/internal/demo-advanced-nutrients-feeding'
     | '/internal/demo-proof-walkthrough'
     | '/internal/pheno-hunt-demo'
     | '/partners/csv-preview'
@@ -1865,6 +1878,7 @@ export interface RootRouteChildren {
   GuidesSlugRoute: typeof GuidesSlugRoute
   GuidesGrowStageCareGuideRoute: typeof GuidesGrowStageCareGuideRoute
   InternalContextualPhenoComparisonDemoRoute: typeof InternalContextualPhenoComparisonDemoRoute
+  InternalDemoAdvancedNutrientsFeedingRoute: typeof InternalDemoAdvancedNutrientsFeedingRoute
   InternalDemoProofWalkthroughRoute: typeof InternalDemoProofWalkthroughRoute
   InternalPhenoHuntDemoRoute: typeof InternalPhenoHuntDemoRoute
   PartnersCsvPreviewRoute: typeof PartnersCsvPreviewRoute
@@ -2365,6 +2379,13 @@ declare module '@tanstack/react-router' {
       path: '/internal/contextual-pheno-comparison-demo'
       fullPath: '/internal/contextual-pheno-comparison-demo'
       preLoaderRoute: typeof InternalContextualPhenoComparisonDemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/internal/demo-advanced-nutrients-feeding': {
+      id: '/internal/demo-advanced-nutrients-feeding'
+      path: '/internal/demo-advanced-nutrients-feeding'
+      fullPath: '/internal/demo-advanced-nutrients-feeding'
+      preLoaderRoute: typeof InternalDemoAdvancedNutrientsFeedingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/internal/demo-proof-walkthrough': {
@@ -3191,6 +3212,8 @@ const rootRouteChildren: RootRouteChildren = {
   GuidesGrowStageCareGuideRoute: GuidesGrowStageCareGuideRoute,
   InternalContextualPhenoComparisonDemoRoute:
     InternalContextualPhenoComparisonDemoRoute,
+  InternalDemoAdvancedNutrientsFeedingRoute:
+    InternalDemoAdvancedNutrientsFeedingRoute,
   InternalDemoProofWalkthroughRoute: InternalDemoProofWalkthroughRoute,
   InternalPhenoHuntDemoRoute: InternalPhenoHuntDemoRoute,
   PartnersCsvPreviewRoute: PartnersCsvPreviewRoute,

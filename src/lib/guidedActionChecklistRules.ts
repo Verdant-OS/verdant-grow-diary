@@ -16,7 +16,7 @@
  * abandonment dead-end for signed-in growers (ONBOARDING_QUICKLOG_CTA_PUBLIC_MISROUTE).
  * LIVE FAIL land: `https://verdantgrowdiary.com/quick-log` (no growId/plantId).
  * Match sibling dashboard pattern:
- * `/daily-check?plantId=<id>&from=dashboard&method=<note|sensor>`.
+ * `/daily-check?plantId=<id>&from=dashboard&method=<watering|photo|note|sensor>`.
  *
  * All time is injectable via `now` for tests.
  */
@@ -190,12 +190,17 @@ function formatAge(ms: number): string {
   return `${hours}h`;
 }
 
-/** Authenticated Daily Check deep-link for a known plant (diary / note path). */
-function plantDailyCheckHref(plantId: string): string {
+/** Authenticated Daily Check deep-link for a known plant diary activity. */
+function plantDailyCheckHref(
+  plantId: string,
+  growId: string,
+  method: "note" | "watering" | "photo",
+): string {
   return buildDailyCheckEntryHref({
     plantId,
+    growId,
     source: "dashboard",
-    method: "note",
+    method,
   });
 }
 
@@ -301,7 +306,7 @@ export function buildGuidedActionChecklist(
             ? "No watering or feeding logged for this plant yet."
             : `No watering or feeding in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: plantDailyCheckHref(plant.id),
+        ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId, "watering"),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -317,7 +322,7 @@ export function buildGuidedActionChecklist(
         title: `Capture a fresh photo of ${plant.name}`,
         reason: lastPhoto == null ? "No photo captured for this plant yet." : `No photo in ${age}.`,
         ctaLabel: "Quick Log",
-        ctaHref: plantDailyCheckHref(plant.id),
+        ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId, "photo"),
         plantId: plant.id,
         tentId: plant.tentId,
       });
@@ -338,7 +343,7 @@ export function buildGuidedActionChecklist(
               ? `${plant.name} is in flower — no trichome or pistil note yet.`
               : `${plant.name} is in flower — last trichome/pistil note ${age} ago.`,
           ctaLabel: "Log observation",
-          ctaHref: plantDailyCheckHref(plant.id),
+          ctaHref: plantDailyCheckHref(plant.id, input.scopedGrowId, "note"),
           plantId: plant.id,
           tentId: plant.tentId,
         });

@@ -40,6 +40,7 @@ import {
   persistHierarchyCreateAttempt,
 } from "@/lib/hierarchyCreatePersistence";
 import { useHierarchyCreateOutcomeRecovery } from "@/hooks/useHierarchyCreateOutcomeRecovery";
+import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 
 export interface CreatedTent {
   id: string;
@@ -168,6 +169,7 @@ export default function CreateTentDialog({
       if (binding.toastMessage) toast.error(binding.toastMessage);
       return;
     }
+    if (!hasTrimmedRequiredIdentity(form.name)) return;
     if (!targetGrowId) {
       toast.error("Choose a verified grow before creating a tent.");
       return;
@@ -465,7 +467,13 @@ export default function CreateTentDialog({
               </div>
             </details>
             <Button
-              disabled={busy || createOutcomeUnknown || !tentGate.allowed || formBlocked}
+              disabled={
+                busy ||
+                createOutcomeUnknown ||
+                !tentGate.allowed ||
+                formBlocked ||
+                !hasTrimmedRequiredIdentity(form.name)
+              }
               className="gradient-leaf text-primary-foreground"
               data-testid="tent-create-submit"
             >

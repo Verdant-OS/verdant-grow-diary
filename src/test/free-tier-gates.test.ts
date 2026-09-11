@@ -126,8 +126,10 @@ describe("static wiring — the gates are actually read at the creation seams", 
     expect(TENT_DIALOG).toMatch(/evaluateTentCreationGate\(/);
     expect(TENT_DIALOG).toMatch(/if \(!tentGate\.allowed\)/);
     // formBlocked is the fail-closed binding gate (replaces hardStop.blockSubmit).
+    // Identity fail-closed (VGD-FORM-FAILCLOSED-001) is an extra conjunct;
+    // whitespace-tolerant so Prettier wrapping cannot evade the pin.
     expect(TENT_DIALOG).toMatch(
-      /disabled=\{busy \|\| createOutcomeUnknown \|\| !tentGate\.allowed \|\| formBlocked\}/,
+      /disabled=\{\s*busy\s*\|\|\s*createOutcomeUnknown\s*\|\|\s*!tentGate\.allowed\s*\|\|\s*formBlocked\s*\|\|\s*!hasTrimmedRequiredIdentity\(form\.name\)\s*\}/,
     );
     expect(TENT_DIALOG).toMatch(/\bformBlocked\b/);
     expect(TENT_DIALOG).not.toMatch(/hardStop\.blockSubmit/);

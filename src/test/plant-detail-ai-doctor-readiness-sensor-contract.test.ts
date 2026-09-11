@@ -114,7 +114,7 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
     expect(r.missing.find((m) => m.kind === "no_sensor_snapshot")).toBeUndefined();
   });
 
-  it("Golden Toad Pin1: ~9h manuals must not be 'outside the stale window' / cautionary-only", () => {
+  it("9-hour valid tent manuals are usable Doctor evidence, not cautionary stale copy", () => {
     const capturedAt = hoursAgo(9);
     const classified = classifyAiDoctorCurrentSensorEvidence(
       [
@@ -136,30 +136,21 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
     expect(classified.status).toBe("usable");
     expect(selected.status).toBe("usable");
     expect(r.sensorEvidence.mode).toBe("healthy");
+    expect(r.sensorEvidence.mode).not.toBe("cautionary");
     expect(r.sensorEvidence.isCautionary).toBe(false);
     expect(r.sensorEvidence.label).not.toMatch(/outside the stale window/i);
     expect(r.sensorEvidence.label).not.toMatch(/cautionary context only/i);
   });
 
-  it("Golden Toad Pin1: stale live rows must not force cautionary copy over a 9h tent manual", () => {
+  it("stale live tent rows do not produce cautionary copy when a 9-hour manual is usable", () => {
+    const liveAt = minutesAgo(16);
+    const manualAt = hoursAgo(9);
     const classified = classifyAiDoctorCurrentSensorEvidence(
       [
-        {
-          metric: "temperature_c",
-          value: 24,
-          captured_at: minutesAgo(16),
-          source: "live",
-          quality: null,
-        },
-        { metric: "temp_f", value: 75, captured_at: hoursAgo(9), source: "manual", quality: null },
-        {
-          metric: "humidity",
-          value: 60,
-          captured_at: hoursAgo(9),
-          source: "manual",
-          quality: null,
-        },
-        { metric: "vpd", value: 1, captured_at: hoursAgo(9), source: "manual", quality: null },
+        { metric: "temperature_c", value: 24, captured_at: liveAt, source: "live", quality: "ok" },
+        { metric: "humidity_pct", value: 55, captured_at: liveAt, source: "live", quality: "ok" },
+        { metric: "temp_f", value: 75, captured_at: manualAt, source: "manual", quality: null },
+        { metric: "humidity", value: 60, captured_at: manualAt, source: "manual", quality: null },
       ],
       { now: NOW },
     );
@@ -169,6 +160,7 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
     });
     expect(classified.status).toBe("usable");
     expect(r.sensorEvidence.mode).toBe("healthy");
+    expect(r.sensorEvidence.mode).not.toBe("cautionary");
     expect(r.sensorEvidence.label).not.toMatch(/outside the stale window/i);
     expect(r.sensorEvidence.label).not.toMatch(/cautionary context only/i);
   });

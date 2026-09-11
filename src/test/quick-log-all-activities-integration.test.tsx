@@ -232,6 +232,17 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("requested watering opens the structured V2 sheet instead of an inline note form", async () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    mountSection({ requestedActivityId: "watering" });
+    await waitFor(() => expect(events).toHaveLength(1));
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    expect(events[0].detail).toEqual({ targetKey: "plant:plant-1", action: "water" });
+    expect(screen.queryByTestId("quick-log-all-activities-form")).not.toBeInTheDocument();
+  });
+
   it("reapplies a requested editor after its target resolves asynchronously", async () => {
     const view = mountSection({
       growId: null,

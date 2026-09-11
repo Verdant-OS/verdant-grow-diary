@@ -329,6 +329,38 @@ describe("AI Doctor current sensor evidence classification", () => {
     expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
   });
 
+  it("keeps a 9-hour-old Golden Run tent manual usable under the 24h manual window", () => {
+    const capturedAt = "2026-07-17T03:00:00.000Z";
+    const rows = [
+      row("temp_f", 75, "manual", capturedAt, "temp"),
+      row("humidity", 60, "manual", capturedAt, "rh"),
+      row("vpd", 1, "manual", capturedAt, "vpd"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.source).toBe("manual");
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(snapshot?.readings.length).toBeGreaterThan(0);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+    expect(currentSensorEvidenceIsFreshLive(rows, { now: NOW })).toBe(false);
+  });
+
+  it("does not let a stale live row mask a 9-hour in-window tent manual", () => {
+    const liveStaleAt = "2026-07-17T11:44:00.000Z";
+    const manualAt = "2026-07-17T03:00:00.000Z";
+    const rows = [
+      row("temperature_c", 24, "live", liveStaleAt, "live-temp"),
+      row("humidity_pct", 55, "live", liveStaleAt, "live-rh"),
+      row("temp_f", 75, "manual", manualAt, "manual-temp"),
+      row("humidity", 60, "manual", manualAt, "manual-rh"),
+      row("vpd", 1, "manual", manualAt, "manual-vpd"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.source).toBe("manual");
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+    expect(currentSensorEvidenceIsFreshLive(rows, { now: NOW })).toBe(false);
+  });
+
   it("marks a 25-hour-old tent manual stale", () => {
     const capturedAt = "2026-07-16T11:00:00.000Z";
     const rows = [

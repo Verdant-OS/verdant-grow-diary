@@ -395,6 +395,7 @@
     "@playwright/test": "^1.48.0",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/typography": "^0.5.16",
+    "@testdino/playwright": "^2.6.0",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.6.1",

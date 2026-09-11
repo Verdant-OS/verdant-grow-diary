@@ -181,8 +181,12 @@ describe("buildGuidedActionChecklist", () => {
     );
     const water = items.find((i) => i.id === "cadence:water:p1");
     const photo = items.find((i) => i.id === "cadence:photo:p1");
-    expect(water?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=note");
-    expect(photo?.ctaHref).toBe("/daily-check?plantId=p1&from=dashboard&method=note");
+    expect(water?.ctaHref).toBe(
+      "/daily-check?plantId=p1&from=dashboard&method=watering&growId=grow-a",
+    );
+    expect(photo?.ctaHref).toBe(
+      "/daily-check?plantId=p1&from=dashboard&method=photo&growId=grow-a",
+    );
     expect(items.every((i) => !i.ctaHref.startsWith("/quick-log"))).toBe(true);
   });
 
@@ -225,10 +229,18 @@ describe("buildGuidedActionChecklist", () => {
     const junkWater = items.find((i) => i.id === `cadence:water:${JUNK.id}`);
     const junkPhoto = items.find((i) => i.id === `cadence:photo:${JUNK.id}`);
 
-    expect(breakWater?.ctaHref).toBe(`/daily-check?plantId=${BREAK.id}&from=dashboard&method=note`);
-    expect(breakPhoto?.ctaHref).toBe(`/daily-check?plantId=${BREAK.id}&from=dashboard&method=note`);
-    expect(junkWater?.ctaHref).toBe(`/daily-check?plantId=${JUNK.id}&from=dashboard&method=note`);
-    expect(junkPhoto?.ctaHref).toBe(`/daily-check?plantId=${JUNK.id}&from=dashboard&method=note`);
+    expect(breakWater?.ctaHref).toBe(
+      `/daily-check?plantId=${BREAK.id}&from=dashboard&method=watering&growId=grow-a`,
+    );
+    expect(breakPhoto?.ctaHref).toBe(
+      `/daily-check?plantId=${BREAK.id}&from=dashboard&method=photo&growId=grow-a`,
+    );
+    expect(junkWater?.ctaHref).toBe(
+      `/daily-check?plantId=${JUNK.id}&from=dashboard&method=watering&growId=grow-a`,
+    );
+    expect(junkPhoto?.ctaHref).toBe(
+      `/daily-check?plantId=${JUNK.id}&from=dashboard&method=photo&growId=grow-a`,
+    );
     expect(items.every((i) => !i.ctaHref.includes("/quick-log"))).toBe(true);
   });
 
@@ -295,7 +307,9 @@ describe("buildGuidedActionChecklist", () => {
       }),
     );
     const trichome = items.find((i) => i.id === "stage:trichome:p2");
-    expect(trichome?.ctaHref).toBe("/daily-check?plantId=p2&from=dashboard&method=note");
+    expect(trichome?.ctaHref).toBe(
+      "/daily-check?plantId=p2&from=dashboard&method=note&growId=grow-a",
+    );
   });
 
   it("emits cadence items when the last log is beyond the window", () => {

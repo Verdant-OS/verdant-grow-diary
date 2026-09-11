@@ -142,7 +142,7 @@ export function formatSensorSourceLabel(input: {
     return `${MANUAL_READING_LABEL} · ${note}`;
   }
 
-  if (src in SNAPSHOT_LAYER_LABELS) {
+  if (Object.prototype.hasOwnProperty.call(SNAPSHOT_LAYER_LABELS, src)) {
     return SNAPSHOT_LAYER_LABELS[src]!;
   }
 

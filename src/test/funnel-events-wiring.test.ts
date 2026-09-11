@@ -57,7 +57,9 @@ const QUICK_LOG_V2_SAVE_CALLERS = [
   },
   {
     file: "src/components/QuickLogV2Sheet.tsx",
-    telemetryIntent: /save\(built\.payload,\s*\{\s*telemetryIntent:\s*form\.action\s*\}\)/,
+    // Recovery submits the frozen intent rather than a mutable form action.
+    telemetryIntent:
+      /save\(exactManualSubmission\.payload,\s*\{\s*telemetryIntent:\s*submissionAction,\s*verifyPersistedNote:\s*pendingManualSubmission !== null,?\s*\}\)/,
   },
   { file: "src/components/AiDoctorCheckInPreviewPanel.tsx", telemetryIntent: null },
   { file: "src/pages/EcowittIngestAudit.tsx", telemetryIntent: null },

@@ -56,6 +56,14 @@ describe("money migration drift alert — runs at all", () => {
     expect(WORKFLOW).not.toContain("SUPABASE_DB_URL_LIVE");
   });
 
+  it("points the missing-secret fix steps at the verdant-production environment", () => {
+    // Default require-ci-secret copy points at repository secrets; this job
+    // reads the verdant-production environment secret.
+    expect(WORKFLOW).toContain("Settings → Environments → verdant-production");
+    expect(WORKFLOW).toContain("knkwiiywfkbqznbxwqfh");
+    expect(WORKFLOW).toContain("pooler.supabase.com");
+  });
+
   it("bounds the checker so a stalled query still reaches the reconciler", () => {
     // The checker calls psql through spawnSync with no timeout of its own, so
     // an accepted-then-stalled connection would block forever. The STEP

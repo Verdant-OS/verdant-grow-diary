@@ -279,6 +279,26 @@ describe("migration drift probe — never publishes credentials", () => {
     expect(workflow).not.toContain("SUPABASE_DB_URL_SANDBOX");
   });
 
+  it("points the missing-secret fix steps at the verdant-production environment", () => {
+    // Default require-ci-secret copy points at repository secrets. This job
+    // reads an *environment* secret; sending operators to the wrong drawer is
+    // how a missing SUPABASE_DB_URL stays missing while the issue body only
+    // says "(no detail captured)".
+    const workflow = readFileSync(
+      resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
+      "utf8",
+    );
+    expect(workflow).toContain("Settings → Environments → verdant-production");
+    expect(workflow).toContain("knkwiiywfkbqznbxwqfh");
+    expect(workflow).toContain("pooler.supabase.com");
+    expect(workflow).toContain("report-path: drift-preflight.md");
+    // Connect-phase bound must be an env var: the identity sanitizer strips
+    // every URL query option, so a connect_timeout in the secret never reaches
+    // libpq.
+    expect(workflow).toContain('PGCONNECT_TIMEOUT: "15"');
+    expect(workflow).not.toMatch(/connect_timeout=/);
+  });
+
   it("closes the tracking issue after a clean run, from a single shared title", () => {
     // The title is present tense, so an issue left open after recovery asserts
     // something false and an operator cannot tell active drift from a stale
@@ -317,6 +337,26 @@ describe("migration drift probe — never publishes credentials", () => {
     // And the issue must say which of the two happened.
     expect(workflow).toContain("probeNeverRan");
     expect(workflow).toContain("PROBE_OUTCOME");
+  });
+
+  it("publishes preflight detail when the probe never ran, instead of an empty placeholder", () => {
+    // Observed for weeks: every scheduled failure left the tracking issue with
+    // "(no detail captured)" because drift.json/drift.err only exist after the
+    // probe step starts. When the secret guard fails first, the issue must
+    // still name the environment secret and the secret-guard outcome so the
+    // operator's first action is correct.
+    const workflow = readFileSync(
+      resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
+      "utf8",
+    );
+    expect(workflow).toContain("id: secret_guard");
+    expect(workflow).toContain("SECRET_GUARD_OUTCOME");
+    expect(workflow).toContain('read("drift-preflight.md")');
+    expect(workflow).toContain("secret_guard_outcome=");
+    expect(workflow).toContain("Require SUPABASE_DB_URL failed before the probe started");
+    // The empty placeholder may remain as a last-resort fallback, but the
+    // never-ran path must build detail before reaching it.
+    expect(workflow).toMatch(/if \(!detail && probeNeverRan\) \{[\s\S]*secret_guard_outcome=/);
   });
 
   it("finds the tracking issue on any page, and never matches a pull request", () => {

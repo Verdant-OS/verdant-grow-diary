@@ -112,12 +112,27 @@ jobs:
 
       # Hard-fail on a missing secret instead of letting the probe report
       # "could not check" into a void.
+      #
+      # The secret lives on the verdant-production *environment*, not the
+      # repository secret store. Default require-ci-secret fix steps point at
+      # Settings → Secrets and variables → Actions, which is the wrong drawer
+      # and sends operators hunting a secret that was never supposed to be
+      # there. Override the steps so a missing/empty value names the real
+      # place to repair it, and write a report the issue body can quote when
+      # the probe step is skipped (the historic "(no detail captured)" hole).
       - name: Require SUPABASE_DB_URL
+        id: secret_guard
         uses: ./.github/actions/require-ci-secret
         with:
           secret-name: SUPABASE_DB_URL
           secret-value: ${{ secrets.SUPABASE_DB_URL }}
           guard-heading: "Migration drift probe cannot reach production"
+          report-path: drift-preflight.md
+          fix-steps-json: >-
+            ["1. Open **Settings → Environments → verdant-production** in this repository.",
+             "2. Set environment secret `SUPABASE_DB_URL` to the IPv4 Supavisor pooler URL for production project `knkwiiywfkbqznbxwqfh` (host form `aws-0-<region>.pooler.supabase.com:5432`, database `postgres`). Direct `db.<ref>.supabase.co` hosts are IPv6-only and GitHub-hosted runners cannot reach them.",
+             "3. Do not point this environment at sandbox project `bzatgtgjvuojpoxcknaa` — the probe binds the URL to the pinned production ref and will refuse a mismatch.",
+             "4. Re-run this workflow via workflow_dispatch from `verdant-grow-diary` and judge the JSON `status` (current / drift / could_not_probe), not only the workflow colour."]
           reason-lines-json: >
             ["Without this secret the probe cannot compare applied migrations
             against the repository, and a green run would falsely imply
@@ -127,6 +142,11 @@ jobs:
         id: probe
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # Connect-phase bound. The identity sanitizer strips every URL query
+          # option, so a connect_timeout in the secret never reaches libpq;
+          # PGCONNECT_TIMEOUT is the only reliable path (same pattern as
+          # money-migration-drift-alert.yml).
+          PGCONNECT_TIMEOUT: "15"
         run: |
           set +e
           node scripts/probe-migration-drift.mjs --json > drift.json 2> drift.err
@@ -190,6 +210,7 @@ jobs:
         env:
           PROBE_EXIT: ${{ steps.probe.outputs.exit_code }}
           PROBE_OUTCOME: ${{ steps.probe.outcome }}
+          SECRET_GUARD_OUTCOME: ${{ steps.secret_guard.outcome }}
         with:
           script: |
             const fs = require("fs");
@@ -200,6 +221,7 @@ jobs:
             // trying" need different fixes, and a rotated secret looks like
             // the former if the issue does not distinguish them.
             const probeOutcome = process.env.PROBE_OUTCOME || "unknown";
+            const secretGuardOutcome = process.env.SECRET_GUARD_OUTCOME || "unknown";
             const probeNeverRan = probeOutcome !== "success" && probeOutcome !== "failure";
             const read = (p) => { try { return fs.readFileSync(p, "utf8").trim(); } catch { return ""; } };
             // In --json mode the probe writes BOTH its drift report and its
@@ -207,7 +229,10 @@ jobs:
             // empty on exit 2. Reading only stderr there produced "(no detail
             // captured)" for precisely the case that most needs detail.
             // Prefer stdout, fall back to stderr for a hard crash before any
-            // JSON was emitted.
+            // JSON was emitted. When the probe never ran at all, neither file
+            // exists — fall through to the secret-guard preflight report so the
+            // published issue still names the missing environment secret
+            // instead of the historic empty placeholder.
             // Second, independent redaction layer. The probe already strips
             // connection strings from its own output; this repeats it at the
             // trust boundary that actually matters, because an issue body is
@@ -222,11 +247,38 @@ jobs:
             // copies cannot drift apart.
             const redact = (s) =>
               String(s).replace(/postgres(?:ql)?:\/\/[^\s"'`<>]+/gi, "[redacted-db-url]");
-            const detail = redact(read("drift.json") || read("drift.err"));
+            const probeDetail = redact(read("drift.json") || read("drift.err"));
+            const preflightDetail = redact(read("drift-preflight.md"));
+            let detail = probeDetail;
+            if (!detail && probeNeverRan) {
+              const lines = [
+                `probe_step_outcome=${probeOutcome}`,
+                `secret_guard_outcome=${secretGuardOutcome}`,
+              ];
+              if (preflightDetail) {
+                lines.push("", preflightDetail);
+              } else if (secretGuardOutcome === "failure") {
+                lines.push(
+                  "",
+                  "Require SUPABASE_DB_URL failed before the probe started.",
+                  "Configure the verdant-production environment secret SUPABASE_DB_URL",
+                  "with the IPv4 Supavisor pooler URL for project knkwiiywfkbqznbxwqfh,",
+                  "then re-run this workflow from verdant-grow-diary.",
+                );
+              } else {
+                lines.push(
+                  "",
+                  "A step before the probe failed and no preflight report was written.",
+                  "Inspect the run log for checkout, Node setup, the psql install,",
+                  "or the required-secret guard.",
+                );
+              }
+              detail = lines.join("\n");
+            }
             const title = process.env.DRIFT_ISSUE_TITLE;
             const body = [
               probeNeverRan
-                ? `The drift probe **never ran** (step outcome: \`${probeOutcome}\`). A step before it failed — checkout, Node setup, the psql install, or the required-secret guard. Nothing was verified, and nothing will be until that is fixed.`
+                ? `The drift probe **never ran** (step outcome: \`${probeOutcome}\`; secret guard: \`${secretGuardOutcome}\`). A step before it failed — checkout, Node setup, the psql install, or the required-secret guard. Nothing was verified, and nothing will be until that is fixed.`
                 : exitCode === "1"
                   ? "The drift probe found migrations committed to the repository that production has **not** applied."
                   : "The drift probe **could not check** production. Nothing was verified — this is not a pass.",

@@ -90,6 +90,7 @@ import {
 } from "@/lib/tentPlantTabsUrlState";
 
 import { plantDetailPath, tentsPath } from "@/lib/routes";
+import { isQueryGrowScopeMismatch } from "@/lib/detailGrowScopeRules";
 import StartPhenoHuntButton from "@/components/StartPhenoHuntButton";
 import { useTentQuickLogTargetEvidence } from "@/context/TentQuickLogTargetContext";
 import TentPendingOutcomeNotice from "@/components/TentPendingOutcomeNotice";
@@ -228,9 +229,9 @@ export default function TentDetail() {
       </div>
     );
   }
-  if (!tent) {
+  if (!tent || isQueryGrowScopeMismatch(tent, searchParams.get("growId"))) {
     return (
-      <div>
+      <div data-testid="tent-detail-not-found">
         <GrowDataSourceDisclosure
           resource="tents"
           hasAnyData={false}

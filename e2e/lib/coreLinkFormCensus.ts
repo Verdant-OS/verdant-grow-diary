@@ -491,6 +491,12 @@ function matchingManifestRoute(
     })[0];
 }
 
+/**
+ * Where a clicked link must finish. On the signed-out lane a protected target
+ * lands on the sign-in screen (`SIGNED_OUT_LANDING` in
+ * src/lib/authRedirectRules.ts: "/auth", destination preserved as redirectTo),
+ * never the marketing /welcome.
+ */
 export function expectedCensusNavigationPath(
   pathname: string,
   manifest: ReadonlyArray<Pick<AppRouteEntry, "path" | "access">>,
@@ -500,7 +506,7 @@ export function expectedCensusNavigationPath(
 
   const route = matchingManifestRoute(pathname, manifest);
   if (route && ["auth", "operator", "internal"].includes(route.access)) {
-    return "/welcome";
+    return "/auth";
   }
   return pathname;
 }

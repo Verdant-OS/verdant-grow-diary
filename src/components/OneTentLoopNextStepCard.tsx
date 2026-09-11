@@ -8,6 +8,8 @@
  * - Never renders internal IDs as visible copy.
  * - Action Queue wording is always approval-required.
  */
+import { useCallback, useContext, useSyncExternalStore } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
 import { Link } from "@/lib/react-router-compat";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,7 @@ import {
   type OneTentLoopStep,
 } from "@/lib/oneTentLoopNavigationRules";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import { resolvePlantDetailActivityNextStep } from "@/lib/plantDetailWhatsMissing";
 
 interface Props {
   current: OneTentLoopStep;
@@ -28,7 +31,35 @@ interface Props {
 }
 
 export default function OneTentLoopNextStepCard({ current, ids, className, testId }: Props) {
-  const step = resolveOneTentLoopNextStep(current, ids);
+  const queryClient = useContext(QueryClientContext);
+  const plantId = current === "plant" ? ids?.plantId : null;
+  // PlantQuickStatusStrip already owns this read. Observe its exact cache key
+  // so a successful save/refetch updates the CTA without starting another read.
+  // Outside the query provider, this remains the standalone loop presenter.
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!queryClient || !plantId) return () => {};
+      return queryClient.getQueryCache().subscribe(({ query }) => {
+        if (query.queryKey[0] === "plant_recent_activity" && query.queryKey[1] === plantId) {
+          onChange();
+        }
+      });
+    },
+    [queryClient, plantId],
+  );
+  const getSnapshot = useCallback(
+    () => queryClient?.getQueryState(["plant_recent_activity", plantId]),
+    [queryClient, plantId],
+  );
+  const activity = useSyncExternalStore(subscribe, getSnapshot, () => undefined);
+  const step =
+    current === "plant" && queryClient
+      ? resolvePlantDetailActivityNextStep(ids, {
+          data: activity?.data,
+          isLoading: !activity || activity.status === "pending",
+          isError: activity?.status === "error",
+        })
+      : resolveOneTentLoopNextStep(current, ids);
   const resolvedTestId = testId ?? "one-tent-loop-next-step-card";
   const currentLabel = ONE_TENT_LOOP_STEP_LABEL[current];
   const nextLabel = step.next ? ONE_TENT_LOOP_STEP_LABEL[step.next] : null;

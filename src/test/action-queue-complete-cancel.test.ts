@@ -4,18 +4,20 @@ import { resolve } from "path";
 
 const src = readFileSync(resolve(__dirname, "../pages/ActionQueue.tsx"), "utf8");
 
-// Only two RPC-invocation shapes are legitimate in this codebase (see
-// action-detail-linked-alert.test.tsx for the full writeup):
+// Legitimate RPC-invocation shapes in this codebase:
 //   1. Direct call:       supabase.rpc("name", args)
-//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
-//      unknown) => Promise<...>)("name", args) — used before the RPC's
-//      generated typing lands (see actionQueueRpcAvailability).
+//   2. Legacy unbound cast-wrapped call (FORBIDDEN for live paths — loses `this`):
+//      (supabase.rpc as unknown as (...)=>(...))("name", args)
+//   3. Method-bound client cast (required when generated typing lags):
+//      (supabase as unknown as UntypedActionQueueRpcClient).rpc("name", args)
 // Anchoring to the call's own first argument rather than "any quote within
 // N characters of supabase.rpc" stops a dynamic/foreign RPC call from
 // being credited with the canonical name (Codex P2).
 const DIRECT_RPC_CALL_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
 const CAST_RPC_CALL_PATTERN =
   /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
+const CLIENT_CAST_RPC_CALL_PATTERN =
+  /\(\s*supabase\s+as\s+unknown\s+as\s+\w+\s*\)\s*\.rpc\s*\(\s*["']([^"']+)["']\s*(?:,\s*(\w+))?\s*,?\s*\)/g;
 
 function resolveRpcCalls(source: string): Array<{ name: string; argsVar?: string }> {
   const direct = [...source.matchAll(DIRECT_RPC_CALL_PATTERN)].map((m) => ({
@@ -26,7 +28,11 @@ function resolveRpcCalls(source: string): Array<{ name: string; argsVar?: string
     name: m[1],
     argsVar: m[2],
   }));
-  return [...direct, ...cast];
+  const clientCast = [...source.matchAll(CLIENT_CAST_RPC_CALL_PATTERN)].map((m) => ({
+    name: m[1],
+    argsVar: m[2],
+  }));
+  return [...direct, ...cast, ...clientCast];
 }
 
 describe("Action Queue complete/cancel transitions", () => {
@@ -77,7 +83,9 @@ describe("Action Queue complete/cancel transitions", () => {
   });
 
   it("records status and audit through the canonical RPC (no privileged key)", () => {
-    const rpcCallSiteCount = (src.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcCallSiteCount =
+      (src.match(/supabase\.rpc\b/g) ?? []).length +
+      (src.match(/\(\s*supabase\s+as\s+unknown\s+as\s+\w+\s*\)\s*\.rpc\b/g) ?? []).length;
     const rpcCalls = resolveRpcCalls(src);
     // Every call site must independently resolve its own first-argument
     // name — a dynamic/foreign call site would leave this short rather

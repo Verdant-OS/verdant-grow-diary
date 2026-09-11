@@ -676,13 +676,18 @@ describe("filterRelativeTimelineItems — pure rules", () => {
     expect(filterRelativeTimelineItems(sample, "training").map((i) => i.id)).toEqual(["tr", "def"]);
   });
 
-  it("Notes returns note/observation/sensor/unknown safe fallback items", () => {
+  it("Notes returns note/observation/unknown safe fallback items", () => {
     expect(filterRelativeTimelineItems(sample, "notes").map((i) => i.id)).toEqual([
       "n1",
       "obs",
-      "sensor",
       "unk",
       "null",
+    ]);
+  });
+
+  it("Measurements include Quick Log environment checks", () => {
+    expect(filterRelativeTimelineItems(sample, "measurement").map((i) => i.id)).toEqual([
+      "sensor",
     ]);
   });
 

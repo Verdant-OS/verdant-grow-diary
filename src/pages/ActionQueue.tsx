@@ -61,8 +61,13 @@ import {
   actionsPath,
   aiDoctorSessionDetailPath,
   alertDetailPath,
-  timelinePath,
 } from "@/lib/routes";
+import {
+  ACTION_QUEUE_EMPTY_SENSORS_CTA_LABEL,
+  ACTION_QUEUE_EMPTY_TIMELINE_CTA_LABEL,
+  buildActionQueueEmptySensorsHref,
+  buildActionQueueEmptyTimelineHref,
+} from "@/lib/actionQueueEmptyNextStepsRules";
 import ActionQueueDetailDrawer from "@/components/ActionQueueDetailDrawer";
 import ActionQueueLoadingSkeleton from "@/components/ActionQueueLoadingSkeleton";
 import ActionQueueTraceStatusAnnouncer from "@/components/ActionQueueTraceStatusAnnouncer";
@@ -93,7 +98,11 @@ import {
 import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
 import {
   isMissingActionQueueTransitionRpcError,
+  areActionQueueTransitionMutationsBlocked,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+  ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+  ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON,
+  ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
   type ActionQueueRpcAvailability,
 } from "@/lib/actionQueueRpcAvailability";
 import { ActionQueueRpcStatusPill } from "@/components/ActionQueueRpcStatusPill";
@@ -150,6 +159,18 @@ import {
 } from "@/lib/actionQueueUrlStateRules";
 
 import { Input } from "@/components/ui/input";
+
+/**
+ * Narrow cast for `action_queue_transition` (typing may lag generated Database
+ * types). Call through the client object — never extract the client's `rpc`
+ * method into a free function. supabase-js implements rpc as
+ * `return this.rest.rpc(...)`; an unbound extract leaves `this` undefined and
+ * throws "Cannot read properties of undefined (reading 'rest')" (same class as
+ * #1304).
+ */
+type UntypedActionQueueRpcClient = {
+  rpc: (fn: string, args: unknown) => PromiseLike<{ data: unknown; error: unknown }>;
+};
 
 type Status = ActionStatus;
 type EventType = ActionEventType;
@@ -420,12 +441,14 @@ export default function ActionQueue() {
   } | null>(null);
   const [retryingTrace, setRetryingTrace] = useState(false);
   // Tri-state availability for the `action_queue_transition` RPC. Starts as
-  // "unknown" so the status pill renders an honest "Checking availability"
-  // placeholder instead of a stale/assumed green. Flips to "available" only
-  // when a transition actually succeeds, and to "unavailable" when a
-  // transition fails with a missing-RPC signal (persistent banner + red pill).
+  // "unknown" — no probe runs until the grower actually transitions. Flips to
+  // "available" only when a transition succeeds, and to "unavailable" only
+  // when a transition fails with a missing-RPC signal (persistent banner).
+  // Do not timeout "unknown" into "unavailable": that painted a false outage
+  // on healthy backends (empty Needs Review + "Transitions unavailable").
   const [rpcAvailability, setRpcAvailability] = useState<ActionQueueRpcAvailability>("unknown");
   const rpcUnavailable = rpcAvailability === "unavailable";
+  const transitionMutationsBlocked = areActionQueueTransitionMutationsBlocked(rpcAvailability);
 
   // Load existing approve/reject diary trace rows for the open drawer
   // row. Pure read; never inserts.
@@ -727,6 +750,14 @@ export default function ActionQueue() {
   }
 
   async function transition(row: ActionRow, kind: TransitionKind, note?: string): Promise<boolean> {
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) {
+      toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
+        id: ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
+        description: ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+        duration: 10000,
+      });
+      return false;
+    }
     setBusyId(row.id);
     const rpcArgs = buildActionQueueTransitionRpcArgs({
       actionQueueId: row.id,
@@ -734,12 +765,10 @@ export default function ActionQueue() {
       expectedStatus: row.status,
       note,
     });
-    const { data, error } = await (
-      supabase.rpc as unknown as (
-        fn: string,
-        args: unknown,
-      ) => Promise<{ data: unknown; error: unknown }>
-    )("action_queue_transition", rpcArgs);
+    const { data, error } = await (supabase as unknown as UntypedActionQueueRpcClient).rpc(
+      "action_queue_transition",
+      rpcArgs,
+    );
     const result = parseActionQueueTransitionRpcResult(data, rpcArgs);
     if (error || !result || result.ok !== true) {
       // Distinguish "backend RPC missing" from a normal transient failure so
@@ -756,8 +785,8 @@ export default function ActionQueue() {
           }),
         );
         toast.error(ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.title, {
-          id: "action-queue-transition-rpc-unavailable",
-          description: ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY.body,
+          id: ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
+          description: ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
           duration: 10000,
         });
         setBusyId(null);
@@ -785,7 +814,9 @@ export default function ActionQueue() {
       else setTraceFailure((prev) => (prev?.actionId === row.id ? null : prev));
     }
     setBusyId(null);
-    // Successful transition proves the RPC is reachable.
+    // Successful transition proves the RPC is reachable. Dismiss any stale
+    // outage toast — Golden Run cancel succeeded while that copy still showed.
+    toast.dismiss(ACTION_QUEUE_TRANSITION_RPC_TOAST_ID);
     setRpcAvailability("available");
     await load();
     if (drawerRow && drawerRow.id === row.id) {
@@ -797,6 +828,7 @@ export default function ActionQueue() {
   function openNoteDialog(row: ActionRow, kind: TransitionKind) {
     // SECURITY: terminal states cannot be transitioned again.
     if (isTerminalStatus(row.status)) return;
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) return;
     setNoteDraft("");
     setNoteDialog({ row, kind });
   }
@@ -804,6 +836,7 @@ export default function ActionQueue() {
   // SECURITY: each branch only flips status + writes audit. No device commands.
   async function confirmNoteDialog() {
     if (!noteDialog) return;
+    if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) return;
     const { row, kind } = noteDialog;
     const note = normalizeNote(noteDraft);
     setNoteDialog(null);
@@ -1025,11 +1058,7 @@ export default function ActionQueue() {
         current="action-queue"
         ids={{
           growId: effectiveGrowId,
-          actionId: pickFirstLoadedId([
-            drawerRow?.id,
-            focusedActionId,
-            highlightedActionId,
-          ]),
+          actionId: pickFirstLoadedId([drawerRow?.id, focusedActionId, highlightedActionId]),
           alertId: alertContextId,
         }}
         testId="action-queue-one-tent-loop-next-step-card"
@@ -1047,8 +1076,9 @@ export default function ActionQueue() {
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  // Manual refresh re-probes RPC state: show the interim
-                  // placeholder until the next transition proves availability.
+                  // Manual refresh reloads the list. Do not claim the
+                  // transition RPC was probed — availability stays unknown
+                  // until the next real approve/reject/complete call.
                   setRpcAvailability("unknown");
                   void load();
                 }}
@@ -1466,18 +1496,18 @@ export default function ActionQueue() {
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Link
-                        to={timelinePath()}
+                        to={buildActionQueueEmptyTimelineHref({ growId: effectiveGrowId })}
                         className="text-xs text-primary hover:underline rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         data-testid="action-queue-empty-next-steps-timeline"
                       >
-                        View Timeline
+                        {ACTION_QUEUE_EMPTY_TIMELINE_CTA_LABEL}
                       </Link>
                       <Link
-                        to="/sensors"
+                        to={buildActionQueueEmptySensorsHref({ growId: effectiveGrowId })}
                         className="text-xs text-primary hover:underline rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                         data-testid="action-queue-empty-next-steps-sensors"
                       >
-                        Add Sensor Snapshot
+                        {ACTION_QUEUE_EMPTY_SENSORS_CTA_LABEL}
                       </Link>
                     </div>
                   </div>
@@ -1635,8 +1665,12 @@ export default function ActionQueue() {
                       </div>
                       <div className="mt-3 flex min-w-0 flex-wrap gap-2">
                         {(() => {
-                          const disabled = busyId === row.id;
-                          const disabledReason = disabled ? "Saving — please wait" : null;
+                          const disabled = busyId === row.id || transitionMutationsBlocked;
+                          const disabledReason = transitionMutationsBlocked
+                            ? ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON
+                            : disabled
+                              ? "Saving — please wait"
+                              : null;
                           return (
                             <>
                               <Button
@@ -1849,8 +1883,12 @@ export default function ActionQueue() {
                           {row.action_type}
                         </h3>
                         {(() => {
-                          const disabled = busyId === row.id;
-                          const disabledReason = disabled ? "Saving — please wait" : null;
+                          const disabled = busyId === row.id || transitionMutationsBlocked;
+                          const disabledReason = transitionMutationsBlocked
+                            ? ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON
+                            : disabled
+                              ? "Saving — please wait"
+                              : null;
                           return (
                             <>
                               {canComplete(row.status) && (
@@ -1985,7 +2023,12 @@ export default function ActionQueue() {
                 <Button variant="ghost" onClick={cancelNoteDialog}>
                   Cancel
                 </Button>
-                <Button onClick={confirmNoteDialog}>{meta.confirmLabel}</Button>
+                <Button
+                  onClick={confirmNoteDialog}
+                  disabled={areActionQueueTransitionMutationsBlocked(rpcAvailability)}
+                >
+                  {meta.confirmLabel}
+                </Button>
               </DialogFooter>
             </>
           )}
@@ -2001,7 +2044,10 @@ export default function ActionQueue() {
         lookups={{
           growsById: Object.fromEntries(grows.map((g) => [g.id, { name: g.name }])),
         }}
-        busy={!!drawerRow && busyId === drawerRow.id}
+        busy={
+          !!drawerRow &&
+          (busyId === drawerRow.id || areActionQueueTransitionMutationsBlocked(rpcAvailability))
+        }
         loading={drawerHistoryLoading && drawerHistory === null}
         canApprove={!!drawerRow && canApproveAction(drawerRow.status)}
         canReject={!!drawerRow && canRejectAction(drawerRow.status)}

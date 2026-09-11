@@ -1608,10 +1608,11 @@ async function assertExpectedRouteContent(page: Page, route: CoreCensusRoute) {
 async function settleRouteReadsBeforeLinkAudit(page: Page, sourcePath: string) {
   // The census records links for a later revisit/click sweep, so the snapshot
   // must describe the route's settled read model rather than an intermediate
-  // loading render. In particular, Dashboard's connected-loop evidence can
-  // briefly expose the "Log your first plant memory" CTA before the mocked
-  // diary read proves that step complete; recording that transient href makes
-  // the later revisit fail even though the product reached the correct state.
+  // loading render. Dashboard's connected-loop evidence can change operating-frame
+  // progress and conditional links after diary evidence settles. Once plant memory
+  // exists, the operating frame intentionally does not render the first-time
+  // checklist or its transient first-log CTA; the helper must still wait for all
+  // read-driven state before recording revisit links.
   //
   // Every external request in this lane is hermetically intercepted above.
   // Playwright's built-in `networkidle` load state can remain latched after the
@@ -1637,10 +1638,7 @@ async function settleRouteReadsBeforeLinkAudit(page: Page, sourcePath: string) {
     if (!state) {
       throw new Error(`${sourcePath} lost the mocked-read lifecycle tracker`);
     }
-    if (
-      state.pending === 0 &&
-      state.now - state.lastActivityAt >= ROUTE_READ_QUIET_WINDOW_MS
-    ) {
+    if (state.pending === 0 && state.now - state.lastActivityAt >= ROUTE_READ_QUIET_WINDOW_MS) {
       expect(
         new URL(page.url()).pathname,
         `${sourcePath} changed routes while its mocked reads were settling`,
@@ -1745,7 +1743,7 @@ async function clickEverySafeInternalHref(
         // query). `expectedPathname === classification.pathname` confirms the
         // destination was NOT rewritten: on the signed-out lane
         // expectedCensusNavigationPath redirects protected targets to
-        // /welcome, and a fragment link clicked from /welcome would otherwise
+        // /auth, and a fragment link clicked from /auth would otherwise
         // look same-page and be asserted for an anchor the redirect never
         // carries.
         const expectedHash = link.classification.hash;
@@ -1859,7 +1857,7 @@ test.describe("core link and form census", () => {
     await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);
   });
 
-  test("scheduled authenticated Dashboard evidence settles before recording revisit links", async ({
+  test("scheduled authenticated Dashboard operating frame settles delayed diary evidence before recording revisit links", async ({
     page,
   }) => {
     test.setTimeout(60_000);
@@ -1885,37 +1883,50 @@ test.describe("core link and form census", () => {
     expect(dashboardRoute.path).toBe("/dashboard");
     await navigateForAudit(page, dashboardRoute);
 
+    const progressPill = page.getByTestId("onboarding-progress-pill");
+    await expect(progressPill).toHaveAttribute("data-complete-count", "3");
+
+    await expect(page.getByTestId("onboarding-checklist-card")).toHaveCount(0);
+    await expect(page.getByTestId("onboarding-step-first_log")).toHaveCount(0);
+    await expect(page.getByTestId("dashboard-daily-grow-check-entry")).toHaveAttribute(
+      "href",
+      "/daily-check",
+    );
+
     const pendingHrefs = (await visibleLinkAudits(page, dashboardRoute.path)).map(
       (link) => link.href,
     );
     expect(
       pendingHrefs,
-      "the delayed diary read must expose the Dashboard's transient first-log CTA",
-    ).toContain(dashboardPath(GROW_ID));
+      "the plants-present operating frame must not reintroduce the onboarding first-log CTA",
+    ).not.toContain(dashboardPath(GROW_ID));
 
     const settlePromise = settleRouteReadsBeforeLinkAudit(page, dashboardRoute.path);
     const settledBeforeRelease = await Promise.race([
       settlePromise.then(() => true),
       new Promise<false>((resolve) => setTimeout(() => resolve(false), 100)),
     ]);
-    releaseDiaryRead();
+
     expect(
       settledBeforeRelease,
       "the settling helper must wait for the delayed diary evidence read",
     ).toBe(false);
+
+    releaseDiaryRead();
     await settlePromise;
 
-    const links = await visibleLinkAudits(page, dashboardRoute.path);
-    const firstLogComplete = await page
-      .getByTestId("onboarding-step-first_log")
-      .getAttribute("data-complete");
-    const hrefs = links.map((link) => link.href);
+    await expect(progressPill).toHaveAttribute("data-complete-count", "4");
+    await expect(page.getByTestId("onboarding-checklist-card")).toHaveCount(0);
+    await expect(page.getByTestId("onboarding-step-first_log")).toHaveCount(0);
 
-    expect(firstLogComplete).toBe("true");
+    const settledHrefs = (await visibleLinkAudits(page, dashboardRoute.path)).map(
+      (link) => link.href,
+    );
     expect(
-      hrefs,
-      "the completed first-log step must not leave its loading-state CTA in the settled link set",
+      settledHrefs,
+      "the settled operating frame must not contain a stale grow-scoped onboarding CTA",
     ).not.toContain(dashboardPath(GROW_ID));
+
     expect(network.blockedMutations, "the focused regression must remain read-only").toEqual([]);
     expect(
       network.unexpectedExternalFetches,

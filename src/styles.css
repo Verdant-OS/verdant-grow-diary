@@ -55,6 +55,14 @@
   --color-card-foreground: hsl(var(--card-foreground));
   --color-leaf: hsl(var(--leaf));
   --color-moss: hsl(var(--moss));
+  /* Sensor source provenance — one colour per canonical label (AGENTS.md Sensor Truth) */
+  --color-source-live: hsl(var(--source-live));
+  --color-source-manual: hsl(var(--source-manual));
+  --color-source-csv: hsl(var(--source-csv));
+  --color-source-demo: hsl(var(--source-demo));
+  --color-source-stale: hsl(var(--source-stale));
+  --color-source-invalid: hsl(var(--source-invalid));
+  --color-source-none: hsl(var(--source-none));
   --color-soil: hsl(var(--soil));
   --color-sidebar: hsl(var(--sidebar-background));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
@@ -152,6 +160,17 @@
   --moss: 140 30% 22%;
   --soil: 25 30% 18%;
 
+  /* Sensor source provenance. `live` is the only healthy label; stale and
+     invalid are deliberately warm so a gap or a failed reading reads as a
+     warning at a glance, never as data. */
+  --source-live: 88 52% 46%;
+  --source-manual: 204 40% 48%;
+  --source-csv: 262 22% 52%;
+  --source-demo: 90 5% 58%;
+  --source-stale: 40 66% 48%;
+  --source-invalid: 8 57% 42%;
+  --source-none: 150 10% 22%;
+
   --gradient-verdant: linear-gradient(135deg, hsl(140 55% 18%), hsl(150 30% 8%));
   --gradient-leaf: linear-gradient(135deg, hsl(130 60% 40%), hsl(95 70% 55%));
   --gradient-glass: linear-gradient(160deg, hsl(150 25% 14% / 0.85), hsl(150 20% 8% / 0.6));
@@ -184,6 +203,13 @@
   --primary: 140 55% 30%;
   --primary-foreground: 0 0% 100%;
   --muted: 80 20% 92%;
+  --source-live: 88 52% 42%;
+  --source-manual: 204 40% 40%;
+  --source-csv: 262 22% 44%;
+  --source-demo: 90 5% 66%;
+  --source-stale: 40 66% 46%;
+  --source-invalid: 8 57% 40%;
+  --source-none: 80 12% 88%;
   --muted-foreground: 150 15% 35%;
   --border: 140 20% 85%;
   --input: 140 20% 88%;

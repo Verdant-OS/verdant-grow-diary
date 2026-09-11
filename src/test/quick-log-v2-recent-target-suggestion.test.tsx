@@ -18,6 +18,10 @@ vi.mock("@/hooks/useQuickLogV2Save", () => ({
 vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: [] }),
 }));
+
+vi.mock("@/hooks/useRecentWateringsForVolumeDefaults", () => ({
+  useRecentWateringsForVolumeDefaults: () => ({ data: [] }),
+}));
 vi.mock("@/hooks/useTemperatureUnitPreference", () => ({
   useTemperatureUnitPreference: () => "celsius",
 }));

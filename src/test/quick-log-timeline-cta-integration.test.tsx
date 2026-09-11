@@ -41,6 +41,10 @@ vi.mock("@/hooks/use-tents", () => ({
 vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: [] }),
 }));
+
+vi.mock("@/hooks/useRecentWateringsForVolumeDefaults", () => ({
+  useRecentWateringsForVolumeDefaults: () => ({ data: [] }),
+}));
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-1" } }),
 }));
@@ -105,6 +109,10 @@ function getToastAction(): {
 
 function clickNote() {
   fireEvent.click(screen.getByRole("button", { name: "Note" }));
+  // Empty-content gate: Save stays disabled until critical note content exists.
+  fireEvent.change(screen.getByLabelText("Note (optional)"), {
+    target: { value: "Timeline CTA — canopy check logged." },
+  });
 }
 function clickSave() {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -156,6 +164,15 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
     expect(rpcMock.mock.calls.length).toBe(rpcBefore);
   });
 
+  it("keeps explicit tent: open target (sole-plant auto-select must not rewrite)", async () => {
+    renderSheet("tent:tent-1");
+    await waitFor(() => {
+      expect(screen.getByLabelText("Choose plant or tent for this Quick Log")).toHaveTextContent(
+        "Tent 1",
+      );
+    });
+  });
+
   it("tent target routes to grow-scoped Timeline without plantId", async () => {
     rpcMock.mockResolvedValue({
       data: { ok: true, grow_event_id: null, environment_event_id: null },
@@ -205,7 +222,8 @@ describe("Quick Log → Timeline CTA (photo success)", () => {
     storageUpload.mockResolvedValue({ data: { path: "p" }, error: null });
 
     renderSheet("plant:plant-1");
-    clickNote();
+    // Photo alone satisfies critical content; open Note without requiring typed text.
+    fireEvent.click(screen.getByRole("button", { name: "Note" }));
 
     // Inject a photo file through the hidden library input.
     const libInput = screen.getByTestId("qlv2-photo-library-input") as HTMLInputElement;

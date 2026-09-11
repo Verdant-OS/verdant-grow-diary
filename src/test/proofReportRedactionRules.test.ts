@@ -70,6 +70,64 @@ describe("proofReportRedactionRules", () => {
     expect(sanitizeProofReportMarkdown(src)).toBe(src);
   });
 
+  // Fourth instance of the redaction-ordering defect class, in the module the
+  // audit behind #1185 / #1184 / #1187 cited as the CORRECT counter-example.
+  // It is correct for the shapes SECRET_PAIR_RES covers; it had no rule for a
+  // header-prefixed assignment, so BEARER_RE consumed the NAME and left the
+  // VALUE behind:
+  //
+  //   Bearer MY_PASSKEY_VAR="secret"  ->  [redacted]="secret"
+  //
+  // The keyword pair rules cannot reach it: they are \b-anchored
+  // (\bapi_key\b) and `_` is a word character, so a label inside
+  // MY_API_KEY_VAR matches nothing. Found by the shared ordering contract's
+  // partial-redaction invariant (#1189), not by review.
+  it.each([
+    ['Bearer MY_PASSKEY_VAR="s3cretV4lue123456"', "s3cretV4lue123456"],
+    ['Bearer SOME_PLAIN_NAME="s3cretV4lue123456"', "s3cretV4lue123456"],
+    ["Bearer MY_PASSKEY_VAR=s3cretV4lue123456", "s3cretV4lue123456"],
+    ["authorization: MY_CONFIG_VAR=s3cretV4lue123456", "s3cretV4lue123456"],
+    ['proof line: Bearer MY_BRIDGE_TOKEN_VAR="s3cretV4lue123456" end', "s3cretV4lue123456"],
+  ] as const)("redacts a header-prefixed assignment whole: %s", (input, secret) => {
+    expect(sanitizeProofReportMarkdown(input), `value survived in: ${input}`).not.toContain(secret);
+  });
+
+  // BEARER_RE is case-SENSITIVE, so a lowercase `bearer NAME=value` passed
+  // through COMPLETELY untouched — not even partially redacted.
+  it("redacts a lowercase bearer-prefixed assignment", () => {
+    const input = 'bearer MY_API_KEY_VAR="s3cretV4lue123456"';
+    expect(sanitizeProofReportMarkdown(input)).not.toContain("s3cretV4lue123456");
+  });
+
+  // The property, stated directly: a placeholder present while the secret
+  // survives means a rule fired and destroyed only part of the span. Output
+  // that looks sanitized and is not — the one failure mode a reader cannot
+  // spot by eye.
+  it.each([
+    'Bearer MY_PASSKEY_VAR="s3cretV4lue123456"',
+    'Bearer SOME_PLAIN_NAME="s3cretV4lue123456"',
+    "Bearer BridgeToken=s3cretV4lue123456",
+  ] as const)("never leaves a placeholder beside a surviving secret: %s", (input) => {
+    const out = sanitizeProofReportMarkdown(input);
+    if (out.includes("[redacted]")) {
+      expect(out, `partial redaction — looks sanitized but is not: ${out}`).not.toContain(
+        "s3cretV4lue123456",
+      );
+    }
+  });
+
+  // Fence: the new rule requires the assignment to follow the name
+  // IMMEDIATELY, so ordinary prose containing "bearer" is untouched.
+  it.each([
+    "The bearer of this report is the grow owner.",
+    "bearer plants showed no stress",
+    "Run at step=3 with mode=strict",
+    "Verified: rows=42, errors=0",
+    "Step 3 — Sensor snapshot: source=manual, captured today (last hour).",
+  ] as const)("preserves benign proof prose: %s", (input) => {
+    expect(sanitizeProofReportMarkdown(input)).toBe(input);
+  });
+
   it("exposes the UI notice copy", () => {
     expect(PROOF_REPORT_REDACTION_NOTICE.join(" ")).toMatch(/sanitized report/i);
     expect(PROOF_REPORT_REDACTION_NOTICE.join(" ")).toMatch(

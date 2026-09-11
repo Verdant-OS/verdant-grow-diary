@@ -84,8 +84,12 @@ function provenanceLabelForRawToken(rawToken: string | null): string | null {
   if (!rawToken) return null;
   // Canonical source words are the Source label — no separate provenance.
   if (isCanonicalSensorSource(rawToken)) return null;
-  const known = PROVENANCE_ALIAS_LABELS[rawToken];
-  if (known) return known;
+  // Own-property guard: a plain object literal inherits Object.prototype, so
+  // tokens like "constructor" / "__proto__" would otherwise resolve to
+  // inherited functions/objects and break the `string | null` contract.
+  if (Object.prototype.hasOwnProperty.call(PROVENANCE_ALIAS_LABELS, rawToken)) {
+    return PROVENANCE_ALIAS_LABELS[rawToken];
+  }
   // Unknown non-canonical tokens stay out of the Source label. Prefer a
   // calm generic provenance line over echoing raw vendor-ish tokens as
   // if they were a sixth source class.

@@ -83,11 +83,14 @@ describe("Plants/Tents — preselect grow on create", () => {
     );
     expect(CREATE_PLANT).toMatch(/if \(formBlocked \|\| !targetGrowId\)/);
     expect(CREATE_TENT).toMatch(/if \(formBlocked\)/);
-    // Disabled wiring must route through formBlocked (not binding.blockSubmit alone).
+    // Disabled wiring must route through formBlocked (not binding.blockSubmit alone)
+    // and keep the trimmed-Name identity fail-closed conjunct.
     expect(CREATE_TENT).toMatch(
-      /disabled=\{busy \|\| createOutcomeUnknown \|\| !tentGate\.allowed \|\| formBlocked\}/,
+      /disabled=\{\s*busy\s*\|\|\s*createOutcomeUnknown\s*\|\|\s*!tentGate\.allowed\s*\|\|\s*formBlocked\s*\|\|\s*!hasTrimmedRequiredIdentity\(form\.name\)\s*\}/,
     );
-    expect(CREATE_PLANT).toMatch(/disabled=\{busy \|\| formBlocked/);
+    expect(CREATE_PLANT).toMatch(
+      /disabled=\{\s*busy\s*\|\|\s*formBlocked\s*\|\|\s*!tentCompat\.compatible\s*\|\|\s*!hasTrimmedRequiredIdentity\(form\.name\)\s*\}/,
+    );
     expect(CREATE_TENT).not.toMatch(/hardStop\.blockSubmit/);
     expect(CREATE_PLANT).not.toMatch(/hardStop\.blockSubmit/);
   });

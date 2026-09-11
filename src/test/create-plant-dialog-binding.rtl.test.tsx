@@ -3,7 +3,7 @@
  * Zero Supabase inserts when blocked; correct grow_id when allowed.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { unstable_batchedUpdates } from "react-dom";
 import { MemoryRouter } from "@/lib/react-router-compat";
@@ -328,7 +328,7 @@ describe("CreatePlantDialog RTL binding", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("create-plant-tent-unavailable")).toBeNull();
     });
-    expect(screen.getByTestId("plant-create-submit")).not.toBeDisabled();
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
     await userEvent.type(screen.getByTestId("create-plant-name"), "Recovered");
     await userEvent.click(screen.getByTestId("plant-create-submit"));
     await waitFor(() => {
@@ -898,5 +898,31 @@ describe("CreatePlantDialog RTL binding", () => {
     resolveGrowPlantsRefresh();
     await waitFor(() => expect(successToastMock).toHaveBeenCalledWith("Plant created"));
     expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  it("disables Create plant when Name is empty or whitespace-only", async () => {
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    await waitFor(() => {
+      expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    });
+    const submit = screen.getByTestId("plant-create-submit");
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form")!);
+    expect(insertMock).not.toHaveBeenCalled();
+
+    await userEvent.type(screen.getByTestId("create-plant-name"), "   ");
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form")!);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("enables Create plant when Name is trimmed non-empty", async () => {
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    await waitFor(() => {
+      expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("plant-create-submit")).toBeDisabled();
+    await userEvent.type(screen.getByTestId("create-plant-name"), "  Fixture Plant  ");
+    expect(screen.getByTestId("plant-create-submit")).toBeEnabled();
   });
 });

@@ -9,7 +9,6 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest import mock
 
 import ecowitt_listener
 from ecowitt_listener import (

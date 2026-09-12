@@ -1379,9 +1379,11 @@ describe("signup-acquisition forward-repair execution", () => {
         schema_effect_live: false,
         prerequisites_live: true,
         reason_code: "receipt_mismatch",
+        identity_reason_code: "project_ref_mismatch",
         note: "grower-private@example.com",
         raw_stdout: DATABASE_URL,
         token: "service-role-token-leak",
+        identity_reason_code_evil: "postgres://postgres:fake@db.example/postgres",
       }),
     ).toEqual({
       operation: "APPLY",
@@ -1391,7 +1393,100 @@ describe("signup-acquisition forward-repair execution", () => {
       schema_effect_live: false,
       prerequisites_live: true,
       reason_code: "receipt_mismatch",
+      identity_reason_code: "project_ref_mismatch",
     });
+
+    expect(
+      runner.sanitizeAuditExtras({
+        reason_code: "target_identity_rejected",
+        identity_reason_code: "postgres://postgres:fake@db.example/postgres",
+      }),
+    ).toEqual({
+      reason_code: "target_identity_rejected",
+    });
+  });
+
+  it("records nested identity_reason_code without echoing the rejected URL", async () => {
+    const runner = await loadRunner();
+    const { SupabaseDatabaseTargetIdentityError } =
+      await import("../../scripts/lib/supabaseDatabaseTargetIdentity.mjs");
+    const fixtureUrl = "postgres://postgres:fake@db.bzatgtgjvuojpoxcknaa.supabase.co:5432/postgres";
+
+    const unsafe = runner.identityRejectAuditFields(
+      new SupabaseDatabaseTargetIdentityError("unsafe_database_url", `rejected ${fixtureUrl}`),
+    );
+    expect(unsafe).toEqual({
+      reason_code: "target_identity_rejected",
+      identity_reason_code: "unsafe_database_url",
+    });
+    expect(JSON.stringify(unsafe)).not.toContain(fixtureUrl);
+    expect(JSON.stringify(unsafe)).not.toContain("fake");
+
+    const mismatch = runner.identityRejectAuditFields(
+      new SupabaseDatabaseTargetIdentityError("project_ref_mismatch", `rejected ${fixtureUrl}`),
+    );
+    expect(mismatch).toEqual({
+      reason_code: "target_identity_rejected",
+      identity_reason_code: "project_ref_mismatch",
+    });
+    expect(JSON.stringify(mismatch)).not.toContain(fixtureUrl);
+    expect(JSON.stringify(mismatch)).not.toContain(":fake@");
+
+    const generic = runner.identityRejectAuditFields(new Error(`boom ${fixtureUrl}`));
+    expect(generic).toEqual({
+      reason_code: "target_identity_rejected",
+      identity_reason_code: "unknown_identity_error",
+    });
+    expect(JSON.stringify(generic)).not.toContain(fixtureUrl);
+    expect(JSON.stringify(generic)).not.toContain("fake");
+
+    const sanitized = runner.sanitizeAuditExtras(unsafe);
+    expect(sanitized).toEqual(unsafe);
+  });
+
+  it("writes identity_reason_code into audit and report when production URL is rejected", async () => {
+    const runner = await loadRunner();
+    const evidence = temporaryEvidenceEnv();
+    const wrongUrl =
+      "postgres://postgres:fake@db.bzatgtgjvuojpoxcknaa.supabase.co:5432/postgres?sslmode=require";
+    const logs: string[] = [];
+    let calls = 0;
+
+    expect(
+      runner.runSignupAcquisitionForwardRepair({
+        env: baseEnv({
+          SUPABASE_DB_URL: wrongUrl,
+          REPORT_PATH: evidence.reportPath,
+          AUDIT_PATH: evidence.auditPath,
+          PREFLIGHT_RECEIPT_PATH: evidence.preflightReceiptPath,
+        }),
+        spawnImpl: () => {
+          calls += 1;
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        logger: {
+          log: (message: string) => logs.push(String(message)),
+          error: (message: string) => logs.push(String(message)),
+        },
+      }),
+    ).toBe(runner.EXIT.TARGET_REJECTED);
+    expect(calls).toBe(0);
+
+    const audit = JSON.parse(readFileSync(evidence.auditPath, "utf8"));
+    expect(audit.outcome).toBe("target_rejected");
+    expect(audit.reason_code).toBe("target_identity_rejected");
+    expect(audit.identity_reason_code).toBe("project_ref_mismatch");
+
+    const report = readFileSync(evidence.reportPath, "utf8");
+    expect(report).toContain("identity_reason_code: project_ref_mismatch");
+    expect(logs.join("\n")).toContain(
+      "Production database identity was rejected. identity_reason_code=project_ref_mismatch",
+    );
+
+    const surfaces = [logs.join("\n"), report, JSON.stringify(audit)].join("\n");
+    expect(surfaces).not.toContain(wrongUrl);
+    expect(surfaces).not.toContain(":fake@");
+    expect(surfaces).not.toContain("postgres:fake");
   });
 
   it("fails when postflight cannot prove both the exact ledger row and full schema contract", async () => {

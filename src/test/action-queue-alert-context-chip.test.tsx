@@ -141,7 +141,7 @@ function renderAt(url: string) {
 
 beforeEach(() => {
   insertSpy.mockClear();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   (Element.prototype as any).scrollIntoView = vi.fn();
 });
 
@@ -269,11 +269,12 @@ describe("ActionQueue — ?alert context chip", () => {
 // --- Static safety scan ------------------------------------------------------
 const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx"), "utf8");
 
-// Only two RPC-invocation shapes are legitimate in this codebase:
+// Legitimate RPC-invocation shapes in this codebase:
 //   1. Direct call:       supabase.rpc("name", args)
-//   2. Cast-wrapped call: (supabase.rpc as unknown as (fn: string, args:
-//      unknown) => Promise<...>)("name", args) — used before the RPC's
-//      generated typing lands (see actionQueueRpcAvailability).
+//   2. Legacy unbound cast-wrapped call (FORBIDDEN for live paths — loses `this`):
+//      (supabase.rpc as unknown as (...)=>(...))("name", args)
+//   3. Method-bound client cast (required when generated typing lags):
+//      (supabase as unknown as UntypedActionQueueRpcClient).rpc("name", args)
 // In both shapes the RPC name is the literal FIRST token of the call's own
 // argument list (only whitespace may precede it). Anchoring to that,
 // instead of "any quote within N characters of supabase.rpc", closes two
@@ -288,11 +289,14 @@ const PAGE = readFileSync(resolve(__dirname, "../..", "src/pages/ActionQueue.tsx
 const DIRECT_RPC_PATTERN = /supabase\.rpc\s*\(\s*["']([^"']+)["']/g;
 const CAST_RPC_PATTERN =
   /supabase\.rpc\s+as\s+unknown\s+as\s*\([\s\S]{0,150}?\)\s*=>\s*[\s\S]{0,150}?\)\s*\(\s*["']([^"']+)["']/g;
+const CLIENT_CAST_RPC_PATTERN =
+  /\(\s*supabase\s+as\s+unknown\s+as\s+\w+\s*\)\s*\.rpc\s*\(\s*["']([^"']+)["']/g;
 
 function extractRpcNames(src: string): string[] {
   const direct = [...src.matchAll(DIRECT_RPC_PATTERN)].map((match) => match[1]);
   const cast = [...src.matchAll(CAST_RPC_PATTERN)].map((match) => match[1]);
-  return [...direct, ...cast];
+  const clientCast = [...src.matchAll(CLIENT_CAST_RPC_PATTERN)].map((match) => match[1]);
+  return [...direct, ...cast, ...clientCast];
 }
 
 describe("ActionQueue alert context chip — safety scan", () => {
@@ -317,7 +321,9 @@ describe("ActionQueue alert context chip — safety scan", () => {
   it("does not add upsert / table-delete / non-transition RPCs on the supabase client", () => {
     expect(PAGE).not.toMatch(/\.upsert\(/);
     expect(PAGE).not.toMatch(/from\(["'][^"']+["']\)[\s\S]{0,200}?\.delete\(/);
-    const rpcCallSiteCount = (PAGE.match(/supabase\.rpc\b/g) ?? []).length;
+    const rpcCallSiteCount =
+      (PAGE.match(/supabase\.rpc\b/g) ?? []).length +
+      (PAGE.match(/\(\s*supabase\s+as\s+unknown\s+as\s+\w+\s*\)\s*\.rpc\b/g) ?? []).length;
     const rpcNames = extractRpcNames(PAGE);
     // Every call site must independently resolve a literal first-argument
     // name — a dynamic/unnamed call site (or a canonical-looking string

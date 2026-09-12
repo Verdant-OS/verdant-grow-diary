@@ -112,16 +112,39 @@ export function isMissingActionQueueTransitionRpcError(
 }
 
 /**
- * Grower-safe copy for the missing-RPC state. Deliberately avoids echoing
- * backend error text or naming internal functions.
+ * Sticky toast id for transition-RPC availability. Dismissed on a later
+ * successful mutation so a 10s outage toast cannot outlive a saved cancel.
+ */
+export const ACTION_QUEUE_TRANSITION_RPC_TOAST_ID =
+  "action-queue-transition-rpc-unavailable" as const;
+
+/**
+ * Grower-safe copy for the missing-RPC / unconfirmed-service state.
+ *
+ * Golden Run reconfirmed: Cancel still committed pending_approval → cancelled
+ * while this banner was visible. Availability and mutations must share one
+ * gate — when this banner is shown, approve/reject/simulate/cancel/complete
+ * are paused. Refresh returns to "unknown" so a later attempt can prove the
+ * backend. Equipment control is never sent from this queue.
  */
 export const ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY = {
   title: "Action updates are temporarily unavailable",
+  label: "Updates paused",
   body:
-    "The backend service that records approve, reject, and complete decisions isn't responding right now. " +
-    "Your queue is unchanged — no status was updated and no device commands were sent. " +
-    "Support has been notified. Please try again in a few minutes.",
+    "Approve, reject, simulate, cancel, and complete are paused until you refresh the queue. " +
+    "No new status will be saved from those buttons while this message is showing. " +
+    "This queue never sends equipment control.",
 } as const;
+
+/** aria/title reason when transition buttons are fail-closed with the banner. */
+export const ACTION_QUEUE_TRANSITION_MUTATIONS_BLOCKED_REASON =
+  "Updates paused — refresh the queue, then try again.";
+
+/**
+ * Toast copy after one transition call failed. Scoped to that attempt only.
+ */
+export const ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY =
+  "That decision was not saved. Check the action status before retrying. No device command was sent.";
 
 /**
  * Tri-state availability of the `action_queue_transition` RPC.
@@ -139,12 +162,26 @@ export const ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY = {
 export type ActionQueueRpcAvailability = "unknown" | "available" | "unavailable";
 
 /**
+ * True only for proven missing-RPC `"unavailable"`. `"unknown"` and
+ * `"available"` must leave mutations enabled so a healthy queue can save.
+ */
+export function areActionQueueTransitionMutationsBlocked(
+  availability: ActionQueueRpcAvailability,
+): boolean {
+  return availability === "unavailable";
+}
+
+/**
  * Grower-safe copy for the interim "we don't know yet" state. Kept short so it
  * fits in a status pill without truncation on mobile.
+ *
+ * This is NOT an in-flight probe. The list page does not call the transition
+ * RPC until the grower actually approves, rejects, edits, or completes. Copy
+ * must not claim a check is running, and must not look like an outage.
  */
 export const ACTION_QUEUE_TRANSITION_RPC_CHECKING_COPY = {
-  title: "Checking action updates…",
-  label: "Checking availability",
+  title: "Action transitions have not been confirmed yet",
+  label: "Not confirmed yet",
 } as const;
 
 /**
@@ -154,3 +191,21 @@ export const ACTION_QUEUE_TRANSITION_RPC_AVAILABLE_COPY = {
   title: "Action transitions are available",
   label: "Transitions ready",
 } as const;
+
+/**
+ * Settle helper for an unresolved availability timer.
+ *
+ * Absence of a transition attempt is not evidence that the backend is down.
+ * `"unknown"` must stay `"unknown"` when a timer elapses — promoting it to
+ * `"unavailable"` painted a false outage (banner + "Transitions unavailable")
+ * on healthy queues, including empty Needs Review lists.
+ *
+ * `"unavailable"` is reserved for `isMissingActionQueueTransitionRpcError`
+ * after a real RPC call. Settled `"available"` / `"unavailable"` stay put.
+ */
+export function settleActionQueueRpcAvailabilityOnCheckTimeout(
+  availability: ActionQueueRpcAvailability,
+  _timedOut: boolean,
+): ActionQueueRpcAvailability {
+  return availability;
+}

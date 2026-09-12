@@ -1,0 +1,298 @@
+/**
+ * oauthHashSessionConsumeRules — consume OAuth implicit-flow hash fragments
+ * into a Supabase session after Google SSO returns to the public origin.
+ *
+ * Managed OAuth (Lovable) redirects back to `window.location.origin` with
+ * `#access_token=...&refresh_token=...` (or `#error=...`). The SPA must
+ * parse those fragments, wipe the hash via replaceState immediately, then
+ * call `setSession` from in-memory tokens so `OAuthPostAuthRedirect` can
+ * honor a pending redirectTo once `user` exists. Tokens must not remain
+ * in `location.hash` (or the current history URL) after app JS runs.
+ *
+ * Fail closed: never invent sessions from malformed or missing tokens.
+ * Does not weaken open-redirect sanitizers — this module only strips the
+ * OAuth fragment from the address bar; navigation authority stays in
+ * `oauthPostAuthRedirectRules`.
+ */
+
+export type OAuthHashSessionTokens = {
+  readonly access_token: string;
+  readonly refresh_token: string;
+};
+
+export type ParsedOAuthHash =
+  | { readonly kind: "session"; readonly tokens: OAuthHashSessionTokens }
+  | {
+      readonly kind: "provider_error";
+      readonly error: string;
+      readonly errorDescription: string | null;
+    }
+  | { readonly kind: "none" }
+  | { readonly kind: "malformed" };
+
+export type OAuthHashConsumeOutcome = "consumed" | "cleared_without_session" | "noop";
+
+/** Soft bounds — reject junk without inventing a session shape. */
+const MIN_ACCESS_TOKEN_LEN = 16;
+const MIN_REFRESH_TOKEN_LEN = 8;
+const MAX_TOKEN_LEN = 8_192;
+
+function stripHashPrefix(hash: string): string {
+  if (typeof hash !== "string" || hash.length === 0) return "";
+  return hash.startsWith("#") ? hash.slice(1) : hash;
+}
+
+/**
+ * Parse a URL hash fragment for OAuth session tokens or a provider error.
+ * Anything else is `none` (leave the hash alone) or `malformed` (oauth-looking
+ * but unusable — clear the hash, do not set a session).
+ */
+export function parseOAuthHashFragment(hash: unknown): ParsedOAuthHash {
+  if (typeof hash !== "string") return { kind: "none" };
+  const raw = stripHashPrefix(hash);
+  if (!raw) return { kind: "none" };
+
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(raw);
+  } catch {
+    return { kind: "none" };
+  }
+
+  const hasAccess = params.has("access_token");
+  const hasRefresh = params.has("refresh_token");
+  const hasError = params.has("error");
+
+  if (!hasAccess && !hasRefresh && !hasError) return { kind: "none" };
+
+  if (hasError) {
+    const error = (params.get("error") ?? "").trim();
+    if (!error) return { kind: "malformed" };
+    const errorDescriptionRaw = params.get("error_description");
+    const errorDescription =
+      typeof errorDescriptionRaw === "string" && errorDescriptionRaw.trim().length > 0
+        ? errorDescriptionRaw.trim()
+        : null;
+    return { kind: "provider_error", error, errorDescription };
+  }
+
+  const access_token = (params.get("access_token") ?? "").trim();
+  const refresh_token = (params.get("refresh_token") ?? "").trim();
+
+  if (
+    !access_token ||
+    !refresh_token ||
+    access_token.length < MIN_ACCESS_TOKEN_LEN ||
+    refresh_token.length < MIN_REFRESH_TOKEN_LEN ||
+    access_token.length > MAX_TOKEN_LEN ||
+    refresh_token.length > MAX_TOKEN_LEN
+  ) {
+    return { kind: "malformed" };
+  }
+
+  return {
+    kind: "session",
+    tokens: { access_token, refresh_token },
+  };
+}
+
+export function shouldAttemptOAuthHashSessionConsume(
+  parsed: ParsedOAuthHash,
+): parsed is { readonly kind: "session"; readonly tokens: OAuthHashSessionTokens } {
+  return parsed.kind === "session";
+}
+
+/** Path + search with no hash. Never invents a destination from the fragment. */
+export function urlWithoutHash(pathname: unknown, search: unknown): string {
+  const path = typeof pathname === "string" && pathname.length > 0 ? pathname : "/";
+  const query = typeof search === "string" ? search : "";
+  // search may already include leading `?` (Location.search) or be empty.
+  return `${path}${query}`;
+}
+
+export type OAuthHashLocationLike = {
+  readonly pathname: string;
+  readonly search: string;
+  readonly hash: string;
+};
+
+/**
+ * Strip the hash from the address bar without a full reload.
+ * Returns true only when an OAuth-looking hash was present and replaceState ran.
+ */
+export function clearOAuthHashFromAddressBar(
+  locationLike: OAuthHashLocationLike,
+  replaceState: (url: string) => void,
+): boolean {
+  if (shouldPreserveAuthCallbackHash(locationLike.hash)) return false;
+  const parsed = parseOAuthHashFragment(locationLike.hash);
+  if (parsed.kind === "none") return false;
+  const url = urlWithoutHash(locationLike.pathname, locationLike.search);
+  try {
+    replaceState(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function hashLooksLikeOAuthReturn(hash: unknown): boolean {
+  return parseOAuthHashFragment(typeof hash === "string" ? hash : "").kind !== "none";
+}
+
+/**
+ * One-shot in-memory stash used by the before-paint wipe script so consume
+ * can still call setSession after location.hash is already empty.
+ * Never log this key's value.
+ */
+export const OAUTH_RETURN_HASH_STASH_KEY = "__VERDANT_OAUTH_RETURN_HASH__" as const;
+
+/**
+ * GoTrue implicit-callback types that must keep the full fragment in the
+ * address bar. Session OAuth (Google SSO) has access/refresh and no `type`
+ * (or only `token_type=bearer`) and still gets wiped.
+ */
+export const AUTH_CALLBACK_HASH_PRESERVE_TYPES = [
+  "recovery",
+  "signup",
+  "invite",
+  "magiclink",
+  "email_change",
+] as const;
+
+export type AuthCallbackHashPreserveType = (typeof AUTH_CALLBACK_HASH_PRESERVE_TYPES)[number];
+
+const AUTH_CALLBACK_HASH_PRESERVE_TYPE_SET: ReadonlySet<string> = new Set(
+  AUTH_CALLBACK_HASH_PRESERVE_TYPES,
+);
+
+function readAuthCallbackType(hash: unknown): string {
+  if (typeof hash !== "string" || hash.length === 0) return "";
+  const raw = stripHashPrefix(hash);
+  if (!raw) return "";
+  let params: URLSearchParams;
+  try {
+    params = new URLSearchParams(raw);
+  } catch {
+    return "";
+  }
+  return (params.get("type") ?? "").trim().toLowerCase();
+}
+
+/** True when the fragment is a recovery/signup (etc.) callback that ResetPassword needs. */
+export function shouldPreserveAuthCallbackHash(hash: unknown): boolean {
+  return AUTH_CALLBACK_HASH_PRESERVE_TYPE_SET.has(readAuthCallbackType(hash));
+}
+
+export type OAuthHashStashHolder = {
+  [OAUTH_RETURN_HASH_STASH_KEY]?: unknown;
+};
+
+/**
+ * Survives AuthProvider `take()` and React remounts so `/reset-password`
+ * can still diagnose recovery/error hashes after the one-shot window stash
+ * is consumed. Never log this value.
+ */
+let retainedOAuthReturnHash: string | null = null;
+
+function readStashHolder(holder: OAuthHashStashHolder): string | null {
+  const raw = holder[OAUTH_RETURN_HASH_STASH_KEY];
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
+export function peekOAuthReturnHashStash(holder: OAuthHashStashHolder): string | null {
+  return readStashHolder(holder) ?? retainedOAuthReturnHash;
+}
+
+export function takeOAuthReturnHashStash(holder: OAuthHashStashHolder): string | null {
+  const raw = readStashHolder(holder);
+  try {
+    delete holder[OAUTH_RETURN_HASH_STASH_KEY];
+  } catch {
+    try {
+      holder[OAUTH_RETURN_HASH_STASH_KEY] = undefined;
+    } catch {
+      // Ignore stash holders that reject delete/assign.
+    }
+  }
+  if (raw) retainedOAuthReturnHash = raw;
+  return raw;
+}
+
+/** Test isolation only — production never needs to forget a just-consumed return hash. */
+export function clearOAuthReturnHashRetention(): void {
+  retainedOAuthReturnHash = null;
+}
+
+export function resolveOAuthHashSource(locationHash: unknown, stashedHash: unknown): string {
+  if (typeof stashedHash === "string" && stashedHash.length > 0) return stashedHash;
+  return typeof locationHash === "string" ? locationHash : "";
+}
+
+/**
+ * Tiny blocking head script: stash an OAuth-looking hash, then replaceState
+ * before first paint. Must stay import-free so it can run before module graph.
+ * Detection mirrors parseOAuthHashFragment's oauth-looking keys, then skips
+ * type=recovery/signup (and sibling GoTrue callbacks) so ResetPassword can
+ * still read the tokenized fragment.
+ */
+const AUTH_CALLBACK_PRESERVE_TYPE_SCRIPT_CHECK = AUTH_CALLBACK_HASH_PRESERVE_TYPES.map(
+  (type) => `t==="${type}"`,
+).join("||");
+
+export const OAUTH_HASH_EARLY_WIPE_SCRIPT =
+  '(function(){try{var h=location.hash||"";if(!h)return;var q=h.charAt(0)==="#"?h.slice(1):h;var p=new URLSearchParams(q);if(!p.has("access_token")&&!p.has("refresh_token")&&!p.has("error"))return;var t=(p.get("type")||"").toLowerCase();if(' +
+  AUTH_CALLBACK_PRESERVE_TYPE_SCRIPT_CHECK +
+  ")return;window." +
+  OAUTH_RETURN_HASH_STASH_KEY +
+  '=h;history.replaceState(history.state,"",location.pathname+location.search);}catch(e){}})();';
+
+export type OAuthHashSetSession = (
+  tokens: OAuthHashSessionTokens,
+) => Promise<{ error: unknown } | null | undefined>;
+
+/**
+ * Parse → wipe hash (replaceState, synchronous) → setSession from in-memory
+ * tokens. Fail closed on malformed / provider error / setSession failure:
+ * hash is already gone; never invent a session.
+ *
+ * Prefer `stashedHash` from the before-paint wipe when location.hash is empty.
+ */
+export async function consumeOAuthHashSessionIfPresent(deps: {
+  readonly hash: string;
+  readonly stashedHash?: string | null;
+  readonly pathname: string;
+  readonly search: string;
+  readonly setSession: OAuthHashSetSession;
+  readonly replaceState: (url: string) => void;
+}): Promise<OAuthHashConsumeOutcome> {
+  const sourceHash = resolveOAuthHashSource(deps.hash, deps.stashedHash);
+  if (shouldPreserveAuthCallbackHash(sourceHash)) return "noop";
+  const parsed = parseOAuthHashFragment(sourceHash);
+  if (parsed.kind === "none") return "noop";
+
+  // Wipe first so tokens do not sit in the address bar for setSession latency.
+  const wiped = clearOAuthHashFromAddressBar(
+    { pathname: deps.pathname, search: deps.search, hash: sourceHash },
+    deps.replaceState,
+  );
+  // `deps.hash` is the live address bar. A successful before-paint wipe leaves
+  // it empty even if this second replaceState throws. Only abort setSession
+  // when the address bar still holds an OAuth-looking fragment.
+  const addressBarStillHasOAuth = parseOAuthHashFragment(deps.hash).kind !== "none";
+  if (!wiped && addressBarStillHasOAuth) {
+    return "cleared_without_session";
+  }
+
+  if (!shouldAttemptOAuthHashSessionConsume(parsed)) {
+    return "cleared_without_session";
+  }
+
+  try {
+    const result = await deps.setSession(parsed.tokens);
+    const error = result && typeof result === "object" && "error" in result ? result.error : null;
+    return error ? "cleared_without_session" : "consumed";
+  } catch {
+    return "cleared_without_session";
+  }
+}

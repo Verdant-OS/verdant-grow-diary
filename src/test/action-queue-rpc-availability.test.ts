@@ -1,9 +1,18 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   isMissingActionQueueTransitionRpcError,
+  areActionQueueTransitionMutationsBlocked,
+  ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY,
+  ACTION_QUEUE_TRANSITION_RPC_TOAST_ID,
   ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY,
+  settleActionQueueRpcAvailabilityOnCheckTimeout,
 } from "@/lib/actionQueueRpcAvailability";
 import { safeActionQueueFailureCopy } from "@/lib/actionQueueFailureCopy";
+
+const ACTION_QUEUE_PAGE = readFileSync(resolve(__dirname, "../pages/ActionQueue.tsx"), "utf8");
+const ACTION_DETAIL_PAGE = readFileSync(resolve(__dirname, "../pages/ActionDetail.tsx"), "utf8");
 
 describe("isMissingActionQueueTransitionRpcError", () => {
   it("detects PostgREST PGRST202 (schema cache miss)", () => {
@@ -129,16 +138,85 @@ describe("safeActionQueueFailureCopy rpc_missing reason", () => {
       ok: false,
       reason: "rpc_missing",
     });
-    expect(copy).toMatch(/temporarily unavailable/i);
+    expect(copy).toMatch(/was not saved/i);
+    expect(copy).not.toMatch(/no status was updated/i);
+    expect(copy).not.toMatch(/queue is unchanged/i);
     expect(copy).not.toMatch(/action_queue_transition/);
     expect(copy).not.toMatch(/PGRST/);
   });
 
-  it("banner copy never names the RPC or leaks provider codes", () => {
-    const { title, body } = ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY;
-    for (const text of [title, body]) {
+  it("banner copy never names the RPC, never claims a global freeze, and never leaks provider codes", () => {
+    const { title, body, label } = ACTION_QUEUE_TRANSITION_RPC_UNAVAILABLE_COPY;
+    for (const text of [title, body, label, ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY]) {
       expect(text).not.toMatch(/action_queue_transition/);
       expect(text).not.toMatch(/PGRST|42883|postgrest/i);
+      expect(text).not.toMatch(/no status was updated/i);
+      expect(text).not.toMatch(/queue is unchanged/i);
     }
+    expect(body).toMatch(/paused until you refresh the queue/i);
+    expect(body).toMatch(/No new status will be saved from those buttons/i);
+    expect(ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY).toMatch(/That decision was not saved/i);
+  });
+});
+
+describe("settleActionQueueRpcAvailabilityOnCheckTimeout", () => {
+  it("does not paint a false outage: unknown + timedOut stays unknown", () => {
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("unknown", true)).toBe("unknown");
+  });
+
+  it("keeps unknown before any timer elapses", () => {
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("unknown", false)).toBe("unknown");
+  });
+
+  it("never overwrites a settled available or unavailable state", () => {
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("available", true)).toBe("available");
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("available", false)).toBe("available");
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("unavailable", true)).toBe("unavailable");
+    expect(settleActionQueueRpcAvailabilityOnCheckTimeout("unavailable", false)).toBe(
+      "unavailable",
+    );
+  });
+});
+
+describe("areActionQueueTransitionMutationsBlocked", () => {
+  it("blocks only the proven unavailable state", () => {
+    expect(areActionQueueTransitionMutationsBlocked("unavailable")).toBe(true);
+    expect(areActionQueueTransitionMutationsBlocked("unknown")).toBe(false);
+    expect(areActionQueueTransitionMutationsBlocked("available")).toBe(false);
+  });
+});
+
+describe("ActionQueue list page does not invent an RPC outage", () => {
+  it("does not auto-timeout unknown availability into unavailable", () => {
+    expect(ACTION_QUEUE_PAGE).not.toMatch(/settleActionQueueRpcAvailabilityOnCheckTimeout/);
+    expect(ACTION_QUEUE_PAGE).not.toMatch(/ACTION_QUEUE_RPC_AVAILABILITY_CHECK_TIMEOUT_MS/);
+  });
+
+  it("fail-closes approve/reject/simulate/cancel/complete while the unavailable banner is showing", () => {
+    expect(ACTION_QUEUE_PAGE).toMatch(
+      /const disabled = busyId === row\.id \|\| transitionMutationsBlocked/,
+    );
+    expect(ACTION_QUEUE_PAGE).toMatch(
+      /if \(areActionQueueTransitionMutationsBlocked\(rpcAvailability\)\) \{/,
+    );
+    expect(ACTION_DETAIL_PAGE).toMatch(/const disabled = busy \|\| rpcUnavailable/);
+    expect(ACTION_DETAIL_PAGE).toMatch(
+      /if \(areActionQueueTransitionMutationsBlocked\(rpcAvailability\)\) \{/,
+    );
+    const queueRpcIdx = ACTION_QUEUE_PAGE.indexOf(
+      "if (areActionQueueTransitionMutationsBlocked(rpcAvailability)) {",
+    );
+    const queueCallIdx = ACTION_QUEUE_PAGE.indexOf('"action_queue_transition"');
+    expect(queueRpcIdx).toBeGreaterThan(-1);
+    expect(queueCallIdx).toBeGreaterThan(queueRpcIdx);
+  });
+
+  it("dismisses the sticky outage toast after a successful mutation", () => {
+    for (const page of [ACTION_QUEUE_PAGE, ACTION_DETAIL_PAGE]) {
+      expect(page).toContain(`toast.dismiss(${"ACTION_QUEUE_TRANSITION_RPC_TOAST_ID"})`);
+      expect(page).toContain("ACTION_QUEUE_TRANSITION_ATTEMPT_UNSAVED_COPY");
+      expect(page).toContain("id: ACTION_QUEUE_TRANSITION_RPC_TOAST_ID");
+    }
+    expect(ACTION_QUEUE_TRANSITION_RPC_TOAST_ID).toBe("action-queue-transition-rpc-unavailable");
   });
 });

@@ -72,6 +72,9 @@ vi.mock("@/integrations/supabase/client", () => {
         spec.filters.push({ op: "lt", column, value });
         return query;
       },
+      in() {
+        return query;
+      },
       order() {
         return query;
       },
@@ -295,7 +298,10 @@ function expectNoTimelineContinuation() {
 function expectNoTimelineDirectoryReads() {
   const directoryReads = harness.executeQuery.mock.calls
     .map(([spec]) => spec as QuerySpec)
-    .filter((spec) => spec.table === "plants" || spec.table === "tents");
+    .filter(
+      (spec) =>
+        spec.table === "plants" || spec.table === "tents" || spec.table === "sensor_readings",
+    );
   expect(directoryReads).toHaveLength(0);
 }
 
@@ -397,6 +403,9 @@ describe("Timeline mounted read-state boundary", () => {
         };
       }
       if (spec.table === "tents") {
+        if (spec.columns === "id") {
+          return { data: [], error: null };
+        }
         expect(spec.filters.some((f) => f.column === "is_archived")).toBe(false);
         expect(spec.filters).toContainEqual({ op: "eq", column: "user_id", value: "owner-1" });
         expect(spec.columns).toBe("id,name,grow_id");
@@ -539,57 +548,52 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
   });
 
-  it("renders a Plant Quick Log manual snapshot once with its persisted values and source truth", async () => {
+  const PLANT_QL_PERSIST_SNAPSHOT = {
+    temp_f: 82,
+    humidity_percent: 48,
+    ph: 6.2,
+    ec: 1.65,
+    source: "manual",
+  } as const;
+
+  function plantQuickLogPersistRows(entryAt: string) {
+    return {
+      diary: {
+        ...diaryEntry("entry-manual-snapshot", "Manual room check", entryAt),
+        plant_id: "plant-manual",
+        tent_id: "tent-manual",
+        details: {
+          event_type: "quick_log",
+          source: "manual",
+          linked_grow_event_id: "grow-event-manual",
+          manual_sensor_snapshot: { ...PLANT_QL_PERSIST_SNAPSHOT },
+        },
+      },
+      growEvent: {
+        ...growEvent("grow-event-manual"),
+        plant_id: "plant-manual",
+        tent_id: "tent-manual",
+        event_type: "observation",
+        occurred_at: entryAt,
+        note: "Manual room check",
+      },
+    };
+  }
+
+  function mockPlantQuickLogPersistQueries(entryAt: string) {
+    const rows = plantQuickLogPersistRows(entryAt);
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {
-        return {
-          data: [
-            {
-              ...diaryEntry(
-                "entry-manual-snapshot",
-                "Manual room check",
-                "2026-07-20T13:00:00.000Z",
-              ),
-              plant_id: "plant-manual",
-              tent_id: "tent-manual",
-              details: {
-                event_type: "quick_log",
-                source: "manual",
-                linked_grow_event_id: "grow-event-manual",
-                manual_sensor_snapshot: {
-                  temp_f: 82,
-                  humidity_percent: 48,
-                  ph: 6.2,
-                  ec: 1.65,
-                  source: "manual",
-                },
-              },
-            },
-          ],
-          error: null,
-          count: 1,
-        };
+        return { data: [rows.diary], error: null, count: 1 };
       }
       if (spec.table === "grow_events") {
-        return {
-          data: [
-            {
-              ...growEvent("grow-event-manual"),
-              plant_id: "plant-manual",
-              tent_id: "tent-manual",
-              event_type: "observation",
-              occurred_at: "2026-07-20T13:00:00.000Z",
-              note: "Manual room check",
-            },
-          ],
-          error: null,
-        };
+        return { data: [rows.growEvent], error: null };
       }
       return defaultResult(spec);
     });
+  }
 
-    renderTimeline("/timeline?sensorSources=manual");
-
+  async function expectPlantQuickLogPersistCardVisibleOnce() {
     const entry = (await screen.findByText("Manual room check")).closest(
       '[data-testid="timeline-entry"]',
     );
@@ -619,9 +623,31 @@ describe("Timeline mounted read-state boundary", () => {
       "data-manual-snapshot-count",
       "1",
     );
+    return entry as HTMLElement;
+  }
+
+  it("renders an in-window Plant Quick Log manual snapshot once with its persisted values and source truth", async () => {
+    const capturedAt = new Date(Date.now() - 60_000).toISOString();
+    mockPlantQuickLogPersistQueries(capturedAt);
+
+    renderTimeline("/timeline?sensorSources=manual");
+
+    await expectPlantQuickLogPersistCardVisibleOnce();
 
     fireEvent.click(screen.getByRole("button", { name: /^Measurements/ }));
     expect(screen.getByText("Manual room check")).toBeInTheDocument();
+  });
+
+  it("excludes a stale Plant Quick Log persist snapshot from Measurements", async () => {
+    mockPlantQuickLogPersistQueries("2026-07-20T13:00:00.000Z");
+
+    renderTimeline("/timeline?sensorSources=manual");
+
+    await expectPlantQuickLogPersistCardVisibleOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Measurements/ }));
+    expect(screen.queryByText("Manual room check")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-manual-snapshot")).toBeNull();
   });
 
   it("preserves canonical and legacy snapshot precedence, aliases, and formatting", async () => {

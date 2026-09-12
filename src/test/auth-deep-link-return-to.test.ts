@@ -1,6 +1,7 @@
 // Signed-out deep-link return-to chain:
-//   protected route → /welcome?redirectTo=<path> → /auth?redirectTo=<path>
-//   → restored after sign-in.
+//   protected route → /auth?redirectTo=<path> → restored after sign-in
+//   (signed-out re-entry: the sign-in screen, never the marketing /welcome).
+//   A direct /welcome?redirectTo=<path> visit still forwards into /auth.
 //
 // Open-redirect safety: a return-to value is only honored when it survives
 // sanitizeAuthRedirect unchanged AND its path portion matches a route in the
@@ -80,23 +81,23 @@ describe("resolveKnownRouteReturnTo — strict return-to resolver", () => {
 
 describe("buildSignedOutRedirect — AppShell signed-out target", () => {
   it("preserves a protected deep link as an encoded redirectTo", () => {
-    expect(buildSignedOutRedirect("/plants", "")).toBe("/welcome?redirectTo=%2Fplants");
-    expect(buildSignedOutRedirect("/alerts/42", "")).toBe("/welcome?redirectTo=%2Falerts%2F42");
+    expect(buildSignedOutRedirect("/plants", "")).toBe("/auth?redirectTo=%2Fplants");
+    expect(buildSignedOutRedirect("/alerts/42", "")).toBe("/auth?redirectTo=%2Falerts%2F42");
     expect(buildSignedOutRedirect("/actions", "?filter=open")).toBe(
-      "/welcome?redirectTo=%2Factions%3Ffilter%3Dopen",
+      "/auth?redirectTo=%2Factions%3Ffilter%3Dopen",
     );
     expect(buildSignedOutRedirect("/dashboard", "?growId=g1")).toBe(
-      "/welcome?redirectTo=%2Fdashboard%3FgrowId%3Dg1",
+      "/auth?redirectTo=%2Fdashboard%3FgrowId%3Dg1",
     );
   });
 
   it("preserves the location hash end-to-end (capture → restore)", () => {
     // Capture side: hash rides along inside the encoded redirectTo…
     expect(buildSignedOutRedirect("/sensors", "", "#manual-reading")).toBe(
-      "/welcome?redirectTo=%2Fsensors%23manual-reading",
+      "/auth?redirectTo=%2Fsensors%23manual-reading",
     );
     expect(buildSignedOutRedirect("/actions", "?filter=open", "#row-3")).toBe(
-      "/welcome?redirectTo=%2Factions%3Ffilter%3Dopen%23row-3",
+      "/auth?redirectTo=%2Factions%3Ffilter%3Dopen%23row-3",
     );
     // …and the consume side hands it back intact (round trip).
     expect(resolveKnownRouteReturnTo("/sensors#manual-reading")).toBe("/sensors#manual-reading");
@@ -107,11 +108,12 @@ describe("buildSignedOutRedirect — AppShell signed-out target", () => {
     expect(resolveKnownRouteReturnTo("/not-a-route#anchor")).toBeNull();
   });
 
-  it("falls back to plain /welcome for the root, the landing itself, and unknown paths", () => {
+  it("falls back to plain /auth for the root, the marketing landing, the sign-in screen itself, and unknown paths", () => {
     expect(buildSignedOutRedirect("/", "")).toBe(SIGNED_OUT_LANDING);
     expect(buildSignedOutRedirect("/welcome", "")).toBe(SIGNED_OUT_LANDING);
     expect(buildSignedOutRedirect("/welcome", "?redirectTo=%2Fplants")).toBe(SIGNED_OUT_LANDING);
     expect(buildSignedOutRedirect("/welcome", "", "#features")).toBe(SIGNED_OUT_LANDING);
+    expect(buildSignedOutRedirect("/auth", "?redirectTo=%2Fplants")).toBe(SIGNED_OUT_LANDING);
     expect(buildSignedOutRedirect("/not-a-route", "")).toBe(SIGNED_OUT_LANDING);
   });
 

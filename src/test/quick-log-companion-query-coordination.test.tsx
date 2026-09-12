@@ -193,9 +193,37 @@ describe("Quick Log companion query coordination", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.items.map((item) => item.key)).toContain("diary-companion-1");
+    expect(result.current.items.map((item) => item.key)).toContain("quicklog-parent-water-1");
+    expect(
+      result.current.items.some(
+        (item) =>
+          item.kind === "diary" &&
+          item.eventType === "watering" &&
+          item.key === "quicklog-parent-water-1",
+      ),
+    ).toBe(true);
     expect(result.current.companionItems?.map((item) => item.key)).toEqual(["diary-companion-1"]);
     expect(result.current.displayItems).toEqual([]);
     expect(supabaseReadState.requestedParentIds).toEqual(["water-1"]);
+  });
+
+  it("keeps grouped watering in complete memory without duplicating the visible card", async () => {
+    const client = makeClient();
+    client.setQueryData(
+      buildQuickLogGroupedTimelineQueryKey(scope, QUICK_LOG_GROUPED_TIMELINE_DEFAULT_LIMIT),
+      ownedGroupedEntries(),
+    );
+
+    const { result } = renderHook(() => useTimelineMemory(scope), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const parent = result.current.items.find((item) => item.key === "quicklog-parent-water-1");
+    expect(parent).toMatchObject({ kind: "diary", eventType: "watering" });
+    expect(result.current.displayItems?.map((item) => item.key) ?? []).not.toContain(
+      "quicklog-parent-water-1",
+    );
   });
 
   it("keeps the valid companion visible when the grouped reader independently fails", async () => {

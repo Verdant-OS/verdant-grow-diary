@@ -38,8 +38,16 @@ vi.mock("@/hooks/use-tents", () => ({
   }),
 }));
 
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1" }] }),
+}));
+
 vi.mock("@/hooks/useRecentFeedingsForDefaults", () => ({
   useRecentFeedingsForDefaults: () => ({ data: [] }),
+}));
+
+vi.mock("@/hooks/useRecentWateringsForVolumeDefaults", () => ({
+  useRecentWateringsForVolumeDefaults: () => ({ data: [] }),
 }));
 
 vi.mock("@/hooks/usePlantManualSensorHistory", () => ({

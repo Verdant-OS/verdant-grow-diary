@@ -38,7 +38,7 @@ describe("buildQuickLogSnapshotStrip", () => {
     expect(v.action).toEqual({
       kind: "add",
       label: "Add snapshot",
-      href: "/sensors#manual-reading",
+      href: "/sensors?tentIntent=required#manual-reading",
     });
     expect(v.metrics).toHaveLength(0);
     expect(v.ageLabel).toBeNull();
@@ -61,7 +61,7 @@ describe("buildQuickLogSnapshotStrip", () => {
     expect(v.action).toEqual({
       kind: "add",
       label: "Add snapshot",
-      href: "/sensors#manual-reading",
+      href: "/sensors?tentIntent=required#manual-reading",
     });
   });
 
@@ -78,7 +78,7 @@ describe("buildQuickLogSnapshotStrip", () => {
     expect(v.action).toEqual({
       kind: "add",
       label: "Add snapshot",
-      href: "/sensors#manual-reading",
+      href: "/sensors?tentIntent=required#manual-reading",
     });
   });
 
@@ -126,7 +126,11 @@ describe("buildQuickLogSnapshotStrip", () => {
     expect(v.status).toBe("stale");
     expect(v.title).toBe("Sensor snapshot stale");
     expect(v.description).toBe("Refresh before saving for better AI Doctor context.");
-    expect(v.action).toEqual({ kind: "refresh", label: "Refresh snapshot", href: "/sensors" });
+    expect(v.action).toEqual({
+      kind: "refresh",
+      label: "Refresh snapshot",
+      href: "/sensors?tentIntent=required",
+    });
     expect(v.ageLabel).toBe("2 days ago");
     expect(v.capturedAt).toBe(hoursAgo(48));
     expect(v.metrics).toEqual([
@@ -167,7 +171,11 @@ describe("buildQuickLogSnapshotStrip", () => {
     expect(v.status).toBe("invalid");
     expect(v.title).toBe("Sensor snapshot not trusted");
     expect(v.description).toBe("This reading will not be treated as reliable context.");
-    expect(v.action).toEqual({ kind: "review", label: "Review sensor intake", href: "/sensors" });
+    expect(v.action).toEqual({
+      kind: "review",
+      label: "Review sensor intake",
+      href: "/sensors?tentIntent=required",
+    });
     expect(v.ageLabel).toBe("5 min ago");
     expect(v.capturedAt).toBe(minutesAgo(5));
     expect(v.classification.status).toBe("invalid");
@@ -190,7 +198,7 @@ describe("buildQuickLogSnapshotStrip", () => {
   it("action hrefs are navigation-only — never automation endpoints", () => {
     const scenarios = [
       { ts: minutesAgo(5), expectedHref: undefined }, // usable → kind:none
-      { ts: hoursAgo(48), expectedHref: "/sensors" }, // stale → refresh
+      { ts: hoursAgo(48), expectedHref: "/sensors?tentIntent=required" }, // stale → refresh
     ];
     for (const { ts, expectedHref } of scenarios) {
       const v = buildQuickLogSnapshotStrip({
@@ -215,9 +223,22 @@ describe("buildQuickLogSnapshotStrip", () => {
       loading?: boolean;
       expectedHref: string;
     }> = [
-      { snapshot: snap({ ts: hoursAgo(48) }), hasTent: true, expectedHref: "/sensors" }, // stale → refresh
-      { snapshot: snap({ source: "sim" }), hasTent: true, expectedHref: "/sensors" }, // invalid → review
-      { snapshot: null, hasTent: true, loading: true, expectedHref: "/sensors#manual-reading" }, // no_data → add (deep link)
+      {
+        snapshot: snap({ ts: hoursAgo(48) }),
+        hasTent: true,
+        expectedHref: "/sensors?tentIntent=required",
+      }, // stale → refresh
+      {
+        snapshot: snap({ source: "sim" }),
+        hasTent: true,
+        expectedHref: "/sensors?tentIntent=required",
+      }, // invalid → review
+      {
+        snapshot: null,
+        hasTent: true,
+        loading: true,
+        expectedHref: "/sensors?tentIntent=required#manual-reading",
+      }, // no_data → add (deep link)
     ];
     for (const { expectedHref, ...args } of allStatuses) {
       const v = buildQuickLogSnapshotStrip({ ...args, now: NOW, temperatureUnit: "celsius" });

@@ -74,6 +74,29 @@ export type LocalForwardingFetchState =
 const SECRET_PATTERNS: RegExp[] = [
   /vbt_[A-Za-z0-9_-]{6,}/g,
   /eyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}/g,
+  // Env NAME=value pairs (never export private env values). Quoted ("…"/'…')
+  // and unquoted forms both match; lone words do not.
+  //
+  // ORDER IS LOAD-BEARING: this MUST stay above BOTH the header rules and the
+  // bare-word label rules that follow. Either group can destroy the env NAME
+  // before this rule sees it, and once the NAME no longer satisfies
+  // `[A-Z][A-Z0-9_]{2,}=` the VALUE survives. Two distinct mechanisms:
+  //
+  //   1. FRAGMENTING — the bare-word label rules rewrite the label anywhere in
+  //      the string, including inside a NAME. Run first, `MY_PASSKEY_VAR="s"`
+  //      becomes `MY_[REDACTED]_VAR="s"` and the value is left behind.
+  //   2. CONSUMING — the header rules swallow a whole following token, NAME
+  //      included. Run first, `Bearer MY_PASSKEY_VAR="s"` becomes
+  //      `[REDACTED]="s"` and the value is again left behind. This one does
+  //      NOT need a credential label in the NAME at all: `Bearer
+  //      SOME_PLAIN_NAME="s"` leaked identically.
+  //
+  // A bare pair with no prefix redacted correctly throughout, which is why
+  // both defects went unnoticed. Removing the whole pair first makes every
+  // later rule a no-op on that span instead of a hazard. Pinned by
+  // `sanitizeReportText — env pair whose NAME carries a credential label` and
+  // `sanitizeReportText — env pair behind a header prefix`.
+  /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
   /Bearer\s+[A-Za-z0-9._-]{6,}/gi,
   /Authorization\s*:\s*[^\s",}]+/gi,
   /PASSKEY/gi,
@@ -94,10 +117,9 @@ const SECRET_PATTERNS: RegExp[] = [
   // Separator-free MAC-length hex runs (12–31 chars containing at least one
   // hex letter, so plain long numbers/epoch timestamps are untouched).
   /(?<![0-9A-Fa-f])(?=[0-9A-Fa-f]{0,30}[A-Fa-f])[0-9A-Fa-f]{12,31}(?![0-9A-Fa-f])/g,
-  // API keys and env NAME=value pairs (never export private env values).
-  // Quoted ("…"/'…') and unquoted forms both match; lone words do not.
+  // API keys. The env NAME=value rule that used to sit here has moved ABOVE
+  // the bare-word label rules — see the ordering note there.
   /\bsk-[A-Za-z0-9_-]{16,}/g,
-  /\b[A-Z][A-Z0-9_]{2,}=(?:"[^"]{2,}"|'[^']{2,}'|[^\s"']{2,})/g,
 ];
 
 const REDACTED = "[REDACTED]";

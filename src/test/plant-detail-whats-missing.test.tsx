@@ -1,10 +1,101 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "@/lib/react-router-compat";
+import PlantDetailWhatsMissing from "@/components/PlantDetailWhatsMissing";
 import fs from "fs";
 import path from "path";
 import {
   buildPlantDetailWhatsMissing,
   type PlantDetailWhatsMissingInput,
 } from "@/lib/plantDetailWhatsMissing";
+
+const activityQuery = vi.hoisted(() => ({
+  data: [] as unknown,
+  isLoading: false,
+  isError: false,
+}));
+
+vi.mock("@/hooks/usePlantRecentActivity", () => ({
+  usePlantRecentActivity: () => activityQuery,
+}));
+
+const savedStatusNote = {
+  id: "saved-status-note",
+  plant_id: "p-1",
+  entry_at: "2026-09-03T02:00:00.000Z",
+  note: "Response check: Same.",
+  details: { event_type: "observation", response: "same" },
+};
+
+describe("PlantDetailWhatsMissing saved activity", () => {
+  beforeEach(() => {
+    activityQuery.data = [];
+    activityQuery.isLoading = false;
+    activityQuery.isError = false;
+  });
+
+  function renderPanel() {
+    return render(
+      <MemoryRouter>
+        <PlantDetailWhatsMissing plantId="p-1" growId="g-1" stage="veg" hasPlantPhoto />
+      </MemoryRouter>,
+    );
+  }
+
+  it.each([
+    ["Same status", savedStatusNote],
+    ["legacy note without an event kind", { ...savedStatusNote, details: null }],
+  ])("counts a saved %s as activity without fabricating watering or feeding", (_name, row) => {
+    activityQuery.data = [row];
+    renderPanel();
+    expect(screen.queryByText("No timeline entries yet")).not.toBeInTheDocument();
+    expect(screen.getByText("No recent watering or feed note")).toBeInTheDocument();
+    expect(screen.getByText("No sensor snapshot")).toBeInTheDocument();
+  });
+
+  it("distinguishes a successful empty history from unavailable activity", () => {
+    renderPanel();
+    expect(screen.getByText("No timeline entries yet")).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-detail-whats-missing-unavailable")).toBeNull();
+  });
+
+  it.each([
+    ["non-array", { rows: [] }],
+    ["null", null],
+    ["one bad element after a valid note", [savedStatusNote, null]],
+    ["missing row id", [{ ...savedStatusNote, id: null }]],
+    ["invalid date", [{ ...savedStatusNote, entry_at: "invalid" }]],
+    ["malformed details", [{ ...savedStatusNote, details: "{" }]],
+    ["another plant", [{ ...savedStatusNote, plant_id: "p-other" }]],
+  ])("shows unavailable for %s instead of claiming empty or complete history", (_name, data) => {
+    activityQuery.data = data;
+    renderPanel();
+    expect(screen.getByTestId("plant-detail-whats-missing-unavailable")).toHaveTextContent(
+      /activity is unavailable/i,
+    );
+    expect(screen.queryByTestId("plant-detail-whats-missing-list")).toBeNull();
+    expect(screen.queryByTestId("plant-detail-whats-missing-solid")).toBeNull();
+  });
+
+  it.each([{ data: [] }, { data: [savedStatusNote] }])(
+    "shows unavailable after a failed read, even with cached data",
+    ({ data }) => {
+      activityQuery.data = data;
+      activityQuery.isError = true;
+      renderPanel();
+      expect(screen.getByTestId("plant-detail-whats-missing-unavailable")).toBeInTheDocument();
+      expect(screen.queryByTestId("plant-detail-whats-missing-list")).toBeNull();
+    },
+  );
+
+  it("shows loading without claiming no activity", () => {
+    activityQuery.data = undefined;
+    activityQuery.isLoading = true;
+    renderPanel();
+    expect(screen.getByTestId("plant-detail-whats-missing-loading")).toBeInTheDocument();
+    expect(screen.queryByText("No timeline entries yet")).not.toBeInTheDocument();
+  });
+});
 
 function makeInput(
   overrides: Partial<PlantDetailWhatsMissingInput> = {},

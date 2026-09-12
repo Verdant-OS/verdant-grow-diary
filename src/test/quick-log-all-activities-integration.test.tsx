@@ -232,6 +232,17 @@ describe("QuickLogAllActivitiesSection — shared taxonomy", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("requested watering opens the structured V2 sheet instead of an inline note form", async () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    mountSection({ requestedActivityId: "watering" });
+    await waitFor(() => expect(events).toHaveLength(1));
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    expect(events[0].detail).toEqual({ targetKey: "plant:plant-1", action: "water" });
+    expect(screen.queryByTestId("quick-log-all-activities-form")).not.toBeInTheDocument();
+  });
+
   it("reapplies a requested editor after its target resolves asynchronously", async () => {
     const view = mountSection({
       growId: null,
@@ -800,6 +811,92 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
+  it("clears the no-symptoms box after a clean Symptom Check save before the next start", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "e-clean-check" },
+      error: null,
+    });
+    mountSection();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-none-observed"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).toBeChecked();
+    fireEvent.change(screen.getByTestId("quick-log-all-activities-note"), {
+      target: { value: "Looked the plant over; nothing visible today." },
+    });
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-stage-confirmed"));
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-save"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
+    const [name, args] = rpcMock.mock.calls[0];
+    expect(name).toBe("quicklog_save_event");
+    expect(args.p_details).toMatchObject({
+      subtype: "issue",
+      event_type: "observation",
+      observation_stage: "flower",
+      symptom_check_result: "no_symptoms_observed",
+    });
+    expect(args.p_details).not.toHaveProperty("observedSign");
+
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).not.toBeChecked();
+  });
+
+  it("clears the no-symptoms box after activity switch and after plant target switch", async () => {
+    const view = mountSection();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-none-observed"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).toBeChecked();
+
+    selectActivity("training");
+    await screen.findByTestId("quick-log-all-activities-form");
+    expect(screen.queryByTestId("quick-log-all-activities-symptom-none-observed")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).not.toBeChecked();
+
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-none-observed"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).toBeChecked();
+
+    view.rerender(
+      <MemoryRouter>
+        <QuickLogAllActivitiesSection
+          growId={GROW}
+          tentId={TENT}
+          plantId={OTHER_PLANT}
+          plantStage="flower"
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.queryByTestId("quick-log-all-activities-form")).toBeNull());
+
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).not.toBeChecked();
+  });
+
+  it("clears the no-symptoms box when a requested activity is applied", async () => {
+    const view = mountSection();
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-start-symptom-check"));
+    fireEvent.click(screen.getByTestId("quick-log-all-activities-symptom-none-observed"));
+    expect(screen.getByTestId("quick-log-all-activities-symptom-none-observed")).toBeChecked();
+
+    view.rerender(
+      <MemoryRouter>
+        <QuickLogAllActivitiesSection
+          growId={GROW}
+          tentId={TENT}
+          plantId={PLANT}
+          plantStage="flower"
+          requestedActivityId="feeding"
+        />
+      </MemoryRouter>,
+    );
+
+    const form = await screen.findByTestId("quick-log-all-activities-form");
+    expect(form).toHaveAttribute("data-activity-id", "feeding");
+    expect(screen.queryByTestId("quick-log-all-activities-symptom-none-observed")).toBeNull();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
   it("Environment check → canonical nested environment_check envelope (numbers) in p_details (celsius preference)", async () => {
     // Grower has explicitly set Celsius — the manual Temperature field labels
     // and validates as °C, and "24" is a plausible room temperature entered
@@ -965,10 +1062,16 @@ describe("QuickLogAllActivitiesSection — save routing", () => {
     noGrow.unmount();
 
     mountSection({ plantId: null, tentId: null });
-    selectActivity("watering");
-    expect(screen.getByTestId("quick-log-all-activities-structured-water-error")).toHaveTextContent(
-      /choose a plant or tent/i,
-    );
+    const watering = screen.getByTestId("quick-log-all-activities-picker-watering");
+    expect(watering).toBeDisabled();
+    expect(watering).toHaveAttribute("data-activity-enabled", "false");
+    expect(
+      screen.getByTestId("quick-log-all-activities-picker-watering-disabled-reason"),
+    ).toHaveTextContent(/choose a plant or tent before logging water/i);
+    fireEvent.click(watering);
+    expect(
+      screen.queryByTestId("quick-log-all-activities-structured-water-error"),
+    ).not.toBeInTheDocument();
 
     window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
     expect(events).toHaveLength(0);
@@ -1139,6 +1242,21 @@ describe("QuickLogAllActivitiesSection — failure paths", () => {
     // User cancels without saving.
     fireEvent.click(screen.getByTestId("quick-log-all-activities-cancel"));
     expect(screen.queryByTestId("quick-log-all-activities-saved")).toBeNull();
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("Watering from tent-only Daily Check context emits a tent targetKey", () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+
+    mountSection({ plantId: null, tentId: "tent-1", growId: "grow-1" });
+    selectActivity("watering");
+
+    window.removeEventListener(QUICK_LOG_V2_OPEN_EVENT, listener);
+    expect(events).toHaveLength(1);
+    expect(events[0].detail).toEqual({ targetKey: "tent:tent-1", action: "water" });
+    expect(screen.queryByTestId("quick-log-all-activities-structured-water-error")).toBeNull();
     expect(rpcMock).not.toHaveBeenCalled();
   });
 

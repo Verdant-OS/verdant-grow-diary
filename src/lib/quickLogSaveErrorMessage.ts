@@ -15,6 +15,7 @@ export type QuickLogSaveReason =
   | "no_selection"
   | "target_unresolved"
   | "selection_not_found"
+  | "empty_content"
   | "invalid_volume"
   | "temperature_out_of_range"
   | "humidity_out_of_range"
@@ -43,6 +44,8 @@ export function quickLogReasonToOperatorMessage(reason: string | null | undefine
     case "target_unresolved":
     case "selection_not_found":
       return "Choose a plant or tent before saving.";
+    case "empty_content":
+      return "Add a note, photo, or reading before saving.";
     case "invalid_volume":
       return "Enter a watering volume greater than zero.";
     case "temperature_out_of_range":
@@ -104,6 +107,8 @@ export function quickLogSaveRecoveryAction(reason: string | null | undefined): s
       return "Re-select the grow, tent, and plant from the pickers, then save again.";
     case "invalid_volume":
       return "Enter a volume above zero and save again.";
+    case "empty_content":
+      return "Add a note, photo, or reading, then save again.";
     case "temperature_out_of_range":
     case "humidity_out_of_range":
     case "vpd_out_of_range":

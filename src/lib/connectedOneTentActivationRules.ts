@@ -169,14 +169,32 @@ function normalizeTents(rows: SelectConnectedOneTentGraphInput["tents"]): Normal
   );
 }
 
-function normalizePlants(rows: SelectConnectedOneTentGraphInput["plants"]): NormalizedPlant[] {
+/**
+ * Normalize plants into the connected graph.
+ *
+ * Tent-attributed legacy rows (`plants.grow_id` null, tent belongs to a grow)
+ * are included via the tent's grow — same BUG-A attribution used by
+ * `fetchPlants` / grow-scoped lists. Cross-grow mismatches and blank tent
+ * links stay out; we never invent a grow or tent that is not already present
+ * in the supplied tent rows.
+ */
+function normalizePlants(
+  rows: SelectConnectedOneTentGraphInput["plants"],
+  tents: readonly NormalizedTent[],
+): NormalizedPlant[] {
+  const tentGrowById = new Map(tents.map((tent) => [tent.id, tent.growId]));
   const byKey = new Map<string, NormalizedPlant>();
   for (const row of rows ?? []) {
     const id = nonBlankId(row?.id);
-    const growId = nonBlankId(row?.growId);
     const tentId = nonBlankId(row?.tentId);
-    // Legacy null relationships are intentionally not inferred.
-    if (!id || !growId || !tentId) continue;
+    if (!id || !tentId) continue;
+    const tentGrowId = tentGrowById.get(tentId) ?? null;
+    if (!tentGrowId) continue;
+    const declaredGrowId = nonBlankId(row?.growId);
+    // Declared grow must match the tent's grow when present; null grow_id
+    // inherits the tent's grow (persisted plant memory on that tent).
+    if (declaredGrowId && declaredGrowId !== tentGrowId) continue;
+    const growId = declaredGrowId ?? tentGrowId;
     const key = `${growId}\u0000${tentId}\u0000${id}`;
     byKey.set(key, { id, growId, tentId });
   }
@@ -201,7 +219,10 @@ function graphDepth(
 }
 
 /**
- * Select one connected graph. The preferred grow wins when it exists.
+ * Select one connected graph. The preferred grow wins when it already has
+ * tent/plant depth. An empty preferred grow does not hide a deeper persisted
+ * One-Tent chain elsewhere in the account (Dashboard abandonment: 1/5 with
+ * "Add your first plant" despite an existing plant on another grow).
  * Otherwise the deepest available graph wins, with lexical ID tie-breakers.
  */
 export function selectConnectedOneTentGraph(
@@ -209,16 +230,28 @@ export function selectConnectedOneTentGraph(
 ): ConnectedOneTentGraph {
   const growIds = uniqueSortedIds(input?.grows);
   const tents = normalizeTents(input?.tents);
-  const plants = normalizePlants(input?.plants);
+  const plants = normalizePlants(input?.plants, tents);
   const preferredGrowId = nonBlankId(input?.preferredGrowId);
 
-  let growId = preferredGrowId && growIds.includes(preferredGrowId) ? preferredGrowId : null;
+  const deepestGrowId =
+    growIds.length > 0
+      ? [...growIds].sort((a, b) => {
+          const depthDifference = graphDepth(b, tents, plants) - graphDepth(a, tents, plants);
+          return depthDifference || compareText(a, b);
+        })[0]
+      : null;
 
-  if (!growId && growIds.length > 0) {
-    growId = [...growIds].sort((a, b) => {
-      const depthDifference = graphDepth(b, tents, plants) - graphDepth(a, tents, plants);
-      return depthDifference || compareText(a, b);
-    })[0];
+  let growId: string | null = null;
+  if (preferredGrowId && growIds.includes(preferredGrowId)) {
+    const preferredDepth = graphDepth(preferredGrowId, tents, plants);
+    const deepestDepth = deepestGrowId ? graphDepth(deepestGrowId, tents, plants) : 0;
+    // Honor preferred when it has any connected depth, or when nothing deeper exists.
+    growId =
+      preferredDepth > 0 || deepestDepth === 0 || deepestGrowId === preferredGrowId
+        ? preferredGrowId
+        : deepestGrowId;
+  } else if (deepestGrowId) {
+    growId = deepestGrowId;
   }
 
   if (!growId) {
@@ -241,9 +274,14 @@ export function selectConnectedOneTentGraph(
       return compareText(a.id, b.id);
     })[0]?.id ?? null;
 
-  const plantId = tentId
+  // Tent-linked plants win when a tent exists. When the grow has plants but
+  // no tent yet (live One-Tent miss: plant memory before first tent), still
+  // surface a grow-attributed plantId so connected-scope framing cannot miss
+  // plant memory that only exists as tentless rows.
+  const tentLinkedPlantId = tentId
     ? (plants.find((plant) => plant.growId === growId && plant.tentId === tentId)?.id ?? null)
     : null;
+  const plantId = tentLinkedPlantId ?? pickGrowAttributedTentlessPlantId(input?.plants, growId);
 
   return {
     growId,
@@ -253,6 +291,28 @@ export function selectConnectedOneTentGraph(
     hasTent: tentId !== null,
     hasPlant: plantId !== null,
   };
+}
+
+/**
+ * Grow-attributed plants with no tent yet. Lexical id tie-break.
+ * Does not invent a tent; does not attribute cross-grow rows.
+ */
+function pickGrowAttributedTentlessPlantId(
+  rows: SelectConnectedOneTentGraphInput["plants"],
+  growId: string,
+): string | null {
+  const candidates: string[] = [];
+  for (const row of rows ?? []) {
+    const id = nonBlankId(row?.id);
+    const rowGrowId = nonBlankId(row?.growId);
+    const tentId = nonBlankId(row?.tentId);
+    if (!id || tentId) continue;
+    if (rowGrowId !== growId) continue;
+    candidates.push(id);
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort(compareText);
+  return candidates[0] ?? null;
 }
 
 /** Build dependency-safe, query-encoded routes for the guided handoff. */

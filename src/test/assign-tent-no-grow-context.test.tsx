@@ -28,6 +28,8 @@ const mocks = vi.hoisted(() => ({
   tentFilters: [] as Array<{ column: string; value: unknown }>,
   tentQueryRuns: 0,
   tentRows: [] as Array<Record<string, unknown>>,
+  /** Optional per-call row queue (empty-grow fallback exercises two queries). */
+  tentRowsByCall: null as Array<Array<Record<string, unknown>>> | null,
   /**
    * The live `onOpenChange` handed to <Dialog>. The dialog's tents query is
    * gated on its internal `open` state, so the test MUST actually open the
@@ -49,21 +51,29 @@ vi.mock("@/integrations/supabase/client", () => {
   // so the component's `q = q.eq(...)` reassignment behaves as in production,
   // and `.order()` resolves. Recording filters is what lets us prove the
   // cross-grow filter is applied when a grow exists and skipped when it isn't.
-  const builder = {
-    select: () => builder,
-    eq: (column: string, value: unknown) => {
-      mocks.tentFilters.push({ column, value });
-      return builder;
-    },
-    order: async () => {
-      mocks.tentQueryRuns += 1;
-      return { data: mocks.tentRows, error: null };
-    },
+  const makeBuilder = () => {
+    const builder = {
+      select: () => builder,
+      eq: (column: string, value: unknown) => {
+        mocks.tentFilters.push({ column, value });
+        return builder;
+      },
+      order: async () => {
+        mocks.tentQueryRuns += 1;
+        const idx = mocks.tentQueryRuns - 1;
+        const data =
+          mocks.tentRowsByCall && mocks.tentRowsByCall[idx] !== undefined
+            ? mocks.tentRowsByCall[idx]
+            : mocks.tentRows;
+        return { data, error: null };
+      },
+    };
+    return builder;
   };
   return {
     supabase: {
       from: (table: string) => {
-        if (table === "tents") return builder;
+        if (table === "tents") return makeBuilder();
         throw new Error(`Unexpected table in test: ${table}`);
       },
     },
@@ -115,6 +125,13 @@ vi.mock("@/components/ui/select", () => {
   };
 });
 
+// AssignTentDialog opens CreateTentDialog as a sibling on the empty-grow
+// escape hatch. This suite does not exercise that CTA; stub it so Link/router
+// hard-stops inside the real create dialog cannot crash picker assertions.
+vi.mock("@/components/CreateTentDialog", () => ({
+  default: () => null,
+}));
+
 import AssignTentDialog from "@/components/AssignTentDialog";
 
 /** Render, then open the dialog the way a grower would. */
@@ -136,6 +153,7 @@ beforeEach(() => {
   mocks.tentFilters.length = 0;
   mocks.tentQueryRuns = 0;
   mocks.dialogOnOpenChange = null;
+  mocks.tentRowsByCall = null;
   mocks.tentRows = [
     { id: "tent-a", name: "Flower Tent", grow_id: "grow-1", is_archived: false },
     { id: "tent-b", name: "Veg Tent", grow_id: null, is_archived: false },
@@ -177,5 +195,27 @@ describe("AssignTentDialog · plant WITH a grow (cross-grow fence intact)", () =
     await waitFor(() => expect(mocks.tentQueryRuns).toBe(1));
     expect(mocks.tentFilters).toContainEqual({ column: "grow_id", value: "grow-1" });
     expect(mocks.tentFilters).toContainEqual({ column: "is_archived", value: false });
+  });
+});
+
+describe("AssignTentDialog · empty-grow orphan re-home", () => {
+  it("falls back to owner tents when the plant's grow has zero tents", async () => {
+    // First grow-scoped query returns empty; dialog must re-query without grow_id.
+    mocks.tentRowsByCall = [
+      [],
+      [
+        { id: "tent-a", name: "Male Tent", grow_id: "banana-cough", is_archived: false },
+        { id: "tent-b", name: "Veg Tent", grow_id: "banana-cough", is_archived: false },
+      ],
+    ];
+    openDialog("vegetation2-gone");
+
+    await waitFor(() => expect(mocks.tentQueryRuns).toBe(2));
+    expect(await screen.findByTestId("assign-tent-select")).toBeInTheDocument();
+    expect(screen.getByText("Male Tent")).toBeInTheDocument();
+    expect(screen.queryByTestId("assign-tent-empty")).toBeNull();
+    // First call was grow-scoped; second must not re-apply grow_id (owner list).
+    const growFilters = mocks.tentFilters.filter((f) => f.column === "grow_id");
+    expect(growFilters).toEqual([{ column: "grow_id", value: "vegetation2-gone" }]);
   });
 });

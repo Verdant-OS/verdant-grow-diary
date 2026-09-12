@@ -47,6 +47,8 @@ export const MEASUREMENT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "measurement",
   "manual_snapshot",
   "sensor_snapshot",
+  "environment",
+  "environment_check",
 ]);
 
 /** Event types that map to the "transplant" bucket. */
@@ -82,6 +84,8 @@ export const MEASUREMENT_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "runoff",
   "watering",
   "manual_sensor_snapshot",
+  "environment_check",
+  "sensor_snapshot",
 ]);
 
 export interface ClassifyTimelineEntryInput {

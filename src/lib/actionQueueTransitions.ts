@@ -71,7 +71,9 @@ export type ActionQueueTransitionFailureReason =
   (typeof ACTION_QUEUE_TRANSITION_FAILURE_REASONS)[number];
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const RFC3339_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
+/** Postgres jsonb timestamptz plus PostgREST JSON strings. */
+const RFC3339_PATTERN =
+  /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}(?::\d{2})?)$/;
 
 function isActionStatus(value: unknown): value is ActionStatus {
   return typeof value === "string" && ACTION_STATUS_VALUES.includes(value as ActionStatus);
@@ -88,10 +90,14 @@ function isUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_PATTERN.test(value);
 }
 
+function normalizeTimestampForParse(value: string): string {
+  const withT = value.includes("T") ? value : value.replace(" ", "T");
+  return /[+-]\d{2}$/.test(withT) ? `${withT}:00` : withT;
+}
+
 function isRfc3339Timestamp(value: unknown): value is string {
-  return (
-    typeof value === "string" && RFC3339_PATTERN.test(value) && Number.isFinite(Date.parse(value))
-  );
+  if (typeof value !== "string" || !RFC3339_PATTERN.test(value)) return false;
+  return Number.isFinite(Date.parse(normalizeTimestampForParse(value)));
 }
 
 /**
@@ -113,6 +119,15 @@ export function buildActionQueueTransitionRpcArgs(args: {
   };
 }
 
+function decodeActionQueueTransitionRpcPayload(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+}
+
 /**
  * Parse the untrusted JSON result returned by PostgREST. Callers must never
  * update local state or run post-transition bookkeeping unless this returns a
@@ -122,8 +137,9 @@ export function parseActionQueueTransitionRpcResult(
   value: unknown,
   expected: ActionQueueTransitionRpcArgs,
 ): ActionQueueTransitionRpcResult | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const row = value as Record<string, unknown>;
+  const payload = decodeActionQueueTransitionRpcPayload(value);
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const row = payload as Record<string, unknown>;
 
   if (row.ok === false) {
     return isTransitionFailureReason(row.reason) ? { ok: false, reason: row.reason } : null;

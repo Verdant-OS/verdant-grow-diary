@@ -264,8 +264,9 @@ function normalizeSamples(samples: readonly DrybackVwcSampleInput[]): Normalized
     const vwc = finiteNumber(s.vwcPct);
     if (vwc === null || !isPlausibleDrybackVwc(vwc)) continue;
     const sourceClass = classifyDrybackSource(s.source);
-    if (sourceClass === "invalid") continue;
-    // Quality string invalid also rejected.
+    // Invalid *source* stays tagged as evidence. Do not drop it here —
+    // that hid real EcoWitt/MQTT/HA soil probes behind empty-copy.
+    // Quality string invalid/error still rejected.
     const q = (s.quality ?? "").trim().toLowerCase();
     if (q === "invalid" || q === "error") continue;
     out.push({
@@ -347,6 +348,9 @@ function scoreWindow(args: {
   if (args.sourceClass === "stale") {
     warnings.push("Stale source present in window.");
   }
+  if (args.sourceClass === "invalid") {
+    warnings.push("Invalid-labeled samples — not live telemetry.");
+  }
   if (args.sampleCount < args.minSamples) {
     return { quality: "unusable", confidence: null, warnings: [...warnings, "Too few samples."] };
   }
@@ -393,10 +397,11 @@ function buildWindow(args: {
   const endMs = args.end ? args.end.ms : args.nowMs;
   // Samples strictly after watering start, at or before next watering (or now).
   const inWindow = args.samples.filter((s) => s.ms > args.start.ms && s.ms <= endMs);
+  const mathSamples = inWindow.filter((s) => s.sourceClass !== "invalid");
 
   const peakDeadline = args.start.ms + args.peakSearchMs;
-  const peakCandidates = inWindow.filter((s) => s.ms <= peakDeadline);
-  const peakPool = peakCandidates.length > 0 ? peakCandidates : inWindow;
+  const peakCandidates = mathSamples.filter((s) => s.ms <= peakDeadline);
+  const peakPool = peakCandidates.length > 0 ? peakCandidates : mathSamples;
 
   let peak: NormalizedSample | null = null;
   for (const s of peakPool) {
@@ -407,7 +412,7 @@ function buildWindow(args: {
 
   let trough: NormalizedSample | null = null;
   if (peak) {
-    for (const s of inWindow) {
+    for (const s of mathSamples) {
       if (s.ms < peak.ms) continue;
       if (!trough || s.vwcPct < trough.vwcPct || (s.vwcPct === trough.vwcPct && s.ms > trough.ms)) {
         trough = s;
@@ -436,7 +441,11 @@ function buildWindow(args: {
     durationLabel = formatDuration(durationMs);
   }
 
-  const sourceClass = majoritySource(inWindow);
+  // Invalid-source samples remain counted evidence and still block a Live /
+  // usable label, but they do not participate in peak/trough math.
+  const sourceClass = inWindow.some((s) => s.sourceClass === "invalid")
+    ? "invalid"
+    : majoritySource(inWindow);
   const scored = scoreWindow({
     kind,
     sampleCount: inWindow.length,
@@ -671,7 +680,9 @@ export function buildDrybackMonitoring(
   const latestClosed = closed[0] ?? null;
 
   const hasAnyEvidence = windows.some(
-    (w) => w.sampleCount > 0 && (w.deltaPctPoints !== null || w.kind === "open"),
+    (w) =>
+      w.sampleCount > 0 &&
+      (w.deltaPctPoints !== null || w.kind === "open" || w.sourceClass === "invalid"),
   );
 
   if (!hasAnyEvidence) {

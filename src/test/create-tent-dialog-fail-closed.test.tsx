@@ -140,4 +140,32 @@ describe("CreateTentDialog fail-closed binding", () => {
     fireEvent.click(screen.getByRole("button", { name: /New tent/i }));
     expect((screen.getByPlaceholderText("Tent #1") as HTMLInputElement).value).toBe("");
   });
+
+  it("disables Create tent when Name is empty or whitespace-only", () => {
+    growsState.grows = [{ id: "grow-active", name: "Spring Veg" }];
+    growsState.activeGrowId = "grow-active";
+    renderDialog();
+
+    const submit = screen.getByTestId("tent-create-submit");
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form")!);
+    expect(insertMock).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), { target: { value: "   " } });
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form")!);
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("enables Create tent when Name is trimmed non-empty", () => {
+    growsState.grows = [{ id: "grow-active", name: "Spring Veg" }];
+    growsState.activeGrowId = "grow-active";
+    renderDialog();
+
+    expect(screen.getByTestId("tent-create-submit")).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText("Tent #1"), {
+      target: { value: "  Flower tent  " },
+    });
+    expect(screen.getByTestId("tent-create-submit")).toBeEnabled();
+  });
 });

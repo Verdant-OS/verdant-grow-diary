@@ -36,6 +36,23 @@ describe("root-zone continuity read-path safety", () => {
     expect(src).not.toMatch(/\.insert\s*\(|\.update\s*\(|\.upsert\s*\(|\.delete\s*\(/);
   });
 
+  it("keeps watering volume defaults plant-scoped, read-only, and fail-closed", () => {
+    const src = read("src/hooks/useRecentWateringsForVolumeDefaults.ts");
+
+    expect(src).toContain('.from("grow_events")');
+    expect(src).toContain('.eq("event_type", "watering")');
+    expect(src).toContain('.eq("plant_id", plantId)');
+    expect(src).toContain("ROOT_ZONE_GROW_EVENT_SELECT");
+    expect(src).toContain("mapGrowEventsToRecentRawEntries");
+    expect(src).toContain("buildWateringVolumeDefaults");
+    expect(src).toContain("if (typedDefaults.defaults) return typedRows");
+    expect(src).toContain('.from("diary_entries")');
+    expect(src).toContain("RECENT_WATERINGS_VOLUME_DEFAULTS_LIMIT");
+    expect(src).toContain("const enabled = Boolean(plantId)");
+    expect(src).not.toMatch(/\.insert\s*\(|\.update\s*\(|\.upsert\s*\(|\.delete\s*\(/);
+    expect(src).not.toMatch(/action_queue|device_control|turn_on|turn_off/i);
+  });
+
   it("keeps the shared root-zone rules pure and excludes raw payload fields", () => {
     const src = read("src/lib/rootZoneObservationRules.ts");
 

@@ -15,6 +15,7 @@ export const TIMELINE_SUPPLEMENTAL_READ_SOURCES = [
   "action_queue_events",
   "alert_events",
   "linked_grow_events",
+  "manual_sensor_readings",
 ] as const;
 
 export type TimelineCoreReadSource = (typeof TIMELINE_CORE_READ_SOURCES)[number];

@@ -32,14 +32,46 @@ export interface TentLike {
   is_archived?: boolean;
 }
 
+function hasLinkedGrowId(growId: string | null | undefined): boolean {
+  return typeof growId === "string" && growId.trim().length > 0;
+}
+
+function toVisibleGrowIdSet(
+  visibleGrowIds: ReadonlySet<string> | readonly string[],
+): ReadonlySet<string> {
+  return visibleGrowIds instanceof Set ? visibleGrowIds : new Set(visibleGrowIds);
+}
+
+/**
+ * Fail-closed grow resolvability for Quick Log V2 Target Select.
+ * A grow_id is selectable only when non-blank AND present in the visible
+ * `useGrows()` roster. Dangling UUIDs (row has grow_id but grow not in the
+ * roster) must not enter options — otherwise the panel shows
+ * "No grow linked" for junk tents (Seedling, E2E*, Starter Tent, etc.).
+ */
+export function isResolvableQuickLogGrowId(
+  growId: string | null | undefined,
+  visibleGrowIds: ReadonlySet<string> | readonly string[],
+): boolean {
+  if (!hasLinkedGrowId(growId)) return false;
+  const id = (growId as string).trim();
+  return toVisibleGrowIdSet(visibleGrowIds).has(id);
+}
+
 export function buildQuickLogV2TargetOptions(
   tents: TentLike[],
   plants: PlantLike[],
+  visibleGrowIds: ReadonlySet<string> | readonly string[],
 ): QuickLogV2TargetOption[] {
+  const visible = toVisibleGrowIdSet(visibleGrowIds);
   const out: QuickLogV2TargetOption[] = [];
   for (const t of tents) {
     if (t?.is_archived) continue;
     if (!t?.id) continue;
+    // Fail closed: null/blank grow_id OR dangling grow_id (not in visible
+    // roster) cannot be selected (live FAIL: "Tent · Flower" with Grow
+    // "No grow linked" while McDonald's Flower Tent was the real target).
+    if (!isResolvableQuickLogGrowId(t.grow_id, visible)) continue;
     out.push({
       type: "tent",
       id: t.id,
@@ -53,6 +85,9 @@ export function buildQuickLogV2TargetOptions(
     // soft-archived (archived_at), and merged plants are never targets.
     if (!p?.id) continue;
     if (isInactiveQuickLogPlant(p)) continue;
+    // Same resolvable-grow fence as tents — unlinked or dangling grow_id
+    // rows are not selectable write targets.
+    if (!isResolvableQuickLogGrowId(p.grow_id, visible)) continue;
     out.push({
       type: "plant",
       id: p.id,
@@ -139,4 +174,163 @@ export function shouldShowVolumeField(action: QuickLogV2Action): boolean {
 
 export function isPhotoSavingSupported(): boolean {
   return true;
+}
+
+/**
+ * Honest empty-content gate for Quick Log V2 note saves.
+ *
+ * Water volume and Feed recipe fields have their own validators. Note action
+ * previously allowed a target-only save with an empty body (live FAIL: toast
+ * "Saved to your diary" / "Log saved" with nothing logged). Critical content
+ * is a note, companion media, manual sensor reading, or maturity evidence.
+ * Water/feed return false here so those paths stay on their own fences.
+ */
+export interface QuickLogV2CriticalContentInput {
+  action: QuickLogV2Action;
+  note: string;
+  temperatureC: string;
+  humidityPct: string;
+  vpdKpa: string;
+  hasPhoto: boolean;
+  hasVideo: boolean;
+  hasMaturityEvidence: boolean;
+}
+
+export function isQuickLogV2CriticalContentMissing(input: QuickLogV2CriticalContentInput): boolean {
+  if (input.action !== "note") return false;
+  if ((input.note ?? "").trim().length > 0) return false;
+  if (input.hasPhoto || input.hasVideo) return false;
+  if (input.hasMaturityEvidence) return false;
+  if ((input.temperatureC ?? "").trim().length > 0) return false;
+  if ((input.humidityPct ?? "").trim().length > 0) return false;
+  if ((input.vpdKpa ?? "").trim().length > 0) return false;
+  return true;
+}
+
+export const QUICK_LOG_V2_EMPTY_CONTENT_HELPER =
+  "Add a note, photo, or reading before saving." as const;
+
+/** Show type-to-filter inside Target Select when the list is this long or longer. */
+export const QUICK_LOG_V2_TARGET_FILTER_THRESHOLD = 8;
+
+export function formatQuickLogV2TargetOptionLabel(option: QuickLogV2TargetOption): string {
+  return `${option.type === "tent" ? "Tent" : "Plant"} · ${option.label}`;
+}
+
+/**
+ * Tent-scoped Target context from open intent / selected key.
+ * Route registration already lands as `defaultTargetKey` (`tent:<id>`).
+ */
+export function resolveQuickLogV2TentContextId(
+  openOrSelectedKey: string | null | undefined,
+): string | null {
+  if (typeof openOrSelectedKey !== "string") return null;
+  const match = /^tent:(.+)$/.exec(openOrSelectedKey.trim());
+  if (!match) return null;
+  const tentId = match[1];
+  return tentId.length > 0 ? tentId : null;
+}
+
+export interface TentScopedQuickLogV2TargetPartitions {
+  tentId: string | null;
+  inTentPlants: QuickLogV2TargetOption[];
+  other: QuickLogV2TargetOption[];
+  /** Flat order: in-tent plants first, then remaining options (tents kept). */
+  ordered: QuickLogV2TargetOption[];
+}
+
+/**
+ * Prioritize plants assigned to `tentId` without dropping tent targets.
+ * When `tentId` is null, returns the input order unchanged.
+ */
+export function partitionQuickLogV2TargetOptionsForTent(
+  options: QuickLogV2TargetOption[],
+  tentId: string | null | undefined,
+): TentScopedQuickLogV2TargetPartitions {
+  if (!tentId) {
+    return {
+      tentId: null,
+      inTentPlants: [],
+      other: options.slice(),
+      ordered: options.slice(),
+    };
+  }
+  const inTentPlants: QuickLogV2TargetOption[] = [];
+  const other: QuickLogV2TargetOption[] = [];
+  for (const option of options) {
+    if (option.type === "plant" && option.tentId === tentId) {
+      inTentPlants.push(option);
+    } else {
+      other.push(option);
+    }
+  }
+  return {
+    tentId,
+    inTentPlants,
+    other,
+    ordered: [...inTentPlants, ...other],
+  };
+}
+
+/** Case-insensitive type-to-filter against the visible Target label. */
+export function filterQuickLogV2TargetOptions(
+  options: QuickLogV2TargetOption[],
+  query: string | null | undefined,
+): QuickLogV2TargetOption[] {
+  const needle = typeof query === "string" ? query.trim().toLowerCase() : "";
+  if (!needle) return options.slice();
+  return options.filter((option) =>
+    formatQuickLogV2TargetOptionLabel(option).toLowerCase().includes(needle),
+  );
+}
+
+export interface ResolveTentScopedQuickLogPlantSelectionInput {
+  tentId: string | null | undefined;
+  options: QuickLogV2TargetOption[];
+  /**
+   * Current draft key. Auto-select only fills an empty/unset key.
+   * Explicit `tent:<id>` (or any non-empty selection) is never rewritten.
+   */
+  selectedKey: string | null | undefined;
+  /** Recent plant id when it should be preferred inside this tent. */
+  recentPlantId?: string | null;
+}
+
+/**
+ * When tent context is active and selectedKey is still empty/unset:
+ * 1) prefer a recent plant that belongs to the tent
+ * 2) else auto-select when exactly one plant is in that tent
+ *
+ * Fence: never rewrite an explicit `tent:<id>` (or plant:/any non-empty key).
+ * Tent open intent may still supply tentContextId via defaultTargetKey while
+ * the draft target stays a tent the grower (or test) chose.
+ */
+export function resolveTentScopedQuickLogPlantSelection(
+  input: ResolveTentScopedQuickLogPlantSelectionInput,
+): string | null {
+  const tentId = typeof input.tentId === "string" && input.tentId.length > 0 ? input.tentId : null;
+  if (!tentId) return null;
+
+  const selected = typeof input.selectedKey === "string" ? input.selectedKey.trim() : "";
+  // Explicit tent/plant (or any other) selection must not be rewritten.
+  if (selected.length > 0) return null;
+
+  const plantsInTent = input.options.filter(
+    (option) => option.type === "plant" && option.tentId === tentId,
+  );
+  if (plantsInTent.length === 0) return null;
+
+  const recentPlantId =
+    typeof input.recentPlantId === "string" && input.recentPlantId.length > 0
+      ? input.recentPlantId
+      : null;
+  if (recentPlantId && plantsInTent.some((plant) => plant.id === recentPlantId)) {
+    return `plant:${recentPlantId}`;
+  }
+
+  if (plantsInTent.length === 1) {
+    return `plant:${plantsInTent[0].id}`;
+  }
+
+  return null;
 }

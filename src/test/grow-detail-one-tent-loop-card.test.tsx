@@ -57,7 +57,7 @@ describe("GrowDetail One-Tent Loop next-step card wiring", () => {
     expect(cta.getAttribute("href")).toBe("/tents/t1");
   });
 
-  it("renders disabled when only a growId is provided (Open tent must not self-link to /grows/{id})", () => {
+  it("on grow detail with growId, next-step is Add tent — not the unavailable-until-selected dead-end", () => {
     renderCard(
       <OneTentLoopNextStepCard
         current="grow"
@@ -65,11 +65,15 @@ describe("GrowDetail One-Tent Loop next-step card wiring", () => {
         testId="grow-detail-one-tent-loop-next-step-card"
       />,
     );
+    expect(screen.queryByTestId("grow-detail-one-tent-loop-next-step-card-disabled")).toBeNull();
+    const cta = screen.getByTestId("grow-detail-one-tent-loop-next-step-card-cta");
+    expect(cta).toHaveTextContent(/Add tent/i);
+    expect(cta.getAttribute("href")).toBe("/tents?growId=g1&intent=one_tent_activation");
+    // Regression: never self-link back to Grow Detail while advancing.
+    expect(cta.getAttribute("href") ?? "").not.toMatch(/^\/grows\//);
     expect(
-      screen.getByTestId("grow-detail-one-tent-loop-next-step-card-disabled"),
-    ).toHaveTextContent(/Next step unavailable until this record is selected\./);
-    // Regression guard: no CTA href anywhere pointing back to /grows/.
-    expect(screen.queryByTestId("grow-detail-one-tent-loop-next-step-card-cta")).toBeNull();
+      screen.getByTestId("grow-detail-one-tent-loop-next-step-card").textContent ?? "",
+    ).not.toMatch(/Next step unavailable until this record is selected\./);
   });
 
   it("renders the safe disabled state when no ids are provided", () => {

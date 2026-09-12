@@ -23,6 +23,9 @@ import {
 export const QUICK_LOG_HARVEST_STAGE_DISABLED_REASON =
   "Harvest logging becomes available in Flower, Flush, or Harvest stages.";
 
+export const QUICK_LOG_WATERING_NEEDS_TARGET_REASON =
+  "Choose a plant or tent before logging Water.";
+
 export const QUICK_LOG_TARGET_CHANGED_REASON =
   "The Quick Log target changed. Choose the activity again before saving.";
 
@@ -54,9 +57,19 @@ export interface QuickLogActivityPickerViewModel {
   additionalActivities: readonly QuickLogActivityPickerItem[];
 }
 
+export interface QuickLogActivityAvailabilityOptions {
+  /**
+   * Structured Water needs a plant or tent target before the CTA may fire.
+   * Omit or pass true when the caller already proved a target. False disables
+   * Watering with a recoverable reason instead of a post-tap dead-end.
+   */
+  hasStructuredWaterTarget?: boolean;
+}
+
 export interface QuickLogActivityPickerViewModelInput {
   plantStage?: unknown;
   hiddenIds?: readonly QuickLogActivityId[];
+  hasStructuredWaterTarget?: boolean;
 }
 
 export interface QuickLogTargetIdentityInput {
@@ -134,17 +147,22 @@ export function bindQuickLogActivityDraft(
 export function evaluateQuickLogActivityAvailability(
   activityId: QuickLogActivityId,
   plantStage: unknown,
+  options?: QuickLogActivityAvailabilityOptions,
 ): QuickLogActivityPickerItem {
   const activity = QUICK_LOG_ACTIVITY_DEFINITIONS[activityId];
   const harvestEligibility =
     activityId === "harvest" ? evaluateHarvestStageEligibility(plantStage) : null;
   const stageBlocked = harvestEligibility?.eligible === false;
-  const disabled = !activity.enabled || stageBlocked;
+  const wateringNeedsTarget =
+    activityId === "watering" && options?.hasStructuredWaterTarget === false;
+  const disabled = !activity.enabled || stageBlocked || wateringNeedsTarget;
   let disabledReason: string | null = null;
   if (!activity.enabled) {
     disabledReason = activity.disabledReason ?? null;
   } else if (stageBlocked) {
     disabledReason = QUICK_LOG_HARVEST_STAGE_DISABLED_REASON;
+  } else if (wateringNeedsTarget) {
+    disabledReason = QUICK_LOG_WATERING_NEEDS_TARGET_REASON;
   }
 
   return {
@@ -178,7 +196,12 @@ export function evaluateQuickLogPrePersistenceGate({
     };
   }
 
-  const availability = evaluateQuickLogActivityAvailability(activityId, currentPlantStage);
+  const availability = evaluateQuickLogActivityAvailability(activityId, currentPlantStage, {
+    hasStructuredWaterTarget: Boolean(
+      (currentTarget?.plantId && String(currentTarget.plantId).trim()) ||
+      (currentTarget?.tentId && String(currentTarget.tentId).trim()),
+    ),
+  });
 
   return {
     allowed: !availability.disabled,
@@ -193,12 +216,15 @@ export function evaluateQuickLogPrePersistenceGate({
 export function buildQuickLogActivityPickerViewModel({
   plantStage,
   hiddenIds,
+  hasStructuredWaterTarget,
 }: QuickLogActivityPickerViewModelInput): QuickLogActivityPickerViewModel {
   const hidden = new Set(hiddenIds ?? []);
   const buildGroup = (ids: readonly QuickLogActivityId[]) =>
     ids
       .filter((id) => !hidden.has(id))
-      .map((id) => evaluateQuickLogActivityAvailability(id, plantStage));
+      .map((id) =>
+        evaluateQuickLogActivityAvailability(id, plantStage, { hasStructuredWaterTarget }),
+      );
 
   return {
     primaryActivities: buildGroup(QUICK_LOG_PRIMARY_ACTIVITY_IDS),

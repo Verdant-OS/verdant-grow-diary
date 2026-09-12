@@ -21,6 +21,8 @@ import MetricChip from "@/components/MetricChip";
 import SeverityBadge from "@/components/SeverityBadge";
 import StageBadge from "@/components/StageBadge";
 import SensorChart from "@/components/SensorChart";
+import EnvironmentRibbon from "@/components/EnvironmentRibbon";
+import { vpdTargetBandFromRange } from "@/lib/environmentRibbonViewModel";
 import ScopedGrowBanner from "@/components/ScopedGrowBanner";
 import GrowBreadcrumbs from "@/components/GrowBreadcrumbs";
 import DashboardDataSourceDisclosure from "@/components/DashboardDataSourceDisclosure";
@@ -226,13 +228,25 @@ export default function Dashboard() {
   // Additive only — the sensor_readings path above is never weakened.
   const quickLogManualSnapshotCount =
     activationEvidence.status === "ok" ? (activationEvidence.summary.manualSnapshotCount ?? 0) : 0;
+  // LIVE MISS hardening: when the graph has no tent yet, tentless plant rows
+  // still carry plant memory. Prefer graph.plantId; fall back to the first
+  // loaded plant so connected-scope framing cannot ignore plants.length.
+  const plantMemoryFallbackId =
+    activationGraph.plantId ??
+    plants.find((p) => !activationGraph.growId || p.growId === activationGraph.growId)?.id ??
+    plants[0]?.id ??
+    null;
   const onboardingVm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
     tentCount: tents.length,
     plantCount: plants.length,
     diaryEntryCount: 0,
     sensorReadingCount: connectedSensorReadingCount + quickLogManualSnapshotCount,
-    connectedScope: activationGraph,
+    connectedScope: {
+      growId: activationGraph.growId,
+      tentId: activationGraph.tentId,
+      plantId: plantMemoryFallbackId,
+    },
     firstLogEvidenceCount:
       activationEvidence.status === "ok" ? activationEvidence.summary.count : null,
     firstLogEvidenceStatus: activationEvidence.status,
@@ -634,7 +648,24 @@ export default function Dashboard() {
                               sensor to see the 7-day environment here.
                             </div>
                           ) : (
-                            <SensorChart data={chartReadings} metric="temp" height={200} />
+                            <>
+                              {/* Tranche 1 (additive): 24h ribbon with provenance band.
+                                  SensorChart below is unchanged. */}
+                              <EnvironmentRibbon
+                                readings={chartReadings}
+                                now={nowTick}
+                                targetVpd={vpdTargetBandFromRange(
+                                  targetsState.status === "ok"
+                                    ? (targetsState.targets?.vpd ?? null)
+                                    : null,
+                                )}
+                                title={`${chartTentName} · last 24 hours`}
+                                testIdPrefix="dashboard-environment-ribbon"
+                              />
+                              <div className="mt-4">
+                                <SensorChart data={chartReadings} metric="temp" height={200} />
+                              </div>
+                            </>
                           )}
                         </div>
                       );

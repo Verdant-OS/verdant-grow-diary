@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -37,15 +37,22 @@ import {
 import { retirePreviousPlantProfilePhoto } from "@/lib/plantProfilePhotoReplacementCleanupService";
 import { usePlantProfilePhotoPreview } from "@/hooks/usePlantProfilePhotoPreview";
 import PlantProfilePhotoPreview from "@/components/PlantProfilePhotoPreview";
+import {
+  buildPlantEditGrowIdFromTent,
+  formatPlantEditSaveError,
+  normalizePlantEditTentSelectValue,
+  resolvePlantEditTentOptions,
+} from "@/lib/plantEditSaveRules";
 
 /**
  * Edits an existing plant's user-facing fields. Profile photo is now
  * a native camera / library upload — the grower never has to find or
  * enter a link. See docs/plant-profile-photo-upload-v1.md.
  *
- * RLS enforces ownership; user_id and grow_id are never touched here.
- * This dialog writes only to `plants` and only uploads to the
- * private `diary-photos` bucket. No alerts, Action Queue, sensor,
+ * RLS enforces ownership; user_id is never touched here. grow_id is only
+ * written when re-homing from an empty-grow tent fallback (copy from the
+ * selected tent). This dialog writes only to `plants` and only uploads to
+ * the private `diary-photos` bucket. No alerts, Action Queue, sensor,
  * AI, Edge Function, or device writes.
  */
 const STAGES = [
@@ -93,11 +100,16 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { data: allTents = [] } = useTents();
-  const tents = plant.growId
-    ? (allTents as Array<{ id: string; name: string; grow_id: string | null }>).filter(
-        (t) => t.grow_id === plant.growId,
-      )
-    : allTents;
+  const tentOptions = useMemo(
+    () =>
+      resolvePlantEditTentOptions(
+        allTents as Array<{ id: string; name: string; grow_id: string | null }>,
+        plant.growId ?? null,
+      ),
+    [allTents, plant.growId],
+  );
+  const tents = tentOptions.tents;
+  const availableTentIds = useMemo(() => tents.map((t) => t.id), [tents]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
@@ -111,7 +123,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     strain: plant.strain ?? "",
     stage: plant.stage ?? "seedling",
     health: plant.health ?? "healthy",
-    tent_id: plant.tentId ?? "none",
+    tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
     started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
     last_note: plant.lastNote ?? "",
     plant_type: plant.plantType ?? "unknown",
@@ -132,7 +144,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         strain: plant.strain ?? "",
         stage: plant.stage ?? "seedling",
         health: plant.health ?? "healthy",
-        tent_id: plant.tentId ?? "none",
+        tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
         started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
         last_note: plant.lastNote ?? "",
         plant_type: plant.plantType ?? "unknown",
@@ -143,7 +155,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     }
     // Also reset when the target plant id changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, plant.id]);
+  }, [open, plant.id, availableTentIds.join("|")]);
 
   // Object-URL lifecycle (create + decode-probe + revoke) is owned by
   // the preview hook so unsupported HEIC/HEIF browsers see the
@@ -195,14 +207,28 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       return;
     }
 
+    // Never re-submit a stale tent_id that is not in the selectable list —
+    // plants UPDATE RLS WITH CHECK rejects missing tents and previously
+    // blocked every field change (including stage → Flowering).
+    const resolvedTentId =
+      form.tent_id === "none" || !availableTentIds.includes(form.tent_id) ? null : form.tent_id;
+    const selectedTent = resolvedTentId ? tents.find((t) => t.id === resolvedTentId) : undefined;
+    const growPatch = buildPlantEditGrowIdFromTent({
+      selectedTentId: resolvedTentId,
+      selectedTentGrowId: selectedTent?.grow_id ?? null,
+      plantGrowId: plant.growId ?? null,
+      usedGrowFallback: tentOptions.usedGrowFallback,
+    });
+
     const payload: Record<string, unknown> = {
       name: form.name.trim(),
       strain: form.strain.trim(),
       stage: form.stage,
       health: form.health,
-      tent_id: form.tent_id === "none" ? null : form.tent_id,
+      tent_id: resolvedTentId,
       last_note: form.last_note.trim() || null,
       plant_type: form.plant_type,
+      ...(growPatch ?? {}),
     };
     if (newReference) {
       payload.photo_url = newReference;
@@ -225,7 +251,9 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       }
       setBusy(false);
       setPhotoErr(null);
-      toast.error("Could not save changes. Please try again.");
+      // Fail closed with the real PostgREST / trigger message so RLS and
+      // constraint failures are diagnosable (was: opaque retry toast).
+      toast.error(formatPlantEditSaveError(error));
       return;
     }
 
@@ -282,7 +310,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         )}
       </DialogTrigger>
       <DialogContent
-        className="glass max-w-md max-h-[90vh] overflow-y-auto"
+        className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]"
         data-testid="edit-plant-dialog"
       >
         <DialogHeader>

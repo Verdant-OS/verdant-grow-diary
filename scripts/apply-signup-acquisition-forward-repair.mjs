@@ -24,9 +24,30 @@ import { SOLO_FOUNDER_POLICY } from "./lib/solo-founder-production-authorization
 import {
   assertSupabaseDatabaseTargetIdentity,
   SUPABASE_DATABASE_TARGETS,
+  SupabaseDatabaseTargetIdentityError,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
 
 export { findUnsafeSqlReason };
+
+/** Fail-closed identity detail codes only — never URLs, passwords, or free text. */
+const IDENTITY_REASON_CODE_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+
+/**
+ * Nested identity detail for the production URL reject gate.
+ * Keeps reason_code/outcome class names unchanged; never echoes the URL or password.
+ */
+export function identityRejectAuditFields(err) {
+  const code =
+    err instanceof SupabaseDatabaseTargetIdentityError &&
+    typeof err.code === "string" &&
+    IDENTITY_REASON_CODE_PATTERN.test(err.code)
+      ? err.code
+      : "unknown_identity_error";
+  return {
+    reason_code: "target_identity_rejected",
+    identity_reason_code: code,
+  };
+}
 
 export const PRODUCTION_PROJECT_REF = SUPABASE_DATABASE_TARGETS.production.projectRef;
 export const APPLY_CONFIRMATION = "APPLY SIGNUP ACQUISITION FORWARD REPAIR";
@@ -2015,6 +2036,12 @@ export function sanitizeAuditExtras(extra = {}) {
     safe.prerequisites_live = extra.prerequisites_live;
   }
   if (AUDIT_REASON_CODES.has(extra.reason_code)) safe.reason_code = extra.reason_code;
+  if (
+    typeof extra.identity_reason_code === "string" &&
+    IDENTITY_REASON_CODE_PATTERN.test(extra.identity_reason_code)
+  ) {
+    safe.identity_reason_code = extra.identity_reason_code;
+  }
   return safe;
 }
 
@@ -2255,13 +2282,17 @@ export function runSignupAcquisitionForwardRepair({
   try {
     assertSupabaseDatabaseTargetIdentity({ targetEnv: "production", databaseUrl });
     childEnv = buildPsqlEnvironment(env, databaseUrl, "production");
-  } catch {
-    logger.error("Production database identity was rejected.");
+  } catch (error) {
+    const rejectFields = identityRejectAuditFields(error);
+    logger.error(
+      `Production database identity was rejected. identity_reason_code=${rejectFields.identity_reason_code}`,
+    );
     writeReport("BLOCKED - target identity rejected", [
       "The protected URL did not prove the pinned Verdant production project.",
       "No database process was started.",
+      `identity_reason_code: ${rejectFields.identity_reason_code}`,
     ]);
-    writeAudit("target_rejected", base, { reason_code: "target_identity_rejected" });
+    writeAudit("target_rejected", base, rejectFields);
     return EXIT.TARGET_REJECTED;
   }
 

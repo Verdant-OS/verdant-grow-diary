@@ -21,11 +21,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import {
-  formatServerBundleProbe,
-  probeServerBundleEntry,
-} from "./lib/serverBundleEntryProbe.mjs";
-
+import { formatServerBundleProbe, probeServerBundleEntry } from "./lib/serverBundleEntryProbe.mjs";
 
 const distDir = resolve(process.argv[2] ?? "dist");
 
@@ -91,10 +87,12 @@ function generateArtifacts() {
         "instead of failing the build. The snapshot-presence and head-fidelity gates below stay fatal.",
     );
   }
-  run("node", captureArgs);
+  // SSR capture imports the Nitro/Vercel server bundle and must run on bun —
+  // the same runtime as generate-seo-artifacts. Spawning with node (especially
+  // Vercel Node 24.x while GitHub builds on bun 1.3.14 / Node 22) has produced
+  // renderToReadableStream TypeError source.type 'direct' failures.
+  run("bun", captureArgs);
 }
-
-
 
 generateArtifacts();
 
@@ -145,7 +143,6 @@ const validators = [
   ["scripts/validate-static-route-head-fidelity.mjs", true],
   ["scripts/validate-public-image-budget.mjs", true],
 ];
-
 
 for (const [script, takesDist] of validators) {
   if (takesDist && !artifactsPresent()) {

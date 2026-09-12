@@ -24,6 +24,7 @@ import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { STAGES } from "@/lib/grow";
 import { buildTentUpdatePayload, isTentUpdatePayloadValid } from "@/lib/tentManagementRules";
+import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 
 /**
  * Edits an existing tent's user-facing fields. Mirrors EditPlantDialog
@@ -81,6 +82,7 @@ export default function EditTentDialog({ tent, trigger }: Props) {
       toast.error("Not signed in");
       return;
     }
+    if (!hasTrimmedRequiredIdentity(form.name)) return;
     const payload = buildTentUpdatePayload({
       name: form.name,
       brand: form.brand,
@@ -122,7 +124,10 @@ export default function EditTentDialog({ tent, trigger }: Props) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="glass max-w-md" data-testid="edit-tent-dialog">
+      <DialogContent
+        className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]"
+        data-testid="edit-tent-dialog"
+      >
         <DialogHeader>
           <DialogTitle className="font-display">Edit tent</DialogTitle>
         </DialogHeader>
@@ -207,7 +212,7 @@ export default function EditTentDialog({ tent, trigger }: Props) {
             />
           </div>
           <Button
-            disabled={busy}
+            disabled={busy || !hasTrimmedRequiredIdentity(form.name)}
             className="gradient-leaf text-primary-foreground"
             data-testid="edit-tent-submit"
           >

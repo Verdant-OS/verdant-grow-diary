@@ -62,7 +62,7 @@ describe("selectConnectedOneTentGraph", () => {
     });
   });
 
-  it("does not infer legacy null or mismatched plant relationships", () => {
+  it("attributes tent-linked plants with null grow_id (BUG-A) and rejects mismatches", () => {
     expect(
       selectConnectedOneTentGraph({
         grows: [{ id: "grow-a" }],
@@ -76,8 +76,26 @@ describe("selectConnectedOneTentGraph", () => {
     ).toMatchObject({
       growId: "grow-a",
       tentId: "tent-a",
-      plantId: null,
-      hasPlant: false,
+      plantId: "null-grow",
+      hasPlant: true,
+    });
+  });
+
+  it("does not keep an empty preferred grow over a deeper persisted plant chain", () => {
+    expect(
+      selectConnectedOneTentGraph({
+        grows: [{ id: "empty-grow" }, { id: "grow-with-plant" }],
+        tents: [{ id: "tent-1", growId: "grow-with-plant" }],
+        plants: [{ id: "plant-1", growId: "grow-with-plant", tentId: "tent-1" }],
+        preferredGrowId: "empty-grow",
+      }),
+    ).toEqual({
+      growId: "grow-with-plant",
+      tentId: "tent-1",
+      plantId: "plant-1",
+      hasGrow: true,
+      hasTent: true,
+      hasPlant: true,
     });
   });
 

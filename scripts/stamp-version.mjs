@@ -66,6 +66,11 @@ function run(cmd) {
 
 const GENERATED_STAMP_OUTPUTS = ["public/version.json", "src/generated/buildInfo.ts"];
 
+/** Vercel sets VERCEL=1 and/or VERCEL_ENV on every build/preview. */
+function isVercelBuildEnvironment(env = process.env) {
+  return env.VERCEL === "1" || Boolean(env.VERCEL_ENV && String(env.VERCEL_ENV).trim());
+}
+
 /**
  * Detached/headless publishers can legitimately build the exact commit that
  * origin/HEAD names. Surface that canonical branch only when both the local
@@ -90,20 +95,43 @@ function canonicalOriginDefaultRef(rawRef, stampSha, currentGitSha) {
 
 /**
  * Generated stamp outputs are build residue, not a source mutation. Exclude
- * only those two exact tracked paths; untracked and changed source/config/Edge
- * files must remain visible as dirty provenance.
+ * only those two exact tracked paths by default. On Vercel, also exclude the
+ * Build Output API tree under `.vercel/` and the repo-root `vercel.json` —
+ * MEASURED on Preview 8b30b7c9 / dpl 3Ak3RtkDD99RJSBhzqdMx6h1fAe4: Vercel
+ * rewrites vercel.json on the builder before prebuild stamp (` M vercel.json`
+ * was the sole porcelain line). Untracked and changed source/config/Edge files
+ * must remain visible as dirty.
+ *
+ * Returns the exact `git status --porcelain` text after those excludes (may be
+ * empty). Callers decide dirty from non-empty text; Vercel builds also print
+ * the lines so the host log names the real paths when dirty:true.
  */
-function hasMeaningfulWorktreeChanges() {
-  const excludedOutputs = GENERATED_STAMP_OUTPUTS.map((path) => `":(exclude)${path}"`).join(" ");
-  return (
-    safe(
-      () =>
-        run(`git status --porcelain --untracked-files=all -- . ${excludedOutputs}`)
-          .toString()
-          .trim(),
-      "",
-    ) !== ""
+function collectMeaningfulPorcelain() {
+  const excludes = [...GENERATED_STAMP_OUTPUTS];
+  if (isVercelBuildEnvironment()) {
+    excludes.push(".vercel", ".vercel/**", "vercel.json");
+  }
+  const excludedOutputs = excludes.map((path) => `":(exclude)${path}"`).join(" ");
+  return safe(
+    () =>
+      run(`git status --porcelain --untracked-files=all -- . ${excludedOutputs}`).toString().trim(),
+    "",
   );
+}
+
+/**
+ * Prefer CI / platform refs over a detached-HEAD abbrev. Never invent a ref:
+ * empty platform values fall through to the git-derived canonicalization.
+ */
+function resolveStampRef(rawRef, stampSha, currentGitSha, env = process.env) {
+  const githubRef = typeof env.GITHUB_REF_NAME === "string" ? env.GITHUB_REF_NAME.trim() : "";
+  if (githubRef) return githubRef;
+
+  const vercelRef =
+    typeof env.VERCEL_GIT_COMMIT_REF === "string" ? env.VERCEL_GIT_COMMIT_REF.trim() : "";
+  if (vercelRef) return vercelRef;
+
+  return canonicalOriginDefaultRef(rawRef, stampSha, currentGitSha);
 }
 
 const pkg = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
@@ -119,7 +147,7 @@ const sha = envSha ?? gitSha;
 const shortSha = sha === "unknown" ? "unknown" : sha.slice(0, 12);
 const commitSource = envSha ? "github-env" : gitSha !== "unknown" ? "git" : "none";
 const rawRef = safe(() => run("git rev-parse --abbrev-ref HEAD").toString().trim());
-const ref = process.env.GITHUB_REF_NAME ?? canonicalOriginDefaultRef(rawRef, sha, gitSha);
+const ref = resolveStampRef(rawRef, sha, gitSha);
 const commitTime = safe(() =>
   run(`git show -s --format=%cI ${sha === "unknown" ? "HEAD" : sha}`)
     .toString()
@@ -132,7 +160,18 @@ const commitTime = safe(() =>
 // history-less snapshot everything besides those outputs is "untracked", so
 // dirty:true plus commitSource:"none" together read as "identity from
 // treeHash".)
-const dirty = hasMeaningfulWorktreeChanges();
+const meaningfulPorcelain = collectMeaningfulPorcelain();
+const dirty = meaningfulPorcelain !== "";
+if (dirty && isVercelBuildEnvironment()) {
+  // Diagnostic only — never flip dirty:false. Next Preview log must name the
+  // exact paths so excludes are not guessed.
+  console.error(
+    "stamp-version: Vercel worktree dirty — git status --porcelain (after stamp excludes):",
+  );
+  for (const line of meaningfulPorcelain.split(/\r?\n/)) {
+    console.error(line);
+  }
+}
 
 // Content identity that needs no git. Guarded: stamping must never fail
 // a build over a hashing error — degrade to null instead.

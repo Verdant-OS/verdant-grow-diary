@@ -19,10 +19,10 @@ import {
   type AiSensorSnapshotSource,
   type AiSensorSnapshotTrust,
 } from "@/lib/aiSensorSnapshotContextRules";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import {
   classifyFreshness,
   evaluateMetric,
-  SENSOR_FRESH_WINDOW_MINUTES,
   type SensorMetricKey,
 } from "@/lib/latestSensorSnapshotRules";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
@@ -217,23 +217,43 @@ function appendUnique(values: readonly string[], addition: string | null): strin
   return Array.from(new Set(addition ? [...values, addition] : values)).sort();
 }
 
-/**
- * Select the newest bounded live/manual sensor cohort and project only safe,
- * source-preserving values into the AI Doctor packet shape.
- */
-export function buildAiDoctorCurrentSensorSnapshot(
-  rows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
-  options: { now?: Date } = {},
+function snapshotIsUsableDoctorEvidence(snapshot: AiDoctorCurrentSensorSnapshot): boolean {
+  if (snapshot.severity === "invalid") return false;
+  if (snapshot.annotation.source !== "live" && snapshot.annotation.source !== "manual") {
+    return false;
+  }
+  return snapshot.annotation.stale === false && snapshot.readings.length > 0;
+}
+
+function preferAiDoctorCurrentSensorSnapshot(
+  live: AiDoctorCurrentSensorSnapshot | null,
+  manual: AiDoctorCurrentSensorSnapshot | null,
 ): AiDoctorCurrentSensorSnapshot | null {
-  const candidates = (rows ?? []).map(toCandidate).filter((row): row is Candidate => row !== null);
+  if (live && snapshotIsUsableDoctorEvidence(live)) return live;
+  if (manual && snapshotIsUsableDoctorEvidence(manual)) return manual;
+  if (!live) return manual;
+  if (!manual) return live;
+  const liveMs = Date.parse(live.capturedAt);
+  const manualMs = Date.parse(manual.capturedAt);
+  if (liveMs !== manualMs) return liveMs > manualMs ? live : manual;
+  return live;
+}
+
+/**
+ * Project one source-preserving cohort. Callers must pass candidates that
+ * already share a single source so a stale live row cannot steal the snapshot
+ * from an in-window tent manual.
+ */
+function buildAiDoctorCurrentSensorSnapshotFromCandidates(
+  candidates: Candidate[],
+  now: Date,
+): AiDoctorCurrentSensorSnapshot | null {
   if (candidates.length === 0) return null;
   candidates.sort(compareCandidates);
 
   const newest = candidates[0];
   const cohort = candidates.filter(
-    (row) =>
-      row.source === newest.source &&
-      newest.atMs - row.atMs <= AI_DOCTOR_CURRENT_SENSOR_COHERENCE_MS,
+    (row) => newest.atMs - row.atMs <= AI_DOCTOR_CURRENT_SENSOR_COHERENCE_MS,
   );
 
   // First row wins for each normalized packet field because the cohort is
@@ -267,14 +287,16 @@ export function buildAiDoctorCurrentSensorSnapshot(
 
   readings.sort((a, b) => a.field.localeCompare(b.field));
 
-  const now = options.now ?? new Date();
   const freshness = classifyFreshness(newest.atIso, now);
   const invalidSnapshot = freshness.freshness === "invalid" || readings.length === 0;
   if (invalidSnapshot) annotationInput.source = "invalid";
 
+  // Source-aware stale window (manual 24h, live 15m). Pass the canon window
+  // explicitly so a caller cannot accidentally park manuals on the live 15m
+  // default. Do not let a stale live cohort mask an in-window manual.
   const context = buildAiSensorSnapshotContext(annotationInput, {
     now,
-    staleThresholdMs: SENSOR_FRESH_WINDOW_MINUTES * 60 * 1000,
+    staleThresholdMs: resolveCurrentStateStaleWindowMs(newest.source),
   });
   const invalidNote =
     invalidCount > 0
@@ -311,9 +333,54 @@ export function buildAiDoctorCurrentSensorSnapshot(
 }
 
 /**
+ * Select bounded live/manual sensor evidence and project only safe,
+ * source-preserving values into the AI Doctor packet shape.
+ *
+ * Usable live wins. Otherwise a usable in-window tent manual wins, even when
+ * a newer live row is already past the 15-minute live window. Manuals stay
+ * `source=manual` and never count as live-bridge presence.
+ */
+export function buildAiDoctorCurrentSensorSnapshot(
+  rows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
+  options: { now?: Date } = {},
+): AiDoctorCurrentSensorSnapshot | null {
+  const candidates = (rows ?? []).map(toCandidate).filter((row): row is Candidate => row !== null);
+  if (candidates.length === 0) return null;
+  const now = options.now ?? new Date();
+  const live = buildAiDoctorCurrentSensorSnapshotFromCandidates(
+    candidates.filter((row) => row.source === "live"),
+    now,
+  );
+  const manual = buildAiDoctorCurrentSensorSnapshotFromCandidates(
+    candidates.filter((row) => row.source === "manual"),
+    now,
+  );
+  return preferAiDoctorCurrentSensorSnapshot(live, manual);
+}
+
+/**
+ * True only when current tent rows project a fresh live snapshot.
+ * Fresh valid manual readings can be usable Doctor evidence without
+ * claiming live-bridge presence.
+ */
+export function currentSensorEvidenceIsFreshLive(
+  rows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
+  options: { now?: Date } = {},
+): boolean {
+  const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, options);
+  return Boolean(
+    snapshot && snapshot.annotation.source === "live" && snapshot.annotation.stale === false,
+  );
+}
+
+/**
  * Convert the provenance-filtered current-row projection into the shared
  * Sensor Snapshot Status Contract used by AI Doctor readiness and audit
  * persistence. Transport success alone is intentionally insufficient.
+ *
+ * Fresh valid `manual` rows are eligible Doctor evidence. They must not be
+ * parked in `needs_review` (that status is treated as unsafe / unused for
+ * recommendations). They still never count as live-bridge presence.
  */
 export function classifyAiDoctorCurrentSensorEvidence(
   rows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
@@ -327,14 +394,16 @@ export function classifyAiDoctorCurrentSensorEvidence(
     result = { status: "invalid", reasonCode: "malformed_payload" };
   } else if (snapshot.annotation.stale) {
     result = { status: "stale", reasonCode: "stale_timestamp" };
-  } else if (snapshot.annotation.source !== "live") {
-    // Manual evidence stays useful context but never becomes healthy live
-    // bridge evidence for the readiness score.
-    result = { status: "needs_review", reasonCode: "none_accepted" };
-  } else {
+  } else if (snapshot.annotation.source === "live" || snapshot.annotation.source === "manual") {
     result = { status: "usable", reasonCode: "fresh_accept" };
+  } else {
+    result = { status: "needs_review", reasonCode: "none_accepted" };
   }
-  return classificationFromStatusResult(result);
+  const classification = classificationFromStatusResult(result);
+  if (result.status === "usable" && snapshot?.annotation.source === "manual") {
+    return { ...classification, label: "Latest manual snapshot accepted." };
+  }
+  return classification;
 }
 
 /**

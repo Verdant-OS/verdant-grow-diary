@@ -81,12 +81,31 @@ describe("manualTentSensorRowsToAiDoctorContextSnapshots", () => {
     },
   );
 
-  it.each(["invalid", "stale", "unknown", "OK", " ok ", null])(
+  it.each(["invalid", "stale", "unknown"])(
     "rejects persisted quality %s instead of treating it as ok",
     (quality) => {
       expect(adapt([reading({ quality })])).toEqual([]);
     },
   );
+
+  it.each([null, undefined, "ok", "OK", " ok "])(
+    "accepts unset or ok persisted quality %s for a fresh manual save",
+    (quality) => {
+      expect(adapt([reading({ quality: quality as never })])).toEqual([
+        { at: "2026-08-14T11:00:00.000Z", severity: "ok" },
+      ]);
+    },
+  );
+
+  it("accepts the remasure Quick Log keys temp_f + humidity at 76°F / 58% RH", () => {
+    const capturedAt = new Date(NOW - HOUR).toISOString();
+    expect(
+      adapt([
+        reading({ metric: "temp_f", value: 76, quality: null, captured_at: capturedAt }),
+        reading({ metric: "humidity", value: 58, quality: null, captured_at: capturedAt }),
+      ]),
+    ).toEqual([{ at: capturedAt, severity: "ok" }]);
+  });
 
   it.each([
     ["temperature_c", 24],

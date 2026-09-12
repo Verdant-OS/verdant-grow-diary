@@ -1,8 +1,8 @@
 /**
  * Tests for feedingDefaultsViewModel.
  *
- * Pure helper — no mocks of Supabase / React / time. Covers the safe
- * "last used feeding" prefill contract for the QuickLogV2 Feed surface.
+ * Pure helper — no mocks of Supabase / React / time. Covers the fail-closed
+ * "last same-plant feeding recipe" prefill contract for QuickLogV2 Feed.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -69,8 +69,6 @@ describe("buildFeedingDefaults", () => {
         }),
       ],
       plantId: "plant-1",
-      tentId: "tent-1",
-      growId: "grow-1",
     });
     expect(r.scope).toBe("plant");
     expect(r.sourceEntryId).toBe("newer");
@@ -196,7 +194,34 @@ describe("buildFeedingDefaults", () => {
     expect(Object.keys(r.defaults!).sort()).toEqual(["lineId", "products"]);
   });
 
-  it("falls back to same tent when no plant feeding exists", () => {
+  it("returns empty defaults without a plant id (fail closed)", () => {
+    const r = buildFeedingDefaults({
+      rawEntries: [row({})],
+      plantId: null,
+    });
+    expect(r.defaults).toBeNull();
+    expect(r.scope).toBeNull();
+    expect(r.label).toBeNull();
+  });
+
+  it("does not use another plant's feeding recipe", () => {
+    const r = buildFeedingDefaults({
+      rawEntries: [
+        row({
+          id: "other-plant",
+          plant_id: "plant-2",
+          details: {
+            nutrients: [{ name: "Other", amount: 9, unit: "ml_per_l" }],
+            nutrient_line_id: "other-line",
+          },
+        }),
+      ],
+      plantId: "plant-1",
+    });
+    expect(r.defaults).toBeNull();
+  });
+
+  it("does not fall back to tent or grow when no same-plant feeding exists", () => {
     const r = buildFeedingDefaults({
       rawEntries: [
         row({
@@ -208,17 +233,6 @@ describe("buildFeedingDefaults", () => {
             nutrient_line_id: "tent-line",
           },
         }),
-      ],
-      plantId: "plant-1",
-      tentId: "tent-1",
-    });
-    expect(r.scope).toBe("tent");
-    expect(r.defaults?.lineId).toBe("tent-line");
-  });
-
-  it("falls back to same grow when no plant/tent feeding exists", () => {
-    const r = buildFeedingDefaults({
-      rawEntries: [
         row({
           id: "grow-only",
           plant_id: "p2",
@@ -231,11 +245,15 @@ describe("buildFeedingDefaults", () => {
         }),
       ],
       plantId: "plant-1",
-      tentId: "tent-1",
-      growId: "grow-1",
     });
-    expect(r.scope).toBe("grow");
-    expect(r.defaults?.lineId).toBe("grow-line");
+    expect(r.defaults).toBeNull();
+    expect(r.scope).toBeNull();
+  });
+
+  it("never invents a manufacturer or AN recipe when empty", () => {
+    const r = buildFeedingDefaults({ rawEntries: [], plantId: "plant-1" });
+    expect(r.defaults).toBeNull();
+    expect(JSON.stringify(r)).not.toMatch(/advanced|AN |manufacturer|chart/i);
   });
 
   it("skips entries missing a nutrient line id", () => {

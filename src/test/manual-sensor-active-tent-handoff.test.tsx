@@ -28,6 +28,14 @@ vi.mock("@/hooks/useGrowData", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useSensorsQuickLogManualReadings", () => ({
+  useSensorsQuickLogManualReadings: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadings: () => ({ data: [], isLoading: false, isError: false }),
 }));

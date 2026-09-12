@@ -33,6 +33,7 @@ import {
   AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
   AI_DOCTOR_CURRENT_SENSOR_SOURCES,
   classifyAiDoctorCurrentSensorEvidence,
+  currentSensorEvidenceIsFreshLive,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { useAiDoctorLiveReview } from "@/hooks/useAiDoctorLiveReview";
 import AiDoctorReviewResultPreview from "@/components/AiDoctorReviewResultPreview";
@@ -287,7 +288,9 @@ function PlantDetailAiDoctorLiveReviewScope({
         currentSensorRows,
         rootZoneObservations: queryRootZoneObservations,
         now,
-        hasFreshLiveSensorReadings: classification?.status === "usable",
+        hasFreshLiveSensorReadings: currentSensorEvidenceIsFreshLive(currentSensorRows, {
+          now,
+        }),
       }),
     [
       plant,

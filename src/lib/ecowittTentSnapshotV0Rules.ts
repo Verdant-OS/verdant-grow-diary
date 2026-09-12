@@ -18,13 +18,10 @@
  *    are left alone — V0 does not call them.
  */
 
+import { AIR_TEMP_C_RANGE } from "@/constants/csvValidationRanges";
 import { SENSOR_SNAPSHOT_STALE_THRESHOLD_MS } from "@/constants/sensorTiming";
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
-import { fahrenheitToCelsius } from "@/lib/temperatureUnitPreference";
-
-/** Plausible tent air temperature in Celsius (stored/display convention). */
-const TEMP_C_PLAUSIBLE_MIN = -20;
-const TEMP_C_PLAUSIBLE_MAX = 60;
+import { fahrenheitToCelsius } from "@/lib/temperatureUnits";
 
 /** Constitution Sensor Truth source labels for V0. */
 export type EcowittTentSnapshotV0TruthSource =
@@ -218,8 +215,7 @@ export function isStuckZeroOrHundredPct(value: number | null | undefined): boole
  * Resolve a V0 temperature reading to Celsius (repo storage/display convention).
  *
  * - `temperature_c` / `temp_c` / `temp`: value is already °C — never silently
- *   reinterpret as °F (Safe-by-Design: Fahrenheit-looking C fails later at
- *   evaluate).
+ *   reinterpret as °F. Fahrenheit-looking C fails later at evaluate.
  * - `temp_f`: convert °F → °C via {@link fahrenheitToCelsius}. If conversion
  *   cannot produce a finite number, fail closed (null).
  *
@@ -257,7 +253,8 @@ export function resolveEcowittTentSnapshotV0TempCelsius(
  *
  * Temp expects Celsius (after {@link resolveEcowittTentSnapshotV0TempCelsius}).
  * Implausible Celsius — including Fahrenheit-looking magnitudes on C keys —
- * fail closed as invalid. Never accept unconverted F as healthy Live °C.
+ * fail closed as invalid using {@link AIR_TEMP_C_RANGE}. Never accept
+ * unconverted F as healthy Live °C.
  */
 export function evaluateEcowittTentSnapshotV0Metric(
   key: EcowittTentSnapshotV0MetricKey,
@@ -268,7 +265,7 @@ export function evaluateEcowittTentSnapshotV0Metric(
   }
   switch (key) {
     case "temp": {
-      if (value < TEMP_C_PLAUSIBLE_MIN || value > TEMP_C_PLAUSIBLE_MAX) {
+      if (value < AIR_TEMP_C_RANGE.min || value > AIR_TEMP_C_RANGE.max) {
         return {
           valid: false,
           reason: "Temperature outside plausible Celsius range.",

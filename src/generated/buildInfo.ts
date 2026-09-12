@@ -2,6 +2,16 @@
 // Regenerated on every `bun run build` (via the `prebuild` script).
 // Safe to import from client code; contains no secrets.
 
+export interface InheritedBuildInfo {
+  readonly source: "tracked-stamp";
+  readonly trusted: false;
+  readonly commit: string;
+  readonly shortCommit: string;
+  readonly ref: string;
+  readonly commitTime: string;
+  readonly buildTime: string;
+}
+
 export interface BuildInfo {
   readonly version: string;
   readonly packageVersion: string;
@@ -14,20 +24,30 @@ export interface BuildInfo {
   readonly dirty: boolean;
   readonly ciRunId: string | null;
   readonly ciRunUrl: string | null;
+  readonly commitSource: "github-env" | "git" | "none";
+  readonly treeHash: string | null;
+  readonly treeHashShort: string | null;
+  readonly treeHashError: string | null;
+  readonly inherited: InheritedBuildInfo | null;
 }
 
 export const buildInfo: BuildInfo = {
-  "version": "0.0.0+20260804.1fb3e3b20a1c-dirty",
+  "version": "0.0.0+20260912.686fef4df26f-dirty",
   "packageVersion": "0.0.0",
-  "commit": "1fb3e3b20a1cfbf46b521d0e5081c21d553ceee0",
-  "shortCommit": "1fb3e3b20a1c",
-  "ref": "edit/edt-f19d06d4-018a-4744-ae92-80acf8765853",
+  "commit": "686fef4df26f22f20415b2bad953d65f0c2f8702",
+  "shortCommit": "686fef4df26f",
+  "ref": "HEAD",
   "tag": null,
-  "commitTime": "2026-08-04T16:18:29Z",
-  "buildTime": "2026-08-04T16:18:37.663Z",
+  "commitTime": "2026-09-11T20:37:16Z",
+  "buildTime": "2026-09-12T00:34:12.649Z",
   "dirty": true,
   "ciRunId": null,
-  "ciRunUrl": null
+  "ciRunUrl": null,
+  "commitSource": "git",
+  "treeHash": "a67cfb1b2d6801c50299eddc1fa00e8773eea40132f84b0d039e9619297fa895",
+  "treeHashShort": "a67cfb1b2d68",
+  "treeHashError": null,
+  "inherited": null
 } as const;
 
 export const APP_VERSION = buildInfo.version;

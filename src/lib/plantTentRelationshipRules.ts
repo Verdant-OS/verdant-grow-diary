@@ -98,3 +98,23 @@ export function buildRemovePlantFromTentPayload(_plantId: string): { tent_id: nu
 export function buildArchivePlantPayload(_plantId: string): { is_archived: true } {
   return { is_archived: true };
 }
+
+/**
+ * Build the minimal update payload to restore an archived plant to active lists.
+ * Diary entries, photos, and sensor readings are intentionally untouched.
+ */
+export function buildRestorePlantPayload(_plantId: string): { is_archived: false } {
+  return { is_archived: false };
+}
+
+export type PlantArchiveMenuAction = "archive" | "restore";
+
+/**
+ * Overflow / row action for archive state. Archived plants must never be
+ * offered Archive again — they get Restore. Active plants keep Archive.
+ */
+export function resolvePlantArchiveMenuAction(
+  isArchived: boolean | null | undefined,
+): PlantArchiveMenuAction {
+  return isArchived === true ? "restore" : "archive";
+}

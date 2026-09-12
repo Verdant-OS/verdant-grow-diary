@@ -3,7 +3,8 @@
  *
  * Presenter only. All ranking, deduplication, and gap detection happens in
  * `guidedActionChecklistRules.ts`. Every item is advisory: taps deep-link
- * into an existing screen (Quick Log, Alerts) and the grower still saves.
+ * into an existing authenticated screen (Daily Check, Alerts) and the grower
+ * still saves. Never the public `/quick-log` starter.
  * Dismissals are stored per-browser via `guidedActionChecklistDismissals`
  * with a 12h TTL so a genuine gap eventually resurfaces.
  */

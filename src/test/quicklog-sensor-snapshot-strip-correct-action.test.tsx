@@ -77,7 +77,9 @@ describe("QuickLogSensorSnapshotStrip — Correct manual reading action", () => 
     );
     const link = getByTestId("quicklog-sensor-snapshot-correct-action") as HTMLAnchorElement;
     const href = link.getAttribute("href") ?? "";
-    expect(href).toMatch(/^\/sensors#manual-reading\?/);
+    expect(href).toMatch(
+      /^\/sensors\?tentId=11111111-1111-4111-8111-111111111111&tentIntent=required#manual-reading\?/,
+    );
     expect(href).toContain(`tent_id=${TENT}`);
     expect(href).toContain(`r_temperature_c=${R_TEMP}`);
   });

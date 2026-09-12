@@ -53,12 +53,16 @@ describe("oneTentLoopNavigationRules", () => {
     expect(r.disabledReason).toBe(ONE_TENT_LOOP_DISABLED_COPY);
   });
 
-  it("grow → tent requires a safe tentId; growId alone stays disabled", () => {
-    // Regression: previously routed /grows/{growId} which self-linked the
-    // operator back to Grow Detail while saying "Open tent".
+  it("grow → tent opens Add tent when growId is selected without a tentId", () => {
+    // Grow Detail (and any caller that already has grow scope) must not
+    // strand the grower with "unavailable until selected". Route to the
+    // grow-scoped Add tent activation path instead of self-linking /grows/.
     const onlyGrow = resolveOneTentLoopNextStep("grow", { growId: "g1" });
-    expect(onlyGrow.disabled).toBe(true);
-    expect(onlyGrow.href).toBeNull();
+    expect(onlyGrow.disabled).toBe(false);
+    expect(onlyGrow.disabledReason).toBeNull();
+    expect(onlyGrow.ctaLabel).toBe("Add tent");
+    expect(onlyGrow.href).toBe("/tents?growId=g1&intent=one_tent_activation");
+    expect(onlyGrow.href ?? "").not.toMatch(/^\/grows\//);
 
     const withTent = resolveOneTentLoopNextStep("grow", {
       growId: "g1",
@@ -72,6 +76,7 @@ describe("oneTentLoopNavigationRules", () => {
   it("grow CTA never self-links to the grow detail route", () => {
     const r = resolveOneTentLoopNextStep("grow", { growId: "g1" });
     expect(r.href ?? "").not.toMatch(/^\/grows\//);
+    expect(r.disabled).toBe(false);
     const r2 = resolveOneTentLoopNextStep("grow", { growId: "g1", tentId: "t1" });
     expect(r2.href ?? "").not.toMatch(/^\/grows\//);
   });

@@ -384,6 +384,7 @@ describe("Timeline read-source helpers", () => {
       "action_queue_events",
       "alert_events",
       "linked_grow_events",
+      "manual_sensor_readings",
     ]);
   });
 

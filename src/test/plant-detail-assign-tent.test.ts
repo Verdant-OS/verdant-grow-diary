@@ -55,18 +55,20 @@ describe("AssignTentDialog · same-grow tent assignment", () => {
     expect(DIALOG).toContain("Plant is already in this tent");
   });
 
-  it("only updates plants.tent_id (no user_id/grow_id/strain/stage/notes)", () => {
+  it("only updates plants.tent_id (grow_id only via empty-grow re-home helper)", () => {
     const updates = [...DIALOG.matchAll(/\.update\(\s*\{([^}]*)\}\s*\)/g)];
     expect(updates.length).toBeGreaterThan(0);
     for (const m of updates) {
       const payload = m[1];
       expect(payload).toMatch(/tent_id/);
       expect(payload).not.toMatch(/\buser_id\b/);
-      expect(payload).not.toMatch(/\bgrow_id\b/);
       expect(payload).not.toMatch(/\bstrain\b/);
       expect(payload).not.toMatch(/\bstage\b/);
       expect(payload).not.toMatch(/\bnotes\b/);
     }
+    // grow_id may appear only via growPatch spread from the shared helper.
+    expect(DIALOG).toMatch(/buildPlantEditGrowIdFromTent\(/);
+    expect(DIALOG).toMatch(/\.\.\.\(growPatch\s*\?\?\s*\{\}\)/);
   });
 
   it("invalidates plant / tent / plants caches after a write", () => {

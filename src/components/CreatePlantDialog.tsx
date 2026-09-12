@@ -51,6 +51,7 @@ import {
 } from "@/lib/createDialogGrowBindingRules";
 import { GROW_SETUP_MESSAGES } from "@/constants/growSetupMessages";
 import { useCreateBindingRetry } from "@/hooks/useCreateBindingRetry";
+import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 
 const STAGES = [
   { value: "seedling", label: "Seedling" },
@@ -360,6 +361,7 @@ export default function CreatePlantDialog({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy || createInFlightRef.current) return;
+    if (!hasTrimmedRequiredIdentity(form.name)) return;
     if (!user) {
       toast.error("Not signed in");
       return;
@@ -544,7 +546,7 @@ export default function CreatePlantDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="glass max-w-md">
+      <DialogContent className="glass max-w-md w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto flex flex-col gap-4 top-4 translate-y-0 sm:top-[50%] sm:translate-y-[-50%] sm:max-h-[min(90vh,calc(100dvh-2rem))]">
         <DialogHeader>
           <DialogTitle className="font-display">New plant</DialogTitle>
         </DialogHeader>
@@ -917,7 +919,12 @@ export default function CreatePlantDialog({
               </div>
             </details>
             <Button
-              disabled={busy || formBlocked || !tentCompat.compatible}
+              disabled={
+                busy ||
+                formBlocked ||
+                !tentCompat.compatible ||
+                !hasTrimmedRequiredIdentity(form.name)
+              }
               className="gradient-leaf text-primary-foreground"
               data-testid="plant-create-submit"
             >

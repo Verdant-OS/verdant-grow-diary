@@ -1,13 +1,20 @@
 /**
  * /actions empty-state — One-Tent Loop next-step links.
  *
- * Confirms: Timeline + Sensors links render, copy is grower-safe,
- * no writes/fetch/AI calls happen on render.
+ * Confirms: Timeline + Sensors links render to grower-intended destinations,
+ * copy is grower-safe, no writes/fetch/AI calls happen on render.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import ActionQueue from "@/pages/ActionQueue";
+import {
+  ACTION_QUEUE_EMPTY_SENSORS_CTA_LABEL,
+  ACTION_QUEUE_EMPTY_TIMELINE_CTA_LABEL,
+  buildActionQueueEmptySensorsHref,
+  buildActionQueueEmptyTimelineHref,
+  isForbiddenActionQueueEmptyHref,
+} from "@/lib/actionQueueEmptyNextStepsRules";
 
 const insertSpy = vi.fn();
 const updateSpy = vi.fn();
@@ -76,9 +83,9 @@ beforeEach(() => {
   upsertSpy.mockClear();
   deleteSpy.mockClear();
   fetchSpy.mockClear();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   (globalThis as any).fetch = fetchSpy;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   (Element.prototype as any).scrollIntoView = vi.fn();
 });
 
@@ -91,18 +98,24 @@ function renderPage() {
 }
 
 describe("/actions empty-state — One-Tent Loop next-step links", () => {
-  it("renders the 'View Timeline' link to /timeline", async () => {
+  it("renders the 'View Timeline' link to grow-scoped Timeline", async () => {
     renderPage();
     const link = await screen.findByTestId("action-queue-empty-next-steps-timeline");
-    expect(link.getAttribute("href")).toBe("/timeline");
-    expect(link.textContent).toBe("View Timeline");
+    const expected = buildActionQueueEmptyTimelineHref({ growId: "g1" });
+    expect(link.getAttribute("href")).toBe(expected);
+    expect(expected).toBe("/timeline?growId=g1");
+    expect(isForbiddenActionQueueEmptyHref(expected)).toBe(false);
+    expect(link.textContent).toBe(ACTION_QUEUE_EMPTY_TIMELINE_CTA_LABEL);
   });
 
-  it("renders the 'Add Sensor Snapshot' link to /sensors", async () => {
+  it("renders the 'Add Sensor Snapshot' link to Sensors manual-reading", async () => {
     renderPage();
     const link = await screen.findByTestId("action-queue-empty-next-steps-sensors");
-    expect(link.getAttribute("href")).toBe("/sensors");
-    expect(link.textContent).toBe("Add Sensor Snapshot");
+    const expected = buildActionQueueEmptySensorsHref({ growId: "g1" });
+    expect(link.getAttribute("href")).toBe(expected);
+    expect(expected).toBe("/sensors?growId=g1#manual-reading");
+    expect(isForbiddenActionQueueEmptyHref(expected)).toBe(false);
+    expect(link.textContent).toBe(ACTION_QUEUE_EMPTY_SENSORS_CTA_LABEL);
   });
 
   it("explains the empty state in cautious, non-automation copy", async () => {

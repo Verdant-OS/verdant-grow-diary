@@ -50,7 +50,7 @@ describe("QuickLogSensorSnapshotStrip — keyboard focus", () => {
     render(<QuickLogSensorSnapshotStrip tentId="t1" />);
     const action = screen.getByTestId("quicklog-sensor-snapshot-action") as HTMLAnchorElement;
     expect(action.tagName).toBe("A");
-    expect(action.getAttribute("href")).toBe("/sensors");
+    expect(action.getAttribute("href")).toBe("/sensors?tentIntent=required");
     expect(action.tabIndex).not.toBe(-1);
     action.focus();
     expect(document.activeElement).toBe(action);

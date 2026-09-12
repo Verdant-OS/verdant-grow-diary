@@ -228,13 +228,25 @@ export default function Dashboard() {
   // Additive only — the sensor_readings path above is never weakened.
   const quickLogManualSnapshotCount =
     activationEvidence.status === "ok" ? (activationEvidence.summary.manualSnapshotCount ?? 0) : 0;
+  // LIVE MISS hardening: when the graph has no tent yet, tentless plant rows
+  // still carry plant memory. Prefer graph.plantId; fall back to the first
+  // loaded plant so connected-scope framing cannot ignore plants.length.
+  const plantMemoryFallbackId =
+    activationGraph.plantId ??
+    plants.find((p) => !activationGraph.growId || p.growId === activationGraph.growId)?.id ??
+    plants[0]?.id ??
+    null;
   const onboardingVm = buildOnboardingChecklistViewModel({
     growCount: grows.length,
     tentCount: tents.length,
     plantCount: plants.length,
     diaryEntryCount: 0,
     sensorReadingCount: connectedSensorReadingCount + quickLogManualSnapshotCount,
-    connectedScope: activationGraph,
+    connectedScope: {
+      growId: activationGraph.growId,
+      tentId: activationGraph.tentId,
+      plantId: plantMemoryFallbackId,
+    },
     firstLogEvidenceCount:
       activationEvidence.status === "ok" ? activationEvidence.summary.count : null,
     firstLogEvidenceStatus: activationEvidence.status,

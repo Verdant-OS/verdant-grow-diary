@@ -55,8 +55,10 @@ describe("Timeline — alert_events fetch", () => {
 
   it("does not load alert events when no grow is active", () => {
     // load() short-circuits and resets state when activeGrowId is missing.
+    // The receipts clear sits in the same block (directoryGrowId gate is
+    // independent); keep the window wide enough to reach setAlertEvents.
     expect(TIMELINE).toMatch(
-      /if\s*\(\s*!user\s*\|\|\s*!activeGrowId\s*\)\s*\{[\s\S]{0,200}setAlertEvents\(\[\]\)/,
+      /if\s*\(\s*!user\s*\|\|\s*!activeGrowId\s*\)\s*\{[\s\S]{0,500}setAlertEvents\(\[\]\)/,
     );
   });
 });

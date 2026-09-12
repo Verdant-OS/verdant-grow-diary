@@ -32,10 +32,15 @@ vi.mock("@tanstack/react-query", () => ({
       { id: "tent-next", name: "Next Tent" },
     ],
     isLoading: false,
+    isPending: false,
   }),
   useQueryClient: () => ({
     invalidateQueries: mocks.invalidateQueries,
   }),
+}));
+
+vi.mock("@/components/CreateTentDialog", () => ({
+  default: () => null,
 }));
 
 vi.mock("sonner", () => ({

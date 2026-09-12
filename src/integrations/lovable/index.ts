@@ -4,6 +4,9 @@ import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
 import { supabase } from "../supabase/client";
 const lovableAuth = createLovableAuth();
 
+// Vercel hosts must hop /~oauth/* to the Lovable project host (see vercel.json);
+// otherwise the SPA rewrite 404s Google SSO initiate.
+
 type SignInOptions = {
   redirect_uri?: string;
   extraParams?: Record<string, string>;

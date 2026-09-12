@@ -370,6 +370,10 @@ describe("DailyCheck target selector order and exact-target truth", () => {
     expectBefore(selector, activities);
     expectBefore(activities, choose);
     expectBefore(choose, guided);
+    // First paint must already carry the grow's first tent so Water is not a
+    // Choose-plant/tent trap while the default-tent effect has not run.
+    expect(activities).toHaveAttribute("data-tent-id", "t1");
+    expect(activities).toHaveAttribute("data-plant-id", "");
   });
 
   it("disables the plant-note fast path without a selected plant and cannot open Quick Log", async () => {

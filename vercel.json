@@ -11,6 +11,11 @@
     }
   },
   "redirects": [
+    {
+      "source": "/~oauth/:path*",
+      "destination": "https://66255e7b-892c-4be5-8686-ab1cfc3666db.lovableproject.com/~oauth/:path*",
+      "permanent": false
+    },
     { "source": "/strains", "destination": "/cultivars", "permanent": true },
     { "source": "/strains/:slug", "destination": "/cultivars/:slug", "permanent": true },
     { "source": "/features", "destination": "/welcome", "permanent": true },
@@ -20,7 +25,7 @@
     { "source": "/terms-of-service", "destination": "/terms", "permanent": true },
     { "source": "/privacy-policy", "destination": "/privacy", "permanent": true }
   ],
-  "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/" }],
+  "rewrites": [{ "source": "/((?!assets/|~oauth).*)", "destination": "/" }],
   "headers": [
     {
       "source": "/(.*)",

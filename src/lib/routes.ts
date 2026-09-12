@@ -9,8 +9,18 @@
  * Pure functions. No side effects, no network, no privileged access.
  */
 
-const withGrowId = (base: string, growId?: string | null): string =>
-  growId ? `${base}?growId=${encodeURIComponent(growId)}` : base;
+/** Retain an explicit grow on an internal destination, including its query and anchor. */
+export const withGrowId = (base: string, growId?: string | null): string => {
+  if (!growId) return base;
+  const hashIndex = base.indexOf("#");
+  const pathAndSearch = hashIndex < 0 ? base : base.slice(0, hashIndex);
+  const hash = hashIndex < 0 ? "" : base.slice(hashIndex);
+  const queryIndex = pathAndSearch.indexOf("?");
+  if (queryIndex < 0) return `${pathAndSearch}?growId=${encodeURIComponent(growId)}${hash}`;
+  const params = new URLSearchParams(pathAndSearch.slice(queryIndex + 1));
+  params.set("growId", growId);
+  return `${pathAndSearch.slice(0, queryIndex)}?${params.toString()}${hash}`;
+};
 
 export const growDetailPath = (growId: string): string => `/grows/${encodeURIComponent(growId)}`;
 

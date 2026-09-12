@@ -17,6 +17,12 @@ import {
   RESTART_FLOW_HREF,
   type ResetLinkDiagnosis,
 } from "@/lib/resetPasswordLinkRules";
+import {
+  parseOAuthHashFragment,
+  peekOAuthReturnHashStash,
+  shouldAttemptOAuthHashSessionConsume,
+  type OAuthHashStashHolder,
+} from "@/lib/oauthHashSessionConsumeRules";
 import { usePageSeo } from "@/hooks/usePageSeo";
 
 type Status = "checking" | "ready" | "link_problem" | "saving" | "done";
@@ -48,19 +54,42 @@ export default function ResetPassword() {
   const confirmMismatch = password.length > 0 && confirm.length > 0 && password !== confirm;
 
   const [diagnosis, setDiagnosis] = useState<ResetLinkDiagnosis | null>(null);
+  const capturedHashRef = useRef<string | null>(null);
+  if (capturedHashRef.current === null && typeof window !== "undefined") {
+    capturedHashRef.current =
+      peekOAuthReturnHashStash(window as OAuthHashStashHolder) ?? window.location.hash ?? "";
+  }
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getSession().then(({ data }) => {
+    const hash = capturedHashRef.current ?? "";
+    const parsed = parseOAuthHashFragment(hash);
+
+    const readSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      return data?.session ?? null;
+    };
+
+    void (async () => {
+      let session = await readSession();
+      if (!session && shouldAttemptOAuthHashSessionConsume(parsed)) {
+        for (let i = 0; i < 40 && !cancelled; i++) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, 25);
+          });
+          session = await readSession();
+          if (session) break;
+        }
+      }
       if (cancelled) return;
       const d = diagnoseResetLink({
-        hash: typeof window !== "undefined" ? window.location.hash : "",
+        hash,
         search: typeof window !== "undefined" ? window.location.search : "",
-        hasSession: !!data.session,
+        hasSession: !!session,
       });
       setDiagnosis(d);
       setStatus(d.status === "ready" ? "ready" : "link_problem");
-    });
+    })();
     return () => {
       cancelled = true;
     };

@@ -247,11 +247,11 @@ describe("evaluatePolicy", () => {
   });
 
   it("fails when an exact npm override is not resolved consistently", () => {
-    const manifest = packageJson("0.24.0", { "fast-uri": "3.1.5" });
+    const manifest = packageJson("0.24.0", { "fast-uri": "3.1.6" });
     const stale = packageLock(manifest);
     stale.packages["node_modules/fast-uri"]!.version = "3.0.0";
     expect(evaluate(policyFiles({ manifest, npmLock: stale })).errors.join(" ")).toContain(
-      "package-lock.json override for fast-uri@3.1.5 is not synchronized",
+      "package-lock.json override for fast-uri@3.1.6 is not synchronized",
     );
   });
 
@@ -262,6 +262,7 @@ describe("evaluatePolicy", () => {
     ["postcss", "8.5.6"],
     ["postcss", "8.5.18-rc.0"],
     ["brace-expansion", "1.1.17"],
+    ["fast-uri", "3.1.5"],
   ])("fails when the npm graph regresses the %s security floor", (packageName, version) => {
     const files = policyFiles();
     const stale = JSON.parse(files[at("package-lock.json")]);

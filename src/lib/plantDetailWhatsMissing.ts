@@ -15,6 +15,17 @@
  *  5. no recent watering/feed note
  */
 
+import { buildPlantRecentActivity } from "@/lib/plantRecentActivityRules";
+import { classifyTimelineEntry } from "@/lib/timelineEntryClassification";
+import {
+  ONE_TENT_LOOP_CTA_LABEL,
+  resolveOneTentLoopNextStep,
+  type OneTentLoopIds,
+  type OneTentLoopNextStep,
+} from "@/lib/oneTentLoopNavigationRules";
+import { PLANT_RELATIVE_TIMELINE_ANCHOR_ID } from "@/lib/plantDetailQuickActions";
+import { plantDetailPath } from "@/lib/routes";
+
 export type WhatsMissingPromptKind =
   | "no_timeline"
   | "stage_unknown"
@@ -61,6 +72,95 @@ export interface PlantDetailWhatsMissingInput {
   hasSensorSnapshot: boolean;
   /** True when at least one recent activity entry is watering or feeding. */
   hasRecentWateringOrFeed: boolean;
+}
+
+type PlantDetailActivitySignals = Pick<
+  PlantDetailWhatsMissingInput,
+  "hasTimelineEntries" | "hasRecentPhoto" | "hasSensorSnapshot" | "hasRecentWateringOrFeed"
+>;
+
+export const PLANT_ACTIVITY_UNAVAILABLE_COPY =
+  "Recent plant activity is unavailable. Try again shortly.";
+
+/**
+ * Share the existing recent-activity projection between both plant guidance
+ * surfaces. Any saved note counts as activity; it does not imply watering/feed.
+ * Null means unavailable, whereas a successful [] means no recorded activity.
+ * Reject the whole read if normalization drops or cannot validate any row.
+ */
+export function derivePlantDetailActivitySignals(
+  plantId: string | null | undefined,
+  hasPlantPhoto: boolean,
+  rawRows: unknown,
+): PlantDetailActivitySignals | null {
+  if (!plantId || !Array.isArray(rawRows)) return null;
+
+  try {
+    const rows = buildPlantRecentActivity(rawRows, { plantId, limit: rawRows.length || 1 });
+    if (
+      rows.length !== rawRows.length ||
+      rows.some(
+        (row) =>
+          !row.occurredAt || row.warnings.some((warning) => warning !== "event-type:missing"),
+      )
+    ) {
+      return null;
+    }
+
+    let hasRecentPhoto = hasPlantPhoto;
+    let hasSensorSnapshot = false;
+    let hasRecentWateringOrFeed = false;
+    for (const row of rows) {
+      if (row.hasPhoto) hasRecentPhoto = true;
+      if (row.hasSnapshot) hasSensorSnapshot = true;
+      const category = classifyTimelineEntry({ eventType: row.eventType });
+      if (category === "watering" || category === "feeding") hasRecentWateringOrFeed = true;
+    }
+    return {
+      hasTimelineEntries: rows.length > 0,
+      hasRecentPhoto,
+      hasSensorSnapshot,
+      hasRecentWateringOrFeed,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Adapt the plant step only; the other One-Tent Loop steps keep their rules. */
+export function resolvePlantDetailActivityNextStep(
+  ids: OneTentLoopIds | undefined,
+  activity: { data?: unknown; isLoading?: boolean; isError?: boolean },
+): OneTentLoopNextStep {
+  const base = resolveOneTentLoopNextStep("plant", ids);
+  const plantId = base.quickLogPrefill?.plantId;
+  if (!plantId) return base;
+
+  const signals =
+    activity.isError || activity.isLoading
+      ? null
+      : derivePlantDetailActivitySignals(plantId, false, activity.data);
+  if (!signals) {
+    return {
+      ...base,
+      next: null,
+      disabled: true,
+      quickLogPrefill: null,
+      disabledReason: activity.isLoading
+        ? "Loading recent plant activity…"
+        : PLANT_ACTIVITY_UNAVAILABLE_COPY,
+    };
+  }
+  if (!signals.hasTimelineEntries) return base;
+
+  return {
+    ...base,
+    next: "timeline",
+    ctaLabel: ONE_TENT_LOOP_CTA_LABEL["quick-log"],
+    intent: "navigate",
+    href: `${plantDetailPath(plantId)}#${PLANT_RELATIVE_TIMELINE_ANCHOR_ID}`,
+    quickLogPrefill: null,
+  };
 }
 
 const PROMPTS: Record<WhatsMissingPromptKind, { title: string; description: string }> = {

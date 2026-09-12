@@ -57,7 +57,9 @@ const QUICK_LOG_V2_SAVE_CALLERS = [
   },
   {
     file: "src/components/QuickLogV2Sheet.tsx",
-    telemetryIntent: /save\(built\.payload,\s*\{\s*telemetryIntent:\s*form\.action\s*\}\)/,
+    // Recovery submits the frozen intent rather than a mutable form action.
+    telemetryIntent:
+      /save\(exactManualSubmission\.payload,\s*\{\s*telemetryIntent:\s*submissionAction,\s*verifyPersistedNote:\s*pendingManualSubmission !== null,?\s*\}\)/,
   },
   { file: "src/components/AiDoctorCheckInPreviewPanel.tsx", telemetryIntent: null },
   { file: "src/pages/EcowittIngestAudit.tsx", telemetryIntent: null },
@@ -514,8 +516,9 @@ describe("ordering and safety constraints at the seams", () => {
     expect(app).not.toContain("useCheckoutReturnCompletionTracking");
     expect(shell).toMatch(/const \{ status: authStatus \} = useRequireAuth\(signedOutRedirect\)/);
     expect(shell).toMatch(
-      /const \{ loading: entitlementLoading, entitlement \} = useMyEntitlements\(\)/,
+      /const \{ loading: entitlementLoading, entitlement \} = useMyEntitlements\(\{\s*enabled:\s*sessionReady,?\s*\}\)/,
     );
+    expect(shell).not.toMatch(/useMyEntitlements\(\)/);
     expect(shell).toMatch(/authStatus === "authenticated"/);
     expect(shell).toMatch(/!entitlementLoading/);
     expect(shell).toMatch(/entitlement\.isActive/);

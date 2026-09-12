@@ -48,6 +48,10 @@ vi.mock("@/hooks/use-tents", () => ({
   }),
 }));
 
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1" }] }),
+}));
+
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "user-1" } }),
 }));

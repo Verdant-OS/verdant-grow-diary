@@ -19,6 +19,7 @@ interface PickerViewModel {
 type BuildPickerViewModel = (input: {
   plantStage?: unknown;
   hiddenIds?: readonly QuickLogActivityId[];
+  hasStructuredWaterTarget?: boolean;
 }) => PickerViewModel;
 
 function builder(): BuildPickerViewModel | undefined {
@@ -112,6 +113,25 @@ describe("Quick Log activity picker rules", () => {
       normalizedStage,
       reason: "eligible",
     });
+  });
+
+  it("disables watering when structured water has no plant or tent target", () => {
+    const build = builder();
+    if (!build) return;
+    const watering = build({
+      plantStage: "flower",
+      hasStructuredWaterTarget: false,
+    }).primaryActivities.find((item) => item.activity.id === "watering");
+
+    expect(watering).toMatchObject({
+      disabled: true,
+      disabledReason: "Choose a plant or tent before logging Water.",
+    });
+    expect(
+      build({ plantStage: "flower" }).primaryActivities.find(
+        (item) => item.activity.id === "watering",
+      ),
+    ).toMatchObject({ disabled: false, disabledReason: null });
   });
 
   it("is deterministic and null-safe for untrusted context", () => {

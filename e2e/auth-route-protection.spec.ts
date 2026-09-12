@@ -109,7 +109,7 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
   });
 
   for (const path of PROTECTED_DESKTOP_ROUTES) {
-    test(`signed-out → ${path} redirects to /welcome and makes no private REST hits`, async ({
+    test(`signed-out → ${path} redirects to /auth and makes no private REST hits`, async ({
       page,
       baseURL,
     }) => {
@@ -126,7 +126,9 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
         });
       });
       await page.goto(path);
-      await page.waitForURL((u) => u.pathname === "/welcome", { timeout: 8000 });
+      // Signed-out re-entry lands on the sign-in screen with the destination
+      // preserved (SIGNED_OUT_LANDING = "/auth"), never the marketing /welcome.
+      await page.waitForURL((u) => u.pathname === "/auth", { timeout: 8000 });
       const url = new URL(page.url());
       expect(url.origin).toBe(new URL(baseURL!).origin);
       const redirectTo = url.searchParams.get("redirectTo");

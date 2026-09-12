@@ -30,6 +30,10 @@ vi.mock("@/hooks/use-tents", () => ({
   }),
 }));
 
+vi.mock("@/store/grows", () => ({
+  useGrows: () => ({ grows: [{ id: "grow-1", name: "Grow 1" }] }),
+}));
+
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
 vi.mock("sonner", () => ({
@@ -75,6 +79,9 @@ function clickWater() {
 
 function clickNote() {
   fireEvent.click(screen.getByRole("button", { name: "Note" }));
+  fireEvent.change(screen.getByLabelText("Note (optional)"), {
+    target: { value: "Observation for refresh test" },
+  });
 }
 
 function clickSave() {
@@ -154,15 +161,20 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
-  it("save without a selected target does NOT invalidate any keys", async () => {
-    // QuickLogV2Sheet has no separate "Photo" action mode; the equivalent
-    // guard is the context block when no plant/tent is selected.
+  it("save without a selected target does NOT invalidate any keys", () => {
+    // Save stays disabled until an explicit plant/tent target is selected.
+    // Do not click through — an enabled empty-target Save was the trust break.
     const { onOpenChange } = renderSheet("");
-    clickSave();
-    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    const save = screen.getByTestId("qlv2-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    expect(screen.getByTestId("qlv2-save-helper")).toHaveTextContent(
+      "Choose a plant or tent before saving.",
+    );
+    fireEvent.click(save);
     expect(rpcMock).not.toHaveBeenCalled();
     expect(invalidateSpy).not.toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("no optimistic fake timeline entry on failed save (no cache mutation)", async () => {

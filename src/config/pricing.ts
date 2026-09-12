@@ -212,9 +212,20 @@ export const PLAN_COMPARISON: PlanComparisonRow[] = [
     },
   },
   {
-    label: "Timeline & history depth",
+    label: "Diary & timeline history",
     values: {
-      free: "Recent",
+      free: "Kept forever",
+      pro_monthly: "Kept forever",
+      pro_annual: "Kept forever",
+      craft_monthly: "Kept forever",
+      craft_annual: "Kept forever",
+      founder_lifetime: "Kept forever",
+    },
+  },
+  {
+    label: "Sensor snapshot history",
+    values: {
+      free: "90 days",
       pro_monthly: "Full history",
       pro_annual: "Full history",
       craft_monthly: "Full history",

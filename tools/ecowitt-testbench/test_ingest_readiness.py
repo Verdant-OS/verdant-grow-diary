@@ -10,7 +10,6 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import ecowitt_listener
 from ecowitt_listener import (
     ECOWITT_LIVE_FRESHNESS,
     FIELD_MAP,

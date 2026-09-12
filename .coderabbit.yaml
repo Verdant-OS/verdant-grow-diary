@@ -1,0 +1,359 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# Verdant — CodeRabbit review configuration (source of truth; overrides the dashboard).
+#
+# Grounded in AGENTS.md (Hard Safety Rules, Architecture Rules, Supabase / Data Safety,
+# Migration Immutability Rules, Sensor Truth Rules, AI Doctor Rules, Monetization /
+# Entitlements Rules, AI Credit Enforcement Rules, Action Queue Rules, Testing Standard)
+# and .github/pull_request_template.md. When this file and AGENTS.md disagree, AGENTS.md
+# wins and this file has a bug — fix it here.
+#
+# Plan note (2026-09-12): the org is on CodeRabbit Essentials. Custom pre-merge checks and
+# finishing touches are not available on that plan, so checklist enforcement lives in the
+# repo-wide path instruction below (visible warning comments, never a merge gate).
+# CodeRabbit never approves or merges; Cheek approves, merges go through the merge queue.
+
+language: en-US
+early_access: true
+
+# Max 250 characters (schema limit). Fuller reviewer guidance lives in the "**" path instruction.
+tone_instructions: >-
+  Calm, exact staff engineer who also runs a grow room. Lead with the defect and its
+  evidence (file, line, why it matters). Cite the AGENTS.md section. State known vs
+  inferred vs missing. No praise padding, no hype.
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  review_status: true
+  review_details: false
+  commit_status: true
+  fail_commit_status: false
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  auto_apply_labels: false
+  labeling_instructions:
+    - label: documentation
+      instructions: >-
+        Only when the PR changes docs/** or *.md files and nothing else (no code, SQL,
+        workflow, or config changes).
+    - label: dependencies
+      instructions: >-
+        Only when the PR is a dependency bump (package.json plus a lockfile) with no
+        source changes.
+    - label: bug
+      instructions: >-
+        The PR corrects incorrect behavior (title starts with fix, or the body describes a
+        defect being fixed).
+    - label: enhancement
+      instructions: >-
+        The PR adds a capability (title starts with feat). Never suggest CI-owned or
+        triage-owned labels: migration-drift, money-contract-check, money-migration-check,
+        edge-shared-drift, codex, zero-defect, blocked, or any severity:* label.
+  suggested_reviewers: false
+  auto_assign_reviewers: false
+  in_progress_fortune: false
+  poem: false
+  enable_prompt_for_ai_agents: true
+  abort_on_close: true
+
+  # Exclusions only (exclusions take precedence over inclusions in CodeRabbit, so a mixed
+  # list would silently drop wanted paths). Everything not listed here is reviewed.
+  path_filters:
+    # Lockfiles and generated code
+    - "!bun.lock"
+    - "!bun.lockb"
+    - "!package-lock.json"
+    - "!**/*.lock"
+    - "!src/integrations/supabase/types.ts"
+    - "!src/routeTree.gen.ts"
+    - "!src/generated/**"
+    - "!**/*.gen.ts"
+    - "!supabase/functions/_shared/lib/**"
+    - "!supabase/functions/mcp/index.ts"
+    # Binary and bulk data
+    - "!**/*.png"
+    - "!**/*.jpg"
+    - "!**/*.jpeg"
+    - "!**/*.gif"
+    - "!**/*.webp"
+    - "!**/*.ico"
+    - "!**/*.ttf"
+    - "!**/*.otf"
+    - "!**/*.woff"
+    - "!**/*.woff2"
+    - "!**/*.csv"
+    - "!**/*.snap"
+    - "!**/__snapshots__/**"
+    - "!assets/**"
+    - "!public/brand/**"
+    - "!fixtures/**"
+    - "!artifacts/**"
+    # Docs that are evidence, exports, or archives rather than operating rules
+    - "!docs/evidence/**"
+    - "!docs/knowledge-library/**"
+    - "!docs/seo/**"
+    - "!docs/plantuml/**"
+    - "!docs/releases/**"
+    - "!docs/artifacts/**"
+    - "!docs/workbook-templates/**"
+    - "!docs/superpowers/**"
+    - "!docs/lovable/**"
+    - "!docs/archive/**"
+    - "!docs/drafts/**"
+    - "!docs/samples/**"
+    - "!docs/diary/**"
+    - "!docs/growth/**"
+    - "!docs/qa/**"
+    - "!docs/audits/**"
+    - "!docs/cleanup/**"
+    - "!docs/remediation/**"
+    - "!docs/buildops-kit/**"
+    - "!CHANGELOG.md"
+
+  path_instructions:
+    - path: "**"
+      instructions: >-
+        Reviewer stance: prefer the smallest safe change that preserves working behavior;
+        when a finding is a judgment call rather than a rule violation, say so; a single
+        photo or single reading is weak evidence and any claim built on one should say what
+        is missing. Repo-wide checks (AGENTS.md: Hard Safety Rules;
+        .github/pull_request_template.md).
+        1) Verify the PR body's Security checklist and V0 Operating Loop checkboxes against
+        the actual diff. If a box is ticked but the diff contradicts it (for example "No
+        service_role introduced in frontend or Edge Functions" while service_role appears
+        under src/ or in a non-admin edge path, or "No fake live / demo data" while demo or
+        default values are rendered without a source label), flag it as a blocker and quote
+        the line.
+        2) The "Tests run" section must contain real, pasted totals (for example "Tests 663
+        passed (663)"). Flag a PR that claims validation without a summary line. Do not
+        accept "all green" as evidence.
+        3) Secrets: flag any literal that looks like an API key, JWT, service-role key,
+        bridge token, webhook secret, or private env value, and any change that reads such
+        a value into client-served code. Publishable/anon Supabase keys are expected.
+        4) Scope: flag schema, RLS, auth, or edge-function changes that the PR body does
+        not request or explain (AGENTS.md: "Do not casually change schema, RLS, auth, or
+        edge functions outside the requested scope").
+        5) Coordination: if the diff touches Pheno Hunt files (paths or names containing
+        "pheno"), note that the Pheno Hunt expansion is owned by the Claude workstream and
+        ask for founder confirmation unless the PR body states the reassignment.
+        6) No device control, no auto-execution, no new external-control surface. If a
+        change could send a command to a controller, bridge, or actuator, treat it as a
+        blocker.
+
+    - path: "src/lib/entitlements/**"
+      instructions: >-
+        AGENTS.md: Monetization / Entitlements Rules and AI Credit Enforcement Rules.
+        `public.subscriptions` is the sole billing entitlement source of truth. Live rows
+        grant production access; sandbox rows grant access only when the server has
+        resolved PAYMENTS_ENVIRONMENT=sandbox. `public.billing_subscriptions` is a legacy
+        sandbox/operator-audit surface and must never grant an entitlement — flag any read
+        that treats it as entitling. `profiles.tier` is XP/gamification only — flag any
+        billing use. Absence of an entitling row resolves to Free. Client entitlement reads
+        are presentation-only; server-side checks are authoritative for paid or costly
+        features. Founder Lifetime is Pro-like access with capped AI credits (100 per UTC
+        month), never unlimited. Capability logic must be typed, deterministic, null-safe,
+        and expressed through capability helpers (canUseCapability), not plan-name string
+        comparisons. Flag any path where a client could set its own tier, credit balance,
+        role, entitlement, or user identity.
+
+    - path: "src/**/*.tsx"
+      instructions: >-
+        AGENTS.md: Architecture Rules. Components stay presenter-focused: no rule tables
+        duplicated in JSX, no transforms or selectors in render bodies when avoidable, and
+        no hardcoded plan gates (`plan === "pro"`) — use capability helpers from
+        src/lib/entitlements. Sensor truth in UI: any rendered reading, snapshot, chart
+        series, or status must carry its source (live, manual, csv, demo, stale, invalid)
+        and unknown or invalid telemetry must never be styled or labeled as healthy.
+        Vendor and transport (EcoWitt, bridge, webhook) are provenance metadata, not source
+        values. Flag placeholder or default numbers that could read as live data.
+
+    - path: "src/lib/**"
+      instructions: >-
+        AGENTS.md: Architecture Rules and Testing Standard. Layering: `*Rules.ts` pure
+        logic, `*Service.ts` IO, `*ViewModel.ts` view models. New logic must be typed,
+        deterministic, and null-safe; stable sorts need explicit tie-breakers; no
+        randomness; time must be injectable where relevant; preserve old rows and documents
+        with missing fields. Every logic change should come with targeted tests covering
+        happy path, boundaries, null/invalid input, deterministic repeatability, and the
+        specific regression or safety fence. Flag logic that lands without tests.
+
+    - path: "{src/lib/sensor/**,src/lib/sensors/**,src/components/sensor/**,src/lib/quick-log/**,src/fixtures/**,tools/**,supabase/functions/ecowitt-ingest/**,supabase/functions/ecowitt-real-ingest/**,supabase/functions/pi-ingest-readings/**,supabase/functions/sensor-ingest-webhook/**,supabase/functions/edge-metrics-latest/**,supabase/functions/edge-metrics-alert-check/**}"
+      instructions: >-
+        AGENTS.md: Sensor Truth Rules. Every reading should include source, captured_at or
+        timestamp, tent_id, plant_id when relevant, confidence, and raw_payload when
+        available. The only allowed source labels are live, manual, csv, demo, stale,
+        invalid. Never classify invalid or unknown telemetry as healthy. Flag: Celsius shown
+        as Fahrenheit, uS/cm shown as mS/cm, humidity or soil moisture stuck at 0 or 100, pH
+        outside a realistic range, old readings presented as current, default or demo
+        values presented as live. Treat bridge payloads, CSVs, and vendor webhooks as
+        untrusted input. VPD uses an EWMA; do not accept PR text claiming Modified Z-Score,
+        MAD, or Nelson Rules unless the implementation is in the diff.
+
+    - path: "src/lib/quick-log/**"
+      instructions: >-
+        Quick Log persists through the single `quicklog_save_manual` write path, frozen by
+        docs/specs/one-tent-loop-quicklog-single-write-path.md. Post-save refresh is
+        `applyQuickLogV2Refresh` plus one `verdant:entry-created` dispatch, only after
+        confirmed success. Target selection is explicit or route-derived only;
+        remembered-target and only-plant auto-selection are banned and test-pinned. Flag
+        any second write path, any dispatch before confirmed success, and any remembered
+        target.
+
+    - path: "{src/lib/aiDoctor*,src/lib/aiCoach*,src/lib/aiCredit*,src/lib/aiContext*,src/lib/ai/**,supabase/functions/ai-doctor-review/**,supabase/functions/ai-coach/**,supabase/functions/ai-cultivar-qa/**}"
+      instructions: >-
+        AGENTS.md: AI Doctor Rules and AI Credit Enforcement Rules. AI Doctor and AI Coach
+        suggest; they never decide or execute. Flag any write to Action Queue tables, any
+        device or controller command, and any path that turns a suggestion into an action
+        without explicit grower approval. Confidence must be conservative and
+        evidence-cited; a single photo or single reading is weak evidence and output must
+        state what is missing rather than guess. The edge function decides model tier and
+        weight (server-pinned); the client must not set user_id, weight, model tier, or
+        plan. Credits are metered server-side before the model call; failed calls are
+        refunded with append-only reversal rows; quota denials are calm, expected responses.
+        Preserve idempotency keys and evidence receipts. Do not change provider or model
+        selection without the PR body saying so.
+
+    - path: "{src/lib/actionQueue*,src/lib/actionOutcome*,src/lib/actionFollow*,src/lib/actionResponse*,src/components/**/ActionQueue*,src/components/**/ActionDetail*,src/pages/**/ActionQueue*}"
+      instructions: >-
+        AGENTS.md: Action Queue Rules. Action Queue is approval-required. Transitions
+        (approve, reject, complete, cancel) must preserve grower approval semantics; flag
+        any auto-approve, auto-complete, or auto-create path unless the PR explicitly
+        requests it. Items should carry reason, risk level, related grow/tent/plant/alert
+        when available, status, and an audit trail. No device control. Keep transition
+        logic in typed pure modules with tests for each transition and each illegal
+        transition.
+
+    - path: "supabase/migrations/**"
+      instructions: >-
+        AGENTS.md: Migration Immutability Rules and Supabase / Data Safety. Any edit,
+        rewrite, or no-op of a migration file that already exists on the base branch is a
+        blocker with no exception — corrections ship as a new timestamped migration, or via
+        config/local-supabase-replay-compatibility.json when replay itself breaks. The
+        Published migration integrity gate hashes files against the base branch. For new
+        migrations: RLS on every touched table; prefer authenticated SELECT of own rows
+        only, no client INSERT/UPDATE/DELETE policies, service_role writes only; no anon
+        grants without explicit justification; policies use auth.uid(), never a
+        client-supplied user_id; flag SECURITY DEFINER functions without a pinned
+        search_path; flag anything that lets a client self-grant billing status, roles,
+        credits, device permissions, or admin. Do not silently alter existing tables.
+
+    - path: "supabase/functions/**"
+      instructions: >-
+        AGENTS.md: Supabase / Data Safety and Hard Safety Rules. Derive identity from the
+        verified JWT (auth.uid()); never trust a client user_id. Service role may be used
+        only in server/admin/test contexts and must never be returned, logged, or shipped
+        to a client. Secrets come from environment, never literals. Treat request bodies,
+        bridge payloads, CSVs, and AI outputs as untrusted: validate shape, units, and
+        ranges. No device-command or external-control surface. `_shared/lib/**` is a
+        generated mirror of src/lib — flag hand edits there and remind that
+        `bun run verify-edge-shared-in-sync` gates it. Money and credit paths need runtime
+        harness coverage, not only static tests.
+
+    - path: ".github/workflows/**"
+      instructions: >-
+        ci.yml produces the required status contexts pinned in
+        config/required-status-checks.json and enforced by the verdant-grow-diary ruleset;
+        renaming or removing a job there breaks the merge queue — flag it. `apply-*`
+        workflows apply production migrations and forward repairs: any change to them, or
+        any new workflow that applies migrations, deploys, or writes to production, needs
+        explicit Codex release-gate sign-off noted in the PR body. Flag: continue-on-error
+        on a gate, secrets echoed or interpolated into logs, pull_request_target combined
+        with a checkout of the PR head, third-party actions not pinned to a SHA, and
+        workflow_dispatch inputs that select a production target without a confirmation
+        input.
+
+    - path: "{src/test/**,e2e/**}"
+      instructions: >-
+        AGENTS.md: Testing Standard. Contract tests over configs or modules must import and
+        assert on resolved values, not regex-match source text, unless the file declares
+        `@source-scan-justified: <reason>`. Many tests pin exact strings and occurrence
+        counts in source: renegotiating a pin is expected in the same commit as the behavior
+        change, but flag pins loosened or deleted without a matching source change. Flag
+        `.only`, `.skip`, `xit`, `xdescribe`, or deleted assertions that make a lane green.
+        Playwright chromium-mocked specs need no credentials; quicklog smoke and golden-path
+        specs run post-deploy and are not same-commit gates. Do not whole-file-format
+        legacy test files.
+
+    - path: "{.env,.env.*,config/**}"
+      instructions: >-
+        The committed .env carries only publishable/anon Supabase values and a client
+        analytics key by design. Flag any addition that is not publishable: service_role,
+        webhook secrets, bridge tokens, provider secret keys, or anything named *_SECRET or
+        *_SERVICE_ROLE*. config/required-status-checks.json mirrors the ruleset; changes
+        there need the ruleset change coordinated by Codex.
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    ignore_title_keywords:
+      - "[skip review]"
+      - "[no review]"
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+  tools:
+    # Repo lints with ESLint + Prettier (eslint.config.js, .prettierrc.json). Disable
+    # overlapping linters that would run with their own default configs and produce
+    # findings the repo's own tooling does not enforce.
+    biome:
+      enabled: false
+    # No .markdownlint / .yamllint / .sqlfluff config in the repo; their defaults would
+    # flag every workflow (line length, document start) and every Postgres RLS migration.
+    # actionlint + zizmor cover workflows; squawk covers migration safety.
+    markdownlint:
+      enabled: false
+    yamllint:
+      enabled: false
+    sqlfluff:
+      enabled: false
+    languagetool:
+      enabled: false
+    # 11 Python files under tools/: one linter is enough.
+    pylint:
+      enabled: false
+    flake8:
+      enabled: false
+
+chat:
+  auto_reply: true
+  allow_non_org_members: false
+
+knowledge_base:
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "**/AGENTS.md"
+      - "**/CLAUDE.md"
+      - "**/GEMINI.md"
+      - "**/.cursor/rules/*"
+      - "docs/security-checklist.md"
+      - "docs/security-exceptions.md"
+      - "docs/specs/one-tent-loop-quicklog-single-write-path.md"
+      - "docs/agents/HANDOFF_PROTOCOL.md"
+      - "docs/agents/merge-queue.md"
+      - "docs/agents/cheek-approval-workflow.md"
+  learnings:
+    scope: local
+  issues:
+    scope: local
+  pull_requests:
+    scope: local
+  # The other repos in the Verdant-OS org (mosquitto fork, an unrelated accelerator) are not
+  # context for this app; do not let reviews borrow from them.
+  automatic_linking_mode: disabled

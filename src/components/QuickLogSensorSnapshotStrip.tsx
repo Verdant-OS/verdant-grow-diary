@@ -9,16 +9,19 @@
  * `buildQuickLogStripFromTentState` adapter.
  *
  * No classification rules live in this file. No writes. No automation.
- * Action buttons are navigation-only and point at /sensors. The strip
- * never promotes provider labels (ecowitt, home_assistant, ...) to Live —
- * only the strict resolver's `fresh_live` status counts as Live.
+ * Action buttons are navigation-only and point at tent-scoped /sensors
+ * (`tentIntent=required`). Missing or malformed tent fails closed instead
+ * of opening another tent's form. The strip never promotes provider labels
+ * (ecowitt, home_assistant, ...) to Live — only the strict resolver's
+ * `fresh_live` status counts as Live.
  */
 
 import { Gauge, History } from "lucide-react";
 import { useLatestTentSensorSnapshot } from "@/lib/sensor";
 import {
   buildQuickLogStripFromTentState,
-  MANUAL_SNAPSHOT_EDIT_ACTION,
+  buildQuickLogStripSensorsHref,
+  buildManualSnapshotEditAction,
   type QuickLogSnapshotStripStatus,
 } from "@/lib/quickLogSnapshotStripAdapter";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
@@ -137,6 +140,7 @@ export default function QuickLogSensorSnapshotStrip({
     status: state.status,
     snapshot: state.snapshot,
     hasTent: !!tentId,
+    tentId,
     attached,
     temperatureUnit,
   });
@@ -152,7 +156,7 @@ export default function QuickLogSensorSnapshotStrip({
   // classified badge (no source classification in this file).
   const action =
     attachBlocked && view.trustBadge.badge === "manual" && view.action.kind === "none"
-      ? MANUAL_SNAPSHOT_EDIT_ACTION
+      ? buildManualSnapshotEditAction(tentId)
       : view.action;
 
   // Additive: derive a single consistent freshness/empty advisory line
@@ -184,7 +188,7 @@ export default function QuickLogSensorSnapshotStrip({
   // capturedAt is supplied.
   const correctionHref =
     tentId && manualCapturedAt && hasCorrectableOriginalIds(manualReadingIds)
-      ? `/sensors${encodeManualCorrectionHash({
+      ? `${buildQuickLogStripSensorsHref(tentId)}${encodeManualCorrectionHash({
           tentId,
           originalCapturedAt: manualCapturedAt,
           originalReadingIds: manualReadingIds ?? {},

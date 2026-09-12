@@ -196,7 +196,7 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
 
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
     expect(action).toHaveAttribute("data-action-kind", "refresh");
-    expect(action).toHaveAttribute("href", "/sensors");
+    expect(action).toHaveAttribute("href", "/sensors?tentIntent=required");
     expect(action).toHaveTextContent("Refresh snapshot");
   });
 
@@ -219,7 +219,7 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
 
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
     expect(action).toHaveAttribute("data-action-kind", "review");
-    expect(action).toHaveAttribute("href", "/sensors");
+    expect(action).toHaveAttribute("href", "/sensors?tentIntent=required");
     expect(action).toHaveTextContent("Review sensor intake");
   });
 
@@ -235,7 +235,7 @@ describe("QuickLogSensorSnapshotStrip render (tent-scoped realtime hook)", () =>
 
     const action = screen.getByTestId("quicklog-sensor-snapshot-action");
     expect(action).toHaveAttribute("data-action-kind", "add");
-    expect(action).toHaveAttribute("href", "/sensors#manual-reading");
+    expect(action).toHaveAttribute("href", "/sensors?tentIntent=required#manual-reading");
     expect(action).toHaveTextContent("Add snapshot");
   });
 
@@ -332,5 +332,50 @@ describe("QuickLogSensorSnapshotStrip — Temp metric is live-reactive to the te
     expect(screen.getByTestId("quicklog-sensor-snapshot-metric-temp")).toHaveTextContent(
       "Temp 24.3°C",
     );
+  });
+});
+
+describe("QuickLogSensorSnapshotStrip — tent-scoped Sensors handoff", () => {
+  const TENT_A = "0094303d-5f4a-444a-8fd2-878dd57be453";
+  const TENT_B = "604edf84-1040-40e2-a31e-cf67640a981e";
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    vi.setSystemTime(NOW);
+    mockUseLatestTentSensorSnapshot.mockReset();
+    clearTemperatureUnitPreference();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("edit/add action retains the non-default tent (Veg B), not Veg A", () => {
+    mockUseLatestTentSensorSnapshot.mockReturnValue(
+      stateReady(
+        fullSnapshot({
+          source: "manual",
+          status: "fresh_non_live",
+          freshness: "fresh",
+          badge_label: "manual • as of 5 min ago",
+        }),
+      ),
+    );
+    render(<QuickLogSensorSnapshotStrip tentId={TENT_B} />);
+    const action = screen.getByTestId("quicklog-sensor-snapshot-action");
+    expect(action).toHaveAttribute(
+      "href",
+      `/sensors?tentId=${TENT_B}&tentIntent=required#manual-reading`,
+    );
+    expect(action.getAttribute("href")).not.toContain(TENT_A);
+  });
+
+  it("malformed tentId does not silently open another tent's form", () => {
+    mockUseLatestTentSensorSnapshot.mockReturnValue(stateAs("loading"));
+    render(<QuickLogSensorSnapshotStrip tentId="t1" />);
+    const action = screen.getByTestId("quicklog-sensor-snapshot-action");
+    expect(action).toHaveAttribute("href", "/sensors?tentIntent=required#manual-reading");
+    expect(action.getAttribute("href")).not.toContain(TENT_A);
+    expect(action.getAttribute("href")).not.toBe("/sensors#manual-reading");
   });
 });

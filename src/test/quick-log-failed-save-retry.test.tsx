@@ -15,12 +15,17 @@ import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 import { QUICK_LOG_TIMELINE_CTA_LABEL } from "@/lib/quickLogTimelineNavigationTarget";
 
 const rpcMock = vi.fn();
+const fromMock = vi.fn();
+const selectMock = vi.fn();
+const eqMock = vi.fn();
+const readbackMock = vi.fn();
+const RETRY_NOTE = "Retry path — leaf posture held after watering.";
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: (...a: unknown[]) => rpcMock(...a),
     storage: { from: () => ({ upload: vi.fn(), remove: vi.fn() }) },
-    from: () => ({ insert: vi.fn() }),
+    from: (...a: unknown[]) => fromMock(...a),
   },
 }));
 vi.mock("@/hooks/use-plants", () => ({
@@ -72,12 +77,29 @@ function renderSheet(defaultTargetKey: string) {
 function prepareNoteSave() {
   fireEvent.click(screen.getByRole("button", { name: "Note" }));
   fireEvent.change(screen.getByLabelText("Note (optional)"), {
-    target: { value: "Retry path — leaf posture held after watering." },
+    target: { value: RETRY_NOTE },
+  });
+}
+
+/** A successful retry must verify the persisted event, not just the RPC reply. */
+function mockPersistedNote(eventId: string) {
+  readbackMock.mockResolvedValueOnce({
+    data: { id: eventId, note: RETRY_NOTE, plant_id: "plant-1", tent_id: "tent-1" },
+    error: null,
   });
 }
 
 beforeEach(() => {
   rpcMock.mockReset();
+  fromMock.mockReset();
+  selectMock.mockReset();
+  eqMock.mockReset();
+  readbackMock.mockReset();
+  fromMock.mockReturnValue({ insert: vi.fn(), select: selectMock });
+  selectMock.mockReturnValue({ eq: eqMock });
+  eqMock.mockReturnValue({ maybeSingle: readbackMock });
+  // An absent row remains unverified unless a test supplies a saved fixture.
+  readbackMock.mockResolvedValue({ data: null, error: null });
   toastSuccess.mockReset();
   toastError.mockReset();
 });
@@ -122,6 +144,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
   });
 
   it("successful retry surfaces View in Timeline CTA", async () => {
+    mockPersistedNote("ge-retry");
     rpcMock
       .mockResolvedValueOnce({
         data: { ok: false, reason: "save_failed" },
@@ -147,9 +170,16 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         }),
       ),
     );
+    expect(fromMock).toHaveBeenCalledWith("grow_events");
+    expect(selectMock).toHaveBeenCalledWith("id,note,plant_id,tent_id");
+    expect(eqMock).toHaveBeenCalledWith("id", "ge-retry");
+    expect(readbackMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock.mock.calls[1][1]).toEqual(rpcMock.mock.calls[0][1]);
+    expect(screen.getByTestId("qlv2-persisted-note")).toHaveTextContent(RETRY_NOTE);
   });
 
   it("Retry button binds disabled to in-flight save state in source", () => {
+    mockPersistedNote("ge-x");
     // Once Retry is clicked, handleSave clears localError, which
     // unmounts the inline error block. We can't observe a 'disabled'
     // state on a node that no longer exists. The presence and exact
@@ -174,6 +204,8 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         fireEvent.click(screen.getByTestId("qlv2-save-retry"));
         await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(2));
         expect(rpcMock.mock.calls[1][0]).toBe("quicklog_save_manual");
+        await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
+        expect(eqMock).toHaveBeenCalledWith("id", "ge-x");
       },
     );
   });

@@ -53,17 +53,18 @@ hunts with `buildE2eHuntName` (never append to the wizard prefill).
 
 ## Required env
 
-| Name                              | Purpose                                                                                                                                                 |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `E2E_BASE_URL`                    | Base URL of the running app (e.g. http://localhost:5173)                                                                                                |
-| `E2E_GROW_1_PLANT_URL`            | Full URL of a Grow #1 plant page to open first                                                                                                          |
-| `E2E_TEST_EMAIL`                  | Login email for the smoke account                                                                                                                       |
-| `E2E_TEST_PASSWORD`               | Login password for the smoke account                                                                                                                    |
-| `E2E_GROW_1_SECOND_PLANT_NAME`    | Optional. Same-grow/tent target; defaults to `E2E Test Plant 2`                                                                                         |
-| `E2E_FIXTURE_MODE`                | Must be exactly `"true"` for any write-producing smoke run                                                                                              |
-| `E2E_FIXTURE_EXPECTED_TENT_NAME`  | Expected disposable E2E tent name (e.g. `E2E Test Tent`)                                                                                                |
-| `E2E_FIXTURE_EXPECTED_PLANT_NAME` | Expected disposable E2E plant name (e.g. `E2E Test Plant`)                                                                                              |
-| `E2E_FIXTURE_EXPECTED_GROW_NAME`  | **Optional.** Only used if the UI visibly exposes a grow name (e.g. `E2E Test Grow`). The current setup flow has no Grow page, so this is not required. |
+| Name                              | Purpose                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `E2E_BASE_URL`                    | Base URL of the running app (e.g. http://localhost:5173)                                                                                                                                                                                                                                                                                         |
+| `E2E_GROW_1_PLANT_URL`            | Full URL of a Grow #1 plant page to open first                                                                                                                                                                                                                                                                                                   |
+| `E2E_TEST_EMAIL`                  | Login email for the smoke account                                                                                                                                                                                                                                                                                                                |
+| `E2E_TEST_PASSWORD`               | Login password for the smoke account                                                                                                                                                                                                                                                                                                             |
+| `E2E_GROW_1_SECOND_PLANT_NAME`    | Optional. Same-grow/tent target; defaults to `E2E Test Plant 2`                                                                                                                                                                                                                                                                                  |
+| `E2E_FIXTURE_MODE`                | Must be exactly `"true"` for any write-producing smoke run                                                                                                                                                                                                                                                                                       |
+| `E2E_FIXTURE_EXPECTED_TENT_NAME`  | Expected disposable E2E tent name (e.g. `E2E Test Tent`)                                                                                                                                                                                                                                                                                         |
+| `E2E_FIXTURE_EXPECTED_PLANT_NAME` | Expected disposable E2E plant name (e.g. `E2E Test Plant`)                                                                                                                                                                                                                                                                                       |
+| `E2E_FIXTURE_EXPECTED_GROW_NAME`  | **Optional.** Only used if the UI visibly exposes a grow name (e.g. `E2E Test Grow`). The current setup flow has no Grow page, so this is not required.                                                                                                                                                                                          |
+| `TESTDINO_TOKEN`                  | **Optional.** Project API key for [TestDino live streaming](https://docs.testdino.com/guides/playwright-real-time-test-streaming). Results stream during the Playwright run — there is no post-run upload. Leave unset in CI unless Cheek adds a secret; `playwright.config.ts` only attaches `@testdino/playwright` when this var is non-empty. |
 
 `E2E_TEST_EMAIL` / `E2E_TEST_PASSWORD` are only required to (re)generate
 `e2e/.auth/user.json`. Once that file exists, the smoke run reuses it.
@@ -238,6 +239,25 @@ Install Playwright once (it is declared in `devDependencies`, so
 ```bash
 bun run e2e:install
 ```
+
+### Optional TestDino live streaming
+
+`playwright.config.ts` keeps the existing `list` / `html` / `json` reporters
+and adds `@testdino/playwright` only when `TESTDINO_TOKEN` is set. The token
+must come from the environment — never commit a real key. There is no
+separate upload step; results stream as tests finish.
+
+```bash
+export TESTDINO_TOKEN="<project-api-key>"
+bunx playwright test --project=chromium-mocked e2e/legal-seo-metadata.spec.ts
+# If bunx is not on PATH, the same command is:
+npx playwright test --project=chromium-mocked e2e/legal-seo-metadata.spec.ts
+```
+
+Existing project scripts (`bun run e2e:quicklog-smoke`, `bun run e2e:ga`,
+etc.) work the same way: export `TESTDINO_TOKEN` first, then run as usual.
+CI should leave the variable unset until a secret is deliberately added;
+an empty or missing token does not fail the Playwright run.
 
 ### Bash / macOS / Linux
 

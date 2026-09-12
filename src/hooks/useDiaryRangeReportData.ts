@@ -50,7 +50,7 @@ export async function fetchDiaryRangeReportDiaryRows(
   return selectWithRetractionCompat((withRetractionFilter) => {
     let q = supabase
       .from("diary_entries")
-      .select("id,note,photo_url,entry_at,details")
+      .select("id,grow_id,note,photo_url,entry_at,details")
       .eq("grow_id", growId);
     if (withRetractionFilter) q = q.is("retracted_at", null);
     return q
@@ -119,7 +119,7 @@ export function useDiaryRangeReportData(
         fetchDiaryRangeReportDiaryRows(growId, startIso, endIso),
         supabase
           .from("grow_events")
-          .select("id,event_type,occurred_at,note")
+          .select("id,grow_id,event_type,occurred_at,note")
           .eq("grow_id", growId)
           .eq("is_deleted", false)
           .gte("occurred_at", startIso)

@@ -16,6 +16,8 @@ import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import { useSoilMoistureCalibrations } from "@/hooks/useSoilMoistureCalibrations";
 import SoilMoistureCalibrationCaptureCard from "@/components/SoilMoistureCalibrationCaptureCard";
@@ -123,7 +125,12 @@ export default function Sensors() {
   // Do not fetch the all-tents aggregate into the Sensors browser cache.
   // `null` is an explicit no-scope sentinel until a persisted tent is chosen.
   const readingsQuery = useGrowSensorReadings(activeTentId);
-  const { data: readings = [] } = readingsQuery;
+  const quickLogManualQuery = useSensorsQuickLogManualReadings(activeTentId);
+  const { data: tentReadings = [] } = readingsQuery;
+  const readings = useMemo(
+    () => mergeSensorsSeriesWithQuickLogManuals(tentReadings, quickLogManualQuery.data ?? []),
+    [quickLogManualQuery.data, tentReadings],
+  );
   const operatorRole = useHasRole("operator");
 
   // Reconcile only after the authenticated tent query succeeds. A failed

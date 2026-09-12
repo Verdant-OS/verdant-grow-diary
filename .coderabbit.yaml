@@ -1,6 +1,11 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 #
-# Verdant — CodeRabbit review configuration (source of truth; overrides the dashboard).
+# Verdant — CodeRabbit review configuration.
+#
+# Precedence: this repository file overrides the repository-level dashboard settings.
+# Organization-level global overrides set in the CodeRabbit dashboard would still take
+# precedence over this file; as of 2026-09-12 the Verdant-OS org sets none (its only
+# non-default org values are early_access and unit_tests, both restated here).
 #
 # Grounded in AGENTS.md (Hard Safety Rules, Architecture Rules, Supabase / Data Safety,
 # Migration Immutability Rules, Sensor Truth Rules, AI Doctor Rules, Monetization /
@@ -10,7 +15,9 @@
 #
 # Plan note (2026-09-12): the org is on CodeRabbit Essentials. Custom pre-merge checks and
 # finishing touches are not available on that plan, so checklist enforcement lives in the
-# repo-wide path instruction below (visible warning comments, never a merge gate).
+# repo-wide path instruction below (visible warning comments, never a merge gate). The
+# built-in pre-merge checks (title, description, docstrings, linked issues) do run on
+# Essentials — verified on PR #1355.
 # CodeRabbit never approves or merges; Cheek approves, merges go through the merge queue.
 
 language: en-US
@@ -254,9 +261,11 @@ reviews:
         to a client. Secrets come from environment, never literals. Treat request bodies,
         bridge payloads, CSVs, and AI outputs as untrusted: validate shape, units, and
         ranges. No device-command or external-control surface. `_shared/lib/**` is a
-        generated mirror of src/lib — flag hand edits there and remind that
-        `bun run verify-edge-shared-in-sync` gates it. Money and credit paths need runtime
-        harness coverage, not only static tests.
+        generated mirror of src/lib and is excluded from review here; the edge-shared-sync
+        CI gate (`bun run verify-edge-shared-in-sync`) enforces it, so if an edge function
+        needs shared logic, expect the change in src/lib plus a regenerated mirror, not
+        new code under `_shared/lib`. Money and credit paths need runtime harness
+        coverage, not only static tests.
 
     - path: ".github/workflows/**"
       instructions: >-

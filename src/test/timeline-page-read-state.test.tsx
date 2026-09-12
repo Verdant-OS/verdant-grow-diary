@@ -527,6 +527,20 @@ describe("Timeline mounted read-state boundary", () => {
     expectNoTimelineContinuation();
   });
 
+  it("does not claim a first-entry empty when a date-bounded read succeeds with zero rows", async () => {
+    renderTimeline("/timeline?start=2026-09-12&end=2026-09-12");
+
+    expect(await screen.findByText("No entries in this date range")).toBeInTheDocument();
+    expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-empty-state-action-photo")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-read-error")).not.toBeInTheDocument();
+    expectNoTimelineContinuation();
+
+    fireEvent.click(screen.getByTestId("timeline-empty-state-clear-dates"));
+    expect(await screen.findByText("No entries yet")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-empty-state-action-photo")).toBeInTheDocument();
+  });
+
   it("unlocks the Sensors continuation after successful diary evidence", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {

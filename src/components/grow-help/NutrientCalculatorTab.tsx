@@ -26,6 +26,11 @@ import {
   type EcTargetRecipeResult,
   type LabelRateRecipeResult,
 } from "@/lib/nutrientCalc";
+import {
+  MEASURED_MIXED_EC_SOURCE,
+  MEASURED_MIXED_EC_SOURCE_LABEL,
+  isValidMeasuredMixedEc,
+} from "@/lib/growHelpToolkitReadiness";
 import { ppm500, ppm700 } from "@/lib/unitsCalc";
 import NumberField from "./NumberField";
 import ResultBlock from "./ResultBlock";
@@ -210,12 +215,21 @@ export default function NutrientCalculatorTab({
   const injector = useMemo(
     () =>
       attempt(
+        // Call the formula when both planning fields are present so RangeError
+        // messages (e.g. stock ≤ 0) still surface. Skip only when incomplete
+        // or the ratio fails the integer constraint shown by NumberField.
         inputs.injectorEnabled &&
           volumeReady &&
           inputs.stockGramsPerGallon !== null &&
-          inputs.injectorRatio > 0,
+          inputs.injectorRatio !== null &&
+          Number.isInteger(inputs.injectorRatio) &&
+          inputs.injectorRatio >= 1,
         () =>
-          calculateInjectorPlan(inputs.stockGramsPerGallon as number, inputs.injectorRatio, volume),
+          calculateInjectorPlan(
+            inputs.stockGramsPerGallon as number,
+            inputs.injectorRatio as number,
+            volume,
+          ),
       ),
     [inputs.injectorEnabled, inputs.injectorRatio, inputs.stockGramsPerGallon, volume, volumeReady],
   );
@@ -537,7 +551,7 @@ export default function NutrientCalculatorTab({
                 max={10}
                 step={0.01}
                 unit="mS/cm"
-                help="Optional. Shows remaining or overshoot versus target."
+                help="Optional grower-entered reading stored only in this browser. Manual data — not a live sensor or telemetry feed. Shows remaining or overshoot versus target."
               />
             </div>
             <div>
@@ -988,12 +1002,11 @@ export default function NutrientCalculatorTab({
                   id="injector-ratio"
                   label="Injector ratio 1 :"
                   value={inputs.injectorRatio}
-                  onChange={(injectorRatio) =>
-                    onChange({ ...inputs, injectorRatio: injectorRatio ?? 100 })
-                  }
+                  onChange={(injectorRatio) => onChange({ ...inputs, injectorRatio })}
                   min={1}
                   max={10000}
                   step={1}
+                  integer
                   required
                 />
               </div>
@@ -1114,6 +1127,15 @@ export default function NutrientCalculatorTab({
                 {remainingEc.value >= 0
                   ? `${fmt(remainingEc.value)} mS/cm remaining`
                   : `${fmt(Math.abs(remainingEc.value))} mS/cm over target`}
+              </Badge>
+            ) : null}
+            {isValidMeasuredMixedEc(inputs.measuredMixedEc) ? (
+              <Badge
+                variant="outline"
+                data-testid="measured-mixed-ec-source"
+                data-source={MEASURED_MIXED_EC_SOURCE}
+              >
+                Measured EC · {MEASURED_MIXED_EC_SOURCE_LABEL}
               </Badge>
             ) : null}
           </div>

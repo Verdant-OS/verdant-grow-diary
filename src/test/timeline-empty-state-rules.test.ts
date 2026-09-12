@@ -112,7 +112,11 @@ describe("resolveTimelineEmptyState", () => {
   });
 
   it("keeps first-entry guidance when the unbounded grow read is truly empty", () => {
-    const view = resolveTimelineEmptyState({ ...base, dateBoundsActive: false, context: withPlant });
+    const view = resolveTimelineEmptyState({
+      ...base,
+      dateBoundsActive: false,
+      context: withPlant,
+    });
     expect(view?.kind).toBe("no_entries");
     expect(view?.title).toBe(TIMELINE_EMPTY_NO_ENTRIES_TITLE);
     expect(view?.offersClearFilters).toBe(false);
@@ -155,7 +159,9 @@ describe("resolveTimelineEmptyState", () => {
   it("exposes a non-null fallback shaped like a filtered-out view", () => {
     expect(TIMELINE_EMPTY_STATE_FALLBACK.kind).toBe("filtered_out");
     expect(TIMELINE_EMPTY_STATE_FALLBACK.actions).toEqual([]);
-    expect(TIMELINE_EMPTY_STATE_FALLBACK.clearFiltersLabel).toBe(TIMELINE_EMPTY_CLEAR_FILTERS_LABEL);
+    expect(TIMELINE_EMPTY_STATE_FALLBACK.clearFiltersLabel).toBe(
+      TIMELINE_EMPTY_CLEAR_FILTERS_LABEL,
+    );
   });
 
   it("never promises automation or device control in its copy", () => {

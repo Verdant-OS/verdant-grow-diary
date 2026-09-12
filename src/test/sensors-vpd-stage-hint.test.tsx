@@ -9,6 +9,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Sensors from "@/pages/Sensors";
 import { VPD_STAGE_HELPER_TEXT } from "@/lib/vpdStageTargetRules";
 
+vi.mock("@/hooks/useSensorsQuickLogManualReadings", () => ({
+  useSensorsQuickLogManualReadings: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({
     data: [],

@@ -3,7 +3,10 @@
  * Local-only runtime proof for the Quick Log dual-timestamp foundation.
  *
  * Exercises both authenticated RPC variants and direct legacy-writer inserts
- * against a disposable local Supabase stack. It refuses remote API hosts.
+ * against a disposable local Supabase stack. Also discards an accepted Note
+ * response and retries its serialized request through a recreated client.
+ * This proves RPC transport recovery, not browser or UI reload recovery.
+ * It refuses remote API hosts.
  * Temporary @verdant.test users and all fixture rows are deleted in finally.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -90,9 +93,14 @@ async function recreateUser(email: string, password: string): Promise<string> {
   return data.user.id;
 }
 
-async function signedInClient(email: string, password: string): Promise<SupabaseClient> {
+async function signedInClient(
+  email: string,
+  password: string,
+  fetchOverride?: HarnessFetch,
+): Promise<SupabaseClient> {
   const client = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
+    ...(fetchOverride ? { global: { fetch: fetchOverride } } : {}),
   });
   const { error } = await client.auth.signInWithPassword({ email, password });
   if (error) throw new Error(`temporary sign-in failed: ${error.message}`);
@@ -330,6 +338,288 @@ async function seedLegacyEventRetryFixture(input: {
     },
     event: event as Record<string, unknown>,
   };
+}
+
+type HarnessFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+type FixtureRow = Record<string, unknown>;
+
+const NOTE_FIXTURE_TABLES = [
+  "grow_events",
+  "diary_entries",
+  "environment_events",
+  "quicklog_idempotency",
+] as const;
+type NoteFixtureRows = Record<(typeof NOTE_FIXTURE_TABLES)[number], FixtureRow[]>;
+
+async function readNoteFixture(uid: string): Promise<NoteFixtureRows> {
+  const entries = await Promise.all(
+    NOTE_FIXTURE_TABLES.map(async (table) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (admin as any)
+        .from(table)
+        .select("*")
+        .eq("user_id", uid);
+      if (error || !Array.isArray(data)) {
+        throw new Error(`response-loss fixture read failed: ${table}`);
+      }
+      return [table, data as FixtureRow[]] as const;
+    }),
+  );
+  return Object.fromEntries(entries) as NoteFixtureRows;
+}
+
+function noteFixtureFingerprint(rows: NoteFixtureRows): string {
+  return JSON.stringify(
+    NOTE_FIXTURE_TABLES.map((table) => [
+      table,
+      rows[table].map((row) => JSON.stringify(row)).sort(),
+    ]),
+  );
+}
+
+async function proveManualResponseLoss(seedA: Seed, seedB: Seed, clientB: SupabaseClient) {
+  // A nonempty second user's fixture makes the isolation comparison meaningful.
+  const witness = await callManual(clientB, {
+    p_target_type: "plant",
+    p_target_id: seedB.plantId,
+    p_action: "note",
+    p_note: `response-loss witness ${STAMP}`,
+    p_temperature_c: 24,
+    p_humidity_pct: 60,
+    p_vpd_kpa: 1.1,
+    p_idempotency_key: key("response-loss-witness"),
+  });
+  check(
+    "response-loss witness Note is accepted for the other fixture",
+    !witness.error && witness.data?.ok === true && Boolean(witness.data?.grow_event_id),
+  );
+  if (witness.error || witness.data?.ok !== true || !witness.data?.grow_event_id) {
+    throw new Error("response-loss witness setup failed");
+  }
+  const witnessBefore = await readNoteFixture(seedB.uid);
+  if (
+    witnessBefore.grow_events.length !== 2 ||
+    witnessBefore.diary_entries.length !== 1 ||
+    witnessBefore.environment_events.length !== 1 ||
+    witnessBefore.quicklog_idempotency.length !== 1
+  ) {
+    throw new Error("response-loss witness readback is incomplete");
+  }
+
+  for (const withSensors of [false, true]) {
+    const label = withSensors ? "Note with manual readings" : "plain Note";
+    const occurredAt = withSensors ? "2026-07-16T09:31:00.000Z" : "2026-07-16T09:30:00.000Z";
+    const capturedAt = new Date(Date.now() - 45_000).toISOString();
+    const idempotencyKey = key(withSensors ? "lost-note-sensors" : "lost-note");
+    const note = `accepted response-loss ${label} ${STAMP}`;
+    // Persist only the request. The recreated client cannot recover IDs or
+    // timestamps from the response that the first client never received.
+    const serializedRequest = JSON.stringify({
+      p_target_type: "plant",
+      p_target_id: seedA.plantId,
+      p_action: "note",
+      p_volume_ml: null,
+      p_note: note,
+      p_temperature_c: withSensors ? 25.2 : null,
+      p_humidity_pct: withSensors ? 58.4 : null,
+      p_vpd_kpa: withSensors ? 1.24 : null,
+      p_occurred_at: occurredAt,
+      p_details: { kind: "note", logged_at: capturedAt },
+      p_idempotency_key: idempotencyKey,
+    });
+    const before = await readNoteFixture(seedA.uid);
+    const accepted: Array<{ status: number; body: FixtureRow }> = [];
+    let rpcFetches = 0;
+    let discardedResponses = 0;
+    const discardAcceptedResponse: HarnessFetch = async (input, init) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      const isManualRpc =
+        url.origin === new URL(SUPABASE_URL).origin &&
+        url.pathname === "/rest/v1/rpc/quicklog_save_manual" &&
+        request.method === "POST";
+      const body = isManualRpc ? ((await request.clone().json()) as FixtureRow) : null;
+      if (isManualRpc) rpcFetches += 1;
+      // Always await the real local PostgREST response. Auth failures, HTTP
+      // errors and {ok:false} RPC results pass through without synthetic loss.
+      const response = await fetch(request);
+      if (
+        isManualRpc &&
+        body?.p_idempotency_key === idempotencyKey &&
+        discardedResponses === 0 &&
+        response.ok
+      ) {
+        const result = (await response.clone().json()) as FixtureRow;
+        if (result.ok === true) {
+          accepted.push({ status: response.status, body: result });
+          discardedResponses += 1;
+          throw new TypeError("harness discarded accepted Note response");
+        }
+      }
+      return response;
+    };
+
+    // Deliberately scoped: the recovery below creates and authenticates a new
+    // Supabase client and restores JSON, rather than reusing this SDK instance.
+    {
+      const firstClient = await signedInClient(EMAIL_A, PASS_A, discardAcceptedResponse);
+      const rejected = await callManual(firstClient, {
+        ...JSON.parse(serializedRequest),
+        p_details: { kind: "note", logged_at: "not-a-timestamp" },
+      });
+      check(
+        `${label}: genuine rejection is returned without synthetic response loss`,
+        !rejected.error &&
+          rejected.data?.ok === false &&
+          rejected.data?.reason === "invalid_logged_at" &&
+          rpcFetches === 1 &&
+          discardedResponses === 0,
+      );
+      const afterRejection = await readNoteFixture(seedA.uid);
+      check(
+        `${label}: rejected request leaves logical rows and idempotency unchanged`,
+        noteFixtureFingerprint(afterRejection) === noteFixtureFingerprint(before),
+      );
+
+      const fetchesBeforeLoss = rpcFetches;
+      const lost = await callManual(firstClient, JSON.parse(serializedRequest));
+      check(
+        `${label}: real successful response is discarded exactly once`,
+        accepted.length === 1 &&
+          accepted[0].status >= 200 &&
+          accepted[0].status < 300 &&
+          accepted[0].body.ok === true &&
+          accepted[0].body.reused === false &&
+          discardedResponses === 1,
+      );
+      check(
+        `${label}: first client sees transport failure after one RPC fetch`,
+        rpcFetches - fetchesBeforeLoss === 1 &&
+          lost.data == null &&
+          Boolean(lost.error?.message?.includes("harness discarded accepted Note response")),
+      );
+    }
+
+    const receipt = accepted[0]?.body;
+    if (!receipt || discardedResponses !== 1 || typeof receipt.grow_event_id !== "string") {
+      throw new Error("accepted-response loss was not observed; recovery proof cannot continue");
+    }
+    const committed = await readNoteFixture(seedA.uid);
+    const parent = committed.grow_events.find((row) => row.id === receipt.grow_event_id);
+    const diary = committed.diary_entries.filter((row) => {
+      const details = row.details as FixtureRow | null;
+      return details?.linked_grow_event_id === receipt.grow_event_id;
+    });
+    const companion = diary[0];
+    const details = companion?.details as FixtureRow | undefined;
+    const environment = committed.grow_events.filter(
+      (row) =>
+        row.event_type === "environment" &&
+        row.grow_id === seedA.growId &&
+        sameInstant(row.occurred_at, occurredAt),
+    );
+    const environmentValues = committed.environment_events.filter(
+      (row) => row.event_id === receipt.environment_event_id,
+    );
+    check(
+      `${label}: lost response already committed exactly one Note and diary companion`,
+      committed.grow_events.length === before.grow_events.length + (withSensors ? 2 : 1) &&
+        committed.diary_entries.length === before.diary_entries.length + 1 &&
+        diary.length === 1 &&
+        companion.id === receipt.diary_entry_id &&
+        committed.quicklog_idempotency.length === before.quicklog_idempotency.length + 1,
+    );
+    check(
+      `${label}: committed Note preserves original owner, target, text and manual source`,
+      parent?.user_id === seedA.uid &&
+        parent.grow_id === seedA.growId &&
+        parent.tent_id === seedA.tentId &&
+        parent.plant_id === seedA.plantId &&
+        parent.event_type === "observation" &&
+        parent.source === "manual" &&
+        parent.note === note,
+    );
+    check(
+      `${label}: diary linkage and original occurrence/capture times survive response loss`,
+      companion?.user_id === seedA.uid &&
+        companion.grow_id === seedA.growId &&
+        companion.tent_id === seedA.tentId &&
+        companion.plant_id === seedA.plantId &&
+        companion.note === note &&
+        details?.kind === "note" &&
+        sameInstant(parent?.occurred_at, occurredAt) &&
+        sameInstant(parent?.logged_at, capturedAt) &&
+        sameInstant(companion.entry_at, occurredAt) &&
+        sameInstant(companion.logged_at, capturedAt) &&
+        sameInstant(details?.logged_at, capturedAt),
+    );
+    check(
+      `${label}: environment companion cardinality and identity match the original request`,
+      committed.environment_events.length ===
+        before.environment_events.length + (withSensors ? 1 : 0) &&
+        (withSensors
+          ? environment.length === 1 &&
+            environment[0].id === receipt.environment_event_id &&
+            environment[0].user_id === seedA.uid &&
+            environment[0].tent_id === seedA.tentId &&
+            environment[0].plant_id === seedA.plantId &&
+            environment[0].source === "manual" &&
+            sameInstant(environment[0].logged_at, capturedAt) &&
+            environmentValues.length === 1 &&
+            Number(environmentValues[0].temperature_c) === 25.2 &&
+            Number(environmentValues[0].humidity_pct) === 58.4 &&
+            Number(environmentValues[0].vpd_kpa) === 1.24
+          : receipt.environment_event_id === null && environment.length === 0),
+    );
+
+    const restoredRequest = JSON.parse(serializedRequest) as FixtureRow;
+    check(
+      `${label}: serialized request restores the original payload and idempotency key`,
+      JSON.stringify(restoredRequest) === serializedRequest &&
+        restoredRequest.p_idempotency_key === idempotencyKey,
+    );
+    let retryFetches = 0;
+    const countRetryFetch: HarnessFetch = async (input, init) => {
+      const request = new Request(input, init);
+      if (
+        new URL(request.url).pathname === "/rest/v1/rpc/quicklog_save_manual" &&
+        request.method === "POST"
+      ) {
+        retryFetches += 1;
+      }
+      return fetch(request);
+    };
+    const recreatedClient = await signedInClient(EMAIL_A, PASS_A, countRetryFetch);
+    const retry = await callManual(recreatedClient, restoredRequest);
+    check(
+      `${label}: recreated client retries once and reuses the accepted parent ID`,
+      retryFetches === 1 &&
+        !retry.error &&
+        retry.data?.ok === true &&
+        retry.data?.reused === true &&
+        retry.data?.grow_event_id === receipt.grow_event_id,
+    );
+    const recovered = await readNoteFixture(seedA.uid);
+    check(
+      `${label}: retry preserves all canonical IDs, rows, text and timestamps`,
+      noteFixtureFingerprint(recovered) === noteFixtureFingerprint(committed),
+    );
+    const keyRows = recovered.quicklog_idempotency.filter(
+      (row) => row.idempotency_key === idempotencyKey,
+    );
+    check(
+      `${label}: one original idempotency record points to the same Note`,
+      keyRows.length === 1 && keyRows[0].grow_event_id === receipt.grow_event_id,
+    );
+    const witnessAfter = await readNoteFixture(seedB.uid);
+    check(
+      `${label}: the other fixture's existing Note and companions remain unchanged`,
+      noteFixtureFingerprint(witnessAfter) === noteFixtureFingerprint(witnessBefore),
+    );
+    console.log(
+      `  ${label} RPC fetches: initial client=${rpcFetches} (rejection + loss), recreated client=${retryFetches}`,
+    );
+  }
 }
 
 async function teardown(uids: string[]) {
@@ -829,6 +1119,8 @@ async function main() {
         scalarManualBefore === scalarManualAfter,
       JSON.stringify(scalarManual.data),
     );
+
+    await proveManualResponseLoss(seedA, seedB, clientB);
 
     const concurrentKey = key("event-concurrent");
     const concurrentArgs = {

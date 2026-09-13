@@ -86,3 +86,15 @@ describe("Google Analytics route metadata timing", () => {
     expect((root.match(/useGoogleAnalyticsPageViews\(\)/g) ?? []).length).toBe(1);
   });
 });
+
+describe("Vercel Web Analytics wiring uniqueness", () => {
+  it("imports @vercel/analytics/react once and mounts <Analytics /> once in RootDocument", () => {
+    const root = readFile("src/routes/__root.tsx");
+    expect((root.match(/from ["']@vercel\/analytics\/react["']/g) ?? []).length).toBe(1);
+    expect(root).toMatch(
+      /function RootDocument\([\s\S]*?<body>[\s\S]*?<Analytics \/>\s*\n\s*<Scripts \/>/,
+    );
+    expect((root.match(/<Analytics \/>/g) ?? []).length).toBe(1);
+    expect(root).toMatch(/function AnalyticsShell\(\)[\s\S]*?return <AnalyticsConsentBanner \/>/);
+  });
+});

@@ -580,7 +580,7 @@ describe("durable unresolved Note recovery", () => {
     expect(screen.getByLabelText("Note (optional)")).toHaveValue(originalNote);
   });
 
-  it("keeps a confirmed Note saved while an uncleared storage fence prevents a new submission", async () => {
+  it.each(["pending", "already cleared"] as const)("keeps a confirmed Note saved while resolving recovery (%s)", async storageState => {
     modelLostNoteReply();
     renderSheet();
     typeNote();
@@ -594,6 +594,8 @@ describe("durable unresolved Note recovery", () => {
     expect(window.sessionStorage.getItem(pendingKey())).not.toBeNull();
     expect(committed.size).toBe(1);
     expect(rpcMock).toHaveBeenCalledTimes(2);
+    // Another mounted sheet may have already cleared this same confirmed operation.
+    if (storageState === "already cleared") window.sessionStorage.removeItem(pendingKey());
     fireEvent.click(screen.getByTestId("qlv2-note-storage-recheck"));
     await waitFor(() => expect(screen.getByTestId("quick-log-post-save-another")).toBeEnabled());
     expect(window.sessionStorage.getItem(pendingKey())).toBeNull();

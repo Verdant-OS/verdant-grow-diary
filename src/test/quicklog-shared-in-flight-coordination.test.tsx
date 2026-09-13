@@ -493,7 +493,7 @@ describe("Quick Log shared in-flight coordination", () => {
     );
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      pending.resolve({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
       await pending.promise;
     });
 
@@ -648,7 +648,7 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(harvest.note).toHaveValue("Harvest activity A");
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      pending.resolve({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
       await pending.promise;
     });
 
@@ -754,7 +754,7 @@ describe("Quick Log shared in-flight coordination", () => {
     });
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      pending.resolve({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
       await pending.promise;
     });
 
@@ -831,7 +831,7 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(harness.rpc.mock.calls[0][1]).toEqual(expect.objectContaining({ p_target_id: "p1" }));
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      pending.resolve({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
       await pending.promise;
     });
   });
@@ -888,7 +888,7 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(capturedPayload.p_note).not.toMatch(/Blocked|999|9\.[1-9]/);
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      pending.resolve({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
       await pending.promise;
     });
 
@@ -1023,7 +1023,7 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(unit).toHaveTextContent("EC mS/cm");
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "main-event" }, error: null });
+      pending.resolve({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
       await pending.promise;
     });
     await waitFor(() => expectMainDraftSemanticallyLocked(false));

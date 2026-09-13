@@ -109,7 +109,7 @@ function ecowittPayload(): QuickLogV2SavePayload {
 describe("useQuickLogV2Save telemetry", () => {
   it("emits once only after a fresh confirmed RPC success with explicit Quick Log intent", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "event-1", reused: false },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
       error: null,
     });
     const { result } = renderHook(() => useQuickLogV2Save());
@@ -126,11 +126,11 @@ describe("useQuickLogV2Save telemetry", () => {
   it("preserves closed observation and environment UI intent when RPC persistence is note", async () => {
     rpcMock
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "observation-1", reused: false },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
         error: null,
       })
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "environment-1", reused: false },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
         error: null,
       });
     const notePayload = { ...manualPayload, p_action: "note" as const, p_volume_ml: null };
@@ -152,7 +152,7 @@ describe("useQuickLogV2Save telemetry", () => {
     ["EcoWitt validation diary", ecowittPayload()],
   ])("emits zero calls for a successful non-Quick-Log %s save", async (_label, payload) => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "event-1", reused: false },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
       error: null,
     });
     const { result } = renderHook(() => useQuickLogV2Save());
@@ -176,7 +176,7 @@ describe("useQuickLogV2Save telemetry", () => {
     {
       label: "replay",
       response: {
-        data: { ok: true, grow_event_id: "event-1", reused: true },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
         error: null,
       },
     },
@@ -241,11 +241,11 @@ describe("useQuickLogActivitySave telemetry", () => {
   it("emits once from the event success branch and zero for an idempotent callback", async () => {
     rpcMock
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "event-1", reused: false },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
         error: null,
       })
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "event-1", reused: true },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
         error: null,
       });
     const { result } = renderHook(() => useQuickLogActivitySave());

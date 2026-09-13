@@ -26,6 +26,8 @@ import type { ResolvedQuickLogV2Target } from "@/lib/quickLogV2Rules";
 
 const rpcMock = vi.fn();
 
+vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: (...a: unknown[]) => rpcMock(...a) },
 }));
@@ -80,9 +82,10 @@ async function savedNote(): Promise<string | null> {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
   rpcMock.mockResolvedValue({
-    data: { ok: true, grow_event_id: "ge-1", environment_event_id: null },
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", environment_event_id: null },
     error: null,
   });
 });

@@ -229,7 +229,7 @@ describe("PlantQuickLog success telemetry", () => {
 
     await act(async () => {
       rpc.resolve({
-        data: { ok: true, grow_event_id: "ge-1", reused: false },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
         error: null,
       });
       await rpc.promise;

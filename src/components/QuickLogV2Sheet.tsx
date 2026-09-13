@@ -1773,7 +1773,13 @@ function QuickLogV2SheetForOwner({
   function handleRecheckNoteStorage() {
     if (!postSave || !noteStorageFence || saveInFlightRef.current) return;
     const confirmed = confirmedNoteRecoveryRef.current;
-    if (!confirmed || !clearPendingQuickLogNote(confirmed)) {
+    if (!confirmed) return;
+    const current = readPendingQuickLogNote(confirmed.ownerId);
+    // Another sheet may already have cleared the same confirmed operation,
+    // or removal may have succeeded before its read-back became unavailable.
+    const cleared = current.status === "empty" ||
+      (current.status === "pending" && clearPendingQuickLogNote(confirmed));
+    if (!cleared) {
       setLocalError(NOTE_RECOVERY_CLEAR_FAILED);
       return;
     }
@@ -2618,7 +2624,7 @@ function QuickLogV2SheetForOwner({
                   data-testid="qlv2-note-storage-recheck"
                   onClick={handleRecheckNoteStorage}
                 >
-                  Recheck recovery storage
+                  Try again
                 </Button>
               )}
               {!postSave && (

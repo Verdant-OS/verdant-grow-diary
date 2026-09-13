@@ -589,7 +589,7 @@ describe("durable unresolved Note recovery", () => {
     vi.spyOn(Storage.prototype, "removeItem").mockImplementationOnce(() => { throw new Error("Storage unavailable"); });
     retry();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
-    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/recovery|storage/i);
+    expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/Your Note is saved/i);
     expect(screen.getByTestId("quick-log-post-save-another")).toBeDisabled();
     expect(window.sessionStorage.getItem(pendingKey())).not.toBeNull();
     expect(committed.size).toBe(1);

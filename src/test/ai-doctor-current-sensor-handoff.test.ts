@@ -18,7 +18,11 @@ import { classificationFromStatusResult } from "@/lib/sensorSnapshotStatusContra
 import { buildAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import type { AiDoctorContextResult } from "@/lib/aiDoctorContextRules";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
-import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
+import {
+  buildManualSnapshotTimelineCard,
+  type ManualSnapshotTimelineCard,
+} from "@/lib/manualSensorSnapshotViewModel";
+import { diaryRowToManualSnapshotRecord } from "@/lib/manualSnapshotDiaryAdapter";
 
 const NOW = new Date("2026-07-17T12:00:00.000Z");
 const FRESH = "2026-07-17T11:58:00.000Z";
@@ -462,6 +466,49 @@ describe("AI Doctor request packet current-sensor selection", () => {
     const manual = packet([row("temperature_c", 25, "manual"), row("humidity_pct", 58, "manual")]);
     expect(manual.recentSensorSnapshotAnnotation?.source).toBe("manual");
     expect(manual.missingLiveSensorReadings).toBe(true);
+  });
+
+
+  it.each([
+    ["stale live", row("temperature_c", 30, "live", "2026-07-17T11:44:00.000Z")],
+    ["invalid live", row("temperature_c", 500, "live", "2026-07-17T11:59:00.000Z")],
+  ] as const)("keeps a usable persisted diary manual over newer %s evidence", (_label, currentRow) => {
+    const record = diaryRowToManualSnapshotRecord({
+      id: "persisted-diary-manual",
+      plant_id: "plant-1",
+      tent_id: "tent-1",
+      entry_at: "2026-07-17T03:00:00.000Z",
+      note: "Grower measured the tent",
+      details: {
+        manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 60 },
+      },
+    });
+    expect(record).not.toBeNull();
+    const card = buildManualSnapshotTimelineCard(record!);
+    const result = buildAiDoctorReviewRequestPacket({
+      plant: null,
+      timelineItems: [
+        { kind: "manual_sensor_snapshot", key: card.id, occurredAt: card.capturedAt, card },
+      ],
+      context: context(),
+      currentSensorRows: [currentRow],
+      now: NOW,
+    });
+
+    expect(result.recentSensorSnapshot?.capturedAt).toBe("2026-07-17T03:00:00.000Z");
+    expect(result.recentSensorSnapshot?.readings).toEqual(
+      expect.arrayContaining([
+        { field: "air_temp_c", value: 25, unit: "°C" },
+        { field: "humidity_pct", value: 60, unit: "%" },
+      ]),
+    );
+    expect(result.recentSensorSnapshotAnnotation).toMatchObject({
+      source: "manual",
+      stale: false,
+      trust: "medium",
+      includesValues: true,
+    });
+    expect(result.missingLiveSensorReadings).toBe(true);
   });
 
   it("prefers the newer of direct tent evidence and a diary-attached snapshot", () => {

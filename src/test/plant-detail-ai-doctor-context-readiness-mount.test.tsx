@@ -6,7 +6,7 @@
  * occur during render.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render as renderTestingLibrary, screen } from "@testing-library/react";
+import { render as renderTestingLibrary, screen, fireEvent } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import PlantDetailAiDoctorContextReadinessMount from "@/components/PlantDetailAiDoctorContextReadinessMount";
@@ -32,37 +32,49 @@ const HOUR = 3600 * 1000;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 const render = (ui: ReactElement) => renderTestingLibrary(<MemoryRouter>{ui}</MemoryRouter>);
 
-let recentActivityState: { data?: unknown; isLoading: boolean } = {
+const activityRetry = vi.fn();
+const manualRetry = vi.fn();
+const tentRetry = vi.fn();
+const alertsRetry = vi.fn();
+type ReadState = { data?: unknown; isLoading: boolean; isFetching?: boolean; isError?: boolean };
+
+let recentActivityState: ReadState = {
   data: [],
   isLoading: false,
 };
-let manualLogsState: { data?: unknown; isLoading: boolean } = {
+let manualLogsState: ReadState = {
   data: [],
   isLoading: false,
 };
-let alertsState: { rows: ReadonlyArray<{ id: string; status?: string }> } = { rows: [] };
+let alertsState: {
+  rows: ReadonlyArray<{ id: string; status?: string }>;
+  status?: "idle" | "loading" | "ok" | "unavailable";
+  openCount?: number;
+} = { rows: [] };
 let tentReadingsState: {
   byTent: Record<string, unknown[]>;
   statusByTent: Record<string, string>;
+  refreshingByTent?: Record<string, boolean>;
 } = { byTent: {}, statusByTent: {} };
 
 vi.mock("@/hooks/usePlantRecentActivity", () => ({
   PLANT_RECENT_ACTIVITY_LIMIT: 10,
-  usePlantRecentActivity: () => recentActivityState,
+  usePlantRecentActivity: () => ({ ...recentActivityState, refetch: activityRetry }),
 }));
 vi.mock("@/hooks/usePlantManualSensorHistory", () => ({
   PLANT_MANUAL_SENSOR_HISTORY_LIMIT: 30,
   usePlantManualSensorHistory: () => ({ data: undefined, isLoading: false }),
-  usePlantManualSensorLogs: () => manualLogsState,
+  usePlantManualSensorLogs: () => ({ ...manualLogsState, refetch: manualRetry }),
 }));
 vi.mock("@/hooks/usePlantAssignedTentAlerts", () => ({
   usePlantAssignedTentAlerts: () => ({
-    status: "idle",
+    status: alertsState.status ?? "ok",
     rows: alertsState.rows,
     // Mirrors the hook: counts come from the uncapped active set, not `rows`.
-    openCount: alertsState.rows.filter((r) => r.status === "open").length,
+    openCount: alertsState.openCount ?? alertsState.rows.filter((r) => r.status === "open").length,
     activeCount: alertsState.rows.length,
-    error: null,
+    error: alertsState.status === "unavailable" ? "private alert error detail" : null,
+    reload: alertsRetry,
   }),
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
@@ -76,9 +88,10 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
     return {
       byTent,
       statusByTent,
+      refreshingByTent: tentReadingsState.refreshingByTent ?? {},
       isLoading: false,
       isError: false,
-      refetch: vi.fn(),
+      refetch: tentRetry,
       retryTent: vi.fn(),
     };
   },
@@ -99,6 +112,10 @@ beforeEach(() => {
   alertsState = { rows: [] };
   tentReadingsState = { byTent: {}, statusByTent: {} };
   fetchSpy.mockClear();
+  activityRetry.mockReset();
+  manualRetry.mockReset();
+  tentRetry.mockReset();
+  alertsRetry.mockReset();
 });
 
 describe("PlantDetailAiDoctorContextReadinessMount", () => {
@@ -288,5 +305,202 @@ describe("PlantDetailAiDoctorContextReadinessMount", () => {
     expect(src).not.toMatch(/\.update\s*\(/);
     expect(src).not.toMatch(/\.delete\s*\(/);
     expect(src).not.toMatch(/createAlert|insertAlert/);
+  });
+});
+
+describe("PlantDetailAiDoctorContextReadinessMount — failed reads are not missing evidence", () => {
+  const tentId = "604edf84-1040-40e2-a31e-cf67640a981e";
+  const props = { ...baseProps, tentId };
+  const manualRow = () => ({
+    tent_id: tentId,
+    source: "manual",
+    quality: "ok",
+    metric: "temperature_c",
+    value: 24,
+    captured_at: ago(8 * HOUR),
+  });
+
+  function expectNoNormalPreview() {
+    expect(screen.queryByTestId("ai-doctor-context-readiness-panel")).toBeNull();
+    expect(screen.queryByTestId("plant-sensor-context-audit-panel")).toBeNull();
+    expect(screen.queryByTestId("ai-doctor-check-in-preview-panel")).toBeNull();
+  }
+
+  it.each(["activity", "plant manuals", "tent manuals"] as const)(
+    "does not show missing context after a failed %s read",
+    (source) => {
+      if (source === "activity") recentActivityState = { isLoading: false, isError: true };
+      if (source === "plant manuals") manualLogsState = { isLoading: false, isError: true };
+      if (source === "tent manuals") {
+        tentReadingsState = { byTent: {}, statusByTent: { [tentId]: "error" } };
+      }
+      render(<PlantDetailAiDoctorContextReadinessMount {...props} />);
+      expect(
+        screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-error"),
+      ).toHaveAttribute("role", "alert");
+      expectNoNormalPreview();
+      fireEvent.click(screen.getByRole("button", { name: "Try context read again" }));
+      expect(activityRetry).toHaveBeenCalledTimes(1);
+      expect(manualRetry).toHaveBeenCalledTimes(1);
+      expect(tentRetry).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    "does not present a failed tent refresh as current context (cached rows: %s)",
+    (hasCachedRows) => {
+      tentReadingsState = {
+        byTent: { [tentId]: hasCachedRows ? [manualRow()] : [] },
+        statusByTent: { [tentId]: "refresh_error" },
+      };
+      render(<PlantDetailAiDoctorContextReadinessMount {...props} />);
+      expect(
+        screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-error"),
+      ).toBeInTheDocument();
+      expectNoNormalPreview();
+    },
+  );
+
+  it.each(["activity", "plant manuals"] as const)(
+    "does not treat failed cached %s as a successful read",
+    (source) => {
+      const failed = { data: [], isLoading: false, isError: true };
+      if (source === "activity") recentActivityState = failed;
+      else manualLogsState = failed;
+      render(<PlantDetailAiDoctorContextReadinessMount {...props} />);
+      expect(
+        screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-error"),
+      ).toBeInTheDocument();
+      expectNoNormalPreview();
+    },
+  );
+
+  it.each(["activity", "plant manuals", "tent manuals"] as const)(
+    "withholds absence claims while an empty %s result refreshes",
+    (source) => {
+      const refreshing = { data: [], isLoading: false, isFetching: true };
+      if (source === "activity") recentActivityState = refreshing;
+      if (source === "plant manuals") manualLogsState = refreshing;
+      if (source === "tent manuals") {
+        tentReadingsState = {
+          byTent: { [tentId]: [] },
+          statusByTent: { [tentId]: "success" },
+          refreshingByTent: { [tentId]: true },
+        };
+      }
+      render(<PlantDetailAiDoctorContextReadinessMount {...props} />);
+      expect(
+        screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-loading"),
+      ).toBeInTheDocument();
+      expectNoNormalPreview();
+    },
+  );
+
+  it("recovers from loading through failure to usable tent history without changing hook order", () => {
+    tentReadingsState = { byTent: {}, statusByTent: { [tentId]: "loading" } };
+    const rendered = render(<PlantDetailAiDoctorContextReadinessMount {...props} />);
+    tentReadingsState = { byTent: {}, statusByTent: { [tentId]: "error" } };
+    rendered.rerender(
+      <MemoryRouter>
+        <PlantDetailAiDoctorContextReadinessMount {...props} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Try context read again" }));
+    tentReadingsState = {
+      byTent: { [tentId]: [manualRow()] },
+      statusByTent: { [tentId]: "success" },
+    };
+    expect(() =>
+      rendered.rerender(
+        <MemoryRouter>
+          <PlantDetailAiDoctorContextReadinessMount {...props} />
+        </MemoryRouter>,
+      ),
+    ).not.toThrow();
+    expect(screen.getByTestId("ai-doctor-context-readiness-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-sensor-context-audit-latest")).not.toHaveTextContent(/None/i);
+    expect(
+      screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-scope"),
+    ).toHaveTextContent(/last 7 days.*current sensor health.*AI Doctor readiness/i);
+  });
+});
+
+describe("PlantDetailAiDoctorContextReadinessMount — assigned-tent alert read state", () => {
+  const count = () => screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts");
+
+  it.each(["idle", "loading"] as const)(
+    "shows alert %s without blocking the context preview",
+    (status) => {
+      alertsState = { rows: [], status, openCount: 7 };
+      render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
+
+      expect(screen.getByTestId("ai-doctor-context-readiness-panel")).toBeInTheDocument();
+      expect(count()).toHaveTextContent(/^Loading…$/);
+      expect(count()).not.toHaveTextContent("7");
+      expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+    },
+  );
+
+  it.each([0, 7])(
+    "does not present failed alert read count %s as a successful result",
+    (staleCount) => {
+      alertsState = { rows: [], status: "unavailable", openCount: staleCount };
+      render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
+
+      expect(count()).toHaveTextContent(/^Unavailable$/);
+      expect(count()).not.toHaveTextContent(String(staleCount));
+      expect(screen.getByTestId("ai-doctor-context-readiness-panel")).not.toHaveTextContent(
+        "private alert error detail",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Retry alerts" }));
+      expect(alertsRetry).toHaveBeenCalledTimes(1);
+      expect(activityRetry).not.toHaveBeenCalled();
+      expect(manualRetry).not.toHaveBeenCalled();
+      expect(tentRetry).not.toHaveBeenCalled();
+    },
+  );
+
+  it("shows successful zero distinctly from unavailable, then recovers through loading", () => {
+    alertsState = { rows: [], status: "ok", openCount: 0 };
+    const rendered = render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
+    expect(count()).toHaveTextContent(/^0$/);
+    const rerender = () =>
+      rendered.rerender(
+        <MemoryRouter>
+          <PlantDetailAiDoctorContextReadinessMount {...baseProps} />
+        </MemoryRouter>,
+      );
+
+    alertsState = { rows: [], status: "unavailable", openCount: 0 };
+    rerender();
+    expect(count()).toHaveTextContent(/^Unavailable$/);
+    fireEvent.click(screen.getByRole("button", { name: "Retry alerts" }));
+
+    alertsState = { rows: [], status: "loading", openCount: 0 };
+    rerender();
+    expect(count()).toHaveTextContent(/^Loading…$/);
+    alertsState = { rows: [], status: "ok", openCount: 8 };
+    rerender();
+    expect(count()).toHaveTextContent(/^8$/);
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+    expect(alertsRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("forwards the uncapped strictly-open count rather than counting acknowledged display rows", () => {
+    alertsState = {
+      rows: Array.from({ length: 5 }, (_, i) => ({ id: `ack-${i}`, status: "acknowledged" })),
+      status: "ok",
+      openCount: 8,
+    };
+    render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
+    expect(count()).toHaveTextContent(/^8$/);
+  });
+
+  it("shows no assigned tent without a zero or an alert retry control", () => {
+    alertsState = { rows: [], status: "idle", openCount: 0 };
+    render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} tentId={null} />);
+    expect(count()).toHaveTextContent(/^No assigned tent$/);
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
   });
 });

@@ -32,6 +32,8 @@ export interface UsePlantAssignedTentAlertsResult {
   /** Active (open + acknowledged) count for the tent, also uncapped. */
   activeCount: number;
   error: string | null;
+  /** Retry only this existing alerts read. */
+  reload: () => void;
 }
 
 export function usePlantAssignedTentAlerts(
@@ -51,7 +53,7 @@ export function usePlantAssignedTentAlerts(
   // server-side (rather than fetching everything and discarding) also means a
   // long tail of resolved/dismissed rows can never crowd an older active alert
   // out of the result set.
-  const { status, alerts, error } = useAlertsList(
+  const { status, alerts, error, reload } = useAlertsList(
     { growId: growId ?? null, statuses: ASSIGNED_TENT_ALERT_STATUSES },
     // No tent means the rules layer returns [] regardless — don't read at all.
     { enabled: !!tentId },
@@ -67,5 +69,5 @@ export function usePlantAssignedTentAlerts(
     [active, limit],
   );
   const openCount = useMemo(() => countOpenAlerts(active), [active]);
-  return { status, rows, openCount, activeCount: active.length, error };
+  return { status, rows, openCount, activeCount: active.length, error, reload };
 }

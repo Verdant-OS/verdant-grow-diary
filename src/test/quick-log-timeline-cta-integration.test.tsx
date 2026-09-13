@@ -119,6 +119,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
   toastSuccess.mockReset();
   toastError.mockReset();
@@ -141,7 +142,7 @@ beforeEach(() => {
 describe("Quick Log → Timeline CTA (standard save)", () => {
   it("exposes 'View diary' with grow-scoped Timeline href (not Plant Detail)", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "ge-42", environment_event_id: null },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000042", environment_event_id: null },
       error: null,
     });
     renderSheet("plant:plant-1");
@@ -156,7 +157,7 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
     const rpcBefore = rpcMock.mock.calls.length;
     action.onClick();
     expect(navigateMock).toHaveBeenCalledWith(
-      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-ge-42",
+      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-77777777-7777-4777-8777-000000000042",
     );
     // Must not route to Plant Detail.
     expect(navigateMock.mock.calls[0][0]).not.toMatch(/^\/plants\//);
@@ -175,7 +176,7 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
 
   it("tent target routes to grow-scoped Timeline without plantId", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: null, environment_event_id: null },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000045", environment_event_id: null },
       error: null,
     });
     renderSheet("tent:tent-1");
@@ -185,14 +186,14 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
 
     const action = getToastAction();
     action.onClick();
-    expect(navigateMock).toHaveBeenCalledWith("/timeline?growId=grow-1&tentId=tent-1");
+    expect(navigateMock).toHaveBeenCalledWith("/timeline?growId=grow-1&tentId=tent-1#timeline-entry-77777777-7777-4777-8777-000000000045");
     expect(navigateMock.mock.calls[0][0]).not.toMatch(/^\/tents\//);
-    expect(navigateMock.mock.calls[0][0]).not.toContain("#");
+    expect(navigateMock.mock.calls[0][0]).not.toContain("plantId=");
   });
 
   it("post-save panel View diary CTA uses the same grow-scoped route", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "ge-panel", environment_event_id: null },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000043", environment_event_id: null },
       error: null,
     });
     renderSheet("plant:plant-1");
@@ -207,7 +208,7 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
     const rpcBefore = rpcMock.mock.calls.length;
     fireEvent.click(viewBtn);
     expect(navigateMock).toHaveBeenCalledWith(
-      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-ge-panel",
+      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-77777777-7777-4777-8777-000000000043",
     );
     expect(rpcMock.mock.calls.length).toBe(rpcBefore);
   });
@@ -216,7 +217,7 @@ describe("Quick Log → Timeline CTA (standard save)", () => {
 describe("Quick Log → Timeline CTA (photo success)", () => {
   it("'Log and photo saved' exposes the same grow-scoped CTA", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "ge-photo", environment_event_id: null },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000044", environment_event_id: null },
       error: null,
     });
     storageUpload.mockResolvedValue({ data: { path: "p" }, error: null });
@@ -242,7 +243,7 @@ describe("Quick Log → Timeline CTA (photo success)", () => {
     const rpcBefore = rpcMock.mock.calls.length;
     action.onClick();
     expect(navigateMock).toHaveBeenCalledWith(
-      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-ge-photo",
+      "/timeline?growId=grow-1&plantId=plant-1&tentId=tent-1#timeline-entry-77777777-7777-4777-8777-000000000044",
     );
     expect(rpcMock.mock.calls.length).toBe(rpcBefore);
   });

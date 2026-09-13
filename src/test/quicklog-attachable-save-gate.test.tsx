@@ -160,7 +160,7 @@ async function saveNoteAndGetPayload(): Promise<Record<string, unknown>> {
 
 beforeEach(() => {
   rpcMock.mockReset();
-  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "e1" }, error: null });
+  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
   snapState.status = "ready";
   snapState.snapshot = snap();
   stripStatusLeak.to = null;

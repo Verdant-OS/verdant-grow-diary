@@ -16,6 +16,7 @@ import {
   type AiDoctorReadinessState,
 } from "@/lib/aiDoctorReadinessViewModel";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
+import type { AlertsListStatus } from "@/hooks/useAlertsList";
 import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 import {
   ACTION_SUGGESTION_INVALID_FIELD_LABELS,
@@ -42,6 +43,9 @@ export interface AiDoctorReadinessQuickActions {
 export interface AiDoctorContextReadinessPanelProps {
   context: AiDoctorContext;
   openAlertsCount?: number;
+  /** Numeric-only callers retain their existing successful-count contract. */
+  openAlertsStatus?: AlertsListStatus | "unassigned";
+  onRetryAlerts?: () => void;
   className?: string;
   quickActions?: AiDoctorReadinessQuickActions;
 }
@@ -164,12 +168,18 @@ function QuickActionsRow({
 export default function AiDoctorContextReadinessPanel({
   context,
   openAlertsCount,
+  openAlertsStatus = "ok",
+  onRetryAlerts,
   className,
   quickActions,
 }: AiDoctorContextReadinessPanelProps) {
   const view = useMemo(
-    () => buildAiDoctorReadinessView({ context, openAlertsCount }),
-    [context, openAlertsCount],
+    () =>
+      buildAiDoctorReadinessView({
+        context,
+        openAlertsCount: openAlertsStatus === "ok" ? openAlertsCount : undefined,
+      }),
+    [context, openAlertsCount, openAlertsStatus],
   );
   const style = STATE_STYLES[view.state];
 
@@ -287,11 +297,25 @@ export default function AiDoctorContextReadinessPanel({
         </div>
         <div className="rounded-md border border-border/40 p-2">
           <dt className="text-muted-foreground">Open alerts</dt>
-          <dd
-            className="font-medium"
-            data-testid="ai-doctor-context-readiness-panel-count-open-alerts"
-          >
-            {view.counts.openAlerts}
+          <dd className="font-medium" aria-live="polite">
+            <span data-testid="ai-doctor-context-readiness-panel-count-open-alerts">
+              {openAlertsStatus === "ok"
+                ? view.counts.openAlerts
+                : openAlertsStatus === "unassigned"
+                  ? "No assigned tent"
+                  : openAlertsStatus === "unavailable"
+                    ? "Unavailable"
+                    : "Loading…"}
+            </span>
+            {openAlertsStatus === "unavailable" && typeof onRetryAlerts === "function" ? (
+              <button
+                type="button"
+                onClick={onRetryAlerts}
+                className="mt-1 block rounded-md border border-border/40 px-2 py-0.5 text-xs"
+              >
+                Retry alerts
+              </button>
+            ) : null}
           </dd>
         </div>
       </dl>

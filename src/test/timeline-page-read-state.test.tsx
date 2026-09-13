@@ -541,6 +541,95 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.getByTestId("timeline-empty-state-action-photo")).toBeInTheDocument();
   });
 
+  it("enables top Clear filters when a stage chip is active and resets stage filtering", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            { ...diaryEntry("veg-entry", "Veg timeline row"), stage: "veg" },
+            { ...diaryEntry("flower-entry", "Flower timeline row"), stage: "flower" },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Veg timeline row")).toBeInTheDocument();
+    expect(screen.getByText("Flower timeline row")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Flowering/i }));
+    expect(screen.queryByText("Veg timeline row")).not.toBeInTheDocument();
+    expect(screen.getByText("Flower timeline row")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-clear-filters")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("timeline-clear-filters"));
+    expect(await screen.findByText("Veg timeline row")).toBeInTheDocument();
+    expect(screen.getByText("Flower timeline row")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+  });
+
+  it("top Clear filters clears an applied date range without hiding in-range entries", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [diaryEntry("dated-entry", "Dated timeline row", "2026-07-20T12:00:00.000Z")],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline("/timeline?start=2026-07-01&end=2026-07-31");
+
+    expect(await screen.findByText("Dated timeline row")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-start-date")).toHaveValue("2026-07-01");
+    expect(screen.getByTestId("timeline-end-date")).toHaveValue("2026-07-31");
+    expect(screen.getByTestId("timeline-clear-filters")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("timeline-clear-filters"));
+
+    expect(await screen.findByText("Dated timeline row")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-start-date")).toHaveValue("");
+    expect(screen.getByTestId("timeline-end-date")).toHaveValue("");
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+  });
+
+  it("top Clear filters clears date bounds when resetting an active stage chip", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [{ ...diaryEntry("veg-entry", "Veg timeline row"), stage: "veg" }],
+          error: null,
+          count: 1,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline("/timeline?start=2026-07-01&end=2026-07-31");
+
+    expect(await screen.findByText("Veg timeline row")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-start-date")).toHaveValue("2026-07-01");
+    expect(screen.getByTestId("timeline-end-date")).toHaveValue("2026-07-31");
+
+    fireEvent.click(screen.getByRole("button", { name: /Vegetative/i }));
+    expect(screen.getByText("Veg timeline row")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-clear-filters")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("timeline-clear-filters"));
+
+    expect(await screen.findByText("Veg timeline row")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-start-date")).toHaveValue("");
+    expect(screen.getByTestId("timeline-end-date")).toHaveValue("");
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+  });
+
   it("unlocks the Sensors continuation after successful diary evidence", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {

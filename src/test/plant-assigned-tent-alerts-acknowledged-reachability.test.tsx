@@ -18,7 +18,7 @@
  * after the fix and prove nothing.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 
 import type { AlertRow, AlertsQuery } from "@/lib/alerts";
 import {
@@ -238,5 +238,58 @@ describe("countOpenAlerts — 'open alerts' copy stays truthful", () => {
     await waitFor(() => expect(result.current.status).toBe("ok"));
     expect(result.current.rows).toHaveLength(ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT);
     expect(result.current.openCount).toBe(8);
+  });
+});
+
+describe("usePlantAssignedTentAlerts — failed reads remain unavailable and retryable", () => {
+  it("exposes the existing alert reload and recovers a rejected first read to successful zero", async () => {
+    listAlertsMock.mockRejectedValueOnce(new Error("alert read failed")).mockResolvedValueOnce([]);
+    const { result } = renderHook(() => usePlantAssignedTentAlerts(TENT, GROW));
+
+    await waitFor(() => expect(result.current.status).toBe("unavailable"));
+    expect(result.current.openCount).toBe(0);
+    expect(result.current.error).toBe("alert read failed");
+    expect(result.current.reload).toEqual(expect.any(Function));
+    act(() => result.current.reload());
+
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.openCount).toBe(0);
+    expect(result.current.error).toBeNull();
+    expect(listAlertsMock).toHaveBeenCalledTimes(2);
+    expect(listAlertsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ growId: GROW, statuses: [...ASSIGNED_TENT_ALERT_STATUSES] }),
+    );
+  });
+
+  it("retains the existing loading/unavailable contract when a refresh fails after populated success", async () => {
+    let rejectRefresh!: (reason: Error) => void;
+    listAlertsMock
+      .mockResolvedValueOnce([alert({ id: "open-1" }), alert({ id: "open-2" })])
+      .mockImplementationOnce(
+        () =>
+          new Promise<AlertRow[]>((_, reject) => {
+            rejectRefresh = reject;
+          }),
+      )
+      .mockResolvedValueOnce([alert({ id: "open-recovered" })]);
+    const { result } = renderHook(() => usePlantAssignedTentAlerts(TENT, GROW));
+
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.openCount).toBe(2);
+    expect(result.current.reload).toEqual(expect.any(Function));
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.status).toBe("loading"));
+    // The underlying hook retains rows while loading. Consumers must honor
+    // status instead of showing this retained number as a completed read.
+    expect(result.current.openCount).toBe(2);
+    await act(async () => rejectRefresh(new Error("alert refresh failed")));
+    await waitFor(() => expect(result.current.status).toBe("unavailable"));
+    expect(result.current.openCount).toBe(0);
+    expect(result.current.error).toBe("alert refresh failed");
+
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.openCount).toBe(1);
+    expect(listAlertsMock).toHaveBeenCalledTimes(3);
   });
 });

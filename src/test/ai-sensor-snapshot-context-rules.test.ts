@@ -436,6 +436,36 @@ describe("buildAiSensorSnapshotContext — canonical manual card fields", () => 
     expect(result.valuesForModel?.soil_ec).toBe(1.1);
   });
 
+  it("uses finite canonical fallbacks when older aliases are nonnumeric", () => {
+    const result = buildAiSensorSnapshotContext(
+      {
+        source: "manual",
+        captured_at: CAPTURED_FRESH,
+        temperature_f: Number.NaN,
+        temp_f: Number.POSITIVE_INFINITY,
+        temperature_c: "24",
+        temp_c: null,
+        air_temp_c: 0,
+        humidity: Number.NaN,
+        humidity_pct: 0,
+        soil_moisture: "40",
+        soil_moisture_pct: 0,
+        soil_ec: Number.POSITIVE_INFINITY,
+        soil_ec_mscm: 0,
+      },
+      { now: NOW },
+    );
+    expect(result.valuesForModel).toEqual({
+      air_temp_c: 0,
+      humidity_pct: 0,
+      soil_moisture_pct: 0,
+      soil_ec_mscm: 0,
+    });
+    expect(result.annotationLine).toBe(
+      "LATEST_SENSOR_SNAPSHOT [source=manual, stale=false, trust=medium]: temp=0°C, humidity=0%, soil_moisture=0%, soil_ec=0",
+    );
+  });
+
   it("keeps a canonical manual measurement stale after its 24-hour window", () => {
     const result = buildAiSensorSnapshotContext(
       { source: "manual", captured_at: "2026-06-05T11:00:00.000Z", air_temp_c: 25 },
@@ -449,6 +479,8 @@ describe("buildAiSensorSnapshotContext — canonical manual card fields", () => 
 
   it.each([
     { source: "invalid", captured_at: CAPTURED_FRESH },
+    { source: "demo", captured_at: CAPTURED_FRESH },
+    { source: "unknown", captured_at: CAPTURED_FRESH },
     { source: "manual", captured_at: "not-a-date" },
   ])("omits canonical numeric values when provenance or timestamp is invalid: %j", (snapshot) => {
     const result = buildAiSensorSnapshotContext(

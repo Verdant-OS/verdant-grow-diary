@@ -97,4 +97,12 @@ describe("Vercel Web Analytics wiring uniqueness", () => {
     expect((root.match(/<Analytics \/>/g) ?? []).length).toBe(1);
     expect(root).toMatch(/function AnalyticsShell\(\)[\s\S]*?return <AnalyticsConsentBanner \/>/);
   });
+
+  it("does not mount a second <Analytics /> inside ApplicationRootComponent (duplicate pageview regression)", () => {
+    const root = readFile("src/routes/__root.tsx");
+    const appRootBody = root.match(/function ApplicationRootComponent\(\)[\s\S]*/)?.[0];
+    expect(appRootBody, "ApplicationRootComponent must exist in __root.tsx").toBeTruthy();
+    expect(appRootBody!).not.toContain("<Analytics />");
+    expect(appRootBody!).not.toMatch(/<QueryClientProvider[\s\S]*<Analytics \/>/);
+  });
 });

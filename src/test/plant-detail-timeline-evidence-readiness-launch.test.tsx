@@ -239,7 +239,6 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — operator actions", () =
   });
 });
 
-
 describe("PlantDetailTimelineEvidenceReadinessLaunch — scope and read honesty", () => {
   it("includes an eight-hour assigned-tent manual when plant diary snapshots are empty", () => {
     renderLaunch({ tentRows: [EIGHT_HOUR_MANUAL] });
@@ -261,9 +260,7 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — scope and read honesty"
     expect(
       screen.queryByTestId("timeline-evidence-readiness-missing-no_recent_sensor_snapshot"),
     ).toBeNull();
-    const scope = screen.getByTestId(
-      "plant-detail-timeline-evidence-readiness-launch-scope",
-    );
+    const scope = screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-scope");
     expect(scope).toHaveTextContent(/plant diary.*assigned tent/i);
     expect(scope).toHaveTextContent(/last 7 days/i);
     expect(scope).toHaveTextContent(/current sensor health.*AI Doctor readiness/i);
@@ -332,25 +329,30 @@ describe("PlantDetailTimelineEvidenceReadinessLaunch — scope and read honesty"
       "cached usable plant manuals",
       {
         manualState: { isError: true },
-        manualLogs: [{
-          capturedAt: "2026-09-12T12:00:00Z",
-          source: "manual",
-          metrics: { temp_f: 75 },
-        }],
+        manualLogs: [
+          {
+            capturedAt: "2026-09-12T12:00:00Z",
+            source: "manual",
+            metrics: { temp_f: 75 },
+          },
+        ],
       },
     ],
-  ])("keeps %s failure distinct from absent evidence and retries contributing reads", (_label, overrides) => {
-    renderLaunch(overrides);
-    expect(
-      screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-error"),
-    ).toHaveAttribute("role", "alert");
-    expect(screen.queryByTestId("timeline-evidence-readiness-panel")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Try context read again" }));
-    expect(activityRetry).toHaveBeenCalledTimes(1);
-    expect(manualRetry).toHaveBeenCalledTimes(1);
-    expect(tentRetry).toHaveBeenCalledTimes(1);
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
+  ])(
+    "keeps %s failure distinct from absent evidence and retries contributing reads",
+    (_label, overrides) => {
+      renderLaunch(overrides);
+      expect(
+        screen.getByTestId("plant-detail-timeline-evidence-readiness-launch-error"),
+      ).toHaveAttribute("role", "alert");
+      expect(screen.queryByTestId("timeline-evidence-readiness-panel")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Try context read again" }));
+      expect(activityRetry).toHaveBeenCalledTimes(1);
+      expect(manualRetry).toHaveBeenCalledTimes(1);
+      expect(tentRetry).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    },
+  );
 
   it("recovers from loading and failure without changing hook order or inventing empty context", () => {
     const rendered = renderLaunch({ tentStatus: "loading" });

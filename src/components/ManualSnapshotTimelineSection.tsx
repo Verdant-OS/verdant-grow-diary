@@ -51,8 +51,8 @@ export default function ManualSnapshotTimelineSection(props: Props) {
         >
           {props.scope === "plant"
             ? "Grower-recorded readings attached to this plant’s diary. Shared tent records can also appear in QuickLog memory."
-            : "Grower-recorded readings in this tent’s diary, including its plants."}
-          {" "}Not live, not synced, not imported.
+            : "Grower-recorded readings in this tent’s diary, including its plants."}{" "}
+          Not live, not synced, not imported.
         </p>
       </CardHeader>
       <CardContent>

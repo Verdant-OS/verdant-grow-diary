@@ -111,8 +111,7 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     manualLogs.isFetching ||
     manualLogs.data === undefined ||
     Boolean(
-      tentUuid &&
-        (tentSensorStatus === "loading" || tentReadings.refreshingByTent?.[tentUuid]),
+      tentUuid && (tentSensorStatus === "loading" || tentReadings.refreshingByTent?.[tentUuid]),
     );
 
   const retryContextReads = () => {

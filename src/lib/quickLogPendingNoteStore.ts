@@ -16,7 +16,7 @@ export const NOTE_RECOVERY_UNAVAILABLE =
 export const NOTE_RECOVERY_PENDING =
   "An earlier Note is unresolved. Retry to check the original entry and destination.";
 export const NOTE_RECOVERY_CLEAR_FAILED =
-  "The Note is saved, but its recovery storage could not be cleared. Another Note is blocked until this recovery record can be checked.";
+  "Your Note is saved. We couldn’t finish preparing the next Note. Try again before logging another.";
 
 export type PendingNoteRead =
   | { status: "empty" }

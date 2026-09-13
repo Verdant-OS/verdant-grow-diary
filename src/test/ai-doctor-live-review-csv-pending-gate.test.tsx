@@ -20,7 +20,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import type { ReactElement } from "react";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
-import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
+import {
+  buildManualSnapshotTimelineCard,
+  type ManualSnapshotTimelineCard,
+} from "@/lib/manualSensorSnapshotViewModel";
+import { diaryRowToManualSnapshotRecord } from "@/lib/manualSnapshotDiaryAdapter";
 
 function render(ui: ReactElement) {
   const client = new QueryClient({
@@ -85,26 +89,37 @@ const sensorQueryState = vi.hoisted(() => ({
   csvRefetch: vi.fn(async () => undefined),
   currentRows: [] as unknown[],
   currentStatus: "success" as "loading" | "error" | "refresh_error" | "success",
+  manualStatus: null as "loading" | "error" | "refresh_error" | "success" | null,
+  currentReadCalls: [] as Array<{ limit: number; sources: readonly string[] }>,
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
-  useSensorReadingsByTents: (tentIds: string[], _limit: number) => {
+  useSensorReadingsByTents: (
+    tentIds: string[],
+    limit: number,
+    sources: readonly string[] = [],
+  ) => {
+    sensorQueryState.currentReadCalls.push({ limit, sources: [...sources] });
+    const isManualOnly = sources.length === 1 && sources[0] === "manual";
+    const status = isManualOnly
+      ? (sensorQueryState.manualStatus ?? sensorQueryState.currentStatus)
+      : sensorQueryState.currentStatus;
     const byTent: Record<string, unknown[]> = {};
     const statusByTent: Record<string, string> = {};
+    // Model independent, source-filtered bounded API responses. The real
+    // query implementation is covered in use-sensor-readings-by-tents.
+    const scopedRows = sensorQueryState.currentRows
+      .filter((row) => sources.includes(String((row as { source?: unknown }).source)))
+      .slice(0, limit);
     for (const id of tentIds) {
-      byTent[id] =
-        sensorQueryState.currentStatus === "success" ||
-        sensorQueryState.currentStatus === "refresh_error"
-          ? sensorQueryState.currentRows
-          : [];
-      statusByTent[id] = sensorQueryState.currentStatus;
+      byTent[id] = status === "success" || status === "refresh_error" ? scopedRows : [];
+      statusByTent[id] = status;
     }
     return {
       byTent,
       statusByTent,
-      isLoading: sensorQueryState.currentStatus === "loading",
-      isError:
-        sensorQueryState.currentStatus === "error" ||
-        sensorQueryState.currentStatus === "refresh_error",
+      isLoading: status === "loading",
+      isError: status === "error" || status === "refresh_error",
+      refetch: vi.fn(async () => undefined),
     };
   },
 }));
@@ -298,6 +313,8 @@ beforeEach(() => {
   sensorQueryState.csvRefetch.mockResolvedValue(undefined);
   sensorQueryState.currentRows = [];
   sensorQueryState.currentStatus = "success";
+  sensorQueryState.manualStatus = null;
+  sensorQueryState.currentReadCalls = [];
   trackFunnelEvent.mockClear();
 });
 
@@ -724,6 +741,116 @@ describe("CSV history pending/error gating", () => {
     expect(packet.recentSensorSnapshotAnnotation?.source).toBe("manual");
     expect(packet.missingLiveSensorReadings).toBe(true);
     expect(JSON.stringify(packet)).not.toContain('"value":29');
+  });
+
+
+  it.each(["error", "refresh_error"] as const)(
+    "preserves a 9h diary manual when the manual query has %s and stale live fills the mixed cap",
+    async (manualStatus) => {
+      const capturedAt = new Date(Date.now() - 9 * 3600_000).toISOString();
+      const record = diaryRowToManualSnapshotRecord({
+        id: "saved-diary-manual",
+        plant_id: "p1",
+        tent_id: TENT_ID,
+        entry_at: capturedAt,
+        note: "Measured by the grower",
+        details: {
+          manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 60 },
+        },
+      });
+      expect(record).not.toBeNull();
+      const card = buildManualSnapshotTimelineCard(record!);
+      itemsRef.current = [
+        ...oneRecentNoteTimeline(),
+        { kind: "manual_sensor_snapshot", key: card.id, occurredAt: capturedAt, card },
+      ];
+      sensorQueryState.currentRows = [
+        ...Array.from({ length: 60 }, (_, index) => ({
+          id: `stale-live-${index}`,
+          tent_id: TENT_ID,
+          metric: "temperature_c",
+          value: 30,
+          captured_at: new Date(Date.now() - 16 * 60_000).toISOString(),
+          source: "live",
+          quality: "ok",
+        })),
+        // Retained cache on refresh_error must never outrank the diary.
+        {
+          id: "cached-manual",
+          tent_id: TENT_ID,
+          metric: "temperature_c",
+          value: 31,
+          captured_at: new Date(Date.now() - 60_000).toISOString(),
+          source: "manual",
+          quality: "ok",
+        },
+      ];
+      sensorQueryState.manualStatus = manualStatus;
+      const invoke = mount();
+
+      expect(sensorQueryState.currentReadCalls).toEqual(
+        expect.arrayContaining([
+          { limit: 50, sources: ["live", "manual"] },
+          { limit: 50, sources: ["manual"] },
+        ]),
+      );
+      fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+      const packet = invoke.mock.calls[0][1].body.packet;
+      expect(packet.recentSensorSnapshot?.capturedAt).toBe(capturedAt);
+      expect(packet.recentSensorSnapshot?.readings).toEqual(
+        expect.arrayContaining([
+          { field: "air_temp_c", value: 25, unit: "°C" },
+          { field: "humidity_pct", value: 60, unit: "%" },
+        ]),
+      );
+      expect(packet.recentSensorSnapshotAnnotation).toMatchObject({
+        source: "manual",
+        stale: false,
+        trust: "medium",
+      });
+      expect(packet.missingLiveSensorReadings).toBe(true);
+      expect(JSON.stringify(packet.recentSensorSnapshot)).not.toContain('"value":31');
+    },
+  );
+
+  it("carries a separately fetched 9h tent manual through a mixed window crowded by 60 stale live rows", async () => {
+    const capturedAt = new Date(Date.now() - 9 * 3600_000).toISOString();
+    itemsRef.current = oneRecentNoteTimeline();
+    sensorQueryState.currentRows = [
+      ...Array.from({ length: 60 }, (_, index) => ({
+        id: `stale-live-${index}`,
+        tent_id: TENT_ID,
+        metric: "temperature_c",
+        value: 30,
+        captured_at: new Date(Date.now() - 16 * 60_000).toISOString(),
+        source: "live",
+        quality: "ok",
+      })),
+      {
+        id: "tent-manual",
+        tent_id: TENT_ID,
+        metric: "temperature_c",
+        value: 25,
+        captured_at: capturedAt,
+        source: "manual",
+        quality: "ok",
+      },
+    ];
+    const invoke = mount();
+
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    const packet = invoke.mock.calls[0][1].body.packet;
+    expect(packet.recentSensorSnapshot?.capturedAt).toBe(capturedAt);
+    expect(packet.recentSensorSnapshot?.readings).toEqual([
+      { field: "temperature_c", value: 25, unit: "°C" },
+    ]);
+    expect(packet.recentSensorSnapshotAnnotation).toMatchObject({
+      source: "manual",
+      stale: false,
+    });
+    expect(packet.missingLiveSensorReadings).toBe(true);
   });
 
   it("a failed current read proceeds without inventing a current snapshot", async () => {

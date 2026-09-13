@@ -286,6 +286,7 @@ function QuickLogV2SheetForOwner({
     return () => { lifetime.active = false; };
   }, []);
   const [noteStorageFence, setNoteStorageFence] = useState(false);
+  const confirmedNoteRecoveryRef = useRef<PendingQuickLogNote | null>(null);
   const [restoredMediaPending, setRestoredMediaPending] = useState(
     Boolean(initialNote && (initialNote.attachments.photo || initialNote.attachments.video)),
   );
@@ -767,6 +768,7 @@ function QuickLogV2SheetForOwner({
     // the previous draft. A stale completion can never repopulate the sheet.
     resetVideoSelection();
     if (open) {
+      setRestoredMediaPending(false);
       setVisitMode("fast_check");
       setForm({
         ...EMPTY_QUICKLOG_V2_FORM,
@@ -1654,6 +1656,9 @@ function QuickLogV2SheetForOwner({
       }
     }
 
+    // Photo cleanup above can await storage after a failed companion write.
+    // Recheck before starting the next write, not only after it resolves.
+    if (exactManualSubmission && !canContinueNote()) return;
     if (submissionVideoFile && submissionVideoMeta && resolved.growId) {
       setSaveStatus("Uploading video…");
       const upload = await uploadQuickLogVideo(resolved.growId, submissionVideoFile);
@@ -1694,6 +1699,7 @@ function QuickLogV2SheetForOwner({
     if (exactManualSubmission) {
       recoveryClearFailed = !clearPendingQuickLogNote(exactManualSubmission.recovery);
       setNoteStorageFence(recoveryClearFailed);
+      confirmedNoteRecoveryRef.current = recoveryClearFailed ? exactManualSubmission.recovery : null;
       if (recoveryClearFailed) setLocalError(NOTE_RECOVERY_CLEAR_FAILED);
       manualRetrySubmissionRef.current = null;
     }
@@ -1764,6 +1770,20 @@ function QuickLogV2SheetForOwner({
    * save cycle can proceed. Preserves the selected target so the
    * grower doesn't lose their place.
    */
+  function handleRecheckNoteStorage() {
+    if (!postSave || !noteStorageFence || saveInFlightRef.current) return;
+    const confirmed = confirmedNoteRecoveryRef.current;
+    if (!confirmed || !clearPendingQuickLogNote(confirmed)) {
+      setLocalError(NOTE_RECOVERY_CLEAR_FAILED);
+      return;
+    }
+    // The server receipt is already confirmed. This action only clears that
+    // exact recovery identity; it must never submit the Note again.
+    confirmedNoteRecoveryRef.current = null;
+    setNoteStorageFence(false);
+    setLocalError(null);
+  }
+
   function handleLogAnother() {
     if (noteStorageFence) return;
     setRestoredMediaPending(false);
@@ -2590,6 +2610,17 @@ function QuickLogV2SheetForOwner({
               className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive flex items-center justify-between gap-2"
             >
               <span>{localError}</span>
+              {postSave && noteStorageFence && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  data-testid="qlv2-note-storage-recheck"
+                  onClick={handleRecheckNoteStorage}
+                >
+                  Recheck recovery storage
+                </Button>
+              )}
               {!postSave && (
                 <Button
                   type="button"

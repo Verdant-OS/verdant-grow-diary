@@ -15,11 +15,14 @@ const fromMock = vi.fn();
 const toastSuccess = vi.fn();
 const telemetryMock = vi.fn();
 const navigationMock = vi.fn();
+const uploadMock = vi.fn();
+const removeMock = vi.fn();
 const context = vi.hoisted(() => ({ isError: false, userId: "11111111-1111-4111-8111-111111111111" }));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: (...args: unknown[]) => rpcMock(...args),
+    storage: { from: () => ({ upload: uploadMock, remove: removeMock }) },
     from: (...args: unknown[]) => fromMock(...args),
   },
 }));
@@ -85,7 +88,7 @@ function modelLostNoteReply() {
   });
 }
 
-function renderSheet() {
+function renderSheet(initialTarget = "plant:33333333-3333-4333-8333-333333333333", initialAction: "note" | "feed" = "note") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const onOpenChange = vi.fn();
   const tree = (open = true, target = "plant:33333333-3333-4333-8333-333333333333", action: "note" | "feed" = "note") => (
@@ -98,7 +101,7 @@ function renderSheet() {
       />
     </QueryClientProvider>
   );
-  const view = render(tree());
+  const view = render(tree(true, initialTarget, initialAction));
   return {
     onOpenChange,
     unmount: view.unmount,
@@ -127,6 +130,10 @@ beforeEach(() => {
   window.sessionStorage.clear();
   context.userId = "11111111-1111-4111-8111-111111111111";
   rpcMock.mockReset();
+  uploadMock.mockReset().mockResolvedValue({ error: null });
+  removeMock.mockReset().mockResolvedValue({ error: null });
+  URL.createObjectURL = vi.fn(() => "blob:test-photo");
+  URL.revokeObjectURL = vi.fn();
   readbackMock.mockReset();
   committed = new Map();
   context.isError = false;
@@ -457,8 +464,7 @@ describe("durable unresolved Note recovery", () => {
     const payload = structuredClone(rpcMock.mock.calls[0][1]);
     first.unmount();
 
-    const second = renderSheet();
-    second.rerender(true, "plant:44444444-4444-4444-8444-444444444444", "feed");
+    renderSheet("plant:44444444-4444-4444-8444-444444444444", "feed");
     await expectRetry();
     expect(rpcMock).toHaveBeenCalledTimes(1);
     expect(JSON.parse(dispatchRecords[0]!)).toMatchObject({ ownerId: ownerA, payload });
@@ -616,6 +622,75 @@ describe("durable unresolved Note recovery", () => {
     expect(screen.getByTestId("qlv2-pending-note-media")).toHaveTextContent(/attachment/i);
     expect(screen.getByTestId("qlv2-post-save")).not.toHaveTextContent(/photo saved|video saved/i);
   });
+
+  it("captures an actual selected photo before dispatch and preserves its unavailable intent after remount", async () => {
+    modelLostNoteReply();
+    const first = renderSheet();
+    typeNote();
+    fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
+      target: { files: [new File(["photo"], "leaf.jpg", { type: "image/jpeg" })] },
+    });
+    save();
+    await expectRetry();
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(window.sessionStorage.getItem(pendingKey())!).attachments).toEqual({ photo: true, video: false });
+    first.unmount();
+    renderSheet("plant:44444444-4444-4444-8444-444444444444", "feed");
+    await expectRetry();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    retry();
+    await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("qlv2-pending-note-media")).toHaveTextContent(/attachment/i);
+    expect(screen.getByTestId("qlv2-post-save")).not.toHaveTextContent(/photo saved/i);
+    expect(committed.size).toBe(1);
+  });
+
+  it("retains the captured operation but never dispatches after the account changes during photo upload", async () => {
+    let finish!: (value: unknown) => void;
+    uploadMock.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const view = renderSheet();
+    typeNote();
+    fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
+      target: { files: [new File(["photo"], "leaf.jpg", { type: "image/jpeg" })] },
+    });
+    save();
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    const pending = window.sessionStorage.getItem(pendingKey());
+    context.userId = ownerB;
+    view.rerender();
+    await act(async () => finish({ error: null }));
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(telemetryMock).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(pending).not.toBeNull();
+    expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
+    context.userId = ownerA;
+    view.rerender();
+    await expectRetry();
+    expect(screen.getByTestId("qlv2-pending-note-media")).toBeInTheDocument();
+  });
+
+  it("does not confirm or clear an old owner's operation after a deferred receipt lookup", async () => {
+    modelLostNoteReply();
+    const view = renderSheet();
+    typeNote();
+    save();
+    await expectRetry();
+    let finish!: (value: unknown) => void;
+    readbackMock.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    retry();
+    await waitFor(() => expect(readbackMock).toHaveBeenCalledTimes(1));
+    const pending = window.sessionStorage.getItem(pendingKey());
+    context.userId = ownerB;
+    view.rerender();
+    await act(async () => finish({ data: [...committed.values()][0], error: null }));
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(telemetryMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
+  });
+
 });
 
 describe("fresh Note acknowledgement integrity", () => {

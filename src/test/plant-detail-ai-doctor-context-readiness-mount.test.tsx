@@ -429,31 +429,37 @@ describe("PlantDetailAiDoctorContextReadinessMount — failed reads are not miss
 describe("PlantDetailAiDoctorContextReadinessMount — assigned-tent alert read state", () => {
   const count = () => screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts");
 
-  it.each(["idle", "loading"] as const)("shows alert %s without blocking the context preview", (status) => {
-    alertsState = { rows: [], status, openCount: 7 };
-    render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
+  it.each(["idle", "loading"] as const)(
+    "shows alert %s without blocking the context preview",
+    (status) => {
+      alertsState = { rows: [], status, openCount: 7 };
+      render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
 
-    expect(screen.getByTestId("ai-doctor-context-readiness-panel")).toBeInTheDocument();
-    expect(count()).toHaveTextContent(/^Loading…$/);
-    expect(count()).not.toHaveTextContent("7");
-    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
-  });
+      expect(screen.getByTestId("ai-doctor-context-readiness-panel")).toBeInTheDocument();
+      expect(count()).toHaveTextContent(/^Loading…$/);
+      expect(count()).not.toHaveTextContent("7");
+      expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+    },
+  );
 
-  it.each([0, 7])("does not present failed alert read count %s as a successful result", (staleCount) => {
-    alertsState = { rows: [], status: "unavailable", openCount: staleCount };
-    render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
+  it.each([0, 7])(
+    "does not present failed alert read count %s as a successful result",
+    (staleCount) => {
+      alertsState = { rows: [], status: "unavailable", openCount: staleCount };
+      render(<PlantDetailAiDoctorContextReadinessMount {...baseProps} />);
 
-    expect(count()).toHaveTextContent(/^Unavailable$/);
-    expect(count()).not.toHaveTextContent(String(staleCount));
-    expect(screen.getByTestId("ai-doctor-context-readiness-panel")).not.toHaveTextContent(
-      "private alert error detail",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Retry alerts" }));
-    expect(alertsRetry).toHaveBeenCalledTimes(1);
-    expect(activityRetry).not.toHaveBeenCalled();
-    expect(manualRetry).not.toHaveBeenCalled();
-    expect(tentRetry).not.toHaveBeenCalled();
-  });
+      expect(count()).toHaveTextContent(/^Unavailable$/);
+      expect(count()).not.toHaveTextContent(String(staleCount));
+      expect(screen.getByTestId("ai-doctor-context-readiness-panel")).not.toHaveTextContent(
+        "private alert error detail",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Retry alerts" }));
+      expect(alertsRetry).toHaveBeenCalledTimes(1);
+      expect(activityRetry).not.toHaveBeenCalled();
+      expect(manualRetry).not.toHaveBeenCalled();
+      expect(tentRetry).not.toHaveBeenCalled();
+    },
+  );
 
   it("shows successful zero distinctly from unavailable, then recovers through loading", () => {
     alertsState = { rows: [], status: "ok", openCount: 0 };

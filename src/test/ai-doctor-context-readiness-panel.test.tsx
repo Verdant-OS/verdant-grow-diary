@@ -298,18 +298,21 @@ describe("AiDoctorContextReadinessPanel", () => {
 describe("AiDoctorContextReadinessPanel — open-alert read state", () => {
   const count = () => screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts");
 
-  it.each(["idle", "loading"] as const)("shows loading for %s even with a retained count", (status) => {
-    render(
-      <AiDoctorContextReadinessPanel
-        context={ctx([], [])}
-        openAlertsCount={7}
-        openAlertsStatus={status}
-      />,
-    );
-    expect(count()).toHaveTextContent(/^Loading…$/);
-    expect(count()).not.toHaveTextContent("7");
-    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
-  });
+  it.each(["idle", "loading"] as const)(
+    "shows loading for %s even with a retained count",
+    (status) => {
+      render(
+        <AiDoctorContextReadinessPanel
+          context={ctx([], [])}
+          openAlertsCount={7}
+          openAlertsStatus={status}
+        />,
+      );
+      expect(count()).toHaveTextContent(/^Loading…$/);
+      expect(count()).not.toHaveTextContent("7");
+      expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+    },
+  );
 
   it.each([0, 7])("shows unavailable instead of the stale numeric prop %s", (staleCount) => {
     const retry = vi.fn();

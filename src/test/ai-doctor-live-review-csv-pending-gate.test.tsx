@@ -749,7 +749,7 @@ describe("CSV history pending/error gating", () => {
   });
 
   it.each(["error", "refresh_error"] as const)(
-    "preserves a 9h diary manual when the manual query has %s and stale live fills the mixed cap",
+    "preserves a 9h temperature-only diary manual when the manual query has %s and stale live fills the mixed cap",
     async (manualStatus) => {
       const capturedAt = new Date(Date.now() - 9 * 3600_000).toISOString();
       const record = diaryRowToManualSnapshotRecord({
@@ -759,7 +759,7 @@ describe("CSV history pending/error gating", () => {
         entry_at: capturedAt,
         note: "Measured by the grower",
         details: {
-          manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 60 },
+          manual_sensor_snapshot: { source: "manual", temp_f: 77 },
         },
       });
       expect(record).not.toBeNull();
@@ -805,13 +805,13 @@ describe("CSV history pending/error gating", () => {
       expect(packet.recentSensorSnapshot?.readings).toEqual(
         expect.arrayContaining([
           { field: "air_temp_c", value: 25, unit: "°C" },
-          { field: "humidity_pct", value: 60, unit: "%" },
         ]),
       );
       expect(packet.recentSensorSnapshotAnnotation).toMatchObject({
         source: "manual",
         stale: false,
         trust: "medium",
+        includesValues: true,
       });
       expect(packet.missingLiveSensorReadings).toBe(true);
       expect(JSON.stringify(packet.recentSensorSnapshot)).not.toContain('"value":31');

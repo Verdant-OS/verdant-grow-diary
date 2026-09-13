@@ -17,6 +17,7 @@ const telemetryMock = vi.fn();
 const navigationMock = vi.fn();
 const uploadMock = vi.fn();
 const removeMock = vi.fn();
+const photoEntryMock = vi.fn();
 const context = vi.hoisted(() => ({ isError: false, userId: "11111111-1111-4111-8111-111111111111" }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -25,6 +26,13 @@ vi.mock("@/integrations/supabase/client", () => ({
     storage: { from: () => ({ upload: uploadMock, remove: removeMock }) },
     from: (...args: unknown[]) => fromMock(...args),
   },
+}));
+vi.mock("@/lib/quickLogPhotoDiaryEntry", () => ({
+  createQuickLogPhotoDiaryEntry: (...args: unknown[]) => photoEntryMock(...args),
+}));
+vi.mock("@/lib/videoAttachmentRules", async importActual => ({
+  ...await importActual<typeof import("@/lib/videoAttachmentRules")>(),
+  createBrowserVideoDurationProber: () => async () => ({ ok: true, durationS: 5 }),
 }));
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: context.userId ? { id: context.userId } : null }) }));
 vi.mock("@/hooks/use-plants", () => ({
@@ -132,6 +140,7 @@ beforeEach(() => {
   rpcMock.mockReset();
   uploadMock.mockReset().mockResolvedValue({ error: null });
   removeMock.mockReset().mockResolvedValue({ error: null });
+  photoEntryMock.mockReset().mockResolvedValue({ ok: true });
   URL.createObjectURL = vi.fn(() => "blob:test-photo");
   URL.revokeObjectURL = vi.fn();
   readbackMock.mockReset();
@@ -577,7 +586,7 @@ describe("durable unresolved Note recovery", () => {
     typeNote();
     save();
     await expectRetry();
-    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("Storage unavailable"); });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementationOnce(() => { throw new Error("Storage unavailable"); });
     retry();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
     expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/recovery|storage/i);
@@ -585,6 +594,17 @@ describe("durable unresolved Note recovery", () => {
     expect(window.sessionStorage.getItem(pendingKey())).not.toBeNull();
     expect(committed.size).toBe(1);
     expect(rpcMock).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByTestId("qlv2-note-storage-recheck"));
+    await waitFor(() => expect(screen.getByTestId("quick-log-post-save-another")).toBeEnabled());
+    expect(window.sessionStorage.getItem(pendingKey())).toBeNull();
+    expect(rpcMock).toHaveBeenCalledTimes(2);
+    const originalKey = rpcMock.mock.calls[0][1].p_idempotency_key;
+    fireEvent.click(screen.getByTestId("quick-log-post-save-another"));
+    typeNote("A deliberate new Note after recovery");
+    save();
+    await expectRetry();
+    expect(rpcMock.mock.calls[2][1].p_idempotency_key).not.toBe(originalKey);
+    expect(committed.size).toBe(2);
   });
 
   it("clears a definitive first rejection but retains a restored operation after the same rejection", async () => {
@@ -614,13 +634,19 @@ describe("durable unresolved Note recovery", () => {
       id: confirmedEventId, note: originalNote,
       plant_id: record.payload.p_target_id, tent_id: record.resolved.tentId,
     });
-    renderSheet();
+    const view = renderSheet();
     await expectRetry();
     expect(screen.getByTestId("qlv2-pending-note-media")).toHaveTextContent(/attachment.*(unavailable|unresolved)|cannot.*restore/i);
     retry();
     await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
     expect(screen.getByTestId("qlv2-pending-note-media")).toHaveTextContent(/attachment/i);
     expect(screen.getByTestId("qlv2-post-save")).not.toHaveTextContent(/photo saved|video saved/i);
+    fireEvent.click(screen.getByTestId("quick-log-post-save-close"));
+    expect(view.onOpenChange).toHaveBeenCalledWith(false);
+    view.rerender(false);
+    view.rerender(true);
+    expect(screen.queryByTestId("qlv2-pending-note-media")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("");
   });
 
   it("captures an actual selected photo before dispatch and preserves its unavailable intent after remount", async () => {
@@ -687,6 +713,35 @@ describe("durable unresolved Note recovery", () => {
     await act(async () => finish({ data: [...committed.values()][0], error: null }));
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(telemetryMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
+  });
+
+  it("never starts video upload after account change during failed-photo cleanup", async () => {
+    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: confirmedEventId }, error: null });
+    photoEntryMock.mockResolvedValue({ ok: false, message: "Photo entry rejected" });
+    let finish!: (value: unknown) => void;
+    removeMock.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const view = renderSheet();
+    typeNote();
+    fireEvent.change(screen.getByTestId("qlv2-photo-library-input"), {
+      target: { files: [new File(["photo"], "leaf.jpg", { type: "image/jpeg" })] },
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("qlv2-video-input"), {
+        target: { files: [new File(["video"], "plant.mp4", { type: "video/mp4" })] },
+      });
+    });
+    save();
+    await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    const pending = window.sessionStorage.getItem(pendingKey());
+    expect(JSON.parse(pending!).attachments).toEqual({ photo: true, video: true });
+    context.userId = ownerB;
+    view.rerender();
+    await act(async () => finish({ error: null }));
+    expect(uploadMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(toastSuccess).not.toHaveBeenCalled();
     expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
   });

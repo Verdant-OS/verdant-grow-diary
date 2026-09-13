@@ -90,6 +90,7 @@ function mockPersistedNote(eventId: string) {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
   fromMock.mockReset();
   selectMock.mockReset();
@@ -144,14 +145,14 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
   });
 
   it("successful retry surfaces View in Timeline CTA", async () => {
-    mockPersistedNote("ge-retry");
+    mockPersistedNote("77777777-7777-4777-8777-000000000001");
     rpcMock
       .mockResolvedValueOnce({
         data: { ok: false, reason: "save_failed" },
         error: null,
       })
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "ge-retry", environment_event_id: null },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", environment_event_id: null },
         error: null,
       });
     renderSheet("plant:plant-1");
@@ -172,14 +173,14 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
     );
     expect(fromMock).toHaveBeenCalledWith("grow_events");
     expect(selectMock).toHaveBeenCalledWith("id,note,plant_id,tent_id");
-    expect(eqMock).toHaveBeenCalledWith("id", "ge-retry");
+    expect(eqMock).toHaveBeenCalledWith("id", "77777777-7777-4777-8777-000000000001");
     expect(readbackMock).toHaveBeenCalledTimes(1);
     expect(rpcMock.mock.calls[1][1]).toEqual(rpcMock.mock.calls[0][1]);
     expect(screen.getByTestId("qlv2-persisted-note")).toHaveTextContent(RETRY_NOTE);
   });
 
   it("Retry button binds disabled to in-flight save state in source", () => {
-    mockPersistedNote("ge-x");
+    mockPersistedNote("77777777-7777-4777-8777-000000000002");
     // Once Retry is clicked, handleSave clears localError, which
     // unmounts the inline error block. We can't observe a 'disabled'
     // state on a node that no longer exists. The presence and exact
@@ -193,7 +194,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         error: null,
       })
       .mockResolvedValueOnce({
-        data: { ok: true, grow_event_id: "ge-x", environment_event_id: null },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002", environment_event_id: null },
         error: null,
       });
     renderSheet("plant:plant-1");
@@ -205,7 +206,7 @@ describe("QuickLogV2Sheet — failed save Retry button", () => {
         await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(2));
         expect(rpcMock.mock.calls[1][0]).toBe("quicklog_save_manual");
         await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeInTheDocument());
-        expect(eqMock).toHaveBeenCalledWith("id", "ge-x");
+        expect(eqMock).toHaveBeenCalledWith("id", "77777777-7777-4777-8777-000000000002");
       },
     );
   });

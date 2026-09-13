@@ -354,11 +354,7 @@ type NoteFixtureRows = Record<(typeof NOTE_FIXTURE_TABLES)[number], FixtureRow[]
 async function readNoteFixture(uid: string): Promise<NoteFixtureRows> {
   const entries = await Promise.all(
     NOTE_FIXTURE_TABLES.map(async (table) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (admin as any)
-        .from(table)
-        .select("*")
-        .eq("user_id", uid);
+      const { data, error } = await (admin as any).from(table).select("*").eq("user_id", uid);
       if (error || !Array.isArray(data)) {
         throw new Error(`response-loss fixture read failed: ${table}`);
       }

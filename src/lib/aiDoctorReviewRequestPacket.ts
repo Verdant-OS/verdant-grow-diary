@@ -279,7 +279,7 @@ function isUsableSensorSnapshot(
       snapshot.severity !== "invalid" &&
       snapshot.readings.length > 0 &&
       annotation &&
-      (annotation.source === "live" || annotation.source === "manual") &&
+      (isFreshLiveSnapshotAnnotation(annotation) || annotation.source === "manual") &&
       annotation.stale === false &&
       annotation.includesValues,
   );

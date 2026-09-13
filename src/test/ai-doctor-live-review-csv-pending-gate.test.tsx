@@ -90,6 +90,7 @@ const sensorQueryState = vi.hoisted(() => ({
   currentRows: [] as unknown[],
   currentStatus: "success" as "loading" | "error" | "refresh_error" | "success",
   manualStatus: null as "loading" | "error" | "refresh_error" | "success" | null,
+  manualRows: null as unknown[] | null,
   currentReadCalls: [] as Array<{ limit: number; sources: readonly string[] }>,
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
@@ -107,7 +108,10 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
     const statusByTent: Record<string, string> = {};
     // Model independent, source-filtered bounded API responses. The real
     // query implementation is covered in use-sensor-readings-by-tents.
-    const scopedRows = sensorQueryState.currentRows
+    const responseRows = isManualOnly
+      ? (sensorQueryState.manualRows ?? sensorQueryState.currentRows)
+      : sensorQueryState.currentRows;
+    const scopedRows = responseRows
       .filter((row) => sources.includes(String((row as { source?: unknown }).source)))
       .slice(0, limit);
     for (const id of tentIds) {
@@ -314,6 +318,7 @@ beforeEach(() => {
   sensorQueryState.currentRows = [];
   sensorQueryState.currentStatus = "success";
   sensorQueryState.manualStatus = null;
+  sensorQueryState.manualRows = null;
   sensorQueryState.currentReadCalls = [];
   trackFunnelEvent.mockClear();
 });
@@ -764,8 +769,7 @@ describe("CSV history pending/error gating", () => {
         ...oneRecentNoteTimeline(),
         { kind: "manual_sensor_snapshot", key: card.id, occurredAt: capturedAt, card },
       ];
-      sensorQueryState.currentRows = [
-        ...Array.from({ length: 60 }, (_, index) => ({
+      sensorQueryState.currentRows = Array.from({ length: 60 }, (_, index) => ({
           id: `stale-live-${index}`,
           tent_id: TENT_ID,
           metric: "temperature_c",
@@ -773,8 +777,9 @@ describe("CSV history pending/error gating", () => {
           captured_at: new Date(Date.now() - 16 * 60_000).toISOString(),
           source: "live",
           quality: "ok",
-        })),
-        // Retained cache on refresh_error must never outrank the diary.
+        }));
+      // This cache is independent of the successful mixed API response.
+      sensorQueryState.manualRows = [
         {
           id: "cached-manual",
           tent_id: TENT_ID,

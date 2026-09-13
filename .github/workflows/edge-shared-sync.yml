@@ -31,6 +31,19 @@ jobs:
         env:
           DRIFT_REPORT_OUT: edge-shared-drift-report.md
         run: node scripts/report-edge-shared-drift.mjs
+      - name: Capture canonical regeneration patch for this draft
+        if: always() && steps.verify-mirror.outcome == 'failure'
+        run: |
+          node scripts/sync-edge-shared.mjs
+          node scripts/verify-edge-shared-in-sync.mjs --check-only
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          const names = execFileSync('git', ['diff', '--name-only'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+          const expected = ['supabase/functions/_shared/lib/.sync-manifest.json', 'supabase/functions/_shared/lib/lib/aiDoctorCurrentSensorSnapshotRules.ts'];
+          if (JSON.stringify([...names].sort()) !== JSON.stringify([...expected].sort())) throw new Error('Unexpected generated-file scope: ' + JSON.stringify(names));
+          const patch = execFileSync('git', ['diff', '--no-ext-diff', '--no-color', '--', ...expected], { encoding: 'utf8' });
+          console.log('VERDANT_CANONICAL_MIRROR_PATCH=' + JSON.stringify({ names, patch }));
+          NODE
       - name: Upload drift report artifact
         if: always() && steps.verify-mirror.outcome == 'failure'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

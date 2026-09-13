@@ -468,7 +468,6 @@ describe("AI Doctor request packet current-sensor selection", () => {
     expect(manual.missingLiveSensorReadings).toBe(true);
   });
 
-
   it.each([
     ["stale live", row("temperature_c", 30, "live", "2026-07-17T11:44:00.000Z")],
     ["invalid live", row("temperature_c", 500, "live", "2026-07-17T11:59:00.000Z")],
@@ -510,6 +509,43 @@ describe("AI Doctor request packet current-sensor selection", () => {
     });
     expect(result.missingLiveSensorReadings).toBe(true);
   });
+
+  it.each([
+    ["fresh live", "2026-07-17T03:00:00.000Z", "2026-07-17T11:59:00.000Z", false],
+    ["stale live with stale diary", "2026-07-16T11:00:00.000Z", "2026-07-17T11:44:00.000Z", true],
+  ] as const)(
+    "still uses newer %s when keeping the diary would not preserve fresher usable evidence",
+    (_label, manualAt, liveAt, stale) => {
+      const record = diaryRowToManualSnapshotRecord({
+        id: "persisted-diary-manual",
+        plant_id: "plant-1",
+        tent_id: "tent-1",
+        entry_at: manualAt,
+        note: null,
+        details: {
+          manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 60 },
+        },
+      });
+      expect(record).not.toBeNull();
+      const card = buildManualSnapshotTimelineCard(record!);
+      const result = buildAiDoctorReviewRequestPacket({
+        plant: null,
+        timelineItems: [
+          { kind: "manual_sensor_snapshot", key: card.id, occurredAt: card.capturedAt, card },
+        ],
+        context: context(),
+        currentSensorRows: [row("temperature_c", 26, "live", liveAt)],
+        now: NOW,
+      });
+
+      expect(result.recentSensorSnapshot?.capturedAt).toBe(liveAt);
+      expect(result.recentSensorSnapshot?.readings).toEqual([
+        { field: "temperature_c", value: 26, unit: "°C" },
+      ]);
+      expect(result.recentSensorSnapshotAnnotation).toMatchObject({ source: "live", stale });
+      expect(result.missingLiveSensorReadings).toBe(stale);
+    },
+  );
 
   it("prefers the newer of direct tent evidence and a diary-attached snapshot", () => {
     const manualCard = {

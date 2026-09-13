@@ -270,6 +270,21 @@ function buildAnnotationFromCard(
   };
 }
 
+function isUsableSensorSnapshot(
+  snapshot: AiDoctorReviewRequestSnapshot | null,
+  annotation: AiDoctorReviewRequestSnapshotAnnotation | null | undefined,
+): boolean {
+  return Boolean(
+    snapshot &&
+      snapshot.severity !== "invalid" &&
+      snapshot.readings.length > 0 &&
+      annotation &&
+      (annotation.source === "live" || annotation.source === "manual") &&
+      annotation.stale === false &&
+      annotation.includesValues,
+  );
+}
+
 /**
  * Build a compact, bounded packet for the server-side review request.
  * The returned object is JSON-safe and contains no sensitive keys.
@@ -356,9 +371,10 @@ export function buildAiDoctorReviewRequestPacket(
   }
 
   // Direct current sensor truth from the plant's assigned tent. Prefer it
-  // only when it is at least as recent as a diary-attached manual snapshot;
-  // otherwise preserve the newer diary evidence. Source and plausibility
-  // decisions live in the pure helper, never in React.
+  // only when it is at least as recent as a diary-attached manual snapshot
+  // and does not replace usable diary evidence with stale/invalid current
+  // rows. A failed manual query can leave only stale live rows in the mixed
+  // window while the diary still carries a valid grower measurement.
   const currentSnapshot = buildAiDoctorCurrentSensorSnapshot(args.currentSensorRows, {
     now: args.now,
   });
@@ -368,7 +384,14 @@ export function buildAiDoctorReviewRequestPacket(
   const currentSnapshotMs = currentSnapshot
     ? Date.parse(currentSnapshot.capturedAt)
     : Number.NEGATIVE_INFINITY;
-  if (currentSnapshot && currentSnapshotMs >= timelineSnapshotMs) {
+  const preserveUsableDiarySnapshot =
+    isUsableSensorSnapshot(recentSensorSnapshot, recentSensorSnapshotAnnotation) &&
+    !isUsableSensorSnapshot(currentSnapshot, currentSnapshot?.annotation);
+  if (
+    currentSnapshot &&
+    currentSnapshotMs >= timelineSnapshotMs &&
+    !preserveUsableDiarySnapshot
+  ) {
     recentSensorSnapshot = {
       capturedAt: currentSnapshot.capturedAt,
       severity: currentSnapshot.severity,

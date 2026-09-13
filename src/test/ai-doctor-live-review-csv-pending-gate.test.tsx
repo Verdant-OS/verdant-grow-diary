@@ -748,7 +748,6 @@ describe("CSV history pending/error gating", () => {
     expect(JSON.stringify(packet)).not.toContain('"value":29');
   });
 
-
   it.each(["error", "refresh_error"] as const)(
     "preserves a 9h diary manual when the manual query has %s and stale live fills the mixed cap",
     async (manualStatus) => {
@@ -770,14 +769,14 @@ describe("CSV history pending/error gating", () => {
         { kind: "manual_sensor_snapshot", key: card.id, occurredAt: capturedAt, card },
       ];
       sensorQueryState.currentRows = Array.from({ length: 60 }, (_, index) => ({
-          id: `stale-live-${index}`,
-          tent_id: TENT_ID,
-          metric: "temperature_c",
-          value: 30,
-          captured_at: new Date(Date.now() - 16 * 60_000).toISOString(),
-          source: "live",
-          quality: "ok",
-        }));
+        id: `stale-live-${index}`,
+        tent_id: TENT_ID,
+        metric: "temperature_c",
+        value: 30,
+        captured_at: new Date(Date.now() - 16 * 60_000).toISOString(),
+        source: "live",
+        quality: "ok",
+      }));
       // This cache is independent of the successful mixed API response.
       sensorQueryState.manualRows = [
         {

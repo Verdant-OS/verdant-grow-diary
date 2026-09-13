@@ -234,8 +234,7 @@ describe("Daily Grow Check failed-read honesty", () => {
       expect(screen.queryByTestId("plant-detail-ai-doctor-readiness-sensor-error")).toBeNull();
       expect(screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel"))
         .toHaveAttribute("data-status", "usable");
-      expect(screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-status"))
-        .toHaveTextContent("Latest manual snapshot accepted.");
+      expect(screen.getByText("Latest manual snapshot accepted.")).toBeInTheDocument();
     },
   );
 

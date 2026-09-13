@@ -90,6 +90,7 @@ async function pickFile(input: HTMLInputElement, file: File) {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
   storageUploadMock.mockReset();
   storageRemoveMock.mockReset();
@@ -100,7 +101,7 @@ beforeEach(() => {
   diarySelectMock.mockClear();
   uploadCalls.length = 0;
   insertCalls.length = 0;
-  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "event-1" }, error: null });
+  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
   storageUploadMock.mockImplementation(async (_bucket: unknown, path: unknown) => ({
     data: { path: String(path) },
     error: null,

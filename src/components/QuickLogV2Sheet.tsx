@@ -1,5 +1,10 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
+import {
+  readPendingQuickLogNote, claimPendingQuickLogNote, clearPendingQuickLogNote,
+  NOTE_RECOVERY_UNAVAILABLE, NOTE_RECOVERY_PENDING, NOTE_RECOVERY_CLEAR_FAILED,
+  type PendingQuickLogNote,
+} from "@/lib/quickLogPendingNoteStore";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -185,6 +190,7 @@ type QuickLogAttachmentWriteResult =
   { ok: true } | { ok: false; message: string; ambiguous?: boolean };
 
 interface LockedManualSubmission {
+  recovery: PendingQuickLogNote;
   payload: QuickLogV2SavePayload;
   resolved: ResolvedQuickLogV2Target;
   photoFile: File | null;
@@ -239,13 +245,50 @@ function loadRecentTargetRecord(userId: string | null | undefined) {
   }
 }
 
-export default function QuickLogV2Sheet({
+function restoredNoteSubmission(record: PendingQuickLogNote): LockedManualSubmission {
+  return {
+    recovery: record, payload: record.payload, resolved: record.resolved,
+    photoFile: null, videoFile: null, videoMeta: null, note: record.payload.p_note ?? "", action: "note",
+  };
+}
+
+function restoredNoteForm(record: PendingQuickLogNote): QuickLogV2FormState {
+  return {
+    ...EMPTY_QUICKLOG_V2_FORM,
+    selectedKey: `${record.payload.p_target_type}:${record.payload.p_target_id}`,
+    action: "note", note: record.payload.p_note ?? "",
+    temperatureC: record.payload.p_temperature_c === null ? "" : String(record.payload.p_temperature_c),
+    humidityPct: record.payload.p_humidity_pct === null ? "" : String(record.payload.p_humidity_pct),
+    vpdKpa: record.payload.p_vpd_kpa === null ? "" : String(record.payload.p_vpd_kpa),
+  };
+}
+
+export default function QuickLogV2Sheet(props: Props) {
+  const { user } = useAuth();
+  // Account changes destroy the old sheet's private draft and async lifetime.
+  // Returning to that account explicitly restores only its own pending Note.
+  return <QuickLogV2SheetForOwner key={user?.id ?? "signed-out"} {...props} />;
+}
+
+function QuickLogV2SheetForOwner({
   open,
   onOpenChange,
   defaultTargetKey,
   defaultAction = "note",
 }: Props) {
   const { user } = useAuth();
+  const [initialRecovery] = useState(() => readPendingQuickLogNote(user?.id ?? null));
+  const initialNote = initialRecovery.status === "pending" ? initialRecovery.record : null;
+  const noteLifetimeRef = useRef({ active: true });
+  useEffect(() => {
+    const lifetime = { active: true };
+    noteLifetimeRef.current = lifetime;
+    return () => { lifetime.active = false; };
+  }, []);
+  const [noteStorageFence, setNoteStorageFence] = useState(false);
+  const [restoredMediaPending, setRestoredMediaPending] = useState(
+    Boolean(initialNote && (initialNote.attachments.photo || initialNote.attachments.video)),
+  );
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const libraryInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -327,7 +370,7 @@ export default function QuickLogV2Sheet({
   // not briefly empty — that vacancy previously let sole-plant auto-select
   // rewrite an explicit tent: open target before the open-reset effect ran.
   const [form, setForm] = useState<QuickLogV2FormState>(() =>
-    open
+    initialNote ? restoredNoteForm(initialNote) : open
       ? {
           ...EMPTY_QUICKLOG_V2_FORM,
           selectedKey: defaultTargetKey ?? null,
@@ -350,7 +393,7 @@ export default function QuickLogV2Sheet({
     useState<QuickLogMaturityEvidenceFormState>(EMPTY_QUICK_LOG_MATURITY_EVIDENCE_FORM);
   const [feedingSaving, setFeedingSaving] = useState(false);
   const [wateringSaving, setWateringSaving] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(initialNote ? NOTE_RECOVERY_PENDING : null);
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -363,14 +406,14 @@ export default function QuickLogV2Sheet({
   const [postSave, setPostSave] = useState<QuickLogPostSaveSuccess | null>(null);
   const [visitMode, setVisitMode] = useState<GrowWalkVisitMode>("fast_check");
   const [wateringRetryPending, setWateringRetryPending] = useState(false);
-  const [exactRetryPending, setExactRetryPending] = useState(false);
+  const [exactRetryPending, setExactRetryPending] = useState(Boolean(initialNote));
   const [persistedNote, setPersistedNote] = useState<string | null | undefined>(undefined);
   const [mismatchedReceipt, setMismatchedReceipt] = useState<{
     note: string | null;
     navigation: NonNullable<ReturnType<typeof buildQuickLogTimelineNavTarget>>;
   } | null>(null);
   const retryPending = wateringRetryPending || exactRetryPending;
-  const [submissionLocked, setSubmissionLocked] = useState(false);
+  const [submissionLocked, setSubmissionLocked] = useState(Boolean(initialNote));
   // Synchronous in-flight guard. The save-state flags are React
   // state and don't flip until the next paint, so rapid double-clicks
   // can slip a second save through. This ref locks the entry point
@@ -390,16 +433,16 @@ export default function QuickLogV2Sheet({
   // submitted payload immutable across Retry so the reused idempotency key can
   // never confirm a different target, timestamp, or set of measurements.
   const wateringRetrySubmissionRef = useRef<LockedWateringSubmission | null>(null);
-  const manualRetrySubmissionRef = useRef<LockedManualSubmission | null>(null);
+  const manualRetrySubmissionRef = useRef<LockedManualSubmission | null>(initialNote ? restoredNoteSubmission(initialNote) : null);
   const feedingRetrySubmissionRef = useRef<LockedFeedingSubmission | null>(null);
   // Synchronous companion to the presenter state. It closes the same-tick
   // race where a grower taps Save and then changes target/action/media before
   // React has painted the disabled controls.
-  const submissionLockedRef = useRef(false);
+  const submissionLockedRef = useRef(Boolean(initialNote));
   // Set only when a server/transport result is ambiguous. Local validation or
   // upload failures release the draft; an uncertain RPC keeps it immutable so
   // Retry can only confirm the original logical record.
-  const keepSubmissionLockedRef = useRef(false);
+  const keepSubmissionLockedRef = useRef(Boolean(initialNote));
   // Async video metadata probes must finish before a save can capture media.
   // The generation token prevents an old close/reopen or target/action draft
   // from installing a stale file when its probe resolves late.
@@ -419,7 +462,7 @@ export default function QuickLogV2Sheet({
   // temperature draft — the manual sensor-snapshot Temp field and the
   // Water/Feed water-temperature fields can each be pinned at different
   // times, or not at all.
-  const manualTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
+  const manualTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(initialNote ? "celsius" : null);
   const wateringTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
   const feedingTempEntryUnitRef = useRef<TemperatureUnitPreference | null>(null);
 
@@ -714,6 +757,7 @@ export default function QuickLogV2Sheet({
     // A parent target/action update must not replace an unresolved logical
     // submission or discard its key. Resolve it before starting another draft.
     if (
+      noteStorageFence ||
       manualRetrySubmissionRef.current ||
       feedingRetrySubmissionRef.current ||
       (saveInFlightRef.current && submissionLockedRef.current)
@@ -1118,7 +1162,23 @@ export default function QuickLogV2Sheet({
     }
   }
 
+  function restorePendingNote(record: PendingQuickLogNote) {
+    manualRetrySubmissionRef.current = restoredNoteSubmission(record);
+    setForm(restoredNoteForm(record));
+    manualTempEntryUnitRef.current = "celsius";
+    setExactRetryPending(true);
+    keepSubmissionLockedRef.current = true;
+    submissionLockedRef.current = true;
+    setSubmissionLocked(true);
+    setRestoredMediaPending(record.attachments.photo || record.attachments.video);
+    setLocalError(NOTE_RECOVERY_PENDING);
+    resetPhotoSelection();
+    resetVideoSelection();
+  }
+
   const handleSave = async () => {
+    if (noteStorageFence) return;
+    const lifetime = noteLifetimeRef.current;
     if (videoValidationInFlightRef.current) {
       setLocalError("Wait for the video check to finish before saving.");
       return;
@@ -1148,18 +1208,22 @@ export default function QuickLogV2Sheet({
     try {
       await runHandleSave();
     } finally {
-      saveInFlightRef.current = false;
-      if (lockSubmission) {
-        setWateringSaving(false);
-        if (!keepSubmissionLockedRef.current) {
-          submissionLockedRef.current = false;
-          setSubmissionLocked(false);
+      if (lifetime.active) {
+        saveInFlightRef.current = false;
+        if (lockSubmission) {
+          setWateringSaving(false);
+          if (!keepSubmissionLockedRef.current) {
+            submissionLockedRef.current = false;
+            setSubmissionLocked(false);
+          }
         }
       }
     }
   };
 
   const runHandleSave = async () => {
+    const lifetime = noteLifetimeRef.current;
+    const canContinueNote = () => lifetime.active && noteLifetimeRef.current === lifetime;
     setMismatchedReceipt(null);
     setLocalError(null);
     setSaveStatus("");
@@ -1381,7 +1445,16 @@ export default function QuickLogV2Sheet({
         setLocalError(reasonToMessage(built.reason));
         return;
       }
+      if (!user?.id) {
+        setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+        return;
+      }
       exactManualSubmission = {
+        recovery: {
+          version: 1, ownerId: user.id, createdAt: occurredAt,
+          payload: built.payload, resolved,
+          attachments: { photo: photoFile !== null, video: videoFile !== null },
+        },
         payload: built.payload,
         resolved,
         photoFile,
@@ -1392,6 +1465,30 @@ export default function QuickLogV2Sheet({
       };
       manualRetrySubmissionRef.current = exactManualSubmission;
     }
+    if (exactManualSubmission) {
+      if (!canContinueNote() || exactManualSubmission.recovery.ownerId !== user?.id) return;
+      const claim = claimPendingQuickLogNote(exactManualSubmission.recovery);
+      if (claim.status !== "claimed") {
+        if (claim.status === "pending") restorePendingNote(claim.record);
+        else {
+          // No RPC was sent. Keep a new draft editable; never replace unreadable storage.
+          if (!pendingManualSubmission) manualRetrySubmissionRef.current = null;
+          else keepSubmissionLockedRef.current = true;
+          setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+        }
+        return;
+      }
+      exactManualSubmission.recovery = claim.record;
+    }
+    const releaseUnsentNote = () => {
+      if (!exactManualSubmission) return;
+      if (!pendingManualSubmission && clearPendingQuickLogNote(exactManualSubmission.recovery)) {
+        manualRetrySubmissionRef.current = null;
+      } else {
+        keepSubmissionLockedRef.current = true;
+        setExactRetryPending(true);
+      }
+    };
     const exactSubmission = exactWateringSubmission ?? exactManualSubmission;
     const submissionPhotoFile = exactSubmission ? exactSubmission.photoFile : photoFile;
     const submissionVideoFile = exactSubmission ? exactSubmission.videoFile : videoFile;
@@ -1403,17 +1500,16 @@ export default function QuickLogV2Sheet({
     if (submissionPhotoFile) {
       if (!resolved.growId) {
         wateringRetrySubmissionRef.current = null;
-        if (!pendingManualSubmission) manualRetrySubmissionRef.current = null;
-        else keepSubmissionLockedRef.current = true;
+        releaseUnsentNote();
         setLocalError("Choose a target with grow context before attaching a photo.");
         return;
       }
       setSaveStatus("Uploading photo…");
       const upload = await uploadQuickLogPhoto(resolved.growId, submissionPhotoFile);
+      if (exactManualSubmission && !canContinueNote()) return;
       if (!upload.ok) {
         wateringRetrySubmissionRef.current = null;
-        if (!pendingManualSubmission) manualRetrySubmissionRef.current = null;
-        else keepSubmissionLockedRef.current = true;
+        releaseUnsentNote();
         setLocalError((upload as { message: string }).message);
         setSaveStatus("");
         return;
@@ -1453,17 +1549,29 @@ export default function QuickLogV2Sheet({
       };
     } else {
       if (!exactManualSubmission) throw new Error("Note submission lock was not created.");
+      // Re-read the same-tab claim after upload, and fence account/lifetime changes.
+      if (!canContinueNote() || exactManualSubmission.recovery.ownerId !== user?.id) return;
+      const claim = claimPendingQuickLogNote(exactManualSubmission.recovery);
+      if (claim.status !== "claimed") {
+        keepSubmissionLockedRef.current = true;
+        setExactRetryPending(true);
+        setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+        return;
+      }
       setSaveStatus("Saving log…");
       res = await save(exactManualSubmission.payload, {
         telemetryIntent: submissionAction,
         verifyPersistedNote: pendingManualSubmission !== null,
+        canContinueNote,
       });
+      if (!canContinueNote()) return;
     }
     if (!res.ok) {
       // A known first-call validation rejection is safe to correct. Once an
       // earlier result was uncertain, a later rejection (e.g. access changed)
       // cannot prove that earlier submission did not commit.
-      const unresolved = pendingManualSubmission !== null || res.definitiveRejected !== true;
+      let unresolved = pendingManualSubmission !== null || res.definitiveRejected !== true;
+      if (!unresolved && exactManualSubmission && !clearPendingQuickLogNote(exactManualSubmission.recovery)) unresolved = true;
       setExactRetryPending(unresolved);
       keepSubmissionLockedRef.current = unresolved;
       if (!unresolved) manualRetrySubmissionRef.current = null;
@@ -1473,6 +1581,7 @@ export default function QuickLogV2Sheet({
           .remove([uploadedPath])
           .catch(() => {});
       }
+      if (exactManualSubmission && !canContinueNote()) return;
       const reason = res.reason || "save_failed";
       if (reason === "receipt_mismatch" && res.growEventId && res.persistedNote !== undefined) {
         const navigation = buildQuickLogTimelineNavTarget({
@@ -1498,7 +1607,6 @@ export default function QuickLogV2Sheet({
       return;
     }
 
-    manualRetrySubmissionRef.current = null;
     setExactRetryPending(false);
     setPersistedNote(res.persistedNote);
     rememberConfirmedPlantTarget(resolved, user?.id ?? null);
@@ -1527,6 +1635,7 @@ export default function QuickLogV2Sheet({
         noteRaw: submissionNote,
         action: submissionAction,
       });
+      if (exactManualSubmission && !canContinueNote()) return;
       if (photoEntry.ok) {
         photoAttached = true;
       } else {
@@ -1548,6 +1657,7 @@ export default function QuickLogV2Sheet({
     if (submissionVideoFile && submissionVideoMeta && resolved.growId) {
       setSaveStatus("Uploading video…");
       const upload = await uploadQuickLogVideo(resolved.growId, submissionVideoFile);
+      if (exactManualSubmission && !canContinueNote()) return;
       if (!upload.ok) {
         mediaFailure = (upload as { message: string }).message;
       } else {
@@ -1562,6 +1672,7 @@ export default function QuickLogV2Sheet({
           noteRaw: submissionNote,
           action: submissionAction,
         });
+        if (exactManualSubmission && !canContinueNote()) return;
         if (videoEntry.ok) {
           videoAttached = true;
         } else {
@@ -1578,6 +1689,14 @@ export default function QuickLogV2Sheet({
       }
     }
 
+    if (exactManualSubmission && !canContinueNote()) return;
+    let recoveryClearFailed = false;
+    if (exactManualSubmission) {
+      recoveryClearFailed = !clearPendingQuickLogNote(exactManualSubmission.recovery);
+      setNoteStorageFence(recoveryClearFailed);
+      if (recoveryClearFailed) setLocalError(NOTE_RECOVERY_CLEAR_FAILED);
+      manualRetrySubmissionRef.current = null;
+    }
     const successMessage =
       submissionAction === "water"
         ? photoAttached
@@ -1595,7 +1714,7 @@ export default function QuickLogV2Sheet({
             ? "Log and video saved"
             : "Log saved";
     setSaveStatus(successMessage);
-    if (mediaFailure) {
+    if (mediaFailure && !recoveryClearFailed) {
       // Non-blocking notice: the entry is saved; only the attachment failed.
       setLocalError(
         mediaFailureAmbiguous
@@ -1646,6 +1765,8 @@ export default function QuickLogV2Sheet({
    * grower doesn't lose their place.
    */
   function handleLogAnother() {
+    if (noteStorageFence) return;
+    setRestoredMediaPending(false);
     idempotencyKeyRef.current = rotateQuickLogIdempotencyKey(idempotencyKeyRef.current);
     setPostSave(null);
     setLocalError(null);
@@ -1682,6 +1803,11 @@ export default function QuickLogV2Sheet({
 
   function handleReviewMismatchedReceipt() {
     if (!mismatchedReceipt || saveInFlightRef.current) return;
+    const pending = manualRetrySubmissionRef.current;
+    if (pending && !clearPendingQuickLogNote(pending.recovery)) {
+      setLocalError(NOTE_RECOVERY_UNAVAILABLE);
+      return;
+    }
     // The grower deliberately opens the verified existing record for review.
     // This is a resolution action, never a successful receipt for this draft.
     manualRetrySubmissionRef.current = null;
@@ -2492,6 +2618,12 @@ export default function QuickLogV2Sheet({
             </div>
           )}
 
+          {restoredMediaPending && (
+            <p data-testid="qlv2-pending-note-media" role="status" className="text-sm text-muted-foreground">
+              Original attachments are unavailable after reopening. Their status is unresolved; retry checks only the original Note. Check its Timeline before adding the files separately.
+            </p>
+          )}
+
           <div className="sr-only" aria-live="polite" data-testid="qlv2-save-status">
             {saveStatus}
           </div>
@@ -2564,6 +2696,7 @@ export default function QuickLogV2Sheet({
                     variant="outline"
                     className="flex-1"
                     onClick={handleLogAnother}
+                    disabled={noteStorageFence}
                     data-testid="quick-log-post-save-another"
                   >
                     {QUICK_LOG_POST_SAVE_ANOTHER_LABEL}

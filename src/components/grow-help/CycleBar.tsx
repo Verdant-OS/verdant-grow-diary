@@ -99,9 +99,7 @@ export default function CycleBar({
           id="cycle-veg-hours"
           label="Veg light"
           value={cycle.vegPhotoperiodHours}
-          onChange={(vegPhotoperiodHours) =>
-            onChange({ ...cycle, vegPhotoperiodHours: vegPhotoperiodHours ?? 18 })
-          }
+          onChange={(vegPhotoperiodHours) => onChange({ ...cycle, vegPhotoperiodHours })}
           min={0.1}
           max={24}
           step={0.5}
@@ -112,9 +110,7 @@ export default function CycleBar({
           id="cycle-flower-hours"
           label="Flower light"
           value={cycle.flowerPhotoperiodHours}
-          onChange={(flowerPhotoperiodHours) =>
-            onChange({ ...cycle, flowerPhotoperiodHours: flowerPhotoperiodHours ?? 12 })
-          }
+          onChange={(flowerPhotoperiodHours) => onChange({ ...cycle, flowerPhotoperiodHours })}
           min={0.1}
           max={24}
           step={0.5}

@@ -15,7 +15,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const { rpcMock, snapshotState } = vi.hoisted(() => ({
   rpcMock: vi.fn().mockResolvedValue({
-    data: { ok: true, grow_event_id: "ge-saved-1" },
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
     error: null,
   }),
   snapshotState: {
@@ -82,7 +82,7 @@ function renderQL(props: Parameters<typeof QuickLog>[0]) {
 beforeEach(() => {
   rpcMock.mockClear();
   rpcMock.mockResolvedValue({
-    data: { ok: true, grow_event_id: "ge-saved-1" },
+    data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
     error: null,
   });
   snapshotState.status = "ready";
@@ -110,7 +110,7 @@ describe("QuickLog post-save target plant action", () => {
     const link = (await screen.findByTestId("quick-log-view-target-plant")) as HTMLAnchorElement;
     expect(link.tagName).toBe("A");
     expect(link.getAttribute("href")).toBe(
-      "/timeline?growId=g1&plantId=p2&tentId=t1#timeline-entry-ge-saved-1",
+      "/timeline?growId=g1&plantId=p2&tentId=t1#timeline-entry-77777777-7777-4777-8777-000000000001",
     );
     expect(link.getAttribute("href")).not.toMatch(/^\/plants\//);
     expect(link.getAttribute("data-target-plant-id")).toBe("p2");

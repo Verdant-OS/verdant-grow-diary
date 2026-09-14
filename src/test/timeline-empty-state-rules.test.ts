@@ -9,6 +9,10 @@ import {
   TIMELINE_EMPTY_FILTERED_TITLE,
   TIMELINE_EMPTY_EVIDENCE_TITLE,
   TIMELINE_EMPTY_EVIDENCE_DESC,
+  TIMELINE_EMPTY_DATE_WINDOW_TITLE,
+  TIMELINE_EMPTY_DATE_WINDOW_DESC,
+  TIMELINE_EMPTY_CLEAR_DATES_LABEL,
+  TIMELINE_EMPTY_CLEAR_FILTERS_LABEL,
 } from "@/lib/timelineEmptyStateRules";
 import {
   TIMELINE_EVIDENCE_EMPTY_DESC,
@@ -90,6 +94,34 @@ describe("resolveTimelineEmptyState", () => {
     expect(view?.offersClearFilters).toBe(false);
   });
 
+  it("treats a successful zero-row date-bounded read as a date window, not a first-entry empty", () => {
+    const view = resolveTimelineEmptyState({
+      ...base,
+      dateBoundsActive: true,
+      evidenceFilterActive: true,
+      context: withPlant,
+    });
+    expect(view?.kind).toBe("date_window");
+    expect(view?.title).toBe(TIMELINE_EMPTY_DATE_WINDOW_TITLE);
+    expect(view?.description).toBe(TIMELINE_EMPTY_DATE_WINDOW_DESC);
+    expect(view?.actions).toEqual([]);
+    expect(view?.offersClearFilters).toBe(true);
+    expect(view?.clearFiltersLabel).toBe(TIMELINE_EMPTY_CLEAR_DATES_LABEL);
+    expect(view?.description).not.toMatch(/entries exist/i);
+    expect(view?.description).not.toMatch(/No entries yet/);
+  });
+
+  it("keeps first-entry guidance when the unbounded grow read is truly empty", () => {
+    const view = resolveTimelineEmptyState({
+      ...base,
+      dateBoundsActive: false,
+      context: withPlant,
+    });
+    expect(view?.kind).toBe("no_entries");
+    expect(view?.title).toBe(TIMELINE_EMPTY_NO_ENTRIES_TITLE);
+    expect(view?.offersClearFilters).toBe(false);
+  });
+
   it("never offers logging actions for a filter-caused empty view", () => {
     for (const evidence of [true, false]) {
       const view = resolveTimelineEmptyState({
@@ -127,6 +159,9 @@ describe("resolveTimelineEmptyState", () => {
   it("exposes a non-null fallback shaped like a filtered-out view", () => {
     expect(TIMELINE_EMPTY_STATE_FALLBACK.kind).toBe("filtered_out");
     expect(TIMELINE_EMPTY_STATE_FALLBACK.actions).toEqual([]);
+    expect(TIMELINE_EMPTY_STATE_FALLBACK.clearFiltersLabel).toBe(
+      TIMELINE_EMPTY_CLEAR_FILTERS_LABEL,
+    );
   });
 
   it("never promises automation or device control in its copy", () => {
@@ -134,6 +169,8 @@ describe("resolveTimelineEmptyState", () => {
       TIMELINE_EMPTY_NO_ENTRIES_DESC,
       TIMELINE_EMPTY_NO_ENTRIES_NEEDS_CONTEXT_DESC,
       TIMELINE_EMPTY_FILTERED_TITLE,
+      TIMELINE_EMPTY_DATE_WINDOW_TITLE,
+      TIMELINE_EMPTY_DATE_WINDOW_DESC,
     ].join(" ");
     expect(copy).not.toMatch(/automat|auto-?log|we'll log|relay|actuator|controller/i);
   });

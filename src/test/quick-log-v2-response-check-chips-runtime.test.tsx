@@ -19,6 +19,8 @@ import { RESPONSE_CHECK_STATUSES, applyResponseCheck } from "@/lib/tenSecondQuic
 
 const rpcMock = vi.fn();
 
+vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "user-1" } }) }));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc: (...a: unknown[]) => rpcMock(...a) },
 }));
@@ -97,8 +99,9 @@ async function savedNote(): Promise<string | null> {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
-  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "ge-1" }, error: null });
+  rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
 });
 afterEach(() => cleanup());
 
@@ -447,7 +450,7 @@ describe("D7 chips — a plant response never survives a switch to a tent", () =
   });
 
   it("does not carry chip provenance into a Log another draft", async () => {
-    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "ge-1" }, error: null });
+    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
     renderSheet("plant:plant-1");
     fireEvent.click(chip("same"));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));

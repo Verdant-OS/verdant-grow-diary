@@ -45,7 +45,9 @@ import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import {
   AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
   AI_DOCTOR_CURRENT_SENSOR_SOURCES,
+  AI_DOCTOR_MANUAL_SENSOR_SOURCES,
   classifyAiDoctorCurrentSensorEvidence,
+  mergeAiDoctorCurrentSensorWindows,
   selectAiDoctorSensorEvidenceClassification,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { isUuid } from "@/lib/isUuid";
@@ -201,25 +203,38 @@ export default function PlantDetailAiDoctorReadiness({
 }: PlantDetailAiDoctorReadinessProps) {
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
   const { data: bridgeHealth } = useSensorBridgeHealth();
-  const {
-    byTent: currentReadingsByTent,
-    statusByTent: currentSensorStatusByTent,
-    refetch: refetchCurrentSensorRows,
-  } = useSensorReadingsByTents(
-    isUuid(tentId) ? [tentId] : [],
+  const tentIds = isUuid(tentId) ? [tentId] : [];
+  const mixedWindow = useSensorReadingsByTents(
+    tentIds,
     AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
     AI_DOCTOR_CURRENT_SENSOR_SOURCES,
   );
-  const currentSensorStatus = isUuid(tentId)
-    ? (currentSensorStatusByTent[tentId] ?? "loading")
+  const manualWindow = useSensorReadingsByTents(
+    tentIds,
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    AI_DOCTOR_MANUAL_SENSOR_SOURCES,
+  );
+  const mixedStatus = isUuid(tentId) ? (mixedWindow.statusByTent[tentId] ?? "loading") : "success";
+  const manualStatus = isUuid(tentId)
+    ? (manualWindow.statusByTent[tentId] ?? "loading")
     : "success";
-  const currentSensorLoading = currentSensorStatus === "loading";
-  const currentSensorError =
-    currentSensorStatus === "error" || currentSensorStatus === "refresh_error";
-  const currentSensorRows =
-    tentId && !currentSensorError
-      ? (currentReadingsByTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
+  const mixedFailed = mixedStatus === "error" || mixedStatus === "refresh_error";
+  const manualFailed = manualStatus === "error" || manualStatus === "refresh_error";
+  const currentSensorLoading = mixedStatus === "loading" || manualStatus === "loading";
+  const currentSensorError = mixedFailed && manualFailed;
+  const mixedRows =
+    tentId && !mixedFailed
+      ? (mixedWindow.byTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
       : NO_CURRENT_SENSOR_ROWS;
+  const manualRows =
+    tentId && !manualFailed
+      ? (manualWindow.byTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
+      : NO_CURRENT_SENSOR_ROWS;
+  const currentSensorRows = mergeAiDoctorCurrentSensorWindows(mixedRows, manualRows);
+  const refetchCurrentSensorRows = () => {
+    void mixedWindow.refetch();
+    void manualWindow.refetch();
+  };
 
   const signals = useMemo(() => {
     return deriveSignals(plantId, hasPlantPhoto, rawRows ?? []);

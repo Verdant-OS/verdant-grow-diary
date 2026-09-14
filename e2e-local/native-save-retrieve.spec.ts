@@ -271,7 +271,7 @@ test("real dated rows retain manual provenance beyond the dense live cap and sta
     await expect(page.getByTestId("tent-detail-sensor-snapshot-truth")).toHaveAttribute("data-is-stale", "true");
     const history = page.getByTestId("tent-manual-snapshot-history");
     await expect(history.getByTestId("tent-manual-snapshot-history-source")).toHaveText("Manual");
-    await expect(history.getByTestId("tent-manual-snapshot-history-metric")).toContainText("25");
+    await expect(history.getByTestId("tent-manual-snapshot-history-metric")).toHaveText(/^Temp\s*77\.0\s*°F$/);
     for (const [scope, manual] of [[f.primary, true], [f.secondary, false]] as const) {
       await page.goto(plantUrl(f, scope));
       await page.getByTestId("plant-detail-disclosure-ai-trigger").click();

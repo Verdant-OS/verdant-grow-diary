@@ -285,8 +285,8 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         data-testid="plant-detail-ai-doctor-context-readiness-mount-scope"
       >
         This preview uses recent plant diary records and manual sensor readings from its assigned
-        tent. Sensor readings are limited to the last 7 days. Current sensor health is shown in AI
-        Doctor readiness.
+        tent. Readiness summaries use sensor readings from the last 7 days. Current sensor health is
+        shown in AI Doctor readiness.
       </p>
       <AiDoctorContextReadinessPanel
         context={built.context}

@@ -4,7 +4,7 @@
  * Requires PostgreSQL server tools (preinstalled on the Ubuntu CI runner).
  * Starts a disposable cluster owned by this test, with no TCP listener and a
  * private Unix socket. Never reads a DB URL, Supabase credentials, or production.
- * Replays the two original founder migrations unchanged; only their external
+ * Replays the original founder and refund migrations unchanged; their external
  * auth/subscription dependencies are minimal empty fixtures.
  *
  * The real edge entrypoint is transpiled and executed with injected Supabase
@@ -24,9 +24,14 @@ const MIGRATIONS = resolve("supabase/migrations");
 const ORIGINALS = [
   "20260719044601_4a9e443b-d980-4890-b85e-5ae6549a907f.sql",
   "20260719052812_c25ba6a6-dcdb-40c7-9dbf-292b35af9150.sql",
+  "20260719063713_387faf67-35ad-4d20-ae4e-4a7419ec8966.sql",
 ];
 const FIX = readFileSync(
   join(MIGRATIONS, "20260914190600_founders_client_updates_fail_closed.sql"),
+  "utf8",
+);
+const REFUND_FIX = readFileSync(
+  join(MIGRATIONS, "20260914212330_founder_refund_subscription_reference.sql"),
   "utf8",
 );
 const OWNER = "00000000-0000-4000-8000-00000000f001";
@@ -46,6 +51,7 @@ let dataDir = "";
 let binDir = "";
 let started = false;
 let baseline: Record<string, unknown>;
+let refundBaseline: { status: number | null; error: string; before: string; after: string };
 
 function literal(value: unknown): string {
   if (value === null) return "NULL";
@@ -90,6 +96,7 @@ function rows(): string {
 function seed() {
   sql(`
     TRUNCATE public.founders;
+    TRUNCATE public.subscriptions;
     INSERT INTO public.founders (user_id, founder_number, status, display_name)
     VALUES
       ('${OWNER}', 1, 'confirmed', 'Original owner'),
@@ -169,7 +176,16 @@ beforeAll(() => {
       "UPDATE public.founders SET display_name = 'refunded bypass' WHERE user_id = " +
       literal(REFUNDED) + " RETURNING display_name;")),
   };
+  seed();
+  seedRefund();
+  const beforeRefund = refundState();
+  const failedRefund = rawSql(asRole("service_role", "", refundCall()));
+  refundBaseline = {
+    status: failedRefund.status, error: failedRefund.stderr,
+    before: beforeRefund, after: refundState(),
+  };
   sql(FIX);
+  sql(REFUND_FIX);
 }, 60_000);
 
 afterAll(() => {
@@ -423,5 +439,174 @@ describe("save-founder-prefs — real handler with PostgreSQL write adapter", ()
     expect(response.status).toBe(400);
     expect(edge.writes).toEqual([]);
     expect(rows()).toBe(before);
+  });
+});
+
+const REFUND_TX = "txn_founder_refund_fixture";
+const REFUND_REF = "lifetime_" + REFUND_TX;
+const REFUND_AT = "2026-09-14T20:00:00.000Z";
+
+function seedRefund(env = "live", uid = OWNER, price = "founder_lifetime") {
+  sql(`
+    INSERT INTO public.subscriptions
+      (user_id, paddle_subscription_id, price_id, status, environment)
+    VALUES (${literal(uid)}, ${literal(REFUND_REF)}, ${literal(price)}, 'active', ${literal(env)});
+    UPDATE public.founders SET paddle_subscription_ref = ${literal(REFUND_REF)},
+      display_name = 'Keep prefs', milestone_status = 'met'
+      WHERE user_id = ${literal(uid)};
+  `);
+}
+
+function refundCall(tx: string | null = REFUND_TX, env: string | null = "live",
+  at: string | null = REFUND_AT) {
+  return "SELECT public.revoke_lovable_founder_lifetime_by_transaction(" +
+    literal(tx) + ", " + literal(env) + ", " + literal(at) + "::timestamptz);";
+}
+
+function refundState() {
+  return sql(`
+    SELECT json_build_object(
+      'subscriptions', (SELECT json_agg(s ORDER BY environment, user_id) FROM public.subscriptions s),
+      'founders', (SELECT json_agg(f ORDER BY founder_number) FROM public.founders f)
+    );
+  `);
+}
+
+function refund(tx: string | null = REFUND_TX, env: string | null = "live",
+  at: string | null = REFUND_AT) {
+  return JSON.parse(sql(asRole("service_role", "", refundCall(tx, env, at))));
+}
+
+describe("founder refunds — executed PostgreSQL transaction contract", () => {
+  it("reproduces the historical 42703 failure and rollback of subscription cancellation", () => {
+    expect(refundBaseline.status).not.toBe(0);
+    expect(refundBaseline.error).toMatch(/42703:.*column "paddle_transaction_id" does not exist/i);
+    expect(refundBaseline.after).toBe(refundBaseline.before);
+    const original = JSON.parse(refundBaseline.after);
+    expect(original.subscriptions[0].status).toBe("active");
+    expect(original.founders[0].status).toBe("confirmed");
+  });
+
+  it("cancels the live purchase and retires only its founder, preserving seat and evidence", () => {
+    seedRefund();
+    const before = JSON.parse(refundState());
+    expect(refund()).toEqual({ ok: true, subscriptions_updated: 1, founders_updated: 1 });
+    const after = JSON.parse(refundState());
+    expect(after.subscriptions[0].status).toBe("canceled");
+    expect(new Date(after.subscriptions[0].current_period_end).toISOString()).toBe(REFUND_AT);
+    expect(after.founders[0].status).toBe("refunded");
+    const { status: _oldStatus, updated_at: _oldUpdated, ...oldEvidence } = before.founders[0];
+    const { status: _newStatus, updated_at: _newUpdated, ...newEvidence } = after.founders[0];
+    expect(newEvidence).toEqual(oldEvidence);
+    expect(after.founders.slice(1)).toEqual(before.founders.slice(1));
+    expect(sql("SELECT public.founders_seats_consumed();")).toBe("4");
+    expect(sql(asRole("authenticated", OWNER,
+      "SELECT status FROM public.founders;"))).toBe("refunded");
+  });
+
+  it("makes repeat delivery a no-op and preserves the first cancellation time", () => {
+    seedRefund();
+    refund();
+    const before = refundState();
+    expect(refund(REFUND_TX, "live", "2026-09-15T20:00:00Z"))
+      .toEqual({ ok: true, subscriptions_updated: 0, founders_updated: 0 });
+    expect(refundState()).toBe(before);
+  });
+
+  it("retires a still-confirmed founder even when its subscription is already canceled", () => {
+    seedRefund();
+    sql("UPDATE public.subscriptions SET status = 'canceled';");
+    expect(refund()).toEqual({ ok: true, subscriptions_updated: 0, founders_updated: 1 });
+    expect(sql("SELECT status FROM public.founders WHERE user_id = " + literal(OWNER))).toBe("refunded");
+  });
+
+  it("isolates sandbox refunds from the same live reference and live founder", () => {
+    seedRefund("live");
+    seedRefund("sandbox");
+    const before = rows();
+    expect(refund(REFUND_TX, "sandbox"))
+      .toEqual({ ok: true, subscriptions_updated: 1, founders_updated: 0 });
+    expect(rows()).toBe(before);
+    expect(sql("SELECT environment, status FROM public.subscriptions ORDER BY environment;"))
+      .toBe("live|active\nsandbox|canceled");
+  });
+
+  it("does not retire a different owner even if their founder reference matches", () => {
+    seedRefund();
+    sql("UPDATE public.founders SET paddle_subscription_ref = NULL WHERE user_id = " + literal(OWNER));
+    sql("UPDATE public.founders SET paddle_subscription_ref = " + literal(REFUND_REF) +
+      " WHERE user_id = " + literal(OTHER));
+    const before = rows();
+    expect(refund()).toEqual({ ok: true, subscriptions_updated: 1, founders_updated: 0 });
+    expect(rows()).toBe(before);
+  });
+
+  it("does not retire the same owner's founder from a different transaction", () => {
+    seedRefund();
+    sql("UPDATE public.founders SET paddle_subscription_ref = 'lifetime_other' WHERE user_id = " +
+      literal(OWNER));
+    const before = rows();
+    expect(refund()).toEqual({ ok: true, subscriptions_updated: 1, founders_updated: 0 });
+    expect(rows()).toBe(before);
+  });
+
+  it("leaves an unknown transaction unchanged without inventing a founder", () => {
+    seedRefund();
+    const before = refundState();
+    expect(refund("txn_unknown")).toEqual({ ok: true, subscriptions_updated: 0, founders_updated: 0 });
+    expect(refundState()).toBe(before);
+  });
+
+  it("does not cancel or retire a non-founder subscription through this RPC", () => {
+    seedRefund("live", OWNER, "pro_monthly");
+    const before = refundState();
+    expect(refund()).toEqual({ ok: true, subscriptions_updated: 0, founders_updated: 0 });
+    expect(refundState()).toBe(before);
+  });
+
+  it.each([
+    [null, "live", REFUND_AT, "invalid_input"],
+    ["", "live", REFUND_AT, "invalid_input"],
+    ["   ", "live", REFUND_AT, "invalid_input"],
+    [REFUND_TX, null, REFUND_AT, "invalid_environment"],
+    [REFUND_TX, "unknown", REFUND_AT, "invalid_environment"],
+    [REFUND_TX, "live", null, "invalid_input"],
+  ])("rejects invalid refund input (%s, %s, %s)", (tx, env, at, reason) => {
+    seedRefund();
+    const before = refundState();
+    expect(refund(tx, env, at)).toEqual({ ok: false, reason });
+    expect(refundState()).toBe(before);
+  });
+
+  it.each(["anon", "authenticated"])("denies direct %s execution of the refund RPC", (role) => {
+    seedRefund();
+    const before = refundState();
+    const result = rawSql(asRole(role, OWNER, refundCall()));
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/42501:.*permission denied for function/i);
+    expect(refundState()).toBe(before);
+  });
+
+  it("rolls back cancellation if founder retirement fails, preserving retryability", () => {
+    seedRefund();
+    const before = refundState();
+    try {
+      sql(`
+        CREATE FUNCTION public.founder_refund_test_failure() RETURNS trigger
+        LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic retirement failure'; END; $$;
+        CREATE TRIGGER founder_refund_test_failure BEFORE UPDATE ON public.founders
+          FOR EACH ROW EXECUTE FUNCTION public.founder_refund_test_failure();
+      `);
+      const failed = rawSql(asRole("service_role", "", refundCall()));
+      expect(failed.status).not.toBe(0);
+      expect(failed.stderr).toContain("synthetic retirement failure");
+      expect(refundState()).toBe(before);
+    } finally {
+      sql(`
+        DROP TRIGGER IF EXISTS founder_refund_test_failure ON public.founders;
+        DROP FUNCTION IF EXISTS public.founder_refund_test_failure();
+      `);
+    }
+    expect(refund()).toEqual({ ok: true, subscriptions_updated: 1, founders_updated: 1 });
   });
 });

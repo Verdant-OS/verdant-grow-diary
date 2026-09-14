@@ -108,8 +108,7 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
     manualLogs.isFetching ||
     manualLogs.data === undefined ||
     Boolean(
-      tentUuid &&
-        (tentSensorStatus === "loading" || tentReadings.refreshingByTent?.[tentUuid]),
+      tentUuid && (tentSensorStatus === "loading" || tentReadings.refreshingByTent?.[tentUuid]),
     );
 
   const retryContextReads = () => {

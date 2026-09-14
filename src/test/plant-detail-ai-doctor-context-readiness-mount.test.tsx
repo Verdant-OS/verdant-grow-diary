@@ -395,19 +395,26 @@ describe("PlantDetailAiDoctorContextReadinessMount — failed reads are not miss
     const rendered = render(<PlantDetailAiDoctorContextReadinessMount {...props} />);
     tentReadingsState = { byTent: {}, statusByTent: { [tentId]: "error" } };
     rendered.rerender(
-      <MemoryRouter><PlantDetailAiDoctorContextReadinessMount {...props} /></MemoryRouter>,
+      <MemoryRouter>
+        <PlantDetailAiDoctorContextReadinessMount {...props} />
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Try context read again" }));
     tentReadingsState = {
       byTent: { [tentId]: [manualRow()] },
       statusByTent: { [tentId]: "success" },
     };
-    expect(() => rendered.rerender(
-      <MemoryRouter><PlantDetailAiDoctorContextReadinessMount {...props} /></MemoryRouter>,
-    )).not.toThrow();
+    expect(() =>
+      rendered.rerender(
+        <MemoryRouter>
+          <PlantDetailAiDoctorContextReadinessMount {...props} />
+        </MemoryRouter>,
+      ),
+    ).not.toThrow();
     expect(screen.getByTestId("ai-doctor-context-readiness-panel")).toBeInTheDocument();
     expect(screen.getByTestId("plant-sensor-context-audit-latest")).not.toHaveTextContent(/None/i);
-    expect(screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-scope"))
-      .toHaveTextContent(/last 7 days.*current sensor health.*AI Doctor readiness/i);
+    expect(
+      screen.getByTestId("plant-detail-ai-doctor-context-readiness-mount-scope"),
+    ).toHaveTextContent(/last 7 days.*current sensor health.*AI Doctor readiness/i);
   });
 });

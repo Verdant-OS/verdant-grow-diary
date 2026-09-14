@@ -293,7 +293,11 @@ export default function PlantDetailAiDoctorContextReadinessMount({
         // The readiness panel renders this under "Open alerts", so it must be
         // the strictly-open count over the UNCAPPED set — the hook's rows
         // include acknowledged alerts and are truncated for display.
-        openAlertsCount={alerts.openCount}
+        // Loading and failed reads cannot establish a count, even if rows
+        // from a previous read are still retained by the underlying hook.
+        openAlertsCount={tentId && alerts.status === "ok" ? alerts.openCount : undefined}
+        openAlertsStatus={tentId ? alerts.status : "no_tent"}
+        onRetryAlerts={alerts.reload}
         quickActions={{
           // Every action routes into an existing Quick Log surface; the
           // grower still reviews and saves. Dispatching never writes.

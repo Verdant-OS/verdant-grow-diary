@@ -613,13 +613,16 @@ async function installNetworkFence(
 
   // Block this known ancillary script locally. Other methods and URLs must
   // still reach the broad fence and remain visible in its external audit.
-  await context.route("https://va.vercel-scripts.com/v1/script.debug.js", async (route, request) => {
-    if (request.method() === "GET") {
-      await route.abort("blockedbyclient");
-      return;
-    }
-    await route.fallback();
-  });
+  await context.route(
+    "https://va.vercel-scripts.com/v1/script.debug.js",
+    async (route, request) => {
+      if (request.method() === "GET") {
+        await route.abort("blockedbyclient");
+        return;
+      }
+      await route.fallback();
+    },
+  );
 
   await context.route("https://fonts.googleapis.com/**", (route) =>
     route.fulfill({ status: 200, contentType: "text/css", body: "" }),
@@ -1948,7 +1951,9 @@ test.describe("core link and form census", () => {
     }, scriptUrl);
     expect((await unrelatedError).location().url).toBe(scriptUrl);
     expect(report.consoleErrors).toHaveLength(5);
-    expect(report.consoleErrors[report.consoleErrors.length - 1]).toContain("census unrelated script error");
+    expect(report.consoleErrors[report.consoleErrors.length - 1]).toContain(
+      "census unrelated script error",
+    );
     expect(network.blockedMutations).toEqual([]);
     expect(network.mockedReadRequests).toBe(0);
     expect(report.pageErrors).toEqual([]);

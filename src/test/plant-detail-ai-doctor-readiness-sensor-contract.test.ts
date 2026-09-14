@@ -9,9 +9,15 @@
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
-import { classifyAiDoctorCurrentSensorEvidence } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import {
+  classifyAiDoctorCurrentSensorEvidence,
+  selectAiDoctorSensorEvidenceClassification,
+} from "@/lib/aiDoctorCurrentSensorSnapshotRules";
 import { buildPlantDetailAiDoctorReadiness } from "@/lib/plantDetailAiDoctorReadiness";
-import { classifyAuditRow } from "@/lib/sensorSnapshotStatusContract";
+import {
+  classificationFromStatusResult,
+  classifyAuditRow,
+} from "@/lib/sensorSnapshotStatusContract";
 
 const NOW = new Date("2026-05-23T12:00:00Z");
 const minutesAgo = (m: number) => new Date(NOW.getTime() - m * 60_000).toISOString();
@@ -118,14 +124,22 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
       ],
       { now: NOW },
     );
+    const staleLiveAudit = classificationFromStatusResult({
+      status: "stale",
+      reasonCode: "stale_timestamp",
+    });
+    const selected = selectAiDoctorSensorEvidenceClassification(classified, staleLiveAudit);
     const r = buildPlantDetailAiDoctorReadiness({
       ...baseInput,
-      sensorSnapshot: classified,
+      sensorSnapshot: selected,
     });
     expect(classified.status).toBe("usable");
+    expect(selected.status).toBe("usable");
     expect(r.sensorEvidence.mode).toBe("healthy");
     expect(r.sensorEvidence.mode).not.toBe("cautionary");
+    expect(r.sensorEvidence.isCautionary).toBe(false);
     expect(r.sensorEvidence.label).not.toMatch(/outside the stale window/i);
+    expect(r.sensorEvidence.label).not.toMatch(/cautionary context only/i);
   });
 
   it("stale live tent rows do not produce cautionary copy when a 9-hour manual is usable", () => {
@@ -145,8 +159,10 @@ describe("AI Doctor readiness × sensor snapshot contract", () => {
       sensorSnapshot: classified,
     });
     expect(classified.status).toBe("usable");
+    expect(r.sensorEvidence.mode).toBe("healthy");
     expect(r.sensorEvidence.mode).not.toBe("cautionary");
     expect(r.sensorEvidence.label).not.toMatch(/outside the stale window/i);
+    expect(r.sensorEvidence.label).not.toMatch(/cautionary context only/i);
   });
 
   it("needs_review is blocked as evidence", () => {

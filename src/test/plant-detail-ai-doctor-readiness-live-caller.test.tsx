@@ -159,6 +159,8 @@ describe("PlantDetailAiDoctorReadiness — live caller × real intake classifica
       expect(COMPONENT_SRC).toMatch(/useSensorReadingsByTents/);
       expect(COMPONENT_SRC).toMatch(/classifyAiDoctorCurrentSensorEvidence/);
       expect(COMPONENT_SRC).toMatch(/selectAiDoctorSensorEvidenceClassification/);
+      expect(COMPONENT_SRC).toMatch(/AI_DOCTOR_MANUAL_SENSOR_SOURCES/);
+      expect(COMPONENT_SRC).toMatch(/mergeAiDoctorCurrentSensorWindows/);
     });
   });
 

@@ -31,6 +31,15 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { from: () => ({ insert: async () => ({ error: null }) }) },
 }));
 
+vi.mock("@/hooks/useSensorsQuickLogManualReadings", () => ({
+  useSensorsQuickLogManualReadings: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({
     data: [],

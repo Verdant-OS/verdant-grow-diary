@@ -158,13 +158,10 @@ describe("D7 — V2 sheet response-check chips", () => {
     expect(chips).toBeLessThan(note);
   });
 
-  it("locks the chips during an in-flight watering submission, like the note", () => {
-    // Pin updated (not loosened): the disabled expression gained the overflow
-    // clause, so `wateringSubmissionLocked` is now the FIRST term of a
-    // disjunction rather than the whole value. The lock itself is unchanged.
-    expect(SHEET).toMatch(
-      /qlv2-response-chip[\s\S]{0,600}disabled=\{[\s\S]{0,80}wateringSubmissionLocked/,
-    );
+  it("locks the chips during an unresolved submission, like the note", () => {
+    // The generalized submission lock also covers exact Note and Feed retries.
+    // Keep it pinned as the first term alongside the per-status overflow guard.
+    expect(SHEET).toMatch(/qlv2-response-chip[\s\S]{0,600}disabled=\{[\s\S]{0,80}submissionLocked/);
   });
 
   it("keeps the save contract unchanged — chips are note text, not a new action", () => {

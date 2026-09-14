@@ -10,6 +10,7 @@
  */
 import { useCallback, useMemo } from "react";
 import { Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import AiDoctorCheckInPreviewPanel from "@/components/AiDoctorCheckInPreviewPanel";
 import PlantSensorContextAuditPanel from "@/components/PlantSensorContextAuditPanel";
@@ -63,6 +64,7 @@ function FallbackShell({ testId, message }: { testId: string; message: string })
   return (
     <section
       data-testid={testId}
+      role="status"
       className="glass rounded-2xl p-4 my-3 text-xs text-muted-foreground flex items-center gap-2"
     >
       <Activity className="h-4 w-4" aria-hidden="true" />
@@ -100,10 +102,23 @@ export default function PlantDetailAiDoctorContextReadinessMount({
       ? (tentReadings.byTent[tentUuid] ?? NO_TENT_MANUAL_ROWS)
       : NO_TENT_MANUAL_ROWS;
 
+  const hasReadError = recentActivity.isError || manualLogs.isError || tentSensorFailed;
   const isLoading =
     recentActivity.isLoading ||
+    recentActivity.isFetching ||
+    recentActivity.data === undefined ||
     manualLogs.isLoading ||
-    Boolean(tentUuid && tentSensorStatus === "loading");
+    manualLogs.isFetching ||
+    manualLogs.data === undefined ||
+    Boolean(
+      tentUuid && (tentSensorStatus === "loading" || tentReadings.refreshingByTent?.[tentUuid]),
+    );
+
+  const retryContextReads = () => {
+    void recentActivity.refetch();
+    void manualLogs.refetch();
+    void tentReadings.refetch();
+  };
 
   const plantRow: PlantRowLike = useMemo(
     () => ({
@@ -216,6 +231,24 @@ export default function PlantDetailAiDoctorContextReadinessMount({
     );
   }
 
+  if (hasReadError) {
+    return (
+      <section
+        data-testid="plant-detail-ai-doctor-context-readiness-mount-error"
+        role="alert"
+        className="glass rounded-2xl p-4 my-3 space-y-2"
+      >
+        <p className="text-sm font-medium">Context preview unavailable.</p>
+        <p className="text-xs text-muted-foreground">
+          Some plant or tent records could not be loaded. Try again to check what is available.
+        </p>
+        <Button type="button" size="sm" variant="outline" onClick={retryContextReads}>
+          Try context read again
+        </Button>
+      </section>
+    );
+  }
+
   if (isLoading) {
     return (
       <FallbackShell
@@ -247,6 +280,14 @@ export default function PlantDetailAiDoctorContextReadinessMount({
 
   return (
     <div data-testid="plant-detail-ai-doctor-context-readiness-mount" className="my-3 space-y-2">
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid="plant-detail-ai-doctor-context-readiness-mount-scope"
+      >
+        This preview uses recent plant diary records and manual sensor readings from its assigned
+        tent. Readiness summaries use sensor readings from the last 7 days. Current sensor health is
+        shown in AI Doctor readiness.
+      </p>
       <AiDoctorContextReadinessPanel
         context={built.context}
         // The readiness panel renders this under "Open alerts", so it must be

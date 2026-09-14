@@ -40,13 +40,19 @@ export default function ManualSnapshotTimelineSection(props: Props) {
     <Card data-testid="manual-snapshot-timeline-section" data-scope={props.scope}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
-          <ClipboardList className="h-4 w-4" aria-hidden /> Manual sensor snapshots
+          <ClipboardList className="h-4 w-4" aria-hidden />
+          {props.scope === "plant"
+            ? "Manual snapshots attached to this plant"
+            : "Manual snapshots in this tent’s diary"}
         </CardTitle>
         <p
           className="text-xs text-muted-foreground"
           data-testid="manual-snapshot-timeline-section-helper"
         >
-          Grower-recorded readings. Not live, not synced, not imported.
+          {props.scope === "plant"
+            ? "Grower-recorded readings attached to this plant’s diary. Shared tent records can also appear in QuickLog memory."
+            : "Grower-recorded readings in this tent’s diary, including its plants."}{" "}
+          Not live, not synced, not imported.
         </p>
       </CardHeader>
       <CardContent>
@@ -74,7 +80,9 @@ export default function ManualSnapshotTimelineSection(props: Props) {
             className="text-sm text-muted-foreground"
             data-testid="manual-snapshot-timeline-section-empty"
           >
-            No manual sensor snapshots yet.
+            {props.scope === "plant"
+              ? "No manual sensor snapshots attached to this plant yet."
+              : "No manual sensor snapshots in this tent’s diary yet."}
           </p>
         ) : (
           <ul className="space-y-3" data-testid="manual-snapshot-timeline-section-list">

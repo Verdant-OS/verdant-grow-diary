@@ -142,6 +142,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   clearLocalStorageForTest();
   clearTemperatureUnitPreference();
   rpcMock.mockReset();
@@ -332,7 +333,7 @@ describe("QuickLogV2Sheet — structured watering", () => {
 
   it("remembers the confirmed plant after a V2 Note succeeds", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "note-event-1", environment_event_id: null },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", environment_event_id: null },
       error: null,
     });
     renderSheet("plant:plant-1", "note");
@@ -731,7 +732,7 @@ describe("QuickLogV2Sheet — structured watering", () => {
 
   it("pins the manual sensor snapshot Temp draft to its entry unit through a live preference flip (Note save path)", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "note-event-temp-pin", environment_event_id: null },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002", environment_event_id: null },
       error: null,
     });
     saveTemperatureUnitPreference("celsius");

@@ -10,6 +10,7 @@ import {
   buildAiDoctorCurrentSensorSnapshot,
   classifyAiDoctorCurrentSensorEvidence,
   currentSensorEvidenceIsFreshLive,
+  mergeAiDoctorCurrentSensorWindows,
   selectAiDoctorSensorEvidenceClassification,
   type AiDoctorCurrentSensorRowLike,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
@@ -377,6 +378,50 @@ describe("AI Doctor current sensor evidence classification", () => {
         now: NOW,
       }).status,
     ).toBe("stale");
+  });
+
+  it("Golden Toad Pin1: a 9h tent manual stays usable Doctor evidence, not live-15m stale", () => {
+    const capturedAt = "2026-07-17T03:00:00.000Z";
+    const rows = [
+      row("temp_f", 75, "manual", capturedAt, "temp"),
+      row("humidity", 60, "manual", capturedAt, "rh"),
+      row("vpd", 1, "manual", capturedAt, "vpd"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.source).toBe("manual");
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+  });
+
+  it("Golden Toad Pin1: stale live must not park a 9h usable tent manual as cautionary", () => {
+    const manualAt = "2026-07-17T03:00:00.000Z";
+    const liveAt = "2026-07-17T11:44:00.000Z";
+    const rows = [
+      row("temperature_c", 24, "live", liveAt, "live-temp"),
+      row("temp_f", 75, "manual", manualAt, "temp"),
+      row("humidity", 60, "manual", manualAt, "rh"),
+      row("vpd", 1, "manual", manualAt, "vpd"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.source).toBe("manual");
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+  });
+
+  it("merges a dedicated manual window so live-cap crowding cannot drop tent manuals", () => {
+    const mixedOnlyLive = [
+      row("temperature_c", 24, "live", "2026-07-17T11:44:00.000Z", "live-temp"),
+      row("humidity_pct", 55, "live", "2026-07-17T11:44:00.000Z", "live-rh"),
+    ];
+    const manuals = [
+      row("temp_f", 75, "manual", "2026-07-17T03:00:00.000Z", "manual-temp"),
+      row("humidity", 60, "manual", "2026-07-17T03:00:00.000Z", "manual-rh"),
+    ];
+    const merged = mergeAiDoctorCurrentSensorWindows(mixedOnlyLive, manuals);
+    expect(merged.map((r) => r.id).sort()).toEqual(
+      ["live-rh", "live-temp", "manual-rh", "manual-temp"].sort(),
+    );
+    expect(classifyAiDoctorCurrentSensorEvidence(merged, { now: NOW }).status).toBe("usable");
   });
 
   it("does not treat a usable manual snapshot as live-bridge presence", () => {

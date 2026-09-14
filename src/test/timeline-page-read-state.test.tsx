@@ -1385,3 +1385,86 @@ describe("Timeline mounted read-state boundary", () => {
     expect(document.querySelector('img[src*="older-foreign"]')).not.toBeInTheDocument();
   });
 });
+
+describe("Timeline mounted filter reset (QOL-09)", () => {
+  beforeEach(() => {
+    harness.executeQuery.mockReset();
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            diaryEntry("entry-veg", "Vegetative stage log", "2026-07-20T12:00:00.000Z"),
+            {
+              ...diaryEntry("entry-flower", "Flowering stage log", "2026-07-21T12:00:00.000Z"),
+              stage: "flower",
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+    Object.assign(harness.growsState, {
+      activeGrow: GROW_A,
+      activeGrowId: GROW_A.id,
+      grows: [GROW_A],
+      loading: false,
+      error: null,
+    });
+  });
+
+  it("disables Clear filters until a stage chip is active, then restores all entries", async () => {
+    renderTimeline();
+
+    expect(await screen.findByText("Vegetative stage log")).toBeInTheDocument();
+    expect(screen.getByText("Flowering stage log")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Vegetative/i }));
+    expect(await screen.findByText("Vegetative stage log")).toBeInTheDocument();
+    expect(screen.queryByText("Flowering stage log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-results-count")).toHaveTextContent("showing 1 of 2");
+    expect(screen.getByTestId("timeline-clear-filters")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("timeline-clear-filters"));
+    expect(await screen.findByText("Flowering stage log")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-results-count")).toHaveTextContent("showing 2 of 2");
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+  });
+
+  it("resets event-type chips together with evidence filters through Clear filters", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-photo", "Photo entry"),
+              photo_url: "https://x/photo.jpg",
+              details: { event_type: "photo", source: "manual" },
+            },
+            diaryEntry("entry-note", "Text-only entry"),
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Photo entry")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Photos/i }));
+    expect(await screen.findByText("Photo entry")).toBeInTheDocument();
+    expect(screen.queryByText("Text-only entry")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-clear-filters")).not.toBeDisabled();
+
+    fireEvent.change(screen.getByTestId("timeline-search-input"), { target: { value: "photo" } });
+    fireEvent.click(screen.getByTestId("timeline-clear-filters"));
+
+    expect(await screen.findByText("Text-only entry")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-results-count")).toHaveTextContent("showing 2 of 2");
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+  });
+});

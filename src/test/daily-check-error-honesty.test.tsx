@@ -14,6 +14,8 @@ const state = vi.hoisted(() => ({
   diaryLoading: false,
   currentSensorStatusByTent: {} as Record<string, "loading" | "success" | "error">,
   manualSensorStatusByTent: {} as Record<string, "loading" | "success" | "error">,
+  currentSensorRowsByTent: {} as Record<string, unknown[]>,
+  manualSensorRowsByTent: {} as Record<string, unknown[]>,
   growPlantsRefetch: vi.fn(async () => undefined),
   growTentsRefetch: vi.fn(async () => undefined),
   sensorRefetch: vi.fn(async () => undefined),
@@ -70,7 +72,7 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
   ) => {
     const manualOnly = sources?.length === 1 && sources[0] === "manual";
     return {
-      byTent: {},
+      byTent: manualOnly ? state.manualSensorRowsByTent : state.currentSensorRowsByTent,
       statusByTent: manualOnly
         ? state.manualSensorStatusByTent
         : state.currentSensorStatusByTent,
@@ -154,6 +156,8 @@ beforeEach(() => {
   state.diaryLoading = false;
   state.currentSensorStatusByTent = {};
   state.manualSensorStatusByTent = {};
+  state.currentSensorRowsByTent = {};
+  state.manualSensorRowsByTent = {};
   vi.clearAllMocks();
 });
 
@@ -202,6 +206,36 @@ describe("Daily Grow Check failed-read honesty", () => {
       fireEvent.click(screen.getByTestId("plant-detail-ai-doctor-readiness-sensor-error-retry"));
       expect(state.currentSensorRefetch).toHaveBeenCalledTimes(1);
       expect(state.manualSensorRefetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["mixed", "manual"] as const)(
+    "keeps usable manual evidence available when the %s query fails",
+    (failedRead) => {
+      const tentId = "11111111-1111-4111-8111-111111111111";
+      const capturedAt = new Date(Date.now() - 60_000).toISOString();
+      const rows = [
+        { metric: "temp_f", value: 75, captured_at: capturedAt, source: "manual", quality: "ok" },
+        { metric: "humidity", value: 60, captured_at: capturedAt, source: "manual", quality: "ok" },
+      ];
+      state.currentSensorStatusByTent = {
+        [tentId]: failedRead === "mixed" ? "error" : "success",
+      };
+      state.manualSensorStatusByTent = {
+        [tentId]: failedRead === "manual" ? "error" : "success",
+      };
+      if (failedRead === "mixed") state.manualSensorRowsByTent = { [tentId]: rows };
+      else state.currentSensorRowsByTent = { [tentId]: rows };
+
+      renderWithProviders(
+        <PlantDetailAiDoctorReadiness plantId="plant-1" tentId={tentId} stage="veg" />,
+      );
+
+      expect(screen.queryByTestId("plant-detail-ai-doctor-readiness-sensor-error")).toBeNull();
+      expect(screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel"))
+        .toHaveAttribute("data-status", "usable");
+      expect(screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-status"))
+        .toHaveTextContent("Latest manual snapshot accepted.");
     },
   );
 

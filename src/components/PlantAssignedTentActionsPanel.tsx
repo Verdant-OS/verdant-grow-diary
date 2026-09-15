@@ -122,7 +122,10 @@ function ActionRowItem({ row }: { row: PlantAssignedTentActionRow }) {
 
 export default function PlantAssignedTentActionsPanel({ tentId, tentName, growId }: Props) {
   const enabled = !!tentId;
-  const { rows, isLoading, isError } = usePlantAssignedTentActions(tentId ?? null, growId ?? null);
+  const { rows, isLoading, isError, isFetching, refetch } = usePlantAssignedTentActions(
+    tentId ?? null,
+    growId ?? null,
+  );
 
   return (
     <Card data-testid="plant-assigned-tent-actions-panel" className="mt-4">
@@ -155,14 +158,30 @@ export default function PlantAssignedTentActionsPanel({ tentId, tentName, growId
           >
             Assign this plant to a tent to see pending actions.
           </p>
-        ) : isLoading ? (
-          <p className="text-muted-foreground">Loading pending actions…</p>
         ) : isError ? (
+          <div role="alert" data-testid="plant-assigned-tent-actions-unavailable">
+            <p className="text-muted-foreground">Pending actions are temporarily unavailable.</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2 min-h-11"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+              aria-label="Retry pending actions"
+              data-testid="plant-assigned-tent-actions-retry"
+            >
+              {isFetching ? "Retrying…" : "Retry"}
+            </Button>
+          </div>
+        ) : isLoading ? (
           <p
             className="text-muted-foreground"
-            data-testid="plant-assigned-tent-actions-unavailable"
+            data-testid="plant-assigned-tent-actions-loading"
+            role="status"
+            aria-busy="true"
           >
-            Pending actions are temporarily unavailable.
+            Loading pending actions…
           </p>
         ) : rows.length === 0 ? (
           <p className="text-muted-foreground" data-testid="plant-assigned-tent-actions-empty">

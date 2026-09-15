@@ -48,6 +48,50 @@ function ctx(opts: {
 }
 
 describe("TimelineEvidenceReadinessPanel — counts & badges", () => {
+  it("labels twelve metric readings from two captures as sensor readings in seven days", () => {
+    const metrics = [
+      { metric: "temperature_c", value: 24 },
+      { metric: "humidity_pct", value: 55 },
+      { metric: "vpd_kpa", value: 1.2 },
+      { metric: "co2_ppm", value: 450 },
+      { metric: "ppfd", value: 300 },
+      { metric: "soil_moisture_pct", value: 40 },
+    ];
+    const sensorReadings = [HOUR, 2 * HOUR].flatMap((age) =>
+      metrics.map((reading) => ({
+        ...reading,
+        captured_at: ago(age),
+        source: "manual",
+      })),
+    );
+    render(
+      <TimelineEvidenceReadinessPanel
+        context={ctx({
+          sensorReadings: [
+            ...sensorReadings,
+            {
+              metric: "temperature_c",
+              value: 24,
+              captured_at: ago(8 * 24 * HOUR),
+              source: "manual",
+            },
+            { metric: "temperature_c", value: 24, captured_at: ago(-HOUR), source: "manual" },
+            { metric: "temperature_c", value: NaN, captured_at: ago(HOUR), source: "manual" },
+          ],
+        })}
+      />,
+    );
+    const count = screen.getByTestId("timeline-evidence-readiness-count-recent-snapshots");
+    expect(count.querySelector("dt")?.textContent).toBe("Sensor readings (7d)");
+    expect(count.querySelector("dd")?.textContent).toBe("12");
+    expect(count.getAttribute("data-count")).toBe("12");
+    expect(count.textContent).not.toContain("Sensor snapshots");
+    const source = screen.getByTestId("timeline-evidence-readiness-source-manual");
+    expect(source.getAttribute("data-source")).toBe("manual");
+    expect(source.getAttribute("data-sample-count")).toBe("12");
+    expect(source.getAttribute("data-trustworthy")).toBe("true");
+  });
+
   it("renders counts for logs/photos/snapshots/watering/feeding/alerts", () => {
     const context = ctx({
       growEvents: [
@@ -126,6 +170,9 @@ describe("TimelineEvidenceReadinessPanel — counts & badges", () => {
 describe("TimelineEvidenceReadinessPanel — missing flags & tone copy", () => {
   it("renders missing-photo / sensor / watering / feeding flags when absent", () => {
     render(<TimelineEvidenceReadinessPanel context={ctx({})} />);
+    const count = screen.getByTestId("timeline-evidence-readiness-count-recent-snapshots");
+    expect(count.querySelector("dt")?.textContent).toBe("Sensor readings (7d)");
+    expect(count.getAttribute("data-count")).toBe("0");
     expect(screen.getByTestId("timeline-evidence-readiness-missing-no_recent_photos")).toBeTruthy();
     expect(
       screen.getByTestId("timeline-evidence-readiness-missing-no_recent_sensor_snapshot"),
@@ -208,6 +255,9 @@ describe("TimelineEvidenceReadinessPanel — missing flags & tone copy", () => {
     );
     const badge = screen.getByTestId("timeline-evidence-readiness-source-stale");
     expect(badge.getAttribute("data-trustworthy")).toBe("false");
+    const count = screen.getByTestId("timeline-evidence-readiness-count-recent-snapshots");
+    expect(count.querySelector("dt")?.textContent).toBe("Sensor readings (7d)");
+    expect(count.getAttribute("data-count")).toBe("1");
   });
 });
 

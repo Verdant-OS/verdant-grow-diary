@@ -705,3 +705,104 @@ describe("handleVerifiedEvent — AI credit-pack grant", () => {
     expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
   });
 });
+
+function refundAdjustmentEvent(
+  eventId = "evt_refund_barrier",
+  transactionId = "txn_abc",
+  action: "refund" | "chargeback" = "refund",
+) {
+  return {
+    eventId,
+    eventType: "adjustment.created",
+    data: {
+      action,
+      status: "approved",
+      transactionId,
+    },
+  };
+}
+
+function founderRefundBarrierId(env: "live" | "sandbox", transactionId: string): string {
+  return `internal:founder-refund:${env}:${transactionId}`;
+}
+
+describe("handleVerifiedEvent — founder refund barrier (#1375)", () => {
+  it("approved refund writes the internal barrier and revokes before marking processed", async () => {
+    const f = makeFixture();
+    const revoke = vi.fn(async () => ({ ok: true as const, foundersUpdated: 0 }));
+    (f.deps as Deps).revokeFounderLifetime = revoke;
+
+    const res = await handleVerifiedEvent(f.deps, refundAdjustmentEvent(), "sandbox", NOW, {});
+
+    expect(res).toEqual({ httpStatus: 200, reason: "processed:revoke_lifetime" });
+    expect(revoke).toHaveBeenCalledWith({
+      paddle_transaction_id: "txn_abc",
+      environment: "sandbox",
+      now: NOW,
+    });
+    expect(
+      f.insertCalls.some(
+        (call) => call.paddle_event_id === founderRefundBarrierId("sandbox", "txn_abc"),
+      ),
+    ).toBe(true);
+    expect(f.markCalls.at(-1)?.patch.processing_status).toBe("processed");
+  });
+
+  it("blocks a later founder purchase when the refund barrier already exists", async () => {
+    const txId = "txn_abc";
+    const f = makeFixture({
+      seedExisting: [[founderRefundBarrierId("sandbox", txId), { processing_status: "skipped" }]],
+    });
+    const allocate = vi.fn(async () => ({ ok: true as const, reason: "allocated" as const }));
+    const revoke = vi.fn(async () => ({ ok: true as const, foundersUpdated: 0 }));
+    (f.deps as Deps).allocateFounderLifetime = allocate;
+    (f.deps as Deps).revokeFounderLifetime = revoke;
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = vi.fn(async () => ({
+      ok: true as const,
+      canceled: 0,
+    }));
+
+    const res = await handleVerifiedEvent(
+      f.deps,
+      txEvent("evt_purchase_after_refund"),
+      "sandbox",
+      NOW,
+      {},
+    );
+
+    expect(res).toEqual({ httpStatus: 200, reason: "skipped:founder_refund_precedes_purchase" });
+    expect(allocate).not.toHaveBeenCalled();
+    expect(revoke).toHaveBeenCalledWith({
+      paddle_transaction_id: txId,
+      environment: "sandbox",
+      now: NOW,
+    });
+    expect(f.upsertCalls).toHaveLength(0);
+    expect(f.markCalls.at(-1)?.patch).toMatchObject({
+      processing_status: "skipped",
+      skip_reason: "founder_refund_precedes_purchase",
+    });
+  });
+
+  it("still allocates when no refund barrier exists for the transaction", async () => {
+    const f = makeFixture();
+    const allocate = vi.fn(async () => ({ ok: true as const, reason: "allocated" as const }));
+    (f.deps as Deps).allocateFounderLifetime = allocate;
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = vi.fn(async () => ({
+      ok: true as const,
+      canceled: 0,
+    }));
+
+    const res = await handleVerifiedEvent(
+      f.deps,
+      txEvent("evt_purchase_clean"),
+      "sandbox",
+      NOW,
+      {},
+    );
+
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe("processed:record_lifetime");
+    expect(allocate).toHaveBeenCalledTimes(1);
+  });
+});

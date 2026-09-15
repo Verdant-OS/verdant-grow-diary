@@ -3,6 +3,7 @@ import {
   CSV_IMPORT_DESCRIPTION,
   CSV_IMPORT_READING_COPY,
   formatCsvPreviewRow,
+  buildCsvImportFailureMessage,
 } from "@/lib/environmentCsvPreviewCopyRules";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 
@@ -51,5 +52,21 @@ describe("environmentCsvPreviewCopyRules", () => {
     expect(copy).not.toContain("VPD");
     expect(copy).not.toContain("ppm CO₂");
     expect(copy).not.toContain("PPFD");
+  });
+});
+
+describe("unconfirmed CSV import copy", () => {
+  it("does not claim zero saves when no batch was acknowledged", () => {
+    const copy = buildCsvImportFailureMessage(0, false, true);
+    expect(copy).toMatch(/couldn.t confirm|unconfirmed/i);
+    expect(copy).toMatch(/review imported history before retrying/i);
+    expect(copy).not.toMatch(/No CSV readings were saved/);
+  });
+
+  it("states the confirmed lower bound without treating it as the total", () => {
+    const copy = buildCsvImportFailureMessage(2, true, true);
+    expect(copy).toMatch(/2 .*confirmed/i);
+    expect(copy).toMatch(/couldn.t confirm|unconfirmed/i);
+    expect(copy).not.toMatch(/stopped after|No CSV readings were saved/i);
   });
 });

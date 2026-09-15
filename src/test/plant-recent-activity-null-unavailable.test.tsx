@@ -106,6 +106,12 @@ describe("plant recent activity null response", () => {
     await screen.findByTestId("plant-detail-whats-missing-unavailable");
     expect(screen.queryByText("No timeline entries yet")).not.toBeInTheDocument();
   });
+
+  it("rejects returned read errors from the fetch boundary", async () => {
+    const readError = new Error("Activity read failed");
+    activityRead.result = { data: null, error: readError };
+    await expect(fetchPlantRecentActivityRows("plant-1")).rejects.toBe(readError);
+  });
 });
 
 describe("Recent Plant Activity error recovery", () => {
@@ -142,6 +148,10 @@ describe("Recent Plant Activity error recovery", () => {
   }
 
   function expectUnavailable() {
+    expect(screen.getByTestId("plant-recent-activity-unavailable")).toHaveAttribute(
+      "role",
+      "alert",
+    );
     expect(screen.getByText("Recent plant activity is unavailable.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry recent activity" })).toBeEnabled();
     expect(screen.queryByText("No activity logged for this plant yet.")).not.toBeInTheDocument();

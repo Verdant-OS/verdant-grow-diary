@@ -40,7 +40,10 @@ export interface UsePlantAssignedTentActionsResult {
   proofSelectedAiDoctorActionRow: PlantAssignedTentActionRow | null;
   isLoading: boolean;
   isError: boolean;
+  isFetching: boolean;
   error: unknown;
+  /** Retry the existing action_queue read only. No writes. */
+  refetch: () => void;
 }
 
 export interface UsePlantAssignedTentActionsOptions {
@@ -149,7 +152,10 @@ export function usePlantAssignedTentActions(
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AssignedTentActionInputRow[];
+      if (!Array.isArray(data)) {
+        throw new Error("Pending actions are temporarily unavailable.");
+      }
+      return data as AssignedTentActionInputRow[];
     },
   });
 
@@ -177,7 +183,10 @@ export function usePlantAssignedTentActions(
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AssignedTentActionInputRow[];
+      if (!Array.isArray(data)) {
+        throw new Error("Pending actions are temporarily unavailable.");
+      }
+      return data as AssignedTentActionInputRow[];
     },
   });
 
@@ -204,7 +213,10 @@ export function usePlantAssignedTentActions(
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AssignedTentActionInputRow[];
+      if (!Array.isArray(data)) {
+        throw new Error("Pending actions are temporarily unavailable.");
+      }
+      return data as AssignedTentActionInputRow[];
     },
   });
 
@@ -231,7 +243,10 @@ export function usePlantAssignedTentActions(
       if (growId) query = query.eq("grow_id", growId);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as AssignedTentActionInputRow[];
+      if (!Array.isArray(data)) {
+        throw new Error("Pending actions are temporarily unavailable.");
+      }
+      return data as AssignedTentActionInputRow[];
     },
   });
 
@@ -266,14 +281,26 @@ export function usePlantAssignedTentActions(
       proofAiDoctorQ.isError ||
       proofReadFetching ||
       proofReadPaused);
-  const rows = proofReadIncomplete
-    ? []
-    : buildAssignedTentActions(q.data ?? [], {
-        tentId,
-        growId,
-        limit,
-        selectedPlantIdForAiCoach,
-      });
+  // Generic panel: TanStack v5 reports an initial offline pause as
+  // isPending + isPaused with isLoading false and no data. Treating that as
+  // settled turns a missing read into a false empty Action Queue.
+  const genericReadUnproven = enabled && q.data === undefined;
+  const genericOfflineUnproven = genericReadUnproven && q.isPaused === true;
+  const genericPendingUnproven =
+    genericReadUnproven &&
+    !q.isError &&
+    q.isPaused !== true &&
+    (q.isPending || q.isLoading || q.isFetching);
+  const genericUnavailable = q.isError || genericOfflineUnproven;
+  const rows =
+    proofReadIncomplete || genericUnavailable || genericPendingUnproven
+      ? []
+      : buildAssignedTentActions(q.data ?? [], {
+          tentId,
+          growId,
+          limit,
+          selectedPlantIdForAiCoach,
+        });
   const proofSelectedPlantAiCoachRow = proofReadIncomplete
     ? null
     : (buildAssignedTentActions(proofAiCoachQ.data ?? [], {
@@ -311,6 +338,17 @@ export function usePlantAssignedTentActions(
           getActionQueueSourceKind(row) === "ai_doctor" &&
           row.aiDoctorSessionBackPointerId === selectedAiDoctorSessionIdForProof,
       ) ?? null);
+  const isError =
+    q.isError ||
+    proofAiCoachQ.isError ||
+    proofAlertQ.isError ||
+    proofAiDoctorQ.isError ||
+    genericOfflineUnproven;
+  const isFetching =
+    q.isFetching ||
+    proofAiCoachQ.isFetching ||
+    proofAlertQ.isFetching ||
+    proofAiDoctorQ.isFetching;
   return {
     rows,
     proofSelectedPlantAiCoachRow,
@@ -322,8 +360,18 @@ export function usePlantAssignedTentActions(
       proofAlertQ.isLoading ||
       proofAiDoctorQ.isLoading ||
       proofReadFetching ||
-      proofReadPaused,
-    isError: q.isError || proofAiCoachQ.isError || proofAlertQ.isError || proofAiDoctorQ.isError,
+      proofReadPaused ||
+      genericPendingUnproven ||
+      genericReadUnproven ||
+      genericUnavailable,
+    isError,
+    isFetching,
     error: q.error ?? proofAiCoachQ.error ?? proofAlertQ.error ?? proofAiDoctorQ.error,
+    refetch: () => {
+      void q.refetch();
+      if (selectedPlantIdForAiCoach !== null) void proofAiCoachQ.refetch();
+      if (selectedAlertIdForProof !== null) void proofAlertQ.refetch();
+      if (selectedAiDoctorSessionIdForProof !== null) void proofAiDoctorQ.refetch();
+    },
   };
 }

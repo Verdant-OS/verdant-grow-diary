@@ -75,6 +75,29 @@ describe("Tent manual snapshot history — audit", () => {
     expect(TENT_DETAIL).toMatch(/from\s+["']@\/components\/TentManualSnapshotHistoryList["']/);
   });
 
+  it("TentDetail passes explicit sensor-readings loading and error truth to the history list", () => {
+    expect(TENT_DETAIL).toMatch(/const sensorReadings = useSensorReadings\(id\);/);
+    expect(TENT_DETAIL).toMatch(/const \{ data: readings = \[\] \} = sensorReadings;/);
+    const listStart = TENT_DETAIL.indexOf("<TentManualSnapshotHistoryList");
+    const listEnd = TENT_DETAIL.indexOf("/>", listStart);
+    expect(listStart).toBeGreaterThan(-1);
+    const list = TENT_DETAIL.slice(listStart, listEnd);
+    expect(list).toContain("readStatus={sensorReadings.status}");
+    expect(list).toContain("isFetching={sensorReadings.isFetching}");
+    expect(list).toContain("sensorReadings.refetch");
+    expect(TENT_DETAIL).not.toContain(
+      "<TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />",
+    );
+  });
+
+  it("component gates history on settled success (fail-closed read contract)", () => {
+    expect(COMPONENT).toContain("canShowHistory");
+    expect(COMPONENT).toMatch(/readStatus === "success"/);
+    expect(COMPONENT).toContain('data-testid="tent-manual-snapshot-history-loading"');
+    expect(COMPONENT).toContain('data-testid="tent-manual-snapshot-history-error"');
+    expect(COMPONENT).toContain('data-testid="tent-manual-snapshot-history-retry"');
+  });
+
   it("filtering/grouping/delta logic lives outside JSX (uses pure helpers)", () => {
     expect(COMPONENT).toContain("buildManualSnapshotHistoryList");
     // No raw metric arithmetic inside the component body.
@@ -330,9 +353,7 @@ describe("TentManualSnapshotHistoryList — fail-closed read states", () => {
     it(`recovers to verified ${label} history only after Retry succeeds`, () => {
       const onRetry = vi.fn();
       const props = { tentId: TENT_A, readings, onRetry };
-      const { rerender } = render(
-        <TentManualSnapshotHistoryList {...props} readStatus="error" />,
-      );
+      const { rerender } = render(<TentManualSnapshotHistoryList {...props} readStatus="error" />);
       fireEvent.click(screen.getByRole("button", { name: "Retry" }));
       expect(onRetry).toHaveBeenCalledTimes(1);
       rerender(<TentManualSnapshotHistoryList {...props} readStatus="pending" isFetching />);

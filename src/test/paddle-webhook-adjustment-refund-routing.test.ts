@@ -234,6 +234,34 @@ describe("decide() — approved refund routing (REFUND-001)", () => {
     });
     expect(d).toEqual({ kind: "skip", reason: "adjustment_missing_transaction_id" });
   });
+
+  it("whitespace-only transaction ids still skip as missing", () => {
+    for (const eventType of ["adjustment.created", "adjustment.updated"] as const) {
+      for (const field of ["transactionId", "transaction_id"] as const) {
+        const d = decideAdjustment({
+          eventType,
+          action: "refund",
+          status: "approved",
+          data: { [field]: "   " },
+        });
+        expect(d).toEqual({ kind: "skip", reason: "adjustment_missing_transaction_id" });
+      }
+    }
+  });
+
+  it("trims surrounding whitespace from nested transaction ids", () => {
+    const d = decideAdjustment({
+      eventType: "adjustment.updated",
+      action: "refund",
+      status: "approved",
+      data: { transaction_id: "  txn_trimmed  " },
+    });
+    expect(d).toEqual({
+      kind: "revoke_lifetime",
+      paddleTransactionId: "txn_trimmed",
+      env: "live",
+    });
+  });
 });
 
 describe("orchestrator — approved updated refund reaches the revoke barrier", () => {
@@ -302,6 +330,57 @@ describe("orchestrator — approved updated refund reaches the revoke barrier", 
     ).toBe("skipped");
   });
 
+  it("approved updated still blocks a later founder purchase (#1375 via REFUND-001 path)", async () => {
+    const f = makeMemoryFixture();
+    const pending = await handleVerifiedEvent(
+      f.deps,
+      {
+        eventId: "evt_pending_created",
+        eventType: "adjustment.created",
+        data: {
+          action: "refund",
+          status: "pending_approval",
+          transaction_id: "txn_refund_001",
+        },
+      },
+      "live",
+      NOW,
+      {},
+    );
+    expect(pending.reason).toBe("skipped:adjustment_not_approved");
+
+    const approved = await handleVerifiedEvent(
+      f.deps,
+      {
+        eventId: "evt_approved_updated",
+        eventType: "adjustment.updated",
+        data: {
+          action: "refund",
+          status: "approved",
+          transaction_id: "txn_refund_001",
+        },
+      },
+      "live",
+      NOW,
+      {},
+    );
+    expect(approved).toEqual({ httpStatus: 200, reason: "processed:revoke_lifetime" });
+
+    const purchase = await handleVerifiedEvent(
+      f.deps,
+      founderPurchase("evt_purchase_after_updated"),
+      "live",
+      PURCHASE_AT,
+      {},
+    );
+    expect(purchase).toEqual({
+      httpStatus: 200,
+      reason: "skipped:founder_refund_precedes_purchase",
+    });
+    expect(f.upsertCalls).toHaveLength(0);
+    expect(f.revokeCalls).toHaveLength(2);
+  });
+
   it("raw approved created still blocks a later founder purchase (#1375 sequential barrier)", async () => {
     const f = makeMemoryFixture();
     const refund = await handleVerifiedEvent(
@@ -364,6 +443,35 @@ describe("orchestrator — approved updated refund reaches the revoke barrier", 
     expect(credit.reason).toBe("skipped:adjustment_not_refund_or_chargeback");
     expect(f.revokeCalls).toHaveLength(0);
     expect(f.existingByEventId.has("internal:founder-refund:live:txn_refund_001")).toBe(false);
+  });
+});
+
+describe("orchestrator — replay semantics for migrated adjustment.updated rows", () => {
+  it("reprocesses a previously skipped adjustment.updated when it is now an approved refund", async () => {
+    const f = makeMemoryFixture();
+    f.existingByEventId.set("evt_legacy_skip", { processing_status: "skipped" });
+
+    const res = await handleVerifiedEvent(
+      f.deps,
+      {
+        eventId: "evt_legacy_skip",
+        eventType: "adjustment.updated",
+        data: {
+          action: "refund",
+          status: "approved",
+          transaction_id: "txn_refund_001",
+        },
+      },
+      "live",
+      NOW,
+      {},
+    );
+
+    expect(res).toEqual({ httpStatus: 200, reason: "processed:revoke_lifetime" });
+    expect(f.revokeCalls).toEqual([
+      { paddle_transaction_id: "txn_refund_001", environment: "live" },
+    ]);
+    expect(res.reason).not.toBe("duplicate_skipped");
   });
 });
 

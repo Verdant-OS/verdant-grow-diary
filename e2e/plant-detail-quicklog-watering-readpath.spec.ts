@@ -156,13 +156,11 @@ async function mockSignedInSupabase(page: Page) {
   await page.route(/google-analytics\.com|googletagmanager\.com/, (route) => route.abort());
 }
 
-async function acceptReconsentGateIfShown(page: Page) {
+async function acceptReconsentGate(page: Page) {
   const gate = page.getByTestId("agreement-reconsent-gate");
-  const shown = await gate
-    .waitFor({ state: "visible", timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!shown) return;
+  // The fixture has no stored acceptances, so this gate is required. Wait for
+  // its async read instead of skipping it on a slow first render.
+  await expect(gate).toBeVisible({ timeout: 30_000 });
   await gate.locator("#reconsent-accept").click();
   await gate.getByRole("button", { name: /accept and continue/i }).click();
   await gate.waitFor({ state: "hidden", timeout: 15_000 });
@@ -183,7 +181,7 @@ test.describe("Plant Detail Quick Log watering read path", () => {
     await mockSignedInSupabase(page);
 
     await page.goto(`/plants/${FAKE_PLANT_ID}`);
-    await acceptReconsentGateIfShown(page);
+    await acceptReconsentGate(page);
 
     // ---- 1. Recap item: Watering, never Note --------------------------
     const recapItem = page.getByTestId("plant-detail-recent-activity-recap-item").first();

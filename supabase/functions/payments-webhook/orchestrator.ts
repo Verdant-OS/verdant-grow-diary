@@ -39,8 +39,9 @@ export type InsertResult = { ok: true; duplicate?: boolean } | { ok: false; erro
  * Result of allocate_lovable_founder_lifetime. `ok=true, reason='allocated'`
  * inserted a new lifetime row; `ok=true, reason='idempotent'` matched an
  * existing row for the same paddle transaction id; `ok=false,
- * reason='cap_reached'` refused because 75 active founder rows already
- * exist. Any other `ok=false` is an unexpected shape and is surfaced as
+ * reason='cap_reached'` refused because all 100 founder seats are consumed.
+ * `founder_refund_precedes_purchase` refuses a grant after reconciling
+ * a durable refund under the database lock. Any other `ok=false` is surfaced as
  * a transient failure so Paddle retries.
  */
 export type FounderAllocationResult =
@@ -352,8 +353,8 @@ export async function handleVerifiedEvent(
     // Any persisted barrier blocks, including received/failed after a mark
     // failure. Revoke first to reconcile a previous partial allocation, then
     // skip without allocating, canceling recurring plans, or sending purchase
-    // success. This guards sequential delivery; it is not a database lock
-    // spanning concurrent refund/allocation RPCs.
+    // success. The allocator also rechecks under its shared refund lock, so
+    // a barrier committed after this precheck still blocks the delayed grant.
     if (barrier.row) {
       const revoke = deps.revokeFounderLifetime
         ? await deps.revokeFounderLifetime({
@@ -406,6 +407,24 @@ export async function handleVerifiedEvent(
         now,
       });
       if (!alloc.ok) {
+        if (alloc.reason === "founder_refund_precedes_purchase") {
+          // The protected allocator already reconciled access. Do not run
+          // provider cancellation or report a successful lifetime purchase.
+          const mark = await deps.markEvent(paddleEventId, {
+            processing_status: "skipped",
+            processed_ok: false,
+            skip_reason: "founder_refund_precedes_purchase",
+            last_error: null,
+          });
+          if ("error" in mark) {
+            return failEvent(
+              deps,
+              paddleEventId,
+              `founder_refund_purchase_mark_failed:${mark.error}`,
+            );
+          }
+          return { httpStatus: 200, reason: "skipped:founder_refund_precedes_purchase" };
+        }
         if (alloc.reason === "cap_reached") {
           // Cap enforcement is not a webhook failure — the buyer's payment
           // needs an operator refund per the runbook, but Paddle should

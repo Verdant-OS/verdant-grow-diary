@@ -58,6 +58,8 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // Refund revocation must use the stored founder subscription reference;
   // the previous body errors and rolls back entitlement cancellation.
   "20260914212330_founder_refund_subscription_reference.sql",
+  // Founder grant/refund serialization and authoritative refund recheck.
+  "20260915193000_founder_refund_grant_serialization.sql",
 ];
 
 /**

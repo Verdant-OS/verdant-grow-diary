@@ -43,6 +43,20 @@ describe("TentDetail · real sensor readings", () => {
     expect(TENT_DETAIL).toMatch(/importedHistory\.refetch/);
   });
 
+  it("passes explicit manual-snapshot history loading and error truth to the compact list", () => {
+    expect(TENT_DETAIL).toMatch(/const sensorReadings = useSensorReadings\(id\);/);
+    const listStart = TENT_DETAIL.indexOf("<TentManualSnapshotHistoryList");
+    const listEnd = TENT_DETAIL.indexOf("/>", listStart);
+    expect(listStart).toBeGreaterThan(-1);
+    const list = TENT_DETAIL.slice(listStart, listEnd);
+    expect(list).toContain("readStatus={sensorReadings.status}");
+    expect(list).toContain("isFetching={sensorReadings.isFetching}");
+    expect(list).toContain("sensorReadings.refetch");
+    expect(TENT_DETAIL).not.toContain(
+      "<TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />",
+    );
+  });
+
   it("passes active-plant loading/error truth without inferring the first plant", () => {
     // Renegotiated from the destructured form. The page now keeps the whole
     // query object so the sole-plant inference can be gated on a SETTLED

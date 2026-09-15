@@ -101,6 +101,24 @@ describe("AlertDetail page composition", () => {
   });
 });
 
+describe("AlertDetail history read-state wiring", () => {
+  it("branches history UI on hook status instead of showing a zero count while loading", () => {
+    expect(DETAIL_PAGE).toMatch(/historyStatus\s*===\s*["']ok["']/);
+    expect(DETAIL_PAGE).toMatch(/historyStatus\s*===\s*["']unavailable["']/);
+    expect(DETAIL_PAGE).toMatch(/Loading history…/);
+    expect(DETAIL_PAGE).toMatch(/Retry loading alert history/);
+    expect(DETAIL_PAGE).toMatch(/reloadHistory/);
+  });
+
+  it("reloads history after a status change via eventsKey", () => {
+    const handlerIdx = DETAIL_PAGE.indexOf("runStatusChange");
+    expect(handlerIdx).toBeGreaterThan(-1);
+    const handlerBlock = DETAIL_PAGE.slice(handlerIdx, handlerIdx + 2200);
+    expect(handlerBlock).toMatch(/setEventsKey\(\(k\)\s*=>\s*k\s*\+\s*1\)/);
+    expect(DETAIL_PAGE).toMatch(/useAlertEvents\([\s\S]{0,160}eventsKey\)/);
+  });
+});
+
 describe("AlertDetail status-change wiring", () => {
   it("status op runs before the audit log row is appended", () => {
     const handlerIdx = DETAIL_PAGE.indexOf("runStatusChange");

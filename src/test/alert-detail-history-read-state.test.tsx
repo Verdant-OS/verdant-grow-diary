@@ -255,6 +255,9 @@ describe("AlertDetail history read states", () => {
     await act(async () => read.reject(new Error("History transport failed")));
 
     expectUnavailableHistory();
+    expect(
+      historyRegion().getByText("Alert history unavailable: History transport failed"),
+    ).toBeInTheDocument();
     expectAlertIntact();
     expect(screen.queryByRole("button", { name: "Retry loading alert" })).not.toBeInTheDocument();
     expect(io.getAlert).toHaveBeenCalledTimes(1);

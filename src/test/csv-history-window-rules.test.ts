@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveCsvHistoryWindow, buildCsvHistoryWindowPreview } from "@/lib/csvHistoryWindowRules";
+import {
+  resolveCsvHistoryWindow,
+  buildCsvHistoryWindowPreview,
+  csvHistoryWindowNotice,
+} from "@/lib/csvHistoryWindowRules";
 import type { LovableSubscriptionRow } from "@/lib/entitlements";
 
 const now = new Date("2026-09-15T12:00:00Z");
@@ -72,6 +76,11 @@ describe("CSV history access uses the live policy contract", () => {
     expect(resolveCsvHistoryWindow(rows, now)).toEqual({ status: "unknown" });
     expect(resolveCsvHistoryWindow([...rows, row()], now)).toEqual({ status: "ready", days: null });
   });
+  it("does not infer Free when the subscription scan contains a null row", () => {
+    expect(resolveCsvHistoryWindow([null as unknown as LovableSubscriptionRow], now)).toEqual({
+      status: "unknown",
+    });
+  });
   it("counts observations at the exact boundary without changing the source rows", () => {
     const rows = Object.freeze([
       Object.freeze({ captured_at: "2026-06-17T11:59:59.999Z" }),
@@ -84,5 +93,46 @@ describe("CSV history access uses the live policy contract", () => {
     });
     expect(buildCsvHistoryWindowPreview(rows, { status: "ready", days: null }, now)).toBeNull();
     expect(buildCsvHistoryWindowPreview(rows, { status: "error" }, now)).toBeNull();
+  });
+  it("ignores unparseable observation timestamps when counting outside-window rows", () => {
+    const rows = Object.freeze([
+      Object.freeze({ captured_at: "not-a-date" }),
+      Object.freeze({ captured_at: "2026-06-17T11:59:59.999Z" }),
+    ]);
+    expect(buildCsvHistoryWindowPreview(rows, { status: "ready", days: 90 }, now)).toEqual({
+      outsideCount: 1,
+      observationCount: 2,
+    });
+  });
+});
+
+describe("csvHistoryWindowNotice copy", () => {
+  it.each([
+    {
+      window: { status: "loading" } as const,
+      includes: "Checking your sensor history window",
+    },
+    {
+      window: { status: "paused" } as const,
+      includes: "Waiting for a connection to check your sensor history window",
+    },
+    {
+      window: { status: "error" } as const,
+      includes: "We couldn't verify your sensor history window",
+    },
+    {
+      window: { status: "unknown" } as const,
+      includes: "We couldn't verify your sensor history window",
+    },
+    {
+      window: { status: "ready", days: null } as const,
+      includes: "no plan time limit for sensor history",
+    },
+    {
+      window: { status: "ready", days: 90 } as const,
+      includes: "sensor history covers the last 90 days",
+    },
+  ])("describes $window.status access honestly", ({ window, includes }) => {
+    expect(csvHistoryWindowNotice(window)).toContain(includes);
   });
 });

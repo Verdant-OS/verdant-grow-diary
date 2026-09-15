@@ -67,6 +67,43 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(trackFunnelEvent).not.toHaveBeenCalled();
   });
 
+  it.each(["error", "unknown"] as const)(
+    "shows history access retry when window verification is %s",
+    (status) => {
+      const onRetryHistoryWindow = vi.fn();
+      render(
+        wrap(
+          <ImportedSensorHistoryPanel
+            tentId="tent-A"
+            readings={[csvRow()]}
+            historyWindow={{ status }}
+            onRetryHistoryWindow={onRetryHistoryWindow}
+          />,
+        ),
+      );
+      expect(screen.getByTestId("imported-history-window")).toHaveTextContent(/couldn't verify/i);
+      fireEvent.click(screen.getByRole("button", { name: "Retry history access" }));
+      expect(onRetryHistoryWindow).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("does not offer history access retry while the window is still loading", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[csvRow()]}
+          historyWindow={{ status: "loading" }}
+          onRetryHistoryWindow={vi.fn()}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("imported-history-window")).toHaveTextContent(
+      /Checking your sensor history window/i,
+    );
+    expect(screen.queryByRole("button", { name: "Retry history access" })).not.toBeInTheDocument();
+  });
+
   it("keeps a failed read distinct from empty history and offers an explicit retry", () => {
     const onRetry = vi.fn();
     render(

@@ -71,6 +71,42 @@ describe("timelineEvidenceReadinessViewModel — counts", () => {
     expect(v.counts.recentSensorSnapshots).toBeGreaterThan(0);
   });
 
+  it("counts twelve valid seven-day metric readings from two captures and ignores decoys", () => {
+    const metrics = [
+      { metric: "temperature_c", value: 24 },
+      { metric: "humidity_pct", value: 55 },
+      { metric: "vpd_kpa", value: 1.2 },
+      { metric: "co2_ppm", value: 450 },
+      { metric: "ppfd", value: 300 },
+      { metric: "soil_moisture_pct", value: 40 },
+    ];
+    const sensorReadings = [HOUR, 2 * HOUR].flatMap((age) =>
+      metrics.map((reading) => ({
+        ...reading,
+        captured_at: ago(age),
+        source: "manual",
+      })),
+    );
+    const ctx = makeCtx({
+      sensorReadings: [
+        ...sensorReadings,
+        {
+          metric: "temperature_c",
+          value: 24,
+          captured_at: ago(8 * 24 * HOUR),
+          source: "manual",
+        },
+        { metric: "temperature_c", value: 24, captured_at: ago(-HOUR), source: "manual" },
+        { metric: "temperature_c", value: NaN, captured_at: ago(HOUR), source: "manual" },
+      ],
+    });
+    const v = buildTimelineEvidenceReadinessView(ctx, {});
+    expect(v.counts.recentSensorSnapshots).toBe(12);
+    const manual = v.sourceBadges.find((b) => b.source === "manual");
+    expect(manual?.sampleCount).toBe(12);
+    expect(v.missing.map((m) => m.code)).not.toContain("no_recent_sensor_snapshot");
+  });
+
   it("clamps negative / non-finite extras to 0 — never invents data", () => {
     const ctx = makeCtx({});
     const v = buildTimelineEvidenceReadinessView(ctx, {

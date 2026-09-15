@@ -6,7 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
-import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
+import {
+  buildPlantEnvironmentReadView,
+  buildPlantTentEnvironmentView,
+} from "@/lib/plantTentEnvironmentRules";
 import { buildRecentSensorSnapshotHistory } from "@/lib/recentSensorSnapshotHistoryRules";
 import { SOURCE_LABEL, formatValue, snapshotFromReadings } from "@/lib/sensorSnapshot";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
@@ -47,8 +50,13 @@ export default function PlantTentEnvironmentPanel({
   const enabled = !!tentId;
   const temperatureUnit = useTemperatureUnitPreference();
   const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
-  const { data, isLoading } = usePlantTentLatestReadings(tentId ?? null);
-  const rows = enabled ? (data ?? []) : [];
+  const readingsQuery = usePlantTentLatestReadings(tentId ?? null);
+  const rows = enabled ? (readingsQuery.data ?? []) : [];
+  const readView = buildPlantEnvironmentReadView({
+    ...readingsQuery,
+    enabled,
+    hasCachedReadings: rows.length > 0,
+  });
   const view = buildPlantTentEnvironmentView(rows, undefined, temperatureUnit);
   const recent = buildRecentSensorSnapshotHistory(rows, { limit: 5 });
   const prefill = buildPlantQuickLogPrefill({ plantId, plantName, growId, tentId, tentName });
@@ -85,19 +93,36 @@ export default function PlantTentEnvironmentPanel({
         ) : null}
       </CardHeader>
       <CardContent className="text-sm">
+        {readView.message ? (
+          <div className="mb-3 space-y-2">
+            <p role="status" className="text-muted-foreground">
+              {readView.message}
+            </p>
+            {readView.kind === "error" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!readView.canRetry}
+                onClick={() => void readingsQuery.refetch()}
+              >
+                Retry
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         {!enabled ? (
           <p className="text-muted-foreground" data-testid="plant-tent-environment-empty-no-tent">
             Assign this plant to a tent to see its latest environment context.
           </p>
-        ) : isLoading ? (
-          <p className="text-muted-foreground">Loading latest readings…</p>
         ) : !view.hasReadings ? (
-          <p
-            className="text-muted-foreground"
-            data-testid="plant-tent-environment-empty-no-readings"
-          >
-            No sensor readings found for this tent yet.
-          </p>
+          readView.kind === "ready" ? (
+            <p
+              className="text-muted-foreground"
+              data-testid="plant-tent-environment-empty-no-readings"
+            >
+              No sensor readings found for this tent yet.
+            </p>
+          ) : null
         ) : (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -134,7 +159,10 @@ export default function PlantTentEnvironmentPanel({
                 </div>
               ))}
             </div>
-            {snap?.vpd !== null && snap?.vpd !== undefined && view.canAssessStage ? (
+            {readView.canAssessCurrent &&
+            snap?.vpd !== null &&
+            snap?.vpd !== undefined &&
+            view.canAssessStage ? (
               <p
                 className="text-[11px] text-muted-foreground"
                 data-testid="plant-tent-environment-vpd-stage-hint"
@@ -142,7 +170,8 @@ export default function PlantTentEnvironmentPanel({
                 {vpdClassification.label}. {VPD_STAGE_HELPER_TEXT}
               </p>
             ) : null}
-            {snap?.vpd !== null &&
+            {readView.canAssessCurrent &&
+              snap?.vpd !== null &&
               snap?.vpd !== undefined &&
               view.canAssessStage &&
               normalizeVpdStage(plantStage) === "unknown" && (
@@ -153,7 +182,7 @@ export default function PlantTentEnvironmentPanel({
               )}
           </div>
         )}
-        {enabled && !isLoading ? (
+        {enabled && (readView.kind === "ready" || recent.length > 0) ? (
           <div className="mt-5 border-t pt-3" data-testid="plant-tent-environment-recent-history">
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               Recent Sensor Readings

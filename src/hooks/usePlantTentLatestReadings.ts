@@ -38,7 +38,13 @@ export function usePlantTentLatestReadings(
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data ?? []) as PlantTentReadingRow[];
+      if (
+        !Array.isArray(data) ||
+        data.some((row) => !row || typeof row !== "object" || Array.isArray(row))
+      ) {
+        throw new Error("Sensor readings unavailable");
+      }
+      return data as PlantTentReadingRow[];
     },
   });
 }

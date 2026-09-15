@@ -2,14 +2,12 @@
  * SensorSourceBadge — presenter-only badge for sensor provenance.
  *
  * No data fetching. No writes. No automation language. Demo/stale/invalid
- * are visually and textually distinct from live.
+ * are visually and textually distinct from live. Vendor/bridge/app tokens
+ * never render as the Source label — they use the display canon helper.
  */
 import { cn } from "@/lib/utils";
-import {
-  normalizeSensorSource,
-  sensorSourceLabel,
-  type SensorSource,
-} from "@/lib/sensor/sensorSourceRules";
+import { resolveSensorSourceDisplayCanon } from "@/lib/sensorSourceDisplayCanon";
+import { type SensorSource } from "@/lib/sensor/sensorSourceRules";
 
 export interface SensorSourceBadgeProps {
   source: SensorSource | string;
@@ -31,15 +29,21 @@ export default function SensorSourceBadge({
   className,
   testId = "sensor-source-badge",
 }: SensorSourceBadgeProps) {
-  const resolved = normalizeSensorSource(source);
-  const label = sensorSourceLabel(resolved);
+  const canon = resolveSensorSourceDisplayCanon(source);
+  const resolved = canon.canonical;
+  const label = canon.sourceLabel;
 
   return (
     <span
       data-testid={testId}
       data-source={resolved}
+      data-provenance={canon.provenanceLabel ?? ""}
       role="status"
-      aria-label={`Sensor source: ${label}`}
+      aria-label={
+        canon.provenanceLabel
+          ? `Sensor source: ${label}. Provenance: ${canon.provenanceLabel}`
+          : `Sensor source: ${label}`
+      }
       className={cn(
         "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
         TONE[resolved],

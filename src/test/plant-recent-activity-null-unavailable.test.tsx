@@ -1,5 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -106,6 +106,12 @@ describe("plant recent activity null response", () => {
     await screen.findByTestId("plant-detail-whats-missing-unavailable");
     expect(screen.queryByText("No timeline entries yet")).not.toBeInTheDocument();
   });
+
+  it("rejects returned read errors from the fetch boundary", async () => {
+    const readError = new Error("Activity read failed");
+    activityRead.result = { data: null, error: readError };
+    await expect(fetchPlantRecentActivityRows("plant-1")).rejects.toBe(readError);
+  });
 });
 
 describe("Recent Plant Activity error recovery", () => {
@@ -142,6 +148,10 @@ describe("Recent Plant Activity error recovery", () => {
   }
 
   function expectUnavailable() {
+    expect(screen.getByTestId("plant-recent-activity-unavailable")).toHaveAttribute(
+      "role",
+      "alert",
+    );
     expect(screen.getByText("Recent plant activity is unavailable.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry recent activity" })).toBeEnabled();
     expect(screen.queryByText("No activity logged for this plant yet.")).not.toBeInTheDocument();
@@ -289,6 +299,84 @@ describe("Recent Plant Activity error recovery", () => {
     expectScopedReads(1);
     await act(async () => initialRead.resolve({ data: [], error: null }));
     expect(await screen.findByText("No activity logged for this plant yet.")).toBeInTheDocument();
+  });
+
+  it.each(["empty", "populated", "error"] as const)(
+    "keeps a first paused read unresolved until reconnect returns %s",
+    async (recovered) => {
+      const wasOnline = onlineManager.isOnline();
+      onlineManager.setOnline(false);
+      const initialRead = deferredRead();
+      activityRead.pending = initialRead.promise;
+      const queryClient = renderActivity();
+      try {
+        await waitFor(() => {
+          const state = queryClient.getQueryState(["plant_recent_activity", "plant-1"]);
+          expect(state?.status).toBe("pending");
+          expect(state?.fetchStatus).toBe("paused");
+        });
+        expectScopedReads(0);
+        expect(
+          screen.queryByText("No activity logged for this plant yet."),
+        ).not.toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent(
+          "Waiting for connection to load recent activity…",
+        );
+        expect(screen.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
+
+        await act(async () => onlineManager.setOnline(true));
+        await waitFor(() => {
+          expectScopedReads(1);
+          expect(screen.getByText("Loading recent activity…")).toBeInTheDocument();
+        });
+        expect(
+          screen.queryByText("No activity logged for this plant yet."),
+        ).not.toBeInTheDocument();
+
+        await act(async () =>
+          initialRead.resolve({
+            data: recovered === "error" ? null : recovered === "empty" ? [] : [savedRow],
+            error: recovered === "error" ? new Error("Reconnect read failed") : null,
+          }),
+        );
+        if (recovered === "error") {
+          await waitFor(expectUnavailable);
+        } else if (recovered === "empty") {
+          expect(
+            await screen.findByText("No activity logged for this plant yet."),
+          ).toBeInTheDocument();
+        } else {
+          expect(await screen.findByText("Previously saved activity")).toBeInTheDocument();
+          expect(screen.getAllByTestId("plant-recent-activity-row")).toHaveLength(1);
+        }
+        expect(
+          screen.queryByText("Waiting for connection to load recent activity…"),
+        ).not.toBeInTheDocument();
+        expectScopedReads(1);
+      } finally {
+        cleanup();
+        queryClient.clear();
+        onlineManager.setOnline(wasOnline);
+      }
+    },
+  );
+
+  it("keeps no-plant messaging while offline without attempting a read", () => {
+    const wasOnline = onlineManager.isOnline();
+    onlineManager.setOnline(false);
+    const queryClient = renderActivity(null);
+    try {
+      expect(screen.getByText("No plant selected.")).toBeInTheDocument();
+      expect(screen.queryByText("No activity logged for this plant yet.")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Waiting for connection to load recent activity…"),
+      ).not.toBeInTheDocument();
+      expectScopedReads(0);
+    } finally {
+      cleanup();
+      queryClient.clear();
+      onlineManager.setOnline(wasOnline);
+    }
   });
 
   it("keeps no-plant messaging without starting a read or exposing Retry", () => {

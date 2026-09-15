@@ -37,6 +37,12 @@ describe("migrationVersion()", () => {
     expect(REQUIRED_MONEY_MIGRATIONS).toContain("20260728090736_ai_credit_pack_portability.sql");
   });
 
+  it("requires founder grant/refund serialization in every deploy target", () => {
+    expect(REQUIRED_MONEY_MIGRATIONS).toContain(
+      "20260915193000_founder_refund_grant_serialization.sql",
+    );
+  });
+
   it("extracts the 14-digit prefix from a well-formed filename", () => {
     expect(migrationVersion("20260721103000_ai_credit_grants.sql")).toBe("20260721103000");
   });

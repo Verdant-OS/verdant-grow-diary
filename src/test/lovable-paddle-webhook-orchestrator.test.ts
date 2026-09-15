@@ -500,6 +500,43 @@ describe("handleVerifiedEvent — Pro→Founder provider cancellation (double-bi
     expect(cancel).not.toHaveBeenCalled();
   });
 
+  it("allocator founder_refund_precedes_purchase skips without provider cancel", async () => {
+    const f = makeFixture();
+    (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
+      ok: false as const,
+      reason: "founder_refund_precedes_purchase",
+    }));
+    const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
+    const res = await handleVerifiedEvent(f.deps, txEvent("evt_refund_recheck_1"), "live", NOW, {});
+    expect(res).toEqual({
+      httpStatus: 200,
+      reason: "skipped:founder_refund_precedes_purchase",
+    });
+    expect(cancel).not.toHaveBeenCalled();
+    const mark = f.markCalls.at(-1)?.patch;
+    expect(mark).toEqual({
+      processing_status: "skipped",
+      processed_ok: false,
+      skip_reason: "founder_refund_precedes_purchase",
+      last_error: null,
+    });
+  });
+
+  it("allocator founder_refund_precedes_purchase mark failure stays retryable (500)", async () => {
+    const f = makeFixture({ markResult: { ok: false, error: "synthetic mark failure" } });
+    (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
+      ok: false as const,
+      reason: "founder_refund_precedes_purchase",
+    }));
+    const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
+    const res = await handleVerifiedEvent(f.deps, txEvent("evt_refund_recheck_2"), "live", NOW, {});
+    expect(res.httpStatus).toBe(500);
+    expect(res.reason).toMatch(/founder_refund_purchase_mark_failed:/);
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
   it("recurring subscription events never touch the cancel dep", async () => {
     const f = makeFixture();
     const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));

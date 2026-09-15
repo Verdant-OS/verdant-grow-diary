@@ -225,6 +225,42 @@ describe("CSV modal uncertainty and explicit recovery", () => {
     expect(onConfirm.mock.calls[2][0]).toEqual(onConfirm.mock.calls[0][0]);
   });
 
+  it("treats a thrown onConfirm as an unconfirmed response-loss failure", async () => {
+    const onConfirm = vi.fn().mockRejectedValue(new TypeError("private transport failure"));
+    render(
+      <MemoryRouter>
+        <EnvironmentCsvImportModal open onOpenChange={() => {}} onConfirm={onConfirm} />
+      </MemoryRouter>,
+    );
+    await uploadCsv("Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\n");
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() => expect(screen.getByTestId("csv-import-error")).toBeTruthy());
+    const copy = screen.getByTestId("csv-import-error").textContent ?? "";
+    expect(copy).toMatch(/couldn.t confirm|unconfirmed/i);
+    expect(copy).not.toMatch(/private transport|No CSV readings were saved/i);
+    expect(screen.getByRole("button", { name: /Retry import/i })).toBeTruthy();
+  });
+
+  it("ignores dismiss while persistence is in flight", async () => {
+    let complete!: (value: { insertedCount: number; error: null }) => void;
+    const onOpenChange = vi.fn();
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<{ insertedCount: number; error: null }>((resolve) => {
+          complete = resolve;
+        }),
+    );
+    render(<EnvironmentCsvImportModal open onOpenChange={onOpenChange} onConfirm={onConfirm} />);
+    await uploadCsv("Timestamp,Temp(°C),RH\n2026-06-01T10:00:00Z,25,50\n");
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() => expect(screen.getByTestId("csv-import-inserting")).toBeTruthy());
+    fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(screen.getByTestId("csv-import-inserting")).toBeTruthy();
+    await act(async () => complete({ insertedCount: 3, error: null }));
+    expect(screen.getByTestId("csv-import-done")).toBeTruthy();
+  });
+
   it("dispatches only once for two clicks before the saving render", async () => {
     let complete!: (value: { insertedCount: number; error: null }) => void;
     const onConfirm = vi.fn(

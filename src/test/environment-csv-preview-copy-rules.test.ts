@@ -4,6 +4,7 @@ import {
   CSV_IMPORT_READING_COPY,
   formatCsvPreviewRow,
   buildCsvImportFailureMessage,
+  mergeCsvImportFailureReceipts,
 } from "@/lib/environmentCsvPreviewCopyRules";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 
@@ -52,6 +53,49 @@ describe("environmentCsvPreviewCopyRules", () => {
     expect(copy).not.toContain("VPD");
     expect(copy).not.toContain("ppm CO₂");
     expect(copy).not.toContain("PPFD");
+  });
+});
+
+describe("mergeCsvImportFailureReceipts", () => {
+  it("accumulates confirmed inserts across retries without dropping uncertainty", () => {
+    const first = mergeCsvImportFailureReceipts(null, {
+      insertedCount: 2,
+      partialWrite: true,
+      unconfirmedWrite: true,
+    });
+    expect(first).toEqual({
+      insertedCount: 2,
+      partialWrite: true,
+      unconfirmedWrite: true,
+    });
+
+    const second = mergeCsvImportFailureReceipts(first, {
+      insertedCount: 0,
+      partialWrite: false,
+    });
+    expect(second.insertedCount).toBe(2);
+    expect(second.partialWrite).toBe(true);
+    expect(second.unconfirmedWrite).toBe(true);
+  });
+
+  it("adds later acknowledged inserts to the running lower bound", () => {
+    const merged = mergeCsvImportFailureReceipts(
+      { insertedCount: 1, partialWrite: true, unconfirmedWrite: true },
+      { insertedCount: 3, partialWrite: true },
+    );
+    expect(merged.insertedCount).toBe(4);
+    expect(merged.partialWrite).toBe(true);
+    expect(merged.unconfirmedWrite).toBe(true);
+  });
+
+  it("does not clear unconfirmedWrite when a later retry reports a definite zero-save failure", () => {
+    const merged = mergeCsvImportFailureReceipts(
+      { insertedCount: 0, unconfirmedWrite: true },
+      { insertedCount: 0, partialWrite: false },
+    );
+    expect(merged.unconfirmedWrite).toBe(true);
+    expect(merged.insertedCount).toBe(0);
+    expect(merged.partialWrite).toBe(false);
   });
 });
 

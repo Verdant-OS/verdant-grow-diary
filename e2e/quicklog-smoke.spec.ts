@@ -3,7 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Locator, Request } from "@playwright/test";
 import { SmokeChecklistReporter } from "./lib/smokeChecklistReporter";
-import { validateQuickLogFixturePage } from "./lib/fixtureSafety";
+import {
+  assertSameQuickLogFixtureBoundary,
+  validateQuickLogFixturePage,
+} from "./lib/fixtureSafety";
 import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 
 /**
@@ -231,9 +234,7 @@ test.describe("Quick Log smoke checklist", () => {
           )
           .not.toBe(routePlantId);
         const selectedTarget = await readTargetTuple(dialog);
-        if (initialTarget && selectedTarget.growId !== initialTarget.growId) {
-          throw new Error("Selected target plant is not in the routed plant's grow.");
-        }
+        assertSameQuickLogFixtureBoundary(initialTarget, selectedTarget);
         if (
           initialTarget &&
           selectedTarget.plantId === initialTarget.plantId &&
@@ -322,7 +323,9 @@ test.describe("Quick Log smoke checklist", () => {
 
       let structuredWaterTargetId = "";
       await report.run(12, "Watering opens the structured Quick Log", async () => {
-        structuredWaterTargetId = (await readTargetTuple(dialog)).plantId;
+        const structuredWaterTarget = await readTargetTuple(dialog);
+        assertSameQuickLogFixtureBoundary(initialTarget, structuredWaterTarget);
+        structuredWaterTargetId = structuredWaterTarget.plantId;
         await dialog.getByRole("button", { name: /^watering$/i, exact: true }).click();
 
         await expect(page.getByTestId("qlv2-watering-form")).toBeVisible();
@@ -367,12 +370,9 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(15, "Save uses displayed target", async () => {
-        const displayedTargetId = await dialog
-          .getByTestId("quick-log-target-card")
-          .getAttribute("data-target-plant-id");
-        if (!isSafeTargetId(displayedTargetId)) {
-          throw new Error("Displayed Quick Log target is missing or invalid before Save.");
-        }
+        const displayedTarget = await readTargetTuple(dialog);
+        assertSameQuickLogFixtureBoundary(initialTarget, displayedTarget);
+        const displayedTargetId = displayedTarget.plantId;
         observedRpcTargetId = null;
         await dialog.getByTestId("quick-log-save").click();
         await expect.poll(() => observedRpcTargetId).toBe(displayedTargetId);
@@ -414,6 +414,8 @@ test.describe("Quick Log smoke checklist", () => {
       });
 
       await report.run(21, "Save quick Observation", async () => {
+        const repeatedTarget = await readTargetTuple(dialog);
+        assertSameQuickLogFixtureBoundary(initialTarget, repeatedTarget);
         await dialog.getByTestId("quicklog-note").fill("Smoke checklist observation");
         await dialog.getByTestId("quick-log-save").click();
         await expect(dialog.getByTestId("quick-log-post-save")).toBeVisible({

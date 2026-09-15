@@ -261,6 +261,15 @@ describe("Plant Detail wiring", () => {
   it("panel shows the no-pending-actions empty state copy", () => {
     expect(PANEL).toContain("No pending actions for this assigned tent.");
   });
+  it("panel keeps loading and unavailable recovery states distinct", () => {
+    expect(PANEL).toContain('data-testid="plant-assigned-tent-actions-loading"');
+    expect(PANEL).toContain('data-testid="plant-assigned-tent-actions-unavailable"');
+    expect(PANEL).toContain('aria-label="Retry pending actions"');
+  });
+  it("hook rejects non-array action_queue payloads instead of coercing to empty", () => {
+    expect(HOOK).toMatch(/if \(!Array\.isArray\(data\)\)/);
+    expect(HOOK).toMatch(/Pending actions are temporarily unavailable\./);
+  });
   it("hook queries action_queue scoped to tent + pending_approval status", () => {
     expect(HOOK).toMatch(/\.from\(\s*["']action_queue["']\s*\)/);
     expect(HOOK).toMatch(/status["'],\s*["']pending_approval["']/);

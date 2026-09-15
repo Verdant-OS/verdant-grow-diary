@@ -112,6 +112,24 @@ describe("plant recent activity null response", () => {
     activityRead.result = { data: null, error: readError };
     await expect(fetchPlantRecentActivityRows("plant-1")).rejects.toBe(readError);
   });
+
+  it("keeps guidance unavailable while the first activity read is paused offline", async () => {
+    const wasOnline = onlineManager.isOnline();
+    onlineManager.setOnline(false);
+    activityRead.pending = new Promise(() => {});
+    try {
+      renderGuidance();
+      await waitFor(() => {
+        expect(screen.getByTestId("plant-detail-whats-missing-unavailable")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("No timeline entries yet")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("plant-detail-whats-missing-solid")).not.toBeInTheDocument();
+      expect(activityRead.queries).toHaveLength(0);
+    } finally {
+      cleanup();
+      onlineManager.setOnline(wasOnline);
+    }
+  });
 });
 
 describe("Recent Plant Activity error recovery", () => {

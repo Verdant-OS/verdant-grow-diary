@@ -236,12 +236,18 @@ describe("Plant Detail wiring", () => {
     expect(PANEL).toMatch(/isError\s*\?[\s\S]*?:\s*rows\.length\s*===\s*0\s*\?/);
   });
 
+  it("keeps paused offline reads in the loading branch before empty or unavailable", () => {
+    expect(PANEL).toMatch(/isPending,\s*fetchStatus/);
+    expect(PANEL).toContain('fetchStatus === "paused"');
+    expect(PANEL).toContain("Waiting for connection to load recent activity…");
+    expect(PANEL).toMatch(/role="status"/);
+  });
+
   it("fetch boundary rejects non-array payloads and surfaces read errors", () => {
     expect(HOOK).toMatch(/if\s*\(\s*error\s*\)\s*throw\s*error/);
     expect(HOOK).toContain("Plant recent activity is unavailable.");
     expect(HOOK).toMatch(/if\s*\(\s*!Array\.isArray\(data\)\s*\)/);
   });
-
   it("hook queries diary_entries scoped to plant_id and orders newest-first", () => {
     expect(HOOK).toMatch(/\.from\(["']diary_entries["']\)/);
     expect(HOOK).toMatch(/\.eq\(["']plant_id["']/);

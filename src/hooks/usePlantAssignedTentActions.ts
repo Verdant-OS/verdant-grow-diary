@@ -62,6 +62,37 @@ const ACTION_QUEUE_READ_COLUMNS =
   "id,grow_id,tent_id,plant_id,status,source,action_type,target_metric,suggested_change,reason,risk_level,target_device,created_at";
 
 /**
+ * Copy React Query flags before combining them. Discriminated UseQueryResult
+ * unions drop `isLoading` / `isFetching` to `never` after `!isError &&
+ * !isPaused && data === undefined`, which is exactly the initial-pending
+ * shape this hook must treat as Loading.
+ */
+function snapshotAssignedTentQueryFlags(query: {
+  isPaused: boolean;
+  isError: boolean;
+  isPending: boolean;
+  isLoading: boolean;
+  isFetching: boolean;
+  data: unknown;
+}): {
+  paused: boolean;
+  errored: boolean;
+  pending: boolean;
+  loading: boolean;
+  fetching: boolean;
+  dataUndefined: boolean;
+} {
+  return {
+    paused: query.isPaused,
+    errored: query.isError,
+    pending: query.isPending,
+    loading: query.isLoading,
+    fetching: query.isFetching,
+    dataUndefined: query.data === undefined,
+  };
+}
+
+/**
  * The generic panel intentionally remains small. Live Proof gets one
  * separately-bounded row for its exact selected-plant AI Coach evidence so a
  * busy tent cannot push that row outside the generic newest-first window.
@@ -250,6 +281,8 @@ export function usePlantAssignedTentActions(
     },
   });
 
+  const genericQueryFlags = snapshotAssignedTentQueryFlags(q);
+
   // A proof-mode response is only evidence after every requested scoped read
   // settles cleanly. Cached data is also incomplete while a scope is
   // refetching: otherwise an older exact causal row could certify the loop
@@ -284,14 +317,14 @@ export function usePlantAssignedTentActions(
   // Generic panel: TanStack v5 reports an initial offline pause as
   // isPending + isPaused with isLoading false and no data. Treating that as
   // settled turns a missing read into a false empty Action Queue.
-  const genericReadUnproven = enabled && q.data === undefined;
-  const genericOfflineUnproven = genericReadUnproven && q.isPaused === true;
+  const genericReadUnproven = enabled && genericQueryFlags.dataUndefined;
+  const genericOfflineUnproven = genericReadUnproven && genericQueryFlags.paused;
   const genericPendingUnproven =
     genericReadUnproven &&
-    !q.isError &&
-    q.isPaused !== true &&
-    (q.isPending || q.isLoading || q.isFetching);
-  const genericUnavailable = q.isError || genericOfflineUnproven;
+    !genericQueryFlags.errored &&
+    !genericQueryFlags.paused &&
+    (genericQueryFlags.pending || genericQueryFlags.loading || genericQueryFlags.fetching);
+  const genericUnavailable = genericQueryFlags.errored || genericOfflineUnproven;
   const rows =
     proofReadIncomplete || genericUnavailable || genericPendingUnproven
       ? []
@@ -345,10 +378,7 @@ export function usePlantAssignedTentActions(
     proofAiDoctorQ.isError ||
     genericOfflineUnproven;
   const isFetching =
-    q.isFetching ||
-    proofAiCoachQ.isFetching ||
-    proofAlertQ.isFetching ||
-    proofAiDoctorQ.isFetching;
+    q.isFetching || proofAiCoachQ.isFetching || proofAlertQ.isFetching || proofAiDoctorQ.isFetching;
   return {
     rows,
     proofSelectedPlantAiCoachRow,

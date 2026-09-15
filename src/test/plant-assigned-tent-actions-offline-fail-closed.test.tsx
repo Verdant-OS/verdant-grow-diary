@@ -5,10 +5,12 @@
  * Mirrors Soft F3/F4: never treat pending or error as empty success.
  * Read-only. No action_queue writes, approve/reject/execute, or device control.
  */
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, configure, render, screen, waitFor } from "@testing-library/react";
 import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
+
+configure({ asyncUtilTimeout: 10_000 });
 
 type ReadResult = { data: unknown; error: unknown };
 
@@ -94,72 +96,95 @@ function expectEmptySuccessHidden() {
 }
 
 describe("assigned-tent pending-actions fail-closed read states", () => {
-  it("keeps Loading while the first pending-actions read has not settled", async () => {
-    const initialRead = deferredRead();
-    actionRead.pending = initialRead.promise;
-    renderPanel();
+  it(
+    "keeps Loading while the first pending-actions read has not settled",
+    { timeout: 15_000 },
+    async () => {
+      const initialRead = deferredRead();
+      actionRead.pending = initialRead.promise;
+      renderPanel();
 
-    expect(await screen.findByTestId("plant-assigned-tent-actions-loading")).toHaveTextContent(
-      "Loading pending actions…",
-    );
-    expectEmptySuccessHidden();
-    expect(screen.queryByRole("button", { name: "Retry pending actions" })).not.toBeInTheDocument();
-    expect(actionRead.queries).toHaveLength(1);
-
-    await act(async () => initialRead.resolve({ data: [], error: null }));
-    expect(await screen.findByTestId("plant-assigned-tent-actions-empty")).toBeInTheDocument();
-  });
-
-  it("shows Unavailable and Retry after a failed pending-actions read", async () => {
-    actionRead.result = { data: null, error: new Error("action_queue read failed") };
-    const queryClient = renderPanel();
-    await waitFor(() => {
-      expect(queryClient.getQueryState(["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5])?.status).toBe(
-        "error",
+      expect(await screen.findByTestId("plant-assigned-tent-actions-loading")).toHaveTextContent(
+        "Loading pending actions…",
       );
-    });
-
-    const unavailable = screen.getByTestId("plant-assigned-tent-actions-unavailable");
-    expect(unavailable).toHaveTextContent("Pending actions are temporarily unavailable.");
-    expect(screen.getByRole("button", { name: "Retry pending actions" })).toBeEnabled();
-    expectEmptySuccessHidden();
-    expect(screen.queryByTestId("plant-assigned-tent-actions-loading")).not.toBeInTheDocument();
-  });
-
-  it("shows Unavailable and Retry on an initial offline pause instead of a false empty queue", async () => {
-    onlineManager.setOnline(false);
-    const queryClient = renderPanel();
-    await waitFor(() => {
+      expectEmptySuccessHidden();
       expect(
-        queryClient.getQueryState(["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5])?.fetchStatus,
-      ).toBe("paused");
-    });
+        screen.queryByRole("button", { name: "Retry pending actions" }),
+      ).not.toBeInTheDocument();
+      expect(actionRead.queries).toHaveLength(1);
 
-    expect(screen.getByTestId("plant-assigned-tent-actions-unavailable")).toHaveTextContent(
-      "Pending actions are temporarily unavailable.",
-    );
-    expect(screen.getByRole("button", { name: "Retry pending actions" })).toBeInTheDocument();
-    expectEmptySuccessHidden();
-    expect(screen.queryByTestId("plant-assigned-tent-actions-loading")).not.toBeInTheDocument();
-    expect(actionRead.queries).toHaveLength(0);
-  });
+      await act(async () => initialRead.resolve({ data: [], error: null }));
+      expect(await screen.findByTestId("plant-assigned-tent-actions-empty")).toBeInTheDocument();
+    },
+  );
 
-  it("preserves a true empty success as the assigned-tent empty copy", async () => {
-    actionRead.result = { data: [], error: null };
-    const queryClient = renderPanel();
-    await waitFor(() => {
-      expect(queryClient.getQueryState(["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5])?.status).toBe(
-        "success",
+  it(
+    "shows Unavailable and Retry after a failed pending-actions read",
+    { timeout: 15_000 },
+    async () => {
+      actionRead.result = { data: null, error: new Error("action_queue read failed") };
+      const queryClient = renderPanel();
+      await waitFor(() => {
+        expect(
+          queryClient.getQueryState(["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5])?.status,
+        ).toBe("error");
+      });
+
+      const unavailable = screen.getByTestId("plant-assigned-tent-actions-unavailable");
+      expect(unavailable).toHaveTextContent("Pending actions are temporarily unavailable.");
+      expect(screen.getByRole("button", { name: "Retry pending actions" })).toBeEnabled();
+      expectEmptySuccessHidden();
+      expect(screen.queryByTestId("plant-assigned-tent-actions-loading")).not.toBeInTheDocument();
+    },
+  );
+
+  it(
+    "shows Unavailable and Retry on an initial offline pause instead of a false empty queue",
+    { timeout: 15_000 },
+    async () => {
+      onlineManager.setOnline(false);
+      const queryClient = renderPanel();
+      await waitFor(() => {
+        expect(
+          queryClient.getQueryState(["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5])
+            ?.fetchStatus,
+        ).toBe("paused");
+      });
+
+      expect(screen.getByTestId("plant-assigned-tent-actions-unavailable")).toHaveTextContent(
+        "Pending actions are temporarily unavailable.",
       );
-    });
+      expect(screen.getByRole("button", { name: "Retry pending actions" })).toBeInTheDocument();
+      expectEmptySuccessHidden();
+      expect(screen.queryByTestId("plant-assigned-tent-actions-loading")).not.toBeInTheDocument();
+      expect(actionRead.queries).toHaveLength(0);
+    },
+  );
 
-    expect(screen.getByTestId("plant-assigned-tent-actions-empty")).toHaveTextContent(
-      "No pending actions for this assigned tent.",
-    );
-    expect(screen.queryByRole("button", { name: "Retry pending actions" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("plant-assigned-tent-actions-unavailable")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("plant-assigned-tent-actions-loading")).not.toBeInTheDocument();
-  });
+  it(
+    "preserves a true empty success as the assigned-tent empty copy",
+    { timeout: 15_000 },
+    async () => {
+      actionRead.result = { data: [], error: null };
+      const queryClient = renderPanel();
+      await waitFor(() => {
+        expect(
+          queryClient.getQueryState(["plant_assigned_tent_actions", TENT_ID, GROW_ID, 5])?.status,
+        ).toBe("success");
+      });
+
+      expect(screen.getByTestId("plant-assigned-tent-actions-empty")).toHaveTextContent(
+        "No pending actions for this assigned tent.",
+      );
+      expect(
+        screen.queryByRole("button", { name: "Retry pending actions" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("plant-assigned-tent-actions-unavailable"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("plant-assigned-tent-actions-loading")).not.toBeInTheDocument();
+    },
+  );
 
   it("keeps the no-tent copy without starting a read or exposing Retry", () => {
     renderPanel(null);

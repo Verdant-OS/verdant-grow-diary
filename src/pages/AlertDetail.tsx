@@ -173,7 +173,12 @@ export default function AlertDetail() {
     };
   }, [load]);
 
-  const { events } = useAlertEvents(alertId ?? null, eventsKey);
+  const {
+    events,
+    status: historyStatus,
+    error: historyError,
+    reload: reloadHistory,
+  } = useAlertEvents(alertId ?? null, eventsKey);
   const targetNames = useAlertTargetNames();
   const linkedTargets = useAlertLinkedTargetEvidence(alert ? [alert] : []);
   const targetInput = buildAlertTargetPresenterInput({
@@ -898,10 +903,36 @@ export default function AlertDetail() {
             <div className="flex items-center gap-2 mb-2">
               <History className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-display font-semibold text-sm">
-                History <span className="text-xs text-muted-foreground">{events.length}</span>
+                History
+                {historyStatus === "ok" && (
+                  <>
+                    {" "}
+                    <span className="text-xs text-muted-foreground">{events.length}</span>
+                  </>
+                )}
               </h2>
             </div>
-            {events.length === 0 ? (
+            {historyStatus === "unavailable" ? (
+              <div role="alert">
+                <p className="text-xs text-muted-foreground">
+                  Alert history unavailable{historyError ? `: ${historyError}` : "."}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={reloadHistory}
+                  aria-label="Retry loading alert history"
+                >
+                  Retry history
+                </Button>
+              </div>
+            ) : historyStatus !== "ok" ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                Loading history…
+              </p>
+            ) : events.length === 0 ? (
               <p className="text-xs text-muted-foreground">No events yet.</p>
             ) : (
               <ol className="space-y-1 pl-3 border-l border-border/40">

@@ -17,7 +17,7 @@
  *  - Never labels CSV as Live.
  *  - Cancel/close must NOT insert.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
@@ -27,7 +27,9 @@ import { trackFunnelEvent } from "@/lib/funnelAnalytics";
 import { EnvironmentCsvImportModal } from "@/components/EnvironmentCsvImportModal";
 import {
   persistCsvEnvironmentRows,
+  type CsvInsertScope,
   type InsertClient,
+  type PersistResult,
   type SensorReadingInsert,
 } from "@/lib/environmentCsvImportPersistence";
 import {
@@ -54,9 +56,12 @@ export interface EnvironmentCsvImportLauncherProps {
 
 const DEFAULT_LABEL = "Import historical data";
 
-function makeInsertClient(): InsertClient {
+function makeInsertClient(canContinue: () => boolean): InsertClient {
   return {
     async insertSensorReadings(rows: SensorReadingInsert[]) {
+      if (!canContinue()) {
+        return { error: { message: "Import session changed." }, insertedCount: 0 };
+      }
       const { error } = await supabase.from("sensor_readings").insert(rows as never);
       if (error) {
         return {
@@ -72,6 +77,7 @@ function makeInsertClient(): InsertClient {
     // user_id, value, or device_id. Fails open (empty set) on any lookup
     // error; the insert-time 23505 catch is the safety net.
     async fetchExistingSensorReadingKeys(scope: ExistingKeysQueryScope) {
+      if (!canContinue()) return new Set<string>();
       try {
         const { data, error } = await supabase
           .from("sensor_readings")
@@ -81,7 +87,7 @@ function makeInsertClient(): InsertClient {
           .in("metric", scope.metrics)
           .gte("captured_at", scope.minCapturedAt)
           .lte("captured_at", scope.maxCapturedAt);
-        if (error || !data) return new Set<string>();
+        if (!canContinue() || error || !data) return new Set<string>();
         const keys = new Set<string>();
         for (const row of data as unknown as Array<{
           tent_id: string;
@@ -112,50 +118,98 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
   const { user } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [importSession, setImportSession] = useState<{
+    scope: CsvInsertScope;
+    generation: number;
+  } | null>(null);
+  const currentUserId = useRef(user?.id);
+  const generation = useRef(0);
+  if (currentUserId.current !== user?.id) {
+    currentUserId.current = user?.id;
+    generation.current += 1;
+  }
+  const unconfirmedWrite = useRef(false);
+
+  useEffect(() => {
+    setOpen(false);
+    setImportSession(null);
+    unconfirmedWrite.current = false;
+  }, [user?.id]);
+
+  useEffect(
+    () => () => {
+      generation.current += 1;
+    },
+    [],
+  );
 
   const ready = !!user?.id && !!growId && !!tentId;
+  const importScope = importSession?.scope;
+  const ownsImport =
+    !!importSession &&
+    importSession.generation === generation.current &&
+    importScope?.user_id === user?.id;
 
   const handleOpen = useCallback(() => {
+    if (!user?.id || !growId || !tentId) return;
+    generation.current += 1;
+    setImportSession({
+      scope: { user_id: user.id, grow_id: growId, tent_id: tentId, plant_id: plantId },
+      generation: generation.current,
+    });
+    unconfirmedWrite.current = false;
     trackFunnelEvent("csv_import_started");
     setOpen(true);
+  }, [user?.id, growId, tentId, plantId]);
+
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      generation.current += 1;
+      setImportSession(null);
+    }
   }, []);
+  const modalKey = importSession ? String(importSession.generation) : "closed-import";
+  const importTentId = importScope?.tent_id ?? tentId;
+  const importGrowId = importScope?.grow_id ?? growId;
 
   // Imported history is rendered on Tent Detail, so the completion link
   // targets that exact anchored section. Plant context is chosen explicitly
   // after the grower sees the history; Verdant never infers a plant from the
   // file or auto-runs AI Doctor.
-  const viewHistoryHref = tentId
-    ? `${tentDetailPath(tentId)}#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`
+  const viewHistoryHref = importTentId
+    ? `${tentDetailPath(importTentId)}#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`
     : null;
   // Current-condition handoff stays on the existing manual sensor form.
   // The grower still enters, reviews, and confirms every value; this link
   // performs no write and never invokes AI Doctor by itself.
-  const addCurrentReadingHref = growId ? `${sensorsPath(growId)}#manual-reading` : null;
+  const addCurrentReadingHref = importGrowId ? `${sensorsPath(importGrowId)}#manual-reading` : null;
 
   const handleConfirm = useCallback(
-    async (rows: readonly ParsedEnvironmentRow[]) => {
-      if (!user?.id || !growId || !tentId) {
+    async (rows: readonly ParsedEnvironmentRow[]): Promise<PersistResult> => {
+      const canContinue = () =>
+        !!importSession &&
+        generation.current === importSession.generation &&
+        currentUserId.current === importSession.scope.user_id;
+      if (!importSession || !canContinue()) {
         return {
           insertedCount: 0,
           duplicateCount: 0,
+          partialWrite: false,
           error: "Missing grow or tent context.",
         };
       }
-      const client = makeInsertClient();
-      const res = await persistCsvEnvironmentRows(
-        rows,
-        {
-          user_id: user.id,
-          grow_id: growId,
-          tent_id: tentId,
-          plant_id: plantId,
-        },
-        client,
-      );
-      // A later batch can fail after earlier atomic batches committed.
-      // Refresh read surfaces whenever any rows were persisted, while
-      // keeping completion analytics/toasts exclusive to full success.
-      if (res.insertedCount > 0) {
+      const client = makeInsertClient(canContinue);
+      const res = await persistCsvEnvironmentRows(rows, importSession.scope, client);
+      // An account switch ends the operation's UI ownership even if its request settles later.
+      if (!canContinue()) {
+        return { ...res, error: "Import session changed." };
+      }
+      const needsReconciliation = unconfirmedWrite.current || res.unconfirmedWrite === true;
+      unconfirmedWrite.current = !!res.error && needsReconciliation;
+      // Refresh read surfaces after any committed, skipped, or unconfirmed
+      // write. Completion analytics/toasts stay exclusive to full success.
+      if (res.insertedCount > 0 || res.duplicateCount > 0 || needsReconciliation) {
         qc.invalidateQueries({ queryKey: ["grow", "sensors"] });
         qc.invalidateQueries({ queryKey: ["sensor_readings"] });
         qc.invalidateQueries({ queryKey: ["csv-timeline-context"] });
@@ -171,12 +225,12 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         toast({ title: "CSV history imported", description });
         trackFunnelEvent("csv_import_completed", { rows: res.insertedCount });
       }
-      return res;
+      return unconfirmedWrite.current ? { ...res, unconfirmedWrite: true } : res;
     },
-    [user?.id, growId, tentId, plantId, qc],
+    [importSession, qc],
   );
 
-  if (!ready) {
+  if (!ready && !(open && ownsImport)) {
     return (
       <div
         data-testid={`${testIdPrefix}-needs-context`}
@@ -200,8 +254,9 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
           <FileUp className="h-3.5 w-3.5" /> Import CSV
         </Button>
         <EnvironmentCsvImportModal
-          open={open}
-          onOpenChange={setOpen}
+          key={modalKey}
+          open={open && ownsImport}
+          onOpenChange={handleOpenChange}
           onConfirm={handleConfirm}
           viewHistoryHref={viewHistoryHref}
           addCurrentReadingHref={addCurrentReadingHref}
@@ -231,8 +286,9 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         </Button>
       </div>
       <EnvironmentCsvImportModal
-        open={open}
-        onOpenChange={setOpen}
+        key={modalKey}
+        open={open && ownsImport}
+        onOpenChange={handleOpenChange}
         onConfirm={handleConfirm}
         viewHistoryHref={viewHistoryHref}
         addCurrentReadingHref={addCurrentReadingHref}

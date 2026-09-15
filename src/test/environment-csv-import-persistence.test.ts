@@ -126,17 +126,19 @@ describe("environmentCsvImportPersistence — runtime", () => {
     expect(client.insertSensorReadings).not.toHaveBeenCalled();
   });
 
-  it("stops on first error", async () => {
+  it("stops on first definite rejection", async () => {
     const client = {
       insertSensorReadings: vi.fn(async () => ({
-        error: { message: "boom" },
+        error: { message: "boom", code: "23514" },
         insertedCount: 0,
       })),
     };
     const res = await persistCsvEnvironmentRows([row()], SCOPE, client);
     expect(res.error).toMatch(/could not be completed/i);
+    expect(res.error).toMatch(/No CSV readings were saved/);
     expect(res.error).not.toContain("boom");
     expect(res.partialWrite).toBe(false);
+    expect(res.unconfirmedWrite === true).toBe(false);
   });
 
   it("preserves a safe partial-write receipt when a later batch fails", async () => {
@@ -148,7 +150,7 @@ describe("environmentCsvImportPersistence — runtime", () => {
           return {
             error: {
               message: "raw postgres secret relation detail",
-              code: "XX000",
+              code: "23514",
             },
             insertedCount: 0,
           };
@@ -197,3 +199,105 @@ describe("environmentCsvImportPersistence — static safety (tests 29-32, 38-44)
     expect(src.toLowerCase()).not.toMatch(/"live"|'live'/);
   });
 });
+
+describe("CSV import response-loss recovery", () => {
+  it("keeps an accepted but unacknowledged first batch uncertain, then skips it on explicit retry", async () => {
+    const saved: ReturnType<typeof buildSensorReadingInserts> = [];
+    const client = {
+      insertSensorReadings: vi.fn(async (batch: typeof saved) => {
+        saved.push(...batch);
+        return { error: { message: "TypeError: fetch failed", code: "" }, insertedCount: 0 };
+      }),
+      fetchExistingSensorReadingKeys: async () =>
+        new Set(saved.map((r) => [r.tent_id, r.source, r.metric, r.captured_at].join("|"))),
+    };
+    const first = await persistCsvEnvironmentRows([row()], SCOPE, client);
+    expect(saved).toHaveLength(3);
+    expect(first.insertedCount).toBe(0);
+    expect(first.unconfirmedWrite).toBe(true);
+    expect(first.error).toMatch(/couldn't confirm/i);
+    expect(first.error).not.toMatch(/No CSV readings were saved/);
+    expect(client.insertSensorReadings).toHaveBeenCalledTimes(1);
+
+    const retry = await persistCsvEnvironmentRows([row()], SCOPE, client);
+    expect(retry.error).toBeNull();
+    expect(retry.insertedCount).toBe(0);
+    expect(retry.duplicateCount).toBe(3);
+    expect(client.insertSensorReadings).toHaveBeenCalledTimes(1);
+    expect(saved).toHaveLength(3);
+    expect(
+      saved.every(
+        (r) =>
+          r.user_id === "u1" &&
+          r.tent_id === "t1" &&
+          r.raw_payload.grow_id === "g1" &&
+          r.raw_payload.plant_id === "p1" &&
+          r.source === "csv",
+      ),
+    ).toBe(true);
+  });
+
+  it("retains the acknowledged first batch when the later insert throws", async () => {
+    const client = {
+      insertSensorReadings: vi
+        .fn()
+        .mockResolvedValueOnce({ error: null, insertedCount: 1 })
+        .mockRejectedValueOnce(new TypeError("private transport diagnostics")),
+    };
+    const result = await persistCsvEnvironmentRows(
+      [
+        row({ humidity_pct: null, vpd_kpa: null }),
+        row({
+          rowNumber: 2,
+          captured_at: "2026-06-01T11:00:00.000Z",
+          humidity_pct: null,
+          vpd_kpa: null,
+        }),
+      ],
+      SCOPE,
+      client,
+      1,
+    );
+
+    expect(result).toMatchObject({
+      insertedCount: 1,
+      partialWrite: true,
+      unconfirmedWrite: true,
+    });
+    expect(result.error).toMatch(/1 .*confirmed/i);
+    expect(result.error).toMatch(/couldn't confirm/i);
+    expect(result.error).not.toMatch(/private transport|No CSV readings were saved|stopped after/i);
+    expect(client.insertSensorReadings).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["", undefined, "40003", "08006", "XX000", "PGRST500", "23", "23514suffix"])(
+    "does not turn unknown outcome code %s into a zero-save claim",
+    async (code) => {
+      const result = await persistCsvEnvironmentRows([row()], SCOPE, {
+        insertSensorReadings: async () => ({
+          error: { message: "private driver text", code },
+          insertedCount: 0,
+        }),
+      });
+      expect(result.unconfirmedWrite).toBe(true);
+      expect(result.error).not.toMatch(/No CSV readings were saved|private driver text/);
+      expect(result.error).toMatch(/couldn't confirm/i);
+    },
+  );
+
+  it.each(["23514", "22P02", "42501"])(
+    "keeps definite rejection %s separate from uncertainty",
+    async (code) => {
+      const result = await persistCsvEnvironmentRows([row()], SCOPE, {
+        insertSensorReadings: async () => ({
+          error: { message: "private rejected row", code },
+          insertedCount: 0,
+        }),
+      });
+      expect(result.unconfirmedWrite === true).toBe(false);
+      expect(result.error).toMatch(/No CSV readings were saved/);
+      expect(result.error).not.toContain("private rejected row");
+    },
+  );
+});
+

@@ -41,6 +41,8 @@ import {
   CSV_IMPORT_READING_COPY,
   CSV_IMPORT_VIEW_HISTORY_LABEL,
   buildCsvImportFailureMessage,
+  mergeCsvImportFailureReceipts,
+  type CsvImportFailureReceipt,
   formatCsvPreviewRow,
 } from "@/lib/environmentCsvPreviewCopyRules";
 
@@ -54,6 +56,8 @@ export interface EnvironmentCsvImportModalProps {
     duplicateCount?: number;
     /** Earlier atomic batches committed before a later batch failed. */
     partialWrite?: boolean;
+    /** The dispatched batch may have committed without a usable response. */
+    unconfirmedWrite?: boolean;
     error: string | null;
   }>;
   /**
@@ -94,9 +98,15 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   const [state, setState] = useState<ImportState>(INITIAL_IMPORT_STATE);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const reset = useCallback(() => setState(cancelImport()), []);
+  const inFlightRef = useRef(false);
+  const failureReceiptRef = useRef<CsvImportFailureReceipt | null>(null);
+  const reset = useCallback(() => {
+    failureReceiptRef.current = null;
+    setState(cancelImport());
+  }, []);
 
   const handleClose = useCallback(() => {
+    if (inFlightRef.current) return;
     reset();
     onOpenChange(false);
   }, [reset, onOpenChange]);
@@ -117,28 +127,48 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   }, []);
 
   const handleConfirm = useCallback(async () => {
+    if (inFlightRef.current) return;
     const rows = rowsToPersist(state.parsed);
     if (rows.length === 0) return;
+    inFlightRef.current = true;
     setState((prev) => ({ ...prev, phase: "inserting" }));
-    const res = await onConfirm(rows);
-    if (res.error) {
+    try {
+      let res: Awaited<ReturnType<EnvironmentCsvImportModalProps["onConfirm"]>>;
+      try {
+        res = await onConfirm(rows);
+      } catch {
+        res = { insertedCount: 0, error: "Import response unavailable", unconfirmedWrite: true };
+      }
+      if (res.error) {
+        const receipt = mergeCsvImportFailureReceipts(failureReceiptRef.current, res);
+        failureReceiptRef.current = receipt;
+        setState((prev) => ({
+          ...prev,
+          phase: "error",
+          errorCode: "insert_failed",
+          errorMessage: buildCsvImportFailureMessage(
+            receipt.insertedCount,
+            receipt.partialWrite === true,
+            receipt.unconfirmedWrite === true,
+          ),
+          insertedCount: receipt.insertedCount,
+          duplicateCount: res.duplicateCount ?? 0,
+          partialWrite: receipt.partialWrite === true,
+        }));
+        return;
+      }
+      failureReceiptRef.current = null;
       setState((prev) => ({
         ...prev,
-        phase: "error",
-        errorCode: "insert_failed",
+        phase: "done",
+        errorCode: null,
         errorMessage: null,
         insertedCount: res.insertedCount,
         duplicateCount: res.duplicateCount ?? 0,
-        partialWrite: res.partialWrite === true || res.insertedCount > 0,
       }));
-      return;
+    } finally {
+      inFlightRef.current = false;
     }
-    setState((prev) => ({
-      ...prev,
-      phase: "done",
-      insertedCount: res.insertedCount,
-      duplicateCount: res.duplicateCount ?? 0,
-    }));
   }, [state.parsed, onConfirm]);
 
   const coverage = buildCoveragePreview(state.parsed);
@@ -282,11 +312,26 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
             <p className="text-sm text-destructive">
               {(state.errorCode && ERROR_COPY[state.errorCode]) ||
                 (state.errorCode === "insert_failed"
-                  ? buildCsvImportFailureMessage(state.insertedCount, state.partialWrite)
+                  ? (state.errorMessage ??
+                    buildCsvImportFailureMessage(state.insertedCount, state.partialWrite))
                   : state.errorMessage) ||
                 "Something went wrong."}
             </p>
             <DialogFooter>
+              {state.errorCode === "insert_failed" ? (
+                <>
+                  {viewHistoryHref && inRouter ? (
+                    <Button asChild variant="secondary">
+                      <Link to={viewHistoryHref} onClick={handleClose}>
+                        {CSV_IMPORT_VIEW_HISTORY_LABEL}
+                      </Link>
+                    </Button>
+                  ) : null}
+                  <Button onClick={handleConfirm} data-testid="csv-import-retry">
+                    Retry import
+                  </Button>
+                </>
+              ) : null}
               <Button variant="ghost" onClick={handleClose}>
                 Close
               </Button>

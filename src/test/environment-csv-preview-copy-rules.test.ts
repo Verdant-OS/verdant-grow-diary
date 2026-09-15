@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   CSV_IMPORT_DESCRIPTION,
   CSV_IMPORT_READING_COPY,
+  CSV_IMPORT_UNCONFIRMED_COPY,
   formatCsvPreviewRow,
+  buildCsvImportFailureMessage,
+  isDefiniteCsvInsertRejection,
+  isUnconfirmedCsvInsertOutcome,
 } from "@/lib/environmentCsvPreviewCopyRules";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 
@@ -51,5 +55,29 @@ describe("environmentCsvPreviewCopyRules", () => {
     expect(copy).not.toContain("VPD");
     expect(copy).not.toContain("ppm CO₂");
     expect(copy).not.toContain("PPFD");
+  });
+});
+
+describe("unconfirmed CSV import copy", () => {
+  it("does not claim zero saves when no batch was acknowledged", () => {
+    const copy = buildCsvImportFailureMessage(0, false, true);
+    expect(copy).toBe(CSV_IMPORT_UNCONFIRMED_COPY);
+    expect(copy).toMatch(/couldn't confirm whether this import finished/i);
+    expect(copy).toMatch(/review imported history before retrying/i);
+    expect(copy).not.toMatch(/No CSV readings were saved/);
+    expect(copy).not.toMatch(/Import could not be completed/);
+  });
+
+  it("states the confirmed lower bound without treating it as the total", () => {
+    const copy = buildCsvImportFailureMessage(2, true, true);
+    expect(copy).toMatch(/2 .*confirmed/i);
+    expect(copy).toMatch(/couldn't confirm/i);
+    expect(copy).not.toMatch(/stopped after|No CSV readings were saved/i);
+  });
+
+  it("keeps known first-batch rejection as a zero-save failure", () => {
+    expect(buildCsvImportFailureMessage(0, false, false)).toMatch(/No CSV readings were saved/);
+    expect(isDefiniteCsvInsertRejection({ code: "23514" })).toBe(true);
+    expect(isUnconfirmedCsvInsertOutcome({ code: "" })).toBe(true);
   });
 });

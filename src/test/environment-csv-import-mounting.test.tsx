@@ -12,17 +12,40 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const trackFunnelEvent = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/funnelAnalytics", () => ({ trackFunnelEvent }));
 
+import { MemoryRouter } from "@/lib/react-router-compat";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 
 const insertSpy = vi.fn();
 let insertError: { message: string; code?: string; details?: string } | null = null;
 let insertFailureCall: number | null = null;
+let existingRows: Array<Record<string, unknown>> = [];
+let insertOverride: ((rows: unknown[]) => Promise<{ error: typeof insertError }>) | null = null;
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
+      select: () => {
+        let tentIds: string[] = [];
+        const chain: Record<string, unknown> = {
+          in: (key: string, values: string[]) => {
+            if (key === "tent_id") tentIds = values;
+            return chain;
+          },
+          gte: () => chain,
+          lte: () => chain,
+          then: (
+            resolve: (result: { data: Array<Record<string, unknown>>; error: null }) => unknown,
+          ) =>
+            Promise.resolve({
+              data: existingRows.filter((r) => tentIds.includes(String(r.tent_id))),
+              error: null,
+            }).then(resolve),
+        };
+        return chain;
+      },
       insert: (rows: unknown) => {
         insertSpy(rows);
+        if (insertOverride) return insertOverride(rows as unknown[]);
         const error =
           insertFailureCall === insertSpy.mock.calls.length
             ? { message: "Later batch failed", code: "PGRST500" }
@@ -38,7 +61,11 @@ vi.mock("@/store/auth", () => ({
 }));
 
 function withQuery(ui: React.ReactElement, qc = new QueryClient()) {
-  return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
+  return (
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
+    </MemoryRouter>
+  );
 }
 
 describe("EnvironmentCsvImportLauncher — mounting", () => {
@@ -47,6 +74,8 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     insertSpy.mockReset();
     insertError = null;
     insertFailureCall = null;
+    existingRows = [];
+    insertOverride = null;
   });
 
   it("renders calm message when no grow/tent selected (test 1, 6)", () => {
@@ -161,8 +190,8 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     expect(trackFunnelEvent).not.toHaveBeenCalledWith("csv_import_completed", expect.anything());
   });
 
-  it("failed persistence does not invalidate sensor chart caches", async () => {
-    insertError = { message: "Insert failed", code: "PGRST500" };
+  it("a definite first-batch rejection does not invalidate sensor chart caches", async () => {
+    insertError = { message: "Insert rejected", code: "23514" };
     const qc = new QueryClient();
     const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
     render(
@@ -223,6 +252,146 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     } finally {
       window.removeEventListener("verdant:csv-imported", csvImportedListener);
     }
+  });
+
+  it("refreshes history after an unconfirmed first batch without reporting completion", async () => {
+    insertOverride = async (rows) => {
+      existingRows.push(...(rows as Array<Record<string, unknown>>));
+      return { error: { message: "TypeError: fetch failed", code: "" } };
+    };
+    const qc = new QueryClient();
+    const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
+    const imported = vi.fn();
+    window.addEventListener("verdant:csv-imported", imported);
+    try {
+      render(
+        withQuery(
+          <EnvironmentCsvImportLauncher growId="g1" tentId="t1" plantId="p1" testIdPrefix="x" />,
+          qc,
+        ),
+      );
+      fireEvent.click(screen.getByTestId("x-button"));
+      const input = screen.getByTestId("csv-import-file-input");
+      fireEvent.change(input, {
+        target: {
+          files: [
+            new File(["Timestamp,Temperature (C),RH\n2026-06-01T10:00:00Z,25,50\n"], "lost.csv", {
+              type: "text/csv",
+            }),
+          ],
+        },
+      });
+      await waitFor(() => expect(screen.getByTestId("csv-import-preview")).toBeTruthy());
+      fireEvent.click(screen.getByTestId("csv-import-confirm"));
+      await waitFor(() => expect(screen.getByTestId("csv-import-error")).toBeTruthy());
+      expect(existingRows).toHaveLength(3);
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["sensor_readings"] });
+      expect(imported).toHaveBeenCalledTimes(1);
+      expect(trackFunnelEvent).not.toHaveBeenCalledWith("csv_import_completed", expect.anything());
+      expect(insertSpy).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByRole("link", { name: /View imported history/i }));
+      expect(screen.queryByTestId("csv-import-modal")).toBeNull();
+      expect(insertSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("verdant:csv-imported", imported);
+    }
+  });
+
+  it("keeps the original target and history link when selection changes, including explicit retry", async () => {
+    insertOverride = async (rows) => {
+      existingRows.push(...(rows as Array<Record<string, unknown>>));
+      return { error: { message: "TypeError: fetch failed", code: "" } };
+    };
+    const qc = new QueryClient();
+    const { rerender } = render(
+      withQuery(
+        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" plantId="p1" testIdPrefix="x" />,
+        qc,
+      ),
+    );
+    fireEvent.click(screen.getByTestId("x-button"));
+    fireEvent.change(screen.getByTestId("csv-import-file-input"), {
+      target: {
+        files: [
+          new File(["Timestamp,Temperature (C),RH\n2026-06-01T10:00:00Z,25,50\n"], "original.csv", {
+            type: "text/csv",
+          }),
+        ],
+      },
+    });
+    await waitFor(() => expect(screen.getByTestId("csv-import-preview")).toBeTruthy());
+    rerender(
+      withQuery(
+        <EnvironmentCsvImportLauncher growId="g2" tentId="t2" plantId="p2" testIdPrefix="x" />,
+        qc,
+      ),
+    );
+    expect(insertSpy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() => expect(screen.getByTestId("csv-import-error")).toBeTruthy());
+    expect(existingRows).toHaveLength(3);
+    expect(
+      existingRows.every(
+        (r) =>
+          r.user_id === "u-1" &&
+          r.tent_id === "t1" &&
+          (r.raw_payload as Record<string, unknown>).grow_id === "g1" &&
+          (r.raw_payload as Record<string, unknown>).plant_id === "p1",
+      ),
+    ).toBe(true);
+    expect(screen.getByRole("link", { name: /View imported history/i }).getAttribute("href")).toBe(
+      "/tents/t1#imported-history",
+    );
+    expect(trackFunnelEvent).not.toHaveBeenCalledWith("csv_import_completed", expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: /Retry import/i }));
+    await waitFor(() => expect(screen.getByTestId("csv-import-done")).toBeTruthy());
+    expect(screen.getByTestId("csv-import-done").textContent).toMatch(/already exist/i);
+    expect(existingRows).toHaveLength(3);
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains an unconfirmed import through a temporarily missing selection", async () => {
+    insertOverride = async (rows) => {
+      existingRows.push(...(rows as Array<Record<string, unknown>>));
+      return { error: { message: "TypeError: fetch failed", code: "" } };
+    };
+    const qc = new QueryClient();
+    const { rerender } = render(
+      withQuery(
+        <EnvironmentCsvImportLauncher growId="g1" tentId="t1" plantId="p1" testIdPrefix="x" />,
+        qc,
+      ),
+    );
+    fireEvent.click(screen.getByTestId("x-button"));
+    fireEvent.change(screen.getByTestId("csv-import-file-input"), {
+      target: {
+        files: [
+          new File(["Timestamp,Temperature (C),RH\n2026-06-01T10:00:00Z,25,50\n"], "original.csv", {
+            type: "text/csv",
+          }),
+        ],
+      },
+    });
+    await waitFor(() => expect(screen.getByTestId("csv-import-preview")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() => expect(screen.getByTestId("csv-import-error")).toBeTruthy());
+    const receipt = screen.getByTestId("csv-import-error").textContent;
+    expect(receipt).toMatch(/couldn't confirm/i);
+    rerender(
+      withQuery(<EnvironmentCsvImportLauncher growId={null} tentId={null} testIdPrefix="x" />, qc),
+    );
+    expect(screen.getByTestId("csv-import-error").textContent).toBe(receipt);
+    rerender(
+      withQuery(
+        <EnvironmentCsvImportLauncher growId="g2" tentId="t2" plantId="p2" testIdPrefix="x" />,
+        qc,
+      ),
+    );
+    expect(screen.getByTestId("csv-import-error").textContent).toBe(receipt);
+    expect(screen.getByRole("link", { name: /View imported history/i }).getAttribute("href")).toBe(
+      "/tents/t1#imported-history",
+    );
+    expect(insertSpy).toHaveBeenCalledTimes(1);
   });
 });
 

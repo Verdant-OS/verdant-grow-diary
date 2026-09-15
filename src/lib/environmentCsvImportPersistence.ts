@@ -23,7 +23,10 @@ import {
   CSV_HISTORY_DEDUPE_CONFLICT_COPY,
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
-import { buildCsvImportFailureMessage } from "@/lib/environmentCsvPreviewCopyRules";
+import {
+  buildCsvImportFailureMessage,
+  isUnconfirmedCsvInsertOutcome,
+} from "@/lib/environmentCsvPreviewCopyRules";
 
 export const CSV_SENSOR_SOURCE = "csv" as const;
 
@@ -125,6 +128,8 @@ export interface PersistResult {
   duplicateCount: number;
   /** True when earlier atomic batches committed before a later batch failed. */
   partialWrite: boolean;
+  /** A dispatched batch may have committed without an acknowledged response. */
+  unconfirmedWrite?: boolean;
   /** Always grower-safe copy. Raw database diagnostics never cross this boundary. */
   error: string | null;
 }
@@ -161,14 +166,25 @@ export async function persistCsvEnvironmentRows(
     ? client.fetchExistingSensorReadingKeys.bind(client)
     : async () => new Set<string>();
 
+  let unconfirmedWrite = false;
   const result = await runDuplicateAwareCsvHistoryImport({
     rows: inserts,
     vendorLabel: "environment",
     batchSize: chunkSize,
     fetchExistingKeys,
     insertBatch: async (batch) => {
-      const res = await client.insertSensorReadings(batch);
-      return { error: res.error };
+      try {
+        const res = await client.insertSensorReadings(batch);
+        if (isUnconfirmedCsvInsertOutcome(res.error)) {
+          unconfirmedWrite = true;
+        }
+        return { error: res.error };
+      } catch {
+        // Keep earlier acknowledged counts; a thrown transport error cannot
+        // prove this atomic insert failed.
+        unconfirmedWrite = true;
+        return { error: { message: "CSV insert response unavailable" } };
+      }
     },
   });
 
@@ -183,7 +199,7 @@ export async function persistCsvEnvironmentRows(
         duplicateCount: result.duplicateRows,
         partialWrite,
         error: partialWrite
-          ? buildCsvImportFailureMessage(result.insertedRows, true)
+          ? buildCsvImportFailureMessage(result.insertedRows, true, unconfirmedWrite)
           : CSV_HISTORY_DEDUPE_CONFLICT_COPY,
       };
     }
@@ -191,7 +207,8 @@ export async function persistCsvEnvironmentRows(
       insertedCount: result.insertedRows,
       duplicateCount: result.duplicateRows,
       partialWrite,
-      error: buildCsvImportFailureMessage(result.insertedRows, partialWrite),
+      ...(unconfirmedWrite ? { unconfirmedWrite: true } : {}),
+      error: buildCsvImportFailureMessage(result.insertedRows, partialWrite, unconfirmedWrite),
     };
   }
 

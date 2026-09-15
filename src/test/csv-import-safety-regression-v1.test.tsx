@@ -113,7 +113,7 @@ describe("CSV Import Safety Regression v1 — persistence boundary", () => {
   it("returns fixed grower-safe copy without leaking RLS diagnostics", async () => {
     const client: InsertClient = {
       async insertSensorReadings() {
-        return { error: { message: "permission denied" }, insertedCount: 0 };
+        return { error: { message: "permission denied", code: "42501" }, insertedCount: 0 };
       },
     };
     const res = await persistCsvEnvironmentRows([row()], SCOPE, client);

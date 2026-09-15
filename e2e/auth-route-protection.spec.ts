@@ -175,6 +175,7 @@ test.describe("Auth route-protection (mocked, 1280x800)", () => {
     "/sensors/csv-preview",
     "/internal/contextual-pheno-comparison-demo",
     "/internal/demo-proof-walkthrough",
+    "/internal/demo-advanced-nutrients-feeding",
     "/internal/pheno-hunt-demo",
     "/pheno-comparison",
     "/pheno-expression-showcase",

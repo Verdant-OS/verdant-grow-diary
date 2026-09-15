@@ -21,6 +21,7 @@ const OPERATOR_PROTECTED_PATHS = new Set(
 const PUBLIC_FIXTURE_ONLY_DEMO_ROUTES = new Set<string>([
   "/internal/demo-proof-walkthrough",
   "/internal/contextual-pheno-comparison-demo",
+  "/internal/demo-advanced-nutrients-feeding",
 ]);
 
 /**
@@ -67,6 +68,7 @@ describe("Route Guard Parity v1 — operator/internal manifest entries are role-
     const pages: Record<string, string> = {
       "/internal/demo-proof-walkthrough": "../pages/DemoProofWalkthrough.tsx",
       "/internal/contextual-pheno-comparison-demo": "../pages/ContextualPhenoComparisonDemo.tsx",
+      "/internal/demo-advanced-nutrients-feeding": "../pages/AnVerdantFeedingDemo.tsx",
     };
     for (const p of PUBLIC_FIXTURE_ONLY_DEMO_ROUTES) {
       const file = pages[p];

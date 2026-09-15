@@ -250,6 +250,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteEntry> = [
       "Read-only Contextual Pheno Comparison v0.1 demo (fixture data only; mounted outside AppShell, unlinked / hidden by URL — no private data).",
   },
   {
+    path: "/internal/demo-advanced-nutrients-feeding",
+    access: "public",
+    description:
+      "Fixture-only Advanced Nutrients × Verdant feeding demo (reuses Quick Log feeding form; in-memory save; no production writes; mounted outside AppShell, unlinked / hidden by URL).",
+  },
+  {
     path: "/internal/demo-proof-walkthrough",
     access: "public",
     description:

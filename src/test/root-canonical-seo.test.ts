@@ -89,6 +89,7 @@ const ROOT_CANONICAL_TOLERATED: ReadonlyMap<string, string> = new Map([
   ["/auth", "sign-in flow; noindex client-side, never an acquisition page"],
   ["/internal/contextual-pheno-comparison-demo", "fixture demo, deliberately unlinked"],
   ["/internal/demo-proof-walkthrough", "fixture demo, deliberately unlinked"],
+  ["/internal/demo-advanced-nutrients-feeding", "fixture demo, deliberately unlinked"],
   ["/internal/pheno-hunt-demo", "fixture demo, deliberately unlinked"],
   [
     "/partners/csv-preview",

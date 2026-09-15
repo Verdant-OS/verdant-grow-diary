@@ -506,9 +506,40 @@ jobs:
             artifacts/ecowitt-bridge-ci-exit-code.txt
           if-no-files-found: warn
 
+      # Earlier stop-ship steps in this job write reports (artifacts/,
+      # test-results/) and can leave tracked/untracked residue. stamp-version
+      # records that as dirty:true (fail-open). verify-publish-provenance then
+      # fail-closes. Restore HEAD before stamping so this job measures the
+      # checkout, not test residue. Does not teach stamp-version to ignore
+      # .env.production. Path names only in the status dump — no diffs.
+      - name: Restore clean worktree before production stamp
+        run: |
+          echo "::group::worktree before restore"
+          git status --porcelain --untracked-files=all || true
+          echo "::endgroup::"
+          git restore --source=HEAD --worktree --staged -- .
+          git clean -fd \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=artifacts \
+            --exclude=test-results \
+            --exclude=coverage \
+            --exclude=playwright-report
+
       - name: Build
         id: prod_build
         run: bun run build
+
+      # Written by prebuild's verify-publish-provenance (also on FAIL).
+      # Path names and class labels only — no token bytes.
+      - name: Upload publish verification report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publish-verification
+          path: artifacts/publish-verification.json
+          if-no-files-found: warn
+          retention-days: 30
 
       # Downloadable build-summary artifact — always runs so failures
       # produce evidence too. Captures commit SHA, validator outcomes,

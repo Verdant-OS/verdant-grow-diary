@@ -138,7 +138,8 @@ export default function TentDetail() {
   const activePlantsIsError = activePlantsQuery.isError;
   const allPlantsQuery = useGrowPlants(id, undefined, { includeArchived: true });
   const allPlants = allPlantsQuery.data ?? EMPTY_TENT_PLANTS;
-  const { data: readings = [] } = useSensorReadings(id);
+  const sensorReadings = useSensorReadings(id);
+  const { data: readings = [] } = sensorReadings;
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
   const header = buildTentSensorHeaderView(readings);
@@ -479,7 +480,15 @@ export default function TentDetail() {
         <EcowittTentSnapshotV0Card tentId={id ?? null} />
       </section>
 
-      <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
+      <TentManualSnapshotHistoryList
+        tentId={id ?? null}
+        readings={readings}
+        readStatus={sensorReadings.status}
+        isFetching={sensorReadings.isFetching}
+        onRetry={() => {
+          void sensorReadings.refetch();
+        }}
+      />
 
       <ManualSnapshotTimelineSection scope="tent" tentId={id ?? null} />
 

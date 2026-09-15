@@ -11,7 +11,7 @@
  *     Mapping lives in src/lib/alertToActionQueueRules.ts (no JSX duplication).
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "@/lib/react-router-compat";
 import { ArrowLeft, Bell, History, ListChecks } from "lucide-react";
 import { toast } from "sonner";
@@ -123,8 +123,13 @@ interface RelatedActionRow {
 
 export default function AlertDetail() {
   const { alertId } = useParams<{ alertId: string }>();
-  const [status, setStatus] = useState<LoadStatus>("idle");
-  const [alert, setAlert] = useState<AlertRow | null>(null);
+  const [storedStatus, setStatus] = useState<LoadStatus>("idle");
+  const [storedAlert, setAlert] = useState<AlertRow | null>(null);
+  const [loadAlertId, setLoadAlertId] = useState<string | null>(null);
+  const loadSequence = useRef(0);
+  // A new route must not expose the previous row or terminal state before effects run.
+  const status = loadAlertId === alertId ? storedStatus : "loading";
+  const alert = loadAlertId === alertId && storedAlert?.id === alertId ? storedAlert : null;
   const [error, setError] = useState<string | null>(null);
   const linkedActionAlertIds = useMemo(() => (alert ? [alert.id] : []), [alert]);
   const linkedActionCounts = useAlertsLinkedActionCounts(linkedActionAlertIds);
@@ -138,11 +143,14 @@ export default function AlertDetail() {
   const [linkedAiDoctorSessionIds, setLinkedAiDoctorSessionIds] = useState<string[]>([]);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     if (!alertId) return;
+    setLoadAlertId(alertId);
     setStatus("loading");
     setError(null);
     try {
       const row = await getAlertById(alertId);
+      if (sequence !== loadSequence.current) return;
       if (!row) {
         setAlert(null);
         setStatus("not_found");
@@ -151,6 +159,7 @@ export default function AlertDetail() {
       setAlert(row);
       setStatus("ok");
     } catch (e) {
+      if (sequence !== loadSequence.current) return;
       setError(e instanceof Error ? e.message : String(e));
       setStatus("error");
     }
@@ -158,6 +167,10 @@ export default function AlertDetail() {
 
   useEffect(() => {
     load();
+    return () => {
+      // Also invalidate retries and earlier visits to the same alert on cleanup.
+      loadSequence.current += 1;
+    };
   }, [load]);
 
   const { events } = useAlertEvents(alertId ?? null, eventsKey);

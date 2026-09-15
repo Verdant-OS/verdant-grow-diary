@@ -163,6 +163,68 @@ describe("useCsvHistoryWindow", () => {
     });
     await waitFor(() => expect(view.result.current.window).toEqual({ status: "error" }));
   });
+  it.each([false, true])(
+    "shows the current retry state after a failed refresh with cached access (paused=%s)",
+    async (paused) => {
+      boundary.rows = [paid()];
+      const view = mount();
+      await waitFor(() =>
+        expect(view.result.current.window).toEqual({ status: "ready", days: null }),
+      );
+      boundary.error = { message: "Failed refresh" };
+      await act(async () => {
+        await view.result.current.refetch();
+      });
+      await waitFor(() => expect(view.result.current.window).toEqual({ status: "error" }));
+      let release!: () => void;
+      boundary.hold = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      boundary.error = null;
+      boundary.rows = [];
+      onlineManager.setOnline(!paused);
+      let retry!: ReturnType<typeof view.result.current.refetch>;
+      act(() => {
+        retry = view.result.current.refetch();
+      });
+      await waitFor(() =>
+        expect(view.result.current.window).toEqual({ status: paused ? "paused" : "loading" }),
+      );
+      if (paused) {
+        act(() => onlineManager.setOnline(true));
+        await waitFor(() => expect(view.result.current.window).toEqual({ status: "loading" }));
+      }
+      await act(async () => {
+        release();
+        await retry;
+      });
+      await waitFor(() =>
+        expect(view.result.current.window).toEqual({ status: "ready", days: 90 }),
+      );
+    },
+  );
+  it("does not present cached unlimited access as newly verified while refreshing", async () => {
+    boundary.rows = [paid()];
+    const view = mount();
+    await waitFor(() =>
+      expect(view.result.current.window).toEqual({ status: "ready", days: null }),
+    );
+    let release!: () => void;
+    boundary.hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    boundary.rows = [];
+    let refresh!: ReturnType<typeof view.result.current.refetch>;
+    act(() => {
+      refresh = view.result.current.refetch();
+    });
+    await waitFor(() => expect(view.result.current.window).toEqual({ status: "loading" }));
+    await act(async () => {
+      release();
+      await refresh;
+    });
+    await waitFor(() => expect(view.result.current.window).toEqual({ status: "ready", days: 90 }));
+  });
   it("does not reuse one account's plan while another account's first read is pending", async () => {
     boundary.rows = [paid()];
     const view = mount();

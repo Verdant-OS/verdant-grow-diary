@@ -34,9 +34,11 @@ export function useCsvHistoryWindow(enabled = true) {
   });
   let window: CsvHistoryWindow;
   if (!userId || !enabled) window = { status: "unknown" };
-  else if (query.isError) window = { status: "error" };
   else if (query.isPaused) window = { status: "paused" };
+  // Revalidation may retain both cached rows and the previous error. Report
+  // the active attempt first; cached access is not a freshly verified window.
   else if (loading || query.isPending || query.isFetching) window = { status: "loading" };
+  else if (query.isError) window = { status: "error" };
   else window = resolveCsvHistoryWindow(query.data, new Date());
   return { window, refetch: query.refetch };
 }

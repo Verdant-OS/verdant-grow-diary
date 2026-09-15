@@ -1,4 +1,4 @@
-// @vitest-environment node
+// @vitest-environment jsdom
 /**
  * Native PostgreSQL multi-session refund/grant regression. Replays committed
  * migrations unchanged into a disposable cluster; auth.users/auth.uid are fixtures.

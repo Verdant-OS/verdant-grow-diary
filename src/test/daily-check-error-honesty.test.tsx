@@ -13,11 +13,15 @@ const state = vi.hoisted(() => ({
   diaryError: false,
   diaryLoading: false,
   currentSensorStatusByTent: {} as Record<string, "loading" | "success" | "error">,
+  manualSensorStatusByTent: {} as Record<string, "loading" | "success" | "error">,
+  currentSensorRowsByTent: {} as Record<string, unknown[]>,
+  manualSensorRowsByTent: {} as Record<string, unknown[]>,
   growPlantsRefetch: vi.fn(async () => undefined),
   growTentsRefetch: vi.fn(async () => undefined),
   sensorRefetch: vi.fn(async () => undefined),
   diaryRefetch: vi.fn(async () => undefined),
   currentSensorRefetch: vi.fn(async () => undefined),
+  manualSensorRefetch: vi.fn(async () => undefined),
 }));
 
 const PLANTS = [
@@ -61,11 +65,20 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
     isLoading: state.sensorLoading,
     refetch: state.sensorRefetch,
   }),
-  useSensorReadingsByTents: () => ({
-    byTent: {},
-    statusByTent: state.currentSensorStatusByTent,
-    refetch: state.currentSensorRefetch,
-  }),
+  useSensorReadingsByTents: (
+    _tentIds: readonly string[],
+    _limit: number,
+    sources?: readonly string[],
+  ) => {
+    const manualOnly = sources?.length === 1 && sources[0] === "manual";
+    return {
+      byTent: manualOnly ? state.manualSensorRowsByTent : state.currentSensorRowsByTent,
+      statusByTent: manualOnly
+        ? state.manualSensorStatusByTent
+        : state.currentSensorStatusByTent,
+      refetch: manualOnly ? state.manualSensorRefetch : state.currentSensorRefetch,
+    };
+  },
 }));
 
 vi.mock("@/hooks/use-diary-entries", () => ({
@@ -142,6 +155,9 @@ beforeEach(() => {
   state.diaryError = false;
   state.diaryLoading = false;
   state.currentSensorStatusByTent = {};
+  state.manualSensorStatusByTent = {};
+  state.currentSensorRowsByTent = {};
+  state.manualSensorRowsByTent = {};
   vi.clearAllMocks();
 });
 
@@ -149,6 +165,7 @@ describe("Daily Grow Check failed-read honesty", () => {
   it("keeps Plant AI Doctor sensor failures distinct from an empty sensor snapshot and retries", () => {
     const tentId = "11111111-1111-4111-8111-111111111111";
     state.currentSensorStatusByTent = { [tentId]: "error" };
+    state.manualSensorStatusByTent = { [tentId]: "error" };
 
     renderWithProviders(
       <PlantDetailAiDoctorReadiness plantId="plant-1" tentId={tentId} stage="veg" />,
@@ -163,7 +180,63 @@ describe("Daily Grow Check failed-read honesty", () => {
 
     fireEvent.click(screen.getByTestId("plant-detail-ai-doctor-readiness-sensor-error-retry"));
     expect(state.currentSensorRefetch).toHaveBeenCalledTimes(1);
+    expect(state.manualSensorRefetch).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["mixed", "manual"] as const)(
+    "keeps a failed %s sensor read unavailable when the other read succeeds without evidence",
+    (failedRead) => {
+      const tentId = "11111111-1111-4111-8111-111111111111";
+      state.currentSensorStatusByTent = {
+        [tentId]: failedRead === "mixed" ? "error" : "success",
+      };
+      state.manualSensorStatusByTent = {
+        [tentId]: failedRead === "manual" ? "error" : "success",
+      };
+
+      renderWithProviders(
+        <PlantDetailAiDoctorReadiness plantId="plant-1" tentId={tentId} stage="veg" />,
+      );
+
+      expect(screen.getByTestId("plant-detail-ai-doctor-readiness-sensor-error"))
+        .toHaveTextContent("Current sensor evidence unavailable");
+      expect(screen.queryByText("No sensor snapshot.")).toBeNull();
+      expect(screen.queryByTestId("plant-detail-ai-doctor-readiness-badge")).toBeNull();
+
+      fireEvent.click(screen.getByTestId("plant-detail-ai-doctor-readiness-sensor-error-retry"));
+      expect(state.currentSensorRefetch).toHaveBeenCalledTimes(1);
+      expect(state.manualSensorRefetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["mixed", "manual"] as const)(
+    "keeps usable manual evidence available when the %s query fails",
+    (failedRead) => {
+      const tentId = "11111111-1111-4111-8111-111111111111";
+      const capturedAt = new Date(Date.now() - 60_000).toISOString();
+      const rows = [
+        { metric: "temp_f", value: 75, captured_at: capturedAt, source: "manual", quality: "ok" },
+        { metric: "humidity", value: 60, captured_at: capturedAt, source: "manual", quality: "ok" },
+      ];
+      state.currentSensorStatusByTent = {
+        [tentId]: failedRead === "mixed" ? "error" : "success",
+      };
+      state.manualSensorStatusByTent = {
+        [tentId]: failedRead === "manual" ? "error" : "success",
+      };
+      if (failedRead === "mixed") state.manualSensorRowsByTent = { [tentId]: rows };
+      else state.currentSensorRowsByTent = { [tentId]: rows };
+
+      renderWithProviders(
+        <PlantDetailAiDoctorReadiness plantId="plant-1" tentId={tentId} stage="veg" />,
+      );
+
+      expect(screen.queryByTestId("plant-detail-ai-doctor-readiness-sensor-error")).toBeNull();
+      expect(screen.getByTestId("plant-detail-ai-doctor-sensor-evidence-panel"))
+        .toHaveAttribute("data-status", "usable");
+      expect(screen.getByText("Latest manual snapshot accepted.")).toBeInTheDocument();
+    },
+  );
 
   it.each(["sensor", "diary"] as const)(
     "does not show Plants daily-check badges or Start check when the %s evidence read fails",

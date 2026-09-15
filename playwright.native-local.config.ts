@@ -22,7 +22,7 @@ if (
 
 export default defineConfig({
   testDir: "./e2e-local",
-  testMatch: "native-save-retrieve.spec.ts",
+  testMatch: ["native-save-retrieve.spec.ts", "native-csv-import-reopen.spec.ts"],
   timeout: 180_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

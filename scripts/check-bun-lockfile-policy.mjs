@@ -23,22 +23,32 @@ const REQUIRED_LOCKFILES = Object.freeze(["bun.lock", "package-lock.json"]);
 export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
   "@modelcontextprotocol/sdk": "1.30.0",
-  hono: "4.12.34",
+  hono: "4.13.5",
   vite: "6.4.3",
   postcss: "8.5.18",
   "brace-expansion": "1.1.18",
   "fast-uri": "3.1.6",
   "form-data": "4.0.6",
-  "js-yaml": "4.3.1",
+  "js-yaml": "4.3.2",
+  qs: "6.16.0",
   ajv: "6.15.0",
   picomatch: "2.3.2",
+  vitest: "4.1.11",
+  "@vitest/mocker": "4.1.11",
+});
+// Vitest 4 uses the root Vite/Rolldown graph and no longer brings in Rollup.
+// Absence is safe; every copy must still be patched if it returns transitively.
+export const PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS = Object.freeze({
   rollup: "4.59.0",
-  vitest: "3.2.6",
 });
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
   "@modelcontextprotocol/sdk": "1.30.0",
-  hono: "4.12.34",
+  hono: "4.13.5",
+  "js-yaml": "4.3.2",
+  qs: "6.16.0",
+  vitest: "4.1.11",
+  "@vitest/mocker": "4.1.11",
   esbuild: "0.28.1",
 });
 export const PACKAGE_LOCK_MAJOR_SECURITY_FLOORS = Object.freeze({
@@ -583,10 +593,13 @@ export function evaluatePolicy({
         }
       }
 
-      for (const [packageName, minimum] of Object.entries(PACKAGE_LOCK_SECURITY_FLOORS)) {
+      for (const [packageName, minimum] of Object.entries({
+        ...PACKAGE_LOCK_SECURITY_FLOORS,
+        ...PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS,
+      })) {
         const versions = packageLockVersions(packageLock, packageName);
         if (
-          versions.length === 0 ||
+          (versions.length === 0 && Object.hasOwn(PACKAGE_LOCK_SECURITY_FLOORS, packageName)) ||
           versions.some((resolvedVersion) => !versionAtLeast(resolvedVersion, minimum))
         ) {
           errors.push(

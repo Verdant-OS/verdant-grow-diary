@@ -426,7 +426,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.1.5",
-    "vitest": "^3.2.6",
+    "vitest": "^4.1.11",
     "vitest-axe": "^0.1.0"
   },
   "version": "0.0.0",
@@ -446,11 +446,12 @@
     "esbuild": "0.28.1",
     "fast-uri": "3.1.6",
     "form-data": "4.0.6",
-    "js-yaml": "4.3.1",
+    "js-yaml": "4.3.2",
     "lodash": "4.18.1",
     "flatted": "3.4.2",
     "glob": "10.5.0",
-    "hono": "4.12.34",
-    "nanoid": "3.3.18"
+    "hono": "4.13.5",
+    "nanoid": "3.3.18",
+    "qs": "6.16.0"
   }
 }

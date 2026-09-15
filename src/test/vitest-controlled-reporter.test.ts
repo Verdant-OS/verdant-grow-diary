@@ -23,6 +23,47 @@ function fileTask({ filepath, state, tests }) {
 }
 
 describe("controlled reporter", () => {
+  it("records the modern run-end callback and unhandled error count exactly once", () => {
+    const progress = path.join(scratch(), "progress.jsonl");
+    const r = new Reporter({ progressFile: progress, repoRoot: "/repo" });
+    const file = fileTask({
+      filepath: "/repo/src/modern.test.ts",
+      state: "pass",
+      tests: [{ name: "ok", state: "pass" }],
+    });
+    r.onTestModuleEnd(file);
+    r.onTestRunEnd([file], [new Error("unhandled rejection")]);
+    // Compatibility callbacks must not duplicate a completed batch.
+    r.onFinished([file], []);
+    const { files, batches, conflicts, corruptLines } = readProgress(progress);
+    expect(files.size).toBe(1);
+    expect(files.get("src/modern.test.ts").counts.passed).toBe(1);
+    expect(batches).toHaveLength(1);
+    expect(batches[0].errorCount).toBe(1);
+    expect(conflicts).toHaveLength(0);
+    expect(corruptLines).toHaveLength(0);
+  });
+
+  it("flushes a file first supplied at modern run end", () => {
+    const progress = path.join(scratch(), "progress.jsonl");
+    const r = new Reporter({ progressFile: progress, repoRoot: "/repo" });
+    r.onTestRunEnd(
+      [
+        fileTask({
+          filepath: "/repo/src/deferred.test.ts",
+          state: "fail",
+          tests: [{ name: "failure", state: "fail", error: "boom" }],
+        }),
+      ],
+      [],
+    );
+    const { files, batches } = readProgress(progress);
+    expect(files.get("src/deferred.test.ts").status).toBe("failed");
+    expect(files.get("src/deferred.test.ts").failedTests).toEqual(["failure"]);
+    expect(batches).toHaveLength(1);
+    expect(batches[0].errorCount).toBe(0);
+  });
+
   it("flushes a passing file", () => {
     const dir = scratch();
     const progress = path.join(dir, "progress.jsonl");

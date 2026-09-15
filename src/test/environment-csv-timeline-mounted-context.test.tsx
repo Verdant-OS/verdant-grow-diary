@@ -32,7 +32,7 @@ const fixtureRows = [
     metric: "vpd_kpa",
     value: 1.42,
     captured_at: "2026-06-01T10:10:00Z",
-    raw_payload: { grow_id: "g1", source_tag: "csv" },
+    raw_payload: { grow_id: "g1", source_tag: "csv", vpd_source: "derived" },
   },
   // tent B, also in window of d2 but different tent — must not bleed
   {
@@ -188,6 +188,12 @@ describe("TimelineCsvContextPanel", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(screen.queryByTestId("timeline-csv-context-panel")).toBeNull();
   });
+
+  it("queries sensor_readings in captured_at descending order", async () => {
+    render(<TimelineCsvContextPanel growId="g1" entries={ENTRIES} />);
+    await screen.findByTestId("csv-timeline-chip-d1");
+    expect(readMocks.queries[0].order).toEqual(["captured_at", { ascending: false }]);
+  });
 });
 
 describe("CSV context read-state honesty", () => {
@@ -197,6 +203,26 @@ describe("CSV context read-state honesty", () => {
     render(<TimelineCsvContextPanel growId="g1" entries={ENTRIES} />);
     expect(screen.getByRole("status").textContent).toMatch(/Loading CSV environment context/);
     expect(screen.queryByRole("button", { name: "Retry CSV context" })).toBeNull();
+  });
+
+  it("treats an initial empty array as confirmed no-match, not unavailable", async () => {
+    readMocks.read.mockResolvedValueOnce({ data: [], error: null });
+    render(<TimelineCsvContextPanel growId="g1" entries={ENTRIES} />);
+    await waitFor(() => expect(readMocks.read).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("timeline-csv-context-panel")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry CSV context" })).toBeNull();
+  });
+
+  it("shows unavailable when Supabase returns an error even if data is present", async () => {
+    readMocks.read.mockResolvedValueOnce({
+      data: fixtureRows,
+      error: { message: "private partial failure" },
+    });
+    render(<TimelineCsvContextPanel growId="g1" entries={ENTRIES} />);
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/is unavailable/));
+    expect(screen.queryByTestId("csv-timeline-chip-d1")).toBeNull();
+    expect(document.body.textContent).not.toContain("private partial failure");
   });
 
   it("shows a safe unavailable state and retry for an initial query error", async () => {
@@ -418,6 +444,26 @@ describe("CSV context read-state honesty", () => {
     expect(screen.queryByTestId("timeline-csv-context-panel")).toBeNull();
     imported();
     expect(readMocks.read).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not query when growId is undefined", () => {
+    render(<TimelineCsvContextPanel growId={undefined} entries={ENTRIES} />);
+    expect(readMocks.read).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("timeline-csv-context-panel")).toBeNull();
+  });
+
+  it("does not query when every entry lacks a tent_id", () => {
+    render(
+      <TimelineCsvContextPanel
+        growId="g1"
+        entries={[
+          { id: "d1", tent_id: null, entry_at: "2026-06-01T10:00:00Z" },
+          { id: "d2", tent_id: null, entry_at: "2026-06-02T10:00:00Z" },
+        ]}
+      />,
+    );
+    expect(readMocks.read).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("timeline-csv-context-panel")).toBeNull();
   });
 
   it("removes the import listener and ignores completion after unmount", async () => {

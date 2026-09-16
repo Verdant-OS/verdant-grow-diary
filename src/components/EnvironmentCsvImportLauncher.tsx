@@ -41,6 +41,7 @@ import { sensorsPath, tentDetailPath } from "@/lib/routes";
 import { IMPORTED_SENSOR_HISTORY_ANCHOR_ID } from "@/lib/importedSensorHistoryViewModel";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useCsvHistoryWindow } from "@/hooks/useCsvHistoryWindow";
 
 export interface EnvironmentCsvImportLauncherProps {
   growId: string | null | undefined;
@@ -117,6 +118,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
   const { user } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const historyAccess = useCsvHistoryWindow(open);
   const [importSession, setImportSession] = useState<{
     scope: CsvInsertScope;
     generation: number;
@@ -259,6 +261,10 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
           onConfirm={handleConfirm}
           viewHistoryHref={viewHistoryHref}
           addCurrentReadingHref={addCurrentReadingHref}
+          historyWindow={historyAccess.window}
+          onRetryHistoryWindow={() => {
+            void historyAccess.refetch();
+          }}
         />
       </>
     );
@@ -291,6 +297,10 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
         onConfirm={handleConfirm}
         viewHistoryHref={viewHistoryHref}
         addCurrentReadingHref={addCurrentReadingHref}
+        historyWindow={historyAccess.window}
+        onRetryHistoryWindow={() => {
+          void historyAccess.refetch();
+        }}
       />
     </section>
   );

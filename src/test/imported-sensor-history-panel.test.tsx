@@ -53,7 +53,7 @@ describe("ImportedSensorHistoryPanel", () => {
       wrap(<ImportedSensorHistoryPanel tentId="tent-A" readings={[csvRow({ source: "live" })]} />),
     );
     expect(screen.getByTestId("imported-history-empty")).toHaveTextContent(
-      "No imported CSV sensor history for this tent yet.",
+      "No CSV readings are available for this tent in the current history view.",
     );
   });
 
@@ -92,7 +92,7 @@ describe("ImportedSensorHistoryPanel", () => {
   it("renders a safe empty state when no tent context is provided", () => {
     render(wrap(<ImportedSensorHistoryPanel tentId={null} readings={[]} />));
     expect(screen.getByTestId("imported-sensor-history-panel")).toBeInTheDocument();
-    expect(screen.getByText(/No imported CSV sensor history/)).toBeInTheDocument();
+    expect(screen.getByText("Select a tent to view its imported CSV history.")).toBeInTheDocument();
   });
 
   it("renders summary counts and metrics for CSV readings", () => {

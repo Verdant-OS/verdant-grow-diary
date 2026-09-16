@@ -34,6 +34,12 @@ import {
 } from "@/lib/environmentCsvImportViewModel";
 import { parseEnvironmentCSV, type ParsedEnvironmentRow } from "@/lib/csvParser";
 import {
+  UNKNOWN_CSV_HISTORY_WINDOW,
+  buildCsvHistoryWindowPreview,
+  csvHistoryWindowNotice,
+  type CsvHistoryWindow,
+} from "@/lib/csvHistoryWindowRules";
+import {
   CSV_IMPORT_DESCRIPTION,
   CSV_IMPORT_ADD_CURRENT_READING_LABEL,
   CSV_IMPORT_CONFIRM_LABEL,
@@ -73,6 +79,8 @@ export interface EnvironmentCsvImportModalProps {
    * Navigation only: it does not save a reading or invoke AI Doctor.
    */
   addCurrentReadingHref?: string | null;
+  historyWindow?: CsvHistoryWindow;
+  onRetryHistoryWindow?: () => void;
 }
 
 const ERROR_COPY: Record<string, string> = {
@@ -90,6 +98,8 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
     onConfirm,
     viewHistoryHref = null,
     addCurrentReadingHref = null,
+    historyWindow = UNKNOWN_CSV_HISTORY_WINDOW,
+    onRetryHistoryWindow,
   } = props;
   // The handoff CTA is a router Link; render it only when a Router is
   // actually mounted so bare mounts (tests, storybook-style harnesses)
@@ -173,6 +183,11 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   }, [state.parsed, onConfirm]);
 
   const coverage = buildCoveragePreview(state.parsed);
+  const windowPreview = buildCsvHistoryWindowPreview(
+    state.parsed?.validRows ?? [],
+    historyWindow,
+    new Date(),
+  );
 
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : handleClose())}>
@@ -181,6 +196,20 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
           <DialogTitle>Import historical data</DialogTitle>
           <DialogDescription>{CSV_IMPORT_DESCRIPTION}</DialogDescription>
         </DialogHeader>
+
+        <div
+          className="space-y-1 text-xs text-muted-foreground"
+          data-testid="csv-import-history-window"
+          role="status"
+        >
+          <p>{csvHistoryWindowNotice(historyWindow)}</p>
+          {onRetryHistoryWindow &&
+          (historyWindow.status === "error" || historyWindow.status === "unknown") ? (
+            <Button type="button" size="sm" variant="outline" onClick={onRetryHistoryWindow}>
+              Retry history access
+            </Button>
+          ) : null}
+        </div>
 
         {state.phase === "idle" ? (
           <div data-testid="csv-import-entry" className="space-y-3">
@@ -247,6 +276,13 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                 </dd>
               </div>
             </dl>
+            {windowPreview && windowPreview.outsideCount > 0 ? (
+              <p data-testid="csv-import-outside-window" className="text-sm" role="note">
+                {windowPreview.outsideCount} of {windowPreview.observationCount} observations fall
+                outside this history window. Import keeps their original timestamps; they can be
+                saved without appearing in the current history view.
+              </p>
+            ) : null}
             {coverage.partialSuccess && coverage.partialMessage ? (
               <div
                 data-testid="csv-import-partial-banner"

@@ -156,6 +156,20 @@ describe("derivePlantDetailBlockedStateView", () => {
     expect(view!.title).toMatch(/plant merged/i);
   });
 
+  it("surfaces a calm waiting state for paused first reads without Retry", () => {
+    const view = derivePlantDetailBlockedStateView({
+      loadState: "paused",
+      plant: null,
+      contextTentId: "tent-9",
+    });
+    expect(view!.kind).toBe("paused");
+    expect(view!.testId).toBe("plant-detail-paused");
+    expect(view!.title).toMatch(/waiting for connection/i);
+    expect(view!.showRetry).toBe(false);
+    expect(view!.primaryBack.path).toBe("/tents/tent-9");
+    expect(view!.secondaryBack?.kind).toBe("plants");
+  });
+
   it("offers Retry + tent fallback on loading-slow when caller has tent context", () => {
     const view = derivePlantDetailBlockedStateView({
       loadState: "loading-slow",

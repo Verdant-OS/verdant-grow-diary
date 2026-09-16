@@ -279,4 +279,18 @@ describe("unresolved query classification", () => {
       }),
     ).toBe("paused");
   });
+  it("does not treat a paused first read as not-found when isLoading is false", () => {
+    // React Query reports isLoading=false for paused queries even though the
+    // first read is still unresolved — the bug this slice fixes.
+    const state = classifyPlantDetailLoadState({
+      isLoading: false,
+      isPending: true,
+      isPaused: true,
+      isError: false,
+      hasPlant: false,
+      loadTimedOut: false,
+    });
+    expect(state).toBe("paused");
+    expect(state).not.toBe("not-found");
+  });
 });

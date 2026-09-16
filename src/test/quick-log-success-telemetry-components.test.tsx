@@ -277,7 +277,9 @@ describe("PlantQuickLog success telemetry", () => {
     await waitFor(() => expect(storageUploadMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
     await waitFor(() =>
-      expect(screen.getByTestId("plant-quick-log-error")).toHaveTextContent(/could not save/i),
+      expect(screen.getByTestId("plant-quick-log-error")).toHaveTextContent(
+        /photo save is unconfirmed/i,
+      ),
     );
     expect(gtagMock()).not.toHaveBeenCalled();
     consoleError.mockRestore();

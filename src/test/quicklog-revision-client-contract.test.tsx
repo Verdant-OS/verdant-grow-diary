@@ -137,6 +137,30 @@ describe("Quick Log revision client contract", () => {
     });
   });
 
+  it("maps transport failures to rpc_unavailable and forbidden", async () => {
+    supabaseMock.rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202" } });
+    await expect(retractQuickLogEntry({ diaryEntryId: "diary-1" }, "accidental")).resolves.toEqual({
+      ok: false,
+      reason: "rpc_unavailable",
+    });
+
+    supabaseMock.rpc.mockResolvedValueOnce({ data: null, error: { code: "42501" } });
+    await expect(
+      correctQuickLogEntry({ diaryEntryId: "diary-1" }, "typo", { note: "x" }),
+    ).resolves.toEqual({
+      ok: false,
+      reason: "forbidden",
+    });
+  });
+
+  it("treats thrown RPC calls as rpc_error", async () => {
+    supabaseMock.rpc.mockRejectedValueOnce(new Error("network down"));
+    await expect(retractQuickLogEntry({ diaryEntryId: "diary-1" }, "accidental")).resolves.toEqual({
+      ok: false,
+      reason: "rpc_error",
+    });
+  });
+
   it("calls the exact generated correction and retraction RPC names", async () => {
     supabaseMock.rpc.mockResolvedValue({
       data: {

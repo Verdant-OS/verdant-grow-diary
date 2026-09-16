@@ -309,4 +309,12 @@ describe("quickLogRevisionFailureCopy", () => {
     expect(quickLogRevisionFailureCopy("no_such_reason")).toMatch(/try again/i);
     expect(quickLogRevisionFailureCopy(null)).toMatch(/try again/i);
   });
+
+  it("pins idempotent replay and transport failure copy from #1460", () => {
+    expect(quickLogRevisionFailureCopy("rpc_unavailable")).toMatch(/unavailable/i);
+    expect(quickLogRevisionFailureCopy("forbidden")).toMatch(/permission/i);
+    expect(quickLogRevisionFailureCopy("invalid_idempotency_key")).toMatch(/close and reopen/i);
+    expect(quickLogRevisionFailureCopy("idempotency_conflict")).toMatch(/close and reopen/i);
+    expect(quickLogRevisionFailureCopy("rpc_error")).toMatch(/could not confirm/i);
+  });
 });

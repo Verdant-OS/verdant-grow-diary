@@ -4,6 +4,7 @@ import {
   CSV_IMPORT_READING_COPY,
   formatCsvPreviewRow,
   buildCsvImportFailureMessage,
+  mergeCsvImportFailureReceipts,
 } from "@/lib/environmentCsvPreviewCopyRules";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 
@@ -52,6 +53,42 @@ describe("environmentCsvPreviewCopyRules", () => {
     expect(copy).not.toContain("VPD");
     expect(copy).not.toContain("ppm CO₂");
     expect(copy).not.toContain("PPFD");
+  });
+});
+
+describe("mergeCsvImportFailureReceipts", () => {
+  it("accumulates confirmed inserts across retries", () => {
+    expect(
+      mergeCsvImportFailureReceipts(
+        { insertedCount: 2, partialWrite: true },
+        { insertedCount: 3, partialWrite: false },
+      ),
+    ).toEqual({ insertedCount: 5, partialWrite: true, unconfirmedWrite: false });
+  });
+
+  it("preserves unconfirmedWrite once any attempt lost confirmation", () => {
+    expect(
+      mergeCsvImportFailureReceipts(
+        { insertedCount: 1, unconfirmedWrite: true },
+        { insertedCount: 0, partialWrite: false, unconfirmedWrite: false },
+      ),
+    ).toEqual({ insertedCount: 1, partialWrite: true, unconfirmedWrite: true });
+  });
+});
+
+describe("unverified duplicate CSV import copy", () => {
+  it("explains hidden history conflicts without claiming a clean zero-save outcome", () => {
+    const copy = buildCsvImportFailureMessage(0, false, false, "unverified_duplicate");
+    expect(copy).toMatch(/couldn't verify all matching readings/i);
+    expect(copy).toMatch(/outside that view/i);
+    expect(copy).toMatch(/No live sensor data was created/);
+  });
+
+  it("states the confirmed lower bound when some rows saved before the conflict", () => {
+    const copy = buildCsvImportFailureMessage(4, true, true, "unverified_duplicate");
+    expect(copy).toMatch(/4 .*confirmed saved/i);
+    expect(copy).toMatch(/couldn't confirm whether the remaining/i);
+    expect(copy).toMatch(/retrying the same file may encounter the same conflict/i);
   });
 });
 

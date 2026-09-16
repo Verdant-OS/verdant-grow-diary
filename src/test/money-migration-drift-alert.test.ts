@@ -35,9 +35,9 @@ const reconcile = job.steps.find(
 const script: string = reconcile.with.script;
 
 describe("money migration drift alert — runs at all", () => {
-  it("is scheduled, because a gate nobody remembers to dispatch is not a gate", () => {
-    expect(Object.keys(doc.on)).toContain("schedule");
-    expect(doc.on.schedule[0].cron).toBe("30 7 * * *");
+  it("retires the hollow-environment schedule and retains explicit manual dispatch", () => {
+    expect(Object.keys(doc.on)).toEqual(["workflow_dispatch"]);
+    expect(doc.on.workflow_dispatch).toEqual({});
   });
 
   it("only ever runs from the trusted default branch", () => {

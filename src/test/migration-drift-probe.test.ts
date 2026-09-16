@@ -18,6 +18,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
+import { load as loadYaml } from "js-yaml";
 import {
   redactDbUrl,
   REDACTION_PLACEHOLDER,
@@ -268,12 +269,26 @@ describe("migration drift probe — never publishes credentials", () => {
     expect(workflow).toContain("could not install postgresql-client after 3 attempts");
   });
 
+  it("retires the hollow-environment schedule and keeps guarded manual dispatch", () => {
+    const workflow = readFileSync(
+      resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
+      "utf8",
+    );
+    const parsed = loadYaml(workflow) as { on: Record<string, unknown> };
+    expect(Object.keys(parsed.on)).toEqual(["workflow_dispatch"]);
+    expect(workflow).not.toMatch(/^\s+schedule:/m);
+  });
+
   it("uses the protected production DB secret without a retired alias or fallback", () => {
     const workflow = readFileSync(
       resolve(ROOT, ".github/workflows/migration-drift-probe.yml"),
       "utf8",
     );
-    expect(workflow).toContain("environment: verdant-production");
+    const parsed = loadYaml(workflow) as {
+      jobs: { probe: { environment: string } };
+    };
+    expect(parsed.jobs.probe.environment).toBe("verdant-production");
+    expect(workflow).not.toMatch(/\n\s+environment:\s+verdant-production-solo-founder\s*$/m);
     expect(workflow.match(/secrets\.SUPABASE_DB_URL\b/g)).toHaveLength(2);
     expect(workflow).not.toContain("SUPABASE_DB_URL_LIVE");
     expect(workflow).not.toContain("SUPABASE_DB_URL_SANDBOX");

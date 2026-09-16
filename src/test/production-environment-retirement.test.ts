@@ -24,6 +24,7 @@ type Workflow = {
 };
 
 const DIRECTORY = resolve(__dirname, "../../.github/workflows");
+const RUNBOOK_PATH = resolve(__dirname, "../../docs/production-environment-retirement-runbook.md");
 const RETIRED_ENVIRONMENT = "verdant-production";
 const WRITER_ENVIRONMENT = "verdant-production-solo-founder";
 const MONITORS = [
@@ -75,6 +76,16 @@ describe("retired production environment schedules", () => {
 });
 
 describe("production writers use the existing protected delivery environment", () => {
+  it("does not treat the retired environment name as a substring of the writer binding", () => {
+    expect(WRITER_ENVIRONMENT).toContain(RETIRED_ENVIRONMENT);
+    expect(`environment: ${WRITER_ENVIRONMENT}`).toContain(`environment: ${RETIRED_ENVIRONMENT}`);
+    expect(WRITER_ENVIRONMENT).not.toBe(RETIRED_ENVIRONMENT);
+  });
+
+  it.each(WRITERS)("keeps %s off the retired writer environment", (name) => {
+    expect(workflow(`${name}.yml`).jobs.apply.environment).not.toBe(RETIRED_ENVIRONMENT);
+  });
+
   it.each(WRITERS)("repoints %s while preserving dispatch and serialization", (name) => {
     const parsed = workflow(`${name}.yml`);
     expect(Object.keys(parsed.on)).toEqual(["workflow_dispatch"]);
@@ -108,5 +119,30 @@ describe("production writers use the existing protected delivery environment", (
       expect(guidance.join("\n")).toContain(WRITER_ENVIRONMENT);
       expect(guidance.join("\n")).not.toMatch(/verdant-production(?:[.,]| environment| before)/);
     }
+  });
+});
+
+describe("production environment retirement runbook", () => {
+  it("documents the retired schedules and repointed writers that the workflows enforce", () => {
+    const runbook = readFileSync(RUNBOOK_PATH, "utf8");
+
+    expect(runbook).toContain("ENV-RETIRE-001");
+    for (const filename of [
+      "migration-drift-probe.yml",
+      "money-migration-drift-alert.yml",
+      "ai-credit-service-contract-effect.yml",
+    ]) {
+      expect(runbook).toContain(filename);
+      expect(Object.keys(workflow(filename).on)).toEqual(["workflow_dispatch"]);
+    }
+
+    for (const writer of WRITERS) {
+      expect(runbook).toContain(`${writer}.yml`);
+      expect(workflow(`${writer}.yml`).jobs.apply.environment).toBe(WRITER_ENVIRONMENT);
+    }
+
+    expect(runbook).toContain("NOT_MEASURED");
+    expect(runbook).toContain(WRITER_ENVIRONMENT);
+    expect(runbook).toContain(RETIRED_ENVIRONMENT);
   });
 });

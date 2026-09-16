@@ -18,9 +18,13 @@ describe("AI-credit service contract effect workflow trust boundary", () => {
     expect(WORKFLOW).not.toContain("scripts/assert-required-money-migrations-applied.mjs");
   });
 
-  it("pins all database access to the deploy branch and production environment", () => {
-    expect(WORKFLOW).toContain("if: github.ref == 'refs/heads/verdant-grow-diary'");
-    expect(WORKFLOW).toContain("environment: verdant-production");
+  it("pins all database access to the deploy branch and the legacy manual monitor environment", () => {
+    const parsed = loadYaml(WORKFLOW) as {
+      jobs: { verify: { environment: string; if?: string } };
+    };
+    expect(parsed.jobs.verify.if).toBe("github.ref == 'refs/heads/verdant-grow-diary'");
+    expect(parsed.jobs.verify.environment).toBe("verdant-production");
+    expect(WORKFLOW).not.toMatch(/\n\s+environment:\s+verdant-production-solo-founder\s*$/m);
     expect(WORKFLOW).toContain("SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}");
     expect(WORKFLOW).not.toContain("SUPABASE_DB_URL_LIVE");
     expect(WORKFLOW).not.toContain("SUPABASE_DB_URL_SANDBOX");

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { load as loadYaml } from "js-yaml";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -1466,11 +1467,15 @@ describe("production runner", () => {
 describe("manual workflow safety contract", () => {
   it("is manual-only, least-privilege, environment-gated, and branch/SHA pinned", () => {
     const workflow = readFileSync(WORKFLOW_PATH, "utf8");
+    const parsed = loadYaml(workflow) as {
+      jobs: { apply: { environment: string } };
+    };
 
     expect(workflow).toMatch(/\bon:\s*\r?\n\s+workflow_dispatch:/);
     expect(workflow).not.toMatch(/^\s+(?:push|pull_request|schedule):/m);
     expect(workflow).toMatch(/permissions:\s*\r?\n\s+contents:\s+read/);
-    expect(workflow).toContain("environment: verdant-production");
+    expect(parsed.jobs.apply.environment).toBe("verdant-production-solo-founder");
+    expect(workflow).not.toMatch(/\n\s+environment:\s+verdant-production\s*$/m);
     expect(workflow).toContain('if [ "$OBSERVED_REF" != "refs/heads/verdant-grow-diary" ]');
     expect(workflow).toContain("EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}");
     expect(workflow).toContain("CONFIRM_PROJECT_REF: ${{ inputs.confirm_project_ref }}");
@@ -1506,12 +1511,14 @@ describe("manual workflow safety contract", () => {
     expect(validateJob).toContain(
       'if [ "$CONFIRM_APPLY" != "APPLY PINNED PRODUCTION MIGRATIONS" ]',
     );
+    expect(validateJob).not.toContain("environment: verdant-production-solo-founder");
     expect(validateJob).not.toContain("environment: verdant-production");
     expect(validateJob).not.toContain("SUPABASE_DB_URL");
     expect(validateJob).not.toContain("secrets.");
 
     expect(applyJob).toContain("needs: validate");
-    expect(applyJob).toContain("environment: verdant-production");
+    expect(applyJob).toContain("environment: verdant-production-solo-founder");
+    expect(applyJob).not.toMatch(/\n\s+environment:\s+verdant-production\s*$/m);
     expect(applyJobEnv).not.toContain("SUPABASE_DB_URL");
     expect(
       workflow.match(/^\s+SUPABASE_DB_URL:\s+\$\{\{\s*secrets\.SUPABASE_DB_URL\s*\}\}$/gm),

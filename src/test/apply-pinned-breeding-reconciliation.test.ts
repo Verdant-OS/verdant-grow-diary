@@ -12,6 +12,7 @@
 import { readFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { load as loadYaml } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -492,10 +493,15 @@ describe("runner source and workflow pins", () => {
   });
 
   it("workflow is manual-dispatch only, branch-guarded, and environment-gated", () => {
+    const parsed = loadYaml(workflowSource) as {
+      jobs: { apply: { environment: string } };
+    };
+
     expect(workflowSource).toContain("workflow_dispatch:");
     expect(workflowSource).not.toMatch(/\n\s{2}(push|pull_request|schedule):/);
     expect(workflowSource).toContain("refs/heads/verdant-grow-diary");
-    expect(workflowSource).toContain("environment: verdant-production");
+    expect(parsed.jobs.apply.environment).toBe("verdant-production-solo-founder");
+    expect(workflowSource).not.toMatch(/\n\s+environment:\s+verdant-production\s*$/m);
     expect(workflowSource).toContain("group: verdant-production-migration-writer");
     expect(workflowSource).toContain("queue: max");
     expect(workflowSource).toContain("APPLY PINNED BREEDING RECONCILIATION");

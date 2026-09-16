@@ -128,8 +128,8 @@ jobs:
             boundary: "Candidate browser with disposable local backend; not published-site acceptance.",
           };
           writeFileSync("native-local-proof.json", JSON.stringify(proof, null, 2) + "\n");
-          if (expected < 5 || unexpected !== 0 || flaky !== 0 || skipped !== 0 || errors !== 0) {
-            throw new Error("Native browser acceptance requires five executed passing scenarios, zero failures, retries, skips, and report errors.");
+          if (expected < 10 || unexpected !== 0 || flaky !== 0 || skipped !== 0 || errors !== 0) {
+            throw new Error("Native browser acceptance requires ten executed passing scenarios, zero failures, retries, skips, and report errors.");
           }
           console.log(`Candidate local-backend browser proof: ${expected} passed, 0 failed, 0 skipped. Published-site acceptance remains separate.`);
           NODE

@@ -4,6 +4,7 @@ import {
   CSV_IMPORT_READING_COPY,
   formatCsvPreviewRow,
   buildCsvImportFailureMessage,
+  mergeCsvImportFailureReceipts,
 } from "@/lib/environmentCsvPreviewCopyRules";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 
@@ -68,5 +69,112 @@ describe("unconfirmed CSV import copy", () => {
     expect(copy).toMatch(/2 .*confirmed/i);
     expect(copy).toMatch(/couldn.t confirm|unconfirmed/i);
     expect(copy).not.toMatch(/stopped after|No CSV readings were saved/i);
+  });
+});
+
+describe("unverified duplicate CSV import copy", () => {
+  const shared = [
+    "Matching CSV history was detected",
+    "couldn't verify all matching readings in your current history view",
+    "Older readings may be outside that view",
+    "retrying the same file may encounter the same conflict",
+    "No live sensor data was created",
+  ] as const;
+
+  it.each([
+    {
+      label: "zero saves, no partial write",
+      insertedCount: 0,
+      partialWrite: false,
+      unconfirmedWrite: false,
+      savedFragment: "No new CSV readings were saved in this attempt",
+      uncertainFragment: null,
+    },
+    {
+      label: "confirmed partial batch",
+      insertedCount: 3,
+      partialWrite: true,
+      unconfirmedWrite: false,
+      savedFragment: "3 CSV readings confirmed saved",
+      uncertainFragment: null,
+    },
+    {
+      label: "single confirmed save",
+      insertedCount: 1,
+      partialWrite: true,
+      unconfirmedWrite: false,
+      savedFragment: "1 CSV reading confirmed saved",
+      uncertainFragment: null,
+    },
+    {
+      label: "lost acknowledgement with no confirmed saves",
+      insertedCount: 0,
+      partialWrite: false,
+      unconfirmedWrite: true,
+      savedFragment: "Import stopped",
+      uncertainFragment: "couldn't confirm whether any CSV readings were saved",
+    },
+    {
+      label: "lost acknowledgement with some confirmed saves",
+      insertedCount: 2,
+      partialWrite: true,
+      unconfirmedWrite: true,
+      savedFragment: "2 CSV readings confirmed saved",
+      uncertainFragment: "couldn't confirm whether the remaining CSV readings were saved",
+    },
+  ])(
+    "builds grower-safe copy for $label",
+    ({ insertedCount, partialWrite, unconfirmedWrite, savedFragment, uncertainFragment }) => {
+      const copy = buildCsvImportFailureMessage(
+        insertedCount,
+        partialWrite,
+        unconfirmedWrite,
+        "unverified_duplicate",
+      );
+      for (const fragment of shared) expect(copy).toContain(fragment);
+      expect(copy).toContain(savedFragment);
+      if (uncertainFragment) expect(copy).toContain(uncertainFragment);
+      expect(copy).not.toMatch(/23505|sensor_readings_dedupe_uidx|upgrade|90.day/i);
+    },
+  );
+
+  it("does not treat unverified duplicate copy as a generic failure", () => {
+    const generic = buildCsvImportFailureMessage(0, false, false);
+    const unverified = buildCsvImportFailureMessage(0, false, false, "unverified_duplicate");
+    expect(generic).toContain("No CSV readings were saved");
+    expect(unverified).not.toContain("No CSV readings were saved. Try again.");
+  });
+});
+
+describe("mergeCsvImportFailureReceipts", () => {
+  it("accumulates confirmed inserts across retries", () => {
+    const merged = mergeCsvImportFailureReceipts(
+      { insertedCount: 3, partialWrite: true, unconfirmedWrite: true },
+      { insertedCount: 0, partialWrite: false },
+    );
+    expect(merged).toEqual({
+      insertedCount: 3,
+      partialWrite: true,
+      unconfirmedWrite: true,
+    });
+  });
+
+  it("starts from null when the first attempt fails", () => {
+    expect(
+      mergeCsvImportFailureReceipts(null, { insertedCount: 0, unconfirmedWrite: true }),
+    ).toEqual({
+      insertedCount: 0,
+      partialWrite: false,
+      unconfirmedWrite: true,
+    });
+  });
+
+  it("marks partialWrite when a later retry confirms additional rows", () => {
+    const merged = mergeCsvImportFailureReceipts(
+      { insertedCount: 0, partialWrite: false },
+      { insertedCount: 2, partialWrite: true },
+    );
+    expect(merged.insertedCount).toBe(2);
+    expect(merged.partialWrite).toBe(true);
   });
 });

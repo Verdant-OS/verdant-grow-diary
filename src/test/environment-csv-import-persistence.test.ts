@@ -299,3 +299,70 @@ describe("CSV import response-loss recovery", () => {
     },
   );
 });
+
+describe("CSV hidden-history dedupe conflicts", () => {
+  const DEDUPE_CONFLICT = {
+    code: "23505",
+    message: 'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
+    details:
+      "Key (tent_id, source, metric, captured_at)=(t1, csv, temperature_c, ...) already exists.",
+  };
+
+  it("classifies an unverified dedupe conflict without leaking driver text", async () => {
+    const result = await persistCsvEnvironmentRows([row()], SCOPE, {
+      insertSensorReadings: async () => ({ error: DEDUPE_CONFLICT, insertedCount: 0 }),
+      fetchExistingSensorReadingKeys: async () => new Set(),
+    });
+    expect(result).toMatchObject({
+      insertedCount: 0,
+      partialWrite: false,
+      failureReason: "unverified_duplicate",
+    });
+    expect(result.error).not.toMatch(/23505|sensor_readings_dedupe_uidx|already exists/i);
+  });
+
+  it("retains failureReason when earlier batches committed before the conflict", async () => {
+    let batch = 0;
+    const result = await persistCsvEnvironmentRows(
+      [
+        row({ humidity_pct: null, vpd_kpa: null }),
+        row({
+          rowNumber: 2,
+          captured_at: "2026-06-01T10:01:00.000Z",
+          humidity_pct: null,
+          vpd_kpa: null,
+        }),
+      ],
+      SCOPE,
+      {
+        insertSensorReadings: async (rows) => {
+          batch += 1;
+          return batch === 1
+            ? { error: null, insertedCount: rows.length }
+            : { error: DEDUPE_CONFLICT, insertedCount: 0 };
+        },
+        fetchExistingSensorReadingKeys: async () => new Set(),
+      },
+      1,
+    );
+    expect(result).toMatchObject({
+      insertedCount: 1,
+      partialWrite: true,
+      failureReason: "unverified_duplicate",
+    });
+    expect(result.error).toMatch(/1 CSV reading was saved/i);
+    expect(result.error).not.toMatch(/23505|sensor_readings_dedupe_uidx/i);
+  });
+
+  it.each([
+    { code: "23505", message: "duplicate key value violates unique constraint other_idx" },
+    { code: "42501", message: DEDUPE_CONFLICT.message },
+  ])("does not classify unrelated rejection as hidden history: $code", async (error) => {
+    const result = await persistCsvEnvironmentRows([row()], SCOPE, {
+      insertSensorReadings: async () => ({ error, insertedCount: 0 }),
+    });
+    expect(result.failureReason).toBeUndefined();
+    expect(result.error).toMatch(/No CSV readings were saved/);
+    expect(result.error).not.toContain(error.message);
+  });
+});

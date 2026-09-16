@@ -18,6 +18,7 @@ import {
 } from "@/lib/authRedirectRules";
 
 const ROOT = resolve(__dirname, "..");
+const APP_SHELL = readFileSync(resolve(ROOT, "components/AppShell.tsx"), "utf8");
 const LANDING = readFileSync(resolve(ROOT, "pages/Landing.tsx"), "utf8");
 const AUTH = readFileSync(resolve(ROOT, "pages/Auth.tsx"), "utf8");
 
@@ -123,8 +124,14 @@ describe("buildSignedOutRedirect — AppShell signed-out target", () => {
 });
 
 describe("Return-to wiring — static safety", () => {
-  // AppShell's two redirect paths are exercised with the real provider/router
-  // in auth-sign-out-navigation-race.test.tsx, including query and fragment.
+  it("AppShell builds its signed-out target from the full current location (incl. hash)", () => {
+    expect(APP_SHELL).toMatch(
+      /const signedOutRedirect = buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
+    );
+    expect(APP_SHELL).toMatch(/useRequireAuth\(signedOutRedirect\)/);
+    expect(APP_SHELL).toMatch(/nav\(signedOutRedirect/);
+  });
+
   it("Landing forwards a validated redirectTo into sign-in and signup CTAs", () => {
     expect(LANDING).toMatch(/resolveKnownRouteReturnTo\(searchParams\.get\("redirectTo"\)\)/);
     expect(LANDING).toMatch(

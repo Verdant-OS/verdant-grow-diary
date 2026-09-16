@@ -65,8 +65,6 @@ export function classifyRevalidationFailure(error: unknown): RevalidationFailure
 export interface RequireAuthOptions {
   /** Test seam for the bounded wait; production uses AUTH_REVALIDATION_TIMEOUT_MS. */
   timeoutMs?: number;
-  /** Consult at action time: an explicit sign-out owns its own destination. */
-  isRedirectSuppressed?: () => boolean;
 }
 
 export function useRequireAuth(
@@ -78,7 +76,6 @@ export function useRequireAuth(
 } {
   const nav = useNavigate();
   const timeoutMs = options?.timeoutMs ?? AUTH_REVALIDATION_TIMEOUT_MS;
-  const isRedirectSuppressed = options?.isRedirectSuppressed;
   const [status, setStatus] = useState<RequireAuthStatus>("loading");
   const [retryToken, setRetryToken] = useState(0);
 
@@ -118,7 +115,10 @@ export function useRequireAuth(
     };
     const redirectUnauthenticated = () => {
       setStatus("unauthenticated");
-      if (!isRedirectSuppressed?.()) nav(redirectTo, { replace: true });
+      // Consult the actual client's operation at action time. Every hook
+      // caller must respect an explicit exit's pending navigation.
+      if (getAuthSignOutOperation(supabase.auth).getSnapshot() === "idle")
+        nav(redirectTo, { replace: true });
     };
     const revalidationFailed = () => setStatus("revalidation_failed");
 
@@ -172,7 +172,7 @@ export function useRequireAuth(
       cancelled = true;
       clearTimeout(bound);
     };
-  }, [nav, redirectTo, retryToken, timeoutMs, isRedirectSuppressed]);
+  }, [nav, redirectTo, retryToken, timeoutMs]);
 
   return { status, retry };
 }

@@ -54,9 +54,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
     location.search,
     location.hash,
   );
-  const { status: authStatus } = useRequireAuth(signedOutRedirect, {
-    isRedirectSuppressed: isSignOutNavigationPending,
-  });
+  const { status: authStatus } = useRequireAuth(signedOutRedirect);
   // One server-validated session gate for every private REST read this shell
   // issues: a cached user while getUser() is still settling, missed
   // (revalidation_failed) or is about to redirect must not fire any of them.

@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSensorsPageSessionController } from "@/hooks/useSensorsPageSession";
+import { buildManualReadingPayloads } from "@/lib/sensorReadingManualEntryRules";
 import {
   STANDARD_MANUAL_CORRECTION_IDENTITY,
   createSensorsPageSession,
@@ -43,17 +44,11 @@ function values(humidity = "57"): ManualDraftValues {
   };
 }
 function payloads(tentId = B): ManualSnapshotPayloads {
-  return [
-    {
-      tent_id: tentId,
-      metric: "humidity_pct",
-      value: 57,
-      source: "manual",
-      ts: "2026-09-16T12:00:00.123Z",
-      captured_at: "2026-09-16T12:00:00.123Z",
-      quality: "ok",
-    },
-  ];
+  return buildManualReadingPayloads({
+    tentId,
+    metrics: [{ metric: "humidity_pct", value: 57 }],
+    ts: "2026-09-16T12:00:00.123Z",
+  });
 }
 function controller(qc = client(), owner = "owner-a") {
   const result = createSensorsPageSessionController(qc, owner);
@@ -425,17 +420,8 @@ describe("session-wide pending save identity", () => {
     const qc = client();
     const session = setup(qc);
     const entered = draft(session);
-    const first = claimed(session.claimSave(entered.identity, payloads()));
-    expect(session.settleSave(first, { status: "unconfirmed" })).toBe(true);
-    const remounted = controller(qc);
-    const restored = remounted.getSnapshot()!.draft!;
-    expect(restored.values.saveUnconfirmed).toBe(true);
-    const replacement = payloads();
-    replacement[0].ts = "2026-09-16T14:00:00Z";
-    replacement[0].captured_at = "2026-09-16T14:00:00Z";
-    replacement[0].value = 61;
-    const retry = claimed(remounted.claimSave(restored.identity, replacement));
-    expect(retry.payloads).toEqual([
+    const original = payloads();
+    expect(original).toMatchObject([
       {
         tent_id: B,
         metric: "humidity_pct",
@@ -446,6 +432,19 @@ describe("session-wide pending save identity", () => {
         quality: "ok",
       },
     ]);
+    const first = claimed(session.claimSave(entered.identity, original));
+    expect(session.settleSave(first, { status: "unconfirmed" })).toBe(true);
+    const remounted = controller(qc);
+    const restored = remounted.getSnapshot()!.draft!;
+    expect(restored.values.saveUnconfirmed).toBe(true);
+    const replacement = payloads();
+    replacement[0].ts = "2026-09-16T14:00:00Z";
+    replacement[0].captured_at = "2026-09-16T14:00:00Z";
+    replacement[0].value = 61;
+    const retry = claimed(remounted.claimSave(restored.identity, replacement));
+    expect(retry.payloads).toEqual(original);
+    expect(retry.payloads).not.toBe(original);
+    expect(retry.payloads).not.toEqual(replacement);
   });
 
   it("holds one in-flight claim across remount and page-target changes", () => {

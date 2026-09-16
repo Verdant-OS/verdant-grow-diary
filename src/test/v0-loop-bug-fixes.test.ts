@@ -42,7 +42,7 @@ describe("Bug 1 · QuickLog invalidates Recent Plant Activity caches", () => {
     expect(inserts.length).toBe(0);
     expect(QUICKLOG).toMatch(/useQuickLogV2Save/);
     // Stage change on grows is still allowed as a separate UPDATE (not an insert).
-    expect(QUICKLOG).toMatch(/\.from\(["']grows["']\)\.update/);
+    expect(QUICKLOG).toMatch(/\.from\(["']grows["']\)\s*\.update/);
   });
 
   it("does not add automation / device-control / service_role surface", () => {

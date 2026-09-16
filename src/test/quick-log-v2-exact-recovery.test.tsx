@@ -1083,6 +1083,43 @@ describe("late successful media upload cleanup attempts", () => {
     expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
   });
 
+  it.each([
+    { label: "rejected cleanup", settle: () => Promise.reject(new Error("remove denied")) },
+    {
+      label: "resolved storage error",
+      settle: () => ({ data: null, error: { message: "policy" } }),
+    },
+    { label: "empty successful data", settle: () => ({ data: [], error: null }) },
+  ])("stays aborted when late video cleanup is $label", async ({ settle }) => {
+    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: confirmedEventId }, error: null });
+    let finishUpload!: (value: unknown) => void;
+    uploadMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishUpload = resolve;
+        }),
+    );
+    removeMock.mockImplementationOnce(() => settle());
+    const view = renderSheet();
+    typeNote();
+    await attachVideo();
+    save();
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    const pending = window.sessionStorage.getItem(pendingKey());
+    context.userId = ownerB;
+    view.rerender();
+    await act(async () => finishUpload({ error: null }));
+    await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    expect(storageRemoves("diary-videos")).toHaveLength(1);
+    expect(videoEntryMock).not.toHaveBeenCalled();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(telemetryMock).toHaveBeenCalledTimes(1);
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
+  });
+
   it("does not revive an abandoned photo continuation when returning to A during deferred cleanup", async () => {
     let finishUpload!: (value: unknown) => void;
     let finishRemove!: (value: unknown) => void;
@@ -1119,6 +1156,46 @@ describe("late successful media upload cleanup attempts", () => {
     expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
     expect(photoEntryMock).not.toHaveBeenCalled();
+  });
+
+  it("does not revive an abandoned video continuation when returning to A during deferred cleanup", async () => {
+    rpcMock.mockResolvedValue({ data: { ok: true, grow_event_id: confirmedEventId }, error: null });
+    let finishUpload!: (value: unknown) => void;
+    let finishRemove!: (value: unknown) => void;
+    uploadMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishUpload = resolve;
+        }),
+    );
+    removeMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRemove = resolve;
+        }),
+    );
+    const view = renderSheet();
+    typeNote();
+    await attachVideo();
+    save();
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(1));
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    const pending = window.sessionStorage.getItem(pendingKey());
+    context.userId = ownerB;
+    view.rerender();
+    await act(async () => finishUpload({ error: null }));
+    await waitFor(() => expect(removeMock).toHaveBeenCalledTimes(1));
+    context.userId = ownerA;
+    view.rerender();
+    await expectRetry();
+    expect(screen.getByTestId("qlv2-pending-note-media")).toBeInTheDocument();
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    await act(async () => finishRemove({ error: null }));
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(videoEntryMock).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(pendingKey())).toBe(pending);
   });
 
   it("does not clean up storage when the active owner saves a photo and a video", async () => {

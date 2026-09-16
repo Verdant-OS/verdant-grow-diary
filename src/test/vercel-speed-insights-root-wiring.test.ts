@@ -13,8 +13,14 @@ function sliceFunction(name: string, until?: string): string {
 }
 
 describe("Vercel Speed Insights · root wiring", () => {
+  const rootDocument = () => sliceFunction("RootDocument", "function RootComponent");
   const applicationRoot = () => sliceFunction("ApplicationRootComponent");
   const rootComponent = () => sliceFunction("RootComponent", "function ApplicationRootComponent");
+
+  it("imports @vercel/speed-insights/react once and mounts <SpeedInsights /> once", () => {
+    expect((ROOT_ROUTE.match(/from ["']@vercel\/speed-insights\/react["']/g) ?? []).length).toBe(1);
+    expect((ROOT_ROUTE.match(/<SpeedInsights \/>/g) ?? []).length).toBe(1);
+  });
 
   it("imports SpeedInsights from the React entry of @vercel/speed-insights", () => {
     expect(ROOT_ROUTE).toMatch(
@@ -52,5 +58,9 @@ describe("Vercel Speed Insights · root wiring", () => {
 
   it("does not mount SpeedInsights on the grow-help-toolkit-only root branch", () => {
     expect(rootComponent()).not.toContain("<SpeedInsights />");
+  });
+
+  it("keeps SpeedInsights out of RootDocument so grow-help-toolkit renders stay provider-free", () => {
+    expect(rootDocument()).not.toContain("<SpeedInsights />");
   });
 });

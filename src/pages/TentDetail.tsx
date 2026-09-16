@@ -136,7 +136,7 @@ export default function TentDetail() {
     setSearchParams((current) => applyTentPlantTabsUrlPlantId(current, next), { replace: true });
   };
 
-  const { data: tent, isLoading, isError, refetch } = useGrowTent(id);
+  const { data: tent, isLoading, isPending, fetchStatus, isError, refetch } = useGrowTent(id);
   const activePlantsQuery = useGrowPlants(id);
   const activePlants = activePlantsQuery.data ?? EMPTY_TENT_PLANTS;
   const activePlantsIsFetching = activePlantsQuery.isFetching;
@@ -188,7 +188,28 @@ export default function TentDetail() {
     }
   }, [selectedPlantTabId, allPlants, rosterIncludeArchived, id, setSearchParams]);
 
-  if (isLoading) {
+  // A first paused query is pending without being loading/fetching. It has
+  // not established absence; already resolved tent rows keep their branch.
+  const awaitingFirstTentRead = !tent && (isPending ?? isLoading);
+  if (awaitingFirstTentRead && fetchStatus === "paused") {
+    return (
+      <div data-testid="tent-detail-paused" role="status">
+        <EmptyState
+          icon={<Box className="h-6 w-6" />}
+          title="Waiting for connection"
+          description="Tent details have not loaded yet. Loading will resume when your connection returns."
+          action={
+            <Button asChild variant="ghost" className="min-h-11">
+              <Link to={tentsPath()}>
+                <ArrowLeft className="h-4 w-4" /> Back to tents
+              </Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+  if (isLoading || awaitingFirstTentRead) {
     return (
       <div
         className="glass rounded-2xl h-64 animate-pulse"
@@ -202,12 +223,9 @@ export default function TentDetail() {
   if (isError) {
     return (
       <div data-testid="tent-detail-error" role="alert">
-        <GrowDataSourceDisclosure
-          resource="tents"
-          hasAnyData={false}
-          metas={[tentMeta]}
-          testId="tent-detail-data-source-disclosure"
-        />
+        <Badge variant="destructive" className="mb-4">
+          Unavailable
+        </Badge>
         <EmptyState
           icon={<Box className="h-6 w-6" />}
           title="Couldn't load this tent"

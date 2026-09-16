@@ -114,6 +114,24 @@ async function signOutThroughUi(page: Page) {
   await expect(dialog).toHaveCount(0);
 }
 
+// Use the existing document after the import starts. A hard navigation would
+// discard the delayed callback instead of challenging its lifecycle guard.
+async function signInCurrentDocument(page: Page, f: LocalFixture) {
+  try {
+    await page.locator("#signin-email").fill(f.owner.email);
+    await page.locator("#signin-password").fill(f.owner.password);
+    await page
+      .getByRole("button", { name: /sign in|log in|continue/i })
+      .first()
+      .click();
+    await page.waitForURL((url) => url.origin === f.env.ui && url.pathname !== "/auth");
+    await page.getByTestId("agreement-reconsent-gate").waitFor({ state: "hidden" });
+    await page.getByTestId("header-quick-log-trigger").waitFor({ state: "visible" });
+  } catch {
+    throw new Error("Real local UI sign-in did not restore the existing document.");
+  }
+}
+
 for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
   test(`an account round trip ends a CSV import held at its ${heldAt}`, async ({
     page,
@@ -130,11 +148,12 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       // Accept each disposable account's real local agreement once before the
       // race. Later sign-ins must reuse those stored receipts, not inject auth.
       const otherFixture = { ...f, owner: f.other, primary: f.foreign };
-      await signIn(control, otherFixture);
-      await signOutThroughUi(control);
+      await signIn(page, otherFixture);
+      await signOutThroughUi(page);
       await signIn(page, f);
-      await control.goto(f.env.ui + "/plants/" + f.primary.plantId);
-      await expect(control.getByTestId("header-quick-log-trigger")).toBeVisible();
+      // Sessions use tab-local storage. Sign in explicitly in both tabs;
+      // cross-tab sign-in is intentionally not an authentication mechanism.
+      await signIn(control, f, false);
       const before = await ownerRows(f.owner);
       const otherBefore = fingerprint(await witnessRows(f));
       const csv = largeCsv();
@@ -189,12 +208,12 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       }
       const committedFingerprint = fingerprint({ ...before, sensor_readings: committed });
 
-      // Only the control tab navigates. The import document remains alive so
-      // its late response can challenge the real generation/unmount guards.
+      // The control tab supplies a real sign-out while the import modal is
+      // busy. All subsequent account changes use the original tab's real UI
+      // and SPA navigation, leaving its delayed callback alive.
       await signOutThroughUi(control);
       await expect(page.getByTestId("csv-import-modal")).toHaveCount(0);
-      await signIn(control, otherFixture, false);
-      await expect(page.getByTestId("header-quick-log-trigger")).toBeVisible();
+      await signInCurrentDocument(page, otherFixture);
       await page.getByRole("link", { name: "Sensors", exact: true }).first().click();
       await expect(
         page.getByRole("button", { name: f.foreign.tentName, exact: true }),
@@ -205,9 +224,9 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       await expect(page.getByTestId("csv-import-preview")).toHaveCount(0);
       await expect(page.getByTestId("csv-import-done")).toHaveCount(0);
       await assertIsolation(f, before, otherBefore);
-      await signOutThroughUi(control);
-      await signIn(control, f, false);
-      await expect(page.getByTestId("header-quick-log-trigger")).toBeVisible();
+      await signOutThroughUi(page);
+      await page.getByTestId("landing-signin-cta-header").click();
+      await signInCurrentDocument(page, f);
       await page.getByRole("link", { name: "Sensors", exact: true }).first().click();
       await page.getByRole("button", { name: f.secondary.tentName, exact: true }).click();
       await page.getByTestId("sensors-csv-import-button").click();

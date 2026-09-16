@@ -168,6 +168,19 @@ describe("buildPlantTimelinePrintSummary", () => {
     expect(ctx!.label).not.toMatch(/user_id|raw_payload/i);
   });
 
+  it("prefers the paginated historyCountLabel over the default visible/total line", () => {
+    const p = buildPlantTimelinePrintSummary({
+      totalEntries: 12,
+      visibleEntries: 10,
+      filterKey: "all",
+      groupCount: 2,
+      historyCountLabel: "Visible entries: 10 from 10 loaded diary entries; 12 total.",
+    });
+    const visible = p.lines.find((l) => l.key === "visible");
+    expect(visible?.label).toBe("Visible entries: 10 from 10 loaded diary entries; 12 total.");
+    expect(visible?.label).not.toMatch(/of 12 total in the current view/);
+  });
+
   it("print output never contains raw private-ID/payload-like tokens", () => {
     const p = buildPlantTimelinePrintSummary({
       totalEntries: 9,

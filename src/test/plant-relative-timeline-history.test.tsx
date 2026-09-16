@@ -163,6 +163,29 @@ afterEach(() => {
   expect(fixture.writes).not.toHaveBeenCalled();
 });
 
+describe("plant relative history query key", () => {
+  it("scopes cache keys by plant and owner without borrowing another grower's history", () => {
+    expect(plantRelativeHistoryQueryKey(PLANT, "owner-1")).toEqual([
+      "plant_recent_activity",
+      PLANT,
+      "relative_timeline",
+      "owner-1",
+    ]);
+    expect(plantRelativeHistoryQueryKey(null, "owner-1")).toEqual([
+      "plant_recent_activity",
+      null,
+      "relative_timeline",
+      "owner-1",
+    ]);
+    expect(plantRelativeHistoryQueryKey(PLANT, null)).toEqual([
+      "plant_recent_activity",
+      PLANT,
+      "relative_timeline",
+      null,
+    ]);
+  });
+});
+
 describe("full plant relative history read boundary", () => {
   it("reads 12 stored entries across pages, preserves scope, and uses total only before the cursor", async () => {
     fixture.rows = Array.from({ length: 12 }, (_, i) => row(i + 1));
@@ -444,6 +467,24 @@ describe("relative history retrieval through the presenter", () => {
     expect(formerSignal?.aborted).toBe(true);
     expect(screen.getAllByTestId("relative-timeline-item")).toHaveLength(1);
     expect(screen.getByTestId("relative-timeline-item")).toHaveAttribute("data-item-id", row(2).id);
+  });
+  it("retains the first page and offers retry when the next boundary is unpageable", async () => {
+    fixture.override = (request) => {
+      if (!request.count) return undefined;
+      const data = Array.from({ length: 11 }, (_, i) => row(11 - i));
+      data[9] = { ...data[9], entry_at: "not-a-date" };
+      return { data, error: null, count: 12 };
+    };
+    renderHistory();
+    await waitFor(() => expect(header()).toHaveTextContent("Showing 10 of 12 timeline entries"));
+    expect(screen.getAllByTestId("relative-timeline-item")).toHaveLength(10);
+    expect(
+      screen.getByText(
+        "Some older entries could not be reached. Refresh to check the history again.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Load older entries" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry timeline history" })).toBeEnabled();
   });
   it("refreshes the history child after the existing Quick Log success invalidation", async () => {
     fixture.rows = [row(1)];

@@ -48,6 +48,14 @@ describe("plant history pagination rules", () => {
       expect(() => buildPlantHistoryPage(data, 1, "plant-1")).toThrow(/unavailable/);
     },
   );
+  it("rejects rows scoped to another owner when ownerId is supplied", () => {
+    expect(() =>
+      buildPlantHistoryPage([row(1, { user_id: "owner-2" })], 1, "plant-1", 10, "owner-1"),
+    ).toThrow(/unavailable/);
+    expect(
+      buildPlantHistoryPage([row(1, { user_id: "owner-1" })], 1, "plant-1", 10, "owner-1").rows,
+    ).toHaveLength(1);
+  });
   it.each([null, "not-a-date", '2026-09-16T12:00:00Z",plant_id.eq.other'])(
     "retains rows but blocks an unsafe timestamp boundary %s",
     (entry_at) => {
@@ -145,5 +153,53 @@ describe("plant history count and read truth", () => {
     expect(view.complete).toBe(false);
     expect(view.canRetry).toBe(true);
     expect(view.notice).toMatch(/could not be reached/);
+  });
+  it("marks a verified full read complete and hides load-more", () => {
+    const view = buildPlantHistoryReadView(
+      { data: [row(1), row(2)], totalCount: 2, hasNextPage: false, boundaryUnavailable: false },
+      "plant-1",
+      2,
+    );
+    expect(view.complete).toBe(true);
+    expect(view.showLoadMore).toBe(false);
+    expect(view.countLabel).toBe("2 timeline entries");
+    expect(view.canRetry).toBe(false);
+  });
+  it("surfaces boundaryUnavailable from the read model without fabricating load-more", () => {
+    const view = buildPlantHistoryReadView(
+      { data: Array.from({ length: 10 }, (_, i) => row(i)), boundaryUnavailable: true },
+      "plant-1",
+      10,
+    );
+    expect(view.canRetry).toBe(true);
+    expect(view.showLoadMore).toBe(false);
+    expect(view.notice).toMatch(/could not be reached/);
+  });
+  it("shows a refresh notice while retaining cached rows", () => {
+    const view = buildPlantHistoryReadView(
+      { data: [row(1)], totalCount: 1, isFetching: true, isFetchingNextPage: false },
+      "plant-1",
+      1,
+    );
+    expect(view.notice).toBe("Refreshing timeline history…");
+    expect(view.current).toBe(false);
+    expect(view.showHeader).toBe(true);
+  });
+  it("reports count conflicts without treating the read as complete", () => {
+    const view = buildPlantHistoryReadView(
+      { data: [row(1), row(2)], totalCount: 1, hasNextPage: false },
+      "plant-1",
+      2,
+    );
+    expect(view.countConflict).toBe(true);
+    expect(view.canRetry).toBe(true);
+    expect(view.totalCount).toBeNull();
+    expect(view.notice).toMatch(/changed while older entries were loading/);
+  });
+  it("prompts for plant selection before any history read", () => {
+    const view = buildPlantHistoryReadView({ data: undefined }, null);
+    expect(view.notice).toBe("Select a plant to read its timeline.");
+    expect(view.showScopeActions).toBe(true);
+    expect(view.showLoading).toBe(false);
   });
 });

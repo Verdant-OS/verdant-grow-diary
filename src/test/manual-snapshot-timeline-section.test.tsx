@@ -417,6 +417,32 @@ describe.each(SCOPES)(
       expect(readCount).toBe(1);
       expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
     });
+
+    it("shows an honest refreshing state while an online refetch is still unresolved", async () => {
+      nextResponse = { data: [ROWS[0]], error: null };
+      const pending = pendingRead();
+      const { qc } = renderSection(props);
+      await screen.findByTestId("manual-snapshot-timeline-section-list");
+      nextResponse = pending.promise;
+      act(() => {
+        void qc.invalidateQueries({ refetchType: "active" });
+      });
+      await waitFor(() => expect(readCount).toBe(2));
+      expect(screen.getByRole("status", { name: "Manual snapshot read status" })).toHaveTextContent(
+        /refreshing.*previously loaded.*unconfirmed/i,
+      );
+      expect(screen.getByTestId("manual-snapshot-timeline-card")).toHaveAttribute(
+        "data-card-id",
+        "plant-1-snap-a",
+      );
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-error")).toBeNull();
+      expect(screen.getByRole("button", { name: "Retry" })).toBeDisabled();
+      await act(async () => pending.resolve({ data: [ROWS[0]], error: null }));
+      await waitFor(() =>
+        expect(screen.queryByRole("status", { name: "Manual snapshot read status" })).toBeNull(),
+      );
+    });
   },
 );
 

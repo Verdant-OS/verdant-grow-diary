@@ -51,12 +51,32 @@ describe("imported sensor history AI Doctor handoff rules", () => {
     [{ isError: false, isFetching: true, hasRows: false }, "loading"],
     [{ isError: false, isFetching: true, hasRows: true }, "success"],
     [{ isError: false, isFetching: false, hasRows: false }, "success"],
+    [{ isError: false, isFetching: false, hasRows: false, isPending: true }, "loading"],
+    [{ isError: false, isFetching: false, hasRows: false, isPaused: true }, "paused"],
+    [{ isError: false, isFetching: true, hasRows: false, isPaused: true }, "paused"],
   ] as const)("resolves cached-row read status %#", (readState, expected) => {
     expect(resolveImportedHistoryHandoffReadStatus(readState)).toBe(expected);
   });
 
+  // REGRESSION: the old predicate only treated `isFetching && !hasRows` as
+  // loading, so an offline-paused first read (pending, not fetching) looked
+  // like a settled empty roster and surfaced "No active plant to review".
+  it.each([
+    [
+      "pending idle first read",
+      { isError: false, isFetching: false, hasRows: false, isPending: true },
+    ],
+    [
+      "paused offline first read",
+      { isError: false, isFetching: false, hasRows: false, isPaused: true },
+    ],
+  ])("does not classify an unresolved first plant read as success — %s", (_label, readState) => {
+    expect(resolveImportedHistoryHandoffReadStatus(readState)).not.toBe("success");
+  });
+
   it.each([
     ["loading", "history_loading"],
+    ["paused", "history_loading"],
     ["error", "history_error"],
     ["success", "history_empty"],
   ] as const)("distinguishes %s history as %s", (historyStatus, expectedState) => {
@@ -115,6 +135,7 @@ describe("imported sensor history AI Doctor handoff rules", () => {
 
   it.each([
     ["loading", "plants_loading"],
+    ["paused", "plants_paused"],
     ["error", "plants_error"],
   ] as const)("distinguishes %s plant reads as %s", (plantStatus, expectedState) => {
     const result = buildImportedSensorHistoryAiDoctorHandoff(input({ plantStatus }));
@@ -123,6 +144,22 @@ describe("imported sensor history AI Doctor handoff rules", () => {
     expect(result.validObservationCount).toBe(2);
     expect(result.distinctTimestampCount).toBe(2);
     expect(result.choices).toEqual([]);
+  });
+
+  it("uses paused-specific copy for history and plant reads waiting on connectivity", () => {
+    const historyPaused = buildImportedSensorHistoryAiDoctorHandoff(
+      input({ historyStatus: "paused", readings: [] }),
+    );
+    const plantsPaused = buildImportedSensorHistoryAiDoctorHandoff(
+      input({ plantStatus: "paused" }),
+    );
+
+    expect(historyPaused.body).toMatch(/waiting for a connection/i);
+    expect(plantsPaused).toMatchObject({
+      state: "plants_paused",
+      title: "Waiting for a connection",
+    });
+    expect(plantsPaused.body).toMatch(/waiting for a connection/i);
   });
 
   it("reports no active plants after filtering null, blank, and archived IDs", () => {

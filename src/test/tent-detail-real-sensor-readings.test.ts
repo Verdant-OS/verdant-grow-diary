@@ -62,6 +62,8 @@ describe("TentDetail · real sensor readings", () => {
     expect(panel).toContain("resolveImportedHistoryHandoffReadStatus");
     expect(panel).toContain("isError: activePlantsIsError");
     expect(panel).toContain("isFetching: activePlantsIsFetching");
+    expect(panel).toContain("isPending: activePlantsQuery.isPending");
+    expect(panel).toContain("isPaused: activePlantsQuery.isPaused");
     expect(panel).not.toContain("activePlants[0]");
   });
 

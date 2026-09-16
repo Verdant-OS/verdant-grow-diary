@@ -118,6 +118,7 @@ async function signOutThroughUi(page: Page) {
 // discard the delayed callback instead of challenging its lifecycle guard.
 async function signInCurrentDocument(page: Page, f: LocalFixture) {
   try {
+    await page.getByTestId("landing-signin-cta-header").click();
     await page.locator("#signin-email").fill(f.owner.email);
     await page.locator("#signin-password").fill(f.owner.password);
     await page
@@ -225,7 +226,6 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       await expect(page.getByTestId("csv-import-done")).toHaveCount(0);
       await assertIsolation(f, before, otherBefore);
       await signOutThroughUi(page);
-      await page.getByTestId("landing-signin-cta-header").click();
       await signInCurrentDocument(page, f);
       await page.getByRole("link", { name: "Sensors", exact: true }).first().click();
       await page.getByRole("button", { name: f.secondary.tentName, exact: true }).click();

@@ -203,5 +203,5 @@ export function buildImportedSensorHistoryViewModel(args: {
 
 export const IMPORTED_SENSOR_HISTORY_ANCHOR_ID = "imported-history" as const;
 export const IMPORTED_SENSOR_HISTORY_EMPTY_COPY =
-  "No imported CSV sensor history for this tent yet." as const;
+  "No CSV readings are available for this tent in the current history view." as const;
 export const IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY = "Not live data" as const;

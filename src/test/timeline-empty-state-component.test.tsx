@@ -5,6 +5,8 @@ import TimelineEmptyState from "@/components/TimelineEmptyState";
 import {
   resolveTimelineEmptyState,
   TIMELINE_EMPTY_NO_ENTRIES_TITLE,
+  TIMELINE_EMPTY_DATE_WINDOW_TITLE,
+  TIMELINE_EMPTY_CLEAR_DATES_LABEL,
 } from "@/lib/timelineEmptyStateRules";
 import { FAST_ADD_NO_CONTEXT_COPY } from "@/lib/fastAddActionRules";
 
@@ -75,6 +77,31 @@ describe("TimelineEmptyState", () => {
     expect(screen.queryByTestId("timeline-empty-state-actions")).not.toBeInTheDocument();
     expect(screen.queryByTestId("timeline-empty-lighting-guide")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("timeline-empty-state-clear-filters"));
+    expect(onClearFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Clear dates without first-entry CTAs for a date-window empty", () => {
+    const onClearFilters = vi.fn();
+    renderView(
+      {
+        ...emptyBase,
+        dateBoundsActive: true,
+        evidenceFilterActive: true,
+        context: withPlant,
+      },
+      { onClearFilters },
+    );
+    expect(screen.getByTestId("timeline-empty-state")).toHaveAttribute(
+      "data-empty-kind",
+      "date_window",
+    );
+    expect(screen.getByText(TIMELINE_EMPTY_DATE_WINDOW_TITLE)).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-empty-state-clear-dates")).toHaveTextContent(
+      TIMELINE_EMPTY_CLEAR_DATES_LABEL,
+    );
+    expect(screen.queryByTestId("timeline-empty-state-actions")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-empty-lighting-guide")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("timeline-empty-state-clear-dates"));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
   });
 

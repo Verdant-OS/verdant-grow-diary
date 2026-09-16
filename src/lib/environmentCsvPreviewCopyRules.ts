@@ -26,7 +26,37 @@ export const CSV_IMPORT_HISTORICAL_CONTEXT_NOTE =
 export const CSV_IMPORT_VIEW_HISTORY_LABEL = "View imported history";
 export const CSV_IMPORT_ADD_CURRENT_READING_LABEL = "Add current reading";
 
-export function buildCsvImportFailureMessage(insertedCount: number, partialWrite: boolean): string {
+export interface CsvImportFailureReceipt {
+  insertedCount: number;
+  partialWrite?: boolean;
+  unconfirmedWrite?: boolean;
+}
+
+/** A failed retry cannot disprove an earlier unconfirmed or acknowledged write. */
+export function mergeCsvImportFailureReceipts(
+  previous: CsvImportFailureReceipt | null,
+  current: CsvImportFailureReceipt,
+): CsvImportFailureReceipt {
+  const insertedCount = (previous?.insertedCount ?? 0) + current.insertedCount;
+  return {
+    insertedCount,
+    partialWrite: insertedCount > 0 || current.partialWrite === true,
+    unconfirmedWrite: previous?.unconfirmedWrite === true || current.unconfirmedWrite === true,
+  };
+}
+
+export function buildCsvImportFailureMessage(
+  insertedCount: number,
+  partialWrite: boolean,
+  unconfirmedWrite = false,
+): string {
+  if (unconfirmedWrite) {
+    const confirmed =
+      insertedCount > 0
+        ? `${insertedCount} CSV reading${insertedCount === 1 ? "" : "s"} confirmed saved. `
+        : "Import could not be completed. ";
+    return `${confirmed}We couldn't confirm whether ${insertedCount > 0 ? "the remaining" : "any"} CSV readings were saved. Review imported history before retrying; readings already present will be skipped safely. No live sensor data was created.`;
+  }
   if (partialWrite && insertedCount > 0) {
     const verb = insertedCount === 1 ? "was" : "were";
     return `Import stopped after ${insertedCount} CSV reading${insertedCount === 1 ? "" : "s"} ${verb} saved. Review imported history before retrying; readings already present will be skipped safely. No live sensor data was created.`;

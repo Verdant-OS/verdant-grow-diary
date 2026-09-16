@@ -157,7 +157,7 @@ describe("buildImportedSensorHistoryViewModel — empty + summary", () => {
     expect(IMPORTED_SENSOR_HISTORY_SOURCE).toBe("csv");
     expect(IMPORTED_SENSOR_HISTORY_ANCHOR_ID).toBe("imported-history");
     expect(IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY).toBe("Not live data");
-    expect(IMPORTED_SENSOR_HISTORY_EMPTY_COPY).toContain("No imported CSV sensor history");
+    expect(IMPORTED_SENSOR_HISTORY_EMPTY_COPY).toContain("No CSV readings are available");
   });
 });
 

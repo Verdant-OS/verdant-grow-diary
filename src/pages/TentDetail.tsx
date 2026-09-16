@@ -518,6 +518,8 @@ export default function TentDetail() {
         readStatus={resolveImportedSensorHistoryReadStatus({
           isError: importedHistory.isError,
           isFetching: importedHistory.isFetching,
+          isPending: importedHistory.isPending,
+          isPaused: importedHistory.isPaused,
           hasRows: (importedHistory.data?.length ?? 0) > 0,
         })}
         onRetry={() => {

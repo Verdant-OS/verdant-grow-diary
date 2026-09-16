@@ -317,6 +317,27 @@ describe("CsvTimelineEnvironmentChip", () => {
     expect(screen.queryByText(/Derived VPD/)).toBeNull();
   });
 
+  it("chip renders neutral VPD label without implying derivation", () => {
+    render(
+      <CsvTimelineEnvironmentChip
+        diaryEntryId="legacy"
+        snapshot={{
+          capturedAt: "2026-06-01T10:00:00Z",
+          temperatureC: 25,
+          humidityPct: 55,
+          derivedVpdKpa: 1.42,
+          sourceLabel: CSV_SOURCE_LABEL,
+          title: CSV_SNAPSHOT_TITLE,
+          derivedVpdLabel: CSV_UNKNOWN_VPD_LABEL,
+        }}
+      />,
+    );
+    const chip = screen.getByTestId("csv-timeline-chip-legacy");
+    expect(chip.textContent).toContain(`${CSV_UNKNOWN_VPD_LABEL}: 1.42 kPa`);
+    expect(chip.textContent).not.toContain("Derived VPD");
+    expect(chip.textContent).not.toContain("CSV VPD");
+  });
+
   it("chip never says Live or Live VPD (test 37)", () => {
     const { container } = render(
       <CsvTimelineEnvironmentChip

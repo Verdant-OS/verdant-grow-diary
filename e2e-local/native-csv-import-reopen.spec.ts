@@ -117,19 +117,21 @@ async function signOutThroughUi(page: Page) {
 // Use the existing document after the import starts. A hard navigation would
 // discard the delayed callback instead of challenging its lifecycle guard.
 async function signInCurrentDocument(page: Page, f: LocalFixture) {
+  let phase = "waiting for the sign-in form";
   try {
-    await page.getByTestId("landing-signin-cta-header").click();
     await page.locator("#signin-email").fill(f.owner.email);
     await page.locator("#signin-password").fill(f.owner.password);
+    phase = "submitting the sign-in form";
     await page
       .getByRole("button", { name: /sign in|log in|continue/i })
       .first()
       .click();
     await page.waitForURL((url) => url.origin === f.env.ui && url.pathname !== "/auth");
+    phase = "waiting for the authenticated application";
     await page.getByTestId("agreement-reconsent-gate").waitFor({ state: "hidden" });
     await page.getByTestId("header-quick-log-trigger").waitFor({ state: "visible" });
   } catch {
-    throw new Error("Real local UI sign-in did not restore the existing document.");
+    throw new Error(`Real local UI sign-in failed while ${phase}.`);
   }
 }
 
@@ -226,6 +228,9 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       await expect(page.getByTestId("csv-import-done")).toHaveCount(0);
       await assertIsolation(f, before, otherBefore);
       await signOutThroughUi(page);
+      // Explicit sign-out goes to /welcome; the other tab's signed-out
+      // protected-route guard went directly to /auth above.
+      await page.getByTestId("landing-signin-cta-header").click();
       await signInCurrentDocument(page, f);
       await page.getByRole("link", { name: "Sensors", exact: true }).first().click();
       await page.getByRole("button", { name: f.secondary.tentName, exact: true }).click();

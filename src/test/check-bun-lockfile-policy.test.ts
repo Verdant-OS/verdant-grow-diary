@@ -10,6 +10,7 @@ import { join, resolve } from "node:path";
 import {
   BUN_LOCK_SECURITY_FLOORS,
   FORBIDDEN_LOCKFILES,
+  PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS,
   PACKAGE_LOCK_SECURITY_FLOORS,
   evaluatePolicy,
   isExactSemver,
@@ -284,6 +285,26 @@ describe("evaluatePolicy", () => {
     delete current.packages["node_modules/rollup"];
     files[at("package-lock.json")] = JSON.stringify(current);
     expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it.each(["vitest", "qs", "js-yaml", "@vitest/mocker"] as const)(
+    "fails when a required npm security floor package is absent: %s",
+    (packageName) => {
+      const files = policyFiles();
+      const current = JSON.parse(files[at("package-lock.json")]);
+      delete current.packages[`node_modules/${packageName}`];
+      files[at("package-lock.json")] = JSON.stringify(current);
+      expect(evaluate(files).errors.join(" ")).toContain(
+        `package-lock.json security floor for ${packageName}`,
+      );
+    },
+  );
+
+  it("keeps optional npm security floors separate from required floors", () => {
+    expect(Object.keys(PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS)).toEqual(["rollup"]);
+    for (const packageName of Object.keys(PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS)) {
+      expect(Object.hasOwn(PACKAGE_LOCK_SECURITY_FLOORS, packageName)).toBe(false);
+    }
   });
 
   it.each(["node_modules/rollup", "node_modules/legacy-vite/node_modules/rollup"])(

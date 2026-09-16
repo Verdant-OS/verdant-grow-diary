@@ -44,6 +44,22 @@ describe("controlled reporter", () => {
     expect(corruptLines).toHaveLength(0);
   });
 
+  it("still completes a legacy-only onFinished batch without onTestRunEnd", () => {
+    const progress = path.join(scratch(), "progress.jsonl");
+    const r = new Reporter({ progressFile: progress, repoRoot: "/repo" });
+    const file = fileTask({
+      filepath: "/repo/src/legacy.test.ts",
+      state: "pass",
+      tests: [{ name: "legacy ok", state: "pass" }],
+    });
+    r.onTestModuleEnd(file);
+    r.onFinished([file], [new Error("legacy unhandled")]);
+    const { files, batches } = readProgress(progress);
+    expect(files.get("src/legacy.test.ts").counts.passed).toBe(1);
+    expect(batches).toHaveLength(1);
+    expect(batches[0].errorCount).toBe(1);
+  });
+
   it("flushes a file first supplied at modern run end", () => {
     const progress = path.join(scratch(), "progress.jsonl");
     const r = new Reporter({ progressFile: progress, repoRoot: "/repo" });

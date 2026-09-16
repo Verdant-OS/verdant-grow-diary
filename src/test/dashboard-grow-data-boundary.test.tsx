@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +11,8 @@ const H = vi.hoisted(() => ({
   secondTentEnabled: false,
   secondTentStatus: "success" as "loading" | "error" | "refresh_error" | "success",
   secondTentRows: [] as unknown[],
+  tentQueryOverride: {} as Record<string, unknown>,
+  plantQueryOverride: {} as Record<string, unknown>,
   refetch: vi.fn(),
   tentId: "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f",
   secondTentId: "6b2d7f10-3c4e-4d6f-9a01-2b3c4d5e6f70",
@@ -50,12 +52,14 @@ vi.mock("@/hooks/useGrowData", () => ({
     isLoading: H.growStatus === "loading",
     isError: H.growStatus === "error",
     refetch: H.refetch,
+    ...H.tentQueryOverride,
   }),
   useGrowPlants: () => ({
     data: [],
     isLoading: H.growStatus === "loading",
     isError: H.growStatus === "error",
     refetch: H.refetch,
+    ...H.plantQueryOverride,
   }),
 }));
 
@@ -196,13 +200,26 @@ function renderDashboard() {
     },
   });
 
-  return render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <Dashboard />
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(tree());
+  return { ...view, rerenderDashboard: () => view.rerender(tree()) };
+}
+
+function pendingFirstRead(fetchStatus: "paused" | "idle") {
+  return {
+    data: undefined,
+    status: "pending",
+    fetchStatus,
+    isPending: true,
+    isLoading: false,
+    isError: false,
+  };
 }
 
 describe("Dashboard private-read honesty boundary", () => {
@@ -214,8 +231,103 @@ describe("Dashboard private-read honesty boundary", () => {
     H.secondTentEnabled = false;
     H.secondTentStatus = "success";
     H.secondTentRows = [];
+    H.tentQueryOverride = {};
+    H.plantQueryOverride = {};
     H.refetch.mockClear();
   });
+
+  it.each([
+    ["tent", "paused"],
+    ["plant", "paused"],
+    ["tent", "idle"],
+    ["plant", "idle"],
+  ] as const)(
+    "withholds zero counts and setup claims for a first %s read that is %s",
+    (source, fetchStatus) => {
+      H.growStatus = "success";
+      if (source === "tent") H.tentQueryOverride = pendingFirstRead(fetchStatus);
+      else H.plantQueryOverride = pendingFirstRead(fetchStatus);
+      renderDashboard();
+
+      expect(screen.getByTestId("dashboard-grow-data-loading")).toHaveTextContent(
+        fetchStatus === "paused" ? /Waiting for connection/ : /Loading dashboard grow data/,
+      );
+      expect(screen.queryAllByTestId("dashboard-kpi-card")).toHaveLength(0);
+      expect(screen.queryByTestId("dashboard-zero-tent-empty-state")).toBeNull();
+      expect(screen.queryByTestId("dashboard-environment-snapshot-empty")).toBeNull();
+    },
+  );
+
+  it("shows confirmed counts after both first paused reads settle", () => {
+    H.growStatus = "success";
+    H.tentQueryOverride = pendingFirstRead("paused");
+    H.plantQueryOverride = pendingFirstRead("paused");
+    const view = renderDashboard();
+    expect(screen.queryAllByTestId("dashboard-kpi-card")).toHaveLength(0);
+
+    H.tentQueryOverride = {};
+    view.rerenderDashboard();
+    expect(screen.queryAllByTestId("dashboard-kpi-card")).toHaveLength(0);
+
+    H.plantQueryOverride = {};
+    view.rerenderDashboard();
+    expect(screen.getAllByTestId("dashboard-kpi-card")[0]).toHaveTextContent("Active tents: 1");
+    expect(screen.queryByTestId("dashboard-grow-data-loading")).toBeNull();
+  });
+
+  it("preserves successful empty reads and their zero counts", () => {
+    H.growStatus = "success";
+    H.tentQueryOverride = { data: [], status: "success", isPending: false, fetchStatus: "idle" };
+    H.plantQueryOverride = { data: [], status: "success", isPending: false, fetchStatus: "idle" };
+    renderDashboard();
+
+    expect(screen.getByTestId("dashboard-zero-tent-empty-state")).toBeVisible();
+    expect(screen.getAllByTestId("dashboard-kpi-card")[0]).toHaveTextContent("Active tents: 0");
+    expect(screen.queryByTestId("dashboard-grow-data-loading")).toBeNull();
+  });
+
+  it("keeps resolved cached rows visible during a paused background refresh", () => {
+    H.growStatus = "success";
+    H.tentQueryOverride = { status: "success", isPending: false, fetchStatus: "paused" };
+    H.plantQueryOverride = { status: "success", isPending: false, fetchStatus: "paused" };
+    renderDashboard();
+
+    expect(screen.getAllByTestId("dashboard-kpi-card")[0]).toHaveTextContent("Active tents: 1");
+    expect(screen.queryByText("Waiting for connection")).toBeNull();
+    expect(screen.queryByTestId("dashboard-zero-tent-empty-state")).toBeNull();
+  });
+
+  it.each(["tent", "plant"] as const)(
+    "keeps a failed %s read unavailable and retries both queries",
+    (source) => {
+      H.growStatus = "success";
+      const retryTent = vi.fn();
+      const retryPlant = vi.fn();
+      const failedRead = {
+        data: undefined,
+        status: "error",
+        isError: true,
+        isPending: false,
+        fetchStatus: "idle",
+      };
+      H.tentQueryOverride = {
+        ...(source === "tent" ? failedRead : pendingFirstRead("paused")),
+        refetch: retryTent,
+      };
+      H.plantQueryOverride = {
+        ...(source === "plant" ? failedRead : pendingFirstRead("paused")),
+        refetch: retryPlant,
+      };
+      renderDashboard();
+
+      expect(screen.getByTestId("dashboard-grow-data-error")).toHaveTextContent("unavailable");
+      expect(screen.queryByTestId("dashboard-kpi-card")).toBeNull();
+      expect(screen.queryByTestId("dashboard-zero-tent-empty-state")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(retryTent).toHaveBeenCalledTimes(1);
+      expect(retryPlant).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("shows no zero KPI, onboarding, or empty-sensor conclusion while grow reads load", () => {
     renderDashboard();

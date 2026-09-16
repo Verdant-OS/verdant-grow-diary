@@ -51,6 +51,10 @@ import {
   type QuickLogGroupedTimelineScope,
 } from "@/hooks/useQuickLogGroupedTimeline";
 import { resolveTimelineDiaryEntryStage } from "@/lib/growDiaryTimelineRules";
+import {
+  contextEvidenceReadStatus,
+  type ContextEvidenceReadStatus,
+} from "@/lib/aiDoctorContextReadStateRules";
 
 export const TIMELINE_MEMORY_DEFAULT_LIMIT = 100;
 
@@ -161,7 +165,8 @@ async function fetchRows(scope: TimelineMemoryScope, limit: number): Promise<Raw
     return q.order("entry_at", { ascending: false }).limit(limit);
   });
   if (error) throw error;
-  return (data ?? []) as RawRow[];
+  if (!Array.isArray(data)) throw new Error("Timeline context is unavailable.");
+  return data as RawRow[];
 }
 
 async function fetchQuickLogCompanionRows(
@@ -185,9 +190,9 @@ async function fetchQuickLogCompanionRows(
       }
       return q.order("entry_at", { ascending: false }).limit(limit);
     });
-    if (error) return { rows: [], unavailable: true };
+    if (error || !Array.isArray(data)) return { rows: [], unavailable: true };
     return {
-      rows: (data ?? []) as unknown as QuickLogCompanionSnapshotDiaryRow[],
+      rows: data as unknown as QuickLogCompanionSnapshotDiaryRow[],
       unavailable: false,
     };
   } catch {
@@ -219,9 +224,9 @@ async function fetchQuickLogParentRows(
     const { data, error } = await q
       .order("occurred_at", { ascending: false })
       .limit(linkedGrowEventIds.length);
-    if (error) return { rows: [], unavailable: true };
+    if (error || !Array.isArray(data)) return { rows: [], unavailable: true };
     return {
-      rows: (data ?? []) as unknown as RawGrowEventRow[],
+      rows: data as unknown as RawGrowEventRow[],
       unavailable: false,
     };
   } catch {
@@ -242,7 +247,7 @@ interface AiDoctorAuditRow {
 async function fetchAiDoctorAuditRows(
   scope: TimelineMemoryScope,
   limit: number,
-): Promise<AiDoctorAuditRow[]> {
+): Promise<{ rows: AiDoctorAuditRow[]; unavailable: boolean }> {
   try {
     let q = supabase
       .from("ai_doctor_sessions" as never)
@@ -252,10 +257,10 @@ async function fetchAiDoctorAuditRows(
     q = scope.kind === "plant" ? q.eq("plant_id", scope.plantId) : q.eq("tent_id", scope.tentId);
     q = q.not("sensor_snapshot_status", "is", null);
     const { data, error } = await q.order("created_at", { ascending: false }).limit(limit);
-    if (error) return [];
-    return (data ?? []) as unknown as AiDoctorAuditRow[];
+    if (error || !Array.isArray(data)) return { rows: [], unavailable: true };
+    return { rows: data as unknown as AiDoctorAuditRow[], unavailable: false };
   } catch {
-    return [];
+    return { rows: [], unavailable: true };
   }
 }
 
@@ -287,6 +292,11 @@ export interface UseTimelineMemoryResult {
   companionItems?: TimelineManualSnapshotItem[];
   /** A linked row existed, but its companion/parent verification read failed. */
   companionEvidenceUnavailable?: boolean;
+  auditEvidenceUnavailable?: boolean;
+  /** Optional for existing consumers/test doubles; real reads always supply it. */
+  readStatus?: ContextEvidenceReadStatus;
+  hasData?: boolean;
+  isFetching?: boolean;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
@@ -329,6 +339,7 @@ export function useTimelineMemory(
       displayItems: TimelineMemoryItem[];
       companionItems: TimelineManualSnapshotItem[];
       companionEvidenceUnavailable: boolean;
+      auditEvidenceUnavailable: boolean;
     }> => {
       if (!scope) {
         return {
@@ -336,9 +347,10 @@ export function useTimelineMemory(
           displayItems: [],
           companionItems: [],
           companionEvidenceUnavailable: false,
+          auditEvidenceUnavailable: false,
         };
       }
-      const [rows, auditRows, companionResult] = await Promise.all([
+      const [rows, auditResult, companionResult] = await Promise.all([
         fetchRows(scope, limit),
         fetchAiDoctorAuditRows(scope, limit),
         fetchQuickLogCompanionRows(scope, limit),
@@ -362,7 +374,7 @@ export function useTimelineMemory(
         }
       }
 
-      for (const row of auditRows) {
+      for (const row of auditResult.rows) {
         const item = auditRowToTimelineItem(row);
         if (item) displayItems.push(item);
       }
@@ -409,6 +421,7 @@ export function useTimelineMemory(
         displayItems,
         companionItems,
         companionEvidenceUnavailable,
+        auditEvidenceUnavailable: auditResult.unavailable,
       };
     },
   });
@@ -430,6 +443,10 @@ export function useTimelineMemory(
     ),
     companionItems,
     companionEvidenceUnavailable: query.data?.companionEvidenceUnavailable ?? false,
+    auditEvidenceUnavailable: query.data?.auditEvidenceUnavailable ?? false,
+    readStatus: contextEvidenceReadStatus(query.status, query.fetchStatus),
+    hasData: query.data !== undefined,
+    isFetching: query.isFetching,
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,

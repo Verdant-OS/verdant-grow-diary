@@ -40,7 +40,7 @@ export function useSensorReadings(
   });
 }
 
-/** Per-tent fetch outcome so consumers can tell "no rows" from "not loaded". */
+/** Per-tent outcome; loading includes a first read paused for connectivity. */
 export type TentSensorReadStatus = "loading" | "error" | "refresh_error" | "success";
 
 /**
@@ -101,7 +101,10 @@ export function useSensorReadingsByTents(
           .order("created_at", { ascending: false })
           .limit(perTentLimit);
         if (error) throw error;
-        return (data ?? []) as SensorReadingRow[];
+        if (!Array.isArray(data)) {
+          throw new Error("Sensor readings are unavailable.");
+        }
+        return data as SensorReadingRow[];
       },
     })),
   });
@@ -112,19 +115,22 @@ export function useSensorReadingsByTents(
     const result = results[i];
     byTent[id] = (result?.data as SensorReadingRow[] | undefined) ?? [];
     refreshingByTent[id] = Boolean(result?.isFetching && !result.isLoading);
-    statusByTent[id] = result?.isLoading
-      ? "loading"
-      : result?.isError
-        ? result.data !== undefined
-          ? "refresh_error"
-          : "error"
-        : "success";
+    // isLoading excludes pending+paused reads. No first result still means
+    // unresolved, even when connectivity has prevented the request starting.
+    statusByTent[id] =
+      !result || result.isPending
+        ? "loading"
+        : result?.isError
+          ? result.data !== undefined
+            ? "refresh_error"
+            : "error"
+          : "success";
   });
   return {
     byTent,
     statusByTent,
     refreshingByTent,
-    isLoading: results.some((r) => r.isLoading),
+    isLoading: results.some((r) => r.isPending),
     isError: results.some((r) => r.isError),
     refetch: async () => {
       await Promise.all(results.map((result) => result.refetch()));

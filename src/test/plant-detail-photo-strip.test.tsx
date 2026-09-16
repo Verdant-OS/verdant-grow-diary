@@ -206,6 +206,35 @@ describe("PlantDetailPhotoStrip render", () => {
     }));
   });
 
+  it("shows loading while the diary query is pending without claiming empty history", () => {
+    useDiaryEntriesMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isPending: true,
+      fetchStatus: "fetching",
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" />);
+    expect(screen.getByTestId("plant-detail-photo-strip-loading")).toBeInTheDocument();
+    expect(screen.queryByText("No photos yet.")).toBeNull();
+  });
+
+  it("treats a settled non-array diary payload as unavailable instead of empty", () => {
+    useDiaryEntriesMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" />);
+    expect(screen.getByTestId("plant-detail-photo-strip-error")).toBeInTheDocument();
+    expect(
+      screen.getByText("Recent photo previews are unavailable right now."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No photos yet.")).toBeNull();
+  });
+
   it("shows waiting instead of empty while the first diary read is paused", () => {
     useDiaryEntriesMock.mockReturnValue({
       data: undefined,

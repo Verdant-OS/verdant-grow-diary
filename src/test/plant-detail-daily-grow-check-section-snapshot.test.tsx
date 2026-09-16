@@ -44,17 +44,23 @@ const state = {
 };
 
 vi.mock("@/hooks/use-sensor-readings", () => ({
-  useSensorReadings: () => ({ data: state.sensors }),
+  useSensorReadings: () => ({ data: state.sensors, status: "success", fetchStatus: "idle" }),
 }));
 vi.mock("@/hooks/use-diary-entries", () => ({
-  useDiaryEntries: () => ({ data: state.diary }),
+  useDiaryEntries: () => ({ data: state.diary, status: "success", fetchStatus: "idle" }),
 }));
 vi.mock("@/hooks/use-tents", () => ({
-  useTents: () => ({ data: [{ id: TENT_ID, name: "Tent A" }] }),
+  useTents: () => ({
+    data: [{ id: TENT_ID, name: "Tent A" }],
+    status: "success",
+    fetchStatus: "idle",
+  }),
 }));
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({
     data: [{ id: PLANT_ID, tent_id: TENT_ID, name: "Plant A" }],
+    status: "success",
+    fetchStatus: "idle",
   }),
 }));
 // Onboarding dismissal must stay un-dismissed for these snapshots.

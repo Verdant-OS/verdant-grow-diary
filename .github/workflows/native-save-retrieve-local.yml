@@ -1,0 +1,150 @@
+name: Native Save Retrieve Local
+
+# Candidate browser + real disposable Supabase evidence. This lane never proves
+# the published build, runs migrations remotely, or uses deployment credentials.
+on:
+  pull_request:
+    branches: [main, verdant-grow-diary]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-save-retrieve-local-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-save-retrieve-local:
+    name: native save/retrieve (local backend)
+    # Reuse the existing opt-in DB-lane setting; skipped is not acceptance proof.
+    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_DB_SECURITY_LANE == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NATIVE_LOCAL_BROWSER: "1"
+      NATIVE_LOCAL_UI_URL: http://127.0.0.1:5173
+      CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+      - name: Install frozen dependencies and Chromium
+        run: |
+          bun install --frozen-lockfile
+          bun run e2e:install:ci
+      - name: Check focused browser files
+        run: |
+          bunx eslint playwright.native-local.config.ts e2e-local
+          bunx tsc --noEmit --skipLibCheck --strict --target ES2022 --module ESNext --moduleResolution Bundler --types node playwright.native-local.config.ts e2e-local/native-save-retrieve.spec.ts e2e-local/lib/nativeLocalFixtures.ts
+      - name: Set up pinned Supabase CLI
+        uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1
+        with:
+          version: 2.109.1
+      - name: Prepare immutable migration replay
+        run: |
+          set -eo pipefail
+          REPLAY_WORKDIR="${RUNNER_TEMP}/verdant-native-browser-replay"
+          bun run test:local-supabase-replay
+          node scripts/prepare-local-supabase-replay.mjs --output="${REPLAY_WORKDIR}" --json > native-replay-report.json
+          echo "SUPABASE_REPLAY_WORKDIR=${REPLAY_WORKDIR}" >> "$GITHUB_ENV"
+      - name: Start disposable local Supabase
+        run: |
+          set -eo pipefail
+          # CLI startup/status may contain temporary keys. Do not print or upload it.
+          if ! supabase start --workdir "$SUPABASE_REPLAY_WORKDIR" > "${RUNNER_TEMP}/native-local-start.log" 2>&1; then
+            echo "::error::Disposable Supabase failed to start; no browser proof was run."
+            exit 1
+          fi
+      - name: Validate and export local-only configuration
+        run: |
+          set -euo pipefail
+          STATUS_JSON="$(supabase status --workdir "$SUPABASE_REPLAY_WORKDIR" -o json)"
+          API_URL="$(echo "$STATUS_JSON" | jq -r '.API_URL // .api_url // empty')"
+          ANON_KEY="$(echo "$STATUS_JSON" | jq -r '.ANON_KEY // .anon_key // empty')"
+          SERVICE_KEY="$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY // .service_role_key // empty')"
+          if [ "$API_URL" != "http://127.0.0.1:54321" ] || [ -z "$ANON_KEY" ] || [ -z "$SERVICE_KEY" ] || [ "$ANON_KEY" = "$SERVICE_KEY" ]; then
+            echo "::error::Local stack configuration is missing or does not match the exact loopback boundary."
+            exit 1
+          fi
+          echo "::add-mask::$ANON_KEY"
+          echo "::add-mask::$SERVICE_KEY"
+          FIXTURE_PASSWORD="Native-$(openssl rand -hex 24)-aA9!"
+          # Mask before launching Playwright; worker stdout is recorded in raw reports.
+          echo "::add-mask::$FIXTURE_PASSWORD"
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY"
+            echo "VITE_SUPABASE_URL=$API_URL"
+            echo "VITE_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+            echo "NATIVE_LOCAL_FIXTURE_PASSWORD=$FIXTURE_PASSWORD"
+          } >> "$GITHUB_ENV"
+      - name: Reset local database with grant-parity seed
+        run: |
+          set -eo pipefail
+          if ! supabase db reset --workdir "$SUPABASE_REPLAY_WORKDIR" > "${RUNNER_TEMP}/native-local-reset.log" 2>&1; then
+            echo "::error::Local migration replay failed; no browser proof was run."
+            exit 1
+          fi
+      - name: Run native browser save and retrieval acceptance
+        id: browser
+        run: bunx playwright test --config=playwright.native-local.config.ts
+      - name: Publish reduced evidence and require passing execution
+        if: always() && steps.browser.outcome != 'skipped'
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const report = JSON.parse(readFileSync("native-local-results/report.json", "utf8"));
+          const tests = [];
+          function collect(suites) {
+            for (const suite of suites ?? []) {
+              for (const spec of suite.specs ?? []) {
+                for (const test of spec.tests ?? []) {
+                  tests.push({
+                    title: spec.title,
+                    status: test.status,
+                    attempts: (test.results ?? []).map(result => ({
+                      status: result.status,
+                      duration: result.duration,
+                      retry: result.retry,
+                    })),
+                  });
+                }
+              }
+              collect(suite.suites);
+            }
+          }
+          collect(report.suites);
+          const { expected = 0, unexpected = 0, flaky = 0, skipped = 0 } = report.stats ?? {};
+          const errors = report.errors?.length ?? 0;
+          // Deliberately exclude stdout, stderr, steps, errors, config, and env.
+          // CI display masking does not sanitize the source report's contents.
+          const proof = {
+            candidateHead: process.env.CANDIDATE_HEAD,
+            checkout: process.env.GITHUB_SHA,
+            expected, unexpected, flaky, skipped, errors, tests,
+            boundary: "Candidate browser with disposable local backend; not published-site acceptance.",
+          };
+          writeFileSync("native-local-proof.json", JSON.stringify(proof, null, 2) + "\n");
+          if (expected < 3 || unexpected !== 0 || flaky !== 0 || skipped !== 0 || errors !== 0) {
+            throw new Error("Native browser acceptance requires three executed passing scenarios, zero failures, retries, skips, and report errors.");
+          }
+          console.log(`Candidate local-backend browser proof: ${expected} passed, 0 failed, 0 skipped. Published-site acceptance remains separate.`);
+          NODE
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-save-retrieve-local-evidence
+          path: |
+            native-local-proof.json
+            native-local-results/browser/**/*.png
+            native-local-results/browser/**/*.webm
+            native-replay-report.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop disposable local Supabase
+        if: always() && env.SUPABASE_REPLAY_WORKDIR != ''
+        run: supabase stop --workdir "$SUPABASE_REPLAY_WORKDIR" --no-backup

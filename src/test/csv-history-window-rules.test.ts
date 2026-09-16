@@ -81,6 +81,11 @@ describe("CSV history access uses the live policy contract", () => {
       status: "unknown",
     });
   });
+  it("still recognizes entitling live rows when the scan also contains a null row", () => {
+    expect(
+      resolveCsvHistoryWindow([null as unknown as LovableSubscriptionRow, row()], now),
+    ).toEqual({ status: "ready", days: null });
+  });
   it("counts observations at the exact boundary without changing the source rows", () => {
     const rows = Object.freeze([
       Object.freeze({ captured_at: "2026-06-17T11:59:59.999Z" }),
@@ -94,6 +99,13 @@ describe("CSV history access uses the live policy contract", () => {
     expect(buildCsvHistoryWindowPreview(rows, { status: "ready", days: null }, now)).toBeNull();
     expect(buildCsvHistoryWindowPreview(rows, { status: "error" }, now)).toBeNull();
   });
+  it.each(["loading", "paused"] as const)(
+    "does not preview outside-window counts while access is %s",
+    (status) => {
+      const rows = Object.freeze([Object.freeze({ captured_at: "2026-06-17T11:59:59.999Z" })]);
+      expect(buildCsvHistoryWindowPreview(rows, { status }, now)).toBeNull();
+    },
+  );
   it("ignores unparseable observation timestamps when counting outside-window rows", () => {
     const rows = Object.freeze([
       Object.freeze({ captured_at: "not-a-date" }),

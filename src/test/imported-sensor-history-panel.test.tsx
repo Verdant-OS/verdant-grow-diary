@@ -104,6 +104,51 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(screen.queryByRole("button", { name: "Retry history access" })).not.toBeInTheDocument();
   });
 
+  it("does not offer history access retry while waiting for a connection", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[csvRow()]}
+          historyWindow={{ status: "paused" }}
+          onRetryHistoryWindow={vi.fn()}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("imported-history-window")).toHaveTextContent(
+      /Waiting for a connection to check your sensor history window/i,
+    );
+    expect(screen.queryByRole("button", { name: "Retry history access" })).not.toBeInTheDocument();
+  });
+
+  it("does not render a retry control when no retry handler is wired", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[csvRow()]}
+          historyWindow={{ status: "error" }}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("imported-history-window")).toHaveTextContent(/couldn't verify/i);
+    expect(screen.queryByRole("button", { name: "Retry history access" })).not.toBeInTheDocument();
+  });
+
+  it("describes a verified Free window without offering history access retry", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[csvRow()]}
+          historyWindow={{ status: "ready", days: 90 }}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("imported-history-window")).toHaveTextContent(/last 90 days/i);
+    expect(screen.queryByRole("button", { name: "Retry history access" })).not.toBeInTheDocument();
+  });
+
   it("keeps a failed read distinct from empty history and offers an explicit retry", () => {
     const onRetry = vi.fn();
     render(

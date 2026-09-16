@@ -31,6 +31,13 @@ describe("PlantDetail tent relationship visibility", () => {
     expect(PLANT_DETAIL).toMatch(/to=\{tentDetailPath\(plant\.tentId\)\}/);
     expect(PLANT_DETAIL).toContain("View Tent");
   });
+
+  it("routes assigned-tent read state through pure rules", () => {
+    expect(PLANT_DETAIL).toContain("resolveAssignedTentRow");
+    expect(PLANT_DETAIL).toContain("buildPlantAssignedTentDetailsReadView");
+    expect(PLANT_DETAIL).toContain('role="status"');
+    expect(PLANT_DETAIL).toContain("Retry");
+  });
 });
 
 describe("TentDetail plant cards + empty state", () => {

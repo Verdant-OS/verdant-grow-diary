@@ -101,6 +101,10 @@ import {
   type PlantDetailBlockedStateAction,
   type PlantDetailBlockedStateView,
 } from "@/lib/plantDetailBlockedStateViewModel";
+import {
+  buildPlantAssignedTentDetailsReadView,
+  resolveAssignedTentRow,
+} from "@/lib/plantAssignedTentDetailsReadRules";
 import { useSearchParams } from "@/lib/react-router-compat";
 import { PlantMemoryEpisodesSection } from "@/components/PlantMemoryEpisodesSection";
 
@@ -260,28 +264,15 @@ export default function PlantDetail() {
   const contextGrowId = searchParams.get("growId");
   const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
   const tentQuery = useGrowTent(plant?.tentId);
-  // The plant row owns the assignment; a missing/failed details read must
-  // neither clear that assignment nor substitute a row for another tent.
-  const tent = tentQuery.data?.id === plant?.tentId ? tentQuery.data : null;
-  const tentReadMessage = tentQuery.isError
-    ? tent
-      ? "Could not refresh assigned tent details. Showing cached details."
-      : "Assigned tent details unavailable."
-    : tentQuery.fetchStatus === "paused"
-      ? tent
-        ? "Waiting for connection to refresh assigned tent details. Showing cached details."
-        : "Waiting for connection to load assigned tent details."
-      : tentQuery.isFetching || tentQuery.isPending
-        ? tent
-          ? "Refreshing assigned tent details. Showing cached details."
-          : "Loading assigned tent details…"
-        : !tent
-          ? "Assigned tent details unavailable."
-          : null;
-  const canRetryTentRead =
-    !tentQuery.isFetching &&
-    tentQuery.fetchStatus !== "paused" &&
-    (tentQuery.isError || (!tent && !tentQuery.isPending));
+  const tent = resolveAssignedTentRow(plant?.tentId, tentQuery.data);
+  const { message: tentReadMessage, canRetry: canRetryTentRead } =
+    buildPlantAssignedTentDetailsReadView({
+      hasResolvedDetails: Boolean(tent),
+      isError: tentQuery.isError,
+      isPending: tentQuery.isPending,
+      isFetching: tentQuery.isFetching,
+      fetchStatus: tentQuery.fetchStatus,
+    });
   const { openGroups, setGroupOpen, revealAndNavigate } = usePlantDetailDisclosureNavigation({
     plantId: plant?.id ?? null,
   });

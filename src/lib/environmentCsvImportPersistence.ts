@@ -23,7 +23,10 @@ import {
   CSV_HISTORY_DEDUPE_CONFLICT_COPY,
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
-import { buildCsvImportFailureMessage } from "@/lib/environmentCsvPreviewCopyRules";
+import {
+  buildCsvImportFailureMessage,
+  type CsvImportFailureReason,
+} from "@/lib/environmentCsvPreviewCopyRules";
 
 export const CSV_SENSOR_SOURCE = "csv" as const;
 
@@ -127,6 +130,8 @@ export interface PersistResult {
   partialWrite: boolean;
   /** A dispatched batch may have committed without an acknowledged response. */
   unconfirmedWrite?: boolean;
+  /** Safe classification; a duplicate conflict does not verify hidden rows. */
+  failureReason?: CsvImportFailureReason;
   /** Always grower-safe copy. Raw database diagnostics never cross this boundary. */
   error: string | null;
 }
@@ -140,8 +145,8 @@ export interface PersistResult {
  * insert fires, using the same (tent_id, source, metric, captured_at) key
  * as the deployed `sensor_readings_dedupe_uidx`. If Postgres still rejects
  * a duplicate (race window, or no lookup supplied), the raw 23505 error is
- * caught and converted to calm, duplicate-skipped feedback — the grower
- * never sees a raw database error.
+ * caught and reported as an unresolved conflict unless the follow-up read
+ * verifies the matching rows. The grower never sees a raw database error.
  */
 export async function persistCsvEnvironmentRows(
   rows: readonly ParsedEnvironmentRow[],
@@ -197,6 +202,7 @@ export async function persistCsvEnvironmentRows(
         insertedCount: result.insertedRows,
         duplicateCount: result.duplicateRows,
         partialWrite,
+        failureReason: "unverified_duplicate",
         error: partialWrite
           ? buildCsvImportFailureMessage(result.insertedRows, true)
           : CSV_HISTORY_DEDUPE_CONFLICT_COPY,

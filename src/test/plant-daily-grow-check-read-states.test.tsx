@@ -108,6 +108,19 @@ for (const [name, Component] of [
           expect(H.plants.refetch).toHaveBeenCalledTimes(1);
         });
       });
+      it(`disables retry and shows progress while ${source} refetch is in flight`, () => {
+        H[source] = {
+          ...successful(),
+          data: undefined,
+          status: "error",
+          isError: true,
+          isFetching: true,
+        };
+        mount();
+        const retry = screen.getByRole("button", { name: "Retry Daily Grow Check" });
+        expect(retry).toBeDisabled();
+        expect(retry).toHaveTextContent("Retrying…");
+      });
       it(`does not turn cached ${source} data into a verified summary after failed refresh`, () => {
         H.diary = successful([note()]);
         H[source] = { ...H[source], status: "error", isError: true };

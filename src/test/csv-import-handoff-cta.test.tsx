@@ -88,6 +88,12 @@ const GROW_ID = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e02";
 const PLANT_ID = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e03";
 const OTHER_TENT_ID = "11111111-1111-4111-8111-111111111111";
 
+/** Regression fence: CSV handoff must target the imported tent, not grow-scoped /sensors. */
+function expectTentScopedManualReadingHref(href: string | null, tentId: string) {
+  expect(href).toBe(`/sensors?tentId=${tentId}&tentIntent=required#manual-reading`);
+  expect(href).not.toContain("growId=");
+}
+
 function CurrentLocation() {
   const location = useLocation();
   return (
@@ -164,9 +170,7 @@ describe("launcher → modal handoff", () => {
     );
     const current = screen.getByTestId("csv-import-add-current-reading");
     expect(current.textContent).toContain(CSV_IMPORT_ADD_CURRENT_READING_LABEL);
-    expect(current.getAttribute("href")).toBe(
-      `/sensors?tentId=${TENT_ID}&tentIntent=required#manual-reading`,
-    );
+    expectTentScopedManualReadingHref(current.getAttribute("href"), TENT_ID);
   });
 
   it("uses the same explicit tent-history target without a plant hint", async () => {
@@ -181,9 +185,30 @@ describe("launcher → modal handoff", () => {
     expect(screen.getByTestId("csv-import-view-history").getAttribute("href")).toBe(
       `${tentDetailPath(TENT_ID)}#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`,
     );
-    expect(screen.getByTestId("csv-import-add-current-reading").getAttribute("href")).toBe(
-      `/sensors?tentId=${TENT_ID}&tentIntent=required#manual-reading`,
+    expectTentScopedManualReadingHref(
+      screen.getByTestId("csv-import-add-current-reading").getAttribute("href"),
+      TENT_ID,
     );
+  });
+
+  it("completion keeps the tent-scoped handoff when parent grow context clears before confirm", async () => {
+    const Wrapper = makeQueryWrapper();
+    const tree = (growId: string | null) => (
+      <Wrapper>
+        <EnvironmentCsvImportLauncher growId={growId} tentId={TENT_ID} />
+      </Wrapper>
+    );
+    const rendered = render(tree(GROW_ID));
+    fireEvent.click(screen.getByTestId("csv-launcher-button"));
+    await upload();
+    // Import session scope is frozen at open; parent grow selection may clear mid-flow.
+    rendered.rerender(tree(null));
+    await confirm();
+    expectTentScopedManualReadingHref(
+      screen.getByTestId("csv-import-add-current-reading").getAttribute("href"),
+      TENT_ID,
+    );
+    expect(supabaseSpies.insertedRows.every((row) => row.tent_id === TENT_ID)).toBe(true);
   });
 
   it.each(["card", "compact"] as const)(
@@ -207,7 +232,7 @@ describe("launcher → modal handoff", () => {
 
       const current = screen.getByTestId("csv-import-add-current-reading");
       const href = current.getAttribute("href")!;
-      expect(href).toBe(`/sensors?tentId=${TENT_ID}&tentIntent=required#manual-reading`);
+      expectTentScopedManualReadingHref(href, TENT_ID);
       expect(screen.getByTestId("csv-import-view-history")).toHaveAttribute(
         "href",
         `${tentDetailPath(TENT_ID)}#${IMPORTED_SENSOR_HISTORY_ANCHOR_ID}`,
@@ -323,6 +348,30 @@ describe("modal — completion copy and back-compat", () => {
     expect(done.textContent).toContain("3");
     expect(done.textContent).toContain(CSV_IMPORT_HISTORICAL_CONTEXT_NOTE);
     expect(done.textContent).toContain("not live telemetry");
+  });
+
+  it("renders the tent-scoped current-reading CTA when addCurrentReadingHref is provided", async () => {
+    const onConfirm = vi.fn(async () => ({
+      insertedCount: 2,
+      duplicateCount: 0,
+      error: null,
+    }));
+    const tentHref = `/sensors?tentId=${TENT_ID}&tentIntent=required#manual-reading`;
+    render(
+      <MemoryRouter>
+        <EnvironmentCsvImportModal
+          open
+          onOpenChange={() => {}}
+          onConfirm={onConfirm}
+          addCurrentReadingHref={tentHref}
+        />
+      </MemoryRouter>,
+    );
+    await uploadAndConfirm();
+    expectTentScopedManualReadingHref(
+      screen.getByTestId("csv-import-add-current-reading").getAttribute("href"),
+      TENT_ID,
+    );
   });
 
   it("omitting viewHistoryHref renders the legacy done state without a CTA", async () => {

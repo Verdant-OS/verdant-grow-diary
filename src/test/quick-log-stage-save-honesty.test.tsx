@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   single: vi.fn(),
   created: vi.fn(),
   message: vi.fn(),
+  success: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -59,7 +60,7 @@ vi.mock("@/hooks/use-tents", () => ({
 }));
 vi.mock("sonner", () => ({
   toast: {
-    success: vi.fn(),
+    success: (...args: unknown[]) => mocks.success(...args),
     error: vi.fn(),
     message: (...args: unknown[]) => mocks.message(...args),
   },
@@ -67,6 +68,7 @@ vi.mock("sonner", () => ({
 vi.mock("@/components/QuickLogSensorSnapshotStrip", () => ({ default: () => null }));
 
 import QuickLog from "@/components/QuickLog";
+import { QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE } from "@/lib/quickLogGrowStageWritebackRules";
 
 function renderQuickLog() {
   const client = new QueryClient({
@@ -128,6 +130,8 @@ describe("Quick Log confirmed diary save and separate grow stage write", () => {
     expect(mocks.single).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("quick-log-stage-save-unconfirmed")).not.toBeInTheDocument();
     expect(mocks.created).toHaveBeenCalledTimes(1);
+    expect(mocks.success).toHaveBeenCalledTimes(1);
+    expect(mocks.message).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -152,6 +156,10 @@ describe("Quick Log confirmed diary save and separate grow stage write", () => {
     expect(mocks.rpc).toHaveBeenCalledTimes(1);
     expect(mocks.created).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("quick-log-save-error")).not.toBeInTheDocument();
+    expect(mocks.message).toHaveBeenCalledWith(QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE, {
+      duration: 12_000,
+    });
+    expect(mocks.success).not.toHaveBeenCalled();
   });
 
   it("a thrown stage request cannot relabel the confirmed diary save as failed", async () => {
@@ -181,10 +189,10 @@ describe("Quick Log confirmed diary save and separate grow stage write", () => {
     mocks.created.mockImplementationOnce(() => cleanup());
     await submitStageChange();
     await waitFor(() => expect(mocks.created).toHaveBeenCalledTimes(1));
-    expect(mocks.message).toHaveBeenCalledWith(
-      "Your log was saved, but the grow's stage update wasn't confirmed. Check the grow's stage before changing it again.",
-      { duration: 12_000 },
-    );
+    expect(mocks.message).toHaveBeenCalledWith(QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE, {
+      duration: 12_000,
+    });
+    expect(mocks.success).not.toHaveBeenCalled();
     expect(mocks.rpc).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("quick-log-post-save")).not.toBeInTheDocument();
   });

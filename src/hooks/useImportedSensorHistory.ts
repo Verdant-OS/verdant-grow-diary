@@ -59,7 +59,8 @@ export async function fetchImportedSensorHistory(
     .limit(normalizeLimit(limit));
 
   if (error) throw error;
-  return (data ?? []) as ImportedSensorHistoryRow[];
+  if (!Array.isArray(data)) throw new Error("Imported sensor history response unavailable");
+  return data as ImportedSensorHistoryRow[];
 }
 
 export function useImportedSensorHistory(

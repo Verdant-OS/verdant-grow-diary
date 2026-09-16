@@ -16,7 +16,10 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 
-import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
+import {
+  buildPlantEnvironmentReadView,
+  buildPlantTentEnvironmentView,
+} from "@/lib/plantTentEnvironmentRules";
 
 const ROOT = resolve(__dirname, "../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -190,6 +193,127 @@ describe("buildPlantTentEnvironmentView (pure)", () => {
   });
 });
 
+describe("buildPlantEnvironmentReadView (pure)", () => {
+  it("marks unassigned plants without implying empty sensor history", () => {
+    expect(
+      buildPlantEnvironmentReadView({
+        enabled: false,
+        hasCachedReadings: false,
+      }),
+    ).toEqual({
+      kind: "unassigned",
+      message: null,
+      summaryLabel: "No tent",
+      canAssessCurrent: false,
+      canRetry: false,
+    });
+  });
+
+  it.each([
+    {
+      name: "paused without cache",
+      input: { enabled: true, hasCachedReadings: false, fetchStatus: "paused" },
+      kind: "paused",
+      message: "Waiting for connection to load sensor readings.",
+      summaryLabel: "Waiting for connection",
+    },
+    {
+      name: "paused with cache",
+      input: { enabled: true, hasCachedReadings: true, fetchStatus: "paused" },
+      kind: "paused",
+      message: "Waiting for connection to refresh sensor readings. Showing cached readings.",
+      summaryLabel: "Waiting for connection · Cached",
+    },
+    {
+      name: "error without cache",
+      input: { enabled: true, hasCachedReadings: false, isError: true },
+      kind: "error",
+      message: "Sensor readings unavailable.",
+      summaryLabel: "Unavailable",
+    },
+    {
+      name: "error with cache",
+      input: { enabled: true, hasCachedReadings: true, isError: true },
+      kind: "error",
+      message: "Could not refresh sensor readings. Showing cached readings.",
+      summaryLabel: "Unavailable · Cached",
+    },
+    {
+      name: "loading first read",
+      input: { enabled: true, hasCachedReadings: false, isLoading: true },
+      kind: "loading",
+      message: "Loading latest readings…",
+      summaryLabel: "Loading…",
+    },
+    {
+      name: "refreshing cached read",
+      input: { enabled: true, hasCachedReadings: true, isFetching: true },
+      kind: "refreshing",
+      message: "Refreshing sensor readings. Showing cached readings.",
+      summaryLabel: "Refreshing · Cached",
+    },
+    {
+      name: "ready after successful read",
+      input: { enabled: true, hasCachedReadings: true },
+      kind: "ready",
+      message: null,
+      summaryLabel: null,
+    },
+  ])("$name", ({ input, kind, message, summaryLabel }) => {
+    const view = buildPlantEnvironmentReadView(input);
+    expect(view.kind).toBe(kind);
+    expect(view.message).toBe(message);
+    expect(view.summaryLabel).toBe(summaryLabel);
+    expect(view.canAssessCurrent).toBe(kind === "ready");
+    if (kind === "error") {
+      expect(view.canRetry).toBe(true);
+    } else {
+      expect(view.canRetry).toBe(false);
+    }
+  });
+
+  it("allows retry on error only when not actively fetching", () => {
+    expect(
+      buildPlantEnvironmentReadView({
+        enabled: true,
+        hasCachedReadings: false,
+        isError: true,
+        isFetching: false,
+      }).canRetry,
+    ).toBe(true);
+    expect(
+      buildPlantEnvironmentReadView({
+        enabled: true,
+        hasCachedReadings: true,
+        isError: true,
+        isFetching: true,
+      }).canRetry,
+    ).toBe(false);
+  });
+
+  it("prefers paused over error when offline", () => {
+    expect(
+      buildPlantEnvironmentReadView({
+        enabled: true,
+        hasCachedReadings: false,
+        fetchStatus: "paused",
+        isError: true,
+      }).kind,
+    ).toBe("paused");
+  });
+
+  it("prefers error over in-flight loading when fetch failed", () => {
+    expect(
+      buildPlantEnvironmentReadView({
+        enabled: true,
+        hasCachedReadings: false,
+        isError: true,
+        isLoading: true,
+      }).kind,
+    ).toBe("error");
+  });
+});
+
 describe("usePlantTentLatestReadings (scoping)", () => {
   it("is disabled when no tentId is provided (no sensor_readings query)", async () => {
     const { result } = renderHook(() => usePlantTentLatestReadings(null), {
@@ -218,6 +342,31 @@ describe("usePlantTentLatestReadings (scoping)", () => {
     expect(orderMock).toHaveBeenCalledWith("ts", { ascending: false });
     expect(orderMock).toHaveBeenCalledWith("created_at", { ascending: false });
   });
+
+  it.each([null, {}, [null], [42], [[]]])(
+    "errors when Supabase returns invalid payload %j",
+    async (data) => {
+      limitMock.mockResolvedValue({ data, error: null });
+      const { result } = renderHook(() => usePlantTentLatestReadings("tent-123"), {
+        wrapper: wrapper(),
+      });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect((result.current.error as Error).message).toBe("Sensor readings unavailable");
+    },
+  );
+
+  it("accepts a well-formed readings array", async () => {
+    const ts = new Date().toISOString();
+    limitMock.mockResolvedValue({
+      data: [{ ts, metric: "temperature_c", value: 24, source: "manual" }],
+      error: null,
+    });
+    const { result } = renderHook(() => usePlantTentLatestReadings("tent-123"), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toHaveLength(1);
+  });
 });
 
 // ---------- Static source-level guardrails ----------
@@ -242,10 +391,13 @@ describe("Plant Detail · Assigned Tent Environment static safety", () => {
     expect(PANEL).toMatch(/tentDetailPath\(/);
   });
 
-  it("gates VPD stage cues on provenance-aware assessment eligibility", () => {
-    expect(PANEL).toMatch(/snap\?\.vpd\s*!==\s*undefined\s*&&\s*view\.canAssessStage/);
+  it("gates VPD stage cues on read success and provenance-aware assessment eligibility", () => {
+    expect(PANEL).toMatch(/readView\.canAssessCurrent/);
+    expect(PANEL).toMatch(/view\.canAssessStage/);
     expect(RULES).toMatch(/snap\.source\s*===\s*["']live["']/);
     expect(RULES).toContain("canAssessStage");
+    expect(RULES).toContain("buildPlantEnvironmentReadView");
+    expect(RULES).toContain("canAssessCurrent");
   });
 
   it("hook only reads sensor_readings (no writes)", () => {

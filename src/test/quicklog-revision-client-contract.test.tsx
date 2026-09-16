@@ -137,6 +137,57 @@ describe("Quick Log revision client contract", () => {
     });
   });
 
+  it.each([
+    ["PGRST202", "rpc_unavailable"],
+    ["42883", "rpc_unavailable"],
+    ["42501", "forbidden"],
+  ])("maps PostgREST code %s to %s", async (code, reason) => {
+    supabaseMock.rpc.mockResolvedValue({ data: null, error: { code } });
+
+    await expect(retractQuickLogEntry({ diaryEntryId: "diary-1" }, "accidental")).resolves.toEqual({
+      ok: false,
+      reason,
+    });
+  });
+
+  it("maps thrown RPC transport failures to rpc_error", async () => {
+    supabaseMock.rpc.mockRejectedValue(new Error("network down"));
+
+    await expect(
+      correctQuickLogEntry({ diaryEntryId: "diary-1" }, "typo", { note: "Fixed" }),
+    ).resolves.toEqual({ ok: false, reason: "rpc_error" });
+  });
+
+  it("reuses an explicit idempotency key on replay", async () => {
+    supabaseMock.rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        revision_id: "revision-1",
+        revision_no: 1,
+        grow_event_id: null,
+        diary_entry_ids: ["diary-1"],
+      },
+      error: null,
+    });
+
+    await correctQuickLogEntry(
+      { diaryEntryId: "diary-1" },
+      "typo",
+      { note: "Fixed" },
+      null,
+      "replay-key-12345678901234567890123456789012",
+    );
+
+    expect(supabaseMock.rpc).toHaveBeenCalledWith("quicklog_correct_entry", {
+      p_idempotency_key: "replay-key-12345678901234567890123456789012",
+      p_reason_code: "typo",
+      p_changes: { note: "Fixed" },
+      p_grow_event_id: undefined,
+      p_diary_entry_id: "diary-1",
+      p_reason_note: undefined,
+    });
+  });
+
   it("calls the exact generated correction and retraction RPC names", async () => {
     supabaseMock.rpc.mockResolvedValue({
       data: {

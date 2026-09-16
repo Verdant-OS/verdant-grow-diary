@@ -127,6 +127,23 @@ describe("Sensors Quick Log manual history read honesty", () => {
     expect(result.current.data ?? []).toEqual([]);
     expect(result.current.isError).toBe(false);
   });
+  it("merges grow_events and diary manual rows when both reads succeed", async () => {
+    const olderEvent = { ...event, occurred_at: "2026-09-10T10:00:00.000Z" };
+    const newerDiary = {
+      ...diary,
+      entry_at: "2026-09-11T10:00:00.000Z",
+      details: {
+        manual_sensor_snapshot: { source: "manual", temp_f: 80, humidity_percent: 58 },
+      },
+    };
+    io.read.mockImplementation((table) =>
+      Promise.resolve(ok(table === "grow_events" ? [olderEvent] : [newerDiary])),
+    );
+    const { result } = mount();
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toHaveLength(2);
+    expect(result.current.data?.every((row) => row.source === "manual")).toBe(true);
+  });
   it("retains cached manual data after both refreshes fail, then retries both sources", async () => {
     io.read.mockImplementation((table) =>
       Promise.resolve(ok(table === "diary_entries" ? [diary] : [])),

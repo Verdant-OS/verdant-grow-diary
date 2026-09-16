@@ -181,4 +181,68 @@ describe("Sensors page manual-history read state", () => {
     );
     expect(screen.queryByTestId("sensors-manual-history-error")).not.toBeInTheDocument();
   });
+  it("marks temp/rh/vpd unresolved while manual history is still pending", async () => {
+    Object.assign(state.manuals, {
+      isPending: true,
+      isLoading: true,
+      isSuccess: false,
+      fetchStatus: "fetching",
+    });
+    mount();
+    await screen.findByTestId("sensors-manual-history-pending");
+    for (const key of ["temp", "rh", "vpd"] as const) {
+      const badge = screen.getByTestId(`sensors-metric-state-${key}`);
+      expect(badge).toHaveAttribute("data-kind", "unresolved");
+      expect(badge).toHaveTextContent("Checking readings");
+      expect(screen.getByTestId(`sensors-empty-${key}`)).toHaveTextContent(
+        "Checking Quick Log manual history",
+      );
+    }
+    expect(screen.getByTestId("sensors-metric-state-soil")).not.toHaveAttribute(
+      "data-kind",
+      "unresolved",
+    );
+  });
+  it("hides stability and source summary during pending reads with no surviving data", async () => {
+    Object.assign(state.manuals, {
+      isPending: true,
+      isSuccess: false,
+      fetchStatus: "fetching",
+    });
+    mount();
+    await screen.findByTestId("sensors-manual-history-pending");
+    expect(screen.queryByTestId("sensors-environment-stability")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Sensor source summary" })).not.toBeInTheDocument();
+  });
+  it("shows Unavailable on empty temp/rh/vpd when manual history read failed", async () => {
+    Object.assign(state.manuals, { isError: true, isSuccess: false });
+    mount();
+    await screen.findByTestId("sensors-manual-history-error");
+    for (const key of ["temp", "rh", "vpd"] as const) {
+      const badge = screen.getByTestId(`sensors-metric-state-${key}`);
+      expect(badge).toHaveAttribute("data-kind", "unresolved");
+      expect(badge).toHaveTextContent("Unavailable");
+      expect(screen.getByTestId(`sensors-empty-${key}`)).toHaveTextContent(
+        /could not be fully checked/i,
+      );
+    }
+  });
+  it("does not relabel resolved temp/rh/vpd as unresolved while manual history is pending", async () => {
+    state.sensors = [manual()];
+    Object.assign(state.manuals, {
+      isPending: true,
+      isSuccess: false,
+      fetchStatus: "fetching",
+    });
+    mount();
+    await screen.findByTestId("sensors-manual-history-pending");
+    for (const key of ["temp", "rh", "vpd"] as const) {
+      const badge = screen.getByTestId(`sensors-metric-state-${key}`);
+      expect(badge).not.toHaveAttribute("data-kind", "unresolved");
+      expect(badge).toHaveTextContent("Manual");
+    }
+    expect(screen.getByRole("region", { name: "Sensor source summary" })).toHaveTextContent(
+      "1 reading",
+    );
+  });
 });

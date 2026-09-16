@@ -448,4 +448,20 @@ describe("manual duplicate receipt verification", () => {
     };
     expect(await confirmManualSnapshotConflict(submitted, { code: "23505" })).toBe(false);
   });
+
+  it("confirms a duplicate legacy snapshot when readback matches absent metadata", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(await confirmManualSnapshotConflict(submitted, { code: "23505" })).toBe(true);
+    expect(backend.reads).toBe(1);
+  });
+
+  it("confirms a duplicate canonical snapshot when readback matches persisted metadata", async () => {
+    const canonicalSubmitted = [{ ...submitted[0], raw_payload: MANUAL_PAYLOAD }];
+    const canonicalStored = [{ ...stored[0], raw_payload: MANUAL_PAYLOAD }];
+    backend.rows = canonicalStored;
+    backend.reads = 0;
+    expect(await confirmManualSnapshotConflict(canonicalSubmitted, { code: "23505" })).toBe(true);
+    expect(backend.reads).toBe(1);
+  });
 });

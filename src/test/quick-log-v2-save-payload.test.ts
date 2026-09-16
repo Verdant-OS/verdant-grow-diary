@@ -95,6 +95,34 @@ describe("quickLogV2SavePayload", () => {
     expect(details).toEqual({ manual_provenance: { source: "live", confidence: 1 } });
   });
 
+  it("does not stamp manual provenance on note-only saves even when details carry stale metadata", () => {
+    const details = Object.freeze({
+      manual_provenance: { source: "live", confidence: 1 },
+      tags: ["inspection"],
+    });
+    const r = buildQuickLogV2SavePayload(base({ note: "Lights-off check", details }));
+    if (!r.ok) throw new Error("expected note-only payload");
+    expect(r.payload.p_temperature_c).toBeNull();
+    expect(r.payload.p_humidity_pct).toBeNull();
+    expect(r.payload.p_vpd_kpa).toBeNull();
+    expect(r.payload.p_details).toEqual(details);
+    expect(r.payload.p_details).not.toHaveProperty("manual_sensor_snapshot");
+  });
+
+  it("adds canonical manual provenance for a VPD-only measurement", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "", vpdKpa: "1.1" }));
+    if (!r.ok) throw new Error("expected valid VPD-only payload");
+    expect(r.payload.p_vpd_kpa).toBe(1.1);
+    expect(r.payload.p_details).toEqual({
+      manual_provenance: {
+        source: "manual",
+        source_identity: "manual_entry",
+        transport: "manual",
+        confidence: null,
+      },
+    });
+  });
+
   it("blocks save when target unresolved", () => {
     const r = buildQuickLogV2SavePayload(
       base({ resolved: { ok: false, reason: "no_selection" } as any }),

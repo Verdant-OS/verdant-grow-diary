@@ -4,6 +4,27 @@ import {
   AI_DOCTOR_NO_WARNING_CONTEXT_COPY,
 } from "@/lib/aiDoctorContextQuickActionsViewModel";
 import { PLANT_QUICKLOG_PREFILL_EVENT } from "@/lib/plantQuickLogPrefillRules";
+import {
+  readSensorsTentRouteIntent,
+  resolveSensorsTentRouteSelection,
+  SENSORS_TENT_INTENT_MODE_REQUIRED,
+} from "@/lib/sensorRouteTentIntentRules";
+
+const TENT_A = "11111111-1111-4111-8111-111111111111";
+const TENT_B = "22222222-2222-4222-8222-222222222222";
+
+function manualSnapshotHref(
+  args: Omit<Parameters<typeof buildAiDoctorContextQuickActions>[0], "missing">,
+): string {
+  const actions = buildAiDoctorContextQuickActions({
+    missing: ["recent-manual-sensor-snapshot"],
+    ...args,
+  });
+  const snap = actions.find((a) => a.kind === "add_manual_sensor_snapshot");
+  expect(snap).toBeDefined();
+  expect(snap!.target.kind).toBe("link");
+  return (snap!.target as { kind: "link"; href: string }).href;
+}
 
 describe("buildAiDoctorContextQuickActions", () => {
   const base = { plantId: "p1", plantName: "Plant A", growId: "g1", tentId: "t1" };
@@ -39,19 +60,77 @@ describe("buildAiDoctorContextQuickActions", () => {
     }
   });
 
-  it("maps missing manual sensor snapshot to sensors route link", () => {
+  it("maps missing manual sensor snapshot to grow-scoped sensors when tentId is not a UUID", () => {
     const actions = buildAiDoctorContextQuickActions({
       missing: ["recent-manual-sensor-snapshot"],
       ...base,
     });
     const snap = actions.find((a) => a.kind === "add_manual_sensor_snapshot");
-    expect(snap).toBeDefined();
-    expect(snap!.label).toBe("Add sensor snapshot");
-    expect(snap!.target).toMatchObject({ kind: "link" });
-    if (snap!.target.kind === "link") {
-      expect(snap!.target.href).toContain("/sensors");
-      expect(snap!.target.href).toContain("g1");
-    }
+    expect(snap?.label).toBe("Add sensor snapshot");
+    const url = new URL(manualSnapshotHref(base), "https://verdant.example");
+    expect(url.pathname).toBe("/sensors");
+    expect(url.searchParams.get("growId")).toBe("g1");
+    expect(url.searchParams.has("tentId")).toBe(false);
+    expect(url.hash).toBe("#manual-reading");
+  });
+
+  describe("add_manual_sensor_snapshot — assigned tent handoff", () => {
+    it("carries exact-match tent intent when tentId is a persisted UUID", () => {
+      const href = manualSnapshotHref({ ...base, tentId: TENT_B });
+      const url = new URL(href, "https://verdant.example");
+      expect(url.pathname).toBe("/sensors");
+      expect(url.searchParams.get("tentId")).toBe(TENT_B);
+      expect(url.searchParams.get("tentIntent")).toBe(SENSORS_TENT_INTENT_MODE_REQUIRED);
+      expect(url.hash).toBe("#manual-reading");
+      expect(url.searchParams.has("growId")).toBe(false);
+    });
+
+    it.each([null, undefined, "not-a-uuid", "t1"] as const)(
+      "falls back to grow-scoped sensors when tentId is %j",
+      (tentId) => {
+        const href = manualSnapshotHref({ ...base, tentId });
+        const url = new URL(href, "https://verdant.example");
+        expect(url.pathname).toBe("/sensors");
+        expect(url.searchParams.get("growId")).toBe("g1");
+        expect(url.searchParams.has("tentId")).toBe(false);
+        expect(url.searchParams.has("tentIntent")).toBe(false);
+        expect(url.hash).toBe("#manual-reading");
+      },
+    );
+
+    it("preserves manual-reading hash without inventing grow or tent", () => {
+      expect(
+        manualSnapshotHref({ plantId: "p1", plantName: "Plant A", growId: "", tentId: null }),
+      ).toBe("/sensors#manual-reading");
+    });
+
+    it("contract: exact-match intent does not let another owned tent win on arrival", () => {
+      const url = new URL(
+        manualSnapshotHref({ ...base, tentId: TENT_B }),
+        "https://verdant.example",
+      );
+      expect(
+        resolveSensorsTentRouteSelection({
+          intent: readSensorsTentRouteIntent(url.searchParams),
+          currentTentId: TENT_A,
+          tents: [{ id: TENT_A }],
+        }),
+      ).toBeNull();
+    });
+
+    it("contract: exact-match intent selects the assigned tent when it is available", () => {
+      const url = new URL(
+        manualSnapshotHref({ ...base, tentId: TENT_B }),
+        "https://verdant.example",
+      );
+      expect(
+        resolveSensorsTentRouteSelection({
+          intent: readSensorsTentRouteIntent(url.searchParams),
+          currentTentId: TENT_A,
+          tents: [{ id: TENT_A }, { id: TENT_B }],
+        }),
+      ).toBe(TENT_B);
+    });
   });
 
   it("maps missing plant-photo to Add plant photo via quicklog event", () => {

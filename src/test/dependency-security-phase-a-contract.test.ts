@@ -3,6 +3,7 @@
  * Reads package.json, canonical bun.lock, and the synchronized npm
  * compatibility lock.
  */
+import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -70,6 +71,34 @@ function productionSourceFiles(directory: string): string[] {
 }
 
 describe("dependency security Phase A resolution floors", () => {
+  it("runs the final full-suite shard with supported single-fork CLI options", () => {
+    const [nodeOptions, ...command] = packageJson.scripts["test:full:shard4"].split(" ");
+    expect(nodeOptions).toBe("NODE_OPTIONS=--max-old-space-size=6144");
+
+    // Use the installed CLI parser in Node, outside the suite's jsdom globals.
+    const parsed = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          "--input-type=module",
+          "--eval",
+          'import { parseCLI } from "vitest/node"; process.stdout.write(JSON.stringify(parseCLI(process.argv[1])));',
+          command.join(" "),
+        ],
+        { cwd: root, encoding: "utf8" },
+      ),
+    );
+    expect(parsed.filter).toEqual([]);
+    expect(parsed.options).toMatchObject({
+      run: true,
+      reporter: ["dot"],
+      shard: "4/4",
+      pool: "forks",
+      maxWorkers: 1,
+      isolate: false,
+    });
+  });
+
   it("declares the direct security floors", () => {
     expect(
       isAtLeast(parseVersion(packageJson.devDependencies.vite), [6, 4, 3]),

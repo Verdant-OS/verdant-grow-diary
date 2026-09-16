@@ -123,7 +123,10 @@ function BlockedStateView({
 }) {
   const isMissingLike = view.kind === "not-found" || view.kind === "archived";
   return (
-    <div data-testid={view.testId} role={view.kind === "loading-slow" ? "alert" : undefined}>
+    <div
+      data-testid={view.testId}
+      role={view.kind === "paused" ? "status" : view.kind === "loading-slow" ? "alert" : undefined}
+    >
       <EmptyState
         icon={
           isMissingLike ? (
@@ -258,7 +261,7 @@ export default function PlantDetail() {
   const [searchParams] = useSearchParams();
   const contextTentId = searchParams.get("tentId");
   const contextGrowId = searchParams.get("growId");
-  const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
+  const { data: plant, isLoading, isPending, fetchStatus, isError, refetch } = useGrowPlant(id);
   const tentQuery = useGrowTent(plant?.tentId);
   // The plant row owns the assignment; a missing/failed details read must
   // neither clear that assignment nor substitute a row for another tent.
@@ -319,20 +322,24 @@ export default function PlantDetail() {
   // hung Supabase request, etc.) we must not leave the grower on a blank
   // skeleton. After PLANT_DETAIL_LOAD_TIMEOUT_MS, promote the loading
   // state to a retryable failure surface. Reset whenever the id changes
-  // or the query is no longer pending.
+  // or the query is no longer pending. A paused first read waits for connection
+  // instead of timing out before it can start.
+  const isLoadingPlant = (isPending ?? isLoading) && fetchStatus !== "paused";
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoadingPlant) {
       setLoadTimedOut(false);
       return;
     }
     setLoadTimedOut(false);
     const handle = setTimeout(() => setLoadTimedOut(true), PLANT_DETAIL_LOAD_TIMEOUT_MS);
     return () => clearTimeout(handle);
-  }, [id, isLoading]);
+  }, [id, isLoadingPlant]);
 
   const loadState = classifyPlantDetailLoadState({
     isLoading,
+    isPending,
+    isPaused: fetchStatus === "paused",
     isError,
     hasPlant: !!plant,
     loadTimedOut,
@@ -355,6 +362,10 @@ export default function PlantDetail() {
         className="glass rounded-2xl h-64 animate-pulse"
       />
     );
+  }
+
+  if (blockedView && blockedView.kind === "paused") {
+    return <BlockedStateView view={blockedView} />;
   }
 
   if (blockedView && blockedView.kind === "loading-slow") {

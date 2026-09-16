@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
 import {
   acceptedReceipt,
   createLocalFixture,
@@ -225,6 +226,7 @@ test("a committed retraction with a lost reply resolves on retry instead of leav
       await expect.poll(() => trace.replies.length).toBe(2);
     }
     await expect.soft(page.getByTestId("quicklog-entry-retract-dialog")).not.toBeVisible();
+    await expect.soft(recentRow(page, note)).toHaveCount(0);
     const dialogStillOpen = await page.getByTestId("quicklog-entry-retract-dialog").isVisible();
     const staleActiveRows = await recentRow(page, note).count();
     const final = await revisions(f, id);
@@ -388,7 +390,10 @@ test("client roles cannot read or alter the receipt store or call its helper, an
     expect(
       await rpcReply(f, "quicklog_correct_entry", { ...args, p_grow_event_id: id }),
     ).toMatchObject({ ok: true, revision_no: 1 });
-    for (const account of [f.owner, f.other]) {
+    const anonymous = createClient(f.env.api, f.env.anon, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    for (const account of [f.owner, f.other, { id: f.owner.id, client: anonymous }]) {
       const read = await account.client.from("quicklog_revision_idempotency").select("*");
       expect(read.error?.code).toBe("42501");
       const insert = await account.client.from("quicklog_revision_idempotency").insert({
@@ -415,6 +420,19 @@ test("client roles cannot read or alter the receipt store or call its helper, an
         p_reason_note: null,
       });
       expect(direct.error?.code).toBe("42501");
+    }
+    for (const rpc of ["quicklog_correct_entry", "quicklog_retract_entry"]) {
+      const { error } = await anonymous.rpc(
+        rpc,
+        rpc === "quicklog_correct_entry"
+          ? { ...args, p_grow_event_id: id }
+          : {
+              p_idempotency_key: args.p_idempotency_key,
+              p_reason_code: "accidental",
+              p_grow_event_id: id,
+            },
+      );
+      expect(error?.code).toBe("42501");
     }
     expect(await revisions(f, id)).toHaveLength(1);
     expect(fingerprint(await witnessRows(f))).toBe(otherBefore);

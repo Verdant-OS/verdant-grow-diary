@@ -119,7 +119,13 @@ async function signOutThroughUi(page: Page) {
 async function signInCurrentDocument(page: Page, f: LocalFixture) {
   let phase = "waiting for the sign-in form";
   try {
-    await page.locator("#signin-email").fill(f.owner.email);
+    const email = page.locator("#signin-email");
+    const landingSignIn = page.getByTestId("landing-signin-cta-header");
+    // The protected-route guard can reach /auth before the sign-out dialog's
+    // /welcome navigation. Use whichever real public entry is displayed.
+    await expect(email.or(landingSignIn).first()).toBeVisible();
+    if (!(await email.isVisible())) await landingSignIn.click();
+    await email.fill(f.owner.email);
     await page.locator("#signin-password").fill(f.owner.password);
     phase = "submitting the sign-in form";
     await page
@@ -228,9 +234,6 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       await expect(page.getByTestId("csv-import-done")).toHaveCount(0);
       await assertIsolation(f, before, otherBefore);
       await signOutThroughUi(page);
-      // Explicit sign-out goes to /welcome; the other tab's signed-out
-      // protected-route guard went directly to /auth above.
-      await page.getByTestId("landing-signin-cta-header").click();
       await signInCurrentDocument(page, f);
       await page.getByRole("link", { name: "Sensors", exact: true }).first().click();
       await page.getByRole("button", { name: f.secondary.tentName, exact: true }).click();

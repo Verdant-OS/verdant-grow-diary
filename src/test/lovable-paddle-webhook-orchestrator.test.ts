@@ -487,6 +487,25 @@ describe("handleVerifiedEvent — Pro→Founder provider cancellation (double-bi
     expect(cancel).not.toHaveBeenCalled();
   });
 
+  it("founder_refund_precedes_purchase skips without provider cancel", async () => {
+    const f = makeFixture();
+    (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({
+      ok: false as const,
+      reason: "founder_refund_precedes_purchase",
+    }));
+    const cancel = vi.fn(async (): Promise<CancelResult> => ({ ok: true, canceled: 0 }));
+    (f.deps as Deps).cancelOtherRecurringSubscriptions = cancel;
+    const res = await handleVerifiedEvent(f.deps, txEvent("evt_refund_first"), "sandbox", NOW, {});
+    expect(res.httpStatus).toBe(200);
+    expect(res.reason).toBe("skipped:founder_refund_precedes_purchase");
+    expect(cancel).not.toHaveBeenCalled();
+    expect(f.markCalls.at(-1)?.patch).toMatchObject({
+      processing_status: "skipped",
+      skip_reason: "founder_refund_precedes_purchase",
+      processed_ok: false,
+    });
+  });
+
   it("allocator hard failure (500 path) never triggers a cancel", async () => {
     const f = makeFixture();
     (f.deps as Deps).allocateFounderLifetime = vi.fn(async () => ({

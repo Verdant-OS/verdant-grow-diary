@@ -9,6 +9,7 @@ const boundary = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
   error: null as null | { message: string },
   nullData: false,
+  malformedData: false,
   calls: [] as unknown[][],
   hold: null as null | Promise<void>,
 }));
@@ -41,13 +42,15 @@ vi.mock("@/integrations/supabase/client", () => ({
           boundary.calls.push(["limit", cap]);
           if (boundary.hold) await boundary.hold;
           return {
-            data: boundary.nullData
-              ? null
-              : boundary.rows
-                  .filter((row) =>
-                    Object.entries(filters).every(([key, value]) => row[key] === value),
-                  )
-                  .slice(0, cap),
+            data: boundary.malformedData
+              ? ({ not: "array" } as unknown as Record<string, unknown>[])
+              : boundary.nullData
+                ? null
+                : boundary.rows
+                    .filter((row) =>
+                      Object.entries(filters).every(([key, value]) => row[key] === value),
+                    )
+                    .slice(0, cap),
             error: boundary.error,
           };
         },
@@ -89,6 +92,7 @@ beforeEach(() => {
     rows: [],
     error: null,
     nullData: false,
+    malformedData: false,
     calls: [],
     hold: null,
   });
@@ -150,6 +154,12 @@ describe("useCsvHistoryWindow", () => {
       await view.result.current.refetch();
     });
     await waitFor(() => expect(view.result.current.window).toEqual({ status: "ready", days: 90 }));
+  });
+  it("fail-closed when subscriptions response is not an array", async () => {
+    boundary.malformedData = true;
+    const view = mount();
+    await waitFor(() => expect(view.result.current.window).toEqual({ status: "error" }));
+    expect(view.result.current.window).not.toEqual({ status: "ready", days: 90 });
   });
   it("does not keep claiming unbounded access after a failed refresh", async () => {
     boundary.rows = [paid()];

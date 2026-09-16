@@ -657,12 +657,13 @@ describe("durable unresolved Note recovery", () => {
       renderSheet();
       typeNote();
       save();
-      await waitFor(() =>
-        expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/recovery|storage/i),
-      );
+      // The error renders before handleSave's finally releases the editor lock.
+      await waitFor(() => {
+        expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/recovery|storage/i);
+        expect(screen.getByLabelText("Note (optional)")).toBeEnabled();
+      });
       expect(rpcMock).not.toHaveBeenCalled();
       expect(toastSuccess).not.toHaveBeenCalled();
-      expect(screen.getByLabelText("Note (optional)")).toBeEnabled();
     },
   );
 

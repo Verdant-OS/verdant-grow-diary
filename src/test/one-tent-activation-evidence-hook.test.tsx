@@ -317,4 +317,11 @@ describe("activation evidence read boundary", () => {
     expect(source).not.toMatch(/service_role/i);
     expect(source).not.toMatch(/device[-_ ]command/i);
   });
+
+  it("treats TanStack pending state as unresolved loading, not isLoading alone", () => {
+    // TanStack v5 reports an offline-paused first read as isPending with isLoading false.
+    // Reverting to isLoading would mark onboarding complete before any evidence fetch.
+    expect(source).toMatch(/if \(query\.isPending\) return \{ status: "loading"/);
+    expect(source).not.toMatch(/if \(query\.isLoading\) return \{ status: "loading"/);
+  });
 });

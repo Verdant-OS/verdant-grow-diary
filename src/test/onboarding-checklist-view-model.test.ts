@@ -60,6 +60,52 @@ describe("buildOnboardingChecklistViewModel — activation states", () => {
     expect(vm.primaryFrame).toBe("operating");
   });
 
+  it("keeps first_log incomplete while connected evidence is still loading", () => {
+    const vm = buildOnboardingChecklistViewModel({
+      growCount: 1,
+      tentCount: 1,
+      plantCount: 1,
+      diaryEntryCount: 0,
+      sensorReadingCount: 0,
+      connectedScope: {
+        growId: "grow-a",
+        tentId: "tent-a",
+        plantId: "plant-a",
+      },
+      firstLogEvidenceCount: null,
+      firstLogEvidenceStatus: "loading",
+    });
+
+    const firstLog = vm.steps.find((s) => s.key === "first_log");
+    expect(firstLog?.complete).toBe(false);
+    expect(firstLog?.description).toBe("Checking saved plant memory for this connected tent.");
+    expect(vm.isFullyActivated).toBe(false);
+  });
+
+  it("fails closed when connected evidence read is unavailable", () => {
+    const vm = buildOnboardingChecklistViewModel({
+      growCount: 1,
+      tentCount: 1,
+      plantCount: 1,
+      diaryEntryCount: 0,
+      sensorReadingCount: 0,
+      connectedScope: {
+        growId: "grow-a",
+        tentId: "tent-a",
+        plantId: "plant-a",
+      },
+      firstLogEvidenceCount: null,
+      firstLogEvidenceStatus: "unavailable",
+    });
+
+    const firstLog = vm.steps.find((s) => s.key === "first_log");
+    expect(firstLog?.complete).toBe(false);
+    expect(firstLog?.description).toBe(
+      "Saved history could not be verified right now. Try again shortly.",
+    );
+    expect(vm.isFullyActivated).toBe(false);
+  });
+
   it("a diary entry establishes plant memory but does not replace sensor truth", () => {
     const vm = buildOnboardingChecklistViewModel({
       ...base,

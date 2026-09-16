@@ -126,6 +126,11 @@ export interface LocalFixture {
   witnessId: string;
   manualAt: string;
   staleAt: string;
+  /** Fixture setup only: canonical subscription rows in the disposable database. */
+  setHistoryAccess: (
+    environment: "sandbox" | "live" | null,
+    target?: "owner" | "other",
+  ) => Promise<void>;
   cleanup: () => Promise<void>;
 }
 
@@ -169,6 +174,7 @@ export async function createLocalFixture(withDatedReadings = false): Promise<Loc
     let failed = false;
     for (const uid of created) {
       for (const table of [
+        "subscriptions",
         "sensor_readings", "environment_events", "feeding_events", "watering_events",
         "quicklog_idempotency", "quicklog_audit_events", "diary_entries", "grow_events",
         "plants", "tents", "grows",
@@ -219,6 +225,33 @@ export async function createLocalFixture(withDatedReadings = false): Promise<Loc
   try {
     const owner = await makeAccount();
     const other = await makeAccount();
+    const subscriptionId = "native-local-history-" + randomUUID();
+    const setHistoryAccess = async (
+      environment: "sandbox" | "live" | null,
+      target: "owner" | "other" = "owner",
+    ) => {
+      localEnvironment();
+      const account = target === "owner" ? owner : other;
+      const accountSubscriptionId = subscriptionId + "-" + account.id;
+      const removed = await admin
+        .from("subscriptions")
+        .delete()
+        .eq("user_id", account.id)
+        .eq("paddle_subscription_id", accountSubscriptionId);
+      if (removed.error) throw new Error("Local history subscription cleanup failed.");
+      if (environment === null) return;
+      const { error } = await admin.from("subscriptions").insert({
+        user_id: account.id,
+        paddle_subscription_id: accountSubscriptionId,
+        paddle_customer_id: "native-local-customer-" + account.id,
+        product_id: "native-local-pro",
+        price_id: "pro_annual",
+        status: "active",
+        environment,
+        current_period_end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+      if (error) throw new Error("Local history subscription setup failed.");
+    };
     const primary = await seedScope(owner, "primary");
     const secondary = await seedScope(owner, "secondary");
     const foreign = await seedScope(other, "other owner");
@@ -254,7 +287,19 @@ export async function createLocalFixture(withDatedReadings = false): Promise<Loc
       ]);
       if (error) throw new Error("Local dated sensor fixture creation failed.");
     }
-    return { env, owner, other, primary, secondary, foreign, witnessId, manualAt, staleAt, cleanup };
+    return {
+      env,
+      owner,
+      other,
+      primary,
+      secondary,
+      foreign,
+      witnessId,
+      manualAt,
+      staleAt,
+      setHistoryAccess,
+      cleanup,
+    };
   } catch (error) {
     await cleanup();
     throw error;
@@ -281,7 +326,11 @@ export async function fenceBrowser(context: BrowserContext, env: LocalEnvironmen
 }
 
 /** Drive the actual sign-in form. Never snapshot auth storage or attach credentials. */
-export async function signIn(page: Page, fixture: LocalFixture): Promise<void> {
+export async function signIn(
+  page: Page,
+  fixture: LocalFixture,
+  acceptNewAgreements = true,
+): Promise<void> {
   localEnvironment();
   try {
     await page.goto(fixture.env.ui + "/auth");
@@ -293,9 +342,11 @@ export async function signIn(page: Page, fixture: LocalFixture): Promise<void> {
     // an unsuppressed route instead of racing its asynchronous read.
     await page.goto(fixture.env.ui + "/plants/" + fixture.primary.plantId);
     const gate = page.getByTestId("agreement-reconsent-gate");
-    await gate.waitFor({ state: "visible" });
-    await page.locator("#reconsent-accept").click();
-    await gate.getByRole("button", { name: "Accept and continue" }).click();
+    if (acceptNewAgreements) {
+      await gate.waitFor({ state: "visible" });
+      await page.locator("#reconsent-accept").click();
+      await gate.getByRole("button", { name: "Accept and continue" }).click();
+    }
     await gate.waitFor({ state: "hidden" });
     await page.getByTestId("header-quick-log-trigger").waitFor({ state: "visible" });
   } catch {

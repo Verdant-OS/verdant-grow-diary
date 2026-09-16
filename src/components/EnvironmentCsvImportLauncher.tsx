@@ -37,7 +37,8 @@ import {
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
-import { sensorsPath, tentDetailPath } from "@/lib/routes";
+import { tentDetailPath } from "@/lib/routes";
+import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
 import { IMPORTED_SENSOR_HISTORY_ANCHOR_ID } from "@/lib/importedSensorHistoryViewModel";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -184,7 +185,11 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
   // Current-condition handoff stays on the existing manual sensor form.
   // The grower still enters, reviews, and confirms every value; this link
   // performs no write and never invokes AI Doctor by itself.
-  const addCurrentReadingHref = importGrowId ? `${sensorsPath(importGrowId)}#manual-reading` : null;
+  const currentReadingRoute = buildSensorsTentRouteHref(importTentId, { requireExactMatch: true });
+  const addCurrentReadingHref =
+    importGrowId && currentReadingRoute !== SENSORS_TENT_ROUTE
+      ? `${currentReadingRoute}#manual-reading`
+      : null;
 
   const handleConfirm = useCallback(
     async (rows: readonly ParsedEnvironmentRow[]) => {

@@ -117,6 +117,7 @@ describe("CSV history import — duplicate-key crash fix", () => {
     };
     const res = await persistCsvEnvironmentRows([row()], SCOPE, client);
     expect(res.error).toBe(CSV_HISTORY_DEDUPE_CONFLICT_COPY);
+    expect(res.failureReason).toBe("unverified_duplicate");
     expect(res.error).not.toMatch(/violates unique constraint/i);
     expect(res.error).not.toMatch(/sensor_readings_dedupe_uidx/i);
   });

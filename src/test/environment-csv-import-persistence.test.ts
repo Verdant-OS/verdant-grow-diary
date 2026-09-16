@@ -137,6 +137,40 @@ describe("environmentCsvImportPersistence — runtime", () => {
     expect(res.error).toMatch(/could not be completed/i);
     expect(res.error).not.toContain("boom");
     expect(res.partialWrite).toBe(false);
+    expect(res.failureReason).toBeUndefined();
+  });
+
+  it("classifies dedupe unique violations as unverified_duplicate without leaking driver text", async () => {
+    let batch = 0;
+    const client = {
+      insertSensorReadings: vi.fn(async (rows: unknown[]) => {
+        batch += 1;
+        if (batch === 1) return { error: null, insertedCount: rows.length };
+        return {
+          error: {
+            code: "23505",
+            message: 'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
+            details: "secret row detail",
+          },
+          insertedCount: 0,
+        };
+      }),
+    };
+    const rows = [
+      row({ humidity_pct: null, vpd_kpa: null }),
+      row({
+        rowNumber: 2,
+        captured_at: "2026-06-01T10:01:00.000Z",
+        humidity_pct: null,
+        vpd_kpa: null,
+      }),
+    ];
+    const res = await persistCsvEnvironmentRows(rows, SCOPE, client, 1);
+    expect(res.insertedCount).toBe(1);
+    expect(res.partialWrite).toBe(true);
+    expect(res.failureReason).toBe("unverified_duplicate");
+    expect(res.error).toMatch(/1 CSV reading was saved/i);
+    expect(res.error).not.toMatch(/sensor_readings_dedupe_uidx|secret row detail|23505/i);
   });
 
   it("preserves a safe partial-write receipt when a later batch fails", async () => {

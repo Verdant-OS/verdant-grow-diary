@@ -70,3 +70,70 @@ describe("unconfirmed CSV import copy", () => {
     expect(copy).not.toMatch(/stopped after|No CSV readings were saved/i);
   });
 });
+
+describe("unverified duplicate CSV import copy", () => {
+  const shared = /Matching CSV history was detected/;
+  const retryHint = /retrying the same file may encounter the same conflict/i;
+  const noLive = /No live sensor data was created/;
+
+  it.each([
+    {
+      label: "zero visible matches",
+      args: [0, false, false, "unverified_duplicate"] as const,
+      expectSaved: /No new CSV readings were saved in this attempt/,
+      expectUncertain: null,
+    },
+    {
+      label: "confirmed partial batch",
+      args: [3, true, false, "unverified_duplicate"] as const,
+      expectSaved: /3 CSV readings confirmed saved/,
+      expectUncertain: null,
+    },
+    {
+      label: "singular confirmed save",
+      args: [1, true, false, "unverified_duplicate"] as const,
+      expectSaved: /1 CSV reading confirmed saved/,
+      expectUncertain: null,
+    },
+    {
+      label: "partial write without a confirmed count",
+      args: [0, true, false, "unverified_duplicate"] as const,
+      expectSaved: /Earlier CSV readings may already have been saved/,
+      expectUncertain: null,
+    },
+    {
+      label: "lost acknowledgement before conflict",
+      args: [0, false, true, "unverified_duplicate"] as const,
+      expectSaved: /Import stopped/,
+      expectUncertain: /couldn't confirm whether any CSV readings were saved/,
+    },
+    {
+      label: "lost acknowledgement after partial save",
+      args: [2, true, true, "unverified_duplicate"] as const,
+      expectSaved: /2 CSV readings confirmed saved/,
+      expectUncertain: /couldn't confirm whether the remaining CSV readings were saved/,
+    },
+  ])("$label", ({ args, expectSaved, expectUncertain }) => {
+    const [insertedCount, partialWrite, unconfirmedWrite, failureReason] = args;
+    const copy = buildCsvImportFailureMessage(
+      insertedCount,
+      partialWrite,
+      unconfirmedWrite,
+      failureReason,
+    );
+    expect(copy).toMatch(shared);
+    expect(copy).toMatch(retryHint);
+    expect(copy).toMatch(noLive);
+    expect(copy).toMatch(expectSaved);
+    if (expectUncertain) expect(copy).toMatch(expectUncertain);
+    expect(copy).not.toMatch(/Try again\.|violates unique constraint|23505/i);
+  });
+
+  it("requires failureReason to reach hidden-history copy (mutation guard)", () => {
+    const withoutReason = buildCsvImportFailureMessage(0, false, false);
+    const withReason = buildCsvImportFailureMessage(0, false, false, "unverified_duplicate");
+    expect(withoutReason).toMatch(/No CSV readings were saved/);
+    expect(withReason).toMatch(/Matching CSV history was detected/);
+    expect(withoutReason).not.toMatch(/Matching CSV history was detected/);
+  });
+});

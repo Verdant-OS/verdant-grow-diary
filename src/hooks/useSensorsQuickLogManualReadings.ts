@@ -4,9 +4,10 @@
  *
  * SELECT only. RLS owns access. Query key is prefixed `grow_events` so a
  * successful Quick Log save (`applyQuickLogV2Refresh`) refetches this window
- * without a reload. Failures resolve to [] so a diary/events miss cannot
- * blank the existing sensor_readings series.
+ * without a reload. Each source retains its own data and read state, so a
+ * failed source cannot erase the survivor or pretend history is empty.
  */
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
@@ -30,8 +31,8 @@ export function buildSensorsQuickLogManualReadingsQueryKey(tentId: string | null
   return [SENSORS_QL_MANUAL_READINGS_QUERY_PREFIX, "sensors-ql-manuals", tentId ?? "none"] as const;
 }
 
-async function fetchSensorsQuickLogManualReadings(tentId: string): Promise<SensorReading[]> {
-  const eventsQuery = supabase
+async function fetchManualEvents(tentId: string): Promise<RawGrowEventRow[]> {
+  const { data, error } = await supabase
     .from("grow_events")
     .select(GROW_EVENT_SELECT)
     .eq("tent_id", tentId)
@@ -41,39 +42,65 @@ async function fetchSensorsQuickLogManualReadings(tentId: string): Promise<Senso
     .order("occurred_at", { ascending: false })
     .limit(200);
 
-  const diaryQuery = selectWithRetractionCompat((withRetractionFilter) => {
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Quick Log environment history unavailable");
+  return data as unknown as RawGrowEventRow[];
+}
+
+async function fetchManualDiary(tentId: string): Promise<SensorsQuickLogDiaryRow[]> {
+  const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
     let query = supabase.from("diary_entries").select(DIARY_SELECT);
     if (withRetractionFilter) query = query.is("retracted_at", null);
     return query.eq("tent_id", tentId).order("entry_at", { ascending: false }).limit(50);
   });
 
-  const [eventsResult, diaryResult] = await Promise.all([eventsQuery, diaryQuery]);
-  if (eventsResult.error) throw eventsResult.error;
-  if (diaryResult.error) throw diaryResult.error;
-
-  return collectSensorsQuickLogManualReadings({
-    tentId,
-    growEvents: (eventsResult.data ?? []) as unknown as RawGrowEventRow[],
-    diaryEntries: (diaryResult.data ?? []) as SensorsQuickLogDiaryRow[],
-  });
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Quick Log diary history unavailable");
+  return data as SensorsQuickLogDiaryRow[];
 }
 
 export function useSensorsQuickLogManualReadings(tentId?: string | null) {
   const { user } = useAuth();
   const enabled = Boolean(user) && isUuid(tentId);
-  return useQuery({
-    queryKey: [...buildSensorsQuickLogManualReadingsQueryKey(tentId), user?.id ?? "anon"],
+  const queryKey = [...buildSensorsQuickLogManualReadingsQueryKey(tentId), user?.id ?? "anon"];
+  const events = useQuery({
+    queryKey: [...queryKey, "events"],
     enabled,
     retry: false,
-    queryFn: async () => {
-      if (!enabled || !tentId) return [] as SensorReading[];
-      try {
-        return await fetchSensorsQuickLogManualReadings(tentId);
-      } catch {
-        // Network / permission miss must not fail the Sensors page or invent
-        // a product defect. sensor_readings remain the surviving series.
-        return [] as SensorReading[];
-      }
-    },
+    queryFn: () => fetchManualEvents(tentId!),
   });
+  const diary = useQuery({
+    queryKey: [...queryKey, "diary"],
+    enabled,
+    retry: false,
+    queryFn: () => fetchManualDiary(tentId!),
+  });
+  const data = useMemo<SensorReading[]>(
+    () =>
+      enabled
+        ? collectSensorsQuickLogManualReadings({
+            tentId,
+            growEvents: events.data,
+            diaryEntries: diary.data,
+          })
+        : [],
+    [enabled, tentId, events.data, diary.data],
+  );
+  return {
+    data,
+    isPending: enabled && (events.isPending || diary.isPending),
+    isLoading: enabled && (events.isLoading || diary.isLoading),
+    isError: enabled && (events.isError || diary.isError),
+    isSuccess: enabled && events.isSuccess && diary.isSuccess,
+    fetchStatus:
+      events.fetchStatus === "paused" || diary.fetchStatus === "paused"
+        ? "paused"
+        : events.isFetching || diary.isFetching
+          ? "fetching"
+          : "idle",
+    // Explicit retry rechecks both sources, retaining each successful cache
+    // until that source's own replacement read succeeds.
+    refetch: () =>
+      enabled ? Promise.all([events.refetch(), diary.refetch()]) : Promise.resolve([]),
+  };
 }

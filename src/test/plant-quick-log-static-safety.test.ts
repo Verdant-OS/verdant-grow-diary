@@ -32,4 +32,12 @@ describe("PlantQuickLog static safety", () => {
     expect(SRC).not.toMatch(/from\("alerts"\)/);
     expect(SRC).not.toMatch(/from\("action_queue"\)/);
   });
+
+  it("scopes idempotency signatures to the signed-in owner and blocks close during in-flight saves", () => {
+    expect(SRC).toMatch(/ownerId:\s*user\?\.id\s*\?\?\s*null/);
+    expect(SRC).toMatch(/if\s*\(\s*busy\s*\|\|\s*saveInFlightRef\.current\s*\)\s*return/);
+    expect(SRC).toMatch(/pendingPhotoSaveRef\.current\s*=\s*prepared/);
+    expect(SRC).toMatch(/saveContextRevisionRef\.current\s*\+?=\s*1/);
+    expect(SRC).toMatch(/canContinueNote:\s*canContinue/);
+  });
 });

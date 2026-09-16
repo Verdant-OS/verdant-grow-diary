@@ -211,4 +211,29 @@ describe("buildQuickLogPhotoIdentity", () => {
     expect(next.decision).toBe("rotate");
     expect(next.state.key).toBe("k2");
   });
+
+  it("rotates when ownerId changes so idempotency keys cannot cross accounts", () => {
+    const ownerA = buildQuickLogSaveSignature({
+      ownerId: "11111111-1111-4111-8111-111111111111",
+      plantId: "plant-1",
+      growId: "grow-1",
+      note: "same draft",
+    });
+    const ownerB = buildQuickLogSaveSignature({
+      ownerId: "22222222-2222-4222-8222-222222222222",
+      plantId: "plant-1",
+      growId: "grow-1",
+      note: "same draft",
+    });
+    expect(ownerB).not.toBe(ownerA);
+
+    const first = resolveQuickLogSaveKey({ current: null, signature: ownerA, mint: () => "k1" });
+    const next = resolveQuickLogSaveKey({
+      current: first.state,
+      signature: ownerB,
+      mint: () => "k2",
+    });
+    expect(next.decision).toBe("rotate");
+    expect(next.state.key).toBe("k2");
+  });
 });

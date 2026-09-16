@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   uploadWait: null as Promise<void> | null,
   replyWait: null as Promise<void> | null,
   readFailure: false,
+  uploadError: null as { message: string } | null,
   telemetry: vi.fn(),
   success: vi.fn(),
 }));
@@ -37,6 +38,7 @@ vi.mock("@/integrations/supabase/client", () => ({
           state.uploads.push(path);
           state.objects.set(path, file);
           if (state.uploadWait) await state.uploadWait;
+          if (state.uploadError) return { data: null, error: state.uploadError };
           return { data: { path }, error: null };
         },
         remove: async (paths: string[]) => {
@@ -105,6 +107,7 @@ beforeEach(() => {
   state.uploadWait = null;
   state.replyWait = null;
   state.readFailure = false;
+  state.uploadError = null;
   state.now = 1_789_560_000_000;
   state.objects.clear();
   state.events.clear();
@@ -125,13 +128,20 @@ beforeEach(() => {
 
 function mount(onSaved?: () => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  let open = true;
+  const onOpenChange = vi.fn((next: boolean) => {
+    open = next;
+  });
   const element = (
     overrides: Partial<{ open: boolean; plantId: string; growId: string; tentId: string }> = {},
   ) => (
     <QueryClientProvider client={client}>
       <PlantQuickLog
-        open
-        onOpenChange={() => undefined}
+        open={"open" in overrides ? overrides.open! : open}
+        onOpenChange={(next) => {
+          onOpenChange(next);
+          open = next;
+        }}
         plantId="plant-1"
         plantName="Test Plant"
         growId="grow-1"
@@ -144,6 +154,12 @@ function mount(onSaved?: () => void) {
   const view = render(element());
   return {
     ...view,
+    onOpenChange,
+    setOpen: (next: boolean) => {
+      open = next;
+      view.rerender(element());
+    },
+    sync: () => view.rerender(element()),
     changeScope: (overrides: Parameters<typeof element>[0] = {}) =>
       view.rerender(element(overrides)),
   };
@@ -384,5 +400,53 @@ describe("Plant Quick Log photo persistence through uncertain saves", () => {
     expect(state.uploads).toHaveLength(1);
     expect(state.requests).toHaveLength(1);
     expect(state.events.size).toBe(1);
+  });
+
+  it("does not call quicklog_save_manual when photo upload fails before the RPC", async () => {
+    state.uploadError = { message: "storage quota exceeded" };
+    mount();
+    choosePhotoAndNote();
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+    await screen.findByTestId("plant-quick-log-error");
+    expect(state.requests).toHaveLength(0);
+    expect(state.events.size).toBe(0);
+    expect(state.removes).toEqual([]);
+    expect(screen.getByTestId("plant-quick-log-error")).toHaveTextContent(/could not upload/i);
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("New leaf photo");
+    expect(screen.getByTestId("plant-quick-log-photo-preview")).toBeInTheDocument();
+  });
+
+  it("blocks parent close while a photo save is still in flight", async () => {
+    let release!: () => void;
+    state.replyWait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const view = mount();
+    choosePhotoAndNote();
+    fireEvent.click(screen.getByTestId("plant-quick-log-save"));
+    await waitFor(() => expect(state.events.size).toBe(1));
+    fireEvent.keyDown(screen.getByTestId("plant-quick-log-sheet"), { key: "Escape" });
+    view.sync();
+    expect(view.onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(screen.getByTestId("plant-quick-log-sheet")).toBeInTheDocument();
+    await act(async () => {
+      release();
+      await state.replyWait;
+    });
+    await waitFor(() => expect(screen.getByTestId("plant-quick-log-save")).toBeEnabled());
+    expect(view.onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it("clears an uncertain draft when the sheet closes and reopens", async () => {
+    const view = mount();
+    await firstUnconfirmedSave();
+    view.setOpen(false);
+    view.setOpen(true);
+    expect(screen.getByTestId("plant-quick-log-note")).toHaveValue("");
+    expect(screen.queryByTestId("plant-quick-log-photo-preview")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("plant-quick-log-error")).not.toBeInTheDocument();
+    expect(state.requests).toHaveLength(1);
+    expect(state.objects.size).toBe(1);
+    expect(state.removes).toEqual([]);
   });
 });

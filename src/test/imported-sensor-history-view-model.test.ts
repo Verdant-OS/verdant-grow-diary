@@ -52,6 +52,16 @@ describe("resolveImportedSensorHistoryReadStatus", () => {
       }),
     ).toBe("error");
   });
+
+  it("prefers error over cached rows after a failed refresh", () => {
+    expect(
+      resolveImportedSensorHistoryReadStatus({
+        isError: true,
+        isFetching: false,
+        hasRows: true,
+      }),
+    ).toBe("error");
+  });
 });
 
 function row(overrides: Partial<ImportedSensorHistoryInputRow>): ImportedSensorHistoryInputRow {

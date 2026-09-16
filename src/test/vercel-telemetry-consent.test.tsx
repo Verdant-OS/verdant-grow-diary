@@ -6,6 +6,12 @@ import {
   ConsentGatedSpeedInsights,
 } from "@/components/ConsentGatedVercelTelemetry";
 import { ANALYTICS_CONSENT_STORAGE_KEY, writeAnalyticsConsent } from "@/lib/analyticsConsent";
+import {
+  ensureLocalStorageForTest,
+  getLocalStorageMethodOwnerForTest,
+  removeLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 type QueuedCommand = [string, ...unknown[]];
 type TelemetryWindow = Window & {
@@ -61,7 +67,7 @@ function resetSdkState() {
 }
 
 beforeEach(() => {
-  localStorage.removeItem(ANALYTICS_CONSENT_STORAGE_KEY);
+  removeLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY);
   resetSdkState();
 });
 
@@ -75,7 +81,7 @@ describe("Vercel telemetry uses the existing consent contract", () => {
   it.each([null, "denied", "unknown", "true"])(
     "does not initialize either real SDK when stored consent is %s",
     (value) => {
-      if (value !== null) localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, value);
+      if (value !== null) setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, value);
       render(<BothTelemetryMounts />);
       expect(scriptSources()).toEqual([]);
       expect(telemetryWindow.va).toBeUndefined();
@@ -84,7 +90,8 @@ describe("Vercel telemetry uses the existing consent contract", () => {
   );
 
   it("fails closed when the initial storage read throws", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    const storageOwner = getLocalStorageMethodOwnerForTest(ensureLocalStorageForTest(), "getItem");
+    vi.spyOn(storageOwner, "getItem").mockImplementation(() => {
       throw new Error("Storage unavailable");
     });
     render(<BothTelemetryMounts />);
@@ -92,7 +99,7 @@ describe("Vercel telemetry uses the existing consent contract", () => {
   });
 
   it("does not initialize telemetry during server rendering even with a stored grant", () => {
-    localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     expect(renderToString(<BothTelemetryMounts />)).toBe("");
     expect(scriptSources()).toEqual([]);
     expect(telemetryWindow.va).toBeUndefined();
@@ -100,7 +107,7 @@ describe("Vercel telemetry uses the existing consent contract", () => {
   });
 
   it("loads each existing SDK once after hydrating a stored grant and on rerenders", () => {
-    localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     const view = render(<BothTelemetryMounts />);
     expectBothScriptsOnce();
     view.rerender(<BothTelemetryMounts />);
@@ -120,7 +127,7 @@ describe("Vercel telemetry uses the existing consent contract", () => {
   });
 
   it("blocks callbacks retained by already-loaded SDKs immediately after revocation", () => {
-    localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     render(<BothTelemetryMounts />);
     const filters = registeredFilters();
     act(() => writeAnalyticsConsent("denied"));
@@ -134,32 +141,33 @@ describe("Vercel telemetry uses the existing consent contract", () => {
   it("reacts to another tab's consent and rechecks the stored decision before sending", () => {
     render(<BothTelemetryMounts />);
     act(() => {
-      localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+      setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
       window.dispatchEvent(new StorageEvent("storage", { key: ANALYTICS_CONSENT_STORAGE_KEY }));
     });
     expectBothScriptsOnce();
     const filters = registeredFilters();
     // The send guard must not wait for React or a storage notification.
-    localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "denied");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "denied");
     filters.forEach((filter) => expect(filter({ type: "event" })).toBeNull());
   });
 
   it("fails closed after storage is cleared", () => {
-    localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     render(<BothTelemetryMounts />);
     const filters = registeredFilters();
     act(() => {
-      localStorage.removeItem(ANALYTICS_CONSENT_STORAGE_KEY);
+      removeLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY);
       window.dispatchEvent(new StorageEvent("storage", { key: null }));
     });
     filters.forEach((filter) => expect(filter({ type: "event" })).toBeNull());
   });
 
   it("fails closed if storage becomes unreadable after telemetry loaded", () => {
-    localStorage.setItem(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
+    setLocalStorageItemForTest(ANALYTICS_CONSENT_STORAGE_KEY, "granted");
     render(<BothTelemetryMounts />);
     const filters = registeredFilters();
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    const storageOwner = getLocalStorageMethodOwnerForTest(ensureLocalStorageForTest(), "getItem");
+    vi.spyOn(storageOwner, "getItem").mockImplementation(() => {
       throw new Error("Storage unavailable");
     });
     filters.forEach((filter) => expect(filter({ type: "event" })).toBeNull());

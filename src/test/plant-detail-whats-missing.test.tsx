@@ -126,6 +126,8 @@ describe("buildPlantDetailWhatsMissing", () => {
     expect(result[0].cta?.kind).toBe("quicklog");
     expect(result[0].cta?.label).toBe("Add Quick Log");
     expect(result[0].cta?.event).toBe("open-quicklog");
+    expect(result[0].cta?.eventPayload).toEqual({ plantId: "p-1", growId: null });
+    expect(result[0].cta?.eventPayload).not.toHaveProperty("activityId");
   });
 
   it("shows stage unknown prompt when stage is null", () => {
@@ -206,6 +208,17 @@ describe("buildPlantDetailWhatsMissing", () => {
     expect(prompt.title).toBe("No recent watering or feed note");
     expect(prompt.description).toMatch(/Watering and feeding logs/);
     expect(prompt.cta?.kind).toBe("quicklog");
+    expect(prompt.cta?.eventPayload).toEqual({ plantId: "p-1", growId: null });
+    expect(prompt.cta?.eventPayload).not.toHaveProperty("activityId");
+  });
+
+  it("includes grow context in generic quicklog handoffs without forcing photo mode", () => {
+    const result = buildPlantDetailWhatsMissing(
+      makeInput({ hasTimelineEntries: false, growId: "g-1" }),
+    );
+    const timeline = result.find((r) => r.kind === "no_timeline")!;
+    expect(timeline.cta!.eventPayload).toEqual({ plantId: "p-1", growId: "g-1" });
+    expect(timeline.cta!.eventPayload).not.toHaveProperty("activityId");
   });
 
   it("limits prompts to 3 maximum", () => {

@@ -91,4 +91,23 @@ describe("Plant Detail missing-context Quick Log targets", () => {
     expect(screen.queryByRole("button", { name: "Add Quick Log" })).not.toBeInTheDocument();
     expect(captured).toEqual([]);
   });
+
+  it("keeps loading from offering missing-context Quick Log prompts", () => {
+    activity.isLoading = true;
+    activity.data = [] as unknown[];
+    render(panel(plantB));
+
+    expect(screen.getByTestId("plant-detail-whats-missing-loading")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add Quick Log" })).not.toBeInTheDocument();
+    expect(captured).toEqual([]);
+  });
+
+  it("does not force photo mode in generic Quick Log handoffs", () => {
+    render(panel(plantB));
+
+    fireEvent.click(screen.getByTestId("plant-detail-whats-missing-cta-no_timeline"));
+
+    expect(captured[0]).toEqual({ plantId: plantB, growId });
+    expect(captured[0]).not.toHaveProperty("activityId");
+  });
 });

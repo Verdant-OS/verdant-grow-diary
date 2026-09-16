@@ -272,6 +272,19 @@ export default function Sensors() {
   );
 
   const hasReadings = filtered.length > 0;
+  const manualHistoryPending = Boolean(activeTentId) && quickLogManualQuery.isPending;
+  const manualHistoryUnavailable = Boolean(activeTentId) && quickLogManualQuery.isError;
+  const manualHistoryIncomplete = manualHistoryPending || manualHistoryUnavailable;
+  const manualHistoryStateLabel = manualHistoryUnavailable
+    ? "Unavailable"
+    : quickLogManualQuery.fetchStatus === "paused"
+      ? "Waiting for connection"
+      : "Checking readings";
+  const manualHistoryMessage = manualHistoryUnavailable
+    ? "Quick Log manual history could not be fully checked. Try the read again."
+    : quickLogManualQuery.fetchStatus === "paused"
+      ? "Waiting for connection to check Quick Log manual history."
+      : "Checking Quick Log manual history…";
 
   const manualTents = tents.map((t) => ({ id: t.id as string, name: t.name as string }));
   const selectTentByGrower = (nextTentId: string) => {
@@ -377,11 +390,33 @@ export default function Sensors() {
         ))}
         <GrowDataSourceBadge classification={classification} className="ml-2" />
       </div>
-      <EnvironmentStabilityCard
-        testId="sensors-environment-stability"
-        className="mb-4"
-        result={vpdStability}
-      />
+      {manualHistoryUnavailable ? (
+        <div className="mb-4">
+          <GrowDataLoadError
+            resource="Quick Log manual history"
+            testId="sensors-manual-history-error"
+            message="Some Quick Log manual readings could not be checked. Available readings remain visible; previously loaded readings may be out of date."
+            onRetry={() => {
+              void quickLogManualQuery.refetch();
+            }}
+          />
+        </div>
+      ) : manualHistoryPending ? (
+        <p
+          role="status"
+          className="mb-4 text-sm text-muted-foreground"
+          data-testid="sensors-manual-history-pending"
+        >
+          {manualHistoryMessage}
+        </p>
+      ) : null}
+      {(!manualHistoryIncomplete || vpdStabilityReadings.length > 0) && (
+        <EnvironmentStabilityCard
+          testId="sensors-environment-stability"
+          className="mb-4"
+          result={vpdStability}
+        />
+      )}
       {/* Presenter-only reconciliation: a derived VPD estimate can exist on
           the VPD card while stability is unavailable (no directly measured
           VPD series). Name both facts so they cannot read as contradictory. */}
@@ -432,6 +467,10 @@ export default function Sensors() {
             isDerived,
             recentValues,
           });
+          const unresolvedManualMetric =
+            manualHistoryIncomplete &&
+            (m.key === "temp" || m.key === "rh" || m.key === "vpd") &&
+            value == null;
           const soilMoistureView =
             m.key === "soil" &&
             latestMetricReading &&
@@ -514,15 +553,15 @@ export default function Sensors() {
                   )}
                   <span
                     data-testid={`sensors-metric-state-${m.key}`}
-                    data-kind={state.kind}
+                    data-kind={unresolvedManualMetric ? "unresolved" : state.kind}
                     data-tone={state.tone}
                     className={cn(
                       "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]",
                       stateToneClass,
                     )}
-                    title={state.message}
+                    title={unresolvedManualMetric ? manualHistoryMessage : state.message}
                   >
-                    {state.label}
+                    {unresolvedManualMetric ? manualHistoryStateLabel : state.label}
                   </span>
                   {m.key === "soil" && soilMoistureView && soilBadgeToneClass && (
                     <span
@@ -561,7 +600,7 @@ export default function Sensors() {
                   className="text-xs text-muted-foreground py-6 text-center"
                   data-testid={`sensors-empty-${m.key}`}
                 >
-                  {state.message}
+                  {unresolvedManualMetric ? manualHistoryMessage : state.message}
                 </p>
               )}
               {m.key === "vpd" && isDerived && (
@@ -783,14 +822,16 @@ export default function Sensors() {
         </div>
       </div>
       <SensorSourceLegendCompact className="mt-4 max-w-xl" testId="sensors-source-legend-compact" />
-      <SensorSourceSummaryWidget
-        className="mt-4 max-w-xl"
-        readings={filtered.map((r) => ({
-          source: (r as unknown as { source?: string | null }).source ?? null,
-          captured_at: (r as unknown as { captured_at?: string | null }).captured_at ?? null,
-          ts: r.ts,
-        }))}
-      />
+      {(hasReadings || !manualHistoryIncomplete) && (
+        <SensorSourceSummaryWidget
+          className="mt-4 max-w-xl"
+          readings={filtered.map((r) => ({
+            source: (r as unknown as { source?: string | null }).source ?? null,
+            captured_at: (r as unknown as { captured_at?: string | null }).captured_at ?? null,
+            ts: r.ts,
+          }))}
+        />
+      )}
       <div className="mt-4 max-w-xl">
         <SensorBridgeHealthCard
           sensorReadings={defaultManualTentId ? trendReadings : []}

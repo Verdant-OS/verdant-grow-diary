@@ -11,8 +11,11 @@ const backend = vi.hoisted(() => ({
   rejectFirstWrite: false,
 }));
 const telemetry = vi.hoisted(() => vi.fn());
+const authState = vi.hoisted(() => ({ userId: "owner-a" }));
 vi.mock("@/lib/quickLogSuccessTelemetry", () => ({ trackQuickLogSuccess: telemetry }));
-vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: "owner-a" }, loading: false }) }));
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: authState.userId }, loading: false }),
+}));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: async (_name: string, input: Payload) => {
@@ -77,9 +80,27 @@ beforeEach(() => {
   backend.rows = new Map();
   backend.loseFirstReply = true;
   backend.rejectFirstWrite = false;
+  authState.userId = "owner-a";
   telemetry.mockReset();
   window.sessionStorage.clear();
 });
+
+async function loseHarvestReply() {
+  selectActivity("harvest");
+  fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-wet"), {
+    target: { value: "120" },
+  });
+  fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-dry"), {
+    target: { value: "22" },
+  });
+  fireEvent.change(screen.getByTestId("quick-log-all-activities-harvest-unit"), {
+    target: { value: "oz" },
+  });
+  enterNote();
+  save();
+  await screen.findByTestId("quick-log-all-activities-error");
+  await waitFor(() => expect(screen.getByTestId("quick-log-all-activities-save")).toBeEnabled());
+}
 
 describe("All activity types retry confirmation", () => {
   for (const activity of ["training", "note", "environment_check"]) {
@@ -190,6 +211,44 @@ describe("All activity types retry confirmation", () => {
     fireEvent.click(screen.getByTestId("quick-log-all-activities-cancel"));
     selectActivity("training");
     enterNote();
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved");
+    expect(backend.posts[1].p_idempotency_key).not.toBe(backend.posts[0].p_idempotency_key);
+  });
+
+  it("keeps the harvest idempotency key after an accepted write loses its reply", async () => {
+    mount();
+    await loseHarvestReply();
+    expect(backend.rows.size).toBe(1);
+    save();
+    await screen.findByTestId("quick-log-all-activities-saved");
+    expect(backend.posts).toHaveLength(2);
+    expect(backend.posts[1].p_idempotency_key).toBe(backend.posts[0].p_idempotency_key);
+    expect(backend.posts[1]).toMatchObject({
+      p_event_type: "harvest",
+      p_details: expect.objectContaining({
+        harvest: expect.objectContaining({ wetWeight: "120", dryWeight: "22", weightUnit: "oz" }),
+      }),
+    });
+    expect(telemetry).toHaveBeenCalledWith("harvest", { reused: true });
+  });
+
+  it("mints a fresh save identity when the signed-in owner changes mid-draft", async () => {
+    const view = mount();
+    await loseReply();
+    authState.userId = "owner-b";
+    await act(async () =>
+      view.rerender(
+        <MemoryRouter>
+          <QuickLogAllActivitiesSection
+            growId="grow-a"
+            tentId="tent-a"
+            plantId="plant-a"
+            plantStage="flower"
+          />
+        </MemoryRouter>,
+      ),
+    );
     save();
     await screen.findByTestId("quick-log-all-activities-saved");
     expect(backend.posts[1].p_idempotency_key).not.toBe(backend.posts[0].p_idempotency_key);

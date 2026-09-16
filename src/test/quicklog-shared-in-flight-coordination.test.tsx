@@ -621,6 +621,35 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(childActivityButton("feeding")).toBeEnabled();
   });
 
+  it("reuses the child note idempotency key when retrying after an unconfirmed save", async () => {
+    harness.rpc
+      .mockResolvedValueOnce({ data: null, error: { message: "Reply unavailable" } })
+      .mockResolvedValueOnce({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: true },
+        error: null,
+      });
+    renderQuickLog();
+    const childSave = await prepareChildNote();
+
+    fireEvent.click(childSave);
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId("quick-log-dialog-all-activities-error")).toHaveTextContent(
+      /save is unconfirmed/i,
+    );
+
+    fireEvent.click(childSave);
+    await waitFor(() => expect(harness.rpc).toHaveBeenCalledTimes(2));
+
+    const firstPayload = harness.rpc.mock.calls[0][1] as { p_idempotency_key?: string };
+    const secondPayload = harness.rpc.mock.calls[1][1] as { p_idempotency_key?: string };
+    expect(firstPayload.p_idempotency_key).toBeTruthy();
+    expect(secondPayload.p_idempotency_key).toBe(firstPayload.p_idempotency_key);
+    expect(await screen.findByTestId("quick-log-dialog-all-activities-saved-item")).toHaveAttribute(
+      "data-saved-activity-id",
+      "note",
+    );
+  });
+
   it("locks every existing child draft mutation while the main save owns the shared guard", async () => {
     const pending = deferredRpc();
     harness.rpc.mockReturnValue(pending.promise);

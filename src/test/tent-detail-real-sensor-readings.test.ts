@@ -40,7 +40,14 @@ describe("TentDetail · real sensor readings", () => {
     expect(TENT_DETAIL).toMatch(/resolveImportedSensorHistoryReadStatus/);
     expect(TENT_DETAIL).toMatch(/importedHistory\.isFetching/);
     expect(TENT_DETAIL).toMatch(/importedHistory\.isError/);
+    expect(TENT_DETAIL).toMatch(/importedHistory\.isPending/);
+    expect(TENT_DETAIL).toMatch(/importedHistory\.isPaused/);
     expect(TENT_DETAIL).toMatch(/importedHistory\.refetch/);
+    const panelStart = TENT_DETAIL.indexOf("<ImportedSensorHistoryPanel");
+    const panelEnd = TENT_DETAIL.indexOf("/>", panelStart);
+    const panel = TENT_DETAIL.slice(panelStart, panelEnd);
+    expect(panel).toContain("isPending: importedHistory.isPending");
+    expect(panel).toContain("isPaused: importedHistory.isPaused");
   });
 
   it("passes active-plant loading/error truth without inferring the first plant", () => {
@@ -62,6 +69,8 @@ describe("TentDetail · real sensor readings", () => {
     expect(panel).toContain("resolveImportedHistoryHandoffReadStatus");
     expect(panel).toContain("isError: activePlantsIsError");
     expect(panel).toContain("isFetching: activePlantsIsFetching");
+    expect(panel).toContain("isPending: activePlantsQuery.isPending");
+    expect(panel).toContain("isPaused: activePlantsQuery.isPaused");
     expect(panel).not.toContain("activePlants[0]");
   });
 

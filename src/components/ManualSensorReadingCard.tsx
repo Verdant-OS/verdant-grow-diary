@@ -505,8 +505,9 @@ export default function ManualSensorReadingCard({
         interactionRevisionRef.current === submissionRevision
       ) {
         setSaveUnconfirmed(true);
+        toast.error(msg);
       }
-      toast.error(msg);
+      if (submissionCorrection) toast.error(msg);
       // Developer-safe diagnostic: console only, not in UI.
 
       console.warn("[manual-sensor-save] failed");

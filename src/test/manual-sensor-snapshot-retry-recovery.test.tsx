@@ -18,6 +18,7 @@ const backend = vi.hoisted(() => ({
   rejectFirstWrite: false,
   readError: false,
   readTransform: null as null | ((rows: Row[]) => Row[]),
+  firstWriteGate: null as Promise<void> | null,
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
@@ -53,6 +54,7 @@ vi.mock("@/integrations/supabase/client", () => ({
         insert: async (input: Row[]) => {
           const rows = input.map((row) => ({ ...row }));
           backend.posts.push(rows);
+          if (backend.posts.length === 1 && backend.firstWriteGate) await backend.firstWriteGate;
           if (backend.rejectFirstWrite && backend.posts.length === 1) {
             return { error: { code: "42501", message: "Write rejected" } };
           }
@@ -126,6 +128,7 @@ beforeEach(() => {
     rejectFirstWrite: false,
     readError: false,
     readTransform: null,
+    firstWriteGate: null,
   });
 });
 afterEach(() => vi.useRealTimers());
@@ -235,6 +238,30 @@ describe("manual snapshot retry confirmation", () => {
     expect(backend.posts[1]).toHaveLength(1);
     expect(backend.posts[1][0]).toMatchObject({ tent_id: TENT_B, value: 26 });
     expect(backend.rows.filter((row) => row.tent_id === TENT_A)).toHaveLength(2);
+  });
+
+  it("does not attach an earlier failed save's retry message to a new tent draft", async () => {
+    let release!: () => void;
+    backend.firstWriteGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    backend.rejectFirstWrite = true;
+    const view = renderCard();
+    fireEvent.change(screen.getByLabelText(/Air temp/i), { target: { value: "25" } });
+    fireEvent.click(screen.getByTestId("manual-reading-save"));
+    fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
+    await waitFor(() => expect(backend.posts).toHaveLength(1));
+    await act(async () => view.changeTarget());
+    fireEvent.change(screen.getByLabelText(/Air temp/i), { target: { value: "26" } });
+    await act(async () => {
+      release();
+      await backend.firstWriteGate;
+    });
+    await waitFor(() => expect(screen.getByTestId("manual-reading-save")).toBeEnabled());
+    expect(screen.getByLabelText(/Air temp/i)).toHaveValue(26);
+    expect(screen.queryByTestId("manual-reading-save-unconfirmed")).not.toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(backend.rows).toHaveLength(0);
   });
 });
 

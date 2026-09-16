@@ -7,6 +7,10 @@ import {
   CSV_SENSOR_SOURCE,
 } from "@/lib/environmentCsvImportPersistence";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
+import {
+  dedupeKeyOf,
+  type ExistingKeysQueryScope,
+} from "@/lib/csv-import/sensorReadingsBatchInsert";
 
 const SCOPE = {
   user_id: "u1",
@@ -298,4 +302,48 @@ describe("CSV import response-loss recovery", () => {
       expect(result.error).not.toContain("private rejected row");
     },
   );
+});
+
+describe("CSV import — tent-scoped dedupe", () => {
+  it("does not treat the same captured_at in another tent as a duplicate", async () => {
+    const persisted: ReturnType<typeof buildSensorReadingInserts> = [];
+    const client = {
+      insertSensorReadings: vi.fn(async (batch: typeof persisted) => {
+        persisted.push(...batch);
+        return { error: null, insertedCount: batch.length };
+      }),
+      fetchExistingSensorReadingKeys: async (scope: ExistingKeysQueryScope) =>
+        new Set(
+          persisted
+            .filter((r) => scope.tentIds.includes(r.tent_id))
+            .map((r) => dedupeKeyOf(r))
+            .filter((key): key is string => key != null),
+        ),
+    };
+
+    const observations = [
+      row({
+        rowNumber: 1,
+        captured_at: "2026-06-09T10:00:00.000Z",
+        vpd_source: "csv",
+        vpd_kpa: 1.11,
+      }),
+      row({
+        rowNumber: 2,
+        captured_at: "2026-06-09T11:00:00.000Z",
+        vpd_source: "csv",
+        vpd_kpa: 1.23,
+      }),
+    ];
+    const primary = { ...SCOPE, tent_id: "t-primary", plant_id: null };
+    const secondary = { ...SCOPE, tent_id: "t-secondary", plant_id: null };
+
+    const first = await persistCsvEnvironmentRows(observations, primary, client);
+    const second = await persistCsvEnvironmentRows(observations, secondary, client);
+
+    expect(first.insertedCount).toBe(6);
+    expect(second.insertedCount).toBe(6);
+    expect(persisted).toHaveLength(12);
+    expect(client.insertSensorReadings).toHaveBeenCalledTimes(2);
+  });
 });

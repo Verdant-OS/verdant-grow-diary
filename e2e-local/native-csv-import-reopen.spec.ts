@@ -125,8 +125,17 @@ async function signInCurrentDocument(page: Page, f: LocalFixture) {
     // /welcome navigation. Use whichever real public entry is displayed.
     await expect(email.or(landingSignIn).first()).toBeVisible();
     if (!(await email.isVisible())) await landingSignIn.click();
-    await email.fill(f.owner.email);
-    await page.locator("#signin-password").fill(f.owner.password);
+    phase = "preparing the sign-in form";
+    const password = page.locator("#signin-password");
+    // A late route replacement can discard an early fill. Prepare the actual
+    // visible form until both values are retained; submit auth only once.
+    // Compare booleans so a failed setup never prints credentials.
+    await expect(async () => {
+      await email.fill(f.owner.email);
+      await password.fill(f.owner.password);
+      expect((await email.inputValue()) === f.owner.email).toBe(true);
+      expect((await password.inputValue()) === f.owner.password).toBe(true);
+    }).toPass({ timeout: 15_000 });
     phase = "submitting the sign-in form";
     await page
       .getByRole("button", { name: /sign in|log in|continue/i })

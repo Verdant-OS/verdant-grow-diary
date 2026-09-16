@@ -63,6 +63,8 @@ export type TimelinePageReadViewKind =
   | "scope_error"
   | "timeline_error"
   | "ready_empty"
+  /** Successful current-scope core read with zero rows while date bounds are applied. */
+  | "ready_empty_date_window"
   | "ready";
 
 export type TimelinePageRetryTarget = "grows" | "timeline" | null;
@@ -96,6 +98,11 @@ export interface BuildTimelinePageReadViewInput {
   coreRead: TimelineCoreReadState | null | undefined;
   /** Count of required, merged Timeline evidence for the core read. */
   evidenceCount: unknown;
+  /**
+   * True when the active read key includes at least one applied, already-validated
+   * date bound. Invalid/inverted ranges must not set this — they apply no bound.
+   */
+  hasAppliedDateBounds?: boolean;
   supplementalLoading?: boolean;
   partialSources?: ReadonlyArray<TimelineSupplementalReadSource | null | undefined> | null;
 }
@@ -185,7 +192,7 @@ export function buildTimelinePageReadView(
   const partialSources = mergeTimelinePartialSources(input?.partialSources);
   if (evidenceCount === 0) {
     return {
-      kind: "ready_empty",
+      kind: input?.hasAppliedDateBounds === true ? "ready_empty_date_window" : "ready_empty",
       showTimelineContent: true,
       showSensorsNextStep: false,
       showSupplementalLoading: input?.supplementalLoading === true,

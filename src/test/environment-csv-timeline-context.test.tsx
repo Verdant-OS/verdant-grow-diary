@@ -9,10 +9,126 @@ import {
   CSV_DERIVED_VPD_LABEL,
 } from "@/lib/environmentCsvTimelineContextViewModel";
 import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentChip";
+import { parseEnvironmentCSVText } from "@/lib/csvParser";
+import { buildSensorReadingInserts } from "@/lib/environmentCsvImportPersistence";
 
 const TENT_A = "tent-a";
 const TENT_B = "tent-b";
 const GROW_A = "grow-a";
+
+describe("CSV timeline VPD origin", () => {
+  const capturedAt = "2026-06-01T10:00:00.000Z";
+  const entry = { id: "origin-entry", grow_id: GROW_A, tent_id: TENT_A, occurred_at: capturedAt };
+
+  function snapshotFor(rows: Parameters<typeof buildCsvTimelineContext>[0]["sensorReadings"]) {
+    return buildCsvTimelineContext({
+      diaryEntries: [entry],
+      sensorReadings: rows,
+      growId: GROW_A,
+      tentId: TENT_A,
+    })[0].snapshot!;
+  }
+
+  it.each([
+    { value: "1.70", origin: "csv", label: "CSV VPD" },
+    { value: "", origin: "derived", label: "Derived VPD" },
+  ])("keeps parser/mapper $origin and renders $label", ({ value, origin, label }) => {
+    const parsed = parseEnvironmentCSVText(
+      ["Timestamp,Temp(°C),RH,VPD", `${capturedAt},25,55,${value}`].join("\n"),
+    );
+    expect(parsed.validRows).toHaveLength(1);
+    expect(parsed.validRows[0].vpd_source).toBe(origin);
+    const rows = buildSensorReadingInserts(parsed.validRows, {
+      user_id: "user-a",
+      grow_id: GROW_A,
+      tent_id: TENT_A,
+    });
+    const vpd = rows.find((row) => row.metric === "vpd_kpa")!;
+    expect(vpd.raw_payload.vpd_source).toBe(origin);
+    const before = JSON.stringify(rows);
+    const snapshot = snapshotFor(rows);
+    expect(snapshot.derivedVpdKpa).toBe(vpd.value);
+    expect(snapshot.derivedVpdLabel).toBe(label);
+    expect(snapshot.sourceLabel).toBe("CSV");
+    expect(snapshot.capturedAt).toBe(capturedAt);
+    render(<CsvTimelineEnvironmentChip diaryEntryId="origin" snapshot={snapshot} />);
+    const chip = screen.getByTestId("csv-timeline-chip-origin");
+    expect(chip.textContent).toContain(`${label}: ${vpd.value.toFixed(2)} kPa`);
+    expect(chip.textContent).not.toContain(origin === "csv" ? "Derived VPD" : "CSV VPD");
+    expect(chip.textContent?.toLowerCase()).not.toContain("live");
+    expect(JSON.stringify(rows)).toBe(before);
+  });
+
+  it("uses the VPD metric's origin rather than another metric's metadata", () => {
+    const snapshot = snapshotFor([
+      {
+        ...csvRow("temperature_c", 25, capturedAt),
+        raw_payload: { grow_id: GROW_A, vpd_source: "csv" },
+      },
+      {
+        ...csvRow("vpd_kpa", 1.42, capturedAt),
+        raw_payload: { grow_id: GROW_A, vpd_source: "derived" },
+      },
+    ]);
+    expect(snapshot.derivedVpdKpa).toBe(1.42);
+    expect(snapshot.derivedVpdLabel).toBe("Derived VPD");
+  });
+
+  it.each(["csv", "derived"])(
+    "keeps the label paired with the selected first VPD row (%s)",
+    (origin) => {
+      const rows = [
+        {
+          ...csvRow("vpd_kpa", 1.7, capturedAt),
+          raw_payload: { grow_id: GROW_A, vpd_source: origin },
+        },
+        {
+          ...csvRow("vpd_kpa", 1.42, capturedAt),
+          raw_payload: { grow_id: GROW_A, vpd_source: origin === "csv" ? "derived" : "csv" },
+        },
+      ];
+      const snapshot = snapshotFor(rows);
+      expect(snapshot.derivedVpdKpa).toBe(1.7);
+      expect(snapshot.derivedVpdLabel).toBe(origin === "csv" ? "CSV VPD" : "Derived VPD");
+    },
+  );
+
+  it("ignores a closer CSV VPD from another tent or grow", () => {
+    const rows = [
+      {
+        ...csvRow("vpd_kpa", 9, capturedAt, TENT_B),
+        raw_payload: { grow_id: GROW_A, vpd_source: "csv" },
+      },
+      {
+        ...csvRow("vpd_kpa", 8, capturedAt),
+        raw_payload: { grow_id: "other-grow", vpd_source: "csv" },
+      },
+      {
+        ...csvRow("vpd_kpa", 1.42, "2026-06-01T10:10:00Z"),
+        raw_payload: { grow_id: GROW_A, vpd_source: "derived" },
+      },
+    ];
+    const snapshot = snapshotFor(rows);
+    expect(snapshot.derivedVpdKpa).toBe(1.42);
+    expect(snapshot.derivedVpdLabel).toBe("Derived VPD");
+    expect(snapshot.capturedAt).toBe("2026-06-01T10:10:00.000Z");
+  });
+
+  it("does not render a non-finite VPD even with CSV origin", () => {
+    const snapshot = snapshotFor([
+      {
+        ...csvRow("vpd_kpa", Number.NaN, capturedAt),
+        raw_payload: { grow_id: GROW_A, vpd_source: "csv" },
+      },
+    ]);
+    expect(snapshot.derivedVpdKpa).toBeNull();
+    const { container } = render(
+      <CsvTimelineEnvironmentChip diaryEntryId="invalid-vpd" snapshot={snapshot} />,
+    );
+    expect(container.textContent).not.toContain("VPD");
+    expect(container.textContent).not.toContain("NaN");
+  });
+});
 
 function csvRow(
   metric: "temperature_c" | "humidity_pct" | "vpd_kpa",

@@ -125,6 +125,8 @@ export interface PersistResult {
   duplicateCount: number;
   /** True when earlier atomic batches committed before a later batch failed. */
   partialWrite: boolean;
+  /** A dispatched batch may have committed without an acknowledged response. */
+  unconfirmedWrite?: boolean;
   /** Always grower-safe copy. Raw database diagnostics never cross this boundary. */
   error: string | null;
 }
@@ -161,14 +163,27 @@ export async function persistCsvEnvironmentRows(
     ? client.fetchExistingSensorReadingKeys.bind(client)
     : async () => new Set<string>();
 
+  let unconfirmedWrite = false;
   const result = await runDuplicateAwareCsvHistoryImport({
     rows: inserts,
     vendorLabel: "environment",
     batchSize: chunkSize,
     fetchExistingKeys,
     insertBatch: async (batch) => {
-      const res = await client.insertSensorReadings(batch);
-      return { error: res.error };
+      try {
+        const res = await client.insertSensorReadings(batch);
+        // Only well-formed data/constraint/access rejections establish that
+        // this atomic insert failed. Transport and unknown codes (including
+        // 40003, statement_completion_unknown) never establish zero writes.
+        if (res.error && !/^(22|23|42)[0-9A-Z]{3}$/.test(res.error.code ?? "")) {
+          unconfirmedWrite = true;
+        }
+        return { error: res.error };
+      } catch {
+        // Return through the batch helper so earlier acknowledged counts survive.
+        unconfirmedWrite = true;
+        return { error: { message: "CSV insert response unavailable" } };
+      }
     },
   });
 
@@ -191,7 +206,8 @@ export async function persistCsvEnvironmentRows(
       insertedCount: result.insertedRows,
       duplicateCount: result.duplicateRows,
       partialWrite,
-      error: buildCsvImportFailureMessage(result.insertedRows, partialWrite),
+      ...(unconfirmedWrite ? { unconfirmedWrite: true } : {}),
+      error: buildCsvImportFailureMessage(result.insertedRows, partialWrite, unconfirmedWrite),
     };
   }
 

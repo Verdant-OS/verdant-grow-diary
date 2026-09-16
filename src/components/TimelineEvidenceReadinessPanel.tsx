@@ -77,7 +77,7 @@ export default function TimelineEvidenceReadinessPanel({ context, extras, classN
           { key: "recent-photos", label: "Photos", value: view.counts.recentPhotos },
           {
             key: "recent-snapshots",
-            label: "Sensor snapshots",
+            label: "Sensor readings (7d)",
             value: view.counts.recentSensorSnapshots,
           },
           { key: "recent-watering", label: "Watering", value: view.counts.recentWatering },

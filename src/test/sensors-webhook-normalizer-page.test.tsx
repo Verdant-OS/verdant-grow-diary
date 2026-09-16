@@ -42,7 +42,7 @@ describe("SensorsIngestNormalizer", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn> | null = null;
 
   beforeEach(() => {
-    fetchSpy = vi.spyOn(globalThis, "fetch" as never).mockImplementation(() => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("fetch must not be called by the normalizer screen");
     }) as never;
     supabaseSpies.from.mockClear();

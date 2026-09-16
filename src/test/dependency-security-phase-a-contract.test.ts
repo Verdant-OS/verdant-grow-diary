@@ -80,7 +80,7 @@ describe("dependency security Phase A resolution floors", () => {
       packageJson.devDependencies.postcss,
     ).toBe(true);
     expect(
-      isAtLeast(parseVersion(packageJson.devDependencies.vitest), [3, 2, 6]),
+      isAtLeast(parseVersion(packageJson.devDependencies.vitest), [4, 1, 11]),
       packageJson.devDependencies.vitest,
     ).toBe(true);
   });
@@ -91,11 +91,13 @@ describe("dependency security Phase A resolution floors", () => {
     ["esbuild", [0, 28, 1] as const],
     ["fast-uri", [3, 1, 6] as const],
     ["form-data", [4, 0, 6] as const],
-    ["js-yaml", [4, 3, 1] as const],
+    ["js-yaml", [4, 3, 2] as const],
+    ["hono", [4, 13, 5] as const],
+    ["qs", [6, 16, 0] as const],
     ["ajv", [6, 15, 0] as const],
     ["picomatch", [2, 3, 2] as const],
-    ["rollup", [4, 59, 0] as const],
-    ["vitest", [3, 2, 6] as const],
+    ["vitest", [4, 1, 11] as const],
+    ["@vitest/mocker", [4, 1, 11] as const],
     ["nanoid", [3, 3, 18] as const],
   ])("resolves every %s instance at or above %s in both locks", (packageName, minimum) => {
     for (const [lockName, versions] of [
@@ -108,6 +110,20 @@ describe("dependency security Phase A resolution floors", () => {
           isAtLeast(version, minimum),
           `${lockName}: ${packageName}@${version.join(".")}`,
         ).toBe(true);
+      }
+    }
+  });
+
+  it("keeps any remaining Rollup resolutions patched without requiring its retired subtree", () => {
+    // Vitest 4 can reuse root Vite/Rolldown; npm removes the old Vite 7/Rollup graph.
+    for (const [lockName, versions] of [
+      ["bun.lock", resolvedVersions("rollup")],
+      ["package-lock.json", npmResolvedVersions("rollup")],
+    ] as const) {
+      for (const version of versions) {
+        expect(isAtLeast(version, [4, 59, 0]), `${lockName}: rollup@${version.join(".")}`).toBe(
+          true,
+        );
       }
     }
   });
@@ -164,7 +180,9 @@ describe("dependency security Phase A resolution floors", () => {
       esbuild: "0.28.1",
       "fast-uri": "3.1.6",
       "form-data": "4.0.6",
-      "js-yaml": "4.3.1",
+      "js-yaml": "4.3.2",
+      hono: "4.13.5",
+      qs: "6.16.0",
       nanoid: "3.3.18",
     });
     expect(packageJson.overrides?.postcss).toBeUndefined();

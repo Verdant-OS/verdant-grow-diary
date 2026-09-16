@@ -49,6 +49,24 @@ function truth(overrides: Partial<SensorTruthAssessment> = {}): SensorTruthAsses
 }
 
 describe("buildSensorSnapshotReadModel", () => {
+  it("labels a legacy manual snapshot canonically without inventing confidence or freshness", () => {
+    const m = buildSensorSnapshotReadModel({
+      snapshot: liveSnap({ source: "manual", device_id: null, ts: STALE }),
+      truth: truth({ stale: true, hasInvalid: true, reasonChips: ["Temperature invalid"] }),
+      now: NOW,
+    });
+    expect(m.source).toBe("manual");
+    expect(m.sourceIdentityLabel).toBe("Identity: manual_entry");
+    expect(m.transportLabel).toBe("Transport: manual");
+    expect(m.confidenceLabel).toBe("Confidence: unknown");
+    expect(m.isStale).toBe(true);
+    expect(m.isInvalid).toBe(true);
+    expect(m.capturedAt).toBe(STALE);
+    expect(m.warnings).toEqual(["Temperature invalid"]);
+    expect(m.emptyState).toBe(SENSOR_SNAPSHOT_INVALID_NOTICE);
+    expect(m.sourceLabel).not.toMatch(/live/i);
+  });
+
   it("returns missing model when snapshot is null", () => {
     const m = buildSensorSnapshotReadModel({ snapshot: null, now: NOW });
     expect(m.isMissing).toBe(true);
@@ -61,6 +79,22 @@ describe("buildSensorSnapshotReadModel", () => {
       "Transport: unknown",
       "Confidence: unknown",
     ]);
+  });
+
+  it("keeps a manual device hint separate from acquisition identity", () => {
+    const m = buildSensorSnapshotReadModel({
+      snapshot: liveSnap({ source: "manual", device_id: "manual:Handheld meter" }),
+      now: NOW,
+    });
+    expect(m.sourceLabel).toBe("Source: Manual");
+    expect(m.sourceIdentityLabel).toBe("Identity: manual_entry");
+    expect(m.transportLabel).toBe("Transport: manual");
+    expect(m.confidenceLabel).toBe("Confidence: unknown");
+    expect(m.badges.map((badge) => badge.label)).toContain("Device hint: Handheld meter");
+    expect(m.badges.map((badge) => badge.label)).not.toContain("Identity: manual:Handheld meter");
+    expect(m.rawPayloadFieldCount).toBe(0);
+    expect(m.capturedAt).toBe(FRESH);
+    expect(m.isStale).toBe(false);
   });
 
   it("returns missing model when snapshot is unavailable", () => {

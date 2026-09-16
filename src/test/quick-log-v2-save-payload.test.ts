@@ -31,6 +31,24 @@ function base(overrides = {}) {
 }
 
 describe("quickLogV2SavePayload", () => {
+  it("adds the canonical manual envelope beside existing details for supplied measurements", () => {
+    const details = Object.freeze({ event_type: "note", plant_id: "p1", tags: ["inspection"] });
+    const result = buildQuickLogV2SavePayload(base({ temperatureC: "25", details }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected a sensor-bearing payload");
+    expect(result.payload.p_details).toEqual({
+      ...details,
+      manual_provenance: {
+        source: "manual",
+        source_identity: "manual_entry",
+        transport: "manual",
+        confidence: null,
+      },
+    });
+    expect(details).toEqual({ event_type: "note", plant_id: "p1", tags: ["inspection"] });
+    expect(result.payload.p_idempotency_key).toBe("quicklog-v2-test-key-0001");
+  });
+
   it("threads the idempotency key into p_idempotency_key", () => {
     const r = buildQuickLogV2SavePayload(base());
     expect(r.ok).toBe(true);
@@ -56,6 +74,25 @@ describe("quickLogV2SavePayload", () => {
     expect(r.payload.p_note).toBe("hello");
     expect(r.payload.p_target_type).toBe("plant");
     expect(r.payload.p_target_id).toBe("p1");
+    expect(r.payload).not.toHaveProperty("p_details");
+  });
+
+  it("treats supplied zero humidity as manual evidence and replaces conflicting provenance", () => {
+    const details = Object.freeze({
+      manual_provenance: { source: "live", confidence: 1 },
+    });
+    const r = buildQuickLogV2SavePayload(base({ humidityPct: "0", details }));
+    if (!r.ok) throw new Error("expected valid zero humidity");
+    expect(r.payload.p_humidity_pct).toBe(0);
+    expect(r.payload.p_details).toEqual({
+      manual_provenance: {
+        source: "manual",
+        source_identity: "manual_entry",
+        transport: "manual",
+        confidence: null,
+      },
+    });
+    expect(details).toEqual({ manual_provenance: { source: "live", confidence: 1 } });
   });
 
   it("blocks save when target unresolved", () => {

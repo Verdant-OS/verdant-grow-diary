@@ -102,6 +102,11 @@ describe("imported CSV history response honesty", () => {
     await expect(fetchImportedSensorHistory(TENT_ID)).rejects.toThrow(/unavailable/i);
   });
 
+  it("returns CSV rows when Supabase responds with a valid array", async () => {
+    response.data = [CSV_ROW];
+    await expect(fetchImportedSensorHistory(TENT_ID)).resolves.toEqual([CSV_ROW]);
+  });
+
   it("reserves empty history for a successfully returned empty array", async () => {
     renderHistory();
     expect(await screen.findByTestId("imported-history-empty")).toHaveTextContent(

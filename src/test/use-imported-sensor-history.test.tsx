@@ -19,6 +19,7 @@ interface FixtureRow {
 const queryState = vi.hoisted(() => ({
   rows: [] as FixtureRow[],
   calls: [] as string[],
+  overrideResponse: null as { data: unknown; error: Error | null } | null,
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -59,6 +60,9 @@ vi.mock("@/integrations/supabase/client", () => {
       },
       limit(limit: number) {
         queryState.calls.push(`limit:${limit}`);
+        if (queryState.overrideResponse) {
+          return Promise.resolve(queryState.overrideResponse);
+        }
         const filtered = queryState.rows.filter(
           (row) =>
             (tentId === null || row.tent_id === tentId) &&
@@ -129,6 +133,7 @@ function wrapper({ children }: { children: ReactNode }) {
 beforeEach(() => {
   queryState.rows = [];
   queryState.calls = [];
+  queryState.overrideResponse = null;
 });
 
 describe("useImportedSensorHistory", () => {
@@ -236,5 +241,19 @@ describe("useImportedSensorHistory", () => {
     expect(ids.at(-1)).toBe("csv-005");
     expect(ids).not.toContain("csv-004");
     expect(ids).not.toContain("csv-000");
+  });
+
+  it("fails closed when Supabase returns a null payload instead of an array", async () => {
+    queryState.overrideResponse = { data: null, error: null };
+
+    const { result } = renderHook(() => useImportedSensorHistory(TENT_ID), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    expect(result.current.error).toMatchObject({
+      message: expect.stringMatching(/unavailable/i),
+    });
+    expect(result.current.data).toBeUndefined();
   });
 });

@@ -25,6 +25,21 @@ export type CoreCensusRoute = {
   fieldPolicy: FieldExercisePolicy;
 };
 
+/** Keep every route contract while bounding each independent browser sweep. */
+export function batchCensusRoutes<T>(
+  routes: readonly T[],
+  maxRoutes: number,
+): readonly (readonly T[])[] {
+  if (!Number.isSafeInteger(maxRoutes) || maxRoutes < 1) {
+    throw new Error("Census batch limit must be a positive integer.");
+  }
+  const batches: T[][] = [];
+  for (let offset = 0; offset < routes.length; offset += maxRoutes) {
+    batches.push(routes.slice(offset, offset + maxRoutes));
+  }
+  return batches;
+}
+
 export const PRIVILEGED_ROUTE_PREFIXES = [
   "/admin",
   "/diagnostics",
@@ -144,6 +159,11 @@ export const PUBLIC_CORE_CENSUS_ROUTES = [
   { path: "/privacy", label: "Privacy", fieldPolicy: "audit-only" },
   { path: "/refund", label: "Refund policy", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
+
+// The public sweep includes field exercises and revisits every safe internal
+// href. One cumulative timer for all 35 routes left little hosted-runner
+// headroom; each batch keeps the full route/link/network assertions.
+export const PUBLIC_CORE_CENSUS_BATCHES = batchCensusRoutes(PUBLIC_CORE_CENSUS_ROUTES, 7);
 
 export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
   { path: "/dashboard", label: "Dashboard", fieldPolicy: "fill-safe-fields" },

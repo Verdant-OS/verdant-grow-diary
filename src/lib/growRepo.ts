@@ -122,5 +122,11 @@ export async function insertSensorReading(row: SensorReadingInsert): Promise<voi
 export async function insertSensorReadingsBatch(rows: SensorReadingInsert[]): Promise<void> {
   if (!rows || rows.length === 0) return;
   const { error } = await supabase.from("sensor_readings").insert(rows);
-  if (error) fail("insertSensorReadingsBatch", error);
+  if (error) {
+    // Keep the structured code so a frozen manual retry can verify a genuine
+    // uniqueness conflict; callers must never infer one from message text.
+    throw Object.assign(new Error(`growRepo.insertSensorReadingsBatch: ${error.message}`), {
+      code: error.code,
+    });
+  }
 }

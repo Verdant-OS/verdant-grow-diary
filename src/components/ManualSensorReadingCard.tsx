@@ -118,6 +118,8 @@ const EMPTY: ManualEntryInput = {
 };
 
 const STANDARD_TARGET_CONTEXT = "manual-reading-standard";
+const STANDARD_SAVE_UNCONFIRMED_MESSAGE =
+  "Manual snapshot save is unconfirmed. Your readings are still here. Retry this snapshot to confirm it.";
 
 function correctionToPrefill(
   ctx: ManualCorrectionContext | null | undefined,
@@ -166,6 +168,7 @@ export default function ManualSensorReadingCard({
   const [deviceCustom, setDeviceCustom] = useState<string>("");
   const [reviewOpen, setReviewOpen] = useState(false);
   const [lastSaved, setLastSaved] = useState<LastSavedConfirmation | null>(null);
+  const [saveUnconfirmed, setSaveUnconfirmed] = useState(false);
   const insert = useInsertSensorReading();
   const insertBatch = useInsertSensorReadings();
   const isSaving = insert.isPending || insertBatch.isPending;
@@ -174,6 +177,17 @@ export default function ManualSensorReadingCard({
   const targetContextRef = useRef(`${initialTentId}\n${correctionIdentity}`);
   const interactionRevisionRef = useRef(0);
   const saveInFlightRef = useRef(false);
+  const pendingStandardSnapshotRef = useRef<{
+    context: string;
+    revision: number;
+    payloads: ReturnType<typeof buildManualReadingPayloads>;
+  } | null>(null);
+  const pendingDraft = pendingStandardSnapshotRef.current;
+  const draftCapturedAt =
+    pendingDraft?.context === targetContextRef.current &&
+    pendingDraft.revision === interactionRevisionRef.current
+      ? pendingDraft.payloads[0]?.captured_at
+      : undefined;
 
   const changeTentTarget = useCallback(
     (nextTentId: string, nextForm: ManualEntryInput, nextContext = STANDARD_TARGET_CONTEXT) => {
@@ -189,6 +203,8 @@ export default function ManualSensorReadingCard({
       setDeviceCustom("");
       setReviewOpen(false);
       setLastSaved(null);
+      setSaveUnconfirmed(false);
+      pendingStandardSnapshotRef.current = null;
     },
     [],
   );
@@ -253,8 +269,8 @@ export default function ManualSensorReadingCard({
   );
   const snapshotQuality = useMemo(() => {
     // Build a sanitized snapshot from validated metrics only. No raw_payload,
-    // no vendor metadata, no tokens, no private IDs. captured_at = now since
-    // the grower is entering a current reading right now.
+    // no vendor metadata, no tokens, no private IDs. A retry retains the
+    // submitted observation time rather than making an older reading fresh.
     const fields: Record<string, number> = {};
     for (const m of validation.metrics) {
       if (m.metric === "temperature_c") fields.temperature_c = m.value;
@@ -264,11 +280,11 @@ export default function ManualSensorReadingCard({
     }
     const snap: ManualSensorSnapshotInput = {
       source: "manual",
-      captured_at: new Date().toISOString(),
+      captured_at: draftCapturedAt ?? new Date().toISOString(),
       ...fields,
     };
     return evaluateManualSensorSnapshotQuality(snap);
-  }, [validation.metrics]);
+  }, [validation.metrics, draftCapturedAt]);
 
   // Structured pre-save review (source: "manual", never live). Renders inside
   // the review prompt so the grower sees findings + normalized preview before
@@ -281,10 +297,10 @@ export default function ManualSensorReadingCard({
       soilWaterContent: form.soilMoisturePct,
       co2Ppm: form.co2Ppm,
       ppfd: form.ppfd,
-      capturedAt: new Date().toISOString(),
+      capturedAt: draftCapturedAt ?? new Date().toISOString(),
       tentId: tentId || null,
     });
-  }, [form, airTempFBridge, tentId]);
+  }, [form, airTempFBridge, tentId, draftCapturedAt]);
 
   // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
@@ -312,10 +328,10 @@ export default function ManualSensorReadingCard({
     }
     return validateManualSensorSnapshotFields({
       source: "manual",
-      capturedAt: new Date().toISOString(),
+      capturedAt: draftCapturedAt ?? new Date().toISOString(),
       ...fields,
     });
-  }, [validation.metrics, form.vpdKpa]);
+  }, [validation.metrics, form.vpdKpa, draftCapturedAt]);
   const enteredVpd =
     fieldValidation.derivedVpd.kind === "entered" ? fieldValidation.derivedVpd.vpdKpa : null;
   const derivedVpdFromTempRh = useMemo(() => {
@@ -338,6 +354,7 @@ export default function ManualSensorReadingCard({
 
   function update<K extends keyof ManualEntryInput>(key: K, value: string) {
     interactionRevisionRef.current += 1;
+    setSaveUnconfirmed(false);
     setHasEditedReading(true);
     setForm((f) => ({ ...f, [key]: value }));
     // Any edit invalidates a previously-shown review prompt so it must be
@@ -350,6 +367,7 @@ export default function ManualSensorReadingCard({
 
   function updateDevicePreset(value: string) {
     interactionRevisionRef.current += 1;
+    setSaveUnconfirmed(false);
     setDevicePreset(value);
     if (reviewOpen) setReviewOpen(false);
     if (lastSaved) setLastSaved(null);
@@ -357,6 +375,7 @@ export default function ManualSensorReadingCard({
 
   function updateDeviceCustom(value: string) {
     interactionRevisionRef.current += 1;
+    setSaveUnconfirmed(false);
     setDeviceCustom(value);
     if (reviewOpen) setReviewOpen(false);
     if (lastSaved) setLastSaved(null);
@@ -372,11 +391,26 @@ export default function ManualSensorReadingCard({
     const submissionRevision = interactionRevisionRef.current;
     const submissionCorrection = correction;
     const capturedMetrics = validation.metrics;
-    const payloads = buildManualReadingPayloads({
-      tentId: submissionTentId,
-      metrics: capturedMetrics,
-      deviceNote,
-    });
+    const pendingSnapshot = pendingStandardSnapshotRef.current;
+    const payloads =
+      !submissionCorrection &&
+      pendingSnapshot?.context === submissionTargetContext &&
+      pendingSnapshot.revision === submissionRevision
+        ? pendingSnapshot.payloads
+        : buildManualReadingPayloads({
+            tentId: submissionTentId,
+            metrics: capturedMetrics,
+            deviceNote,
+          });
+    if (!submissionCorrection) {
+      // Retrying an unchanged snapshot must retain its database identity and
+      // observation time, including when the first reply was lost after commit.
+      pendingStandardSnapshotRef.current = {
+        context: submissionTargetContext,
+        revision: submissionRevision,
+        payloads,
+      };
+    }
     try {
       let auditWarnings = 0;
       if (submissionCorrection) {
@@ -427,8 +461,13 @@ export default function ManualSensorReadingCard({
         // multi-row INSERT, so PostgreSQL either commits every metric or
         // rejects the whole snapshot.
         await insertBatch.mutateAsync(payloads);
+        if (pendingStandardSnapshotRef.current?.payloads === payloads) {
+          pendingStandardSnapshotRef.current = null;
+        }
       }
-      const createdAt = new Date().toISOString();
+      const createdAt = submissionCorrection
+        ? new Date().toISOString()
+        : (payloads[0]?.captured_at ?? new Date().toISOString());
       const successLine = buildManualSaveSuccessLine({ metrics: capturedMetrics });
       toast.success(successMessage ?? successLine);
       if (auditWarnings > 0) {
@@ -446,6 +485,7 @@ export default function ManualSensorReadingCard({
         tentIdRef.current === submissionTentId &&
         interactionRevisionRef.current === submissionRevision;
       if (submissionStillOwnsDraft) {
+        setSaveUnconfirmed(false);
         setLastSaved({ line: successLine, capturedAt: createdAt, tentId: submissionTentId });
         setForm(EMPTY);
         setHasEditedReading(false);
@@ -456,8 +496,18 @@ export default function ManualSensorReadingCard({
     } catch (err) {
       // Preserve entered values (we don't clear the form on failure) and
       // surface a safe operator-facing error. Never echo raw internals.
-      const msg = mapManualSaveErrorToUserMessage(err);
-      toast.error(msg);
+      const msg = submissionCorrection
+        ? mapManualSaveErrorToUserMessage(err)
+        : STANDARD_SAVE_UNCONFIRMED_MESSAGE;
+      if (
+        !submissionCorrection &&
+        targetContextRef.current === submissionTargetContext &&
+        interactionRevisionRef.current === submissionRevision
+      ) {
+        setSaveUnconfirmed(true);
+        toast.error(msg);
+      }
+      if (submissionCorrection) toast.error(msg);
       // Developer-safe diagnostic: console only, not in UI.
 
       console.warn("[manual-sensor-save] failed");
@@ -900,6 +950,16 @@ export default function ManualSensorReadingCard({
                 guidance.
               </p>
             </section>
+
+            {saveUnconfirmed && (
+              <p
+                role="status"
+                className="text-xs text-muted-foreground"
+                data-testid="manual-reading-save-unconfirmed"
+              >
+                {STANDARD_SAVE_UNCONFIRMED_MESSAGE}
+              </p>
+            )}
 
             {lastSaved && (
               <div

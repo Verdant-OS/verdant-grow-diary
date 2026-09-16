@@ -441,6 +441,39 @@ describe("Plant Detail recent activity recap — read-state honesty", () => {
       expectNoUnverifiedSummary();
     });
   }
+  for (const data of [{ rows: [] }, {}, "broken-payload", 42]) {
+    it(`does not coerce non-array ${typeof data} payloads into an empty recap`, () => {
+      useRecentMock.mockReturnValue({ ...success(), data });
+      render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+      expect(
+        screen.getByTestId("plant-detail-recent-activity-recap-unavailable"),
+      ).toHaveTextContent("Recent plant activity is unavailable.");
+      expectNoUnverifiedSummary();
+    });
+  }
+  it("keeps the first isLoading read in the loading branch instead of unavailable", () => {
+    useRecentMock.mockReturnValue({
+      ...success(),
+      data: undefined,
+      isLoading: true,
+      isPending: true,
+      fetchStatus: "fetching",
+    });
+    render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+    expect(screen.getByTestId("plant-detail-recent-activity-recap-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-detail-recent-activity-recap-unavailable")).toBeNull();
+    expectNoUnverifiedSummary();
+  });
+  it("keeps View full timeline available while activity is unavailable", () => {
+    useRecentMock.mockReturnValue({ ...success(), data: undefined, isError: true });
+    render(<PlantDetailRecentActivityRecap plantId="p1" onAddQuickCheck={openQuickLog} />);
+    expect(
+      screen.getByTestId("plant-detail-recent-activity-recap-view-timeline"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("plant-detail-recent-activity-recap-unavailable"),
+    ).toBeInTheDocument();
+  });
   it("keeps the failure visible and disables Retry while the retry is running", () => {
     useRecentMock.mockReturnValue({
       ...success([savedNote()]),
@@ -452,6 +485,7 @@ describe("Plant Detail recent activity recap — read-state honesty", () => {
     expect(screen.getByRole("alert")).toBeInTheDocument();
     const retry = screen.getByRole("button", { name: "Retry recent activity" });
     expect(retry).toBeDisabled();
+    expect(retry).toHaveTextContent("Retrying…");
     fireEvent.click(retry);
     expect(refetch).not.toHaveBeenCalled();
     expectNoUnverifiedSummary();
@@ -525,6 +559,18 @@ describe("Plant Detail recent activity recap — static safety", () => {
 
   it("component avoids writes/RPC/unsafe paths", () => {
     for (const re of FORBIDDEN) expect(COMPONENT).not.toMatch(re);
+  });
+
+  it("recap fails closed on query errors before empty/recovery branches", () => {
+    expect(COMPONENT).toMatch(/isError,\s*isFetching,\s*fetchStatus,\s*refetch/);
+    expect(COMPONENT).toContain("Recent plant activity is unavailable.");
+    expect(COMPONENT).toContain('data-testid="plant-detail-recent-activity-recap-unavailable"');
+    expect(COMPONENT).toContain('aria-label="Retry recent activity"');
+    expect(COMPONENT).toMatch(/!Array\.isArray\(rawRows\)/);
+    expect(COMPONENT).toMatch(
+      /!plantId\s*\?[\s\S]*?:\s*unavailable\s*\?[\s\S]*?:\s*isLoading\s*\|\|\s*isPending/,
+    );
+    expect(COMPONENT).not.toMatch(/buildPlantRecentActivity\(rawRows\s*\?\?\s*\[\]/);
   });
 
   it("page wires the recap to the existing Quick Log opener", () => {

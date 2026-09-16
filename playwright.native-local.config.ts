@@ -22,17 +22,18 @@ if (
 
 export default defineConfig({
   testDir: "./e2e-local",
-  testMatch: ["native-save-retrieve.spec.ts", "native-csv-import-reopen.spec.ts"],
+  testMatch: [
+    "native-save-retrieve.spec.ts",
+    "native-csv-import-reopen.spec.ts",
+    "native-revision-recovery.spec.ts",
+  ],
   timeout: 180_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,
   retries: 0,
   forbidOnly: true,
-  reporter: [
-    ["list"],
-    ["json", { outputFile: "native-local-results/report.json" }],
-  ],
+  reporter: [["list"], ["json", { outputFile: "native-local-results/report.json" }]],
   outputDir: "native-local-results/browser",
   use: {
     baseURL: uiUrl,

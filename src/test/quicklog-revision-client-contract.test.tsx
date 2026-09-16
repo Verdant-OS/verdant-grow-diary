@@ -155,12 +155,14 @@ describe("Quick Log revision client contract", () => {
     });
 
     expect(supabaseMock.rpc).toHaveBeenNthCalledWith(1, "quicklog_retract_entry", {
+      p_idempotency_key: expect.any(String),
       p_reason_code: "accidental",
       p_grow_event_id: undefined,
       p_diary_entry_id: "diary-1",
       p_reason_note: undefined,
     });
     expect(supabaseMock.rpc).toHaveBeenNthCalledWith(2, "quicklog_correct_entry", {
+      p_idempotency_key: expect.any(String),
       p_reason_code: "typo",
       p_changes: { note: "Corrected note" },
       p_grow_event_id: undefined,

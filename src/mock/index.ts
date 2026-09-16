@@ -1,4 +1,5 @@
 // Mock data layer. Swap to Supabase later by replacing `src/hooks/useMockData.ts`.
+import type { PlantHealth } from "@/lib/plantHealthRules";
 
 export type Stage = "seedling" | "veg" | "flower" | "flush" | "harvest" | "cure";
 
@@ -22,7 +23,8 @@ export interface Plant {
   /** null when the source row has no stage or an unmapped value. */
   stage: Stage | null;
   startedAt: string;
-  health: "healthy" | "watch" | "issue";
+  /** Recorded profile value, or client-only unknown when absent or invalid. */
+  health: PlantHealth;
   photo: string;
   lastNote: string;
   growId?: string | null;

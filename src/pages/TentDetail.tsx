@@ -842,9 +842,6 @@ export default function TentDetail() {
                           {archivedLabel.kind === "merged" ? "Merged / Archived" : "Archived"}
                         </Badge>
                       )}
-                      <p className="text-[11px] text-muted-foreground mt-1 capitalize">
-                        {p.health}
-                      </p>
                     </div>
                   </Link>
                   <div className="absolute top-2 right-2">

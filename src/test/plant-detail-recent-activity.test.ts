@@ -227,6 +227,21 @@ describe("Plant Detail wiring", () => {
     expect(PANEL).toContain("plant-recent-activity-empty");
   });
 
+  it("panel fails closed on query errors before the empty-state branch", () => {
+    expect(PANEL).toMatch(/isError,\s*isFetching,\s*refetch/);
+    expect(PANEL).toContain("Recent plant activity is unavailable.");
+    expect(PANEL).toContain('data-testid="plant-recent-activity-unavailable"');
+    expect(PANEL).toContain('aria-label="Retry recent activity"');
+    expect(PANEL).toMatch(/isLoading\s*\|\|\s*isPending\s*\?\s*[\s\S]*?:\s*isError\s*\?/);
+    expect(PANEL).toMatch(/isError\s*\?[\s\S]*?:\s*rows\.length\s*===\s*0\s*\?/);
+  });
+
+  it("fetch boundary rejects non-array payloads and surfaces read errors", () => {
+    expect(HOOK).toMatch(/if\s*\(\s*error\s*\)\s*throw\s*error/);
+    expect(HOOK).toContain("Plant recent activity is unavailable.");
+    expect(HOOK).toMatch(/if\s*\(\s*!Array\.isArray\(data\)\s*\)/);
+  });
+
   it("hook queries diary_entries scoped to plant_id and orders newest-first", () => {
     expect(HOOK).toMatch(/\.from\(["']diary_entries["']\)/);
     expect(HOOK).toMatch(/\.eq\(["']plant_id["']/);

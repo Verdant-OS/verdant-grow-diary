@@ -6,7 +6,7 @@
  * calls happen during render.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import AiDoctorContextReadinessPanel from "@/components/AiDoctorContextReadinessPanel";
 import { compileAiDoctorContextFromRows } from "@/lib/aiDoctorEngine";
 
@@ -53,6 +53,118 @@ function ctx(
 }
 
 describe("AiDoctorContextReadinessPanel", () => {
+  it.each(["idle", "loading"] as const)(
+    "shows Loading… instead of a retained alert count when alerts are %s",
+    (openAlertsStatus) => {
+      const onRetryAlerts = vi.fn();
+      render(
+        <AiDoctorContextReadinessPanel
+          context={ctx([], [])}
+          openAlertsCount={42}
+          openAlertsStatus={openAlertsStatus}
+          onRetryAlerts={onRetryAlerts}
+        />,
+      );
+
+      expect(
+        screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent,
+      ).toBe("Loading…");
+      expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+      expect(onRetryAlerts).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([0, 42])("shows Unavailable with Retry alerts instead of count %s", (count) => {
+    const onRetryAlerts = vi.fn();
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={count}
+        openAlertsStatus="unavailable"
+        onRetryAlerts={onRetryAlerts}
+      />,
+    );
+
+    const alertCount = screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts");
+    expect(alertCount.textContent).toContain("Unavailable");
+    expect(alertCount.textContent).not.toMatch(/\d/);
+    const retry = screen.getByRole("button", { name: "Retry alerts" });
+    expect(retry.getAttribute("type")).toBe("button");
+    expect(onRetryAlerts).not.toHaveBeenCalled();
+    fireEvent.click(retry);
+    expect(onRetryAlerts).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("shows No assigned tent instead of a retained alert count", () => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={42}
+        openAlertsStatus="no_tent"
+        onRetryAlerts={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent,
+    ).toBe("No assigned tent");
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it.each([0, 127])("shows successful open alert count %s without a display cap", (count) => {
+    render(
+      <AiDoctorContextReadinessPanel
+        context={ctx([], [])}
+        openAlertsCount={count}
+        openAlertsStatus="ok"
+        onRetryAlerts={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent,
+    ).toBe(String(count));
+    expect(screen.queryByRole("button", { name: "Retry alerts" })).toBeNull();
+  });
+
+  it("hides a previous successful count through loading and failure until recovery", () => {
+    const context = ctx([], []);
+    const { rerender } = render(
+      <AiDoctorContextReadinessPanel
+        context={context}
+        openAlertsCount={42}
+        openAlertsStatus="ok"
+      />,
+    );
+    const alertCount = () =>
+      screen.getByTestId("ai-doctor-context-readiness-panel-count-open-alerts").textContent;
+    expect(alertCount()).toBe("42");
+
+    rerender(
+      <AiDoctorContextReadinessPanel
+        context={context}
+        openAlertsCount={42}
+        openAlertsStatus="loading"
+      />,
+    );
+    expect(alertCount()).toBe("Loading…");
+
+    rerender(
+      <AiDoctorContextReadinessPanel
+        context={context}
+        openAlertsCount={42}
+        openAlertsStatus="unavailable"
+      />,
+    );
+    expect(alertCount()).toBe("Unavailable");
+
+    rerender(
+      <AiDoctorContextReadinessPanel context={context} openAlertsCount={0} openAlertsStatus="ok" />,
+    );
+    expect(alertCount()).toBe("0");
+  });
+
   it("renders 'Ready for cautious check-in' when context is strong", () => {
     const context = ctx(
       [{ occurred_at: ago(12 * HOUR), event_type: "watering", source: "manual" }],

@@ -241,55 +241,164 @@ describe("countOpenAlerts — 'open alerts' copy stays truthful", () => {
   });
 });
 
-describe("usePlantAssignedTentAlerts — failed reads remain unavailable and retryable", () => {
-  it("exposes the existing alert reload and recovers a rejected first read to successful zero", async () => {
-    listAlertsMock.mockRejectedValueOnce(new Error("alert read failed")).mockResolvedValueOnce([]);
+describe("usePlantAssignedTentAlerts — read state and existing reload", () => {
+  function deferredRows() {
+    let resolve!: (rows: AlertRow[]) => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<AlertRow[]>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  it("exposes the existing reload and recovers a failed read to successful zero", async () => {
+    const retry = deferredRows();
+    listAlertsMock
+      .mockRejectedValueOnce(new Error("Alerts unavailable"))
+      .mockReturnValueOnce(retry.promise);
     const { result } = renderHook(() => usePlantAssignedTentAlerts(TENT, GROW));
 
     await waitFor(() => expect(result.current.status).toBe("unavailable"));
-    expect(result.current.openCount).toBe(0);
-    expect(result.current.error).toBe("alert read failed");
-    expect(result.current.reload).toEqual(expect.any(Function));
-    act(() => result.current.reload());
-
-    await waitFor(() => expect(result.current.status).toBe("ok"));
-    expect(result.current.openCount).toBe(0);
+    expect(result.current.error).toBe("Alerts unavailable");
+    expect(result.current.reload).toBeTypeOf("function");
+    const reload = result.current.reload;
+    act(() => reload());
+    expect(result.current.status).toBe("loading");
     expect(result.current.error).toBeNull();
     expect(listAlertsMock).toHaveBeenCalledTimes(2);
-    expect(listAlertsMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ growId: GROW, statuses: [...ASSIGNED_TENT_ALERT_STATUSES] }),
-    );
+    expect(listAlertsMock.mock.calls[1][0]).toEqual(listAlertsMock.mock.calls[0][0]);
+
+    await act(async () => retry.resolve([]));
+    expect(result.current.status).toBe("ok");
+    expect(result.current.openCount).toBe(0);
+    expect(result.current.activeCount).toBe(0);
+    expect(result.current.reload).toBe(reload);
   });
 
-  it("retains the existing loading/unavailable contract when a refresh fails after populated success", async () => {
-    let rejectRefresh!: (reason: Error) => void;
+  it("marks retained counts loading, reports refresh failure, then recovers uncapped counts", async () => {
+    const refresh = deferredRows();
+    const retry = deferredRows();
     listAlertsMock
-      .mockResolvedValueOnce([alert({ id: "open-1" }), alert({ id: "open-2" })])
-      .mockImplementationOnce(
-        () =>
-          new Promise<AlertRow[]>((_, reject) => {
-            rejectRefresh = reject;
-          }),
-      )
-      .mockResolvedValueOnce([alert({ id: "open-recovered" })]);
+      .mockResolvedValueOnce([alert()])
+      .mockReturnValueOnce(refresh.promise)
+      .mockReturnValueOnce(retry.promise);
     const { result } = renderHook(() => usePlantAssignedTentAlerts(TENT, GROW));
 
     await waitFor(() => expect(result.current.status).toBe("ok"));
-    expect(result.current.openCount).toBe(2);
-    expect(result.current.reload).toEqual(expect.any(Function));
+    expect(result.current.openCount).toBe(1);
+    expect(result.current.reload).toBeTypeOf("function");
     act(() => result.current.reload());
-    await waitFor(() => expect(result.current.status).toBe("loading"));
-    // The underlying hook retains rows while loading. Consumers must honor
-    // status instead of showing this retained number as a completed read.
-    expect(result.current.openCount).toBe(2);
-    await act(async () => rejectRefresh(new Error("alert refresh failed")));
-    await waitFor(() => expect(result.current.status).toBe("unavailable"));
-    expect(result.current.openCount).toBe(0);
-    expect(result.current.error).toBe("alert refresh failed");
+    expect(result.current.status).toBe("loading");
+    // Numeric API stays compatible; callers must gate it on the read status.
+    expect(result.current.openCount).toBe(1);
 
+    await act(async () => refresh.reject(new Error("Refresh failed")));
+    expect(result.current.status).toBe("unavailable");
+    expect(result.current.error).toBe("Refresh failed");
     act(() => result.current.reload());
+    expect(result.current.status).toBe("loading");
+
+    await act(async () =>
+      retry.resolve([
+        ...Array.from({ length: 8 }, (_, i) => alert({ id: `open-${i}` })),
+        alert({ id: "ack", status: "acknowledged" }),
+      ]),
+    );
+    expect(result.current.status).toBe("ok");
+    expect(result.current.error).toBeNull();
+    expect(result.current.rows).toHaveLength(ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT);
+    expect(result.current.openCount).toBe(8);
+    expect(result.current.activeCount).toBe(9);
+    expect(listAlertsMock).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    [GROW, "g2"],
+    [GROW, null],
+    [null, GROW],
+  ])(
+    "reports loading on the first render when grow scope changes from %s to %s",
+    async (from, to) => {
+      const nextRead = deferredRows();
+      listAlertsMock.mockResolvedValueOnce([alert()]).mockReturnValueOnce(nextRead.promise);
+      const statuses: string[] = [];
+      const { result, rerender } = renderHook(
+        ({ growId }: { growId: string | null }) => {
+          const state = usePlantAssignedTentAlerts(TENT, growId);
+          statuses.push(state.status);
+          return state;
+        },
+        { initialProps: { growId: from } },
+      );
+      await waitFor(() => expect(result.current.status).toBe("ok"));
+      statuses.length = 0;
+
+      rerender({ growId: to });
+      // Checking every render catches the old 'ok' before useAlertsList's effect.
+      expect(statuses[0]).toBe("loading");
+      expect(statuses).not.toContain("ok");
+      expect(listAlertsMock).toHaveBeenLastCalledWith(expect.objectContaining({ growId: to }));
+
+      await act(async () => nextRead.resolve([]));
+      expect(result.current.status).toBe("ok");
+      expect(result.current.openCount).toBe(0);
+    },
+  );
+
+  it("reports idle immediately on unassignment and loading immediately on reassignment", async () => {
+    const nextRead = deferredRows();
+    listAlertsMock.mockResolvedValueOnce([alert()]).mockReturnValueOnce(nextRead.promise);
+    const statuses: string[] = [];
+    const { result, rerender } = renderHook(
+      ({ tentId }: { tentId: string | null }) => {
+        const state = usePlantAssignedTentAlerts(tentId, GROW);
+        statuses.push(state.status);
+        return state;
+      },
+      { initialProps: { tentId: TENT as string | null } },
+    );
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    statuses.length = 0;
+
+    rerender({ tentId: null });
+    expect(statuses[0]).toBe("idle");
+    expect(result.current.openCount).toBe(0);
+    expect(result.current.rows).toEqual([]);
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
+    statuses.length = 0;
+
+    rerender({ tentId: TENT });
+    expect(statuses[0]).toBe("loading");
+    expect(statuses).not.toContain("ok");
+    await act(async () => nextRead.resolve([alert()]));
+    expect(result.current.status).toBe("ok");
+    expect(result.current.openCount).toBe(1);
+    expect(listAlertsMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses the successful grow-scoped read immediately when only the assigned tent changes", async () => {
+    respondWith([
+      alert({ id: "first" }),
+      alert({ id: "second-a", tent_id: "t2" }),
+      alert({ id: "second-b", tent_id: "t2" }),
+    ]);
+    const statuses: string[] = [];
+    const { result, rerender } = renderHook(
+      ({ tentId }) => {
+        const state = usePlantAssignedTentAlerts(tentId, GROW);
+        statuses.push(state.status);
+        return state;
+      },
+      { initialProps: { tentId: TENT } },
+    );
     await waitFor(() => expect(result.current.status).toBe("ok"));
     expect(result.current.openCount).toBe(1);
-    expect(listAlertsMock).toHaveBeenCalledTimes(3);
+    statuses.length = 0;
+
+    rerender({ tentId: "t2" });
+    expect(statuses).toEqual(["ok"]);
+    expect(result.current.openCount).toBe(2);
+    expect(listAlertsMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -8,7 +8,7 @@
  *
  * No writes. No action_queue. No alert mutations.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import {
   ASSIGNED_TENT_ALERTS_DEFAULT_LIMIT,
@@ -32,8 +32,8 @@ export interface UsePlantAssignedTentAlertsResult {
   /** Active (open + acknowledged) count for the tent, also uncapped. */
   activeCount: number;
   error: string | null;
-  /** Retry only this existing alerts read. */
-  reload: () => void;
+  /** Retry only the existing alerts read; performs no writes. */
+  reload: ReturnType<typeof useAlertsList>["reload"];
 }
 
 export function usePlantAssignedTentAlerts(
@@ -41,6 +41,8 @@ export function usePlantAssignedTentAlerts(
   growId: string | null | undefined,
   limit?: number,
 ): UsePlantAssignedTentAlertsResult {
+  const scopedGrowId = growId ?? null;
+  const enabled = !!tentId;
   // Ask the server for exactly the statuses the rules layer treats as active.
   //
   // This query used to narrow to open-only, which `listAlerts` turns into an
@@ -54,10 +56,27 @@ export function usePlantAssignedTentAlerts(
   // long tail of resolved/dismissed rows can never crowd an older active alert
   // out of the result set.
   const { status, alerts, error, reload } = useAlertsList(
-    { growId: growId ?? null, statuses: ASSIGNED_TENT_ALERT_STATUSES },
+    { growId: scopedGrowId, statuses: ASSIGNED_TENT_ALERT_STATUSES },
     // No tent means the rules layer returns [] regardless — don't read at all.
     { enabled: !!tentId },
   );
+  // useAlertsList updates its state in a passive effect. Until that effect
+  // starts the new read, its previous 'ok' must not validate a different scope.
+  // This effect follows useAlertsList's effect, so accepting the scope and its
+  // loading state happen together. Changing tents within one grow needs no read.
+  const [readScope, setReadScope] = useState({ growId: scopedGrowId, enabled });
+  useEffect(() => {
+    setReadScope((previous) =>
+      previous.growId === scopedGrowId && previous.enabled === enabled
+        ? previous
+        : { growId: scopedGrowId, enabled },
+    );
+  }, [scopedGrowId, enabled]);
+  const scopedStatus = !enabled
+    ? "idle"
+    : readScope.growId !== scopedGrowId || readScope.enabled !== enabled
+      ? "loading"
+      : status;
   // Select once, uncapped, then derive both the display slice and the counts
   // from it — counting the capped slice is what produced the false zero.
   const active = useMemo(
@@ -69,5 +88,5 @@ export function usePlantAssignedTentAlerts(
     [active, limit],
   );
   const openCount = useMemo(() => countOpenAlerts(active), [active]);
-  return { status, rows, openCount, activeCount: active.length, error, reload };
+  return { status: scopedStatus, rows, openCount, activeCount: active.length, error, reload };
 }

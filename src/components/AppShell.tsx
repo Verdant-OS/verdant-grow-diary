@@ -40,23 +40,23 @@ import {
 } from "@/lib/quickLogV2OpenIntent";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isSignOutNavigationPending } = useAuth();
   const hydrated = useHydrated();
   const location = useLocation();
   const previousNavigationKeyRef = useRef(location.key);
   // Protected-route boundary: re-validate session against the auth server.
   // Keep both session checks on the same signed-out destination. Sending the
-  // server revalidation to /auth while the shell sent cached-session misses to
-  // /welcome created a race at the public root and bypassed the landing page.
-  // The destination stays /welcome; buildSignedOutRedirect only appends a
-  // manifest-validated redirectTo so a signed-out deep link (e.g. a /plants
-  // bookmark) can be restored after sign-in instead of silently dropped.
+  // server revalidation and cached-session misses to /auth preserves the
+  // manifest-validated return path. An explicit sign-out owns its separate
+  // destination and suppresses both guards until that navigation commits.
   const signedOutRedirect = buildSignedOutRedirect(
     location.pathname,
     location.search,
     location.hash,
   );
-  const { status: authStatus } = useRequireAuth(signedOutRedirect);
+  const { status: authStatus } = useRequireAuth(signedOutRedirect, {
+    isRedirectSuppressed: isSignOutNavigationPending,
+  });
   // One server-validated session gate for every private REST read this shell
   // issues: a cached user while getUser() is still settling, missed
   // (revalidation_failed) or is about to redirect must not fire any of them.
@@ -224,8 +224,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // updated while AppShell is rendering (React update-during-render error,
   // asserted clean by the never-healthy E2E console check).
   useEffect(() => {
-    if (!loading && !user) nav(signedOutRedirect, { replace: true });
-  }, [loading, user, nav, signedOutRedirect]);
+    if (!loading && !user && !isSignOutNavigationPending?.())
+      nav(signedOutRedirect, { replace: true });
+  }, [loading, user, nav, signedOutRedirect, isSignOutNavigationPending]);
 
   // Never carry an open structured sheet or typed intent across navigations,
   // including same-path scope changes. Seeding the ref from the initial key

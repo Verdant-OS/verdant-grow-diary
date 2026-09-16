@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
 
 export type RequireAuthStatus =
   "loading" | "authenticated" | "unauthenticated" | "revalidation_failed";
@@ -64,6 +65,8 @@ export function classifyRevalidationFailure(error: unknown): RevalidationFailure
 export interface RequireAuthOptions {
   /** Test seam for the bounded wait; production uses AUTH_REVALIDATION_TIMEOUT_MS. */
   timeoutMs?: number;
+  /** Consult at action time: an explicit sign-out owns its own destination. */
+  isRedirectSuppressed?: () => boolean;
 }
 
 export function useRequireAuth(
@@ -75,6 +78,7 @@ export function useRequireAuth(
 } {
   const nav = useNavigate();
   const timeoutMs = options?.timeoutMs ?? AUTH_REVALIDATION_TIMEOUT_MS;
+  const isRedirectSuppressed = options?.isRedirectSuppressed;
   const [status, setStatus] = useState<RequireAuthStatus>("loading");
   const [retryToken, setRetryToken] = useState(0);
 
@@ -114,7 +118,7 @@ export function useRequireAuth(
     };
     const redirectUnauthenticated = () => {
       setStatus("unauthenticated");
-      nav(redirectTo, { replace: true });
+      if (!isRedirectSuppressed?.()) nav(redirectTo, { replace: true });
     };
     const revalidationFailed = () => setStatus("revalidation_failed");
 
@@ -145,7 +149,11 @@ export function useRequireAuth(
           // Sign out — never a redirect carrying a stale "Signed in".
           armBound();
           void Promise.resolve()
-            .then(() => supabase.auth.signOut({ scope: "local" }))
+            .then(() =>
+              getAuthSignOutOperation(supabase.auth).runSdkSignOut(() =>
+                supabase.auth.signOut({ scope: "local" }),
+              ),
+            )
             .then(
               (result) => settle(result?.error ? revalidationFailed : redirectUnauthenticated),
               () => settle(revalidationFailed),
@@ -164,7 +172,7 @@ export function useRequireAuth(
       cancelled = true;
       clearTimeout(bound);
     };
-  }, [nav, redirectTo, retryToken, timeoutMs]);
+  }, [nav, redirectTo, retryToken, timeoutMs, isRedirectSuppressed]);
 
   return { status, retry };
 }

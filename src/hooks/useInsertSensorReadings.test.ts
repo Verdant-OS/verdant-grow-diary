@@ -7,7 +7,12 @@ vi.mock("@/lib/growRepo", () => ({
   insertSensorReadingsBatch: vi.fn(),
 }));
 
+vi.mock("@/lib/manualSensorSnapshotRecovery", () => ({
+  confirmManualSnapshotConflict: vi.fn(),
+}));
+
 import * as repo from "@/lib/growRepo";
+import { confirmManualSnapshotConflict } from "@/lib/manualSensorSnapshotRecovery";
 import type { InsertSensorReadingPayload } from "./useInsertSensorReading";
 import { useInsertSensorReadings } from "./useInsertSensorReadings";
 
@@ -46,7 +51,12 @@ function makeWrapper() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(repo.insertSensorReadingsBatch).mockResolvedValue(undefined);
+  vi.mocked(confirmManualSnapshotConflict).mockResolvedValue(false);
 });
+
+function duplicateKeyError(message = "duplicate key value violates unique constraint") {
+  return Object.assign(new Error(message), { code: "23505" });
+}
 
 describe("useInsertSensorReadings", () => {
   it("commits one manual snapshot batch, invalidates every consumer, and emits one refresh event", async () => {
@@ -89,5 +99,44 @@ describe("useInsertSensorReadings", () => {
     } finally {
       window.removeEventListener("verdant:sensor-reading-created", onCreated);
     }
+  });
+
+  it("treats a verified duplicate-key conflict as success without re-inserting", async () => {
+    const duplicateError = duplicateKeyError();
+    vi.mocked(repo.insertSensorReadingsBatch).mockRejectedValueOnce(duplicateError);
+    vi.mocked(confirmManualSnapshotConflict).mockResolvedValueOnce(true);
+
+    const { invalidateSpy, wrapper } = makeWrapper();
+    const createdEvents: Event[] = [];
+    const onCreated = (event: Event) => createdEvents.push(event);
+    window.addEventListener("verdant:sensor-reading-created", onCreated);
+
+    try {
+      const { result } = renderHook(() => useInsertSensorReadings(), { wrapper });
+      result.current.mutate(MANUAL_ROWS);
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+      expect(repo.insertSensorReadingsBatch).toHaveBeenCalledTimes(1);
+      expect(confirmManualSnapshotConflict).toHaveBeenCalledWith(MANUAL_ROWS, duplicateError);
+      expect(invalidateSpy).toHaveBeenCalled();
+      expect(createdEvents).toHaveLength(1);
+    } finally {
+      window.removeEventListener("verdant:sensor-reading-created", onCreated);
+    }
+  });
+
+  it("rethrows when duplicate confirmation cannot prove the snapshot persisted", async () => {
+    const duplicateError = duplicateKeyError();
+    vi.mocked(repo.insertSensorReadingsBatch).mockRejectedValueOnce(duplicateError);
+    vi.mocked(confirmManualSnapshotConflict).mockResolvedValueOnce(false);
+
+    const { wrapper } = makeWrapper();
+    const { result } = renderHook(() => useInsertSensorReadings(), { wrapper });
+    result.current.mutate(MANUAL_ROWS);
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(duplicateError);
+    expect(confirmManualSnapshotConflict).toHaveBeenCalledWith(MANUAL_ROWS, duplicateError);
   });
 });

@@ -304,6 +304,40 @@ describe("manual duplicate receipt verification", () => {
     ).toBe(true);
   });
 
+  it("accepts a multi-metric manual snapshot when every row matches", () => {
+    const multiSubmitted: SensorReadingInsert[] = [
+      { ...submitted[0] },
+      {
+        tent_id: TENT_A,
+        user_id: "owner-a",
+        source: "manual",
+        metric: "humidity_pct",
+        value: 60,
+        captured_at: CAPTURED,
+        ts: CAPTURED,
+        quality: "ok",
+      },
+    ];
+    const multiStored: SensorReadingRow[] = [
+      stored[0],
+      {
+        id: "stored-humidity",
+        user_id: "owner-a",
+        tent_id: TENT_A,
+        source: "manual",
+        metric: "humidity_pct",
+        value: 60,
+        captured_at: CAPTURED,
+        ts: CAPTURED,
+        created_at: CAPTURED,
+        quality: "ok",
+        device_id: null,
+        raw_payload: null,
+      },
+    ];
+    expect(matchesManualSnapshotReadback(multiSubmitted, multiStored)).toBe(true);
+  });
+
   for (const [field, value] of [
     ["source", "live"],
     ["tent_id", TENT_B],
@@ -327,6 +361,33 @@ describe("manual duplicate receipt verification", () => {
     expect(
       matchesManualSnapshotReadback([submitted[0], submitted[0]], [stored[0], stored[0]]),
     ).toBe(false);
+  });
+
+  it("confirms a genuine duplicate when readback proves every metric persisted", async () => {
+    backend.rows = [
+      stored[0],
+      {
+        ...stored[0],
+        id: "stored-humidity",
+        metric: "humidity_pct",
+        value: 60,
+      },
+    ];
+    const multiSubmitted: SensorReadingInsert[] = [
+      submitted[0],
+      {
+        tent_id: TENT_A,
+        user_id: "owner-a",
+        source: "manual",
+        metric: "humidity_pct",
+        value: 60,
+        captured_at: CAPTURED,
+        ts: CAPTURED,
+        quality: "ok",
+      },
+    ];
+    expect(await confirmManualSnapshotConflict(multiSubmitted, { code: "23505" })).toBe(true);
+    expect(backend.reads).toBe(1);
   });
 
   it("never recovers an unrelated error or a non-manual write as this snapshot", async () => {

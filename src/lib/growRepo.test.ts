@@ -22,9 +22,7 @@ function reset() {
   calls.single = false;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function builder(): any {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const b: any = {
     select: () => b,
     eq: (col: string, val: unknown) => {
@@ -68,6 +66,7 @@ import {
   fetchPlants,
   fetchSensorReadings,
   insertSensorReading,
+  insertSensorReadingsBatch,
 } from "./growRepo";
 
 beforeEach(reset);
@@ -182,5 +181,29 @@ describe("insertSensorReading", () => {
         value: 1,
       } as never),
     ).rejects.toThrow(/insertSensorReading.*denied/);
+  });
+});
+
+describe("insertSensorReadingsBatch", () => {
+  it("preserves the structured Postgres code on duplicate-key failures", async () => {
+    nextResult = {
+      data: null,
+      error: { code: "23505", message: "duplicate key value violates unique constraint" },
+    };
+    const rows = [
+      {
+        user_id: "u",
+        tent_id: TENT_UUID,
+        source: "manual",
+        metric: "temperature_c",
+        value: 24,
+        captured_at: "2026-09-16T08:00:00.000Z",
+        ts: "2026-09-16T08:00:00.000Z",
+      },
+    ] as never;
+
+    await expect(insertSensorReadingsBatch(rows)).rejects.toMatchObject({ code: "23505" });
+    expect(calls.table).toBe("sensor_readings");
+    expect(calls.inserted).toEqual(rows);
   });
 });

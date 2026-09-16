@@ -3,6 +3,8 @@ name: Native Save Retrieve Local
 # Candidate browser + real disposable Supabase evidence. This lane never proves
 # the published build, runs migrations remotely, or uses deployment credentials.
 on:
+  push:
+    branches: ["codex/native-revision-lost-reply-20260916"]
   pull_request:
     branches: [main, verdant-grow-diary, "codex/native-save-retrieve-proof-*"]
   workflow_dispatch:
@@ -37,7 +39,7 @@ jobs:
       - name: Check focused browser files
         run: |
           bunx eslint playwright.native-local.config.ts e2e-local
-          bunx tsc --noEmit --skipLibCheck --strict --target ES2022 --module ESNext --moduleResolution Bundler --types node playwright.native-local.config.ts e2e-local/native-save-retrieve.spec.ts e2e-local/native-csv-import-reopen.spec.ts e2e-local/lib/nativeLocalFixtures.ts
+          bunx tsc --noEmit --skipLibCheck --strict --target ES2022 --module ESNext --moduleResolution Bundler --types node playwright.native-local.config.ts e2e-local/native-save-retrieve.spec.ts e2e-local/native-csv-import-reopen.spec.ts e2e-local/native-revision-recovery.spec.ts e2e-local/lib/nativeLocalFixtures.ts
       - name: Set up pinned Supabase CLI
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1
         with:

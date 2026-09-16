@@ -32,7 +32,7 @@ const fixtureRows = [
     metric: "vpd_kpa",
     value: 1.42,
     captured_at: "2026-06-01T10:10:00Z",
-    raw_payload: { grow_id: "g1", source_tag: "csv" },
+    raw_payload: { grow_id: "g1", source_tag: "csv", vpd_source: "derived" },
   },
   // tent B, also in window of d2 but different tent — must not bleed
   {

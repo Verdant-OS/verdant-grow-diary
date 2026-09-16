@@ -1508,7 +1508,16 @@ function QuickLogV2SheetForOwner({
       }
       setSaveStatus("Uploading photo…");
       const upload = await uploadQuickLogPhoto(resolved.growId, submissionPhotoFile);
-      if (exactManualSubmission && !canContinueNote()) return;
+      if (exactManualSubmission && !canContinueNote()) {
+        if (upload.ok) {
+          try {
+            await supabase.storage.from("diary-photos").remove([upload.path]);
+          } catch {
+            // Best effort only; the current session may no longer own this path.
+          }
+        }
+        return;
+      }
       if (!upload.ok) {
         wateringRetrySubmissionRef.current = null;
         releaseUnsentNote();
@@ -1662,7 +1671,16 @@ function QuickLogV2SheetForOwner({
     if (submissionVideoFile && submissionVideoMeta && resolved.growId) {
       setSaveStatus("Uploading video…");
       const upload = await uploadQuickLogVideo(resolved.growId, submissionVideoFile);
-      if (exactManualSubmission && !canContinueNote()) return;
+      if (exactManualSubmission && !canContinueNote()) {
+        if (upload.ok) {
+          try {
+            await supabase.storage.from("diary-videos").remove([upload.path]);
+          } catch {
+            // Best effort only; the current session may no longer own this path.
+          }
+        }
+        return;
+      }
       if (!upload.ok) {
         mediaFailure = (upload as { message: string }).message;
       } else {

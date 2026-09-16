@@ -5327,6 +5327,132 @@ draft PR** from the restarted `claude/verdant-pheno-hunt-lab-vq6pd9`. The third 
 RLS harness for the RPC — remains `BLOCKED` (no credentials in agent sessions) and is recorded
 here rather than silently dropped. This edit touches this file only. Prior header follows.)
 
+### Pheno / breeding hosted verification — 2026-09-16 (Codex)
+
+**FAIL — breeding save and top-N diary functions are absent from the measured hosted
+catalog. BLOCKED — production APPLY is not approved or eligible through the existing
+breeding lane.** This dated receipt updates the pheno/breeding migration posture below;
+it does not restamp the document's historical global release, payment or live-SHA claims.
+Source inspected: `verdant-grow-diary` at
+`4dc19a15e5ef7b8539712f587e18296d2606aaf8`. Claude's separate application audit was
+reported at `c22340c7d16ca1f14c20bf9582c849bbf79cdbb2`; that is not a fresh live identity
+measurement by Codex. Claude owns the Pheno application repairs. Codex owns H1/M7
+hosted verification and the migration plan; the founder retains the production go/no-go.
+
+**Sanctioned read-only path — PASS:** `lovable_query_database` against the existing
+Verdant Grow Diary project `66255e7b-892c-4be5-8686-ab1cfc3666db`. That project's config
+identifies Supabase ref `knkwiiywfkbqznbxwqfh`. The optional
+`app.settings.supabase_url` database setting was unset; it is not independent database
+identity proof. No laptop service-role SQL, application RPC, DDL, DML or APPLY was run.
+The external task artifact `outputs/pheno-breeding-hosted-readonly-receipt-2026-09-16.json`
+retains the exact tool arguments, SQL and returned rows for `identity`, `ledger`,
+`policies`, `rpc`, `preflight`, dependency history and object checks. It is a read receipt,
+not an apply receipt, and is not a committed repository file. Source-only plan and exact
+file hashes are in the external artifact `outputs/GDP-breeding-migration-source-plan-2026-09-16.md`.
+
+**Hosted ledger — FAIL for every requested exact migration marker:** the query compares
+each expected version **or** name against `supabase_migrations.schema_migrations`.
+At **2026-09-16 19:36:45.66782 UTC**, all **24 / 24** requested rows returned
+`matches: []`; **0 / 24** had a version or name match. These files are **not recorded
+as applied** in that hosted ledger. Missing old export markers do not prove their schema
+effects are absent or authorize replay over later hardening.
+
+| Requested migration | Hosted ledger output / status |
+| --- | --- |
+| `20260707120000_breeding_workflow_v1.sql` | `matches: []` — **FAIL** |
+| `20260728163100_production_breeding_workflow_reconciliation.sql` | `matches: []` — **FAIL** |
+| `20260825233000_pheno_hunts_ownership_check_restore.sql` | `matches: []` — **FAIL** |
+| `20260826100000_pheno_candidate_diary_entries_top_n_rpc.sql` | `matches: []` — **FAIL** |
+| `20260721182752_4fc51714-bc29-4044-9b91-180c065e997f.sql` | `matches: []` — **FAIL** |
+| `20260721190300_6e424afe-215e-474e-8e41-d62406450973.sql` | `matches: []` — **FAIL** |
+| `20260721190434_d4c06065-8426-4d69-aac6-f1135e381aee.sql` | `matches: []` — **FAIL** |
+| `20260721190634_e16d1c98-27e3-4246-882c-d6ebc0c4491b.sql` | `matches: []` — **FAIL** |
+| `20260721190735_ad890fa2-a669-48bb-92fc-89376b84370f.sql` | `matches: []` — **FAIL** |
+| `20260721192508_2ee8c89c-be17-4c29-8d73-684db0db4649.sql` | `matches: []` — **FAIL** |
+| `20260721192852_78e5de95-fef1-456d-a0d1-e026e4e1115b.sql` | `matches: []` — **FAIL** |
+| `20260721193009_804e0421-0e2e-470f-a9b6-adf4bc312ae1.sql` | `matches: []` — **FAIL** |
+| `20260721193128_17950647-c02c-4adb-a83e-cd186cfca7a8.sql` | `matches: []` — **FAIL** |
+| `20260721193247_f6b46fe2-299b-4f0b-91cf-80768cf5c11c.sql` | `matches: []` — **FAIL** |
+| `20260721193431_99226d9d-eff2-4bf1-bda4-7f86584e2162.sql` | `matches: []` — **FAIL** |
+| `20260721193523_380202e1-6b43-48b8-8831-ab5b99bd4a51.sql` | `matches: []` — **FAIL** |
+| `20260721193641_c9189cd4-85d1-4c1f-808e-bb1e5779ca70.sql` | `matches: []` — **FAIL** |
+| `20260721194118_d777533e-a1d4-4b36-a75e-ea7742e7cd6e.sql` | `matches: []` — **FAIL** |
+| `20260721194154_9cf7d1a8-174a-44fd-ad49-8ca1fe2e41fb.sql` | `matches: []` — **FAIL** |
+| `20260721194239_18592b2d-3ca9-4608-bbf5-c2262e422c70.sql` | `matches: []` — **FAIL** |
+| `20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql` | `matches: []` — **FAIL** |
+| `20260721193747_2f19fd24-b3a8-4e2d-87ab-e7c1cf71ce55.sql` | `matches: []` — **FAIL** |
+| `20260721185858_5f0fda0a-baef-4dc5-a53c-aa468e45ddb1.sql` | `matches: []` — **FAIL** |
+| `20260721185929_b8b30ebf-cf2c-4082-9b7b-6dcc6871e707.sql` | `matches: []` — **FAIL** |
+
+**Catalog and policy measurements:**
+
+- **FAIL**, 19:36:49 UTC: `pg_proc` contained no `public.breeding_log_save_event` or
+  `public.pheno_candidate_diary_entries_top_n` at **any signature**. This independently
+  confirms function absence beyond Claude's relayed `404 PGRST202` HTTP observations.
+  **FAIL**, 19:37:18 UTC: `public.breeding_events` was absent.
+- **FAIL — restored ownership policy absent**, 19:36:47 UTC: all **7** hosted
+  `pheno_hunts` policies were returned. RLS was enabled. The permissive
+  `Users update own pheno_hunts` policy had `USING (auth.uid() = user_id)` and
+  `with_check: null`, matching the v2 source shape. The restrictive
+  `pheno_hunts_pro_required_update` policy still had
+  `has_pheno_tracker_entitlement(auth.uid())` in both `USING` and `WITH CHECK`.
+  The restored owned-grow / owned-tent / compatible-tent-grow checks were absent.
+  A null explicit UPDATE `WITH CHECK` does **not** establish that `user_id` can be
+  reassigned: PostgreSQL uses that policy's `USING` expression when no check is supplied.
+  The source-v2 migration's own ledger marker was also absent, so the policy shape is
+  measured without claiming which historical file originally created it.
+- **PASS**, 19:36:49 UTC: `has_pheno_tracker_entitlement(_user_id uuid)` existed;
+  anon execution was false and authenticated execution true. **NOT_APPLICABLE** for
+  current late-table policies: `pheno_male_evaluations` and
+  `pheno_pollen_viability_tests` were both absent at 19:37:18 UTC. The ownership
+  migration conditionally skips them; later table creation needs its own protection.
+- **PASS for the prerequisite column only**, 19:37:18 UTC:
+  `diary_entries.retracted_at` existed. At 19:37:17 UTC the ledger had version
+  `20260811090000` with name `2c5c4adb-b680-471f-9726-3822edec3c24`, not the canonical
+  `quicklog_corrections_retractions` name. Exact canonical-file acceptance remains
+  **NOT_MEASURED**; do not flatten this into a missing-column or exact-file PASS claim.
+- **PASS for preserved helper revocation**, 19:36:49 UTC:
+  `genetics_subject_evidence(p_owner uuid, p_subject_type text, p_subject_id uuid)`
+  was `SECURITY DEFINER`, with anon and authenticated execution both false.
+  The later `20260804091142_da8cef1f-8279-4137-8d63-e9bbc739004a` marker existed.
+  Replaying the old `20260721193747` export would re-grant authenticated access and
+  undo this later hardening; its absent marker is **not** a safe replay instruction.
+
+**Apply plan — BLOCKED / NO-GO:** the existing
+[breeding reconciliation workflow](../../.github/workflows/apply-pinned-breeding-reconciliation.yml)
+was **not dispatched**. Its source `PREFLIGHT_SQL` was run read-only through the same
+sanctioned Cloud SQL path, and the result was passed to the existing classifier offline:
+`BLOCKED prior_reconciliation_missing:20260728090000`. All three prerequisite markers
+(`20260728090000`, `20260728090736`, `20260728103000`) were absent by version and name.
+The required base tables existed, but the breeding table, RPC and owner trigger did not.
+The writer has no selectable dry-run-only mode; invoking it for discovery could apply SQL.
+Do not bypass its ledger or exact-contract guards.
+
+The historical breeding migration has no standalone pinned lane; the reconciliation
+handles absent historical breeding state and records its marker. The
+[candidate-number maintenance workflow](../../.github/workflows/apply-candidate-number-maintenance-migrations.yml)
+covers only `20260806230020` and `20260806230021`, not either requested August Pheno file.
+The ownership restore, top-N RPC and July exports therefore remain **BLOCKED** for pinned
+lane coverage and reviewed recovery planning. No exact post-commit reverse lane exists for
+these targets. Do not drop data or restore weaker grants/policies as a rollback. The
+[local replay compatibility registry](../../config/local-supabase-replay-compatibility.json)
+is for disposable replay copies, not production marker fabrication or export replay.
+
+**Validation / deferred acceptance:** **24** requested hosted ledger rows, **7** Pheno
+policy rows, catalog absence independently confirmed, and one blocked offline preflight
+classification. Source inventory validated **17/17** export hashes, **17/17** canonical
+hashes and **1/1** breeding artifact contract. These are source/catalog checks, not an APPLY
+or signed-in save test. Fresh anonymous HTTP probes, post-apply acceptance and the one
+founder-approved Pollination save on disposable grow
+`2c5b5d44-e34f-4c54-a841-f8eb9530169e` remain **NOT_MEASURED**; follow-up suggestions
+must be unchecked when that later test is authorized. No Skunk Gas Run interaction,
+audit-fixture deletion, Action Queue operation, merge or Publish occurred. **No apply
+receipt exists for this task.** The optional CTA capability guard is proposed only and
+requires a separate founder decision. The twelve attributed audit findings are recorded
+on the [defect board](../cleanup/zero-known-defects-board.md#pheno--breeding-findings--2026-09-16).
+**Safety verdict: FAIL for sending real customers through breeding saves while the save
+RPC is absent; production acceptance remains BLOCKED. HOLD #1250 remains in force.**
+
 **Prior update:** 2026-08-26 UTC (18:15 UTC)
 **Updated by:** Claude (2026-08-26: **server-side top-N-per-plant diary read for Pheno Hunt
 candidates delivered as draft [PR #1149](https://github.com/Verdant-OS/verdant-grow-diary/pull/1149)**

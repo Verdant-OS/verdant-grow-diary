@@ -513,6 +513,8 @@ export default function TentDetail() {
         plantReadStatus={resolveImportedHistoryHandoffReadStatus({
           isError: activePlantsIsError,
           isFetching: activePlantsIsFetching,
+          isPending: activePlantsQuery.isPending,
+          isPaused: activePlantsQuery.isPaused,
           hasRows: activePlants.length > 0,
         })}
         readStatus={resolveImportedSensorHistoryReadStatus({

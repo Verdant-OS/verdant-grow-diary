@@ -65,7 +65,8 @@ const QUICK_LOG_V2_SAVE_CALLERS = [
   { file: "src/pages/EcowittIngestAudit.tsx", telemetryIntent: null },
   {
     file: "src/components/PlantQuickLog.tsx",
-    telemetryIntent: /save\(built\.payload,\s*\{\s*telemetryIntent:\s*"plant_quick_log"\s*\}\)/,
+    telemetryIntent:
+      /save\(built\.payload,\s*\{\s*telemetryIntent:\s*"plant_quick_log",\s*canContinueNote:\s*canContinue,?\s*\}\)/,
   },
 ] as const;
 

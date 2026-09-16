@@ -7,6 +7,7 @@ import {
   CSV_SNAPSHOT_TITLE,
   CSV_SOURCE_LABEL,
   CSV_DERIVED_VPD_LABEL,
+  CSV_UNKNOWN_VPD_LABEL,
 } from "@/lib/environmentCsvTimelineContextViewModel";
 import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentChip";
 import { parseEnvironmentCSVText } from "@/lib/csvParser";
@@ -170,6 +171,7 @@ describe("buildCsvTimelineContext", () => {
     expect(out[0].snapshot!.temperatureC).toBe(25);
     expect(out[0].snapshot!.humidityPct).toBe(55);
     expect(out[0].snapshot!.derivedVpdKpa).toBe(1.42);
+    expect(out[0].snapshot!.derivedVpdLabel).toBe(CSV_UNKNOWN_VPD_LABEL);
     expect(out[0].matchAgeMinutes).toBe(20);
   });
 
@@ -256,6 +258,27 @@ describe("CsvTimelineEnvironmentChip", () => {
     expect(screen.getByText(CSV_SNAPSHOT_TITLE)).toBeTruthy();
     expect(screen.getByTestId("csv-timeline-chip-source-d1").textContent).toBe(CSV_SOURCE_LABEL);
     expect(screen.getByText(/Derived VPD/)).toBeTruthy();
+  });
+
+  it("chip renders neutral VPD label without implying derivation", () => {
+    render(
+      <CsvTimelineEnvironmentChip
+        diaryEntryId="legacy"
+        snapshot={{
+          capturedAt: "2026-06-01T10:00:00Z",
+          temperatureC: 25,
+          humidityPct: 55,
+          derivedVpdKpa: 1.42,
+          sourceLabel: CSV_SOURCE_LABEL,
+          title: CSV_SNAPSHOT_TITLE,
+          derivedVpdLabel: CSV_UNKNOWN_VPD_LABEL,
+        }}
+      />,
+    );
+    const chip = screen.getByTestId("csv-timeline-chip-legacy");
+    expect(chip.textContent).toContain(`${CSV_UNKNOWN_VPD_LABEL}: 1.42 kPa`);
+    expect(chip.textContent).not.toContain("Derived VPD");
+    expect(chip.textContent).not.toContain("CSV VPD");
   });
 
   it("chip never says Live or Live VPD (test 37)", () => {

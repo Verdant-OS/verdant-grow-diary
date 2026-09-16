@@ -145,6 +145,21 @@ const ENTRIES = [
 ];
 
 describe("TimelineCsvContextPanel", () => {
+  it("renders neutral VPD for legacy rows missing vpd_source metadata", async () => {
+    const legacyRows = fixtureRows.map((row) =>
+      row.metric === "vpd_kpa"
+        ? { ...row, raw_payload: { grow_id: "g1", source_tag: "csv" } }
+        : row,
+    );
+    readMocks.read.mockResolvedValueOnce({ data: legacyRows, error: null });
+    render(<TimelineCsvContextPanel growId="g1" entries={ENTRIES} />);
+    await waitFor(() => expect(screen.queryByTestId("csv-timeline-chip-d1")).toBeTruthy());
+    const chip = screen.getByTestId("csv-timeline-chip-d1");
+    expect(chip.textContent).toMatch(/VPD: 1\.42 kPa/);
+    expect(chip.textContent).not.toMatch(/Derived VPD/);
+    expect(chip.textContent).not.toMatch(/CSV VPD/);
+  });
+
   it("renders CSV chip for matched diary entry; says CSV + Derived VPD; never Live (tests 17, 21, 22, 23, 24, 25)", async () => {
     render(<TimelineCsvContextPanel growId="g1" entries={ENTRIES} />);
     await waitFor(() => {

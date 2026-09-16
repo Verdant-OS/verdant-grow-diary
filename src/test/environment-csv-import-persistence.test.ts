@@ -6,6 +6,10 @@ import {
   persistCsvEnvironmentRows,
   CSV_SENSOR_SOURCE,
 } from "@/lib/environmentCsvImportPersistence";
+import {
+  buildCsvTimelineContext,
+  CSV_UNKNOWN_VPD_LABEL,
+} from "@/lib/environmentCsvTimelineContextViewModel";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 
 const SCOPE = {
@@ -68,6 +72,31 @@ describe("environmentCsvImportPersistence — shape", () => {
     const inserts = buildSensorReadingInserts([row({ vpd_source: "csv" })], SCOPE);
     const vpd = inserts.find((i) => i.metric === "vpd_kpa");
     expect(vpd?.raw_payload.vpd_source).toBe("csv");
+  });
+
+  it("omits vpd_source from raw_payload when parser provenance is null", () => {
+    const inserts = buildSensorReadingInserts([row({ vpd_source: null, vpd_kpa: 1.42 })], SCOPE);
+    const vpd = inserts.find((i) => i.metric === "vpd_kpa");
+    expect(vpd?.raw_payload.vpd_source).toBeUndefined();
+    expect("vpd_source" in (vpd?.raw_payload ?? {})).toBe(false);
+  });
+
+  it("legacy persisted rows without vpd_source stay neutral on the timeline", () => {
+    const capturedAt = "2026-06-01T10:00:00.000Z";
+    const inserts = buildSensorReadingInserts(
+      [row({ vpd_source: null, captured_at: capturedAt })],
+      SCOPE,
+    );
+    const snapshot = buildCsvTimelineContext({
+      diaryEntries: [
+        { id: "d1", grow_id: SCOPE.grow_id, tent_id: SCOPE.tent_id, occurred_at: capturedAt },
+      ],
+      sensorReadings: inserts,
+      growId: SCOPE.grow_id,
+      tentId: SCOPE.tent_id,
+    })[0].snapshot!;
+    expect(snapshot.derivedVpdKpa).toBe(1.58);
+    expect(snapshot.derivedVpdLabel).toBe(CSV_UNKNOWN_VPD_LABEL);
   });
 
   it("persists Spider Farmer CO2 and PPFD metrics", () => {

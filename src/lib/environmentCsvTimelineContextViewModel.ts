@@ -8,11 +8,13 @@
  *  - Scopes by grow_id and tent_id; never crosses tents/grows.
  *  - Never relabels CSV as "live". Source is always "csv".
  *  - Supplied VPD is labeled "CSV VPD"; computed VPD stays "Derived VPD".
+ *  - Missing or unrecognized VPD provenance stays neutral: "VPD".
  *  - When no match falls inside the window, snapshot is null.
  */
 
 export const CSV_DERIVED_VPD_LABEL = "Derived VPD" as const;
 export const CSV_SUPPLIED_VPD_LABEL = "CSV VPD" as const;
+export const CSV_UNKNOWN_VPD_LABEL = "VPD" as const;
 export const CSV_SNAPSHOT_TITLE = "CSV environment snapshot" as const;
 export const CSV_SOURCE_LABEL = "CSV" as const;
 
@@ -44,7 +46,10 @@ export interface CsvTimelineSnapshot {
   derivedVpdKpa: number | null;
   sourceLabel: typeof CSV_SOURCE_LABEL;
   title: typeof CSV_SNAPSHOT_TITLE;
-  derivedVpdLabel: typeof CSV_DERIVED_VPD_LABEL | typeof CSV_SUPPLIED_VPD_LABEL;
+  derivedVpdLabel:
+    | typeof CSV_DERIVED_VPD_LABEL
+    | typeof CSV_SUPPLIED_VPD_LABEL
+    | typeof CSV_UNKNOWN_VPD_LABEL;
 }
 
 export interface CsvTimelineContextEntry {
@@ -75,10 +80,11 @@ function isCsvRow(r: CsvSensorReadingRow): boolean {
 
 function rowVpdLabel(row: CsvSensorReadingRow | undefined): CsvTimelineSnapshot["derivedVpdLabel"] {
   const raw = row?.raw_payload;
-  if (raw && typeof raw === "object" && "vpd_source" in raw && raw.vpd_source === "csv") {
-    return CSV_SUPPLIED_VPD_LABEL;
+  if (raw && typeof raw === "object" && "vpd_source" in raw) {
+    if (raw.vpd_source === "csv") return CSV_SUPPLIED_VPD_LABEL;
+    if (raw.vpd_source === "derived") return CSV_DERIVED_VPD_LABEL;
   }
-  return CSV_DERIVED_VPD_LABEL;
+  return CSV_UNKNOWN_VPD_LABEL;
 }
 
 function rowMs(r: CsvSensorReadingRow): number | null {

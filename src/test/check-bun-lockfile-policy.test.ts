@@ -307,6 +307,36 @@ describe("evaluatePolicy", () => {
     expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
   });
 
+  it.each(["rollup", "legacy-vite/rollup", "compat-rollup"])(
+    "rejects below-floor Rollup in Bun at %s",
+    (lockPath) => {
+      const files = policyFiles();
+      const stale = JSON.parse(files[at("bun.lock")]);
+      stale.packages[lockPath] = ["rollup@4.58.0", "", {}];
+      files[at("bun.lock")] = JSON.stringify(stale);
+      expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for rollup");
+    },
+  );
+
+  it.each(["rollup", "legacy-vite/rollup", "compat-rollup"])(
+    "accepts patched optional Rollup in Bun at %s",
+    (lockPath) => {
+      const files = policyFiles();
+      const current = JSON.parse(files[at("bun.lock")]);
+      current.packages[lockPath] = ["rollup@4.59.0", "", {}];
+      files[at("bun.lock")] = JSON.stringify(current);
+      expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+    },
+  );
+
+  it("rejects a stale nested Bun package even when its root copy meets the floor", () => {
+    const files = policyFiles();
+    const stale = JSON.parse(files[at("bun.lock")]);
+    stale.packages["legacy/hono"] = ["hono@4.13.4", "", {}];
+    files[at("bun.lock")] = JSON.stringify(stale);
+    expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for hono");
+  });
+
   it.each([
     ["@hono/node-server", "2.0.9"],
     ["@modelcontextprotocol/sdk", "1.29.0"],

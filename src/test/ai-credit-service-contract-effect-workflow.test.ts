@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { load as loadYaml } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 const ROOT = resolve(__dirname, "..", "..");
@@ -8,11 +9,11 @@ const WORKFLOW = readFileSync(
   "utf8",
 ).replace(/\r\n/g, "\n");
 const TRIGGERS = WORKFLOW.slice(0, WORKFLOW.indexOf("\npermissions:"));
+const WORKFLOW_CONFIG = loadYaml(WORKFLOW) as { on: Record<string, unknown> };
 
 describe("AI-credit service contract effect workflow trust boundary", () => {
-  it("runs as a separate scheduled/manual production monitor after migration presence", () => {
-    expect(WORKFLOW).toContain('cron: "0 8 * * *"');
-    expect(WORKFLOW).toContain("workflow_dispatch: {}");
+  it("retires the hollow-environment schedule and keeps the separate manual effect check", () => {
+    expect(WORKFLOW_CONFIG.on).toEqual({ workflow_dispatch: {} });
     expect(WORKFLOW).toContain("scripts/verify-ai-credit-service-contract-effect.mjs");
     expect(WORKFLOW).not.toContain("scripts/assert-required-money-migrations-applied.mjs");
   });

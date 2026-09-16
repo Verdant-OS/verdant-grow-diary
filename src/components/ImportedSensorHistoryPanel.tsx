@@ -107,7 +107,7 @@ export default function ImportedSensorHistoryPanel({
     () =>
       buildImportedSensorHistoryAiDoctorHandoff({
         tentId,
-        historyStatus: readStatus,
+        historyStatus: readStatus === "paused" ? "loading" : readStatus,
         readings,
         plantStatus: plantReadStatus,
         plants,
@@ -183,7 +183,16 @@ export default function ImportedSensorHistoryPanel({
         </p>
       ) : null}
 
-      {readStatus === "loading" ? (
+      {readStatus === "paused" ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="imported-history-paused"
+          role="status"
+          aria-live="polite"
+        >
+          Waiting for a connection to load imported CSV history…
+        </p>
+      ) : readStatus === "loading" ? (
         <p
           className="text-sm text-muted-foreground"
           data-testid="imported-history-loading"

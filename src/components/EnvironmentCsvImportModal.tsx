@@ -49,6 +49,7 @@ import {
   buildCsvImportFailureMessage,
   mergeCsvImportFailureReceipts,
   type CsvImportFailureReceipt,
+  type CsvImportFailureReason,
   formatCsvPreviewRow,
 } from "@/lib/environmentCsvPreviewCopyRules";
 
@@ -64,6 +65,8 @@ export interface EnvironmentCsvImportModalProps {
     partialWrite?: boolean;
     /** The dispatched batch may have committed without a usable response. */
     unconfirmedWrite?: boolean;
+    /** Safe failure classification from persistence, never a raw driver message. */
+    failureReason?: CsvImportFailureReason;
     error: string | null;
   }>;
   /**
@@ -160,6 +163,7 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
             receipt.insertedCount,
             receipt.partialWrite === true,
             receipt.unconfirmedWrite === true,
+            res.failureReason,
           ),
           insertedCount: receipt.insertedCount,
           duplicateCount: res.duplicateCount ?? 0,

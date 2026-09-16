@@ -41,6 +41,7 @@ export const PACKAGE_LOCK_SECURITY_FLOORS = Object.freeze({
 export const PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS = Object.freeze({
   rollup: "4.59.0",
 });
+export const BUN_LOCK_OPTIONAL_SECURITY_FLOORS = PACKAGE_LOCK_OPTIONAL_SECURITY_FLOORS;
 export const BUN_LOCK_SECURITY_FLOORS = Object.freeze({
   "@hono/node-server": "2.0.10",
   "@modelcontextprotocol/sdk": "1.30.0",
@@ -340,8 +341,9 @@ export function isExactSemver(spec) {
 export function resolvedVersionInBunLock(lockText, packageName) {
   if (typeof lockText !== "string") return null;
   const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Bun keys may be nested paths or aliases; the descriptor identifies the package.
   const pattern = new RegExp(
-    `"${escaped}":\\s*\\["${escaped}@(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?)`,
+    `"[^"]+":\\s*\\["${escaped}@(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?)`,
     "g",
   );
   const versions = new Set();
@@ -505,10 +507,13 @@ export function evaluatePolicy({
         }
       }
 
-      for (const [packageName, minimum] of Object.entries(BUN_LOCK_SECURITY_FLOORS)) {
-        const versions = resolvedVersionInBunLock(bunLockText, packageName);
+      for (const [packageName, minimum] of Object.entries({
+        ...BUN_LOCK_SECURITY_FLOORS,
+        ...BUN_LOCK_OPTIONAL_SECURITY_FLOORS,
+      })) {
+        const versions = resolvedVersionInBunLock(bunLockText, packageName) ?? [];
         if (
-          !versions ||
+          (versions.length === 0 && Object.hasOwn(BUN_LOCK_SECURITY_FLOORS, packageName)) ||
           versions.some((resolvedVersion) => !versionAtLeast(resolvedVersion, minimum))
         ) {
           errors.push(

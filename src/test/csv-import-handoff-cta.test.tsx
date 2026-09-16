@@ -28,14 +28,27 @@ import {
 // ---- shared spies -----------------------------------------------------
 const supabaseSpies = vi.hoisted(() => ({
   tables: [] as string[],
+  writes: [] as Array<[string, string]>,
+  subscriptionFilters: [] as Array<[string, unknown]>,
   functionsInvoke: vi.fn(),
 }));
 
 vi.mock("@/integrations/supabase/client", () => {
-  const builder = () => {
+  const builder = (table: string) => {
     const b: Record<string, unknown> = {};
-    b.insert = async () => ({ error: null });
+    for (const operation of ["insert", "update", "upsert", "delete"]) {
+      b[operation] = async () => {
+        supabaseSpies.writes.push([table, operation]);
+        return { error: null };
+      };
+    }
     b.select = () => b;
+    b.eq = (column: string, value: unknown) => {
+      if (table === "subscriptions") supabaseSpies.subscriptionFilters.push([column, value]);
+      return b;
+    };
+    b.order = () => b;
+    b.limit = () => Promise.resolve({ data: [], error: null });
     b.in = () => b;
     b.gte = () => b;
     b.lte = () => Promise.resolve({ data: [], error: null });
@@ -45,7 +58,7 @@ vi.mock("@/integrations/supabase/client", () => {
     supabase: {
       from: (table: string) => {
         supabaseSpies.tables.push(table);
-        return builder();
+        return builder(table);
       },
       functions: { invoke: supabaseSpies.functionsInvoke },
     },
@@ -94,6 +107,8 @@ async function uploadAndConfirm() {
 
 beforeEach(() => {
   supabaseSpies.tables.length = 0;
+  supabaseSpies.writes.length = 0;
+  supabaseSpies.subscriptionFilters.length = 0;
   supabaseSpies.functionsInvoke.mockReset();
   trackSpy.mockReset();
 });
@@ -166,11 +181,15 @@ describe("launcher → modal handoff", () => {
     // No edge-function calls at all (AI Doctor runs only via
     // supabase.functions.invoke).
     expect(supabaseSpies.functionsInvoke).not.toHaveBeenCalled();
-    // Only sensor_readings is touched — never alerts / action_queue.
+    // History access may read the owner's live subscriptions; only the CSV
+    // sensor rows may be written. No alerts, Action Queue or billing mutation.
     expect(supabaseSpies.tables.length).toBeGreaterThan(0);
     for (const table of supabaseSpies.tables) {
-      expect(table).toBe("sensor_readings");
+      expect(["sensor_readings", "subscriptions"]).toContain(table);
     }
+    expect(supabaseSpies.writes).toEqual([["sensor_readings", "insert"]]);
+    expect(supabaseSpies.subscriptionFilters).toContainEqual(["user_id", "u1"]);
+    expect(supabaseSpies.subscriptionFilters).toContainEqual(["environment", "live"]);
     // Funnel events remain privacy-safe and explicitly cover the import start
     // and durable completion boundaries—nothing downstream is inferred.
     expect(trackSpy).toHaveBeenCalledWith("csv_import_started");

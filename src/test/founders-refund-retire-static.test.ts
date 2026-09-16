@@ -12,8 +12,12 @@ import { describe, expect, it } from "vitest";
 const MIGRATIONS_DIR = resolve(process.cwd(), "supabase/migrations");
 const REVOKE_MIGRATION = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith(".sql"))
+  .sort()
+  .reverse()
   .map((f) => readFileSync(resolve(MIGRATIONS_DIR, f), "utf8"))
-  .find((sql) => sql.includes("revoke_lovable_founder_lifetime_by_transaction"));
+  .find((sql) =>
+    /CREATE\s+OR\s+REPLACE\s+FUNCTION\s+public\.revoke_lovable_founder_lifetime_by_transaction\s*\(/i.test(sql),
+  );
 
 describe("revoke_lovable_founder_lifetime_by_transaction — refund-retire invariant", () => {
   it("migration exists", () => {
@@ -32,10 +36,11 @@ describe("revoke_lovable_founder_lifetime_by_transaction — refund-retire invar
     );
   });
 
-  it("keys off paddle_transaction_id to find the founders row", () => {
+  it("uses the allocator subscription reference and live environment to find the founder", () => {
     expect(REVOKE_MIGRATION!).toMatch(
-      /WHERE\s+paddle_transaction_id\s*=\s*p_paddle_transaction_id/i,
+      /f\.paddle_subscription_ref\s*=\s*v_pseudo_sub_id/i,
     );
+    expect(REVOKE_MIGRATION!).toMatch(/WHERE\s+p_environment\s*=\s*\x27live\x27/i);
   });
 
   it("is SECURITY DEFINER with pinned search_path", () => {

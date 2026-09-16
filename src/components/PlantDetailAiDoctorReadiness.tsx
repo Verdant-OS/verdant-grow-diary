@@ -221,7 +221,6 @@ export default function PlantDetailAiDoctorReadiness({
   const mixedFailed = mixedStatus === "error" || mixedStatus === "refresh_error";
   const manualFailed = manualStatus === "error" || manualStatus === "refresh_error";
   const currentSensorLoading = mixedStatus === "loading" || manualStatus === "loading";
-  const currentSensorError = mixedFailed && manualFailed;
   const mixedRows =
     tentId && !mixedFailed
       ? (mixedWindow.byTent[tentId] ?? NO_CURRENT_SENSOR_ROWS)
@@ -253,6 +252,10 @@ export default function PlantDetailAiDoctorReadiness({
       : null;
     return selectAiDoctorSensorEvidenceClassification(current, audit);
   }, [bridgeHealth, currentSensorRows]);
+
+  // A failed read cannot prove absence; a surviving usable snapshot can still help.
+  const currentSensorError =
+    (mixedFailed || manualFailed) && sensorSnapshot?.status !== "usable";
 
   const result = useMemo(() => {
     return buildPlantDetailAiDoctorReadiness({

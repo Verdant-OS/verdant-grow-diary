@@ -148,6 +148,38 @@ describe("ManualSnapshotTimelineSection — plant scope", () => {
   });
 });
 
+describe("ManualSnapshotTimelineSection — scope wording", () => {
+  it("does not imply shared tent or sibling-plant snapshots are missing", async () => {
+    nextResponse = {
+      // Deliberately return both kinds: the selector must keep plant isolation.
+      data: ROWS.filter((r) => r.plant_id !== "plant-1" && r.tent_id === "tent-1"),
+      error: null,
+    };
+    renderSection({ scope: "plant", plantId: "plant-1" });
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-snapshot-timeline-section-empty")).toHaveTextContent(
+        /No manual sensor snapshots attached to this plant yet/i,
+      ),
+    );
+    expect(screen.queryByTestId("manual-snapshot-timeline-section-list")).toBeNull();
+    expect(screen.getByText("Manual snapshots attached to this plant")).toBeInTheDocument();
+    expect(screen.getByTestId("manual-snapshot-timeline-section-helper")).toHaveTextContent(
+      /plant.s diary.*Shared tent records.*QuickLog memory/i,
+    );
+    expect(lastFilter).toEqual({ column: "plant_id", value: "plant-1" });
+  });
+
+  it("describes a successful empty tent read as tent-scoped", async () => {
+    renderSection({ scope: "tent", tentId: "tent-1" });
+    await waitFor(() =>
+      expect(screen.getByTestId("manual-snapshot-timeline-section-empty")).toHaveTextContent(
+        /No manual sensor snapshots in this tent.s diary yet/i,
+      ),
+    );
+    expect(screen.getByText("Manual snapshots in this tent’s diary")).toBeInTheDocument();
+  });
+});
+
 describe("ManualSnapshotTimelineSection — tent scope", () => {
   it("renders plant-linked and tent-level snapshots for the tent", async () => {
     nextResponse = {

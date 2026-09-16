@@ -1202,6 +1202,23 @@ export default function Timeline() {
     setEndDateFilter("");
   }
 
+  // Full reset for both top Clear filters and empty-state reset. Stage/event
+  // chips stay independently toggleable; this callback is the one complete
+  // reset. Grow scope, highlight/entry anchor, and Timeline membership stay.
+  function clearAllTimelineFilters() {
+    clearEvidenceFilters();
+    setStageFilter("all");
+    setEventFilter("all");
+  }
+
+  function clearTimelineDateFilters() {
+    setStartDateFilter("");
+    setEndDateFilter("");
+  }
+
+  const chipFiltersActive = stageFilter !== "all" || eventFilter !== "all";
+  const anyFilterActive = evidenceActive || chipFiltersActive;
+
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind
   // its own logged rhythm. Suggestion-only — the grower decides; Verdant
@@ -1464,9 +1481,21 @@ export default function Timeline() {
     activeReadKey,
     coreRead,
     evidenceCount: recentLaneRawEntries.length,
+    hasAppliedDateBounds: Boolean(effectiveStartDate || effectiveEndDate),
     supplementalLoading,
     partialSources: partialReadSources,
   });
+  const isDateWindowEmpty = pageReadView.kind === "ready_empty_date_window";
+  const isConfirmedEmptyGrow = pageReadView.kind === "ready_empty";
+  const emptyStateView =
+    resolveTimelineEmptyState({
+      totalEntryCount: isDateWindowEmpty || isConfirmedEmptyGrow ? 0 : displayEntries.length,
+      filteredEntryCount: filtered.length,
+      evidenceFilterActive: evidenceActive,
+      otherFiltersActive: stageFilter !== "all" || eventFilter !== "all" || evidenceActive,
+      dateBoundsActive: isDateWindowEmpty,
+      context: fastAddContext,
+    }) ?? TIMELINE_EMPTY_STATE_FALLBACK;
 
   if (pageReadView.kind === "loading")
     return (
@@ -1784,8 +1813,8 @@ export default function Timeline() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={clearEvidenceFilters}
-            disabled={!evidenceActive}
+            onClick={clearAllTimelineFilters}
+            disabled={!anyFilterActive}
             data-testid="timeline-clear-filters"
             aria-label="Clear timeline filters"
           >
@@ -1992,9 +2021,7 @@ export default function Timeline() {
             });
             const blockersLine = formatTimelineHighlightBlockersLine(blockers);
             const handleClear = () => {
-              clearEvidenceFilters();
-              setStageFilter("all");
-              setEventFilter("all");
+              clearAllTimelineFilters();
               // Preserve highlight (and any other) query params untouched.
             };
             return (
@@ -2247,24 +2274,17 @@ export default function Timeline() {
         <AlertEventsSection events={alertEvents} />
       </div>
 
-      {pageReadView.kind === "ready_empty" ||
+      {isConfirmedEmptyGrow ||
+      isDateWindowEmpty ||
       (displayEntries.length > 0 && filtered.length === 0) ? (
         <TimelineEmptyState
-          view={
-            resolveTimelineEmptyState({
-              totalEntryCount: pageReadView.kind === "ready_empty" ? 0 : displayEntries.length,
-              filteredEntryCount: filtered.length,
-              evidenceFilterActive: evidenceActive,
-              otherFiltersActive: stageFilter !== "all" || eventFilter !== "all" || evidenceActive,
-              context: fastAddContext,
-            }) ?? TIMELINE_EMPTY_STATE_FALLBACK
-          }
+          view={emptyStateView}
           context={fastAddContext}
-          onClearFilters={() => {
-            clearEvidenceFilters();
-            setStageFilter("all");
-            setEventFilter("all");
-          }}
+          onClearFilters={
+            emptyStateView.kind === "date_window"
+              ? clearTimelineDateFilters
+              : clearAllTimelineFilters
+          }
         />
       ) : displayEntries.length === 0 ? null : (
         <div className="space-y-5">

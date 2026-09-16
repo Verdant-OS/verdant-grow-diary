@@ -34,6 +34,12 @@ import {
 } from "@/lib/environmentCsvImportViewModel";
 import { parseEnvironmentCSV, type ParsedEnvironmentRow } from "@/lib/csvParser";
 import {
+  UNKNOWN_CSV_HISTORY_WINDOW,
+  buildCsvHistoryWindowPreview,
+  csvHistoryWindowNotice,
+  type CsvHistoryWindow,
+} from "@/lib/csvHistoryWindowRules";
+import {
   CSV_IMPORT_DESCRIPTION,
   CSV_IMPORT_ADD_CURRENT_READING_LABEL,
   CSV_IMPORT_CONFIRM_LABEL,
@@ -41,6 +47,8 @@ import {
   CSV_IMPORT_READING_COPY,
   CSV_IMPORT_VIEW_HISTORY_LABEL,
   buildCsvImportFailureMessage,
+  mergeCsvImportFailureReceipts,
+  type CsvImportFailureReceipt,
   formatCsvPreviewRow,
 } from "@/lib/environmentCsvPreviewCopyRules";
 
@@ -54,6 +62,8 @@ export interface EnvironmentCsvImportModalProps {
     duplicateCount?: number;
     /** Earlier atomic batches committed before a later batch failed. */
     partialWrite?: boolean;
+    /** The dispatched batch may have committed without a usable response. */
+    unconfirmedWrite?: boolean;
     error: string | null;
   }>;
   /**
@@ -69,6 +79,8 @@ export interface EnvironmentCsvImportModalProps {
    * Navigation only: it does not save a reading or invoke AI Doctor.
    */
   addCurrentReadingHref?: string | null;
+  historyWindow?: CsvHistoryWindow;
+  onRetryHistoryWindow?: () => void;
 }
 
 const ERROR_COPY: Record<string, string> = {
@@ -86,6 +98,8 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
     onConfirm,
     viewHistoryHref = null,
     addCurrentReadingHref = null,
+    historyWindow = UNKNOWN_CSV_HISTORY_WINDOW,
+    onRetryHistoryWindow,
   } = props;
   // The handoff CTA is a router Link; render it only when a Router is
   // actually mounted so bare mounts (tests, storybook-style harnesses)
@@ -94,9 +108,15 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   const [state, setState] = useState<ImportState>(INITIAL_IMPORT_STATE);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const reset = useCallback(() => setState(cancelImport()), []);
+  const inFlightRef = useRef(false);
+  const failureReceiptRef = useRef<CsvImportFailureReceipt | null>(null);
+  const reset = useCallback(() => {
+    failureReceiptRef.current = null;
+    setState(cancelImport());
+  }, []);
 
   const handleClose = useCallback(() => {
+    if (inFlightRef.current) return;
     reset();
     onOpenChange(false);
   }, [reset, onOpenChange]);
@@ -117,31 +137,57 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
   }, []);
 
   const handleConfirm = useCallback(async () => {
+    if (inFlightRef.current) return;
     const rows = rowsToPersist(state.parsed);
     if (rows.length === 0) return;
+    inFlightRef.current = true;
     setState((prev) => ({ ...prev, phase: "inserting" }));
-    const res = await onConfirm(rows);
-    if (res.error) {
+    try {
+      let res: Awaited<ReturnType<EnvironmentCsvImportModalProps["onConfirm"]>>;
+      try {
+        res = await onConfirm(rows);
+      } catch {
+        res = { insertedCount: 0, error: "Import response unavailable", unconfirmedWrite: true };
+      }
+      if (res.error) {
+        const receipt = mergeCsvImportFailureReceipts(failureReceiptRef.current, res);
+        failureReceiptRef.current = receipt;
+        setState((prev) => ({
+          ...prev,
+          phase: "error",
+          errorCode: "insert_failed",
+          errorMessage: buildCsvImportFailureMessage(
+            receipt.insertedCount,
+            receipt.partialWrite === true,
+            receipt.unconfirmedWrite === true,
+          ),
+          insertedCount: receipt.insertedCount,
+          duplicateCount: res.duplicateCount ?? 0,
+          partialWrite: receipt.partialWrite === true,
+        }));
+        return;
+      }
+      // A successful full retry has resolved this file through inserts or dedupe.
+      failureReceiptRef.current = null;
       setState((prev) => ({
         ...prev,
-        phase: "error",
-        errorCode: "insert_failed",
+        phase: "done",
+        errorCode: null,
         errorMessage: null,
         insertedCount: res.insertedCount,
         duplicateCount: res.duplicateCount ?? 0,
-        partialWrite: res.partialWrite === true || res.insertedCount > 0,
       }));
-      return;
+    } finally {
+      inFlightRef.current = false;
     }
-    setState((prev) => ({
-      ...prev,
-      phase: "done",
-      insertedCount: res.insertedCount,
-      duplicateCount: res.duplicateCount ?? 0,
-    }));
   }, [state.parsed, onConfirm]);
 
   const coverage = buildCoveragePreview(state.parsed);
+  const windowPreview = buildCsvHistoryWindowPreview(
+    state.parsed?.validRows ?? [],
+    historyWindow,
+    new Date(),
+  );
 
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : handleClose())}>
@@ -150,6 +196,20 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
           <DialogTitle>Import historical data</DialogTitle>
           <DialogDescription>{CSV_IMPORT_DESCRIPTION}</DialogDescription>
         </DialogHeader>
+
+        <div
+          className="space-y-1 text-xs text-muted-foreground"
+          data-testid="csv-import-history-window"
+          role="status"
+        >
+          <p>{csvHistoryWindowNotice(historyWindow)}</p>
+          {onRetryHistoryWindow &&
+          (historyWindow.status === "error" || historyWindow.status === "unknown") ? (
+            <Button type="button" size="sm" variant="outline" onClick={onRetryHistoryWindow}>
+              Retry history access
+            </Button>
+          ) : null}
+        </div>
 
         {state.phase === "idle" ? (
           <div data-testid="csv-import-entry" className="space-y-3">
@@ -216,6 +276,13 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
                 </dd>
               </div>
             </dl>
+            {windowPreview && windowPreview.outsideCount > 0 ? (
+              <p data-testid="csv-import-outside-window" className="text-sm" role="note">
+                {windowPreview.outsideCount} of {windowPreview.observationCount} observations fall
+                outside this history window. Import keeps their original timestamps; they can be
+                saved without appearing in the current history view.
+              </p>
+            ) : null}
             {coverage.partialSuccess && coverage.partialMessage ? (
               <div
                 data-testid="csv-import-partial-banner"
@@ -282,11 +349,26 @@ export function EnvironmentCsvImportModal(props: EnvironmentCsvImportModalProps)
             <p className="text-sm text-destructive">
               {(state.errorCode && ERROR_COPY[state.errorCode]) ||
                 (state.errorCode === "insert_failed"
-                  ? buildCsvImportFailureMessage(state.insertedCount, state.partialWrite)
+                  ? (state.errorMessage ??
+                    buildCsvImportFailureMessage(state.insertedCount, state.partialWrite))
                   : state.errorMessage) ||
                 "Something went wrong."}
             </p>
             <DialogFooter>
+              {state.errorCode === "insert_failed" ? (
+                <>
+                  {viewHistoryHref && inRouter ? (
+                    <Button asChild variant="secondary">
+                      <Link to={viewHistoryHref} onClick={handleClose}>
+                        {CSV_IMPORT_VIEW_HISTORY_LABEL}
+                      </Link>
+                    </Button>
+                  ) : null}
+                  <Button onClick={handleConfirm} data-testid="csv-import-retry">
+                    Retry import
+                  </Button>
+                </>
+              ) : null}
               <Button variant="ghost" onClick={handleClose}>
                 Close
               </Button>

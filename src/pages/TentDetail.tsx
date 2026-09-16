@@ -40,7 +40,11 @@ import TentSensorSourceHealthCard from "@/components/TentSensorSourceHealthCard"
 import SensorSnapshotTruthStrip from "@/components/SensorSnapshotTruthStrip";
 import { buildSensorSnapshotReadModel } from "@/lib/sensors/sensorSnapshotReadModel";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
-import { useImportedSensorHistory } from "@/hooks/useImportedSensorHistory";
+import {
+  useImportedSensorHistory,
+  IMPORTED_SENSOR_HISTORY_QUERY_LIMIT,
+} from "@/hooks/useImportedSensorHistory";
+import { useCsvHistoryWindow } from "@/hooks/useCsvHistoryWindow";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
@@ -100,6 +104,7 @@ const EMPTY_TENT_PLANTS: never[] = [];
 export default function TentDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const historyAccess = useCsvHistoryWindow(!!id);
   const [showArchived, setShowArchived] = useState(false);
   const [rosterIncludeArchived, setRosterIncludeArchived] = useState<boolean>(() =>
     readTentPlantRosterIncludeArchived(id ?? null),
@@ -138,7 +143,8 @@ export default function TentDetail() {
   const activePlantsIsError = activePlantsQuery.isError;
   const allPlantsQuery = useGrowPlants(id, undefined, { includeArchived: true });
   const allPlants = allPlantsQuery.data ?? EMPTY_TENT_PLANTS;
-  const { data: readings = [] } = useSensorReadings(id);
+  const sensorReadings = useSensorReadings(id);
+  const { data: readings = [] } = sensorReadings;
   const importedHistory = useImportedSensorHistory(id);
   const series = buildTentSensorChartSeries(readings);
   const header = buildTentSensorHeaderView(readings);
@@ -479,7 +485,15 @@ export default function TentDetail() {
         <EcowittTentSnapshotV0Card tentId={id ?? null} />
       </section>
 
-      <TentManualSnapshotHistoryList tentId={id ?? null} readings={readings} />
+      <TentManualSnapshotHistoryList
+        tentId={id ?? null}
+        readings={readings}
+        readStatus={sensorReadings.status}
+        isFetching={sensorReadings.isFetching}
+        onRetry={() => {
+          void sensorReadings.refetch();
+        }}
+      />
 
       <ManualSnapshotTimelineSection scope="tent" tentId={id ?? null} />
 
@@ -489,6 +503,11 @@ export default function TentDetail() {
 
       <ImportedSensorHistoryPanel
         tentId={id ?? null}
+        historyWindow={historyAccess.window}
+        onRetryHistoryWindow={() => {
+          void historyAccess.refetch();
+        }}
+        queryLimit={IMPORTED_SENSOR_HISTORY_QUERY_LIMIT}
         readings={importedHistory.data ?? []}
         plants={activePlants}
         plantReadStatus={resolveImportedHistoryHandoffReadStatus({

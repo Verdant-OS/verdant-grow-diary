@@ -53,7 +53,7 @@ describe("ImportedSensorHistoryPanel", () => {
       wrap(<ImportedSensorHistoryPanel tentId="tent-A" readings={[csvRow({ source: "live" })]} />),
     );
     expect(screen.getByTestId("imported-history-empty")).toHaveTextContent(
-      "No imported CSV sensor history for this tent yet.",
+      "No CSV readings are available for this tent in the current history view.",
     );
   });
 
@@ -65,6 +65,43 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(screen.queryByTestId("imported-history-empty")).not.toBeInTheDocument();
     expect(screen.queryByTestId("imported-history-ai-doctor-handoff")).not.toBeInTheDocument();
     expect(trackFunnelEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(["error", "unknown"] as const)(
+    "shows history access retry when window verification is %s",
+    (status) => {
+      const onRetryHistoryWindow = vi.fn();
+      render(
+        wrap(
+          <ImportedSensorHistoryPanel
+            tentId="tent-A"
+            readings={[csvRow()]}
+            historyWindow={{ status }}
+            onRetryHistoryWindow={onRetryHistoryWindow}
+          />,
+        ),
+      );
+      expect(screen.getByTestId("imported-history-window")).toHaveTextContent(/couldn't verify/i);
+      fireEvent.click(screen.getByRole("button", { name: "Retry history access" }));
+      expect(onRetryHistoryWindow).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("does not offer history access retry while the window is still loading", () => {
+    render(
+      wrap(
+        <ImportedSensorHistoryPanel
+          tentId="tent-A"
+          readings={[csvRow()]}
+          historyWindow={{ status: "loading" }}
+          onRetryHistoryWindow={vi.fn()}
+        />,
+      ),
+    );
+    expect(screen.getByTestId("imported-history-window")).toHaveTextContent(
+      /Checking your sensor history window/i,
+    );
+    expect(screen.queryByRole("button", { name: "Retry history access" })).not.toBeInTheDocument();
   });
 
   it("keeps a failed read distinct from empty history and offers an explicit retry", () => {
@@ -92,7 +129,7 @@ describe("ImportedSensorHistoryPanel", () => {
   it("renders a safe empty state when no tent context is provided", () => {
     render(wrap(<ImportedSensorHistoryPanel tentId={null} readings={[]} />));
     expect(screen.getByTestId("imported-sensor-history-panel")).toBeInTheDocument();
-    expect(screen.getByText(/No imported CSV sensor history/)).toBeInTheDocument();
+    expect(screen.getByText("Select a tent to view its imported CSV history.")).toBeInTheDocument();
   });
 
   it("renders summary counts and metrics for CSV readings", () => {

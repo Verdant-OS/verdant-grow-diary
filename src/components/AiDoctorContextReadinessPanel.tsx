@@ -16,6 +16,7 @@ import {
   type AiDoctorReadinessState,
 } from "@/lib/aiDoctorReadinessViewModel";
 import type { AiDoctorContext } from "@/lib/aiDoctorEngine";
+import type { AlertsListStatus } from "@/hooks/useAlertsList";
 import AiDoctorImportedHistoryDisclosurePanel from "@/components/AiDoctorImportedHistoryDisclosurePanel";
 import {
   ACTION_SUGGESTION_INVALID_FIELD_LABELS,
@@ -179,8 +180,12 @@ export default function AiDoctorContextReadinessPanel({
   quickActions,
 }: AiDoctorContextReadinessPanelProps) {
   const view = useMemo(
-    () => buildAiDoctorReadinessView({ context, openAlertsCount }),
-    [context, openAlertsCount],
+    () =>
+      buildAiDoctorReadinessView({
+        context,
+        openAlertsCount: openAlertsStatus === "ok" ? openAlertsCount : undefined,
+      }),
+    [context, openAlertsCount, openAlertsStatus],
   );
   const style = STATE_STYLES[view.state];
 

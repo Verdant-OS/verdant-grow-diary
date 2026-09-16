@@ -572,9 +572,9 @@ async function seedFakeSession(context: BrowserContext) {
  * events over anything beneath it — on the authenticated lane it blocked the
  * sidebar's lowest links for the entire test budget (926 click retries on
  * /account/preferences). The census audits app surfaces, not the consent
- * flow; "denied" keeps the banner away AND guarantees no analytics code can
- * load (every loader gates on readAnalyticsConsent() === "granted"), which
- * preserves the lane's hermetic zero-external-fetch contract.
+ * flow; "denied" keeps the banner away and leaves Google Analytics consent
+ * denied. The network fence separately blocks ancillary analytics scripts;
+ * this census does not prove analytics consent compliance.
  */
 async function seedDeniedAnalyticsConsent(context: BrowserContext) {
   await context.addInitScript(
@@ -610,6 +610,19 @@ async function installNetworkFence(
     }
     await route.abort("blockedbyclient");
   });
+
+  // Block this known ancillary script locally. Other methods and URLs must
+  // still reach the broad fence and remain visible in its external audit.
+  await context.route(
+    "https://va.vercel-scripts.com/v1/script.debug.js",
+    async (route, request) => {
+      if (request.method() === "GET") {
+        await route.abort("blockedbyclient");
+        return;
+      }
+      await route.fallback();
+    },
+  );
 
   await context.route("https://fonts.googleapis.com/**", (route) =>
     route.fulfill({ status: 200, contentType: "text/css", body: "" }),
@@ -766,6 +779,14 @@ function installContextErrorAudit(context: BrowserContext, report: LaneReport) {
   });
   context.on("console", (message) => {
     if (message.type() === "error") {
+      // The fence deliberately aborts this script. Keep every other resource
+      // error, and every unrelated error originating from that same URL.
+      if (
+        message.location().url === "https://va.vercel-scripts.com/v1/script.debug.js" &&
+        /^Failed to load resource: net::ERR_BLOCKED_BY_CLIENT(?:\.Inspector)?$/.test(message.text())
+      ) {
+        return;
+      }
       const source = message.page()?.url() || message.location().url || "unknown page";
       report.consoleErrors.push(`${source}: ${message.text()}`);
     }
@@ -1855,6 +1876,87 @@ test.describe("core link and form census", () => {
       `core census runs once, under the ${MOCKED_PROJECT} project`,
     );
     await page.clock.setFixedTime(CORE_CENSUS_FIXED_TIME);
+  });
+
+  test("scheduled public network fence blocks the exact ancillary script and audits other requests", async ({
+    page,
+  }) => {
+    test.setTimeout(30_000);
+    const network: NetworkAudit = {
+      blockedMutations: [],
+      unexpectedExternalFetches: [],
+      mockedReadRequests: 0,
+    };
+    const report: LaneReport = {
+      lane: "public",
+      routeAudits: [],
+      fieldAudits: [],
+      linkAudits: [],
+      clickedInternalHrefs: [],
+      consoleErrors: [],
+      pageErrors: [],
+      network,
+    };
+    installContextErrorAudit(page.context(), report);
+    await installNetworkFence(page.context(), false, network);
+
+    const requestThroughBrowser = async (url: string, method = "GET") => {
+      const consoleError = page.waitForEvent("console", {
+        predicate: (message) => message.type() === "error" && message.location().url === url,
+      });
+      const result = await page.evaluate(
+        async ({ requestUrl, requestMethod }) => {
+          try {
+            await fetch(requestUrl, { method: requestMethod, mode: "no-cors" });
+            return "completed";
+          } catch {
+            return "blocked";
+          }
+        },
+        { requestUrl: url, requestMethod: method },
+      );
+      await consoleError;
+      return result;
+    };
+
+    const scriptUrl = "https://va.vercel-scripts.com/v1/script.debug.js";
+    expect(await requestThroughBrowser(scriptUrl)).toBe("blocked");
+    expect(network.unexpectedExternalFetches).toEqual([]);
+    expect(report.consoleErrors).toEqual([]);
+
+    const unexpectedRequests = [
+      { url: scriptUrl, method: "POST" },
+      { url: `${scriptUrl}?unexpected=1`, method: "GET" },
+      { url: "https://va.vercel-scripts.com/v1/other.js", method: "GET" },
+      { url: "https://va.vercel-scripts.com.example.invalid/v1/script.debug.js", method: "GET" },
+      { url: "https://census-unapproved.example.invalid/script.js", method: "GET" },
+    ];
+    for (const { url, method } of unexpectedRequests) {
+      expect(await requestThroughBrowser(url, method)).toBe("blocked");
+    }
+    expect(network.unexpectedExternalFetches).toEqual(
+      unexpectedRequests.map(({ url, method }) => `${method} ${url}`),
+    );
+    // The same-URL POST is caught by the network audit above; resource errors
+    // for all four nonmatching URLs must also survive the console audit.
+    expect(report.consoleErrors).toHaveLength(4);
+
+    const unrelatedError = page.waitForEvent("console", {
+      predicate: (message) => message.text() === "census unrelated script error",
+    });
+    await page.evaluate((url) => {
+      const script = document.createElement("script");
+      script.textContent = `console.error("census unrelated script error");\n//# sourceURL=${url}`;
+      document.head.append(script);
+    }, scriptUrl);
+    expect((await unrelatedError).location().url).toBe(scriptUrl);
+    expect(report.consoleErrors).toHaveLength(5);
+    expect(report.consoleErrors[report.consoleErrors.length - 1]).toContain(
+      "census unrelated script error",
+    );
+    expect(network.blockedMutations).toEqual([]);
+    expect(network.mockedReadRequests).toBe(0);
+    expect(report.pageErrors).toEqual([]);
   });
 
   test("scheduled authenticated Dashboard operating frame settles delayed diary evidence before recording revisit links", async ({

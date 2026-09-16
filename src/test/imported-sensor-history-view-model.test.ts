@@ -52,6 +52,60 @@ describe("resolveImportedSensorHistoryReadStatus", () => {
       }),
     ).toBe("error");
   });
+
+  it.each([
+    [
+      "paused first read",
+      { isError: false, isPaused: true, isPending: true, isFetching: false, hasRows: false },
+      "paused",
+    ],
+    [
+      "paused cached-empty refresh",
+      { isError: false, isPaused: true, isPending: false, isFetching: true, hasRows: false },
+      "paused",
+    ],
+    [
+      "pending idle first read",
+      { isError: false, isPaused: false, isPending: true, isFetching: false, hasRows: false },
+      "loading",
+    ],
+    [
+      "established empty after success",
+      { isError: false, isPaused: false, isPending: false, isFetching: false, hasRows: false },
+      "success",
+    ],
+    [
+      "cached rows during paused refresh",
+      { isError: false, isPaused: true, isPending: false, isFetching: true, hasRows: true },
+      "success",
+    ],
+  ] as const)("%s resolves to %s", (_label, input, expected) => {
+    expect(resolveImportedSensorHistoryReadStatus(input)).toBe(expected);
+  });
+
+  it("prefers error over paused or loading when no rows are available", () => {
+    expect(
+      resolveImportedSensorHistoryReadStatus({
+        isError: true,
+        isPaused: true,
+        isPending: true,
+        isFetching: true,
+        hasRows: false,
+      }),
+    ).toBe("error");
+  });
+
+  it("prefers paused over loading when the read is waiting for connectivity", () => {
+    expect(
+      resolveImportedSensorHistoryReadStatus({
+        isError: false,
+        isPaused: true,
+        isPending: true,
+        isFetching: true,
+        hasRows: false,
+      }),
+    ).toBe("paused");
+  });
 });
 
 function row(overrides: Partial<ImportedSensorHistoryInputRow>): ImportedSensorHistoryInputRow {

@@ -67,6 +67,17 @@ describe("ImportedSensorHistoryPanel", () => {
     expect(trackFunnelEvent).not.toHaveBeenCalled();
   });
 
+  it("keeps a paused read waiting for connection and withholds AI Doctor handoff", () => {
+    render(wrap(<ImportedSensorHistoryPanel tentId="tent-A" readings={[]} readStatus="paused" />));
+    expect(screen.getByTestId("imported-history-paused")).toHaveTextContent(
+      /waiting for a connection/i,
+    );
+    expect(screen.queryByTestId("imported-history-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("imported-history-loading")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("imported-history-ai-doctor-handoff")).not.toBeInTheDocument();
+    expect(trackFunnelEvent).not.toHaveBeenCalled();
+  });
+
   it.each(["error", "unknown"] as const)(
     "shows history access retry when window verification is %s",
     (status) => {

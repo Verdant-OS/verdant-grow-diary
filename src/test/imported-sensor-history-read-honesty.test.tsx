@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
 const response = vi.hoisted(() => ({
@@ -58,6 +58,8 @@ function History() {
       readStatus={resolveImportedSensorHistoryReadStatus({
         isError: history.isError,
         isFetching: history.isFetching,
+        isPending: history.isPending,
+        isPaused: history.isPaused,
         hasRows: (history.data?.length ?? 0) > 0,
       })}
       onRetry={() => void history.refetch()}
@@ -81,6 +83,7 @@ function renderHistory() {
 }
 
 beforeEach(() => {
+  onlineManager.setOnline(true);
   response.data = [];
   response.error = null;
 });
@@ -88,6 +91,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   for (const client of clients.splice(0)) client.clear();
+  onlineManager.setOnline(true);
 });
 
 describe("imported CSV history response honesty", () => {
@@ -158,5 +162,15 @@ describe("imported CSV history response honesty", () => {
     );
     expect(screen.queryByTestId("imported-history-empty")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("keeps a paused first read unresolved instead of established empty history", async () => {
+    onlineManager.setOnline(false);
+    renderHistory();
+    expect(await screen.findByTestId("imported-history-paused")).toHaveTextContent(
+      /waiting for a connection/i,
+    );
+    expect(screen.queryByTestId("imported-history-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("imported-history-loading")).not.toBeInTheDocument();
   });
 });

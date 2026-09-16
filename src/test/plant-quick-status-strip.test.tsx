@@ -267,56 +267,79 @@ describe("PlantQuickStatusStrip — recent activity read honesty", () => {
       "initial loading",
       { data: undefined, isLoading: true, isPending: true },
       "Checking recent activity…",
+      "loading",
     ],
     [
       "paused first read",
       { data: undefined, isPending: true, fetchStatus: "paused" },
       "Waiting for connection to check recent activity.",
+      "waiting",
     ],
-    ["failed first read", { data: undefined, isError: true }, "Recent activity unavailable."],
+    [
+      "failed first read",
+      { data: undefined, isError: true },
+      "Recent activity unavailable.",
+      "unavailable",
+    ],
     [
       "failed refresh with cached rows",
       { data: cached, isError: true },
       "Recent activity unavailable.",
+      "unavailable",
     ],
     [
       "failed refresh with cached empty result",
       { data: [], isError: true },
       "Recent activity unavailable.",
+      "unavailable",
     ],
-    ["null response", { data: null }, "Recent activity unavailable."],
-    ["undefined completed response", { data: undefined }, "Recent activity unavailable."],
-    ["malformed response", { data: { message: "private-error" } }, "Recent activity unavailable."],
-  ])("keeps %s distinct from an empty or verified timeline", (_name, state, label) => {
-    setActivityRead(state as Record<string, unknown>);
-    const reveal = vi.fn();
-    render(
-      <PlantQuickStatusStrip
-        plantId={PLANT}
-        plantStartedAt={PLANT_STARTED}
-        onRevealAndNavigate={reveal}
-      />,
-    );
-    const strip = screen.getByTestId("plant-quick-status-strip");
-    expect(strip).toHaveTextContent(label as string);
-    expect(strip.getAttribute("aria-label")).toContain(label);
-    expect(strip.getAttribute("data-compact")).toContain(label);
-    expect(strip).not.toHaveTextContent(
-      /No updates yet|Last updated|Add a quick log|private-error/,
-    );
-    expect(strip.getAttribute("aria-label")).not.toMatch(
-      /No updates yet|Last updated|Add a quick log|private-error/,
-    );
-    const latest = screen.getByTestId("plant-quick-status-view-latest");
-    expect(latest).toHaveAttribute("aria-disabled", "true");
-    fireEvent.click(latest);
-    expect(reveal).not.toHaveBeenCalled();
-    if ((state as Record<string, unknown>).isPending) {
-      expect(screen.queryByRole("button", { name: "Retry recent activity" })).toBeNull();
-    } else {
-      expect(screen.getByRole("button", { name: "Retry recent activity" })).toBeEnabled();
-    }
-  });
+    ["null response", { data: null }, "Recent activity unavailable.", "unavailable"],
+    [
+      "undefined completed response",
+      { data: undefined },
+      "Recent activity unavailable.",
+      "unavailable",
+    ],
+    [
+      "malformed response",
+      { data: { message: "private-error" } },
+      "Recent activity unavailable.",
+      "unavailable",
+    ],
+  ])(
+    "keeps %s distinct from an empty or verified timeline",
+    (_name, state, label, timelineState) => {
+      setActivityRead(state as Record<string, unknown>);
+      const reveal = vi.fn();
+      render(
+        <PlantQuickStatusStrip
+          plantId={PLANT}
+          plantStartedAt={PLANT_STARTED}
+          onRevealAndNavigate={reveal}
+        />,
+      );
+      const strip = screen.getByTestId("plant-quick-status-strip");
+      expect(strip).toHaveTextContent(label as string);
+      expect(strip.getAttribute("aria-label")).toContain(label);
+      expect(strip.getAttribute("data-compact")).toContain(label);
+      expect(strip.getAttribute("data-timeline-state")).toBe(timelineState);
+      expect(strip).not.toHaveTextContent(
+        /No updates yet|Last updated|Add a quick log|private-error/,
+      );
+      expect(strip.getAttribute("aria-label")).not.toMatch(
+        /No updates yet|Last updated|Add a quick log|private-error/,
+      );
+      const latest = screen.getByTestId("plant-quick-status-view-latest");
+      expect(latest).toHaveAttribute("aria-disabled", "true");
+      fireEvent.click(latest);
+      expect(reveal).not.toHaveBeenCalled();
+      if ((state as Record<string, unknown>).isPending) {
+        expect(screen.queryByRole("button", { name: "Retry recent activity" })).toBeNull();
+      } else {
+        expect(screen.getByRole("button", { name: "Retry recent activity" })).toBeEnabled();
+      }
+    },
+  );
 
   it.each([undefined, null])("requires a plant before interpreting query state (%s)", (plantId) => {
     setActivityRead({ data: cached, isPending: true, isError: true });
@@ -599,6 +622,79 @@ describe("buildPlantQuickStatusView — loading / links / view-latest", () => {
     expect(v.viewLatestEntry.disabled).toBe(true);
     expect(v.viewLatestEntry.targetItemId).toBeNull();
     expect(v.viewLatestEntry.disabledReason).toMatch(/quick log|photo|snapshot/i);
+  });
+});
+
+describe("buildPlantQuickStatusView — timeline read-state honesty", () => {
+  const cachedItems = [
+    tItem({ id: "cached-newest", occurredAt: "2026-05-31T00:00:00Z" }),
+    tItem({ id: "cached-older", occurredAt: "2026-04-10T00:00:00Z" }),
+  ];
+
+  it.each([
+    ["loading", "Checking recent activity…", true],
+    ["waiting", "Waiting for connection to check recent activity.", true],
+    ["unavailable", "Recent activity unavailable.", false],
+    ["no-plant", "Select a plant to view recent activity.", false],
+  ] as const)(
+    "surfaces %s copy and blocks view-latest until the read is verified",
+    (timelineState, label, timelineLoading) => {
+      const v = buildPlantQuickStatusView({
+        stage: "vegetation",
+        timelineItems: cachedItems,
+        timelineState,
+      });
+      expect(v.timelineState).toBe(timelineState);
+      expect(v.timelineLoading).toBe(timelineLoading);
+      expect(v.lastUpdateLabel).toBe(label);
+      expect(v.lastUpdateIsFallback).toBe(true);
+      expect(v.compact).toContain(label);
+      expect(v.viewLatestEntry.disabled).toBe(true);
+      expect(v.viewLatestEntry.targetItemId).toBeNull();
+      expect(v.viewLatestEntry.disabledReason).toBe(label);
+      expect(v.compact).not.toMatch(/Last updated|No updates yet/);
+    },
+  );
+
+  it("maps legacy timelineLoading to loading when timelineState is omitted", () => {
+    const v = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: cachedItems,
+      timelineLoading: true,
+    });
+    expect(v.timelineState).toBe("loading");
+    expect(v.lastUpdateLabel).toBe("Checking recent activity…");
+    expect(v.viewLatestEntry.targetItemId).toBeNull();
+  });
+
+  it("prefers explicit timelineState over legacy timelineLoading", () => {
+    const v = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: cachedItems,
+      timelineState: "ready",
+      timelineLoading: true,
+    });
+    expect(v.timelineState).toBe("ready");
+    expect(v.timelineLoading).toBe(false);
+    expect(v.lastUpdateLabel).toBe("Last updated May 31, 2026");
+    expect(v.viewLatestEntry.targetItemId).toBe("cached-newest");
+  });
+
+  it("keeps verified empty reads distinct from unavailable reads", () => {
+    const empty = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: [],
+      timelineState: "ready",
+    });
+    const unavailable = buildPlantQuickStatusView({
+      stage: "vegetation",
+      timelineItems: [],
+      timelineState: "unavailable",
+    });
+    expect(empty.lastUpdateLabel).toBe("No updates yet");
+    expect(unavailable.lastUpdateLabel).toBe("Recent activity unavailable.");
+    expect(empty.viewLatestEntry.disabledReason).toMatch(/quick log|photo|snapshot/i);
+    expect(unavailable.viewLatestEntry.disabledReason).toBe("Recent activity unavailable.");
   });
 });
 

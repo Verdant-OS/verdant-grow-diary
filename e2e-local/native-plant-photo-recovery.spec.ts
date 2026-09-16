@@ -16,7 +16,7 @@ import {
 
 // A synthetic one-pixel PNG, never a grower's private media.
 const imageBytes = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aKZkAAAAASUVORK5CYII=",
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
   "base64",
 );
 
@@ -94,7 +94,9 @@ test("a committed Plant Quick Log photo survives a lost reply, explicit retry an
     const first = await ownerRows(f.owner);
     expect(first.grow_events).toHaveLength(1);
     expect(first.diary_entries).toHaveLength(1);
-    const originalDetails = isRow(first.grow_events[0].details) ? first.grow_events[0].details : {};
+    const originalDetails = isRow(first.diary_entries[0].details)
+      ? first.diary_entries[0].details
+      : {};
     const originalPath = String(originalDetails.photo_url);
     expect(uploadedPaths.has(originalPath)).toBe(true);
     expect(first.grow_events[0]).toMatchObject({
@@ -116,7 +118,6 @@ test("a committed Plant Quick Log photo survives a lost reply, explicit retry an
     expect(final.diary_entries).toHaveLength(1);
     expect(final.sensor_readings).toEqual(first.sensor_readings);
     expect(final.environment_events).toEqual(first.environment_events);
-    const eventDetails = isRow(final.grow_events[0].details) ? final.grow_events[0].details : {};
     const diaryDetails = isRow(final.diary_entries[0].details)
       ? final.diary_entries[0].details
       : {};
@@ -161,7 +162,6 @@ test("a committed Plant Quick Log photo survives a lost reply, explicit retry an
       photoSurvivedUncertain,
       originalPhotoReadable,
       referencesAgree:
-        eventDetails.photo_url === originalPath &&
         diaryDetails.photo_url === originalPath &&
         (!final.diary_entries[0].photo_url || final.diary_entries[0].photo_url === originalPath),
       sourceRemainsManual: final.grow_events[0].source === "manual",

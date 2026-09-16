@@ -154,6 +154,48 @@ function Harness() {
 }
 
 describe("Timeline evidence drawer integration", () => {
+  it.each(["invalid", "live", "demo"])(
+    "renders a cautionary hint alongside the %s source badge",
+    (source) => {
+      const viewModel = buildTimelineEvidenceDetailViewModel(
+        {
+          id: "untrusted-snapshot",
+          photo_url: "https://example.test/photo.jpg",
+          entry_at: "2025-06-01T11:55:00Z",
+          details: { sensor_snapshot: { source, ts: "2025-06-01T11:55:00Z", temp: 24 } },
+        },
+        { nowMs: Date.parse("2025-06-01T12:00:00Z") },
+      );
+      render(<TimelineEvidenceDetailDrawer open viewModel={viewModel} onClose={() => {}} />);
+      const context = screen.getByTestId("timeline-evidence-drawer-context");
+      expect(context.className).not.toContain("emerald");
+      expect(context.textContent).toContain("Photo and sensor record are present");
+      expect(context.textContent).not.toMatch(/strong evidence|no photo/i);
+      expect(
+        screen.getByTestId(
+          `timeline-sensor-source-badge-${source === "demo" ? "demo" : "invalid"}`,
+        ),
+      ).toBeTruthy();
+    },
+  );
+
+  it("shows invalid-reading warnings instead of an implausible numeric chip", () => {
+    const viewModel = buildTimelineEvidenceDetailViewModel(
+      {
+        id: "invalid-value",
+        photo_url: "https://example.test/photo.jpg",
+        entry_at: "2025-06-01T11:55:00Z",
+        details: { sensor_snapshot: { source: "manual", temp: 200, rh: 55 } },
+      },
+      { nowMs: Date.parse("2025-06-01T12:00:00Z") },
+    );
+    render(<TimelineEvidenceDetailDrawer open viewModel={viewModel} onClose={() => {}} />);
+    const sensor = screen.getByTestId("timeline-evidence-drawer-sensor");
+    expect(sensor.textContent).not.toContain("200°C");
+    expect(sensor.textContent).toContain("Invalid temp");
+    expect(sensor.textContent).toContain("55% RH");
+  });
+
   it("clicking the entry body opens the drawer", () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId("entry-body-e1"));

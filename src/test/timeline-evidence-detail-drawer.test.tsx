@@ -154,6 +154,37 @@ function Harness() {
 }
 
 describe("Timeline evidence drawer integration", () => {
+  it("renders strong evidence copy and styling for a fresh manual snapshot with photo", () => {
+    const viewModel = buildTimelineEvidenceDetailViewModel(
+      {
+        id: "strong-manual",
+        note: "Looks healthy",
+        photo_url: "https://example.test/photo.jpg",
+        stage: "veg",
+        entry_at: "2025-06-01T11:55:00Z",
+        details: {
+          event_type: "photo",
+          plant_name: "Blue Dream",
+          tent_name: "Tent A",
+          source: "manual",
+          sensor_snapshot: {
+            ts: "2025-06-01T11:55:00Z",
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+            source: "manual",
+          },
+        },
+      },
+      { nowMs: Date.parse("2025-06-01T12:00:00Z") },
+    );
+    render(<TimelineEvidenceDetailDrawer open viewModel={viewModel} onClose={() => {}} />);
+    const context = screen.getByTestId("timeline-evidence-drawer-context");
+    expect(context.className).toContain("emerald");
+    expect(context.textContent).toContain("Useful for AI Doctor context");
+    expect(context.textContent).toContain("useful context for AI Doctor");
+  });
+
   it.each(["invalid", "live", "demo"])(
     "renders a cautionary hint alongside the %s source badge",
     (source) => {

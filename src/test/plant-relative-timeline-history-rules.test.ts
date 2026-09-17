@@ -159,4 +159,20 @@ describe("plant history count and read truth", () => {
     expect(view.canRetry).toBe(true);
     expect(view.notice).toMatch(/could not be reached/);
   });
+
+  it("surfaces a count conflict when the server total shrinks below loaded rows", () => {
+    const view = buildPlantHistoryReadView(
+      { data: [row(1), row(2), row(3)], totalCount: 2, hasNextPage: false },
+      "plant-1",
+      3,
+    );
+    expect(view.countConflict).toBe(true);
+    expect(view.totalCount).toBeNull();
+    expect(view.complete).toBe(false);
+    expect(view.canRetry).toBe(true);
+    expect(view.notice).toBe(
+      "Timeline history changed while older entries were loading. Refresh to verify the total.",
+    );
+    expect(view.countLabel).toContain("total not verified");
+  });
 });

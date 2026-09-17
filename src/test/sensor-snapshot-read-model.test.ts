@@ -97,6 +97,16 @@ describe("buildSensorSnapshotReadModel", () => {
     expect(m.isStale).toBe(false);
   });
 
+  it("normalizes a legacy manual device note without the manual: prefix", () => {
+    const m = buildSensorSnapshotReadModel({
+      snapshot: liveSnap({ source: "manual", device_id: "  Handheld   meter " }),
+      now: NOW,
+    });
+    expect(m.sourceIdentityLabel).toBe("Identity: manual_entry");
+    expect(m.badges.map((badge) => badge.label)).toContain("Device hint: Handheld meter");
+    expect(m.badges.map((badge) => badge.label)).not.toContain("Identity: Handheld meter");
+  });
+
   it("returns missing model when snapshot is unavailable", () => {
     const m = buildSensorSnapshotReadModel({
       snapshot: liveSnap({ source: "unavailable", device_id: null }),

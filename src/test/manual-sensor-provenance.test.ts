@@ -212,6 +212,15 @@ describe("closed manual provenance contract", () => {
     },
   );
 
+  it("rejects a provenance object with any extra top-level key", () => {
+    expect(
+      isCanonicalManualSensorProvenance({
+        ...CANONICAL,
+        observed_at: CAPTURED,
+      }),
+    ).toBe(false);
+  });
+
   it("accepts only the exact canonical envelope regardless of JSON property order", () => {
     const submitted = { manual_provenance: buildManualSensorProvenance() };
     const stored = {

@@ -301,10 +301,10 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
           // on the common failure path. Propagate so performSafeSignOut can
           // return ok:false + SIGN_OUT_FAILURE_MESSAGE (auth hardening #588).
           // Never rethrow the raw error object — it may carry token/session text.
-          const { error } = await signOutOperation.runSdkSignOut(() => supabase.auth.signOut());
-          if (error) {
-            throw new Error("sign_out_failed");
-          }
+          await signOutOperation.runSdkSignOut(async () => {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw new Error("sign_out_failed");
+          });
         },
       }}
     >

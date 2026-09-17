@@ -16,6 +16,8 @@ import RootEntry from "@/components/RootEntry";
 import { AUTH_REVALIDATE_EVENT } from "@/hooks/useRequireAuth";
 import { useNavigate } from "@/lib/react-router-compat";
 import { SIGN_OUT_FAILURE_MESSAGE } from "@/lib/authSessionExitRules";
+import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
+import { supabase } from "@/integrations/supabase/client";
 
 const sdk = vi.hoisted(() => ({
   hasSession: true,
@@ -237,6 +239,9 @@ async function flushOldContinuations() {
 }
 
 beforeEach(() => {
+  // Cases intentionally share one mocked SDK client. Runtime failure memory
+  // survives provider remounts, but it must not leak between independent tests.
+  getAuthSignOutOperation(supabase.auth).clearFailedCleanup();
   window.sessionStorage.clear();
   sdk.hasSession = true;
   sdk.ownerId = "fixture-owner";
@@ -494,20 +499,84 @@ describe("explicit sign-out owns navigation through the committed public destina
     expect(sdk.toastError).not.toHaveBeenCalled();
   });
 
-  it("queues explicit sign-out behind a rejected-bearer local SDK logout that outlives revalidation recovery", async () => {
+  it("keeps automatic rejected-bearer cleanup closed through Retry, null-session delivery and provider remount until the local SDK settles", async () => {
     const localGate = deferred<{ error: null }>({ error: null });
-    const explicitGate = deferred<{ error: null }>({ error: null });
-    sdk.signOut.mockImplementation((options?: { scope?: string }) => {
-      if (options?.scope === "local") {
-        return localGate.promise.then((result) => {
-          signedOutEvent();
-          return result;
-        });
-      }
-      signedOutEvent();
-      return explicitGate.promise;
+    sdk.signOut.mockImplementation(() =>
+      localGate.promise.then((result) => {
+        signedOutEvent();
+        return result;
+      }),
+    );
+    const destination = "/sensors?tentId=tent-a#manual-reading";
+    const { router, welcomeLoader } = renderRoutes(destination);
+    await screen.findByTestId("private-page");
+    sdk.getUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: { name: "AuthApiError", status: 401, message: "Fixture bearer rejected" },
     });
-    const { router, welcomeGate, welcomeLoader } = renderRoutes("/sensors");
+    vi.useFakeTimers();
+    act(() => window.dispatchEvent(new Event(AUTH_REVALIDATE_EVENT)));
+    await flushOldContinuations();
+    expect(sdk.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+    await act(async () => vi.advanceTimersByTimeAsync(15_000));
+    vi.useRealTimers();
+
+    // The faulty recovery screen permits Retry while an older SDK logout is
+    // still active. A session_missing response can deliver SIGNED_OUT before
+    // that older promise settles. A protected cleanup boundary removes Retry;
+    // the same SDK event must remain harmless even when there is no button.
+    const retry = screen.queryByRole("button", { name: "Retry" });
+    if (retry) {
+      const readsBeforeRetry = sdk.getUser.mock.calls.length;
+      sdk.getUser.mockImplementationOnce(async () => {
+        signedOutEvent();
+        return missingSession();
+      });
+      fireEvent.click(retry);
+      await waitFor(() => expect(sdk.getUser).toHaveBeenCalledTimes(readsBeforeRetry + 1));
+    } else {
+      act(() => signedOutEvent());
+    }
+    // Exercise entry at the actual auth route as well as the event-driven
+    // redirect; neither route resolution nor remount may release SDK cleanup.
+    await act(async () => {
+      await router.navigate({ to: "/auth", search: { redirectTo: destination } });
+    });
+    expect(screen.queryByTestId("private-page")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("public-landing")).not.toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Sign-in form" })).not.toBeInTheDocument();
+    expect(sdk.authMounts).toBe(0);
+    expect(screen.getByRole("button", { name: "Reload page" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Remount provider" }));
+    await flushOldContinuations();
+    expect(screen.queryByRole("form", { name: "Sign-in form" })).not.toBeInTheDocument();
+    expect(sdk.authMounts).toBe(0);
+    expect(sdk.signOut).toHaveBeenCalledTimes(1);
+
+    await act(async () => localGate.resolve({ error: null }));
+    const email = await screen.findByLabelText("Email");
+    fireEvent.change(email, { target: { value: "after-cleanup@example.invalid" } });
+    await flushOldContinuations();
+    expect(router.state.resolvedLocation?.pathname).toBe("/auth");
+    expect(router.state.resolvedLocation?.search.redirectTo).toBe(destination);
+    expect(screen.getByLabelText("Email")).toBe(email);
+    expect(email).toHaveValue("after-cleanup@example.invalid");
+    expect(sdk.authMounts).toBe(1);
+    expect(sdk.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+    expect(welcomeLoader).not.toHaveBeenCalled();
+    expect(sdk.toastError).not.toHaveBeenCalled();
+  });
+
+  it("keeps stalled automatic logout behind Reload recovery and permits a stable new account only after cleanup settles", async () => {
+    const localGate = deferred<{ error: null }>({ error: null });
+    sdk.signOut.mockImplementation(() =>
+      localGate.promise.then((result) => {
+        signedOutEvent();
+        return result;
+      }),
+    );
+    const destination = "/sensors?tentId=tent-a#manual-reading";
+    const { router, welcomeLoader } = renderRoutes(destination);
     await screen.findByTestId("private-page");
     sdk.getUser.mockResolvedValueOnce({
       data: { user: null },
@@ -519,14 +588,12 @@ describe("explicit sign-out owns navigation through the committed public destina
     expect(sdk.signOut).toHaveBeenCalledTimes(1);
     expect(sdk.signOut).toHaveBeenCalledWith({ scope: "local" });
     await act(async () => vi.advanceTimersByTimeAsync(15_000));
-    const recovery = screen.getByTestId("app-shell-revalidation-failed");
-    fireEvent.click(within(recovery).getByRole("button", { name: "Sign out" }));
-    const dialog = screen.getByTestId("sign-out-confirm-dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Sign out" }));
-    await flushOldContinuations();
-
-    // The explicit intent owns the UI immediately, but its SDK operation may
-    // not overtake the older local logout and remove a later session twice.
+    expect(screen.getByRole("button", { name: "Reload page" })).toBeEnabled();
+    expect(screen.queryByTestId("app-shell-revalidation-failed")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    // An uncancellable automatic cleanup owns entry until it settles. The
+    // stalled UI cannot dispatch a second SDK logout or admit another account.
     expect(sdk.signOut).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("private-page")).not.toBeInTheDocument();
     expect(screen.queryByTestId("public-landing")).not.toBeInTheDocument();
@@ -535,20 +602,102 @@ describe("explicit sign-out owns navigation through the committed public destina
     vi.useRealTimers();
 
     await act(async () => localGate.resolve({ error: null }));
-    await waitFor(() => expect(sdk.signOut).toHaveBeenCalledTimes(2));
-    expect(sdk.signOut.mock.calls[1]).toEqual([]);
-    expect(screen.queryByRole("form", { name: "Sign-in form" })).not.toBeInTheDocument();
+    const email = await screen.findByLabelText("Email");
+    expect(router.state.resolvedLocation?.pathname).toBe("/auth");
+    expect(router.state.resolvedLocation?.search.redirectTo).toBe(destination);
+    expect(screen.queryByRole("button", { name: "Reload page" })).not.toBeInTheDocument();
+    fireEvent.change(email, { target: { value: "new-owner@example.invalid" } });
+    await flushOldContinuations();
+    expect(email).toHaveValue("new-owner@example.invalid");
+    expect(screen.getByLabelText("Email")).toBe(email);
+    act(() => signedInEvent("fixture-owner-b"));
+    await act(async () => {
+      await router.navigate({
+        to: "/sensors",
+        search: { tentId: "tent-b" },
+        hash: "manual-reading",
+      });
+    });
+    await screen.findByTestId("private-page");
+    const newAccountKey = "verdant:auth:after-automatic-cleanup";
+    window.sessionStorage.setItem(newAccountKey, "new-account-draft");
+    await flushOldContinuations();
+    expect(sdk.hasSession).toBe(true);
+    expect(screen.getByTestId("auth-identity")).toHaveTextContent("fixture-owner-b");
+    expect(screen.getByTestId("private-page")).toBeInTheDocument();
+    expect(router.state.resolvedLocation?.href).toBe("/sensors?tentId=tent-b#manual-reading");
+    expect(window.sessionStorage.getItem(newAccountKey)).toBe("new-account-draft");
+    expect(sdk.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
     expect(welcomeLoader).not.toHaveBeenCalled();
-    await act(async () => explicitGate.resolve({ error: null }));
-    await waitFor(() => expect(welcomeLoader).toHaveBeenCalledTimes(1));
-    expect(router.state.status).toBe("pending");
-    expect(screen.queryByRole("form", { name: "Sign-in form" })).not.toBeInTheDocument();
-    await act(async () => welcomeGate.resolve());
-    await screen.findByTestId("public-landing");
-    expect(router.state.resolvedLocation?.pathname).toBe("/welcome");
-    expect(sdk.authMounts).toBe(0);
+    expect(sdk.authMounts).toBe(1);
     expect(sdk.toastError).not.toHaveBeenCalled();
   });
+
+  it.each(["returned-error", "rejected-promise"])(
+    "automatic cleanup failure (%s) keeps the held account behind explicit revalidation recovery without repeating logout",
+    async (failureKind) => {
+      const firstCleanup = deferred<void>(undefined);
+      const unexpectedCleanup = deferred<{ error: null }>({ error: null });
+      sdk.signOut
+        .mockImplementationOnce(() =>
+          firstCleanup.promise.then(() => {
+            if (failureKind === "rejected-promise") throw new Error("Fixture cleanup failed");
+            return { error: { message: "Fixture cleanup failed" } };
+          }),
+        )
+        // Keep an unexpected repeated cleanup pending so the regression fails
+        // deterministically at its count, rather than creating an async loop.
+        .mockImplementation(() => unexpectedCleanup.promise);
+      const { router, welcomeLoader } = renderRoutes("/sensors?tentId=tent-a#manual-reading");
+      await screen.findByTestId("private-page");
+      sdk.getUser.mockImplementation(async () => ({
+        data: { user: null },
+        error: { name: "AuthApiError", status: 401, message: "Fixture bearer rejected" },
+      }));
+      act(() => window.dispatchEvent(new Event(AUTH_REVALIDATE_EVENT)));
+      await waitFor(() => expect(sdk.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" }));
+      expect(screen.queryByTestId("private-page")).not.toBeInTheDocument();
+      expect(screen.queryByRole("form", { name: "Sign-in form" })).not.toBeInTheDocument();
+      await act(async () => firstCleanup.resolve());
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("app-shell-revalidation-failed") !== null ||
+            sdk.signOut.mock.calls.length > 1,
+        ).toBe(true),
+      );
+      expect(sdk.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+      let recovery = screen.getByTestId("app-shell-revalidation-failed");
+      expect(within(recovery).getByRole("button", { name: "Retry" })).toBeEnabled();
+      expect(screen.queryByRole("button", { name: "Reload page" })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("private-page")).not.toBeInTheDocument();
+      expect(screen.queryByRole("form", { name: "Sign-in form" })).not.toBeInTheDocument();
+      expect(sdk.hasSession).toBe(true);
+      expect(sdk.ownerId).toBe("fixture-owner");
+      expect(sdk.authMounts).toBe(0);
+      expect(welcomeLoader).not.toHaveBeenCalled();
+
+      const validationsBeforeRemount = sdk.getUser.mock.calls.length;
+      fireEvent.click(screen.getByRole("button", { name: "Remount provider" }));
+      recovery = await screen.findByTestId("app-shell-revalidation-failed");
+      await flushOldContinuations();
+      expect(within(recovery).getByRole("button", { name: "Retry" })).toBeEnabled();
+      expect(sdk.getUser).toHaveBeenCalledTimes(validationsBeforeRemount);
+      expect(sdk.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+      expect(screen.queryByTestId("private-page")).not.toBeInTheDocument();
+      expect(screen.queryByRole("form", { name: "Sign-in form" })).not.toBeInTheDocument();
+
+      // A deliberate Retry may recover once server validation succeeds; the
+      // completed failed SDK cleanup must not run automatically on remount.
+      sdk.getUser.mockImplementation(async () => authenticated());
+      fireEvent.click(within(recovery).getByRole("button", { name: "Retry" }));
+      await screen.findByTestId("private-page");
+      await flushOldContinuations();
+      expect(router.state.resolvedLocation?.href).toBe("/sensors?tentId=tent-a#manual-reading");
+      expect(screen.getByTestId("auth-identity")).toHaveTextContent("fixture-owner");
+      expect(sdk.signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
+      expect(sdk.authMounts).toBe(0);
+    },
+  );
 
   it.each(["sdk", "welcome-loader"])(
     "offers reload recovery after 15 seconds of held %s without releasing the active sign-out boundary",

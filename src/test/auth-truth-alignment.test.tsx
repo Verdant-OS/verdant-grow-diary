@@ -97,6 +97,8 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({ default: () => null }));
 vi.mock("@/components/GlobalSearchDialog", () => ({ default: () => null }));
 
 import { AuthProvider, useAuth } from "@/store/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
 import {
   AUTH_REVALIDATION_TIMEOUT_MS,
   classifyRevalidationFailure,
@@ -208,6 +210,8 @@ function GoTo({ to }: { to: string }) {
 }
 
 beforeEach(() => {
+  // Each case starts an independent session on the reused mock SDK client.
+  getAuthSignOutOperation(supabase.auth).clearFailedCleanup();
   window.sessionStorage.clear();
   mocks.listeners.length = 0;
   renderedIdentities.length = 0;

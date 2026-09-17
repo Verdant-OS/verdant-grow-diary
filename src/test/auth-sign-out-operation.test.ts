@@ -246,3 +246,240 @@ describe("auth client SDK sign-out serialization", () => {
     expect(await firstCall).toBe("first client completed");
   });
 });
+
+describe("SDK-owned sign-out visibility", () => {
+  it("publishes pending synchronously for automatic cleanup without a navigation lease", async () => {
+    const client = {};
+    const service = getAuthSignOutOperation(client);
+    const gate = deferred<string>();
+    const started = deferred<void>();
+    const snapshots: string[] = [];
+    const unsubscribe = service.subscribe(() => snapshots.push(service.getSnapshot()));
+    const action = vi.fn(() => {
+      started.resolve();
+      return gate.promise;
+    });
+    const cleanup = service.runSdkSignOut(action);
+    try {
+      // A missing-session retry can render before this queued action starts.
+      expect(action).not.toHaveBeenCalled();
+      expect(service.getSnapshot()).toBe("pending");
+      expect(snapshots).toEqual(["pending"]);
+      await started.promise;
+      unsubscribe();
+      expect(getAuthSignOutOperation(client).getSnapshot()).toBe("pending");
+    } finally {
+      gate.resolve("cleanup complete");
+      expect(await cleanup).toBe("cleanup complete");
+      unsubscribe();
+    }
+    expect(service.getSnapshot()).toBe("idle");
+  });
+
+  it("does not expose idle when a navigation lease finishes before queued SDK cleanups", async () => {
+    const service = getAuthSignOutOperation({});
+    const firstGate = deferred<void>();
+    const secondGate = deferred<void>();
+    const secondStarted = deferred<void>();
+    const snapshots: string[] = [];
+    const unsubscribe = service.subscribe(() => snapshots.push(service.getSnapshot()));
+    const lease = service.begin();
+    expect(lease).not.toBeNull();
+    const first = service.runSdkSignOut(() => firstGate.promise);
+    const second = service.runSdkSignOut(() => {
+      secondStarted.resolve();
+      return secondGate.promise;
+    });
+    try {
+      lease!.finish();
+      expect(service.getSnapshot()).toBe("pending");
+      firstGate.resolve();
+      await first;
+      await secondStarted.promise;
+      expect(service.getSnapshot()).toBe("pending");
+      expect(snapshots).toEqual(["pending"]);
+    } finally {
+      firstGate.resolve();
+      secondGate.resolve();
+      await Promise.all([first, second]);
+      lease!.finish();
+      unsubscribe();
+    }
+    expect(service.getSnapshot()).toBe("idle");
+    expect(snapshots).toEqual(["pending", "idle"]);
+  });
+
+  it("keeps one fifteen-second recovery deadline across queued SDK work and a later UI lease", async () => {
+    const service = getAuthSignOutOperation({});
+    const firstGate = deferred<void>();
+    const secondGate = deferred<void>();
+    const secondStarted = deferred<void>();
+    const snapshots: string[] = [];
+    const unsubscribe = service.subscribe(() => snapshots.push(service.getSnapshot()));
+    const first = service.runSdkSignOut(() => firstGate.promise);
+    vi.advanceTimersByTime(SIGN_OUT_RECOVERY_DELAY_MS - 1);
+    const lease = service.begin();
+    expect(lease).not.toBeNull();
+    const second = service.runSdkSignOut(() => {
+      secondStarted.resolve();
+      return secondGate.promise;
+    });
+    try {
+      vi.advanceTimersByTime(1);
+      expect(service.getSnapshot()).toBe("stalled");
+      lease!.finish();
+      expect(service.getSnapshot()).toBe("stalled");
+      firstGate.resolve();
+      await first;
+      await secondStarted.promise;
+      vi.advanceTimersByTime(SIGN_OUT_RECOVERY_DELAY_MS);
+      expect(service.getSnapshot()).toBe("stalled");
+      expect(snapshots).toEqual(["pending", "stalled"]);
+    } finally {
+      firstGate.resolve();
+      secondGate.resolve();
+      await Promise.all([first, second]);
+      lease!.finish();
+      unsubscribe();
+    }
+    expect(service.getSnapshot()).toBe("idle");
+    vi.advanceTimersByTime(SIGN_OUT_RECOVERY_DELAY_MS);
+    expect(service.getSnapshot()).toBe("idle");
+    expect(snapshots).toEqual(["pending", "stalled", "idle"]);
+  });
+
+  it.each(["synchronous throw", "promise rejection"] as const)(
+    "propagates a %s without clearing the pending successor or poisoning its queue",
+    async (failureMode) => {
+      const service = getAuthSignOutOperation({});
+      const failure = new Error("fixture cleanup failure");
+      const successorGate = deferred<string>();
+      const successorStarted = deferred<void>();
+      const snapshots: string[] = [];
+      const unsubscribe = service.subscribe(() => snapshots.push(service.getSnapshot()));
+      const predecessor = service.runSdkSignOut(() => {
+        if (failureMode === "synchronous throw") throw failure;
+        return Promise.reject(failure);
+      });
+      const rejected = expect(predecessor).rejects.toBe(failure);
+      const successor = service.runSdkSignOut(() => {
+        successorStarted.resolve();
+        return successorGate.promise;
+      });
+      try {
+        expect(service.getSnapshot()).toBe("pending");
+        await rejected;
+        await successorStarted.promise;
+        expect(service.getSnapshot()).toBe("pending");
+        expect(snapshots).toEqual(["pending"]);
+      } finally {
+        successorGate.resolve("successor completed");
+        await rejected;
+        expect(await successor).toBe("successor completed");
+        unsubscribe();
+      }
+      expect(service.getSnapshot()).toBe("idle");
+      expect(snapshots).toEqual(["pending", "idle"]);
+    },
+  );
+});
+
+describe("failed SDK cleanup recovery across remounts", () => {
+  it("records failure before publishing idle and retains it for the same remounted client", async () => {
+    const client = {};
+    const service = getAuthSignOutOperation(client);
+    const observations: Array<{ status: string; failed: boolean }> = [];
+    const unsubscribe = service.subscribe(() =>
+      observations.push({ status: service.getSnapshot(), failed: service.hasFailedCleanup() }),
+    );
+    const failure = new Error("fixture cleanup failed");
+    await expect(
+      service.runSdkSignOut(() => {
+        throw failure;
+      }),
+    ).rejects.toBe(failure);
+    expect(observations).toEqual([
+      { status: "pending", failed: false },
+      { status: "idle", failed: true },
+    ]);
+    unsubscribe();
+    expect(getAuthSignOutOperation(client).hasFailedCleanup()).toBe(true);
+    expect(getAuthSignOutOperation({}).hasFailedCleanup()).toBe(false);
+  });
+
+  it("clears the failure latch without releasing pending work or restarting its watchdog", async () => {
+    const service = getAuthSignOutOperation({});
+    await expect(
+      service.runSdkSignOut(() => Promise.reject(new Error("fixture failure"))),
+    ).rejects.toThrow("fixture failure");
+    const gate = deferred<void>();
+    const cleanup = service.runSdkSignOut(() => gate.promise);
+    const lease = service.begin();
+    expect(lease).not.toBeNull();
+    try {
+      expect(service.hasFailedCleanup()).toBe(true);
+      vi.advanceTimersByTime(SIGN_OUT_RECOVERY_DELAY_MS - 1);
+      service.clearFailedCleanup();
+      expect(service.hasFailedCleanup()).toBe(false);
+      expect(service.getSnapshot()).toBe("pending");
+      vi.advanceTimersByTime(1);
+      expect(service.getSnapshot()).toBe("stalled");
+      service.clearFailedCleanup();
+      lease!.finish();
+      expect(service.getSnapshot()).toBe("stalled");
+    } finally {
+      gate.resolve();
+      await cleanup;
+      lease!.finish();
+    }
+    expect(service.getSnapshot()).toBe("idle");
+    expect(service.hasFailedCleanup()).toBe(false);
+  });
+
+  it("retains a predecessor's failure while its queued successor is pending and clears on success", async () => {
+    const service = getAuthSignOutOperation({});
+    const failedGate = deferred<void>();
+    const successGate = deferred<string>();
+    const successStarted = deferred<void>();
+    const failure = new Error("fixture predecessor failure");
+    const predecessor = service.runSdkSignOut(() => failedGate.promise);
+    const rejected = expect(predecessor).rejects.toBe(failure);
+    const successor = service.runSdkSignOut(() => {
+      successStarted.resolve();
+      return successGate.promise;
+    });
+    try {
+      failedGate.reject(failure);
+      await rejected;
+      await successStarted.promise;
+      expect(service.getSnapshot()).toBe("pending");
+      expect(service.hasFailedCleanup()).toBe(true);
+    } finally {
+      failedGate.reject(failure);
+      successGate.resolve("recovered");
+      await rejected;
+      expect(await successor).toBe("recovered");
+    }
+    expect(service.getSnapshot()).toBe("idle");
+    expect(service.hasFailedCleanup()).toBe(false);
+  });
+
+  it("retains the last queued cleanup's failure despite its predecessor succeeding", async () => {
+    const service = getAuthSignOutOperation({});
+    const failedGate = deferred<void>();
+    const failure = new Error("fixture successor failure");
+    const predecessor = service.runSdkSignOut(() => "first cleanup completed");
+    const successor = service.runSdkSignOut(() => failedGate.promise);
+    const rejected = expect(successor).rejects.toBe(failure);
+    try {
+      expect(await predecessor).toBe("first cleanup completed");
+      expect(service.hasFailedCleanup()).toBe(false);
+      expect(service.getSnapshot()).toBe("pending");
+    } finally {
+      failedGate.reject(failure);
+      await rejected;
+    }
+    expect(service.getSnapshot()).toBe("idle");
+    expect(service.hasFailedCleanup()).toBe(true);
+  });
+});

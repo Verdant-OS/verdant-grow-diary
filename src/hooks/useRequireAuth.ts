@@ -80,11 +80,13 @@ export function useRequireAuth(
   const [retryToken, setRetryToken] = useState(0);
 
   const retry = useCallback(() => {
+    getAuthSignOutOperation(supabase.auth).clearFailedCleanup();
     setRetryToken((t) => t + 1);
   }, []);
 
   useEffect(() => {
     function onRevalidate() {
+      getAuthSignOutOperation(supabase.auth).clearFailedCleanup();
       setRetryToken((t) => t + 1);
     }
     window.addEventListener(AUTH_REVALIDATE_EVENT, onRevalidate);
@@ -122,6 +124,11 @@ export function useRequireAuth(
     };
     const revalidationFailed = () => setStatus("revalidation_failed");
 
+    if (getAuthSignOutOperation(supabase.auth).hasFailedCleanup()) {
+      settle(revalidationFailed);
+      return;
+    }
+
     setStatus("loading");
     armBound();
 
@@ -150,9 +157,11 @@ export function useRequireAuth(
           armBound();
           void Promise.resolve()
             .then(() =>
-              getAuthSignOutOperation(supabase.auth).runSdkSignOut(() =>
-                supabase.auth.signOut({ scope: "local" }),
-              ),
+              getAuthSignOutOperation(supabase.auth).runSdkSignOut(async () => {
+                const result = await supabase.auth.signOut({ scope: "local" });
+                if (result?.error) throw new Error("local_sign_out_failed");
+                return result;
+              }),
             )
             .then(
               (result) => settle(result?.error ? revalidationFailed : redirectUnauthenticated),

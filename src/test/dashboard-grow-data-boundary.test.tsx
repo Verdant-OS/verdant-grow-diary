@@ -258,6 +258,104 @@ describe("Dashboard private-read honesty boundary", () => {
     },
   );
 
+  it("exposes the paused waiting state as a live status region", () => {
+    H.growStatus = "success";
+    H.tentQueryOverride = pendingFirstRead("paused");
+    renderDashboard();
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveTextContent("Waiting for connection");
+    expect(status).toHaveTextContent(
+      "Your tents and plants haven't loaded yet. They'll appear when the connection returns.",
+    );
+  });
+
+  it("exposes an idle first-read load as a live status region", () => {
+    H.growStatus = "success";
+    H.plantQueryOverride = pendingFirstRead("idle");
+    renderDashboard();
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveTextContent("Loading dashboard grow data");
+    expect(status).not.toHaveTextContent("Waiting for connection");
+  });
+
+  it("does not offer retry while waiting for connection on a paused first read", () => {
+    H.growStatus = "success";
+    H.plantQueryOverride = pendingFirstRead("paused");
+    renderDashboard();
+
+    expect(screen.getByTestId("dashboard-grow-data-loading")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.queryByTestId("dashboard-grow-data-error")).toBeNull();
+  });
+
+  it.each([
+    ["tent", "plant"],
+    ["plant", "tent"],
+  ] as const)(
+    "withholds counts when %s reads settle but %s remains on a paused first read",
+    (settled, pending) => {
+      H.growStatus = "success";
+      const settledPlantRead = {
+        data: [],
+        status: "success",
+        isPending: false,
+        isLoading: false,
+        isError: false,
+        fetchStatus: "idle",
+      };
+      if (settled === "tent") {
+        H.tentQueryOverride = {};
+        H.plantQueryOverride = pendingFirstRead("paused");
+      } else {
+        H.tentQueryOverride = pendingFirstRead("paused");
+        H.plantQueryOverride = settledPlantRead;
+      }
+      renderDashboard();
+
+      expect(screen.getByTestId("dashboard-grow-data-loading")).toHaveTextContent(
+        /Waiting for connection/,
+      );
+      expect(screen.queryAllByTestId("dashboard-kpi-card")).toHaveLength(0);
+      expect(screen.queryByTestId("dashboard-zero-tent-empty-state")).toBeNull();
+    },
+  );
+
+  it.each([
+    ["tent", "plant"],
+    ["plant", "tent"],
+  ] as const)(
+    "withholds counts when %s reads settle but %s remains on an idle first read",
+    (settled, pending) => {
+      H.growStatus = "success";
+      const settledPlantRead = {
+        data: [],
+        status: "success",
+        isPending: false,
+        isLoading: false,
+        isError: false,
+        fetchStatus: "idle",
+      };
+      if (settled === "tent") {
+        H.tentQueryOverride = {};
+        H.plantQueryOverride = pendingFirstRead("idle");
+      } else {
+        H.tentQueryOverride = pendingFirstRead("idle");
+        H.plantQueryOverride = settledPlantRead;
+      }
+      renderDashboard();
+
+      expect(screen.getByTestId("dashboard-grow-data-loading")).toHaveTextContent(
+        /Loading dashboard grow data/,
+      );
+      expect(screen.queryAllByTestId("dashboard-kpi-card")).toHaveLength(0);
+      expect(screen.queryByTestId("dashboard-zero-tent-empty-state")).toBeNull();
+    },
+  );
+
   it("shows confirmed counts after both first paused reads settle", () => {
     H.growStatus = "success";
     H.tentQueryOverride = pendingFirstRead("paused");

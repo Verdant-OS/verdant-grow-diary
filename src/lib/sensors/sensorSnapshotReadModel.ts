@@ -18,6 +18,12 @@ import {
   type SnapshotSource,
 } from "@/lib/sensorSnapshot";
 import type { SensorTruthAssessment } from "@/lib/sensorTruthRules";
+import { buildManualSensorProvenanceLabels } from "@/lib/manualSensorProvenanceRules";
+import {
+  MANUAL_DEVICE_ID_PREFIX,
+  extractManualDeviceNote,
+  normalizeManualSourceNote,
+} from "@/lib/manualSensorSourceLabel";
 
 export type SensorSnapshotReadModelTone = "info" | "neutral" | "warning" | "danger" | "muted";
 
@@ -88,6 +94,14 @@ function identityLabel(snapshot: SensorSnapshot): string {
   return "Identity: unknown";
 }
 
+function manualDeviceHint(snapshot: SensorSnapshot): string | null {
+  if (snapshot.source !== "manual") return null;
+  const deviceId = snapshot.device_id;
+  return typeof deviceId === "string" && deviceId.startsWith(MANUAL_DEVICE_ID_PREFIX)
+    ? extractManualDeviceNote(deviceId)
+    : normalizeManualSourceNote(deviceId);
+}
+
 export function buildSensorSnapshotReadModel(
   input: BuildSensorSnapshotReadModelInput,
 ): SensorSnapshotReadModel {
@@ -125,9 +139,10 @@ export function buildSensorSnapshotReadModel(
   const warnings = truth?.reasonChips ? [...truth.reasonChips] : [];
 
   const sourceLabel = `Source: ${SOURCE_LABEL[snapshot.source]}`;
-  const identity = identityLabel(snapshot);
-  const transportLabel = "Transport: unknown";
-  const confidenceLabel = "Confidence: unknown";
+  const [, manualIdentity, transportLabel, confidenceLabel] = buildManualSensorProvenanceLabels(
+    snapshot.source,
+  );
+  const identity = snapshot.source === "manual" ? manualIdentity : identityLabel(snapshot);
 
   const badges: SensorSnapshotReadModelBadge[] = [
     { label: sourceLabel, tone: SOURCE_TONE[snapshot.source] },
@@ -135,6 +150,8 @@ export function buildSensorSnapshotReadModel(
     { label: transportLabel, tone: "muted" },
     { label: confidenceLabel, tone: "muted" },
   ];
+  const deviceHint = manualDeviceHint(snapshot);
+  if (deviceHint) badges.push({ label: `Device hint: ${deviceHint}`, tone: "muted" });
   if (stale) badges.push({ label: "Stale", tone: "warning" });
   if (invalid) badges.push({ label: "Invalid", tone: "danger" });
 

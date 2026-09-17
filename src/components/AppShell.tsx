@@ -7,7 +7,11 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useHydrated } from "@/hooks/useHydrated";
 import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
-import { buildSignedOutRedirect } from "@/lib/authRedirectRules";
+import {
+  buildSignedOutRedirect,
+  retainSignedOutReturnIntent,
+  SIGNED_OUT_LANDING,
+} from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
@@ -40,22 +44,34 @@ import {
 } from "@/lib/quickLogV2OpenIntent";
 
 export default function AppShell({ children }: { children?: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isSignOutNavigationPending } = useAuth();
   const hydrated = useHydrated();
-  const location = useLocation();
+  const observedLocation = useLocation();
+  const protectedLocationRef = useRef(observedLocation);
+  // Before the initial route resolves, an auth redirect can expose its target
+  // location to this still-mounted shell. Keep the protected source location
+  // so neither session guard replaces /auth?redirectTo=... with bare /auth.
+  if (observedLocation.pathname !== SIGNED_OUT_LANDING)
+    protectedLocationRef.current = observedLocation;
+  const location = protectedLocationRef.current;
   const previousNavigationKeyRef = useRef(location.key);
   // Protected-route boundary: re-validate session against the auth server.
   // Keep both session checks on the same signed-out destination. Sending the
-  // server revalidation to /auth while the shell sent cached-session misses to
-  // /welcome created a race at the public root and bypassed the landing page.
-  // The destination stays /welcome; buildSignedOutRedirect only appends a
-  // manifest-validated redirectTo so a signed-out deep link (e.g. a /plants
-  // bookmark) can be restored after sign-in instead of silently dropped.
-  const signedOutRedirect = buildSignedOutRedirect(
+  // server revalidation and cached-session misses to /auth preserves the
+  // manifest-validated return path. An explicit sign-out owns its separate
+  // destination and suppresses both guards until that navigation commits.
+  const builtSignedOutRedirect = buildSignedOutRedirect(
     location.pathname,
     location.search,
     location.hash,
   );
+  const signedOutRedirectRef = useRef(builtSignedOutRedirect);
+  signedOutRedirectRef.current = retainSignedOutReturnIntent(
+    signedOutRedirectRef.current,
+    builtSignedOutRedirect,
+    Boolean(user),
+  );
+  const signedOutRedirect = signedOutRedirectRef.current;
   const { status: authStatus } = useRequireAuth(signedOutRedirect);
   // One server-validated session gate for every private REST read this shell
   // issues: a cached user while getUser() is still settling, missed
@@ -224,8 +240,9 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // updated while AppShell is rendering (React update-during-render error,
   // asserted clean by the never-healthy E2E console check).
   useEffect(() => {
-    if (!loading && !user) nav(signedOutRedirect, { replace: true });
-  }, [loading, user, nav, signedOutRedirect]);
+    if (!loading && !user && !isSignOutNavigationPending?.())
+      nav(signedOutRedirect, { replace: true });
+  }, [loading, user, nav, signedOutRedirect, isSignOutNavigationPending]);
 
   // Never carry an open structured sheet or typed intent across navigations,
   // including same-path scope changes. Seeding the ref from the initial key

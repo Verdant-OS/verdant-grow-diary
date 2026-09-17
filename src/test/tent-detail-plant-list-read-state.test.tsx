@@ -57,6 +57,10 @@ vi.mock("@/components/StartPhenoHuntButton", () => ({ default: () => null }));
 vi.mock("@/components/TentPendingOutcomeNotice", () => ({ default: () => null }));
 
 import TentDetail from "@/pages/TentDetail";
+import {
+  readTentPlantTabsSelectedPlantId,
+  writeTentPlantTabsSelectedPlantId,
+} from "@/lib/tentPlantTabsPreferences";
 
 const tent: Tent = {
   id: "tent-1",
@@ -126,6 +130,7 @@ function deferredPlants() {
 beforeEach(() => {
   clearGrowDataMeta();
   onlineManager.setOnline(true);
+  writeTentPlantTabsSelectedPlantId(tent.id, null);
   fixture.fetchTent.mockReset().mockResolvedValue(tent);
   fixture.fetchPlants.mockReset().mockResolvedValue([plant]);
 });
@@ -291,6 +296,38 @@ describe("Tent plant list reads using real queries", () => {
       "Active plants: 0 · Archived plants: 0",
     );
   });
+  it("keeps a persisted plant tab selected while plant-list reads stay incomplete", async () => {
+    writeTentPlantTabsSelectedPlantId(tent.id, plant.id);
+    fixture.fetchPlants.mockRejectedValue(new Error("unavailable"));
+    renderPage(true);
+    await waitFor(() =>
+      expect(screen.getByTestId("tent-plant-list-read-status")).toHaveTextContent("unavailable"),
+    );
+    expect(screen.getByTestId(`tent-plant-tabs-tab-${plant.id}`)).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByTestId("tent-plant-tabs-tab-all")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("tent-plant-tabs-current-scope")).toHaveTextContent(
+      "Viewing plant-specific activity for Saved plant.",
+    );
+    expect(readTentPlantTabsSelectedPlantId(tent.id)).toBe(plant.id);
+  });
+
+  it("does not clear a persisted plant tab during an offline pause", async () => {
+    writeTentPlantTabsSelectedPlantId(tent.id, plant.id);
+    onlineManager.setOnline(false);
+    renderPage(true);
+    expect(screen.getByTestId("tent-plant-list-read-status")).toHaveTextContent(
+      "Waiting for connection",
+    );
+    expect(screen.getByTestId(`tent-plant-tabs-tab-${plant.id}`)).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(readTentPlantTabsSelectedPlantId(tent.id)).toBe(plant.id);
+  });
+
   it("does not turn cached empty into confirmed empty after the refresh fails", async () => {
     fixture.fetchPlants.mockRejectedValue(new Error("unavailable"));
     const client = new QueryClient({

@@ -160,9 +160,13 @@ describe("guided Symptom Check timeline stage resolution", () => {
     expect(TIMELINE_SOURCE).not.toContain("stageLabel(e.stage)");
   });
 
-  it("uses the guided fallback on the plant and tent Timeline memory surface", () => {
+  it("reads the canonical diary stage column on the plant and tent Timeline memory surface", () => {
     expect(TIMELINE_MEMORY_SOURCE).toContain("resolveTimelineDiaryEntryStage");
-    expect(TIMELINE_MEMORY_SOURCE).toContain("stage: detailsRecord.stage");
+    expect(TIMELINE_MEMORY_SOURCE).toContain("readStage(row.stage, row.details)");
+    expect(TIMELINE_MEMORY_SOURCE).toContain(
+      'select("id, plant_id, tent_id, entry_at, note, photo_url, stage, details")',
+    );
+    expect(TIMELINE_MEMORY_SOURCE).toContain("stage: detailsRecord.stage, details");
     expect(TIMELINE_MEMORY_SOURCE).not.toContain(
       "const v = (details as { stage?: unknown }).stage",
     );

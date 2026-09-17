@@ -219,7 +219,72 @@ describe("Timeline evidence drawer integration", () => {
     expect(context.textContent).toContain("useful context for AI Doctor");
   });
 
-  it.each(["invalid", "live", "demo"])(
+  it("describes photo-only evidence as missing sensor context in the drawer DOM", () => {
+    const viewModel = buildTimelineEvidenceDetailViewModel({
+      id: "photo-only",
+      photo_url: "https://example.test/photo.jpg",
+      entry_at: "2025-06-01T11:55:00Z",
+      details: { event_type: "photo", plant_name: "Blue Dream" },
+    });
+    render(<TimelineEvidenceDetailDrawer open viewModel={viewModel} onClose={() => {}} />);
+    const context = screen.getByTestId("timeline-evidence-drawer-context");
+    expect(context.className).not.toContain("emerald");
+    expect(context.textContent).toContain("Missing sensor context");
+    expect(context.textContent).toContain("no sensor snapshot");
+    expect(screen.getByTestId("timeline-evidence-drawer-badges").textContent).toContain("Photo");
+    expect(screen.getByTestId("timeline-evidence-drawer-badges").textContent).not.toContain(
+      "Sensor snapshot",
+    );
+  });
+
+  it("describes sensor-only evidence as missing photo context in the drawer DOM", () => {
+    const viewModel = buildTimelineEvidenceDetailViewModel(
+      {
+        id: "sensor-only",
+        photo_url: null,
+        entry_at: "2025-06-01T11:55:00Z",
+        details: {
+          event_type: "measurement",
+          sensor_snapshot: { ts: "2025-06-01T11:55:00Z", temp: 23, source: "manual" },
+        },
+      },
+      { nowMs: Date.parse("2025-06-01T12:00:00Z") },
+    );
+    render(<TimelineEvidenceDetailDrawer open viewModel={viewModel} onClose={() => {}} />);
+    const context = screen.getByTestId("timeline-evidence-drawer-context");
+    expect(context.className).not.toContain("emerald");
+    expect(context.textContent).toContain("Missing photo context");
+    expect(context.textContent).toContain("no photo");
+    expect(screen.getByTestId("timeline-evidence-drawer-badges").textContent).toContain(
+      "Sensor snapshot",
+    );
+    expect(screen.getByTestId("timeline-evidence-drawer-badges").textContent).not.toContain(
+      "Photo",
+    );
+  });
+
+  it("renders a stale snapshot badge and non-emerald context for an older live reading", () => {
+    const viewModel = buildTimelineEvidenceDetailViewModel(
+      {
+        id: "stale-live",
+        photo_url: "https://example.test/photo.jpg",
+        entry_at: "2025-06-01T09:00:00Z",
+        details: {
+          event_type: "photo",
+          sensor_snapshot: { ts: "2025-06-01T09:00:00Z", temp: 22, rh: 50, source: "live" },
+        },
+      },
+      { nowMs: Date.parse("2025-06-01T12:00:00Z") },
+    );
+    render(<TimelineEvidenceDetailDrawer open viewModel={viewModel} onClose={() => {}} />);
+    const context = screen.getByTestId("timeline-evidence-drawer-context");
+    expect(context.className).not.toContain("emerald");
+    expect(screen.getByTestId("timeline-evidence-drawer-badges").textContent).toContain(
+      "Stale snapshot",
+    );
+  });
+
+  it.each(["invalid", "live", "demo", "csv"])(
     "renders a cautionary hint alongside the %s source badge",
     (source) => {
       const viewModel = buildTimelineEvidenceDetailViewModel(
@@ -236,11 +301,13 @@ describe("Timeline evidence drawer integration", () => {
       expect(context.className).not.toContain("emerald");
       expect(context.textContent).toContain("Photo and sensor record are present");
       expect(context.textContent).not.toMatch(/strong evidence|no photo/i);
-      expect(
-        screen.getByTestId(
-          `timeline-sensor-source-badge-${source === "demo" ? "demo" : "invalid"}`,
-        ),
-      ).toBeTruthy();
+      const badgeKey = source === "demo" ? "demo" : source === "csv" ? "csv" : "invalid";
+      expect(screen.getByTestId(`timeline-sensor-source-badge-${badgeKey}`)).toBeTruthy();
+      if (source === "csv") {
+        expect(screen.getByTestId("timeline-evidence-drawer-sources").textContent).toContain(
+          "CSV import",
+        );
+      }
     },
   );
 

@@ -170,6 +170,21 @@ describe("derivePlantDetailBlockedStateView", () => {
     expect(view!.secondaryBack?.kind).toBe("plants");
   });
 
+  it("falls back to plants-only navigation when a paused read has no tent context", () => {
+    const view = derivePlantDetailBlockedStateView({
+      loadState: "paused",
+      plant: null,
+    });
+    expect(view!.kind).toBe("paused");
+    expect(view!.showRetry).toBe(false);
+    expect(view!.primaryBack).toMatchObject({
+      kind: "plants",
+      path: "/plants",
+      testId: "plant-detail-back-to-plants",
+    });
+    expect(view!.secondaryBack).toBeNull();
+  });
+
   it("offers Retry + tent fallback on loading-slow when caller has tent context", () => {
     const view = derivePlantDetailBlockedStateView({
       loadState: "loading-slow",

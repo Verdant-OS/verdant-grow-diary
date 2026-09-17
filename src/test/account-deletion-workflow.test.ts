@@ -217,6 +217,19 @@ describe("account deletion workflow", () => {
     expect(deps.deleteAuthUser).not.toHaveBeenCalled();
   });
 
+  it("keeps the Auth user when Paddle customer mirror cleanup fails", async () => {
+    const { deps } = fixture([ACTIVE]);
+    vi.mocked(deps.deletePaddleCustomerMirrors).mockResolvedValueOnce({ ok: false });
+
+    await expect(
+      executeAccountDeletion({ userId: "user-1", accessToken: "jwt" }, deps),
+    ).resolves.toEqual({ ok: false, error: "delete_failed" });
+    expect(deps.cancelSubscriptionImmediately).toHaveBeenCalled();
+    expect(deps.revokeSessions).not.toHaveBeenCalled();
+    expect(deps.deleteOwnedStorage).not.toHaveBeenCalled();
+    expect(deps.deleteAuthUser).not.toHaveBeenCalled();
+  });
+
   it("keeps the Auth user when storage cleanup fails", async () => {
     const { deps } = fixture();
     vi.mocked(deps.deleteOwnedStorage).mockResolvedValueOnce({ ok: false });

@@ -8,7 +8,7 @@
 //  - surfaces a friendly non-sensitive message on failure but still
 //    redirects to a safe internal page
 // On cancel: leaves the user in place.
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@/lib/react-router-compat";
 import {
   AlertDialog,
@@ -27,6 +27,7 @@ import {
   performSafeSignOut,
   SAFE_SIGN_OUT_REDIRECT,
   SIGN_OUT_LOADING_LABEL,
+  SIGN_OUT_FAILURE_MESSAGE,
 } from "@/lib/authSessionExitRules";
 import { toast } from "sonner";
 
@@ -37,33 +38,52 @@ export default function SignOutConfirmDialog({
   trigger: ReactNode;
   redirectTo?: string;
 }) {
-  const { signOut } = useAuth();
+  const { signOut, beginSignOutNavigation } = useAuth();
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const busyRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   async function onConfirm() {
-    if (busy) return; // prevent double-submit
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
-    const result = await performSafeSignOut(
-      {
-        signOut,
-        clearUiState: () => clearAuthTransientUiState(),
-      },
-      redirectTo,
-    );
-    setBusy(false);
-    if (result.ok === false) {
-      // Dialog closes + navigates immediately; toast keeps the non-sensitive
-      // failure copy visible after redirect (ok:false was previously unreachable
-      // because store.signOut swallowed supabase { error }).
-      setError(result.message);
-      toast.error(result.message);
+    const operation = beginSignOutNavigation?.();
+    if (beginSignOutNavigation && !operation) {
+      busyRef.current = false;
+      setBusy(false);
+      return;
     }
-    setOpen(false);
-    nav(result.redirectTo, { replace: true });
+    const isCurrent = () => (operation ? operation.isCurrent() : mountedRef.current);
+    try {
+      const result = await performSafeSignOut(
+        { signOut, clearUiState: () => clearAuthTransientUiState(), isCurrent },
+        redirectTo,
+      );
+      if (!isCurrent()) return;
+      if (result.ok === false) toast.error(result.message);
+      // The provider keeps all entry surfaces pending until the router commits.
+      // This handler intentionally survives the initiating dialog's unmount.
+      await nav(result.redirectTo, { replace: true });
+    } catch {
+      if (isCurrent()) toast.error(SIGN_OUT_FAILURE_MESSAGE);
+    } finally {
+      operation?.finish();
+      busyRef.current = false;
+      if (mountedRef.current) {
+        setBusy(false);
+        setOpen(false);
+      }
+    }
   }
 
   return (

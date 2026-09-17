@@ -136,6 +136,7 @@ function expectNoFalseAbsence() {
   expect(screen.queryByText("No real plants yet")).not.toBeInTheDocument();
 }
 function expectWaiting() {
+  expect(screen.getByTestId("plant-detail-paused")).toBeVisible();
   expect(screen.getByRole("status")).toHaveTextContent("Waiting for connection");
   expectNoFalseAbsence();
   expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
@@ -278,5 +279,34 @@ describe("unresolved query classification", () => {
         loadTimedOut: true,
       }),
     ).toBe("paused");
+  });
+  it("does not treat a paused first read as not-found when isLoading is false", () => {
+    // React Query reports isLoading=false for paused queries even though the
+    // first read is still unresolved — the bug this slice fixes.
+    const state = classifyPlantDetailLoadState({
+      isLoading: false,
+      isPending: true,
+      isPaused: true,
+      isError: false,
+      hasPlant: false,
+      loadTimedOut: false,
+    });
+    expect(state).toBe("paused");
+    expect(state).not.toBe("not-found");
+  });
+
+  it("does not treat isPaused alone as unresolved when the query is no longer pending", () => {
+    // Guard against over-fitting on fetchStatus: a settled query must not
+    // stay paused just because a stale isPaused flag was passed through.
+    expect(
+      classifyPlantDetailLoadState({
+        isLoading: false,
+        isPending: false,
+        isPaused: true,
+        isError: false,
+        hasPlant: false,
+        loadTimedOut: false,
+      }),
+    ).toBe("not-found");
   });
 });

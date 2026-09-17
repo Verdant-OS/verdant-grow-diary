@@ -31,7 +31,7 @@ describe("AssignTentDialog · same-grow tent assignment", () => {
     // or a server-side grow delete — plants.grow_id is ON DELETE SET NULL)
     // could never be assigned to a tent at all.
     expect(DIALOG).toMatch(
-      /if\s*\(\s*growId\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId/,
+      /if\s*\(\s*growId\s*&&\s*!untaggedThisSession\s*\)\s*q\s*=\s*q\.eq\(\s*["']grow_id["']\s*,\s*growId/,
     );
   });
 
@@ -55,20 +55,12 @@ describe("AssignTentDialog · same-grow tent assignment", () => {
     expect(DIALOG).toContain("Plant is already in this tent");
   });
 
-  it("only updates plants.tent_id (grow_id only via empty-grow re-home helper)", () => {
-    const updates = [...DIALOG.matchAll(/\.update\(\s*\{([^}]*)\}\s*\)/g)];
-    expect(updates.length).toBeGreaterThan(0);
-    for (const m of updates) {
-      const payload = m[1];
-      expect(payload).toMatch(/tent_id/);
-      expect(payload).not.toMatch(/\buser_id\b/);
-      expect(payload).not.toMatch(/\bstrain\b/);
-      expect(payload).not.toMatch(/\bstage\b/);
-      expect(payload).not.toMatch(/\bnotes\b/);
-    }
-    // grow_id may appear only via growPatch spread from the shared helper.
-    expect(DIALOG).toMatch(/buildPlantEditGrowIdFromTent\(/);
-    expect(DIALOG).toMatch(/\.\.\.\(growPatch\s*\?\?\s*\{\}\)/);
+  it("moves via a dedicated payload and never auto-clears pheno_hunt_id", () => {
+    expect(DIALOG).toMatch(/buildPlantTentMoveUpdate\(/);
+    expect(DIALOG).toMatch(/buildPlantPhenoUntagPayload\(/);
+    expect(DIALOG).toMatch(/\.update\(\s*movePayload\s*\)/);
+    expect(DIALOG).not.toMatch(/pheno_hunt_id:\s*null[\s\S]{0,80}tent_id/);
+    expect(DIALOG).not.toMatch(/tent_id[\s\S]{0,80}pheno_hunt_id:\s*null/);
   });
 
   it("invalidates plant / tent / plants caches after a write", () => {

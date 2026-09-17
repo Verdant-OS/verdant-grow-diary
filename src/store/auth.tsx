@@ -170,7 +170,7 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
 
   useEffect(() => {
     let disposed = false;
-    // Every session-bearing event bumps this; only the newest reconciliation
+    // Every auth event bumps this; only the newest reconciliation
     // may act on its answer, so a slower read never overrides a later event.
     let reconcileSeq = 0;
 
@@ -189,33 +189,47 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
     // ahead of the render React schedules for the first apply, so no render
     // commits the relayed identity.
     //
-    // The event is still applied synchronously first: the identity fence must
+    // Session-bearing events are still applied synchronously first: the identity fence must
     // run before React commits, and /auth navigates the moment
     // signInWithPassword resolves, which auth-js only does after this
     // callback returns. The read is never awaited inside the callback.
-    // INITIAL_SESSION and a null session are the client's own answers.
+    // INITIAL_SESSION is the client's own answer. SIGNED_OUT, including its
+    // null payload, is also relayed between tabs: do not clear this tab's
+    // identity/cache or redirect until its held-session read confirms it.
     const sameBearer = (a: Session, b: Session) => a.access_token === b.access_token;
-    const reconcileWithClientSession = async (seq: number, delivered: Session) => {
+    const reconcileWithClientSession = async (seq: number, delivered: Session | null) => {
       let held: Session | null;
       try {
-        const { data } = await supabase.auth.getSession();
-        held = data?.session ?? null;
+        const { data, error } = await supabase.auth.getSession();
+        held = data?.session;
+        if (
+          error ||
+          held === undefined ||
+          (held !== null && (!held.user?.id || !held.access_token))
+        )
+          throw new Error("held_session_unconfirmed");
       } catch {
-        // The client cannot read its own store: a client fault, not a
-        // cross-tab signal. Keep the delivered session; a later event still
-        // corrects it (see the initial-read failure contract below).
+        if (disposed || seq !== reconcileSeq) return;
+        // A null notification with an unreadable store cannot establish an
+        // authenticated identity. Preserve the privacy fence on that failure.
+        if (delivered === null) applySession(null);
+        // Preserve the existing session-bearing failure behavior; a later
+        // event can still correct that provisionally delivered identity.
         return;
       }
       if (disposed || seq !== reconcileSeq) return;
       reconcileSignOutWithHeldSession(held);
-      if (held === null || !sameBearer(held, delivered)) applySession(held);
+      if (held === null || delivered === null || !sameBearer(held, delivered)) applySession(held);
     };
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      applySession(s);
+      // Every event invalidates earlier answers, including a null event or
+      // INITIAL_SESSION arriving after an older session-bearing read.
+      const seq = ++reconcileSeq;
+      if (s !== null || event === "INITIAL_SESSION") applySession(s);
       if (event === "INITIAL_SESSION") reconcileSignOutWithHeldSession(s);
-      if (s !== null && event !== "INITIAL_SESSION") {
-        void reconcileWithClientSession(++reconcileSeq, s);
+      if (event !== "INITIAL_SESSION") {
+        void reconcileWithClientSession(seq, s);
       }
     });
 

@@ -222,6 +222,7 @@ beforeEach(() => {
   mocks.signOut.mockReset();
   // auth-js `_removeSession` notifies SIGNED_OUT after a local sign-out.
   mocks.signOut.mockImplementation(async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     deliver("SIGNED_OUT", null);
     return { error: null };
   });
@@ -336,17 +337,115 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     expect(await screen.findByText("u-own")).toBeInTheDocument();
   });
 
-  it("applies a SIGNED_OUT immediately, without a reconciliation read", async () => {
+  it("applies SIGNED_OUT when the reconciliation confirms this client has no session", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
     renderProvider();
     expect(await screen.findByText("u-own")).toBeInTheDocument();
 
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     act(() => {
       deliver("SIGNED_OUT", null);
     });
 
     expect(await screen.findByText("signed-out")).toBeInTheDocument();
-    expect(mocks.getSession).toHaveBeenCalledTimes(1);
+    expect(mocks.getSession).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not clear the privacy fence or resolved identity for a foreign null relay", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const fence = vi.fn();
+    renderProvider(fence);
+    expect(await screen.findByText("u-own")).toBeInTheDocument();
+    fence.mockClear();
+    await relayFromOtherTab("SIGNED_OUT", null);
+    expect(screen.getByTestId("probe")).toHaveTextContent("u-own");
+    expect(fence).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("verdant:auth:last-resolved-identity:v1")).toBe("u-own");
+  });
+
+  it.each([
+    ["rejected", () => Promise.reject(new Error("fixture store unavailable"))],
+    [
+      "returned error",
+      () =>
+        Promise.resolve({
+          data: { session: sessionFor("u-own") },
+          error: { message: "fixture store unavailable" },
+        }),
+    ],
+    ["missing session field", () => Promise.resolve({ data: {}, error: null })],
+    ["malformed session", () => Promise.resolve({ data: { session: {} }, error: null })],
+  ])("fails closed on a %s held-session read after a null notification", async (_label, read) => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const fence = vi.fn();
+    renderProvider(fence);
+    expect(await screen.findByText("u-own")).toBeInTheDocument();
+    fence.mockClear();
+    mocks.getSession.mockImplementationOnce(read);
+    await relayFromOtherTab("SIGNED_OUT", null);
+    expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+    expect(fence).toHaveBeenCalledWith("u-own", null);
+  });
+
+  it("a null event invalidates an older session-bearing reconciliation before it settles", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    renderProvider();
+    expect(await screen.findByText("u-own")).toBeInTheDocument();
+    const olderRead = pending<{ data: { session: ReturnType<typeof sessionFor> }; error: null }>();
+    mocks.getSession.mockImplementationOnce(() => olderRead.promise);
+    act(() => deliver("SIGNED_IN", sessionFor("u-own")));
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    await relayFromOtherTab("SIGNED_OUT", null);
+    await act(async () =>
+      olderRead.resolve({ data: { session: sessionFor("u-old") }, error: null }),
+    );
+    expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+    expect(renderedIdentities).not.toContain("u-old");
+  });
+
+  it.each([null, sessionFor("u-own")])(
+    "a delayed null-event answer %j cannot replace the later held B identity",
+    async (staleSession) => {
+      mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+      const fence = vi.fn();
+      renderProvider(fence);
+      expect(await screen.findByText("u-own")).toBeInTheDocument();
+      const olderRead = pending<{
+        data: { session: ReturnType<typeof sessionFor> | null };
+        error: null;
+      }>();
+      mocks.getSession.mockImplementationOnce(() => olderRead.promise);
+      await relayFromOtherTab("SIGNED_OUT", null);
+      // A notification alone has not established a local identity change.
+      expect(screen.getByTestId("probe")).toHaveTextContent("u-own");
+      fence.mockClear();
+      mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-next") }, error: null });
+      act(() => {
+        deliver("SIGNED_IN", sessionFor("u-next"));
+        expect(fence).toHaveBeenCalledWith("u-own", "u-next");
+      });
+      await act(async () => olderRead.resolve({ data: { session: staleSession }, error: null }));
+      expect(screen.getByTestId("probe")).toHaveTextContent("u-next");
+    },
+  );
+
+  it("a foreign null relay does not revoke the initiating owner's pending exit lease", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    await waitFor(() => expect(result.current.user?.id).toBe("u-own"));
+    let lease: ReturnType<NonNullable<ReturnType<typeof useAuth>["beginSignOutNavigation"]>>;
+    act(() => {
+      lease = result.current.beginSignOutNavigation!();
+    });
+    try {
+      await relayFromOtherTab("SIGNED_OUT", null);
+      await relayFromOtherTab("TOKEN_REFRESHED", sessionFor("u-own"));
+      expect(lease!.isCurrent()).toBe(true);
+    } finally {
+      act(() => lease?.finish());
+    }
   });
 
   it("applies the client's own INITIAL_SESSION without a reconciliation read", async () => {
@@ -622,6 +721,7 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
     // /logout is a round trip; auth-js raises SIGNED_OUT only once it settles.
     mocks.signOut.mockImplementation(async () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
+      mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
       deliver("SIGNED_OUT", null);
       return { error: null };
     });

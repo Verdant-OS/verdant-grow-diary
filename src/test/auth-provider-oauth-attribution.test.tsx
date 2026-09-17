@@ -155,8 +155,12 @@ describe("AuthProvider OAuth signup attribution handoff", () => {
     expect(await screen.findByText("owner-b")).toBeInTheDocument();
     window.sessionStorage.setItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY, "owner-b private query");
 
-    act(() => {
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    await act(async () => {
       mocks.authListener?.("SIGNED_OUT", null);
+      // SIGNED_OUT is also broadcast by other tabs. Confirm this client's
+      // actual removal before expecting the privacy fence to clear its data.
+      await Promise.resolve();
       expect(window.sessionStorage.getItem(GLOBAL_SEARCH_SESSION_STORAGE_KEY)).toBeNull();
     });
 

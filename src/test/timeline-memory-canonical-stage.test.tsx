@@ -167,6 +167,31 @@ describe("Timeline Memory preserves the stored diary stage", () => {
     },
   );
 
+  it("includes the canonical stage on the full items evidence list", async () => {
+    harness.rows = [row({ stage: "flower" })];
+    const view = renderHook(() => useTimelineMemory({ kind: "plant", plantId: "plant-a" }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(view.result.current.hasData).toBe(true));
+    const diary = view.result.current.items.find((value) => value.kind === "diary");
+    expect(diary?.kind).toBe("diary");
+    if (diary?.kind !== "diary") return;
+    expect(diary.stage).toBe("flower");
+  });
+
+  it("requires the stage column in the primary select to preserve the saved diary stage", async () => {
+    harness.rows = [row({ stage: "flower", details: { event_type: "note" } })];
+    await readStage();
+    const read = harness.reads.find((value) => value.table === "diary_entries" && !value.companion);
+    expect(read?.columns).toContain("stage");
+    const projectedWithoutStage = Object.fromEntries(
+      read!.columns
+        .filter((column) => column !== "stage")
+        .map((column) => [column, harness.rows[0][column as keyof Row]]),
+    );
+    expect(projectedWithoutStage).not.toHaveProperty("stage");
+  });
+
   it("renders an ordinary saved stage again after reopening with a fresh query cache", async () => {
     harness.rows = [row({ stage: "flower" })];
     const first = render(<TimelineMemorySection scope="plant" plantId="plant-a" />, {

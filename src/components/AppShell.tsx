@@ -7,7 +7,11 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useHydrated } from "@/hooks/useHydrated";
 import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
-import { buildSignedOutRedirect, retainSignedOutReturnIntent, SIGNED_OUT_LANDING } from "@/lib/authRedirectRules";
+import {
+  buildSignedOutRedirect,
+  retainSignedOutReturnIntent,
+  SIGNED_OUT_LANDING,
+} from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";

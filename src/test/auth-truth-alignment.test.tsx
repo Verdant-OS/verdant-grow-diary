@@ -377,6 +377,27 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     ],
     ["missing session field", () => Promise.resolve({ data: {}, error: null })],
     ["malformed session", () => Promise.resolve({ data: { session: {} }, error: null })],
+    [
+      "whitespace user id",
+      () =>
+        Promise.resolve({
+          data: {
+            session: {
+              ...sessionFor("u-own"),
+              user: { ...sessionFor("u-own").user, id: "   " },
+            },
+          },
+          error: null,
+        }),
+    ],
+    [
+      "whitespace bearer",
+      () =>
+        Promise.resolve({
+          data: { session: { ...sessionFor("u-own"), access_token: "   " } },
+          error: null,
+        }),
+    ],
   ])("fails closed on a %s held-session read after a null notification", async (_label, read) => {
     mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
     const fence = vi.fn();

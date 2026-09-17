@@ -33,14 +33,18 @@ import {
   classifyTest,
   commandLinesIn,
   isCommandLine,
+  isPlaywrightSpec,
   isRuntimeHarness,
   namedPathsIn,
   resolveSpec,
   runtimeImportSpecifiers,
+  stripDisabledBlocks,
+  stripJsComments,
   stripTriggerBlock,
   testFileReach,
   testFileRuntimeSpecifiers,
-  // Pure rules; the script supplies all I/O.
+  // Pure rules; the script supplies all I/O.,
+  resolveBareBasenames,
 } from "../../scripts/lib/testEstateRules.mjs";
 
 const wf = (s: string) => s.replace(/\n {6}/g, "\n");
@@ -864,5 +868,198 @@ describe("reproducer CLI — `--rev` never reaches a shell", () => {
     const result = run("--upload-pack=touch");
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("cannot resolve");
+  });
+});
+
+describe("resolveBareBasenames — a runner argument names a lane file by basename", () => {
+  // `bunx playwright test agent-integrations-smoke.spec.ts` runs
+  // e2e/agent-integrations-smoke.spec.ts via testDir. Exact-path matching alone
+  // called that spec never-run while CI executed it on every matching PR.
+  it("resolves an unambiguous bare basename to its one lane file", () => {
+    const out = resolveBareBasenames({
+      laneFiles: ["e2e/a.spec.ts", "e2e/b.spec.ts"],
+      namedPaths: new Set(["a.spec.ts"]),
+    });
+    expect(out.has("e2e/a.spec.ts")).toBe(true);
+    expect(out.has("e2e/b.spec.ts")).toBe(false);
+  });
+
+  it("refuses an ambiguous basename — two lane files, one token, no fabricated reading", () => {
+    const out = resolveBareBasenames({
+      laneFiles: ["supabase/functions/x/contract.test.ts", "supabase/functions/y/contract.test.ts"],
+      namedPaths: new Set(["contract.test.ts"]),
+    });
+    expect(out.has("supabase/functions/x/contract.test.ts")).toBe(false);
+    expect(out.has("supabase/functions/y/contract.test.ts")).toBe(false);
+  });
+
+  it("keeps every full path already named, and never mutates its input", () => {
+    const named = new Set(["e2e/full.spec.ts", "stray.spec.ts"]);
+    const out = resolveBareBasenames({ laneFiles: ["e2e/full.spec.ts"], namedPaths: named });
+    expect(out.has("e2e/full.spec.ts")).toBe(true);
+    expect(out.has("stray.spec.ts")).toBe(true); // passthrough — not a lane file, not dropped
+    expect(named.size).toBe(2);
+    expect(named.has("e2e/full.spec.ts")).toBe(true);
+  });
+
+  it("is a bare-token match only — a basename inside a longer path is not one", () => {
+    // `e2e/nested/a.spec.ts` named in full must not make bare `a.spec.ts` resolve to a
+    // DIFFERENT lane file that happens to share the basename.
+    const out = resolveBareBasenames({
+      laneFiles: ["e2e/a.spec.ts", "e2e/nested/a.spec.ts"],
+      namedPaths: new Set(["e2e/nested/a.spec.ts"]),
+    });
+    expect(out.has("e2e/nested/a.spec.ts")).toBe(true);
+    expect(out.has("e2e/a.spec.ts")).toBe(false);
+  });
+});
+
+describe("runner bodies — a comment is not an invocation (Codex, #1221 round 4)", () => {
+  // The one-hop runner body was appended to the corpus WHOLE, so a runner carrying
+  // `// bunx playwright test e2e/dead.spec.ts` marked the spec executed: the same
+  // comment-out defeat F1 closed for workflow bodies, one hop further in.
+  it("strips line and block comments but keeps strings, template literals and regex literals", () => {
+    const src = [
+      'const url = "https://example.test/e2e/kept-in-string.spec.ts"; // playwright test e2e/line-comment.spec.ts',
+      "/* bunx vitest run src/test/block-comment.test.ts",
+      "   spans lines */",
+      "const tpl = `bunx playwright test e2e/kept-in-template.spec.ts`;",
+      "const re = /https?:\\/\\//; run('e2e/kept-after-regex.spec.ts');",
+      "const s = 'it\\'s // not a comment e2e/kept-in-single.spec.ts';",
+    ].join("\n");
+    const out = stripJsComments(src);
+    expect(out).toContain("e2e/kept-in-string.spec.ts");
+    expect(out).toContain("e2e/kept-in-template.spec.ts");
+    expect(out).toContain("e2e/kept-after-regex.spec.ts");
+    expect(out).toContain("e2e/kept-in-single.spec.ts");
+    expect(out).not.toContain("e2e/line-comment.spec.ts");
+    expect(out).not.toContain("src/test/block-comment.test.ts");
+    // Line structure survives, so line-oriented consumers keep their numbering.
+    expect(out.split("\n")).toHaveLength(src.split("\n").length);
+  });
+
+  it("a command commented out inside a runner does not mark its spec executed", () => {
+    const runner = [
+      "// bunx playwright test e2e/dead-line.spec.ts",
+      "/* bunx playwright test e2e/dead-block.spec.ts */",
+      "spawn('bunx', ['playwright', 'test', 'e2e/live.spec.ts']);",
+    ].join("\n");
+    const paths = namedPathsIn(
+      buildExecutableCorpus({
+        workflowTexts: ["jobs:\n  a:\n    steps:\n      - run: node scripts/run-x.mjs\n"],
+        readRunner: (rel: string) => (rel === "scripts/run-x.mjs" ? runner : null),
+      }),
+    );
+    expect(paths.has("e2e/live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dead-line.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dead-block.spec.ts")).toBe(false);
+  });
+
+  it("is idempotent, deterministic, and null-safe", () => {
+    const src = "a(); // c\n/* d */ b();";
+    expect(stripJsComments(stripJsComments(src))).toBe(stripJsComments(src));
+    expect(stripJsComments(src)).toBe(stripJsComments(src));
+    expect(stripJsComments("")).toBe("");
+    expect(stripJsComments(null)).toBe("");
+    expect(stripJsComments("/* unterminated")).toBe("");
+  });
+});
+
+describe("Playwright lane discovery — testMatch under testDir, at any depth (Codex + Vercel, #1221 round 5)", () => {
+  // Both the audit and the manifest guard filtered `^e2e/[^/]+\.spec\.ts$`. Playwright's
+  // testDir is "./e2e" and its default testMatch is `**\/*.@(spec|test).?(c|m)[jt]s?(x)`,
+  // scanned recursively — so a spec in a subdirectory, or a `.spec.tsx`, was run by
+  // Playwright and invisible to the guard. Reproduced: `e2e/zz-nested/dead.spec.ts` was
+  // listed by `playwright test --list` while the manifest suite stayed green.
+  it("accepts a spec at any depth and every extension Playwright matches", () => {
+    expect(isPlaywrightSpec("e2e/root.spec.ts")).toBe(true);
+    expect(isPlaywrightSpec("e2e/mobile/nested.spec.ts")).toBe(true);
+    expect(isPlaywrightSpec("e2e/a/b/c/deep.test.ts")).toBe(true);
+    expect(isPlaywrightSpec("e2e/component.spec.tsx")).toBe(true);
+    expect(isPlaywrightSpec("e2e/legacy.spec.mjs")).toBe(true);
+    expect(isPlaywrightSpec("e2e/legacy.test.cjs")).toBe(true);
+  });
+
+  it("rejects helpers, fixtures, the auth setup file, node_modules, and files outside testDir", () => {
+    expect(isPlaywrightSpec("e2e/helpers/session.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e/fixtures/plant.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e/auth.setup.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e/node_modules/pkg/x.spec.ts")).toBe(false);
+    expect(isPlaywrightSpec("src/test/unit.spec.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e-old/x.spec.ts")).toBe(false);
+  });
+
+  it("honours a configured testDir, with or without the ./ prefix and trailing slash", () => {
+    expect(isPlaywrightSpec("tests/x.spec.ts", "./tests/")).toBe(true);
+    expect(isPlaywrightSpec("e2e/x.spec.ts", "./tests")).toBe(false);
+    expect(isPlaywrightSpec(null as unknown as string)).toBe(false);
+  });
+});
+
+describe("statically disabled steps and jobs are not execution evidence (Codex, #1221 round 6)", () => {
+  // `if: ${{ false }}` (or `if: false`) disables a step or a whole job without deleting
+  // it. The corpus took every `run:` line as evidence, so a lane switched off that way
+  // still read as executed. Only a LITERAL false is decidable statically; expressions
+  // that happen to be false at runtime are not, and are left alone.
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - name: dead step",
+    "        if: ${{ false }}",
+    "        run: bunx playwright test e2e/dead-step.spec.ts",
+    "      - name: live step",
+    "        if: always()",
+    "        run: bunx playwright test e2e/live.spec.ts",
+    "  b:",
+    "    if: false",
+    "    steps:",
+    "      - run: bunx playwright test e2e/dead-job.spec.ts",
+    "      - run: bunx playwright test e2e/dead-job-two.spec.ts",
+    "  c:",
+    "    if: env.FLAG == 'false'",
+    "    steps:",
+    "      - run: bunx playwright test e2e/live-expr.spec.ts",
+    "",
+  ].join("\n");
+
+  it("drops a step and a job disabled with a literal false, keeps their siblings", () => {
+    const paths = pathsOf(y);
+    expect(paths.has("e2e/dead-step.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dead-job.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dead-job-two.spec.ts")).toBe(false);
+    expect(paths.has("e2e/live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/live-expr.spec.ts")).toBe(true);
+  });
+
+  it("recognises every literal-false spelling and no expression", () => {
+    for (const cond of [
+      "false",
+      "${{ false }}",
+      "'false'",
+      '"false"',
+      "'${{ false }}'",
+      "${{false}}",
+    ]) {
+      const w = `jobs:\n  a:\n    steps:\n      - if: ${cond}\n        run: bunx playwright test e2e/x.spec.ts\n`;
+      expect(pathsOf(w).has("e2e/x.spec.ts"), cond).toBe(false);
+    }
+    for (const cond of [
+      "always()",
+      "${{ !cancelled() }}",
+      "github.ref == 'false'",
+      "steps.x.outputs.ok == 'false'",
+    ]) {
+      const w = `jobs:\n  a:\n    steps:\n      - if: ${cond}\n        run: bunx playwright test e2e/x.spec.ts\n`;
+      expect(pathsOf(w).has("e2e/x.spec.ts"), cond).toBe(true);
+    }
+  });
+
+  it("preserves line count, is idempotent, and is null-safe", () => {
+    const out = stripDisabledBlocks(y);
+    expect(out.split("\n")).toHaveLength(y.split("\n").length);
+    expect(stripDisabledBlocks(out)).toBe(out);
+    expect(stripDisabledBlocks(null)).toBe("");
+    expect(stripDisabledBlocks("")).toBe("");
   });
 });

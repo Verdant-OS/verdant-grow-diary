@@ -6,6 +6,18 @@
 // - Performs no real writes, ingest, AI calls, alerts, Action Queue changes,
 //   token minting, automation, or device control.
 import { expect, test, type Page } from "@playwright/test";
+import { CURRENT_AGREEMENT_LIST } from "../src/constants/agreements";
+
+// AgreementReconsentGate renders inside the authenticated shell and queries
+// user_agreement_acceptances on mount. Without this fixture the catch-all below
+// answers `[]`, computeAgreementGaps reports both agreements missing, and the
+// modal opens over the page, intercepting clicks depending on whether the query
+// resolves before or after the interaction. Derived from the product registry
+// so an agreement bump cannot silently reintroduce the flake.
+const CURRENT_AGREEMENT_ROWS = CURRENT_AGREEMENT_LIST.map((agreement) => ({
+  agreement_type: agreement.type,
+  version: agreement.version,
+}));
 
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
@@ -95,6 +107,15 @@ async function mockSignedInSupabase(
   await page.route(/\/rest\/v1\//, async (route, request) => {
     const url = new URL(request.url());
     const pathname = url.pathname;
+    if (pathname.endsWith("/rest/v1/user_agreement_acceptances")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(CURRENT_AGREEMENT_ROWS),
+      });
+      return;
+    }
+
     if (pathname.endsWith("/rest/v1/rpc/has_role")) {
       await route.fulfill({ status: 200, contentType: "application/json", body: "false" });
       return;

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY,
@@ -89,5 +89,24 @@ describe("Quick Log photo attachment recovery fence", () => {
     expect(getQuickLogPhotoAttachmentRecoveryRecord(ORIGINAL_SCOPE)).toEqual({
       diaryEntryId: null,
     });
+  });
+
+  it("does not overwrite an existing stored lock when sessionStorage.setItem throws", () => {
+    const diaryEntryId = "00000000-0000-4000-8000-000000000111";
+    recordQuickLogPhotoAttachmentRecoveryLock(ORIGINAL_SCOPE, diaryEntryId);
+
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    recordQuickLogPhotoAttachmentRecoveryLock(
+      { ...ORIGINAL_SCOPE, plantId: "plant-b" },
+      "00000000-0000-4000-8000-000000000222",
+    );
+
+    expect(getQuickLogPhotoAttachmentRecoveryRecord(ORIGINAL_SCOPE)).toEqual({ diaryEntryId });
+    expect(hasQuickLogPhotoAttachmentRecoveryLock({ ...ORIGINAL_SCOPE, plantId: "plant-b" })).toBe(
+      false,
+    );
   });
 });

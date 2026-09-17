@@ -8,8 +8,20 @@
  * On success, the caller's session is invalidated server-side; we also
  * call supabase.auth.signOut locally so the SPA drops the stale session.
  */
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
+
+/** Matches AuthProvider held-session confirmation: fail closed on malformed shape. */
+function isDispatchableHeldSession(session: Session | null | undefined): session is Session {
+  return (
+    session != null &&
+    typeof session.access_token === "string" &&
+    session.access_token.trim() !== "" &&
+    typeof session.user?.id === "string" &&
+    session.user.id.trim() !== ""
+  );
+}
 
 export const DELETE_ACCOUNT_CONFIRMATION = "DELETE";
 
@@ -92,7 +104,13 @@ export async function requestAccountDeletion(
           return;
         }
         const held = data.session;
-        if (held && held.user.id !== options.expectedUserId) authCurrent = false;
+        if (held !== null && held !== undefined) {
+          if (!isDispatchableHeldSession(held)) {
+            authReadUnconfirmed = true;
+            return;
+          }
+          if (held.user.id !== options.expectedUserId) authCurrent = false;
+        }
         if (held === null) {
           if (duringCleanup) observedCleanupSignOut = true;
           else authCurrent = false;
@@ -117,7 +135,7 @@ export async function requestAccountDeletion(
       if (
         error ||
         authReadUnconfirmed ||
-        !session?.access_token ||
+        !isDispatchableHeldSession(session) ||
         session.user.id !== options.expectedUserId ||
         !isCurrent() ||
         !cleanupAvailable()
@@ -143,9 +161,15 @@ export async function requestAccountDeletion(
     if (authReadUnconfirmed) return cleanupUnconfirmed();
     const { data: held, error: heldError } = await supabase.auth.getSession();
     await settleAuthChecks();
-    if (!isCurrent() || (held?.session && held.session.user.id !== options.expectedUserId))
+    if (
+      !isCurrent() ||
+      (held?.session &&
+        (!isDispatchableHeldSession(held.session) ||
+          held.session.user.id !== options.expectedUserId))
+    )
       return { ok: true, disposition: "superseded" };
-    if (heldError || authReadUnconfirmed || !held?.session) return cleanupUnconfirmed();
+    if (heldError || authReadUnconfirmed || !isDispatchableHeldSession(held?.session))
+      return cleanupUnconfirmed();
 
     // Never join another exit or clear its failure latch with a skipped
     // queue action. Admission, lease acquisition and enqueue are synchronous.
@@ -158,14 +182,22 @@ export async function requestAccountDeletion(
       if (!isCurrent() || !lease?.isCurrent()) return false;
       if (currentError || authReadUnconfirmed)
         throw new Error("account_deletion_cleanup_unconfirmed");
-      if (!current?.session || current.session.user.id !== options.expectedUserId) return false;
+      if (
+        !isDispatchableHeldSession(current?.session) ||
+        current.session.user.id !== options.expectedUserId
+      )
+        return false;
       cleanupStarted = true;
       const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
       if (signOutError) throw new Error("account_deletion_cleanup_unconfirmed");
       const { data: cleared, error: clearedError } = await supabase.auth.getSession();
       await settleAuthChecks();
       if (!isCurrent() || !lease?.isCurrent()) return false;
-      if (cleared?.session && cleared.session.user.id !== options.expectedUserId) {
+      if (
+        cleared?.session &&
+        (!isDispatchableHeldSession(cleared.session) ||
+          cleared.session.user.id !== options.expectedUserId)
+      ) {
         authCurrent = false;
         return false;
       }
@@ -180,7 +212,11 @@ export async function requestAccountDeletion(
     const { data: afterCleanup, error: afterError } = await supabase.auth.getSession();
     await settleAuthChecks();
     if (!isCurrent() || !lease.isCurrent()) return { ok: true, disposition: "superseded" };
-    if (afterCleanup?.session && afterCleanup.session.user.id !== options.expectedUserId)
+    if (
+      afterCleanup?.session &&
+      (!isDispatchableHeldSession(afterCleanup.session) ||
+        afterCleanup.session.user.id !== options.expectedUserId)
+    )
       return { ok: true, disposition: "superseded" };
     if (afterError || authReadUnconfirmed || afterCleanup?.session !== null)
       return cleanupUnconfirmed();

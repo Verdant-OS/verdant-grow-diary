@@ -137,6 +137,20 @@ describe("quickLogV2SavePayload", () => {
     });
   });
 
+  it("adds canonical manual provenance for a temperature-only measurement without pre-existing p_details", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "", temperatureC: "24.5" }));
+    if (!r.ok) throw new Error("expected valid temperature-only payload");
+    expect(r.payload.p_temperature_c).toBe(24.5);
+    expect(r.payload.p_details).toEqual({
+      manual_provenance: {
+        source: "manual",
+        source_identity: "manual_entry",
+        transport: "manual",
+        confidence: null,
+      },
+    });
+  });
+
   it("blocks save when target unresolved", () => {
     const r = buildQuickLogV2SavePayload(
       base({ resolved: { ok: false, reason: "no_selection" } as any }),

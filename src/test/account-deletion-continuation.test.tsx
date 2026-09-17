@@ -782,6 +782,13 @@ describe("account deletion completion belongs to its initiating account and moun
       },
     },
     {
+      label: "409 conflict without billing error code in body",
+      response: {
+        data: { ok: false },
+        error: { context: { status: 409 } },
+      },
+    },
+    {
       label: "billing_cancellation_failed body without 409",
       response: {
         data: { ok: false, error: "billing_cancellation_failed" },
@@ -795,6 +802,30 @@ describe("account deletion completion belongs to its initiating account and moun
       renderSettings();
       await startDeletion();
       expect(await screen.findByRole("alert")).toHaveTextContent(DELETE_ACCOUNT_BILLING_FAILURE);
+      expect(sdk.signOut).not.toHaveBeenCalled();
+      expect(sdk.replace).not.toHaveBeenCalled();
+      expect(sdk.welcomeLoads).not.toHaveBeenCalled();
+      expect(sdk.ownerId).toBe("fixture-owner-a");
+    },
+  );
+
+  it.each([
+    { label: "storage cleanup failure", error: "storage_cleanup_failed" },
+    { label: "session revoke failure", error: "session_revoke_failed" },
+    { label: "auth deletion failure", error: "delete_failed" },
+  ])(
+    "surfaces generic deletion failure for non-billing edge errors ($label) without signing out or navigating away",
+    async ({ error }) => {
+      sdk.invoke.mockResolvedValueOnce({
+        data: { ok: false, error },
+        error: { context: { status: 500 } },
+      });
+      renderSettings();
+      await startDeletion();
+      expect(await screen.findByRole("alert")).toHaveTextContent(DELETE_ACCOUNT_GENERIC_FAILURE);
+      expect(await screen.findByRole("alert")).not.toHaveTextContent(
+        DELETE_ACCOUNT_BILLING_FAILURE,
+      );
       expect(sdk.signOut).not.toHaveBeenCalled();
       expect(sdk.replace).not.toHaveBeenCalled();
       expect(sdk.welcomeLoads).not.toHaveBeenCalled();

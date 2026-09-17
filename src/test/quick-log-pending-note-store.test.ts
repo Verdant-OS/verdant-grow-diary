@@ -161,6 +161,32 @@ describe("claimPendingQuickLogNote", () => {
     expect(claimPendingQuickLogNote(record)).toEqual({ status: "blocked" });
     vi.restoreAllMocks();
   });
+
+  it("blocks when sessionStorage.getItem throws during an existing pending read", () => {
+    const record = validRecord();
+    window.sessionStorage.setItem(pendingKey(), JSON.stringify(record));
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("Storage unavailable");
+    });
+    expect(claimPendingQuickLogNote(record)).toEqual({ status: "blocked" });
+    vi.restoreAllMocks();
+  });
+
+  it("blocks when sessionStorage.getItem throws during post-write read-back", () => {
+    const record = validRecord();
+    const getItem = vi.spyOn(Storage.prototype, "getItem");
+    let readBack = false;
+    getItem.mockImplementation((key: string) => {
+      if (key !== pendingKey()) return null;
+      if (!readBack) {
+        readBack = true;
+        return null;
+      }
+      throw new Error("Storage unavailable");
+    });
+    expect(claimPendingQuickLogNote(record)).toEqual({ status: "blocked" });
+    vi.restoreAllMocks();
+  });
 });
 
 describe("clearPendingQuickLogNote", () => {
@@ -181,7 +207,7 @@ describe("clearPendingQuickLogNote", () => {
     expect(window.sessionStorage.getItem(pendingKey())).not.toBeNull();
   });
 
-  it("returns false when storage throws", () => {
+  it("returns false when storage throws on removeItem", () => {
     const record = validRecord();
     window.sessionStorage.setItem(pendingKey(), JSON.stringify(record));
     vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
@@ -189,5 +215,16 @@ describe("clearPendingQuickLogNote", () => {
     });
     expect(clearPendingQuickLogNote(record)).toBe(false);
     vi.restoreAllMocks();
+  });
+
+  it("returns false when sessionStorage.getItem throws during read verification", () => {
+    const record = validRecord();
+    window.sessionStorage.setItem(pendingKey(), JSON.stringify(record));
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("Storage unavailable");
+    });
+    expect(clearPendingQuickLogNote(record)).toBe(false);
+    vi.restoreAllMocks();
+    expect(window.sessionStorage.getItem(pendingKey())).not.toBeNull();
   });
 });

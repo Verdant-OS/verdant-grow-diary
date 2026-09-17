@@ -135,4 +135,29 @@ describe("plantTentRelationshipRules · orphan / whitespace grow edges", () => {
       }),
     ).toEqual({ tent_id: "t2" });
   });
+
+  it.each([null, undefined])(
+    "does not require untag when destination grow id is %s",
+    (destinationGrowId) => {
+      expect(
+        plantMoveRequiresPhenoUntag({
+          phenoHuntId: "hunt-1",
+          plantGrowId: "g1",
+          destinationGrowId,
+        }),
+      ).toBe(false);
+    },
+  );
+
+  it("does not copy grow_id when the destination grow cannot be resolved", () => {
+    expect(
+      buildPlantTentMoveUpdate({
+        tentId: "t2",
+        plantGrowId: null,
+        destinationGrowId: null,
+        usedGrowFallback: true,
+        phenoHuntId: null,
+      }),
+    ).toEqual({ tent_id: "t2" });
+  });
 });

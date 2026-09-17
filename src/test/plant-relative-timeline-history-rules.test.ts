@@ -76,6 +76,19 @@ describe("plant history pagination rules", () => {
       buildPlantHistoryPage(rows, 12, "plant-1"),
     );
   });
+
+  it("rejects another owner's rows when ownerId is supplied", () => {
+    expect(() =>
+      buildPlantHistoryPage([row(1, { user_id: "owner-b" })], 1, "plant-1", 10, "owner-a"),
+    ).toThrow(/unavailable/);
+  });
+
+  it("accepts matching owner rows and legacy rows without user_id", () => {
+    expect(
+      buildPlantHistoryPage([row(1, { user_id: "owner-a" })], 1, "plant-1", 10, "owner-a").rows,
+    ).toHaveLength(1);
+    expect(buildPlantHistoryPage([row(1)], 1, "plant-1", 10, "owner-a").rows).toHaveLength(1);
+  });
 });
 
 describe("plant history count and read truth", () => {

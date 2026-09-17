@@ -298,4 +298,37 @@ describe("CSV import response-loss recovery", () => {
       expect(result.error).not.toContain("private rejected row");
     },
   );
+
+  it("retains two acknowledged batches when the final batch loses its reply", async () => {
+    let batch = 0;
+    const client = {
+      insertSensorReadings: vi.fn(async (rows: unknown[]) => {
+        batch += 1;
+        if (batch <= 2) {
+          return { error: null, insertedCount: rows.length };
+        }
+        throw new Error("response lost after a possible commit");
+      }),
+    };
+    const rows = Array.from({ length: 450 }, (_, index) =>
+      row({
+        rowNumber: index + 1,
+        captured_at: `2026-06-01T${String(Math.floor(index / 60)).padStart(2, "0")}:${String(index % 60).padStart(2, "0")}:00.000Z`,
+        humidity_pct: 50 + (index % 3),
+        vpd_kpa: 1.2 + (index % 4) * 0.01,
+      }),
+    );
+
+    const result = await persistCsvEnvironmentRows(rows, SCOPE, client, 500);
+
+    expect(client.insertSensorReadings).toHaveBeenCalledTimes(3);
+    expect(result.insertedCount).toBe(1000);
+    expect(result.partialWrite).toBe(true);
+    expect(result.unconfirmedWrite).toBe(true);
+    expect(result.error).toContain("1000 CSV readings confirmed saved.");
+    expect(result.error).toContain(
+      "couldn't confirm whether the remaining CSV readings were saved.",
+    );
+    expect(result.error).not.toMatch(/No CSV readings were saved/);
+  });
 });

@@ -80,6 +80,31 @@ describe("sensorReadingManualEntryRules — pure validation", () => {
 });
 
 describe("buildManualReadingPayloads", () => {
+  it("persists canonical manual provenance on every metric without changing observation time", () => {
+    const capturedAt = "2026-09-16T03:56:18.102Z";
+    const metrics = validateManualEntry({ airTempF: 77, humidityPct: 55 }).metrics;
+    const input = { tentId: "tent-1", metrics, ts: capturedAt };
+    const payloads = buildManualReadingPayloads(input);
+    expect(payloads).toHaveLength(2);
+    for (const row of payloads) {
+      expect(row).toMatchObject({
+        source: "manual",
+        ts: capturedAt,
+        captured_at: capturedAt,
+        raw_payload: {
+          manual_provenance: {
+            source: "manual",
+            source_identity: "manual_entry",
+            transport: "manual",
+            confidence: null,
+          },
+        },
+      });
+    }
+    expect(buildManualReadingPayloads(input)).toEqual(payloads);
+    expect(buildManualReadingPayloads({ ...input, metrics: [] })).toEqual([]);
+  });
+
   it("marks source='manual' and never includes user_id", () => {
     const v = validateManualEntry({ airTempF: 75, humidityPct: 55 });
     const payloads = buildManualReadingPayloads({ tentId: "tent-1", metrics: v.metrics });

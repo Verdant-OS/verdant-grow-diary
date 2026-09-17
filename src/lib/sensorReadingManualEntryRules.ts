@@ -22,6 +22,10 @@
 
 import { buildManualDeviceId } from "@/lib/manualSensorSourceLabel";
 import {
+  buildManualSensorProvenance,
+  type ManualSensorPayload,
+} from "@/lib/manualSensorProvenanceRules";
+import {
   parseTemperatureInput,
   resolveTemperatureInputUnit,
   type ParsedTemperatureInput,
@@ -221,6 +225,7 @@ export interface ManualReadingPayload {
   ts: string;
   captured_at: string;
   quality: "ok";
+  raw_payload: ManualSensorPayload;
   /**
    * Optional `manual:<note>` device id capturing where the grower took
    * the reading (e.g. EcoWitt WH45 CO2/THP Monitor). Omitted when absent so
@@ -252,6 +257,7 @@ export function buildManualReadingPayloads(args: {
       ts,
       captured_at: ts,
       quality: "ok",
+      raw_payload: { manual_provenance: buildManualSensorProvenance() },
     };
     if (deviceId) row.device_id = deviceId;
     return row;

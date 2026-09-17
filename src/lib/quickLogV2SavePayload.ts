@@ -10,6 +10,7 @@ import { isTemperatureValid, isHumidityValid, isVpdValid } from "./sensorReading
 import { normalizeQuickLogStage } from "./quickLogStageDefaultRules";
 import { hasQuickLogMaturityEvidence } from "./quickLogMaturityEvidenceRules";
 import type { QuickLogMaturityEvidenceFormState } from "./quickLogMaturityEvidenceRules";
+import { buildManualSensorProvenance } from "./manualSensorProvenanceRules";
 
 export interface QuickLogV2SavePayload {
   p_target_type: "tent" | "plant";
@@ -139,6 +140,13 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
     return { ok: false, reason: "empty_content" };
   }
 
+  // Metadata belongs to the existing diary companion. Do not duplicate the
+  // measurements: the RPC already creates their environment event sibling.
+  const details =
+    t !== null || h !== null || v !== null
+      ? { ...input.details, manual_provenance: buildManualSensorProvenance() }
+      : input.details;
+
   return {
     ok: true,
     payload: {
@@ -151,7 +159,7 @@ export function buildQuickLogV2SavePayload(input: BuildQuickLogV2PayloadInput): 
       p_humidity_pct: h,
       p_vpd_kpa: v,
       p_occurred_at: input.occurredAt ?? null,
-      ...(input.details ? { p_details: input.details } : {}),
+      ...(details ? { p_details: details } : {}),
       ...((): { p_stage?: string } => {
         const stage = normalizeQuickLogStage(input.stage ?? "");
         return stage ? { p_stage: stage } : {};

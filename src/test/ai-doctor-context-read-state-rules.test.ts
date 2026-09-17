@@ -76,4 +76,100 @@ describe("context read completeness", () => {
       }),
     ).toMatchObject({ status: "ready", showAssessment: true, canRetry: false, message: null });
   });
+
+  it("maps legacy boolean read flags when readStatus is absent", () => {
+    expect(
+      buildAiDoctorContextReadView({
+        timeline: { isError: true, hasData: true },
+        rootZone: null,
+        manual: null,
+      }),
+    ).toMatchObject({ status: "unavailable", showAssessment: false, canRetry: true });
+    expect(
+      buildAiDoctorContextReadView({
+        timeline: { isLoading: true },
+        rootZone: null,
+        manual: null,
+      }).status,
+    ).toBe("loading");
+    expect(
+      buildAiDoctorContextReadView({
+        timeline: { isFetching: true, hasData: true },
+        rootZone: null,
+        manual: null,
+      }),
+    ).toMatchObject({
+      status: "refreshing",
+      showAssessment: false,
+      cachedNotice: expect.any(String),
+    });
+  });
+
+  it.each([
+    ["loading", "Loading recent context…"],
+    ["refreshing", "Refreshing recent context…"],
+    ["paused", "Waiting for connection to check recent context."],
+  ] as const)("surfaces the %s status message", (readStatus, message) => {
+    expect(
+      buildAiDoctorContextReadView({
+        timeline: { readStatus },
+        rootZone: null,
+        manual: null,
+      }).message,
+    ).toBe(message);
+  });
+
+  it("surfaces the unavailable status message when a read fails", () => {
+    expect(
+      buildAiDoctorContextReadView({
+        timeline: { readStatus: "error" },
+        rootZone: null,
+        manual: null,
+      }).message,
+    ).toBe("Some context is unavailable. Retry to check the complete summary.");
+  });
+
+  it("prefers paused over loading when every transport read is paused", () => {
+    expect(
+      buildAiDoctorContextReadView({
+        timeline: { readStatus: "paused" },
+        rootZone: { readStatus: "paused" },
+        manual: { status: "loading" },
+      }),
+    ).toMatchObject({ status: "paused", showAssessment: false, canRetry: false });
+  });
+
+  it("treats manual transport errors like other failed reads", () => {
+    const result = buildAiDoctorContextReadView({
+      timeline: { readStatus: "success" },
+      rootZone: { readStatus: "success" },
+      manual: { status: "error" },
+    });
+    expect(result).toMatchObject({ status: "unavailable", showAssessment: false, canRetry: true });
+    expect(result.cachedNotice).toBeNull();
+  });
+
+  it("marks partial companion and audit gaps unavailable together", () => {
+    expect(
+      buildAiDoctorContextReadView({
+        timeline: {
+          readStatus: "success",
+          companionEvidenceUnavailable: true,
+          auditEvidenceUnavailable: true,
+        },
+        rootZone: { readStatus: "success" },
+        manual: { status: "success" },
+      }),
+    ).toMatchObject({ status: "unavailable", showAssessment: false, canRetry: true });
+  });
+
+  it("omits cached notice when no evidence survived the failed read", () => {
+    expect(
+      buildAiDoctorContextReadView({
+        timeline: { readStatus: "error" },
+        rootZone: { readStatus: "error" },
+        manual: { status: "error" },
+      }).cachedNotice,
+    ).toBeNull();
+  });
 });

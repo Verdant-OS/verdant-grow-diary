@@ -67,7 +67,9 @@ function readEventType(details: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
-function readStage(details: unknown): string | null {
+function readStage(stage: unknown, details: unknown): string | null {
+  const canonicalStage = resolveTimelineDiaryEntryStage({ stage });
+  if (canonicalStage) return canonicalStage;
   if (!details || typeof details !== "object" || Array.isArray(details)) return null;
   const detailsRecord = details as Record<string, unknown>;
   return resolveTimelineDiaryEntryStage({ stage: detailsRecord.stage, details });
@@ -90,9 +92,7 @@ function readPhotosArray(details: unknown): unknown {
   return undefined;
 }
 
-function diaryRowToDiaryItem(
-  row: ManualSnapshotDiaryRow & { photo_url?: string | null },
-): TimelineDiaryItem {
+function diaryRowToDiaryItem(row: RawRow): TimelineDiaryItem {
   return {
     kind: "diary",
     key: row.id,
@@ -103,7 +103,7 @@ function diaryRowToDiaryItem(
     sensorSnapshot: readSensorSnapshot(row.details),
     photoUrl: row.photo_url ?? null,
     photos: readPhotosArray(row.details),
-    stage: readStage(row.details),
+    stage: readStage(row.stage, row.details),
     earlyStage: buildEarlyStageTimelineViewModel(row.details),
   };
 }
@@ -151,6 +151,7 @@ function rowToManualSnapshotItem(row: ManualSnapshotDiaryRow): TimelineManualSna
 
 interface RawRow extends ManualSnapshotDiaryRow {
   photo_url: string | null;
+  stage?: unknown;
 }
 
 async function fetchRows(scope: TimelineMemoryScope, limit: number): Promise<RawRow[]> {
@@ -159,7 +160,7 @@ async function fetchRows(scope: TimelineMemoryScope, limit: number): Promise<Raw
   const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
     let q = supabase
       .from("diary_entries")
-      .select("id, plant_id, tent_id, entry_at, note, photo_url, details");
+      .select("id, plant_id, tent_id, entry_at, note, photo_url, stage, details");
     if (withRetractionFilter) q = q.is("retracted_at", null);
     q = scope.kind === "plant" ? q.eq("plant_id", scope.plantId) : q.eq("tent_id", scope.tentId);
     return q.order("entry_at", { ascending: false }).limit(limit);

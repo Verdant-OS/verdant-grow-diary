@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useHydrated } from "@/hooks/useHydrated";
 import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
-import { buildSignedOutRedirect, SIGNED_OUT_LANDING } from "@/lib/authRedirectRules";
+import { buildSignedOutRedirect, retainSignedOutReturnIntent, SIGNED_OUT_LANDING } from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
@@ -56,11 +56,18 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // server revalidation and cached-session misses to /auth preserves the
   // manifest-validated return path. An explicit sign-out owns its separate
   // destination and suppresses both guards until that navigation commits.
-  const signedOutRedirect = buildSignedOutRedirect(
+  const builtSignedOutRedirect = buildSignedOutRedirect(
     location.pathname,
     location.search,
     location.hash,
   );
+  const signedOutRedirectRef = useRef(builtSignedOutRedirect);
+  signedOutRedirectRef.current = retainSignedOutReturnIntent(
+    signedOutRedirectRef.current,
+    builtSignedOutRedirect,
+    Boolean(user),
+  );
+  const signedOutRedirect = signedOutRedirectRef.current;
   const { status: authStatus } = useRequireAuth(signedOutRedirect);
   // One server-validated session gate for every private REST read this shell
   // issues: a cached user while getUser() is still settling, missed

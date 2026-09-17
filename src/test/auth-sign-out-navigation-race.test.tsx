@@ -341,9 +341,12 @@ describe("explicit sign-out owns navigation through the committed public destina
     await screen.findByTestId("private-page");
     act(() => signedOutEvent());
     await screen.findByRole("form", { name: "Sign-in form" });
+    await flushOldContinuations();
     expect(screen.queryByTestId("private-page")).not.toBeInTheDocument();
-    expect(router.state.resolvedLocation?.pathname).toBe("/auth");
-    expect(router.state.resolvedLocation?.search.redirectTo).toBe(destination);
+    await waitFor(() => {
+      expect(router.state.resolvedLocation?.pathname).toBe("/auth");
+      expect(router.state.resolvedLocation?.search.redirectTo).toBe(destination);
+    });
     expect(sdk.signOut).not.toHaveBeenCalled();
     expect(welcomeLoader).not.toHaveBeenCalled();
   });

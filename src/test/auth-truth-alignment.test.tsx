@@ -461,6 +461,21 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     expect(renderedIdentities).toContain("u-relayed");
   });
 
+  it("preserves a session-bearing delivery when the held-session read returns an error", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    renderProvider();
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+
+    mocks.getSession.mockResolvedValueOnce({
+      data: { session: sessionFor("u-relayed") },
+      error: { message: "fixture store unavailable" },
+    });
+    await relayFromOtherTab("SIGNED_IN", sessionFor("u-relayed"));
+
+    expect(screen.getByTestId("probe")).toHaveTextContent("u-relayed");
+    expect(renderedIdentities).toContain("u-relayed");
+  });
+
   it("clears persisted identity when a foreign null relay confirms this tab has no held session", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
     const fence = vi.fn();
@@ -475,6 +490,20 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
     expect(fence).toHaveBeenCalledWith("u-own", null);
     expect(window.sessionStorage.getItem("verdant:auth:last-resolved-identity:v1")).toBe("");
+  });
+
+  it("applies INITIAL_SESSION null without a reconciliation read", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    renderProvider();
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+    expect(mocks.getSession).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      deliver("INITIAL_SESSION", null);
+    });
+
+    expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+    expect(mocks.getSession).toHaveBeenCalledTimes(1);
   });
 
   it("applies the client's own INITIAL_SESSION without a reconciliation read", async () => {

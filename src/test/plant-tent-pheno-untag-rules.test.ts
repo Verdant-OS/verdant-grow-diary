@@ -113,4 +113,26 @@ describe("plantTentRelationshipRules · orphan / whitespace grow edges", () => {
     expect(move).not.toHaveProperty("candidate_label");
     expect(buildPlantPhenoUntagPayload()).not.toHaveProperty("tent_id");
   });
+
+  it("does not require untag when destination grow id is blank", () => {
+    expect(
+      plantMoveRequiresPhenoUntag({
+        phenoHuntId: "hunt-1",
+        plantGrowId: "g1",
+        destinationGrowId: "   ",
+      }),
+    ).toBe(false);
+  });
+
+  it("omits grow_id on same-grow hunt-linked moves", () => {
+    expect(
+      buildPlantTentMoveUpdate({
+        tentId: "t2",
+        plantGrowId: "g1",
+        destinationGrowId: "g1",
+        usedGrowFallback: false,
+        phenoHuntId: "hunt-1",
+      }),
+    ).toEqual({ tent_id: "t2" });
+  });
 });

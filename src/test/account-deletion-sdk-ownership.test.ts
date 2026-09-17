@@ -7,6 +7,7 @@ import {
 } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  DELETE_ACCOUNT_GENERIC_FAILURE,
   requestAccountDeletion,
   type DeleteAccountContinuationOptions,
 } from "@/lib/accountDeletion";
@@ -312,6 +313,68 @@ describe("account deletion with the actual Supabase SDK and intercepted HTTP", (
     expect((await fixture.client.auth.getSession()).data.session?.user.id).toBe("owner-b");
     expect(request.onDeleted).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["whitespace bearer", { ...session("owner-a"), access_token: "   " }],
+    [
+      "missing user",
+      {
+        ...session("owner-a"),
+        user: null as unknown as Session["user"],
+      },
+    ],
+    [
+      "non-string user id",
+      {
+        ...session("owner-a"),
+        user: { ...session("owner-a").user, id: 42 as unknown as string },
+      },
+    ],
+    [
+      "missing access_token",
+      { ...session("owner-a"), access_token: undefined as unknown as string },
+    ],
+  ])(
+    "does not invoke delete-account when pre-dispatch held session has %s",
+    async (_label, badSession) => {
+      vi.spyOn(fixture.client.auth, "getSession").mockResolvedValue({
+        data: { session: badSession },
+        error: null,
+      });
+      const request = startDeletion();
+      await expect(request.result).resolves.toEqual({
+        ok: false,
+        error: DELETE_ACCOUNT_GENERIC_FAILURE,
+      });
+      expect(deleteHeaders).toEqual([]);
+      expect(request.onDeleted).not.toHaveBeenCalled();
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not invoke delete-account when an auth-event held read returns a missing user", async () => {
+    const request = startDeletion();
+    vi.spyOn(fixture.client.auth, "getSession").mockResolvedValueOnce({
+      data: {
+        session: {
+          access_token: token("owner-a"),
+          refresh_token: "fixture-refresh",
+          token_type: "bearer",
+          expires_in: 3600,
+          expires_at: expiresAt,
+          user: null as unknown as Session["user"],
+        },
+      },
+      error: null,
+    });
+    await relayAuthEvent("SIGNED_IN", session("owner-b"));
+    await expect(request.result).resolves.toEqual({
+      ok: false,
+      error: DELETE_ACCOUNT_GENERIC_FAILURE,
+    });
+    expect(deleteHeaders).toEqual([]);
+    expect(request.onDeleted).not.toHaveBeenCalled();
   });
 
   it("pins A's request bearer while the SDK token getter is delayed across B signing in", async () => {

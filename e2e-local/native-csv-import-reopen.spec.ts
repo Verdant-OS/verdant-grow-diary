@@ -153,7 +153,7 @@ async function signInCurrentDocument(page: Page, f: LocalFixture) {
 }
 
 for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
-  test(`an account round trip ends a CSV import held at its ${heldAt}`, async ({
+  test(`leaving a CSV import held at its ${heldAt} survives an account round trip`, async ({
     page,
     context,
   }) => {
@@ -177,8 +177,14 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       const before = await ownerRows(f.owner);
       const otherBefore = fingerprint(await witnessRows(f));
       const csv = largeCsv();
-      await preview(page, f, f.primary, csv);
       const importDocument = await page.evaluate(() => performance.timeOrigin);
+      const returnUrl = page.url();
+      // Enter through the real SPA link so browser Back can leave the busy
+      // modal without replacing this document or destroying its callback.
+      await page.getByRole("link", { name: "Sensors", exact: true }).first().click();
+      await page.getByRole("button", { name: f.primary.tentName, exact: true }).click();
+      await page.getByTestId("sensors-csv-import-button").click();
+      await uploadCsv(page, csv);
       const writes: Row[][] = [];
       let held = false;
       let delivered = false;
@@ -228,11 +234,19 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       }
       const committedFingerprint = fingerprint({ ...before, sensor_readings: committed });
 
-      // The control tab supplies a real sign-out while the import modal is
-      // busy. All subsequent account changes use the original tab's real UI
-      // and SPA navigation, leaving its delayed callback alive.
+      // Signing out a different tab must not discard this tab's held session
+      // or busy import. The modal cannot be dismissed during an insert, so
+      // use the browser's same-document Back before this tab's own sign-out.
+      // Route departure invalidates the import; the later account round trip
+      // must not revive it. This is not a mounted-modal logout-only witness.
       await signOutThroughUi(control);
+      await expect(page.getByTestId("csv-import-inserting")).toBeVisible();
+      await page.goBack();
+      await expect(page).toHaveURL(returnUrl);
+      expect(await page.evaluate(() => performance.timeOrigin)).toBe(importDocument);
+      await expect(page.getByTestId("header-quick-log-trigger")).toBeVisible();
       await expect(page.getByTestId("csv-import-modal")).toHaveCount(0);
+      await signOutThroughUi(page);
       await signInCurrentDocument(page, otherFixture);
       await page.getByRole("link", { name: "Sensors", exact: true }).first().click();
       await expect(
@@ -274,7 +288,7 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       );
       expect((await ownerRows(f.owner)).sensor_readings).toHaveLength(priorRowCount + 6);
       await assertIsolation(f, before, otherBefore);
-      console.log("Native CSV account round trip:", heldAt, "retained rows:", priorRowCount);
+      console.log("Native CSV route/account departure:", heldAt, "retained rows:", priorRowCount);
     } finally {
       releaseReply();
       await page.close();

@@ -206,6 +206,7 @@ export default function ManualSensorReadingCard({
   const insert = useInsertSensorReading();
   const insertBatch = useInsertSensorReadings();
   const isSaving = insert.isPending || insertBatch.isPending || !!sessionState?.inFlight;
+  const recoveryError = sessionState?.recoveryError;
   const isCorrection = !!correction;
   const saveInFlightRef = useRef(false);
   const requestedTargetContextRef = useRef(`${initialTentId}\n${correctionIdentity}`);
@@ -452,7 +453,7 @@ export default function ManualSensorReadingCard({
   async function doSave() {
     // Belt-and-suspenders: even though Save buttons are disabled while
     // pending, guard against a second concurrent call from any path.
-    if (isSaving || saveInFlightRef.current || !draft) return;
+    if (isSaving || saveInFlightRef.current || !draft || recoveryError) return;
     const readCurrentDraft = () => (session ? session.getSnapshot()?.draft : localDraftRef.current);
     const currentDraft = readCurrentDraft();
     if (
@@ -606,6 +607,7 @@ export default function ManualSensorReadingCard({
   }
 
   async function onSave() {
+    if (recoveryError) return;
     if (!tentId) {
       toast.error("Pick a tent first.");
       return;
@@ -649,6 +651,23 @@ export default function ManualSensorReadingCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {recoveryError && (
+          <div
+            role="alert"
+            data-testid="manual-reading-recovery-error"
+            className="space-y-2 text-sm"
+          >
+            <p>{recoveryError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => session?.retryRecovery()}
+              disabled={isSaving}
+            >
+              Retry recovery
+            </Button>
+          </div>
+        )}
         {isCorrection && correction && (
           <div
             className="flex items-start gap-2 rounded-md border border-primary/40 bg-primary/5 p-2 text-xs"
@@ -1010,7 +1029,7 @@ export default function ManualSensorReadingCard({
                       <Button
                         size="sm"
                         onClick={doSave}
-                        disabled={isSaving || hasBlocker || !draft}
+                        disabled={isSaving || hasBlocker || !draft || !!recoveryError}
                         data-testid="manual-sensor-review-confirm"
                       >
                         {isSaving ? (
@@ -1098,7 +1117,7 @@ export default function ManualSensorReadingCard({
               </p>
               <Button
                 onClick={onSave}
-                disabled={!validation.ok || !tentId || isSaving || !draft}
+                disabled={!validation.ok || !tentId || isSaving || !draft || !!recoveryError}
                 data-testid="manual-reading-save"
               >
                 {isSaving ? (

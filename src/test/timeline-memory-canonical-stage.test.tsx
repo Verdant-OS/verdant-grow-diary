@@ -179,6 +179,20 @@ describe("Timeline Memory preserves the stored diary stage", () => {
     expect(diary.stage).toBe("flower");
   });
 
+  it("keeps the canonical stage on displayItems used by Timeline Memory UI", async () => {
+    harness.rows = [row({ stage: "flower", details: { stage: "veg", event_type: "note" } })];
+    const view = renderHook(() => useTimelineMemory({ kind: "plant", plantId: "plant-a" }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(view.result.current.hasData).toBe(true));
+    const visible = (view.result.current.displayItems ?? view.result.current.items).find(
+      (value) => value.kind === "diary",
+    );
+    expect(visible?.kind).toBe("diary");
+    if (visible?.kind !== "diary") return;
+    expect(visible.stage).toBe("flower");
+  });
+
   it("requires the stage column in the primary select to preserve the saved diary stage", async () => {
     harness.rows = [row({ stage: "flower", details: { event_type: "note" } })];
     await readStage();

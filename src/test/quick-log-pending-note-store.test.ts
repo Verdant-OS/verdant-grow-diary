@@ -68,6 +68,14 @@ describe("readPendingQuickLogNote", () => {
     expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "blocked" });
   });
 
+  it("returns blocked when sessionStorage.getItem throws", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("Storage unavailable");
+    });
+    expect(readPendingQuickLogNote(ownerA)).toEqual({ status: "blocked" });
+    vi.restoreAllMocks();
+  });
+
   it("returns blocked when the stored ownerId does not match the reader", () => {
     window.sessionStorage.setItem(
       pendingKey(ownerB),

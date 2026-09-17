@@ -259,6 +259,11 @@ describe("evaluatePolicy", () => {
     ["@hono/node-server", "2.0.9"],
     ["@modelcontextprotocol/sdk", "1.29.0"],
     ["hono", "4.12.33"],
+    ["hono", "4.13.4"],
+    ["js-yaml", "4.3.1"],
+    ["qs", "6.15.3"],
+    ["vitest", "4.1.10"],
+    ["@vitest/mocker", "4.1.10"],
     ["postcss", "8.5.6"],
     ["postcss", "8.5.18-rc.0"],
     ["brace-expansion", "1.1.17"],
@@ -266,24 +271,88 @@ describe("evaluatePolicy", () => {
   ])("fails when the npm graph regresses the %s security floor", (packageName, version) => {
     const files = policyFiles();
     const stale = JSON.parse(files[at("package-lock.json")]);
-    stale.packages[`node_modules/${packageName}`].version = version;
+    stale.packages[`node_modules/${packageName}`] = { version };
     files[at("package-lock.json")] = JSON.stringify(stale);
     expect(evaluate(files).errors.join(" ")).toContain(
       `package-lock.json security floor for ${packageName}`,
     );
   });
 
+  it("accepts removal of the retired Rollup transitive dependency", () => {
+    const files = policyFiles();
+    const current = JSON.parse(files[at("package-lock.json")]);
+    delete current.packages["node_modules/rollup"];
+    files[at("package-lock.json")] = JSON.stringify(current);
+    expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it.each(["node_modules/rollup", "node_modules/legacy-vite/node_modules/rollup"])(
+    "rejects vulnerable Rollup when it is present at %s",
+    (lockPath) => {
+      const files = policyFiles();
+      const stale = JSON.parse(files[at("package-lock.json")]);
+      stale.packages[lockPath] = { version: "4.58.0" };
+      files[at("package-lock.json")] = JSON.stringify(stale);
+      expect(evaluate(files).errors.join(" ")).toContain(
+        "package-lock.json security floor for rollup",
+      );
+    },
+  );
+
+  it("accepts patched Rollup if a dependency brings it back", () => {
+    const files = policyFiles();
+    const current = JSON.parse(files[at("package-lock.json")]);
+    current.packages["node_modules/legacy-vite/node_modules/rollup"] = { version: "4.59.0" };
+    files[at("package-lock.json")] = JSON.stringify(current);
+    expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it.each(["rollup", "legacy-vite/rollup", "compat-rollup"])(
+    "rejects below-floor Rollup in Bun at %s",
+    (lockPath) => {
+      const files = policyFiles();
+      const stale = JSON.parse(files[at("bun.lock")]);
+      stale.packages[lockPath] = ["rollup@4.58.0", "", {}];
+      files[at("bun.lock")] = JSON.stringify(stale);
+      expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for rollup");
+    },
+  );
+
+  it.each(["rollup", "legacy-vite/rollup", "compat-rollup"])(
+    "accepts patched optional Rollup in Bun at %s",
+    (lockPath) => {
+      const files = policyFiles();
+      const current = JSON.parse(files[at("bun.lock")]);
+      current.packages[lockPath] = ["rollup@4.59.0", "", {}];
+      files[at("bun.lock")] = JSON.stringify(current);
+      expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+    },
+  );
+
+  it("rejects a stale nested Bun package even when its root copy meets the floor", () => {
+    const files = policyFiles();
+    const stale = JSON.parse(files[at("bun.lock")]);
+    stale.packages["legacy/hono"] = ["hono@4.13.4", "", {}];
+    files[at("bun.lock")] = JSON.stringify(stale);
+    expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for hono");
+  });
+
   it.each([
     ["@hono/node-server", "2.0.9"],
     ["@modelcontextprotocol/sdk", "1.29.0"],
     ["hono", "4.12.33"],
+    ["hono", "4.13.4"],
+    ["js-yaml", "4.3.1"],
+    ["qs", "6.15.3"],
+    ["vitest", "4.1.10"],
+    ["@vitest/mocker", "4.1.10"],
     ["esbuild", "0.28.0"],
   ])(
     "fails when the canonical Bun graph regresses the %s security floor",
     (packageName, version) => {
       const files = policyFiles();
       const stale = JSON.parse(files[at("bun.lock")]);
-      stale.packages[packageName][0] = `${packageName}@${version}`;
+      stale.packages[packageName] = [`${packageName}@${version}`, "", {}];
       files[at("bun.lock")] = JSON.stringify(stale);
       expect(evaluate(files).errors.join(" ")).toContain(
         `bun.lock security floor for ${packageName}`,

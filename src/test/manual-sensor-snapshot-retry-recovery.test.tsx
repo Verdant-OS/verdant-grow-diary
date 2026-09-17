@@ -464,4 +464,40 @@ describe("manual duplicate receipt verification", () => {
     expect(await confirmManualSnapshotConflict(canonicalSubmitted, { code: "23505" })).toBe(true);
     expect(backend.reads).toBe(1);
   });
+
+  it("rejects duplicate recovery when captured_at and ts disagree on the frozen submission", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict([{ ...submitted[0], ts: "2026-09-16T08:00:01.000Z" }], {
+        code: "23505",
+      }),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate recovery when batch metrics carry mismatched provenance envelopes", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    const mixedBatch: SensorReadingInsert[] = [
+      { ...submitted[0], raw_payload: MANUAL_PAYLOAD },
+      {
+        ...submitted[0],
+        metric: "humidity_pct",
+        value: 55,
+        raw_payload: null,
+      },
+    ];
+    expect(await confirmManualSnapshotConflict(mixedBatch, { code: "23505" })).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate recovery when the frozen batch repeats a metric", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict([submitted[0], submitted[0]], { code: "23505" }),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
 });

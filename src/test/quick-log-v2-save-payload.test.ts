@@ -123,6 +123,20 @@ describe("quickLogV2SavePayload", () => {
     });
   });
 
+  it("adds canonical manual provenance for a humidity-only measurement without pre-existing details", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "", humidityPct: "58" }));
+    if (!r.ok) throw new Error("expected valid humidity-only payload");
+    expect(r.payload.p_humidity_pct).toBe(58);
+    expect(r.payload.p_details).toEqual({
+      manual_provenance: {
+        source: "manual",
+        source_identity: "manual_entry",
+        transport: "manual",
+        confidence: null,
+      },
+    });
+  });
+
   it("blocks save when target unresolved", () => {
     const r = buildQuickLogV2SavePayload(
       base({ resolved: { ok: false, reason: "no_selection" } as any }),

@@ -81,6 +81,19 @@ describe("private grow-data error honesty", () => {
     expect(emptyIndex).toBeGreaterThan(errorIndex);
   });
 
+  it("withholds Dashboard KPI and empty-state UI until scoped grow reads leave pending", () => {
+    const source = readSource("src/pages/Dashboard.tsx");
+    const pendingGuard = source.indexOf("tentsQuery.isPending");
+    const kpiIndex = source.indexOf("<KpiCard");
+
+    expect(source).toContain("plantsQuery.isPending");
+    expect(source).toContain('fetchStatus === "paused"');
+    expect(source).toContain("Waiting for connection");
+    expect(pendingGuard).toBeGreaterThan(-1);
+    expect(kpiIndex).toBeGreaterThan(-1);
+    expect(pendingGuard).toBeLessThan(kpiIndex);
+  });
+
   it("keeps the Sensors grow read scoped to the synchronously validated tent", () => {
     const source = readSource("src/pages/Sensors.tsx");
     expect(source).toMatch(/useGrowSensorReadings\(activeTentId\)/);

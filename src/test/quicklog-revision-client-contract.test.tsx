@@ -137,6 +137,42 @@ describe("Quick Log revision client contract", () => {
     });
   });
 
+  it.each([
+    ["PGRST202 schema-cache miss", { code: "PGRST202", message: "Could not find the function" }],
+    ["42883 undefined function", { code: "42883", message: "function does not exist" }],
+    ["42501 permission denied", { code: "42501", message: "permission denied for function" }],
+  ] as const)(
+    "maps transport failure %s to the classified revision reason",
+    async (_label, error) => {
+      supabaseMock.rpc.mockResolvedValue({ data: null, error });
+
+      await expect(
+        retractQuickLogEntry({ diaryEntryId: "diary-1" }, "accidental"),
+      ).resolves.toEqual({
+        ok: false,
+        reason: error.code === "42501" ? "forbidden" : "rpc_unavailable",
+      });
+    },
+  );
+
+  it("fails closed when success payload carries an empty revision_id", async () => {
+    supabaseMock.rpc.mockResolvedValue({
+      data: {
+        ok: true,
+        revision_id: "",
+        revision_no: 1,
+        grow_event_id: null,
+        diary_entry_ids: ["diary-1"],
+      },
+      error: null,
+    });
+
+    await expect(retractQuickLogEntry({ diaryEntryId: "diary-1" }, "accidental")).resolves.toEqual({
+      ok: false,
+      reason: "rpc_error",
+    });
+  });
+
   it("calls the exact generated correction and retraction RPC names", async () => {
     supabaseMock.rpc.mockResolvedValue({
       data: {

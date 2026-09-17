@@ -325,7 +325,15 @@ export default function Dashboard() {
     );
   }
 
-  if (tentsQuery.isLoading || plantsQuery.isLoading) {
+  if (
+    tentsQuery.isPending ||
+    plantsQuery.isPending ||
+    tentsQuery.isLoading ||
+    plantsQuery.isLoading
+  ) {
+    const waitingForConnection =
+      (tentsQuery.isPending && tentsQuery.fetchStatus === "paused") ||
+      (plantsQuery.isPending && plantsQuery.fetchStatus === "paused");
     return (
       <div className="space-y-4 md:space-y-6" data-testid="dashboard-root">
         <GrowBreadcrumbs
@@ -339,7 +347,24 @@ export default function Dashboard() {
           description="Track your tents, plants, sensors, and grow activity in one place."
           icon={<Sparkles className="h-5 w-5" />}
         />
-        <GrowDataLoadingState resource="Dashboard grow data" testId="dashboard-grow-data-loading" />
+        {waitingForConnection ? (
+          <div
+            className="glass rounded-2xl p-6 text-center text-sm text-muted-foreground"
+            role="status"
+            aria-live="polite"
+            data-testid="dashboard-grow-data-loading"
+          >
+            <p className="font-semibold">Waiting for connection</p>
+            <p className="mt-1">
+              Your tents and plants haven't loaded yet. They'll appear when the connection returns.
+            </p>
+          </div>
+        ) : (
+          <GrowDataLoadingState
+            resource="Dashboard grow data"
+            testId="dashboard-grow-data-loading"
+          />
+        )}
       </div>
     );
   }

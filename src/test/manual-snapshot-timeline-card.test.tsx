@@ -46,6 +46,28 @@ describe("ManualSnapshotTimelineCard", () => {
     expect(text).not.toMatch(/\bimported\b/);
   });
 
+  it("renders canonical manual truth for legacy diary evidence without saved metadata", () => {
+    render(<ManualSnapshotTimelineCard card={mkCard()} />);
+    const chips = screen.getByTestId("manual-snapshot-timeline-card-truth-chips");
+    expect(
+      within(chips)
+        .getAllByRole("listitem")
+        .map((chip) => chip.textContent),
+    ).toEqual([
+      "Source: manual",
+      "Identity: manual_entry",
+      "Transport: manual",
+      "Confidence: unknown",
+    ]);
+    expect(screen.getByTestId("manual-snapshot-timeline-card-quality")).toHaveTextContent(
+      "Historical reading — quality reflects captured values; not current-room guidance.",
+    );
+    expect(screen.getByTestId("manual-snapshot-timeline-card-captured-at")).toHaveAttribute(
+      "title",
+      "2026-01-01T10:00:00.000Z",
+    );
+  });
+
   it("shows captured_at and readings", () => {
     render(<ManualSnapshotTimelineCard card={mkCard()} />);
     const capturedAt = screen.getByTestId("manual-snapshot-timeline-card-captured-at");

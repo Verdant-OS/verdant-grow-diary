@@ -773,19 +773,34 @@ describe("account deletion completion belongs to its initiating account and moun
     expect(sdk.ownerId).toBe("fixture-owner-a");
   });
 
-  it("surfaces billing cancellation failure without signing out or navigating away", async () => {
-    sdk.invoke.mockResolvedValueOnce({
-      data: { ok: false, error: "billing_cancellation_failed" },
-      error: { context: { status: 409 } },
-    });
-    renderSettings();
-    await startDeletion();
-    expect(await screen.findByRole("alert")).toHaveTextContent(DELETE_ACCOUNT_BILLING_FAILURE);
-    expect(sdk.signOut).not.toHaveBeenCalled();
-    expect(sdk.replace).not.toHaveBeenCalled();
-    expect(sdk.welcomeLoads).not.toHaveBeenCalled();
-    expect(sdk.ownerId).toBe("fixture-owner-a");
-  });
+  it.each([
+    {
+      label: "409 conflict",
+      response: {
+        data: { ok: false, error: "billing_cancellation_failed" },
+        error: { context: { status: 409 } },
+      },
+    },
+    {
+      label: "billing_cancellation_failed body without 409",
+      response: {
+        data: { ok: false, error: "billing_cancellation_failed" },
+        error: { context: { status: 500 } },
+      },
+    },
+  ])(
+    "surfaces billing cancellation failure ($label) without signing out or navigating away",
+    async ({ response }) => {
+      sdk.invoke.mockResolvedValueOnce(response);
+      renderSettings();
+      await startDeletion();
+      expect(await screen.findByRole("alert")).toHaveTextContent(DELETE_ACCOUNT_BILLING_FAILURE);
+      expect(sdk.signOut).not.toHaveBeenCalled();
+      expect(sdk.replace).not.toHaveBeenCalled();
+      expect(sdk.welcomeLoads).not.toHaveBeenCalled();
+      expect(sdk.ownerId).toBe("fixture-owner-a");
+    },
+  );
 
   it("dispatches one deletion for duplicate clicks while the original request is pending", async () => {
     const deletion = deferredDeletion();

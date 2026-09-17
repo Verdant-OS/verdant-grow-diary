@@ -171,9 +171,11 @@ function SignInForm() {
   );
 }
 
-function renderRoutes(initialEntry: string) {
+function renderRoutes(initialEntry: string, holdAuthLoad = false) {
   const welcomeGate = deferred<void>(undefined);
   const welcomeLoader = vi.fn(async () => welcomeGate.promise);
+  const authGate = deferred<void>(undefined);
+  const authLoader = vi.fn(async () => authGate.promise);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   function FixtureRoot() {
     const [providerGeneration, setProviderGeneration] = useState(0);
@@ -211,6 +213,7 @@ function renderRoutes(initialEntry: string) {
     getParentRoute: () => root,
     path: "/auth",
     validateSearch: (search: Record<string, unknown>) => search,
+    loader: holdAuthLoad ? authLoader : undefined,
     component: SignInForm,
   });
   const router = createRouter({
@@ -221,7 +224,7 @@ function renderRoutes(initialEntry: string) {
     defaultPendingMs: 60_000,
   });
   render(<RouterProvider router={router} />);
-  return { router, welcomeGate, welcomeLoader, client };
+  return { router, welcomeGate, welcomeLoader, client, authGate, authLoader };
 }
 
 async function confirmSignOut() {
@@ -339,6 +342,29 @@ describe("explicit sign-out owns navigation through the committed public destina
     act(() => signedOutEvent());
     await screen.findByRole("form", { name: "Sign-in form" });
     expect(screen.queryByTestId("private-page")).not.toBeInTheDocument();
+    expect(router.state.resolvedLocation?.pathname).toBe("/auth");
+    expect(router.state.resolvedLocation?.search.redirectTo).toBe(destination);
+    expect(sdk.signOut).not.toHaveBeenCalled();
+    expect(welcomeLoader).not.toHaveBeenCalled();
+  });
+
+  it("preserves the protected return intent when an initial missing session reaches a held auth route", async () => {
+    sdk.hasSession = false;
+    const destination = "/sensors?tentId=tent-a#manual-reading";
+    const { router, authGate, authLoader, welcomeLoader } = renderRoutes(destination, true);
+
+    await waitFor(() => expect(authLoader).toHaveBeenCalled());
+    await flushOldContinuations();
+    // No initial resolved location exists yet. The still-mounted protected
+    // shell must not turn its first /auth?redirectTo=... request into /auth.
+    expect(router.state.status).toBe("pending");
+    expect(router.state.resolvedLocation).toBeUndefined();
+    expect(router.state.location.search.redirectTo).toBe(destination);
+    expect(screen.queryByTestId("private-page")).not.toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Sign-in form" })).not.toBeInTheDocument();
+
+    await act(async () => authGate.resolve());
+    await screen.findByRole("form", { name: "Sign-in form" });
     expect(router.state.resolvedLocation?.pathname).toBe("/auth");
     expect(router.state.resolvedLocation?.search.redirectTo).toBe(destination);
     expect(sdk.signOut).not.toHaveBeenCalled();

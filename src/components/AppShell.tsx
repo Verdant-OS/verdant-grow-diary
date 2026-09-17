@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
 import { useHydrated } from "@/hooks/useHydrated";
 import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
-import { buildSignedOutRedirect } from "@/lib/authRedirectRules";
+import { buildSignedOutRedirect, SIGNED_OUT_LANDING } from "@/lib/authRedirectRules";
 import { useAlertsList } from "@/hooks/useAlertsList";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
@@ -42,7 +42,14 @@ import {
 export default function AppShell({ children }: { children?: ReactNode }) {
   const { user, loading, isSignOutNavigationPending } = useAuth();
   const hydrated = useHydrated();
-  const location = useLocation();
+  const observedLocation = useLocation();
+  const protectedLocationRef = useRef(observedLocation);
+  // Before the initial route resolves, an auth redirect can expose its target
+  // location to this still-mounted shell. Keep the protected source location
+  // so neither session guard replaces /auth?redirectTo=... with bare /auth.
+  if (observedLocation.pathname !== SIGNED_OUT_LANDING)
+    protectedLocationRef.current = observedLocation;
+  const location = protectedLocationRef.current;
   const previousNavigationKeyRef = useRef(location.key);
   // Protected-route boundary: re-validate session against the auth server.
   // Keep both session checks on the same signed-out destination. Sending the

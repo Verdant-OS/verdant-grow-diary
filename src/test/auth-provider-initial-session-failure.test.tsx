@@ -96,6 +96,9 @@ describe("AuthProvider initial session read failure", () => {
   it.each([
     ["whitespace user id", { access_token: "fixture-existing-bearer", user: { id: "   " } }],
     ["whitespace bearer", { access_token: "   ", user: { id: "existing-user" } }],
+    ["missing user id", { access_token: "fixture-existing-bearer", user: {} }],
+    ["non-string user id", { access_token: "fixture-existing-bearer", user: { id: 42 } }],
+    ["non-string bearer", { access_token: 42, user: { id: "existing-user" } }],
   ])(
     "resolves to signed-out when bootstrap confirms a held session with %s",
     async (_label, session) => {
@@ -111,4 +114,36 @@ describe("AuthProvider initial session read failure", () => {
       expect(screen.queryByText("loading")).not.toBeInTheDocument();
     },
   );
+
+  it.each([
+    ["missing session field", { data: {}, error: null }],
+    ["explicit undefined session", { data: { session: undefined }, error: null }],
+  ])("resolves to signed-out when bootstrap getSession returns %s", async (_label, response) => {
+    mocks.getSession.mockResolvedValue(response);
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+    expect(screen.queryByText("loading")).not.toBeInTheDocument();
+  });
+
+  it("resolves to signed-out when bootstrap getSession returns an error without throwing", async () => {
+    mocks.getSession.mockResolvedValue({
+      data: { session: { access_token: "fixture-existing-bearer", user: { id: "existing-user" } } },
+      error: { message: "fixture store unavailable" },
+    });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+    expect(screen.queryByText("loading")).not.toBeInTheDocument();
+  });
 });

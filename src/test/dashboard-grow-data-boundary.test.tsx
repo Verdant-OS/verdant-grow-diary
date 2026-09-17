@@ -271,6 +271,17 @@ describe("Dashboard private-read honesty boundary", () => {
     );
   });
 
+  it("exposes an idle first-read load as a live status region", () => {
+    H.growStatus = "success";
+    H.plantQueryOverride = pendingFirstRead("idle");
+    renderDashboard();
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toHaveTextContent("Loading dashboard grow data");
+    expect(status).not.toHaveTextContent("Waiting for connection");
+  });
+
   it("does not offer retry while waiting for connection on a paused first read", () => {
     H.growStatus = "success";
     H.plantQueryOverride = pendingFirstRead("paused");
@@ -307,6 +318,38 @@ describe("Dashboard private-read honesty boundary", () => {
 
       expect(screen.getByTestId("dashboard-grow-data-loading")).toHaveTextContent(
         /Waiting for connection/,
+      );
+      expect(screen.queryAllByTestId("dashboard-kpi-card")).toHaveLength(0);
+      expect(screen.queryByTestId("dashboard-zero-tent-empty-state")).toBeNull();
+    },
+  );
+
+  it.each([
+    ["tent", "plant"],
+    ["plant", "tent"],
+  ] as const)(
+    "withholds counts when %s reads settle but %s remains on an idle first read",
+    (settled, pending) => {
+      H.growStatus = "success";
+      const settledPlantRead = {
+        data: [],
+        status: "success",
+        isPending: false,
+        isLoading: false,
+        isError: false,
+        fetchStatus: "idle",
+      };
+      if (settled === "tent") {
+        H.tentQueryOverride = {};
+        H.plantQueryOverride = pendingFirstRead("idle");
+      } else {
+        H.tentQueryOverride = pendingFirstRead("idle");
+        H.plantQueryOverride = settledPlantRead;
+      }
+      renderDashboard();
+
+      expect(screen.getByTestId("dashboard-grow-data-loading")).toHaveTextContent(
+        /Loading dashboard grow data/,
       );
       expect(screen.queryAllByTestId("dashboard-kpi-card")).toHaveLength(0);
       expect(screen.queryByTestId("dashboard-zero-tent-empty-state")).toBeNull();

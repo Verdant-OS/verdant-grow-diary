@@ -4,6 +4,7 @@ import {
   CSV_IMPORT_READING_COPY,
   formatCsvPreviewRow,
   buildCsvImportFailureMessage,
+  mergeCsvImportFailureReceipts,
 } from "@/lib/environmentCsvPreviewCopyRules";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 
@@ -68,5 +69,86 @@ describe("unconfirmed CSV import copy", () => {
     expect(copy).toMatch(/2 .*confirmed/i);
     expect(copy).toMatch(/couldn.t confirm|unconfirmed/i);
     expect(copy).not.toMatch(/stopped after|No CSV readings were saved/i);
+  });
+
+  it("states a large confirmed lower bound without claiming the import finished", () => {
+    const copy = buildCsvImportFailureMessage(1000, true, true);
+    expect(copy).toContain("1000 CSV readings confirmed saved.");
+    expect(copy).toContain("couldn't confirm whether the remaining CSV readings were saved.");
+    expect(copy).not.toMatch(/No CSV readings were saved/);
+    expect(copy).toContain("No live sensor data was created");
+  });
+});
+
+describe("mergeCsvImportFailureReceipts", () => {
+  it("accumulates confirmed counts across retries without dropping uncertainty", () => {
+    const first = mergeCsvImportFailureReceipts(null, {
+      insertedCount: 1000,
+      partialWrite: true,
+      unconfirmedWrite: true,
+    });
+    expect(first).toEqual({
+      insertedCount: 1000,
+      partialWrite: true,
+      unconfirmedWrite: true,
+    });
+
+    const second = mergeCsvImportFailureReceipts(first, {
+      insertedCount: 0,
+      partialWrite: false,
+    });
+    expect(second).toEqual({
+      insertedCount: 1000,
+      partialWrite: true,
+      unconfirmedWrite: true,
+    });
+    expect(
+      buildCsvImportFailureMessage(
+        second.insertedCount,
+        second.partialWrite === true,
+        second.unconfirmedWrite === true,
+        "unverified_duplicate",
+      ),
+    ).toContain("1000 CSV readings confirmed saved.");
+  });
+
+  it("never clears a prior unconfirmed write on a later zero-save retry", () => {
+    const merged = mergeCsvImportFailureReceipts(
+      { insertedCount: 500, partialWrite: true, unconfirmedWrite: true },
+      { insertedCount: 0, partialWrite: false, unconfirmedWrite: false },
+    );
+    expect(merged.unconfirmedWrite).toBe(true);
+    expect(merged.insertedCount).toBe(500);
+  });
+
+  it("treats any confirmed rows as a partial write for retry copy", () => {
+    expect(
+      mergeCsvImportFailureReceipts(null, { insertedCount: 1, partialWrite: false }).partialWrite,
+    ).toBe(true);
+  });
+});
+
+describe("hidden-history duplicate conflict copy", () => {
+  it("explains an unresolved duplicate without exposing database diagnostics", () => {
+    const copy = buildCsvImportFailureMessage(0, false, false, "unverified_duplicate");
+    expect(copy).toContain("Matching CSV history was detected");
+    expect(copy).toContain("couldn't verify all matching readings in your current history view");
+    expect(copy).toContain("No new CSV readings were saved in this attempt");
+    expect(copy).not.toMatch(/23505|sensor_readings_dedupe_uidx|upgrade|90.day/i);
+  });
+
+  it("keeps confirmed batches visible when a later batch hits an unresolved duplicate", () => {
+    const copy = buildCsvImportFailureMessage(3, true, false, "unverified_duplicate");
+    expect(copy).toContain("3 CSV readings confirmed saved.");
+    expect(copy).toContain("Matching CSV history was detected");
+    expect(copy).not.toContain("No new CSV readings were saved in this attempt");
+  });
+
+  it("combines confirmed batches with an uncertain tail beyond the read cap", () => {
+    const copy = buildCsvImportFailureMessage(1000, true, true, "unverified_duplicate");
+    expect(copy).toContain("1000 CSV readings confirmed saved.");
+    expect(copy).toContain("couldn't confirm whether the remaining CSV readings were saved.");
+    expect(copy).toContain("Matching CSV history was detected");
+    expect(copy).not.toMatch(/No CSV readings were saved/);
   });
 });

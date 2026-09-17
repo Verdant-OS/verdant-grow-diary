@@ -43,6 +43,7 @@ import {
   normalizePlantEditTentSelectValue,
   resolvePlantEditTentOptions,
 } from "@/lib/plantEditSaveRules";
+import { buildPlantHealthUpdate, editablePlantHealth } from "@/lib/plantHealthRules";
 
 /**
  * Edits an existing plant's user-facing fields. Profile photo is now
@@ -77,7 +78,7 @@ interface Plant {
   name: string;
   strain?: string | null;
   stage: string;
-  health: string;
+  health?: string | null;
   startedAt?: string | null;
   tentId?: string | null;
   growId?: string | null;
@@ -122,7 +123,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     name: plant.name ?? "",
     strain: plant.strain ?? "",
     stage: plant.stage ?? "seedling",
-    health: plant.health ?? "healthy",
+    health: editablePlantHealth(plant.health),
     tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
     started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
     last_note: plant.lastNote ?? "",
@@ -143,7 +144,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         name: plant.name ?? "",
         strain: plant.strain ?? "",
         stage: plant.stage ?? "seedling",
-        health: plant.health ?? "healthy",
+        health: editablePlantHealth(plant.health),
         tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
         started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
         last_note: plant.lastNote ?? "",
@@ -224,7 +225,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       name: form.name.trim(),
       strain: form.strain.trim(),
       stage: form.stage,
-      health: form.health,
+      ...buildPlantHealthUpdate(form.health),
       tent_id: resolvedTentId,
       last_note: form.last_note.trim() || null,
       plant_type: form.plant_type,
@@ -519,9 +520,12 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             </div>
             <div>
               <Label>Health</Label>
-              <Select value={form.health} onValueChange={(v) => setForm({ ...form, health: v })}>
+              <Select
+                value={form.health}
+                onValueChange={(v) => setForm({ ...form, health: editablePlantHealth(v) })}
+              >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Unknown" />
                 </SelectTrigger>
                 <SelectContent>
                   {HEALTH.map((h) => (

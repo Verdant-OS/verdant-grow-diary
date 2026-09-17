@@ -13,7 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
+import { usePlantRelativeTimelineHistory } from "@/hooks/usePlantRelativeTimelineHistory";
+import { buildPlantHistoryReadView } from "@/lib/plantRelativeTimelineHistoryRules";
 import {
   buildRelativeTimelineFilterChips,
   buildRelativeTimelineProjection,
@@ -255,7 +256,8 @@ export default function PlantRelativeTimelineSection({
   growId,
   tentId,
 }: Props) {
-  const { data, isLoading } = usePlantRecentActivity(plantId);
+  const history = usePlantRelativeTimelineHistory(plantId);
+  const initialHistoryView = buildPlantHistoryReadView(history, plantId);
   const [filter, setFilter] = useState<RelativeTimelineFilterKey>("all");
   const entryContext: RelativeTimelineEntryContext = {
     plantName: plantName ?? null,
@@ -272,20 +274,27 @@ export default function PlantRelativeTimelineSection({
   });
 
   const items = buildRelativeTimelineProjection({
-    rawEntries: data ?? [],
+    rawEntries: history.data ?? [],
+    limit: initialHistoryView.projectionLimit,
     plantId: plantId ?? null,
     plantStartedAt: plantStartedAt ?? null,
     currentStage: currentStage ?? null,
     stageStartedAt: stageStartedAt ?? null,
   });
   const visibleItems = filterRelativeTimelineItems(items, filter);
+  const historyView = buildPlantHistoryReadView(
+    history,
+    plantId,
+    items.length,
+    visibleItems.length,
+  );
   const groups = groupRelativeTimelineByStage(visibleItems);
   const filterDef =
     RELATIVE_TIMELINE_FILTERS.find((f) => f.key === filter) ?? RELATIVE_TIMELINE_FILTERS[0];
   const categorySections = buildDiaryTimelineSections(visibleItems);
   const evidenceSummary = buildDiaryTimelineEvidenceQualitySummary(categorySections);
   const readabilitySummary = buildPlantTimelineReadabilitySummary({
-    totalEntries: items.length,
+    totalEntries: historyView.totalCount,
     visibleEntries: visibleItems.length,
     filterKey: filter,
     filterLabel: filterDef?.label ?? null,
@@ -294,7 +303,8 @@ export default function PlantRelativeTimelineSection({
     sectionsWithEvidence: evidenceSummary.presentCount,
   });
   const printSummary = buildPlantTimelinePrintSummary({
-    totalEntries: items.length,
+    totalEntries: historyView.totalCount,
+    historyCountLabel: historyView.printCountLabel,
     visibleEntries: visibleItems.length,
     filterKey: filter,
     filterLabel: filterDef?.label ?? null,
@@ -317,13 +327,42 @@ export default function PlantRelativeTimelineSection({
         </p>
       </CardHeader>
       <CardContent>
-        {!isLoading &&
+        {historyView.notice && (
+          <div
+            role={historyView.canRetry ? "alert" : "status"}
+            className="mb-3 text-sm"
+            data-testid="relative-timeline-read-status"
+          >
+            <p>{historyView.notice}</p>
+            {historyView.showScopeActions && (
+              <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                {emptyState.ctas.map((cta) => (
+                  <TimelineEmptyStateCta key={cta.key} cta={cta} />
+                ))}
+              </div>
+            )}
+            {historyView.canRetry && (
+              <Button
+                variant="outline"
+                className="mt-2"
+                disabled={history.isFetching}
+                onClick={() => {
+                  if (historyView.retryOlder) void history.fetchNextPage();
+                  else void history.refetch();
+                }}
+              >
+                Retry timeline history
+              </Button>
+            )}
+          </div>
+        )}
+        {historyView.showHeader &&
           (() => {
             const header = formatRelativeTimelineHeader(items);
             return (
               <div
                 data-testid="relative-timeline-header"
-                data-total={header.total}
+                data-total={historyView.totalCount ?? undefined}
                 data-last-updated-fallback={header.lastUpdatedIsFallback ? "true" : "false"}
                 className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs"
               >
@@ -331,7 +370,7 @@ export default function PlantRelativeTimelineSection({
                   data-testid="relative-timeline-header-count"
                   className="font-medium text-foreground"
                 >
-                  {header.countLabel}
+                  {historyView.countLabel}
                 </span>
                 <span className="text-muted-foreground/60" aria-hidden>
                   ·
@@ -348,12 +387,12 @@ export default function PlantRelativeTimelineSection({
               </div>
             );
           })()}
-        {isLoading ? (
+        {historyView.showLoading ? (
           <div
             className="h-16 rounded-md bg-muted/40 animate-pulse"
             data-testid="relative-timeline-loading"
           />
-        ) : items.length === 0 ? (
+        ) : historyView.showEmpty ? (
           <div
             className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 space-y-3"
             data-testid="relative-timeline-empty"
@@ -370,8 +409,14 @@ export default function PlantRelativeTimelineSection({
               ))}
             </div>
           </div>
-        ) : (
+        ) : items.length > 0 ? (
           <div className="space-y-3">
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="relative-timeline-loaded-scope"
+            >
+              {historyView.scopeLabel}
+            </p>
             {(() => {
               const formatted = formatRelativeTimelineSummary(
                 summarizeRelativeTimelineItems(items),
@@ -457,7 +502,7 @@ export default function PlantRelativeTimelineSection({
               data-testid="relative-timeline-readability-summary"
               data-is-filtered={readabilitySummary.isFiltered ? "true" : "false"}
               data-visible={readabilitySummary.visibleEntries}
-              data-total={readabilitySummary.totalEntries}
+              data-total={historyView.totalCount ?? undefined}
               data-groups={readabilitySummary.groupCount}
               data-evidence-sections={readabilitySummary.sectionsWithEvidence}
               data-total-sections={readabilitySummary.totalSections}
@@ -615,6 +660,23 @@ export default function PlantRelativeTimelineSection({
               </ol>
             </aside>
           </div>
+        ) : null}
+        {historyView.invalidRowsNotice && (
+          <p className="mt-2 text-sm" role="status">
+            {historyView.invalidRowsNotice}
+          </p>
+        )}
+        {historyView.showLoadMore && (
+          <Button
+            variant="outline"
+            className="mt-3"
+            disabled={historyView.loadMoreDisabled}
+            onClick={() => {
+              void history.fetchNextPage();
+            }}
+          >
+            {historyView.loadMoreLabel}
+          </Button>
         )}
       </CardContent>
     </Card>

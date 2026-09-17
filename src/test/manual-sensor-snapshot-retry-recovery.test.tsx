@@ -52,7 +52,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       return {
         select: () => query,
         insert: async (input: Row[]) => {
-          const rows = input.map((row) => ({ ...row }));
+          const rows = JSON.parse(JSON.stringify(input)) as Row[];
           backend.posts.push(rows);
           if (backend.posts.length === 1 && backend.firstWriteGate) await backend.firstWriteGate;
           if (backend.rejectFirstWrite && backend.posts.length === 1) {
@@ -72,7 +72,7 @@ vi.mock("@/integrations/supabase/client", () => ({
               id: `reading-${backend.rows.length + index}`,
               user_id: "owner-a",
               device_id: row.device_id ?? null,
-              raw_payload: null,
+              raw_payload: row.raw_payload ?? null,
             })),
           );
           return backend.loseFirstReply && backend.posts.length === 1
@@ -87,6 +87,14 @@ vi.mock("@/integrations/supabase/client", () => ({
 const TENT_A = "11111111-1111-4111-8111-111111111111";
 const TENT_B = "22222222-2222-4222-8222-222222222222";
 const CAPTURED = "2026-09-16T08:00:00.000Z";
+const MANUAL_PAYLOAD = {
+  manual_provenance: {
+    source: "manual",
+    source_identity: "manual_entry",
+    transport: "manual",
+    confidence: null,
+  },
+};
 
 function renderCard() {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
@@ -141,6 +149,11 @@ describe("manual snapshot retry confirmation", () => {
       renderCard();
       await submitSnapshot();
       expect(backend.rows).toHaveLength(2);
+      expect(backend.posts[0].map((row) => row.raw_payload)).toEqual([
+        MANUAL_PAYLOAD,
+        MANUAL_PAYLOAD,
+      ]);
+      expect(backend.rows.map((row) => row.raw_payload)).toEqual([MANUAL_PAYLOAD, MANUAL_PAYLOAD]);
       expect(screen.queryByTestId("manual-reading-saved-confirmation")).not.toBeInTheDocument();
       expect(created).not.toHaveBeenCalled();
       vi.setSystemTime("2026-09-16T08:05:00.000Z");
@@ -187,7 +200,14 @@ describe("manual snapshot retry confirmation", () => {
     expect(backend.rows).toHaveLength(2);
   });
 
-  for (const missing of ["failed", "partial", "mismatched"] as const) {
+  for (const missing of [
+    "failed",
+    "partial",
+    "mismatched",
+    "missing provenance",
+    "wrong provenance",
+    "extra provenance",
+  ] as const) {
     it(`does not claim success when duplicate readback is ${missing}`, async () => {
       renderCard();
       await submitSnapshot();
@@ -195,6 +215,22 @@ describe("manual snapshot retry confirmation", () => {
       if (missing === "partial") backend.readTransform = (rows) => rows.slice(0, 1);
       if (missing === "mismatched")
         backend.readTransform = (rows) => rows.map((row) => ({ ...row, value: 99 }));
+      if (missing === "missing provenance")
+        backend.readTransform = (rows) => rows.map((row) => ({ ...row, raw_payload: null }));
+      if (missing === "wrong provenance")
+        backend.readTransform = (rows) =>
+          rows.map((row) => ({
+            ...row,
+            raw_payload: {
+              manual_provenance: { ...MANUAL_PAYLOAD.manual_provenance, transport: "live" },
+            },
+          }));
+      if (missing === "extra provenance")
+        backend.readTransform = (rows) =>
+          rows.map((row) => ({
+            ...row,
+            raw_payload: { ...MANUAL_PAYLOAD, extra: true },
+          }));
       vi.setSystemTime("2026-09-16T08:05:00.000Z");
       fireEvent.click(screen.getByTestId("manual-sensor-review-confirm"));
       await waitFor(() => expect(backend.posts).toHaveLength(2));
@@ -296,12 +332,76 @@ describe("manual duplicate receipt verification", () => {
     },
   ];
 
-  it("accepts exact persisted evidence with equivalent timestamp notation", () => {
+  it("accepts legacy null-payload evidence with equivalent timestamp notation", () => {
     expect(
       matchesManualSnapshotReadback(submitted, [
         { ...stored[0], captured_at: "2026-09-16T08:00:00+00:00" },
       ]),
     ).toBe(true);
+  });
+
+  it("accepts exact canonical persisted metadata regardless of JSON property order", () => {
+    const withProvenance = [{ ...submitted[0], raw_payload: MANUAL_PAYLOAD }];
+    const persisted = [
+      {
+        ...stored[0],
+        raw_payload: {
+          manual_provenance: {
+            confidence: null,
+            transport: "manual",
+            source_identity: "manual_entry",
+            source: "manual",
+          },
+        },
+      },
+    ];
+    expect(matchesManualSnapshotReadback(withProvenance, persisted)).toBe(true);
+  });
+
+  for (const [description, payload] of [
+    ["missing envelope", null],
+    [
+      "wrong identity",
+      { manual_provenance: { ...MANUAL_PAYLOAD.manual_provenance, source_identity: "probe" } },
+    ],
+    [
+      "wrong transport",
+      { manual_provenance: { ...MANUAL_PAYLOAD.manual_provenance, transport: "live" } },
+    ],
+    [
+      "invented confidence",
+      { manual_provenance: { ...MANUAL_PAYLOAD.manual_provenance, confidence: 1 } },
+    ],
+    [
+      "missing confidence",
+      {
+        manual_provenance: {
+          source: "manual",
+          source_identity: "manual_entry",
+          transport: "manual",
+        },
+      },
+    ],
+    [
+      "extra envelope field",
+      { manual_provenance: { ...MANUAL_PAYLOAD.manual_provenance, extra: true } },
+    ],
+    ["extra payload field", { ...MANUAL_PAYLOAD, extra: true }],
+  ] as const) {
+    it(`rejects canonical confirmation with ${description}`, () => {
+      expect(
+        matchesManualSnapshotReadback(
+          [{ ...submitted[0], raw_payload: MANUAL_PAYLOAD }],
+          [{ ...stored[0], raw_payload: payload }],
+        ),
+      ).toBe(false);
+    });
+  }
+
+  it("does not confirm a legacy submission against a newly annotated row", () => {
+    expect(
+      matchesManualSnapshotReadback(submitted, [{ ...stored[0], raw_payload: MANUAL_PAYLOAD }]),
+    ).toBe(false);
   });
 
   for (const [field, value] of [
@@ -329,6 +429,119 @@ describe("manual duplicate receipt verification", () => {
     ).toBe(false);
   });
 
+  it("rejects duplicate-conflict recovery before readback when captured_at and ts diverge", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict([{ ...submitted[0], ts: "2026-09-16T08:05:00Z" }], {
+        code: "23505",
+      }),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when the batch repeats a metric", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict([submitted[0], { ...submitted[0], value: 26 }], {
+        code: "23505",
+      }),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows carry mismatched provenance", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    const canonical = [{ ...submitted[0], raw_payload: MANUAL_PAYLOAD }];
+    const legacy = [
+      {
+        ...submitted[0],
+        metric: "humidity_pct",
+        value: 55,
+        raw_payload: null,
+      },
+    ];
+    expect(await confirmManualSnapshotConflict([...canonical, ...legacy], { code: "23505" })).toBe(
+      false,
+    );
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on tent_id", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict(
+        [submitted[0], { ...submitted[0], metric: "humidity_pct", value: 55, tent_id: TENT_B }],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on user_id", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict(
+        [submitted[0], { ...submitted[0], metric: "humidity_pct", value: 55, user_id: "owner-b" }],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when the batch is empty", async () => {
+    backend.reads = 0;
+    expect(await confirmManualSnapshotConflict([], { code: "23505" })).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on captured_at", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    const later = "2026-09-16T09:00:00.000Z";
+    expect(
+      await confirmManualSnapshotConflict(
+        [
+          submitted[0],
+          {
+            ...submitted[0],
+            metric: "humidity_pct",
+            value: 55,
+            captured_at: later,
+            ts: later,
+          },
+        ],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on ts", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    const later = "2026-09-16T09:00:00.000Z";
+    expect(
+      await confirmManualSnapshotConflict(
+        [
+          submitted[0],
+          {
+            ...submitted[0],
+            metric: "humidity_pct",
+            value: 55,
+            ts: later,
+          },
+        ],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
   it("never recovers an unrelated error or a non-manual write as this snapshot", async () => {
     backend.rows = stored;
     expect(await confirmManualSnapshotConflict(submitted, { code: "42501" })).toBe(false);
@@ -347,5 +560,21 @@ describe("manual duplicate receipt verification", () => {
       throw new Error("connection lost");
     };
     expect(await confirmManualSnapshotConflict(submitted, { code: "23505" })).toBe(false);
+  });
+
+  it("confirms a duplicate legacy snapshot when readback matches absent metadata", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(await confirmManualSnapshotConflict(submitted, { code: "23505" })).toBe(true);
+    expect(backend.reads).toBe(1);
+  });
+
+  it("confirms a duplicate canonical snapshot when readback matches persisted metadata", async () => {
+    const canonicalSubmitted = [{ ...submitted[0], raw_payload: MANUAL_PAYLOAD }];
+    const canonicalStored = [{ ...stored[0], raw_payload: MANUAL_PAYLOAD }];
+    backend.rows = canonicalStored;
+    backend.reads = 0;
+    expect(await confirmManualSnapshotConflict(canonicalSubmitted, { code: "23505" })).toBe(true);
+    expect(backend.reads).toBe(1);
   });
 });

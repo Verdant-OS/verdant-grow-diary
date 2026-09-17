@@ -54,6 +54,7 @@ vi.mock("@/integrations/supabase/client", () => {
             : [];
         return { data, error: null };
       },
+      maybeSingle: async () => ({ data: { pheno_hunt_id: null }, error: null }),
     };
     return builder;
   };

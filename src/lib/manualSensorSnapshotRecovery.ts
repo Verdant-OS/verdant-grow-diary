@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { SensorReadingInsert, SensorReadingRow } from "@/lib/db";
+import { matchesManualSensorPayload } from "@/lib/manualSensorProvenanceRules";
 
 type ManualSnapshotStoredRow = Omit<SensorReadingRow, "created_at">;
 
@@ -33,8 +34,7 @@ export function matchesManualSnapshotReadback(
       sameInstant(row.ts, expected.ts) &&
       row.quality === (expected.quality ?? "ok") &&
       row.device_id === (expected.device_id ?? null) &&
-      expected.raw_payload == null &&
-      row.raw_payload == null
+      matchesManualSensorPayload(expected.raw_payload, row.raw_payload)
     );
   });
 }
@@ -61,7 +61,7 @@ export async function confirmManualSnapshotConflict(
         row.source === "manual" &&
         row.tent_id === first.tent_id &&
         row.user_id === first.user_id &&
-        row.raw_payload == null &&
+        matchesManualSensorPayload(row.raw_payload, first.raw_payload) &&
         sameInstant(row.captured_at, first.captured_at) &&
         sameInstant(row.ts, first.ts),
     )

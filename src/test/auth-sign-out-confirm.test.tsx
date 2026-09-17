@@ -7,10 +7,21 @@ import SignOutConfirmDialog from "@/components/SignOutConfirmDialog";
 import { SIGN_OUT_FAILURE_MESSAGE } from "@/lib/authSessionExitRules";
 
 const signOutMock = vi.fn().mockResolvedValue(undefined);
-vi.mock("@/store/auth", () => ({
-  useAuth: () => ({ user: { id: "u" }, loading: false, signOut: signOutMock }),
+const finishMock = vi.fn();
+let isCurrent = true;
+const beginSignOutNavigationMock = vi.fn(() => ({
+  isCurrent: () => isCurrent,
+  finish: finishMock,
 }));
-const navMock = vi.fn();
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({
+    user: { id: "u" },
+    loading: false,
+    signOut: signOutMock,
+    beginSignOutNavigation: beginSignOutNavigationMock,
+  }),
+}));
+const navMock = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/react-router-compat", async () => {
   const actual = await vi.importActual<typeof import("@/lib/react-router-compat")>(
     "@/lib/react-router-compat",
@@ -30,11 +41,25 @@ function setup() {
   );
 }
 
+async function confirmSignOut() {
+  fireEvent.click(screen.getByText("Sign out"));
+  const buttons = screen.getAllByRole("button", { name: /sign out/i });
+  fireEvent.click(buttons[buttons.length - 1]);
+}
+
 describe("SignOutConfirmDialog", () => {
   beforeEach(() => {
     signOutMock.mockReset();
     signOutMock.mockResolvedValue(undefined);
+    beginSignOutNavigationMock.mockReset();
+    beginSignOutNavigationMock.mockImplementation(() => ({
+      isCurrent: () => isCurrent,
+      finish: finishMock,
+    }));
+    finishMock.mockReset();
+    isCurrent = true;
     navMock.mockClear();
+    navMock.mockResolvedValue(undefined);
     toastError.mockClear();
   });
 
@@ -51,27 +76,76 @@ describe("SignOutConfirmDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
     expect(signOutMock).not.toHaveBeenCalled();
     expect(navMock).not.toHaveBeenCalled();
+    expect(beginSignOutNavigationMock).not.toHaveBeenCalled();
   });
 
-  it("confirm calls signOut and redirects to /welcome", async () => {
+  it("confirm acquires navigation ownership, signs out, navigates, and releases the lease", async () => {
+    setup();
+    await confirmSignOut();
+    await waitFor(() => expect(beginSignOutNavigationMock).toHaveBeenCalledTimes(1));
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(navMock).toHaveBeenCalledWith("/welcome", { replace: true });
+    expect(finishMock).toHaveBeenCalledTimes(1);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("does not start a duplicate exit when navigation ownership is already held", async () => {
+    beginSignOutNavigationMock.mockReturnValueOnce(null as never);
+    setup();
+    await confirmSignOut();
+    await waitFor(() => expect(beginSignOutNavigationMock).toHaveBeenCalledTimes(1));
+    expect(signOutMock).not.toHaveBeenCalled();
+    expect(navMock).not.toHaveBeenCalled();
+    expect(finishMock).not.toHaveBeenCalled();
+  });
+
+  it("ignores stale navigation when the operation is superseded before redirect", async () => {
+    isCurrent = false;
+    setup();
+    await confirmSignOut();
+    await waitFor(() => expect(signOutMock).toHaveBeenCalledTimes(1));
+    expect(navMock).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(finishMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("double confirm does not invoke signOut twice", async () => {
+    let releaseSignOut!: () => void;
+    signOutMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseSignOut = resolve;
+        }),
+    );
     setup();
     fireEvent.click(screen.getByText("Sign out"));
-    const buttons = screen.getAllByRole("button", { name: /sign out/i });
-    fireEvent.click(buttons[buttons.length - 1]);
+    const confirm = screen.getAllByRole("button", { name: /sign out/i }).at(-1)!;
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    await waitFor(() => expect(signOutMock).toHaveBeenCalledTimes(1));
+    releaseSignOut();
+    await waitFor(() => expect(navMock).toHaveBeenCalledTimes(1));
+  });
+
+  it("on resolved { error }: still redirects, toasts non-sensitive copy, and releases the lease (#588)", async () => {
+    signOutMock.mockResolvedValueOnce({ error: { message: "Auth session missing" } });
+    setup();
+    await confirmSignOut();
     await waitFor(() => expect(signOutMock).toHaveBeenCalledTimes(1));
     expect(navMock).toHaveBeenCalledWith("/welcome", { replace: true });
-    expect(toastError).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(SIGN_OUT_FAILURE_MESSAGE);
+    expect(toastError.mock.calls[0][0]).not.toMatch(/session|token|Auth/i);
+    expect(finishMock).toHaveBeenCalledTimes(1);
   });
 
   it("on signOut throw: still redirects and toasts non-sensitive failure copy (#588)", async () => {
     signOutMock.mockRejectedValueOnce(new Error("network token session"));
     setup();
-    fireEvent.click(screen.getByText("Sign out"));
-    const buttons = screen.getAllByRole("button", { name: /sign out/i });
-    fireEvent.click(buttons[buttons.length - 1]);
+    await confirmSignOut();
     await waitFor(() => expect(signOutMock).toHaveBeenCalledTimes(1));
     expect(navMock).toHaveBeenCalledWith("/welcome", { replace: true });
     expect(toastError).toHaveBeenCalledWith(SIGN_OUT_FAILURE_MESSAGE);
     expect(toastError.mock.calls[0][0]).not.toMatch(/network|token|session/i);
+    expect(finishMock).toHaveBeenCalledTimes(1);
   });
 });

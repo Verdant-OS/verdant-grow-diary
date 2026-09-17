@@ -2,7 +2,9 @@ import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useAuth } from "@/store/auth";
+import { useSensorsPageSession } from "@/hooks/useSensorsPageSession";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -77,8 +79,18 @@ const METRICS = [
   { key: "ppfd", label: "PPFD" },
 ] as const;
 
+const subscribeWithoutSession = () => () => {};
+const readWithoutSession = () => null;
+
 export default function Sensors() {
   const location = useLocation();
+  const { user } = useAuth();
+  const session = useSensorsPageSession(user?.id);
+  const sessionState = useSyncExternalStore(
+    session?.subscribe ?? subscribeWithoutSession,
+    session?.getSnapshot ?? readWithoutSession,
+    readWithoutSession,
+  );
   const tentsQuery = useGrowTents();
   const { data: tents = [] } = tentsQuery;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -98,12 +110,19 @@ export default function Sensors() {
     () => buildSensorsTentRouteIntentKey(sensorsTentRouteIntent, location.key),
     [location.key, sensorsTentRouteIntent],
   );
-  const [tentId, setTentId] = useState<string | null>(null);
-  const [appliedTentRouteIntentKey, setAppliedTentRouteIntentKey] = useState<string | null>(null);
-  const [growerTentSelection, setGrowerTentSelection] = useState<{
+  const [localTentId, setTentId] = useState<string | null>(null);
+  const [localAppliedIntentKey, setAppliedTentRouteIntentKey] = useState<string | null>(null);
+  const [localGrowerSelection, setGrowerTentSelection] = useState<{
     intentKey: string;
     tentId: string;
   } | null>(null);
+  const tentId = session ? (sessionState?.selection.tentId ?? null) : localTentId;
+  const appliedTentRouteIntentKey = session
+    ? (sessionState?.selection.appliedIntentKey ?? null)
+    : localAppliedIntentKey;
+  const growerTentSelection = session
+    ? (sessionState?.selection.explicitSelection ?? null)
+    : localGrowerSelection;
   const focusedSensorAnchorHashRef = useRef<string | null>(null);
   const explicitTentId =
     growerTentSelection?.intentKey === sensorsTentRouteIntentKey
@@ -143,6 +162,15 @@ export default function Sensors() {
   const tentsSyncKey = useMemo(() => tents.map((tent) => tent.id).join("\0"), [tents]);
   useEffect(() => {
     if (!tentsQuery.isSuccess) return;
+    if (session) {
+      session.reconcileSelection({
+        intent: sensorsTentRouteIntent,
+        intentKey: sensorsTentRouteIntentKey,
+        tents,
+        tentsLoaded: true,
+      });
+      return;
+    }
 
     const intentChanged = appliedTentRouteIntentKey !== sensorsTentRouteIntentKey;
     setTentId((currentTentId) =>
@@ -170,6 +198,7 @@ export default function Sensors() {
     sensorsTentRouteIntentKey,
     tentsSyncKey,
     tentsQuery.isSuccess,
+    session,
   ]);
 
   // React Router updates hashes without a full browser navigation, so make
@@ -288,6 +317,10 @@ export default function Sensors() {
 
   const manualTents = tents.map((t) => ({ id: t.id as string, name: t.name as string }));
   const selectTentByGrower = (nextTentId: string) => {
+    if (session) {
+      session.selectTent(nextTentId, sensorsTentRouteIntentKey, tents);
+      return;
+    }
     setGrowerTentSelection({ intentKey: sensorsTentRouteIntentKey, tentId: nextTentId });
     setTentId(nextTentId);
   };
@@ -772,6 +805,7 @@ export default function Sensors() {
             tents={manualTents}
             defaultTentId={defaultManualTentId}
             correction={correctionCtx}
+            session={session ?? undefined}
           />
         )}
       </div>

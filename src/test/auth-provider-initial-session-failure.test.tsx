@@ -66,6 +66,12 @@ describe("AuthProvider initial session read failure", () => {
 
     expect(await screen.findByText("signed-out")).toBeInTheDocument();
 
+    mocks.getSession.mockResolvedValue({
+      data: {
+        session: { access_token: "fixture-recovered-bearer", user: { id: "recovered-user" } },
+      },
+      error: null,
+    });
     act(() => {
       mocks.authListener?.("SIGNED_IN", { user: { id: "recovered-user" } });
     });
@@ -75,7 +81,7 @@ describe("AuthProvider initial session read failure", () => {
 
   it("keeps the fulfilled path unchanged", async () => {
     mocks.getSession.mockResolvedValue({
-      data: { session: { user: { id: "existing-user" } } },
+      data: { session: { access_token: "fixture-existing-bearer", user: { id: "existing-user" } } },
     });
 
     render(

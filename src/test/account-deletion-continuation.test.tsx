@@ -13,7 +13,10 @@ import {
 } from "@tanstack/react-router";
 import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
 import { supabase } from "@/integrations/supabase/client";
-import { DELETE_ACCOUNT_GENERIC_FAILURE } from "@/lib/accountDeletion";
+import {
+  DELETE_ACCOUNT_BILLING_FAILURE,
+  DELETE_ACCOUNT_GENERIC_FAILURE,
+} from "@/lib/accountDeletion";
 import * as accountDeletion from "@/lib/accountDeletion";
 import { useNavigate } from "@/lib/react-router-compat";
 
@@ -159,6 +162,7 @@ function SignInForm() {
 }
 
 function renderSettings(options?: {
+  initialEntries?: string[];
   holdWelcome?: boolean;
   bridgeDocumentNavigation?: boolean;
   holdOther?: boolean;
@@ -202,7 +206,7 @@ function renderSettings(options?: {
   const auth = createRoute({ getParentRoute: () => root, path: "/auth", component: SignInForm });
   const router = createRouter({
     routeTree: root.addChildren([settings, other, welcome, auth]),
-    history: createMemoryHistory({ initialEntries: ["/settings"] }),
+    history: createMemoryHistory({ initialEntries: options?.initialEntries ?? ["/settings"] }),
     defaultPendingMs: 60_000,
   });
   if (options?.bridgeDocumentNavigation) {
@@ -748,6 +752,39 @@ describe("account deletion completion belongs to its initiating account and moun
     expect(sdk.signOut).not.toHaveBeenCalled();
     expect(sdk.replace).not.toHaveBeenCalled();
     expect(sdk.welcomeLoads).not.toHaveBeenCalled();
+  });
+
+  it("invalidates completion when browser Back commits away from Settings during a pending deletion", async () => {
+    const deletion = deferredDeletion();
+    sdk.invoke.mockReturnValueOnce(deletion.promise);
+    const view = renderSettings({ initialEntries: ["/plants", "/settings"] });
+    await startDeletion();
+    act(() => {
+      view.router.history.back();
+    });
+    await waitFor(() => expect(view.router.state.resolvedLocation?.pathname).toBe("/plants"));
+    expect(screen.getByTestId("other-page")).toBeInTheDocument();
+    await act(async () => deletion.resolve(successfulDeletion));
+    await flushContinuations();
+    expect(sdk.signOut).not.toHaveBeenCalled();
+    expect(sdk.replace).not.toHaveBeenCalled();
+    expect(sdk.welcomeLoads).not.toHaveBeenCalled();
+    expect(view.router.state.resolvedLocation?.pathname).toBe("/plants");
+    expect(sdk.ownerId).toBe("fixture-owner-a");
+  });
+
+  it("surfaces billing cancellation failure without signing out or navigating away", async () => {
+    sdk.invoke.mockResolvedValueOnce({
+      data: { ok: false, error: "billing_cancellation_failed" },
+      error: { context: { status: 409 } },
+    });
+    renderSettings();
+    await startDeletion();
+    expect(await screen.findByRole("alert")).toHaveTextContent(DELETE_ACCOUNT_BILLING_FAILURE);
+    expect(sdk.signOut).not.toHaveBeenCalled();
+    expect(sdk.replace).not.toHaveBeenCalled();
+    expect(sdk.welcomeLoads).not.toHaveBeenCalled();
+    expect(sdk.ownerId).toBe("fixture-owner-a");
   });
 
   it("dispatches one deletion for duplicate clicks while the original request is pending", async () => {

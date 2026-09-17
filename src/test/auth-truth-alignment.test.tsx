@@ -552,6 +552,32 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     }
   });
 
+  it("invalidates the navigation continuation when held confirmation finds a different owner during an active exit lease", async () => {
+    let heldOwner: "u-own" | "u-other" = "u-own";
+    mocks.getSession.mockImplementation(async () => ({
+      data: { session: sessionFor(heldOwner) },
+      error: null,
+    }));
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    await waitFor(() => expect(result.current.user?.id).toBe("u-own"));
+    let lease: ReturnType<NonNullable<ReturnType<typeof useAuth>["beginSignOutNavigation"]>>;
+    act(() => {
+      lease = result.current.beginSignOutNavigation!();
+    });
+    try {
+      expect(lease!.isCurrent()).toBe(true);
+      expect(getAuthSignOutOperation(supabase.auth).getSnapshot()).not.toBe("idle");
+      heldOwner = "u-other";
+      await relayFromOtherTab("SIGNED_IN", sessionFor("u-relayed"));
+      await waitFor(() => expect(lease!.isCurrent()).toBe(false));
+      expect(getAuthSignOutOperation(supabase.auth).getSnapshot()).not.toBe("idle");
+    } finally {
+      act(() => lease?.finish());
+    }
+  });
+
   it("does not adopt a session-bearing relay when the held-session read is unreadable", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     renderProvider();

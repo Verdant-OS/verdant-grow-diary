@@ -204,6 +204,16 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
       }
       if (disposed || seq !== reconcileSeq) return;
       reconcileSignOutWithHeldSession(held);
+      // An active sign-out must not adopt a different held owner mid-exit.
+      if (
+        signOutOperation.getSnapshot() !== "idle" &&
+        held &&
+        currentUserIdRef.current != null &&
+        held.user.id !== currentUserIdRef.current
+      ) {
+        setLoading(false);
+        return;
+      }
       applySession(held);
       setLoading(false);
     };

@@ -500,6 +500,35 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     }
   });
 
+  it("does not publish a different held owner while an explicit sign-out lease is active", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const fence = vi.fn();
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => (
+        <AuthProvider onBeforeAuthIdentityChange={fence}>{children}</AuthProvider>
+      ),
+    });
+    await waitFor(() => expect(result.current.user?.id).toBe("u-own"));
+
+    let lease: ReturnType<NonNullable<ReturnType<typeof useAuth>["beginSignOutNavigation"]>>;
+    act(() => {
+      lease = result.current.beginSignOutNavigation!();
+    });
+    fence.mockClear();
+
+    try {
+      mocks.getSession.mockResolvedValue({
+        data: { session: sessionFor("u-foreign") },
+        error: null,
+      });
+      await relayFromOtherTab("SIGNED_IN", sessionFor("u-foreign"));
+      expect(result.current.user?.id).not.toBe("u-foreign");
+      expect(fence).not.toHaveBeenCalledWith("u-own", "u-foreign");
+    } finally {
+      act(() => lease?.finish());
+    }
+  });
+
   it("does not adopt a session-bearing relay when the held-session read is unreadable", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     renderProvider();

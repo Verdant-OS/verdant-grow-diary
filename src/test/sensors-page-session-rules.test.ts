@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSensorsPageSessionController } from "@/hooks/useSensorsPageSession";
 import { buildManualReadingPayloads } from "@/lib/sensorReadingManualEntryRules";
 import {
@@ -20,6 +20,7 @@ const B = "22222222-2222-4222-8222-222222222222";
 const C = "33333333-3333-4333-8333-333333333333";
 const tents = [{ id: A }, { id: B }];
 const clients: QueryClient[] = [];
+beforeEach(() => sessionStorage.clear());
 function client() {
   const qc = new QueryClient();
   clients.push(qc);

@@ -5,10 +5,13 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   ReactNode,
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
+import { SIGN_OUT_LOADING_LABEL } from "@/lib/authSessionExitRules";
+import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
 import {
   flushPendingOAuthSignupAcquisition,
   type SignupAcquisitionRpcClient,
@@ -25,6 +28,11 @@ interface Ctx {
   session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  beginSignOutNavigation?: () => {
+    isCurrent: () => boolean;
+    finish: () => void;
+  } | null;
+  isSignOutNavigationPending?: () => boolean;
 }
 const AuthCtx = createContext<Ctx>({
   user: null,
@@ -86,11 +94,57 @@ interface AuthProviderProps {
 export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  // This operation outlives the dialog/route that started it. SIGNED_OUT can
+  // unmount that route before the SDK finishes notifying its other listeners.
+  const [signOutOperation] = useState(() => getAuthSignOutOperation(supabase.auth));
+  const signOutStatus = useSyncExternalStore(
+    signOutOperation.subscribe,
+    signOutOperation.getSnapshot,
+    () => "idle",
+  );
+  const signOutNavigationPending = signOutStatus !== "idle";
+  const signOutNavigationRef = useRef<{ userId: string | null; observedSignedOut: boolean } | null>(
+    null,
+  );
+  const isSignOutNavigationPending = useCallback(
+    () => signOutOperation.getSnapshot() !== "idle",
+    [signOutOperation],
+  );
+  const beginSignOutNavigation = useCallback(() => {
+    const lease = signOutOperation.begin();
+    if (!lease) return null;
+    const operation = { userId: currentUserIdRef.current ?? null, observedSignedOut: false };
+    signOutNavigationRef.current = operation;
+    return {
+      isCurrent: () => signOutNavigationRef.current === operation,
+      finish: () => {
+        if (signOutNavigationRef.current === operation) signOutNavigationRef.current = null;
+        // Release only after the actual SDK operation settles, even if its
+        // initiating provider or navigation intent has been superseded.
+        lease.finish();
+      },
+    };
+  }, [signOutOperation]);
+  useEffect(
+    () => () => {
+      signOutNavigationRef.current = null;
+    },
+    [],
+  );
   // `undefined` means the initial auth identity has not resolved yet. Keep it
   // distinct from a resolved signed-out `null` so the first null session still
   // runs the privacy fence and clears state left by an expired prior session.
   const currentUserIdRef = useRef<string | null | undefined>(undefined);
   const sessionUserId = session?.user.id ?? null;
+
+  const reconcileSignOutWithHeldSession = useCallback((held: Session | null) => {
+    const operation = signOutNavigationRef.current;
+    if (held && operation && (operation.observedSignedOut || held.user.id !== operation.userId)) {
+      // Relayed identities are not authority. Only this client's own session
+      // may supersede the old UI continuation; the SDK lock remains held.
+      signOutNavigationRef.current = null;
+    }
+  }, []);
 
   const applySession = useCallback(
     (nextSession: Session | null) => {
@@ -106,6 +160,8 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
         onBeforeAuthIdentityChange?.(previousUserId ?? null, nextUserId);
       }
       writePersistedLastResolvedIdentity(nextUserId);
+      if (nextUserId === null && signOutNavigationRef.current)
+        signOutNavigationRef.current.observedSignedOut = true;
       currentUserIdRef.current = nextUserId;
       setSession(nextSession);
     },
@@ -151,11 +207,13 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
         return;
       }
       if (disposed || seq !== reconcileSeq) return;
+      reconcileSignOutWithHeldSession(held);
       if (held === null || !sameBearer(held, delivered)) applySession(held);
     };
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       applySession(s);
+      if (event === "INITIAL_SESSION") reconcileSignOutWithHeldSession(s);
       if (s !== null && event !== "INITIAL_SESSION") {
         void reconcileWithClientSession(++reconcileSeq, s);
       }
@@ -192,6 +250,7 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
       if (disposed) return;
       try {
         const { data } = await supabase.auth.getSession();
+        reconcileSignOutWithHeldSession(data.session);
         applySession(data.session);
       } catch {
         // A rejected initial session read (network failure, corrupt storage)
@@ -208,7 +267,7 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
       disposed = true;
       sub.subscription.unsubscribe();
     };
-  }, [applySession]);
+  }, [applySession, reconcileSignOutWithHeldSession]);
 
   useEffect(() => {
     if (!sessionUserId) return;
@@ -234,20 +293,42 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
       value={{
         user: session?.user ?? null,
         session,
-        loading,
+        loading: loading || signOutNavigationPending,
+        beginSignOutNavigation,
+        isSignOutNavigationPending,
         signOut: async () => {
           // supabase.auth.signOut() resolves with `{ error }` and does not throw
           // on the common failure path. Propagate so performSafeSignOut can
           // return ok:false + SIGN_OUT_FAILURE_MESSAGE (auth hardening #588).
           // Never rethrow the raw error object — it may carry token/session text.
-          const { error } = await supabase.auth.signOut();
-          if (error) {
-            throw new Error("sign_out_failed");
-          }
+          await signOutOperation.runSdkSignOut(async () => {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw new Error("sign_out_failed");
+          });
         },
       }}
     >
-      {children}
+      {signOutNavigationPending ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="min-h-screen flex flex-col gap-3 items-center justify-center text-muted-foreground"
+        >
+          {signOutStatus === "stalled" ? (
+            <>
+              <p>Sign-out is taking longer than expected.</p>
+              <p>Reload the page to recover before signing in again.</p>
+              <button type="button" className="underline" onClick={() => window.location.reload()}>
+                Reload page
+              </button>
+            </>
+          ) : (
+            SIGN_OUT_LOADING_LABEL
+          )}
+        </div>
+      ) : (
+        children
+      )}
     </AuthCtx.Provider>
   );
 }

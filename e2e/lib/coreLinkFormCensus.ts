@@ -372,6 +372,13 @@ export const AUTHENTICATED_CORE_CENSUS_ROUTES = [
   { path: "/health", label: "App health", fieldPolicy: "audit-only" },
 ] as const satisfies readonly CoreCensusRoute[];
 
+// Preserve every authenticated route and its contract while isolating the total
+// sweep budget. Each batch runs with its own browser context and network guards.
+export const AUTHENTICATED_CORE_CENSUS_BATCHES = batchCensusRoutes(
+  AUTHENTICATED_CORE_CENSUS_ROUTES,
+  12,
+);
+
 export type LinkDisposition =
   | "navigate"
   | "excluded-privileged"

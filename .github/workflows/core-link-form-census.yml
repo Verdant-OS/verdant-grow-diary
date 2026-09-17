@@ -58,8 +58,10 @@ jobs:
         include:
           - lane: public
             grep: scheduled public
+            workers: 1
           - lane: authenticated
             grep: scheduled authenticated
+            workers: 2
     env:
       PLAYWRIGHT_RETRIES: "0"
     steps:
@@ -91,6 +93,7 @@ jobs:
           --project=chromium-mocked
           e2e/core-link-form-census.spec.ts
           --grep "${{ matrix.grep }}"
+          --workers "${{ matrix.workers }}"
           --reporter=list
       - name: Upload failure evidence
         if: failure()

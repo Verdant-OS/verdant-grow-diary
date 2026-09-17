@@ -23,6 +23,7 @@ import { ANALYTICS_CONSENT_STORAGE_KEY } from "../src/lib/analyticsConsent";
 import { dashboardPath } from "../src/lib/routes";
 import {
   AUTHENTICATED_CORE_CENSUS_ROUTES,
+  AUTHENTICATED_CORE_CENSUS_BATCHES,
   PUBLIC_CORE_CENSUS_BATCHES,
   classifyLink,
   expectedCensusNavigationPath,
@@ -2104,14 +2105,22 @@ test.describe("core link and form census", () => {
     });
   }
 
-  test("audits every scheduled authenticated page, visible field, and safe internal link", async ({
-    page,
-  }) => {
-    test.setTimeout(1_800_000);
-    const report = await runLaneCensus(page, "authenticated", AUTHENTICATED_CORE_CENSUS_ROUTES);
-    expect(report.routeAudits).toHaveLength(AUTHENTICATED_CORE_CENSUS_ROUTES.length);
-    expect(report.fieldAudits.length).toBeGreaterThan(0);
-    expect(report.linkAudits.length).toBeGreaterThan(0);
-    expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
+  test.describe("authenticated census batches", () => {
+    test.describe.configure({ mode: "parallel" });
+
+    for (const [index, routes] of AUTHENTICATED_CORE_CENSUS_BATCHES.entries()) {
+      test(`audits every scheduled authenticated page, visible field, and safe internal link (batch ${index + 1}/${AUTHENTICATED_CORE_CENSUS_BATCHES.length})`, async ({
+        page,
+      }) => {
+        test.setTimeout(1_800_000);
+        const report = await runLaneCensus(page, "authenticated", routes);
+        expect(report.routeAudits.map((route) => route.path)).toEqual(
+          routes.map((route) => route.path),
+        );
+        expect(report.fieldAudits.length).toBeGreaterThan(0);
+        expect(report.linkAudits.length).toBeGreaterThan(0);
+        expect(report.clickedInternalHrefs.length).toBeGreaterThan(0);
+      });
+    }
   });
 });

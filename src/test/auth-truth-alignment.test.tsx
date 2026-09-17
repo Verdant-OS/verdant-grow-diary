@@ -398,6 +398,33 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
           error: null,
         }),
     ],
+    [
+      "non-string user id",
+      () =>
+        Promise.resolve({
+          data: {
+            session: {
+              ...sessionFor("u-own"),
+              user: { ...sessionFor("u-own").user, id: 42 as unknown as string },
+            },
+          },
+          error: null,
+        }),
+    ],
+    [
+      "non-string bearer",
+      () =>
+        Promise.resolve({
+          data: {
+            session: { ...sessionFor("u-own"), access_token: 42 as unknown as string },
+          },
+          error: null,
+        }),
+    ],
+    [
+      "explicit undefined session",
+      () => Promise.resolve({ data: { session: undefined }, error: null }),
+    ],
   ])("fails closed on a %s held-session read after a null notification", async (_label, read) => {
     mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
     const fence = vi.fn();

@@ -448,6 +448,35 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     }
   });
 
+  it("preserves a session-bearing delivery when the held-session read is unreadable", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    renderProvider();
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+
+    mocks.getSession.mockRejectedValueOnce(new Error("fixture store unavailable"));
+    await relayFromOtherTab("SIGNED_IN", sessionFor("u-relayed"));
+
+    // Unreadable store after a session-bearing relay must not fail closed to signed-out.
+    expect(screen.getByTestId("probe")).toHaveTextContent("u-relayed");
+    expect(renderedIdentities).toContain("u-relayed");
+  });
+
+  it("clears persisted identity when a foreign null relay confirms this tab has no held session", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const fence = vi.fn();
+    renderProvider(fence);
+    expect(await screen.findByText("u-own")).toBeInTheDocument();
+    expect(window.sessionStorage.getItem("verdant:auth:last-resolved-identity:v1")).toBe("u-own");
+    fence.mockClear();
+
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    await relayFromOtherTab("SIGNED_OUT", null);
+
+    expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+    expect(fence).toHaveBeenCalledWith("u-own", null);
+    expect(window.sessionStorage.getItem("verdant:auth:last-resolved-identity:v1")).toBe("");
+  });
+
   it("applies the client's own INITIAL_SESSION without a reconciliation read", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
     renderProvider();
@@ -766,6 +795,20 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
     );
     expect(screen.getByTestId("location")).toHaveTextContent("/grows");
     expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
+  it("a foreign SIGNED_OUT does not evict a grower who still holds a local session on a protected route", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    mocks.getUser.mockResolvedValue({ data: { user: sessionFor("u-own").user }, error: null });
+    renderApp("/grows");
+    expect(await screen.findByTestId("protected-child")).toBeInTheDocument();
+
+    await relayFromOtherTab("SIGNED_OUT", null);
+
+    expect(screen.getByTestId("protected-child")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/grows");
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("sign-in-screen")).toBeNull();
   });
 
   it("a transport failure with a held session stays put: no bounce, no page, no sign-out", async () => {

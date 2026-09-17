@@ -175,4 +175,22 @@ describe("plant history count and read truth", () => {
     );
     expect(view.countLabel).toContain("total not verified");
   });
+
+  it("shows a refreshing notice without treating the read as current or complete", () => {
+    const view = buildPlantHistoryReadView(
+      {
+        data: [row(1), row(2)],
+        totalCount: 12,
+        isFetching: true,
+        isFetchingNextPage: false,
+        hasNextPage: true,
+      },
+      "plant-1",
+      2,
+    );
+    expect(view.current).toBe(false);
+    expect(view.complete).toBe(false);
+    expect(view.notice).toBe("Refreshing timeline history…");
+    expect(view.countLabel).toContain("total at last successful read");
+  });
 });

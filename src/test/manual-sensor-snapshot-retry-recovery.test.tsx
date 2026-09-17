@@ -499,6 +499,49 @@ describe("manual duplicate receipt verification", () => {
     expect(backend.reads).toBe(0);
   });
 
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on captured_at", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    const later = "2026-09-16T09:00:00.000Z";
+    expect(
+      await confirmManualSnapshotConflict(
+        [
+          submitted[0],
+          {
+            ...submitted[0],
+            metric: "humidity_pct",
+            value: 55,
+            captured_at: later,
+            ts: later,
+          },
+        ],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on ts", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    const later = "2026-09-16T09:00:00.000Z";
+    expect(
+      await confirmManualSnapshotConflict(
+        [
+          submitted[0],
+          {
+            ...submitted[0],
+            metric: "humidity_pct",
+            value: 55,
+            ts: later,
+          },
+        ],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
   it("never recovers an unrelated error or a non-manual write as this snapshot", async () => {
     backend.rows = stored;
     expect(await confirmManualSnapshotConflict(submitted, { code: "42501" })).toBe(false);

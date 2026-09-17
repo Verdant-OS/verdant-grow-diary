@@ -367,4 +367,57 @@ describe("AssignTentDialog · hunt-linked untag then move", () => {
     expect(screen.queryByTestId("assign-tent-option-cross-grow-tent-other")).toBeNull();
     expect(mocks.plantUpdates).toEqual([]);
   });
+
+  it("does not record a diary entry when cross-grow move fails after untag", async () => {
+    openDialog();
+    await screen.findByTestId("assign-tent-pheno-untag-open");
+    act(() => {
+      screen.getByTestId("assign-tent-pheno-untag-open").click();
+    });
+    await screen.findByTestId("assign-tent-pheno-untag-submit");
+    act(() => {
+      screen.getByTestId("assign-tent-pheno-untag-submit").click();
+    });
+    await waitFor(() =>
+      expect(mocks.plantUpdates[0]).toEqual({ pheno_hunt_id: null, candidate_label: null }),
+    );
+    expect(
+      await screen.findByTestId("assign-tent-option-cross-grow-tent-other"),
+    ).toBeInTheDocument();
+    mocks.moveError = { message: "move rejected" };
+    act(() => {
+      screen.getByTestId("pick-other").click();
+    });
+    act(() => {
+      screen.getByTestId("assign-tent-submit").click();
+    });
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith("move rejected"));
+    expect(mocks.plantUpdates).toHaveLength(2);
+    expect(mocks.plantUpdates[1]).toEqual({ tent_id: "tent-other", grow_id: "grow-2" });
+    expect(mocks.diaryInserts).toEqual([]);
+    expect(mocks.toastSuccess).not.toHaveBeenCalledWith("Plant moved to new current tent");
+  });
+
+  it("does not require re-untag after reopen when the hunt tag is already cleared in DB", async () => {
+    openDialog();
+    await screen.findByTestId("assign-tent-pheno-untag-open");
+    act(() => {
+      screen.getByTestId("assign-tent-pheno-untag-open").click();
+    });
+    act(() => {
+      screen.getByTestId("assign-tent-pheno-untag-submit").click();
+    });
+    await waitFor(() =>
+      expect(mocks.plantUpdates[0]).toEqual({ pheno_hunt_id: null, candidate_label: null }),
+    );
+    act(() => {
+      mocks.dialogOnOpenChange?.(false);
+    });
+    act(() => {
+      mocks.dialogOnOpenChange?.(true);
+    });
+    await screen.findByTestId("assign-tent-option-tent-same");
+    expect(screen.queryByTestId("assign-tent-pheno-untag")).toBeNull();
+    expect(screen.queryByTestId("assign-tent-option-cross-grow-tent-other")).toBeNull();
+  });
 });

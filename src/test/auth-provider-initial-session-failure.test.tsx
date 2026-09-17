@@ -92,4 +92,23 @@ describe("AuthProvider initial session read failure", () => {
 
     expect(await screen.findByText("existing-user")).toBeInTheDocument();
   });
+
+  it.each([
+    ["whitespace user id", { access_token: "fixture-existing-bearer", user: { id: "   " } }],
+    ["whitespace bearer", { access_token: "   ", user: { id: "existing-user" } }],
+  ])(
+    "resolves to signed-out when bootstrap confirms a held session with %s",
+    async (_label, session) => {
+      mocks.getSession.mockResolvedValue({ data: { session }, error: null });
+
+      render(
+        <AuthProvider>
+          <Probe />
+        </AuthProvider>,
+      );
+
+      expect(await screen.findByText("signed-out")).toBeInTheDocument();
+      expect(screen.queryByText("loading")).not.toBeInTheDocument();
+    },
+  );
 });

@@ -219,6 +219,15 @@ describe("full plant relative history read boundary", () => {
     ).rejects.toThrow(/boundary/);
     expect(fixture.queries).toHaveLength(0);
   });
+  it("retains the first page but blocks load-more when the boundary row cannot be paged", async () => {
+    const sortedPage = Array.from({ length: 11 }, (_, i) => row(11 - i));
+    sortedPage[9] = { ...sortedPage[9], id: "not-a-valid-uuid" };
+    fixture.override = () => ({ data: sortedPage, error: null, count: 11 });
+    const first = await fetchPlantRelativeHistoryPage(PLANT, null);
+    expect(first.rows).toHaveLength(10);
+    expect(first.boundaryUnavailable).toBe(true);
+    expect(first.nextCursor).toBeNull();
+  });
   it("passes cancellation through and preserves the abort classification", async () => {
     const controller = new AbortController();
     fixture.override = () => ({
@@ -366,6 +375,21 @@ describe("relative history retrieval through the presenter", () => {
     expect(screen.getByTestId("relative-timeline-print-summary")).toHaveTextContent(
       "total not verified",
     );
+  });
+  it("offers retry instead of load-more when a legacy boundary cannot be paged safely", async () => {
+    const sortedPage = Array.from({ length: 11 }, (_, i) => row(11 - i));
+    sortedPage[9] = { ...sortedPage[9], id: "not-a-valid-uuid" };
+    fixture.override = () => ({ data: sortedPage, error: null, count: 11 });
+    renderHistory();
+    await waitFor(() => expect(header()).toHaveTextContent("Showing 10 of 11 timeline entries"));
+    expect(screen.getAllByTestId("relative-timeline-item")).toHaveLength(10);
+    expect(
+      screen.getByText(
+        "Some older entries could not be reached. Refresh to check the history again.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Retry timeline history" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Load older entries" })).not.toBeInTheDocument();
   });
   it("discloses raw rows that cannot be projected instead of shrinking the server total", async () => {
     fixture.override = () => ({ data: [row(1), { ...row(2), id: null }], error: null, count: 2 });

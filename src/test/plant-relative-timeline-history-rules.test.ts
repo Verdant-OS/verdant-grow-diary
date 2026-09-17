@@ -48,6 +48,18 @@ describe("plant history pagination rules", () => {
       expect(() => buildPlantHistoryPage(data, 1, "plant-1")).toThrow(/unavailable/);
     },
   );
+  it.each([0, -1, 1.5, Number.NaN])("rejects an invalid page size %s", (pageSize) => {
+    expect(() => buildPlantHistoryPage([row(1)], 1, "plant-1", pageSize)).toThrow(/unavailable/);
+  });
+  it("blocks continuation when the boundary row has a malformed id", () => {
+    const data = Array.from({ length: 11 }, (_, i) =>
+      row(i, i === 9 ? { id: "not-a-valid-uuid" } : {}),
+    );
+    const page = buildPlantHistoryPage(data, 12, "plant-1");
+    expect(page.rows).toHaveLength(10);
+    expect(page.nextCursor).toBeNull();
+    expect(page.boundaryUnavailable).toBe(true);
+  });
   it.each([null, "not-a-date", '2026-09-16T12:00:00Z",plant_id.eq.other'])(
     "retains rows but blocks an unsafe timestamp boundary %s",
     (entry_at) => {
@@ -158,6 +170,26 @@ describe("plant history count and read truth", () => {
     expect(view.complete).toBe(false);
     expect(view.canRetry).toBe(true);
     expect(view.notice).toMatch(/could not be reached/);
+  });
+
+  it("surfaces boundaryUnavailable from the hook without offering load more", () => {
+    const view = buildPlantHistoryReadView(
+      {
+        data: Array.from({ length: 10 }, (_, i) => row(i + 1)),
+        totalCount: 12,
+        boundaryUnavailable: true,
+        hasNextPage: false,
+      },
+      "plant-1",
+      10,
+    );
+    expect(view.complete).toBe(false);
+    expect(view.canRetry).toBe(true);
+    expect(view.showLoadMore).toBe(false);
+    expect(view.notice).toBe(
+      "Some older entries could not be reached. Refresh to check the history again.",
+    );
+    expect(view.countLabel).toBe("Showing 10 of 12 timeline entries");
   });
 
   it("surfaces a count conflict when the server total shrinks below loaded rows", () => {

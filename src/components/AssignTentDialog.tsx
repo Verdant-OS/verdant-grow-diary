@@ -44,11 +44,17 @@ import {
   partitionTentsForPlantMove,
 } from "@/lib/plantTentRelationshipRules";
 import CreateTentDialog, { type CreatedTent } from "@/components/CreateTentDialog";
+import {
+  buildOtherGrowMoveDestinations,
+  withoutDisclosedMoveDestinations,
+} from "@/lib/plantMoveDestinationRules";
 
 interface TentRow {
   id: string;
   name: string;
   grow_id?: string | null;
+  grow_name?: string | null;
+  is_archived?: boolean | null;
 }
 
 interface Props {
@@ -138,12 +144,20 @@ export default function AssignTentDialog({
   const skipGrowFallback = livePhenoHuntId != null;
 
   const mapRows = (
-    data: Array<{ id: string; name: string | null; grow_id: string | null }> | null,
+    data: Array<{
+      id: string;
+      name: string | null;
+      grow_id: string | null;
+      is_archived?: boolean | null;
+      grow?: { name: string | null } | null;
+    }> | null,
   ): TentRow[] =>
     (data ?? []).map((t) => ({
       id: t.id as string,
       name: (t.name as string) ?? "Unnamed tent",
       grow_id: (t.grow_id as string | null) ?? null,
+      grow_name: t.grow?.name ?? null,
+      is_archived: t.is_archived,
     }));
 
   const { data: rows = [], isPending: tentsPending } = useQuery({
@@ -168,7 +182,7 @@ export default function AssignTentDialog({
       // way; EditPlantDialog uses the same empty-grow fallback.
       let q = supabase
         .from("tents")
-        .select("id, name, grow_id, is_archived")
+        .select("id, name, grow_id, is_archived, grow:grows!tents_grow_id_fkey(name)")
         .eq("is_archived", false);
       if (growId && !untaggedThisSession) q = q.eq("grow_id", growId as string);
       const { data, error } = await q.order("created_at", { ascending: true });
@@ -177,7 +191,7 @@ export default function AssignTentDialog({
       if (growId && scoped.length === 0 && !skipGrowFallback && !untaggedThisSession) {
         const { data: allData, error: allErr } = await supabase
           .from("tents")
-          .select("id, name, grow_id, is_archived")
+          .select("id, name, grow_id, is_archived, grow:grows!tents_grow_id_fkey(name)")
           .eq("is_archived", false)
           .order("created_at", { ascending: true });
         if (allErr) throw allErr;
@@ -187,13 +201,13 @@ export default function AssignTentDialog({
     },
   });
 
-  const { data: ownerTents = [] } = useQuery({
+  const { data: ownerTents = [], isError: ownerTentsError } = useQuery({
     queryKey: ["plant-detail", "owner-tents", plantId],
-    enabled: open && huntLinked && !untaggedThisSession,
+    enabled: open && (huntLinked || huntTagError) && !untaggedThisSession,
     queryFn: async (): Promise<TentRow[]> => {
       const { data, error } = await supabase
         .from("tents")
-        .select("id, name, grow_id, is_archived")
+        .select("id, name, grow_id, is_archived, grow:grows!tents_grow_id_fkey(name)")
         .eq("is_archived", false)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -222,14 +236,23 @@ export default function AssignTentDialog({
   );
   const others = includeCrossGrow ? [...sameGrow, ...otherGrow] : sameGrow;
 
-  const ownerPartition = useMemo(
+  const crossGrowDestinations = useMemo(
     () =>
-      partitionTentsForPlantMove(ownerTents, currentTentId ?? null, growId ?? null, {
-        includeCrossGrow: true,
-      }),
-    [ownerTents, currentTentId, growId],
+      buildOtherGrowMoveDestinations(
+        includeCrossGrow ? rows : huntLinked || huntTagError ? ownerTents : [],
+        {
+          currentTentId,
+          growId,
+          huntStatus: includeCrossGrow ? "clear" : huntLinked ? "linked" : "unresolved",
+        },
+      ),
+    [includeCrossGrow, rows, ownerTents, currentTentId, growId, huntLinked, huntTagError],
   );
-  const hasCrossGrowDestinations = ownerPartition.otherGrow.length > 0;
+  const sameGrowDestinations = useMemo(
+    () => withoutDisclosedMoveDestinations(sameGrow, crossGrowDestinations),
+    [sameGrow, crossGrowDestinations],
+  );
+  const hasCrossGrowDestinations = crossGrowDestinations.length > 0;
   const showUntagPath =
     huntLinked && (hasCrossGrowDestinations || (Boolean(growId) && sameGrow.length === 0));
 
@@ -267,7 +290,16 @@ export default function AssignTentDialog({
       toast.error("Plant is already in this tent");
       return;
     }
+    const destination = crossGrowDestinations.find((tent) => tent.id === selected);
+    if (destination?.disabled) {
+      toast.error(destination.reason);
+      return;
+    }
     const nextTent = others.find((t) => t.id === selected) ?? rows.find((t) => t.id === selected);
+    if (!nextTent) {
+      toast.error("Pick an available tent");
+      return;
+    }
     const movePayload = buildPlantTentMoveUpdate({
       tentId: selected,
       plantGrowId: growId ?? null,
@@ -400,6 +432,11 @@ export default function AssignTentDialog({
                   {PHENO_UNTAG_BEFORE_CROSS_GROW_MOVE_COPY.huntTagLoadFailed}
                 </p>
               ) : null}
+              {ownerTentsError && !untaggedThisSession ? (
+                <p className="text-sm text-muted-foreground" role="status">
+                  Could not load destinations in other grows. Close and reopen to retry.
+                </p>
+              ) : null}
               {showUntagPath ? (
                 <div
                   className="grid gap-2 rounded-md border border-border p-3"
@@ -421,7 +458,7 @@ export default function AssignTentDialog({
                   </Button>
                 </div>
               ) : null}
-              {others.length === 0 && current.length === 0 ? (
+              {others.length === 0 && current.length === 0 && !hasCrossGrowDestinations ? (
                 <div className="grid gap-3" data-testid="assign-tent-empty">
                   <p className="text-sm text-muted-foreground">
                     {growId && !usedGrowFallback && !includeCrossGrow
@@ -456,10 +493,10 @@ export default function AssignTentDialog({
                         <SelectValue placeholder="Pick a tent" />
                       </SelectTrigger>
                       <SelectContent>
-                        {sameGrow.length > 0 && (
+                        {sameGrowDestinations.length > 0 && (
                           <SelectGroup>
                             <SelectLabel>Tents in this grow</SelectLabel>
-                            {sameGrow.map((t) => (
+                            {sameGrowDestinations.map((t) => (
                               <SelectItem
                                 key={t.id}
                                 value={t.id}
@@ -470,16 +507,22 @@ export default function AssignTentDialog({
                             ))}
                           </SelectGroup>
                         )}
-                        {includeCrossGrow && otherGrow.length > 0 && (
+                        {hasCrossGrowDestinations && (
                           <SelectGroup>
                             <SelectLabel>Tents in other grows</SelectLabel>
-                            {otherGrow.map((t) => (
+                            {crossGrowDestinations.map((t) => (
                               <SelectItem
                                 key={t.id}
                                 value={t.id}
-                                data-testid={`assign-tent-option-cross-grow-${t.id}`}
+                                disabled={t.disabled}
+                                data-testid={
+                                  t.disabled
+                                    ? `assign-tent-option-blocked-${t.id}`
+                                    : `assign-tent-option-cross-grow-${t.id}`
+                                }
                               >
-                                {t.name}
+                                {t.label}
+                                {t.reason ? ` — ${t.reason}` : ""}
                               </SelectItem>
                             ))}
                           </SelectGroup>

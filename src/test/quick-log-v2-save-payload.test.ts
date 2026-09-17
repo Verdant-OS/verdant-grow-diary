@@ -123,10 +123,24 @@ describe("quickLogV2SavePayload", () => {
     });
   });
 
-  it("adds canonical manual provenance for a humidity-only measurement without pre-existing details", () => {
-    const r = buildQuickLogV2SavePayload(base({ note: "", humidityPct: "58" }));
+  it("adds canonical manual provenance for a humidity-only measurement without pre-existing p_details", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "", humidityPct: "55" }));
     if (!r.ok) throw new Error("expected valid humidity-only payload");
-    expect(r.payload.p_humidity_pct).toBe(58);
+    expect(r.payload.p_humidity_pct).toBe(55);
+    expect(r.payload.p_details).toEqual({
+      manual_provenance: {
+        source: "manual",
+        source_identity: "manual_entry",
+        transport: "manual",
+        confidence: null,
+      },
+    });
+  });
+
+  it("adds canonical manual provenance for a temperature-only measurement without pre-existing p_details", () => {
+    const r = buildQuickLogV2SavePayload(base({ note: "", temperatureC: "24.5" }));
+    if (!r.ok) throw new Error("expected valid temperature-only payload");
+    expect(r.payload.p_temperature_c).toBe(24.5);
     expect(r.payload.p_details).toEqual({
       manual_provenance: {
         source: "manual",

@@ -429,6 +429,119 @@ describe("manual duplicate receipt verification", () => {
     ).toBe(false);
   });
 
+  it("rejects duplicate-conflict recovery before readback when captured_at and ts diverge", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict([{ ...submitted[0], ts: "2026-09-16T08:05:00Z" }], {
+        code: "23505",
+      }),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when the batch repeats a metric", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict([submitted[0], { ...submitted[0], value: 26 }], {
+        code: "23505",
+      }),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows carry mismatched provenance", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    const canonical = [{ ...submitted[0], raw_payload: MANUAL_PAYLOAD }];
+    const legacy = [
+      {
+        ...submitted[0],
+        metric: "humidity_pct",
+        value: 55,
+        raw_payload: null,
+      },
+    ];
+    expect(await confirmManualSnapshotConflict([...canonical, ...legacy], { code: "23505" })).toBe(
+      false,
+    );
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on tent_id", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict(
+        [submitted[0], { ...submitted[0], metric: "humidity_pct", value: 55, tent_id: TENT_B }],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on user_id", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    expect(
+      await confirmManualSnapshotConflict(
+        [submitted[0], { ...submitted[0], metric: "humidity_pct", value: 55, user_id: "owner-b" }],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when the batch is empty", async () => {
+    backend.reads = 0;
+    expect(await confirmManualSnapshotConflict([], { code: "23505" })).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on captured_at", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    const later = "2026-09-16T09:00:00.000Z";
+    expect(
+      await confirmManualSnapshotConflict(
+        [
+          submitted[0],
+          {
+            ...submitted[0],
+            metric: "humidity_pct",
+            value: 55,
+            captured_at: later,
+            ts: later,
+          },
+        ],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
+  it("rejects duplicate-conflict recovery before readback when batch rows disagree on ts", async () => {
+    backend.rows = stored;
+    backend.reads = 0;
+    const later = "2026-09-16T09:00:00.000Z";
+    expect(
+      await confirmManualSnapshotConflict(
+        [
+          submitted[0],
+          {
+            ...submitted[0],
+            metric: "humidity_pct",
+            value: 55,
+            ts: later,
+          },
+        ],
+        { code: "23505" },
+      ),
+    ).toBe(false);
+    expect(backend.reads).toBe(0);
+  });
+
   it("never recovers an unrelated error or a non-manual write as this snapshot", async () => {
     backend.rows = stored;
     expect(await confirmManualSnapshotConflict(submitted, { code: "42501" })).toBe(false);

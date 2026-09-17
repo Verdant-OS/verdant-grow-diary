@@ -10,6 +10,7 @@ import { clearPrivateClientStateBeforeAuthIdentityChange } from "@/lib/authIdent
 const TENT_A = "11111111-1111-4111-8111-111111111111";
 const TENT_B = "22222222-2222-4222-8222-222222222222";
 const REQUIRED_A = `/sensors?tentId=${TENT_A}&tentIntent=required#manual-reading`;
+const DEEP_LINK_B = `/sensors?tentId=${TENT_B}`;
 const state = vi.hoisted(() => ({
   owner: "owner-a" as string | null,
   getUser: vi.fn(),
@@ -144,13 +145,13 @@ function RouteControls() {
   );
 }
 
-function renderProtectedSensors() {
+function renderProtectedSensors(initialEntry: string = REQUIRED_A) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const tree = () => (
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[REQUIRED_A]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <RouteControls />
         <AppShell>
           <Sensors />
@@ -222,6 +223,37 @@ describe("Sensors continuity through the real protected auth remount", () => {
     expect(await screen.findByTestId("app-shell-revalidation-failed")).toBeInTheDocument();
     expect(screen.queryByTestId("manual-reading-tent-row")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Humidity/i)).not.toBeInTheDocument();
+    expect(state.insert).not.toHaveBeenCalled();
+  });
+
+  it("preserves a humidity draft through transport revalidation and Retry recovery", async () => {
+    renderProtectedSensors();
+    await expectTarget("A");
+    fireEvent.click(screen.getByRole("button", { name: "Tent B" }));
+    await expectTarget("B");
+    fireEvent.change(screen.getByLabelText(/Humidity/i), { target: { value: "57" } });
+    const pending = await pauseOrdinaryRoute();
+    await act(async () =>
+      pending.resolve({ data: { user: null }, error: { message: "upstream unavailable" } }),
+    );
+    expect(await screen.findByTestId("app-shell-revalidation-failed")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Humidity/i)).not.toBeInTheDocument();
+    state.getUser.mockImplementation(async () => authenticated());
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await expectTarget("B");
+    expect(screen.getByLabelText(/Humidity/i)).toHaveValue(57);
+    expect(state.insert).not.toHaveBeenCalled();
+  });
+
+  it("honours a tentId deep link after auth loading without reverting to tent A", async () => {
+    const gate = deferred<AuthResult>();
+    state.getUser.mockReturnValueOnce(gate.promise);
+    renderProtectedSensors(DEEP_LINK_B);
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.queryByTestId("manual-reading-tent-row")).not.toBeInTheDocument();
+    await act(async () => gate.resolve(authenticated()));
+    await expectTarget("B");
+    expect(state.readScope).toHaveBeenLastCalledWith(TENT_B);
     expect(state.insert).not.toHaveBeenCalled();
   });
 

@@ -12,6 +12,7 @@ import { PHENO_UNTAG_BEFORE_CROSS_GROW_MOVE_COPY } from "@/lib/plantTentRelation
 
 const mocks = vi.hoisted(() => ({
   phenoHuntId: "hunt-1" as string | null,
+  huntTagLoadError: null as { message: string } | null,
   untagError: null as { message: string } | null,
   moveError: null as { message: string } | null,
   plantUpdates: [] as Array<Record<string, unknown>>,
@@ -63,10 +64,15 @@ vi.mock("@/integrations/supabase/client", () => {
           return {
             select: () => ({
               eq: () => ({
-                maybeSingle: async () => ({
-                  data: { pheno_hunt_id: mocks.phenoHuntId },
-                  error: null,
-                }),
+                maybeSingle: async () => {
+                  if (mocks.huntTagLoadError) {
+                    return { data: null, error: mocks.huntTagLoadError };
+                  }
+                  return {
+                    data: { pheno_hunt_id: mocks.phenoHuntId },
+                    error: null,
+                  };
+                },
               }),
             }),
             update: (payload: Record<string, unknown>) => {
@@ -230,6 +236,7 @@ function openDialog() {
 
 beforeEach(() => {
   mocks.phenoHuntId = "hunt-1";
+  mocks.huntTagLoadError = null;
   mocks.untagError = null;
   mocks.moveError = null;
   mocks.plantUpdates.length = 0;
@@ -325,5 +332,39 @@ describe("AssignTentDialog · hunt-linked untag then move", () => {
     expect(mocks.plantUpdates).toEqual([{ pheno_hunt_id: null, candidate_label: null }]);
     expect(screen.queryByTestId("assign-tent-option-cross-grow-tent-other")).toBeNull();
     expect(mocks.diaryInserts).toEqual([]);
+  });
+
+  it("fail-closes cross-grow when the hunt tag cannot be read", async () => {
+    mocks.huntTagLoadError = { message: "tag read failed" };
+    openDialog();
+    expect(await screen.findByTestId("assign-tent-hunt-tag-error")).toHaveTextContent(
+      PHENO_UNTAG_BEFORE_CROSS_GROW_MOVE_COPY.huntTagLoadFailed,
+    );
+    expect(screen.queryByTestId("assign-tent-pheno-untag")).toBeNull();
+    expect(screen.queryByTestId("assign-tent-option-cross-grow-tent-other")).toBeNull();
+    expect(screen.getByTestId("assign-tent-option-tent-same")).toBeInTheDocument();
+    act(() => {
+      screen.getByTestId("pick-same").click();
+    });
+    act(() => {
+      screen.getByTestId("assign-tent-submit").click();
+    });
+    await waitFor(() => expect(mocks.plantUpdates.length).toBe(1));
+    expect(mocks.plantUpdates[0]).toEqual({ tent_id: "tent-same" });
+    expect(mocks.plantUpdates[0]).not.toHaveProperty("grow_id");
+  });
+
+  it("keeps cross-grow gated after close and reopen when the plant is still hunt-linked", async () => {
+    openDialog();
+    await screen.findByTestId("assign-tent-pheno-untag");
+    act(() => {
+      mocks.dialogOnOpenChange?.(false);
+    });
+    act(() => {
+      mocks.dialogOnOpenChange?.(true);
+    });
+    await screen.findByTestId("assign-tent-pheno-untag");
+    expect(screen.queryByTestId("assign-tent-option-cross-grow-tent-other")).toBeNull();
+    expect(mocks.plantUpdates).toEqual([]);
   });
 });

@@ -73,6 +73,15 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: (table: string) => {
+        if (table === "plants") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { pheno_hunt_id: null }, error: null }),
+              }),
+            }),
+          };
+        }
         if (table === "tents") return makeBuilder();
         throw new Error(`Unexpected table in test: ${table}`);
       },

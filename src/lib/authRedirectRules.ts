@@ -133,3 +133,24 @@ export function buildSignedOutRedirect(
   }
   return `${SIGNED_OUT_LANDING}?redirectTo=${encodeURIComponent(returnTo)}`;
 }
+
+/**
+ * Keep a protected return intent across the signed-out navigation itself.
+ *
+ * `buildSignedOutRedirect` refuses to loop `/auth` onto itself, so once the
+ * shell's location is already the sign-in screen (including while the source
+ * route is still mounted behind `defaultPendingMs`) the next build collapses
+ * to bare `/auth`. Feeding that collapse into `useRequireAuth` re-runs
+ * getUser and replaces the exact `redirectTo` with nothing. Ordinary session
+ * expiry must not lose the protected destination that way.
+ */
+export function retainSignedOutReturnIntent(
+  previous: string,
+  next: string,
+  hasUser: boolean,
+): string {
+  if (hasUser) return next;
+  if (next !== SIGNED_OUT_LANDING) return next;
+  if (previous.startsWith(`${SIGNED_OUT_LANDING}?`)) return previous;
+  return next;
+}

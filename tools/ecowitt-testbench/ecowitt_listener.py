@@ -80,7 +80,8 @@ except Exception:
 VENDOR = "ecowitt_windows_testbench"
 LOG_PATH = Path(__file__).with_name("ecowitt_raw_log.jsonl")
 PORT = int(os.environ.get("VERDANT_TESTBENCH_PORT", "8787"))
-ECOWITT_LIVE_FRESHNESS = timedelta(minutes=30)
+# Constitution Sensor Truth: dateutc ≤ 15 min → live; older → stale.
+ECOWITT_LIVE_FRESHNESS = timedelta(minutes=15)
 
 app = Flask(__name__)
 
@@ -89,10 +90,23 @@ app = Flask(__name__)
 # Normalization
 # ---------------------------------------------------------------------------
 
+# Keep only the listener's configured channels. Other tent/probe channels stay
+# in metadata.raw_payload until an explicit per-listener routing map exists.
 FIELD_MAP = {
-    "temp_f": ("temp1f", "tempf", "tempinf"),
-    "humidity_percent": ("humidity1", "humidity", "humidityin"),
-    "soil_moisture_pct": ("soilmoisture1", "soilmoisture2"),
+    "temp_f": (
+        "temp1f",
+        "tempf",
+        "tempinf",
+    ),
+    "humidity_percent": (
+        "humidity1",
+        "humidity",
+        "humidityin",
+    ),
+    "soil_moisture_pct": (
+        "soilmoisture1",
+        "soilmoisture2",
+    ),
     "co2_ppm": ("co2", "co2in", "co2_ppm"),
 }
 
@@ -114,18 +128,34 @@ def normalize_metrics(payload: Dict[str, Any]) -> Dict[str, Optional[float]]:
     """Map known EcoWitt fields into Verdant canonical metric names.
 
     Unknown / missing / malformed values become ``None`` so downstream
-    code can flag them — they are never treated as healthy.
+    code can flag them — they are never treated as healthy. Unconfigured
+    grow channels remain in the raw payload and are not attributed to this
+    listener's configured tent or probe.
     """
     metrics: Dict[str, Optional[float]] = {}
+    # Case-insensitive key lookup so gateway firmware casing variants still map.
+    lower_payload = {str(k).lower(): v for k, v in payload.items()} if isinstance(payload, dict) else {}
     for canonical, candidates in FIELD_MAP.items():
         value: Optional[float] = None
         for key in candidates:
-            if key in payload:
-                value = _coerce_float(payload[key])
+            if key.lower() in lower_payload:
+                value = _coerce_float(lower_payload[key.lower()])
                 if value is not None:
                     break
         metrics[canonical] = value
     return metrics
+
+
+def is_stuck_zero_or_hundred_pct(value: Optional[float]) -> bool:
+    """True when RH/soil is stuck at the impossible healthy extremes."""
+    return value is not None and value in (0.0, 100.0)
+
+
+def metrics_force_invalid_source(metrics: Dict[str, Optional[float]]) -> bool:
+    """Stuck humidity/soil at 0 or 100 must not remain a healthy source."""
+    return is_stuck_zero_or_hundred_pct(
+        metrics.get("humidity_percent")
+    ) or is_stuck_zero_or_hundred_pct(metrics.get("soil_moisture_pct"))
 
 
 def parse_ecowitt_dateutc(value: Any) -> Optional[str]:
@@ -380,6 +410,12 @@ def _resolve_source_from_validated(
     # establish live provenance. Do not replace it with listener receive time:
     # that would make a delayed or replayed packet appear fresh.
     if looks_like_ecowitt_gateway(payload) and canonical_gateway_time is None:
+        return "invalid"
+
+    # Stuck RH/soil at 0 or 100 must never remain healthy live/demo/stale.
+    if isinstance(payload, dict) and metrics_force_invalid_source(
+        normalize_metrics(payload)
+    ):
         return "invalid"
 
     physical_gateway_evidence = _has_physical_gateway_evidence_from_validated(
@@ -1017,6 +1053,9 @@ def ecowitt() -> Any:
         env_mode=None,
         now=request_now,
     )
+    # Stuck RH/soil at 0 or 100 must never remain healthy live/demo/stale.
+    if metrics_force_invalid_source(metrics):
+        source = "invalid"
     physical_gateway_evidence = _has_physical_gateway_evidence_from_validated(
         raw, request.remote_addr, gateway_captured_at
     )

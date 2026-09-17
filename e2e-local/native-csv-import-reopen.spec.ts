@@ -158,7 +158,6 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
     context,
   }) => {
     const f = await createLocalFixture();
-    const control = await context.newPage();
     let releaseReply!: () => void;
     const replyGate = new Promise<void>((resolve) => {
       releaseReply = resolve;
@@ -171,9 +170,6 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       await signIn(page, otherFixture);
       await signOutThroughUi(page);
       await signIn(page, f);
-      // Sessions use tab-local storage. Sign in explicitly in both tabs;
-      // cross-tab sign-in is intentionally not an authentication mechanism.
-      await signIn(control, f, false);
       const before = await ownerRows(f.owner);
       const otherBefore = fingerprint(await witnessRows(f));
       const csv = largeCsv();
@@ -234,12 +230,11 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
       }
       const committedFingerprint = fingerprint({ ...before, sensor_readings: committed });
 
-      // Signing out a different tab must not discard this tab's held session
-      // or busy import. The modal cannot be dismissed during an insert, so
-      // use the browser's same-document Back before this tab's own sign-out.
+      // The modal cannot be dismissed during an insert, so use the browser's
+      // same-document Back before this tab's own real sign-out. Signing out
+      // a control tab would revoke this account's server sessions globally.
       // Route departure invalidates the import; the later account round trip
       // must not revive it. This is not a mounted-modal logout-only witness.
-      await signOutThroughUi(control);
       await expect(page.getByTestId("csv-import-inserting")).toBeVisible();
       await page.goBack();
       await expect(page).toHaveURL(returnUrl);
@@ -292,7 +287,6 @@ for (const heldAt of ["duplicate lookup", "first committed batch"] as const) {
     } finally {
       releaseReply();
       await page.close();
-      await control.close();
       await f.cleanup();
     }
   });

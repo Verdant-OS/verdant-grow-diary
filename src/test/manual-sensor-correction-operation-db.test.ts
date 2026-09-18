@@ -664,6 +664,26 @@ describe("atomic manual correction database contract", () => {
     op.originals[0].value = 54;
     denied(op, /correction_original_conflict/);
   });
+  it.each(["original", "expected", "addition"] as const)(
+    "returns a non-retryable conflict code for a deterministic %s mismatch",
+    (kind) => {
+      const op = operation();
+      if (kind === "original") op.originals[0].value = 54;
+      if (kind === "expected") op.changes[0].expectedValue = 54;
+      if (kind === "addition") {
+        op.changes[0].originalReadingId = null;
+        op.changes[0].expectedValue = null;
+      }
+      const response = rawSql(role(saveSql(op)));
+      expect(response.status).not.toBe(0);
+      expect(response.stderr).toMatch(/PT409:.*correction_original_conflict/);
+      expect(response.stderr).not.toContain("40001");
+      expect(count()).toBe(0);
+      expect(
+        sql("SELECT string_agg(value::text, ',' ORDER BY metric) FROM public.sensor_readings;"),
+      ).toBe("55,25");
+    },
+  );
   it("does not relabel a live row as manual", () => {
     sql("UPDATE public.sensor_readings SET source='live' WHERE id=" + literal(TEMP));
     denied(operation(), /correction_original_unavailable/);

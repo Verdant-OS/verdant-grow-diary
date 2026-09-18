@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient } from "@tanstack/react-query";
+import { createSensorsPageSessionController } from "@/hooks/useSensorsPageSession";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
@@ -56,14 +58,28 @@ function receipt(request: ManualCorrectionOperation) {
     error: null,
   };
 }
-function mount() {
+const clients: QueryClient[] = [];
+afterEach(() => {
+  for (const client of clients.splice(0)) client.clear();
+});
+function mount(withSession = false) {
   const saved = vi.fn();
+  const client = new QueryClient();
+  clients.push(client);
+  const session = withSession ? createSensorsPageSessionController(client, mocks.owner) : null;
+  session?.reconcileSelection({
+    intent: { tentId, requireExactMatch: true },
+    intentKey: "correction-session-test",
+    tents: [{ id: tentId }],
+    tentsLoaded: true,
+  });
   const view = render(
     <MemoryRouter>
       <ManualSensorReadingCard
         tents={[{ id: tentId, name: "Tent A" }]}
         correction={correction}
         onSaved={saved}
+        session={session ?? undefined}
       />
     </MemoryRouter>,
   );
@@ -96,9 +112,16 @@ describe("atomic correction form", () => {
     expect(mocks.replacement).not.toHaveBeenCalled();
     expect(mocks.edit).not.toHaveBeenCalled();
   });
-  it.each(["missing", "mismatch", "lost"])(
-    "keeps %s response unconfirmed with no fallback",
-    async (failure) => {
+  it.each([
+    ["missing", false],
+    ["mismatch", false],
+    ["lost", false],
+    ["missing", true],
+    ["mismatch", true],
+    ["lost", true],
+  ] as const)(
+    "keeps %s response unconfirmed with no fallback (page session: %s)",
+    async (failure, withSession) => {
       mocks.rpc.mockImplementation(async (_name, { p_request }) => {
         if (failure === "lost") throw new Error("Response lost");
         if (failure === "missing") return { data: null, error: { code: "PGRST202" } };
@@ -107,7 +130,7 @@ describe("atomic correction form", () => {
           data: { ...receipt(p_request).data, observedAt: "2026-09-17T12:00:00Z" },
         };
       });
-      const view = mount();
+      const view = mount(withSession);
       await waitFor(() =>
         expect(view.getByTestId("manual-reading-save-unconfirmed")).toHaveTextContent(
           /correction.*unconfirmed/i,

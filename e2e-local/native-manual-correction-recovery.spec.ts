@@ -201,7 +201,12 @@ test("a database-rejected multi-metric correction writes nothing and the origina
         original.value += 1;
         change.expectedValue = original.value;
       }
+      const headers = { ...route.request().headers() };
+      // A changed body must get its own byte length. Never forward the browser's
+      // original content-length with a replacement JSON payload.
+      delete headers["content-length"];
       const response = await route.fetch({
+        headers,
         postData: JSON.stringify(forwarded),
         maxRedirects: 0,
         maxRetries: 0,

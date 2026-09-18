@@ -238,7 +238,10 @@ test("a database-rejected multi-metric correction writes nothing and the origina
     expect(fingerprint(await ownerRows(f.owner))).toBe(before);
     await expect(page.locator("#m-air-temp")).toHaveValue("26");
     await expect(page.locator("#m-humidity")).toHaveValue("60");
-    await confirm(page);
+    // A rejected request keeps the review open. Retry through that existing
+    // confirmation instead of opening a second review after the retry saves.
+    await expect(page.getByTestId("manual-sensor-review-confirm")).toBeEnabled();
+    await page.getByTestId("manual-sensor-review-confirm").click();
     await expect(page.getByTestId("manual-reading-saved-confirmation")).toBeVisible();
     expect(calls).toHaveLength(2);
     expect(calls[1]).toEqual(calls[0]);

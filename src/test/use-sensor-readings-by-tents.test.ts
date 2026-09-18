@@ -7,39 +7,39 @@ import { createElement, type ReactNode } from "react";
 // rows from FIXTURES. This proves that one tent's rows cannot starve out
 // another's, which was the production "unavailable" bug.
 const FIXTURES: Record<string, Array<Record<string, unknown>>> = {
-  "tent-a": [
+  "00000000-0000-4000-8000-000000000001": [
     {
-      id: "ra1",
-      tent_id: "tent-a",
+      id: "00000000-0000-4000-8000-000000000005",
+      tent_id: "00000000-0000-4000-8000-000000000001",
       metric: "vpd_kpa",
       value: 1.0,
       ts: "2025-01-01T00:00:00Z",
       created_at: "2025-01-01T00:00:00Z",
     },
     {
-      id: "ra2",
-      tent_id: "tent-a",
+      id: "00000000-0000-4000-8000-000000000006",
+      tent_id: "00000000-0000-4000-8000-000000000001",
       metric: "vpd_kpa",
       value: 1.1,
       ts: "2025-01-01T01:00:00Z",
       created_at: "2025-01-01T01:00:00Z",
     },
   ],
-  "tent-b": [
+  "00000000-0000-4000-8000-000000000002": [
     {
-      id: "rb1",
-      tent_id: "tent-b",
+      id: "00000000-0000-4000-8000-000000000007",
+      tent_id: "00000000-0000-4000-8000-000000000002",
       metric: "vpd_kpa",
       value: 1.4,
       ts: "2025-01-01T02:00:00Z",
       created_at: "2025-01-01T02:00:00Z",
     },
   ],
-  "tent-c": [],
-  "tent-history": [
+  "00000000-0000-4000-8000-000000000003": [],
+  "00000000-0000-4000-8000-000000000004": [
     ...Array.from({ length: 205 }, (_, i) => ({
-      id: `live-${i}`,
-      tent_id: "tent-history",
+      id: `00000000-0000-4000-8000-${String(i + 100).padStart(12, "0")}`,
+      tent_id: "00000000-0000-4000-8000-000000000004",
       metric: "temperature_c",
       value: 24,
       source: "live",
@@ -47,8 +47,8 @@ const FIXTURES: Record<string, Array<Record<string, unknown>>> = {
       created_at: new Date(Date.UTC(2026, 6, 16, 12, i)).toISOString(),
     })),
     {
-      id: "csv-canonical",
-      tent_id: "tent-history",
+      id: "00000000-0000-4000-8000-000000000008",
+      tent_id: "00000000-0000-4000-8000-000000000004",
       metric: "temperature_c",
       value: 22,
       source: "csv",
@@ -56,8 +56,8 @@ const FIXTURES: Record<string, Array<Record<string, unknown>>> = {
       created_at: "2026-07-16T00:00:00Z",
     },
     {
-      id: "csv-legacy",
-      tent_id: "tent-history",
+      id: "00000000-0000-4000-8000-000000000009",
+      tent_id: "00000000-0000-4000-8000-000000000004",
       metric: "humidity_pct",
       value: 55,
       source: "csv_import_ac_infinity",
@@ -66,6 +66,20 @@ const FIXTURES: Record<string, Array<Record<string, unknown>>> = {
     },
   ],
 };
+
+// Fixtures now model the complete, validated effective-view response.
+for (const rows of Object.values(FIXTURES))
+  for (const row of rows) {
+    Object.assign(row, {
+      user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      quality: "ok",
+      captured_at: row.ts,
+      device_id: null,
+      raw_payload: null,
+      correction_valid: true,
+      source: row.source ?? "manual",
+    });
+  }
 
 const REQUESTED_TENT_IDS = vi.hoisted(() => [] as string[]);
 const FAILED_TENT_IDS = vi.hoisted(() => new Set<string>());
@@ -133,115 +147,190 @@ beforeEach(() => {
 
 describe("useSensorReadingsByTents", () => {
   it("returns each tent's own rows, isolated from other tents", async () => {
-    const { result } = renderHook(() => useSensorReadingsByTents(["tent-a", "tent-b", "tent-c"]), {
-      wrapper,
-    });
+    const { result } = renderHook(
+      () =>
+        useSensorReadingsByTents([
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002",
+          "00000000-0000-4000-8000-000000000003",
+        ]),
+      {
+        wrapper,
+      },
+    );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.byTent["tent-a"].map((r) => r.id)).toEqual(["ra1", "ra2"]);
-    expect(result.current.byTent["tent-b"].map((r) => r.id)).toEqual(["rb1"]);
-    expect(result.current.byTent["tent-c"]).toEqual([]);
+    expect(result.current.byTent["00000000-0000-4000-8000-000000000001"].map((r) => r.id)).toEqual([
+      "00000000-0000-4000-8000-000000000005",
+      "00000000-0000-4000-8000-000000000006",
+    ]);
+    expect(result.current.byTent["00000000-0000-4000-8000-000000000002"].map((r) => r.id)).toEqual([
+      "00000000-0000-4000-8000-000000000007",
+    ]);
+    expect(result.current.byTent["00000000-0000-4000-8000-000000000003"]).toEqual([]);
   });
 
   it("does not leak tent-a rows into tent-b's window (no global cap starvation)", async () => {
-    const { result } = renderHook(() => useSensorReadingsByTents(["tent-a", "tent-b"]), {
-      wrapper,
-    });
+    const { result } = renderHook(
+      () =>
+        useSensorReadingsByTents([
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002",
+        ]),
+      {
+        wrapper,
+      },
+    );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    for (const row of result.current.byTent["tent-b"]) {
-      expect(row.tent_id).toBe("tent-b");
+    for (const row of result.current.byTent["00000000-0000-4000-8000-000000000002"]) {
+      expect(row.tent_id).toBe("00000000-0000-4000-8000-000000000002");
     }
-    for (const row of result.current.byTent["tent-a"]) {
-      expect(row.tent_id).toBe("tent-a");
+    for (const row of result.current.byTent["00000000-0000-4000-8000-000000000001"]) {
+      expect(row.tent_id).toBe("00000000-0000-4000-8000-000000000001");
     }
   });
 
   it("returns empty arrays for tents with no readings (not undefined)", async () => {
-    const { result } = renderHook(() => useSensorReadingsByTents(["tent-c"]), { wrapper });
+    const { result } = renderHook(
+      () => useSensorReadingsByTents(["00000000-0000-4000-8000-000000000003"]),
+      { wrapper },
+    );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.byTent["tent-c"]).toEqual([]);
+    expect(result.current.byTent["00000000-0000-4000-8000-000000000003"]).toEqual([]);
   });
 
   it("statusByTent distinguishes an established empty result from a pending read", async () => {
-    const { result } = renderHook(() => useSensorReadingsByTents(["tent-c"]), { wrapper });
+    const { result } = renderHook(
+      () => useSensorReadingsByTents(["00000000-0000-4000-8000-000000000003"]),
+      { wrapper },
+    );
     // While pending, the slot must not claim success — absence is not
     // established yet (SENSOR TRUTH: no false "No sensor data yet").
-    expect(result.current.statusByTent["tent-c"]).toBe("loading");
+    expect(result.current.statusByTent["00000000-0000-4000-8000-000000000003"]).toBe("loading");
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.statusByTent["tent-c"]).toBe("success");
-    expect(result.current.byTent["tent-c"]).toEqual([]);
+    expect(result.current.statusByTent["00000000-0000-4000-8000-000000000003"]).toBe("success");
+    expect(result.current.byTent["00000000-0000-4000-8000-000000000003"]).toEqual([]);
   });
 
   it("reports a cached-empty background refetch without hiding other cached sensor rows", async () => {
-    const { result } = renderHook(() => useSensorReadingsByTents(["tent-a", "tent-c"]), {
-      wrapper,
-    });
-    await waitFor(() => expect(result.current.statusByTent["tent-c"]).toBe("success"));
-    expect(result.current.refreshingByTent["tent-c"]).toBe(false);
+    const { result } = renderHook(
+      () =>
+        useSensorReadingsByTents([
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000003",
+        ]),
+      {
+        wrapper,
+      },
+    );
+    await waitFor(() =>
+      expect(result.current.statusByTent["00000000-0000-4000-8000-000000000003"]).toBe("success"),
+    );
+    expect(result.current.refreshingByTent["00000000-0000-4000-8000-000000000003"]).toBe(false);
 
-    PENDING_TENT_IDS.add("tent-c");
+    PENDING_TENT_IDS.add("00000000-0000-4000-8000-000000000003");
     let retryPromise: Promise<void> | undefined;
     act(() => {
-      retryPromise = result.current.retryTent("tent-c");
+      retryPromise = result.current.retryTent("00000000-0000-4000-8000-000000000003");
     });
 
-    await waitFor(() => expect(result.current.refreshingByTent["tent-c"]).toBe(true));
-    expect(result.current.statusByTent["tent-c"]).toBe("success");
-    expect(result.current.byTent["tent-c"]).toEqual([]);
-    expect(result.current.refreshingByTent["tent-a"]).toBe(false);
-    expect(result.current.byTent["tent-a"].map((row) => row.id)).toEqual(["ra1", "ra2"]);
+    await waitFor(() =>
+      expect(result.current.refreshingByTent["00000000-0000-4000-8000-000000000003"]).toBe(true),
+    );
+    expect(result.current.statusByTent["00000000-0000-4000-8000-000000000003"]).toBe("success");
+    expect(result.current.byTent["00000000-0000-4000-8000-000000000003"]).toEqual([]);
+    expect(result.current.refreshingByTent["00000000-0000-4000-8000-000000000001"]).toBe(false);
+    expect(
+      result.current.byTent["00000000-0000-4000-8000-000000000001"].map((row) => row.id),
+    ).toEqual(["00000000-0000-4000-8000-000000000005", "00000000-0000-4000-8000-000000000006"]);
 
-    const pending = PENDING_REQUESTS.find((request) => request.tentId === "tent-c");
+    const pending = PENDING_REQUESTS.find(
+      (request) => request.tentId === "00000000-0000-4000-8000-000000000003",
+    );
     expect(pending).toBeDefined();
-    PENDING_TENT_IDS.delete("tent-c");
+    PENDING_TENT_IDS.delete("00000000-0000-4000-8000-000000000003");
     await act(async () => {
       pending?.resolve({ data: pending.rows, error: null });
       await retryPromise;
     });
 
-    await waitFor(() => expect(result.current.refreshingByTent["tent-c"]).toBe(false));
-    expect(result.current.statusByTent["tent-c"]).toBe("success");
+    await waitFor(() =>
+      expect(result.current.refreshingByTent["00000000-0000-4000-8000-000000000003"]).toBe(false),
+    );
+    expect(result.current.statusByTent["00000000-0000-4000-8000-000000000003"]).toBe("success");
   });
 
   it("retries exactly the requested tent window and ignores unknown ids", async () => {
-    const { result } = renderHook(() => useSensorReadingsByTents(["tent-a", "tent-b"]), {
-      wrapper,
-    });
+    const { result } = renderHook(
+      () =>
+        useSensorReadingsByTents([
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002",
+        ]),
+      {
+        wrapper,
+      },
+    );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(REQUESTED_TENT_IDS.filter((id) => id === "tent-a")).toHaveLength(1);
-    expect(REQUESTED_TENT_IDS.filter((id) => id === "tent-b")).toHaveLength(1);
+    expect(
+      REQUESTED_TENT_IDS.filter((id) => id === "00000000-0000-4000-8000-000000000001"),
+    ).toHaveLength(1);
+    expect(
+      REQUESTED_TENT_IDS.filter((id) => id === "00000000-0000-4000-8000-000000000002"),
+    ).toHaveLength(1);
 
     await act(async () => {
-      await result.current.retryTent("tent-b");
+      await result.current.retryTent("00000000-0000-4000-8000-000000000002");
       await result.current.retryTent("not-requested");
     });
 
-    expect(REQUESTED_TENT_IDS.filter((id) => id === "tent-a")).toHaveLength(1);
-    expect(REQUESTED_TENT_IDS.filter((id) => id === "tent-b")).toHaveLength(2);
+    expect(
+      REQUESTED_TENT_IDS.filter((id) => id === "00000000-0000-4000-8000-000000000001"),
+    ).toHaveLength(1);
+    expect(
+      REQUESTED_TENT_IDS.filter((id) => id === "00000000-0000-4000-8000-000000000002"),
+    ).toHaveLength(2);
   });
 
   it("retains cached rows and distinguishes a failed refresh from an uncached error", async () => {
-    const { result } = renderHook(() => useSensorReadingsByTents(["tent-a"]), { wrapper });
-    await waitFor(() => expect(result.current.statusByTent["tent-a"]).toBe("success"));
-    expect(result.current.byTent["tent-a"].map((row) => row.id)).toEqual(["ra1", "ra2"]);
+    const { result } = renderHook(
+      () => useSensorReadingsByTents(["00000000-0000-4000-8000-000000000001"]),
+      { wrapper },
+    );
+    await waitFor(() =>
+      expect(result.current.statusByTent["00000000-0000-4000-8000-000000000001"]).toBe("success"),
+    );
+    expect(
+      result.current.byTent["00000000-0000-4000-8000-000000000001"].map((row) => row.id),
+    ).toEqual(["00000000-0000-4000-8000-000000000005", "00000000-0000-4000-8000-000000000006"]);
 
-    FAILED_TENT_IDS.add("tent-a");
+    FAILED_TENT_IDS.add("00000000-0000-4000-8000-000000000001");
     await act(async () => {
-      await result.current.retryTent("tent-a");
+      await result.current.retryTent("00000000-0000-4000-8000-000000000001");
     });
 
-    await waitFor(() => expect(result.current.statusByTent["tent-a"]).toBe("refresh_error"));
-    expect(result.current.byTent["tent-a"].map((row) => row.id)).toEqual(["ra1", "ra2"]);
+    await waitFor(() =>
+      expect(result.current.statusByTent["00000000-0000-4000-8000-000000000001"]).toBe(
+        "refresh_error",
+      ),
+    );
+    expect(
+      result.current.byTent["00000000-0000-4000-8000-000000000001"].map((row) => row.id),
+    ).toEqual(["00000000-0000-4000-8000-000000000005", "00000000-0000-4000-8000-000000000006"]);
   });
 
   it("filters CSV sources before the cap so newer live rows cannot starve imported history", async () => {
     const { result } = renderHook(
-      () => useSensorReadingsByTents(["tent-history"], 200, AI_DOCTOR_CSV_HISTORY_SOURCES),
+      () =>
+        useSensorReadingsByTents(
+          ["00000000-0000-4000-8000-000000000004"],
+          200,
+          AI_DOCTOR_CSV_HISTORY_SOURCES,
+        ),
       { wrapper },
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.byTent["tent-history"].map((row) => row.id)).toEqual([
-      "csv-canonical",
-      "csv-legacy",
-    ]);
+    expect(
+      result.current.byTent["00000000-0000-4000-8000-000000000004"].map((row) => row.id),
+    ).toEqual(["00000000-0000-4000-8000-000000000008", "00000000-0000-4000-8000-000000000009"]);
   });
 });

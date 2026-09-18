@@ -61,7 +61,12 @@ vi.mock("@/integrations/supabase/client", () => ({
 const TENT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const ROW = {
-  id: "reading-a",
+  id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+  user_id: io.owner,
+  quality: "ok",
+  device_id: null,
+  raw_payload: null,
+  correction_valid: true,
   tent_id: TENT_A,
   metric: "temperature_c",
   value: 23,
@@ -123,7 +128,10 @@ describe("per-tent sensor read outcome honesty", () => {
 
   it("preserves a confirmed cached window while a different tent's first read is paused", () => {
     const { wrapper, client } = setup();
-    client.setQueryData(buildPrivateSensorQueryKey(io.owner, [TENT_A, 200, "all-sources"]), [ROW]);
+    client.setQueryData(
+      buildPrivateSensorQueryKey(io.owner, [TENT_A, 200, "all-sources", "effective-v1"]),
+      [ROW],
+    );
     onlineManager.setOnline(false);
     const { result } = renderHook(() => useSensorReadingsByTents([TENT_A, TENT_B]), { wrapper });
 

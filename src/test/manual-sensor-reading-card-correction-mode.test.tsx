@@ -1,23 +1,16 @@
-/**
- * ManualSensorReadingCard — correction mode wiring.
- *
- * Guarantees:
- *  - Renders banner referencing the original captured_at.
- *  - Pre-fills original values (with °C → °F conversion for air temp).
- *  - On save with ONE changed metric: inserts ONE replacement sensor
- *    reading (source=manual) AND ONE audit row with changed_fields
- *    length 1. No update/delete/upsert of the original row.
- *  - On save with TWO changed metrics: inserts TWO replacement rows and
- *    TWO audit rows (per-metric).
- *  - Metrics with no original ID are still saved (standard insert) but
- *    produce NO audit row — never infers IDs.
- *  - source_before / source_after remain "manual".
- */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
+const rpc = vi.fn();
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } }),
+}));
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { rpc: (...args: unknown[]) => rpc(...args) },
+}));
+import type { ManualCorrectionOperation } from "@/lib/manualSensorCorrectionOperationRules";
 const insertMutate = vi.fn().mockResolvedValue(undefined);
 const editMutate = vi.fn().mockResolvedValue({ id: "audit-1", changed_at: "now" });
 const returningId = vi.fn();
@@ -76,6 +69,29 @@ function renderCard(correction: ManualCorrectionContext | null) {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
+  rpc
+    .mockReset()
+    .mockImplementation(
+      async (_name, { p_request: request }: { p_request: ManualCorrectionOperation }) => ({
+        error: null,
+        data: {
+          operationId: request.operationId,
+          observedAt: request.observedAt,
+          changedAt: "2026-09-17T12:00:00Z",
+          revision: 1,
+          reused: false,
+          request,
+          changes: request.changes.map((row) => ({
+            metric: row.metric,
+            readingId: row.originalReadingId ?? R_RH_NEXT,
+            previousValue: row.expectedValue,
+            value: row.value,
+            added: row.originalReadingId === null,
+          })),
+        },
+      }),
+    );
   insertMutate.mockReset().mockResolvedValue(undefined);
   editMutate.mockReset().mockResolvedValue({ id: "audit-x", changed_at: "now" });
   returningId
@@ -120,108 +136,77 @@ describe("ManualSensorReadingCard — correction mode", () => {
     fireEvent.change(humidity, { target: { value: "43" } });
     fireEvent.click(getByTestId("manual-reading-save"));
     fireEvent.click(getByTestId("manual-sensor-review-confirm"));
-    await waitFor(() => expect(editMutate).toHaveBeenCalledTimes(1));
-    expect(editMutate.mock.calls[0][0].original_reading_id).toBe(R_RH_NEXT);
+    await waitFor(() => expect(rpc).toHaveBeenCalledTimes(1));
+    expect(rpc.mock.calls[0][1].p_request.changes[0].originalReadingId).toBe(R_RH_NEXT);
 
     rerender(card(null));
     await waitFor(() => expect(humidity.value).toBe(""));
     expect(queryByTestId("manual-reading-correction-banner")).not.toBeInTheDocument();
   });
 
-  it("ONE changed metric → ONE replacement insert + ONE audit row (changed_fields length 1)", async () => {
-    const { getByLabelText, getByTestId } = renderCard(makeCtx());
-    // Change only humidity from 58 → 62. Air temp stays at prefill 75.2°F ≈ 24°C.
-    fireEvent.change(getByLabelText(/Humidity/i), { target: { value: "62" } });
-    fireEvent.click(getByTestId("manual-reading-save"));
-    fireEvent.click(getByTestId("manual-sensor-review-confirm"));
-
-    await waitFor(() => expect(returningId).toHaveBeenCalled());
-    // Replacement inserts: one for temp_c (unchanged but still routed
-    // through returning-id because it has an origId), one for humidity.
-    // Audit inserts: only for humidity (the changed metric).
-    await waitFor(() => expect(editMutate).toHaveBeenCalledTimes(1));
-    const auditArg = editMutate.mock.calls[0][0];
-    expect(auditArg.original_reading_id).toBe(R_RH);
-    expect(auditArg.original.source).toBe("manual");
-    expect(auditArg.replacement.source).toBe("manual");
-    expect(Object.keys(auditArg.original)).toContain("humidity_pct");
-    expect(Object.keys(auditArg.replacement)).toContain("humidity_pct");
-    expect(auditArg.original.humidity_pct).toBe(58);
-    expect(auditArg.replacement.humidity_pct).toBe(62);
-    // Original row was never updated/deleted (no direct sensor_readings
-    // mutations occurred here — insertMutate is standard-path only and
-    // it must NOT have been called for metrics with an origId).
-    for (const call of insertMutate.mock.calls) {
-      const p = call[0];
-      expect(p.metric).not.toBe("humidity_pct");
-      expect(p.metric).not.toBe("temperature_c");
-    }
+  it("sends only the changed metric in one atomic operation", async () => {
+    const view = renderCard(makeCtx());
+    fireEvent.change(view.getByLabelText(/Humidity/i), { target: { value: "62" } });
+    fireEvent.click(view.getByTestId("manual-reading-save"));
+    fireEvent.click(view.getByTestId("manual-sensor-review-confirm"));
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-saved-confirmation")).toBeInTheDocument(),
+    );
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0][1].p_request.changes).toEqual([
+      { metric: "humidity_pct", originalReadingId: R_RH, expectedValue: 58, value: 62 },
+    ]);
+    expect(returningId).not.toHaveBeenCalled();
+    expect(editMutate).not.toHaveBeenCalled();
+    expect(insertMutate).not.toHaveBeenCalled();
   });
-
-  it("TWO changed metrics → TWO replacement inserts + TWO audit rows (each length 1)", async () => {
-    const { getByLabelText, getByTestId } = renderCard(makeCtx());
-    fireEvent.change(getByLabelText(/Air temp/i), { target: { value: "78" } }); // was ~75.2
-    fireEvent.change(getByLabelText(/Humidity/i), { target: { value: "62" } });
-    fireEvent.click(getByTestId("manual-reading-save"));
-    fireEvent.click(getByTestId("manual-sensor-review-confirm"));
-
-    await waitFor(() => expect(editMutate).toHaveBeenCalledTimes(2));
-    for (const call of editMutate.mock.calls) {
-      const arg = call[0];
-      expect(arg.original.source).toBe("manual");
-      expect(arg.replacement.source).toBe("manual");
-      // Each audit call carries a single changed metric — the diff
-      // builder derives changed_fields from old/new keys, so pass in
-      // exactly one metric on each side.
-      const oldKeys = Object.keys(arg.original).filter((k) => k !== "source");
-      const newKeys = Object.keys(arg.replacement).filter((k) => k !== "source");
-      expect(oldKeys.length).toBe(1);
-      expect(newKeys.length).toBe(1);
-      expect(oldKeys[0]).toBe(newKeys[0]);
-    }
+  it("submits two changed metrics together with MANUAL source", async () => {
+    const view = renderCard(makeCtx());
+    fireEvent.change(view.getByLabelText(/Air temp/i), { target: { value: "78" } });
+    fireEvent.change(view.getByLabelText(/Humidity/i), { target: { value: "62" } });
+    fireEvent.click(view.getByTestId("manual-reading-save"));
+    fireEvent.click(view.getByTestId("manual-sensor-review-confirm"));
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-saved-confirmation")).toBeInTheDocument(),
+    );
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0][1].p_request.changes).toHaveLength(2);
+    expect(rpc.mock.calls[0][1].p_request.source).toBe("manual");
+    expect(returningId).not.toHaveBeenCalled();
+    expect(editMutate).not.toHaveBeenCalled();
   });
-
-  it("metrics with no original ID are saved (standard insert) with NO audit row", async () => {
-    // Provide only a temp original ID. RH has no origId — user still
-    // enters an RH value; it must save via standard insert with no audit.
-    const ctx = makeCtx({
-      originalReadingIds: { temperature_c: R_TEMP },
-      originalValues: { temperature_c: 24 },
-    });
-    const { getByLabelText, getByTestId } = renderCard(ctx);
-    // Add a fresh humidity value (no origId → standard path).
-    fireEvent.change(getByLabelText(/Humidity/i), { target: { value: "55" } });
-    // Change temp so an audit is created for it.
-    fireEvent.change(getByLabelText(/Air temp/i), { target: { value: "78" } });
-    fireEvent.click(getByTestId("manual-reading-save"));
-    fireEvent.click(getByTestId("manual-sensor-review-confirm"));
-
-    await waitFor(() => expect(editMutate).toHaveBeenCalledTimes(1));
-    // Standard insert path was called for humidity (no origId).
-    const stdMetrics = insertMutate.mock.calls.map((c) => c[0].metric);
-    expect(stdMetrics).toContain("humidity_pct");
-    // Never for temperature_c (that went through the returning-id path).
-    expect(stdMetrics).not.toContain("temperature_c");
-    // Audit row is for temperature_c only.
-    expect(editMutate.mock.calls[0][0].original_reading_id).toBe(R_TEMP);
+  it("includes an explicitly added metric in the same operation without inventing its original ID", async () => {
+    const view = renderCard(
+      makeCtx({
+        originalReadingIds: { temperature_c: R_TEMP },
+        originalValues: { temperature_c: 24 },
+      }),
+    );
+    fireEvent.change(view.getByLabelText(/Humidity/i), { target: { value: "55" } });
+    fireEvent.click(view.getByTestId("manual-reading-save"));
+    fireEvent.click(view.getByTestId("manual-sensor-review-confirm"));
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-saved-confirmation")).toBeInTheDocument(),
+    );
+    expect(rpc.mock.calls[0][1].p_request.changes).toEqual([
+      { metric: "humidity_pct", originalReadingId: null, expectedValue: null, value: 55 },
+    ]);
+    expect(insertMutate).not.toHaveBeenCalled();
   });
-
-  it("failed replacement insert creates no audit row for that metric", async () => {
-    returningId.mockImplementation(async (p: { metric: string }) => {
-      if (p.metric === "humidity_pct") throw new Error("insert failed");
-      return { id: "new-temp", ts: "now" };
-    });
-    const { getByLabelText, getByTestId } = renderCard(makeCtx());
-    fireEvent.change(getByLabelText(/Humidity/i), { target: { value: "62" } });
-    fireEvent.change(getByLabelText(/Air temp/i), { target: { value: "78" } });
-    fireEvent.click(getByTestId("manual-reading-save"));
-    fireEvent.click(getByTestId("manual-sensor-review-confirm"));
-
-    await waitFor(() => expect(returningId).toHaveBeenCalled());
-    // No audit rows because save aborted on the first failure — critically,
-    // no audit row was written for the metric whose replacement failed.
-    for (const call of editMutate.mock.calls) {
-      expect(call[0].original_reading_id).not.toBe(R_RH);
-    }
+  it("keeps both edited metrics when the atomic correction is rejected", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
+    const view = renderCard(makeCtx());
+    fireEvent.change(view.getByLabelText(/Air temp/i), { target: { value: "78" } });
+    fireEvent.change(view.getByLabelText(/Humidity/i), { target: { value: "62" } });
+    fireEvent.click(view.getByTestId("manual-reading-save"));
+    fireEvent.click(view.getByTestId("manual-sensor-review-confirm"));
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument(),
+    );
+    expect(view.getByLabelText(/Humidity/i)).toHaveValue(62);
+    expect(view.getByLabelText(/Air temp/i)).toHaveValue(78);
+    expect(view.queryByTestId("manual-reading-saved-confirmation")).not.toBeInTheDocument();
+    expect(returningId).not.toHaveBeenCalled();
+    expect(editMutate).not.toHaveBeenCalled();
   });
 });

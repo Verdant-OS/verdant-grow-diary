@@ -46,6 +46,7 @@ import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOut
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
 import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
 import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
+import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
 import { APPROVAL_QUEUE_EMPTY_COPY, mapRiskToSeverity } from "@/lib/dashboardActionQueueViewModel";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
@@ -195,7 +196,8 @@ export default function Dashboard() {
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
-  const currentSensorSnapshot = sensorState.status === "ok" ? sensorState.snapshot : null;
+  const snapshotReadState = buildSensorSnapshotReadState(sensorState);
+  const currentSensorSnapshot = snapshotReadState.confirmedSnapshot;
   // Tent attribution for a manually saved alert, taken from the same snapshot
   // the alert was derived from. Null when the current view spans several tents
   // — inventing a winner there would pin a real breach on an arbitrary tent.
@@ -506,7 +508,7 @@ export default function Dashboard() {
                   sensorStatusByTent[tentId] === "error" ||
                   sensorStatusByTent[tentId] === "refresh_error",
               );
-              const snapshotQuality = sensorState.status === "ok" ? dashboardSensorQuality : null;
+              const snapshotQuality = currentSensorSnapshot ? dashboardSensorQuality : null;
               const isStaleSnap =
                 sensorState.status === "ok" &&
                 !!sensorState.snapshot.ts &&
@@ -514,8 +516,8 @@ export default function Dashboard() {
               const isInvalidSnap =
                 !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
               const isUnverifiedSnap =
-                sensorState.status === "ok" &&
-                sensorState.snapshot.source !== "unavailable" &&
+                currentSensorSnapshot !== null &&
+                currentSensorSnapshot.source !== "unavailable" &&
                 dashboardHealthSnapshot === null;
               if (dashboardReadingsQuery.isLoading || (!anyReading && hasPendingTentRead)) {
                 return (
@@ -1038,16 +1040,27 @@ export default function Dashboard() {
                 )}
               </div>
             )}
-            {sensorState.status === "loading" || sensorState.status === "idle" ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : sensorState.status === "unavailable" ? (
+            {snapshotReadState.pendingNotice && (
+              <p
+                role="status"
+                className="text-sm text-muted-foreground"
+                data-testid="latest-env-read-status"
+              >
+                {snapshotReadState.pendingNotice}
+              </p>
+            )}
+            {sensorState.status === "loading" ||
+            sensorState.status === "idle" ? null : sensorState.status === "unavailable" ? (
               <p className="text-sm text-muted-foreground">Sensor data unavailable.</p>
             ) : sensorState.snapshot.source === "unavailable" ? (
-              <p className="text-sm text-muted-foreground">No sensor data yet.</p>
+              snapshotReadState.pendingNotice ? null : (
+                <p className="text-sm text-muted-foreground">No sensor data yet.</p>
+              )
             ) : (
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-2">
                   <Badge variant="outline" className="text-[10px] uppercase">
+                    {snapshotReadState.pendingNotice ? "Last loaded · " : null}
                     {sensorState.snapshot.source === "csv"
                       ? buildSensorSourceDisplayLabel({
                           source: "csv",
@@ -1138,7 +1151,7 @@ export default function Dashboard() {
               />
             )}
           </section>
-          {sensorState.status === "ok" && (
+          {currentSensorSnapshot && (
             <section className="glass rounded-2xl p-4 mt-4" aria-label="Sensor Data Quality">
               {(() => {
                 const q = dashboardSensorQuality;
@@ -1467,7 +1480,11 @@ export default function Dashboard() {
                       className="mb-2"
                     />
                   )}
-                  {alerts.length === 0 ? (
+                  {snapshotReadState.pendingNotice ? (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      {snapshotReadState.pendingNotice}
+                    </p>
+                  ) : alerts.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{EMPTY_ALERTS_MESSAGE}</p>
                   ) : (
                     <ul className="space-y-2">

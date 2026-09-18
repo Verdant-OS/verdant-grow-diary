@@ -1,9 +1,13 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const H = vi.hoisted(() => ({
+  snapshotState: null as SnapshotState | null,
+  scoped: false,
+  persist: vi.fn(),
   growStatus: "loading" as "loading" | "error" | "success",
   aggregateStatus: "success" as "loading" | "error" | "success",
   perTentStatus: "success" as "loading" | "error" | "refresh_error" | "success",
@@ -86,10 +90,12 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
 
 vi.mock("@/hooks/useScopedGrow", () => ({
   useScopedGrow: () => ({
-    urlGrowId: null,
-    scopedGrow: null,
+    urlGrowId: H.scoped ? "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" : null,
+    scopedGrow: H.scoped
+      ? { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Trust Grow", stage: "veg" }
+      : null,
     scopedGrowName: null,
-    isValidScopedGrow: false,
+    isValidScopedGrow: H.scoped,
     backHref: null,
   }),
 }));
@@ -106,23 +112,24 @@ vi.mock("@/hooks/useOneTentActivationEvidence", () => ({
   }),
 }));
 vi.mock("@/hooks/useLatestSensorSnapshot", () => ({
-  useLatestSensorSnapshot: () => ({
-    status: "idle",
-    snapshot: {
-      source: "unavailable",
-      ts: null,
-      temp: null,
-      rh: null,
-      vpd: null,
-      co2: null,
-      soil: null,
-      soil_ec: null,
-      soil_temp: null,
-      ppfd: null,
-      device_id: null,
-      csvVendor: null,
+  useLatestSensorSnapshot: () =>
+    H.snapshotState ?? {
+      status: "idle",
+      snapshot: {
+        source: "unavailable",
+        ts: null,
+        temp: null,
+        rh: null,
+        vpd: null,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+        device_id: null,
+        csvVendor: null,
+      },
     },
-  }),
 }));
 vi.mock("@/hooks/useEnvironmentTrends", () => ({
   useEnvironmentTrends: () => ({
@@ -143,7 +150,7 @@ vi.mock("@/hooks/useGrowTargets", () => ({
   useGrowTargets: () => ({ status: "idle", targets: null, reload: vi.fn() }),
 }));
 vi.mock("@/hooks/usePersistEnvironmentAlerts", () => ({
-  usePersistEnvironmentAlerts: () => undefined,
+  usePersistEnvironmentAlerts: (input: unknown) => H.persist(input),
 }));
 vi.mock("@/hooks/useAlertsList", () => ({
   useAlertsList: () => ({ status: "ok", alerts: [], error: null, reload: vi.fn() }),
@@ -224,6 +231,9 @@ function pendingFirstRead(fetchStatus: "paused" | "idle") {
 
 describe("Dashboard private-read honesty boundary", () => {
   beforeEach(() => {
+    H.snapshotState = null;
+    H.scoped = false;
+    H.persist.mockClear();
     H.growStatus = "loading";
     H.aggregateStatus = "success";
     H.perTentStatus = "success";
@@ -235,6 +245,71 @@ describe("Dashboard private-read honesty boundary", () => {
     H.plantQueryOverride = {};
     H.refetch.mockClear();
   });
+
+  it.each(["isPaused", "isFetching"] as const)(
+    "retains cached values but withholds quality and persistence while %s, then confirms on completion",
+    (flag) => {
+      H.growStatus = "success";
+      H.scoped = true;
+      H.perTentRows = [
+        {
+          id: "reading-a",
+          tent_id: H.tentId,
+          metric: "temperature_c",
+          value: 24,
+          source: "manual",
+          quality: "ok",
+          ts: new Date().toISOString(),
+          captured_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        },
+      ];
+      H.snapshotState = {
+        status: "ok",
+        [flag]: true,
+        snapshot: {
+          source: "manual",
+          ts: new Date().toISOString(),
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+          co2: null,
+          soil: null,
+          soil_ec: null,
+          soil_temp: null,
+          ppfd: null,
+          device_id: null,
+          csvVendor: null,
+          tent_id: H.tentId,
+        },
+      };
+      const view = renderDashboard();
+      const environment = screen.getByRole("region", { name: "Latest environment" });
+      expect(within(environment).getByTestId("latest-env-read-status")).toHaveTextContent(
+        flag === "isPaused" ? /Waiting for connection/ : /Refreshing sensor data/,
+      );
+      expect(environment).toHaveTextContent(/Last loaded/);
+      expect(environment).toHaveTextContent(/24\.0°C|75\.2°F/);
+      expect(screen.queryByRole("region", { name: "Sensor Data Quality" })).toBeNull();
+      expect(screen.queryByTestId("dashboard-environment-snapshot-status-banner")).toBeNull();
+      const alerts = screen.getByRole("region", { name: "Environment Alerts" });
+      expect(alerts).toHaveTextContent(
+        flag === "isPaused" ? /Waiting for connection/ : /Refreshing sensor data/,
+      );
+      expect(within(alerts).queryByRole("button", { name: /Save alert/i })).toBeNull();
+      expect(H.persist).toHaveBeenLastCalledWith(expect.objectContaining({ snapshot: null }));
+
+      H.snapshotState = { ...H.snapshotState, [flag]: false };
+      view.rerenderDashboard();
+      expect(screen.queryByTestId("latest-env-read-status")).toBeNull();
+      expect(screen.getByRole("region", { name: "Sensor Data Quality" })).toBeInTheDocument();
+      expect(H.persist).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          snapshot: expect.objectContaining({ temp: 24, source: "manual" }),
+        }),
+      );
+    },
+  );
 
   it.each([
     ["tent", "paused"],

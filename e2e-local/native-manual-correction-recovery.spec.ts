@@ -150,6 +150,12 @@ test("lost committed correction reply reopens the original tent and retries one 
     await page.goto(f.env.ui + "/sensors?tentId=" + f.secondary.tentId);
     await page.getByRole("link", { name: "Reopen pending correction", exact: true }).click();
     await expect(page).toHaveURL((url) => url.hash.includes(f.primary.tentId));
+    const unit = await page
+      .getByTestId("manual-reading-temp-unit-toggle")
+      .getAttribute("data-active-unit");
+    expect(["C", "F"]).toContain(unit);
+    await expect(page.locator("#m-air-temp")).toHaveValue(unit === "F" ? "78.8" : "26");
+    await page.getByTestId("manual-reading-temp-unit-C").click();
     await expect(page.locator("#m-air-temp")).toHaveValue("26");
     await expect(page.locator("#m-humidity")).toHaveValue("60");
     await confirm(page);
@@ -213,9 +219,9 @@ test("a database-rejected multi-metric correction writes nothing and the origina
       });
       statuses.push(response.status());
       if (calls.length === 1) {
-        expect(response.ok()).toBe(false);
+        expect(response.status()).toBe(409);
         const rejection: unknown = await response.json();
-        expect(rejection).toMatchObject({ message: "correction_original_conflict" });
+        expect(rejection).toMatchObject({ code: "PT409", message: "correction_original_conflict" });
       } else {
         expect(response.ok()).toBe(true);
       }

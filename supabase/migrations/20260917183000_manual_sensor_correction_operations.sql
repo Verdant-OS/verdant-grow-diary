@@ -204,7 +204,9 @@ BEGIN
       RAISE EXCEPTION 'correction_original_unavailable' USING ERRCODE = '42501';
     END IF;
     IF abs(v_row.value - (v_original->>'value')::numeric) >= 0.000000001 THEN
-      RAISE EXCEPTION 'correction_original_conflict' USING ERRCODE = '40001';
+      -- A deterministic mismatch is HTTP 409, not a retryable serialization failure.
+      -- PostgREST can retry SQLSTATE 40001 indefinitely.
+      RAISE EXCEPTION 'correction_original_conflict' USING ERRCODE = 'PT409';
     END IF;
     v_seen_ids := array_append(v_seen_ids, v_id);
     NEW.legacy_evidence := NEW.legacy_evidence || jsonb_build_object(v_id::text, v_row.legacy_evidence);
@@ -234,7 +236,7 @@ BEGIN
          OR EXISTS (SELECT 1 FROM public.sensor_readings
            WHERE user_id = v_uid AND tent_id = NEW.tent_id AND source = 'manual'
              AND metric = v_metric AND COALESCE(captured_at, ts) = NEW.observed_at) THEN
-        RAISE EXCEPTION 'correction_original_conflict' USING ERRCODE = '40001';
+        RAISE EXCEPTION 'correction_original_conflict' USING ERRCODE = 'PT409';
       END IF;
       v_expected := NULL;
       INSERT INTO public.sensor_readings (user_id, tent_id, metric, value, source, quality,
@@ -253,7 +255,7 @@ BEGIN
         WHERE (a->>'readingId')::uuid = v_id AND a->>'metric' = v_metric
           AND abs((a->>'value')::numeric - v_expected) < 0.000000001)
         OR abs(v_value - v_expected) < 0.000000001 THEN
-        RAISE EXCEPTION 'correction_original_conflict' USING ERRCODE = '40001';
+        RAISE EXCEPTION 'correction_original_conflict' USING ERRCODE = 'PT409';
       END IF;
     END IF;
     v_changed_metrics := array_append(v_changed_metrics, v_metric);

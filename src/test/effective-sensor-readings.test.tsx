@@ -133,6 +133,10 @@ describe("effective sensor read boundary", () => {
   it("retains a successful empty read", () => {
     expect(requireEffectiveSensorReadings([])).toEqual([]);
   });
+  it("rejects duplicate reading ids in one response", () => {
+    const duplicate = row();
+    expect(() => requireEffectiveSensorReadings([duplicate, duplicate])).toThrow(/unavailable/i);
+  });
   it("routes the history query through the effective view", async () => {
     const { result } = renderHook(() => useSensorReadings(tentId), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

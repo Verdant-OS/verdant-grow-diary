@@ -38,6 +38,20 @@ describe("buildDashboardSensorHealthSummary", () => {
     }
   });
 
+  it.each([
+    ["isPaused", /Waiting for connection/],
+    ["isFetching", /Refreshing sensor data/],
+  ] as const)("withholds healthy classification while cached evidence is %s", (flag, notice) => {
+    const state = ok({ temp: 24, rh: 55, vpd: 1.1 });
+    const vm = buildDashboardSensorHealthSummary({ ...state, [flag]: true }, NOW);
+    expect(vm.status).toBe("loading");
+    expect(vm.tone).toBe("muted");
+    expect(vm.hideValues).toBe(true);
+    expect(vm.statusLabel).toBe("Checking…");
+    expect(vm.body).toMatch(notice);
+    expect(vm.body).not.toMatch(/looks usable|Healthy/i);
+  });
+
   it("returns loading for null/undefined state", () => {
     expect(buildDashboardSensorHealthSummary(null, NOW).status).toBe("loading");
     expect(buildDashboardSensorHealthSummary(undefined, NOW).status).toBe("loading");

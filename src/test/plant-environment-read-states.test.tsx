@@ -34,7 +34,16 @@ vi.mock("@/hooks/usePlantAssignedTentActions", () => ({
   usePlantAssignedTentActions: () => ({ rows: [], isLoading: false }),
 }));
 
-const key = ["plant-tent-environment", "tent-a"];
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } }),
+}));
+
+const key = [
+  "plant-tent-environment",
+  "tent-a",
+  "effective-v1",
+  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+];
 const clients: QueryClient[] = [];
 function rows() {
   const ts = new Date().toISOString();
@@ -42,7 +51,18 @@ function rows() {
     { ts, metric: "temperature_c", value: 24, source: "manual" },
     { ts, metric: "humidity_pct", value: 55, source: "manual" },
     { ts, metric: "vpd_kpa", value: 1.0, source: "manual" },
-  ];
+  ].map((row, index) => ({
+    ...row,
+    id: `bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb${index}`,
+    user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    tent_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    captured_at: ts,
+    created_at: ts,
+    device_id: null,
+    raw_payload: {},
+    quality: "good",
+    correction_valid: true,
+  }));
 }
 function mount(cached?: ReturnType<typeof rows>, tentId: string | null = "tent-a") {
   const client = new QueryClient({

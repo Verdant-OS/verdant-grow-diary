@@ -12,6 +12,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
 
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "user-1" } }),
+}));
+
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: vi.fn(),
@@ -74,6 +78,7 @@ function renderSheet() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   writeFeedingMock.mockReset();
   mockedRows = [];
 });

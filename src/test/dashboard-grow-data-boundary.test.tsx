@@ -20,6 +20,8 @@ const H = vi.hoisted(() => ({
   refetch: vi.fn(),
   tentId: "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f",
   secondTentId: "6b2d7f10-3c4e-4d6f-9a01-2b3c4d5e6f70",
+  targetsStatus: "idle" as "idle" | "ok",
+  targets: null as Record<string, { min: number | null; max: number | null }> | null,
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -147,7 +149,7 @@ vi.mock("@/hooks/useEnvironmentTrends", () => ({
   }),
 }));
 vi.mock("@/hooks/useGrowTargets", () => ({
-  useGrowTargets: () => ({ status: "idle", targets: null, reload: vi.fn() }),
+  useGrowTargets: () => ({ status: H.targetsStatus, targets: H.targets, reload: vi.fn() }),
 }));
 vi.mock("@/hooks/usePersistEnvironmentAlerts", () => ({
   usePersistEnvironmentAlerts: (input: unknown) => H.persist(input),
@@ -244,6 +246,57 @@ describe("Dashboard private-read honesty boundary", () => {
     H.tentQueryOverride = {};
     H.plantQueryOverride = {};
     H.refetch.mockClear();
+    H.targetsStatus = "idle";
+    H.targets = null;
+  });
+
+  it("withholds Target Comparison range badges while isFetching even when Last loaded values are visible", () => {
+    H.growStatus = "success";
+    H.scoped = true;
+    H.targetsStatus = "ok";
+    H.targets = {
+      temp: { min: 20, max: 22 },
+      rh: { min: 40, max: 60 },
+    };
+    H.perTentRows = [
+      {
+        id: "reading-a",
+        tent_id: H.tentId,
+        metric: "temperature_c",
+        value: 24,
+        source: "manual",
+        quality: "ok",
+        ts: new Date().toISOString(),
+        captured_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      },
+    ];
+    H.snapshotState = {
+      status: "ok",
+      isFetching: true,
+      snapshot: {
+        source: "manual",
+        ts: new Date().toISOString(),
+        temp: 24,
+        rh: 55,
+        vpd: 1.1,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+        device_id: null,
+        csvVendor: null,
+        tent_id: H.tentId,
+      },
+    };
+    renderDashboard();
+    const environment = screen.getByRole("region", { name: "Latest environment" });
+    expect(environment).toHaveTextContent(/Last loaded/);
+    const targetComparison = screen.getByRole("region", { name: "Target Comparison" });
+    expect(within(targetComparison).getByText("Unavailable")).toBeInTheDocument();
+    expect(within(targetComparison).queryByText("Needs review")).toBeNull();
+    expect(within(targetComparison).queryByText("Within configured targets")).toBeNull();
   });
 
   it.each(["isPaused", "isFetching"] as const)(

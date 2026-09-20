@@ -314,6 +314,21 @@ describe("QuickLogV2Sheet — uncertain Water recovery", () => {
     expect(committed.size).toBe(1);
   });
 
+  it("does not replace a corrupt pending Water record or send a new save", async () => {
+    window.sessionStorage.setItem("verdant:quick-log:pending-watering:v1:user-1", "invalid-json");
+    renderSheet("plant:plant-1", "water");
+    enterVolume("750");
+    clickSave();
+    await waitFor(() =>
+      expect(screen.getByTestId("qlv2-error")).toHaveTextContent(/recovery storage.*unavailable/i),
+    );
+    expect(wateringWriterMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("verdant:quick-log:pending-watering:v1:user-1")).toBe(
+      "invalid-json",
+    );
+  });
+
   it("does not dispatch Water when same-tab durable storage cannot retain the operation", async () => {
     const committed = await installAcceptedWaterLedger();
     renderSheet("plant:plant-1", "water");

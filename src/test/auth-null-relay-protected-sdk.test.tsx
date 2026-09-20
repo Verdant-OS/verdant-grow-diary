@@ -274,7 +274,8 @@ describe("protected route with actual SDK foreign-tab sign-out transport", () =>
     });
     fireEvent.submit(screen.getByRole("form", { name: "Sign in" }));
     await screen.findByLabelText("Unsaved plant observation");
-    expect(router.state.resolvedLocation?.pathname).toBe("/sensors");
+    // Destination content can mount before the router commits resolvedLocation.
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/sensors"));
     expect(screen.getByTestId("identity")).toHaveTextContent("owner-b");
     expect((await fixture.client.auth.getSession()).data.session?.user.id).toBe("owner-b");
     const committedB = renderedIdentities.filter((identity) => identity.owner === "owner-b");

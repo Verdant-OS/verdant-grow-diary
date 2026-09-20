@@ -57,6 +57,8 @@ export interface SensorsSaveClaim {
 }
 export interface SensorsPageSession {
   generation: number;
+  /** Client recovery storage failures must be visible and block a new write. */
+  recoveryError?: string;
   selection: SensorsPageSelection;
   draft: SensorsManualDraft | null;
   inFlight: SensorsSaveClaim | null;

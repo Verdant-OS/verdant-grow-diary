@@ -145,3 +145,31 @@ it("refreshes the mounted strip after its correction cache is invalidated", asyn
   });
   await waitFor(() => expect(result.current.snapshot.metrics.temp_f).toBeCloseTo(75.2));
 });
+it("withholds cached snapshot while a background correction refetch is in flight", async () => {
+  mocks.read.mockResolvedValue({ data: [row(25)], error: null });
+  const { client, result } = mount();
+  await waitFor(() => expect(result.current.status).toBe("ready"));
+  expect(result.current.snapshot.metrics.temp_f).toBe(77);
+
+  let resolveRefetch!: (value: { data: ReturnType<typeof row>[]; error: null }) => void;
+  mocks.read.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveRefetch = resolve;
+      }),
+  );
+
+  act(() => {
+    void client.invalidateQueries({ queryKey: ["sensor", "latest"] });
+  });
+
+  await waitFor(() => expect(result.current.status).toBe("loading"));
+  expect(result.current.snapshot.usable).toBe(false);
+
+  await act(async () => {
+    resolveRefetch({ data: [row(24)], error: null });
+  });
+
+  await waitFor(() => expect(result.current.status).toBe("ready"));
+  expect(result.current.snapshot.metrics.temp_f).toBeCloseTo(75.2);
+});

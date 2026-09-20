@@ -6,6 +6,8 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import { useSensorsPageSession } from "@/hooks/useSensorsPageSession";
 import type { ManualCorrectionContext } from "@/lib/manualSensorCorrectionContext";
+import { buildManualReadingPayloads } from "@/lib/sensorReadingManualEntryRules";
+import { MANUAL_RECOVERY_PREVIOUS_PENDING } from "@/lib/manualSensorPendingSnapshotStore";
 
 type Row = Record<string, unknown>;
 const backend = vi.hoisted(() => ({
@@ -90,23 +92,25 @@ function SessionCard({
   ownerId,
   target = TENT_A,
   correction,
+  tents: availableTents = tents,
 }: {
   ownerId: string;
   target?: string;
   correction?: ManualCorrectionContext;
+  tents?: typeof tents;
 }) {
   const session = useSensorsPageSession(ownerId);
   useEffect(() => {
     session?.reconcileSelection({
       intent: { tentId: target, requireExactMatch: true },
       intentKey: `fixture-required-${target}`,
-      tents,
+      tents: availableTents,
       tentsLoaded: true,
     });
-  }, [session, target]);
+  }, [session, target, availableTents]);
   return (
     <ManualSensorReadingCard
-      tents={tents}
+      tents={availableTents}
       defaultTentId={target}
       session={session ?? undefined}
       correction={correction}
@@ -114,7 +118,12 @@ function SessionCard({
   );
 }
 
-function renderSessionCard(initialOwnerId = "owner-a", initialTarget = TENT_A) {
+function renderSessionCard(
+  initialOwnerId = "owner-a",
+  initialTarget = TENT_A,
+  tentList = tents,
+  initialCorrection?: ManualCorrectionContext,
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -122,25 +131,35 @@ function renderSessionCard(initialOwnerId = "owner-a", initialTarget = TENT_A) {
     visible: boolean,
     ownerId = "owner-a",
     target = TENT_A,
+    availableTents = tentList,
     correction?: ManualCorrectionContext,
   ) => (
     <QueryClientProvider client={client}>
       <MemoryRouter>
         {visible ? (
-          <SessionCard ownerId={ownerId} target={target} correction={correction} />
+          <SessionCard
+            ownerId={ownerId}
+            target={target}
+            correction={correction}
+            tents={availableTents}
+          />
         ) : (
           <p>Protected form unmounted</p>
         )}
       </MemoryRouter>
     </QueryClientProvider>
   );
-  const view = render(tree(true, initialOwnerId, initialTarget));
+  const view = render(tree(true, initialOwnerId, initialTarget, tentList, initialCorrection));
   return {
     ...view,
     client,
     hide: () => view.rerender(tree(false)),
-    show: (ownerId?: string, target?: string, correction?: ManualCorrectionContext) =>
-      view.rerender(tree(true, ownerId, target, correction)),
+    show: (
+      ownerId?: string,
+      target?: string,
+      correction?: ManualCorrectionContext,
+      availableTents = tentList,
+    ) => view.rerender(tree(true, ownerId, target, availableTents, correction)),
   };
 }
 
@@ -272,6 +291,72 @@ describe("manual snapshot uncertain-save recovery after a document reload", () =
     expect(backend.posts).toHaveLength(2);
     expect(backend.posts[1]).toEqual(original);
     expect(backend.rows).toHaveLength(2);
+  });
+
+  it("blocks retry when sessionStorage disagrees with the restored pending snapshot", async () => {
+    renderSessionCard();
+    await submit();
+    await screen.findByTestId("manual-reading-save-unconfirmed");
+    const tampered = buildManualReadingPayloads({
+      tentId: TENT_A,
+      ts: "2026-09-15T08:00:00.000Z",
+      metrics: [
+        { metric: "temperature_c", value: 25 },
+        { metric: "humidity_pct", value: 60 },
+      ],
+    });
+    sessionStorage.setItem(
+      "verdant:sensors:pending-manual:v1:owner-a",
+      JSON.stringify({ version: 1, ownerId: "owner-a", payloads: tampered }),
+    );
+    await reviewAndConfirm();
+    expect(screen.getByTestId("manual-reading-recovery-error")).toHaveTextContent(
+      MANUAL_RECOVERY_PREVIOUS_PENDING,
+    );
+    expect(screen.getByTestId("manual-reading-save")).toBeDisabled();
+    expect(backend.posts).toHaveLength(1);
+  });
+
+  it("refuses recovery when the pending tent is no longer owned on this page", async () => {
+    const stored = buildManualReadingPayloads({
+      tentId: TENT_A,
+      ts: CAPTURED,
+      metrics: [
+        { metric: "temperature_c", value: 25 },
+        { metric: "humidity_pct", value: 60 },
+      ],
+    });
+    sessionStorage.setItem(
+      "verdant:sensors:pending-manual:v1:owner-a",
+      JSON.stringify({ version: 1, ownerId: "owner-a", payloads: stored }),
+    );
+    renderSessionCard("owner-a", TENT_B, [{ id: TENT_B, name: "Tent B" }]);
+    expect(screen.getByTestId("manual-reading-recovery-error")).toHaveTextContent(
+      "original tent is unavailable",
+    );
+    expect(screen.getByTestId("manual-reading-save")).toBeDisabled();
+    expect(backend.posts).toHaveLength(0);
+  });
+
+  it("blocks correction while a standard pending snapshot remains in browser storage after reload", async () => {
+    const first = renderSessionCard();
+    await submit();
+    await screen.findByTestId("manual-reading-save-unconfirmed");
+    first.unmount();
+    const correction: ManualCorrectionContext = {
+      tentId: TENT_A,
+      originalCapturedAt: "2026-09-15T08:00:00.000Z",
+      originalReadingIds: { humidity_pct: "33333333-3333-4333-8333-333333333333" },
+      originalValues: { humidity_pct: 42 },
+    };
+    renderSessionCard("owner-a", TENT_A, tents, correction);
+    expect(screen.getByLabelText(/Humidity/i)).toHaveValue(42);
+    expect(screen.getByLabelText(/Air temp/i)).toHaveValue(null);
+    expect(screen.queryByTestId("manual-reading-save-unconfirmed")).not.toBeInTheDocument();
+    expect(screen.getByTestId("manual-reading-recovery-error")).toHaveTextContent(
+      "original tent is unavailable",
+    );
+    expect(screen.getByTestId("manual-reading-save")).toBeDisabled();
   });
 
   it("restores an accepted snapshot after a fresh document cache and never gives its retry a new capture time", async () => {

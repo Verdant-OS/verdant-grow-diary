@@ -65,6 +65,21 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(findSupabaseTableWrites(TIMELINE_SRC, "sensor_readings", "Timeline.tsx")).toEqual([]);
   });
 
+  it("refetches manual sensor receipts when a confirmed correction lands for the owner", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /from\s+["']@\/lib\/manualSensorCorrectionEvents["'][\s\S]*subscribeManualSensorCorrections/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /subscribeManualSensorCorrections\(\s*ownerId[\s\S]{0,120}void load\(\)/,
+    );
+  });
+
+  it("counts supplemental manual sensor receipts toward Timeline evidence for the Sensors step", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /evidenceCount:\s*recentLaneRawEntries\.length\s*\+\s*manualSensorMeasurementEntries\.length/,
+    );
+  });
+
   it("gates supplemental tents and sensor_readings on directoryGrowId like the owner directory", () => {
     expect(TIMELINE_SRC).toMatch(/if\s*\(\s*directoryGrowId\s*\)\s*\{/);
     expect(TIMELINE_SRC).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*directoryGrowId\s*\)/);

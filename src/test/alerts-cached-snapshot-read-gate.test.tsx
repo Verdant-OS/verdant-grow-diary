@@ -1,8 +1,15 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SnapshotState } from "@/hooks/useLatestSensorSnapshot";
 import { EMPTY_SNAPSHOT } from "@/lib/sensorSnapshot";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
+
+const AUTO_PERSIST = readFileSync(
+  resolve(__dirname, "../components/AlertsAutoPersistForGrow.tsx"),
+  "utf8",
+);
 
 const h = vi.hoisted(() => ({ state: null as SnapshotState | null, persist: vi.fn() }));
 vi.mock("@/hooks/useGrowData", () => ({
@@ -59,5 +66,15 @@ describe("alert evidence waits for a completed current read", () => {
     expect(h.persist).toHaveBeenLastCalledWith(
       expect.objectContaining({ snapshot: null, tentId: null }),
     );
+  });
+});
+
+describe("AlertsAutoPersistForGrow — confirmed read wiring (#1555)", () => {
+  it("derives persistence input from buildSensorSnapshotReadState confirmed evidence only", () => {
+    expect(AUTO_PERSIST).toMatch(/buildSensorSnapshotReadState\s*\(\s*sensorState\s*\)/);
+    expect(AUTO_PERSIST).toMatch(
+      /buildSensorSnapshotReadState\s*\(\s*sensorState\s*\)\.confirmedSnapshot/,
+    );
+    expect(AUTO_PERSIST).not.toMatch(/snapshot:\s*sensorState\.snapshot/);
   });
 });

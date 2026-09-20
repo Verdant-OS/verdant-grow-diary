@@ -53,9 +53,29 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:entry-created["']/);
   });
 
+  it("refetches Timeline evidence when a confirmed manual correction lands", () => {
+    expect(TIMELINE_SRC).toMatch(/from\s+["']@\/lib\/manualSensorCorrectionEvents["']/);
+    expect(TIMELINE_SRC).toMatch(/\bsubscribeManualSensorCorrections\s*\(\s*ownerId/);
+    expect(TIMELINE_SRC).toMatch(
+      /subscribeManualSensorCorrections\s*\(\s*ownerId[\s\S]{0,120}void\s+load\s*\(\s*\)/,
+    );
+  });
+
   it("refetches when a tent Manual Snapshot lands in sensor_readings", () => {
     expect(TIMELINE_SRC).toMatch(/verdant:sensor-reading-created/);
     expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:sensor-reading-created["']/);
+  });
+
+  it("refetches when a confirmed manual correction lands for the signed-in owner", () => {
+    expect(TIMELINE_SRC).toMatch(/subscribeManualSensorCorrections\s*\(\s*ownerId/);
+    expect(TIMELINE_SRC).toMatch(/subscribeManualSensorCorrections[\s\S]{0,120}void\s+load\(\)/);
+    expect(TIMELINE_SRC).toMatch(/\[\s*ownerId\s*,\s*load\s*\]/);
+  });
+
+  it("counts supplemental manual sensor receipts toward timeline evidence", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /evidenceCount:\s*recentLaneRawEntries\.length\s*\+\s*manualSensorMeasurementEntries\.length/,
+    );
   });
 
   it("reads effective manual sensor values as a supplemental Timeline source", () => {

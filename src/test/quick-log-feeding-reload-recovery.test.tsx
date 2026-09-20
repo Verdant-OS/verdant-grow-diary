@@ -2,6 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import QuickLogV2Sheet from "@/components/QuickLogV2Sheet";
+import {
+  claimPendingQuickLogFeeding,
+  type PendingQuickLogFeeding,
+} from "@/lib/quickLogPendingFeedingStore";
+import { claimPendingQuickLogNote, type PendingQuickLogNote } from "@/lib/quickLogPendingNoteStore";
+import {
+  claimPendingQuickLogWatering,
+  type PendingQuickLogWatering,
+} from "@/lib/quickLogPendingWateringStore";
 import type { QuickLogFeedingEventRpcArgs } from "@/lib/writeFeedingTypedEvent";
 
 const owner = vi.hoisted(() => ({ id: "owner-a" }));
@@ -68,6 +77,88 @@ async function uncertain() {
   await waitFor(() => expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeVisible());
 }
 const storageKey = (id = "owner-a") => `verdant:quick-log:pending-feeding:v1:${id}`;
+const at = "2026-09-17T16:00:00.000Z";
+function feedingRecord(): PendingQuickLogFeeding {
+  return {
+    version: 1,
+    ownerId: "owner-a",
+    createdAt: at,
+    payload: {
+      idempotency_key: "feeding-save-12345678",
+      grow_id: "grow-a",
+      tent_id: "tent-a",
+      plant_id: "plant-a",
+      occurred_at: at,
+      nutrient_line_id: "veg-week-3",
+      volume_ml: 750,
+      products: [{ name: "Base A", amount: 2, unit: "ml_per_l" }],
+      note: "Feed-only recovery",
+    },
+    resolved: {
+      ok: true,
+      targetType: "plant",
+      targetId: "plant-a",
+      plantId: "plant-a",
+      tentId: "tent-a",
+      growId: "grow-a",
+    },
+  };
+}
+function noteRecord(): PendingQuickLogNote {
+  return {
+    version: 1,
+    ownerId: "owner-a",
+    createdAt: at,
+    payload: {
+      p_target_type: "plant",
+      p_target_id: "plant-a",
+      p_action: "note",
+      p_volume_ml: null,
+      p_note: "Note recovery wins",
+      p_temperature_c: null,
+      p_humidity_pct: null,
+      p_vpd_kpa: null,
+      p_occurred_at: at,
+      p_details: { source: "manual" },
+      p_stage: null,
+      p_idempotency_key: "note-save-12345678",
+    },
+    resolved: {
+      ok: true,
+      targetType: "plant",
+      targetId: "plant-a",
+      plantId: "plant-a",
+      tentId: "tent-a",
+      growId: "grow-a",
+    },
+    attachments: { photo: false, video: false },
+  };
+}
+function wateringRecord(): PendingQuickLogWatering {
+  return {
+    version: 1,
+    ownerId: "owner-a",
+    createdAt: at,
+    payload: {
+      idempotency_key: "water-save-12345678",
+      grow_id: "grow-a",
+      tent_id: "tent-a",
+      plant_id: "plant-a",
+      occurred_at: at,
+      volume_ml: 600,
+      note: "Water recovery wins",
+    },
+    resolved: {
+      ok: true,
+      targetType: "plant",
+      targetId: "plant-a",
+      plantId: "plant-a",
+      tentId: "tent-a",
+      growId: "grow-a",
+    },
+    attachments: { photo: false, video: false },
+  };
+}
 function acceptedThenLost() {
   const ledger = new Map<string, QuickLogFeedingEventRpcArgs>();
   rpc.mockImplementation(async (fn: string, args: QuickLogFeedingEventRpcArgs) => {
@@ -89,6 +180,33 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("Feed exact recovery through the actual typed writer", () => {
+  it("opens with a pre-seeded pending Feed without going through Save first", () => {
+    claimPendingQuickLogFeeding(feedingRecord());
+    sheet();
+    expect(screen.getByLabelText("Nutrient line")).toHaveValue("veg-week-3");
+    expect(screen.getByLabelText("Applied volume (ml)")).toHaveValue("750");
+    expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeVisible();
+    expect(screen.getByLabelText("Product 1 name")).toBeDisabled();
+  });
+
+  it("restores Note before Feed when both pending records exist for one owner", () => {
+    claimPendingQuickLogFeeding(feedingRecord());
+    claimPendingQuickLogNote(noteRecord());
+    sheet();
+    expect(screen.getByTestId("qlv2-exact-retry-lock")).toBeVisible();
+    expect(screen.getByLabelText("Note (optional)")).toHaveValue("Note recovery wins");
+    expect(screen.queryByLabelText("Nutrient line")).toBeNull();
+  });
+
+  it("restores Water before Feed when Note is absent but both Water and Feed are pending", () => {
+    claimPendingQuickLogFeeding(feedingRecord());
+    claimPendingQuickLogWatering(wateringRecord());
+    sheet();
+    expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible();
+    expect(screen.getByLabelText("Volume (ml)")).toHaveValue("600");
+    expect(screen.queryByLabelText("Nutrient line")).toBeNull();
+  });
+
   it("restores after remount on another plant and reuses one accepted RPC record", async () => {
     const ledger = acceptedThenLost();
     const first = sheet();

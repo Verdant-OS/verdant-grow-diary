@@ -69,4 +69,63 @@ describe("restored Feed presentation", () => {
     expect(JSON.stringify(record)).toBe(original);
     expect(buildFeedingRecoveryForm(record).feedingForm.products[0].name).toBe("Base A");
   });
+
+  it("keeps absent measurements empty for tent scope instead of inventing runoff or pH", () => {
+    const saved: PendingQuickLogFeeding = {
+      ...record,
+      payload: {
+        idempotency_key: "feed-save-12345",
+        grow_id: "grow-a",
+        tent_id: "tent-a",
+        plant_id: null,
+        occurred_at: "2026-09-17T16:00:00.000Z",
+        nutrient_line_id: "veg-week-3",
+        products: [{ name: "Base A" }],
+        volume_ml: 750,
+        note: null,
+      },
+      resolved: {
+        ok: true,
+        targetType: "tent",
+        targetId: "tent-a",
+        tentId: "tent-a",
+        growId: "grow-a",
+        plantId: null,
+      },
+    };
+    const restored = buildFeedingRecoveryForm(saved);
+    expect(restored.form).toMatchObject({
+      selectedKey: "tent:tent-a",
+      action: "feed",
+      note: "",
+    });
+    expect(restored.feedingForm).toEqual({
+      lineId: "veg-week-3",
+      volumeMl: "750",
+      ph: "",
+      ecIn: "",
+      ppmIn: "",
+      ecOut: "",
+      ppmOut: "",
+      runoffMl: "",
+      runoffPh: "",
+      runoffEc: "",
+      runoffPpm: "",
+      waterTempC: "",
+      note: "",
+      products: [{ name: "Base A", amount: "", unit: "" }],
+    });
+  });
+
+  it("does not modify the frozen write when restoring it repeatedly", () => {
+    const saved = structuredClone(record);
+    const before = structuredClone(saved);
+    const first = buildFeedingRecoveryForm(saved);
+    first.form.note = "Edited display object";
+    first.feedingForm.volumeMl = "900";
+    const second = buildFeedingRecoveryForm(saved);
+    expect(second.form.note).toBe("Original note");
+    expect(second.feedingForm.volumeMl).toBe("750");
+    expect(saved).toEqual(before);
+  });
 });

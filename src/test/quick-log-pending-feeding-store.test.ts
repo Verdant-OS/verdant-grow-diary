@@ -284,4 +284,17 @@ describe("owner-scoped exact pending Feed", () => {
     vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {});
     expect(clearPendingQuickLogFeeding(value)).toBe(false);
   });
+  it("fails closed when sessionStorage cannot be read", () => {
+    claimPendingQuickLogFeeding(record());
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("unavailable");
+    });
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "blocked" });
+  });
+  it("fails closed on invalid JSON without deleting evidence", () => {
+    const raw = "not-json";
+    window.sessionStorage.setItem(key(), raw);
+    expect(readPendingQuickLogFeeding("owner-a")).toEqual({ status: "blocked" });
+    expect(window.sessionStorage.getItem(key())).toBe(raw);
+  });
 });

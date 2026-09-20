@@ -57,6 +57,8 @@ export interface SensorsSaveClaim {
 }
 export interface SensorsPageSession {
   generation: number;
+  /** Client recovery storage failures must be visible and block a new write. */
+  recoveryError?: string;
   selection: SensorsPageSelection;
   draft: SensorsManualDraft | null;
   inFlight: SensorsSaveClaim | null;
@@ -408,9 +410,9 @@ export function settleSensorsSave(
         ...values,
         pendingStandardSnapshot:
           result.status === "success" ? null : current.values.pendingStandardSnapshot,
-        saveUnconfirmed:
-          result.status === "unconfirmed" &&
-          claim.correctionIdentity === STANDARD_MANUAL_CORRECTION_IDENTITY,
+        // Both forms retain an honest visible state after an ambiguous reply.
+        // Correction retry identity stays in its separate operation journal.
+        saveUnconfirmed: result.status === "unconfirmed",
       }),
     });
   }

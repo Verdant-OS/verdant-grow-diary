@@ -40,7 +40,7 @@ vi.mock("@/integrations/supabase/client", () => ({
         order: () => query,
         limit: async () => {
           const source: Source =
-            table === "sensor_readings"
+            table === "sensor_readings_effective"
               ? "manual"
               : table === "ai_doctor_sessions"
                 ? "audit"
@@ -107,7 +107,11 @@ async function settled(client: QueryClient) {
 function manualReading() {
   const at = new Date(Date.now() - 60_000).toISOString();
   return {
-    id: "manual-a",
+    id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    user_id: "11111111-1111-4111-8111-111111111111",
+    device_id: null,
+    raw_payload: null,
+    correction_valid: true,
     tent_id: TENT,
     metric: "temperature_c",
     value: 23,

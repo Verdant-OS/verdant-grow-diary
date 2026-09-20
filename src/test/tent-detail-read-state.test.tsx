@@ -114,6 +114,7 @@ function expectNoFalseAbsence() {
   ).not.toBeInTheDocument();
 }
 function expectWaiting() {
+  expect(screen.getByTestId("tent-detail-paused")).toHaveAttribute("role", "status");
   expect(screen.getByRole("status")).toHaveTextContent("Waiting for connection");
   expectNoFalseAbsence();
   expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
@@ -165,16 +166,45 @@ describe("Tent Detail read honesty with the real query", () => {
     expect(screen.getByText("No real tents yet")).toBeVisible();
     expect(fixture.fetchTent).toHaveBeenCalledExactlyOnceWith(tent.id);
   });
+  it("moves from waiting to loading while the resumed read remains unresolved", async () => {
+    const read = deferredTent();
+    fixture.fetchTent.mockReturnValue(read.promise);
+    onlineManager.setOnline(false);
+    renderPage();
+    expectWaiting();
+    act(() => onlineManager.setOnline(true));
+    expect(await screen.findByTestId("tent-detail-loading")).toHaveAttribute("aria-busy", "true");
+    expectNoFalseAbsence();
+    await act(async () => read.resolve(tent));
+    expect(await screen.findByRole("heading", { name: tent.name })).toBeVisible();
+  });
   it("shows unavailable and same-target Retry after a failed first read without empty guidance", async () => {
     fixture.fetchTent
       .mockRejectedValueOnce(new Error("private read detail"))
       .mockResolvedValue(tent);
     renderPage();
     expect(await screen.findByText("Couldn't load this tent")).toBeVisible();
+    expect(screen.getByTestId("tent-detail-error")).toHaveAttribute("role", "alert");
     expect(screen.getByText("Unavailable", { exact: true })).toBeVisible();
     expectNoFalseAbsence();
     expect(screen.queryByText("private read detail")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    fireEvent.click(screen.getByTestId("tent-detail-error-retry"));
+    expect(await screen.findByRole("heading", { name: tent.name })).toBeVisible();
+    expect(fixture.fetchTent.mock.calls).toEqual([[tent.id], [tent.id]]);
+  });
+  it("shows a failed read with Retry after reconnect and retries the same tent", async () => {
+    fixture.fetchTent
+      .mockRejectedValueOnce(new Error("private read detail"))
+      .mockResolvedValue(tent);
+    onlineManager.setOnline(false);
+    renderPage();
+    expectWaiting();
+    act(() => onlineManager.setOnline(true));
+    expect(await screen.findByText("Couldn't load this tent")).toBeVisible();
+    expect(screen.getByTestId("tent-detail-error")).toBeInTheDocument();
+    expectNoFalseAbsence();
+    expect(screen.queryByText("private read detail")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("tent-detail-error-retry"));
     expect(await screen.findByRole("heading", { name: tent.name })).toBeVisible();
     expect(fixture.fetchTent.mock.calls).toEqual([[tent.id], [tent.id]]);
   });

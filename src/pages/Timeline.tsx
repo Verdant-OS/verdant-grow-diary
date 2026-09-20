@@ -1,4 +1,5 @@
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
@@ -116,8 +117,11 @@ import {
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
-  type ManualSensorTimelineMetricRow,
 } from "@/lib/timelineManualSensorMeasurementRules";
+import {
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
@@ -862,11 +866,8 @@ export default function Timeline() {
                 setManualSensorMeasurementEntries([]);
                 return;
               }
-              let sensorQuery = supabase
-                .from("sensor_readings")
-                .select(
-                  "id,tent_id,metric,value,source,ts,captured_at,quality,user_id,created_at,device_id",
-                )
+              let sensorQuery = effectiveSensorReadingsQuery()
+                .select("*")
                 .in("tent_id", tentIds)
                 .eq("source", "manual")
                 .order("captured_at", { ascending: false, nullsFirst: false })
@@ -886,7 +887,7 @@ export default function Timeline() {
                 return;
               }
               let receipts = manualSensorReadingsToTimelineEntries(
-                sensorResult.data as ManualSensorTimelineMetricRow[],
+                requireEffectiveSensorReadings(sensorResult.data),
                 new Date(),
               );
               if (timelineDateRangeBounds.startIso) {
@@ -1035,6 +1036,13 @@ export default function Timeline() {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(
+    () =>
+      subscribeManualSensorCorrections(ownerId, () => {
+        void load();
+      }),
+    [ownerId, load],
+  );
   useEffect(() => {
     const h = () => load();
     window.addEventListener("verdant:entry-created", h);
@@ -1480,7 +1488,7 @@ export default function Timeline() {
     hasInvalidScope,
     activeReadKey,
     coreRead,
-    evidenceCount: recentLaneRawEntries.length,
+    evidenceCount: recentLaneRawEntries.length + manualSensorMeasurementEntries.length,
     hasAppliedDateBounds: Boolean(effectiveStartDate || effectiveEndDate),
     supplementalLoading,
     partialSources: partialReadSources,

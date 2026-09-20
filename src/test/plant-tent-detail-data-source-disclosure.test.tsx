@@ -191,6 +191,26 @@ describe("TentDetail page wiring", () => {
     expect(TENT_DETAIL).toMatch(/<GrowDataSourceDisclosure/);
   });
 
+  it("keeps GrowDataSourceDisclosure off the fetch-error branch", () => {
+    const errorStart = TENT_DETAIL.indexOf("if (isError) {");
+    const notFoundStart = TENT_DETAIL.indexOf("if (!tent || isQueryGrowScopeMismatch");
+    expect(errorStart).toBeGreaterThan(-1);
+    expect(notFoundStart).toBeGreaterThan(errorStart);
+    const errorBranch = TENT_DETAIL.slice(errorStart, notFoundStart);
+    expect(errorBranch).toMatch(/data-testid="tent-detail-error"/);
+    expect(errorBranch).toMatch(/Unavailable/);
+    expect(errorBranch).not.toMatch(/GrowDataSourceDisclosure/);
+    expect(errorBranch).not.toMatch(/tent-detail-data-source-disclosure/);
+  });
+
+  it("renders a paused branch before not-found for unresolved offline reads", () => {
+    expect(TENT_DETAIL).toMatch(/awaitingFirstTentRead && fetchStatus === "paused"/);
+    const pausedIdx = TENT_DETAIL.indexOf('data-testid="tent-detail-paused"');
+    const notFoundIdx = TENT_DETAIL.indexOf('data-testid="tent-detail-not-found"');
+    expect(pausedIdx).toBeGreaterThan(-1);
+    expect(notFoundIdx).toBeGreaterThan(pausedIdx);
+  });
+
   it("reads classification metadata via getGrowDataMeta", () => {
     expect(TENT_DETAIL).toMatch(/getGrowDataMeta/);
   });

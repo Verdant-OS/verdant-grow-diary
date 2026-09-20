@@ -244,6 +244,14 @@ describe("Dashboard sensor provenance fence", () => {
     expect(assemblyIndex).toBeGreaterThan(filterIndex);
   });
 
+  it("exposes background fetch and paused states on completed reads (#1555)", () => {
+    expect(LATEST_SNAPSHOT_HOOK).toMatch(/isFetching:\s*query\.isFetching/);
+    expect(LATEST_SNAPSHOT_HOOK).toMatch(/isPaused:\s*query\.isPaused/);
+    expect(LATEST_SNAPSHOT_HOOK).toMatch(
+      /TanStack Query preserves cached data during a background refetch/,
+    );
+  });
+
   it("wires the evidence-only rows into counts, charts, snapshots, and per-tent stability", () => {
     expect(DASHBOARD).toContain(
       "const dashboardSensorRows = selectDashboardSensorEvidenceRows(rawReadings)",
@@ -259,6 +267,12 @@ describe("Dashboard sensor provenance fence", () => {
       "countActivatingSensorReadings(readingsByTent[activationGraph.tentId] ?? [])",
     );
     expect(DASHBOARD).toContain("sensorReadingCount: connectedSensorReadingCount");
+    expect(DASHBOARD).toMatch(/buildSensorSnapshotReadState\s*\(\s*sensorState\s*\)/);
+    expect(DASHBOARD).toMatch(
+      /const\s+currentSensorSnapshot\s*=\s*snapshotReadState\.confirmedSnapshot/,
+    );
+    expect(DASHBOARD).toMatch(/dashboardSnapshotForHealthyCues\s*\(\s*currentSensorSnapshot\s*\)/);
+    expect(DASHBOARD).toMatch(/evaluateDashboardSensorQuality\s*\(\s*currentSensorSnapshot/);
     expect(DASHBOARD).toContain("dashboardSnapshotForHealthyCues(");
     expect(DASHBOARD).toContain("evaluateDashboardSensorQuality(");
     expect(DASHBOARD).toMatch(

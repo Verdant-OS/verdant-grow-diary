@@ -94,6 +94,10 @@ vi.mock("@/integrations/supabase/client", () => {
         spec.filters.push({ op: "lt", column, value });
         return query;
       },
+      in(column: string, value: unknown) {
+        spec.filters.push({ op: "eq", column, value });
+        return query;
+      },
       order() {
         return query;
       },
@@ -302,6 +306,28 @@ describe("Timeline local-day query integration (America/Chicago)", () => {
     expect(findFilter(diarySpec, "lte", "entry_at")).toBe(LOCAL_DAY_END_ISO);
     expect(findFilter(growEventSpec, "gte", "occurred_at")).toBe(LOCAL_DAY_START_ISO);
     expect(findFilter(growEventSpec, "lte", "occurred_at")).toBe(LOCAL_DAY_END_ISO);
+  });
+
+  it("the manual sensor effective query receives the same local-day ISO bounds on ts", async () => {
+    harness.executeQuery.mockImplementation((spec) => {
+      if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
+      if (spec.table === "tents") return { data: [{ id: "tent-1" }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: [], error: null };
+      return { data: [], error: null };
+    });
+
+    renderTimeline("/timeline?start=2026-07-15&end=2026-07-15");
+
+    await waitFor(() => {
+      expect(harness.capturedQueries.some((q) => q.table === "sensor_readings_effective")).toBe(
+        true,
+      );
+    });
+
+    const sensorSpec = harness.capturedQueries.find((q) => q.table === "sensor_readings_effective");
+    expect(findFilter(sensorSpec, "gte", "ts")).toBe(LOCAL_DAY_START_ISO);
+    expect(findFilter(sensorSpec, "lte", "ts")).toBe(LOCAL_DAY_END_ISO);
+    expect(findFilter(sensorSpec, "eq", "source")).toBe("manual");
   });
 
   it("loadOlder() issues the identical local-day bounds as the initial page", async () => {

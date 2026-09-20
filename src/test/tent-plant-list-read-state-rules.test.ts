@@ -89,4 +89,26 @@ describe("buildTentPlantListReadView", () => {
     expect(view.showRows).toBe(true);
     expect(view.complete).toBe(false);
   });
+
+  it("shows loading when both reads are still unresolved", () => {
+    const view = buildTentPlantListReadView(
+      { data: undefined, isPending: true },
+      { data: undefined, isPending: true },
+    );
+    expect(view.status).toBe("loading");
+    expect(view.message).toBe("Loading plants in this tent…");
+    expect(view.showRows).toBe(false);
+    expect(view.canRetry).toBe(false);
+  });
+
+  it("surfaces unavailable when only the active query fails after all-plants is ready", () => {
+    const view = buildTentPlantListReadView(
+      { data: [plant("a"), plant("b")], isPending: false, fetchStatus: "idle" },
+      { data: undefined, isError: true },
+    );
+    expect(view.status).toBe("unavailable");
+    expect(view.plants).toEqual([plant("a"), plant("b")]);
+    expect(view.canRetry).toBe(true);
+    expect(view.complete).toBe(false);
+  });
 });

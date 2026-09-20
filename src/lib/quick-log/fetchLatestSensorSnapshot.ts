@@ -9,13 +9,12 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import type { QuickLogSensorSnapshot } from "./createQuickLogEvent";
+import { acquireQuickLogSensorSnapshot } from "./quickLogSensorSnapshotAcquisitionRules";
 import {
-  acquireQuickLogSensorSnapshot,
-  type QuickLogSensorAcquisitionRow,
-} from "./quickLogSensorSnapshotAcquisitionRules";
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 
-const QUICK_LOG_SENSOR_ROW_COLUMNS =
-  "id,metric,value,quality,source,captured_at,ts,created_at,raw_payload";
 const QUICK_LOG_SENSOR_LOOKBACK_MS = 4 * 60 * 60 * 1000;
 const QUICK_LOG_SENSOR_ROW_LIMIT = 200;
 
@@ -34,9 +33,8 @@ export async function fetchLatestSensorSnapshot(
   if (!capturedAt || !Number.isFinite(capturedAtMs)) return null;
 
   const lowerBound = new Date(capturedAtMs - QUICK_LOG_SENSOR_LOOKBACK_MS).toISOString();
-  const { data: rows, error: rowsError } = await supabase
-    .from("sensor_readings")
-    .select(QUICK_LOG_SENSOR_ROW_COLUMNS)
+  const { data: rows, error: rowsError } = await effectiveSensorReadingsQuery()
+    .select("*")
     .eq("tent_id", tentId)
     .gte("captured_at", lowerBound)
     .lte("captured_at", capturedAt)
@@ -46,5 +44,11 @@ export async function fetchLatestSensorSnapshot(
     .limit(QUICK_LOG_SENSOR_ROW_LIMIT);
 
   if (rowsError || !Array.isArray(rows)) return null;
-  return acquireQuickLogSensorSnapshot(rows as unknown as QuickLogSensorAcquisitionRow[]).snapshot;
+  try {
+    return acquireQuickLogSensorSnapshot(requireEffectiveSensorReadings(rows)).snapshot;
+  } catch {
+    // Optional evidence must not attach unverified correction values, nor
+    // recover them from the older flat RPC projection.
+    return null;
+  }
 }

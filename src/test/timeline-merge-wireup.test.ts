@@ -58,8 +58,9 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:sensor-reading-created["']/);
   });
 
-  it("reads manual sensor_readings as a supplemental Timeline source", () => {
-    expect(TIMELINE_SRC).toMatch(/from\(\s*["']sensor_readings["']\s*\)/);
+  it("reads effective manual sensor values as a supplemental Timeline source", () => {
+    expect(TIMELINE_SRC).toContain("effectiveSensorReadingsQuery()");
+    expect(TIMELINE_SRC).toContain("requireEffectiveSensorReadings(sensorResult.data)");
     expect(TIMELINE_SRC).toMatch(/eq\(\s*["']source["']\s*,\s*["']manual["']\s*\)/);
     expect(findSupabaseTableWrites(TIMELINE_SRC, "sensor_readings", "Timeline.tsx")).toEqual([]);
   });

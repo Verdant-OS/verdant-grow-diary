@@ -5,6 +5,7 @@ import { Bell, LogOut, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/store/auth";
+import { useManualSensorCorrectionRefresh } from "@/hooks/useManualSensorCorrectionRefresh";
 import { useHydrated } from "@/hooks/useHydrated";
 import { AUTH_REVALIDATE_EVENT, useRequireAuth } from "@/hooks/useRequireAuth";
 import {
@@ -77,6 +78,7 @@ export default function AppShell({ children }: { children?: ReactNode }) {
   // issues: a cached user while getUser() is still settling, missed
   // (revalidation_failed) or is about to redirect must not fire any of them.
   const sessionReady = !loading && !!user && authStatus === "authenticated";
+  useManualSensorCorrectionRefresh(sessionReady ? user.id : null);
   // Same trust gate as alerts (#1256 P2): the entitlements read is
   // presentation-only, but GET /rest/v1/subscriptions and user_roles are
   // still private REST.

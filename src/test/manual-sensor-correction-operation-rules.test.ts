@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildManualCorrectionOperation } from "@/lib/manualSensorCorrectionOperationRules";
+import {
+  buildManualCorrectionOperation,
+  isObservationTimestamp,
+} from "@/lib/manualSensorCorrectionOperationRules";
 import type { ManualCorrectionContext } from "@/lib/manualSensorCorrectionContext";
 import type { ManualReadingMetric } from "@/lib/sensorReadingManualEntryRules";
 
@@ -193,4 +196,19 @@ describe("manual correction operation identity and observation contract", () => 
   ])("rejects a no-op submission", ({ metrics }) => {
     expect(build(context(), metrics)).toEqual({ ok: false, reason: "no_changes" });
   });
+});
+
+describe("isObservationTimestamp", () => {
+  it("accepts PostgreSQL microsecond precision and explicit offsets", () => {
+    expect(isObservationTimestamp("2026-09-15T08:00:00.123456+00:00")).toBe(true);
+    expect(isObservationTimestamp("2026-09-15T08:00:00Z")).toBe(true);
+    expect(isObservationTimestamp("2026-09-15T08:00:00-05:00")).toBe(true);
+  });
+
+  it.each(["2026-02-30T00:00:00Z", "2026-09-16", "not-a-date", "", 0, null])(
+    "rejects ambiguous or invalid observation times: %j",
+    (value) => {
+      expect(isObservationTimestamp(value)).toBe(false);
+    },
+  );
 });

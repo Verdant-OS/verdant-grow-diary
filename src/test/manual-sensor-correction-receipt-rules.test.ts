@@ -103,6 +103,12 @@ describe("manual correction receipt confirmation", () => {
     r.changes[1] = r.changes[0];
     expect(confirmManualCorrectionReceipt(r, operation())).toBe(false);
   });
+
+  it("rejects an added change that reuses an original reading identity", () => {
+    const r = receipt();
+    r.changes[0] = { ...r.changes[0], readingId: original, added: true };
+    expect(confirmManualCorrectionReceipt(r, operation())).toBe(false);
+  });
   it("is deterministic and leaves caller values untouched", () => {
     const r = receipt();
     const o = operation();

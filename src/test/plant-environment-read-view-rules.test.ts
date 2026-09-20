@@ -18,6 +18,23 @@ describe("buildPlantEnvironmentReadView", () => {
     });
   });
 
+  it("prefers paused over error when fetchStatus is paused", () => {
+    const view = buildPlantEnvironmentReadView({
+      enabled: true,
+      hasCachedReadings: false,
+      fetchStatus: "paused",
+      isError: true,
+      isFetching: false,
+    });
+    expect(view).toMatchObject({
+      kind: "paused",
+      summaryLabel: "Waiting for connection",
+      canAssessCurrent: false,
+      canRetry: false,
+    });
+    expect(view.message).toMatch(/Waiting for connection to load sensor readings/);
+  });
+
   it.each([
     [true, "Waiting for connection · Cached"],
     [false, "Waiting for connection"],

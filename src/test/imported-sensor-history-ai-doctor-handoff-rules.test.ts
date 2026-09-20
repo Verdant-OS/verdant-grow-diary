@@ -52,6 +52,7 @@ describe("imported sensor history AI Doctor handoff rules", () => {
     [{ isError: false, isFetching: true, hasRows: false }, "loading"],
     [{ isError: false, isFetching: true, hasRows: true }, "success"],
     [{ isError: false, isFetching: false, hasRows: false }, "success"],
+    [{ isError: false, isPending: true, hasRows: false, isFetching: false }, "loading"],
     [{ isError: false, isPaused: true, hasRows: false, isFetching: false }, "paused"],
     [{ isError: false, isPaused: true, hasRows: false, isFetching: true }, "paused"],
     [{ isError: false, isPaused: true, hasRows: true, isFetching: true }, "success"],
@@ -60,16 +61,17 @@ describe("imported sensor history AI Doctor handoff rules", () => {
   });
 
   it.each([
-    ["loading", "history_loading"],
-    ["paused", "history_loading"],
-    ["error", "history_error"],
-    ["success", "history_empty"],
-  ] as const)("distinguishes %s history as %s", (historyStatus, expectedState) => {
+    ["loading", "history_loading", /Imported sensor history is still loading/],
+    ["paused", "history_loading", /Waiting for a connection to check imported sensor history/],
+    ["error", "history_error", /could not be checked right now/i],
+    ["success", "history_empty", /no imported CSV sensor history/i],
+  ] as const)("distinguishes %s history as %s", (historyStatus, expectedState, bodyPattern) => {
     const result = buildImportedSensorHistoryAiDoctorHandoff(
       input({ historyStatus, readings: [] }),
     );
 
     expect(result.state).toBe(expectedState);
+    expect(result.body).toMatch(bodyPattern);
     expect(result.validObservationCount).toBe(0);
     expect(result.distinctTimestampCount).toBe(0);
     expect(result.choices).toEqual([]);

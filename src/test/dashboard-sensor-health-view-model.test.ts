@@ -38,6 +38,36 @@ describe("buildDashboardSensorHealthSummary", () => {
     }
   });
 
+  it.each([
+    ["live", "isPaused"],
+    ["manual", "isPaused"],
+    ["live", "isFetching"],
+    ["manual", "isFetching"],
+  ] as const)(
+    "withholds healthy classification for cached %s evidence while %s",
+    (source, flag) => {
+      const vm = buildDashboardSensorHealthSummary(
+        {
+          status: "ok",
+          snapshot: {
+            ...EMPTY_SNAPSHOT,
+            source,
+            ts: new Date(NOW - 60_000).toISOString(),
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+          },
+          [flag]: true,
+        },
+        NOW,
+      );
+      expect(vm.status).toBe("loading");
+      expect(vm.statusLabel).toBe("Checking…");
+      expect(vm.hideValues).toBe(true);
+      expect(vm.headline).not.toMatch(/usable|Healthy/i);
+    },
+  );
+
   it("returns loading for null/undefined state", () => {
     expect(buildDashboardSensorHealthSummary(null, NOW).status).toBe("loading");
     expect(buildDashboardSensorHealthSummary(undefined, NOW).status).toBe("loading");

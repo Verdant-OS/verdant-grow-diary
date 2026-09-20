@@ -41,6 +41,25 @@ describe("current snapshot read evidence", () => {
     expect(result.pendingNotice).toContain("Waiting for connection");
     expect(result.pendingNotice).not.toContain("Last loaded readings");
   });
+  it("does not describe an in-flight refresh as last loaded when no cached values exist", () => {
+    const result = buildSensorSnapshotReadState({
+      status: "ok",
+      snapshot: EMPTY_SNAPSHOT,
+      isFetching: true,
+    });
+    expect(result.confirmedSnapshot).toBeNull();
+    expect(result.pendingNotice).toMatch(/Loading sensor data/);
+    expect(result.pendingNotice).not.toContain("Last loaded readings");
+  });
+  it("keeps loading status honest when only unavailable cache exists", () => {
+    const result = buildSensorSnapshotReadState({
+      status: "loading",
+      snapshot: EMPTY_SNAPSHOT,
+    });
+    expect(result.confirmedSnapshot).toBeNull();
+    expect(result.pendingNotice).toMatch(/Loading sensor data/);
+    expect(result.pendingNotice).not.toContain("Last loaded readings");
+  });
   it("keeps a failed read unavailable even when old values are present", () => {
     expect(
       buildSensorSnapshotReadState({ status: "unavailable", snapshot, isPaused: true }),

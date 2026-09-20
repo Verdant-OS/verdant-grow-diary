@@ -43,16 +43,28 @@ describe("buildDashboardSensorHealthSummary", () => {
     expect(buildDashboardSensorHealthSummary(undefined, NOW).status).toBe("loading");
   });
 
-  it("returns missing for unavailable snapshot — never healthy", () => {
+  it("distinguishes a failed read from a completed empty read", () => {
     const vm = buildDashboardSensorHealthSummary(
       { status: "unavailable", snapshot: EMPTY_SNAPSHOT },
       NOW,
     );
-    expect(vm.status).toBe("missing");
+    expect(vm.status).toBe("unavailable");
     expect(vm.tone).toBe("muted");
-    expect(vm.statusLabel).toBe("Missing");
+    expect(vm.statusLabel).toBe("Unavailable");
     expect(vm.sourceLabel).toBe("Unknown");
     expect(vm.hideValues).toBe(true);
+    expect(vm.headline).not.toMatch(/No sensor data yet/);
+    expect(vm.body).toMatch(/could not be confirmed/i);
+  });
+
+  it("does not reuse retained live values to explain a failed read", () => {
+    const state = ok({ temp: 24, rh: 55, vpd: 1.1 });
+    const vm = buildDashboardSensorHealthSummary({ ...state, status: "unavailable" }, NOW);
+    expect(vm.status).toBe("unavailable");
+    expect(vm.sourceLabel).toBe("Unknown");
+    expect(vm.hideValues).toBe(true);
+    expect(vm.reasons).toEqual([]);
+    expect(vm.headline).not.toMatch(/No sensor data|healthy|usable/i);
   });
 
   it("returns missing when all metric values are null even if status==ok", () => {

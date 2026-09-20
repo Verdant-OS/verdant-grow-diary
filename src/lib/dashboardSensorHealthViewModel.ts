@@ -16,8 +16,10 @@ import { type SensorQualityResult } from "@/lib/sensorQuality";
 import { evaluateDashboardSensorQuality } from "@/lib/dashboardSensorEvidenceRules";
 import { resolveSensorSourceLabel } from "@/lib/sensorSourceLabelRules";
 import type { SensorReadingSource } from "@/mock";
+import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 
-export type SensorHealthStatus = "loading" | "missing" | "invalid" | "stale" | "watch" | "healthy";
+export type SensorHealthStatus =
+  "loading" | "unavailable" | "missing" | "invalid" | "stale" | "watch" | "healthy";
 
 export type SensorHealthTone = "ok" | "warn" | "bad" | "muted";
 
@@ -46,6 +48,7 @@ export interface SensorHealthSummary {
 
 const TONE_BY_STATUS: Record<SensorHealthStatus, SensorHealthTone> = {
   loading: "muted",
+  unavailable: "muted",
   missing: "muted",
   invalid: "bad",
   stale: "warn",
@@ -55,6 +58,7 @@ const TONE_BY_STATUS: Record<SensorHealthStatus, SensorHealthTone> = {
 
 const STATUS_LABEL: Record<SensorHealthStatus, string> = {
   loading: "Checking…",
+  unavailable: "Unavailable",
   missing: "Missing",
   invalid: "Invalid",
   stale: "Stale",
@@ -94,14 +98,31 @@ export function buildDashboardSensorHealthSummary(
   state: SnapshotState | null | undefined,
   now: number = Date.now(),
 ): SensorHealthSummary {
-  if (!state || state.status === "idle" || state.status === "loading") {
+  const readState = buildSensorSnapshotReadState(state);
+  if (!state || readState.pendingNotice) {
     return {
       status: "loading",
       tone: "muted",
       statusLabel: STATUS_LABEL.loading,
       headline: "Checking sensor health…",
-      body: "Loading the most recent sensor snapshot for this grow.",
+      body: readState.pendingNotice ?? "Loading the most recent sensor snapshot for this grow.",
       sourceLabel: EMPTY_VALUE,
+      stale: false,
+      reasons: [],
+      suspiciousFields: [],
+      safeByDesignNote: SENSOR_HEALTH_SAFE_BY_DESIGN_NOTE,
+      hideValues: true,
+    };
+  }
+
+  if (state.status === "unavailable") {
+    return {
+      status: "unavailable",
+      tone: "muted",
+      statusLabel: STATUS_LABEL.unavailable,
+      headline: "Sensor health is unavailable.",
+      body: "Sensor readings could not be confirmed. Try refreshing this page.",
+      sourceLabel: "Unknown",
       stale: false,
       reasons: [],
       suspiciousFields: [],
@@ -114,11 +135,7 @@ export function buildDashboardSensorHealthSummary(
   const quality = evaluateDashboardSensorQuality(snapshot, now);
 
   // Missing: no snapshot or all metric values are null.
-  if (
-    state.status === "unavailable" ||
-    snapshot.source === "unavailable" ||
-    quality.quality === "unavailable"
-  ) {
+  if (snapshot.source === "unavailable" || quality.quality === "unavailable") {
     return {
       status: "missing",
       tone: "muted",

@@ -143,6 +143,10 @@ export function usePersistEnvironmentAlerts(
     }
 
     let cancelled = false;
+    const activeKeys = inFlightKeys.current;
+    // Reservations belong to this read until its request actually starts.
+    // Release unstarted work on cleanup so a newer confirmed read can proceed.
+    const pendingKeys = new Set<string>();
 
     (async () => {
       // 1. Re-derive alerts from the rules layer (single source of truth).
@@ -198,6 +202,8 @@ export function usePersistEnvironmentAlerts(
         return;
       }
 
+      if (cancelled) return;
+
       // The tent this run's evidence belongs to (null when the snapshot spans
       // several tents, or none is known).
       const observedTentId = input.tentId ?? null;
@@ -243,8 +249,9 @@ export function usePersistEnvironmentAlerts(
       const toInsert = persistable.filter((a) => {
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
         if (existing.has(key)) return false;
-        if (inFlightKeys.current.has(key)) return false;
-        inFlightKeys.current.add(key);
+        if (activeKeys.has(key)) return false;
+        activeKeys.add(key);
+        pendingKeys.add(key);
         return true;
       });
 
@@ -263,7 +270,9 @@ export function usePersistEnvironmentAlerts(
       let lastError: string | null = null;
 
       for (const a of toInsert) {
+        if (cancelled) return;
         const key = scopedKey(observedTentId, derivedAlertKey(a, SOURCE));
+        pendingKeys.delete(key);
         try {
           // Explicit refs only: metric_refs (sensor_readings) first, then
           // diary_evidence_ref (Environment Check diary row). Never
@@ -292,7 +301,7 @@ export function usePersistEnvironmentAlerts(
           persistedCount += 1;
         } catch (err) {
           // Release the in-flight guard so a later real attempt can retry.
-          inFlightKeys.current.delete(key);
+          activeKeys.delete(key);
           lastError = (err as Error).message ?? "insert failed";
         }
       }
@@ -308,6 +317,8 @@ export function usePersistEnvironmentAlerts(
 
     return () => {
       cancelled = true;
+      for (const key of pendingKeys) activeKeys.delete(key);
+      pendingKeys.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

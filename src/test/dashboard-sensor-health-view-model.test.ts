@@ -38,6 +38,35 @@ describe("buildDashboardSensorHealthSummary", () => {
     }
   });
 
+  it.each([
+    ["live", "isPaused", /Waiting for connection/],
+    ["manual", "isPaused", /Waiting for connection/],
+    ["live", "isFetching", /Refreshing sensor data/],
+    ["manual", "isFetching", /Refreshing sensor data/],
+  ] as const)("withholds health for cached %s evidence while %s", (source, flag, notice) => {
+    const vm = buildDashboardSensorHealthSummary(
+      {
+        status: "ok",
+        snapshot: {
+          ...EMPTY_SNAPSHOT,
+          source,
+          ts: new Date(NOW - 60_000).toISOString(),
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+        },
+        [flag]: true,
+      },
+      NOW,
+    );
+    expect(vm.status).toBe("loading");
+    expect(vm.tone).toBe("muted");
+    expect(vm.hideValues).toBe(true);
+    expect(vm.sourceLabel).toBe("—");
+    expect(vm.body).toMatch(notice);
+    expect(vm.statusLabel).not.toBe("Healthy");
+  });
+
   it("returns loading for null/undefined state", () => {
     expect(buildDashboardSensorHealthSummary(null, NOW).status).toBe("loading");
     expect(buildDashboardSensorHealthSummary(undefined, NOW).status).toBe("loading");

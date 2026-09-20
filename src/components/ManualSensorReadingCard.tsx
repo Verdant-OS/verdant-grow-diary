@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useReducer,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -49,17 +50,12 @@ import {
   toFahrenheitInputString,
   type TemperatureInputUnit,
 } from "@/lib/sensorInputUnitConversion";
-import {
-  buildManualSaveSuccessLine,
-  mapManualSaveErrorToUserMessage,
-} from "@/lib/manualSensorSaveConfirmation";
-import { useInsertSensorReading } from "@/hooks/useInsertSensorReading";
+import { buildManualSaveSuccessLine } from "@/lib/manualSensorSaveConfirmation";
 import { useInsertSensorReadings } from "@/hooks/useInsertSensorReadings";
 import {
   buildManualReadingPayloads,
   validateManualEntry,
   type ManualEntryInput,
-  type ManualMetric,
 } from "@/lib/sensorReadingManualEntryRules";
 import {
   getManualSensorDeviceOptions,
@@ -74,6 +70,7 @@ import {
 import ManualSensorSnapshotQualityBadge from "@/components/ManualSensorSnapshotQualityBadge";
 import ManualSensorSnapshotReviewPanel from "@/components/ManualSensorSnapshotReviewPanel";
 import { reviewManualSensorSnapshot } from "@/lib/sensorSnapshotReviewRules";
+import { reviewManualSensorCorrection } from "@/lib/manualSensorCorrectionReviewRules";
 import DerivedVpdStatus from "@/components/DerivedVpdStatus";
 import {
   validateManualSensorSnapshotFields,
@@ -93,8 +90,18 @@ import {
   encodeManualCorrectionHash,
   type ManualCorrectionContext,
 } from "@/lib/manualSensorCorrectionContext";
-import { insertManualSensorReadingReturningId } from "@/lib/insertManualSensorReadingReturningId";
-import { insertManualSnapshotEdit } from "@/hooks/useInsertManualSnapshotEdit";
+import { useAuth } from "@/store/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { buildManualCorrectionOperation } from "@/lib/manualSensorCorrectionOperationRules";
+import { createManualCorrectionJournal } from "@/lib/manualSensorCorrectionPendingStore";
+import {
+  getPendingCorrectionRecovery,
+  restoreManualCorrectionDraft,
+} from "@/lib/manualSensorCorrectionRecoveryRules";
+import {
+  submitPendingManualCorrection,
+  type ManualCorrectionRpcClient,
+} from "@/lib/manualSensorCorrectionService";
 import { formatSnapshotTimestamp } from "@/lib/dateFormat";
 
 interface TentOption {
@@ -112,9 +119,8 @@ interface Props {
   /**
    * When set, the card runs in correction mode: pre-fills original values,
    * shows a banner referencing the original captured_at, and on save
-   * inserts a linked `manual_sensor_snapshot_edits` row per changed
-   * metric that has a known original reading ID. The original
-   * sensor_readings row is never touched. Source stays MANUAL.
+   * submits one atomic correction operation, retaining the original observation
+   * time and MANUAL source. Original sensor_readings rows remain untouched.
    */
   correction?: ManualCorrectionContext | null;
   /** Account-bound runtime continuity supplied only by the Sensors page. */
@@ -133,6 +139,8 @@ const EMPTY: ManualEntryInput = {
 const STANDARD_TARGET_CONTEXT = STANDARD_MANUAL_CORRECTION_IDENTITY;
 const subscribeWithoutSession = () => () => {};
 const readWithoutSession = () => null;
+const CORRECTION_SAVE_UNCONFIRMED_MESSAGE =
+  "Manual correction save is unconfirmed. Your readings are still here. Retry the same correction to confirm it.";
 const STANDARD_SAVE_UNCONFIRMED_MESSAGE =
   "Manual snapshot save is unconfirmed. Your readings are still here. Retry this snapshot to confirm it.";
 
@@ -164,16 +172,42 @@ export default function ManualSensorReadingCard({
   correction,
   session,
 }: Props) {
+  const { user } = useAuth();
+  const ownerId = user?.id ?? "";
+  const ownerRef = useRef(ownerId);
+  ownerRef.current = ownerId;
+  const correctionJournal = useMemo(() => createManualCorrectionJournal(), []);
+  const [correctionSaving, setCorrectionSaving] = useState(false);
+  const [, retryCorrectionRecovery] = useReducer((value: number) => value + 1, 0);
   const temperaturePreference = useTemperatureUnitPreference();
   const preferredUnit = temperatureInputUnitFromPreference(temperaturePreference);
   const initialTentId = correction?.tentId ?? defaultTentId ?? tents[0]?.id ?? "";
   const correctionIdentity = correction
     ? encodeManualCorrectionHash(correction)
     : STANDARD_TARGET_CONTEXT;
-  const initialValues = useMemo(
-    () => createManualDraftValues(correctionToPrefill(correction, preferredUnit)),
-    [correction, preferredUnit],
-  );
+  const ownedTentIds = useMemo(() => tents.map((tent) => tent.id), [tents]);
+  const readCorrectionRecovery = useCallback(() => {
+    if (!correction) return null;
+    const pending = correctionJournal.read(ownerId);
+    if (pending.status !== "pending") return null;
+    const restored = restoreManualCorrectionDraft(pending.operation, ownedTentIds);
+    return restored && encodeManualCorrectionHash(restored.correction) === correctionIdentity
+      ? restored
+      : null;
+  }, [correction, correctionIdentity, correctionJournal, ownerId, ownedTentIds]);
+  const initialValues = useMemo(() => {
+    const restored = readCorrectionRecovery();
+    const prefill = restored
+      ? {
+          ...restored.correction,
+          originalValues: Object.fromEntries(
+            restored.metrics.map((row) => [row.metric, row.value]),
+          ),
+        }
+      : correction;
+    const initial = createManualDraftValues(correctionToPrefill(prefill, preferredUnit));
+    return restored ? { ...initial, hasEditedReading: true, saveUnconfirmed: true } : initial;
+  }, [correction, preferredUnit, readCorrectionRecovery]);
   const [localDraft, setLocalDraft] = useState<SensorsManualDraft>(() => ({
     identity: { epoch: 0, id: 0 },
     tentId: initialTentId,
@@ -187,7 +221,6 @@ export default function ManualSensorReadingCard({
     readWithoutSession,
   );
   const epoch = sessionState?.selection.draftEpoch ?? 0;
-  const ownedTentIds = useMemo(() => tents.map((tent) => tent.id), [tents]);
   const cachedDraft = sessionState?.draft;
   const draft = session
     ? cachedDraft?.identity.epoch === epoch &&
@@ -198,21 +231,26 @@ export default function ManualSensorReadingCard({
     : localDraft;
   const values = draft?.values ?? initialValues;
   const { form, hasEditedReading, devicePreset, deviceCustom, lastSaved, saveUnconfirmed } = values;
+  const pendingCorrectionRecovery = ownerId
+    ? getPendingCorrectionRecovery(correctionJournal.read(ownerId), ownedTentIds, correction)
+    : { status: "none" as const };
   const tentId = draft?.tentId ?? initialTentId;
   // A restored reading carries its explicit unit; preference resolution must
   // not reinterpret the same numeric string after a protected-shell remount.
   const airTempUnit = values.tempUnitOverride ?? form.airTempUnit ?? preferredUnit;
   const [reviewOpen, setReviewOpen] = useState(false);
-  const insert = useInsertSensorReading();
   const insertBatch = useInsertSensorReadings();
-  const isSaving = insert.isPending || insertBatch.isPending || !!sessionState?.inFlight;
+  const isSaving = correctionSaving || insertBatch.isPending || !!sessionState?.inFlight;
   const recoveryError = sessionState?.recoveryError;
   const isCorrection = !!correction;
   const saveInFlightRef = useRef(false);
   const requestedTargetContextRef = useRef(`${initialTentId}\n${correctionIdentity}`);
   const pendingDraft = values.pendingStandardSnapshot;
   const draftCapturedAt =
-    pendingDraft?.revision === values.revision ? pendingDraft.payloads[0]?.captured_at : undefined;
+    correction?.originalCapturedAt ??
+    (pendingDraft?.revision === values.revision
+      ? pendingDraft.payloads[0]?.captured_at
+      : undefined);
 
   const updateValues = useCallback(
     (update: (current: ManualDraftValues) => ManualDraftValues) => {
@@ -238,13 +276,18 @@ export default function ManualSensorReadingCard({
   }, [session, epoch, correctionIdentity, initialTentId, ownedTentIds, initialValues]);
 
   const changeTentTarget = useCallback(
-    (nextTentId: string, nextForm: ManualEntryInput, nextContext = STANDARD_TARGET_CONTEXT) => {
+    (
+      nextTentId: string,
+      nextForm: ManualEntryInput,
+      nextContext = STANDARD_TARGET_CONTEXT,
+      restorePending = false,
+    ) => {
       if (!draft || (draft.tentId === nextTentId && draft.correctionIdentity === nextContext))
         return;
-      const nextValues = createManualDraftValues(
-        { ...nextForm, airTempUnit },
-        values.tempUnitOverride,
-      );
+      const nextValues = {
+        ...createManualDraftValues({ ...nextForm, airTempUnit }, values.tempUnitOverride),
+        ...(restorePending ? { hasEditedReading: true, saveUnconfirmed: true } : {}),
+      };
       if (session) {
         session.changeDraftTarget(draft.identity, {
           tentId: nextTentId,
@@ -274,8 +317,30 @@ export default function ManualSensorReadingCard({
     const requestedContext = `${nextTentId}\n${correctionIdentity}`;
     if (requestedTargetContextRef.current === requestedContext) return;
     requestedTargetContextRef.current = requestedContext;
-    changeTentTarget(nextTentId, correctionToPrefill(correction, airTempUnit), correctionIdentity);
-  }, [airTempUnit, changeTentTarget, correction, correctionIdentity, defaultTentId, session]);
+    const restored = readCorrectionRecovery();
+    const prefill = restored
+      ? {
+          ...restored.correction,
+          originalValues: Object.fromEntries(
+            restored.metrics.map((row) => [row.metric, row.value]),
+          ),
+        }
+      : correction;
+    changeTentTarget(
+      nextTentId,
+      correctionToPrefill(prefill, airTempUnit),
+      correctionIdentity,
+      !!restored,
+    );
+  }, [
+    airTempUnit,
+    changeTentTarget,
+    correction,
+    correctionIdentity,
+    defaultTentId,
+    readCorrectionRecovery,
+    session,
+  ]);
 
   useEffect(() => setReviewOpen(false), [draft?.identity.epoch, draft?.identity.id]);
 
@@ -364,7 +429,8 @@ export default function ManualSensorReadingCard({
   // the review prompt so the grower sees findings + normalized preview before
   // confirming. Blockers here also disable the Confirm button.
   const snapshotReview = useMemo(() => {
-    return reviewManualSensorSnapshot({
+    const review = isCorrection ? reviewManualSensorCorrection : reviewManualSensorSnapshot;
+    return review({
       tempF: airTempFBridge,
       humidity: form.humidityPct,
       vpdKpa: form.vpdKpa,
@@ -374,7 +440,7 @@ export default function ManualSensorReadingCard({
       capturedAt: draftCapturedAt ?? new Date().toISOString(),
       tentId: tentId || null,
     });
-  }, [form, airTempFBridge, tentId, draftCapturedAt]);
+  }, [form, airTempFBridge, tentId, draftCapturedAt, isCorrection]);
 
   // Entered VPD vs air-VPD estimate. Uses only sanitized numeric metrics —
   // never relabels source. If the grower entered a VPD that disagrees with
@@ -463,6 +529,7 @@ export default function ManualSensorReadingCard({
       currentDraft.values.revision !== values.revision
     )
       return;
+    const submissionOwner = ownerId;
     const submissionTentId = tentId;
     const submissionIdentity = draft.identity;
     const submissionRevision = values.revision;
@@ -476,6 +543,7 @@ export default function ManualSensorReadingCard({
             tentId: submissionTentId,
             metrics: capturedMetrics,
             deviceNote,
+            ts: submissionCorrection?.originalCapturedAt,
           });
     let sessionClaim: SensorsSaveClaim | null = null;
     if (session) {
@@ -492,9 +560,11 @@ export default function ManualSensorReadingCard({
       }));
     }
     saveInFlightRef.current = true;
+    if (submissionCorrection) setCorrectionSaving(true);
     const submissionStillOwnsDraft = () => {
       const current = readCurrentDraft();
       return (
+        (!submissionCorrection || ownerRef.current === submissionOwner) &&
         current?.identity.epoch === submissionIdentity.epoch &&
         current.identity.id === submissionIdentity.id &&
         current.tentId === submissionTentId &&
@@ -502,50 +572,29 @@ export default function ManualSensorReadingCard({
       );
     };
     try {
-      let auditWarnings = 0;
+      let cleanupPending = false;
+      let savedMetrics = capturedMetrics;
       if (submissionCorrection) {
-        // Correction save path — never touches the original row. For each
-        // metric we insert a NEW manual sensor_readings row (source stays
-        // MANUAL), then, when we have both the ORIGINAL reading id AND
-        // the metric's value actually changed, we insert ONE
-        // manual_sensor_snapshot_edits row linking original → replacement.
-        // If a replacement insert fails, we insert no audit row for that
-        // metric. If the audit insert fails after the replacement
-        // succeeds, we surface a warning but keep the replacement.
-        for (const p of payloads) {
-          const metric = p.metric as ManualMetric;
-          const origId = submissionCorrection.originalReadingIds[metric];
-          const origValue = submissionCorrection.originalValues[metric];
-          const changed =
-            typeof origValue === "number" ? Math.abs(origValue - p.value) > 1e-9 : true;
-
-          if (!origId) {
-            // No original ID for this metric — save through the standard
-            // path (no audit link possible). Never infer IDs.
-            await insert.mutateAsync(p);
-            continue;
-          }
-
-          const replacement = await insertManualSensorReadingReturningId(p);
-
-          if (!changed) continue;
-
-          try {
-            await insertManualSnapshotEdit({
-              original_reading_id: origId,
-              replacement_reading_id: replacement.id,
-              tent_id: submissionTentId,
-              plant_id: null,
-              original: { source: "manual", [metric]: origValue as number },
-              replacement: { source: "manual", [metric]: p.value },
-              change_reason: null,
-            });
-          } catch (auditErr) {
-            auditWarnings += 1;
-
-            console.warn("[manual-sensor-correction] audit insert failed", auditErr);
-          }
-        }
+        if (!ownedTentIds.includes(submissionTentId))
+          throw new Error("Correction target unavailable");
+        const pending = correctionJournal.read(submissionOwner);
+        if (pending.status === "blocked") throw new Error("Correction recovery unavailable");
+        const intent = buildManualCorrectionOperation({
+          operationId:
+            pending.status === "pending" ? pending.operation.operationId : crypto.randomUUID(),
+          correction: submissionCorrection,
+          metrics: capturedMetrics,
+        });
+        if (!intent.ok) throw new Error("Correction intent invalid");
+        const result = await submitPendingManualCorrection(
+          submissionOwner,
+          intent.operation,
+          supabase as unknown as ManualCorrectionRpcClient,
+          correctionJournal,
+        );
+        if (result.status !== "confirmed") throw new Error("Correction unconfirmed");
+        cleanupPending = result.cleanup === "pending";
+        savedMetrics = intent.operation.changes.map(({ metric, value }) => ({ metric, value }));
       } else {
         // A snapshot is one logical write. The batch helper sends one
         // multi-row INSERT, so PostgreSQL either commits every metric or
@@ -553,9 +602,9 @@ export default function ManualSensorReadingCard({
         await insertBatch.mutateAsync(payloads);
       }
       const createdAt = submissionCorrection
-        ? new Date().toISOString()
+        ? submissionCorrection.originalCapturedAt
         : (payloads[0]?.captured_at ?? new Date().toISOString());
-      const successLine = buildManualSaveSuccessLine({ metrics: capturedMetrics });
+      const successLine = buildManualSaveSuccessLine({ metrics: savedMetrics });
       const stillOwnsDraft = submissionStillOwnsDraft();
       const confirmedValues = (current: ManualDraftValues): ManualDraftValues => ({
         ...createManualDraftValues(
@@ -572,37 +621,38 @@ export default function ManualSensorReadingCard({
       }
       // Old callbacks may finish after logout or after the grower starts a
       // different draft. They must not announce success for the visible draft.
-      const showConfirmation = !session || stillOwnsDraft;
+      const showConfirmation = submissionCorrection ? stillOwnsDraft : !session || stillOwnsDraft;
       if (showConfirmation) toast.success(successMessage ?? successLine);
-      if (showConfirmation && auditWarnings > 0) {
+      if (showConfirmation && cleanupPending) {
         toast.warning(
-          `Correction saved, but ${auditWarnings} edit history entr${auditWarnings === 1 ? "y" : "ies"} could not be recorded. The replacement readings are safe; the original stays in history.`,
+          "Correction saved. Local recovery cleanup is pending; retrying this correction will only confirm the same save.",
         );
       }
       if (showConfirmation)
-        onSaved?.({ tentId: submissionTentId, metricsSaved: payloads.length, createdAt });
+        onSaved?.({ tentId: submissionTentId, metricsSaved: savedMetrics.length, createdAt });
       if (stillOwnsDraft) setReviewOpen(false);
     } catch (err) {
       // Preserve entered values (we don't clear the form on failure) and
       // surface a safe operator-facing error. Never echo raw internals.
       const msg = submissionCorrection
-        ? mapManualSaveErrorToUserMessage(err)
+        ? CORRECTION_SAVE_UNCONFIRMED_MESSAGE
         : STANDARD_SAVE_UNCONFIRMED_MESSAGE;
       const stillOwnsDraft = submissionStillOwnsDraft();
       if (session && sessionClaim) {
         session.settleSave(sessionClaim, { status: "unconfirmed" });
-      } else if (!submissionCorrection && stillOwnsDraft) {
+      } else if (stillOwnsDraft) {
         updateValues((current) => ({ ...current, saveUnconfirmed: true }));
       }
       if (!submissionCorrection && stillOwnsDraft) {
         toast.error(msg);
       }
-      if (submissionCorrection && (!session || stillOwnsDraft)) toast.error(msg);
+      if (submissionCorrection && stillOwnsDraft) toast.error(msg);
       // Developer-safe diagnostic: console only, not in UI.
 
       console.warn("[manual-sensor-save] failed");
     } finally {
       saveInFlightRef.current = false;
+      if (submissionCorrection) setCorrectionSaving(false);
     }
   }
 
@@ -651,6 +701,48 @@ export default function ManualSensorReadingCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {pendingCorrectionRecovery.status !== "none" && (
+          <div
+            role="status"
+            data-testid="manual-reading-pending-correction"
+            className="space-y-2 text-sm"
+          >
+            {pendingCorrectionRecovery.status === "available" ? (
+              <>
+                <p>
+                  An earlier manual correction is still unconfirmed. Reopen it to retry the original
+                  save.
+                </p>
+                <Button asChild variant="outline" size="sm" disabled={isSaving}>
+                  <Link
+                    to={pendingCorrectionRecovery.href}
+                    onClick={(event) => {
+                      if (isSaving) event.preventDefault();
+                    }}
+                  >
+                    Reopen pending correction
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <p>
+                  {pendingCorrectionRecovery.status === "blocked"
+                    ? "Could not check for an unconfirmed correction. Keep this tab open and retry recovery."
+                    : "An earlier manual correction is still unconfirmed, but its original tent is unavailable. Keep this tab open until that tent is available."}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isSaving}
+                  onClick={retryCorrectionRecovery}
+                >
+                  Retry correction recovery
+                </Button>
+              </>
+            )}
+          </div>
+        )}
         {recoveryError && (
           <div
             role="alert"
@@ -1069,8 +1161,42 @@ export default function ManualSensorReadingCard({
                 className="text-xs text-muted-foreground"
                 data-testid="manual-reading-save-unconfirmed"
               >
-                {STANDARD_SAVE_UNCONFIRMED_MESSAGE}
+                {isCorrection
+                  ? CORRECTION_SAVE_UNCONFIRMED_MESSAGE
+                  : STANDARD_SAVE_UNCONFIRMED_MESSAGE}
               </p>
+            )}
+            {saveUnconfirmed && isCorrection && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isSaving}
+                onClick={() => {
+                  const restored = readCorrectionRecovery();
+                  if (!restored) {
+                    toast.error(
+                      "The pending correction cannot be restored for this observation. Keep this tab open and retry recovery when its tent is available.",
+                    );
+                    return;
+                  }
+                  const prefill = {
+                    ...restored.correction,
+                    originalValues: Object.fromEntries(
+                      restored.metrics.map((row) => [row.metric, row.value]),
+                    ),
+                  };
+                  updateValues((current) => ({
+                    ...editManualDraftValues(current, {
+                      form: correctionToPrefill(prefill, airTempUnit),
+                      hasEditedReading: true,
+                    }),
+                    saveUnconfirmed: true,
+                  }));
+                  setReviewOpen(false);
+                }}
+              >
+                Restore pending correction
+              </Button>
             )}
 
             {lastSaved && (

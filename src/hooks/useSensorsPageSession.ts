@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { notifyManualSensorCorrectionConfirmed } from "@/lib/manualSensorCorrectionEvents";
+import { invalidateManualSensorCorrectionReaders } from "@/lib/manualSensorCorrectionCache";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   createSensorsPageSession,
@@ -257,6 +259,19 @@ export function createSensorsPageSessionController(
         }
         return next;
       });
+      if (
+        accepted !== null &&
+        settled &&
+        result.status === "success" &&
+        claim.correctionIdentity !== STANDARD_MANUAL_CORRECTION_IDENTITY &&
+        getSnapshot()
+      ) {
+        // The atomic correction service bypasses the standard insert mutation.
+        // Refresh its existing read families only after a current-owner receipt
+        // is confirmed. A correction is not a newly captured sensor observation.
+        invalidateManualSensorCorrectionReaders(client);
+        notifyManualSensorCorrectionConfirmed(ownerId, claim.tentId);
+      }
       return accepted !== null && settled;
     },
     retryRecovery: () => {

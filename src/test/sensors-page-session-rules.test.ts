@@ -558,13 +558,13 @@ describe("session-wide pending save identity", () => {
     expect(session.getSnapshot()!.inFlight).toBeNull();
   });
 
-  it("correction save uncertainty never creates a standard snapshot retry record", () => {
+  it("correction uncertainty stays visible without creating a standard snapshot retry record", () => {
     const session = setup();
     const correction = draft(session, B, "correction-reading-b");
     const save = claimed(session.claimSave(correction.identity, payloads()));
     session.settleSave(save, { status: "unconfirmed" });
     expect(session.getSnapshot()!.draft!.values.pendingStandardSnapshot).toBeNull();
-    expect(session.getSnapshot()!.draft!.values.saveUnconfirmed).toBe(false);
+    expect(session.getSnapshot()!.draft!.values.saveUnconfirmed).toBe(true);
   });
 
   it("a completion replay cannot release another save's in-flight claim", () => {

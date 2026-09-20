@@ -1,6 +1,11 @@
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSensorsPageSessionController } from "@/hooks/useSensorsPageSession";
+import {
+  claimPendingManualSnapshot,
+  MANUAL_RECOVERY_PREVIOUS_PENDING,
+  MANUAL_RECOVERY_STORAGE_ERROR,
+} from "@/lib/manualSensorPendingSnapshotStore";
 import { buildManualReadingPayloads } from "@/lib/sensorReadingManualEntryRules";
 import {
   STANDARD_MANUAL_CORRECTION_IDENTITY,
@@ -722,5 +727,108 @@ describe("owner and runtime boundaries", () => {
     const qc = client();
     expect(createSensorsPageSessionController(qc, owner)).toBeNull();
     expect(qc.getQueryCache().getAll()).toHaveLength(0);
+  });
+});
+
+describe("manual snapshot sessionStorage recovery", () => {
+  const storageKey = "verdant:sensors:pending-manual:v1:owner-a";
+
+  function pendingRecord(tentId = B, humidity = 57) {
+    return {
+      version: 1 as const,
+      ownerId: "owner-a",
+      payloads: payloads(tentId).map((row) =>
+        row.metric === "humidity_pct" ? { ...row, value: humidity } : row,
+      ),
+    };
+  }
+
+  it("restores a pending snapshot from sessionStorage when the draft initializes", () => {
+    const stored = pendingRecord(B, 61);
+    claimPendingManualSnapshot(stored);
+    const session = setup();
+    const restored = session.getOrInitializeDraft({
+      epoch: session.getSnapshot()!.selection.draftEpoch,
+      correctionIdentity: STANDARD_MANUAL_CORRECTION_IDENTITY,
+      defaultTentId: B,
+      ownedTentIds: [A, B],
+      initial: values(),
+    });
+    expect(restored?.values.saveUnconfirmed).toBe(true);
+    expect(restored?.values.pendingStandardSnapshot?.payloads[0].captured_at).toBe(
+      stored.payloads[0].captured_at,
+    );
+    expect(restored?.values.form.humidityPct).toBe("61");
+  });
+
+  it("blocks a new standard claim when sessionStorage disagrees with the draft pending identity", () => {
+    claimPendingManualSnapshot(pendingRecord(B, 57));
+    const session = setup();
+    const entered = draft(session);
+    const tampered = buildManualReadingPayloads({
+      tentId: B,
+      metrics: [{ metric: "humidity_pct", value: 62 }],
+      ts: "2026-09-16T12:05:00.000Z",
+    });
+    sessionStorage.setItem(
+      storageKey,
+      JSON.stringify({ version: 1, ownerId: "owner-a", payloads: tampered }),
+    );
+    expect(session.claimSave(entered.identity, tampered)).toEqual({ status: "stale" });
+    expect(session.getSnapshot()?.recoveryError).toBe(MANUAL_RECOVERY_PREVIOUS_PENDING);
+    expect(session.getSnapshot()?.inFlight).toBeNull();
+  });
+
+  it("surfaces recovery error when the pending snapshot tent is not owned here", () => {
+    claimPendingManualSnapshot(pendingRecord(A, 57));
+    const session = controller();
+    session.reconcileSelection({
+      intent: { tentId: B, requireExactMatch: true },
+      intentKey: "required-b",
+      tents: [{ id: B }],
+      tentsLoaded: true,
+    });
+    expect(
+      session.getOrInitializeDraft({
+        epoch: session.getSnapshot()!.selection.draftEpoch,
+        correctionIdentity: STANDARD_MANUAL_CORRECTION_IDENTITY,
+        defaultTentId: B,
+        ownedTentIds: [B],
+        initial: values(),
+      }),
+    ).toBeNull();
+    expect(session.getSnapshot()?.recoveryError).toContain("original tent is unavailable");
+  });
+
+  it("clears sessionStorage when the grower edits away from a pending snapshot", () => {
+    const session = setup();
+    const entered = draft(session);
+    const save = claimed(session.claimSave(entered.identity, payloads()));
+    session.settleSave(save, { status: "unconfirmed" });
+    expect(sessionStorage.getItem(storageKey)).not.toBeNull();
+    session.updateDraft(entered.identity, (current) =>
+      editManualDraftValues(current, { form: { humidityPct: "62" } }),
+    );
+    expect(sessionStorage.getItem(storageKey)).toBeNull();
+    expect(session.getSnapshot()?.draft?.values.pendingStandardSnapshot).toBeNull();
+  });
+
+  it("retryRecovery rehydrates after malformed storage is repaired", () => {
+    sessionStorage.setItem(storageKey, "{");
+    const session = setup();
+    expect(session.getSnapshot()?.recoveryError).toBe(MANUAL_RECOVERY_STORAGE_ERROR);
+    sessionStorage.removeItem(storageKey);
+    claimPendingManualSnapshot(pendingRecord(B, 59));
+    session.retryRecovery();
+    const restored = session.getOrInitializeDraft({
+      epoch: session.getSnapshot()!.selection.draftEpoch,
+      correctionIdentity: STANDARD_MANUAL_CORRECTION_IDENTITY,
+      defaultTentId: B,
+      ownedTentIds: [A, B],
+      initial: values(),
+    });
+    expect(session.getSnapshot()?.recoveryError).toBeUndefined();
+    expect(restored?.values.form.humidityPct).toBe("59");
+    expect(restored?.values.saveUnconfirmed).toBe(true);
   });
 });

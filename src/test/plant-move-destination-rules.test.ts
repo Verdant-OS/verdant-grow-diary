@@ -113,3 +113,52 @@ describe("withoutDisclosedMoveDestinations", () => {
     expect(frozen.map((tent) => tent.id)).toEqual(["current", "same", "male"]);
   });
 });
+
+describe("withoutDisclosedMoveDestinations", () => {
+  it("omits tents that already appear as disclosed other-grow destinations", () => {
+    const sameGrowTents = [
+      { id: "current", name: "Current" },
+      { id: "male", name: "Male Tent" },
+      { id: "other", name: "Other" },
+    ];
+    const destinations = buildOtherGrowMoveDestinations(tents, plant);
+
+    expect(withoutDisclosedMoveDestinations(sameGrowTents, destinations)).toEqual([
+      { id: "current", name: "Current" },
+      { id: "other", name: "Other" },
+    ]);
+  });
+
+  it("returns the input list unchanged when no destinations are disclosed", () => {
+    const sameGrowTents = [{ id: "current", name: "Current" }];
+    expect(withoutDisclosedMoveDestinations(sameGrowTents, [])).toEqual(sameGrowTents);
+  });
+
+  it("does not mutate the input tent array", () => {
+    const sameGrowTents = Object.freeze([
+      Object.freeze({ id: "current", name: "Current" }),
+      Object.freeze({ id: "male", name: "Male Tent" }),
+    ]);
+    const destinations = buildOtherGrowMoveDestinations(tents, plant);
+
+    withoutDisclosedMoveDestinations(sameGrowTents, destinations);
+
+    expect(sameGrowTents.map((tent) => tent.id)).toEqual(["current", "male"]);
+  });
+
+  it("leaves no duplicate tent id across disabled other-grow and enabled same-grow lists", () => {
+    const destinations = buildOtherGrowMoveDestinations(tents, plant);
+    const enabledSameGrow = withoutDisclosedMoveDestinations(
+      [
+        { id: "current", name: "Current" },
+        { id: "same", name: "Same" },
+        { id: "male", name: "Male Tent" },
+      ],
+      destinations,
+    );
+
+    const selectableIds = [...destinations.map((d) => d.id), ...enabledSameGrow.map((t) => t.id)];
+    expect(new Set(selectableIds).size).toBe(selectableIds.length);
+    expect(enabledSameGrow.some((tent) => tent.id === "male")).toBe(false);
+  });
+});

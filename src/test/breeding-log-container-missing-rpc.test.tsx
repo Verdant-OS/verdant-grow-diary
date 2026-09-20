@@ -153,6 +153,49 @@ describe("BreedingLogContainer missing audit RPC", () => {
     expect(screen.getByRole("button", { name: "Save without suggestions" })).toBeInTheDocument();
   });
 
+  it("toasts grower copy for a business refusal instead of the missing-RPC fallback", async () => {
+    rpc.mockResolvedValue({
+      data: { ok: false, reason: "plant_not_in_grow" },
+      error: null,
+    });
+
+    render(
+      <BreedingLogContainer
+        activeGrowId="grow-1"
+        plants={[{ id: "plant-1", tent_id: "tent-1" }]}
+        onCreated={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Save without suggestions" }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(screen.queryByTestId("audit-rpc-missing-fallback")).not.toBeInTheDocument();
+    expect(toastError.mock.calls[0]?.[0]).not.toMatch(/PGRST202|42883|schema cache/i);
+  });
+
+  it("toasts on generic RPC transport errors without treating them as missing audit RPC", async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { code: "42501", message: "permission denied for function breeding_log_save_event" },
+    });
+
+    render(
+      <BreedingLogContainer
+        activeGrowId="grow-1"
+        plants={[{ id: "plant-1", tent_id: "tent-1" }]}
+        onCreated={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Save without suggestions" }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(screen.queryByTestId("audit-rpc-missing-fallback")).not.toBeInTheDocument();
+  });
+
   it("forwards dismiss to onCancel from the fallback", async () => {
     rpc.mockResolvedValue({
       data: null,

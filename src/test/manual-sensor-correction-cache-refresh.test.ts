@@ -4,6 +4,7 @@ import { waitFor } from "@testing-library/react";
 import { createSensorsPageSessionController } from "@/hooks/useSensorsPageSession";
 import { createManualDraftValues } from "@/lib/sensorsPageSessionRules";
 import { buildManualReadingPayloads } from "@/lib/sensorReadingManualEntryRules";
+import { MANUAL_SENSOR_CORRECTION_READER_QUERY_KEY_PREFIXES } from "@/lib/manualSensorCorrectionCache";
 import {
   MANUAL_SENSOR_CORRECTION_CONFIRMED_EVENT,
   subscribeManualSensorCorrections,
@@ -11,17 +12,7 @@ import {
 
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const tentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-const prefixes = [
-  ["grow", "sensors"],
-  ["sensor_readings"],
-  ["latest-sensor-snapshot"],
-  ["plant-tent-environment"],
-  ["environment-trends"],
-  ["diary-range-report"],
-  ["sensor", "latest"],
-  ["reports-hub"],
-  ["post-grow-report"],
-];
+const prefixes = MANUAL_SENSOR_CORRECTION_READER_QUERY_KEY_PREFIXES.map((prefix) => [...prefix]);
 function prepare() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const controller = createSensorsPageSessionController(client, owner)!;

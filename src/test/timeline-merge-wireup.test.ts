@@ -78,6 +78,21 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     );
   });
 
+  it("applies the active date bounds to manual sensor effective reads at query and receipt layers", () => {
+    expect(TIMELINE_SRC).toMatch(
+      /sensorQuery\s*=\s*sensorQuery\.gte\(\s*["']ts["']\s*,\s*timelineDateRangeBounds\.startIso\s*\)/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /sensorQuery\s*=\s*sensorQuery\.lte\(\s*["']ts["']\s*,\s*timelineDateRangeBounds\.endIso\s*\)/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /receipts\s*=\s*receipts\.filter\([\s\S]*row\.entry_at\s*>=\s*timelineDateRangeBounds\.startIso/,
+    );
+    expect(TIMELINE_SRC).toMatch(
+      /receipts\s*=\s*receipts\.filter\([\s\S]*row\.entry_at\s*<=\s*timelineDateRangeBounds\.endIso/,
+    );
+  });
+
   it("gates supplemental tents and sensor_readings on directoryGrowId like the owner directory", () => {
     expect(TIMELINE_SRC).toMatch(/if\s*\(\s*directoryGrowId\s*\)\s*\{/);
     expect(TIMELINE_SRC).toMatch(/\.eq\(\s*["']grow_id["']\s*,\s*directoryGrowId\s*\)/);

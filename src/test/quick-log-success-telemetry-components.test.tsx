@@ -128,6 +128,7 @@ function renderPlantQuickLog() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
   storageUploadMock.mockReset();
   storageRemoveMock.mockReset();

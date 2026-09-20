@@ -53,6 +53,14 @@ describe("Timeline.tsx — mergeTimelineSources wire-up", () => {
     expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:entry-created["']/);
   });
 
+  it("refetches Timeline evidence when a confirmed manual correction lands", () => {
+    expect(TIMELINE_SRC).toMatch(/from\s+["']@\/lib\/manualSensorCorrectionEvents["']/);
+    expect(TIMELINE_SRC).toMatch(/\bsubscribeManualSensorCorrections\s*\(\s*ownerId/);
+    expect(TIMELINE_SRC).toMatch(
+      /subscribeManualSensorCorrections\s*\(\s*ownerId[\s\S]{0,120}void\s+load\s*\(\s*\)/,
+    );
+  });
+
   it("refetches when a tent Manual Snapshot lands in sensor_readings", () => {
     expect(TIMELINE_SRC).toMatch(/verdant:sensor-reading-created/);
     expect(TIMELINE_SRC).toMatch(/addEventListener\(\s*["']verdant:sensor-reading-created["']/);

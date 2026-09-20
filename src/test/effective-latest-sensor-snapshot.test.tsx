@@ -11,6 +11,7 @@ const io = vi.hoisted(() => ({
   diary: [] as unknown,
   error: null as unknown,
   reject: false,
+  sensorLimit: null as null | (() => Promise<{ data: unknown; error: unknown }>),
 }));
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } }),
@@ -25,12 +26,14 @@ vi.mock("@/integrations/supabase/client", () => ({
         eq: () => q,
         is: () => q,
         order: () => q,
-        limit: () =>
-          table === "diary_entries"
-            ? Promise.resolve({ data: io.diary, error: null })
-            : io.reject
-              ? Promise.reject(new Error("private read failure"))
-              : Promise.resolve({ data: io.sensor, error: io.error }),
+        limit: () => {
+          if (table === "diary_entries") {
+            return Promise.resolve({ data: io.diary, error: null });
+          }
+          if (io.sensorLimit) return io.sensorLimit();
+          if (io.reject) return Promise.reject(new Error("private read failure"));
+          return Promise.resolve({ data: io.sensor, error: io.error });
+        },
       };
       return q;
     },
@@ -87,6 +90,7 @@ beforeEach(() => {
   io.diary = [];
   io.error = null;
   io.reject = false;
+  io.sensorLimit = null;
 });
 afterEach(() => {
   cleanup();
@@ -108,6 +112,35 @@ describe("Dashboard effective correction reads", () => {
     expect(result.current.snapshot.temp).toBe(24);
     expect(result.current.isPaused).toBe(false);
   });
+  it("keeps cached evidence visible with isFetching during a background correction refetch", async () => {
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.snapshot.temp).toBe(24);
+
+    let resolveRefetch!: (value: { data: unknown; error: null }) => void;
+    io.sensor = [{ ...reading(), value: 26 }];
+    io.sensorLimit = () =>
+      new Promise((resolve) => {
+        resolveRefetch = resolve;
+      });
+
+    act(() => {
+      void clients.at(-1)!.invalidateQueries({ queryKey: ["latest-sensor-snapshot"] });
+    });
+
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.status).toBe("ok");
+    expect(result.current.snapshot.temp).toBe(24);
+    expect(result.current.isPaused).toBe(false);
+
+    await act(async () => {
+      resolveRefetch({ data: io.sensor, error: null });
+    });
+
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.snapshot.temp).toBe(26);
+  });
+
   it("preserves cached evidence with an explicit paused flag during an offline refresh", async () => {
     const { result } = mount();
     await waitFor(() => expect(result.current.status).toBe("ok"));

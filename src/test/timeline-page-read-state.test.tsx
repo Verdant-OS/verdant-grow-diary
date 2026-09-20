@@ -388,6 +388,13 @@ describe("Timeline mounted read-state boundary", () => {
         harness.executeQuery.mock.calls.some(([spec]) => spec.table === "sensor_readings"),
       ).toBe(false);
       expect(screen.queryByTestId("timeline-partial-read-warning")).not.toBeInTheDocument();
+      if (!hasDiary) {
+        expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+        expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+        expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
+          "Detailed diary: showing 0 of 0 entries",
+        );
+      }
       correctedValue = 25;
       const callsBefore = harness.executeQuery.mock.calls.length;
       await act(async () => {

@@ -1,6 +1,13 @@
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createSensorsPageSessionController } from "@/hooks/useSensorsPageSession";
+import * as manualSensorPendingSnapshotStore from "@/lib/manualSensorPendingSnapshotStore";
+import {
+  MANUAL_RECOVERY_CLEAR_ERROR,
+  MANUAL_RECOVERY_PREVIOUS_PENDING,
+  MANUAL_RECOVERY_STORAGE_ERROR,
+  claimPendingManualSnapshot,
+} from "@/lib/manualSensorPendingSnapshotStore";
 import { buildManualReadingPayloads } from "@/lib/sensorReadingManualEntryRules";
 import {
   STANDARD_MANUAL_CORRECTION_IDENTITY,
@@ -722,5 +729,144 @@ describe("owner and runtime boundaries", () => {
     const qc = client();
     expect(createSensorsPageSessionController(qc, owner)).toBeNull();
     expect(qc.getQueryCache().getAll()).toHaveLength(0);
+  });
+});
+
+describe("manual snapshot recovery errors", () => {
+  const owner = "owner-a";
+  const pendingKey = `verdant:sensors:pending-manual:v1:${owner}`;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("surfaces unreadable recovery storage at controller init", () => {
+    sessionStorage.setItem(pendingKey, "{");
+    const session = controller(client(), owner);
+    expect(session.getSnapshot()?.recoveryError).toBe(MANUAL_RECOVERY_STORAGE_ERROR);
+  });
+
+  it("blocks claimSave while recoveryError is set", () => {
+    sessionStorage.setItem(pendingKey, "{");
+    const session = controller(client(), owner);
+    session.reconcileSelection({
+      intent: { tentId: A, requireExactMatch: true },
+      intentKey: "required-a",
+      tents,
+      tentsLoaded: true,
+    });
+    const entered = draft(session);
+    expect(session.claimSave(entered.identity, payloads())).toEqual({ status: "stale" });
+    expect(session.getSnapshot()?.recoveryError).toBe(MANUAL_RECOVERY_STORAGE_ERROR);
+  });
+
+  it("sets MANUAL_RECOVERY_PREVIOUS_PENDING when pending storage rejects a new claim", () => {
+    const session = setup();
+    const entered = draft(session);
+    const existing = payloads();
+    const save = claimed(session.claimSave(entered.identity, existing));
+    expect(session.settleSave(save, { status: "unconfirmed" })).toBe(true);
+    session.updateDraft(entered.identity, (current) =>
+      editManualDraftValues(current, { deviceCustom: "second meter" }),
+    );
+    const conflicting = buildManualReadingPayloads({
+      tentId: B,
+      metrics: [{ metric: "humidity_pct", value: 58 }],
+      ts: "2026-09-16T12:05:00.123Z",
+    });
+    const claimSpy = vi.spyOn(manualSensorPendingSnapshotStore, "claimPendingManualSnapshot");
+    claimSpy.mockReturnValueOnce({
+      status: "pending",
+      record: { version: 1, ownerId: owner, payloads: existing },
+    });
+    expect(session.claimSave(entered.identity, conflicting)).toEqual({ status: "stale" });
+    expect(session.getSnapshot()?.recoveryError).toBe(MANUAL_RECOVERY_PREVIOUS_PENDING);
+    expect(session.getSnapshot()?.inFlight).toBeNull();
+  });
+
+  it("sets MANUAL_RECOVERY_CLEAR_ERROR when cleanup fails after a confirmed save", () => {
+    const session = setup();
+    const entered = draft(session);
+    const save = claimed(session.claimSave(entered.identity, payloads()));
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    expect(session.settleSave(save, { status: "success", update: () => values() })).toBe(true);
+    expect(session.getSnapshot()?.recoveryError).toBe(MANUAL_RECOVERY_CLEAR_ERROR);
+  });
+
+  it("clears MANUAL_RECOVERY_CLEAR_ERROR after retryRecovery succeeds", () => {
+    const session = setup();
+    const entered = draft(session);
+    const save = claimed(session.claimSave(entered.identity, payloads()));
+    const removeItem = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("denied");
+    });
+    session.settleSave(save, { status: "success", update: () => values() });
+    removeItem.mockRestore();
+    session.retryRecovery();
+    expect(session.getSnapshot()?.recoveryError).toBeUndefined();
+  });
+
+  it("defers pending restore until route intent reconciles, then restores the original tent", () => {
+    claimPendingManualSnapshot({
+      version: 1,
+      ownerId: owner,
+      payloads: payloads(B),
+    });
+    const session = controller(client(), owner);
+    const epoch = session.getSnapshot()!.selection.draftEpoch;
+    expect(
+      session.getOrInitializeDraft({
+        epoch,
+        correctionIdentity: STANDARD_MANUAL_CORRECTION_IDENTITY,
+        defaultTentId: A,
+        ownedTentIds: [A, B],
+        initial: values(),
+      }),
+    ).toBeNull();
+    session.reconcileSelection({
+      intent: { tentId: A, requireExactMatch: true },
+      intentKey: "required-a",
+      tents,
+      tentsLoaded: true,
+    });
+    const restored = session.getOrInitializeDraft({
+      epoch: session.getSnapshot()!.selection.draftEpoch,
+      correctionIdentity: STANDARD_MANUAL_CORRECTION_IDENTITY,
+      defaultTentId: A,
+      ownedTentIds: [A, B],
+      initial: values(),
+    });
+    expect(restored?.tentId).toBe(B);
+    expect(restored?.values.saveUnconfirmed).toBe(true);
+    expect(restored?.values.pendingStandardSnapshot?.payloads).toEqual(payloads(B));
+  });
+
+  it("blocks wrong-tent recovery when the pending tent is unavailable on this page", () => {
+    claimPendingManualSnapshot({
+      version: 1,
+      ownerId: owner,
+      payloads: payloads(B),
+    });
+    const session = controller(client(), owner);
+    session.reconcileSelection({
+      intent: { tentId: A, requireExactMatch: true },
+      intentKey: "required-a",
+      tents: [{ id: A }],
+      tentsLoaded: true,
+    });
+    expect(
+      session.getOrInitializeDraft({
+        epoch: session.getSnapshot()!.selection.draftEpoch,
+        correctionIdentity: STANDARD_MANUAL_CORRECTION_IDENTITY,
+        defaultTentId: A,
+        ownedTentIds: [A],
+        initial: values(),
+      }),
+    ).toBeNull();
+    expect(session.getSnapshot()?.recoveryError).toBe(
+      "The unconfirmed manual snapshot's original tent is unavailable here. Return to its owned tent before retrying recovery.",
+    );
   });
 });

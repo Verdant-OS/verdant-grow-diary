@@ -55,12 +55,14 @@ separately before this lane can run. Configure exactly:
 6. Environment secret `SUPABASE_DB_CA_CERT_B64`, containing the base64 bytes of
    that production Supabase project's Server root certificate.
 
-Do not rely on GitHub auto-creating the environment. The legacy
-`verdant-production` environment has a known-mismatched secret; do not copy it.
+Do not rely on GitHub auto-creating the environment or copy credentials from
+the legacy `verdant-production` environment.
 Obtain and verify the URL for project `knkwiiywfkbqznbxwqfh` and its CA
 independently, then configure them directly on
-`verdant-production-solo-founder`. The legacy environment and its other
-production writers remain unchanged.
+`verdant-production-solo-founder`. See the
+[production environment retirement runbook](production-environment-retirement-runbook.md)
+for retired schedules, repointed writers, and remaining manual read paths.
+Repository routing does not verify hosted settings or authorize a production run.
 
 This lane uses founder self-review. For every fresh PREFLIGHT or APPLY dispatch,
 the workflow projects and validates four read-only GitHub API resources before

@@ -200,6 +200,26 @@ describe("effective Environment Trends", () => {
     act(() => onlineManager.setOnline(true));
     await waitFor(() => expect(result.current.trends.temp.avg).toBe(23));
   });
+  it("withholds a cached trend while an online background refetch is in flight", async () => {
+    let resolveRefresh!: (value: unknown) => void;
+    const { result, client } = mount();
+    await waitFor(() => expect(result.current.trends.temp.avg).toBe(24));
+    io.read.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+    act(() => {
+      void client.invalidateQueries({ queryKey: ["environment-trends"] });
+    });
+    await waitFor(() => expect(result.current.status).toBe("loading"));
+    expect(result.current.trends.count).toBe(0);
+    await act(async () => {
+      resolveRefresh(ok(rows(23)));
+    });
+    await waitFor(() => expect(result.current.trends.temp.avg).toBe(23));
+  });
   it.each([null, tentB])("rejects a diary survivor from scope %s", async (scope) => {
     io.read.mockImplementation((table) =>
       Promise.resolve(

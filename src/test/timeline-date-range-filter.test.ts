@@ -188,6 +188,13 @@ describe("static wiring — src/pages/Timeline.tsx", () => {
     expect(src).toContain('const TIMELINE_END_DATE_PARAM = "end"');
   });
 
+  it("applies the bounds to effective manual sensor reads at query time", () => {
+    expect(src).toMatch(/sensorQuery\s*=\s*sensorQuery\.gte\(\s*["']ts["']/);
+    expect(src).toMatch(/sensorQuery\s*=\s*sensorQuery\.lte\(\s*["']ts["']/);
+    expect(src).toMatch(/row\.entry_at\s*>=\s*timelineDateRangeBounds\.startIso/);
+    expect(src).toMatch(/row\.entry_at\s*<=\s*timelineDateRangeBounds\.endIso/);
+  });
+
   it("applies the bounds at the query level for initial load AND keyset pagination", () => {
     const gteCount = (src.match(/\.gte\("entry_at"/g) ?? []).length;
     const lteCount = (src.match(/\.lte\("entry_at"/g) ?? []).length;

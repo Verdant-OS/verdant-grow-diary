@@ -133,4 +133,13 @@ describe("owner-scoped pending correction journal", () => {
     Object.assign(op.changes[0], { value: 23 });
     expect(f.journal.read(owner)).toEqual({ status: "pending", operation: operation() });
   });
+
+  it("blocks oversized persisted payloads instead of parsing partial intent", () => {
+    const f = fixture();
+    f.journal.claim(owner, operation());
+    const key = [...f.data.keys()][0];
+    f.data.set(key, "x".repeat(16385));
+    expect(f.journal.read(owner)).toEqual({ status: "blocked" });
+    expect(f.journal.claim(owner, operation())).toEqual({ status: "blocked" });
+  });
 });

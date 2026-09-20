@@ -338,6 +338,27 @@ describe("relative history retrieval through the presenter", () => {
     fireEvent.click(retry);
     expect(await screen.findByTestId("relative-timeline-empty")).toBeVisible();
   });
+  it("surfaces an unreachable boundary notice instead of a broken load-more control", async () => {
+    fixture.override = () => ({
+      data: Array.from({ length: 11 }, (_, i) => ({
+        ...row(i + 1),
+        entry_at: "not-a-date",
+      })),
+      error: null,
+      count: 12,
+    });
+    renderHistory();
+    await waitFor(() => expect(header()).toHaveTextContent("Showing 10 of 12"));
+    expect(
+      screen.getByText(
+        "Some older entries could not be reached. Refresh to check the history again.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Retry timeline history" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Load older entries" })).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("relative-timeline-item")).toHaveLength(10);
+  });
+
   it("retains cached rows after an older-page failure and retries that same boundary", async () => {
     fixture.rows = Array.from({ length: 12 }, (_, i) => row(i + 1));
     fixture.override = (request) =>

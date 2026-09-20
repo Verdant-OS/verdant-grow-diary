@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import { waitFor } from "@testing-library/react";
 import { createSensorsPageSessionController } from "@/hooks/useSensorsPageSession";
-import { createManualDraftValues } from "@/lib/sensorsPageSessionRules";
+import {
+  STANDARD_MANUAL_CORRECTION_IDENTITY,
+  createManualDraftValues,
+} from "@/lib/sensorsPageSessionRules";
 import { buildManualReadingPayloads } from "@/lib/sensorReadingManualEntryRules";
 import {
   MANUAL_SENSOR_CORRECTION_CONFIRMED_EVENT,
@@ -59,6 +62,44 @@ function prepare() {
   keys.forEach((key) => client.setQueryData(key, [{ value: 25 }]));
   const invalidate = vi.spyOn(client, "invalidateQueries");
   return { client, controller, claim: claimed.claim, keys, invalidate };
+}
+function prepareStandard() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const controller = createSensorsPageSessionController(client, owner)!;
+  controller.reconcileSelection({
+    intent: { tentId, requireExactMatch: true },
+    intentKey: "standard",
+    tents: [{ id: tentId }],
+    tentsLoaded: true,
+  });
+  const draft = controller.getOrInitializeDraft({
+    epoch: controller.getSnapshot()!.selection.draftEpoch,
+    correctionIdentity: STANDARD_MANUAL_CORRECTION_IDENTITY,
+    defaultTentId: tentId,
+    ownedTentIds: [tentId],
+    initial: createManualDraftValues({
+      airTemp: "24",
+      airTempUnit: "C",
+      humidityPct: "57",
+      vpdKpa: "",
+      co2Ppm: "",
+      soilMoisturePct: "",
+      ppfd: "",
+    }),
+  })!;
+  const claimed = controller.claimSave(
+    draft.identity,
+    buildManualReadingPayloads({
+      tentId,
+      metrics: [{ metric: "humidity_pct", value: 57 }],
+      ts: "2026-09-16T12:00:00.123Z",
+    }),
+  );
+  if (claimed.status !== "claimed") throw new Error("Fixture save was not claimed");
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  const refresh = vi.fn();
+  const stop = subscribeManualSensorCorrections(owner, refresh);
+  return { client, controller, claim: claimed.claim, invalidate, refresh, stop };
 }
 beforeEach(() => sessionStorage.clear());
 describe("confirmed correction cache refresh", () => {
@@ -162,5 +203,16 @@ describe("confirmed correction cache refresh", () => {
     expect(controller.settleSave(claim, { status: "success" })).toBe(false);
     expect(invalidate).toHaveBeenCalledTimes(prefixes.length);
     client.clear();
+  });
+  it("does not emit a correction refresh signal after a standard snapshot success", () => {
+    const { client, controller, claim, invalidate, refresh, stop } = prepareStandard();
+    try {
+      expect(controller.settleSave(claim, { status: "success" })).toBe(true);
+      expect(invalidate).not.toHaveBeenCalled();
+      expect(refresh).not.toHaveBeenCalled();
+    } finally {
+      stop();
+      client.clear();
+    }
   });
 });

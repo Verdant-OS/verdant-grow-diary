@@ -15,7 +15,12 @@ describe("historical correction review", () => {
     expect(result.confidence).toBe("low");
     expect(result.normalizedPreview.capturedAt).toBe(input.capturedAt);
     expect(result.findings).toContainEqual(
-      expect.objectContaining({ key: "captured_at_too_old", severity: "warning" }),
+      expect.objectContaining({
+        key: "captured_at_too_old",
+        severity: "warning",
+        message:
+          "This corrects a historical reading. Its original observation time stays unchanged; it cannot support current-room guidance.",
+      }),
     );
     expect(reviewManualSensorSnapshot(input, options).canSave).toBe(false);
   });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import { createSensorsPageSessionController } from "@/hooks/useSensorsPageSession";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "@/lib/react-router-compat";
@@ -62,7 +63,7 @@ const clients: QueryClient[] = [];
 afterEach(() => {
   for (const client of clients.splice(0)) client.clear();
 });
-function mount(withSession = false) {
+function mount(withSession = false, beforeSave?: (client: QueryClient) => void) {
   const saved = vi.fn();
   const client = new QueryClient();
   clients.push(client);
@@ -83,10 +84,11 @@ function mount(withSession = false) {
       />
     </MemoryRouter>,
   );
+  beforeSave?.(client);
   fireEvent.change(view.getByLabelText(/Humidity/i), { target: { value: "60" } });
   fireEvent.click(view.getByTestId("manual-reading-save"));
   fireEvent.click(view.getByTestId("manual-sensor-review-confirm"));
-  return { ...view, saved };
+  return { ...view, saved, client, session };
 }
 beforeEach(() => {
   mocks.owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -96,6 +98,23 @@ beforeEach(() => {
   mocks.replacement.mockResolvedValue({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });
 });
 describe("atomic correction form", () => {
+  it("routes a confirmed correction through the page session and refreshes sensor readers", async () => {
+    const refresh = vi.fn();
+    const stop = subscribeManualSensorCorrections(mocks.owner, refresh);
+    const invalidate = vi.fn();
+    try {
+      const view = mount(true, (client) => {
+        vi.spyOn(client, "invalidateQueries").mockImplementation(invalidate);
+      });
+      await waitFor(() => expect(view.saved).toHaveBeenCalledTimes(1));
+      expect(view.session?.getSnapshot()?.inFlight).toBeNull();
+      expect(view.session?.getSnapshot()?.draft?.values.saveUnconfirmed).toBe(false);
+      expect(invalidate).toHaveBeenCalled();
+      expect(refresh).toHaveBeenCalledExactlyOnceWith("local");
+    } finally {
+      stop();
+    }
+  });
   it("uses one complete correction RPC and confirms the original observation time", async () => {
     const view = mount();
     await waitFor(() => expect(view.saved).toHaveBeenCalledTimes(1));

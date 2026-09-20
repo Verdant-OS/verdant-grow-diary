@@ -17,6 +17,9 @@ describe("historical correction review", () => {
     expect(result.findings).toContainEqual(
       expect.objectContaining({ key: "captured_at_too_old", severity: "warning" }),
     );
+    expect(
+      result.findings.find((finding) => finding.key === "captured_at_too_old")?.message,
+    ).toMatch(/cannot support current-room guidance/);
     expect(reviewManualSensorSnapshot(input, options).canSave).toBe(false);
   });
   it.each([

@@ -169,4 +169,23 @@ describe("effective sensor read boundary", () => {
     await waitFor(() => expect(result.current.statusByTent[tentId]).toBe("error"));
     expect(state.from.mock.calls).toEqual([["sensor_readings_effective"]]);
   });
+  it("fail-closes useSensorReadings(null) without querying or reusing aggregate cache", () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    client.setQueryData(buildPrivateSensorQueryKey(row().user_id, ["all", 200, "effective-v1"]), [
+      { ...row(), value: 99 },
+    ]);
+    const { result } = renderHook(() => useSensorReadings(null), { wrapper: wrapper(client) });
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(result.current.data).toBeUndefined();
+    expect(state.from).not.toHaveBeenCalled();
+    client.clear();
+  });
+  it("fail-closes fetchSensorReadings(null) and non-uuid tent ids without querying", async () => {
+    state.from.mockClear();
+    await expect(fetchSensorReadings(null)).resolves.toEqual([]);
+    await expect(fetchSensorReadings("tent-1")).resolves.toEqual([]);
+    expect(state.from).not.toHaveBeenCalled();
+  });
 });

@@ -388,6 +388,13 @@ describe("Timeline mounted read-state boundary", () => {
         harness.executeQuery.mock.calls.some(([spec]) => spec.table === "sensor_readings"),
       ).toBe(false);
       expect(screen.queryByTestId("timeline-partial-read-warning")).not.toBeInTheDocument();
+      if (!hasDiary) {
+        expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+        expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+        expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
+          "Detailed diary: showing 0 of 0 entries",
+        );
+      }
       correctedValue = 25;
       const callsBefore = harness.executeQuery.mock.calls.length;
       await act(async () => {
@@ -410,6 +417,46 @@ describe("Timeline mounted read-state boundary", () => {
       expect(screen.getAllByText(/^Manual sensor snapshot:/)).toHaveLength(1);
     },
   );
+
+  it("treats manual-only sensor history as grow evidence instead of an empty timeline", async () => {
+    const observed = new Date(Date.now() - 60_000).toISOString();
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective")
+        return {
+          data: [
+            {
+              id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+              user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              tent_id: tent,
+              metric: "temperature_c",
+              value: 24,
+              source: "manual",
+              quality: "ok",
+              ts: observed,
+              captured_at: observed,
+              created_at: observed,
+              device_id: null,
+              raw_payload: null,
+              correction_valid: true,
+              corrected_at: new Date().toISOString(),
+            },
+          ],
+          error: null,
+        };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Manual sensor snapshot: 75.2°F")).toBeInTheDocument();
+    expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+    expect(harness.executeQuery.mock.calls.some(([spec]) => spec.table === "sensor_readings")).toBe(
+      false,
+    );
+  });
 
   it("discloses invalid correction evidence as partial history and retains diary entries", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {

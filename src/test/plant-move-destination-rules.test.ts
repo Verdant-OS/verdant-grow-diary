@@ -66,6 +66,52 @@ describe("other-grow move destination disclosure", () => {
     expect(buildOtherGrowMoveDestinations(frozen, plant)).toEqual(first);
     expect(frozen.map((tent) => tent.id)).toEqual(["current", "same", "male", "archived"]);
   });
+
+  it("labels unnamed tents honestly without inventing a display name", () => {
+    expect(
+      buildOtherGrowMoveDestinations(
+        [{ id: "male", name: "   ", grow_id: "b", grow_name: "Banana Cough" }],
+        plant,
+      )[0],
+    ).toMatchObject({ label: "Unnamed tent — Banana Cough", disabled: true });
+  });
+
+  it.each(["", "   "])(
+    "does not treat whitespace-only grow_id %j as a cross-grow destination",
+    (growId) => {
+      expect(
+        buildOtherGrowMoveDestinations([{ id: "male", name: "Male Tent", grow_id: growId }], plant),
+      ).toEqual([]);
+    },
+  );
+});
+
+describe("withoutDisclosedMoveDestinations", () => {
+  const sameGrow = [
+    { id: "current", name: "Current" },
+    { id: "same", name: "Same" },
+    { id: "male", name: "Male Tent" },
+  ];
+  const disclosed = [
+    { id: "male", label: "Male Tent — Banana Cough", disabled: true, reason: "Untag first." },
+  ];
+
+  it("removes tents that already appear as disclosed cross-grow destinations", () => {
+    expect(withoutDisclosedMoveDestinations(sameGrow, disclosed)).toEqual([
+      { id: "current", name: "Current" },
+      { id: "same", name: "Same" },
+    ]);
+  });
+
+  it("returns the original list when no destinations are disclosed", () => {
+    expect(withoutDisclosedMoveDestinations(sameGrow, [])).toEqual(sameGrow);
+  });
+
+  it("does not mutate the input tent list", () => {
+    const frozen = Object.freeze(sameGrow.map((tent) => Object.freeze({ ...tent })));
+    withoutDisclosedMoveDestinations(frozen, disclosed);
+    expect(frozen.map((tent) => tent.id)).toEqual(["current", "same", "male"]);
+  });
 });
 
 describe("withoutDisclosedMoveDestinations", () => {

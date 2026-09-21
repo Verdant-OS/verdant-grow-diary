@@ -183,6 +183,61 @@ describe("fetchSensorReadings", () => {
     expect(await fetchSensorReadings("t1")).toEqual([]);
     expect(calls.table).toBeUndefined();
   });
+  it("fails closed when the effective view returns invalid correction evidence", async () => {
+    nextResult = {
+      data: [
+        {
+          id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          user_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          tent_id: TENT_UUID,
+          metric: "temperature_c",
+          value: 24,
+          source: "manual",
+          quality: "ok",
+          ts: "2026-09-16T12:00:00.000Z",
+          created_at: "2026-09-16T12:00:00.000Z",
+          captured_at: "2026-09-16T12:00:00.000Z",
+          device_id: null,
+          raw_payload: null,
+          correction_valid: false,
+        },
+      ],
+      error: null,
+    };
+    await expect(fetchSensorReadings(TENT_UUID)).rejects.toThrow(
+      /Sensor readings are unavailable\./,
+    );
+  });
+  it("groups validated effective rows into domain readings", async () => {
+    const observed = "2026-09-16T12:00:00.000Z";
+    nextResult = {
+      data: [
+        {
+          id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          user_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          tent_id: TENT_UUID,
+          metric: "temperature_c",
+          value: 24,
+          source: "manual",
+          quality: "ok",
+          ts: observed,
+          created_at: observed,
+          captured_at: observed,
+          device_id: null,
+          raw_payload: null,
+          correction_valid: true,
+        },
+      ],
+      error: null,
+    };
+    const readings = await fetchSensorReadings(TENT_UUID);
+    expect(readings).toHaveLength(1);
+    expect(readings[0]).toMatchObject({
+      tentId: TENT_UUID,
+      temp: 24,
+      source: "manual",
+    });
+  });
   it("throws on supabase error", async () => {
     nextResult = { data: null, error: { message: "permission denied" } };
     await expect(fetchSensorReadings(TENT_UUID)).rejects.toThrow(

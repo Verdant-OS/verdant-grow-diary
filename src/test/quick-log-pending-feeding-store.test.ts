@@ -236,6 +236,36 @@ describe("owner-scoped exact pending Feed", () => {
       },
     ],
     [
+      "overlong key",
+      (r) => {
+        r.payload.idempotency_key = "x".repeat(201);
+      },
+    ],
+    [
+      "normalized-away key whitespace",
+      (r) => {
+        r.payload.idempotency_key = " feeding-key-12345678 ";
+      },
+    ],
+    [
+      "plant target without matching plantId",
+      (r) => {
+        r.resolved.targetType = "plant";
+        r.resolved.plantId = "other-plant";
+        r.resolved.targetId = "other-plant";
+      },
+    ],
+    [
+      "tent target with a non-null plantId",
+      (r) => {
+        r.resolved.targetType = "tent";
+        r.resolved.targetId = "tent-a";
+        r.resolved.tentId = "tent-a";
+        r.resolved.plantId = "plant-a";
+        r.payload.plant_id = null;
+      },
+    ],
+    [
       "nontext note",
       (r) => {
         r.payload.note = 123;

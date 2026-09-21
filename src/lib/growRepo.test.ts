@@ -22,9 +22,7 @@ function reset() {
   calls.single = false;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function builder(): any {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const b: any = {
     select: () => b,
     eq: (col: string, val: unknown) => {
@@ -68,6 +66,7 @@ import {
   fetchPlants,
   fetchSensorReadings,
   insertSensorReading,
+  insertSensorReadingsBatch,
 } from "./growRepo";
 
 beforeEach(reset);
@@ -144,19 +143,71 @@ describe("fetchPlants", () => {
 });
 
 describe("fetchSensorReadings", () => {
-  it("orders by physical capture time before the legacy ts fallback", async () => {
+  it("reads the effective view and orders by physical capture time before the legacy ts fallback", async () => {
     nextResult = { data: [], error: null };
     await fetchSensorReadings(TENT_UUID);
+    expect(calls.table).toBe("sensor_readings_effective");
     expect(calls.ordered).toEqual(["captured_at", "ts"]);
     expect(calls.limited).toBe(2000);
   });
-  it("returns empty array on no data", async () => {
-    nextResult = { data: null, error: null };
+  it("returns an empty grouped result for a validated empty packet", async () => {
+    nextResult = { data: [], error: null };
     expect(await fetchSensorReadings()).toEqual([]);
+  });
+  it("fails closed when the effective view response is not an array", async () => {
+    nextResult = { data: null, error: null };
+    await expect(fetchSensorReadings()).rejects.toThrow(/Sensor readings are unavailable\./);
   });
   it("treats null as explicit no-scope without querying Supabase", async () => {
     expect(await fetchSensorReadings(null)).toEqual([]);
     expect(calls.table).toBeUndefined();
+  });
+  it("returns [] for a legacy non-UUID tentId without querying Supabase", async () => {
+    expect(await fetchSensorReadings("t1")).toEqual([]);
+    expect(calls.table).toBeUndefined();
+  });
+  it("throws on supabase error", async () => {
+    nextResult = { data: null, error: { message: "permission denied" } };
+    await expect(fetchSensorReadings(TENT_UUID)).rejects.toThrow(
+      /fetchSensorReadings.*permission denied/,
+    );
+  });
+  it("applies tent_id filter when scoped to one tent", async () => {
+    nextResult = { data: [], error: null };
+    await fetchSensorReadings(TENT_UUID);
+    expect(calls.filters).toContainEqual(["tent_id", TENT_UUID]);
+  });
+});
+
+describe("insertSensorReadingsBatch", () => {
+  const batchRow = {
+    user_id: "u",
+    tent_id: TENT_UUID,
+    metric: "temperature_c",
+    value: 22,
+    source: "manual",
+    ts: "2026-01-01T00:00:00Z",
+    captured_at: "2026-01-01T00:00:00Z",
+  };
+
+  it("forwards the batch payload to sensor_readings", async () => {
+    nextResult = { data: null, error: null };
+    await insertSensorReadingsBatch([batchRow as never]);
+    expect(calls.table).toBe("sensor_readings");
+    expect(calls.inserted).toEqual([batchRow]);
+  });
+
+  it("no-ops on an empty batch", async () => {
+    await insertSensorReadingsBatch([]);
+    expect(calls.table).toBeUndefined();
+  });
+
+  it("preserves Postgres error.code on batch insert failure", async () => {
+    nextResult = { data: null, error: { code: "23505", message: "duplicate key" } };
+    await expect(insertSensorReadingsBatch([batchRow as never])).rejects.toMatchObject({
+      code: "23505",
+      message: expect.stringMatching(/insertSensorReadingsBatch.*duplicate key/),
+    });
   });
 });
 

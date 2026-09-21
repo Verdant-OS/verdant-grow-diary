@@ -38,21 +38,62 @@ describe("buildDashboardSensorHealthSummary", () => {
     }
   });
 
+  it.each([
+    ["live", "isPaused", /Waiting for connection/],
+    ["manual", "isPaused", /Waiting for connection/],
+    ["live", "isFetching", /Refreshing sensor data/],
+    ["manual", "isFetching", /Refreshing sensor data/],
+  ] as const)("withholds health for cached %s evidence while %s", (source, flag, notice) => {
+    const vm = buildDashboardSensorHealthSummary(
+      {
+        status: "ok",
+        snapshot: {
+          ...EMPTY_SNAPSHOT,
+          source,
+          ts: new Date(NOW - 60_000).toISOString(),
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+        },
+        [flag]: true,
+      },
+      NOW,
+    );
+    expect(vm.status).toBe("loading");
+    expect(vm.tone).toBe("muted");
+    expect(vm.hideValues).toBe(true);
+    expect(vm.sourceLabel).toBe("—");
+    expect(vm.body).toMatch(notice);
+    expect(vm.statusLabel).not.toBe("Healthy");
+  });
+
   it("returns loading for null/undefined state", () => {
     expect(buildDashboardSensorHealthSummary(null, NOW).status).toBe("loading");
     expect(buildDashboardSensorHealthSummary(undefined, NOW).status).toBe("loading");
   });
 
-  it("returns missing for unavailable snapshot — never healthy", () => {
+  it("distinguishes a failed read from a completed empty read", () => {
     const vm = buildDashboardSensorHealthSummary(
       { status: "unavailable", snapshot: EMPTY_SNAPSHOT },
       NOW,
     );
-    expect(vm.status).toBe("missing");
+    expect(vm.status).toBe("unavailable");
     expect(vm.tone).toBe("muted");
-    expect(vm.statusLabel).toBe("Missing");
+    expect(vm.statusLabel).toBe("Unavailable");
     expect(vm.sourceLabel).toBe("Unknown");
     expect(vm.hideValues).toBe(true);
+    expect(vm.headline).not.toMatch(/No sensor data yet/);
+    expect(vm.body).toMatch(/could not be confirmed/i);
+  });
+
+  it("does not reuse retained live values to explain a failed read", () => {
+    const state = ok({ temp: 24, rh: 55, vpd: 1.1 });
+    const vm = buildDashboardSensorHealthSummary({ ...state, status: "unavailable" }, NOW);
+    expect(vm.status).toBe("unavailable");
+    expect(vm.sourceLabel).toBe("Unknown");
+    expect(vm.hideValues).toBe(true);
+    expect(vm.reasons).toEqual([]);
+    expect(vm.headline).not.toMatch(/No sensor data|healthy|usable/i);
   });
 
   it("returns missing when all metric values are null even if status==ok", () => {
@@ -236,5 +277,10 @@ describe("dashboardSensorHealthViewModel safety", () => {
   });
   it("introduces no ai-coach or AI rule changes", () => {
     expect(FILE).not.toMatch(/ai-coach|ai_coach|doctorAnalysisRules/);
+  });
+  it("withholds health until buildSensorSnapshotReadState confirms the current read (#1555)", () => {
+    expect(FILE).toMatch(/buildSensorSnapshotReadState\s*\(\s*state\s*\)/);
+    expect(FILE).toMatch(/readState\.pendingNotice/);
+    expect(FILE).not.toMatch(/evaluateDashboardSensorQuality\s*\(\s*state\.snapshot/);
   });
 });

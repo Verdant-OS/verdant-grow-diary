@@ -2,6 +2,10 @@
 // Boring, predictable: each fn returns mapped domain objects or throws.
 // Not wired into UI yet; safe to import alongside mock data.
 import { supabase } from "@/integrations/supabase/client";
+import {
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 import type { SensorReadingInsert } from "@/lib/db";
 import type { Tent, Plant, SensorReading } from "@/mock";
 import { mapTentRow, mapPlantRow, groupSensorReadingRows } from "./growAdapters";
@@ -92,7 +96,7 @@ export async function fetchSensorReadings(tentId?: string | null): Promise<Senso
   // the caller has no selected tent and must fail closed without a query.
   if (tentId === null) return [];
   if (tentId !== undefined && !isUuid(tentId)) return [];
-  let q = supabase.from("sensor_readings").select("*");
+  let q = effectiveSensorReadingsQuery().select("*");
   if (tentId) q = q.eq("tent_id", tentId);
   const { data, error } = await q
     // Actual observation time leads: imported CSV rows preserve historical
@@ -101,7 +105,7 @@ export async function fetchSensorReadings(tentId?: string | null): Promise<Senso
     .order("ts", { ascending: false })
     .limit(2000);
   if (error) fail("fetchSensorReadings", error);
-  return groupSensorReadingRows(data ?? []);
+  return groupSensorReadingRows(requireEffectiveSensorReadings(data));
 }
 
 export async function insertSensorReading(row: SensorReadingInsert): Promise<void> {

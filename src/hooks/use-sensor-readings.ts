@@ -1,5 +1,9 @@
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+  EFFECTIVE_SENSOR_QUERY_VERSION,
+} from "@/lib/effectiveSensorReadings";
 import type { SensorReadingRow } from "@/lib/db";
 import { buildPrivateSensorQueryKey } from "@/lib/growDataQueryKeyRules";
 import { isUuid } from "@/lib/isUuid";
@@ -18,13 +22,16 @@ export function useSensorReadings(
   return useQuery({
     // Keep explicit no-scope separate from the intentional all-tents cache so
     // a disabled query can never surface aggregate readings from cache.
-    queryKey: buildPrivateSensorQueryKey(user?.id, [scopeKey, limit]),
+    queryKey: buildPrivateSensorQueryKey(user?.id, [
+      scopeKey,
+      limit,
+      EFFECTIVE_SENSOR_QUERY_VERSION,
+    ]),
     enabled,
     retry: false,
     queryFn: async () => {
       if (!enabled) return [];
-      let q = supabase
-        .from("sensor_readings")
+      let q = effectiveSensorReadingsQuery()
         .select("*")
         // Actual observation time takes precedence. CSV rows retain historical
         // `captured_at` while `ts` can be one shared import time.
@@ -35,7 +42,7 @@ export function useSensorReadings(
       if (tentId) q = q.eq("tent_id", tentId);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as SensorReadingRow[];
+      return requireEffectiveSensorReadings(data);
     },
   });
 }
@@ -85,10 +92,11 @@ export function useSensorReadingsByTents(
         tentId,
         perTentLimit,
         sources.length > 0 ? sources.join("|") : "all-sources",
+        EFFECTIVE_SENSOR_QUERY_VERSION,
       ]),
       retry: false,
       queryFn: async () => {
-        let query = supabase.from("sensor_readings").select("*").eq("tent_id", tentId);
+        let query = effectiveSensorReadingsQuery().select("*").eq("tent_id", tentId);
         // Apply source scope before ordering/limiting. This prevents a busy
         // live stream from crowding older imported history out of a bounded
         // CSV-only read window.
@@ -101,10 +109,7 @@ export function useSensorReadingsByTents(
           .order("created_at", { ascending: false })
           .limit(perTentLimit);
         if (error) throw error;
-        if (!Array.isArray(data)) {
-          throw new Error("Sensor readings are unavailable.");
-        }
-        return data as SensorReadingRow[];
+        return requireEffectiveSensorReadings(data);
       },
     })),
   });

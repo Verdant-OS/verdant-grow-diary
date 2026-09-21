@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildOtherGrowMoveDestinations } from "@/lib/plantMoveDestinationRules";
+import {
+  buildOtherGrowMoveDestinations,
+  withoutDisclosedMoveDestinations,
+} from "@/lib/plantMoveDestinationRules";
 
 const plant = { growId: "a", currentTentId: "current", huntStatus: "linked" as const };
 const tents = [
@@ -62,5 +65,100 @@ describe("other-grow move destination disclosure", () => {
     const first = buildOtherGrowMoveDestinations(frozen, plant);
     expect(buildOtherGrowMoveDestinations(frozen, plant)).toEqual(first);
     expect(frozen.map((tent) => tent.id)).toEqual(["current", "same", "male", "archived"]);
+  });
+
+  it("labels unnamed tents honestly without inventing a display name", () => {
+    expect(
+      buildOtherGrowMoveDestinations(
+        [{ id: "male", name: "   ", grow_id: "b", grow_name: "Banana Cough" }],
+        plant,
+      )[0],
+    ).toMatchObject({ label: "Unnamed tent — Banana Cough", disabled: true });
+  });
+
+  it.each(["", "   "])(
+    "does not treat whitespace-only grow_id %j as a cross-grow destination",
+    (growId) => {
+      expect(
+        buildOtherGrowMoveDestinations([{ id: "male", name: "Male Tent", grow_id: growId }], plant),
+      ).toEqual([]);
+    },
+  );
+});
+
+describe("withoutDisclosedMoveDestinations", () => {
+  const sameGrow = [
+    { id: "current", name: "Current" },
+    { id: "same", name: "Same" },
+    { id: "male", name: "Male Tent" },
+  ];
+  const disclosed = [
+    { id: "male", label: "Male Tent — Banana Cough", disabled: true, reason: "Untag first." },
+  ];
+
+  it("removes tents that already appear as disclosed cross-grow destinations", () => {
+    expect(withoutDisclosedMoveDestinations(sameGrow, disclosed)).toEqual([
+      { id: "current", name: "Current" },
+      { id: "same", name: "Same" },
+    ]);
+  });
+
+  it("returns the original list when no destinations are disclosed", () => {
+    expect(withoutDisclosedMoveDestinations(sameGrow, [])).toEqual(sameGrow);
+  });
+
+  it("does not mutate the input tent list", () => {
+    const frozen = Object.freeze(sameGrow.map((tent) => Object.freeze({ ...tent })));
+    withoutDisclosedMoveDestinations(frozen, disclosed);
+    expect(frozen.map((tent) => tent.id)).toEqual(["current", "same", "male"]);
+  });
+});
+
+describe("withoutDisclosedMoveDestinations", () => {
+  it("omits tents that already appear as disclosed other-grow destinations", () => {
+    const sameGrowTents = [
+      { id: "current", name: "Current" },
+      { id: "male", name: "Male Tent" },
+      { id: "other", name: "Other" },
+    ];
+    const destinations = buildOtherGrowMoveDestinations(tents, plant);
+
+    expect(withoutDisclosedMoveDestinations(sameGrowTents, destinations)).toEqual([
+      { id: "current", name: "Current" },
+      { id: "other", name: "Other" },
+    ]);
+  });
+
+  it("returns the input list unchanged when no destinations are disclosed", () => {
+    const sameGrowTents = [{ id: "current", name: "Current" }];
+    expect(withoutDisclosedMoveDestinations(sameGrowTents, [])).toEqual(sameGrowTents);
+  });
+
+  it("does not mutate the input tent array", () => {
+    const sameGrowTents = Object.freeze([
+      Object.freeze({ id: "current", name: "Current" }),
+      Object.freeze({ id: "male", name: "Male Tent" }),
+    ]);
+    const destinations = buildOtherGrowMoveDestinations(tents, plant);
+
+    withoutDisclosedMoveDestinations(sameGrowTents, destinations);
+
+    expect(sameGrowTents.map((tent) => tent.id)).toEqual(["current", "male"]);
+  });
+
+  it("leaves no duplicate tent id across disabled other-grow and enabled same-grow lists", () => {
+    const destinations = buildOtherGrowMoveDestinations(tents, plant);
+    const enabledSameGrow = withoutDisclosedMoveDestinations(
+      [
+        { id: "current", name: "Current" },
+        { id: "same", name: "Same" },
+        { id: "male", name: "Male Tent" },
+      ],
+      destinations,
+    );
+
+    const selectableIds = [...destinations.map((d) => d.id), ...enabledSameGrow.map((t) => t.id)];
+    expect(new Set(selectableIds).size).toBe(selectableIds.length);
+    expect(enabledSameGrow.some((tent) => tent.id === "male")).toBe(false);
   });
 });

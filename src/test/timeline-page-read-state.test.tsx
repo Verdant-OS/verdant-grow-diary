@@ -750,6 +750,24 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.getByTestId("timeline-empty-state-action-photo")).toBeInTheDocument();
   });
 
+  it("shows date-window empty state when manual-only supplemental readings fall outside the active range", async () => {
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
+      if (spec.table === "grow_events") return { data: [], error: null };
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: [], error: null };
+      return defaultResult(spec);
+    });
+
+    renderTimeline("/timeline?start=2026-09-12&end=2026-09-12");
+
+    expect(await screen.findByText("No entries in this date range")).toBeInTheDocument();
+    expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Manual sensor snapshot:/)).not.toBeInTheDocument();
+    expectNoTimelineContinuation();
+  });
+
   it("unlocks the Sensors continuation after successful diary evidence", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") {

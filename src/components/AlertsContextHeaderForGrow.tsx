@@ -16,6 +16,7 @@ import { useGrowTents } from "@/hooks/useGrowData";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
 import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildAlertsHeaderContext } from "@/lib/alertFreshnessContext";
+import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
@@ -58,14 +59,25 @@ export default function AlertsContextHeaderForGrow({
     [stage, tents],
   );
 
+  const snapshotReadState = buildSensorSnapshotReadState(sensorState);
+  const confirmedSnapshot = snapshotReadState.confirmedSnapshot;
+  const headerStatus =
+    sensorState.status === "unavailable"
+      ? "unavailable"
+      : confirmedSnapshot
+        ? "ok"
+        : snapshotReadState.pendingNotice
+          ? "loading"
+          : sensorState.status;
+
   const vm = useMemo(
     () =>
       buildAlertsHeaderContext({
         growName,
         stage: resolvedStage,
         targets: targetsState.status === "ok" ? targetsState.targets : null,
-        snapshot: sensorState.status === "ok" ? sensorState.snapshot : null,
-        status: sensorState.status,
+        snapshot: confirmedSnapshot,
+        status: headerStatus,
         tempUnit,
       }),
     [
@@ -73,15 +85,15 @@ export default function AlertsContextHeaderForGrow({
       resolvedStage,
       targetsState.status,
       targetsState.targets,
-      sensorState.status,
-      sensorState.snapshot,
+      confirmedSnapshot,
+      headerStatus,
       tempUnit,
     ],
   );
 
   const freshnessArgs = {
-    snapshot: sensorState.status === "ok" ? sensorState.snapshot : null,
-    status: sensorState.status,
+    snapshot: confirmedSnapshot,
+    status: headerStatus,
   } as const;
 
   return (

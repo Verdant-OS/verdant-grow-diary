@@ -42,6 +42,16 @@ function metricRow(
 }
 
 describe("manualSensorReadingsToTimelineEntries", () => {
+  it("uses the effective corrected value in the receipt note, not a stale raw reading", () => {
+    const correctedTempC = fahrenheitToCelsius(77);
+    const rows = [metricRow("temperature_c", correctedTempC), metricRow("humidity_pct", 58)];
+    const [receipt] = manualSensorReadingsToTimelineEntries(rows, NOW);
+    expect(receipt?.note).toContain("77°F");
+    expect(receipt?.note).not.toContain("75.2°F");
+    const snap = receipt?.details.manual_sensor_snapshot as { temp_f: number };
+    expect(snap.temp_f).toBeCloseTo(77, 5);
+  });
+
   it("includes a grouped manual temp+RH snapshot in the Measurements query/view", () => {
     const tempC = fahrenheitToCelsius(76);
     const rows = [metricRow("temperature_c", tempC), metricRow("humidity_pct", 58)];

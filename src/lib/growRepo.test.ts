@@ -91,6 +91,11 @@ const tentRow = {
 };
 
 describe("fetchTents", () => {
+  it("returns [] for a legacy non-UUID growId without querying Supabase", async () => {
+    expect(await fetchTents("g1")).toEqual([]);
+    expect(calls.table).toBeUndefined();
+  });
+
   it("returns mapped rows on happy path", async () => {
     nextResult = { data: [tentRow], error: null };
     const r = await fetchTents();
@@ -118,6 +123,10 @@ describe("fetchTent", () => {
     expect(await fetchTent("")).toBeNull();
     expect(calls.table).toBeUndefined();
   });
+  it("returns null for a legacy non-UUID id without querying Supabase", async () => {
+    expect(await fetchTent("t1")).toBeNull();
+    expect(calls.table).toBeUndefined();
+  });
   it("returns null when row missing", async () => {
     nextResult = { data: null, error: null };
     expect(await fetchTent(TENT_UUID)).toBeNull();
@@ -126,6 +135,14 @@ describe("fetchTent", () => {
 });
 
 describe("fetchPlants", () => {
+  it("returns [] for a legacy non-UUID tentId without querying Supabase", async () => {
+    expect(await fetchPlants("t1")).toEqual([]);
+    expect(calls.table).toBeUndefined();
+  });
+  it("returns [] for a legacy non-UUID growId without querying Supabase", async () => {
+    expect(await fetchPlants(undefined, "g1")).toEqual([]);
+    expect(calls.table).toBeUndefined();
+  });
   it("filters by tentId when provided", async () => {
     nextResult = { data: [], error: null };
     await fetchPlants(TENT_UUID_2);

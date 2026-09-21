@@ -418,6 +418,78 @@ describe("Timeline mounted read-state boundary", () => {
     },
   );
 
+  it("reloads corrected manual receipt after a cross-tab BroadcastChannel notification", async () => {
+    const channelName = "verdant:manual-sensor-corrections:v1";
+    class Channel {
+      static instances = new Set<Channel>();
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      closed = false;
+      constructor(readonly name: string) {
+        Channel.instances.add(this);
+      }
+      postMessage(data: unknown) {
+        for (const receiver of Channel.instances) {
+          if (receiver !== this && receiver.name === this.name && !receiver.closed)
+            receiver.onmessage?.(new MessageEvent("message", { data }));
+        }
+      }
+      close() {
+        this.closed = true;
+        Channel.instances.delete(this);
+      }
+    }
+    vi.stubGlobal("BroadcastChannel", Channel);
+
+    const observed = new Date(Date.now() - 60_000).toISOString();
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    let correctedValue = 24;
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective")
+        return {
+          data: [
+            {
+              id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+              user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              tent_id: tent,
+              metric: "temperature_c",
+              value: correctedValue,
+              source: "manual",
+              quality: "ok",
+              ts: observed,
+              captured_at: observed,
+              created_at: observed,
+              device_id: null,
+              raw_payload: null,
+              correction_valid: true,
+              corrected_at: new Date().toISOString(),
+            },
+          ],
+          error: null,
+        };
+      return defaultResult(spec);
+    });
+
+    try {
+      renderTimeline();
+      expect(await screen.findByText("Manual sensor snapshot: 75.2°F")).toBeInTheDocument();
+      correctedValue = 25;
+      const callsBefore = harness.executeQuery.mock.calls.length;
+      new Channel(channelName).postMessage({
+        version: 1,
+        ownerId: "another-owner",
+        tentId: tent,
+      });
+      expect(harness.executeQuery.mock.calls.length).toBe(callsBefore);
+      new Channel(channelName).postMessage({ version: 1, ownerId: "owner-1", tentId: tent });
+      expect(await screen.findByText("Manual sensor snapshot: 77°F")).toBeInTheDocument();
+      expect(screen.queryByText("Manual sensor snapshot: 75.2°F")).not.toBeInTheDocument();
+    } finally {
+      Channel.instances.forEach((channel) => channel.close());
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("treats manual-only sensor history as grow evidence instead of an empty timeline", async () => {
     const observed = new Date(Date.now() - 60_000).toISOString();
     const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";

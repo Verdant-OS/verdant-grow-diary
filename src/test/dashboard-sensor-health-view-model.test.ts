@@ -278,4 +278,9 @@ describe("dashboardSensorHealthViewModel safety", () => {
   it("introduces no ai-coach or AI rule changes", () => {
     expect(FILE).not.toMatch(/ai-coach|ai_coach|doctorAnalysisRules/);
   });
+  it("withholds health until buildSensorSnapshotReadState confirms the current read (#1555)", () => {
+    expect(FILE).toMatch(/buildSensorSnapshotReadState\s*\(\s*state\s*\)/);
+    expect(FILE).toMatch(/readState\.pendingNotice/);
+    expect(FILE).not.toMatch(/evaluateDashboardSensorQuality\s*\(\s*state\.snapshot/);
+  });
 });

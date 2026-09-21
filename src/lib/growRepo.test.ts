@@ -3,8 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Chainable fake Supabase query builder.
 type Result = { data: unknown; error: unknown };
 let nextResult: Result = { data: [], error: null };
+let resultQueue: Result[] = [];
+let orFilter: string | undefined;
 const calls: {
   table?: string;
+  fromTables?: string[];
   filters: Array<[string, unknown]>;
   ordered?: string[];
   limited?: number;
@@ -14,7 +17,10 @@ const calls: {
 
 function reset() {
   nextResult = { data: [], error: null };
+  resultQueue = [];
+  orFilter = undefined;
   calls.table = undefined;
+  calls.fromTables = [];
   calls.filters = [];
   calls.ordered = [];
   calls.limited = undefined;
@@ -27,6 +33,10 @@ function builder(): any {
     select: () => b,
     eq: (col: string, val: unknown) => {
       calls.filters.push([col, val]);
+      return b;
+    },
+    or: (filter: string) => {
+      orFilter = filter;
       return b;
     },
     order: (col: string) => {
@@ -46,7 +56,8 @@ function builder(): any {
       calls.inserted = row;
       return Promise.resolve(nextResult);
     },
-    then: (resolve: (r: Result) => unknown) => Promise.resolve(nextResult).then(resolve),
+    then: (resolve: (r: Result) => unknown) =>
+      Promise.resolve(resultQueue.shift() ?? nextResult).then(resolve),
   };
   return b;
 }
@@ -54,6 +65,8 @@ function builder(): any {
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: (table: string) => {
+      calls.fromTables ??= [];
+      calls.fromTables.push(table);
       calls.table = table;
       return builder();
     },
@@ -64,6 +77,7 @@ import {
   fetchTents,
   fetchTent,
   fetchPlants,
+  fetchPlant,
   fetchSensorReadings,
   insertSensorReading,
   insertSensorReadingsBatch,
@@ -73,6 +87,24 @@ beforeEach(reset);
 
 const TENT_UUID = "11111111-1111-4111-8111-111111111111";
 const TENT_UUID_2 = "22222222-2222-4222-8222-222222222222";
+const GROW_UUID = "33333333-3333-4333-8333-333333333333";
+const PLANT_UUID = "44444444-4444-4444-8444-444444444444";
+const PLANT_UUID_2 = "55555555-5555-4555-8555-555555555555";
+
+const validPlantRow = {
+  id: PLANT_UUID,
+  user_id: "u",
+  name: "Blue Dream",
+  strain: "BD",
+  tent_id: TENT_UUID,
+  grow_id: GROW_UUID,
+  stage: "veg",
+  health: "healthy",
+  plant_type: "photoperiod",
+  is_archived: false,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+};
 
 const tentRow = {
   id: TENT_UUID,
@@ -156,6 +188,69 @@ describe("fetchPlants", () => {
   it("throws on supabase error", async () => {
     nextResult = { data: null, error: { message: "nope" } };
     await expect(fetchPlants()).rejects.toThrow(/fetchPlants.*nope/);
+  });
+
+  it("rolls up grow-scoped plants through tent attribution filter", async () => {
+    resultQueue = [
+      { data: [{ id: TENT_UUID }], error: null },
+      { data: [validPlantRow], error: null },
+    ];
+    const plants = await fetchPlants(undefined, GROW_UUID);
+    expect(calls.fromTables).toEqual(["plants", "tents"]);
+    expect(calls.filters).toContainEqual(["grow_id", GROW_UUID]);
+    expect(orFilter).toBe(`grow_id.eq.${GROW_UUID},tent_id.in.(${TENT_UUID})`);
+    expect(plants).toHaveLength(1);
+    expect(plants[0]?.id).toBe(PLANT_UUID);
+  });
+
+  it("degrades grow-scoped filter to grow_id only when tent rollup is empty", async () => {
+    resultQueue = [
+      { data: [], error: null },
+      { data: [], error: null },
+    ];
+    await fetchPlants(undefined, GROW_UUID);
+    expect(orFilter).toBe(`grow_id.eq.${GROW_UUID}`);
+  });
+
+  it("drops malformed plant rows from fetchPlants results", async () => {
+    nextResult = {
+      data: [validPlantRow, { id: PLANT_UUID_2, name: "missing plant_type" }],
+      error: null,
+    };
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const plants = await fetchPlants();
+    expect(plants).toHaveLength(1);
+    expect(plants[0]?.id).toBe(PLANT_UUID);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/dropped 1 malformed plant row\(s\)/),
+    );
+    warnSpy.mockRestore();
+  });
+});
+
+describe("fetchPlant", () => {
+  it("returns null for a legacy non-UUID id without querying Supabase", async () => {
+    expect(await fetchPlant("t1")).toBeNull();
+    expect(calls.table).toBeUndefined();
+  });
+
+  it("returns null when row missing", async () => {
+    nextResult = { data: null, error: null };
+    expect(await fetchPlant(PLANT_UUID)).toBeNull();
+    expect(calls.single).toBe(true);
+  });
+
+  it("throws when the row fails validation", async () => {
+    nextResult = { data: { id: PLANT_UUID, name: "P" }, error: null };
+    await expect(fetchPlant(PLANT_UUID)).rejects.toThrow(/plant row failed validation/);
+  });
+
+  it("returns mapped plant on valid row", async () => {
+    nextResult = { data: validPlantRow, error: null };
+    const plant = await fetchPlant(PLANT_UUID);
+    expect(plant?.id).toBe(PLANT_UUID);
+    expect(plant?.name).toBe("Blue Dream");
+    expect(plant?.growId).toBe(GROW_UUID);
   });
 });
 

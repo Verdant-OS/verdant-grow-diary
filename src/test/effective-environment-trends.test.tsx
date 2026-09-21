@@ -267,4 +267,44 @@ describe("effective Environment Trends", () => {
     const { result } = mount();
     await waitFor(() => expect(result.current.status).toBe("unavailable"));
   });
+
+  function diagnosticSensorRow() {
+    return {
+      ...rows()[0],
+      source: "live",
+      raw_payload: {
+        vendor: "ecowitt_windows_testbench",
+        metadata: { confidence: "test" },
+      },
+    };
+  }
+
+  it("falls back to scoped diary evidence when sensor rows are diagnostic-only", async () => {
+    io.read.mockImplementation((table) =>
+      Promise.resolve(
+        table === "diary_entries"
+          ? ok([{ tent_id: tentA, entry_at: observed, details: { sensor_snapshot: { temp: 22 } } }])
+          : ok([diagnosticSensorRow()]),
+      ),
+    );
+    const { result } = mount();
+    await waitFor(() => expect(result.current.trends.temp.avg).toBe(22));
+    expect(result.current.status).toBe("ok");
+    expect(io.read.mock.calls.filter((c) => c[0] === "sensor_readings_effective")).toEqual([
+      ["sensor_readings_effective", [tentA], 500],
+    ]);
+  });
+
+  it("reports honest empty trends when sensor rows are diagnostic-only and diary is empty", async () => {
+    io.read.mockImplementation((table) =>
+      Promise.resolve(table === "diary_entries" ? ok([]) : ok([diagnosticSensorRow()])),
+    );
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.trends.count).toBe(0);
+    expect(io.read.mock.calls).toEqual([
+      ["sensor_readings_effective", [tentA], 500],
+      ["diary_entries", [], 50],
+    ]);
+  });
 });

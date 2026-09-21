@@ -500,7 +500,10 @@ export default function Dashboard() {
                 </p>
               </div>
               <Button asChild size="sm" variant="ghost">
-                <Link to={sensorsPath(scopedGrowId)}>
+                <Link
+                  to={sensorsPath(scopedGrowId)}
+                  data-testid="dashboard-environment-snapshot-open-sensors"
+                >
                   Open sensors <ArrowRight className="h-3 w-3" />
                 </Link>
               </Button>
@@ -668,7 +671,10 @@ export default function Dashboard() {
                               )}
                             </div>
                             <Button asChild size="sm" variant="ghost">
-                              <Link to={sensorsPath(scopedGrowId)}>
+                              <Link
+                                to={sensorsPath(scopedGrowId)}
+                                data-testid="dashboard-environment-snapshot-sensor-data"
+                              >
                                 Sensor data <ArrowRight className="h-3 w-3" />
                               </Link>
                             </Button>

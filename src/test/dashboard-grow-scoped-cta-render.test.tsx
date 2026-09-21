@@ -16,6 +16,7 @@ const TENT = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f";
 const H = vi.hoisted(() => ({
   scoped: false,
   growStatus: "success" as "loading" | "error" | "success",
+  perTentRows: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("@/hooks/useGrowData", () => ({
@@ -50,13 +51,13 @@ vi.mock("@/hooks/useGrowData", () => ({
 
 vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadings: () => ({
-    data: [],
+    data: H.perTentRows,
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
   }),
   useSensorReadingsByTents: () => ({
-    byTent: { [TENT]: [] },
+    byTent: { [TENT]: H.perTentRows },
     statusByTent: { [TENT]: "success" },
     isLoading: false,
     isError: false,
@@ -194,7 +195,47 @@ describe("Dashboard grow-scoped CTA render", () => {
   beforeEach(() => {
     H.scoped = false;
     H.growStatus = "success";
+    H.perTentRows = [];
   });
+
+  const populatedReading = () => {
+    const ts = new Date().toISOString();
+    H.perTentRows = [
+      {
+        id: "reading-render-a",
+        tent_id: TENT,
+        metric: "temperature_c",
+        value: 24,
+        source: "manual",
+        quality: "ok",
+        ts,
+        captured_at: ts,
+        created_at: ts,
+      },
+      {
+        id: "reading-render-b",
+        tent_id: TENT,
+        metric: "humidity_pct",
+        value: 55,
+        source: "manual",
+        quality: "ok",
+        ts,
+        captured_at: ts,
+        created_at: ts,
+      },
+      {
+        id: "reading-render-c",
+        tent_id: TENT,
+        metric: "vpd_kpa",
+        value: 1.1,
+        source: "manual",
+        quality: "ok",
+        ts,
+        captured_at: ts,
+        created_at: ts,
+      },
+    ];
+  };
 
   it("carries growId on PageHeader Quick Log when grow scope is active", () => {
     H.scoped = true;
@@ -239,5 +280,37 @@ describe("Dashboard grow-scoped CTA render", () => {
       "/sensors#csv-import",
     );
     expect(hrefForTestId("dashboard-environment-snapshot-empty-sensors-link")).toBe("/sensors");
+    expect(hrefForTestId("dashboard-environment-snapshot-open-sensors")).toBe("/sensors");
+  });
+
+  it("carries growId on Environment Snapshot header Open sensors when grow scope is active", () => {
+    H.scoped = true;
+    renderDashboard();
+
+    expect(hrefForTestId("dashboard-environment-snapshot-open-sensors")).toBe(
+      `/sensors?growId=${GROW}`,
+    );
+  });
+
+  it("carries growId on populated chart Sensor data link when grow scope is active", () => {
+    H.scoped = true;
+    populatedReading();
+    renderDashboard();
+
+    expect(screen.queryByTestId("dashboard-environment-snapshot-empty")).toBeNull();
+    expect(hrefForTestId("dashboard-environment-snapshot-sensor-data")).toBe(
+      `/sensors?growId=${GROW}`,
+    );
+    expect(hrefForTestId("dashboard-environment-snapshot-open-sensors")).toBe(
+      `/sensors?growId=${GROW}`,
+    );
+  });
+
+  it("keeps bare /sensors on populated chart Sensor data link without grow scope", () => {
+    populatedReading();
+    renderDashboard();
+
+    expect(hrefForTestId("dashboard-environment-snapshot-sensor-data")).toBe("/sensors");
+    expect(hrefForTestId("dashboard-environment-snapshot-open-sensors")).toBe("/sensors");
   });
 });

@@ -19,6 +19,17 @@ describe("current snapshot read evidence", () => {
       expect(buildSensorSnapshotReadState({ status, snapshot }).confirmedSnapshot).toBeNull();
     },
   );
+  it("describes a first fetch as loading rather than last loaded during isFetching", () => {
+    const result = buildSensorSnapshotReadState({
+      status: "ok",
+      snapshot: EMPTY_SNAPSHOT,
+      isFetching: true,
+    });
+    expect(result.confirmedSnapshot).toBeNull();
+    expect(result.pendingNotice).toBe("Loading sensor data…");
+    expect(result.pendingNotice).not.toContain("Last loaded readings");
+  });
+
   it.each(["isPaused", "isFetching"] as const)(
     "keeps cached data out of current evidence during %s",
     (flag) => {

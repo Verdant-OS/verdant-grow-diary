@@ -77,6 +77,29 @@ describe("buildDashboardSensorHealthSummary", () => {
     expect(buildDashboardSensorHealthSummary(undefined, NOW).status).toBe("loading");
   });
 
+  it("withholds healthy classification with the paused notice when both isPaused and isFetching", () => {
+    const vm = buildDashboardSensorHealthSummary(
+      {
+        status: "ok",
+        snapshot: {
+          ...EMPTY_SNAPSHOT,
+          source: "live",
+          ts: new Date(NOW - 60_000).toISOString(),
+          temp: 24,
+          rh: 55,
+          vpd: 1.1,
+        },
+        isPaused: true,
+        isFetching: true,
+      },
+      NOW,
+    );
+    expect(vm.status).toBe("loading");
+    expect(vm.statusLabel).toBe("Checking…");
+    expect(vm.body).toMatch(/Waiting for connection/);
+    expect(vm.body).not.toMatch(/Refreshing sensor data|looks usable|Healthy/i);
+  });
+
   it("distinguishes a failed read from a completed empty read", () => {
     const vm = buildDashboardSensorHealthSummary(
       { status: "unavailable", snapshot: EMPTY_SNAPSHOT },

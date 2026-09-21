@@ -52,6 +52,17 @@ describe("current snapshot read evidence", () => {
     expect(result.pendingNotice).toContain("Waiting for connection");
     expect(result.pendingNotice).not.toContain("Last loaded readings");
   });
+  it("prefers the paused notice when both isPaused and isFetching are true", () => {
+    const result = buildSensorSnapshotReadState({
+      status: "ok",
+      snapshot,
+      isPaused: true,
+      isFetching: true,
+    });
+    expect(result.confirmedSnapshot).toBeNull();
+    expect(result.pendingNotice).toMatch(/Waiting for connection/);
+    expect(result.pendingNotice).not.toMatch(/Refreshing sensor data/);
+  });
   it("keeps a failed read unavailable even when old values are present", () => {
     expect(
       buildSensorSnapshotReadState({ status: "unavailable", snapshot, isPaused: true }),

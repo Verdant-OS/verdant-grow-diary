@@ -42,6 +42,20 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
     );
   });
 
+  it("carries growId on Timeline Review sensor snapshot when only grow scope is present", () => {
+    renderCard(
+      <OneTentLoopNextStepCard
+        current="timeline"
+        ids={{ growId: "g1" }}
+        testId="timeline-one-tent-loop-next-step-card"
+      />,
+    );
+
+    const cta = screen.getByTestId("timeline-one-tent-loop-next-step-card-cta");
+    const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
+    expect(anchor?.getAttribute("href")).toBe("/sensors?growId=g1");
+  });
+
   it("carries a selected Timeline tent to Sensors without exposing it as copy", () => {
     const tentId = "00000000-0000-4000-8000-00000000000a";
     renderCard(

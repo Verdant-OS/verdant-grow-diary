@@ -102,12 +102,32 @@ describe("useInsertSensorReadings", () => {
     vi.mocked(repo.insertSensorReadingsBatch).mockRejectedValue(duplicateError);
     vi.mocked(confirmManualSnapshotConflict).mockResolvedValue(true);
 
-    const { wrapper } = makeWrapper();
-    const { result } = renderHook(() => useInsertSensorReadings(), { wrapper });
-    result.current.mutate(MANUAL_ROWS);
+    const { invalidateSpy, wrapper } = makeWrapper();
+    const createdEvents: Event[] = [];
+    const onCreated = (event: Event) => createdEvents.push(event);
+    window.addEventListener("verdant:sensor-reading-created", onCreated);
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(confirmManualSnapshotConflict).toHaveBeenCalledWith(MANUAL_ROWS, duplicateError);
+    try {
+      const { result } = renderHook(() => useInsertSensorReadings(), { wrapper });
+      result.current.mutate(MANUAL_ROWS);
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(confirmManualSnapshotConflict).toHaveBeenCalledWith(MANUAL_ROWS, duplicateError);
+      expect(
+        invalidateSpy.mock.calls.map(
+          ([options]) => (options as { queryKey: readonly unknown[] }).queryKey,
+        ),
+      ).toEqual([
+        ["grow", "sensors"],
+        ["sensor_readings"],
+        ["latest-sensor-snapshot"],
+        ["plant-tent-environment"],
+        ["environment-trends"],
+      ]);
+      expect(createdEvents).toHaveLength(1);
+    } finally {
+      window.removeEventListener("verdant:sensor-reading-created", onCreated);
+    }
   });
 
   it("rethrows when duplicate recovery cannot confirm the existing snapshot", async () => {

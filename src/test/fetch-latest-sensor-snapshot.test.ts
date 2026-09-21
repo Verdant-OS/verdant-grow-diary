@@ -129,6 +129,18 @@ describe("fetchLatestSensorSnapshot", () => {
     expect(result).toBeNull();
   });
 
+  it.each(["not-a-date", ""])(
+    "returns null for non-finite RPC captured_at %j without querying effective readings",
+    async (capturedAt) => {
+      vi.mocked(supabase.rpc).mockResolvedValue({
+        data: { captured_at: capturedAt, temperature: 24 },
+        error: null,
+      } as never);
+      await expect(fetchLatestSensorSnapshot("tent-1")).resolves.toBeNull();
+      expect(supabase.from).not.toHaveBeenCalled();
+    },
+  );
+
   it("transforms flat JSONB into canonical snapshot shape", async () => {
     (supabase.rpc as any).mockResolvedValue({
       data: {

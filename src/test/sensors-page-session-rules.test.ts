@@ -760,6 +760,19 @@ describe("manual snapshot recovery errors", () => {
     expect(session.getSnapshot()?.recoveryError).toBe(MANUAL_RECOVERY_STORAGE_ERROR);
   });
 
+  it("surfaces MANUAL_RECOVERY_STORAGE_ERROR when draft edit cannot clear pending snapshot storage", () => {
+    const session = setup();
+    const entered = draft(session);
+    const save = claimed(session.claimSave(entered.identity, payloads()));
+    expect(session.settleSave(save, { status: "unconfirmed" })).toBe(true);
+    vi.spyOn(manualSensorPendingSnapshotStore, "clearPendingManualSnapshot").mockReturnValue(false);
+    session.updateDraft(entered.identity, (current) =>
+      editManualDraftValues(current, { deviceCustom: "second meter" }),
+    );
+    expect(session.getSnapshot()?.recoveryError).toBe(MANUAL_RECOVERY_STORAGE_ERROR);
+    expect(session.claimSave(entered.identity, payloads())).toEqual({ status: "stale" });
+  });
+
   it("sets MANUAL_RECOVERY_PREVIOUS_PENDING when pending storage rejects a new claim", () => {
     const session = setup();
     const entered = draft(session);

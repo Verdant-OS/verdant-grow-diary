@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   batch: vi.fn(),
   edit: vi.fn(),
   replacement: vi.fn(),
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 vi.mock("@/store/auth", () => ({
   useAuth: () => ({ user: { id: mocks.owner } }),
@@ -28,6 +29,7 @@ vi.mock("@/lib/insertManualSensorReadingReturningId", () => ({
   insertManualSensorReadingReturningId: mocks.replacement,
 }));
 vi.mock("@/hooks/useInsertManualSnapshotEdit", () => ({ insertManualSnapshotEdit: mocks.edit }));
+vi.mock("sonner", () => ({ toast: mocks.toast }));
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 
 const tentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -92,6 +94,9 @@ beforeEach(() => {
   mocks.owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   sessionStorage.clear();
   vi.clearAllMocks();
+  mocks.toast.success.mockReset();
+  mocks.toast.error.mockReset();
+  mocks.toast.warning.mockReset();
   mocks.rpc.mockReset().mockImplementation(async (_name, { p_request }) => receipt(p_request));
   mocks.replacement.mockResolvedValue({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });
 });
@@ -186,6 +191,41 @@ describe("atomic correction form", () => {
     expect(mocks.rpc).toHaveBeenCalledTimes(2);
     expect(mocks.rpc.mock.calls[1][1]).toEqual(mocks.rpc.mock.calls[0][1]);
   });
+  it("warns when correction saves but local journal cleanup is pending", async () => {
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage denied");
+    });
+    const view = mount();
+    await waitFor(() => expect(view.saved).toHaveBeenCalledTimes(1));
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+    expect(mocks.toast.success).toHaveBeenCalled();
+    expect(mocks.toast.warning).toHaveBeenCalledWith(
+      expect.stringMatching(/local recovery cleanup is pending/i),
+    );
+  });
+
+  it("does not dispatch correction RPC when the correction tent is not owned", async () => {
+    const foreignTent = "99999999-9999-4999-8999-999999999999";
+    const saved = vi.fn();
+    const view = render(
+      <MemoryRouter>
+        <ManualSensorReadingCard
+          tents={[{ id: tentId, name: "Tent A" }]}
+          correction={{ ...correction, tentId: foreignTent }}
+          onSaved={saved}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.change(view.getByLabelText(/Humidity/i), { target: { value: "60" } });
+    fireEvent.click(view.getByTestId("manual-reading-save"));
+    fireEvent.click(view.getByTestId("manual-sensor-review-confirm"));
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument(),
+    );
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(saved).not.toHaveBeenCalled();
+  });
+
   it("does not dispatch when pending storage is corrupt", async () => {
     sessionStorage.setItem(
       "verdant:sensors:pending-correction:v1:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",

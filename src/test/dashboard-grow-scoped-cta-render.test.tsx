@@ -19,6 +19,23 @@ const H = vi.hoisted(() => ({
   perTentRows: [] as Array<Record<string, unknown>>,
 }));
 
+vi.mock("@/hooks/use-diary-entries", () => ({
+  useDiaryEntries: () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(async () => undefined),
+  }),
+}));
+
+vi.mock("@/hooks/use-tents", () => ({
+  useTents: () => ({ data: [] }),
+}));
+
+vi.mock("@/hooks/use-plants", () => ({
+  usePlants: () => ({ data: [] }),
+}));
+
 vi.mock("@/hooks/useGrowData", () => ({
   useGrowTents: () => ({
     data:
@@ -154,7 +171,6 @@ vi.mock("@/components/DashboardPendingOutcomeReviewsCard", () => ({ default: () 
 vi.mock("@/components/SafeByDesignNotice", () => ({ default: () => null }));
 vi.mock("@/components/DashboardSensorHealthSummary", () => ({ default: () => null }));
 vi.mock("@/components/GrowTargetsEditor", () => ({ default: () => null }));
-vi.mock("@/components/DailyGrowCheckStatusCard", () => ({ default: () => null }));
 vi.mock("@/components/DashboardDailyGrowCheckPanel", () => ({ default: () => null }));
 vi.mock("@/components/GuidedActionChecklistPanel", () => ({ default: () => null }));
 vi.mock("@/components/SensorSourceBadge", () => ({ default: () => null }));
@@ -248,6 +264,19 @@ describe("Dashboard grow-scoped CTA render", () => {
     renderDashboard();
 
     expect(hrefForTestId("dashboard-daily-grow-check-entry")).toBe("/daily-check");
+  });
+
+  it("carries growId on inline Daily Grow Check Start Check when grow scope is active", () => {
+    H.scoped = true;
+    renderDashboard();
+
+    expect(hrefForTestId("daily-grow-check-status-cta")).toBe(`/daily-check?growId=${GROW}`);
+  });
+
+  it("keeps global /daily-check on inline Start Check without grow scope", () => {
+    renderDashboard();
+
+    expect(hrefForTestId("daily-grow-check-status-cta")).toBe("/daily-check");
   });
 
   it("carries growId on Environment Snapshot sensor CTAs when grow scope is active", () => {

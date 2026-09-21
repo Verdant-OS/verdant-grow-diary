@@ -43,6 +43,20 @@ describe("grow-scoped continue CTAs retain growId", () => {
     );
   });
 
+  it("trims whitespace growId before carrying it on Timeline → Sensors", () => {
+    const paddedGrow = `  ${GROW}  `;
+    expect(resolveOneTentLoopNextStep("timeline", { growId: paddedGrow }).href).toBe(
+      sensorsPath(GROW),
+    );
+    expect(
+      resolveOneTentLoopNextStep("timeline", {
+        growId: paddedGrow,
+        tentId: TENT,
+        plantId: PLANT,
+      }).href,
+    ).toBe(withGrowId(`/sensors?tentId=${TENT}&tentIntent=required&plantId=${PLANT}`, GROW));
+  });
+
   it("Dashboard Open sensors and Start Check CTAs reuse withGrowId/sensorsPath", () => {
     const dashboard = readFileSync(resolve(ROOT, "src/pages/Dashboard.tsx"), "utf8");
     const card = readFileSync(resolve(ROOT, "src/components/DailyGrowCheckStatusCard.tsx"), "utf8");

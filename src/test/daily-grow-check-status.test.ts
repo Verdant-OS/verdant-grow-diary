@@ -112,6 +112,7 @@ describe("Daily Grow Check status · wiring", () => {
 
   it("Dashboard renders the status card", () => {
     expect(dash).toMatch(/DailyGrowCheckStatusCard/);
+    expect(dash).toMatch(/growId=\{scopedGrowId\s*\?\?\s*null\}/);
   });
 
   it("GrowRoomMode renders the compact status card", () => {

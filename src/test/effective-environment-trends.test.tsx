@@ -204,6 +204,33 @@ describe("effective Environment Trends", () => {
     await waitFor(() => expect(result.current.status).toBe("ok"));
     expect(result.current.trends.count).toBe(0);
   });
+  it("withholds cached trends during an online background correction refetch", async () => {
+    const { result, client } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.trends.temp.avg).toBe(24);
+
+    let resolveRefetch!: (value: unknown) => void;
+    io.read.mockImplementation((_table, _tents, limit) =>
+      limit === 500
+        ? new Promise((resolve) => {
+            resolveRefetch = resolve;
+          })
+        : Promise.resolve(ok(rows(23))),
+    );
+
+    act(() => {
+      void client.invalidateQueries({ queryKey: ["environment-trends"] });
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("loading"));
+    expect(result.current.trends.count).toBe(0);
+
+    await act(async () => {
+      resolveRefetch(ok(rows(23)));
+    });
+    await waitFor(() => expect(result.current.trends.temp.avg).toBe(23));
+  });
+
   it("withholds a cached trend while correction refresh is paused, then reconnects", async () => {
     const { result, client } = mount();
     await waitFor(() => expect(result.current.trends.temp.avg).toBe(24));

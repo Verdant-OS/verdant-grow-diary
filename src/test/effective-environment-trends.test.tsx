@@ -88,6 +88,23 @@ describe("effective Environment Trends", () => {
     expect(result.current.trends).toMatchObject({ latestTs: observed, source: "manual" });
     expect(io.read.mock.calls[0]).toEqual(["sensor_readings_effective", [tentA], 500]);
   });
+  it("includes null captured_at rows when ts is inside the 24h window", async () => {
+    const recentTs = new Date(Date.now() - 60_000).toISOString();
+    io.read.mockResolvedValue(
+      ok([
+        {
+          ...rows()[0],
+          ts: recentTs,
+          captured_at: null,
+          created_at: recentTs,
+        },
+      ]),
+    );
+    const { result } = mount();
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.trends.temp.avg).toBe(24);
+    expect(result.current.trends.latestTs).toBe(recentTs);
+  });
   it("refetches mounted trends after the existing correction invalidation", async () => {
     const { result, client } = mount();
     await waitFor(() => expect(result.current.trends.temp.avg).toBe(24));

@@ -52,6 +52,40 @@ describe("manualSensorReadingsToTimelineEntries", () => {
     expect(snap.temp_f).toBeCloseTo(77, 5);
   });
 
+  it("uses captured_at for receipt entry_at when ts differs from the observation time", () => {
+    const now = new Date("2026-07-15T20:00:00.000Z");
+    const ts = "2026-07-15T19:55:00.000Z";
+    const capturedAt = "2026-07-16T05:00:00.000Z";
+    const tempC = fahrenheitToCelsius(76);
+    const [receipt] = manualSensorReadingsToTimelineEntries(
+      [
+        metricRow("temperature_c", tempC, "manual", { ts, captured_at: capturedAt }),
+        metricRow("humidity_pct", 58, "manual", { ts, captured_at: capturedAt }),
+      ],
+      now,
+    );
+    expect(receipt?.entry_at).toBe(capturedAt);
+    expect(receipt?.entry_at).not.toBe(ts);
+  });
+
+  it("post-filter on entry_at drops receipts whose captured_at sits outside the active window", () => {
+    const startIso = "2026-07-15T05:00:00.000Z";
+    const endIso = "2026-07-16T04:59:59.999Z";
+    const now = new Date("2026-07-15T20:00:00.000Z");
+    const ts = "2026-07-15T19:55:00.000Z";
+    const capturedAt = "2026-07-16T05:00:00.000Z";
+    const tempC = fahrenheitToCelsius(76);
+    let receipts = manualSensorReadingsToTimelineEntries(
+      [
+        metricRow("temperature_c", tempC, "manual", { ts, captured_at: capturedAt }),
+        metricRow("humidity_pct", 58, "manual", { ts, captured_at: capturedAt }),
+      ],
+      now,
+    );
+    receipts = receipts.filter((row) => row.entry_at >= startIso && row.entry_at <= endIso);
+    expect(receipts).toEqual([]);
+  });
+
   it("includes a grouped manual temp+RH snapshot in the Measurements query/view", () => {
     const tempC = fahrenheitToCelsius(76);
     const rows = [metricRow("temperature_c", tempC), metricRow("humidity_pct", 58)];

@@ -54,7 +54,7 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
 
     const cta = screen.getByTestId("timeline-one-tent-loop-next-step-card-cta");
     const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
-    expect(anchor?.getAttribute("href")).toBe(`/sensors?tentId=${tentId}`);
+    expect(anchor?.getAttribute("href")).toBe(`/sensors?tentId=${tentId}&growId=g1`);
     expect(
       screen.getByTestId("timeline-one-tent-loop-next-step-card").textContent ?? "",
     ).not.toContain(tentId);
@@ -74,7 +74,7 @@ describe("Timeline One-Tent Loop next-step card wiring", () => {
     const cta = screen.getByTestId("timeline-one-tent-loop-next-step-card-cta");
     const anchor = cta.tagName === "A" ? cta : cta.querySelector("a");
     expect(anchor?.getAttribute("href")).toBe(
-      `/sensors?tentId=${tentId}&tentIntent=required&plantId=${plantId}`,
+      `/sensors?tentId=${tentId}&tentIntent=required&plantId=${plantId}&growId=g1`,
     );
     const text = screen.getByTestId("timeline-one-tent-loop-next-step-card").textContent ?? "";
     expect(text).not.toContain(plantId);

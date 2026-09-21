@@ -114,9 +114,11 @@ import {
   alertDetailPath,
   alertsPath,
   dashboardPath,
+  sensorsPath,
   timelinePath,
   tentDetailPath,
   tentsPath,
+  withGrowId,
 } from "@/lib/routes";
 import {
   buildTentSnapshotView,
@@ -392,8 +394,9 @@ export default function Dashboard() {
             <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
               {/* Route still targets /daily-check (the underlying Quick Log
                   surface). Label unified to "Quick Log" so the Dashboard
-                  presents a single grower-facing logging concept. */}
-              <Link to="/daily-check">Quick Log</Link>
+                  presents a single grower-facing logging concept. Carry
+                  scopedGrowId when present so Daily Check stays on this grow. */}
+              <Link to={withGrowId("/daily-check", scopedGrowId)}>Quick Log</Link>
             </Button>
             <Button asChild className="gradient-leaf text-primary-foreground">
               <Link to={tentsPath()}>Open tents</Link>
@@ -442,7 +445,11 @@ export default function Dashboard() {
         snapshotSource={sensorState.status === "ok" ? sensorState.snapshot.source : undefined}
       />
 
-      <DailyGrowCheckStatusCard className="mb-6" tentIds={tents.map((t) => t.id)} />
+      <DailyGrowCheckStatusCard
+        className="mb-6"
+        growId={scopedGrowId ?? null}
+        tentIds={tents.map((t) => t.id)}
+      />
 
       <DashboardDailyGrowCheckPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
@@ -493,7 +500,7 @@ export default function Dashboard() {
                 </p>
               </div>
               <Button asChild size="sm" variant="ghost">
-                <Link to="/sensors">
+                <Link to={sensorsPath(scopedGrowId)}>
                   Open sensors <ArrowRight className="h-3 w-3" />
                 </Link>
               </Button>
@@ -560,7 +567,7 @@ export default function Dashboard() {
                     <p className="text-sm text-muted-foreground">
                       Add a manual reading or{" "}
                       <Link
-                        to="/sensors"
+                        to={sensorsPath(scopedGrowId)}
                         data-testid="dashboard-environment-snapshot-empty-sensors-link"
                         className="underline text-primary hover:opacity-80"
                       >
@@ -575,7 +582,7 @@ export default function Dashboard() {
                       Sensors page (no new routes). */}
                       <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
                         <Link
-                          to="/sensors"
+                          to={sensorsPath(scopedGrowId)}
                           data-testid="dashboard-environment-snapshot-go-to-sensors"
                           aria-label="Go to Sensors page"
                         >
@@ -584,7 +591,7 @@ export default function Dashboard() {
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link
-                          to="/sensors#manual-reading"
+                          to={withGrowId("/sensors#manual-reading", scopedGrowId)}
                           data-testid="dashboard-environment-snapshot-add-manual-reading"
                           aria-label="Add manual sensor reading"
                         >
@@ -593,7 +600,7 @@ export default function Dashboard() {
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link
-                          to="/sensors#csv-import"
+                          to={withGrowId("/sensors#csv-import", scopedGrowId)}
                           data-testid="dashboard-environment-snapshot-import-sensor-data"
                           aria-label="Import sensor data"
                         >
@@ -661,7 +668,7 @@ export default function Dashboard() {
                               )}
                             </div>
                             <Button asChild size="sm" variant="ghost">
-                              <Link to="/sensors">
+                              <Link to={sensorsPath(scopedGrowId)}>
                                 Sensor data <ArrowRight className="h-3 w-3" />
                               </Link>
                             </Button>

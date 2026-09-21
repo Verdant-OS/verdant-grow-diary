@@ -45,11 +45,11 @@ describe("Dashboard · mobile density section headings", () => {
 
   it("preserves canonical route targets for primary grower paths", () => {
     // Primary Quick Log CTA route is unchanged.
-    expect(DASHBOARD).toMatch(/to="\/daily-check"/);
-    // Sensors primary + secondary anchors remain.
-    expect(DASHBOARD).toMatch(/to="\/sensors"/);
-    expect(DASHBOARD).toMatch(/to="\/sensors#manual-reading"/);
-    expect(DASHBOARD).toMatch(/to="\/sensors#csv-import"/);
+    expect(DASHBOARD).toMatch(/withGrowId\("\/daily-check",\s*scopedGrowId\)/);
+    // Sensors primary + secondary anchors remain, grow-scoped via helpers.
+    expect(DASHBOARD).toMatch(/sensorsPath\(scopedGrowId\)/);
+    expect(DASHBOARD).toMatch(/withGrowId\("\/sensors#manual-reading",\s*scopedGrowId\)/);
+    expect(DASHBOARD).toMatch(/withGrowId\("\/sensors#csv-import",\s*scopedGrowId\)/);
     // AI Doctor link is unchanged.
     expect(DASHBOARD).toMatch(/to="\/doctor"/);
   });

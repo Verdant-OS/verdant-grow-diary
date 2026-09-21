@@ -107,7 +107,7 @@ describe("Daily Grow Check status · wiring", () => {
 
   it("card includes Start Check CTA linking to /daily-check", () => {
     expect(card).toMatch(/Start Check/);
-    expect(card).toMatch(/to=["']\/daily-check["']/);
+    expect(card).toMatch(/withGrowId\("\/daily-check",\s*growId\)/);
   });
 
   it("Dashboard renders the status card", () => {

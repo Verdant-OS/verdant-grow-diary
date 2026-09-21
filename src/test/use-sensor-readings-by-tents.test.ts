@@ -83,6 +83,8 @@ for (const rows of Object.values(FIXTURES))
 
 const REQUESTED_TENT_IDS = vi.hoisted(() => [] as string[]);
 const FAILED_TENT_IDS = vi.hoisted(() => new Set<string>());
+const INVALID_EVIDENCE_TENT_IDS = vi.hoisted(() => new Set<string>());
+const MALFORMED_RESPONSE_TENT_IDS = vi.hoisted(() => new Set<string>());
 const PENDING_TENT_IDS = vi.hoisted(() => new Set<string>());
 const PENDING_REQUESTS = vi.hoisted(
   () =>
@@ -102,6 +104,31 @@ vi.mock("@/integrations/supabase/client", () => {
       if (tentId) REQUESTED_TENT_IDS.push(tentId);
       if (tentId && FAILED_TENT_IDS.has(tentId)) {
         return Promise.resolve({ data: null, error: new Error("fixture refresh failure") });
+      }
+      if (tentId && MALFORMED_RESPONSE_TENT_IDS.has(tentId)) {
+        return Promise.resolve({ data: null, error: null });
+      }
+      if (tentId && INVALID_EVIDENCE_TENT_IDS.has(tentId)) {
+        return Promise.resolve({
+          data: [
+            {
+              id: "00000000-0000-4000-8000-000000000099",
+              user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              tent_id: tentId,
+              metric: "vpd_kpa",
+              value: 1.2,
+              source: "manual",
+              quality: "ok",
+              ts: "2025-01-01T00:00:00Z",
+              created_at: "2025-01-01T00:00:00Z",
+              captured_at: "2025-01-01T00:00:00Z",
+              device_id: null,
+              raw_payload: null,
+              correction_valid: false,
+            },
+          ],
+          error: null,
+        });
       }
       const tentRows = tentId ? (FIXTURES[tentId] ?? []) : [];
       const scopedRows = sourceFilter
@@ -141,6 +168,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   REQUESTED_TENT_IDS.length = 0;
   FAILED_TENT_IDS.clear();
+  INVALID_EVIDENCE_TENT_IDS.clear();
+  MALFORMED_RESPONSE_TENT_IDS.clear();
   PENDING_TENT_IDS.clear();
   PENDING_REQUESTS.length = 0;
 });
@@ -316,6 +345,53 @@ describe("useSensorReadingsByTents", () => {
     expect(
       result.current.byTent["00000000-0000-4000-8000-000000000001"].map((row) => row.id),
     ).toEqual(["00000000-0000-4000-8000-000000000005", "00000000-0000-4000-8000-000000000006"]);
+  });
+
+  it("marks only the tent with invalid correction evidence as error while siblings succeed", async () => {
+    INVALID_EVIDENCE_TENT_IDS.add("00000000-0000-4000-8000-000000000002");
+    const { result } = renderHook(
+      () =>
+        useSensorReadingsByTents([
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002",
+        ]),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.statusByTent["00000000-0000-4000-8000-000000000001"]).toBe("success");
+    expect(
+      result.current.byTent["00000000-0000-4000-8000-000000000001"].map((row) => row.id),
+    ).toEqual(["00000000-0000-4000-8000-000000000005", "00000000-0000-4000-8000-000000000006"]);
+    expect(result.current.statusByTent["00000000-0000-4000-8000-000000000002"]).toBe("error");
+    expect(result.current.byTent["00000000-0000-4000-8000-000000000002"]).toEqual([]);
+    expect(result.current.isError).toBe(true);
+  });
+
+  it("reports an uncached invalid effective payload as error, not refresh_error", async () => {
+    INVALID_EVIDENCE_TENT_IDS.add("00000000-0000-4000-8000-000000000002");
+    const { result } = renderHook(
+      () => useSensorReadingsByTents(["00000000-0000-4000-8000-000000000002"]),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.statusByTent["00000000-0000-4000-8000-000000000002"]).toBe("error");
+    expect(result.current.byTent["00000000-0000-4000-8000-000000000002"]).toEqual([]);
+  });
+
+  it("fail-closes a tent that returns a non-array effective payload without affecting siblings", async () => {
+    MALFORMED_RESPONSE_TENT_IDS.add("00000000-0000-4000-8000-000000000003");
+    const { result } = renderHook(
+      () =>
+        useSensorReadingsByTents([
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000003",
+        ]),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.statusByTent["00000000-0000-4000-8000-000000000001"]).toBe("success");
+    expect(result.current.statusByTent["00000000-0000-4000-8000-000000000003"]).toBe("error");
+    expect(result.current.byTent["00000000-0000-4000-8000-000000000003"]).toEqual([]);
   });
 
   it("filters CSV sources before the cap so newer live rows cannot starve imported history", async () => {

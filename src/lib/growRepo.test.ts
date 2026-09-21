@@ -66,6 +66,7 @@ import {
   fetchPlants,
   fetchSensorReadings,
   insertSensorReading,
+  insertSensorReadingsBatch,
 } from "./growRepo";
 
 beforeEach(reset);
@@ -90,6 +91,11 @@ const tentRow = {
 };
 
 describe("fetchTents", () => {
+  it("returns [] for a legacy non-UUID growId without querying Supabase", async () => {
+    expect(await fetchTents("g1")).toEqual([]);
+    expect(calls.table).toBeUndefined();
+  });
+
   it("returns mapped rows on happy path", async () => {
     nextResult = { data: [tentRow], error: null };
     const r = await fetchTents();
@@ -117,6 +123,10 @@ describe("fetchTent", () => {
     expect(await fetchTent("")).toBeNull();
     expect(calls.table).toBeUndefined();
   });
+  it("returns null for a legacy non-UUID id without querying Supabase", async () => {
+    expect(await fetchTent("t1")).toBeNull();
+    expect(calls.table).toBeUndefined();
+  });
   it("returns null when row missing", async () => {
     nextResult = { data: null, error: null };
     expect(await fetchTent(TENT_UUID)).toBeNull();
@@ -125,6 +135,14 @@ describe("fetchTent", () => {
 });
 
 describe("fetchPlants", () => {
+  it("returns [] for a legacy non-UUID tentId without querying Supabase", async () => {
+    expect(await fetchPlants("t1")).toEqual([]);
+    expect(calls.table).toBeUndefined();
+  });
+  it("returns [] for a legacy non-UUID growId without querying Supabase", async () => {
+    expect(await fetchPlants(undefined, "g1")).toEqual([]);
+    expect(calls.table).toBeUndefined();
+  });
   it("filters by tentId when provided", async () => {
     nextResult = { data: [], error: null };
     await fetchPlants(TENT_UUID_2);
@@ -160,6 +178,53 @@ describe("fetchSensorReadings", () => {
   it("treats null as explicit no-scope without querying Supabase", async () => {
     expect(await fetchSensorReadings(null)).toEqual([]);
     expect(calls.table).toBeUndefined();
+  });
+  it("returns [] for a legacy non-UUID tentId without querying Supabase", async () => {
+    expect(await fetchSensorReadings("t1")).toEqual([]);
+    expect(calls.table).toBeUndefined();
+  });
+  it("throws on supabase error", async () => {
+    nextResult = { data: null, error: { message: "permission denied" } };
+    await expect(fetchSensorReadings(TENT_UUID)).rejects.toThrow(
+      /fetchSensorReadings.*permission denied/,
+    );
+  });
+  it("applies tent_id filter when scoped to one tent", async () => {
+    nextResult = { data: [], error: null };
+    await fetchSensorReadings(TENT_UUID);
+    expect(calls.filters).toContainEqual(["tent_id", TENT_UUID]);
+  });
+});
+
+describe("insertSensorReadingsBatch", () => {
+  const batchRow = {
+    user_id: "u",
+    tent_id: TENT_UUID,
+    metric: "temperature_c",
+    value: 22,
+    source: "manual",
+    ts: "2026-01-01T00:00:00Z",
+    captured_at: "2026-01-01T00:00:00Z",
+  };
+
+  it("forwards the batch payload to sensor_readings", async () => {
+    nextResult = { data: null, error: null };
+    await insertSensorReadingsBatch([batchRow as never]);
+    expect(calls.table).toBe("sensor_readings");
+    expect(calls.inserted).toEqual([batchRow]);
+  });
+
+  it("no-ops on an empty batch", async () => {
+    await insertSensorReadingsBatch([]);
+    expect(calls.table).toBeUndefined();
+  });
+
+  it("preserves Postgres error.code on batch insert failure", async () => {
+    nextResult = { data: null, error: { code: "23505", message: "duplicate key" } };
+    await expect(insertSensorReadingsBatch([batchRow as never])).rejects.toMatchObject({
+      code: "23505",
+      message: expect.stringMatching(/insertSensorReadingsBatch.*duplicate key/),
+    });
   });
 });
 

@@ -31,6 +31,7 @@ import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
 import { buildManualCorrectionOperation } from "@/lib/manualSensorCorrectionOperationRules";
 import { createManualCorrectionJournal } from "@/lib/manualSensorCorrectionPendingStore";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
+import { getPendingCorrectionRecovery } from "@/lib/manualSensorCorrectionRecoveryRules";
 
 const tentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const otherTent = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
@@ -78,6 +79,16 @@ function mount(entry = "/sensors?tentId=" + otherTent) {
   );
 }
 
+function correctionRecoveryHref() {
+  const recovery = getPendingCorrectionRecovery(
+    createManualCorrectionJournal().read(mocks.owner),
+    [tentId, otherTent],
+    null,
+  );
+  if (recovery.status !== "available") throw new Error("expected pending correction recovery link");
+  return recovery.href;
+}
+
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.removeItem("verdant:temperatureUnit");
@@ -103,6 +114,31 @@ describe("correction recovery under default Fahrenheit preference", () => {
     expect(view.getByTestId("manual-reading-temp-unit-F")).toHaveAttribute("aria-pressed", "false");
     expect(view.getByLabelText(/Humidity/i)).toHaveValue(60);
     expect(view.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument();
+  });
+
+  it("prefills canonical Celsius digits when the correction hash is already in the URL", async () => {
+    const view = mount(correctionRecoveryHref());
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-correction-banner")).toBeInTheDocument(),
+    );
+    const airTemp = view.container.querySelector("#m-air-temp") as HTMLInputElement;
+    expect(airTemp.value).toBe("26");
+    expect(airTemp.value).not.toBe("78.8");
+    expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");
+    expect(view.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument();
+    expect(view.queryByTestId("manual-reading-pending-correction")).not.toBeInTheDocument();
+  });
+
+  it("keeps Celsius digits when the grower explicitly prefers Fahrenheit", async () => {
+    localStorage.setItem("verdant:temperatureUnit", "fahrenheit");
+    const view = mount();
+    fireEvent.click(view.getByRole("link", { name: "Reopen pending correction" }));
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-correction-banner")).toBeInTheDocument(),
+    );
+    const airTemp = view.container.querySelector("#m-air-temp") as HTMLInputElement;
+    expect(airTemp.value).toBe("26");
+    expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps Celsius digits when Restore pending correction reruns on the same identity", async () => {

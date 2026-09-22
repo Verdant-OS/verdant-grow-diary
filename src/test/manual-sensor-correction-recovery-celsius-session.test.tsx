@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { QueryClient } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "@/lib/react-router-compat";
@@ -96,11 +96,12 @@ function mountSession(entry: string) {
     tents,
     tentsLoaded: true,
   });
-  return render(
+  const view = render(
     <MemoryRouter initialEntries={[entry]}>
       <SessionHarness session={session} />
     </MemoryRouter>,
   );
+  return { view, session };
 }
 
 afterEach(() => {
@@ -127,7 +128,7 @@ describe("correction recovery session draft under Fahrenheit preference", () => 
     if (recovery.status !== "available")
       throw new Error("expected pending correction recovery link");
 
-    const view = mountSession(recovery.href);
+    const { view } = mountSession(recovery.href);
 
     await waitFor(() =>
       expect(view.getByTestId("manual-reading-correction-banner")).toBeInTheDocument(),
@@ -138,5 +139,70 @@ describe("correction recovery session draft under Fahrenheit preference", () => 
     expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");
     expect(view.getByLabelText(/Humidity/i)).toHaveValue(60);
     expect(view.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument();
+  });
+
+  it("keeps Celsius digits when Restore pending correction reruns after a unit toggle", async () => {
+    const recovery = getPendingCorrectionRecovery(
+      createManualCorrectionJournal().read(mocks.owner),
+      [tentId, otherTent],
+      null,
+    );
+    if (recovery.status !== "available")
+      throw new Error("expected pending correction recovery link");
+
+    const { view } = mountSession(recovery.href);
+
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-correction-banner")).toBeInTheDocument(),
+    );
+    fireEvent.click(view.getByTestId("manual-reading-temp-unit-F"));
+    expect((view.container.querySelector("#m-air-temp") as HTMLInputElement).value).toBe("78.8");
+
+    fireEvent.click(view.getByRole("button", { name: "Restore pending correction" }));
+
+    const airTemp = view.container.querySelector("#m-air-temp") as HTMLInputElement;
+    expect(airTemp.value).toBe("26");
+    expect(airTemp.value).not.toBe("78.8");
+    expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");
+    expect(view.getByLabelText(/Humidity/i)).toHaveValue(60);
+  });
+
+  it("keeps Celsius digits when Restore reruns after the session draft revision advanced", async () => {
+    const recovery = getPendingCorrectionRecovery(
+      createManualCorrectionJournal().read(mocks.owner),
+      [tentId, otherTent],
+      null,
+    );
+    if (recovery.status !== "available")
+      throw new Error("expected pending correction recovery link");
+
+    const { view, session } = mountSession(recovery.href);
+
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-correction-banner")).toBeInTheDocument(),
+    );
+
+    const draft = session.getSnapshot()?.draft;
+    if (!draft) throw new Error("expected session draft");
+    session.updateDraft(draft.identity, (current) => ({
+      ...current,
+      revision: current.revision + 2,
+      saveUnconfirmed: true,
+      tempUnitOverride: "F",
+      form: { ...current.form, airTemp: "78.8", airTempUnit: "F" },
+    }));
+
+    await waitFor(() =>
+      expect((view.container.querySelector("#m-air-temp") as HTMLInputElement).value).toBe("78.8"),
+    );
+    expect(view.getByRole("button", { name: "Restore pending correction" })).toBeInTheDocument();
+
+    fireEvent.click(view.getByRole("button", { name: "Restore pending correction" }));
+
+    const airTemp = view.container.querySelector("#m-air-temp") as HTMLInputElement;
+    expect(airTemp.value).toBe("26");
+    expect(airTemp.value).not.toBe("78.8");
+    expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");
+    expect(view.getByLabelText(/Humidity/i)).toHaveValue(60);
   });
 });

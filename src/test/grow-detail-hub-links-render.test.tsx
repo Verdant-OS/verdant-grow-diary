@@ -11,15 +11,17 @@ import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 const GROW = "4cad3cae-21e3-42f8-8372-2f6237205db3";
 
 const refetch = vi.fn();
+let growStage = "veg";
+let growArchived = false;
 
 vi.mock("@/hooks/useGrowDetailData", () => ({
   useGrowDetailData: () => ({
     grow: {
       id: GROW,
       name: "Render Grow",
-      stage: "veg",
+      stage: growStage,
       grow_type: "indoor",
-      is_archived: false,
+      is_archived: growArchived,
       notes: null,
       started_at: "2026-01-01T00:00:00.000Z",
       created_at: "2026-01-01T00:00:00.000Z",
@@ -93,6 +95,8 @@ function renderGrowDetail() {
 describe("Grow Detail hub links — rendered hrefs", () => {
   beforeEach(() => {
     refetch.mockClear();
+    growStage = "veg";
+    growArchived = false;
   });
 
   it("carries growId on Timeline, Plants, Tents, Action Queue, Alerts, and Dashboard hub links", () => {
@@ -110,5 +114,26 @@ describe("Grow Detail hub links — rendered hrefs", () => {
     renderGrowDetail();
 
     expect(hubHref("Learning review")).toBe(`/grows/${GROW}/learning`);
+  });
+
+  it("does not render Post-Grow Report hub link for an active veg grow", () => {
+    renderGrowDetail();
+
+    const section = screen.getByLabelText("Grow hub links");
+    expect(within(section).queryByRole("link", { name: /Post-Grow Report/i })).toBeNull();
+  });
+
+  it("carries growId on Post-Grow Report hub link when the grow is harvest-stage", () => {
+    growStage = "harvest";
+    renderGrowDetail();
+
+    expect(hubHref("Post-Grow Report")).toBe(`/reports/post-grow/${GROW}`);
+  });
+
+  it("carries growId on Post-Grow Report hub link when the grow is archived", () => {
+    growArchived = true;
+    renderGrowDetail();
+
+    expect(hubHref("Post-Grow Report")).toBe(`/reports/post-grow/${GROW}`);
   });
 });

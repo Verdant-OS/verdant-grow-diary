@@ -65,6 +65,31 @@ describe("Labs Pheno Hunt retains growId", () => {
     expect(resolveNavigationGrowId({ pathname: "/dashboard", search: "" })).toBeNull();
   });
 
+  it("resolveNavigationGrowId prefers grow hub path over query growId", () => {
+    const pathGrow = "grow-from-path";
+    const queryGrow = "grow-from-query";
+    expect(
+      resolveNavigationGrowId({
+        pathname: `/grows/${pathGrow}`,
+        search: `?growId=${queryGrow}`,
+      }),
+    ).toBe(pathGrow);
+  });
+
+  it("resolveNavigationGrowId decodes encoded grow ids from the path", () => {
+    const encoded = encodeURIComponent(GROW);
+    expect(resolveNavigationGrowId({ pathname: `/grows/${encoded}`, search: "" })).toBe(GROW);
+  });
+
+  it("resolveLabsNavigationDestinations leaves the static manifest untouched", () => {
+    const before = LABS_NAVIGATION_DESTINATIONS.map((item) => item.to);
+    resolveLabsNavigationDestinations(GROW);
+    expect(LABS_NAVIGATION_DESTINATIONS.map((item) => item.to)).toEqual(before);
+    expect(LABS_NAVIGATION_DESTINATIONS.find((item) => item.id === "phenoHunt")?.to).toBe(
+      "/pheno-hunts",
+    );
+  });
+
   it("AppSidebar and MobileNav wire Labs through resolveLabsNavigationDestinations", () => {
     const sidebar = readFileSync(resolve(ROOT, "src/components/AppSidebar.tsx"), "utf8");
     const mobile = readFileSync(resolve(ROOT, "src/components/MobileNav.tsx"), "utf8");

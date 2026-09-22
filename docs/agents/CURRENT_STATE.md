@@ -1,13 +1,15 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-22 UTC (~23:35 UTC)
+**Last updated:** 2026-09-22 UTC (~23:50 UTC)
 **Updated by:** Claude (2026-09-22 late, restamp on **deploy tip `8b73c14031050b51061d4715bedbcdfeb66eee52`**.
 That tip is the squash of **`#1626`**, which re-verified the architecture contract and changes docs
-only (§1, §3). **Live is `NOT_MEASURED` by Claude** after a seventh egress refusal at 23:26:27 UTC (§2).
+only (§1, §3). **Live is MEASURED: tip = live, `8b73c140`, `dirty:false`.** The read was made by GDP
+during the Grok independent review, not by Claude, whose own egress was refused an eighth time (§2).
 **New collision:** two open bot drafts, `#1625` and `#1627`, each implement a fix for the
 session-backed _Restore pending correction_ finding recorded in the prior stamp's §4. Each one also
 carries a **stale copy of a Claude docs commit**. They are surfaced here, not resolved (§4). The board
-was re-listed: **33 open PRs**, and `#1625` is the only other one touching this file (§5). No Publish.
+was re-listed: **33 open PRs at ~23:28 UTC, 34 including this PR**, and `#1625` is the only other one
+touching this file (§5). No Publish.
 No APPLY. No merge. `HOLD #1250`. Prior header follows.)
 
 ## 1. Deploy tip `8b73c140` — `#1626` MERGED, docs only
@@ -27,19 +29,31 @@ No APPLY. No merge. `HOLD #1250`. Prior header follows.)
 387a0006 8b73c140` lists only `docs/architecture-contract.md`. The product state is therefore the
 one recorded at `8fc38407` (`#1621`).
 
-## 2. Live — `NOT_MEASURED` by Claude
+## 2. Live is MEASURED — tip = live, `dirty:false`
 
-| Field             | Value                                                                      |
-| ----------------- | -------------------------------------------------------------------------- |
-| Claude's own read | **`BLOCKED`** → `curl: (56) CONNECT tunnel failed, response 403`           |
-| When              | 2026-09-22 **23:26:27 UTC** — the **seventh** refusal                      |
-| Last value held   | `9a30593d…`, `dirty:false`, from a GDP brief (`source claim`, pre-`#1621`) |
-| Live vs tip       | **`NOT_MEASURED`**                                                         |
+**`established fact`, measured by GDP during the Grok independent review, not by Claude.** The source
+is the `#1629` review `5285231537`, which read `https://verdantgrowdiary.com/version.json` over an
+unblocked path.
 
-Whether production serves the `#1621` C/F fix (`8fc38407`) is **unknown**. **Do not green-lane the
-live `"26"` pin** until `version.json`, read over an unblocked path, reports a commit that includes
-`8fc38407`. The two commits since then (`387a0006`, `8b73c140`) are docs-only and change nothing a
-user sees. **`LIVE_LAG` is not a product `FAIL`.**
+| Field             | Value                                                                       |
+| ----------------- | --------------------------------------------------------------------------- |
+| `commit`          | **`8b73c14031050b51061d4715bedbcdfeb66eee52`** (= tip)                      |
+| `shortCommit`     | `8b73c1403105`                                                              |
+| `ref`             | `verdant-grow-diary`                                                        |
+| `dirty`           | **`false`**                                                                 |
+| `buildTime`       | `2026-09-22T23:25:04.802Z` (~12 s after `#1626` merged)                      |
+| status            | **tip = live; `LIVE_LAG` CLEARED**                                          |
+| Claude's own read | **`BLOCKED`**: eighth 403, 2026-09-22 **23:42:56 UTC**; never routed around |
+
+**The `#1621` C/F fix is live.** `git merge-base --is-ancestor 8fc38407 8b73c140` succeeds, so the live
+commit contains it. That clears the precondition that blocked the live `"26"` pin. **Whether the pin
+actually passes against production is `NOT_MEASURED`**, because no one has run it. It is now runnable,
+not proven.
+
+**Provenance, kept deliberately:** Claude did not perform this measurement, and this document is not
+the evidence for it; the reviewer's read is. A measurement is a fact about an instant, so re-read
+`version.json` rather than quoting this row later. An earlier revision of this section said
+`NOT_MEASURED`, and the review corrected it.
 
 ## 3. What `#1626` shipped
 
@@ -96,9 +110,10 @@ the finding stays open and unowned.
 `established fact`, ~23:28 UTC. Each head was fetched by `refs/pull/N/head` and diffed against its
 merge-base after deepening the clone.
 
-**33 open PRs: 30 target `verdant-grow-diary` and 3 are stacked** (`#1618` on `#1151`, `#1620` on
+**33 open PRs at ~23:28 UTC: 30 target `verdant-grow-diary` and 3 are stacked** (`#1618` on `#1151`, `#1620` on
 `#1088`, `#1481` on `#1478`). New since the prior stamp: `#1625`, `#1627`, `#1628`. `#1624` and `#1626`
-have merged.
+have merged. **Re-measured at ~23:43 UTC: 34.** The only addition is this PR, `#1629`, which was opened
+after the first count. Grok's review measured the same 34.
 
 **Other writers of `docs/agents/CURRENT_STATE.md`: one, `#1625`**, via its carried stale commit (§4).
 It is not a live competing restamp. This PR is the only intended writer.
@@ -152,9 +167,10 @@ touches it and **must not be revived**.
 - It records the session-restore finding as open and unowned with no fix in flight; there are now two
   competing fixes (§4).
 - It says no other open PR writes this file; `#1625` now does, through a carried commit (§5).
-- Its board counted 30 open PRs; the count is now 33 (§5).
+- Its board counted 30 open PRs; the count is now 34 (§5).
+- Its live row said `NOT_MEASURED`; live is now measured as tip = live (§2).
 
-Its live row (`NOT_MEASURED`) still holds. Carried rows keep their original labels.
+Carried rows keep their original labels.
 
 ## 8. Current locks
 
@@ -162,7 +178,9 @@ Its live row (`NOT_MEASURED`) still holds. Carried rows keep their original labe
   control, no automatic Action Queue writes, no invented credentials. **Never KEEP. No owner email.**
 - **`HOLD #1250`.**
 - **Tip is `8b73c14031050b51061d4715bedbcdfeb66eee52`.** Cite no other SHA as the tip.
-- **Live is `NOT_MEASURED` by Claude.** Do not green-lane the live `"26"` pin.
+- **Live = tip = `8b73c140`, `dirty:false`**, measured by GDP during the Grok review, not by Claude. The
+  live `"26"` pin is **runnable but not yet run** (`NOT_MEASURED`). Do not claim it passes until it
+  does.
 - **§4: exactly one of `#1625` / `#1627` may land**, after its stale docs commit is dropped. GDP names
   the owner. Claude does not choose, close, or push to either.
 - **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**

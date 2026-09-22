@@ -32,8 +32,11 @@ until `#1621` merges (§7). No Publish. No APPLY. No merge. `HOLD #1250`. Prior 
 
 **The tip is Soft `#1615`, a docs-only squash.** `git diff --name-only aabbd2b3^ aabbd2b3` returns
 exactly `docs/agents/CURRENT_STATE.md`. **Product behaviour on the branch is therefore unchanged
-versus that merge's parent `a25942686dc7`** — the only product change in flight is Soft `#1621`
-(§3), which is **not merged**.
+versus that merge's parent `a25942686dc7`**. **On the C/F correction surface specifically**, the
+only change in flight is Soft `#1621` (§3), which is **not merged**. That scoping is deliberate:
+other product work is also in flight — `#1174` (EcoWitt ingest-readiness), `#1151` (fixture feeding
+demo) and `#1088` (sensor source display canon) are open non-draft product PRs at behind 0 (§5).
+**This document does not erase them.**
 
 ## 2. Live is MEASURED — tip = live, `LIVE_LAG` Soft-park CLEARED
 
@@ -154,7 +157,12 @@ list is not evidence, and this one changed materially in under two hours.
 Method unchanged: list open PRs based on `verdant-grow-diary`; fetch each head by
 `refs/pull/N/head`; per head compute behind-count and `CURRENT_STATE.md` ownership.
 
-**28 open PRs** (up from 24). **Nine are at behind ≤ 1**, so the board the previous stamp recorded
+**The scope limit of that method, stated because the count below would otherwise overclaim:** it
+enumerates PRs whose **base is the deploy branch**. **Stacked PRs based on another feature branch
+are invisible to it** — `#1618` and `#1620` are exactly that case (§5 note below). So "28 open PRs"
+means _28 open PRs targeting `verdant-grow-diary`_, not 28 open PRs in the repository.
+
+**28 open PRs targeting the deploy branch** (up from 24). **Nine are at behind ≤ 1**, so the board the previous stamp recorded
 as **EMPTY** is now populated:
 
 | PR      | Head         | Behind | Draft  | Class                                            |
@@ -180,8 +188,19 @@ docs, CI, or feature branches on unrelated surfaces (§3 collision check).
 - **`#1221`** likewise moved from 263 behind to **0**; head is now `9a93c63373`, not the
   `8aa7cfadbd` the earlier stamps recorded.
 
-**`#1618` and `#1620` are not in the open set.** Whether they were closed, merged, or never existed
-is **`NOT_MEASURED`** — this slice did not look beyond open PRs, and does not guess.
+**`#1618` and `#1620` — correction.** An earlier draft of this block recorded them as "not in the
+open set" and offered "closed, merged, or never existed" as the possibilities. **That was wrong, and
+the "never existed" branch was a false alternative.** Copilot caught it on `#1622`; Claude then
+measured both directly rather than accepting the correction on trust:
+
+| PR      | State           | Base branch                               | Stacked on |
+| ------- | --------------- | ----------------------------------------- | ---------- |
+| `#1618` | **open**, draft | `cursor/an-verdant-feeding-demo-7026`     | `#1151`    |
+| `#1620` | **open**, draft | `cursor/sensor-source-display-canon-a9bf` | `#1088`    |
+
+Both are open tests-only PRs **stacked on feature branches**, which is why a base-filtered listing
+of `verdant-grow-diary` never saw them. **They were never missing; the method could not see them.**
+That is a limitation of the enumeration, now stated above, not a gap in the repository.
 
 ## 6. Golden Toad — AUTH_NEEDED, and NOT chooser-ready
 

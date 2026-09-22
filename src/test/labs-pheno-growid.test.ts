@@ -27,13 +27,13 @@ describe("Labs Pheno Hunt retains growId", () => {
     expect(phenoHuntsPath("")).toBe("/pheno-hunts");
   });
 
-  it("resolveLabsNavigationDestinations rewrites only Pheno Hunt", () => {
+  it("resolveLabsNavigationDestinations rewrites Pheno Hunt and keeps other Labs ids", () => {
     const resolved = resolveLabsNavigationDestinations(GROW);
     const pheno = resolved.find((item) => item.id === "phenoHunt");
     const breeding = resolved.find((item) => item.id === "breedingPrograms");
 
     expect(pheno?.to).toBe(`/pheno-hunts?growId=${GROW}`);
-    expect(breeding?.to).toBe("/breeding");
+    expect(breeding?.to).toBe(`/breeding?growId=${GROW}`);
     expect(resolved.map((item) => item.id)).toEqual(
       LABS_NAVIGATION_DESTINATIONS.map((item) => item.id),
     );

@@ -201,7 +201,125 @@ describe("PlantDetailPhotoStrip render", () => {
       isResolvingPrivatePhotos: false,
       hasPrivatePhotoError: false,
       hasPhotoReference: false,
+      isPrivatePhotoReadPaused: false,
+      refetchPrivatePhotos: vi.fn().mockResolvedValue(undefined),
     }));
+  });
+
+  it("shows waiting instead of empty while the first diary read is paused", () => {
+    useDiaryEntriesMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isPending: true,
+      fetchStatus: "paused",
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Waiting for connection to load recent photos.",
+    );
+    expect(screen.queryByText("No photos yet.")).toBeNull();
+  });
+
+  it("requests private previews only for the selected plant, preserving the legacy plantId alias", () => {
+    const owned = { id: "photo-1", plant_id: "p1", photo_url: "owner/grow/one.jpg" };
+    const alias = { id: "photo-2", plantId: "p1", photo_url: "owner/grow/two.jpg" };
+    const other = { id: "photo-3", plant_id: "p2", photo_url: "owner/grow/three.jpg" };
+    useDiaryEntriesMock.mockReturnValue({ data: [owned, alias, other], refetch: vi.fn() });
+    const { rerender } = render(<PlantDetailPhotoStrip plantId="p1" />);
+    expect(useDiaryPhotoDisplayRowsMock).toHaveBeenLastCalledWith([owned, alias]);
+    rerender(<PlantDetailPhotoStrip plantId="p2" />);
+    expect(useDiaryPhotoDisplayRowsMock).toHaveBeenLastCalledWith([other]);
+    rerender(<PlantDetailPhotoStrip plantId={null} />);
+    expect(useDiaryPhotoDisplayRowsMock).toHaveBeenLastCalledWith([]);
+  });
+
+  it("shows waiting while saved private photos await their first signed URL", () => {
+    useDiaryEntriesMock.mockReturnValue({ data: [], isPending: false, refetch: vi.fn() });
+    useDiaryPhotoDisplayRowsMock.mockReturnValue({
+      rows: [],
+      isResolvingPrivatePhotos: true,
+      isPrivatePhotoReadPaused: true,
+      hasPhotoReference: true,
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Waiting for connection to load recent photos.",
+    );
+    expect(screen.queryByText("No photos yet.")).toBeNull();
+  });
+
+  it("asks for plant context before interpreting a pending or failed read", () => {
+    useDiaryEntriesMock.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: true,
+      refetch: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId={null} />);
+    expect(screen.getByText("Select a plant to view recent photos.")).toBeInTheDocument();
+    expect(screen.queryByTestId("plant-detail-photo-strip-retry")).toBeNull();
+    expect(screen.queryByText("No photos yet.")).toBeNull();
+  });
+
+  it("retries the failed signed-image request as well as the diary read", () => {
+    const refetch = vi.fn().mockResolvedValue({ data: [] });
+    const refetchPrivatePhotos = vi.fn().mockResolvedValue(undefined);
+    useDiaryEntriesMock.mockReturnValue({ data: [], isError: false, refetch });
+    useDiaryPhotoDisplayRowsMock.mockReturnValue({
+      rows: [],
+      hasPrivatePhotoError: true,
+      refetchPrivatePhotos,
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" />);
+    fireEvent.click(screen.getByTestId("plant-detail-photo-strip-retry"));
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(refetchPrivatePhotos).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the unavailable state and disables retry while recovering cached failed reads", () => {
+    useDiaryEntriesMock.mockReturnValue({
+      data: [],
+      isError: true,
+      isFetching: true,
+      refetch: vi.fn(),
+    });
+    useDiaryPhotoDisplayRowsMock.mockReturnValue({
+      rows: [],
+      isResolvingPrivatePhotos: true,
+      hasPrivatePhotoError: true,
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" />);
+    expect(screen.getByTestId("plant-detail-photo-strip-error")).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-photo-strip-retry")).toBeDisabled();
+    expect(screen.queryByText("No photos yet.")).toBeNull();
+  });
+
+  it("keeps available external photos visible while disclosing unavailable private previews", () => {
+    const rows = [
+      {
+        id: "photo-external",
+        plant_id: "p1",
+        entry_at: "2026-05-30T10:00:00Z",
+        entry_type: "photo",
+        photo_url: "https://images.example.com/external.jpg",
+      },
+    ];
+    useDiaryEntriesMock.mockReturnValue({ data: rows, refetch: vi.fn() });
+    useDiaryPhotoDisplayRowsMock.mockReturnValue({
+      rows,
+      hasPrivatePhotoError: true,
+      refetchPrivatePhotos: vi.fn(),
+    });
+    render(<PlantDetailPhotoStrip plantId="p1" />);
+    expect(screen.getByRole("img")).toHaveAttribute(
+      "src",
+      "https://images.example.com/external.jpg",
+    );
+    expect(
+      screen.getByText("Some recent photo previews are unavailable right now."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("plant-detail-photo-strip-retry")).toBeEnabled();
   });
 
   it("renders heading", () => {

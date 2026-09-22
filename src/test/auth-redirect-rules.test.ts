@@ -3,6 +3,7 @@ import {
   buildSignedOutRedirect,
   DEFAULT_AUTH_REDIRECT,
   PUBLIC_MARKETING_LANDING,
+  retainSignedOutReturnIntent,
   sanitizeAuthRedirect,
   SIGNED_OUT_LANDING,
 } from "@/lib/authRedirectRules";
@@ -97,5 +98,33 @@ describe("buildSignedOutRedirect — signed-out re-entry lands on the sign-in sc
     expect(buildSignedOutRedirect("/not-a-route")).toBe("/auth");
     expect(buildSignedOutRedirect("//evil.example")).toBe("/auth");
     expect(buildSignedOutRedirect("/plants", "?q=a b")).toBe("/auth");
+  });
+});
+
+describe("retainSignedOutReturnIntent — expiry must keep the protected return", () => {
+  const sensorsReturn = buildSignedOutRedirect("/sensors", "?tentId=tent-a", "#manual-reading");
+
+  it("keeps the exact redirectTo when the next build collapses to bare /auth", () => {
+    expect(sensorsReturn).toBe("/auth?redirectTo=%2Fsensors%3FtentId%3Dtent-a%23manual-reading");
+    expect(retainSignedOutReturnIntent(sensorsReturn, SIGNED_OUT_LANDING, false)).toBe(
+      sensorsReturn,
+    );
+  });
+
+  it("adopts a later protected destination instead of freezing the first one", () => {
+    const plantsReturn = buildSignedOutRedirect("/plants");
+    expect(retainSignedOutReturnIntent(sensorsReturn, plantsReturn, false)).toBe(plantsReturn);
+  });
+
+  it("resets once a user is present so a later miss uses the current location", () => {
+    expect(retainSignedOutReturnIntent(sensorsReturn, SIGNED_OUT_LANDING, true)).toBe(
+      SIGNED_OUT_LANDING,
+    );
+  });
+
+  it("leaves a bare landing alone when there was never a return intent", () => {
+    expect(retainSignedOutReturnIntent(SIGNED_OUT_LANDING, SIGNED_OUT_LANDING, false)).toBe(
+      SIGNED_OUT_LANDING,
+    );
   });
 });

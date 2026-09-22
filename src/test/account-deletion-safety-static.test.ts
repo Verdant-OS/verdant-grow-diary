@@ -12,12 +12,32 @@ const EDGE = read("supabase/functions/delete-account/index.ts");
 const SETTINGS = read("src/pages/Settings.tsx");
 
 describe("account deletion billing and data safety", () => {
-  it("maps provider cancellation failure to an honest, actionable message", () => {
-    expect(deleteAccountFailureMessage(409, null)).toBe(DELETE_ACCOUNT_BILLING_FAILURE);
-    expect(deleteAccountFailureMessage(500, "billing_cancellation_failed")).toBe(
-      DELETE_ACCOUNT_BILLING_FAILURE,
+  it.each([
+    { status: 409, errorCode: null, expected: DELETE_ACCOUNT_BILLING_FAILURE },
+    {
+      status: 500,
+      errorCode: "billing_cancellation_failed",
+      expected: DELETE_ACCOUNT_BILLING_FAILURE,
+    },
+    { status: 500, errorCode: "storage_cleanup_failed", expected: DELETE_ACCOUNT_GENERIC_FAILURE },
+    { status: 500, errorCode: "session_revoke_failed", expected: DELETE_ACCOUNT_GENERIC_FAILURE },
+    { status: 500, errorCode: "delete_failed", expected: DELETE_ACCOUNT_GENERIC_FAILURE },
+    {
+      status: null,
+      errorCode: "billing_cancellation_failed",
+      expected: DELETE_ACCOUNT_BILLING_FAILURE,
+    },
+  ])(
+    "maps deleteAccountFailureMessage(status=$status, errorCode=$errorCode) to the correct copy",
+    ({ status, errorCode, expected }) => {
+      expect(deleteAccountFailureMessage(status, errorCode)).toBe(expected);
+    },
+  );
+
+  it("maps billing workflow failures to HTTP 409 and other failures to HTTP 500", () => {
+    expect(EDGE).toMatch(
+      /result\.error === ["']billing_cancellation_failed["']\s*\?\s*409\s*:\s*500/,
     );
-    expect(deleteAccountFailureMessage(500, "delete_failed")).toBe(DELETE_ACCOUNT_GENERIC_FAILURE);
   });
 
   it("uses the verified JWT for global session revocation, not the user id", () => {

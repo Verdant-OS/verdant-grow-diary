@@ -131,6 +131,8 @@ export function buildPlantTimelineReadabilitySummary(
 // ---------------------------------------------------------------------------
 
 export interface BuildPlantTimelinePrintSummaryInput extends BuildPlantTimelineReadabilitySummaryInput {
+  /** Authoritative retrieval/count disclosure for paginated history callers. */
+  historyCountLabel?: string;
   /** Optional plant display name (no internal IDs). */
   plantName?: string | null;
   /** Optional tent display name (no internal IDs). */
@@ -205,7 +207,9 @@ export function buildPlantTimelinePrintSummary(
   lines.push({ key: "filter", label: summary.filterCopy });
   lines.push({
     key: "visible",
-    label: `Visible entries: ${summary.visibleEntries} of ${summary.totalEntries} total in the current view.`,
+    label:
+      src.historyCountLabel ??
+      `Visible entries: ${summary.visibleEntries} of ${summary.totalEntries} total in the current view.`,
   });
   lines.push({
     key: "groups",

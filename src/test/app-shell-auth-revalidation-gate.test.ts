@@ -118,6 +118,16 @@ describe("AppShell auth revalidation gate (#588)", () => {
     expect(APP_SHELL).not.toMatch(/enabled:\s*authStatus === ["']authenticated["']/);
     expect(APP_SHELL).not.toMatch(/useMyEntitlements\(\)/);
   });
+
+  it("gates manual-correction cache refresh on sessionReady, not cached user alone", () => {
+    expect(APP_SHELL).toMatch(
+      /useManualSensorCorrectionRefresh\(\s*sessionReady\s*\?\s*user\.id\s*:\s*null\s*\)/,
+    );
+    const sessionReadyAt = APP_SHELL.indexOf("const sessionReady =");
+    expect(sessionReadyAt).toBeGreaterThan(-1);
+    expect(sessionReadyAt).toBeLessThan(APP_SHELL.indexOf("useManualSensorCorrectionRefresh("));
+    expect(APP_SHELL).not.toMatch(/useManualSensorCorrectionRefresh\(\s*user\.id\s*\)/);
+  });
 });
 
 describe("AppShell revalidation_failed at runtime (#1262)", () => {

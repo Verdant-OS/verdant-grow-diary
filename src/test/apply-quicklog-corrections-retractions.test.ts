@@ -565,7 +565,7 @@ describe("Quick Log corrections/retractions migration delivery", () => {
 
     expect(Object.keys(trigger)).toEqual(["workflow_dispatch"]);
     expect(workflow.permissions).toEqual({ contents: "read", actions: "read" });
-    expect(workflow.jobs.apply.environment).toBe("verdant-production");
+    expect(workflow.jobs.apply.environment).toBe("verdant-production-solo-founder");
     expect(workflowSource).toContain("refs/heads/verdant-grow-diary");
     expect(workflowSource).toContain("verify-quicklog-corrections-preflight-artifact.mjs");
     expect(workflowSource).toContain(

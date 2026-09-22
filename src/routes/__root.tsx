@@ -8,7 +8,10 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
-import { Analytics } from "@vercel/analytics/react";
+import {
+  ConsentGatedVercelAnalytics,
+  ConsentGatedSpeedInsights,
+} from "@/components/ConsentGatedVercelTelemetry";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,7 +33,6 @@ import appCss from "@/styles.css?url";
 import { SITE_SOFTWARE_APPLICATION_JSON_LD } from "@/lib/build/siteSoftwareApplicationJsonLd";
 import { GROW_HELP_TOOLKIT_PATH } from "@/lib/growHelpToolkitState";
 import { OAUTH_HASH_EARLY_WIPE_SCRIPT } from "@/lib/oauthHashSessionConsumeRules";
-import { Analytics } from "@vercel/analytics/react";
 
 const SITE_URL = "https://verdantgrowdiary.com";
 const SITE_NAME = "Verdant Grow Diary";
@@ -197,7 +199,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
-        <Analytics />
+        <ConsentGatedVercelAnalytics />
         <Scripts />
       </body>
     </html>
@@ -256,7 +258,7 @@ function ApplicationRootComponent() {
               </GrowsProvider>
             </AuthProvider>
           </TooltipProvider>
-          <Analytics />
+          <ConsentGatedSpeedInsights />
         </QueryClientProvider>
       </RootErrorBoundary>
     </RootDocument>

@@ -113,7 +113,7 @@ describe("CSV Import Safety Regression v1 — persistence boundary", () => {
   it("returns fixed grower-safe copy without leaking RLS diagnostics", async () => {
     const client: InsertClient = {
       async insertSensorReadings() {
-        return { error: { message: "permission denied" }, insertedCount: 0 };
+        return { error: { message: "permission denied", code: "42501" }, insertedCount: 0 };
       },
     };
     const res = await persistCsvEnvironmentRows([row()], SCOPE, client);
@@ -125,6 +125,25 @@ describe("CSV Import Safety Regression v1 — persistence boundary", () => {
         "Import could not be completed. No CSV readings were saved. Try again. No live sensor data was created.",
     });
     expect(res.error).not.toMatch(/permission denied|row-level security|rls/i);
+  });
+
+  it("keeps a code-less failure unconfirmed without leaking its diagnostics", async () => {
+    const client: InsertClient = {
+      async insertSensorReadings() {
+        return { error: { message: "permission denied" }, insertedCount: 0 };
+      },
+    };
+    const res = await persistCsvEnvironmentRows([row()], SCOPE, client);
+    expect(res).toMatchObject({
+      insertedCount: 0,
+      duplicateCount: 0,
+      partialWrite: false,
+      unconfirmedWrite: true,
+    });
+    expect(res.error).toMatch(/couldn't confirm whether any CSV readings were saved/i);
+    expect(res.error).not.toMatch(
+      /permission denied|row-level security|rls|No CSV readings were saved/i,
+    );
   });
 });
 

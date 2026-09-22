@@ -20,6 +20,7 @@ import {
   buildAnVerdantAiDoctorSplit,
   buildAnVerdantSensorSnapshot,
   buildDefaultAnDemoForm,
+  buildPhotoEvidence,
   enrichProductsWithCatalogMeta,
   isActionQueueExecutable,
   resetAnVerdantDemoSaveCache,
@@ -88,6 +89,14 @@ describe("catalog apply + amounts/units", () => {
     expect(next.products[0].name).toBe("B-52");
     expect(next.products[0].amount).toBe("");
     expect(next.products[0].unit).toBe("ml_per_l");
+  });
+
+  it("preserves a grower-set nutrient line when applying catalog products", () => {
+    const product = findAnDemoProductById("an-demo-big-bud")!;
+    const form = { ...buildDefaultAnDemoForm(), lineId: "custom-house-line" };
+    const next = applyCatalogProductToForm(form, product, 0);
+    expect(next.lineId).toBe("custom-house-line");
+    expect(next.products[0].name).toBe("Big Bud");
   });
 
   it("requires grower-entered amount/unit/volume for a valid payload", () => {
@@ -176,6 +185,61 @@ describe("save + enrich + idempotency", () => {
     });
   });
 
+  it("labels non-catalog and invalid grower rows as user_entered", () => {
+    const enriched = enrichProductsWithCatalogMeta(
+      [
+        { name: "House CalMag", amount: 5, unit: "ml_per_l" },
+        { name: "Big Bud", amount: Number.NaN, unit: "" },
+        { name: "  ", amount: "oops", unit: null },
+      ],
+      [],
+    );
+    expect(enriched[0]).toMatchObject({
+      catalogSource: "user_entered",
+      productId: "user-entered-house-calmag",
+      amount: 5,
+      unit: "ml_per_l",
+    });
+    expect(enriched[1]).toMatchObject({
+      catalogSource: "demo_fixture",
+      productId: "an-demo-big-bud",
+      amount: null,
+      unit: null,
+    });
+    expect(enriched[2]).toMatchObject({
+      catalogSource: "user_entered",
+      name: "Unnamed product",
+      amount: null,
+      unit: null,
+    });
+  });
+
+  it("rejects incomplete forms without writing to the in-memory cache", () => {
+    const failed = saveAnVerdantDemoFeeding({
+      form: buildDefaultAnDemoForm(),
+      idempotencyKey: "an-demo-idem-incomplete",
+      selectedProductIds: [],
+      sensorScenario: "missing",
+      photoState: "missing",
+      nowIso: NOW,
+    });
+    expect(failed.ok).toBe(false);
+    if (failed.ok) return;
+    expect(failed.reason).not.toBe("products:empty");
+
+    const retry = saveAnVerdantDemoFeeding({
+      form: readyForm(),
+      idempotencyKey: "an-demo-idem-incomplete",
+      selectedProductIds: ["an-demo-ph-perfect-grow"],
+      sensorScenario: "trustworthy",
+      photoState: "present",
+      nowIso: NOW,
+    });
+    expect(retry.ok).toBe(true);
+    if (!retry.ok) return;
+    expect(retry.event.reused).toBe(false);
+  });
+
   it("saves in-memory with full evidence and reuses idempotency key", () => {
     const first = saveAnVerdantDemoFeeding({
       form: readyForm(),
@@ -203,6 +267,13 @@ describe("save + enrich + idempotency", () => {
     if (!second.ok) return;
     expect(second.event.reused).toBe(true);
     expect(second.event.eventId).toBe(first.event.eventId);
+  });
+});
+
+describe("photo evidence labels", () => {
+  it("distinguishes fixture placeholder from honest missing photo", () => {
+    expect(buildPhotoEvidence("present").label).toMatch(/fixture placeholder/i);
+    expect(buildPhotoEvidence("missing").label).toMatch(/No photo attached/i);
   });
 });
 
@@ -241,6 +312,57 @@ describe("AI Doctor Observed / Inferred / Unknown + AQ approval", () => {
     expect(aq.autoCreatedOnSave).toBe(false);
     expect(aq.sourceFeedingEventId).toBe(saved.event.eventId);
     expect(isActionQueueExecutable(aq)).toBe(false);
+  });
+
+  it("trustworthy manual sensor lands in Observed, not Unknown", () => {
+    const saved = saveAnVerdantDemoFeeding({
+      form: {
+        ...buildDefaultAnDemoForm(),
+        volumeMl: "500",
+        products: [{ name: "B-52", amount: "2", unit: "ml_per_l" }],
+      },
+      idempotencyKey: "an-demo-idem-trustworthy-sensor",
+      selectedProductIds: ["an-demo-b-52"],
+      sensorScenario: "trustworthy",
+      photoState: "present",
+      nowIso: NOW,
+    });
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) return;
+
+    const split = buildAnVerdantAiDoctorSplit(saved.event);
+    expect(split.observed.items.some((i) => /Sensor at save:/i.test(i))).toBe(true);
+    expect(split.unknown.items.some((i) => /Trustworthy current environment/i.test(i))).toBe(false);
+  });
+
+  it("stale and demo sensors stay out of Observed and add inferred cautions", () => {
+    for (const scenario of ["stale", "demo"] as const) {
+      const saved = saveAnVerdantDemoFeeding({
+        form: {
+          ...buildDefaultAnDemoForm(),
+          volumeMl: "400",
+          products: [{ name: "Overdrive", amount: "1", unit: "ml_per_l" }],
+        },
+        idempotencyKey: `an-demo-idem-${scenario}-sensor`,
+        selectedProductIds: ["an-demo-overdrive"],
+        sensorScenario: scenario,
+        photoState: "missing",
+        nowIso: NOW,
+      });
+      expect(saved.ok).toBe(true);
+      if (!saved.ok) return;
+
+      const split = buildAnVerdantAiDoctorSplit(saved.event);
+      expect(split.observed.items.some((i) => /Sensor at save:/i.test(i))).toBe(false);
+      expect(split.unknown.items.some((i) => /Trustworthy current environment/i.test(i))).toBe(
+        true,
+      );
+      if (scenario === "stale") {
+        expect(split.inferred.items.some((i) => /Stale sensor/i.test(i))).toBe(true);
+      } else {
+        expect(split.inferred.items.some((i) => /Demo sensor fixture/i.test(i))).toBe(true);
+      }
+    }
   });
 });
 

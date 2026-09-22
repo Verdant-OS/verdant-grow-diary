@@ -85,6 +85,31 @@ describe("AnVerdantFeedingDemo page", () => {
     expect(sensor).not.toMatch(/\blive\b/i);
   });
 
+  it("surfaces a save error when volume or product amount is missing", () => {
+    render(<AnVerdantFeedingDemo />);
+    fireEvent.click(screen.getByTestId("an-verdant-catalog-product-an-demo-ph-perfect-grow"));
+    fireEvent.click(screen.getByTestId("an-verdant-demo-save"));
+
+    expect(screen.getByTestId("an-verdant-demo-save-error").textContent).toMatch(
+      /nutrient solution|volume|amount/i,
+    );
+    expect(screen.queryByTestId("an-verdant-demo-saved")).toBeNull();
+  });
+
+  it("demo sensor path labels illustrative telemetry, not live", () => {
+    render(<AnVerdantFeedingDemo />);
+    fireEvent.click(screen.getByTestId("an-verdant-catalog-product-an-demo-b-52"));
+    fireEvent.change(screen.getByLabelText(/Applied volume/i), { target: { value: "650" } });
+    fireEvent.change(screen.getByLabelText(/Product 1 amount/i), { target: { value: "3" } });
+    fireEvent.click(screen.getByTestId("an-verdant-sensor-demo"));
+    fireEvent.click(screen.getByTestId("an-verdant-demo-save"));
+
+    const sensor = screen.getByTestId("an-verdant-event-sensor").textContent ?? "";
+    expect(sensor).toMatch(/demo/i);
+    expect(sensor).toMatch(/never live/i);
+    expect(sensor).not.toMatch(/source=live/i);
+  });
+
   it("non-catalog typed product still saves without treating catalog as the event source", () => {
     render(<AnVerdantFeedingDemo />);
     fireEvent.change(screen.getByLabelText(/Nutrient line/i), {

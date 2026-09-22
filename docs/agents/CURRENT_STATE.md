@@ -5,7 +5,8 @@
 `aabbd2b3`**, remeasured and **unmoved** — still the `#1615` docs squash, so **no product behaviour
 has changed on the branch since `a25942686dc7`** (§1). **The C/F failure is adjudicated: GDP calls
 it `READING_1_PRODUCT_DEFECT`, not a stale pin**, and **Soft `#1621` is the single ACTIVE OWNER
-Soft-couple** for the fix — head `3855ab77`, two files, **the e2e pin `"26"` is untouched**, all
+Soft-couple** for the fix — head `85ee8a26` (**moved** from `3855ab77` at 18:24 UTC; re-measured
+here), two files, **the e2e pin `"26"` is untouched**, all
 measured (§3). **Live: GDP reports tip = live and `LIVE_LAG` Soft-park CLEARED. Claude did NOT
 measure it** — a fourth `version.json` read was refused by the same egress 403 at 18:09:05 UTC, so
 that row stays **operator-supplied and `BLOCKED`** here (§2). Do not read this stamp as independent
@@ -65,23 +66,33 @@ evidence standard.**
 
 ## 3. Soft `#1621` — ACTIVE OWNER Soft-couple, CLEAN, and the pin is untouched
 
-`established fact`, measured from the GitHub API and the PR diff at ~18:10 UTC.
+`established fact`, re-measured from the GitHub API and the PR diff at **18:33 UTC**, after the
+head moved.
 
 | Field       | Value                                                                           |
 | ----------- | ------------------------------------------------------------------------------- |
 | PR          | **`#1621`**, draft, opened 2026-09-22 18:07:13 UTC                              |
 | Title       | `GDP-SENSOR-CF-RECOVERY-001: correction reopen keeps °C digits under default F` |
 | Branch      | `cursor/gdp-sensor-cf-recovery-001-c120`                                        |
-| Head (full) | `3855ab77495e93f48e3e70215eaca0b5c3b43899`                                      |
+| Head (full) | **`85ee8a267aecc6955f1f41bb35361850530a07c6`**                                  |
 | Behind tip  | **0**                                                                           |
 | Files       | **2**                                                                           |
+| Totals      | +163 / −34, 2 commits                                                           |
 
-The head **matches the value GDP supplied**, re-read rather than carried.
+**The head MOVED after the first measurement, and the value GDP supplied is now stale.** GDP's
+brief named `3855ab77495e93f48e3e70215eaca0b5c3b43899`, which was correct at 18:10 UTC and is now
+the **parent**. A second commit landed at **18:24:25 UTC**:
 
-**Files, measured:**
+- `3855ab7749` — `fix(sensors): keep °C digits on correction reopen under default F`
+- `85ee8a267a` — `test(sensors): pin correction reopen 26°C under default F`
 
-- `src/components/ManualSensorReadingCard.tsx` — modified, +42 / −34
-- `src/test/manual-sensor-correction-recovery-celsius-digits.test.tsx` — **added**, +130
+This is exactly why the brief says to re-read rather than carry: a head supplied in a brief is a
+snapshot, and this one aged out in twenty-three minutes. **Cite `85ee8a26`, not `3855ab77`.**
+
+**Files at the current head, measured:** unchanged in shape — still exactly two.
+
+- `src/components/ManualSensorReadingCard.tsx` — modified
+- `src/test/manual-sensor-correction-recovery-celsius-digits.test.tsx` — **added**
 
 **The verdict it implements: `READING_1_PRODUCT_DEFECT`.** GDP adjudicated the
 `Native Manual Correction Local` failure as a product defect, **not** a stale pin: correction reopen
@@ -96,8 +107,9 @@ airTempUnit)` at the tent-target change and `createManualDraftValues({ ...nextFo
 "C" }, "C")` on restore-pending.
 - The new vitest asserts `#m-air-temp` is `"26"` and explicitly **`not "78.8"`**, with the `C` unit
   toggle `aria-pressed=true` and `F` false.
-- **`git diff --name-only <merge-base> <head> -- e2e-local/` returns nothing.** The e2e pin is
-  untouched, exactly as the adjudication requires.
+- **`git diff --name-only <merge-base> <head> -- e2e-local/` returns nothing at the CURRENT head
+  `85ee8a26`**, and line 153 of `e2e-local/native-manual-correction-recovery.spec.ts` still reads
+  `toHaveValue("26")`. The pin survived the second commit too — re-checked, not assumed.
 
 **Collision check — CLEAN, enumerated not asserted.** Across every other open PR at behind ≤ 1
 (`#1174`, `#1175`, `#1151`, `#1088`, `#1221`), **none** touches `ManualSensorReadingCard`,
@@ -141,7 +153,7 @@ as **EMPTY** is now populated:
 
 | PR      | Head         | Behind | Draft  | Class                                            |
 | ------- | ------------ | -----: | ------ | ------------------------------------------------ |
-| `#1621` | `3855ab7749` |      0 | yes    | **product — ACTIVE OWNER Soft-couple** (C/F fix) |
+| `#1621` | `85ee8a267a` |      0 | yes    | **product — ACTIVE OWNER Soft-couple** (C/F fix) |
 | `#1619` | `19e5833bcc` |      0 | yes    | tests-only (publish-verify leak fail-closed)     |
 | `#1617` | `c059a3c268` |      1 | yes    | tests-only (`useInsertSensorReadings` wiring)    |
 | `#1616` | `d68ae0379e` |      0 | yes    | docs — SUPERSEDED Soft-park (§4)                 |

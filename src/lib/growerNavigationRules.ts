@@ -1,3 +1,5 @@
+import { phenoHuntsPath } from "@/lib/routes";
+
 export interface GrowerNavigationDestination {
   id:
     | "phenoHunt"
@@ -32,3 +34,18 @@ export const LABS_NAVIGATION_DESTINATIONS = [
 ] as const satisfies readonly GrowerNavigationDestination[];
 
 export type LabsNavigationDestinationId = (typeof LABS_NAVIGATION_DESTINATIONS)[number]["id"];
+
+/**
+ * Soft-couple only: rewrite Labs Pheno Hunt onto `?growId=` when the
+ * caller already has an explicit grow. The Phase-1 static manifest
+ * stays byte-for-byte; this helper never invents a growId.
+ */
+export function resolveLabsNavigationDestinations(
+  growId?: string | null,
+): GrowerNavigationDestination[] {
+  const trimmed = typeof growId === "string" ? growId.trim() : "";
+  const scopedGrowId = trimmed || null;
+  return LABS_NAVIGATION_DESTINATIONS.map((item) =>
+    item.id === "phenoHunt" ? { ...item, to: phenoHuntsPath(scopedGrowId) } : { ...item },
+  );
+}

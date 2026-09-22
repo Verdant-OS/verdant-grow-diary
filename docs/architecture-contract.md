@@ -974,7 +974,7 @@ true; a clause missing from this table would be an unstated gap.
 | AC-9.1  | `Published migration integrity` runs on migration PRs; not a required context per the 2026-08-10 mirror                                           | **partially gated** |
 | AC-9.2  | comment and review                                                                                                                                | `convention only`   |
 | AC-9.3  | comment and review — edge trigger identity `NOT_MEASURED`                                                                                         | `convention only`   |
-| AC-10.1 | **nothing** — `src/test/vpd-drift-ewma.test.ts` does not assert α; T6 is the proposed pin                                                         | **unenforced**      |
+| AC-10.1 | comment and review — α is documented here but not pinned (`src/test/vpd-drift-ewma.test.ts` does not assert it); T6 is the proposed pin           | `convention only`   |
 | AC-10.2 | absence of Nelson / MAD implementations; T5 proposed                                                                                              | **unenforced**      |
 | AC-10.3 | product decision recorded in §12                                                                                                                  | **unenforced**      |
 

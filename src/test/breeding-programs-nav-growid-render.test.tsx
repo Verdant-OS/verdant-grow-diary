@@ -13,6 +13,8 @@ import { MemoryRouter, Route, Routes, useLocation } from "@/lib/react-router-com
 
 const GROW = "4cad3cae-21e3-42f8-8372-2f6237205db3";
 const PROGRAM_ID = "b7e1c2a0-1111-4000-8000-000000000099";
+/** Stored on a program row — must never be invented into hrefs without URL grow context. */
+const STORED_GROW = "aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee";
 
 const api = vi.hoisted(() => ({
   listBreedingPrograms: vi.fn(),
@@ -134,6 +136,34 @@ describe("Breeding Programs index/create/detail retain growId", () => {
     expect(hrefForTestId("breeding-programs-empty-create")).toBe("/breeding/new");
   });
 
+  it("index list links fail-closed without grow context when programs exist", async () => {
+    api.listBreedingPrograms.mockResolvedValue([listedProgram]);
+    renderIndex("/breeding");
+
+    await screen.findByTestId(`breeding-program-link-${PROGRAM_ID}`);
+    expect(hrefForTestId(`breeding-program-link-${PROGRAM_ID}`)).toBe(`/breeding/${PROGRAM_ID}`);
+    expect(hrefForTestId("breeding-programs-new")).toBe("/breeding/new");
+  });
+
+  it("index does not invent growId from program.grow_id when URL lacks grow context", async () => {
+    api.listBreedingPrograms.mockResolvedValue([{ ...listedProgram, grow_id: STORED_GROW }]);
+    renderIndex("/breeding");
+
+    await screen.findByTestId(`breeding-program-link-${PROGRAM_ID}`);
+    expect(hrefForTestId(`breeding-program-link-${PROGRAM_ID}`)).toBe(`/breeding/${PROGRAM_ID}`);
+    expect(hrefForTestId("breeding-programs-new")).toBe("/breeding/new");
+  });
+
+  it("index prefers URL growId over program.grow_id when both are present", async () => {
+    api.listBreedingPrograms.mockResolvedValue([{ ...listedProgram, grow_id: STORED_GROW }]);
+    renderIndex(`/breeding?growId=${GROW}`);
+
+    await screen.findByTestId(`breeding-program-link-${PROGRAM_ID}`);
+    expect(hrefForTestId(`breeding-program-link-${PROGRAM_ID}`)).toBe(
+      `/breeding/${PROGRAM_ID}?growId=${GROW}`,
+    );
+  });
+
   it("index does not invent a growId from whitespace query", async () => {
     api.listBreedingPrograms.mockResolvedValue([]);
     renderIndex("/breeding?growId=%20");
@@ -189,6 +219,20 @@ describe("Breeding Programs index/create/detail retain growId", () => {
     expect(screen.getByTestId("nav-location").textContent).not.toContain("growId");
   });
 
+  it("new-program post-create navigation stays unscoped without grow context", async () => {
+    api.createBreedingProgram.mockResolvedValue({ programId: PROGRAM_ID });
+    const user = userEvent.setup();
+    renderNew("/breeding/new");
+
+    await user.type(screen.getByLabelText(/Program name/i), "Resin line");
+    await user.click(screen.getByRole("button", { name: /Create program/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("nav-location")).toHaveTextContent(`/breeding/${PROGRAM_ID}`);
+    });
+    expect(screen.getByTestId("nav-location").textContent).not.toContain("growId");
+  });
+
   it("detail All programs link retains growId when present", async () => {
     api.getBreedingProgram.mockResolvedValue({
       program: listedProgram,
@@ -211,5 +255,29 @@ describe("Breeding Programs index/create/detail retain growId", () => {
 
     await screen.findByTestId("breeding-program-detail-back");
     expect(hrefForTestId("breeding-program-detail-back")).toBe("/breeding");
+  });
+
+  it("detail does not invent growId from program.grow_id when URL lacks grow context", async () => {
+    api.getBreedingProgram.mockResolvedValue({
+      program: { ...listedProgram, grow_id: STORED_GROW },
+      steps: [],
+      evidence: [],
+    });
+    renderDetail(`/breeding/${PROGRAM_ID}`);
+
+    await screen.findByTestId("breeding-program-detail-back");
+    expect(hrefForTestId("breeding-program-detail-back")).toBe("/breeding");
+  });
+
+  it("detail prefers URL growId over program.grow_id when both are present", async () => {
+    api.getBreedingProgram.mockResolvedValue({
+      program: { ...listedProgram, grow_id: STORED_GROW },
+      steps: [],
+      evidence: [],
+    });
+    renderDetail(`/breeding/${PROGRAM_ID}?growId=${GROW}`);
+
+    await screen.findByTestId("breeding-program-detail-back");
+    expect(hrefForTestId("breeding-program-detail-back")).toBe(`/breeding?growId=${GROW}`);
   });
 });

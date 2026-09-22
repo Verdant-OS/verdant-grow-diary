@@ -9,7 +9,9 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
+import ecowitt_listener
 from ecowitt_listener import (
     ECOWITT_LIVE_FRESHNESS,
     FIELD_MAP,
@@ -115,6 +117,20 @@ class FieldMapIngestReadinessTests(unittest.TestCase):
         self.assertIsNone(metrics["temp_f"])
         self.assertIsNone(metrics["humidity_percent"])
         self.assertIsNone(metrics["soil_moisture_pct"])
+
+    def test_mixed_case_gateway_keys_still_normalize(self):
+        metrics = normalize_metrics(
+            {
+                "TEMP1F": "77.4",
+                "Humidity1": "58",
+                "SoilMoisture1": "33",
+                "CO2IN": "721",
+            }
+        )
+        self.assertAlmostEqual(metrics["temp_f"], 77.4)
+        self.assertAlmostEqual(metrics["humidity_percent"], 58.0)
+        self.assertAlmostEqual(metrics["soil_moisture_pct"], 33.0)
+        self.assertAlmostEqual(metrics["co2_ppm"], 721.0)
 
     def test_passkey_redacted_from_raw_payload(self):
         redacted = _redact_raw_payload_for_forward(MULTI_CHANNEL_DEMO)
@@ -365,6 +381,20 @@ class IngestReadinessRouteTests(unittest.TestCase):
         self.assertEqual(raw["ec1"], "0.8")
         self.assertEqual(raw["unknown_probe"], "keep-me")
         self.assertNotIn("leafwetness1", FIELD_MAP["temp_f"])
+
+    def test_get_stuck_humidity_on_lan_is_invalid_not_live(self):
+        qs = (
+            "stationtype=GW1200B_V1.4.7&model=GW1200B"
+            "&dateutc=2026-06-17+05:31:00&temp1f=77.4&humidity1=0"
+        )
+        response = self.client.get(
+            f"/ecowitt?{qs}",
+            environ_overrides={"REMOTE_ADDR": "192.168.68.75"},
+        )
+        self.assertEqual(response.status_code, 200)
+        public = response.get_json()["reading"]
+        self.assertEqual(public["source"], "invalid")
+        self.assertAlmostEqual(public["metrics"]["humidity_percent"], 0.0)
 
 
 if __name__ == "__main__":

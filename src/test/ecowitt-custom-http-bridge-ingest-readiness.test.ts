@@ -11,6 +11,16 @@ import { buildEcowittTentSnapshotV0ViewModel } from "@/lib/ecowittTentSnapshotV0
 import { ECOWITT_CUSTOM_HTTP_FIELD_MAP } from "@/lib/ecowittCustomHttpBridgeIngestRules";
 
 describe("ecowitt custom-HTTP FIELD_MAP contract", () => {
+  it("matches Python FIELD_MAP tuples in ecowitt_listener.py", () => {
+    const listener = readFileSync("tools/ecowitt-testbench/ecowitt_listener.py", "utf-8");
+    const block = listener.split("FIELD_MAP = {")[1]?.split("}\n")[0] ?? "";
+    for (const [canonical, candidates] of Object.entries(ECOWITT_CUSTOM_HTTP_FIELD_MAP)) {
+      for (const key of candidates) {
+        expect(block, `${canonical} missing ${key} in Python FIELD_MAP`).toContain(`"${key}"`);
+      }
+    }
+  });
+
   it("matches the listener's configured channels", () => {
     expect(ECOWITT_CUSTOM_HTTP_FIELD_MAP).toEqual({
       temp_f: ["temp1f", "tempf", "tempinf"],
@@ -33,6 +43,25 @@ describe("custom-HTTP ingest still feeds Snapshot V0 as T / RH / soil only", () 
   const TENT = "11111111-1111-4111-8111-111111111111";
   const NOW = new Date("2026-06-17T05:45:30Z");
   const CAPTURED = "2026-06-17T05:40:30.000Z";
+
+  it("maps custom-HTTP humidity_percent rows into V0 rh", () => {
+    const vm = buildEcowittTentSnapshotV0ViewModel(
+      [
+        {
+          tent_id: TENT,
+          source: "demo" as const,
+          captured_at: CAPTURED,
+          metric: "humidity_percent",
+          value: 55,
+          raw_payload: { humidity1: "55" },
+        },
+      ],
+      { tentId: TENT, now: NOW },
+    );
+    const rh = vm.metrics.find((m) => m.key === "rh");
+    expect(rh?.value).toBe(55);
+    expect(rh?.unit).toBe("%");
+  });
 
   it("keeps extra channels raw-only while rendering configured metrics", () => {
     const rows = [

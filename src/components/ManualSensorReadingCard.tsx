@@ -1197,9 +1197,20 @@ export default function ManualSensorReadingCard({
                     );
                     return;
                   }
-                  updateValues(() =>
-                    recoveredCorrectionDraftValues(restored.correction, restored.metrics),
-                  );
+                  updateValues((current) => {
+                    const recovered = recoveredCorrectionDraftValues(
+                      restored.correction,
+                      restored.metrics,
+                    );
+                    return editManualDraftValues(current, {
+                      form: recovered.form,
+                      tempUnitOverride: recovered.tempUnitOverride,
+                      hasEditedReading: recovered.hasEditedReading,
+                      saveUnconfirmed: recovered.saveUnconfirmed,
+                      devicePreset: recovered.devicePreset,
+                      deviceCustom: recovered.deviceCustom,
+                    });
+                  });
                   setReviewOpen(false);
                 }}
               >

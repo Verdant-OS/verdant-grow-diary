@@ -1,7 +1,232 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-22 UTC (~18:45 UTC)
-**Updated by:** Claude (2026-09-22 PM, slice `GDP-CURRENT-STATE-REStamp-20260922-pm`: **deploy tip =
+**Last updated:** 2026-09-22 UTC (~20:15 UTC)
+**Updated by:** Claude (2026-09-22 evening, slice `GDP-CURRENT-STATE-REStamp-after-1621`: **Soft `#1621`
+GDP-SENSOR-CF-RECOVERY-001 is MERGED** and the **deploy tip is its squash,
+`8fc3840743ed58e8a27dc6b39f68563e16a8e48e`** (§1). The squash is **byte-identical to the reviewed
+head `1a6a9186`** across all three files, and **the e2e pin `"26"` is untouched** (§3). **ACTIVE OWNER
+Soft-couple is CLEAR** — the product slice is closed (§3). **Live is `NOT_MEASURED` by Claude**:
+the sixth egress refusal, at 20:09:16 UTC. The GDP brief records live at `9a30593d` (`source claim`),
+so **the fix is not yet known to be live** (§2). **One review thread on `#1621` was still unresolved at
+merge.** It is a Copilot Medium finding that _Restore pending correction_ becomes a no-op on the
+session-backed Sensors page. Claude's static read of the tip is consistent with it, it is untested,
+and it is **recorded as `inference`, not fixed here** (§4). The board was re-listed with **30 open
+PRs**, and **no other PR writes this file** (§6). No Publish. No APPLY. No merge. `HOLD #1250`.
+Prior header follows.)
+
+## 1. Deploy tip `8fc38407` — Soft `#1621` MERGED
+
+`established fact`, `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-22
+20:09:06 UTC, cross-checked against the GitHub API.
+
+| Field      | Value                                                                                   |
+| ---------- | --------------------------------------------------------------------------------------- |
+| Tip        | **`8fc3840743ed58e8a27dc6b39f68563e16a8e48e`**                                          |
+| Subject    | `GDP-SENSOR-CF-RECOVERY-001: correction reopen keeps °C digits under default F (#1621)` |
+| Parent     | `9a30593d527fc397e2eb9f1613fb351af724294b` (`#1622`, the prior restamp)                 |
+| Merged     | 2026-09-22 **20:08:55 UTC**, by `cheekhimself`                                          |
+| Files      | **3** (see §3)                                                                          |
+| Totals     | +345 / −34                                                                              |
+| Migrations | **0**                                                                                   |
+
+**This is the only tip this stamp cites.** `9a30593d` was the tip when the brief was written, and it is
+now the parent. `1a6a9186` is the **reviewed PR head**, not the merge commit. Do not cite either one
+as the tip.
+
+## 2. Live — `NOT_MEASURED` by Claude; the fix is not yet known to be live
+
+| Field              | Value                                                                      |
+| ------------------ | -------------------------------------------------------------------------- |
+| Claude's own read  | **`BLOCKED`** → `curl: (56) CONNECT tunnel failed, response 403`           |
+| When               | 2026-09-22 **20:09:16 UTC** — the **sixth** refusal across five slices     |
+| Live per GDP brief | `9a30593d527fc397e2eb9f1613fb351af724294b`, `dirty:false` — `source claim` |
+| Live vs `8fc38407` | **`NOT_MEASURED`**                                                         |
+
+**Claude did not measure live and does not claim a live SHA.** The only value on record is the one
+the GDP brief carried from before the merge. If it still holds, live is **one commit behind** the tip,
+and that one commit is `#1621`. **`LIVE_LAG` is not a product `FAIL`.** The proxy documents a 403 as an
+organisation egress-policy denial, so it was reported and not routed around.
+
+**Consequence for the pin:** **do not green-lane the live `"26"` pin until `version.json` reports a
+commit that includes `8fc38407`.** Before that, a live correction reopen can still show `78.8`, and
+that would be expected, not a regression.
+
+## 3. Soft `#1621` — CLOSED as MERGED; ACTIVE OWNER CLEAR
+
+`established fact`, measured from the GitHub API and `git` at 20:09–20:12 UTC.
+
+| Field                 | Value                                                                           |
+| --------------------- | ------------------------------------------------------------------------------- |
+| PR                    | `#1621`, **merged**                                                             |
+| Title                 | `GDP-SENSOR-CF-RECOVERY-001: correction reopen keeps °C digits under default F` |
+| Reviewed head (full)  | **`1a6a91868c4c374473237e4b644f5e0c3703c4b7`**                                  |
+| Squash vs reviewed    | `git diff 1a6a9186 8fc38407 -- <3 files>` → **0 lines** (byte-identical)        |
+| Superseded heads      | `07fa5121`, `85ee8a26`, `3855ab77` — **do not cite as current**                 |
+| Verdict it implements | **`READING_1_PRODUCT_DEFECT`** (GDP) — pin `"26"` RIGHT; 26 ≠ 78.8              |
+
+**Files, measured by `git diff --name-only 8fc38407^ 8fc38407` (N=3):**
+
+- `src/components/ManualSensorReadingCard.tsx`
+- `src/test/manual-sensor-correction-recovery-celsius-digits.test.tsx`
+- `src/test/manual-sensor-correction-recovery-celsius-session.test.tsx`
+
+**Verified at the tip:**
+
+- `e2e-local/native-manual-correction-recovery.spec.ts:153` still reads `toHaveValue("26")`. **The pin
+  was not edited.**
+- **Lint Soft-couple:** the digits test contains **zero raw `localStorage` calls**. Its single
+  `localStorage` match is the `@/test/helpers/localStorageTestHelper` import path. CodeRabbit's thread
+  on this is resolved and marked _addressed in `1a6a918`_.
+- **CI on `1a6a9186`:** `manual correction recovery (local backend)` → **success**, the lane that had
+  failed with `"78.8"`. The 32 shards, `Lint, typecheck, test, build`, `test:legal-seo` and the edge
+  preflights → success. Two lanes are red: `Lockfile policy, dependency audit, …` and `Nested static
+proofs and production isolation`. Both are **tip-class**, so they are Soft-ignored as P2 per GDP and
+  are not `#1621`'s.
+
+**Review provenance, stated precisely.** The **Blue Dream PASS-with-P2 at `1a6a9186`** is a `source
+claim` from the GDP brief. It does not appear among the GitHub reviews, all three of which were posted
+against `85ee8a26`: a Cursor approval, a Copilot review and a CodeRabbit review. Claude does not quote
+from the Blue Dream packet.
+
+**ACTIVE OWNER Soft-couple: CLEAR.** The C/F product slice is closed. There is **no product
+Soft-couple owner** until GDP names one.
+
+## 4. One `#1621` review thread was unresolved at merge — recorded, not fixed
+
+**`established fact`:** Copilot thread `PRRT_kwDOSc4h5c6k3Ov2`
+([`discussion_r4075099533`](https://github.com/Verdant-OS/verdant-grow-diary/pull/1621#discussion_r4075099533)),
+**Medium**, reads `is_resolved: false, is_outdated: false` at merge. Its claim: _Restore pending
+correction_ builds a fresh draft at **revision 0**, and `updateSensorsDraft` rejects any lower
+revision. On the session-backed Sensors page, the restore would therefore be a no-op.
+
+**`inference`, from a static read of `8fc38407`. This is not a runtime measurement.**
+
+- The button calls `updateValues(() => recoveredCorrectionDraftValues(…))`.
+  `recoveredCorrectionDraftValues` wraps `createManualDraftValues`, which sets `revision: 0`.
+- With a `session`, `updateValues` routes through `session.updateDraft`.
+  `updateSensorsDraft` (`src/lib/sensorsPageSessionRules.ts`) returns the session unchanged when
+  `values.revision < existing.values.revision`.
+- The digits test exercises the button **without a session** (the local path). The session test
+  covers **initialization only**. **The session-backed Restore path is untested at the tip.**
+
+**Status: `NOT_MEASURED` at runtime; open; unowned.** It does not reopen the adjudicated C/F verdict,
+which concerns reopen digits, and it is not a product `FAIL` claim. **Claude did not implement anything
+and does not assign it.** GDP routes it. It belongs beside the Soft-P2 register in §7.
+
+## 5. Tired-grower line
+
+Once the live commit includes `8fc38407`, reopening a pending Manual Correction you entered as
+**26 °C** shows **26** with **C** selected, even when your default unit is Fahrenheit. It no longer
+shows 78.8.
+
+## 6. Soft-couple board — re-listed; no other writer of this file
+
+`established fact`, re-listed from the GitHub API at ~20:10 UTC. Every head was fetched by
+`refs/pull/N/head` and diffed against its merge-base with the tip.
+
+**30 open PRs: 27 target `verdant-grow-diary` and 3 are stacked on feature branches** (`#1618` on
+`#1151`, `#1620` on `#1088`, `#1481` on `#1478`). `#1621` and `#1622` merged and `#1616` is closed.
+The new entry is `#1623`.
+
+**No other open PR touches `docs/agents/CURRENT_STATE.md`. This PR (`#1624`) is the only writer.**
+
+**Method correction, recorded rather than hidden.** The first pass ran on a shallow clone. It reported
+`CURRENT_STATE.md` touches and C/F-surface overlap for `#1250`, `#1295`, `#1340`, `#1344`, `#1355`
+and `#1369`, and those were **artifacts of truncated merge-bases**. After deepening the history and
+re-measuring, all six show **zero** touches. Only the deepened figures are used here.
+
+**At behind ≤ 3:**
+
+| PR      | Head         | Behind | Draft  | Class                                   |
+| ------- | ------------ | -----: | ------ | --------------------------------------- |
+| `#1623` | `87d534db5f` |      2 | yes    | tests-only (navigation growId / alerts) |
+| `#1619` | `19e5833bcc` |      2 | yes    | tests-only (publish-verify leak)        |
+| `#1617` | `c059a3c268` |      3 | yes    | tests-only (`useInsertSensorReadings`)  |
+| `#1221` | `9a93c63373` |      2 | yes    | CI lanes                                |
+| `#1175` | `b082c01004` |      2 | **no** | publish verification report             |
+| `#1174` | `6b2a7d3393` |      2 | **no** | EcoWitt ingest-readiness + C/F safety   |
+| `#1151` | `8d66f05291` |      2 | **no** | fixture feeding demo                    |
+| `#1088` | `59742962b0` |      2 | **no** | sensor source/provenance display canon  |
+
+**C/F-surface overlap, measured:** none among the entries above. Two stale drafts touch the
+correction surface:
+
+- **`#1556`** (draft, **124 behind**) edits `ManualSensorReadingCard.tsx`, the native correction e2e
+  spec and its workflow. It predates `#1621` and would conflict. **It is not an ACTIVE OWNER.** It
+  must not be revived to compete with the merged fix.
+- **`#1561`** (draft, 107 behind) touches only `manual-sensor-correction-cache-rules.test.ts`.
+
+## 7. Soft-park register — current
+
+- **`HOLD #1250`.** Do not touch, ready or merge it.
+- **No Publish. No APPLY.** `#1460` and `#1545` stay parked. No production SQL.
+- **Fixture AUTH Soft-park** (`source claim`, GDP): the sticky Playwright session **dropped**. After
+  `cheekhimself` re-banks, re-measure the **empty Action Queue** and the **archived Restore XOR**.
+  **Never KEEP on fixture walks.** No owner email is recorded in this file.
+- **Soft P2 — parked, do not implement:**
+  - sensors / Start Check `growId` omit
+  - Quick Log target count
+  - `/onboarding` preference gate
+  - Assign true-empty needs a **zero-tent fixture**
+  - **plus §4**, the session-backed Restore revision thread (`inference`, unowned)
+
+## 8. CI lanes
+
+- **`Native Manual Correction Local` Soft-ignore: LIFTED for PRs built on `8fc38407` or later.**
+  It passed on `1a6a9186` (§3). A red result on a head that contains `8fc38407` is now a **new
+  finding**, not the old C/F defect.
+- **`Dependency & Security CI`** (`hono` moderate ×3, `js-yaml` **high**): still Soft-ignored and
+  **not addressed by this restamp**. `config/dependency-security-exceptions.json` stays **empty**.
+  The fix belongs to a dependency slice, which is still unowned.
+- **`Nested static proofs and production isolation`**: tip-class, Soft-ignored as P2 per GDP.
+- **The tip's own push build on `8fc38407`: `NOT_MEASURED`.** It was minutes old when this stamp was
+  written.
+
+## 9. Carried, not re-measured
+
+- **Sandbox schema and money-migration gaps.** Last measured on `aabbd2b3`: `Required core schema
+present` 14 of 51 columns missing, and `Required money-critical migrations present` 2 of 17. Both
+  runs used `TARGET_ENV: sandbox`. **These are sandbox-scoped. Production applied state is
+  `NOT_MEASURED`. No APPLY.** Neither `#1622` nor `#1621` touched migrations, but the lanes were not
+  re-run for this stamp.
+- **Golden Toad:** AUTH_NEEDED (~12:54 CT), and the one-tent Next step is `NOT_MEASURED`. This is
+  **not** `AUTH_CHOOSER_READY`. Passkey, 2FA and chooser decisions stay **Cheek's**.
+
+## 10. The `9a30593d` / ~18:45 UTC stamp below is SUPERSEDED
+
+`established fact`. That stamp recorded `#1621` as **open**, with its ACTIVE OWNER head at `85ee8a26`.
+It listed the correction lane as Soft-ignored pending that merge and the board at **28** deploy-branch
+PRs. **All four rows are superseded:** `#1621` merged from `1a6a9186` (§3), the correction-lane ignore
+is lifted (§8), and the board is re-listed (§6). Its live row, `aabbd2b3` as measured by the GDP/Grok
+review, describes a **past instant** and must not be read as current (§2). Carried rows keep their
+original labels.
+
+## 11. Current locks
+
+- **No merge. No ready. No Publish. No History-restore. No APPLY. No production SQL.** No device
+  control, no automatic Action Queue writes, no invented credentials. **Never KEEP. No owner email.**
+- **`HOLD #1250`.**
+- **Tip is `8fc3840743ed58e8a27dc6b39f68563e16a8e48e`.** Cite no other SHA as the tip.
+- **Live is `NOT_MEASURED` by Claude.** Do not green-lane the live `"26"` pin until `version.json`
+  includes `8fc38407`.
+- **ACTIVE OWNER Soft-couple CLEAR.** The §4 thread is open and unowned. **Do not revive `#1556`** to
+  compete with the merged fix.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- This slice is **N=1**, on branch `claude/current-state-restamp-after-1621`, cut from
+  `origin/verdant-grow-diary` at `8fc3840743ed58e8a27dc6b39f68563e16a8e48e`. Its only file is
+  `docs/agents/CURRENT_STATE.md`. It contains no `src/`, `supabase/`, `package.json`, lockfile, test,
+  workflow or governance-file changes. The architecture-contract work that the GDP brief numbers §15
+  is a separate slice; this file has no §15, and nothing here claims it.
+- **Slice owner: Claude. Independent reviewer: Grok** (routed by GDP; HANDOFF on `#1624`). Claude
+  opened the PR as a draft. **Cheek marked it ready and armed auto-merge at 20:18 UTC**; that is
+  Cheek's decision, not Claude's. Claude does not self-merge and does not assign its own next slice.
+
+---
+
+**The block below is SUPERSEDED — see §10 of the current stamp.**
+
+**Prior last updated:** 2026-09-22 UTC (~18:45 UTC)
+**Prior update:** Claude (2026-09-22 PM, slice `GDP-CURRENT-STATE-REStamp-20260922-pm`: **deploy tip =
 `aabbd2b3`**, remeasured and **unmoved** — still the `#1615` docs squash, so **no product behaviour
 has changed on the branch since `a25942686dc7`** (§1). **The C/F failure is adjudicated: GDP calls
 it `READING_1_PRODUCT_DEFECT`, not a stale pin**, and **Soft `#1621` is the single ACTIVE OWNER

@@ -1,4 +1,4 @@
-import { phenoHuntsPath } from "@/lib/routes";
+import { breedingProgramsPath, phenoHuntsPath } from "@/lib/routes";
 
 export interface GrowerNavigationDestination {
   id:
@@ -36,16 +36,20 @@ export const LABS_NAVIGATION_DESTINATIONS = [
 export type LabsNavigationDestinationId = (typeof LABS_NAVIGATION_DESTINATIONS)[number]["id"];
 
 /**
- * Soft-couple only: rewrite Labs Pheno Hunt onto `?growId=` when the
- * caller already has an explicit grow. The Phase-1 static manifest
- * stays byte-for-byte; this helper never invents a growId.
+ * Soft-couple only: rewrite Labs Pheno Hunt and Breeding Programs onto
+ * `?growId=` when the caller already has an explicit grow. The Phase-1
+ * static manifest stays byte-for-byte; this helper never invents a growId.
  */
 export function resolveLabsNavigationDestinations(
   growId?: string | null,
 ): GrowerNavigationDestination[] {
   const trimmed = typeof growId === "string" ? growId.trim() : "";
   const scopedGrowId = trimmed || null;
-  return LABS_NAVIGATION_DESTINATIONS.map((item) =>
-    item.id === "phenoHunt" ? { ...item, to: phenoHuntsPath(scopedGrowId) } : { ...item },
-  );
+  return LABS_NAVIGATION_DESTINATIONS.map((item) => {
+    if (item.id === "phenoHunt") return { ...item, to: phenoHuntsPath(scopedGrowId) };
+    if (item.id === "breedingPrograms") {
+      return { ...item, to: breedingProgramsPath(scopedGrowId) };
+    }
+    return { ...item };
+  });
 }

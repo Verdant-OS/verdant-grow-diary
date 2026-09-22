@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-22 UTC (~18:15 UTC)
+**Last updated:** 2026-09-22 UTC (~18:45 UTC)
 **Updated by:** Claude (2026-09-22 PM, slice `GDP-CURRENT-STATE-REStamp-20260922-pm`: **deploy tip =
 `aabbd2b3`**, remeasured and **unmoved** — still the `#1615` docs squash, so **no product behaviour
 has changed on the branch since `a25942686dc7`** (§1). **The C/F failure is adjudicated: GDP calls
@@ -65,12 +65,19 @@ Vercel `forbidden` on the deployments list. The proxy documents a 403 as an orga
 egress-policy denial that must be reported rather than retried or routed around. **Reported every
 time; never routed around.** The reviewer's path was not subject to that policy.
 
-**What this means in practice, stated plainly:** if GDP's reading is right, the 237-commit
-`LIVE_LAG` recorded in the two superseded stamps is now closed and tip Soft-couples are live. That
-would be good news, and nothing here disputes it. But **this document cannot be cited as the
-evidence**. The next agent with an unblocked path should read `version.json` and convert this row to
-MEASURED. **Until then, whether production serves `aabbd2b3` is `NOT_MEASURED` by Verdant's own
-evidence standard.**
+**What this means in practice, stated plainly:** the **237-commit `LIVE_LAG` recorded in the two
+superseded stamps is closed**, and tip Soft-couples are live. That is settled, not conditional.
+
+**What is still true about provenance:** **Claude did not perform the measurement**, and **this
+document is not the evidence for it** — the reviewer's read is. Cite `#1622` comment `5781860840`.
+A reader who needs production's state at some later moment must re-read `version.json` rather than
+quote this stamp, because a measurement is a fact about an instant, not a standing guarantee.
+
+**Correction, recorded rather than silently overwritten:** an earlier revision of this section kept
+a closing line reading _"whether production serves `aabbd2b3` is `NOT_MEASURED`"_ after the table
+above had already been upgraded to MEASURED. That left §2 contradicting itself on the single most
+load-bearing row in the file. CodeRabbit caught it on `#1622`; the stale line is gone. **The row is
+`MEASURED`.**
 
 ## 3. Soft `#1621` — ACTIVE OWNER Soft-couple, CLEAN, and the pin is untouched
 

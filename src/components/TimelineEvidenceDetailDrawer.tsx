@@ -257,6 +257,16 @@ export default function TimelineEvidenceDetailDrawer({ viewModel, open, onClose 
                 <div className="mb-1.5">
                   <TimelineSensorSourceBadge badge={sourceBadge} className="mr-1" />
                 </div>
+                {vm.sensor.warnings.length > 0 && (
+                  <ul
+                    className="mb-2 space-y-1 text-xs text-amber-300"
+                    aria-label="Sensor evidence cautions"
+                  >
+                    {vm.sensor.warnings.map((warning, index) => (
+                      <li key={`${index}-${warning}`}>{warning}</li>
+                    ))}
+                  </ul>
+                )}
                 <div className="flex flex-wrap gap-1.5">
                   {vm.sensor.tempC != null && (
                     <Chip>{fmtChipTemp(vm.sensor.tempC, temperatureUnit)}</Chip>

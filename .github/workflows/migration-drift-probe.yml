@@ -9,7 +9,10 @@ name: Migration drift probe (production)
 # not that production ever ran them. The gap surfaced only because someone
 # queried schema_migrations by hand on a hunch.
 #
-# This job closes that blind spot on a schedule.
+# ENV-RETIRE-001: the daily schedule is retired because verdant-production is
+# owner-reported hollow. Manual dispatch remains guarded; an absent run is
+# NOT_MEASURED, never evidence that production is current.
+# See docs/production-environment-retirement-runbook.md before any dispatch.
 #
 # TWO ANTI-VACUITY RULES, both learned the hard way in this repo:
 #
@@ -24,10 +27,6 @@ name: Migration drift probe (production)
 #      the signal lands somewhere a human actually looks.
 
 on:
-  schedule:
-    # 07:00 UTC daily. Drift is measured in days, so daily is ample; the
-    # point is that six days can never pass unnoticed again.
-    - cron: "0 7 * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -61,22 +60,14 @@ jobs:
     # production database credential, which is a credential-exfiltration path
     # regardless of what the probe itself does.
     #
-    # Safe for the schedule too: scheduled runs only ever fire from the
-    # repository default branch, which IS verdant-grow-diary here, so this
-    # gate never blocks the cron it exists to protect.
+    # Retirement does not relax the trusted-ref gate for manual dispatch.
     if: github.ref == 'refs/heads/verdant-grow-diary'
     # Holds the verdant-production environment's SUPABASE_DB_URL. If this
     # environment stops resolving, the secret guard below fails the job loudly
     # rather than skipping green.
     #
-    # OPERATIONAL CAVEAT: if a REQUIRED REVIEWER is ever added to
-    # verdant-production, every scheduled run will park awaiting deployment
-    # approval and this monitor silently stops monitoring -- no runner, no
-    # probe, no issue. Verified at authoring time that this environment has
-    # only a branch_policy rule and zero reviewers, so the cron does run
-    # today. If approval rules are added later, move this job to a separate
-    # read-only monitoring environment whose protection rules permit
-    # unattended scheduled runs.
+    # No unattended monitoring is active. Restoring it requires a separately
+    # approved read-only environment and target-specific verification receipt.
     environment: verdant-production
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5

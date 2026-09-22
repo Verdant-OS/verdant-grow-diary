@@ -5,10 +5,14 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   ReactNode,
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
+import { SIGN_OUT_LOADING_LABEL } from "@/lib/authSessionExitRules";
+import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
+import { runAuthOAuthBootstrap } from "@/lib/authOAuthBootstrapService";
 import {
   flushPendingOAuthSignupAcquisition,
   type SignupAcquisitionRpcClient,
@@ -25,6 +29,11 @@ interface Ctx {
   session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  beginSignOutNavigation?: () => {
+    isCurrent: () => boolean;
+    finish: () => void;
+  } | null;
+  isSignOutNavigationPending?: () => boolean;
 }
 const AuthCtx = createContext<Ctx>({
   user: null,
@@ -86,11 +95,57 @@ interface AuthProviderProps {
 export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  // This operation outlives the dialog/route that started it. SIGNED_OUT can
+  // unmount that route before the SDK finishes notifying its other listeners.
+  const [signOutOperation] = useState(() => getAuthSignOutOperation(supabase.auth));
+  const signOutStatus = useSyncExternalStore(
+    signOutOperation.subscribe,
+    signOutOperation.getSnapshot,
+    () => "idle",
+  );
+  const signOutNavigationPending = signOutStatus !== "idle";
+  const signOutNavigationRef = useRef<{ userId: string | null; observedSignedOut: boolean } | null>(
+    null,
+  );
+  const isSignOutNavigationPending = useCallback(
+    () => signOutOperation.getSnapshot() !== "idle",
+    [signOutOperation],
+  );
+  const beginSignOutNavigation = useCallback(() => {
+    const lease = signOutOperation.begin();
+    if (!lease) return null;
+    const operation = { userId: currentUserIdRef.current ?? null, observedSignedOut: false };
+    signOutNavigationRef.current = operation;
+    return {
+      isCurrent: () => signOutNavigationRef.current === operation,
+      finish: () => {
+        if (signOutNavigationRef.current === operation) signOutNavigationRef.current = null;
+        // Release only after the actual SDK operation settles, even if its
+        // initiating provider or navigation intent has been superseded.
+        lease.finish();
+      },
+    };
+  }, [signOutOperation]);
+  useEffect(
+    () => () => {
+      signOutNavigationRef.current = null;
+    },
+    [],
+  );
   // `undefined` means the initial auth identity has not resolved yet. Keep it
   // distinct from a resolved signed-out `null` so the first null session still
   // runs the privacy fence and clears state left by an expired prior session.
   const currentUserIdRef = useRef<string | null | undefined>(undefined);
   const sessionUserId = session?.user.id ?? null;
+
+  const reconcileSignOutWithHeldSession = useCallback((held: Session | null) => {
+    const operation = signOutNavigationRef.current;
+    if (held && operation && (operation.observedSignedOut || held.user.id !== operation.userId)) {
+      // Relayed identities are not authority. Only this client's own session
+      // may supersede the old UI continuation; the SDK lock remains held.
+      signOutNavigationRef.current = null;
+    }
+  }, []);
 
   const applySession = useCallback(
     (nextSession: Session | null) => {
@@ -106,6 +161,8 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
         onBeforeAuthIdentityChange?.(previousUserId ?? null, nextUserId);
       }
       writePersistedLastResolvedIdentity(nextUserId);
+      if (nextUserId === null && signOutNavigationRef.current)
+        signOutNavigationRef.current.observedSignedOut = true;
       currentUserIdRef.current = nextUserId;
       setSession(nextSession);
     },
@@ -114,51 +171,59 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
 
   useEffect(() => {
     let disposed = false;
-    // Every session-bearing event bumps this; only the newest reconciliation
+    // Every auth event bumps this; only the newest reconciliation
     // may act on its answer, so a slower read never overrides a later event.
     let reconcileSeq = 0;
+    let oauthBootstrapPending = true;
 
-    // The auth client relays SIGNED_IN / TOKEN_REFRESHED between same-origin
-    // tabs over a BroadcastChannel and hands the OTHER tab's session to this
-    // listener without saving it. With `storage: sessionStorage` this tab may
-    // hold nothing: getUser(), REST and edge calls then run signed-out while
-    // `user` claims otherwise (measured on the deploy branch, 2026-09-03). Or
-    // it may hold a DIFFERENT session — another account, or an older token of
-    // the same account — which every request keeps using.
-    // So the session this client actually holds is the one React exposes:
-    // the delivered session is compared with the client's own read by bearer
-    // (the access token is what every request carries, so it is the identity
-    // that must agree with the UI) and, when they differ, replaced by what
-    // the client holds (null included). The read resolves in microtasks,
-    // ahead of the render React schedules for the first apply, so no render
-    // commits the relayed identity.
-    //
-    // The event is still applied synchronously first: the identity fence must
-    // run before React commits, and /auth navigates the moment
-    // signInWithPassword resolves, which auth-js only does after this
-    // callback returns. The read is never awaited inside the callback.
-    // INITIAL_SESSION and a null session are the client's own answers.
-    const sameBearer = (a: Session, b: Session) => a.access_token === b.access_token;
-    const reconcileWithClientSession = async (seq: number, delivered: Session) => {
+    // Auth notifications are also relayed from other tabs without updating
+    // this tab's sessionStorage. Publishing their payload even briefly can
+    // erase private cache/search state or expose another tab's bearer. Only
+    // this client's held-session answer may reach the identity fence or UI.
+    const reconcileWithClientSession = async (seq: number) => {
       let held: Session | null;
       try {
-        const { data } = await supabase.auth.getSession();
-        held = data?.session ?? null;
+        const { data, error } = await supabase.auth.getSession();
+        held = data?.session;
+        if (
+          error ||
+          held === undefined ||
+          (held !== null &&
+            (typeof held.user?.id !== "string" ||
+              !held.user.id.trim() ||
+              typeof held.access_token !== "string" ||
+              !held.access_token.trim()))
+        )
+          throw new Error("held_session_unconfirmed");
       } catch {
-        // The client cannot read its own store: a client fault, not a
-        // cross-tab signal. Keep the delivered session; a later event still
-        // corrects it (see the initial-read failure contract below).
+        if (disposed || seq !== reconcileSeq) return;
+        // An unreadable store cannot establish an authenticated identity.
+        applySession(null);
+        setLoading(false);
         return;
       }
       if (disposed || seq !== reconcileSeq) return;
-      if (held === null || !sameBearer(held, delivered)) applySession(held);
+      reconcileSignOutWithHeldSession(held);
+      applySession(held);
+      setLoading(false);
     };
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      applySession(s);
-      if (s !== null && event !== "INITIAL_SESSION") {
-        void reconcileWithClientSession(++reconcileSeq, s);
-      }
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      // Include INITIAL_SESSION: its snapshot may predate a newer local
+      // sign-in. Read again, and invalidate every earlier in-flight answer.
+      const seq = ++reconcileSeq;
+      // INITIAL_SESSION can arrive while OAuth setSession is still waiting
+      // for its user lookup. Neither that old held session nor a later event
+      // may resolve bootstrap before the OAuth return has finished. The
+      // post-consume read below confirms the final held session once.
+      if (oauthBootstrapPending) return;
+      // Auth.tsx navigates immediately after signInWithPassword resolves.
+      // With no confirmed owner, keep that destination waiting for this read
+      // instead of bouncing back to /auth. Existing owners keep their draft
+      // mounted while an untrusted notification is being reconciled.
+      if (currentUserIdRef.current == null) setLoading(true);
+      // Do not await an auth call inside auth-js's own notification callback.
+      void reconcileWithClientSession(seq);
     });
 
     // Google / managed OAuth returns to the public origin with
@@ -170,45 +235,39 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
     // inventing a session. Never log the hash or tokens.
     void (async () => {
       try {
-        if (typeof window !== "undefined") {
-          const stashedHash = takeOAuthReturnHashStash(window as OAuthHashStashHolder);
-          await consumeOAuthHashSessionIfPresent({
-            hash: window.location.hash,
-            stashedHash,
-            pathname: window.location.pathname,
-            search: window.location.search,
-            setSession: async (tokens) => {
-              const { error } = await supabase.auth.setSession(tokens);
-              return { error };
-            },
-            replaceState: (url) => {
-              window.history.replaceState(window.history.state, "", url);
-            },
-          });
-        }
+        await runAuthOAuthBootstrap(supabase.auth, async () => {
+          if (typeof window !== "undefined") {
+            const stashedHash = takeOAuthReturnHashStash(window as OAuthHashStashHolder);
+            await consumeOAuthHashSessionIfPresent({
+              hash: window.location.hash,
+              stashedHash,
+              pathname: window.location.pathname,
+              search: window.location.search,
+              setSession: async (tokens) => {
+                const { error } = await supabase.auth.setSession(tokens);
+                return { error };
+              },
+              replaceState: (url) => {
+                window.history.replaceState(window.history.state, "", url);
+              },
+            });
+          }
+        });
       } catch {
         // Hash consume must never block auth bootstrap.
       }
       if (disposed) return;
-      try {
-        const { data } = await supabase.auth.getSession();
-        applySession(data.session);
-      } catch {
-        // A rejected initial session read (network failure, corrupt storage)
-        // must resolve to signed-out instead of leaving the apex and every
-        // AppShell route on a permanent loading screen. onAuthStateChange
-        // still delivers the real session if one materializes later.
-        applySession(null);
-      } finally {
-        if (!disposed) setLoading(false);
-      }
+      oauthBootstrapPending = false;
+      // Bootstrap has the same generation fence: a late initial read must
+      // never replace a newer confirmed sign-in, sign-out or failed read.
+      await reconcileWithClientSession(++reconcileSeq);
     })();
 
     return () => {
       disposed = true;
       sub.subscription.unsubscribe();
     };
-  }, [applySession]);
+  }, [applySession, reconcileSignOutWithHeldSession]);
 
   useEffect(() => {
     if (!sessionUserId) return;
@@ -234,20 +293,42 @@ export function AuthProvider({ children, onBeforeAuthIdentityChange }: AuthProvi
       value={{
         user: session?.user ?? null,
         session,
-        loading,
+        loading: loading || signOutNavigationPending,
+        beginSignOutNavigation,
+        isSignOutNavigationPending,
         signOut: async () => {
           // supabase.auth.signOut() resolves with `{ error }` and does not throw
           // on the common failure path. Propagate so performSafeSignOut can
           // return ok:false + SIGN_OUT_FAILURE_MESSAGE (auth hardening #588).
           // Never rethrow the raw error object — it may carry token/session text.
-          const { error } = await supabase.auth.signOut();
-          if (error) {
-            throw new Error("sign_out_failed");
-          }
+          await signOutOperation.runSdkSignOut(async () => {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw new Error("sign_out_failed");
+          });
         },
       }}
     >
-      {children}
+      {signOutNavigationPending ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="min-h-screen flex flex-col gap-3 items-center justify-center text-muted-foreground"
+        >
+          {signOutStatus === "stalled" ? (
+            <>
+              <p>Sign-out is taking longer than expected.</p>
+              <p>Reload the page to recover before signing in again.</p>
+              <button type="button" className="underline" onClick={() => window.location.reload()}>
+                Reload page
+              </button>
+            </>
+          ) : (
+            SIGN_OUT_LOADING_LABEL
+          )}
+        </div>
+      ) : (
+        children
+      )}
     </AuthCtx.Provider>
   );
 }

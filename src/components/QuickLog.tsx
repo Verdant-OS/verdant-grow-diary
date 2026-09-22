@@ -297,6 +297,9 @@ const QUICK_OBSERVATION_CHIPS = [
   { label: "Photo only", text: "Photo only — no other changes today." },
 ] as const;
 
+const GROW_STAGE_UNCONFIRMED_MESSAGE =
+  "Your log was saved, but the grow's stage update wasn't confirmed. Check the grow's stage before changing it again.";
+
 type SavedTarget = {
   id: string;
   name: string;
@@ -307,6 +310,7 @@ type SavedTarget = {
   growEventId: string | null;
   eventType: string;
   savedAt: string;
+  growStageUnconfirmed?: boolean;
 };
 
 type LastQuickLogTarget = {
@@ -1461,13 +1465,29 @@ export default function QuickLog({
       // from the selected PLANT, which can differ from the grow, so we gate on
       // the touched ref to avoid silently mutating the grow's stage on an
       // ordinary save. Still never writes an unknown/empty stage.
+      let growStageUnconfirmed = false;
       if (
         saveGrow &&
         saveStageWasUserTouched &&
         normalizeQuickLogStage(saveStage) &&
         saveStage !== saveGrow.stage
       ) {
-        await supabase.from("grows").update({ stage: saveStage }).eq("id", saveTarget.growId);
+        // The diary entry is already confirmed. A separate stage write must
+        // neither hide its own failure nor turn that saved entry into a retry.
+        try {
+          const { data: updatedGrow, error: stageError } = await supabase
+            .from("grows")
+            .update({ stage: saveStage })
+            .eq("id", saveTarget.growId)
+            .select("id,stage")
+            .maybeSingle();
+          growStageUnconfirmed =
+            !!stageError ||
+            updatedGrow?.id !== saveTarget.growId ||
+            updatedGrow?.stage !== saveStage;
+        } catch {
+          growStageUnconfirmed = true;
+        }
       }
 
       // Submission completed: the next logical submission gets a fresh key.
@@ -1481,7 +1501,13 @@ export default function QuickLog({
         successMessage && successMessage !== "Logged 🌱"
           ? successMessage
           : `Saved ${savedVerb(saveEventType)} for ${plantLabel}`;
-      toast.success(finalMessage);
+      if (growStageUnconfirmed) {
+        // Some callers navigate after onCreated, so keep the partial outcome
+        // visible outside this dialog as well as in its saved-entry panel.
+        toast.message(GROW_STAGE_UNCONFIRMED_MESSAGE, { duration: 12_000 });
+      } else {
+        toast.success(finalMessage);
+      }
 
       rememberLastTarget(
         {
@@ -1503,6 +1529,7 @@ export default function QuickLog({
         growEventId: result.growEventId ?? null,
         eventType: saveEventType,
         savedAt: new Date().toISOString(),
+        growStageUnconfirmed,
       });
       onCreated?.();
       // Public starter handoff consume-once: the shared helper clears the
@@ -3268,6 +3295,14 @@ export default function QuickLog({
                         photoAttached: false,
                       })}
                     </p>
+                    {savedTarget.growStageUnconfirmed && (
+                      <p
+                        className="mt-2 text-xs text-amber-700 dark:text-amber-400"
+                        data-testid="quick-log-stage-save-unconfirmed"
+                      >
+                        {GROW_STAGE_UNCONFIRMED_MESSAGE}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

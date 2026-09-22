@@ -42,7 +42,8 @@ vi.mock("@/hooks/use-sensor-readings", () => ({
   useSensorReadings: () => ({ data: [], isLoading: false, isError: false }),
 }));
 
-vi.mock("@/hooks/useImportedSensorHistory", () => ({
+vi.mock("@/hooks/useImportedSensorHistory", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/useImportedSensorHistory")>()),
   useImportedSensorHistory: () => ({ data: [], isLoading: false, isError: false }),
 }));
 

@@ -55,6 +55,11 @@ export const REQUIRED_MONEY_MIGRATIONS = [
   // authoritative service-spend definition and closes the checkout-to-
   // settlement race for completed credit-pack purchases.
   "20260728090736_ai_credit_pack_portability.sql",
+  // Refund revocation must use the stored founder subscription reference;
+  // the previous body errors and rolls back entitlement cancellation.
+  "20260914212330_founder_refund_subscription_reference.sql",
+  // Founder grant/refund serialization and authoritative refund recheck.
+  "20260915193000_founder_refund_grant_serialization.sql",
 ];
 
 /**
@@ -89,6 +94,8 @@ export const KNOWN_MONEY_MIGRATIONS = new Set([
   "20260714230000_paddle_paid_launch_ordering_and_founder.sql",
   "20260715001000_paddle_paid_launch_review_hardening.sql",
   "20260717193000_entitlement_status_parity.sql",
+  // Client UPDATE hardening merged in #1373; preferences remain edge-only.
+  "20260914190600_founders_client_updates_fail_closed.sql",
   // everything in REQUIRED is by definition known
   ...REQUIRED_MONEY_MIGRATIONS,
 ]);

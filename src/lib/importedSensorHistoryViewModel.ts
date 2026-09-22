@@ -24,19 +24,25 @@ export const IMPORTED_SENSOR_HISTORY_ALL_METRICS = "all" as const;
 
 export type ImportedSensorHistoryMetricFilter = typeof IMPORTED_SENSOR_HISTORY_ALL_METRICS | string;
 
-export type ImportedSensorHistoryReadStatus = "loading" | "error" | "success";
+export type ImportedSensorHistoryReadStatus = "loading" | "paused" | "error" | "success";
 
 /**
- * Keep a cached-empty refetch distinct from an established empty result.
+ * Keep unresolved first reads and cached-empty refreshes distinct from an
+ * established empty result, including reads paused while offline.
  * Existing non-empty history remains visible while React Query refreshes it.
  */
 export function resolveImportedSensorHistoryReadStatus(input: {
   isError: boolean;
   isFetching: boolean;
   hasRows: boolean;
+  isPending?: boolean;
+  isPaused?: boolean;
 }): ImportedSensorHistoryReadStatus {
   if (input.isError) return "error";
-  if (input.isFetching && !input.hasRows) return "loading";
+  if (!input.hasRows) {
+    if (input.isPaused) return "paused";
+    if (input.isPending || input.isFetching) return "loading";
+  }
   return "success";
 }
 
@@ -203,5 +209,5 @@ export function buildImportedSensorHistoryViewModel(args: {
 
 export const IMPORTED_SENSOR_HISTORY_ANCHOR_ID = "imported-history" as const;
 export const IMPORTED_SENSOR_HISTORY_EMPTY_COPY =
-  "No imported CSV sensor history for this tent yet." as const;
+  "No CSV readings are available for this tent in the current history view." as const;
 export const IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY = "Not live data" as const;

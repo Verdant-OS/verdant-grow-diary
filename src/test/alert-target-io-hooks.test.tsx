@@ -116,6 +116,21 @@ describe("useAlertTargetNames", () => {
     expect(result.current.singleTentIdByGrowId.size).toBe(0);
   });
 
+  it("fail-closed when plants read errors even if tents succeed", async () => {
+    supabaseState.tables.tents = {
+      data: [{ id: TENT_A, name: "One-Tent", grow_id: GROW_A }],
+      error: null,
+    };
+    supabaseState.tables.plants = { data: null, error: { message: "denied" } };
+
+    const { result } = renderHook(() => useAlertTargetNames());
+
+    await waitFor(() => expect(result.current.status).toBe("unavailable"));
+    expect(result.current.tentNameById.size).toBe(0);
+    expect(result.current.plantNameById.size).toBe(0);
+    expect(result.current.singleTentIdByGrowId.size).toBe(0);
+  });
+
   it("fail-closed when the parallel fetch rejects", async () => {
     supabaseState.from.mockImplementation((table: string) => {
       const builder = {

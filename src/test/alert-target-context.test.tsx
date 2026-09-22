@@ -19,8 +19,11 @@ import {
   ALERT_TARGET_NAME_UNAVAILABLE_LABEL,
   ALERT_TARGET_PREFIX,
   ALERT_TARGET_UNAVAILABLE_TEXT,
+  buildAlertTargetPresenterInput,
   deriveAlertTargetContext,
+  linkedEvidenceForRefIds,
   linkedEvidenceLookupIds,
+  mergeLinkedEvidenceLookupRow,
   resolveAlertTargetIds,
   sanitizeAlertTargetLabel,
 } from "@/lib/alertTargetContextRules";
@@ -55,6 +58,85 @@ describe("resolveAlertTargetIds", () => {
       tentSource: "alert",
       plantSource: "linked_evidence",
     });
+  });
+
+  it("blocks sole-tent fallback when linked evidence disagrees on tent", () => {
+    expect(
+      resolveAlertTargetIds({
+        tentId: null,
+        plantId: null,
+        linkedEvidence: [
+          { tentId: "tent-a", plantId: null },
+          { tentId: "tent-b", plantId: null },
+        ],
+        singleTentId: "tent-sole",
+      }),
+    ).toEqual({
+      tentId: null,
+      plantId: null,
+      tentSource: "none",
+      plantSource: "none",
+    });
+  });
+
+  it("uses unambiguous linked evidence before sole-tent fallback", () => {
+    expect(
+      resolveAlertTargetIds({
+        tentId: null,
+        plantId: null,
+        linkedEvidence: [{ tentId: "tent-snap", plantId: "plant-1" }],
+        singleTentId: "tent-sole",
+      }),
+    ).toEqual({
+      tentId: "tent-snap",
+      plantId: "plant-1",
+      tentSource: "linked_evidence",
+      plantSource: "linked_evidence",
+    });
+  });
+});
+
+describe("mergeLinkedEvidenceLookupRow", () => {
+  it("nulls conflicting tent ids while keeping matching plant ids", () => {
+    expect(
+      mergeLinkedEvidenceLookupRow(
+        { tentId: "tent-a", plantId: "plant-a" },
+        { tentId: "tent-b", plantId: "plant-a" },
+      ),
+    ).toEqual({ tentId: null, plantId: "plant-a" });
+  });
+});
+
+describe("linkedEvidenceForRefIds", () => {
+  it("orders evidence by lookup id and trims blank fields", () => {
+    const rows = new Map([
+      ["snap-1", { tentId: " tent-a ", plantId: null }],
+      ["diary-1", { tentId: null, plantId: "plant-b" }],
+    ]);
+    expect(linkedEvidenceForRefIds(["snap-1", "diary-1", "missing"], rows)).toEqual([
+      { tentId: "tent-a", plantId: null },
+      { tentId: null, plantId: "plant-b" },
+    ]);
+  });
+});
+
+describe("buildAlertTargetPresenterInput", () => {
+  it("withholds linked evidence and sole-tent while idsLoading is true", () => {
+    const input = buildAlertTargetPresenterInput({
+      tentId: null,
+      plantId: null,
+      growId: "grow-1",
+      tentNameById: new Map([["tent-sole", "Solo Tent"]]),
+      plantNameById: new Map(),
+      linkedEvidence: [{ tentId: "tent-linked", plantId: null }],
+      singleTentIdByGrowId: new Map([["grow-1", "tent-sole"]]),
+      idsLoading: true,
+    });
+    expect(input.tentId).toBeNull();
+    expect(input.plantId).toBeNull();
+    expect(input.linkedEvidence).toEqual([]);
+    expect(input.singleTentId).toBeNull();
+    expect(input.idsLoading).toBe(true);
   });
 });
 

@@ -168,9 +168,8 @@ Its live row (`NOT_MEASURED`) still holds. Carried rows keep their original labe
 - **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
 - **This slice:** **N=1**, **draft**, on branch `claude/current-state-restamp-8b73c140`, cut from
   `origin/verdant-grow-diary` at `8b73c14031050b51061d4715bedbcdfeb66eee52`. Its only file is
-  `docs/agents/CURRENT_STATE.md`. **Slice owner: Claude.** The **independent reviewer is not yet
-  named**. GDP routes it, and the slice is incomplete until a different peer is assigned. Claude does
-  not self-merge and does not assign its own next slice.
+  `docs/agents/CURRENT_STATE.md`. **Slice owner: Claude. Independent reviewer: Grok** (routed by GDP;
+  HANDOFF on `#1629`). Claude does not self-merge and does not assign its own next slice.
 
 ---
 

@@ -1,7 +1,289 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-22 UTC (~16:20 UTC)
-**Updated by:** Claude (2026-09-22: **deploy tip = `a25942686dc7`**, Soft `#1614`, squash subject
+**Last updated:** 2026-09-22 UTC (~16:45 UTC)
+**Updated by:** Claude (2026-09-22, second stamp of the day: **deploy tip = `aabbd2b3`**, the squash
+of `#1615`, the previous restamp — docs-only, one Markdown file, zero migrations. **Tip ≠ live.**
+Live is still recorded at **`24697dc2c88c`, `dirty:false`, ref `verdant-grow-diary`**, still an
+**operator-supplied value**, and **Claude's own read is still `BLOCKED`** — a third attempt this
+slice returned the same egress 403 (§2). Lag is now **237**. **`LIVE_LAG`, Soft-park; lag is not a
+product `FAIL`.** **The deploy tip's own push CI is MEASURED and carries three red lanes** (§4),
+none of them required contexts and `CI` itself green. Two are new to this file and both target the
+**sandbox**: 14 of 51 required core columns missing, and 2 of 17 money-critical migrations not
+applied. **Production applied state remains `NOT_MEASURED` — do not read the sandbox rows as
+production.** The dependency red the prior stamp _inferred_ on the tip is now **measured**.
+**ACTIVE OWNER Soft-couple CLEAR; Soft-couple board EMPTY** (24 open PRs re-listed, all draft, none
+owns this file, closest 88 behind). **`#1615` merged with its independent-review seat unfilled;
+Grok is routed as reviewer post-merge** (§6). Golden Toad rows are **carried from the prior stamp
+and NOT re-measured here**; QL empty Save stays **`NOT_MEASURED`**. **The `a25942686dc7` /
+2026-09-22 16:20 stamp below is SUPERSEDED.** No Publish. No APPLY. No merge. Prior header follows.)
+
+## 1. Deploy tip is `aabbd2b3` — the `#1615` squash
+
+`established fact`, from `git fetch origin verdant-grow-diary` then `git log`, measured
+2026-09-22 ~16:42 UTC. Full tip oid: `aabbd2b3748678229387fbf110d8d2525ce32f4a`.
+
+| Field      | Value                                                                              |
+| ---------- | ---------------------------------------------------------------------------------- |
+| Merge SHA  | `aabbd2b3748678229387fbf110d8d2525ce32f4a`                                         |
+| Commit     | 2026-09-22 11:32 CT                                                                |
+| Subject    | `docs(state): restamp on a25942686dc7 — LIVE_LAG, Soft-couple board EMPTY (#1615)` |
+| Files      | 1 (`docs/agents/CURRENT_STATE.md`)                                                 |
+| Migrations | 0                                                                                  |
+
+**The tip is a documentation commit.** `git diff --name-only aabbd2b3^ aabbd2b3` returns exactly
+`docs/agents/CURRENT_STATE.md`. No runtime, schema, lockfile or test file moved, so **nothing about
+product behaviour changed between `a25942686dc7` and this tip.** The `#1611`–`#1614` rows are in the
+superseded block below and are not re-stated here.
+
+## 2. `LIVE_LAG` is 237 — live unchanged, and Claude's read is STILL `BLOCKED`
+
+**The live values remain `source claim`, operator-supplied. This slice did not measure production
+either.** A third attempt was made and refused.
+
+| Field                  | Value                                                      |
+| ---------------------- | ---------------------------------------------------------- |
+| `commit`               | `24697dc2c88ca5371126ee97c15651ea3c4c7f8e`                 |
+| `dirty`                | `false`                                                    |
+| `ref`                  | `verdant-grow-diary`                                       |
+| provenance             | **operator-supplied (GDP brief)** — not read by this slice |
+| Claude's own live read | **`BLOCKED`**, 2026-09-22 16:42:33 UTC                     |
+
+The attempt: `curl https://verdantgrowdiary.com/version.json` → **`curl: (56) CONNECT tunnel failed,
+response 403`**, logged by the session proxy as `connect_rejected` on `verdantgrowdiary.com:443` at
+`2026-09-22T16:42:33.712Z`. That is the **third** refusal across two slices, after the same 403 and
+a Vercel `forbidden` on the deployments list in the prior stamp. **Reported, not routed around.**
+
+**What git establishes** — `established fact`, unchanged in substance from the prior stamp except
+the count:
+
+- `24697dc2c88c` is a **first-parent ancestor** of the tip (`git merge-base --is-ancestor` → true).
+- `git rev-list --count 24697dc2c88c..origin/verdant-grow-diary` = **237**. It moved 236 → 237
+  because `#1615` merged; the increment is **this file's own restamp**, not product change.
+- Its subject is `fix(payments): serialize Founder Lifetime grants and refunds (#1398)`,
+  2026-09-15 15:18 CT.
+
+**`LIVE_LAG`, Soft-park. Nothing merged after `24697dc2c88c` may be described as live.** Whether
+production serves that SHA right now is **`NOT_MEASURED`**, and the next holder of an unblocked path
+should read `version.json` and stamp it.
+
+## 3. The lag window still carries exactly two committed migrations
+
+`established fact`, re-run this slice:
+`git rev-list 24697dc2c88c..origin/verdant-grow-diary -- 'supabase/migrations/*'` → **2**, the same
+pair as the prior stamp, because the only commit added since was documentation:
+
+| Migration file                                           | Commit                                     | PR      |
+| -------------------------------------------------------- | ------------------------------------------ | ------- |
+| `20260916111000_quicklog_revision_idempotent_replay.sql` | `c8194a3d79bcd4f16194534c910fb8e0789fab43` | `#1460` |
+| `20260917183000_manual_sensor_correction_operations.sql` | `c00b2e29e2d770153b1e376ed4a06baf1d472276` | `#1545` |
+
+**Committed is not applied.** Production applied state is `NOT_MEASURED`. Both are merged history
+and immutable. **No APPLY in this slice.**
+
+## 4. Deploy-tip CI is MEASURED — three red lanes, `CI` itself green
+
+`established fact`, MEASURED 2026-09-22 ~16:43 UTC from the **push** workflow runs on the tip
+`aabbd2b3`. This section replaces the prior stamp's §8b **inference** about the base branch with
+measurement.
+
+`CI` (`.github/workflows/ci.yml`), the workflow that supplies all 35 required contexts, concluded
+**`success`** (run `35754816992`), as did typecheck, tsgo+build, ESLint, the full Vitest suite,
+edge-shared-sync, security regression, Security DB Local, One-Tent Loop smoke, SEO parity,
+jsonld-rich-results, Sentinel version parity and the Required-check audit. **Three concluded
+`failure`. None of the three is a required context.**
+
+### 4.1 `Dependency & Security CI` — `failure` (run `35754816855`)
+
+The prior stamp inferred this from byte-identical gate inputs and explicitly refused to call it
+measured. **It is now measured on the tip itself, and the inference was correct.** Same `check:deps`
+block: `hono` (moderate ×3, ids `1193729`/`1193730`/`1193731`) and `js-yaml` (high, id `1193727`).
+`config/dependency-security-exceptions.json` is still empty. **Do not add an entry to silence it.**
+The remedy is a dependency slice, and it is **not** a product `FAIL`.
+
+### 4.2 `Required core schema present` — `failure` (run `35754816814`), SANDBOX
+
+Job `Verify pinned Verdant sandbox schema`, `TARGET_ENV: sandbox`. The runner first reports
+`Database identity verified for sandbox (shared-supavisor-transaction)`, then:
+
+```text
+14 of 51 required core column(s) are missing.
+  quicklog_entry_revisions.id <- supabase/migrations/20260811090000_quicklog_corrections_retractions.sql
+  … (13 columns of quicklog_entry_revisions: id, grow_event_id, diary_entry_id, root_id, user_id,
+     actor_id, revision_no, kind, reason_code, reason_note, previous_state, new_state, created_at)
+  diary_entries.retracted_at <- supabase/migrations/20260811090000_quicklog_corrections_retractions.sql
+```
+
+All 14 trace to **one** migration, `20260811090000_quicklog_corrections_retractions.sql`, added by
+`7c676f9cc646f6e25d6c1088052fc9e48f621bcf` (`#910`, 2026-08-15) — **merged more than five weeks
+ago**. The advisory scope of the same check passed: `All 4 required advisory columns are present in
+sandbox`.
+
+### 4.3 `Required money-critical migrations present` — `failure` (run `35754816906`), SANDBOX
+
+Job `Assert money migrations applied in SANDBOX`, `TARGET_ENV: sandbox`. **Expected 17, applied 15,
+missing 2, unexpected 0:**
+
+```text
+20260914212330  supabase/migrations/20260914212330_founder_refund_subscription_reference.sql
+20260915193000  supabase/migrations/20260915193000_founder_refund_grant_serialization.sql
+```
+
+The check's own instruction is `Do NOT deploy. Apply the missing migration(s) via the Supabase CLI
+against this environment`. **That apply is owner-locked and was not performed here.**
+
+**The correlation worth naming, stated precisely.** `established fact` by
+`git log --diff-filter=A`: `20260915193000_founder_refund_grant_serialization.sql` was added by
+commit **`24697dc2c88c` — the SHA recorded as live** — and `20260914212330_…` by `2e639c88` (`#1374`),
+also at-or-before live. So the branch state recorded as serving production **ships founder-refund
+serialization code whose migration is measured absent in sandbox.**
+
+**This is a sandbox measurement and nothing more.** It does **not** establish that production is
+missing those migrations, and it must not be quoted as if it did. Production applied state stays
+**`NOT_MEASURED`** — nobody read the production database in this slice, and no APPLY was run
+anywhere.
+
+**Why it still matters:** a money-critical gate is red on the deploy branch naming Founder refund
+behaviour, and Founder Lifetime is a real entitlement surface. Whether the same gap exists in
+production is exactly the question this file cannot answer today, and it should be answered before
+any Publish. **Recorded as an operating item for whoever owns the next billing or APPLY slice;
+Claude is not assigning it.**
+
+## 5. ACTIVE OWNER Soft-couple CLEAR — board EMPTY, re-listed not carried
+
+`established fact`, MEASURED 2026-09-22 ~16:42 UTC, **re-listed from the GitHub API in this slice**.
+A PR list carried from a previous stamp is not evidence, including the one 25 minutes old.
+
+Method unchanged: list open PRs based on `verdant-grow-diary`; fetch each head by
+`refs/pull/N/head`; per head compute `git rev-list --count <head>..origin/verdant-grow-diary` and
+`git diff --name-only <merge-base> <head> -- docs/agents/CURRENT_STATE.md`.
+
+**24 open PRs. All 24 `draft: true`. All 24 return zero files for this document.** Behind-counts
+each rose by one with the `#1615` merge; the minimum is **88** (`#1568`).
+
+- **ACTIVE OWNER Soft-couple: CLEAR.** No other open PR writes this file. This restamp is the only
+  writer.
+- **Soft-couple board: EMPTY.** Nothing is behind ≤ 1; the closest is 88. **EMPTY** because it was
+  measured, not because nothing turned up.
+
+## 6. `#1615` merged with its review seat unfilled — Grok routed post-merge
+
+`established fact`, from the PR record. `#1615` was **created draft at 16:21:23 UTC**, readied and
+**merged by `cheekhimself` at 16:32:41 UTC**, eleven minutes later, squashed as `aabbd2b3`. Claude
+neither readied nor merged it.
+
+**No independent review ran before that merge.** `CodeRabbit` reported `Review skipped: draft pull
+request`, and the Codex connector posted that it had **reached its code-review usage limits**. So the
+`AGENTS.md` standing rule — one owner plus a **different** peer as independent reviewer — was **not
+satisfied at merge time** for that slice.
+
+**Grok is routed as the independent reviewer**, at Cheek's direction, with a full `HANDOFF` block
+posted on `#1615`. Slice owner **Claude**; independent reviewer **Grok**; the owner cannot review
+their own work. The review is **post-merge**, so any finding lands as a follow-up stamp rather than
+as a change to that PR. **Its outcome is `NOT_MEASURED` — no review has been returned.**
+
+## 7. Golden Toad — CARRIED, not re-measured
+
+`source claim`, **carried verbatim from the superseded block and NOT re-measured by this slice.**
+Claude ran no browser and holds no session. Golden Run `growId`
+`4cad3cae-21e3-42f8-8372-2f6237205db3`.
+
+- **AUTH** banked, `cheekhimself` on the Playwright sticky session.
+- **ARCHIVED_RESTORE_XOR** remasure `PASS` — final 2 active / 4 archived, JUNK-only, BREAK untouched.
+- **DEEP_LINKS** remasure `PASS` — Fixture Tent A `tentId` `12a9ac5a-b70f-4a5e-8e44-44ba9204b495`;
+  grow and tent Start Pheno and grow Log Breeding retain IDs; **tent Start Breeding absent →
+  Soft-park against Soft `#1613` until Publish, not `FAIL`**.
+- **QL empty Save** remasure — **`NOT_MEASURED`**. Still in flight, still no packet. Not a pass.
+
+**Both `PASS` rows were measured against live `24697dc2c88c`, not against this tip**, and 237
+commits now separate the two. A live `PASS` says nothing about tip behaviour.
+
+## 8. Soft-park register — current
+
+- **`HOLD #1250`.** MEASURED still open, draft, head `2d52daeed2`, now **231** behind.
+- **No Publish. No APPLY. `knk` closed.**
+- **Toad RE-PIN Soft-park `LIVE_LAG`** for Soft `#1557`, `#1595`, `#1601`, `#1604`, `#1606`,
+  `#1609` — all merged, all inside the lag window, therefore none live. Their SHAs are in the
+  superseded block and are unchanged.
+- **Soft `P2` Quick Log Target picker subset — Soft-park.**
+- **Assign-to-tent true-empty Create CTA — Soft-park**, needs a zero-tent fixture; `BLOCKED`
+  by that dependency, never a pass.
+- **NEW — sandbox schema and money-migration gaps (§4.2, §4.3) — Soft-park**, owner unassigned.
+  Sandbox-scoped; production `NOT_MEASURED`; no APPLY.
+
+Quick Log's frozen contract is unchanged: the single `quicklog_save_manual` write path stands, and
+**remembered-target and only-plant auto-selection remain banned and test-pinned.**
+
+## 9. The `a25942686dc7` / 2026-09-22 16:20 stamp is SUPERSEDED
+
+`established fact`: that block described tip `a25942686dc7`, which is now **one commit behind**, and
+recorded the lag as **236**, now **237**. Its rows are carried history and keep their original
+labels. Specifically:
+
+- Its **§1 tip row and §8b lag count are stale by construction** — superseded by §1 and §2 here.
+- Its **§8b inference** that the deploy tip carried the dependency red is **now measured and
+  confirmed** (§4.1). The inference stands vindicated; it was still correctly labelled at the time.
+- Its **§4 board** (24 PRs, minimum 87) is superseded by §5 here (24 PRs, minimum 88).
+- The **`763e703f0` / 2026-09-04 stamp below it remains SUPERSEDED**, now 329 behind. **Do not ping
+  Tolu.** A restore point must be re-derived against current live, never copied from there.
+
+## 10. Carried, not re-measured by this slice
+
+Labels below are the prior blocks' labels, preserved:
+
+- **Production Postgres identity** (`source claim`, Cheek/GDP): Lovable Cloud; `knkwiiywfkbqznbxwqfh`
+  is that Cloud DB's published identity. Do not treat `bzatgtgjvuojpoxcknaa` as production.
+- **Billing** (`source claim`): stay on Paddle; live checkout off; `test_` keys and the sandbox
+  banner are EXPECTED. Do not revoke the existing `live_` token.
+- **Publisher identity remains UNRESOLVED** — prior blocks say Vercel (`source claim`), `CLAUDE.md`
+  says Lovable. Neither measured here; do not cite either as settled.
+- **Signup PREFLIGHT still `BLOCKED`** (malformed Aug 24 `SUPABASE_DB_URL`); signup-attribution
+  APPLY stays owner-locked. Not run here, not claimed passed.
+- **`Supabase Preview` `42P07` remains UNSTABLE, not `FAIL`** — documented replay collision in
+  `config/local-supabase-replay-compatibility.json`. Do not re-run, do not edit merged migration
+  history to chase it.
+- Older `#1276` findings, `#1221`, `#1174`: history below, not re-checked.
+- No metrics, no subscriber counts, no CI-derived product claims. **CI on this restamp's own head is
+  `NOT_MEASURED` at stamp time** — §4 measures the _deploy tip_, not this PR's head.
+
+## 11. Current locks
+
+- **No merge. No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No
+  production SQL, no device control, no automatic Action Queue writes, no invented credentials.
+- **`LIVE_LAG` is 237 and is Soft-park, not a `FAIL`.** Nothing merged after `24697dc2c88c` may be
+  described as live.
+- **Live is operator-supplied, not Claude-measured.** Three refusals across two slices. **Do not
+  upgrade that row to MEASURED without an actual `version.json` read.**
+- **The deploy tip is red on three non-required lanes** (§4): dependency advisories, sandbox core
+  schema, sandbox money migrations. **`CI` and all 35 required contexts are green.**
+- **The sandbox gaps are SANDBOX-scoped.** 14 of 51 core columns and 2 of 17 money migrations are
+  measured missing **in sandbox**. **Production applied state is `NOT_MEASURED`. Do not quote these
+  rows as production, and do not APPLY anything to clear them.**
+- **The live SHA `24697dc2c88c` is itself the commit that added
+  `20260915193000_founder_refund_grant_serialization.sql`**, one of the two measured missing in
+  sandbox. Answer the production question before any Publish.
+- **ACTIVE OWNER Soft-couple CLEAR; board EMPTY** (24 open drafts, none owns this file, closest 88).
+  **Re-list from the API before any future collision claim.**
+- **`#1615` merged with no independent review** (CodeRabbit skipped drafts; Codex out of review
+  quota). **Grok is the routed independent reviewer, post-merge; its outcome is `NOT_MEASURED`.**
+- **Golden Toad rows are carried, not re-measured**, and were measured against live, not the tip.
+  **QL empty Save stays `NOT_MEASURED`.**
+- **`HOLD #1250`** — do not touch, ready or merge. **`#1221`** draft, 263 behind, peer seat
+  unfilled. **`#1174`** draft, SUPERSEDED on V0 C/F hunks.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- **The `a25942686dc7` and `763e703f0` stamps are SUPERSEDED.** Carried rows keep their labels.
+- This slice is **N=1** and stays **draft**, branch `claude/cool-cerf-m8uhw2` **restarted from**
+  `origin/verdant-grow-diary` at `aabbd2b3748678229387fbf110d8d2525ce32f4a` — the previous PR was
+  squash-merged, so its history is not reused. Unique file `docs/agents/CURRENT_STATE.md`. No
+  `src/`, no `supabase/`, no `package.json`, no lockfile, no test, no governance file. **No ready.
+  No merge. No auto-merge. GDP routes Blue Dream; Claude does not self-merge and does not assign its
+  own next slice.**
+
+---
+
+**The block below is SUPERSEDED — see §9 of the current stamp.**
+
+**Prior last updated:** 2026-09-22 UTC (~16:20 UTC)
+**Prior update:** Claude (2026-09-22: **deploy tip = `a25942686dc7`**, Soft `#1614`, squash subject
 `test(coverage): pin alert target I/O hook fail-closed behavior (#1614)`. **Tip ≠ live.** Live is
 recorded at **`24697dc2c88c`, `dirty:false`, ref `verdant-grow-diary`** — an **operator-supplied
 value from the GDP slice brief**, because **Claude's own live read is `BLOCKED`** by this session's

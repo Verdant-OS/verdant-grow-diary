@@ -46,9 +46,7 @@ describe("resolveSensorSourceDisplayCanon", () => {
     expect(canon.provenanceLabel).toBe("Pi bridge");
     expect(canon.sourceLabel.toLowerCase()).not.toContain("pi_bridge");
     expect(canon.sourceLabel.toLowerCase()).not.toContain("pi bridge");
-    expect(formatSensorSourceDisplayWithProvenance("pi_bridge")).toBe(
-      "Live sensor · Pi bridge",
-    );
+    expect(formatSensorSourceDisplayWithProvenance("pi_bridge")).toBe("Live sensor · Pi bridge");
     // Presenter helper used by Dashboard / plant tent / charts:
     expect(formatSensorSourceLabel({ source: "pi_bridge" })).toBe("Live sensor");
   });
@@ -101,6 +99,47 @@ describe("resolveSensorSourceDisplayCanon", () => {
       expect(canon.sourceLabel).toBe("Invalid reading");
       expect(canon.isHealthyLive).toBe(false);
     }
+  });
+
+  it("unknown non-canonical tokens use External ingest provenance — never as Source", () => {
+    for (const raw of ["future-vendor-x", "mystery-bridge", "random-thing"] as const) {
+      const canon = resolveSensorSourceDisplayCanon(raw);
+      expect(canon.canonical).toBe("invalid");
+      expect(canon.sourceLabel).toBe("Invalid reading");
+      expect(canon.provenanceLabel).toBe("External ingest");
+      expect(canon.sourceLabel.toLowerCase()).not.toContain(raw);
+      expect(formatSensorSourceDisplayWithProvenance(raw)).toBe(
+        "Invalid reading · External ingest",
+      );
+    }
+  });
+
+  it("prototype-pollution tokens do not resolve via Object.prototype", () => {
+    for (const raw of ["constructor", "__proto__", "toString"] as const) {
+      const canon = resolveSensorSourceDisplayCanon(raw);
+      expect(typeof canon.provenanceLabel).toBe("string");
+      expect(canon.provenanceLabel).toBe("External ingest");
+      expect(canon.sourceLabel).toBe("Invalid reading");
+    }
+  });
+
+  it("GGS / Spider Farmer aliases stay in provenance only", () => {
+    for (const raw of ["ggs", "spider_farmer_ggs", "ggs_api"] as const) {
+      const canon = resolveSensorSourceDisplayCanon(raw);
+      expect(canon.sourceLabel.toLowerCase()).not.toContain("ggs");
+      expect(canon.provenanceLabel).toBe("Spider Farmer GGS");
+      expect(canon.isHealthyLive).toBe(false);
+    }
+  });
+
+  it("ESP32 / ESPHome aliases map to calm provenance labels", () => {
+    expect(resolveSensorSourceDisplayCanon("esp32_esphome").provenanceLabel).toBe("ESPHome");
+    expect(resolveSensorSourceDisplayCanon("esp32_mqtt_bridge").provenanceLabel).toBe(
+      "MQTT bridge",
+    );
+    expect(resolveSensorSourceDisplayCanon("esp32_arduino_sht31").provenanceLabel).toBe(
+      "ESP32 (SHT31)",
+    );
   });
 });
 

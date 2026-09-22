@@ -106,6 +106,20 @@ describe("formatSensorSourceLabel", () => {
     expect(formatSensorSourceLabel({ source: "live", deviceNote: "spoof" })).toBe("Live sensor");
   });
 
+  it("bridge/vendor ingest tokens use display canon — never raw tokens as Source", () => {
+    for (const raw of ["pi_bridge", "eco_witt", "mqtt", "webhook"] as const) {
+      const label = formatSensorSourceLabel({ source: raw });
+      expect(label.toLowerCase()).not.toContain(raw.replace(/_/g, " "));
+      expect(label.toLowerCase()).not.toContain(raw);
+      expect(label).not.toMatch(/\bPi bridge\b/i);
+      expect(label).not.toMatch(/\bEcoWitt\b/i);
+      expect(label).not.toMatch(/\bMQTT\b/i);
+      expect(label).not.toMatch(/\bWebhook\b/i);
+    }
+    expect(formatSensorSourceLabel({ source: "pi_bridge" })).toBe("Live sensor");
+    expect(formatSensorSourceLabel({ source: "home_assistant" })).toBe("Invalid reading");
+  });
+
   it("device options are non-empty and stable", () => {
     const opts = getManualSensorDeviceOptions();
     expect(opts.length).toBeGreaterThan(3);

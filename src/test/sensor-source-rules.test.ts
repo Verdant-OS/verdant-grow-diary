@@ -25,6 +25,13 @@ describe("sensorSourceRules", () => {
     expect(normalizeSensorSource("autopilot")).toBe("invalid");
   });
 
+  it("prototype-pollution tokens collapse to invalid — never inherited Object keys", () => {
+    for (const raw of ["constructor", "__proto__", "toString"] as const) {
+      expect(normalizeSensorSource(raw)).toBe("invalid");
+      expect(sensorSourceLabel(normalizeSensorSource(raw))).toBe("Invalid reading");
+    }
+  });
+
   it("only live is healthy", () => {
     expect(isHealthySensorSource("live")).toBe(true);
     for (const s of ["manual", "csv", "demo", "stale", "invalid"] as const) {

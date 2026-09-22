@@ -32,6 +32,10 @@ import { buildManualCorrectionOperation } from "@/lib/manualSensorCorrectionOper
 import { createManualCorrectionJournal } from "@/lib/manualSensorCorrectionPendingStore";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { getPendingCorrectionRecovery } from "@/lib/manualSensorCorrectionRecoveryRules";
+import {
+  removeLocalStorageItemForTest,
+  setLocalStorageItemForTest,
+} from "@/test/helpers/localStorageTestHelper";
 
 const tentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const otherTent = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
@@ -91,7 +95,7 @@ function correctionRecoveryHref() {
 
 beforeEach(() => {
   sessionStorage.clear();
-  localStorage.removeItem("verdant:temperatureUnit");
+  removeLocalStorageItemForTest("verdant:temperatureUnit");
   vi.clearAllMocks();
   mocks.owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   expect(createManualCorrectionJournal().claim(mocks.owner, pendingOperation()).status).toBe(
@@ -130,7 +134,7 @@ describe("correction recovery under default Fahrenheit preference", () => {
   });
 
   it("keeps Celsius digits when the grower explicitly prefers Fahrenheit", async () => {
-    localStorage.setItem("verdant:temperatureUnit", "fahrenheit");
+    setLocalStorageItemForTest("verdant:temperatureUnit", "fahrenheit");
     const view = mount();
     fireEvent.click(view.getByRole("link", { name: "Reopen pending correction" }));
     await waitFor(() =>

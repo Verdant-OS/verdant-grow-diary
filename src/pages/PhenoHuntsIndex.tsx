@@ -4,15 +4,15 @@
  * Lists the grower's own pheno hunts (RLS-scoped, newest first) with a
  * link into each hunt's workspace, plus an honest empty state. A hunt is
  * started from a grow's timeline (it needs a grow/tent context), so the
- * empty-state CTA routes to My Grows rather than a new-hunt wizard that
- * would dead-end without a grow.
+ * empty-state CTA routes to that grow when ?growId= is already on the
+ * URL, otherwise to My Grows. It never invents a growId.
  *
  * Read-only presenter. The route file (src/routes/_app/pheno-hunts.tsx)
  * wraps this page in PhenoTrackerUpgradeGate (allowReadOnly for lapsed-Pro
  * viewing), so this component never re-checks entitlement.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@/lib/react-router-compat";
+import { Link, useLocation } from "@/lib/react-router-compat";
 import { AlertCircle, ArrowUpRight, Loader2, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
@@ -20,6 +20,8 @@ import { listPhenoHuntsForOwner, type PhenoHuntListItem } from "@/lib/phenoHuntC
 import { listKeeperStabilityForOwner, type KeeperStabilityRow } from "@/lib/phenoKeepersService";
 import { buildStabilityDashboard } from "@/lib/phenoStabilityDashboardRules";
 import PhenoStabilityDashboard from "@/components/PhenoStabilityDashboard";
+import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
+import { resolvePhenoHuntsEmptyCta } from "@/lib/phenoHuntsIndexEmptyCtaRules";
 import { phenoHuntWorkspacePath } from "@/lib/routes";
 
 type Status = "loading" | "ready" | "error";
@@ -33,6 +35,8 @@ function formatCreated(iso: string | null): string {
 }
 
 export default function PhenoHuntsIndex() {
+  const { pathname, search } = useLocation();
+  const emptyCta = resolvePhenoHuntsEmptyCta(resolveNavigationGrowId({ pathname, search }));
   const [status, setStatus] = useState<Status>("loading");
   const [hunts, setHunts] = useState<PhenoHuntListItem[]>([]);
   const [keepers, setKeepers] = useState<KeeperStabilityRow[]>([]);
@@ -137,12 +141,11 @@ export default function PhenoHuntsIndex() {
           </div>
           <h2 className="font-display text-lg font-semibold">No pheno hunts yet</h2>
           <p className="mx-auto mb-5 mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">
-            A pheno hunt starts from a grow. Open a grow and use “Start Pheno Hunt” on its timeline
-            to begin tracking candidates.
+            {emptyCta.body}
           </p>
           <Button asChild className="gradient-leaf text-primary-foreground">
-            <Link to="/grows" data-testid="pheno-hunts-index-empty-cta">
-              Go to My Grows
+            <Link to={emptyCta.href} data-testid="pheno-hunts-index-empty-cta">
+              {emptyCta.label}
               <ArrowUpRight data-icon="inline-end" />
             </Link>
           </Button>

@@ -73,7 +73,7 @@ describe("AppShell still protects real-data routes", () => {
     // resolves onto /welcome (optionally with a manifest-validated
     // redirectTo for deep-link restore). See auth-deep-link-return-to.
     expect(SHELL).toMatch(
-      /const signedOutRedirect = buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
+      /buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
     );
     expect(SHELL).toMatch(/nav\(signedOutRedirect/);
   });

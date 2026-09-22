@@ -15,6 +15,7 @@ import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import {
   deriveDailyGrowCheckOnboarding,
+  deriveDailyGrowCheckSetupReadState,
   type OnboardingGuidance,
 } from "@/lib/dailyGrowCheckOnboardingRules";
 import { deriveDailyGrowCheckStatus } from "@/lib/dailyGrowCheckStatusRules";
@@ -52,10 +53,16 @@ export default function DailyGrowCheckOnboardingCard({
   const scopeKey =
     dismissScope ?? `daily-grow-check:${focusedPlantId ?? "_"}:${focusedTentId ?? "_"}`;
   const { isDismissed, dismiss } = useOnboardingDismissed(scopeKey);
-  const { data: tents = [] } = useTents();
-  const { data: plants = [] } = usePlants();
-  const { data: rawReadings = [] } = useSensorReadings();
-  const { data: rawDiary = [] } = useDiaryEntries();
+  const tentsQuery = useTents();
+  const plantsQuery = usePlants();
+  const sensorsQuery = useSensorReadings();
+  const diaryQuery = useDiaryEntries();
+  const reads = [tentsQuery, plantsQuery, sensorsQuery, diaryQuery];
+
+  const tents = Array.isArray(tentsQuery.data) ? tentsQuery.data : [];
+  const plants = Array.isArray(plantsQuery.data) ? plantsQuery.data : [];
+  const rawReadings = Array.isArray(sensorsQuery.data) ? sensorsQuery.data : [];
+  const rawDiary = Array.isArray(diaryQuery.data) ? diaryQuery.data : [];
 
   const scoped = tentIds && tentIds.length > 0 ? new Set(tentIds) : null;
 
@@ -100,8 +107,75 @@ export default function DailyGrowCheckOnboardingCard({
     hasTodayCheckActivity: status.occurredToday,
   });
 
-  if (hideWhenReady && guidance.isReady) return null;
+  const readState = deriveDailyGrowCheckSetupReadState(
+    { tents: tentsQuery, plants: plantsQuery, sensors: sensorsQuery, diary: diaryQuery },
+    guidance.step,
+  );
+
+  const dismissButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label="Hide guidance for this session"
+      title="Hide guidance until you refresh"
+      data-testid="daily-grow-check-onboarding-dismiss"
+      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+      onClick={dismiss}
+    >
+      <X className="h-4 w-4" />
+    </Button>
+  );
+
   if (isDismissed) return null;
+  if (readState.state !== "ready") {
+    const unavailable = readState.state === "unavailable";
+    return (
+      <Card
+        data-testid="daily-grow-check-onboarding-card"
+        data-step={readState.state}
+        data-compact={compact ? "1" : "0"}
+        className={["p-4 space-y-3", className ?? ""].join(" ")}
+      >
+        <div role={unavailable ? "alert" : "status"} className="space-y-1 text-sm">
+          <p className="font-medium">
+            {unavailable ? "Setup guidance unavailable" : "Checking your grow setup…"}
+          </p>
+          <p className="text-muted-foreground">
+            {unavailable
+              ? "We couldn't check your setup and recent activity. Try again before choosing a setup step."
+              : readState.state === "paused"
+                ? "Waiting for a connection to check your grow setup."
+                : "Your setup and recent activity are still being checked."}
+          </p>
+          {readState.hasCachedData && (
+            <p className="text-muted-foreground">
+              Previously loaded setup information may be out of date.
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {readState.state !== "loading" && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              aria-label="Retry setup check"
+              disabled={readState.isFetching}
+              onClick={() => {
+                void Promise.allSettled(reads.map(async (read) => read.refetch()));
+              }}
+            >
+              Retry
+            </Button>
+          )}
+          {dismissButton}
+        </div>
+      </Card>
+    );
+  }
+
+  if (hideWhenReady && guidance.isReady) return null;
 
   return (
     <Card
@@ -166,18 +240,7 @@ export default function DailyGrowCheckOnboardingCard({
             <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Hide guidance for this session"
-          title="Hide guidance until you refresh"
-          data-testid="daily-grow-check-onboarding-dismiss"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-          onClick={dismiss}
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        {dismissButton}
       </div>
     </Card>
   );

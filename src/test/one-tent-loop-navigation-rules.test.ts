@@ -160,6 +160,9 @@ describe("oneTentLoopNavigationRules", () => {
         tentId: "00000000-0000-4000-8000-00000000000a",
       }).href,
     ).toBe("/sensors?tentId=00000000-0000-4000-8000-00000000000a");
+    expect(resolveOneTentLoopNextStep("timeline", { growId: "g1" }).href).toBe(
+      "/sensors?growId=g1",
+    );
     // A malformed local filter must not become an untrusted route query.
     expect(resolveOneTentLoopNextStep("timeline", { tentId: "tent-a" }).href).toBe("/sensors");
 

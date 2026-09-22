@@ -17,6 +17,7 @@ import {
 import { isSensorTestbenchRow } from "@/lib/sensorTestbenchIndicatorRules";
 import { resolveSensorObservationTime } from "@/lib/sensorObservationTimeRules";
 import { normalizePlantType } from "@/lib/plantTypeRules";
+import { normalizePlantHealth } from "@/lib/plantHealthRules";
 
 const VALID_SOURCES: readonly SensorReadingSource[] = [
   "live",
@@ -114,8 +115,6 @@ function leastTrustedSource(
 }
 
 const VALID_STAGES: readonly Stage[] = ["seedling", "veg", "flower", "flush", "harvest", "cure"];
-const VALID_HEALTH = ["healthy", "watch", "issue"] as const;
-type Health = (typeof VALID_HEALTH)[number];
 
 /**
  * Preserve the missing/unknown-stage signal so stage-aware UI (VPD badges,
@@ -125,9 +124,6 @@ type Health = (typeof VALID_HEALTH)[number];
  */
 function coerceStage(v: string | null | undefined): Stage | null {
   return (VALID_STAGES as readonly string[]).includes(v ?? "") ? (v as Stage) : null;
-}
-function coerceHealth(v: string | null | undefined): Health {
-  return (VALID_HEALTH as readonly string[]).includes(v ?? "") ? (v as Health) : "healthy";
 }
 
 export function mapTentRow(row: TentRow): Tent {
@@ -161,7 +157,7 @@ export function mapPlantRow(row: PlantRow): Plant {
     tentId: row.tent_id ?? "",
     stage: coerceStage(row.stage),
     startedAt: row.started_at,
-    health: coerceHealth(row.health),
+    health: normalizePlantHealth(row.health),
     photo: row.photo_url ?? "",
     lastNote: row.last_note ?? "",
     growId: row.grow_id ?? null,

@@ -67,6 +67,48 @@ export interface OnboardingGuidance {
 export const ONBOARDING_TITLE = "Set up your daily grow loop";
 export const ONBOARDING_INTRO_SUBTITLE = "Start with one tent, one plant, and one manual snapshot.";
 
+interface SetupRead {
+  data: unknown;
+  status: "pending" | "error" | "success";
+  fetchStatus: "fetching" | "paused" | "idle";
+  isPlaceholderData?: boolean;
+}
+
+/** Missing setup can only be inferred after its prerequisite reads complete. */
+export function deriveDailyGrowCheckSetupReadState(
+  reads: { tents: SetupRead; plants: SetupRead; sensors: SetupRead; diary: SetupRead },
+  step: OnboardingStep,
+) {
+  const allReads = [reads.tents, reads.plants, reads.sensors, reads.diary];
+  // Later history failures must not block an earlier, already established setup step.
+  const required =
+    step === "add-tent"
+      ? [reads.tents]
+      : step === "add-plant" || step === "assign-plant"
+        ? [reads.tents, reads.plants]
+        : step === "add-manual-snapshot"
+          ? [reads.tents, reads.plants, reads.sensors]
+          : allReads;
+  const failed = required.some(
+    (read) => read.status === "error" || (read.status === "success" && !Array.isArray(read.data)),
+  );
+  const unresolved = required.filter(
+    (read) => read.status !== "success" || read.isPlaceholderData || !Array.isArray(read.data),
+  );
+  const state = failed
+    ? "unavailable"
+    : unresolved.some((read) => read.fetchStatus === "paused")
+      ? "paused"
+      : unresolved.length > 0
+        ? "loading"
+        : "ready";
+  return {
+    state,
+    hasCachedData: required.some((read) => read.status === "error" && Array.isArray(read.data)),
+    isFetching: allReads.some((read) => read.fetchStatus === "fetching"),
+  };
+}
+
 /**
  * Decide the single next-step guidance for a grower.
  *

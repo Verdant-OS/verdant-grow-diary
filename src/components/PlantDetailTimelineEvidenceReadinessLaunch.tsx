@@ -25,6 +25,12 @@ import TimelineEvidenceReadinessPanel from "@/components/TimelineEvidenceReadine
 import { buildTimelineEvidenceReadinessView } from "@/lib/timelineEvidenceReadinessViewModel";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { usePlantManualSensorLogs } from "@/hooks/usePlantManualSensorHistory";
+import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
+import {
+  AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+  AI_DOCTOR_MANUAL_SENSOR_SOURCES,
+} from "@/lib/aiDoctorCurrentSensorSnapshotRules";
+import { isUuid } from "@/lib/isUuid";
 import {
   buildPlantAiDoctorContext,
   type DiaryEntryRowLike,
@@ -34,7 +40,8 @@ import {
   buildPlantQuickLogPrefill,
   PLANT_QUICKLOG_PREFILL_EVENT,
 } from "@/lib/plantQuickLogPrefillRules";
-import { sensorsPath } from "@/lib/routes";
+import { withGrowId } from "@/lib/routes";
+import { buildQuickLogStripSensorsHref } from "@/lib/quickLogSnapshotStripAdapter";
 import type { PlantRowLike } from "@/lib/aiDoctorContextCompiler";
 import { QUICK_LOG_V2_OPEN_EVENT, buildQuickLogV2OpenIntent } from "@/lib/quickLogV2OpenIntent";
 
@@ -62,6 +69,8 @@ export const READINESS_ACTION_COPY = {
     "Complete stage, medium, and pot size so AI Doctor has the basics before diagnosis.",
 } as const;
 
+const NO_TENT_MANUAL_ROWS: never[] = [];
+
 const ROOT_TEST_ID = "plant-detail-timeline-evidence-readiness-launch";
 
 export default function PlantDetailTimelineEvidenceReadinessLaunch({
@@ -76,6 +85,37 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
 }: PlantDetailTimelineEvidenceReadinessLaunchProps) {
   const recentActivity = usePlantRecentActivity(plantId);
   const manualLogs = usePlantManualSensorLogs(plantId);
+  const tentUuid = isUuid(tentId) ? tentId : null;
+  const tentReadings = useSensorReadingsByTents(
+    tentUuid ? [tentUuid] : [],
+    AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
+    AI_DOCTOR_MANUAL_SENSOR_SOURCES,
+  );
+  const tentSensorStatus = tentUuid
+    ? (tentReadings.statusByTent[tentUuid] ?? "loading")
+    : "success";
+  const tentSensorFailed = tentSensorStatus === "error" || tentSensorStatus === "refresh_error";
+  const tentSensorRows =
+    tentUuid && !tentSensorFailed
+      ? (tentReadings.byTent[tentUuid] ?? NO_TENT_MANUAL_ROWS)
+      : NO_TENT_MANUAL_ROWS;
+  const hasReadError = recentActivity.isError || manualLogs.isError || tentSensorFailed;
+  const isLoading =
+    recentActivity.isLoading ||
+    recentActivity.isFetching ||
+    recentActivity.data === undefined ||
+    manualLogs.isLoading ||
+    manualLogs.isFetching ||
+    manualLogs.data === undefined ||
+    Boolean(
+      tentUuid && (tentSensorStatus === "loading" || tentReadings.refreshingByTent?.[tentUuid]),
+    );
+
+  const retryContextReads = () => {
+    void recentActivity.refetch();
+    void manualLogs.refetch();
+    void tentReadings.refetch();
+  };
 
   const plantRow: PlantRowLike = useMemo(
     () => ({
@@ -97,11 +137,13 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
         plant: plantRow,
         diaryEntries: diary,
         manualSensorLogs: logs,
+        tentSensorRows,
+        tentId: tentUuid,
       });
     } catch {
       return null;
     }
-  }, [plantRow, recentActivity.data, manualLogs.data]);
+  }, [plantRow, recentActivity.data, manualLogs.data, tentSensorRows, tentUuid]);
 
   const extras = useMemo(
     () => ({
@@ -148,9 +190,39 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
     dispatchQuickLog(prefill ? { ...prefill, eventType: "feeding" } : { eventType: "feeding" });
   }, [dispatchQuickLog, prefill]);
 
-  if (!plantId || !view) {
-    return null;
+  if (!plantId) return null;
+
+  if (hasReadError) {
+    return (
+      <section
+        data-testid={`${ROOT_TEST_ID}-error`}
+        role="alert"
+        className="my-3 rounded-md border border-border/40 p-3 space-y-2"
+      >
+        <p className="text-sm font-medium">Context preview unavailable.</p>
+        <p className="text-xs text-muted-foreground">
+          Some plant or tent records could not be loaded. Try again to check what is available.
+        </p>
+        <Button type="button" size="sm" variant="outline" onClick={retryContextReads}>
+          Try context read again
+        </Button>
+      </section>
+    );
   }
+
+  if (isLoading) {
+    return (
+      <section
+        data-testid={`${ROOT_TEST_ID}-loading`}
+        role="status"
+        className="my-3 rounded-md border border-border/40 p-3 text-xs text-muted-foreground"
+      >
+        Checking plant and tent context…
+      </section>
+    );
+  }
+
+  if (!view) return null;
 
   const missingCodes = new Set(view.missing.map((m) => m.code));
 
@@ -161,6 +233,11 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
       className="my-3 space-y-2"
       aria-label="AI Doctor context readiness"
     >
+      <p className="text-xs text-muted-foreground" data-testid={`${ROOT_TEST_ID}-scope`}>
+        This preview uses recent plant diary records and manual sensor readings from its assigned
+        tent. Sensor readings are limited to the last 7 days. Current sensor health is shown in AI
+        Doctor readiness.
+      </p>
       <TimelineEvidenceReadinessPanel context={context!} extras={extras} />
 
       {(missingCodes.has("no_recent_photos") ||
@@ -228,7 +305,10 @@ export default function PlantDetailTimelineEvidenceReadinessLaunch({
                 title={READINESS_ACTION_COPY.no_recent_sensor_snapshot}
               >
                 <Link
-                  to={sensorsPath(growId)}
+                  to={withGrowId(
+                    buildQuickLogStripSensorsHref(tentId, { hash: "manual-reading" }),
+                    growId,
+                  )}
                   aria-label="Add sensor snapshot for AI Doctor context"
                 >
                   <Activity className="h-3.5 w-3.5" aria-hidden="true" /> Add Sensor Snapshot

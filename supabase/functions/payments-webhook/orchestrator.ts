@@ -8,7 +8,8 @@
  *      If that insert fails with anything other than a duplicate, return 500
  *      so Paddle retries — otherwise we would silently drop the event.
  *   2. On duplicate paddle_event_id, look up the prior processing_status:
- *        - processed / skipped  → no-op 200 (idempotent)
+ *        - processed / skipped  → no-op 200 (idempotent), except approved
+ *          refunds reprocess to preserve their barrier and reconcile access
  *        - received / failed    → fall through and (re)process
  *   3. Decide via the pure `decide()` helper.
  *   4. Perform the DB write. If it fails, mark the event 'failed' with a
@@ -38,8 +39,9 @@ export type InsertResult = { ok: true; duplicate?: boolean } | { ok: false; erro
  * Result of allocate_lovable_founder_lifetime. `ok=true, reason='allocated'`
  * inserted a new lifetime row; `ok=true, reason='idempotent'` matched an
  * existing row for the same paddle transaction id; `ok=false,
- * reason='cap_reached'` refused because 75 active founder rows already
- * exist. Any other `ok=false` is an unexpected shape and is surfaced as
+ * reason='cap_reached'` refused because all 100 founder seats are consumed.
+ * `founder_refund_precedes_purchase` refuses a grant after reconciling
+ * a durable refund under the database lock. Any other `ok=false` is surfaced as
  * a transient failure so Paddle retries.
  */
 export type FounderAllocationResult =
@@ -215,6 +217,21 @@ function resolvePaddleEventId(event: EventLikeWithId, env: PaddleEnv, now: Date)
   return `synthetic_${env}_${event.eventType ?? "unknown"}_${now.toISOString()}`;
 }
 
+function founderRefundBarrierId(env: PaddleEnv, transactionId: string): string {
+  return `internal:founder-refund:${env}:${transactionId}`;
+}
+
+async function failEvent(deps: Deps, eventId: string, error: string): Promise<HandleResult> {
+  const redacted = redactError(error);
+  await deps.markEvent(eventId, {
+    processing_status: "failed",
+    processed_ok: false,
+    skip_reason: null,
+    last_error: redacted,
+  });
+  return { httpStatus: 500, reason: `write_failed:${redacted}` };
+}
+
 export async function handleVerifiedEvent(
   deps: Deps,
   event: EventLikeWithId,
@@ -243,10 +260,15 @@ export async function handleVerifiedEvent(
       return { httpStatus: 500, reason: `event_log_lookup_failed:${redactError(existing.error)}` };
     }
     const prior = existing.row?.processing_status;
-    if (prior === "processed" || prior === "skipped") {
+    // Refund replay also repairs a missing barrier from an older handler and
+    // retries idempotent revocation. Other terminal events remain no-ops.
+    if (
+      (prior === "processed" || prior === "skipped") &&
+      decide(event, env, now).kind !== "revoke_lifetime"
+    ) {
       return { httpStatus: 200, reason: `duplicate_${prior}` };
     }
-    // prior is 'received' or 'failed' (or row somehow missing) → reprocess.
+    // Retryable/missing rows and approved refund replays → reprocess.
   }
 
   // 2) Resolve transaction price external id if needed.
@@ -281,6 +303,82 @@ export async function handleVerifiedEvent(
     return { httpStatus: 200, reason: `skipped:${decision.reason}` };
   }
 
+  if (decision.kind === "revoke_lifetime") {
+    // A zero-row revoke is not evidence that this purchase may later grant
+    // access. Preserve the approved refund before revoking, even when no
+    // subscription exists yet. This is an INTERNAL audit row, not a Paddle
+    // event or an assertion that a founder subscription was canceled.
+    const barrierId = founderRefundBarrierId(decision.env, decision.paddleTransactionId);
+    const barrier = await deps.insertEventReceived({
+      paddle_event_id: barrierId,
+      audit: {
+        ...audit,
+        event_type: "internal.founder_refund_barrier",
+        user_id: null,
+        paddle_subscription_id: null,
+        paddle_transaction_id: decision.paddleTransactionId,
+        price_external_id: null,
+        product_external_id: null,
+      },
+      payload: { source_paddle_event_id: paddleEventId, reason: "approved_refund_or_chargeback" },
+    });
+    if ("error" in barrier) {
+      return failEvent(
+        deps,
+        paddleEventId,
+        `founder_refund_barrier_insert_failed:${barrier.error}`,
+      );
+    }
+    const mark = await deps.markEvent(barrierId, {
+      processing_status: "skipped",
+      processed_ok: false,
+      skip_reason: "internal_founder_refund_barrier",
+      last_error: null,
+    });
+    if ("error" in mark) {
+      return failEvent(deps, paddleEventId, `founder_refund_barrier_mark_failed:${mark.error}`);
+    }
+  }
+
+  if (decision.kind === "record_lifetime") {
+    const transactionId = decision.row.paddle_subscription_id.slice("lifetime_".length);
+    const barrier = await deps.getExistingEvent(founderRefundBarrierId(env, transactionId));
+    if ("error" in barrier) {
+      return failEvent(
+        deps,
+        paddleEventId,
+        `founder_refund_barrier_lookup_failed:${barrier.error}`,
+      );
+    }
+    // Any persisted barrier blocks, including received/failed after a mark
+    // failure. Revoke first to reconcile a previous partial allocation, then
+    // skip without allocating, canceling recurring plans, or sending purchase
+    // success. The allocator also rechecks under its shared refund lock, so
+    // a barrier committed after this precheck still blocks the delayed grant.
+    if (barrier.row) {
+      const revoke = deps.revokeFounderLifetime
+        ? await deps.revokeFounderLifetime({
+            paddle_transaction_id: transactionId,
+            environment: env,
+            now,
+          })
+        : { ok: false, error: "founder_refund_revoke_unwired" };
+      if ("error" in revoke) {
+        return failEvent(deps, paddleEventId, `founder_refund_reconcile_failed:${revoke.error}`);
+      }
+      const mark = await deps.markEvent(paddleEventId, {
+        processing_status: "skipped",
+        processed_ok: false,
+        skip_reason: "founder_refund_precedes_purchase",
+        last_error: null,
+      });
+      if ("error" in mark) {
+        return failEvent(deps, paddleEventId, `founder_refund_purchase_mark_failed:${mark.error}`);
+      }
+      return { httpStatus: 200, reason: "skipped:founder_refund_precedes_purchase" };
+    }
+  }
+
   // 3) Write.
   let writeRes: IoResult;
   // Set when the post-grant provider cancellation fails; recorded on the
@@ -309,6 +407,24 @@ export async function handleVerifiedEvent(
         now,
       });
       if (!alloc.ok) {
+        if (alloc.reason === "founder_refund_precedes_purchase") {
+          // The protected allocator already reconciled access. Do not run
+          // provider cancellation or report a successful lifetime purchase.
+          const mark = await deps.markEvent(paddleEventId, {
+            processing_status: "skipped",
+            processed_ok: false,
+            skip_reason: "founder_refund_precedes_purchase",
+            last_error: null,
+          });
+          if ("error" in mark) {
+            return failEvent(
+              deps,
+              paddleEventId,
+              `founder_refund_purchase_mark_failed:${mark.error}`,
+            );
+          }
+          return { httpStatus: 200, reason: "skipped:founder_refund_precedes_purchase" };
+        }
         if (alloc.reason === "cap_reached") {
           // Cap enforcement is not a webhook failure — the buyer's payment
           // needs an operator refund per the runbook, but Paddle should
@@ -432,15 +548,14 @@ export async function handleVerifiedEvent(
     // success so the event is marked processed and Paddle stops retrying.
     writeRes = deps.upsertCustomer ? await deps.upsertCustomer(decision.row) : { ok: true };
   } else if (decision.kind === "revoke_lifetime") {
-    // Turn B refund-retire. If the dep isn't wired (unit tests), treat as
-    // ok — those tests never exercise the refund path end-to-end.
+    // A missing revoker cannot acknowledge a refund as successfully applied.
     writeRes = deps.revokeFounderLifetime
       ? await deps.revokeFounderLifetime({
           paddle_transaction_id: decision.paddleTransactionId,
           environment: decision.env,
           now,
         })
-      : { ok: true };
+      : { ok: false, error: "founder_refund_revoke_unwired" };
   } else {
     writeRes = await deps.updateSubscription(decision.paddleSubscriptionId, decision.patch, env);
   }

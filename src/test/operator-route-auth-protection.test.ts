@@ -86,8 +86,9 @@ describe("AppShell protected boundary", () => {
     // The destination is built by buildSignedOutRedirect, which always
     // resolves to /welcome (with an optional manifest-validated redirectTo).
     expect(shell).toMatch(
-      /const signedOutRedirect = buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
+      /buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
     );
+    expect(shell).toMatch(/retainSignedOutReturnIntent\(/);
     expect(shell).toMatch(/useRequireAuth\(\s*signedOutRedirect\s*\)/);
     expect(shell).not.toMatch(/useRequireAuth\(\s*["']\/auth["']\s*\)/);
   });

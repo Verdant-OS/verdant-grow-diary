@@ -97,6 +97,8 @@ vi.mock("@/components/QuickLogV2Sheet", () => ({ default: () => null }));
 vi.mock("@/components/GlobalSearchDialog", () => ({ default: () => null }));
 
 import { AuthProvider, useAuth } from "@/store/auth";
+import { supabase } from "@/integrations/supabase/client";
+import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
 import {
   AUTH_REVALIDATION_TIMEOUT_MS,
   classifyRevalidationFailure,
@@ -208,6 +210,8 @@ function GoTo({ to }: { to: string }) {
 }
 
 beforeEach(() => {
+  // Each case starts an independent session on the reused mock SDK client.
+  getAuthSignOutOperation(supabase.auth).clearFailedCleanup();
   window.sessionStorage.clear();
   mocks.listeners.length = 0;
   renderedIdentities.length = 0;
@@ -218,6 +222,7 @@ beforeEach(() => {
   mocks.signOut.mockReset();
   // auth-js `_removeSession` notifies SIGNED_OUT after a local sign-out.
   mocks.signOut.mockImplementation(async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     deliver("SIGNED_OUT", null);
     return { error: null };
   });
@@ -315,7 +320,7 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     expect(renderedTokens).not.toContain("access-other-tab");
   });
 
-  it("still applies a session-bearing event synchronously (identity fence and post-sign-in navigation contract)", async () => {
+  it("runs the privacy fence after held confirmation and before exposing the new owner", async () => {
     mocks.getSession
       .mockResolvedValueOnce({ data: { session: null }, error: null })
       .mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
@@ -324,38 +329,364 @@ describe("AuthProvider exposes only a session this tab's client holds", () => {
     expect(await screen.findByText("signed-out")).toBeInTheDocument();
     fence.mockClear();
 
-    act(() => {
+    await act(async () => {
       deliver("SIGNED_IN", sessionFor("u-own"));
+      expect(fence).not.toHaveBeenCalled();
+      await Promise.resolve();
       expect(fence).toHaveBeenCalledWith(null, "u-own");
     });
 
     expect(await screen.findByText("u-own")).toBeInTheDocument();
   });
 
-  it("applies a SIGNED_OUT immediately, without a reconciliation read", async () => {
+  it("applies SIGNED_OUT when the reconciliation confirms this client has no session", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
     renderProvider();
     expect(await screen.findByText("u-own")).toBeInTheDocument();
 
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
     act(() => {
       deliver("SIGNED_OUT", null);
     });
 
     expect(await screen.findByText("signed-out")).toBeInTheDocument();
-    expect(mocks.getSession).toHaveBeenCalledTimes(1);
+    expect(mocks.getSession).toHaveBeenCalledTimes(2);
   });
 
-  it("applies the client's own INITIAL_SESSION without a reconciliation read", async () => {
+  it("does not clear the privacy fence or resolved identity for a foreign null relay", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const fence = vi.fn();
+    renderProvider(fence);
+    expect(await screen.findByText("u-own")).toBeInTheDocument();
+    fence.mockClear();
+    await relayFromOtherTab("SIGNED_OUT", null);
+    expect(screen.getByTestId("probe")).toHaveTextContent("u-own");
+    expect(fence).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("verdant:auth:last-resolved-identity:v1")).toBe("u-own");
+  });
+
+  it.each([
+    ["rejected", () => Promise.reject(new Error("fixture store unavailable"))],
+    [
+      "returned error",
+      () =>
+        Promise.resolve({
+          data: { session: sessionFor("u-own") },
+          error: { message: "fixture store unavailable" },
+        }),
+    ],
+    ["missing session field", () => Promise.resolve({ data: {}, error: null })],
+    ["malformed session", () => Promise.resolve({ data: { session: {} }, error: null })],
+    [
+      "whitespace user id",
+      () =>
+        Promise.resolve({
+          data: {
+            session: {
+              ...sessionFor("u-own"),
+              user: { ...sessionFor("u-own").user, id: "   " },
+            },
+          },
+          error: null,
+        }),
+    ],
+    [
+      "whitespace bearer",
+      () =>
+        Promise.resolve({
+          data: { session: { ...sessionFor("u-own"), access_token: "   " } },
+          error: null,
+        }),
+    ],
+    [
+      "non-string user id",
+      () =>
+        Promise.resolve({
+          data: {
+            session: {
+              ...sessionFor("u-own"),
+              user: { ...sessionFor("u-own").user, id: 42 as unknown as string },
+            },
+          },
+          error: null,
+        }),
+    ],
+    [
+      "non-string bearer",
+      () =>
+        Promise.resolve({
+          data: {
+            session: { ...sessionFor("u-own"), access_token: 42 as unknown as string },
+          },
+          error: null,
+        }),
+    ],
+    [
+      "explicit undefined session",
+      () => Promise.resolve({ data: { session: undefined }, error: null }),
+    ],
+  ])("fails closed on a %s held-session read after a null notification", async (_label, read) => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const fence = vi.fn();
+    renderProvider(fence);
+    expect(await screen.findByText("u-own")).toBeInTheDocument();
+    fence.mockClear();
+    mocks.getSession.mockImplementationOnce(read);
+    await relayFromOtherTab("SIGNED_OUT", null);
+    expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+    expect(fence).toHaveBeenCalledWith("u-own", null);
+  });
+
+  it("a null event invalidates an older session-bearing reconciliation before it settles", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    renderProvider();
+    expect(await screen.findByText("u-own")).toBeInTheDocument();
+    const olderRead = pending<{ data: { session: ReturnType<typeof sessionFor> }; error: null }>();
+    mocks.getSession.mockImplementationOnce(() => olderRead.promise);
+    act(() => deliver("SIGNED_IN", sessionFor("u-own")));
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    await relayFromOtherTab("SIGNED_OUT", null);
+    await act(async () =>
+      olderRead.resolve({ data: { session: sessionFor("u-old") }, error: null }),
+    );
+    expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+    expect(renderedIdentities).not.toContain("u-old");
+  });
+
+  it.each([null, sessionFor("u-own")])(
+    "a delayed null-event answer %j cannot replace the later held B identity",
+    async (staleSession) => {
+      mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+      const fence = vi.fn();
+      renderProvider(fence);
+      expect(await screen.findByText("u-own")).toBeInTheDocument();
+      const olderRead = pending<{
+        data: { session: ReturnType<typeof sessionFor> | null };
+        error: null;
+      }>();
+      mocks.getSession.mockImplementationOnce(() => olderRead.promise);
+      await relayFromOtherTab("SIGNED_OUT", null);
+      // A notification alone has not established a local identity change.
+      expect(screen.getByTestId("probe")).toHaveTextContent("u-own");
+      fence.mockClear();
+      mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-next") }, error: null });
+      await act(async () => {
+        deliver("SIGNED_IN", sessionFor("u-next"));
+        expect(fence).not.toHaveBeenCalled();
+        await Promise.resolve();
+        expect(fence).toHaveBeenCalledWith("u-own", "u-next");
+      });
+      await act(async () => olderRead.resolve({ data: { session: staleSession }, error: null }));
+      expect(screen.getByTestId("probe")).toHaveTextContent("u-next");
+    },
+  );
+
+  it("a foreign null relay does not revoke the initiating owner's pending exit lease", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    await waitFor(() => expect(result.current.user?.id).toBe("u-own"));
+    let lease: ReturnType<NonNullable<ReturnType<typeof useAuth>["beginSignOutNavigation"]>>;
+    act(() => {
+      lease = result.current.beginSignOutNavigation!();
+    });
+    try {
+      await relayFromOtherTab("SIGNED_OUT", null);
+      await relayFromOtherTab("TOKEN_REFRESHED", sessionFor("u-own"));
+      expect(lease!.isCurrent()).toBe(true);
+    } finally {
+      act(() => lease?.finish());
+    }
+  });
+
+  it("releases a pending sign-out navigation lease after a local null resolve leaves a held session", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    await waitFor(() => expect(result.current.user?.id).toBe("u-own"));
+    let lease: ReturnType<NonNullable<ReturnType<typeof useAuth>["beginSignOutNavigation"]>>;
+    act(() => {
+      lease = result.current.beginSignOutNavigation!();
+    });
+    try {
+      mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+      await act(async () => {
+        deliver("SIGNED_OUT", null);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+      await act(async () => {
+        deliver("TOKEN_REFRESHED", sessionFor("u-own"));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(lease!.isCurrent()).toBe(false);
+    } finally {
+      act(() => lease?.finish());
+    }
+  });
+
+  it("releases a pending sign-out navigation lease when the held session belongs to another user", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    await waitFor(() => expect(result.current.user?.id).toBe("u-own"));
+    let lease: ReturnType<NonNullable<ReturnType<typeof useAuth>["beginSignOutNavigation"]>>;
+    act(() => {
+      lease = result.current.beginSignOutNavigation!();
+    });
+    try {
+      mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-other") }, error: null });
+      await act(async () => {
+        deliver("SIGNED_IN", sessionFor("u-other"));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(lease!.isCurrent()).toBe(false);
+    } finally {
+      act(() => lease?.finish());
+    }
+  });
+
+  it("invalidates the navigation continuation when held confirmation finds a different owner during an active exit lease", async () => {
+    let heldOwner: "u-own" | "u-other" = "u-own";
+    mocks.getSession.mockImplementation(async () => ({
+      data: { session: sessionFor(heldOwner) },
+      error: null,
+    }));
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }) => <AuthProvider>{children}</AuthProvider>,
+    });
+    await waitFor(() => expect(result.current.user?.id).toBe("u-own"));
+    let lease: ReturnType<NonNullable<ReturnType<typeof useAuth>["beginSignOutNavigation"]>>;
+    act(() => {
+      lease = result.current.beginSignOutNavigation!();
+    });
+    try {
+      expect(lease!.isCurrent()).toBe(true);
+      expect(getAuthSignOutOperation(supabase.auth).getSnapshot()).not.toBe("idle");
+      heldOwner = "u-other";
+      await relayFromOtherTab("SIGNED_IN", sessionFor("u-relayed"));
+      await waitFor(() => expect(lease!.isCurrent()).toBe(false));
+      expect(getAuthSignOutOperation(supabase.auth).getSnapshot()).not.toBe("idle");
+    } finally {
+      act(() => lease?.finish());
+    }
+  });
+
+  it("does not adopt a session-bearing relay when the held-session read is unreadable", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    renderProvider();
+    expect(await screen.findByText("signed-out")).toBeInTheDocument();
+
+    mocks.getSession.mockRejectedValueOnce(new Error("fixture store unavailable"));
+    await relayFromOtherTab("SIGNED_IN", sessionFor("u-relayed"));
+
+    expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+    expect(renderedIdentities).not.toContain("u-relayed");
+  });
+
+  it("clears persisted identity when a foreign null relay confirms this tab has no held session", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    const fence = vi.fn();
+    renderProvider(fence);
+    expect(await screen.findByText("u-own")).toBeInTheDocument();
+    expect(window.sessionStorage.getItem("verdant:auth:last-resolved-identity:v1")).toBe("u-own");
+    fence.mockClear();
+
+    mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    await relayFromOtherTab("SIGNED_OUT", null);
+
+    expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+    expect(fence).toHaveBeenCalledWith("u-own", null);
+    expect(window.sessionStorage.getItem("verdant:auth:last-resolved-identity:v1")).toBe("");
+  });
+
+  it("confirms INITIAL_SESSION against the current held session", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
     renderProvider();
     expect(await screen.findByText("u-own")).toBeInTheDocument();
 
-    act(() => {
+    await act(async () => {
       deliver("INITIAL_SESSION", sessionFor("u-own"));
     });
 
     expect(screen.getByTestId("probe")).toHaveTextContent("u-own");
-    expect(mocks.getSession).toHaveBeenCalledTimes(1);
+    expect(mocks.getSession).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["SIGNED_IN", "TOKEN_REFRESHED"])(
+    "does not expose foreign %s when the held store is unreadable",
+    async (event) => {
+      mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+      const fence = vi.fn();
+      renderProvider(fence);
+      expect(await screen.findByText("u-own")).toBeInTheDocument();
+      mocks.getSession.mockRejectedValueOnce(new Error("fixture unavailable"));
+      await relayFromOtherTab(event, sessionFor("u-foreign"));
+      expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+      expect(renderedIdentities).not.toContain("u-foreign");
+      expect(fence).toHaveBeenLastCalledWith("u-own", null);
+    },
+  );
+
+  it.each([
+    { data: { session: sessionFor("u-foreign") }, error: { message: "fixture unavailable" } },
+    { data: {}, error: null },
+    { data: { session: {} }, error: null },
+    { data: { session: { user: { id: "u-foreign" } } }, error: null },
+    { data: { session: { access_token: "fixture-bearer", user: { id: 12 } } }, error: null },
+    { data: { session: { access_token: 12, user: { id: "u-foreign" } } }, error: null },
+    { data: { session: { access_token: " ", user: { id: "u-foreign" } } }, error: null },
+  ])(
+    "rejects unusable held session-bearing reads without exposing their payload %#",
+    async (answer) => {
+      mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+      renderProvider();
+      expect(await screen.findByText("u-own")).toBeInTheDocument();
+      mocks.getSession.mockResolvedValueOnce(answer);
+      await relayFromOtherTab("SIGNED_IN", sessionFor("u-foreign"));
+      expect(screen.getByTestId("probe")).toHaveTextContent("signed-out");
+      expect(renderedIdentities).not.toContain("u-foreign");
+    },
+  );
+
+  it.each(["success", "failure"])(
+    "a late initial %s cannot replace a newer confirmed local identity",
+    async (outcome) => {
+      const initial = pending<{
+        data: { session: ReturnType<typeof sessionFor> | null };
+        error: { message: string } | null;
+      }>();
+      mocks.getSession.mockImplementationOnce(() => initial.promise);
+      renderProvider();
+      await waitFor(() => expect(mocks.getSession).toHaveBeenCalledTimes(1));
+      mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-next") }, error: null });
+      await relayFromOtherTab("SIGNED_IN", sessionFor("u-next"));
+      expect(screen.getByTestId("probe")).toHaveTextContent("u-next");
+      await act(async () =>
+        initial.resolve(
+          outcome === "success"
+            ? { data: { session: sessionFor("u-old") }, error: null }
+            : { data: { session: null }, error: { message: "fixture unavailable" } },
+        ),
+      );
+      expect(screen.getByTestId("probe")).toHaveTextContent("u-next");
+      expect(renderedIdentities).not.toContain("u-old");
+    },
+  );
+
+  it("an INITIAL_SESSION snapshot cannot replace the newer session held by this client", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-next") }, error: null });
+    renderProvider();
+    expect(await screen.findByText("u-next")).toBeInTheDocument();
+    await relayFromOtherTab("INITIAL_SESSION", sessionFor("u-old"));
+    expect(screen.getByTestId("probe")).toHaveTextContent("u-next");
+    expect(renderedIdentities).not.toContain("u-old");
   });
 });
 
@@ -618,6 +949,7 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
     // /logout is a round trip; auth-js raises SIGNED_OUT only once it settles.
     mocks.signOut.mockImplementation(async () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
+      mocks.getSession.mockResolvedValue({ data: { session: null }, error: null });
       deliver("SIGNED_OUT", null);
       return { error: null };
     });
@@ -662,6 +994,20 @@ describe("AppShell cold / stale entry uses the same auth truth", () => {
     );
     expect(screen.getByTestId("location")).toHaveTextContent("/grows");
     expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
+  it("a foreign SIGNED_OUT does not evict a grower who still holds a local session on a protected route", async () => {
+    mocks.getSession.mockResolvedValue({ data: { session: sessionFor("u-own") }, error: null });
+    mocks.getUser.mockResolvedValue({ data: { user: sessionFor("u-own").user }, error: null });
+    renderApp("/grows");
+    expect(await screen.findByTestId("protected-child")).toBeInTheDocument();
+
+    await relayFromOtherTab("SIGNED_OUT", null);
+
+    expect(screen.getByTestId("protected-child")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/grows");
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("sign-in-screen")).toBeNull();
   });
 
   it("a transport failure with a held session stays put: no bounce, no page, no sign-out", async () => {

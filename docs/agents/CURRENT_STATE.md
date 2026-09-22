@@ -1,7 +1,312 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-04 UTC (~16:20 UTC)
-**Updated by:** Claude (2026-09-04: **twenty-three merges since the last stamp; deploy tip =
+**Last updated:** 2026-09-22 UTC (~16:20 UTC)
+**Updated by:** Claude (2026-09-22: **deploy tip = `a25942686dc7`**, Soft `#1614`, squash subject
+`test(coverage): pin alert target I/O hook fail-closed behavior (#1614)`. **Tip ≠ live.** Live is
+recorded at **`24697dc2c88c`, `dirty:false`, ref `verdant-grow-diary`** — an **operator-supplied
+value from the GDP slice brief**, because **Claude's own live read is `BLOCKED`** by this session's
+egress policy (§2). The tip is **236 commits ahead** of that SHA — **`LIVE_LAG`, Soft-park. Lag is
+not a product `FAIL`** and is not a defect claim about anything. **Two committed migrations sit
+inside the lag window** (§3); committed is not applied, **no APPLY**, production apply state stays
+`NOT_MEASURED`. **ACTIVE OWNER Soft-couple CLEAR** — 24 open PRs MEASURED, all draft, **none touches
+this file**; the **Soft-couple board is EMPTY** at restamp time (no open draft is behind ≤ 1; the
+closest is 87). Golden Toad 2026-09-22 CT: **AUTH banked**, **ARCHIVED_RESTORE_XOR PASS**,
+**DEEP_LINKS PASS**, all three measured by the operator **against live `24697dc2c88c`, not against
+this tip**; **QL empty Save remasure is in flight — `NOT_MEASURED`, no packet at stamp time** (§5).
+**The `763e703f0` / 2026-09-04 stamp below is SUPERSEDED**; its rows are carried and labelled, never
+re-claimed as current. No Publish. No History-restore. No APPLY. No merge. Prior header follows.)
+
+## 1. Deploy tip is `a25942686dc7` — Soft `#1611`–`#1614`
+
+`established fact`, from `git fetch origin verdant-grow-diary` then `git log`, measured
+2026-09-22 ~16:14 UTC. Full tip oid: `a25942686dc7d7310d7180591bb57ef31589fcf8`.
+
+| #     | Merge SHA (full)                           | Commit (CT)      | Files | Migrations |
+| ----- | ------------------------------------------ | ---------------- | ----: | ---------: |
+| #1611 | `5561a4cf2930e3ddcdfdbf0a25f9f8a9a37b9b5d` | 2026-09-22 01:57 |     1 |          0 |
+| #1612 | `49fbab4a9fbdba839e15682d7b8ba41e22c57fa9` | 2026-09-22 08:43 |     2 |          0 |
+| #1613 | `635a85d2097bd02fba549659179663871696a210` | 2026-09-22 10:36 |     1 |          0 |
+| #1614 | `a25942686dc7d7310d7180591bb57ef31589fcf8` | 2026-09-22 10:43 |     1 |          0 |
+
+Squash subjects, read from `git log` and **not** paraphrased:
+
+- `#1611` — `test(coverage): pin BreedingLogNew grow-scoped nav render hrefs (#1611)`
+- `#1612` — `test(coverage): pin PhenoHuntNew grow-scoped nav render hrefs (#1612)`
+- `#1613` — `test(coverage): pin tent-scoped Start Pheno/Breeding deep-link hrefs (#1613)`
+- `#1614` — `test(coverage): pin alert target I/O hook fail-closed behavior (#1614)`
+
+**All four are tests-only.** Every path touched across the four is under `src/test/`:
+`breeding-log-new-growid-nav-render.test.tsx`, `pheno-hunt-new-growid-nav-render.test.tsx`,
+`start-pheno-breeding-button-growid-render.test.tsx`, `alert-target-io-hooks.test.tsx`. Zero `src/`
+runtime files, zero `supabase/`, zero migrations. The `Commit (CT)` column is the squash commit
+timestamp (`-05:00`), not `merged_at`; read it as commit order.
+
+**A tests-only pin is not a behavioural claim about production.** `#1613` pins tent-scoped deep-link
+hrefs in a test; it does not establish that a grower sees those links on live. See §5.
+
+## 2. `LIVE_LAG` — live is `24697dc2c88c`, the tip is 236 ahead, and Claude did NOT measure live
+
+**The live values are `source claim`, operator-supplied in the GDP slice brief. Claude did not read
+`version.json` in this slice and does not claim to have.** Recording them as measured would be
+exactly the confidently-wrong production claim this file exists to prevent.
+
+| Field                  | Value                                                      |
+| ---------------------- | ---------------------------------------------------------- |
+| `commit`               | `24697dc2c88ca5371126ee97c15651ea3c4c7f8e`                 |
+| `dirty`                | `false`                                                    |
+| `ref`                  | `verdant-grow-diary`                                       |
+| provenance             | **operator-supplied (GDP brief)** — not read by this slice |
+| Claude's own live read | **`BLOCKED`** — see below                                  |
+
+**Why `BLOCKED`, with the evidence.** Two attempts, both refused, both at 2026-09-22 ~16:14 UTC:
+
+1. `curl https://verdantgrowdiary.com/version.json` → **`curl: (56) CONNECT tunnel failed,
+response 403`**. The session proxy's own status endpoint logged it as
+   `kind: connect_rejected`, `detail: "gateway answered 403 to CONNECT (policy denial or upstream
+failure)"`, `host: verdantgrowdiary.com:443`.
+2. The authorised Vercel deployment-fetch tool → `"Unable to create shareable URL for
+https://verdantgrowdiary.com/version.json."`
+
+The proxy documentation is explicit that a 403 is an organisation egress-policy denial and must be
+**reported, not retried or routed around**. So it is reported. **No third attempt was made.**
+
+**What git DOES establish about that SHA** — `established fact`, and it corroborates the brief
+without confirming that production serves it:
+
+- `24697dc2c88ca5371126ee97c15651ea3c4c7f8e` is a **real commit and a first-parent ancestor of the
+  tip** on `verdant-grow-diary` (`git merge-base --is-ancestor` → true).
+- Its subject is `fix(payments): serialize Founder Lifetime grants and refunds (#1398)`, committed
+  **2026-09-15 15:18 CT** — seven days behind the tip.
+- `git rev-list --count 24697dc2c88c..origin/verdant-grow-diary` = **236**.
+
+**`LIVE_LAG`, Soft-park. 236 commits are merged and not live.** That is a deployment-state fact, not
+a product defect: **lag ≠ `FAIL`**, and nothing here says any of those 236 commits is broken. What
+follows from it is narrower and matters more — **no behaviour merged after `24697dc2c88c` can be
+claimed as live**, however green its CI and however firmly its tests are pinned. A merge is not a
+deployment.
+
+**Whether production actually serves `24697dc2c88c` right now is `NOT_MEASURED` by this slice.**
+Whoever next holds an unblocked path should re-read `version.json` and stamp it as measured.
+
+## 3. Two committed migrations sit inside the lag window — committed is NOT applied
+
+`established fact`, history-aware, from
+`git rev-list 24697dc2c88c..origin/verdant-grow-diary -- 'supabase/migrations/*'` (a per-commit path
+walk, so an add-then-remove inside the span could not hide from it):
+
+| Migration file                                           | Commit                                     | PR      |
+| -------------------------------------------------------- | ------------------------------------------ | ------- |
+| `20260916111000_quicklog_revision_idempotent_replay.sql` | `c8194a3d79bcd4f16194534c910fb8e0789fab43` | `#1460` |
+| `20260917183000_manual_sensor_correction_operations.sql` | `c00b2e29e2d770153b1e376ed4a06baf1d472276` | `#1545` |
+
+One further `supabase/` path moved in the window and is **not** a migration:
+`supabase/functions/_shared/lib/` mirror files under `#1604` (`61ff19f6`), plus `supabase/seed.sql`
+under `#1460`.
+
+**These are committed, not applied.** Publishing ships frontend and edge functions; migrations reach
+production only through the operator's own apply path. **Production applied-migration state is
+`NOT_MEASURED`. No APPLY in this slice. Do not infer either migration is in production from its
+presence in the branch** — that inference is precisely the trap `AGENTS.md` names.
+
+**These two files are merged history and therefore immutable.** If either is wrong, the remedy is a
+new additive migration or a `config/local-supabase-replay-compatibility.json` entry, never an edit.
+
+## 4. ACTIVE OWNER Soft-couple CLEAR — and the Soft-couple board is EMPTY
+
+`established fact`, MEASURED 2026-09-22 ~16:15 UTC, **re-listed from the GitHub API in this slice**
+— not carried from earlier in the session, per the standing rule in the `763e703f0` block that a
+carried PR list is not evidence.
+
+Method: list open PRs with base `verdant-grow-diary`; fetch every head by `refs/pull/N/head`; then
+per head `git rev-list --count <head>..origin/verdant-grow-diary` for behind-count and
+`git diff --name-only <merge-base> <head> -- docs/agents/CURRENT_STATE.md` for ownership.
+
+**24 open PRs. All 24 are `draft: true`. All 24 return zero files for this document.**
+
+| Behind the tip | PRs                                                                  |
+| -------------- | -------------------------------------------------------------------- |
+| 87–125         | #1568, #1565, #1561, #1558, #1556, #1553, #1551, #1494, #1478, #1343 |
+| 145–175        | #1524, #1517, #1500                                                  |
+| 230–268        | #1369, #1344, #1340, #1250, #1221, #1175, #1174, #1151, #1088, #1355 |
+| 314            | #1295                                                                |
+
+- **ACTIVE OWNER Soft-couple: CLEAR.** No other open PR writes `docs/agents/CURRENT_STATE.md`. This
+  restamp is the only writer, and it cannot collide with one.
+- **Soft-couple board: EMPTY.** The gate is open drafts **behind ≤ 1**; the closest open PR is
+  **87 behind** (`#1568`). **Nothing qualifies. EMPTY** — stated because it was measured, not
+  because nothing was found to say.
+
+## 5. Golden Toad — 2026-09-22 CT, One-Tent Golden Run
+
+`source claim`, **operator/GDP packet, relayed verbatim. Claude ran no browser, held no session, and
+independently verified none of these rows.** Golden Run `growId`
+**`4cad3cae-21e3-42f8-8372-2f6237205db3`**.
+
+- **AUTH — banked.** `cheekhimself` on the Playwright sticky session.
+- **ARCHIVED_RESTORE_XOR — remasure `PASS`**, measured against live `24697dc2c88c`. Final state
+  **2 active / 4 archived**; **JUNK-only**; **BREAK untouched**.
+- **DEEP_LINKS — remasure `PASS`**, measured against live `24697dc2c88c`. Fixture Tent A `tentId`
+  **`12a9ac5a-b70f-4a5e-8e44-44ba9204b495`**. Grow and tent **Start Pheno** and grow **Log
+  Breeding** retain their IDs. **Tent Start Breeding is absent → Soft-park against Soft `#1613`
+  until Publish. Absent is `Soft-park`, explicitly not `FAIL`.**
+- **QL empty Save — remasure IN FLIGHT. `NOT_MEASURED`.** No packet had arrived at stamp time. It is
+  not a `PASS`, not a `FAIL`, and must not be recorded as either until its packet lands.
+
+**Read every row above against live `24697dc2c88c`, never against tip `a25942686dc7`.** All 236
+lag-window commits — `#1557`, `#1595`, `#1601`, `#1604`, `#1606`, `#1609` among them, each confirmed
+by ancestry to sit inside the window — are outside what these PASSes measured. A `PASS` on live says
+nothing about tip behaviour, and a tip-side test pin says nothing about live behaviour.
+
+On the absent tent Start Breeding control: it is **consistent with `LIVE_LAG`**, since `#1613` is in
+the tip and not in live. That consistency is **`inference`, not `established fact`** — this slice did
+not trace the control to a specific commit, and Soft-park is the recorded status either way.
+
+## 6. Soft-park register — current
+
+- **`HOLD #1250`.** MEASURED still open, draft, head `2d52daeed2`, 230 behind. Copilot's
+  `fix(ci): surface migration-drift preflight detail when probe never runs`. Not touched, not
+  readied, not merged.
+- **No Publish. No APPLY. `knk` closed.**
+- **Toad RE-PIN Soft-park `LIVE_LAG`** for Soft `#1557`, `#1595`, `#1601`, `#1604`, `#1606`,
+  `#1609`. All six are MEASURED merged and MEASURED inside the lag window, so none is live:
+  - `#1557` `a0cac97ce1421c438bb67f4c53c33862a73356a1` — `fix(timeline): retrieve and refresh confirmed manual corrections (#1557)`
+  - `#1595` `855ff02c4fe7e40842bf37b3cba3a342ad0d540b` — `fix(nav): retain growId on grow-scoped continue CTAs (#1595)`
+  - `#1601` `9242c70ebdecca9ecaac89c28914e8083c8b89fb` — `Soft-couple: Labs Pheno Hunt retains growId (GDP-LABS-PHENO-GROWID-001) (#1601)`
+  - `#1604` `61ff19f6521bf275efa00ba1ca342e57da79485e` — `Soft-couple: Labs Breeding Programs retains growId (GDP-LABS-BREEDING-GROWID-001) (#1604)`
+  - `#1606` `92e607b46450d274658ae9fb991dc7fefeede1ca` — `fix(breeding): retain growId on program index/create/detail (GDP-BREEDING-NAV-GROWID-001) (#1606)`
+  - `#1609` `e4d69f7e6c7b01544114aa7b71c5e2fac855e755` — `fix(pheno): grow-scoped empty CTA when ?growId= is present (#1609)`
+- **Soft `P2` Quick Log Target picker subset — Soft-park.**
+- **Assign-to-tent true-empty Create CTA — Soft-park**, needs a zero-tent fixture. Without that
+  fixture the case cannot be exercised, so its state is `BLOCKED`-by-dependency, never a pass.
+
+Quick Log's frozen contract is unchanged by this slice and is restated because the register touches
+its neighbourhood: the single `quicklog_save_manual` write path stands, and **remembered-target and
+only-plant auto-selection remain banned and test-pinned**. Target selection stays explicit or
+route-derived.
+
+## 7. The `763e703f0` / 2026-09-04 stamp is SUPERSEDED
+
+`established fact`: `763e703f08b99866715472702b5e5957693915f7` is **328 commits behind** the current
+tip. Everything in that block and below is **carried history**. Its rows keep their original labels
+and **must not be re-claimed as current** — in particular:
+
+- **`Tip = live` is no longer true.** That block measured tip = live at `763e703f0` on 2026-09-04.
+  Today the tip is 236 ahead of the recorded live SHA. **Do not carry `763e703f0` as live.**
+- Its "Restore SHA is `763e703f0`" row is **stale for restore purposes** — if a restore point is
+  ever requested, it must be re-derived against current live, not copied from there. **Do not ping
+  Tolu.**
+- One commit has touched this file since that stamp without restamping the header:
+  `abe70934b3c25cfee61bb54852929c7e1367b537` (2026-09-16, `docs: record hosted breeding and pheno
+verification blockers`), which appended a Codex block lower in the file. It is intact and
+  unmodified here.
+
+## 8. Carried, not re-measured by this slice
+
+Labels below are the **prior** blocks' labels, preserved:
+
+- **Production Postgres identity** (`source claim`, Cheek/GDP): Lovable Cloud; `knkwiiywfkbqznbxwqfh`
+  is that Cloud DB's published identity. Do not treat `bzatgtgjvuojpoxcknaa` as production.
+- **Billing** (`source claim`): stay on Paddle; live checkout off; `test_` keys and the sandbox
+  banner are EXPECTED. Do not revoke the existing `live_` token.
+- **Publisher identity remains UNRESOLVED.** Prior blocks assert Vercel (`source claim`); `CLAUDE.md`
+  says Lovable publishes. **This slice measured neither and resolves neither.** Do not cite either as
+  settled; do not "correct" `CLAUDE.md` on header evidence.
+- **Signup PREFLIGHT still `BLOCKED`** (malformed Aug 24 `SUPABASE_DB_URL`). Not run here, not
+  claimed passed. Signup-attribution APPLY stays owner-locked.
+- **`Supabase Preview` `42P07` remains UNSTABLE, not `FAIL`** — the documented repo-wide replay
+  collision, catalogued in `config/local-supabase-replay-compatibility.json`. Deterministic; do not
+  re-run it and do not edit merged migration history to chase it. **This PR is one Markdown file**:
+  zero `supabase/`, zero migrations, zero non-Markdown files.
+- The three `#1276` findings, `#1221`'s CI and review detail, `#1174`'s SUPERSEDED V0 C/F hunks, and
+  the older Copilot findings: history in the blocks below, not re-checked here.
+- No metrics, no subscriber counts, no CI-derived product claims.
+
+## 8b. CI on this restamp's head — MEASURED, and one red lane that is not this PR's
+
+`established fact`, MEASURED 2026-09-22 ~16:23 UTC on head `5a4c1ee755ec9f8c540a58eebac7cf8d1be2531b`
+(PR `#1615`, draft). This supersedes the "CI is `NOT_MEASURED` at stamp time" line an earlier draft
+of this block carried: it was true when written and is no longer.
+
+All three commit statuses are `success` (Vercel deployment, Vercel Deployments validation,
+CodeRabbit — the last reporting `Review skipped: draft pull request`). Of the workflow runs on this
+head, 9 had concluded `success`, 1 was `skipped` (`Stabilization PR scope gate`), 16 were still
+running, and **one concluded `failure`: `Dependency & Security CI`** (run `35753568851`, job
+`Lockfile policy, dependency audit, typecheck, build, tests`).
+
+**The failure is `check:deps`, and it is not this PR's.** Verbatim from the job log:
+
+```text
+check-dependency-security: BLOCKED
+  - bun: Blocked package "hono" has active advisory (severity=moderate, id=1193729).
+  - bun: Blocked package "hono" has active advisory (severity=moderate, id=1193730).
+  - bun: Blocked package "hono" has active advisory (severity=moderate, id=1193731).
+  - bun: Advisory on "js-yaml" is high severity (id=1193727).
+```
+
+`npm` reports the same four. Why it cannot be caused by this change, measured rather than asserted:
+
+- `git diff --name-only a25942686dc7 HEAD` returns **exactly one path**,
+  `docs/agents/CURRENT_STATE.md`.
+- Every input the gate reads is **byte-identical** to the deploy tip: `package.json`, `bun.lock`,
+  `package-lock.json`, `bunfig.toml`, `config/dependency-security-exceptions.json` and
+  `scripts/check-dependency-security.mjs` all return an empty diff against `a25942686dc7`.
+- **`Dependency & Security CI` is not one of the 35 required contexts** in
+  `config/required-status-checks.json` (checked by name: no `Dependency`, `Lockfile` or `audit`
+  entry). It cannot block the merge queue.
+
+**Identical inputs must produce an identical verdict, so the deploy tip carries this red too** —
+that is `inference`, not measurement: the advisory database is fetched at run time and is external
+and time-varying, and **no base-branch push run was read in this slice, so the base-branch result is
+`NOT_MEASURED`.** The inference is about inputs, not about production.
+
+**No fix is ported and none is attempted here.** The remedy is a dependency or lockfile change, and
+this slice's file plan is closed at one Markdown file — touching a lockfile is out of scope by
+instruction. **`config/dependency-security-exceptions.json` stays empty; do not add an entry** to
+silence this. No re-run was spent: input identity is stronger evidence than a second run, and the
+lane is deterministic against a fixed advisory set. **Recorded as a repo-wide dependency-hygiene
+item for whoever owns the next dependency slice — it is not a product `FAIL` and not a defect in
+anything this PR touches.**
+
+## 9. Current locks
+
+- **No merge. No Publish. No History-restore. No APPLY. No `knk`. No `query_database`.** No
+  production SQL, no device control, no automatic Action Queue writes, no invented credentials.
+- **`LIVE_LAG` is Soft-park, not a `FAIL`.** Tip `a25942686dc7` is 236 ahead of the recorded live
+  `24697dc2c88c`. **Nothing merged after `24697dc2c88c` may be described as live.**
+- **Live is operator-supplied, not Claude-measured.** Claude's read was `BLOCKED` by egress policy
+  (two refusals, §2). **Do not upgrade that row to MEASURED without an actual `version.json` read.**
+- **Two migrations sit in the lag window, committed and not applied.** Production applied state is
+  `NOT_MEASURED`. They are merged history — immutable.
+- **ACTIVE OWNER Soft-couple CLEAR; Soft-couple board EMPTY** (24 open drafts, none owns this file,
+  closest 87 behind). **Re-list from the API before any future collision claim.**
+- **Golden Toad AUTH banked; ARCHIVED_RESTORE_XOR and DEEP_LINKS `PASS` against live
+  `24697dc2c88c`.** Neither is evidence about the tip. **Tent Start Breeding absent = Soft-park
+  against Soft `#1613` until Publish, not `FAIL`.**
+- **QL empty Save remasure is `NOT_MEASURED`** — in flight, no packet. Not a pass, not a fail.
+- **`Dependency & Security CI` is red on this head and is NOT this PR's** — `check:deps` BLOCKED on
+  `hono` (moderate ×3) and `js-yaml` (high). Not a required context; every gate input is
+  byte-identical to the deploy tip. **Do not add a
+  `config/dependency-security-exceptions.json` entry to silence it**, and do not widen a docs slice
+  to chase it.
+- **`HOLD #1250`** — do not touch, ready or merge. **`#1221`** stays draft, 262 behind, peer seat
+  unfilled. **`#1174`** stays draft, SUPERSEDED on V0 C/F hunks.
+- **Soft P2 QL Target picker subset — Soft-park. Assign-to-tent true-empty Create CTA — Soft-park**
+  pending a zero-tent fixture.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- **The `763e703f0` / 2026-09-04 stamp is SUPERSEDED** (328 behind). Carried rows keep their labels.
+  **Do not ping Tolu.**
+- This slice is **N=1** and stays **draft**, branch `claude/cool-cerf-m8uhw2` based on
+  `origin/verdant-grow-diary` at `a25942686dc7d7310d7180591bb57ef31589fcf8`. Unique file
+  `docs/agents/CURRENT_STATE.md`. No `src/`, no `supabase/`, no `package.json`, no lockfile, no
+  test, no governance file. **No ready. No merge. No auto-merge. GDP routes Blue Dream; Claude does
+  not self-merge and does not assign its own next slice.**
+
+---
+
+**The block below is SUPERSEDED — see §7 of the current stamp.**
+
+**Prior last updated:** 2026-09-04 UTC (~16:20 UTC)
+**Prior update:** Claude (2026-09-04: **twenty-three merges since the last stamp; deploy tip =
 `763e703f0`**, and **live is independently MEASURED at `763e703f0`, `dirty:false`**, read from
 `https://verdantgrowdiary.com/version.json` at 15:49:43 UTC (`buildTime`
 `2026-09-04T15:48:53.588Z`). **Tip = live.** Restore SHA is **`763e703f0`**. **Do not ping Tolu.**
@@ -5326,6 +5631,132 @@ retraction-is-server-side contract documented against the SQL pin) ship as a **n
 draft PR** from the restarted `claude/verdant-pheno-hunt-lab-vq6pd9`. The third P2 — a runtime
 RLS harness for the RPC — remains `BLOCKED` (no credentials in agent sessions) and is recorded
 here rather than silently dropped. This edit touches this file only. Prior header follows.)
+
+### Pheno / breeding hosted verification — 2026-09-16 (Codex)
+
+**FAIL — breeding save and top-N diary functions are absent from the measured hosted
+catalog. BLOCKED — production APPLY is not approved or eligible through the existing
+breeding lane.** This dated receipt updates the pheno/breeding migration posture below;
+it does not restamp the document's historical global release, payment or live-SHA claims.
+Source inspected: `verdant-grow-diary` at
+`4dc19a15e5ef7b8539712f587e18296d2606aaf8`. Claude's separate application audit was
+reported at `c22340c7d16ca1f14c20bf9582c849bbf79cdbb2`; that is not a fresh live identity
+measurement by Codex. Claude owns the Pheno application repairs. Codex owns H1/M7
+hosted verification and the migration plan; the founder retains the production go/no-go.
+
+**Sanctioned read-only path — PASS:** `lovable_query_database` against the existing
+Verdant Grow Diary project `66255e7b-892c-4be5-8686-ab1cfc3666db`. That project's config
+identifies Supabase ref `knkwiiywfkbqznbxwqfh`. The optional
+`app.settings.supabase_url` database setting was unset; it is not independent database
+identity proof. No laptop service-role SQL, application RPC, DDL, DML or APPLY was run.
+The external task artifact `outputs/pheno-breeding-hosted-readonly-receipt-2026-09-16.json`
+retains the exact tool arguments, SQL and returned rows for `identity`, `ledger`,
+`policies`, `rpc`, `preflight`, dependency history and object checks. It is a read receipt,
+not an apply receipt, and is not a committed repository file. Source-only plan and exact
+file hashes are in the external artifact `outputs/GDP-breeding-migration-source-plan-2026-09-16.md`.
+
+**Hosted ledger — FAIL for every requested exact migration marker:** the query compares
+each expected version **or** name against `supabase_migrations.schema_migrations`.
+At **2026-09-16 19:36:45.66782 UTC**, all **24 / 24** requested rows returned
+`matches: []`; **0 / 24** had a version or name match. These files are **not recorded
+as applied** in that hosted ledger. Missing old export markers do not prove their schema
+effects are absent or authorize replay over later hardening.
+
+| Requested migration | Hosted ledger output / status |
+| --- | --- |
+| `20260707120000_breeding_workflow_v1.sql` | `matches: []` — **FAIL** |
+| `20260728163100_production_breeding_workflow_reconciliation.sql` | `matches: []` — **FAIL** |
+| `20260825233000_pheno_hunts_ownership_check_restore.sql` | `matches: []` — **FAIL** |
+| `20260826100000_pheno_candidate_diary_entries_top_n_rpc.sql` | `matches: []` — **FAIL** |
+| `20260721182752_4fc51714-bc29-4044-9b91-180c065e997f.sql` | `matches: []` — **FAIL** |
+| `20260721190300_6e424afe-215e-474e-8e41-d62406450973.sql` | `matches: []` — **FAIL** |
+| `20260721190434_d4c06065-8426-4d69-aac6-f1135e381aee.sql` | `matches: []` — **FAIL** |
+| `20260721190634_e16d1c98-27e3-4246-882c-d6ebc0c4491b.sql` | `matches: []` — **FAIL** |
+| `20260721190735_ad890fa2-a669-48bb-92fc-89376b84370f.sql` | `matches: []` — **FAIL** |
+| `20260721192508_2ee8c89c-be17-4c29-8d73-684db0db4649.sql` | `matches: []` — **FAIL** |
+| `20260721192852_78e5de95-fef1-456d-a0d1-e026e4e1115b.sql` | `matches: []` — **FAIL** |
+| `20260721193009_804e0421-0e2e-470f-a9b6-adf4bc312ae1.sql` | `matches: []` — **FAIL** |
+| `20260721193128_17950647-c02c-4adb-a83e-cd186cfca7a8.sql` | `matches: []` — **FAIL** |
+| `20260721193247_f6b46fe2-299b-4f0b-91cf-80768cf5c11c.sql` | `matches: []` — **FAIL** |
+| `20260721193431_99226d9d-eff2-4bf1-bda4-7f86584e2162.sql` | `matches: []` — **FAIL** |
+| `20260721193523_380202e1-6b43-48b8-8831-ab5b99bd4a51.sql` | `matches: []` — **FAIL** |
+| `20260721193641_c9189cd4-85d1-4c1f-808e-bb1e5779ca70.sql` | `matches: []` — **FAIL** |
+| `20260721194118_d777533e-a1d4-4b36-a75e-ea7742e7cd6e.sql` | `matches: []` — **FAIL** |
+| `20260721194154_9cf7d1a8-174a-44fd-ad49-8ca1fe2e41fb.sql` | `matches: []` — **FAIL** |
+| `20260721194239_18592b2d-3ca9-4608-bbf5-c2262e422c70.sql` | `matches: []` — **FAIL** |
+| `20260721194325_f96507e6-a612-4d26-a99d-2a261f2c0ad5.sql` | `matches: []` — **FAIL** |
+| `20260721193747_2f19fd24-b3a8-4e2d-87ab-e7c1cf71ce55.sql` | `matches: []` — **FAIL** |
+| `20260721185858_5f0fda0a-baef-4dc5-a53c-aa468e45ddb1.sql` | `matches: []` — **FAIL** |
+| `20260721185929_b8b30ebf-cf2c-4082-9b7b-6dcc6871e707.sql` | `matches: []` — **FAIL** |
+
+**Catalog and policy measurements:**
+
+- **FAIL**, 19:36:49 UTC: `pg_proc` contained no `public.breeding_log_save_event` or
+  `public.pheno_candidate_diary_entries_top_n` at **any signature**. This independently
+  confirms function absence beyond Claude's relayed `404 PGRST202` HTTP observations.
+  **FAIL**, 19:37:18 UTC: `public.breeding_events` was absent.
+- **FAIL — restored ownership policy absent**, 19:36:47 UTC: all **7** hosted
+  `pheno_hunts` policies were returned. RLS was enabled. The permissive
+  `Users update own pheno_hunts` policy had `USING (auth.uid() = user_id)` and
+  `with_check: null`, matching the v2 source shape. The restrictive
+  `pheno_hunts_pro_required_update` policy still had
+  `has_pheno_tracker_entitlement(auth.uid())` in both `USING` and `WITH CHECK`.
+  The restored owned-grow / owned-tent / compatible-tent-grow checks were absent.
+  A null explicit UPDATE `WITH CHECK` does **not** establish that `user_id` can be
+  reassigned: PostgreSQL uses that policy's `USING` expression when no check is supplied.
+  The source-v2 migration's own ledger marker was also absent, so the policy shape is
+  measured without claiming which historical file originally created it.
+- **PASS**, 19:36:49 UTC: `has_pheno_tracker_entitlement(_user_id uuid)` existed;
+  anon execution was false and authenticated execution true. **NOT_APPLICABLE** for
+  current late-table policies: `pheno_male_evaluations` and
+  `pheno_pollen_viability_tests` were both absent at 19:37:18 UTC. The ownership
+  migration conditionally skips them; later table creation needs its own protection.
+- **PASS for the prerequisite column only**, 19:37:18 UTC:
+  `diary_entries.retracted_at` existed. At 19:37:17 UTC the ledger had version
+  `20260811090000` with name `2c5c4adb-b680-471f-9726-3822edec3c24`, not the canonical
+  `quicklog_corrections_retractions` name. Exact canonical-file acceptance remains
+  **NOT_MEASURED**; do not flatten this into a missing-column or exact-file PASS claim.
+- **PASS for preserved helper revocation**, 19:36:49 UTC:
+  `genetics_subject_evidence(p_owner uuid, p_subject_type text, p_subject_id uuid)`
+  was `SECURITY DEFINER`, with anon and authenticated execution both false.
+  The later `20260804091142_da8cef1f-8279-4137-8d63-e9bbc739004a` marker existed.
+  Replaying the old `20260721193747` export would re-grant authenticated access and
+  undo this later hardening; its absent marker is **not** a safe replay instruction.
+
+**Apply plan — BLOCKED / NO-GO:** the existing
+[breeding reconciliation workflow](../../.github/workflows/apply-pinned-breeding-reconciliation.yml)
+was **not dispatched**. Its source `PREFLIGHT_SQL` was run read-only through the same
+sanctioned Cloud SQL path, and the result was passed to the existing classifier offline:
+`BLOCKED prior_reconciliation_missing:20260728090000`. All three prerequisite markers
+(`20260728090000`, `20260728090736`, `20260728103000`) were absent by version and name.
+The required base tables existed, but the breeding table, RPC and owner trigger did not.
+The writer has no selectable dry-run-only mode; invoking it for discovery could apply SQL.
+Do not bypass its ledger or exact-contract guards.
+
+The historical breeding migration has no standalone pinned lane; the reconciliation
+handles absent historical breeding state and records its marker. The
+[candidate-number maintenance workflow](../../.github/workflows/apply-candidate-number-maintenance-migrations.yml)
+covers only `20260806230020` and `20260806230021`, not either requested August Pheno file.
+The ownership restore, top-N RPC and July exports therefore remain **BLOCKED** for pinned
+lane coverage and reviewed recovery planning. No exact post-commit reverse lane exists for
+these targets. Do not drop data or restore weaker grants/policies as a rollback. The
+[local replay compatibility registry](../../config/local-supabase-replay-compatibility.json)
+is for disposable replay copies, not production marker fabrication or export replay.
+
+**Validation / deferred acceptance:** **24** requested hosted ledger rows, **7** Pheno
+policy rows, catalog absence independently confirmed, and one blocked offline preflight
+classification. Source inventory validated **17/17** export hashes, **17/17** canonical
+hashes and **1/1** breeding artifact contract. These are source/catalog checks, not an APPLY
+or signed-in save test. Fresh anonymous HTTP probes, post-apply acceptance and the one
+founder-approved Pollination save on disposable grow
+`2c5b5d44-e34f-4c54-a841-f8eb9530169e` remain **NOT_MEASURED**; follow-up suggestions
+must be unchecked when that later test is authorized. No Skunk Gas Run interaction,
+audit-fixture deletion, Action Queue operation, merge or Publish occurred. **No apply
+receipt exists for this task.** The optional CTA capability guard is proposed only and
+requires a separate founder decision. The twelve attributed audit findings are recorded
+on the [defect board](../cleanup/zero-known-defects-board.md#pheno--breeding-findings--2026-09-16).
+**Safety verdict: FAIL for sending real customers through breeding saves while the save
+RPC is absent; production acceptance remains BLOCKED. HOLD #1250 remains in force.**
 
 **Prior update:** 2026-08-26 UTC (18:15 UTC)
 **Updated by:** Claude (2026-08-26: **server-side top-N-per-plant diary read for Pheno Hunt

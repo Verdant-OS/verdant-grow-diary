@@ -24,10 +24,14 @@
  */
 export const PLANT_DETAIL_LOAD_TIMEOUT_MS = 8000;
 
-export type PlantDetailLoadState = "loading" | "loading-slow" | "error" | "not-found" | "ready";
+export type PlantDetailLoadState =
+  "loading" | "paused" | "loading-slow" | "error" | "not-found" | "ready";
 
 export interface ClassifyPlantDetailLoadInput {
   isLoading: boolean;
+  /** Includes an unresolved first read that is not currently fetching. */
+  isPending?: boolean;
+  isPaused?: boolean;
   isError: boolean;
   hasPlant: boolean;
   /** True once the bounded-loading timer has elapsed at least once. */
@@ -40,16 +44,18 @@ export interface ClassifyPlantDetailLoadInput {
  * Precedence (most specific first):
  *   1. explicit error → "error"
  *   2. plant resolved → "ready"
- *   3. still loading AND timeout elapsed → "loading-slow"
- *   4. still loading → "loading"
- *   5. settled with no plant → "not-found"
+ *   3. unresolved first read paused for connection → "paused"
+ *   4. still pending AND timeout elapsed → "loading-slow"
+ *   5. still pending → "loading"
+ *   6. settled with no plant → "not-found"
  */
 export function classifyPlantDetailLoadState(
   input: ClassifyPlantDetailLoadInput,
 ): PlantDetailLoadState {
   if (input.isError) return "error";
   if (input.hasPlant) return "ready";
-  if (input.isLoading) {
+  if (input.isPending || input.isLoading) {
+    if (input.isPaused) return "paused";
     return input.loadTimedOut ? "loading-slow" : "loading";
   }
   return "not-found";

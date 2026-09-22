@@ -13,6 +13,11 @@
  *   - No alert / action_queue / sensor_readings / device-control surface.
  */
 
+import {
+  buildManualSensorProvenance,
+  type ManualSensorProvenance,
+} from "@/lib/manualSensorProvenanceRules";
+
 export const QUICK_LOG_EVENT_TYPE = "quick_log" as const;
 // Manual logs are source-tagged and never trigger alerts or Action Queue.
 // This is intentional for Sensors phase safety defaults — manual values
@@ -32,6 +37,7 @@ export interface ManualSensorSnapshot {
   ph: number | null;
   ec: number | null;
   source: typeof MANUAL_SENSOR_SOURCE;
+  manual_provenance: ManualSensorProvenance;
 }
 
 /**
@@ -59,6 +65,7 @@ export function buildManualSensorSnapshot(input: QuickLogSensorInput): ManualSen
     ph: parseOptionalNumber(input.ph),
     ec: parseOptionalNumber(input.ec),
     source: MANUAL_SENSOR_SOURCE,
+    manual_provenance: buildManualSensorProvenance(),
   };
   if (
     snap.temp_f === null &&

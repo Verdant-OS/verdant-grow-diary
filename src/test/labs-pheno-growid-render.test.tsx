@@ -78,7 +78,7 @@ describe("Labs Pheno Hunt grow-scoped render", () => {
       expect(phenoHuntHref(labs)).toBe(`/pheno-hunts?growId=${GROW}`);
       expect(within(labs).getByText("Breeding Programs").closest("a")).toHaveAttribute(
         "href",
-        "/breeding",
+        `/breeding?growId=${GROW}`,
       );
     });
 
@@ -108,7 +108,7 @@ describe("Labs Pheno Hunt grow-scoped render", () => {
       );
       expect(screen.getByText("Breeding Programs").closest("a")).toHaveAttribute(
         "href",
-        "/breeding",
+        `/breeding?growId=${GROW}`,
       );
     });
 

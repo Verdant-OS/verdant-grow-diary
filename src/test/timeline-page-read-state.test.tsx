@@ -300,7 +300,10 @@ function expectNoTimelineDirectoryReads() {
     .map(([spec]) => spec as QuerySpec)
     .filter(
       (spec) =>
-        spec.table === "plants" || spec.table === "tents" || spec.table === "sensor_readings",
+        spec.table === "plants" ||
+        spec.table === "tents" ||
+        spec.table === "sensor_readings" ||
+        spec.table === "sensor_readings_effective",
     );
   expect(directoryReads).toHaveLength(0);
 }
@@ -339,6 +342,212 @@ describe("Timeline mounted read-state boundary", () => {
       isValidScopedGrow: false,
       backHref: undefined,
     });
+  });
+
+  it.each([false, true])(
+    "renders corrected manual receipts with existing diary=%s",
+    async (hasDiary) => {
+      const observed = new Date(Date.now() - 60_000).toISOString();
+      const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+      let correctedValue = 24;
+      harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+        if (hasDiary && spec.table === "diary_entries")
+          return {
+            data: [diaryEntry("existing-note", "Existing grow note")],
+            error: null,
+            count: 1,
+          };
+        if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+        if (spec.table === "sensor_readings_effective")
+          return {
+            data: [
+              {
+                id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                tent_id: tent,
+                metric: "temperature_c",
+                value: correctedValue,
+                source: "manual",
+                quality: "ok",
+                ts: observed,
+                captured_at: observed,
+                created_at: observed,
+                device_id: null,
+                raw_payload: null,
+                correction_valid: true,
+                corrected_at: new Date().toISOString(),
+              },
+            ],
+            error: null,
+          };
+        return defaultResult(spec);
+      });
+      renderTimeline();
+      expect(await screen.findByText("Manual sensor snapshot: 75.2°F")).toBeInTheDocument();
+      expect(
+        harness.executeQuery.mock.calls.some(([spec]) => spec.table === "sensor_readings"),
+      ).toBe(false);
+      expect(screen.queryByTestId("timeline-partial-read-warning")).not.toBeInTheDocument();
+      if (!hasDiary) {
+        expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+        expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+        expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
+          "Detailed diary: showing 0 of 0 entries",
+        );
+      }
+      correctedValue = 25;
+      const callsBefore = harness.executeQuery.mock.calls.length;
+      await act(async () => {
+        window.dispatchEvent(
+          new CustomEvent("verdant:sensor-reading-corrected", {
+            detail: { ownerId: "another-owner", tentId: tent },
+          }),
+        );
+      });
+      expect(harness.executeQuery.mock.calls.length).toBe(callsBefore);
+      await act(async () => {
+        window.dispatchEvent(
+          new CustomEvent("verdant:sensor-reading-corrected", {
+            detail: { ownerId: "owner-1", tentId: tent },
+          }),
+        );
+      });
+      expect(await screen.findByText("Manual sensor snapshot: 77°F")).toBeInTheDocument();
+      expect(screen.queryByText("Manual sensor snapshot: 75.2°F")).not.toBeInTheDocument();
+      expect(screen.getAllByText(/^Manual sensor snapshot:/)).toHaveLength(1);
+    },
+  );
+
+  it("reloads corrected manual receipt after a cross-tab BroadcastChannel notification", async () => {
+    const channelName = "verdant:manual-sensor-corrections:v1";
+    class Channel {
+      static instances = new Set<Channel>();
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      closed = false;
+      constructor(readonly name: string) {
+        Channel.instances.add(this);
+      }
+      postMessage(data: unknown) {
+        for (const receiver of Channel.instances) {
+          if (receiver !== this && receiver.name === this.name && !receiver.closed)
+            receiver.onmessage?.(new MessageEvent("message", { data }));
+        }
+      }
+      close() {
+        this.closed = true;
+        Channel.instances.delete(this);
+      }
+    }
+    vi.stubGlobal("BroadcastChannel", Channel);
+
+    const observed = new Date(Date.now() - 60_000).toISOString();
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    let correctedValue = 24;
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective")
+        return {
+          data: [
+            {
+              id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+              user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              tent_id: tent,
+              metric: "temperature_c",
+              value: correctedValue,
+              source: "manual",
+              quality: "ok",
+              ts: observed,
+              captured_at: observed,
+              created_at: observed,
+              device_id: null,
+              raw_payload: null,
+              correction_valid: true,
+              corrected_at: new Date().toISOString(),
+            },
+          ],
+          error: null,
+        };
+      return defaultResult(spec);
+    });
+
+    try {
+      renderTimeline();
+      expect(await screen.findByText("Manual sensor snapshot: 75.2°F")).toBeInTheDocument();
+      correctedValue = 25;
+      const callsBefore = harness.executeQuery.mock.calls.length;
+      new Channel(channelName).postMessage({
+        version: 1,
+        ownerId: "another-owner",
+        tentId: tent,
+      });
+      expect(harness.executeQuery.mock.calls.length).toBe(callsBefore);
+      new Channel(channelName).postMessage({ version: 1, ownerId: "owner-1", tentId: tent });
+      expect(await screen.findByText("Manual sensor snapshot: 77°F")).toBeInTheDocument();
+      expect(screen.queryByText("Manual sensor snapshot: 75.2°F")).not.toBeInTheDocument();
+    } finally {
+      Channel.instances.forEach((channel) => channel.close());
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("treats manual-only sensor history as grow evidence instead of an empty timeline", async () => {
+    const observed = new Date(Date.now() - 60_000).toISOString();
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective")
+        return {
+          data: [
+            {
+              id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+              user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              tent_id: tent,
+              metric: "temperature_c",
+              value: 24,
+              source: "manual",
+              quality: "ok",
+              ts: observed,
+              captured_at: observed,
+              created_at: observed,
+              device_id: null,
+              raw_payload: null,
+              correction_valid: true,
+              corrected_at: new Date().toISOString(),
+            },
+          ],
+          error: null,
+        };
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Manual sensor snapshot: 75.2°F")).toBeInTheDocument();
+    expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+    expect(harness.executeQuery.mock.calls.some(([spec]) => spec.table === "sensor_readings")).toBe(
+      false,
+    );
+  });
+
+  it("discloses invalid correction evidence as partial history and retains diary entries", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "tents")
+        return { data: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" }], error: null };
+      if (spec.table === "diary_entries")
+        return {
+          data: [diaryEntry("diary-survivor", "Retained diary note")],
+          error: null,
+          count: 1,
+        };
+      if (spec.table === "sensor_readings_effective")
+        return { data: [{ correction_valid: false, value: null }], error: null };
+      return defaultResult(spec);
+    });
+    renderTimeline();
+    expect(await screen.findByText("Retained diary note")).toBeInTheDocument();
+    expect(await screen.findByTestId("timeline-partial-read-warning")).toBeInTheDocument();
+    expect(screen.queryByText(/^Manual sensor snapshot:/)).not.toBeInTheDocument();
   });
 
   it("rejects an unavailable URL grow before any Timeline read can become empty", async () => {
@@ -524,6 +733,38 @@ describe("Timeline mounted read-state boundary", () => {
       "Detailed diary: showing 0 of 0 entries",
     );
     expect(screen.queryByTestId("timeline-read-error")).not.toBeInTheDocument();
+    expectNoTimelineContinuation();
+  });
+
+  it("does not claim a first-entry empty when a date-bounded read succeeds with zero rows", async () => {
+    renderTimeline("/timeline?start=2026-09-12&end=2026-09-12");
+
+    expect(await screen.findByText("No entries in this date range")).toBeInTheDocument();
+    expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-empty-state-action-photo")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("timeline-read-error")).not.toBeInTheDocument();
+    expectNoTimelineContinuation();
+
+    fireEvent.click(screen.getByTestId("timeline-empty-state-clear-dates"));
+    expect(await screen.findByText("No entries yet")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-empty-state-action-photo")).toBeInTheDocument();
+  });
+
+  it("shows date-window empty state when manual-only supplemental readings fall outside the active range", async () => {
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
+      if (spec.table === "grow_events") return { data: [], error: null };
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective") return { data: [], error: null };
+      return defaultResult(spec);
+    });
+
+    renderTimeline("/timeline?start=2026-09-12&end=2026-09-12");
+
+    expect(await screen.findByText("No entries in this date range")).toBeInTheDocument();
+    expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Manual sensor snapshot:/)).not.toBeInTheDocument();
     expectNoTimelineContinuation();
   });
 
@@ -1001,6 +1242,49 @@ describe("Timeline mounted read-state boundary", () => {
     expect(screen.getByText("Plant B CSV reading")).toBeInTheDocument();
   });
 
+  it("unlocks the Sensors continuation for manual-only effective readings without diary or grow events", async () => {
+    const observed = new Date(Date.now() - 60_000).toISOString();
+    const tent = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
+      if (spec.table === "grow_events") return { data: [], error: null };
+      if (spec.table === "tents") return { data: [{ id: tent }], error: null };
+      if (spec.table === "sensor_readings_effective") {
+        return {
+          data: [
+            {
+              id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+              user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              tent_id: tent,
+              metric: "temperature_c",
+              value: 24,
+              source: "manual",
+              quality: "ok",
+              ts: observed,
+              captured_at: observed,
+              created_at: observed,
+              device_id: null,
+              raw_payload: null,
+              correction_valid: true,
+              corrected_at: observed,
+            },
+          ],
+          error: null,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Manual sensor snapshot: 75.2°F")).toBeInTheDocument();
+    expect(await screen.findByTestId("timeline-one-tent-loop-next-step-card")).toBeInTheDocument();
+    expect(screen.queryByText("No entries yet")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-results-count")).toHaveTextContent(
+      "Detailed diary: showing 0 of 0 entries",
+    );
+  });
+
   it("unlocks the Sensors continuation for V2 grow-event-only evidence", async () => {
     harness.executeQuery.mockImplementation((spec: QuerySpec) => {
       if (spec.table === "diary_entries") return { data: [], error: null, count: 0 };
@@ -1369,5 +1653,88 @@ describe("Timeline mounted read-state boundary", () => {
       document.querySelector('img[src="https://images.example.test/older-canonical.jpg"]'),
     ).toBeInTheDocument();
     expect(document.querySelector('img[src*="older-foreign"]')).not.toBeInTheDocument();
+  });
+});
+
+describe("Timeline mounted filter reset (QOL-09)", () => {
+  beforeEach(() => {
+    harness.executeQuery.mockReset();
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            diaryEntry("entry-veg", "Vegetative stage log", "2026-07-20T12:00:00.000Z"),
+            {
+              ...diaryEntry("entry-flower", "Flowering stage log", "2026-07-21T12:00:00.000Z"),
+              stage: "flower",
+            },
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+    Object.assign(harness.growsState, {
+      activeGrow: GROW_A,
+      activeGrowId: GROW_A.id,
+      grows: [GROW_A],
+      loading: false,
+      error: null,
+    });
+  });
+
+  it("disables Clear filters until a stage chip is active, then restores all entries", async () => {
+    renderTimeline();
+
+    expect(await screen.findByText("Vegetative stage log")).toBeInTheDocument();
+    expect(screen.getByText("Flowering stage log")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Vegetative/i }));
+    expect(await screen.findByText("Vegetative stage log")).toBeInTheDocument();
+    expect(screen.queryByText("Flowering stage log")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-results-count")).toHaveTextContent("showing 1 of 2");
+    expect(screen.getByTestId("timeline-clear-filters")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("timeline-clear-filters"));
+    expect(await screen.findByText("Flowering stage log")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-results-count")).toHaveTextContent("showing 2 of 2");
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
+  });
+
+  it("resets event-type chips together with evidence filters through Clear filters", async () => {
+    harness.executeQuery.mockImplementation((spec: QuerySpec) => {
+      if (spec.table === "diary_entries") {
+        return {
+          data: [
+            {
+              ...diaryEntry("entry-photo", "Photo entry"),
+              photo_url: "https://x/photo.jpg",
+              details: { event_type: "photo", source: "manual" },
+            },
+            diaryEntry("entry-note", "Text-only entry"),
+          ],
+          error: null,
+          count: 2,
+        };
+      }
+      return defaultResult(spec);
+    });
+
+    renderTimeline();
+
+    expect(await screen.findByText("Photo entry")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Photos/i }));
+    expect(await screen.findByText("Photo entry")).toBeInTheDocument();
+    expect(screen.queryByText("Text-only entry")).not.toBeInTheDocument();
+    expect(screen.getByTestId("timeline-clear-filters")).not.toBeDisabled();
+
+    fireEvent.change(screen.getByTestId("timeline-search-input"), { target: { value: "photo" } });
+    fireEvent.click(screen.getByTestId("timeline-clear-filters"));
+
+    expect(await screen.findByText("Text-only entry")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-results-count")).toHaveTextContent("showing 2 of 2");
+    expect(screen.getByTestId("timeline-clear-filters")).toBeDisabled();
   });
 });

@@ -126,8 +126,9 @@ describe("buildSignedOutRedirect — AppShell signed-out target", () => {
 describe("Return-to wiring — static safety", () => {
   it("AppShell builds its signed-out target from the full current location (incl. hash)", () => {
     expect(APP_SHELL).toMatch(
-      /const signedOutRedirect = buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
+      /buildSignedOutRedirect\(\s*location\.pathname,\s*location\.search,\s*location\.hash,?\s*\)/,
     );
+    expect(APP_SHELL).toMatch(/retainSignedOutReturnIntent\(/);
     expect(APP_SHELL).toMatch(/useRequireAuth\(signedOutRedirect\)/);
     expect(APP_SHELL).toMatch(/nav\(signedOutRedirect/);
   });

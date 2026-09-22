@@ -97,7 +97,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: verdant-production
+    environment: verdant-production-solo-founder
     env:
       OPERATION: ${{ inputs.operation }}
       TARGET_ENV: production
@@ -165,9 +165,9 @@ jobs:
           report-path: ${{ github.workspace }}/audit/quicklog-corrections-retractions/report.md
           log-prefix: quicklog-corrections-retractions
           fix-steps-json: >-
-            ["1. Open Settings → Environments → verdant-production.",
+            ["1. Open Settings → Environments → verdant-production-solo-founder.",
              "2. Add or repair environment secret SUPABASE_DB_URL using the pooled Postgres URL for project knkwiiywfkbqznbxwqfh.",
-             "3. Add a required reviewer to verdant-production before APPLY, then dispatch again from verdant-grow-diary."]
+             "3. Verify required-reviewer protection on verdant-production-solo-founder before APPLY, then dispatch again from verdant-grow-diary."]
           reason-lines-json: >-
             ["The exact production target cannot be proven or reached without the protected database URL.",
              "No preflight or migration SQL is allowed to run when this secret is absent."]
@@ -183,7 +183,7 @@ jobs:
           fix-steps-json: >-
             ["1. Download the Server root certificate from the production Supabase project Dashboard.",
              "2. Base64-encode the certificate without changing its bytes.",
-             "3. Save it as the verdant-production environment secret SUPABASE_DB_CA_CERT_B64, then run PREFLIGHT again."]
+             "3. Save it as the verdant-production-solo-founder environment secret SUPABASE_DB_CA_CERT_B64, then run PREFLIGHT again."]
           reason-lines-json: >-
             ["PostgreSQL 15 requires an explicit trusted root for sslmode=verify-full.",
              "No production database process is allowed to run without certificate and hostname verification."]

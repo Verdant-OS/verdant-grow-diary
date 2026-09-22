@@ -17,10 +17,13 @@ import { usePlants } from "@/hooks/use-plants";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { deriveDailyGrowCheckStatus, type DailyCheckStatus } from "@/lib/dailyGrowCheckStatusRules";
+import { withGrowId } from "@/lib/routes";
 
 interface Props {
   /** Compact strip variant (used inside the legacy operator view). */
   compact?: boolean;
+  /** Optional grow scope for Start Check. Absent/blank keeps global /daily-check. */
+  growId?: string | null;
   /** Optional scope filter; when set, only activity for this tent counts. */
   tentIds?: string[] | null;
   className?: string;
@@ -35,6 +38,7 @@ function relTime(iso: string | null): string {
 
 export default function DailyGrowCheckStatusCard({
   compact = false,
+  growId = null,
   tentIds = null,
   className,
 }: Props) {
@@ -199,7 +203,7 @@ export default function DailyGrowCheckStatusCard({
         className="gradient-leaf text-primary-foreground shrink-0"
         data-testid="daily-grow-check-status-cta"
       >
-        <Link to="/daily-check">
+        <Link to={withGrowId("/daily-check", growId)}>
           Start Check <ArrowRight className="h-4 w-4" />
         </Link>
       </Button>

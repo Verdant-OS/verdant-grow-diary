@@ -167,7 +167,7 @@ beforeEach(() => {
   harness.tentsRefetch.mockReset();
   harness.tentsRefetch.mockResolvedValue({ data: harness.tents });
   harness.rpc.mockReset();
-  harness.rpc.mockResolvedValue({ data: { ok: true, grow_event_id: "event-1" }, error: null });
+  harness.rpc.mockResolvedValue({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
   harness.growUpdate.mockReset();
   harness.growUpdateEq.mockReset();
   harness.growUpdateEq.mockResolvedValue({ error: null });
@@ -581,7 +581,7 @@ describe("Quick Log canonical target contract", () => {
     expect(eventSelect).toHaveTextContent("Observation");
 
     await act(async () => {
-      resolveRpc({ data: { ok: true, grow_event_id: "event-1" }, error: null });
+      resolveRpc({ data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" }, error: null });
       await pendingRpc;
     });
     await waitFor(() => expect(screen.getByTestId("quick-log-post-save")).toBeInTheDocument());

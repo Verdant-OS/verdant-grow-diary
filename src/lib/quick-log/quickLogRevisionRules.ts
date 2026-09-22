@@ -346,7 +346,12 @@ export const QUICKLOG_REVISION_FAILURE_COPY: Record<string, string> = {
   invalid_changes: "Those changes could not be applied.",
   target_not_owned: "That plant or tent is not in your grows.",
   grow_not_owned: "That grow is not yours.",
-  rpc_error: "The change could not be saved. Try again.",
+  rpc_unavailable: "Entry changes are unavailable. Try again later.",
+  forbidden: "You do not have permission to change this entry.",
+  invalid_idempotency_key: "This change could not be identified. Close and reopen the entry.",
+  idempotency_conflict: "This change could not be confirmed. Close and reopen the entry.",
+  rpc_error:
+    "We could not confirm whether this change saved. Try again to confirm the same change.",
 };
 
 export function quickLogRevisionFailureCopy(reason: string | null | undefined): string {

@@ -18,6 +18,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "@/lib/react-router-compat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  UNKNOWN_CSV_HISTORY_WINDOW,
+  csvHistoryWindowNotice,
+  type CsvHistoryWindow,
+} from "@/lib/csvHistoryWindowRules";
 import ImportedSensorHistoryAiDoctorHandoff from "@/components/ImportedSensorHistoryAiDoctorHandoff";
 import {
   buildImportedSensorHistoryAiDoctorHandoff,
@@ -44,6 +49,10 @@ interface Props {
   plantReadStatus?: ImportedHistoryAiDoctorHandoffReadStatus;
   /** Optional cap for the recent-rows table. Defaults to view-model default. */
   limit?: number;
+  historyWindow?: CsvHistoryWindow;
+  onRetryHistoryWindow?: () => void;
+  /** Maximum rows requested by the mounted history query, before table filtering. */
+  queryLimit?: number;
 }
 
 const NO_HANDOFF_PLANTS: ReadonlyArray<ImportedHistoryAiDoctorHandoffPlant> = [];
@@ -65,6 +74,9 @@ export default function ImportedSensorHistoryPanel({
   plants = NO_HANDOFF_PLANTS,
   plantReadStatus = "success",
   limit,
+  historyWindow = UNKNOWN_CSV_HISTORY_WINDOW,
+  onRetryHistoryWindow,
+  queryLimit,
 }: Props) {
   const sectionRef = useRef<HTMLElement | null>(null);
   const location = useLocation();
@@ -95,7 +107,7 @@ export default function ImportedSensorHistoryPanel({
     () =>
       buildImportedSensorHistoryAiDoctorHandoff({
         tentId,
-        historyStatus: readStatus,
+        historyStatus: readStatus === "paused" ? "loading" : readStatus,
         readings,
         plantStatus: plantReadStatus,
         plants,
@@ -116,7 +128,9 @@ export default function ImportedSensorHistoryPanel({
         className="border rounded-md p-4 space-y-2"
       >
         <h2 className="text-base font-semibold">Imported sensor history</h2>
-        <p className="text-sm text-muted-foreground">{IMPORTED_SENSOR_HISTORY_EMPTY_COPY}</p>
+        <p className="text-sm text-muted-foreground">
+          Select a tent to view its imported CSV history.
+        </p>
       </section>
     );
   }
@@ -149,7 +163,36 @@ export default function ImportedSensorHistoryPanel({
         equipment.
       </div>
 
-      {readStatus === "loading" ? (
+      <div
+        data-testid="imported-history-window"
+        className="space-y-1 text-xs text-muted-foreground"
+        role="status"
+      >
+        <p>{csvHistoryWindowNotice(historyWindow)}</p>
+        {onRetryHistoryWindow &&
+        (historyWindow.status === "error" || historyWindow.status === "unknown") ? (
+          <Button type="button" size="sm" variant="outline" onClick={onRetryHistoryWindow}>
+            Retry history access
+          </Button>
+        ) : null}
+      </div>
+      {queryLimit ? (
+        <p data-testid="imported-history-query-limit" className="text-xs text-muted-foreground">
+          This view requests the newest {queryLimit} available CSV readings by observation time.
+          Counts and dates describe the returned readings, not all readings ever saved.
+        </p>
+      ) : null}
+
+      {readStatus === "paused" ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="imported-history-paused"
+          role="status"
+          aria-live="polite"
+        >
+          Waiting for a connection to load imported CSV history…
+        </p>
+      ) : readStatus === "loading" ? (
         <p
           className="text-sm text-muted-foreground"
           data-testid="imported-history-loading"
@@ -180,13 +223,13 @@ export default function ImportedSensorHistoryPanel({
             data-testid="imported-history-summary"
           >
             <div>
-              <dt className="text-xs text-muted-foreground">Total readings</dt>
+              <dt className="text-xs text-muted-foreground">Available readings</dt>
               <dd className="font-medium" data-testid="imported-history-total">
                 {vm.totalCount}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">Visible</dt>
+              <dt className="text-xs text-muted-foreground">Matching readings</dt>
               <dd className="font-medium" data-testid="imported-history-visible">
                 {vm.visibleCount}
               </dd>
@@ -254,6 +297,9 @@ export default function ImportedSensorHistoryPanel({
             </table>
           </div>
 
+          <p data-testid="imported-history-table-limit" className="text-xs text-muted-foreground">
+            Showing {vm.recentRows.length} of {vm.visibleCount} matching available readings.
+          </p>
           <p className="text-xs text-muted-foreground">
             Read-only view of CSV-imported sensor history. {IMPORTED_SENSOR_HISTORY_NOT_LIVE_COPY}.
           </p>

@@ -15,6 +15,7 @@
  */
 import { ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
 import {
   useManualSnapshotTimelineCards,
@@ -34,19 +35,25 @@ function toScope(props: Props): ManualSnapshotTimelineScope | null {
 
 export default function ManualSnapshotTimelineSection(props: Props) {
   const scope = toScope(props);
-  const { cards, isLoading, isError } = useManualSnapshotTimelineCards(scope);
+  const { cards, readStatus, refetch } = useManualSnapshotTimelineCards(scope);
 
   return (
     <Card data-testid="manual-snapshot-timeline-section" data-scope={props.scope}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
-          <ClipboardList className="h-4 w-4" aria-hidden /> Manual sensor snapshots
+          <ClipboardList className="h-4 w-4" aria-hidden />
+          {props.scope === "plant"
+            ? "Manual snapshots attached to this plant"
+            : "Manual snapshots in this tent’s diary"}
         </CardTitle>
         <p
           className="text-xs text-muted-foreground"
           data-testid="manual-snapshot-timeline-section-helper"
         >
-          Grower-recorded readings. Not live, not synced, not imported.
+          {props.scope === "plant"
+            ? "Grower-recorded readings attached to this plant’s diary. Shared tent records can also appear in QuickLog memory."
+            : "Grower-recorded readings in this tent’s diary, including its plants."}{" "}
+          Not live, not synced, not imported.
         </p>
       </CardHeader>
       <CardContent>
@@ -57,33 +64,66 @@ export default function ManualSnapshotTimelineSection(props: Props) {
           >
             Open a {props.scope} to see manual snapshots.
           </p>
-        ) : isLoading ? (
-          <div
-            className="h-16 rounded-md bg-muted/40 animate-pulse"
-            data-testid="manual-snapshot-timeline-section-loading"
-          />
-        ) : isError ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="manual-snapshot-timeline-section-error"
-          >
-            Couldn't load manual snapshots right now. Other entries are still shown.
-          </p>
-        ) : cards.length === 0 ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="manual-snapshot-timeline-section-empty"
-          >
-            No manual sensor snapshots yet.
-          </p>
         ) : (
-          <ul className="space-y-3" data-testid="manual-snapshot-timeline-section-list">
-            {cards.map((card) => (
-              <li key={card.id}>
-                <ManualSnapshotTimelineCard card={card} />
-              </li>
-            ))}
-          </ul>
+          <>
+            {readStatus === "loading" ? (
+              <div
+                role="status"
+                aria-label="Manual snapshot read status"
+                className="h-16 rounded-md bg-muted/40 animate-pulse"
+                data-testid="manual-snapshot-timeline-section-loading"
+              >
+                <span className="sr-only">Loading manual snapshots…</span>
+              </div>
+            ) : readStatus !== "success" ? (
+              <div
+                role="status"
+                aria-label="Manual snapshot read status"
+                className="mb-3 text-sm text-muted-foreground"
+                data-testid={
+                  readStatus === "error" ? "manual-snapshot-timeline-section-error" : undefined
+                }
+              >
+                <p>
+                  {readStatus === "paused"
+                    ? "Waiting for connection to load manual snapshots."
+                    : readStatus === "refreshing"
+                      ? "Refreshing manual snapshots…"
+                      : "Couldn't load manual snapshots right now."}
+                  {cards.length > 0 &&
+                    " Showing previously loaded snapshots; the latest read is unconfirmed."}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  disabled={readStatus === "refreshing"}
+                  onClick={() => void refetch()}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : null}
+            {cards.length > 0 ? (
+              <ul className="space-y-3" data-testid="manual-snapshot-timeline-section-list">
+                {cards.map((card) => (
+                  <li key={card.id}>
+                    <ManualSnapshotTimelineCard card={card} />
+                  </li>
+                ))}
+              </ul>
+            ) : readStatus === "success" ? (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="manual-snapshot-timeline-section-empty"
+              >
+                {props.scope === "plant"
+                  ? "No manual sensor snapshots attached to this plant yet."
+                  : "No manual sensor snapshots in this tent’s diary yet."}
+              </p>
+            ) : null}
+          </>
         )}
       </CardContent>
     </Card>

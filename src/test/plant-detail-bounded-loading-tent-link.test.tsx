@@ -110,6 +110,16 @@ describe("classifyPlantDetailLoadState", () => {
     expect(
       classifyPlantDetailLoadState({
         isLoading: false,
+        isPending: true,
+        isPaused: true,
+        isError: false,
+        hasPlant: false,
+        loadTimedOut: true,
+      }),
+    ).toBe("paused");
+    expect(
+      classifyPlantDetailLoadState({
+        isLoading: false,
         isError: true,
         hasPlant: false,
         loadTimedOut: false,

@@ -29,6 +29,11 @@ import {
 export type TimelineEmptyStateKind =
   /** The grower has no diary entries at all in this scope. */
   | "no_entries"
+  /**
+   * The current-scope bounded date read succeeded with zero rows.
+   * Does not claim entries exist outside the window.
+   */
+  | "date_window"
   /** Entries exist, but the evidence-only filter excluded all of them. */
   | "evidence_filtered"
   /** Entries exist, but the active filters excluded all of them. */
@@ -43,6 +48,11 @@ export interface TimelineEmptyStateInput {
   evidenceFilterActive: boolean;
   /** True when any non-evidence filter (search, stage, event, date, plant, tent) is set. */
   otherFiltersActive: boolean;
+  /**
+   * True when the successful core read was date-bounded. A zero-row result then
+   * is a date-window empty, not a confirmed empty grow.
+   */
+  dateBoundsActive?: boolean;
   /** Current plant/tent selection, used to decide if fast add can act. */
   context?: FastAddSelectionContext | null;
 }
@@ -68,8 +78,10 @@ export interface TimelineEmptyStateView {
    * actions can do anything. The caller renders the picker CTAs.
    */
   needsContext: boolean;
-  /** True when the caller should offer a "Clear filters" control. */
+  /** True when the caller should offer a clear-filters / clear-dates control. */
   offersClearFilters: boolean;
+  /** Label for the empty-state reset control. */
+  clearFiltersLabel: string;
 }
 
 /**
@@ -92,6 +104,12 @@ export const TIMELINE_EMPTY_FILTERED_TITLE = "No entries match these filters";
 export const TIMELINE_EMPTY_FILTERED_DESC =
   "Entries exist in this grow, but none match the current filters. Widen the date range or clear a filter to see them.";
 
+export const TIMELINE_EMPTY_DATE_WINDOW_TITLE = "No entries in this date range";
+export const TIMELINE_EMPTY_DATE_WINDOW_DESC =
+  "Nothing showed up in the selected dates. Clear dates to widen the window.";
+export const TIMELINE_EMPTY_CLEAR_FILTERS_LABEL = "Clear filters";
+export const TIMELINE_EMPTY_CLEAR_DATES_LABEL = "Clear dates";
+
 /**
  * The evidence-filter wording is already pinned in
  * `timelineEvidenceFilterRules`. Re-export rather than fork it so the two
@@ -109,7 +127,8 @@ function hasSelectionContext(ctx: FastAddSelectionContext | null | undefined): b
  * Resolve which empty state the timeline should render.
  *
  * Returns null when the timeline is NOT empty — the caller renders entries.
- * Priority: nothing logged at all > evidence filter > other filters.
+ * Priority: date-window zero-row success > nothing logged at all > evidence
+ * filter > other filters.
  */
 export function resolveTimelineEmptyState(
   input: TimelineEmptyStateInput,
@@ -120,6 +139,18 @@ export function resolveTimelineEmptyState(
     : 0;
 
   if (filtered > 0) return null;
+
+  if (total === 0 && input.dateBoundsActive === true) {
+    return {
+      kind: "date_window",
+      title: TIMELINE_EMPTY_DATE_WINDOW_TITLE,
+      description: TIMELINE_EMPTY_DATE_WINDOW_DESC,
+      actions: [],
+      needsContext: false,
+      offersClearFilters: true,
+      clearFiltersLabel: TIMELINE_EMPTY_CLEAR_DATES_LABEL,
+    };
+  }
 
   if (total === 0) {
     const needsContext = !hasSelectionContext(input.context);
@@ -132,6 +163,7 @@ export function resolveTimelineEmptyState(
       actions: TIMELINE_EMPTY_STATE_ACTIONS,
       needsContext,
       offersClearFilters: false,
+      clearFiltersLabel: TIMELINE_EMPTY_CLEAR_FILTERS_LABEL,
     };
   }
 
@@ -143,6 +175,7 @@ export function resolveTimelineEmptyState(
       actions: [],
       needsContext: false,
       offersClearFilters: true,
+      clearFiltersLabel: TIMELINE_EMPTY_CLEAR_FILTERS_LABEL,
     };
   }
 
@@ -153,6 +186,7 @@ export function resolveTimelineEmptyState(
     actions: [],
     needsContext: false,
     offersClearFilters: input.otherFiltersActive,
+    clearFiltersLabel: TIMELINE_EMPTY_CLEAR_FILTERS_LABEL,
   };
 }
 
@@ -168,4 +202,5 @@ export const TIMELINE_EMPTY_STATE_FALLBACK: TimelineEmptyStateView = {
   actions: [],
   needsContext: false,
   offersClearFilters: true,
+  clearFiltersLabel: TIMELINE_EMPTY_CLEAR_FILTERS_LABEL,
 };

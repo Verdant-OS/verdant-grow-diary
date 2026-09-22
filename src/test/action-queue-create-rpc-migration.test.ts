@@ -116,4 +116,22 @@ describe("client create paths prefer the atomic RPC (#586)", () => {
     expect(src).not.toMatch(/from\(["']action_queue_events["']\)\.insert/);
     expect(src).not.toMatch(/Action queued, but audit log failed/);
   });
+
+  it("pheno herm cull uses createActionQueueItem (not a direct insert)", () => {
+    const src = read("src/lib/phenoActionQueueService.ts");
+    expect(src).toMatch(/createActionQueueItem/);
+    expect(src).not.toMatch(/from\(["']action_queue["']\)\.insert/);
+  });
+});
+
+describe("known #586 residuals — direct insert still allowed", () => {
+  it("post-grow apply-lesson still inserts pending_approval drafts directly", () => {
+    const hook = read("src/hooks/usePostGrowLearningReportData.ts");
+    const rules = read("src/lib/postGrowLearningReportRules.ts");
+    expect(hook).toMatch(/from\(["']action_queue["']\)[\s\S]*?\.insert\(/);
+    expect(hook).not.toMatch(/createActionQueueItem/);
+    expect(rules).toContain('status: "pending_approval"');
+    expect(rules).toContain("target_device");
+    expect(rules).toMatch(/target_device:\s*null/);
+  });
 });

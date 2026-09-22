@@ -1,5 +1,5 @@
 // Tests for the safe sign-out helper layer.
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   AUTH_TRANSIENT_SESSION_PREFIXES,
   SAFE_SIGN_OUT_REDIRECT,
@@ -112,6 +112,49 @@ describe("clearAuthTransientUiState", () => {
 
 describe("performSafeSignOut", () => {
   beforeEach(() => vi.restoreAllMocks());
+  afterEach(() => vi.useRealTimers());
+
+  it("does not clear a newer account's transient state when an old sign-out settles", async () => {
+    let finish!: () => void;
+    let current = true;
+    const clear = vi.fn();
+    const pending = performSafeSignOut({
+      signOut: () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+      clearUiState: clear,
+      isCurrent: () => current,
+    });
+    current = false;
+    finish();
+    await pending;
+    expect(clear).not.toHaveBeenCalled();
+  });
+
+  it("keeps SDK completion pending instead of treating elapsed time as cancellation", async () => {
+    vi.useFakeTimers();
+    let finish!: () => void;
+    const clear = vi.fn();
+    let result: Awaited<ReturnType<typeof performSafeSignOut>> | undefined;
+    const pending = performSafeSignOut({
+      signOut: () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+      clearUiState: clear,
+    }).then((value) => {
+      result = value;
+    });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(result).toBeUndefined();
+    expect(clear).not.toHaveBeenCalled();
+    finish();
+    await pending;
+    expect(result).toEqual({ ok: true, redirectTo: "/welcome" });
+    expect(clear).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 
   it("calls signOut and returns safe internal redirect", async () => {
     const signOut = vi.fn().mockResolvedValue(undefined);

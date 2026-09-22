@@ -243,6 +243,51 @@ describe("token class compare + report assembly", () => {
     ).toBe(false);
   });
 
+  it("treats non-string serialized input as a leak (fail closed)", () => {
+    expect(reportJsonLeaksTokenPayload(null as unknown as string)).toBe(true);
+    expect(reportJsonLeaksTokenPayload(undefined as unknown as string)).toBe(true);
+  });
+
+  it("maps unknown token class labels to unavailable in compareTokenClasses", () => {
+    expect(compareTokenClasses("bogus", "also_bogus")).toEqual({
+      committedTokenClass: "unavailable",
+      effectiveTokenClass: "unavailable",
+      tokenClassMismatch: false,
+      mismatches: [],
+    });
+  });
+
+  it("derives shortCommit from commit when shortCommit is absent", () => {
+    const stamp = cleanStamp();
+    delete (stamp as { shortCommit?: string }).shortCommit;
+    const report = buildPublishVerificationReport({
+      stamp,
+      committedTokenClass: "test_",
+      effectiveTokenClass: "test_",
+      generatedAt: "2026-08-25T00:00:00.000Z",
+    });
+    expect(report.shortCommit).toBe(CLEAN_SHA.slice(0, 12));
+  });
+
+  it("collects multiple stamp blockers for dirty orphan stamps", () => {
+    const stamp = cleanStamp({ dirty: true, ref: "__orphan__", commit: "unknown" });
+    expect(collectStampBlockers(stamp)).toEqual(["stamp_dirty", "stamp_orphan", "commit_unknown"]);
+    expect(isOrphanStamp(null)).toBe(true);
+    expect(
+      formatPublishVerificationSummary({
+        ...buildPublishVerificationReport({
+          stamp,
+          committedTokenClass: "test_",
+          effectiveTokenClass: "test_",
+          generatedAt: "2026-08-25T00:00:00.000Z",
+        }),
+        verdict: "FAIL",
+        blockers: [],
+        mismatches: [],
+      }),
+    ).toBe("[publish-verify] FAIL unknown");
+  });
+
   it("serialized report never contains token-shaped payloads", () => {
     const report = buildPublishVerificationReport({
       stamp: cleanStamp({
@@ -295,6 +340,12 @@ describe("parseGitPorcelainPaths", () => {
     ]);
     expect(parseGitPorcelainPaths("")).toEqual([]);
     expect(sanitizeDirtyPathList(["docs/a.md", "docs/a.md", "\n"])).toEqual(["docs/a.md"]);
+  });
+
+  it("strips control characters and caps dirty path count", () => {
+    expect(parseGitPorcelainPaths(" M src/\u0007bad.ts\n")).toEqual(["src/bad.ts"]);
+    const manyLines = Array.from({ length: 60 }, (_, index) => ` M file-${index}.txt`).join("\n");
+    expect(parseGitPorcelainPaths(manyLines)).toHaveLength(50);
   });
 });
 
@@ -362,6 +413,74 @@ describe("runPublishVerification (injected I/O)", () => {
     expect(written).not.toContain(FIXTURE_TEST_TOKEN);
     expect(written).not.toContain(FIXTURE_LIVE_TOKEN);
     expect(reportJsonLeaksTokenPayload(written)).toBe(false);
+  });
+
+  it("fail-closes when dirty path names would leak token-shaped payloads into the report", async () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-leak-"));
+    temporaryRoots.push(root);
+    const versionPath = resolve(root, "public/version.json");
+    const reportPath = resolve(root, "artifacts/publish-verification.json");
+    mkdirSync(resolve(root, "public"), { recursive: true });
+    writeFileSync(versionPath, `${JSON.stringify(cleanStamp({ dirty: true }), null, 2)}\n`, "utf8");
+
+    const gitEnv = {
+      ...process.env,
+      GIT_AUTHOR_NAME: "fixture",
+      GIT_AUTHOR_EMAIL: "fixture@example.com",
+      GIT_COMMITTER_NAME: "fixture",
+      GIT_COMMITTER_EMAIL: "fixture@example.com",
+    };
+    const git = (args: string[]) =>
+      spawnSync("git", ["-C", root, ...args], { encoding: "utf8", env: gitEnv });
+    expect(git(["init"]).status).toBe(0);
+    git(["config", "user.email", "fixture@example.com"]);
+    git(["config", "user.name", "fixture"]);
+    writeFileSync(join(root, "README.md"), "fixture\n");
+    expect(git(["add", "README.md"]).status).toBe(0);
+    expect(git(["commit", "-m", "baseline"]).status).toBe(0);
+    writeFileSync(join(root, "test_LEAKEDPATHNAME"), "fixture\n");
+
+    const logs: string[] = [];
+    const { exitCode, report } = await runPublishVerification({
+      rootDir: root,
+      versionPath,
+      reportPath,
+      resolveCommitted: async () => "test_",
+      resolveEffective: async () => "test_",
+      now: () => "2026-08-25T12:00:00.000Z",
+      logger: {
+        log: (line: string) => logs.push(line),
+        error: (line: string) => logs.push(line),
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(report.verdict).toBe("FAIL");
+    expect(report.blockers).toContain("stamp_missing");
+    expect(report.blockers).toContain("stamp_dirty");
+    expect(reportJsonLeaksTokenPayload(readFileSync(reportPath, "utf8"))).toBe(false);
+    expect(logs.some((line) => line.startsWith("[publish-verify] FAIL"))).toBe(true);
+  });
+
+  it("exits 1 when the stamp file is missing or unreadable", async () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-missing-stamp-"));
+    temporaryRoots.push(root);
+    const versionPath = resolve(root, "public/version.json");
+    const reportPath = resolve(root, "artifacts/publish-verification.json");
+
+    const { exitCode, report } = await runPublishVerification({
+      rootDir: root,
+      versionPath,
+      reportPath,
+      resolveCommitted: async () => "test_",
+      resolveEffective: async () => "test_",
+      now: () => "2026-08-25T12:00:00.000Z",
+      logger: { log: () => undefined, error: () => undefined },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(report.blockers).toEqual(["stamp_missing"]);
+    expect(readFileSync(reportPath, "utf8")).toContain('"verdict": "FAIL"');
   });
 
   it("exits 1 for a dirty stamp without leaking token bytes", async () => {
@@ -493,5 +612,47 @@ describe("resolveEffectiveTokenClass (Vite production env, class only)", () => {
       if (hadToken) process.env[TOKEN_NAME] = previous;
       else delete process.env[TOKEN_NAME];
     }
+  });
+
+  it("reports unavailable for malformed production tokens without returning bytes", async () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-effective-malformed-"));
+    temporaryRoots.push(root);
+    writeFileSync(join(root, ".env.production"), `${TOKEN_NAME}=pk_not_paddle\n`);
+
+    const hadToken = Object.hasOwn(process.env, TOKEN_NAME);
+    const previous = process.env[TOKEN_NAME];
+    delete process.env[TOKEN_NAME];
+    try {
+      expect(await resolveEffectiveTokenClass(root)).toBe("unavailable");
+    } finally {
+      if (hadToken) process.env[TOKEN_NAME] = previous;
+      else delete process.env[TOKEN_NAME];
+    }
+  });
+});
+
+describe("resolveCommittedTokenClass edge cases", () => {
+  it("reports missing when HEAD has no committed .env.production", async () => {
+    const root = mkdtempSync(join(tmpdir(), "verdant-publish-verify-git-empty-"));
+    temporaryRoots.push(root);
+
+    const gitEnv = {
+      ...process.env,
+      GIT_AUTHOR_NAME: "fixture",
+      GIT_AUTHOR_EMAIL: "fixture@example.com",
+      GIT_COMMITTER_NAME: "fixture",
+      GIT_COMMITTER_EMAIL: "fixture@example.com",
+    };
+    const git = (args: string[]) =>
+      spawnSync("git", ["-C", root, ...args], { encoding: "utf8", env: gitEnv });
+
+    expect(git(["init"]).status).toBe(0);
+    git(["config", "user.email", "fixture@example.com"]);
+    git(["config", "user.name", "fixture"]);
+    writeFileSync(join(root, "README.md"), "fixture\n");
+    expect(git(["add", "README.md"]).status).toBe(0);
+    expect(git(["commit", "-m", "no env"]).status).toBe(0);
+
+    expect(await resolveCommittedTokenClass(root)).toBe("missing");
   });
 });

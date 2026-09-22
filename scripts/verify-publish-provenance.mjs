@@ -500,6 +500,7 @@ export async function runPublishVerification({
       ...report,
       verdict: "FAIL",
       blockers: [...new Set([...report.blockers, "stamp_missing"])],
+      dirtyPaths: [],
     };
     const safeSerialized = `${JSON.stringify(safeFail, null, 2)}\n`;
     mkdirSync(dirname(reportPath), { recursive: true });

@@ -11,6 +11,7 @@ import {
   LABS_NAVIGATION_DESTINATIONS,
   resolveLabsNavigationDestinations,
 } from "@/lib/growerNavigationRules";
+import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
 import { breedingProgramsPath } from "@/lib/routes";
 
 const GROW = "4cad3cae-21e3-42f8-8372-2f6237205db3";
@@ -55,5 +56,37 @@ describe("Labs Breeding Programs retains growId", () => {
       resolveLabsNavigationDestinations().find((item) => item.id === "breedingPrograms")?.to,
     ).toBe("/breeding");
     expect(unscoped.find((item) => item.id === "phenoHunt")?.to).toBe("/pheno-hunts");
+  });
+
+  it("keeps the Phase-1 static manifest unscoped for Breeding Programs", () => {
+    const breeding = LABS_NAVIGATION_DESTINATIONS.find((item) => item.id === "breedingPrograms");
+    expect(breeding?.to).toBe("/breeding");
+    expect(breeding?.label).toBe("Breeding Programs");
+  });
+
+  it("resolveNavigationGrowId reads growId from /breeding and trims whitespace", () => {
+    expect(resolveNavigationGrowId({ pathname: "/breeding", search: `?growId=${GROW}` })).toBe(
+      GROW,
+    );
+    expect(resolveNavigationGrowId({ pathname: "/breeding", search: `growId=${GROW}` })).toBe(GROW);
+    expect(resolveNavigationGrowId({ pathname: "/breeding", search: "?growId=" })).toBeNull();
+    expect(resolveNavigationGrowId({ pathname: "/breeding", search: "?growId=%20" })).toBeNull();
+  });
+
+  it("round-trips location growId into scoped Labs Breeding Programs links", () => {
+    const growId = resolveNavigationGrowId({
+      pathname: `/grows/${GROW}/learning`,
+      search: "",
+    });
+    const breeding = resolveLabsNavigationDestinations(growId).find(
+      (item) => item.id === "breedingPrograms",
+    );
+
+    expect(breeding?.to).toBe(`/breeding?growId=${GROW}`);
+    expect(
+      resolveLabsNavigationDestinations(`  ${GROW}  `).find(
+        (item) => item.id === "breedingPrograms",
+      )?.to,
+    ).toBe(`/breeding?growId=${GROW}`);
   });
 });

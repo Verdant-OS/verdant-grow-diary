@@ -34,31 +34,29 @@ describe("Labs Pheno Hunt retains growId", () => {
 
     expect(pheno?.to).toBe(`/pheno-hunts?growId=${GROW}`);
     expect(breeding?.to).toBe("/breeding");
-    expect(resolved.map((item) => item.id)).toEqual(LABS_NAVIGATION_DESTINATIONS.map((item) => item.id));
+    expect(resolved.map((item) => item.id)).toEqual(
+      LABS_NAVIGATION_DESTINATIONS.map((item) => item.id),
+    );
 
     const unscoped = resolveLabsNavigationDestinations(null);
     expect(unscoped.find((item) => item.id === "phenoHunt")?.to).toBe("/pheno-hunts");
-    expect(resolveLabsNavigationDestinations("   ").find((item) => item.id === "phenoHunt")?.to).toBe(
-      "/pheno-hunts",
-    );
+    expect(
+      resolveLabsNavigationDestinations("   ").find((item) => item.id === "phenoHunt")?.to,
+    ).toBe("/pheno-hunts");
     expect(resolveLabsNavigationDestinations().find((item) => item.id === "phenoHunt")?.to).toBe(
       "/pheno-hunts",
     );
   });
 
   it("resolveNavigationGrowId reads path and query, and does not invent", () => {
-    expect(
-      resolveNavigationGrowId({ pathname: `/grows/${GROW}`, search: "" }),
-    ).toBe(GROW);
-    expect(
-      resolveNavigationGrowId({ pathname: `/grows/${GROW}/learning`, search: "" }),
-    ).toBe(GROW);
-    expect(
-      resolveNavigationGrowId({ pathname: "/pheno-hunts", search: `?growId=${GROW}` }),
-    ).toBe(GROW);
-    expect(
-      resolveNavigationGrowId({ pathname: "/pheno-hunts", search: `growId=${GROW}` }),
-    ).toBe(GROW);
+    expect(resolveNavigationGrowId({ pathname: `/grows/${GROW}`, search: "" })).toBe(GROW);
+    expect(resolveNavigationGrowId({ pathname: `/grows/${GROW}/learning`, search: "" })).toBe(GROW);
+    expect(resolveNavigationGrowId({ pathname: "/pheno-hunts", search: `?growId=${GROW}` })).toBe(
+      GROW,
+    );
+    expect(resolveNavigationGrowId({ pathname: "/pheno-hunts", search: `growId=${GROW}` })).toBe(
+      GROW,
+    );
     expect(resolveNavigationGrowId({ pathname: "/grows", search: "" })).toBeNull();
     expect(resolveNavigationGrowId({ pathname: "/grows/", search: "" })).toBeNull();
     expect(resolveNavigationGrowId({ pathname: "/plants", search: "" })).toBeNull();

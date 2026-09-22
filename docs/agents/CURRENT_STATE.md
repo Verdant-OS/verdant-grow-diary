@@ -1,7 +1,183 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-22 UTC (~20:15 UTC)
-**Updated by:** Claude (2026-09-22 evening, slice `GDP-CURRENT-STATE-REStamp-after-1621`: **Soft `#1621`
+**Last updated:** 2026-09-22 UTC (~23:35 UTC)
+**Updated by:** Claude (2026-09-22 late, restamp on **deploy tip `8b73c14031050b51061d4715bedbcdfeb66eee52`**.
+That tip is the squash of **`#1626`**, which re-verified the architecture contract and changes docs
+only (§1, §3). **Live is `NOT_MEASURED` by Claude** after a seventh egress refusal at 23:26:27 UTC (§2).
+**New collision:** two open bot drafts, `#1625` and `#1627`, each implement a fix for the
+session-backed _Restore pending correction_ finding recorded in the prior stamp's §4. Each one also
+carries a **stale copy of a Claude docs commit**. They are surfaced here, not resolved (§4). The board
+was re-listed: **33 open PRs**, and `#1625` is the only other one touching this file (§5). No Publish.
+No APPLY. No merge. `HOLD #1250`. Prior header follows.)
+
+## 1. Deploy tip `8b73c140` — `#1626` MERGED, docs only
+
+`established fact`, `git fetch` then `git rev-parse` at ~23:26 UTC, cross-checked against the API.
+
+| Field      | Value                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------- |
+| Tip        | **`8b73c14031050b51061d4715bedbcdfeb66eee52`**                                        |
+| Subject    | `docs(architecture): re-verify the Current Architecture Contract at 387a0006 (#1626)` |
+| Parent     | `387a00067a76ca9e2ced453d6b6a0f580e33209b` (`#1624`, the prior restamp)               |
+| Merged     | 2026-09-22 **23:24:53 UTC** via the merge queue, by `cheekhimself`                    |
+| Files      | **1** (`docs/architecture-contract.md`), +541 / −217                                  |
+| Migrations | **0**                                                                                 |
+
+**No product behaviour changed between `387a0006` and this tip.** `git diff --name-only
+387a0006 8b73c140` lists only `docs/architecture-contract.md`. The product state is therefore the
+one recorded at `8fc38407` (`#1621`).
+
+## 2. Live — `NOT_MEASURED` by Claude
+
+| Field             | Value                                                                      |
+| ----------------- | -------------------------------------------------------------------------- |
+| Claude's own read | **`BLOCKED`** → `curl: (56) CONNECT tunnel failed, response 403`           |
+| When              | 2026-09-22 **23:26:27 UTC** — the **seventh** refusal                      |
+| Last value held   | `9a30593d…`, `dirty:false`, from a GDP brief (`source claim`, pre-`#1621`) |
+| Live vs tip       | **`NOT_MEASURED`**                                                         |
+
+Whether production serves the `#1621` C/F fix (`8fc38407`) is **unknown**. **Do not green-lane the
+live `"26"` pin** until `version.json`, read over an unblocked path, reports a commit that includes
+`8fc38407`. The two commits since then (`387a0006`, `8b73c140`) are docs-only and change nothing a
+user sees. **`LIVE_LAG` is not a product `FAIL`.**
+
+## 3. What `#1626` shipped
+
+`established fact` from the PR, its reviews, and `git`.
+
+- **An amendment, not a new contract.** `docs/architecture-contract.md` (first stamped in `#1281`)
+  was re-verified under its own §15 rule at `387a0006`. It now has **48 clauses**: 47 existing plus
+  new AC-1.8 (stack majors).
+- **The squash is identical to the reviewed head.** `git diff a2a0f828 8b73c140 --
+docs/architecture-contract.md` is empty.
+- **Independent review: Grok, PASS-with-P2, pinned to `a2a0f8286bd60d9b2e7578f84417bf4fef814497`**
+  (review `5285007779`). It was posted through the `cheekhimself` account as a comment, not a GitHub
+  approval. The P2 items are the tip-class dependency lane, `UNSTABLE` merge state from that lane,
+  and stale `CLAUDE.md` facts, which are out of scope.
+- **Bot review:** four threads were raised and all four were resolved before merge. Three were fixed:
+  the clause count, the AC-1.2 MCP bundle recorded as `convention only`, and the AC-10.1 map row. One
+  was declined with evidence (the provenance sentence), and Cursor independently re-measured and
+  confirmed that decision.
+- **Recorded in the contract, not fixed:** the AC-4.1 prototype-key normalizer defect. Its fix is on
+  unmerged `#1620`.
+- **The Release Topology Specification is still deferred.** It is blocked on open `#1175` and `#1221`,
+  both re-confirmed open in §5.
+
+## 4. COLLISION — two competing fixes for the session-restore finding
+
+`established fact` from the PR heads, measured with `git`. **Surfaced, not resolved: Claude does not
+pick between them.**
+
+The prior stamp's §4 recorded, as `inference`, that _Restore pending correction_ builds a revision-0
+draft that `updateSensorsDraft` rejects on the session-backed Sensors page. **Two bot-authored drafts
+now fix it, in two different ways:**
+
+| PR      | Head         | Base       | Behind | Fix mechanism                                                        | Also carries (stale)                                                          |
+| ------- | ------------ | ---------- | -----: | -------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `#1625` | `95bf0fb8b1` | `8fc38407` |      2 | routes the restore through `editManualDraftValues` (bumps revision)  | **`2685be21`**, `#1624`'s first commit, i.e. `CURRENT_STATE.md` before review |
+| `#1627` | `33270e2287` | `387a0006` |      1 | returns `{ ...next, revision: current.revision + 1 }` when `session` | **`61aacaf3`**, `#1626`'s first commit, i.e. the contract before review       |
+
+Both touch `src/components/ManualSensorReadingCard.tsx` and
+`src/test/manual-sensor-correction-recovery-celsius-session.test.tsx`. **Only one can merge.**
+
+**Why the carried commits matter:** each would **revert reviewed fixes** if merged as-is.
+`#1625`'s copy of this file lacks `#1624`'s review corrections. `#1627`'s copy of the contract lacks
+`#1626`'s three review fixes. **Both already conflict with the tip**: `git merge-tree` against
+`8b73c140` reports a content conflict in `docs/agents/CURRENT_STATE.md` for `#1625` and in
+`docs/architecture-contract.md` for `#1627`. Either PR needs its docs commit dropped before it is
+mergeable.
+
+**Status:** runtime behaviour of both fixes is `NOT_MEASURED` by Claude. **No ACTIVE OWNER is
+assigned.** GDP names one owner and one independent reviewer, and the other PR is closed. Until then
+the finding stays open and unowned.
+
+## 5. Soft-couple board — re-listed
+
+`established fact`, ~23:28 UTC. Each head was fetched by `refs/pull/N/head` and diffed against its
+merge-base after deepening the clone.
+
+**33 open PRs: 30 target `verdant-grow-diary` and 3 are stacked** (`#1618` on `#1151`, `#1620` on
+`#1088`, `#1481` on `#1478`). New since the prior stamp: `#1625`, `#1627`, `#1628`. `#1624` and `#1626`
+have merged.
+
+**Other writers of `docs/agents/CURRENT_STATE.md`: one, `#1625`**, via its carried stale commit (§4).
+It is not a live competing restamp. This PR is the only intended writer.
+
+**At behind ≤ 5:**
+
+| PR      | Head         | Behind | Draft  | Class                                                     |
+| ------- | ------------ | -----: | ------ | --------------------------------------------------------- |
+| `#1628` | `1cdb027c09` |      1 | yes    | product — pheno demo ranking (`PhenoHuntDemo.tsx` + test) |
+| `#1627` | `33270e2287` |      1 | yes    | product — session restore fix (**§4 collision**)          |
+| `#1625` | `95bf0fb8b1` |      2 | yes    | product — session restore fix (**§4 collision**)          |
+| `#1623` | `87d534db5f` |      4 | yes    | tests-only                                                |
+| `#1619` | `19e5833bcc` |      4 | yes    | tests-only                                                |
+| `#1617` | `c059a3c268` |      5 | yes    | tests-only                                                |
+| `#1221` | `9a93c63373` |      4 | yes    | CI lanes                                                  |
+| `#1175` | `b082c01004` |      4 | **no** | publish verification report                               |
+| `#1174` | `6b2a7d3393` |      4 | **no** | EcoWitt ingest-readiness + C/F safety                     |
+| `#1151` | `8d66f05291` |      4 | **no** | fixture feeding demo                                      |
+| `#1088` | `59742962b0` |      4 | **no** | sensor source/provenance display canon                    |
+
+**C/F correction surface:** `#1625` and `#1627` (§4). The stale draft `#1556` (126 behind) also still
+touches it and **must not be revived**.
+
+## 6. Carried, not re-measured
+
+- **Soft-park register** (`source claim`, GDP): **`HOLD #1250`**. No Publish. No APPLY; `#1460` and
+  `#1545` stay parked. **Fixture AUTH** is Soft-parked: the sticky Playwright session dropped. After
+  `cheekhimself` re-banks, re-measure the empty Action Queue and the archived Restore XOR. **Never KEEP
+  on fixture walks.**
+- **Soft P2 — parked, do not implement:**
+  - sensors / Start Check `growId` omit
+  - Quick Log target count
+  - `/onboarding` preference gate
+  - Assign true-empty needs a zero-tent fixture
+- **`Dependency & Security CI`** (`hono` moderate ×3, `js-yaml` **high**): red on every recent head and
+  still Soft-ignored. `config/dependency-security-exceptions.json` stays **empty**. No one owns it; it
+  needs a dependency slice. **`Nested static proofs`**: tip-class, Soft-ignored as P2.
+- **`Native Manual Correction Local`**: Soft-ignore **lifted** for heads containing `8fc38407`. It
+  passed on `#1626`'s head `a2a0f828`.
+- **The tip's own push build on `8b73c140`: `NOT_MEASURED`.**
+- **Sandbox schema and money-migration gaps:** last measured on `aabbd2b3`. **Sandbox-scoped only;
+  production applied state is `NOT_MEASURED`. No APPLY.**
+- **Golden Toad:** AUTH_NEEDED; the one-tent Next step is `NOT_MEASURED`. This is **not**
+  `AUTH_CHOOSER_READY`. Passkey, 2FA and chooser decisions stay **Cheek's**.
+
+## 7. The `387a0006` / ~20:15 UTC stamp below is SUPERSEDED
+
+`established fact`. Four of its rows are now stale:
+
+- It cites the tip as `8fc38407`; the tip is `8b73c140` (§1).
+- It records the session-restore finding as open and unowned with no fix in flight; there are now two
+  competing fixes (§4).
+- It says no other open PR writes this file; `#1625` now does, through a carried commit (§5).
+- Its board counted 30 open PRs; the count is now 33 (§5).
+
+Its live row (`NOT_MEASURED`) still holds. Carried rows keep their original labels.
+
+## 8. Current locks
+
+- **No merge. No ready. No Publish. No History-restore. No APPLY. No production SQL.** No device
+  control, no automatic Action Queue writes, no invented credentials. **Never KEEP. No owner email.**
+- **`HOLD #1250`.**
+- **Tip is `8b73c14031050b51061d4715bedbcdfeb66eee52`.** Cite no other SHA as the tip.
+- **Live is `NOT_MEASURED` by Claude.** Do not green-lane the live `"26"` pin.
+- **§4: exactly one of `#1625` / `#1627` may land**, after its stale docs commit is dropped. GDP names
+  the owner. Claude does not choose, close, or push to either.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- **This slice:** **N=1**, **draft**, on branch `claude/current-state-restamp-8b73c140`, cut from
+  `origin/verdant-grow-diary` at `8b73c14031050b51061d4715bedbcdfeb66eee52`. Its only file is
+  `docs/agents/CURRENT_STATE.md`. **Slice owner: Claude.** The **independent reviewer is not yet
+  named**. GDP routes it, and the slice is incomplete until a different peer is assigned. Claude does
+  not self-merge and does not assign its own next slice.
+
+---
+
+**The block below is SUPERSEDED — see §7 of the current stamp.**
+
+**Prior last updated:** 2026-09-22 UTC (~20:15 UTC)
+**Prior update:** Claude (2026-09-22 evening, slice `GDP-CURRENT-STATE-REStamp-after-1621`: **Soft `#1621`
 GDP-SENSOR-CF-RECOVERY-001 is MERGED** and the **deploy tip is its squash,
 `8fc3840743ed58e8a27dc6b39f68563e16a8e48e`** (§1). The squash is **byte-identical to the reviewed
 head `1a6a9186`** across all three files, and **the e2e pin `"26"` is untouched** (§3). **ACTIVE OWNER

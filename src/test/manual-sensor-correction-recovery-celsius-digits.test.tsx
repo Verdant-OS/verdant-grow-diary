@@ -28,45 +28,33 @@ vi.mock("@/lib/insertManualSensorReadingReturningId", () => ({
 }));
 
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
+import { buildManualCorrectionOperation } from "@/lib/manualSensorCorrectionOperationRules";
 import { createManualCorrectionJournal } from "@/lib/manualSensorCorrectionPendingStore";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 
 const tentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const otherTent = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const observedAt = "2026-09-16T08:00:00.000Z";
-const pending: ManualCorrectionOperation = {
-  version: 1,
-  operationId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
-  tentId,
-  observedAt,
-  source: "manual",
-  originals: [
-    {
-      metric: "temperature_c",
-      readingId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      value: 24,
+function pendingOperation(): ManualCorrectionOperation {
+  const result = buildManualCorrectionOperation({
+    operationId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    correction: {
+      tentId,
+      originalCapturedAt: observedAt,
+      originalReadingIds: {
+        temperature_c: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        humidity_pct: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      },
+      originalValues: { temperature_c: 24, humidity_pct: 55 },
     },
-    {
-      metric: "humidity_pct",
-      readingId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-      value: 55,
-    },
-  ],
-  changes: [
-    {
-      metric: "temperature_c",
-      originalReadingId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-      expectedValue: 24,
-      value: 26,
-    },
-    {
-      metric: "humidity_pct",
-      originalReadingId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-      expectedValue: 55,
-      value: 60,
-    },
-  ],
-};
+    metrics: [
+      { metric: "temperature_c", value: 26 },
+      { metric: "humidity_pct", value: 60 },
+    ],
+  });
+  if (!result.ok) throw new Error("invalid correction fixture");
+  return result.operation;
+}
 
 function Harness() {
   const location = useLocation();
@@ -95,7 +83,9 @@ beforeEach(() => {
   localStorage.removeItem("verdant:temperatureUnit");
   vi.clearAllMocks();
   mocks.owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-  expect(createManualCorrectionJournal().claim(mocks.owner, pending).status).toBe("claimed");
+  expect(createManualCorrectionJournal().claim(mocks.owner, pendingOperation()).status).toBe(
+    "claimed",
+  );
 });
 afterEach(cleanup);
 
@@ -121,7 +111,8 @@ describe("correction recovery under default Fahrenheit preference", () => {
     await waitFor(() =>
       expect(view.getByRole("button", { name: "Restore pending correction" })).toBeInTheDocument(),
     );
-    fireEvent.change(view.getByLabelText(/Air temp/i), { target: { value: "99" } });
+    fireEvent.click(view.getByTestId("manual-reading-temp-unit-F"));
+    expect((view.container.querySelector("#m-air-temp") as HTMLInputElement).value).toBe("78.8");
     fireEvent.click(view.getByRole("button", { name: "Restore pending correction" }));
     expect((view.container.querySelector("#m-air-temp") as HTMLInputElement).value).toBe("26");
     expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");

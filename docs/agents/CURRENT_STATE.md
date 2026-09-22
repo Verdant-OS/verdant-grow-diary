@@ -219,8 +219,53 @@ Labels below are the **prior** blocks' labels, preserved:
   zero `supabase/`, zero migrations, zero non-Markdown files.
 - The three `#1276` findings, `#1221`'s CI and review detail, `#1174`'s SUPERSEDED V0 C/F hunks, and
   the older Copilot findings: history in the blocks below, not re-checked here.
-- No metrics, no subscriber counts, no CI-derived product claims. **CI on this restamp's own head is
-  `NOT_MEASURED` at stamp time.**
+- No metrics, no subscriber counts, no CI-derived product claims.
+
+## 8b. CI on this restamp's head — MEASURED, and one red lane that is not this PR's
+
+`established fact`, MEASURED 2026-09-22 ~16:23 UTC on head `5a4c1ee755ec9f8c540a58eebac7cf8d1be2531b`
+(PR `#1615`, draft). This supersedes the "CI is `NOT_MEASURED` at stamp time" line an earlier draft
+of this block carried: it was true when written and is no longer.
+
+All three commit statuses are `success` (Vercel deployment, Vercel Deployments validation,
+CodeRabbit — the last reporting `Review skipped: draft pull request`). Of the workflow runs on this
+head, 9 had concluded `success`, 1 was `skipped` (`Stabilization PR scope gate`), 16 were still
+running, and **one concluded `failure`: `Dependency & Security CI`** (run `35753568851`, job
+`Lockfile policy, dependency audit, typecheck, build, tests`).
+
+**The failure is `check:deps`, and it is not this PR's.** Verbatim from the job log:
+
+```text
+check-dependency-security: BLOCKED
+  - bun: Blocked package "hono" has active advisory (severity=moderate, id=1193729).
+  - bun: Blocked package "hono" has active advisory (severity=moderate, id=1193730).
+  - bun: Blocked package "hono" has active advisory (severity=moderate, id=1193731).
+  - bun: Advisory on "js-yaml" is high severity (id=1193727).
+```
+
+`npm` reports the same four. Why it cannot be caused by this change, measured rather than asserted:
+
+- `git diff --name-only a25942686dc7 HEAD` returns **exactly one path**,
+  `docs/agents/CURRENT_STATE.md`.
+- Every input the gate reads is **byte-identical** to the deploy tip: `package.json`, `bun.lock`,
+  `package-lock.json`, `bunfig.toml`, `config/dependency-security-exceptions.json` and
+  `scripts/check-dependency-security.mjs` all return an empty diff against `a25942686dc7`.
+- **`Dependency & Security CI` is not one of the 35 required contexts** in
+  `config/required-status-checks.json` (checked by name: no `Dependency`, `Lockfile` or `audit`
+  entry). It cannot block the merge queue.
+
+**Identical inputs must produce an identical verdict, so the deploy tip carries this red too** —
+that is `inference`, not measurement: the advisory database is fetched at run time and is external
+and time-varying, and **no base-branch push run was read in this slice, so the base-branch result is
+`NOT_MEASURED`.** The inference is about inputs, not about production.
+
+**No fix is ported and none is attempted here.** The remedy is a dependency or lockfile change, and
+this slice's file plan is closed at one Markdown file — touching a lockfile is out of scope by
+instruction. **`config/dependency-security-exceptions.json` stays empty; do not add an entry** to
+silence this. No re-run was spent: input identity is stronger evidence than a second run, and the
+lane is deterministic against a fixed advisory set. **Recorded as a repo-wide dependency-hygiene
+item for whoever owns the next dependency slice — it is not a product `FAIL` and not a defect in
+anything this PR touches.**
 
 ## 9. Current locks
 
@@ -238,6 +283,11 @@ Labels below are the **prior** blocks' labels, preserved:
   `24697dc2c88c`.** Neither is evidence about the tip. **Tent Start Breeding absent = Soft-park
   against Soft `#1613` until Publish, not `FAIL`.**
 - **QL empty Save remasure is `NOT_MEASURED`** — in flight, no packet. Not a pass, not a fail.
+- **`Dependency & Security CI` is red on this head and is NOT this PR's** — `check:deps` BLOCKED on
+  `hono` (moderate ×3) and `js-yaml` (high). Not a required context; every gate input is
+  byte-identical to the deploy tip. **Do not add a
+  `config/dependency-security-exceptions.json` entry to silence it**, and do not widen a docs slice
+  to chase it.
 - **`HOLD #1250`** — do not touch, ready or merge. **`#1221`** stays draft, 262 behind, peer seat
   unfilled. **`#1174`** stays draft, SUPERSEDED on V0 C/F hunks.
 - **Soft P2 QL Target picker subset — Soft-park. Assign-to-tent true-empty Create CTA — Soft-park**

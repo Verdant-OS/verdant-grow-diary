@@ -7,12 +7,11 @@ has changed on the branch since `a25942686dc7`** (§1). **The C/F failure is adj
 it `READING_1_PRODUCT_DEFECT`, not a stale pin**, and **Soft `#1621` is the single ACTIVE OWNER
 Soft-couple** for the fix — head `85ee8a26` (**moved** from `3855ab77` at 18:24 UTC; re-measured
 here), two files, **the e2e pin `"26"` is untouched**, all
-measured (§3). **Live: GDP reports tip = live and `LIVE_LAG` Soft-park CLEARED. Claude did NOT
-measure it** — a fourth `version.json` read was refused by the same egress 403 at 18:09:05 UTC, so
-that row stays **operator-supplied and `BLOCKED`** here (§2). Do not read this stamp as independent
-confirmation that lag is cleared. **Soft `#1616` is SUPERSEDED Soft-park** and, measured, is the
-**only other open PR that writes this file** — two open writers now exist and only one may land
-(§4). Board re-listed from the API: **28 open PRs**, and it is **no longer EMPTY** — nine sit at
+measured (§3). **Live is MEASURED: tip = live, `dirty:false`, `LIVE_LAG` Soft-park CLEARED** — read
+by the **GDP/Grok independent review** (`#1622` comment `5781860840`), not by Claude, whose own
+egress refused a fifth time at 18:32:41 UTC (§2). **Soft `#1616` is SUPERSEDED and was CLOSED
+unmerged by GDP at 18:33 UTC**, so the two-writers collision is resolved and **this PR is the only
+writer of this file still in flight** (§4). Board re-listed from the API: **28 open PRs**, and it is **no longer EMPTY** — nine sit at
 behind ≤ 1, four of them newly readied out of draft (§5). **Golden Toad: AUTH_NEEDED ~12:54 CT**,
 sticky Playwright session dropped; one-tent Next step **`NOT_MEASURED`**; **not**
 `AUTH_CHOOSER_READY` (§6). `Native Manual Correction Local` stays Soft-ignored on tip and docs PRs
@@ -36,26 +35,32 @@ exactly `docs/agents/CURRENT_STATE.md`. **Product behaviour on the branch is the
 versus that merge's parent `a25942686dc7`** — the only product change in flight is Soft `#1621`
 (§3), which is **not merged**.
 
-## 2. Live — GDP says tip = live; Claude's read is `BLOCKED` for the fourth time
+## 2. Live is MEASURED — tip = live, `LIVE_LAG` Soft-park CLEARED
 
-**The `LIVE_LAG`-cleared status is `source claim`, operator-supplied. This slice did not verify it.**
-GDP's brief expects `shortCommit aabbd2b37486`, `dirty:false`, tip = live, and `LIVE_LAG` Soft-park
-CLEARED for tip Soft-couples. **Claude cannot confirm or contradict that**, and per the brief's own
-instruction — _never invent_ — the row is recorded as unverified rather than echoed as measured.
+**`established fact`, measured by the independent reviewer, not by Claude.** This row was
+`source claim` when first written; the GDP/Grok independent review on `#1622`
+(comment `5781860840`, 2026-09-22 ~13:32 CT) read `https://verdantgrowdiary.com/version.json`
+over an unblocked path and posted the values. **That closes it.**
 
-| Field                      | Value                                        |
-| -------------------------- | -------------------------------------------- |
-| GDP-reported `shortCommit` | `aabbd2b37486`                               |
-| GDP-reported `dirty`       | `false`                                      |
-| GDP-reported status        | tip = live; `LIVE_LAG` Soft-park **CLEARED** |
-| provenance                 | **operator-supplied (GDP brief)**            |
-| Claude's own read          | **`BLOCKED`**, 2026-09-22 **18:09:05 UTC**   |
+| Field             | Value                                                             |
+| ----------------- | ----------------------------------------------------------------- |
+| `commit`          | `aabbd2b3748678229387fbf110d8d2525ce32f4a`                        |
+| `shortCommit`     | `aabbd2b37486`                                                    |
+| `dirty`           | **`false`**                                                       |
+| `ref`             | `verdant-grow-diary`                                              |
+| status            | **tip = live; `LIVE_LAG` Soft-park CLEARED**                      |
+| measured by       | **GDP / Grok independent review** (`#1622` comment `5781860840`)  |
+| Claude's own read | **`BLOCKED`** — five refusals, latest 2026-09-22 **18:32:41 UTC** |
 
-The attempt: `curl https://verdantgrowdiary.com/version.json` → **`curl: (56) CONNECT tunnel failed,
-response 403`**. That is the **fourth** refusal of this host across three slices, after two 403s and
-a Vercel `forbidden` on the deployments list. The proxy documents a 403 as an organisation
-egress-policy denial that must be reported rather than retried or routed around. **Reported. No
-fifth attempt.**
+**The attribution matters and is kept deliberately.** The measurement is real and the lag is
+closed, but **Claude did not perform it**. A later reader tracing this row must land on the
+reviewer's comment, not on this document. Claude's own egress stayed blocked throughout.
+
+Claude's own attempts: `curl https://verdantgrowdiary.com/version.json` → **`curl: (56) CONNECT
+tunnel failed, response 403`**, five times across four slices, the last at **18:32:41 UTC**, plus a
+Vercel `forbidden` on the deployments list. The proxy documents a 403 as an organisation
+egress-policy denial that must be reported rather than retried or routed around. **Reported every
+time; never routed around.** The reviewer's path was not subject to that policy.
 
 **What this means in practice, stated plainly:** if GDP's reading is right, the 237-commit
 `LIVE_LAG` recorded in the two superseded stamps is now closed and tip Soft-couples are live. That
@@ -122,7 +127,7 @@ implementation, one owner.**
 has **not** read it and does not quote from it. What Claude can cite first-hand is its own finding
 comment on `#1616` (`5780580183`) and the GDP reply to it. **No citation is invented.**
 
-## 4. Soft `#1616` is SUPERSEDED Soft-park — and this file now has two open writers
+## 4. Soft `#1616` is SUPERSEDED and now CLOSED — the two-writers collision is resolved
 
 `established fact`. Soft `#1616` (`docs(state): restamp on aabbd2b3 — LIVE_LAG 237, measured
 deploy-tip CI, sandbox schema gaps`, branch `claude/cool-cerf-m8uhw2`, head `d68ae037`, behind 0) is
@@ -130,11 +135,12 @@ deploy-tip CI, sandbox schema gaps`, branch `claude/cool-cerf-m8uhw2`, head `d68
 `LIVE_LAG` as **237 and open**, and it carries the C/F failure as an **unadjudicated** two-reading
 question. Both rows are now stale. **Do not Soft-couple `#1616`. Do not merge it.**
 
-**The collision this creates, named rather than left implicit.** Measured across all 28 open PRs,
-**`#1616` is the only other PR whose diff touches `docs/agents/CURRENT_STATE.md`** — and this slice
-makes a second. **Two open PRs now write this file, and only one may land.** The two earlier stamps
-each recorded "no other ACTIVE OWNER" truthfully; that is no longer true, and the resolution is
-GDP's to make, not Claude's. This slice does not close, ready, or push to `#1616`.
+**The collision this created, and how it was resolved.** Measured across all 28 open PRs,
+`#1616` was the only other PR whose diff touched `docs/agents/CURRENT_STATE.md`, and this slice
+made a second — two open writers where only one could land. Claude named it rather than papering
+over it, and did **not** close, ready or push to `#1616`. **GDP closed `#1616` unmerged as
+SUPERSEDED at 18:33 UTC**, so **exactly one writer of this file remains in flight: this PR.**
+`#1616` is closed, not merged; do not reopen it.
 
 **Branch note.** `#1616` occupies `claude/cool-cerf-m8uhw2` and must stay intact, so this slice runs
 on a **new branch**, `claude/gdp-current-state-restamp-20260922-pm`, cut fresh from the tip.
@@ -262,10 +268,12 @@ Carried rows keep their original labels. Nothing below is re-claimed as current.
 - **`#1621` is the single ACTIVE OWNER Soft-couple for the C/F fix.** Do not open a competing
   implementation, do not touch `ManualSensorReadingCard.tsx` or `#1621`'s files, and **do not edit
   the e2e pin `"26"`** — the pin is right and the app was wrong.
-- **Live is operator-supplied, not Claude-measured.** Four refusals across three slices. **Do not
-  record `LIVE_LAG` CLEARED as MEASURED without an actual `version.json` read.**
-- **`#1616` is SUPERSEDED Soft-park and is a second open writer of this file.** Only one may land.
-  Claude did not close, ready or push to it.
+- **Live is MEASURED and `LIVE_LAG` is CLEARED** — `aabbd2b3`, `dirty:false`, read by the
+  **GDP/Grok independent review**, not by Claude (five egress refusals). Cite that review as the
+  evidence, never this document.
+- **`#1616` is SUPERSEDED and CLOSED unmerged** (GDP, 18:33 UTC). The two-writers collision is
+  resolved; this PR is the only writer in flight. **Do not reopen `#1616`.** Claude did not close
+  it.
 - **The Soft-couple board is NOT empty.** Nine PRs at behind ≤ 1; four of them newly readied out of
   draft, including two sensor surfaces. **Re-list from the API before any collision claim.**
 - **Golden Toad AUTH is `AUTH_NEEDED`** (sticky session dropped, ~12:54 CT). One-tent Next step is

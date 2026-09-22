@@ -79,7 +79,13 @@ export function normalizeSensorSource(input: unknown): SensorSource {
   if (typeof input !== "string") return "invalid";
   const v = input.trim().toLowerCase();
   if (v.length === 0) return "invalid";
-  return ALIAS[v] ?? "invalid";
+  // Own-property guard: plain-object ALIAS inherits Object.prototype, so
+  // tokens like "constructor" / "__proto__" must not resolve to inherited
+  // values and escape the invalid fallback.
+  if (Object.prototype.hasOwnProperty.call(ALIAS, v)) {
+    return ALIAS[v]!;
+  }
+  return "invalid";
 }
 
 export function isHealthySensorSource(source: SensorSource): boolean {

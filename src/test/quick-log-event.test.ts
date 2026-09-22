@@ -3,8 +3,8 @@
  *
  * The writer is now a thin client over `public.quicklog_save_event`. These
  * tests assert:
- *   - sensor snapshot is fetched (via the snapshot RPC) and passed to the
- *     save RPC verbatim, preserving source + captured_at
+ *   - validated effective sensor evidence is selected behind the snapshot RPC
+ *     availability gate, preserving source + captured_at in the save RPC
  *   - canonical event type mapping is applied
  *   - idempotency_key is forwarded
  *   - reused responses surface the same grow_event_id
@@ -29,6 +29,7 @@ const state = {
 };
 
 const rpcSpy = vi.fn();
+const fromSpy = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -38,7 +39,8 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (fn === "get_latest_tent_sensor_snapshot") return Promise.resolve(state.snapshotRpc);
       return Promise.resolve({ data: null, error: null });
     },
-    from: () => {
+    from: (table: string) => {
+      fromSpy(table);
       const builder: Record<string, unknown> = {};
       for (const method of ["select", "eq", "gte", "lte", "order"]) {
         builder[method] = () => builder;
@@ -59,8 +61,28 @@ function getSaveCall() {
   return call ? (call[1] as Record<string, unknown>) : null;
 }
 
+function effectiveReading(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    user_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    tent_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    metric: "temperature_c",
+    value: 24.3,
+    quality: "ok",
+    source: "csv",
+    captured_at: "2026-06-09T12:00:00Z",
+    ts: "2026-06-09T12:00:00Z",
+    created_at: "2026-06-09T12:00:00Z",
+    device_id: null,
+    raw_payload: {},
+    correction_valid: true,
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   rpcSpy.mockClear();
+  fromSpy.mockClear();
   state.saveRpc = {
     data: { ok: true, grow_event_id: "event-1", reused: false },
     error: null,
@@ -191,24 +213,12 @@ describe("createQuickLogEvent — RPC contract", () => {
     };
     state.sensorRows = {
       data: [
-        {
-          id: "temperature",
-          metric: "temperature_c",
-          value: 24.3,
-          quality: "ok",
-          source: "csv",
-          captured_at: "2026-06-09T12:00:00Z",
-          raw_payload: {},
-        },
-        {
-          id: "humidity",
+        effectiveReading(),
+        effectiveReading({
+          id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
           metric: "humidity_pct",
           value: 55,
-          quality: "ok",
-          source: "csv",
-          captured_at: "2026-06-09T12:00:00Z",
-          raw_payload: {},
-        },
+        }),
       ],
       error: null,
     };
@@ -226,6 +236,41 @@ describe("createQuickLogEvent — RPC contract", () => {
     expect(snap.source).not.toBe("live");
     expect(snap.captured_at).toBe("2026-06-09T12:00:00Z");
     expect(snap.metrics).toEqual({ temperature: 24.3, humidity: 55 });
+    expect(fromSpy).toHaveBeenCalledExactlyOnceWith("sensor_readings_effective");
+  });
+
+  it("attaches the corrected manual value without refreshing its observation time", async () => {
+    state.snapshotRpc = {
+      data: { captured_at: "2026-06-09T12:00:00Z", source: "live", temperature: 99 },
+      error: null,
+    };
+    state.sensorRows = {
+      data: [effectiveReading({ source: "manual", value: 26 })],
+      error: null,
+    };
+    await createQuickLogEvent({ ...baseInput, tentId: "tent-1", eventType: "note" });
+    expect(getSaveCall()?.p_sensor_snapshot).toEqual({
+      source: "manual",
+      captured_at: "2026-06-09T12:00:00Z",
+      metrics: { temperature: 26 },
+    });
+  });
+
+  it.each([
+    ["invalid correction", { correction_valid: false }],
+    ["missing ownership", { user_id: undefined }],
+    ["invalid reading identity", { id: "temperature" }],
+  ])("saves the log without unverified evidence for %s", async (_name, invalid) => {
+    state.snapshotRpc = {
+      data: { captured_at: "2026-06-09T12:00:00Z", source: "live", temperature: 99 },
+      error: null,
+    };
+    state.sensorRows = { data: [effectiveReading(invalid)], error: null };
+    await expect(
+      createQuickLogEvent({ ...baseInput, tentId: "tent-1", eventType: "note" }),
+    ).resolves.toEqual({ id: "event-1", reused: false });
+    expect(getSaveCall()?.p_sensor_snapshot).toBeNull();
+    expect(fromSpy).toHaveBeenCalledExactlyOnceWith("sensor_readings_effective");
   });
 
   it("returns reused=true when the RPC replays a duplicate save", async () => {

@@ -7,6 +7,7 @@
  * detail state so the presenter stays a thin renderer:
  *
  *   - loading      : early skeleton (handled directly in the page)
+ *   - paused       : first read waiting for connection
  *   - loading-slow : bounded retryable surface after the load timeout
  *   - error        : explicit fetch failure
  *   - archived     : plant resolved but archived/merged (not active)
@@ -33,7 +34,8 @@ import { isQueryGrowScopeMismatch, readEntityGrowId } from "@/lib/detailGrowScop
 export const readPlantGrowId = readEntityGrowId;
 export const isPlantDetailGrowScopeMismatch = isQueryGrowScopeMismatch;
 
-export type PlantDetailBlockedStateKind = "loading-slow" | "error" | "archived" | "not-found";
+export type PlantDetailBlockedStateKind =
+  "paused" | "loading-slow" | "error" | "archived" | "not-found";
 
 export interface PlantDetailBlockedStateAction {
   /** Stable test id for the link element. */
@@ -162,6 +164,17 @@ export function derivePlantDetailBlockedStateView(
   }
 
   switch (loadState) {
+    case "paused":
+      return {
+        kind: "paused",
+        testId: "plant-detail-paused",
+        title: "Waiting for connection",
+        description:
+          "Plant details have not loaded yet. Loading will resume when your connection returns.",
+        showRetry: false,
+        primaryBack: primary,
+        secondaryBack: secondary,
+      };
     case "loading-slow":
       return {
         kind: "loading-slow",

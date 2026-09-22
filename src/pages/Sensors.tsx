@@ -2,7 +2,9 @@ import VpdStageMissingBadge from "@/components/VpdStageMissingBadge";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useAuth } from "@/store/auth";
+import { useSensorsPageSession } from "@/hooks/useSensorsPageSession";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { Activity } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -16,6 +18,8 @@ import FirstTentSetupEmptyState from "@/components/FirstTentSetupEmptyState";
 import EnvironmentCsvImportLauncher from "@/components/EnvironmentCsvImportLauncher";
 import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
+import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
+import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
 import { useSoilMoistureCalibrations } from "@/hooks/useSoilMoistureCalibrations";
 import SoilMoistureCalibrationCaptureCard from "@/components/SoilMoistureCalibrationCaptureCard";
@@ -75,8 +79,18 @@ const METRICS = [
   { key: "ppfd", label: "PPFD" },
 ] as const;
 
+const subscribeWithoutSession = () => () => {};
+const readWithoutSession = () => null;
+
 export default function Sensors() {
   const location = useLocation();
+  const { user } = useAuth();
+  const session = useSensorsPageSession(user?.id);
+  const sessionState = useSyncExternalStore(
+    session?.subscribe ?? subscribeWithoutSession,
+    session?.getSnapshot ?? readWithoutSession,
+    readWithoutSession,
+  );
   const tentsQuery = useGrowTents();
   const { data: tents = [] } = tentsQuery;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -96,12 +110,19 @@ export default function Sensors() {
     () => buildSensorsTentRouteIntentKey(sensorsTentRouteIntent, location.key),
     [location.key, sensorsTentRouteIntent],
   );
-  const [tentId, setTentId] = useState<string | null>(null);
-  const [appliedTentRouteIntentKey, setAppliedTentRouteIntentKey] = useState<string | null>(null);
-  const [growerTentSelection, setGrowerTentSelection] = useState<{
+  const [localTentId, setTentId] = useState<string | null>(null);
+  const [localAppliedIntentKey, setAppliedTentRouteIntentKey] = useState<string | null>(null);
+  const [localGrowerSelection, setGrowerTentSelection] = useState<{
     intentKey: string;
     tentId: string;
   } | null>(null);
+  const tentId = session ? (sessionState?.selection.tentId ?? null) : localTentId;
+  const appliedTentRouteIntentKey = session
+    ? (sessionState?.selection.appliedIntentKey ?? null)
+    : localAppliedIntentKey;
+  const growerTentSelection = session
+    ? (sessionState?.selection.explicitSelection ?? null)
+    : localGrowerSelection;
   const focusedSensorAnchorHashRef = useRef<string | null>(null);
   const explicitTentId =
     growerTentSelection?.intentKey === sensorsTentRouteIntentKey
@@ -123,7 +144,12 @@ export default function Sensors() {
   // Do not fetch the all-tents aggregate into the Sensors browser cache.
   // `null` is an explicit no-scope sentinel until a persisted tent is chosen.
   const readingsQuery = useGrowSensorReadings(activeTentId);
-  const { data: readings = [] } = readingsQuery;
+  const quickLogManualQuery = useSensorsQuickLogManualReadings(activeTentId);
+  const { data: tentReadings = [] } = readingsQuery;
+  const readings = useMemo(
+    () => mergeSensorsSeriesWithQuickLogManuals(tentReadings, quickLogManualQuery.data ?? []),
+    [quickLogManualQuery.data, tentReadings],
+  );
   const operatorRole = useHasRole("operator");
 
   // Reconcile only after the authenticated tent query succeeds. A failed
@@ -136,6 +162,15 @@ export default function Sensors() {
   const tentsSyncKey = useMemo(() => tents.map((tent) => tent.id).join("\0"), [tents]);
   useEffect(() => {
     if (!tentsQuery.isSuccess) return;
+    if (session) {
+      session.reconcileSelection({
+        intent: sensorsTentRouteIntent,
+        intentKey: sensorsTentRouteIntentKey,
+        tents,
+        tentsLoaded: true,
+      });
+      return;
+    }
 
     const intentChanged = appliedTentRouteIntentKey !== sensorsTentRouteIntentKey;
     setTentId((currentTentId) =>
@@ -163,6 +198,7 @@ export default function Sensors() {
     sensorsTentRouteIntentKey,
     tentsSyncKey,
     tentsQuery.isSuccess,
+    session,
   ]);
 
   // React Router updates hashes without a full browser navigation, so make
@@ -265,9 +301,26 @@ export default function Sensors() {
   );
 
   const hasReadings = filtered.length > 0;
+  const manualHistoryPending = Boolean(activeTentId) && quickLogManualQuery.isPending;
+  const manualHistoryUnavailable = Boolean(activeTentId) && quickLogManualQuery.isError;
+  const manualHistoryIncomplete = manualHistoryPending || manualHistoryUnavailable;
+  const manualHistoryStateLabel = manualHistoryUnavailable
+    ? "Unavailable"
+    : quickLogManualQuery.fetchStatus === "paused"
+      ? "Waiting for connection"
+      : "Checking readings";
+  const manualHistoryMessage = manualHistoryUnavailable
+    ? "Quick Log manual history could not be fully checked. Try the read again."
+    : quickLogManualQuery.fetchStatus === "paused"
+      ? "Waiting for connection to check Quick Log manual history."
+      : "Checking Quick Log manual history…";
 
   const manualTents = tents.map((t) => ({ id: t.id as string, name: t.name as string }));
   const selectTentByGrower = (nextTentId: string) => {
+    if (session) {
+      session.selectTent(nextTentId, sensorsTentRouteIntentKey, tents);
+      return;
+    }
     setGrowerTentSelection({ intentKey: sensorsTentRouteIntentKey, tentId: nextTentId });
     setTentId(nextTentId);
   };
@@ -370,11 +423,33 @@ export default function Sensors() {
         ))}
         <GrowDataSourceBadge classification={classification} className="ml-2" />
       </div>
-      <EnvironmentStabilityCard
-        testId="sensors-environment-stability"
-        className="mb-4"
-        result={vpdStability}
-      />
+      {manualHistoryUnavailable ? (
+        <div className="mb-4">
+          <GrowDataLoadError
+            resource="Quick Log manual history"
+            testId="sensors-manual-history-error"
+            message="Some Quick Log manual readings could not be checked. Available readings remain visible; previously loaded readings may be out of date."
+            onRetry={() => {
+              void quickLogManualQuery.refetch();
+            }}
+          />
+        </div>
+      ) : manualHistoryPending ? (
+        <p
+          role="status"
+          className="mb-4 text-sm text-muted-foreground"
+          data-testid="sensors-manual-history-pending"
+        >
+          {manualHistoryMessage}
+        </p>
+      ) : null}
+      {(!manualHistoryIncomplete || vpdStabilityReadings.length > 0) && (
+        <EnvironmentStabilityCard
+          testId="sensors-environment-stability"
+          className="mb-4"
+          result={vpdStability}
+        />
+      )}
       {/* Presenter-only reconciliation: a derived VPD estimate can exist on
           the VPD card while stability is unavailable (no directly measured
           VPD series). Name both facts so they cannot read as contradictory. */}
@@ -425,6 +500,10 @@ export default function Sensors() {
             isDerived,
             recentValues,
           });
+          const unresolvedManualMetric =
+            manualHistoryIncomplete &&
+            (m.key === "temp" || m.key === "rh" || m.key === "vpd") &&
+            value == null;
           const soilMoistureView =
             m.key === "soil" &&
             latestMetricReading &&
@@ -507,15 +586,15 @@ export default function Sensors() {
                   )}
                   <span
                     data-testid={`sensors-metric-state-${m.key}`}
-                    data-kind={state.kind}
+                    data-kind={unresolvedManualMetric ? "unresolved" : state.kind}
                     data-tone={state.tone}
                     className={cn(
                       "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px]",
                       stateToneClass,
                     )}
-                    title={state.message}
+                    title={unresolvedManualMetric ? manualHistoryMessage : state.message}
                   >
-                    {state.label}
+                    {unresolvedManualMetric ? manualHistoryStateLabel : state.label}
                   </span>
                   {m.key === "soil" && soilMoistureView && soilBadgeToneClass && (
                     <span
@@ -554,7 +633,7 @@ export default function Sensors() {
                   className="text-xs text-muted-foreground py-6 text-center"
                   data-testid={`sensors-empty-${m.key}`}
                 >
-                  {state.message}
+                  {unresolvedManualMetric ? manualHistoryMessage : state.message}
                 </p>
               )}
               {m.key === "vpd" && isDerived && (
@@ -726,6 +805,7 @@ export default function Sensors() {
             tents={manualTents}
             defaultTentId={defaultManualTentId}
             correction={correctionCtx}
+            session={session ?? undefined}
           />
         )}
       </div>
@@ -776,14 +856,16 @@ export default function Sensors() {
         </div>
       </div>
       <SensorSourceLegendCompact className="mt-4 max-w-xl" testId="sensors-source-legend-compact" />
-      <SensorSourceSummaryWidget
-        className="mt-4 max-w-xl"
-        readings={filtered.map((r) => ({
-          source: (r as unknown as { source?: string | null }).source ?? null,
-          captured_at: (r as unknown as { captured_at?: string | null }).captured_at ?? null,
-          ts: r.ts,
-        }))}
-      />
+      {(hasReadings || !manualHistoryIncomplete) && (
+        <SensorSourceSummaryWidget
+          className="mt-4 max-w-xl"
+          readings={filtered.map((r) => ({
+            source: (r as unknown as { source?: string | null }).source ?? null,
+            captured_at: (r as unknown as { captured_at?: string | null }).captured_at ?? null,
+            ts: r.ts,
+          }))}
+        />
+      )}
       <div className="mt-4 max-w-xl">
         <SensorBridgeHealthCard
           sensorReadings={defaultManualTentId ? trendReadings : []}

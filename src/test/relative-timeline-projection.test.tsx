@@ -489,15 +489,18 @@ describe("groupRelativeTimelineByStage — pure rules", () => {
   });
 });
 
-vi.mock("@/hooks/usePlantRecentActivity", () => ({
-  usePlantRecentActivity: vi.fn(),
-  PLANT_RECENT_ACTIVITY_LIMIT: 10,
+const historyFixture = vi.hoisted(() => ({ read: vi.fn() }));
+vi.mock("@/hooks/usePlantRelativeTimelineHistory", () => ({
+  usePlantRelativeTimelineHistory: () => {
+    const read = historyFixture.read();
+    // These presentation fixtures represent complete successful reads; the
+    // real loader/count/pagination contract is exercised in the history suite.
+    return { ...read, totalCount: read?.data?.length ?? null };
+  },
 }));
-
-import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import PlantRelativeTimelineSection from "@/components/PlantRelativeTimelineSection";
 
-const mockUse = usePlantRecentActivity as unknown as ReturnType<typeof vi.fn>;
+const mockUse = historyFixture.read;
 
 describe("PlantRelativeTimelineSection — render", () => {
   it("renders the helper line about plant days", () => {

@@ -5,7 +5,7 @@
  * Hard constraints:
  *  - Presenter only. No fetches, no writes.
  *  - Always labels source as "CSV". Never "Live".
- *  - Derived VPD label is always "Derived VPD". Never "Live VPD".
+ *  - VPD uses the matched row's CSV/Derived label. Never "Live VPD".
  *  - Renders nothing when no snapshot matched.
  */
 import type { CsvTimelineSnapshot } from "@/lib/environmentCsvTimelineContextViewModel";

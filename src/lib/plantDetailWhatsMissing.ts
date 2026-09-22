@@ -53,7 +53,7 @@ export interface WhatsMissingCta {
   eventPayload?: {
     plantId: string | null;
     growId: string | null;
-    activityId: "photo";
+    activityId?: "photo";
   };
   /** Query params object for href construction (kept minimal). */
   query?: Record<string, string>;
@@ -193,7 +193,15 @@ function buildCta(
 ): WhatsMissingCta {
   switch (kind) {
     case "quicklog":
-      return { kind, label: "Add Quick Log", event: "open-quicklog" };
+      return {
+        kind,
+        label: "Add Quick Log",
+        event: "open-quicklog",
+        eventPayload: {
+          plantId: plantId ?? null,
+          growId: growId ?? null,
+        },
+      };
     case "sensor_snapshot": {
       const href = growId ? `/sensors?growId=${encodeURIComponent(growId)}` : "/sensors";
       return { kind, label: "Add manual sensor snapshot", href };

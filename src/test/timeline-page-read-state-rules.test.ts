@@ -130,6 +130,25 @@ describe("buildTimelinePageReadView", () => {
     });
   });
 
+  it("classifies a successful zero-row date-bounded read without claiming an empty grow", () => {
+    expect(
+      buildTimelinePageReadView(viewInput({ evidenceCount: 0, hasAppliedDateBounds: true })),
+    ).toEqual({
+      kind: "ready_empty_date_window",
+      showTimelineContent: true,
+      showSensorsNextStep: false,
+      showSupplementalLoading: false,
+      retryTarget: null,
+      partialSources: [],
+    });
+  });
+
+  it("does not treat a false date-bounds flag as a date window", () => {
+    expect(
+      buildTimelinePageReadView(viewInput({ evidenceCount: 0, hasAppliedDateBounds: false })),
+    ).toMatchObject({ kind: "ready_empty" });
+  });
+
   it.each([null, undefined, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, "1"])(
     "fails closed for invalid evidence count %o",
     (evidenceCount) => {
@@ -360,6 +379,7 @@ describe("buildTimelinePageReadView", () => {
       viewInput({ coreRead: { status: "loading", readKey: ACTIVE_KEY } }),
       viewInput({ coreRead: { status: "error", readKey: ACTIVE_KEY } }),
       viewInput({ evidenceCount: 0 }),
+      viewInput({ evidenceCount: 0, hasAppliedDateBounds: true }),
     ];
     const views = states.map(buildTimelinePageReadView);
     expect(views.every((view) => view.showSensorsNextStep === false)).toBe(true);
@@ -372,6 +392,7 @@ describe("buildTimelinePageReadView", () => {
       "loading",
       "timeline_error",
       "ready_empty",
+      "ready_empty_date_window",
     ]);
   });
 });

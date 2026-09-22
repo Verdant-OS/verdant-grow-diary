@@ -8,6 +8,10 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
+import {
+  ConsentGatedVercelAnalytics,
+  ConsentGatedSpeedInsights,
+} from "@/components/ConsentGatedVercelTelemetry";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -195,6 +199,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <ConsentGatedVercelAnalytics />
         <Scripts />
       </body>
     </html>
@@ -253,6 +258,7 @@ function ApplicationRootComponent() {
               </GrowsProvider>
             </AuthProvider>
           </TooltipProvider>
+          <ConsentGatedSpeedInsights />
         </QueryClientProvider>
       </RootErrorBoundary>
     </RootDocument>

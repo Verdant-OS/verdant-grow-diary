@@ -57,13 +57,16 @@ const QUICK_LOG_V2_SAVE_CALLERS = [
   },
   {
     file: "src/components/QuickLogV2Sheet.tsx",
-    telemetryIntent: /save\(built\.payload,\s*\{\s*telemetryIntent:\s*form\.action\s*\}\)/,
+    // Recovery submits the frozen intent rather than a mutable form action.
+    telemetryIntent:
+      /save\(exactManualSubmission\.payload,\s*\{\s*telemetryIntent:\s*submissionAction,\s*verifyPersistedNote:\s*pendingManualSubmission !== null,\s*canContinueNote,?\s*\}\)/,
   },
   { file: "src/components/AiDoctorCheckInPreviewPanel.tsx", telemetryIntent: null },
   { file: "src/pages/EcowittIngestAudit.tsx", telemetryIntent: null },
   {
     file: "src/components/PlantQuickLog.tsx",
-    telemetryIntent: /save\(built\.payload,\s*\{\s*telemetryIntent:\s*"plant_quick_log"\s*\}\)/,
+    telemetryIntent:
+      /save\(built\.payload,\s*\{\s*telemetryIntent:\s*"plant_quick_log",\s*canContinueNote:\s*canContinue,?\s*\}\)/,
   },
 ] as const;
 
@@ -324,12 +327,15 @@ describe("each funnel event fires from its canonical seam", () => {
 describe("ordering and safety constraints at the seams", () => {
   it("shared manual RPC telemetry defaults off and fires only after explicit confirmed success", () => {
     const src = read("src/hooks/useQuickLogV2Save.ts");
-    const okBranch = src.indexOf("if (!r.ok)");
+    const okBranch = src.indexOf('if (payload.p_action === "note" ? r.ok !== true : !r.ok)');
+    const uuidGate = src.indexOf("if (!isUuid(r.grow_event_id))");
     const optIn = src.indexOf("if (options.telemetryIntent !== undefined)");
     const track = src.indexOf("trackQuickLogSuccess(options.telemetryIntent");
     const okReturn = src.indexOf("ok: true");
     expect(okBranch).toBeGreaterThan(-1);
-    expect(optIn).toBeGreaterThan(okBranch);
+    expect(uuidGate).toBeGreaterThan(okBranch);
+    expect(optIn).toBeGreaterThan(uuidGate);
+    expect(src.lastIndexOf("if (!canContinue())", optIn)).toBeGreaterThan(uuidGate);
     expect(track).toBeGreaterThan(optIn);
     expect(okReturn).toBeGreaterThan(track);
     expect(src).toMatch(/reused:\s*r\.reused === true/);

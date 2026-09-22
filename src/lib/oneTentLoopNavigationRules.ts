@@ -17,7 +17,7 @@ import {
   type PlantQuickLogPrefill,
 } from "@/lib/plantQuickLogPrefillRules";
 import { buildConnectedActivationRoutes } from "@/lib/connectedOneTentActivationRules";
-import { actionsPath, alertsPath, timelinePath } from "@/lib/routes";
+import { actionsPath, alertsPath, timelinePath, withGrowId } from "@/lib/routes";
 
 export type OneTentLoopStep =
   | "grow"
@@ -237,16 +237,24 @@ export function resolveOneTentLoopNextStep(
       // from pairing that plant with a first-available fallback if its tent
       // disappears before the destination resolves. Direct callers that pass
       // a plant without a tent fail closed to a generic Sensors route.
+      // Grow scope is additive via the shared withGrowId helper (same as
+      // Reports "Open sensor context") — never invent a growId.
       if (normalizedTentId && normalizedPlantId) {
         return enable(
           base,
-          withSensorsPlantIntent(
-            buildSensorsTentRouteHref(normalizedTentId, { requireExactMatch: true }),
-            normalizedPlantId,
+          withGrowId(
+            withSensorsPlantIntent(
+              buildSensorsTentRouteHref(normalizedTentId, { requireExactMatch: true }),
+              normalizedPlantId,
+            ),
+            normalizedGrowId,
           ),
         );
       }
-      return enable(base, buildSensorsTentRouteHref(normalizedTentId));
+      return enable(
+        base,
+        withGrowId(buildSensorsTentRouteHref(normalizedTentId), normalizedGrowId),
+      );
     case "sensor-snapshot":
       if (normalizedGrowId && normalizedTentId) {
         const scopedHref = `/doctor?growId=${encodeURIComponent(normalizedGrowId)}&tentId=${encodeURIComponent(normalizedTentId)}`;

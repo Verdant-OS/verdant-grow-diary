@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "@/lib/react-router-compat";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthSignOutOperation } from "@/lib/authSignOutOperationService";
 
 export type RequireAuthStatus =
   "loading" | "authenticated" | "unauthenticated" | "revalidation_failed";
@@ -79,11 +80,13 @@ export function useRequireAuth(
   const [retryToken, setRetryToken] = useState(0);
 
   const retry = useCallback(() => {
+    getAuthSignOutOperation(supabase.auth).clearFailedCleanup();
     setRetryToken((t) => t + 1);
   }, []);
 
   useEffect(() => {
     function onRevalidate() {
+      getAuthSignOutOperation(supabase.auth).clearFailedCleanup();
       setRetryToken((t) => t + 1);
     }
     window.addEventListener(AUTH_REVALIDATE_EVENT, onRevalidate);
@@ -114,9 +117,17 @@ export function useRequireAuth(
     };
     const redirectUnauthenticated = () => {
       setStatus("unauthenticated");
-      nav(redirectTo, { replace: true });
+      // Consult the actual client's operation at action time. Every hook
+      // caller must respect an explicit exit's pending navigation.
+      if (getAuthSignOutOperation(supabase.auth).getSnapshot() === "idle")
+        nav(redirectTo, { replace: true });
     };
     const revalidationFailed = () => setStatus("revalidation_failed");
+
+    if (getAuthSignOutOperation(supabase.auth).hasFailedCleanup()) {
+      settle(revalidationFailed);
+      return;
+    }
 
     setStatus("loading");
     armBound();
@@ -145,7 +156,13 @@ export function useRequireAuth(
           // Sign out — never a redirect carrying a stale "Signed in".
           armBound();
           void Promise.resolve()
-            .then(() => supabase.auth.signOut({ scope: "local" }))
+            .then(() =>
+              getAuthSignOutOperation(supabase.auth).runSdkSignOut(async () => {
+                const result = await supabase.auth.signOut({ scope: "local" });
+                if (result?.error) throw new Error("local_sign_out_failed");
+                return result;
+              }),
+            )
             .then(
               (result) => settle(result?.error ? revalidationFailed : redirectUnauthenticated),
               () => settle(revalidationFailed),

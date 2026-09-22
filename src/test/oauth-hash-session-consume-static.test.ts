@@ -14,20 +14,11 @@ function read(rel: string): string {
 }
 
 describe("oauth hash session consume wiring", () => {
-  it("AuthProvider consumes OAuth hash before getSession via the rules helper", () => {
+  it("does not log OAuth return tokens during auth bootstrap", () => {
     const authSrc = read("src/store/auth.tsx");
-    expect(authSrc).toContain("consumeOAuthHashSessionIfPresent");
-    expect(authSrc).toContain("takeOAuthReturnHashStash");
-    expect(authSrc).toContain("stashedHash");
-    expect(authSrc).toContain("supabase.auth.setSession");
-    expect(authSrc).toContain("history.replaceState");
     expect(authSrc).not.toMatch(/console\.(log|debug|info|warn|error)\(/);
-
-    // Bootstrap IIFE: hash consume completes before the initial getSession.
-    // (reconcileWithClientSession also calls getSession earlier in the file.)
-    expect(authSrc).toMatch(
-      /await consumeOAuthHashSessionIfPresent\(\{[\s\S]*?\}\);[\s\S]*?if \(disposed\) return;[\s\S]*?await supabase\.auth\.getSession\(\)/,
-    );
+    // Actual OAuth consume / INITIAL_SESSION ordering is exercised through
+    // the SDK in auth-oauth-bootstrap-held-session.test.tsx.
   });
 
   it("early wipe script matches parseOAuthHashFragment keys (resolved constant)", () => {

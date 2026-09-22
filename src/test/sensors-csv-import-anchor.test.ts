@@ -24,7 +24,7 @@ describe("Sensors page — CSV import regression guard", () => {
 
   it("mounts the focusable target named by the Dashboard import CTA", () => {
     const dashboardHref = DASHBOARD_SRC.match(
-      /to="\/sensors#([^"]+)"[\s\S]{0,300}data-testid="dashboard-environment-snapshot-import-sensor-data"/,
+      /withGrowId\("\/sensors#([^"]+)",\s*scopedGrowId\)[\s\S]{0,300}data-testid="dashboard-environment-snapshot-import-sensor-data"/,
     );
 
     expect(dashboardHref?.[1]).toBe("csv-import");

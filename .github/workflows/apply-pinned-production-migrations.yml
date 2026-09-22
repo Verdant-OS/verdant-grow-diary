@@ -70,7 +70,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: verdant-production
+    environment: verdant-production-solo-founder
     env:
       TARGET_ENV: production
       EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
@@ -97,9 +97,9 @@ jobs:
           report-path: ${{ github.workspace }}/audit/production-migrations/report.md
           log-prefix: pinned-production-migrations
           fix-steps-json: >-
-            ["1. Open Settings → Environments → verdant-production.",
+            ["1. Open Settings → Environments → verdant-production-solo-founder.",
              "2. Add environment secret SUPABASE_DB_URL using the pooled Postgres URL for project knkwiiywfkbqznbxwqfh.",
-             "3. Configure a required reviewer for verdant-production, then dispatch again from verdant-grow-diary."]
+             "3. Verify required-reviewer protection for verdant-production-solo-founder, then dispatch again from verdant-grow-diary."]
           reason-lines-json: >-
             ["The exact production target cannot be proven or reached without the protected database URL.",
              "No migration SQL is allowed to run when this secret is absent."]

@@ -116,7 +116,7 @@ describe("mapPlantRow", () => {
       plantType: "unknown",
     });
   });
-  it("defaults null tent_id, strain, photo, note, and invalid health", () => {
+  it("defaults optional profile fields while preserving invalid health as unknown", () => {
     const p = mapPlantRow({
       ...plantRow,
       tent_id: null,
@@ -129,7 +129,16 @@ describe("mapPlantRow", () => {
     expect(p.strain).toBe("");
     expect(p.photo).toBe("");
     expect(p.lastNote).toBe("");
-    expect(p.health).toBe("healthy");
+    expect(p.health).toBe("unknown");
+  });
+  it.each([null, undefined, "", " ", "unknown", "weird", true, 17, {}, []])(
+    "does not fabricate healthy from missing or malformed health %j",
+    (health) => {
+      expect(mapPlantRow({ ...plantRow, health: health as string }).health).toBe("unknown");
+    },
+  );
+  it.each(["healthy", "watch", "issue"])("preserves the recorded health value %s", (health) => {
+    expect(mapPlantRow({ ...plantRow, health }).health).toBe(health);
   });
   it("preserves null stage as null (does not coerce to seedling)", () => {
     const p = mapPlantRow({ ...plantRow, stage: null as unknown as string });

@@ -128,6 +128,7 @@ function renderPlantQuickLog() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   rpcMock.mockReset();
   storageUploadMock.mockReset();
   storageRemoveMock.mockReset();
@@ -229,7 +230,7 @@ describe("PlantQuickLog success telemetry", () => {
 
     await act(async () => {
       rpc.resolve({
-        data: { ok: true, grow_event_id: "ge-1", reused: false },
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001", reused: false },
         error: null,
       });
       await rpc.promise;
@@ -277,7 +278,9 @@ describe("PlantQuickLog success telemetry", () => {
     await waitFor(() => expect(storageUploadMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(1));
     await waitFor(() =>
-      expect(screen.getByTestId("plant-quick-log-error")).toHaveTextContent(/could not save/i),
+      expect(screen.getByTestId("plant-quick-log-error")).toHaveTextContent(
+        /photo save is unconfirmed/i,
+      ),
     );
     expect(gtagMock()).not.toHaveBeenCalled();
     consoleError.mockRestore();

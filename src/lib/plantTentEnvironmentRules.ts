@@ -39,6 +39,67 @@ export interface PlantTentEnvironmentView {
   metrics: PlantTentEnvironmentMetric[];
 }
 
+/** Query availability is separate from an observation's timestamp/source. */
+export function buildPlantEnvironmentReadView(input: {
+  enabled: boolean;
+  hasCachedReadings: boolean;
+  isError?: boolean;
+  isPending?: boolean;
+  isLoading?: boolean;
+  isFetching?: boolean;
+  fetchStatus?: string;
+}) {
+  const cached = input.hasCachedReadings;
+  const kind = !input.enabled
+    ? "unassigned"
+    : input.fetchStatus === "paused"
+      ? "paused"
+      : input.isError
+        ? "error"
+        : input.isPending || input.isLoading || input.isFetching
+          ? cached
+            ? "refreshing"
+            : "loading"
+          : "ready";
+  const message =
+    kind === "paused"
+      ? cached
+        ? "Waiting for connection to refresh sensor readings. Showing cached readings."
+        : "Waiting for connection to load sensor readings."
+      : kind === "error"
+        ? cached
+          ? "Could not refresh sensor readings. Showing cached readings."
+          : "Sensor readings unavailable."
+        : kind === "refreshing"
+          ? "Refreshing sensor readings. Showing cached readings."
+          : kind === "loading"
+            ? "Loading latest readings…"
+            : null;
+  const summaryLabel =
+    kind === "unassigned"
+      ? "No tent"
+      : kind === "paused"
+        ? cached
+          ? "Waiting for connection · Cached"
+          : "Waiting for connection"
+        : kind === "error"
+          ? cached
+            ? "Unavailable · Cached"
+            : "Unavailable"
+          : kind === "refreshing"
+            ? "Refreshing · Cached"
+            : kind === "loading"
+              ? "Loading…"
+              : null;
+  return {
+    kind,
+    message,
+    summaryLabel,
+    canAssessCurrent: kind === "ready",
+    canRetry: kind === "error" && !input.isFetching,
+  };
+}
+
 const EMPTY_VIEW: PlantTentEnvironmentView = {
   hasReadings: false,
   capturedAt: null,

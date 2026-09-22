@@ -7,7 +7,12 @@
  * plants never trigger a query.
  */
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/store/auth";
+import {
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+  EFFECTIVE_SENSOR_QUERY_VERSION,
+} from "@/lib/effectiveSensorReadings";
 
 export interface PlantTentReadingRow {
   ts: string;
@@ -23,13 +28,18 @@ export interface PlantTentReadingRow {
 export function usePlantTentLatestReadings(
   tentId: string | null | undefined,
 ): UseQueryResult<PlantTentReadingRow[]> {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["plant-tent-environment", tentId ?? "none"],
+    queryKey: [
+      "plant-tent-environment",
+      tentId ?? "none",
+      EFFECTIVE_SENSOR_QUERY_VERSION,
+      user?.id ?? "anon",
+    ],
     enabled: !!tentId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("sensor_readings")
-        .select("ts,captured_at,metric,value,source,created_at,device_id,raw_payload")
+      const { data, error } = await effectiveSensorReadingsQuery()
+        .select("*")
         // Actual observation time takes precedence: imported CSV rows preserve historical
         // `captured_at` while `ts` can be one shared import time.
         .eq("tent_id", tentId as string)
@@ -38,7 +48,7 @@ export function usePlantTentLatestReadings(
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data ?? []) as PlantTentReadingRow[];
+      return requireEffectiveSensorReadings(data);
     },
   });
 }

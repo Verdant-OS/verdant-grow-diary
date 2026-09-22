@@ -319,7 +319,8 @@ describe("Timeline page source — anchor + label + leak guards", () => {
   });
 
   it("Clear filters is disabled when no filter is active", () => {
-    expect(TIMELINE).toMatch(/disabled=\{!evidenceActive\}/);
+    // QOL-09: top Clear filters keys off anyFilterActive (evidence + stage/event chips).
+    expect(TIMELINE).toMatch(/disabled=\{!anyFilterActive\}/);
   });
 
   it("results count is rendered with aria-live", () => {

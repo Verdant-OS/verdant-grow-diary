@@ -1,10 +1,11 @@
 import type { PropsWithChildren } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { QUICK_LOG_V2_ENTRY_CREATED_EVENT } from "@/lib/quickLogV2EntryCreatedEvent";
+import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
 
 const GROW_ID = "11111111-1111-4111-8111-111111111111";
 const TENT_ID = "22222222-2222-4222-8222-222222222222";
@@ -48,17 +49,21 @@ vi.mock("@/integrations/supabase/client", () => {
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 
 const scope = { growId: GROW_ID, tentId: TENT_ID, plantId: PLANT_ID };
+const clients: QueryClient[] = [];
 
-function makeWrapper() {
-  const client = new QueryClient({
+function makeWrapper(
+  client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
+  }),
+) {
+  clients.push(client);
   return function Wrapper({ children }: PropsWithChildren) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   };
 }
 
 beforeEach(() => {
+  onlineManager.setOnline(true);
   vi.clearAllMocks();
   mocks.authUserId = USER_ID;
   mocks.results.diary_entries = { data: [], error: null };
@@ -67,7 +72,127 @@ beforeEach(() => {
   mocks.limits.grow_events.mockImplementation(async () => mocks.results.grow_events);
 });
 
+afterEach(() => {
+  cleanup();
+  for (const client of clients) client.clear();
+  clients.length = 0;
+  onlineManager.setOnline(true);
+});
+
+function savedPlantMemory() {
+  return {
+    id: "saved-memory",
+    grow_id: GROW_ID,
+    tent_id: TENT_ID,
+    plant_id: PLANT_ID,
+    occurred_at: "2026-07-19T12:00:00.000Z",
+    event_type: "watering",
+    source: "manual",
+    is_deleted: false,
+  };
+}
+
+function firstLogStep(evidence: ReturnType<typeof useOneTentActivationEvidence>) {
+  return buildOnboardingChecklistViewModel({
+    growCount: 1,
+    tentCount: 1,
+    plantCount: 1,
+    diaryEntryCount: 0,
+    sensorReadingCount: 0,
+    connectedScope: scope,
+    firstLogEvidenceStatus: evidence.status,
+    firstLogEvidenceCount: evidence.status === "ok" ? evidence.summary.count : null,
+  }).steps.find((step) => step.key === "first_log");
+}
+
 describe("useOneTentActivationEvidence", () => {
+  it.each(["empty", "saved", "failed"] as const)(
+    "keeps a paused first read unresolved, then reconnects to %s evidence",
+    async (outcome) => {
+      if (outcome === "saved") mocks.results.grow_events.data = [savedPlantMemory()];
+      if (outcome === "failed") mocks.results.diary_entries.error = new Error("read failed");
+      onlineManager.setOnline(false);
+      const client = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      });
+      const { result } = renderHook(() => useOneTentActivationEvidence(scope), {
+        wrapper: makeWrapper(client),
+      });
+
+      expect(client.getQueryCache().getAll()[0].state).toMatchObject({
+        status: "pending",
+        fetchStatus: "paused",
+      });
+      expect(mocks.from).not.toHaveBeenCalled();
+      expect(result.current.status).toBe("loading");
+      expect(firstLogStep(result.current)?.description).toBe(
+        "Checking saved plant memory for this connected tent.",
+      );
+
+      act(() => onlineManager.setOnline(true));
+      await waitFor(() =>
+        expect(result.current.status).toBe(outcome === "failed" ? "unavailable" : "ok"),
+      );
+      expect(result.current.summary.hasEvidence).toBe(outcome === "saved");
+      expect(result.current.summary.count).toBe(outcome === "saved" ? 1 : 0);
+      expect(firstLogStep(result.current)?.complete).toBe(outcome === "saved");
+      expect(mocks.limits.diary_entries).toHaveBeenCalledTimes(1);
+      expect(mocks.limits.grow_events).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("keeps an offline owner switch unresolved without reusing the previous owner's evidence", async () => {
+    mocks.results.grow_events.data = [savedPlantMemory()];
+    const { result, rerender } = renderHook(() => useOneTentActivationEvidence(scope), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.summary.hasEvidence).toBe(true));
+
+    act(() => onlineManager.setOnline(false));
+    mocks.authUserId = "55555555-5555-4555-8555-555555555555";
+    mocks.results.grow_events.data = [];
+    rerender();
+    expect(result.current.status).toBe("loading");
+    expect(result.current.summary.hasEvidence).toBe(false);
+    expect(mocks.limits.grow_events).toHaveBeenCalledTimes(1);
+
+    act(() => onlineManager.setOnline(true));
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(result.current.summary.hasEvidence).toBe(false);
+    expect(mocks.limits.grow_events).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains verified cached evidence while an offline refresh is paused", async () => {
+    mocks.results.grow_events.data = [savedPlantMemory()];
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const { result } = renderHook(() => useOneTentActivationEvidence(scope), {
+      wrapper: makeWrapper(client),
+    });
+    await waitFor(() => expect(result.current.summary.hasEvidence).toBe(true));
+    act(() => {
+      onlineManager.setOnline(false);
+      window.dispatchEvent(new CustomEvent(QUICK_LOG_V2_ENTRY_CREATED_EVENT));
+    });
+
+    expect(client.getQueryCache().getAll()[0].state.fetchStatus).toBe("paused");
+    expect(result.current.status).toBe("ok");
+    expect(result.current.summary.count).toBe(1);
+    expect(mocks.limits.diary_entries).toHaveBeenCalledTimes(1);
+    expect(mocks.limits.grow_events).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays idle without an authenticated owner even when offline", () => {
+    mocks.authUserId = null;
+    onlineManager.setOnline(false);
+    const { result } = renderHook(() => useOneTentActivationEvidence(scope), {
+      wrapper: makeWrapper(),
+    });
+    expect(result.current.status).toBe("idle");
+    expect(mocks.from).not.toHaveBeenCalled();
+  });
+
   it("counts a grow_events-only watering as connected plant memory", async () => {
     mocks.results.grow_events.data = [
       {

@@ -152,4 +152,47 @@ describe("BreedingLogNew grow-scoped navigation", () => {
     await screen.findByRole("heading", { name: "Grow not found" });
     expect(hrefForLink(/^Back$/)).toBe("/grows");
   });
+
+  it("fail-closed: empty growId query stays on /grows", async () => {
+    from.mockReset();
+    renderLogNew("/breeding/log/new?growId=");
+
+    await screen.findByRole("heading", { name: "Grow not found" });
+    expect(hrefForLink(/^Back$/)).toBe("/grows");
+  });
+
+  it("fail-closed: whitespace growId does not invent a grow", async () => {
+    from.mockReset().mockImplementation((table: string) => {
+      if (table === "tents") {
+        return {
+          select: () => ({
+            eq: async () => ({ data: [], error: null }),
+          }),
+        };
+      }
+      if (table === "grows") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "plants") {
+        return {
+          select: () => ({
+            or: () => ({
+              eq: async () => ({ data: [], error: null }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+    renderLogNew("/breeding/log/new?growId=%20");
+
+    await screen.findByRole("heading", { name: "Grow not found" });
+    expect(hrefForLink(/^Back$/)).toBe("/grows");
+  });
 });

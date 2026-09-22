@@ -41,7 +41,7 @@ unblocked path.
 | `shortCommit`     | `8b73c1403105`                                                              |
 | `ref`             | `verdant-grow-diary`                                                        |
 | `dirty`           | **`false`**                                                                 |
-| `buildTime`       | `2026-09-22T23:25:04.802Z` (~12 s after `#1626` merged)                      |
+| `buildTime`       | `2026-09-22T23:25:04.802Z` (~12 s after `#1626` merged)                     |
 | status            | **tip = live; `LIVE_LAG` CLEARED**                                          |
 | Claude's own read | **`BLOCKED`**: eighth 403, 2026-09-22 **23:42:56 UTC**; never routed around |
 

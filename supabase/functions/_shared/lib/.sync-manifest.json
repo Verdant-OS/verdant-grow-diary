@@ -98,7 +98,7 @@
     "src/lib/sensorTruthRules.ts": "20c5e681d016727e1133836875861cb88c405f8740dcf3a38e2ca8439e27fc3b",
     "src/lib/spiderFarmerGgsMappingRules.ts": "dca4a2e6cca9af03cbb8f3af0c89547c7f587d5bb102b49ca76baa1dcb626a60",
     "src/lib/temperatureUnits.ts": "1f8aeb96ffcc869601a0ffd11f85836d60aa9496b67ca817c5aac4810424ef7f",
-    "src/lib/timelineEntryAnchorRules.ts": "155cf98d4cc8c75d583748fceaff088158ffee4fb3d25dbc4e74b24367080deb",
+    "src/lib/timelineEntryAnchorRules.ts": "069dc7a085d0ad025f59ed3799778df442c329df3baf340e668babfb52d8d8ae",
     "src/lib/timelineEntryClassification.ts": "7b2d3ae86f926b105ce3b025a35350d0a622b9bd661350ba7090af1030ca5a9f",
     "src/lib/timelineFilterRules.ts": "1765526a75f064a2524c514796d7a96ce2b2fd219220380316aeb5f674b554e3",
     "src/lib/vpdDriftRules.ts": "c6323c0f6fd9d9700ded58103a0f20cb10a162e27834ff39552226e3723cf6c7",

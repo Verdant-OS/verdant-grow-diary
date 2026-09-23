@@ -130,6 +130,7 @@ import {
   dashboardSnapshotForHealthyCues,
   evaluateDashboardSensorQuality,
   groupDashboardSensorReadings,
+  resolveDashboardSensorBadgeStatus,
   selectDashboardSensorEvidenceRows,
 } from "@/lib/dashboardSensorEvidenceRules";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
@@ -665,7 +666,7 @@ export default function Dashboard() {
                               {latest && (
                                 <SensorSourceBadge
                                   source={latest.source}
-                                  status={latest.status}
+                                  status={resolveDashboardSensorBadgeStatus(latest, nowTick)}
                                   testId="dashboard-tent-chart-source-badge"
                                 />
                               )}
@@ -721,7 +722,7 @@ export default function Dashboard() {
                             return (
                               <SensorSourceBadge
                                 source={latest.source}
-                                status={latest.status}
+                                status={resolveDashboardSensorBadgeStatus(latest, nowTick)}
                                 testId="dashboard-env-strip-source-badge"
                               />
                             );

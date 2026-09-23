@@ -26,12 +26,27 @@ describe("shouldAttemptQuickLogGrowStageWriteback", () => {
       "unknown stage",
       { saveGrow: { stage: "veg" }, saveStageWasUserTouched: true, saveStage: "mystery" },
     ],
+    ["empty stage", { saveGrow: { stage: "veg" }, saveStageWasUserTouched: true, saveStage: "" }],
     [
       "unchanged stage",
       { saveGrow: { stage: "veg" }, saveStageWasUserTouched: true, saveStage: "veg" },
     ],
   ] as const)("skips writeback when %s", (_label, input) => {
     expect(shouldAttemptQuickLogGrowStageWriteback(input)).toBe(false);
+  });
+
+  it.each([
+    ["null grow stage", { stage: null }],
+    ["undefined grow stage", { stage: undefined }],
+    ["blank grow stage", { stage: "" }],
+  ] as const)("attempts writeback when the grow stage is %s", (_label, saveGrow) => {
+    expect(
+      shouldAttemptQuickLogGrowStageWriteback({
+        saveGrow,
+        saveStageWasUserTouched: true,
+        saveStage: "flower",
+      }),
+    ).toBe(true);
   });
 });
 
@@ -60,8 +75,8 @@ describe("isQuickLogGrowStageUnconfirmed", () => {
 
 describe("QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE", () => {
   it("stays pinned for UI and toast parity", () => {
-    expect(QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE).toMatch(
-      /wasn't confirmed\. Check the grow's stage before changing it again\.$/,
+    expect(QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE).toBe(
+      "Your log was saved, but the grow's stage update wasn't confirmed. Check the grow's stage before changing it again.",
     );
   });
 });

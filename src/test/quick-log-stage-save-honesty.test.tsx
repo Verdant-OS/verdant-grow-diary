@@ -144,7 +144,7 @@ describe("Quick Log confirmed diary save and separate grow stage write", () => {
     await submitStageChange();
     await screen.findByTestId("quick-log-post-save");
     expect(await screen.findByTestId("quick-log-stage-save-unconfirmed")).toHaveTextContent(
-      "Your log was saved, but the grow's stage update wasn't confirmed.",
+      QUICK_LOG_GROW_STAGE_UNCONFIRMED_MESSAGE,
     );
     expect(mocks.rpc.mock.calls[0][1]).toMatchObject({
       p_target_type: "plant",

@@ -8,8 +8,13 @@
 import PageHeader from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { usePiIngestStatus } from "@/hooks/usePiIngestStatus";
-import { PI_INGEST_DISCLOSURE_LINES, PI_INGEST_HEALTH_LABEL } from "@/lib/piIngestStatusRules";
+import {
+  PI_INGEST_DISCLOSURE_LINES,
+  PI_INGEST_HEALTH_LABEL,
+  piIngestReadState,
+} from "@/lib/piIngestStatusRules";
 
 function healthVariant(
   h: "no_data" | "recently_active" | "stale",
@@ -20,7 +25,9 @@ function healthVariant(
 }
 
 export default function PiIngestStatus() {
-  const { data, isLoading, error } = usePiIngestStatus();
+  const query = usePiIngestStatus();
+  const state = piIngestReadState(query);
+  const data = state === "ready" ? query.data : undefined;
 
   return (
     <div className="space-y-4">
@@ -41,8 +48,24 @@ export default function PiIngestStatus() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {isLoading && <p className="text-muted-foreground">Loading…</p>}
-          {error && <p className="text-destructive">Could not load ingest status.</p>}
+          {state === "loading" && (
+            <p role="status" className="text-muted-foreground">
+              Loading…
+            </p>
+          )}
+          {state === "waiting" && (
+            <p role="status" className="text-muted-foreground">
+              Waiting for connection to load ingest status.
+            </p>
+          )}
+          {state === "unavailable" && (
+            <div role="alert" className="space-y-2">
+              <p className="text-destructive">Could not load ingest status.</p>
+              <Button variant="outline" onClick={() => void query.refetch()}>
+                Retry
+              </Button>
+            </div>
+          )}
           {data && (
             <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div>

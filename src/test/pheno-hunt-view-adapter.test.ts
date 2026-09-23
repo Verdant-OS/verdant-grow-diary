@@ -57,6 +57,31 @@ describe("phenoHuntViewAdapter", () => {
     });
   });
 
+  it("passes plantType and stage through for comparability on the board", () => {
+    const contenders = adaptContenders([
+      {
+        candidateNumber: 1,
+        name: "Gas Runtz",
+        decision: "keep",
+        traits: { nose_loudness: 9 },
+        plantType: "photoperiod",
+        stage: "cure",
+      },
+      {
+        candidateNumber: 2,
+        name: "Sherb Cake",
+        decision: "keep",
+        traits: { nose_loudness: 8 },
+        plantType: "photoperiod",
+        stage: "cure",
+      },
+    ]);
+    expect(contenders[0].plantType).toBe("photoperiod");
+    expect(contenders[0].stage).toBe("cure");
+    const board = buildContenders(contenders);
+    expect(board.comparability).toBe("comparable");
+  });
+
   it("adapts candidates into contender inputs that score through the real board", () => {
     const contenders = adaptContenders([
       {

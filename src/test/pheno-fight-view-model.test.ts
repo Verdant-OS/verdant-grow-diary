@@ -3,9 +3,16 @@ import { buildFight } from "@/lib/phenoFightViewModel";
 import type { ContenderInput } from "@/lib/phenoContendersViewModel";
 import { DEMO_CANDIDATES } from "@/lib/demo/phenoHuntDemoFixture";
 
-const toInput = (num: number): ContenderInput => {
+const toInput = (num: number, withComparability = true): ContenderInput => {
   const c = DEMO_CANDIDATES.find((x) => x.candidateNumber === num)!;
-  return { id: c.candidateNumber, name: c.name, verdict: c.verdict, aroma: c.aroma, axes: c.loud };
+  return {
+    id: c.candidateNumber,
+    name: c.name,
+    verdict: c.verdict,
+    aroma: c.aroma,
+    axes: c.loud,
+    ...(withComparability ? { plantType: c.plantType, stage: c.stage } : {}),
+  };
 };
 
 const GAS = toInput(3); // Gas Runtz {9,8,7,7,8}
@@ -61,5 +68,16 @@ describe("phenoFightViewModel", () => {
   it("returns null when a side is missing", () => {
     expect(buildFight(GAS, null)).toBeNull();
     expect(buildFight(undefined, CAKE)).toBeNull();
+  });
+
+  it("keeps the demo keeper pairing comparable when plantType and stage are mapped", () => {
+    const fight = buildFight(GAS, CAKE)!;
+    expect(fight.comparability.comparable).toBe(true);
+  });
+
+  it("marks the demo keeper pairing not comparable when plantType/stage are omitted", () => {
+    const fight = buildFight(toInput(3, false), toInput(7, false))!;
+    expect(fight.comparability.comparable).toBe(false);
+    expect(fight.comparability.reason).toBe("type_unknown");
   });
 });

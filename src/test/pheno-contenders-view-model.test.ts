@@ -7,13 +7,24 @@ import {
 } from "@/lib/phenoContendersViewModel";
 import { DEMO_CANDIDATES } from "@/lib/demo/phenoHuntDemoFixture";
 
-/** The demo pack, shaped for the contenders board. */
+/** The demo pack, shaped for the contenders board (axes-only — omits comparability metadata). */
+const DEMO_INPUT_AXES_ONLY: ContenderInput[] = DEMO_CANDIDATES.map((c) => ({
+  id: c.candidateNumber,
+  name: c.name,
+  verdict: c.verdict,
+  aroma: c.aroma,
+  axes: c.loud,
+}));
+
+/** Full demo mapping: plantType + stage must travel with scores or ranking hides. */
 const DEMO_INPUT: ContenderInput[] = DEMO_CANDIDATES.map((c) => ({
   id: c.candidateNumber,
   name: c.name,
   verdict: c.verdict,
   aroma: c.aroma,
   axes: c.loud,
+  plantType: c.plantType,
+  stage: c.stage,
 }));
 
 describe("phenoContendersViewModel", () => {
@@ -94,5 +105,17 @@ describe("phenoContendersViewModel", () => {
     expect(buildContenders([]).contenders).toHaveLength(0);
     expect(buildContenders(null).culledCount).toBe(0);
     expect(buildContenders(undefined).maxScore).toBe(0);
+  });
+
+  it("keeps the uniform demo pack comparable when plantType and stage are mapped", () => {
+    const board = buildContenders(DEMO_INPUT);
+    expect(board.comparability).toBe("comparable");
+    expect(board.comparabilityReasons).toEqual([]);
+  });
+
+  it("marks the demo pack not comparable when plantType/stage are dropped from the mapping", () => {
+    const board = buildContenders(DEMO_INPUT_AXES_ONLY);
+    expect(board.comparability).toBe("not_comparable");
+    expect(board.comparabilityReasons).toContain("type_unknown");
   });
 });

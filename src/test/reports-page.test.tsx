@@ -249,7 +249,10 @@ describe("Reports page · static safety", () => {
     expect(HOOK_SRC).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/);
     expect(HOOK_SRC).not.toMatch(/service_role/);
     expect(HOOK_SRC).not.toMatch(/ai-coach|ai_coach|functions\.invoke/);
-    expect(HOOK_SRC).toContain('.select("ts,captured_at,source,raw_payload")');
+    expect(HOOK_SRC).toContain("effectiveSensorReadingsQuery()");
+    expect(HOOK_SRC).toContain("raw_payload,correction_valid");
+    expect(HOOK_SRC).toContain("requireEffectiveSensorReadings(data)");
+    expect(HOOK_SRC).not.toMatch(/\.from\(["']sensor_readings["']\)/);
     expect(HOOK_SRC).toContain("isDiagnosticSensorProvenanceRow");
   });
 });

@@ -53,4 +53,17 @@ it("retains standalone history anchors and handles absent candidates", () => {
   expect(resolveHistoryTimelineAnchorId("timeline-entry-event-1")).toBe("timeline-entry-event-1");
   expect(resolveHistoryTimelineAnchorId(null)).toBeNull();
   expect(resolveHistoryTimelineAnchorId(undefined, new Set())).toBeNull();
+  expect(resolveHistoryTimelineAnchorId("")).toBeNull();
+});
+
+it("reserves only the primary diary anchor when no linked grow event is present", () => {
+  expect([
+    ...buildRenderedDiaryTimelineAnchorIds([{ id: "diary-only", details: { note: "no link" } }]),
+  ]).toEqual(["timeline-entry-diary-only"]);
+});
+
+it("does not treat an empty reservation set as blocking standalone history anchors", () => {
+  expect(resolveHistoryTimelineAnchorId("timeline-entry-event-1", new Set())).toBe(
+    "timeline-entry-event-1",
+  );
 });

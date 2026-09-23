@@ -86,7 +86,9 @@ it.each(["watering", "feeding"] as const)(
     expect(document.querySelectorAll('[id="timeline-entry-event-1"]')).toHaveLength(1);
     expect(document.activeElement).toBe(screen.getByTestId("diary-evidence"));
     expect(screen.getByTestId("diary-evidence")).toHaveTextContent("Source: manual");
-    expect(within(screen.getByTestId(`${kind}-history-panel`)).getByText(/750/)).toBeVisible();
+    const panel = screen.getByTestId(`${kind}-history-panel`);
+    expect(within(panel).getByText(/750/)).toBeVisible();
+    expect(panel.querySelector('li[id="timeline-entry-event-1"]')).toBeNull();
   },
 );
 
@@ -99,6 +101,9 @@ it.each(["watering", "feeding"] as const)(
     expect(document.querySelectorAll('[id="timeline-entry-event-1"]')).toHaveLength(1);
     expect(document.activeElement).toBe(target);
     expect(target).toHaveTextContent("750");
+    expect(
+      screen.getByTestId(`${kind}-history-panel`).querySelector('li[id="timeline-entry-event-1"]'),
+    ).not.toBeNull();
   },
 );
 

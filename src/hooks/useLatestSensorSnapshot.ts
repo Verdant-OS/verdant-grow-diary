@@ -143,7 +143,11 @@ export function useLatestSensorSnapshot(
           (withRetractionFilter) => {
             let query = supabase.from("diary_entries").select("id,entry_at,details,tent_id");
             if (withRetractionFilter) query = query.is("retracted_at", null);
-            return query.eq("grow_id", growId).order("entry_at", { ascending: false }).limit(20);
+            query = query.eq("grow_id", growId);
+            // Scope before LIMIT so newer activity in other tents cannot
+            // crowd this tent's saved evidence out of the bounded read.
+            if (tentIds.length > 0) query = query.in("tent_id", tentIds);
+            return query.order("entry_at", { ascending: false }).limit(20);
           },
         );
         if (diaryErr || !Array.isArray(diaryRows)) throw new Error("unavailable");

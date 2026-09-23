@@ -171,6 +171,50 @@ it("does not load while signed out", () => {
   expect(result.current.state).toEqual({ status: "idle" });
   expect(io.load).not.toHaveBeenCalled();
 });
+
+it("does not reuse memories cached under a pre-effective query key", async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: Infinity } },
+  });
+  clients.push(client);
+  client.setQueryData(
+    ["action-response-memory", "owner-a", "grow-a", "plant-a"],
+    [{ key: "stale-cache" }],
+  );
+  const { result } = renderHook(
+    () => useActionResponseMemory({ growId: "grow-a", plantId: "plant-a" }),
+    {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    },
+  );
+  expect(result.current.state).toEqual({ status: "loading" });
+  await waitFor(() => expect(result.current.state).toEqual(loaded("current")));
+  expect(io.load).toHaveBeenCalledTimes(1);
+});
+
+it("ignores reload when grow scope is missing", async () => {
+  const { result, rerender } = renderHook(
+    ({ grow, plant }) => useActionResponseMemory({ growId: grow, plantId: plant }),
+    {
+      initialProps: { grow: null as string | null, plant: "plant-a" },
+      wrapper: ({ children }) => {
+        const client = new QueryClient({
+          defaultOptions: { queries: { retry: false, gcTime: 0 } },
+        });
+        clients.push(client);
+        return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+      },
+    },
+  );
+  expect(result.current.state).toEqual({ status: "idle" });
+  act(() => result.current.reload());
+  expect(io.load).not.toHaveBeenCalled();
+  rerender({ grow: "grow-a", plant: "plant-a" });
+  await waitFor(() => expect(result.current.state).toEqual(loaded("current")));
+  expect(io.load).toHaveBeenCalledTimes(1);
+});
 it("sanitizes a rejected load into unavailable", async () => {
   io.load.mockRejectedValueOnce(new Error("PRIVATE"));
   const { result } = mount();

@@ -287,4 +287,12 @@ describe("static safety — every new M5 file", () => {
       );
     }
   });
+
+  it("useActionResponseMemory keys reads to the effective sensor contract", () => {
+    const hook = read("src/hooks/useActionResponseMemory.ts");
+    expect(hook).toContain("EFFECTIVE_SENSOR_QUERY_VERSION");
+    expect(hook).toContain("subscribeManualSensorCorrections");
+    expect(hook).toContain('"action-response-memory"');
+    expect(hook).not.toMatch(/useState\s*\(/);
+  });
 });

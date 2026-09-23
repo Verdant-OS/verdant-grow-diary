@@ -387,6 +387,20 @@ describe("effective sensor evidence and honest failed reads", () => {
     },
   );
 
+  it("survives thrown effective-sensor validation without failing the load", async () => {
+    const { client } = makeFakeClient({
+      diaryRows: [diary],
+      actionRows: [action],
+      sensorRows: [{ ...reading, metric: "" }],
+    });
+    const result = await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client });
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("Outcome must survive sensor validation throw");
+    expect(result.memories[0].sensor.state).toBe("unavailable");
+    expect(result.memories[0].response.outcome).toBe("improved");
+    expect(result.memories[0].limitations).toContain("sensor_lookup_unavailable");
+  });
+
   it.each(["diary", "actions"] as const)(
     "reports a null %s read as unavailable, not successful empty",
     async (failed) => {

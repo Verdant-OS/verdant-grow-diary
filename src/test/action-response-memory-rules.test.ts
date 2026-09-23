@@ -533,6 +533,36 @@ describe("sensor evidence targeting and quality", () => {
     });
     expect(memory.sensor.state).toBe("available");
   });
+  it("falls back to the action tent when the response row has no tent", () => {
+    const [memory] = buildActionResponseMemories({
+      responseRows: [responseRow({ tent_id: null, detailsOver: { sensor_snapshot_id: "snap-1" } })],
+      actions: [action({ tent_id: "tent-1" })],
+      sensorRows: [{ id: "snap-1", tent_id: "tent-1", source: "manual", captured_at: T0 }],
+    });
+    expect(memory.sensor.state).toBe("available");
+    expect(memory.sensor.trustState).toBe("manual");
+  });
+  it("prefers diagnostic provenance over a stale quality flag", () => {
+    const [memory] = buildActionResponseMemories({
+      responseRows: [responseRow({ detailsOver: { sensor_snapshot_id: "snap-1" } })],
+      actions: [action()],
+      sensorRows: [
+        {
+          id: "snap-1",
+          tent_id: "tent-1",
+          source: "live",
+          quality: "stale",
+          captured_at: T0,
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: { confidence: "test", verdant_source: "live" },
+          },
+        },
+      ],
+    });
+    expect(memory.sensor.trustState).toBe("demo");
+    expect(memory.sensor.source).toBe("live");
+  });
   it.each(["live", "manual", "csv"])(
     "retains %s source but does not trust flagged quality",
     (source) => {

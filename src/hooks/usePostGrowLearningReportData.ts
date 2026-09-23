@@ -8,8 +8,15 @@
  *
  * No schema/RLS/Edge/auth changes. No device control. No AI calls.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  EFFECTIVE_SENSOR_QUERY_VERSION,
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 import { useAuth } from "@/store/auth";
 import {
   POST_GROW_LESSON_EVENT_TYPE,
@@ -20,13 +27,9 @@ import {
   type PostGrowGrowLike,
   type PostGrowHarvestLike,
   type PostGrowLearningReportViewModel,
-  type PostGrowSensorReadingLike,
 } from "@/lib/postGrowLearningReportRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
-import {
-  computeYieldEfficiency,
-  type YieldEfficiencyReport,
-} from "@/lib/yieldEfficiencyRules";
+import { computeYieldEfficiency, type YieldEfficiencyReport } from "@/lib/yieldEfficiencyRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 export type PostGrowReportStatus = "idle" | "loading" | "ready" | "unavailable";
@@ -60,8 +63,10 @@ async function signPhotoUrls(rows: PostGrowDiaryLike[]): Promise<PostGrowDiaryLi
     .map((r) => r.photo_url)
     .filter((p): p is string => !!p && !p.startsWith("http"));
   if (paths.length === 0) return rows;
-  const { data } = await supabase.storage.from("diary-photos").createSignedUrls(paths, 3600);
-  const map = new Map((data ?? []).map((s) => [s.path as string, s.signedUrl]));
+  const { data, error } = await supabase.storage.from("diary-photos").createSignedUrls(paths, 3600);
+  if (error || !Array.isArray(data)) throw new Error("Report photos unavailable.");
+  const map = new Map(data.map((s) => [s.path as string, s.signedUrl]));
+  if (paths.some((path) => !map.get(path)?.trim())) throw new Error("Report photos unavailable.");
   return rows.map((r) =>
     r.photo_url && map.has(r.photo_url) ? { ...r, photo_url: map.get(r.photo_url)! } : r,
   );
@@ -71,42 +76,36 @@ export function usePostGrowLearningReportData(
   growId: string | null | undefined,
 ): UsePostGrowLearningReportDataResult {
   const { user } = useAuth();
-  const [status, setStatus] = useState<PostGrowReportStatus>("idle");
-  const [report, setReport] = useState<PostGrowLearningReportViewModel | null>(null);
-  const [yieldEfficiency, setYieldEfficiency] = useState<YieldEfficiencyReport | null>(null);
   const tempUnit = useTemperatureUnitPreference();
   const measurementSystem = tempUnit === "celsius" ? ("metric" as const) : ("imperial" as const);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!user || !growId) {
-      setStatus("idle");
-      setReport(null);
-      setYieldEfficiency(null);
-      setError(null);
-      return;
-    }
-    setStatus("loading");
-    setError(null);
-    try {
+  const query = useQuery<{
+    report: PostGrowLearningReportViewModel;
+    yieldEfficiency: YieldEfficiencyReport;
+  }>({
+    queryKey: [
+      "post-grow-report",
+      user?.id ?? "anon",
+      growId ?? "none",
+      measurementSystem,
+      EFFECTIVE_SENSOR_QUERY_VERSION,
+    ],
+    enabled: !!user && !!growId,
+    retry: false,
+    queryFn: async () => {
+      if (!user || !growId) throw new Error("Report unavailable.");
       const { data: grow, error: growErr } = await supabase
         .from("grows")
         .select("id,name,stage,is_archived,started_at")
         .eq("id", growId)
         .maybeSingle();
       if (growErr) throw growErr;
-      if (!grow) {
-        setReport(null);
-        setStatus("unavailable");
-        setError("Grow not found or unavailable.");
-        return;
-      }
+      if (!grow) throw new Error("Grow not found or unavailable.");
 
       const { data: tents, error: tentErr } = await supabase
         .from("tents")
         .select("id,size,light_wattage")
         .eq("grow_id", growId);
-      if (tentErr) throw tentErr;
+      if (tentErr || !Array.isArray(tents)) throw new Error("Unable to load report tents.");
       const tentIds = (tents ?? []).map((t) => t.id as string).filter(Boolean);
 
       const [harvestRes, diaryRes, sensorRes, actionRes] = await Promise.all([
@@ -117,9 +116,10 @@ export function usePostGrowLearningReportData(
           .order("harvested_at", { ascending: false }),
         fetchPostGrowLearningDiaryRows(growId),
         tentIds.length > 0
-          ? supabase
-              .from("sensor_readings")
-              .select("id,metric,value,ts,captured_at,source,raw_payload")
+          ? effectiveSensorReadingsQuery()
+              .select(
+                "id,user_id,tent_id,metric,value,ts,captured_at,created_at,device_id,source,quality,raw_payload,correction_valid",
+              )
               .in("tent_id", tentIds)
               .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
               .order("captured_at", { ascending: true, nullsFirst: false })
@@ -139,18 +139,31 @@ export function usePostGrowLearningReportData(
       if (diaryRes.error) throw diaryRes.error;
       if (sensorRes.error) throw sensorRes.error;
       if (actionRes.error) throw actionRes.error;
+      for (const response of [harvestRes, diaryRes, actionRes]) {
+        if (!Array.isArray(response.data)) throw new Error("Unable to load report evidence.");
+      }
 
       const diaryRows = await signPhotoUrls((diaryRes.data ?? []) as PostGrowDiaryLike[]);
       const vm = buildPostGrowLearningReportViewModel({
         grow: grow as PostGrowGrowLike,
         harvests: (harvestRes.data ?? []) as PostGrowHarvestLike[],
         diaryEntries: diaryRows,
-        sensorReadings: (sensorRes.data ?? []) as PostGrowSensorReadingLike[],
+        sensorReadings: requireEffectiveSensorReadings(sensorRes.data).map(
+          ({ id, metric, value, ts, captured_at, source, raw_payload }) => ({
+            id,
+            metric,
+            value,
+            ts,
+            captured_at,
+            source,
+            raw_payload,
+          }),
+        ),
         actions: (actionRes.data ?? []) as PostGrowActionLike[],
       });
-      setReport(vm);
-      setYieldEfficiency(
-        computeYieldEfficiency({
+      return {
+        report: vm,
+        yieldEfficiency: computeYieldEfficiency({
           harvestEntries: diaryRows.map((r) => ({ details: r.details })),
           tents: (tents ?? []).map((t) => ({
             size: (t as { size?: string | null }).size ?? null,
@@ -158,19 +171,32 @@ export function usePostGrowLearningReportData(
           })),
           system: measurementSystem,
         }),
-      );
-      setStatus("ready");
-    } catch (err) {
-      setReport(null);
-      setYieldEfficiency(null);
-      setStatus("unavailable");
-      setError(err instanceof Error ? err.message : "Unable to load post-grow report.");
-    }
-  }, [user, growId, measurementSystem]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+      };
+    },
+  });
+  const enabled = !!user && !!growId;
+  const pending = query.isPending || query.isFetching || query.fetchStatus === "paused";
+  const status: PostGrowReportStatus = !enabled
+    ? "idle"
+    : pending
+      ? "loading"
+      : query.isError
+        ? "unavailable"
+        : "ready";
+  const report = status === "ready" ? (query.data?.report ?? null) : null;
+  const yieldEfficiency = status === "ready" ? (query.data?.yieldEfficiency ?? null) : null;
+  const error = status === "unavailable" ? "Unable to load post-grow report." : null;
+  const refetch = query.refetch;
+  const load = useCallback(async () => {
+    if (user?.id && growId) await refetch();
+  }, [user?.id, growId, refetch]);
+  useEffect(
+    () =>
+      subscribeManualSensorCorrections(user?.id ?? null, () => {
+        void load();
+      }),
+    [user?.id, load],
+  );
 
   const saveLesson = useCallback(
     async (lesson: string): Promise<{ ok: true } | { ok: false; message: string }> => {

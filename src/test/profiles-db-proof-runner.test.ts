@@ -128,6 +128,8 @@ describe("profile fixture SQL stays local and private", () => {
     SUPABASE_SERVICE_ROLE_KEY: "fake-service",
     SUPABASE_DB_URL: "postgresql://postgres:fake-password@127.0.0.1:54322/postgres",
     PGHOSTADDR: "remote.example.invalid",
+    PGSERVICE: "remote-service",
+    PGSERVICEFILE: "/private/service.conf",
     PGOPTIONS: "untrusted options",
   };
   it("passes SQL on stdin, keeps credentials off argv, and overrides inherited routing", () => {
@@ -137,11 +139,18 @@ describe("profile fixture SQL stays local and private", () => {
     expect(args).toEqual(["-X", "-q", "-v", "ON_ERROR_STOP=1", "-f", "-"]);
     expect(options.input).toBe("SELECT 1;");
     expect(options.env.PGHOST).toBe("127.0.0.1");
-    expect(options.env.PGHOSTADDR).toBe("");
+    expect(options.env.PGHOSTADDR).toBeUndefined();
     expect(options.env.PGPORT).toBe("54322");
     expect(options.env.PGOPTIONS).toBe("-c statement_timeout=10000");
     expect(options.timeout).toBe(15000);
     expect(options.windowsHide).toBe(true);
+  });
+  it("unsets inherited libpq service configuration instead of supplying empty names", () => {
+    runProfileFixtureSql("SELECT 1;", env, sqlCommand);
+    const options = sqlCommand.mock.calls[0][2];
+    expect(options.env).not.toHaveProperty("PGSERVICE");
+    expect(options.env).not.toHaveProperty("PGSERVICEFILE");
+    expect(options.env).not.toHaveProperty("PGPASSFILE");
   });
   it("refuses a database host override before any SQL process", () => {
     expect(() =>

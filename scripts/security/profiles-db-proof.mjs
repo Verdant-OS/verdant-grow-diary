@@ -47,21 +47,24 @@ export function requireLocalProfileEnvironment(env) {
 /** Test fixture DDL only; never exports SQL through an application RPC. */
 export function runProfileFixtureSql(sql, env = process.env, execute = execFileSync) {
   const { database } = requireLocalProfileEnvironment(env);
-  const childEnv = {
-    ...env,
+  const childEnv = { ...env };
+  // libpq treats PGSERVICE="" as a service lookup, not as an unset option.
+  // Remove inherited PG routing/configuration before supplying the validated
+  // connection. This also prevents service files and platform PG wrappers from
+  // redirecting this disposable fixture to a different database.
+  for (const name of Object.keys(childEnv)) {
+    if (name.toUpperCase().startsWith("PG")) delete childEnv[name];
+  }
+  Object.assign(childEnv, {
     PGHOST: database.hostname.replace(/^\[|\]$/g, ""),
     PGPORT: database.port || "5432",
     PGUSER: decodeURIComponent(database.username),
     PGPASSWORD: decodeURIComponent(database.password),
     PGDATABASE: decodeURIComponent(database.pathname.slice(1)),
-    PGHOSTADDR: "",
-    PGSERVICE: "",
-    PGSERVICEFILE: "",
-    PGPASSFILE: "",
     PGOPTIONS: "-c statement_timeout=10000",
     PGCONNECT_TIMEOUT: "5",
     PGSSLMODE: "disable",
-  };
+  });
   try {
     execute("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1", "-f", "-"], {
       input: sql,

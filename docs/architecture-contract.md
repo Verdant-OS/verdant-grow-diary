@@ -1,12 +1,13 @@
 # Verdant — Current Architecture Contract
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
-**Verified from source at:** `387a00067a76ca9e2ced453d6b6a0f580e33209b` (deploy branch
-`verdant-grow-diary`), 2026-09-22, by Claude (§15 re-verification amendment; see §15.1). Every
-clause was re-read against `8fc3840743ed58e8a27dc6b39f68563e16a8e48e`. The only file that differs
-between that tree and the stamped tip is `docs/agents/CURRENT_STATE.md`, which this contract does
-not cite for any clause. First verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05
-by Grok (PR #1281).
+**Verified from source at:** `8b73c14031050b51061d4715bedbcdfeb66eee52` (deploy branch
+`verdant-grow-diary`), 2026-09-23, by Claude (§15 amendment; see §15.1). The only file that differs
+between that tree and `387a00067a76ca9e2ced453d6b6a0f580e33209b`, where every clause was last fully
+re-verified on 2026-09-22, is this contract itself, so the code-facing clauses carry forward
+unchanged. This amendment re-measured AC-1.4, AC-1.5 and the §14 build-target note against installed
+packages whose versions match `bun.lock`. First verified at
+`7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
 **Carries no `Sentinel-Version`.** This is not one of the twelve governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
 
@@ -111,35 +112,79 @@ What is **not** tested is general `auth` ↔ `_app` and `public` ↔ public-root
 > It is corrected here, not quietly reworded.
 
 **AC-1.4 — `vite.config.ts` stays a thin wrapper over the Lovable preset.**
-`@lovable.dev/vite-tanstack-config` already supplies TanStack devtools, `tanstackStart`,
-`viteReact`, `tailwindcss`, `tsConfigPaths`, Nitro, `VITE_*` injection, the `@` alias and
-React/TanStack dedupe. Re-adding any of them duplicates a plugin and breaks the app. The preset must
-be imported from its explicit ESM path (`/dist/index.js`); the bare specifier resolves the CJS
-`main`, whose `require("vite")` throws `ERR_REQUIRE_CYCLE_MODULE`.
-_Source:_ `vite.config.ts:1-5` (the preset's plugin list, as stated in the file), `:7-11` (the CJS
-note), `:12` (the ESM import). `established fact` for what the file says and imports. The preset's
-actual internals are a `source claim` carried from the first stamp. They could not be re-read here:
-`node_modules` was absent at re-verification. `bun.lock` resolves the preset at 2.8.5 with peers
-consistent with the comment.
+`@lovable.dev/vite-tanstack-config` already supplies every plugin and setting below. Re-adding any of
+them duplicates it. Measured in the installed preset, 2.8.5, which is the version `bun.lock` pins, in
+`dist/index.js`:
+
+| Supplied by the preset                                          | Condition                                         | Lines     |
+| --------------------------------------------------------------- | ------------------------------------------------- | --------- |
+| TanStack devtools                                               | `mode === "development"` only                     | `535-545` |
+| `tailwindcss`, `tsConfigPaths` (over `./tsconfig.json`)         | always                                            | `546-549` |
+| `tanstackStart`                                                 | always                                            | `553-561` |
+| Nitro                                                           | `command === "build"` only, unless `nitro: false` | `563-596` |
+| `viteReact`                                                     | always                                            | `597-598` |
+| `VITE_*` env define                                             | unless `envDefine: false`                         | `612-616` |
+| `@` alias; dedupe of React, the JSX runtimes and TanStack Query | always                                            | `625-633` |
+
+The preset must be imported from its explicit ESM path (`/dist/index.js`). The package declares
+`main: "./dist/index.cjs"` and `module: "./dist/index.js"` with no `exports` map, and the CJS entry
+calls `require("vite")` (`dist/index.cjs:24`).
+
+**The stated reason for the ESM-path rule did not reproduce.** `vite.config.ts:7-11` says the bare
+specifier throws `ERR_REQUIRE_CYCLE_MODULE` on Node 22. At this amendment, on Node 22.22.2 with Vite
+8.2.0, a disposable worktree with the bare specifier passed both Vite's `loadConfigFromFile` and a
+full `vite build` (exit 0). The failure may depend on a Node version or runtime that was not measured
+here, such as the Lovable sandbox. **The rule stands**: it is pinned, it costs nothing, and it imports
+the entry the preset's own `module` field names. Only its rationale is downgraded to `uncertainty`.
+Do not cite the rule as proof that the bare specifier fails everywhere.
+_Source:_ `@lovable.dev/vite-tanstack-config@2.8.5`: its `package.json`, `dist/index.js` (the lines
+in the table) and `dist/index.cjs:24`. These are package-internal paths, qualified by version, not
+repository paths; `vite.config.ts:1-5` (the file's own plugin list,
+which matches the table), `:7-11` (the CJS note), `:12` (the ESM import). `established fact` for
+the preset's contents and for the non-reproduction on the measured runtime; `uncertainty` for other
+runtimes.
 _Enforcement:_ **partially gated.** The ESM-path rule is pinned: `src/test/vite-dev-server-binding.test.ts:34-39`
 requires `/dist/index.js` and forbids the bare specifier. "Do not re-add a preset plugin" stays
-`convention only`; the failure there is a broken build, not a gate.
+`convention only`; the file warns that a duplicated plugin breaks the app, and no gate catches it.
 
-**AC-1.5 — CSRF protection for server functions requires explicit middleware registration.**
+**AC-1.5 — CSRF protection for server functions depends on the explicit registration in
+`src/start.ts`.**
 `src/start.ts` registers `createCsrfMiddleware` filtered to `handlerType === "serverFn"` in
-`requestMiddleware`. That registration is what keeps server functions protected. **There is no
-automatic CSRF default to fall back on** if the middleware is removed — deleting it removes
-protection silently. An in-file comment that claims defining `src/start.ts` "opts out" of an
-automatic install is **not** treated as contract evidence; measure the installed Start behaviour,
-not the comment.
-_Source:_ `src/start.ts:24-26` (`createCsrfMiddleware`), `:30` (`requestMiddleware:
-[errorMiddleware, csrfMiddleware]`); the discounted comment is at `:21-23`. `established fact` for the
-explicit registration. The absent automatic install is a **`source claim`** carried from the first
-stamp, where it was measured against the installed package. It could not be re-measured here,
-because `node_modules` was absent. `bun.lock` resolves `@tanstack/react-start` at 1.168.34.
-_Enforcement:_ `convention only`. A search of `src/test`, `scripts` and `e2e` for
-`createCsrfMiddleware`, `csrfMiddleware` or `src/start.ts` finds no hits. This is the highest-value
-unguarded invariant in §1.
+`requestMiddleware`. That registration is what keeps server functions protected.
+
+**Start's own default does not cover Verdant.** The installed Start server handler installs a
+default CSRF middleware only when the application defines no start instance:
+`requestMiddleware: hasStartInstance ? startOptions.requestMiddleware : [defaultCsrfMiddleware]`.
+Verdant defines `startInstance` to carry its error and Supabase-auth middleware, so the default never
+applies. The in-file comment at `src/start.ts:21-23`, which says that defining the file opts out of
+the automatic install, is therefore **accurate**.
+
+What follows:
+
+- Removing `csrfMiddleware` from `requestMiddleware` removes the protection. Nothing falls back.
+- Outside production, Start logs one `console.warn` when no CSRF middleware is registered, unless
+  `serverFns.disableCsrfMiddlewareWarning` is set. Verdant does not set it. In production there is
+  no warning, so the removal is silent where it matters.
+- Reading `:238`, deleting `src/start.ts` would bring the default back (`inference`; not run),
+  but it would also drop the error and auth middleware. That is not a fix either.
+
+> Earlier versions said there was no automatic CSRF default, and told readers to discount the
+> `src/start.ts` comment. On the installed Start, both were wrong: the default exists and the comment
+> describes it correctly. The operative conclusion, that removing the registration removes
+> protection, was right. Whether the Start version at the first stamp behaved differently is
+> `NOT_MEASURED`.
+
+_Source:_ `src/start.ts:21-23` (comment), `:24-26` (`createCsrfMiddleware`), `:28-31`
+(`startInstance`, with `requestMiddleware: [errorMiddleware, csrfMiddleware]` at `:30`).
+`@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins under `@tanstack/react-start`
+1.168.34: `dist/esm/createStartHandler.js:21` (`defaultCsrfMiddleware`), `:238` (the fallback),
+`:45-68` (the warning), `:261` (its condition). `@tanstack/start-client-core`
+`dist/esm/createCsrfMiddleware.js:4,12`: the middleware is tagged with
+`Symbol.for("tanstack-start:csrf-middleware")`, and only when `NODE_ENV !== "production"`.
+`established fact`.
+_Enforcement:_ `convention only`, plus the development-only warning. A search of `src/test`,
+`scripts` and `e2e` for `createCsrfMiddleware`, `csrfMiddleware` or `src/start.ts` finds no hits.
+This is still the highest-value unguarded invariant in §1. T8 in §11 is the proposed gate.
 
 **AC-1.6 — SSR failures must not be served as h3's JSON 500.**
 h3 swallows in-handler throws into a normal `500` carrying
@@ -933,7 +978,7 @@ true; a clause missing from this table would be an unstated gap.
 | AC-1.2  | regeneration overwrite (route tree, `_shared`); MCP bundle and `types.ts` by convention (`TREE_HASH_ROOTS` records a change, does not reject one) | **partially gated** |
 | AC-1.3  | URL-set parity, `/operator/` shape, operator/internal ↔ `_operator` layout, `/sensors/*` both ways; general auth ↔ `_app` parity unenforced (T7)  | **partially gated** |
 | AC-1.4  | `vite-dev-server-binding.test.ts` pins the ESM import path; no-duplicate-plugin rule by review                                                    | **partially gated** |
-| AC-1.5  | comment and review — explicit CSRF registration; no test references it                                                                            | `convention only`   |
+| AC-1.5  | comment and review — explicit CSRF registration; Start's default applies only without a start instance; dev-only warning; T8 proposed             | `convention only`   |
 | AC-1.6  | comment and review                                                                                                                                | `convention only`   |
 | AC-1.7  | `funnel-event-db-sink.test.tsx` source-scan pins sink-before-Outlet order                                                                         | **gated**           |
 | AC-1.8  | lockfile + 24 h release-age guard (AC-8.2); major-line moves by review                                                                            | `convention only`   |
@@ -996,24 +1041,26 @@ AC-6.4.
 
 | ID  | Test                                                                                                                                                                         | Guards        |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| T1  | Every path cited by a clause in this file exists at the stamped SHA                                                                                                          | this document |
+| T1  | Every repository path cited by a clause in this file exists at the stamped SHA                                                                                               | this document |
 | T2  | `SENSOR_SOURCES` and `CANONICAL_SENSOR_SOURCES` resolve **equal** — by import and object comparison, not by regex                                                            | AC-4.1        |
 | T3  | No module outside the two canonical files declares a sensor-source union literal, with the two known drifts allowlisted so the count can shrink but not grow                 | AC-4.3        |
 | T4  | `MODEL` and `MODEL_TIER` are module constants and not request-derived                                                                                                        | AC-5.2        |
 | T5  | Zero occurrences of Nelson / modified-Z / MAD across `src/` and `supabase/`                                                                                                  | AC-10.2       |
 | T6  | `DEFAULT_VPD_DRIFT_ALPHA === 0.3`, `DEFAULT_VPD_DRIFT_MIN_READINGS === 6`, and one exact numeric recurrence step                                                             | AC-10.1       |
 | T7  | Every route's declared `access` matches the layout it is mounted under for `auth` ↔ `_app` and `public` ↔ public roots — operator/internal parity is already tested (AC-1.3) | AC-1.3        |
+| T8  | `startInstance`'s resolved `requestMiddleware` contains a CSRF middleware filtered to server functions                                                                       | AC-1.5        |
 
 **Each test needs the technique its claim actually admits — they are not all import tests.**
 
-| Test | Technique                  | Why                                                                                                                                                                                                                                                                                                                                       |
-| ---- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T2   | **resolved import**        | Both are runtime `as const` arrays, so the values exist at runtime and can be compared as objects                                                                                                                                                                                                                                         |
-| T3   | **source / AST scan**      | Sensor-source unions are **type-level and erased at runtime**. No import can observe a declaration that does not exist in the emitted output; finding declarations outside the canonical files needs AST                                                                                                                                  |
-| T4   | **source / AST scan only** | `MODEL` and `MODEL_TIER` in `ai-doctor-review/index.ts` are **unexported** module constants, and importing that entrypoint executes `Deno.serve(...)`. A resolved-value import assertion is not available without a structure change; do not fake one. Scan for the const declarations and prove no request field reaches model selection |
-| T5   | **source scan**            | Proving a token is **absent** is exactly what scanning is good for                                                                                                                                                                                                                                                                        |
-| T6   | **resolved import**        | Both are exported runtime numbers; assert the values and one hand-computed EWMA step so a default change fails loudly                                                                                                                                                                                                                     |
-| T7   | **route-tree traversal**   | Access group is a property of the mounted layout, so the check must walk the tree, not the manifest alone                                                                                                                                                                                                                                 |
+| Test | Technique                  | Why                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T2   | **resolved import**        | Both are runtime `as const` arrays, so the values exist at runtime and can be compared as objects                                                                                                                                                                                                                                                                                                              |
+| T3   | **source / AST scan**      | Sensor-source unions are **type-level and erased at runtime**. No import can observe a declaration that does not exist in the emitted output; finding declarations outside the canonical files needs AST                                                                                                                                                                                                       |
+| T4   | **source / AST scan only** | `MODEL` and `MODEL_TIER` in `ai-doctor-review/index.ts` are **unexported** module constants, and importing that entrypoint executes `Deno.serve(...)`. A resolved-value import assertion is not available without a structure change; do not fake one. Scan for the const declarations and prove no request field reaches model selection                                                                      |
+| T5   | **source scan**            | Proving a token is **absent** is exactly what scanning is good for                                                                                                                                                                                                                                                                                                                                             |
+| T6   | **resolved import**        | Both are exported runtime numbers; assert the values and one hand-computed EWMA step so a default change fails loudly                                                                                                                                                                                                                                                                                          |
+| T7   | **route-tree traversal**   | Access group is a property of the mounted layout, so the check must walk the tree, not the manifest alone                                                                                                                                                                                                                                                                                                      |
+| T8   | **resolved import**        | Import `startInstance` and resolve its options; detect the middleware by `Symbol.for("tanstack-start:csrf-middleware")`, which Start attaches only when `NODE_ENV !== "production"`, so the check holds under Vitest and would not in a production-mode probe. Whether `src/start.ts` imports cleanly under Vitest is `NOT_MEASURED`; if it does not, a declared `@source-scan-justified` scan is the fallback |
 
 **`scripts/check-contract-test-resolution.mjs` does not apply to any of these.** It flags only tests
 that read the source of `playwright.config` or `vitest.config` without importing them
@@ -1049,7 +1096,7 @@ Not rejected — sequenced.
 
 | Item                                                                                                    | Gate                                                                                                                                        |
 | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| The gates T1–T7 in §11 (earlier versions of this row said T1–T5 while §11 proposed seven)               | Their own slice; T2 and T3 are the highest value                                                                                            |
+| The gates T1–T8 in §11 (earlier versions of this row said T1–T5, then T1–T7)                            | Their own slice; T2, T3 and T8 are the highest value                                                                                        |
 | Consolidating `docs/architecture.md`, `docs/grow-os-architecture.md`, `docs/grow-diary-architecture.md` | All three predate or contradict the current stack in places; retiring them is a separate reviewed slice                                     |
 | Enumerating the remaining sensor-source union re-declarations                                           | Bounded by T3 rather than by hand                                                                                                           |
 | Renaming `BillingSubscriptionRow` (AC-6.1 hazard)                                                       | Cosmetic; touches entitlement types, so it wants its own diff                                                                               |
@@ -1100,10 +1147,14 @@ stale every time the operating picture moved. Only the durable rules stay:
   telemetry is sent, not who builds, publishes, or serves the application. The same rule as for
   response headers applies.
 - **Two product-surface facts that bear on topology but do not settle it.** The preset comment names
-  Nitro's build-only default target as Cloudflare (`vite.config.ts:4`), and `prebuild` runs
-  `restore-env-production-from-head.mjs` and `assert-paddle-production-sandbox.mjs` before the edge
-  and stamp gates (`package.json:9`). Both are build inputs; neither measures the serving target or
-  the publish trigger.
+  Nitro's build-only default target as Cloudflare (`vite.config.ts:4`), and the preset code agrees:
+  it sets `defaultPreset: "cloudflare-module"`, and inside a Lovable sandbox it forces
+  `preset: "cloudflare-module"` with output under `dist/` (preset 2.8.5, `dist/index.js:576-592`). A
+  local production build at this amendment logged `preset: cloudflare-module` and wrote `.output/`.
+  That is the build target on the machine measured, not the serving target. Separately, `prebuild`
+  runs `restore-env-production-from-head.mjs` and `assert-paddle-production-sandbox.mjs` before
+  the edge and stamp gates (`package.json:9`). Both are build inputs; neither measures the serving
+  target or the publish trigger.
 
 ---
 
@@ -1135,3 +1186,4 @@ stale every time the operating picture moved. Only the durable rules stay:
 | ---------- | ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 2026-09-05 | `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` | Grok   | First stamp (PR #1281).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 2026-09-22 | `387a00067a76ca9e2ced453d6b6a0f580e33209b` | Claude | Full §15 re-verification of the 47 existing clauses, 327 commits after the first stamp, plus new AC-1.8 (stack majors); 48 clauses in total. Corrected enforcement for AC-1.3, 1.4, 1.7, 2.4 (tests existed at the first stamp) and AC-4.6, 9.1 (not required checks), and for the AC-1.2 MCP bundle (convention only; `TREE_HASH_ROOTS` does not reject hand edits). Recorded the AC-4.1 prototype-key defect, the AC-4.2 catch-all and registry divergence, the AC-4.3 unreachable promotion, the AC-5.6 second site, and the AC-7.3 explicit breeding writer. Corrected the AC-2.1 client-library and RPC claims. Re-pointed drifted citations. Carried the AC-1.4 preset internals and the AC-1.5 automatic-CSRF absence as `source claim` (not re-measurable without `node_modules`). |
+| 2026-09-23 | `8b73c14031050b51061d4715bedbcdfeb66eee52` | Claude | §15 amendment, verified against installed packages whose versions match `bun.lock`. AC-1.4: measured the preset internals, previously a `source claim` (devtools are development-only; Nitro is build-only); recorded that the ESM-path rationale did not reproduce on Node 22.22.2 with Vite 8.2.0, and kept the rule. AC-1.5: corrected. Start installs a default CSRF middleware only when no start instance exists, the `src/start.ts` comment is accurate, and the missing-middleware warning is development-only. Added proposed gate T8 (AC-1.5). §14: measured the local build's Nitro preset. No other clause touched; the code tree is identical to `387a0006`.                                                                                                                  |

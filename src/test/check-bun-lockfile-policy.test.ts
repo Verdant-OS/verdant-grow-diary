@@ -169,6 +169,24 @@ describe("resolvedVersionInBunLock", () => {
   it("returns null when the package is missing", () => {
     expect(resolvedVersionInBunLock('"other": ["other@1.0.0"]', MCP)).toBeNull();
   });
+
+  it("finds versions under nested Bun lock keys and aliases", () => {
+    const nested = [
+      '"hono": ["hono@4.13.5", "", {}]',
+      '"legacy/hono": ["hono@4.13.5", "", {}]',
+      '"compat-rollup/rollup": ["rollup@4.59.0", "", {}]',
+    ].join(",\n");
+    expect(resolvedVersionInBunLock(nested, "hono")).toEqual(["4.13.5"]);
+    expect(resolvedVersionInBunLock(nested, "rollup")).toEqual(["4.59.0"]);
+  });
+
+  it("returns every distinct resolved version sorted", () => {
+    const nested = [
+      '"hono": ["hono@4.13.5", "", {}]',
+      '"legacy/hono": ["hono@4.13.4", "", {}]',
+    ].join(",\n");
+    expect(resolvedVersionInBunLock(nested, "hono")).toEqual(["4.13.4", "4.13.5"]);
+  });
 });
 
 describe("evaluatePolicy", () => {
@@ -284,6 +302,24 @@ describe("evaluatePolicy", () => {
     delete current.packages["node_modules/rollup"];
     files[at("package-lock.json")] = JSON.stringify(current);
     expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it("accepts removal of optional Rollup from the canonical Bun graph", () => {
+    const files = policyFiles();
+    const current = JSON.parse(files[at("bun.lock")]);
+    for (const key of Object.keys(current.packages)) {
+      if (key === "rollup" || key.endsWith("/rollup")) delete current.packages[key];
+    }
+    files[at("bun.lock")] = JSON.stringify(current);
+    expect(evaluate(files)).toMatchObject({ ok: true, errors: [] });
+  });
+
+  it("fails when a required Bun security floor package is absent entirely", () => {
+    const files = policyFiles();
+    const current = JSON.parse(files[at("bun.lock")]);
+    delete current.packages.vitest;
+    files[at("bun.lock")] = JSON.stringify(current);
+    expect(evaluate(files).errors.join(" ")).toContain("bun.lock security floor for vitest");
   });
 
   it.each(["node_modules/rollup", "node_modules/legacy-vite/node_modules/rollup"])(

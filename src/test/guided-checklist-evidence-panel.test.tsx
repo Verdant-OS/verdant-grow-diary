@@ -36,7 +36,6 @@ const gap = () => screen.queryByTestId("guided-action-checklist-item-sensor:t1")
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
-  localStorage.clear();
   for (const key of ["plants", "tents", "diary", "readings"] as const)
     state[key] = { data: [], isLoading: false, refetch: vi.fn().mockResolvedValue({}) };
   state.tents.data = [{ id: "t1", name: "Tent A" }];

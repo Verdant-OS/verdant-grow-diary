@@ -1197,9 +1197,10 @@ export default function ManualSensorReadingCard({
                     );
                     return;
                   }
-                  updateValues(() =>
-                    recoveredCorrectionDraftValues(restored.correction, restored.metrics),
-                  );
+                  updateValues((current) => ({
+                    ...recoveredCorrectionDraftValues(restored.correction, restored.metrics),
+                    revision: current.revision + 1,
+                  }));
                   setReviewOpen(false);
                 }}
               >

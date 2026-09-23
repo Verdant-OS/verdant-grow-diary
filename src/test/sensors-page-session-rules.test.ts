@@ -16,6 +16,8 @@ import {
   editManualDraftValues,
   reexpressManualDraftTemperature,
   reconcileSensorsSelection,
+  updateSensorsDraft,
+  initializeSensorsDraft,
   type ManualDraftValues,
   type ManualSnapshotPayloads,
   type SensorsManualDraft,
@@ -881,5 +883,42 @@ describe("manual snapshot recovery errors", () => {
     expect(session.getSnapshot()?.recoveryError).toBe(
       "The unconfirmed manual snapshot's original tent is unavailable here. Return to its owned tent before retrying recovery.",
     );
+  });
+});
+
+describe("updateSensorsDraft revision guard", () => {
+  it("rejects a restore payload that reuses a lower revision after an edit", () => {
+    let session = createSensorsPageSession(0);
+    session = initializeSensorsDraft(session, {
+      epoch: 0,
+      correctionIdentity: STANDARD_MANUAL_CORRECTION_IDENTITY,
+      defaultTentId: A,
+      ownedTentIds: [A],
+      initial: createManualDraftValues({ airTemp: "26", airTempUnit: "C", humidityPct: "60" }),
+    });
+    const identity = session.draft!.identity;
+    session = updateSensorsDraft(session, identity, (current) =>
+      editManualDraftValues(current, { form: { ...current.form, humidityPct: "65" } }),
+    );
+    expect(session.draft!.values.form.humidityPct).toBe("65");
+    expect(session.draft!.values.revision).toBe(1);
+
+    const staleRestore = createManualDraftValues({
+      airTemp: "26",
+      airTempUnit: "C",
+      humidityPct: "60",
+    });
+    const rejected = updateSensorsDraft(session, identity, () => staleRestore);
+    expect(rejected).toBe(session);
+    expect(rejected.draft!.values.form.humidityPct).toBe("65");
+
+    const accepted = updateSensorsDraft(session, identity, (current) => ({
+      ...staleRestore,
+      revision: current.revision + 1,
+      saveUnconfirmed: true,
+      hasEditedReading: true,
+    }));
+    expect(accepted.draft!.values.form.humidityPct).toBe("60");
+    expect(accepted.draft!.values.revision).toBe(2);
   });
 });

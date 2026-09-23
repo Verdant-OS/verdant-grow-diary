@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import CultivationCalendarMonthGrid from "@/components/CultivationCalendarMonthGrid";
+import { FLOWER_WINDOW_SUGGESTED_DURATION_LABEL } from "@/lib/flowerWindowCalendarRules";
 import type {
   DiaryCalendarDayGroup,
   DiaryCalendarEvent,
@@ -212,6 +213,27 @@ describe("<CultivationCalendarMonthGrid />", () => {
     );
     expect(screen.getByTestId("cultivation-calendar-stage-legend")).toHaveTextContent(
       /derived overlay/i,
+    );
+  });
+
+  it("surfaces suggested duration honesty without hiding the flower day label", () => {
+    render(
+      <CultivationCalendarMonthGrid
+        monthKey="2026-03"
+        groups={[]}
+        flowerWindowBandDateKeys={["2026-03-02", "2026-03-03"]}
+        plantDayLabel="Plant day 70"
+        flowerDayLabel="Flower day 10 of 75"
+        durationHonestyLabel={FLOWER_WINDOW_SUGGESTED_DURATION_LABEL}
+        now={new Date("2026-03-12T12:00:00Z")}
+      />,
+    );
+
+    expect(screen.getByTestId("cultivation-calendar-duration-honesty")).toHaveTextContent(
+      FLOWER_WINDOW_SUGGESTED_DURATION_LABEL,
+    );
+    expect(screen.getByTestId("cultivation-calendar-flower-day")).toHaveTextContent(
+      "Flower day 10 of 75",
     );
   });
 

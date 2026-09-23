@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  FLOWER_WINDOW_MAX_DURATION_DAYS,
   FLOWER_WINDOW_PALETTE_KEY,
   FLOWER_WINDOW_SUGGESTED_DURATION_LABEL,
   deriveFlowerWindowCalendar,
@@ -111,5 +112,59 @@ describe("deriveFlowerWindowCalendar", () => {
     expect(suggested.durationHonestyLabel).toBe(FLOWER_WINDOW_SUGGESTED_DURATION_LABEL);
     expect(suggested.flowerDayLabel).toBe("Flower day 10 of 75");
     expect(suggested.bandDateKeys).toHaveLength(75);
+  });
+
+  it("returns an empty window for null input", () => {
+    const window = deriveFlowerWindowCalendar(null);
+    expect(window.bandDateKeys).toEqual([]);
+    expect(window.honesty.durationSource).toBe("missing");
+    expect(window.honesty.band).toBe("null");
+  });
+
+  it("accepts a validated YYYY-MM-DD flower flip and builds an inclusive UTC band", () => {
+    const window = deriveFlowerWindowCalendar({
+      plantStartedAt: PLANT_START,
+      flowerFlipAt: "2026-03-02",
+      durationDays: 3,
+      now: NOW,
+    });
+
+    expect(window.bandDateKeys).toEqual(["2026-03-02", "2026-03-03", "2026-03-04"]);
+    expect(window.flowerDay).toBe(10);
+    expect(window.honesty.band).toBe("derived");
+  });
+
+  it("rejects impossible calendar dates and durations above the safe integer cap", () => {
+    expect(
+      deriveFlowerWindowCalendar({
+        plantStartedAt: PLANT_START,
+        flowerFlipAt: "2026-02-30",
+        durationDays: 60,
+        now: NOW,
+      }).bandDateKeys,
+    ).toEqual([]);
+
+    expect(
+      deriveFlowerWindowCalendar({
+        plantStartedAt: PLANT_START,
+        flowerFlipAt: FLOWER_FLIP,
+        durationDays: FLOWER_WINDOW_MAX_DURATION_DAYS + 1,
+        now: NOW,
+      }).honesty.band,
+    ).toBe("null");
+  });
+
+  it("omits the flower day label when duration is missing even if flower age is known", () => {
+    const window = deriveFlowerWindowCalendar({
+      plantStartedAt: PLANT_START,
+      flowerFlipAt: FLOWER_FLIP,
+      durationDays: null,
+      now: NOW,
+    });
+
+    expect(window.flowerDay).toBe(10);
+    expect(window.flowerDayLabel).toBeNull();
+    expect(window.bandDateKeys).toEqual([]);
+    expect(window.honesty.durationSource).toBe("missing");
   });
 });

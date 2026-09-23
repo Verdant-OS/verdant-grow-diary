@@ -52,7 +52,7 @@ describe("MCP latest sensor snapshot — ECOWITT provenance fence", () => {
 
     // Bundle may emit const (pretty) or var (min-style); columns may wrap.
     expect(mirror).toMatch(
-      /(?:const|var)\s+SENSOR_COLUMNS\s*=\s*\n?\s*"id,tent_id,metric,value,quality,source,ts,captured_at,created_at,raw_payload"/,
+      /(?:const|var)\s+SENSOR_COLUMNS\s*=\s*\n?\s*"id,user_id,tent_id,metric,value,quality,source,ts,captured_at,created_at,device_id,raw_payload,correction_valid"/,
     );
     expect(mirror).toContain('vendor === "ecowitt_windows_testbench"');
     expect(mirror).toMatch(/(?:const|var)\s+SENSOR_CANDIDATE_LIMIT\s*=\s*25/);

@@ -42,6 +42,11 @@ export interface CultivationCalendarMonthGridInput {
   projectedReviews: readonly CultivationCalendarProjectedReviewBlock[] | null | undefined;
   /** Optional injected instant used only to identify the grower's today cell. */
   today?: Date | string | null | undefined;
+  /**
+   * UTC date keys of a derived stage window band (flower SET duration).
+   * Overlay only — never promoted to logged facts, reviews, or writes.
+   */
+  stageBandDateKeys?: readonly string[] | null | undefined;
 }
 
 export interface CultivationCalendarMonthGridDay {
@@ -59,6 +64,10 @@ export interface CultivationCalendarMonthGridDay {
   advisoryReviews: readonly CultivationCalendarProjectedReviewBlock[];
   hasLoggedFacts: boolean;
   hasAdvisoryReviews: boolean;
+  /** True when this UTC day sits inside a derived stage window band. */
+  hasStageBand: boolean;
+  /** Palette key for the overlay band, currently only `"flower"`. */
+  stageBandPaletteKey: "flower" | null;
 }
 
 export interface CultivationCalendarMonthGrid {
@@ -351,9 +360,17 @@ export function buildCultivationCalendarMonthGrid(
     if (cell) cell.advisoryReviews.push(review);
   }
 
+  const stageBandKeys = new Set<string>();
+  const rawBandKeys = Array.isArray(input?.stageBandDateKeys) ? input.stageBandDateKeys : [];
+  for (const rawKey of rawBandKeys) {
+    const dateKey = normalizeDateKey(rawKey);
+    if (dateKey) stageBandKeys.add(dateKey);
+  }
+
   const days: CultivationCalendarMonthGridDay[] = cells.map((cell) => {
     const loggedFacts = [...cell.loggedFacts].sort(compareLoggedFacts);
     const advisoryReviews = [...cell.advisoryReviews].sort(compareProjectedReviews);
+    const hasStageBand = stageBandKeys.has(cell.dateKey);
     return {
       dateKey: cell.dateKey,
       dayOfMonth: cell.dayOfMonth,
@@ -363,6 +380,8 @@ export function buildCultivationCalendarMonthGrid(
       advisoryReviews,
       hasLoggedFacts: loggedFacts.length > 0,
       hasAdvisoryReviews: advisoryReviews.length > 0,
+      hasStageBand,
+      stageBandPaletteKey: hasStageBand ? "flower" : null,
     };
   });
 

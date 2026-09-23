@@ -169,7 +169,9 @@ describe("sensor-history server read-boundary audit", () => {
       /function supabaseForUser[\s\S]*?Authorization: `Bearer \$\{ctx\.getToken\(\)\}`/,
     );
     // Whitespace-tolerant: the generated bundle line-wraps the query chain.
-    expect(MCP).toMatch(/client\s*\.from\("sensor_readings"\)\s*\.select/);
+    expect(MCP).toMatch(/client\s*\.from\("sensor_readings_effective"\)\s*\.select/);
+    expect(MCP).toContain("requireEffectiveSensorReadings(result.data)");
+    expect(MCP).not.toMatch(/client\s*\.from\("sensor_readings"\)/);
     expect(MCP).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
   });
 

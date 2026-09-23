@@ -141,6 +141,14 @@ describe("claimPendingQuickLogNote", () => {
     );
   });
 
+  it("blocks when the record fails closed-schema validation", () => {
+    const invalid = validRecord({
+      payload: { ...validRecord().payload, p_action: "water" },
+    });
+    expect(claimPendingQuickLogNote(invalid)).toEqual({ status: "blocked" });
+    expect(window.sessionStorage.getItem(pendingKey())).toBeNull();
+  });
+
   it("blocks when sessionStorage.setItem cannot persist the claim", () => {
     const record = validRecord();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
@@ -190,6 +198,10 @@ describe("claimPendingQuickLogNote", () => {
 });
 
 describe("clearPendingQuickLogNote", () => {
+  it("returns false when no pending record exists", () => {
+    expect(clearPendingQuickLogNote(validRecord())).toBe(false);
+  });
+
   it("removes only a matching pending record for the same owner and payload", () => {
     const record = validRecord();
     window.sessionStorage.setItem(pendingKey(), JSON.stringify(record));
@@ -226,5 +238,17 @@ describe("clearPendingQuickLogNote", () => {
     expect(clearPendingQuickLogNote(record)).toBe(false);
     vi.restoreAllMocks();
     expect(window.sessionStorage.getItem(pendingKey())).not.toBeNull();
+  });
+
+  it("returns false when removeItem does not clear the stored pending record", () => {
+    const record = validRecord();
+    const raw = JSON.stringify(record);
+    window.sessionStorage.setItem(pendingKey(), raw);
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation((key: string) => {
+      if (key === pendingKey()) return raw;
+      return null;
+    });
+    expect(clearPendingQuickLogNote(record)).toBe(false);
+    vi.restoreAllMocks();
   });
 });

@@ -6,7 +6,7 @@
  *  - empty states (no tent / no readings)
  *  - rendering of available metrics, source, stale labels
  *  - hook is disabled when no tent is assigned
- *  - hook queries sensor_readings scoped only by tent_id
+ *  - hook queries effective sensor readings scoped only by tent_id
  *  - no writes, no automation/device-control strings, no Edge / pi-ingest edits
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -204,15 +204,13 @@ describe("usePlantTentLatestReadings (scoping)", () => {
     expect(result.current.isFetching).toBe(false);
   });
 
-  it("queries sensor_readings scoped only by tent_id when assigned", async () => {
+  it("queries effective sensor readings scoped only by tent_id when assigned", async () => {
     limitMock.mockResolvedValue({ data: [], error: null });
     renderHook(() => usePlantTentLatestReadings("tent-123"), {
       wrapper: wrapper(),
     });
-    await waitFor(() => expect(fromMock).toHaveBeenCalledWith("sensor_readings"));
-    expect(selectMock).toHaveBeenCalledWith(
-      "ts,captured_at,metric,value,source,created_at,device_id,raw_payload",
-    );
+    await waitFor(() => expect(fromMock).toHaveBeenCalledWith("sensor_readings_effective"));
+    expect(selectMock).toHaveBeenCalledWith("*");
     expect(eqMock).toHaveBeenCalledWith("tent_id", "tent-123");
     expect(orderMock).toHaveBeenCalledWith("captured_at", {
       ascending: false,
@@ -251,8 +249,9 @@ describe("Plant Detail · Assigned Tent Environment static safety", () => {
     expect(RULES).toContain("canAssessStage");
   });
 
-  it("hook only reads sensor_readings (no writes)", () => {
-    expect(HOOK).toMatch(/\.from\(["']sensor_readings["']\)/);
+  it("hook only reads validated effective sensor values (no writes)", () => {
+    expect(HOOK).toContain("effectiveSensorReadingsQuery()");
+    expect(HOOK).toContain("requireEffectiveSensorReadings(data)");
     for (const verb of [".insert(", ".update(", ".delete(", ".upsert(", ".rpc("]) {
       expect(HOOK.includes(verb)).toBe(false);
     }

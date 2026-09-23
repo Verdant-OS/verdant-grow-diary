@@ -771,18 +771,21 @@ export default function DailyCheck() {
               data-testid="daily-grow-check-empty-no-tents-actions"
             >
               <Button asChild className="min-h-11 whitespace-normal">
-                <Link to={tentsPath()} data-testid="daily-grow-check-add-tent">
+                <Link to={tentsPath(growId)} data-testid="daily-grow-check-add-tent">
                   Add Tent <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm" className="min-h-11 whitespace-normal">
-                <Link to={plantsPath()} data-testid="daily-grow-check-empty-no-tents-go-plants">
+                <Link
+                  to={plantsPath(growId)}
+                  data-testid="daily-grow-check-empty-no-tents-go-plants"
+                >
                   {DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL}
                 </Link>
               </Button>
               <Button asChild variant="ghost" size="sm" className="min-h-11 whitespace-normal">
                 <Link
-                  to={timelinePath()}
+                  to={timelinePath(growId)}
                   data-testid="daily-grow-check-empty-no-tents-open-timeline"
                 >
                   {DAILY_CHECK_EMPTY_OPEN_TIMELINE_LABEL}
@@ -803,18 +806,21 @@ export default function DailyCheck() {
               data-testid="daily-grow-check-empty-no-plants-actions"
             >
               <Button asChild className="min-h-11 whitespace-normal">
-                <Link to={plantsPath()} data-testid="daily-grow-check-add-plant">
+                <Link to={plantsPath(growId)} data-testid="daily-grow-check-add-plant">
                   Add Plant <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm" className="min-h-11 whitespace-normal">
-                <Link to={tentsPath()} data-testid="daily-grow-check-empty-no-plants-go-tents">
+                <Link
+                  to={tentsPath(growId)}
+                  data-testid="daily-grow-check-empty-no-plants-go-tents"
+                >
                   {DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL}
                 </Link>
               </Button>
               <Button asChild variant="ghost" size="sm" className="min-h-11 whitespace-normal">
                 <Link
-                  to={sensorsPath()}
+                  to={sensorsPath(growId)}
                   data-testid="daily-grow-check-empty-no-plants-open-sensors"
                 >
                   {DAILY_CHECK_EMPTY_OPEN_SENSORS_LABEL}
@@ -910,7 +916,7 @@ export default function DailyCheck() {
                       className="min-h-11 whitespace-normal"
                     >
                       <Link
-                        to={plantsPath()}
+                        to={plantsPath(growId)}
                         data-testid="daily-grow-check-choose-no-plant-go-plants"
                       >
                         {DAILY_CHECK_EMPTY_GO_TO_PLANTS_LABEL}
@@ -923,7 +929,7 @@ export default function DailyCheck() {
                       className="min-h-11 whitespace-normal"
                     >
                       <Link
-                        to={timelinePath()}
+                        to={timelinePath(growId)}
                         data-testid="daily-grow-check-choose-no-plant-open-timeline"
                       >
                         {DAILY_CHECK_EMPTY_OPEN_TIMELINE_LABEL}
@@ -967,7 +973,10 @@ export default function DailyCheck() {
                       variant="ghost"
                       className="min-h-11 whitespace-normal"
                     >
-                      <Link to={tentsPath()} data-testid="daily-grow-check-choose-no-tent-go-tents">
+                      <Link
+                        to={tentsPath(growId)}
+                        data-testid="daily-grow-check-choose-no-tent-go-tents"
+                      >
                         {DAILY_CHECK_EMPTY_GO_TO_TENTS_LABEL}
                       </Link>
                     </Button>

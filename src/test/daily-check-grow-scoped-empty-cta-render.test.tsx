@@ -143,6 +143,65 @@ describe("Daily Check grow-scoped empty CTA render", () => {
     expect(hrefForTestId("daily-grow-check-empty-no-plants-open-sensors")).toBe("/sensors");
   });
 
+  it("carries growId on no-tents empty state when only activeGrowId resolves scope", () => {
+    H.activeGrowId = GROW;
+    H.tents = [];
+    H.plants = [
+      {
+        id: "p1",
+        name: "Plant",
+        grow_id: GROW,
+        tent_id: TENT,
+        stage: "veg",
+        is_archived: false,
+      },
+    ];
+
+    renderDailyCheck("/daily-check");
+
+    expect(screen.getByTestId("daily-grow-check-empty-no-tents-actions")).toBeInTheDocument();
+    expect(hrefForTestId("daily-grow-check-add-tent")).toBe(`/tents?growId=${GROW}`);
+    expect(hrefForTestId("daily-grow-check-empty-no-tents-go-plants")).toBe(
+      `/plants?growId=${GROW}`,
+    );
+    expect(hrefForTestId("daily-grow-check-empty-no-tents-open-timeline")).toBe(
+      `/timeline?growId=${GROW}`,
+    );
+  });
+
+  it("carries growId on choose-section helper links when activeGrowId is the only scope", () => {
+    H.activeGrowId = GROW;
+    H.tents = [{ id: TENT, name: "Tent", grow_id: GROW }];
+    H.plants = [
+      {
+        id: "p1",
+        name: "Plant",
+        grow_id: GROW,
+        tent_id: TENT,
+        stage: "veg",
+        is_archived: false,
+      },
+      {
+        id: "p2",
+        name: "Second plant",
+        grow_id: GROW,
+        tent_id: TENT,
+        stage: "veg",
+        is_archived: false,
+      },
+    ];
+
+    renderDailyCheck("/daily-check");
+
+    expect(screen.getByTestId("daily-grow-check-choose-no-plant")).toBeInTheDocument();
+    expect(hrefForTestId("daily-grow-check-choose-no-plant-go-plants")).toBe(
+      `/plants?growId=${GROW}`,
+    );
+    expect(hrefForTestId("daily-grow-check-choose-no-plant-open-timeline")).toBe(
+      `/timeline?growId=${GROW}`,
+    );
+  });
+
   it("carries growId on choose-section helper links when grow scope is active", () => {
     H.urlGrowId = GROW;
     H.tents = [{ id: TENT, name: "Tent", grow_id: GROW }];

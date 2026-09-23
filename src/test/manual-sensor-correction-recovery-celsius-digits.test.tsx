@@ -93,6 +93,13 @@ function correctionRecoveryHref() {
   return recovery.href;
 }
 
+/** Deep-link with a stale tentId query but the correction hash already present. */
+function wrongTentCorrectionRecoveryHref() {
+  const url = new URL(correctionRecoveryHref(), "https://example.invalid");
+  url.searchParams.set("tentId", otherTent);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 beforeEach(() => {
   sessionStorage.clear();
   removeLocalStorageItemForTest("verdant:temperatureUnit");
@@ -118,6 +125,19 @@ describe("correction recovery under default Fahrenheit preference", () => {
     expect(view.getByTestId("manual-reading-temp-unit-F")).toHaveAttribute("aria-pressed", "false");
     expect(view.getByLabelText(/Humidity/i)).toHaveValue(60);
     expect(view.getByTestId("manual-reading-save-unconfirmed")).toBeInTheDocument();
+  });
+
+  it("auto-retargets to the correction tent and keeps 26°C when tentId query is stale", async () => {
+    setLocalStorageItemForTest("verdant:temperatureUnit", "fahrenheit");
+    const view = mount(wrongTentCorrectionRecoveryHref());
+    await waitFor(() =>
+      expect(view.getByTestId("manual-reading-correction-banner")).toBeInTheDocument(),
+    );
+    const airTemp = view.container.querySelector("#m-air-temp") as HTMLInputElement;
+    expect(airTemp.value).toBe("26");
+    expect(airTemp.value).not.toBe("78.8");
+    expect(view.getByTestId("manual-reading-temp-unit-C")).toHaveAttribute("aria-pressed", "true");
+    expect(view.getByLabelText(/Humidity/i)).toHaveValue(60);
   });
 
   it("prefills canonical Celsius digits when the correction hash is already in the URL", async () => {

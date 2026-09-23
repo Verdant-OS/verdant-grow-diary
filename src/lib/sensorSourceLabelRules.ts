@@ -73,7 +73,7 @@ export function resolveSensorSourceLabel(input: ResolveSourceLabelInput): Resolv
   const vendor = normaliseVendor(input.vendor);
   const source = input.source;
 
-  if (!source || !(source in CANONICAL_SOURCE_LABELS)) {
+  if (!source || !Object.prototype.hasOwnProperty.call(CANONICAL_SOURCE_LABELS, source)) {
     return { label: "Unknown", vendor, vendorPromoted: false };
   }
 

@@ -27,6 +27,41 @@ const TARGETS: Array<{ name: string; path: string; scope: "lib" | "hook" | "ui" 
     scope: "lib",
   },
   {
+    name: "manualSensorCorrectionOperationRules",
+    path: "src/lib/manualSensorCorrectionOperationRules.ts",
+    scope: "lib",
+  },
+  {
+    name: "manualSensorCorrectionOperationParser",
+    path: "src/lib/manualSensorCorrectionOperationParser.ts",
+    scope: "lib",
+  },
+  {
+    name: "manualSensorCorrectionPendingStore",
+    path: "src/lib/manualSensorCorrectionPendingStore.ts",
+    scope: "lib",
+  },
+  {
+    name: "manualSensorCorrectionReceiptRules",
+    path: "src/lib/manualSensorCorrectionReceiptRules.ts",
+    scope: "lib",
+  },
+  {
+    name: "manualSensorCorrectionService",
+    path: "src/lib/manualSensorCorrectionService.ts",
+    scope: "lib",
+  },
+  {
+    name: "manualSensorLegacyCorrectionRules",
+    path: "src/lib/manualSensorLegacyCorrectionRules.ts",
+    scope: "lib",
+  },
+  {
+    name: "effectiveSensorReadingRules",
+    path: "src/lib/effectiveSensorReadingRules.ts",
+    scope: "lib",
+  },
+  {
     name: "insertManualSensorReadingReturningId",
     path: "src/lib/insertManualSensorReadingReturningId.ts",
     scope: "lib",

@@ -62,7 +62,7 @@ describe("private sensor query owner isolation", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: 3, staleTime: Number.POSITIVE_INFINITY } },
     });
-    client.setQueryData(buildPrivateSensorQueryKey("owner-a", ["all", 60]), [
+    client.setQueryData(buildPrivateSensorQueryKey("owner-a", ["all", 60, "effective-v1"]), [
       { id: "owner-a-private-row" },
     ]);
 

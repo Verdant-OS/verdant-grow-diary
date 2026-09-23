@@ -158,6 +158,7 @@ async function reviewAndConfirm() {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(CAPTURED);

@@ -34,8 +34,10 @@ import OperatorModeLink from "@/components/OperatorModeLink";
 import { isNavigationItemActive, type NavigationActiveRule } from "@/lib/navigationActiveRules";
 import {
   LABS_NAVIGATION_DESTINATIONS,
+  resolveLabsNavigationDestinations,
   type LabsNavigationDestinationId,
 } from "@/lib/growerNavigationRules";
+import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
 
 type PrimaryItem = MoreItem & NavigationActiveRule;
 
@@ -124,7 +126,13 @@ export const more: MoreItem[] = moreGroups.flatMap((g) => g.items);
 
 export default function MobileNav() {
   const [open, setOpen] = useState(false);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const labsNavItems: MoreItem[] = resolveLabsNavigationDestinations(
+    resolveNavigationGrowId({ pathname, search }),
+  ).map((item) => ({
+    ...item,
+    icon: labsIcons[item.id],
+  }));
   return (
     <nav
       aria-label="Primary navigation"
@@ -181,7 +189,7 @@ export default function MobileNav() {
                     {group.heading}
                   </h3>
                   <div className="grid grid-cols-3 gap-2">
-                    {group.items.map((m) => (
+                    {(group.heading === "Labs" ? labsNavItems : group.items).map((m) => (
                       <NavLink
                         key={m.to}
                         to={m.to}

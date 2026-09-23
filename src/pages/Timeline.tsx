@@ -1,4 +1,5 @@
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
@@ -116,8 +117,11 @@ import {
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
-  type ManualSensorTimelineMetricRow,
 } from "@/lib/timelineManualSensorMeasurementRules";
+import {
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
@@ -862,11 +866,8 @@ export default function Timeline() {
                 setManualSensorMeasurementEntries([]);
                 return;
               }
-              let sensorQuery = supabase
-                .from("sensor_readings")
-                .select(
-                  "id,tent_id,metric,value,source,ts,captured_at,quality,user_id,created_at,device_id",
-                )
+              let sensorQuery = effectiveSensorReadingsQuery()
+                .select("*")
                 .in("tent_id", tentIds)
                 .eq("source", "manual")
                 .order("captured_at", { ascending: false, nullsFirst: false })
@@ -886,7 +887,7 @@ export default function Timeline() {
                 return;
               }
               let receipts = manualSensorReadingsToTimelineEntries(
-                sensorResult.data as ManualSensorTimelineMetricRow[],
+                requireEffectiveSensorReadings(sensorResult.data),
                 new Date(),
               );
               if (timelineDateRangeBounds.startIso) {
@@ -1035,6 +1036,13 @@ export default function Timeline() {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(
+    () =>
+      subscribeManualSensorCorrections(ownerId, () => {
+        void load();
+      }),
+    [ownerId, load],
+  );
   useEffect(() => {
     const h = () => load();
     window.addEventListener("verdant:entry-created", h);
@@ -1201,6 +1209,23 @@ export default function Timeline() {
     setStartDateFilter("");
     setEndDateFilter("");
   }
+
+  // Full reset for both top Clear filters and empty-state reset. Stage/event
+  // chips stay independently toggleable; this callback is the one complete
+  // reset. Grow scope, highlight/entry anchor, and Timeline membership stay.
+  function clearAllTimelineFilters() {
+    clearEvidenceFilters();
+    setStageFilter("all");
+    setEventFilter("all");
+  }
+
+  function clearTimelineDateFilters() {
+    setStartDateFilter("");
+    setEndDateFilter("");
+  }
+
+  const chipFiltersActive = stageFilter !== "all" || eventFilter !== "all";
+  const anyFilterActive = evidenceActive || chipFiltersActive;
 
   // "Next missing action": infer per-category logging rhythm from the
   // merged diary + Quick Log rows and surface the category most behind
@@ -1463,10 +1488,22 @@ export default function Timeline() {
     hasInvalidScope,
     activeReadKey,
     coreRead,
-    evidenceCount: recentLaneRawEntries.length,
+    evidenceCount: recentLaneRawEntries.length + manualSensorMeasurementEntries.length,
+    hasAppliedDateBounds: Boolean(effectiveStartDate || effectiveEndDate),
     supplementalLoading,
     partialSources: partialReadSources,
   });
+  const isDateWindowEmpty = pageReadView.kind === "ready_empty_date_window";
+  const isConfirmedEmptyGrow = pageReadView.kind === "ready_empty";
+  const emptyStateView =
+    resolveTimelineEmptyState({
+      totalEntryCount: isDateWindowEmpty || isConfirmedEmptyGrow ? 0 : displayEntries.length,
+      filteredEntryCount: filtered.length,
+      evidenceFilterActive: evidenceActive,
+      otherFiltersActive: stageFilter !== "all" || eventFilter !== "all" || evidenceActive,
+      dateBoundsActive: isDateWindowEmpty,
+      context: fastAddContext,
+    }) ?? TIMELINE_EMPTY_STATE_FALLBACK;
 
   if (pageReadView.kind === "loading")
     return (
@@ -1784,8 +1821,8 @@ export default function Timeline() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={clearEvidenceFilters}
-            disabled={!evidenceActive}
+            onClick={clearAllTimelineFilters}
+            disabled={!anyFilterActive}
             data-testid="timeline-clear-filters"
             aria-label="Clear timeline filters"
           >
@@ -1992,9 +2029,7 @@ export default function Timeline() {
             });
             const blockersLine = formatTimelineHighlightBlockersLine(blockers);
             const handleClear = () => {
-              clearEvidenceFilters();
-              setStageFilter("all");
-              setEventFilter("all");
+              clearAllTimelineFilters();
               // Preserve highlight (and any other) query params untouched.
             };
             return (
@@ -2247,24 +2282,17 @@ export default function Timeline() {
         <AlertEventsSection events={alertEvents} />
       </div>
 
-      {pageReadView.kind === "ready_empty" ||
+      {isConfirmedEmptyGrow ||
+      isDateWindowEmpty ||
       (displayEntries.length > 0 && filtered.length === 0) ? (
         <TimelineEmptyState
-          view={
-            resolveTimelineEmptyState({
-              totalEntryCount: pageReadView.kind === "ready_empty" ? 0 : displayEntries.length,
-              filteredEntryCount: filtered.length,
-              evidenceFilterActive: evidenceActive,
-              otherFiltersActive: stageFilter !== "all" || eventFilter !== "all" || evidenceActive,
-              context: fastAddContext,
-            }) ?? TIMELINE_EMPTY_STATE_FALLBACK
-          }
+          view={emptyStateView}
           context={fastAddContext}
-          onClearFilters={() => {
-            clearEvidenceFilters();
-            setStageFilter("all");
-            setEventFilter("all");
-          }}
+          onClearFilters={
+            emptyStateView.kind === "date_window"
+              ? clearTimelineDateFilters
+              : clearAllTimelineFilters
+          }
         />
       ) : displayEntries.length === 0 ? null : (
         <div className="space-y-5">

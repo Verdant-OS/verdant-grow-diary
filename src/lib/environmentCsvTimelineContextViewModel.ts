@@ -7,11 +7,14 @@
  *  - Pure / deterministic. No I/O, no React.
  *  - Scopes by grow_id and tent_id; never crosses tents/grows.
  *  - Never relabels CSV as "live". Source is always "csv".
- *  - Derived VPD is labeled "Derived VPD" (never "Live VPD").
+ *  - Supplied VPD is labeled "CSV VPD"; computed VPD stays "Derived VPD".
+ *  - Missing or unrecognized VPD provenance stays neutral: "VPD".
  *  - When no match falls inside the window, snapshot is null.
  */
 
 export const CSV_DERIVED_VPD_LABEL = "Derived VPD" as const;
+export const CSV_SUPPLIED_VPD_LABEL = "CSV VPD" as const;
+export const CSV_UNKNOWN_VPD_LABEL = "VPD" as const;
 export const CSV_SNAPSHOT_TITLE = "CSV environment snapshot" as const;
 export const CSV_SOURCE_LABEL = "CSV" as const;
 
@@ -43,7 +46,10 @@ export interface CsvTimelineSnapshot {
   derivedVpdKpa: number | null;
   sourceLabel: typeof CSV_SOURCE_LABEL;
   title: typeof CSV_SNAPSHOT_TITLE;
-  derivedVpdLabel: typeof CSV_DERIVED_VPD_LABEL;
+  derivedVpdLabel:
+    | typeof CSV_DERIVED_VPD_LABEL
+    | typeof CSV_SUPPLIED_VPD_LABEL
+    | typeof CSV_UNKNOWN_VPD_LABEL;
 }
 
 export interface CsvTimelineContextEntry {
@@ -70,6 +76,15 @@ function rowGrowId(r: CsvSensorReadingRow): string | null {
 
 function isCsvRow(r: CsvSensorReadingRow): boolean {
   return (r.source ?? "").trim().toLowerCase() === "csv";
+}
+
+function rowVpdLabel(row: CsvSensorReadingRow | undefined): CsvTimelineSnapshot["derivedVpdLabel"] {
+  const raw = row?.raw_payload;
+  if (raw && typeof raw === "object" && "vpd_source" in raw) {
+    if (raw.vpd_source === "csv") return CSV_SUPPLIED_VPD_LABEL;
+    if (raw.vpd_source === "derived") return CSV_DERIVED_VPD_LABEL;
+  }
+  return CSV_UNKNOWN_VPD_LABEL;
 }
 
 function rowMs(r: CsvSensorReadingRow): number | null {
@@ -155,7 +170,7 @@ export function buildCsvTimelineContext(input: CsvTimelineContextInput): CsvTime
       derivedVpdKpa: findVal("vpd_kpa"),
       sourceLabel: CSV_SOURCE_LABEL,
       title: CSV_SNAPSHOT_TITLE,
-      derivedVpdLabel: CSV_DERIVED_VPD_LABEL,
+      derivedVpdLabel: rowVpdLabel(group.find((r) => (r.metric ?? "") === "vpd_kpa")),
     };
     out.push({
       diaryEntryId: entry.id,

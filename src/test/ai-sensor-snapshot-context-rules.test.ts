@@ -387,3 +387,109 @@ describe("buildAiSensorSnapshotContext — raw blob regression", () => {
     expect(valueIdx).toBeGreaterThan(bracketIdx);
   });
 });
+
+describe("buildAiSensorSnapshotContext — canonical manual card fields", () => {
+  it.each([
+    ["air_temp_c", 25, "temp=25°C"],
+    ["humidity_pct", 60, "humidity=60%"],
+    ["soil_moisture_pct", 42, "soil_moisture=42%"],
+    ["soil_ec_mscm", 1.2, "soil_ec=1.2"],
+    ["reservoir_ph", 6.2, "reservoir_ph=6.2"],
+    ["reservoir_ec_mscm", 1.4, "reservoir_ec=1.4mS/cm"],
+  ] as const)("includes and accurately labels a single %s measurement", (field, value, readingText) => {
+    const result = buildAiSensorSnapshotContext(
+      { source: "manual", captured_at: "2026-06-06T03:00:00.000Z", [field]: value },
+      { now: NOW },
+    );
+
+    expect(result.valuesForModel).toEqual({ [field]: value });
+    expect(result.annotationLine).toBe(
+      `LATEST_SENSOR_SNAPSHOT [source=manual, stale=false, trust=medium]: ${readingText}`,
+    );
+    expect(result.isTrustedForAi).toBe(true);
+  });
+
+  it("preserves existing alias precedence while keeping reservoir measurements separate", () => {
+    const result = buildAiSensorSnapshotContext(
+      {
+        source: "manual",
+        captured_at: CAPTURED_FRESH,
+        temperature_f: 77,
+        air_temp_c: 26,
+        humidity: 58,
+        humidity_pct: 60,
+        soil_moisture: 40,
+        soil_moisture_pct: 42,
+        soil_ec: 1.1,
+        soil_ec_mscm: 1.2,
+        ph: 6,
+        reservoir_ph: 6.2,
+        reservoir_ec_mscm: 1.4,
+      },
+      { now: NOW },
+    );
+
+    expect(result.annotationLine).toBe(
+      "LATEST_SENSOR_SNAPSHOT [source=manual, stale=false, trust=medium]: temp=77°F, humidity=58%, ph=6, soil_moisture=40%, soil_ec=1.1, reservoir_ph=6.2, reservoir_ec=1.4mS/cm",
+    );
+    expect(result.valuesForModel?.reservoir_ec_mscm).toBe(1.4);
+    expect(result.valuesForModel?.soil_ec).toBe(1.1);
+  });
+
+  it("uses finite canonical fallbacks when older aliases are nonnumeric", () => {
+    const result = buildAiSensorSnapshotContext(
+      {
+        source: "manual",
+        captured_at: CAPTURED_FRESH,
+        temperature_f: Number.NaN,
+        temp_f: Number.POSITIVE_INFINITY,
+        temperature_c: "24",
+        temp_c: null,
+        air_temp_c: 0,
+        humidity: Number.NaN,
+        humidity_pct: 0,
+        soil_moisture: "40",
+        soil_moisture_pct: 0,
+        soil_ec: Number.POSITIVE_INFINITY,
+        soil_ec_mscm: 0,
+      },
+      { now: NOW },
+    );
+    expect(result.valuesForModel).toEqual({
+      air_temp_c: 0,
+      humidity_pct: 0,
+      soil_moisture_pct: 0,
+      soil_ec_mscm: 0,
+    });
+    expect(result.annotationLine).toBe(
+      "LATEST_SENSOR_SNAPSHOT [source=manual, stale=false, trust=medium]: temp=0°C, humidity=0%, soil_moisture=0%, soil_ec=0",
+    );
+  });
+
+  it("keeps a canonical manual measurement stale after its 24-hour window", () => {
+    const result = buildAiSensorSnapshotContext(
+      { source: "manual", captured_at: "2026-06-05T11:00:00.000Z", air_temp_c: 25 },
+      { now: NOW },
+    );
+    expect(result.stale).toBe(true);
+    expect(result.trustLevel).toBe("low");
+    expect(result.isTrustedForAi).toBe(false);
+    expect(result.annotationLine).toContain("temp=25°C (stale:");
+  });
+
+  it.each([
+    { source: "invalid", captured_at: CAPTURED_FRESH },
+    { source: "demo", captured_at: CAPTURED_FRESH },
+    { source: "unknown", captured_at: CAPTURED_FRESH },
+    { source: "manual", captured_at: "not-a-date" },
+  ])("omits canonical numeric values when provenance or timestamp is invalid: %j", (snapshot) => {
+    const result = buildAiSensorSnapshotContext(
+      { ...snapshot, air_temp_c: 25, reservoir_ec_mscm: 1.4 },
+      { now: NOW },
+    );
+    expect(result.valuesForModel).toBeNull();
+    expect(result.isTrustedForAi).toBe(false);
+    expect(result.annotationLine).not.toContain("temp=25");
+    expect(result.annotationLine).not.toContain("reservoir_ec=1.4");
+  });
+});

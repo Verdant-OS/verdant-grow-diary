@@ -15,7 +15,7 @@ import {
   useDiaryPhotoDisplayRows,
   type DiaryPhotoDisplayRow,
 } from "@/hooks/useDiaryPhotoDisplayRows";
-import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
+import { normalizeDiaryEntries, normalizeDiaryEntry } from "@/lib/diaryEntryRules";
 import { buildPhotoHistory } from "@/lib/photoHistoryRules";
 import {
   buildPlantPhotoStripItemsWithSource,
@@ -61,12 +61,30 @@ export default function PlantDetailPhotoStrip({
   onUploadPhoto,
   onReviewPhoto,
 }: PlantDetailPhotoStripProps) {
-  const { data: rawDiary, isLoading, isError, refetch } = useDiaryEntries();
+  const {
+    data: rawDiary,
+    isLoading,
+    isPending,
+    isFetching,
+    fetchStatus,
+    isError,
+    refetch,
+  } = useDiaryEntries();
+  const hasPlantContext = !!plantId?.trim();
+  const scopedDiary = useMemo(
+    () =>
+      hasPlantContext && Array.isArray(rawDiary)
+        ? rawDiary.filter((row) => normalizeDiaryEntry(row)?.plantId === plantId?.trim())
+        : [],
+    [hasPlantContext, plantId, rawDiary],
+  );
   const {
     rows: diaryRowsForDisplay,
     isResolvingPrivatePhotos,
     hasPrivatePhotoError,
-  } = useDiaryPhotoDisplayRows(rawDiary as ReadonlyArray<DiaryPhotoDisplayRow> | null | undefined);
+    isPrivatePhotoReadPaused,
+    refetchPrivatePhotos,
+  } = useDiaryPhotoDisplayRows(scopedDiary as ReadonlyArray<DiaryPhotoDisplayRow>);
 
   const latestReviewsByPhotoId = useMemo(
     () => projectLatestPhotoDiagnosisReviewsByPhoto(rawDiary),
@@ -97,9 +115,13 @@ export default function PlantDetailPhotoStrip({
     }));
   }, [diaryRowsForDisplay, latestReviewsByPhotoId, plantId]);
 
-  const hasPlantContext = !!(plantId && plantId.trim());
   const canReviewPhotos = hasPlantContext && !!growId?.trim() && !!onReviewPhoto;
   const uploadHref = logsPath(growId ?? null);
+  const diaryUnavailable = isError || (!isLoading && !isPending && !Array.isArray(rawDiary));
+  const photosUnavailable = diaryUnavailable || hasPrivatePhotoError;
+  const waitingForConnection = (isPending && fetchStatus === "paused") || isPrivatePhotoReadPaused;
+  const loadingPhotos = isLoading || isPending || isResolvingPrivatePhotos;
+  const showPhotos = !diaryUnavailable && items.length > 0;
 
   return (
     <section
@@ -157,7 +179,34 @@ export default function PlantDetailPhotoStrip({
         )}
       </header>
 
-      {isLoading || isResolvingPrivatePhotos ? (
+      {!hasPlantContext ? (
+        <p className="text-sm text-muted-foreground">Select a plant to view recent photos.</p>
+      ) : photosUnavailable ? (
+        <div
+          data-testid="plant-detail-photo-strip-error"
+          className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-3 text-sm text-muted-foreground flex items-center justify-between gap-3"
+        >
+          <span className="inline-flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-[hsl(var(--warning))]" />
+            {showPhotos
+              ? "Some recent photo previews are unavailable right now."
+              : "Recent photo previews are unavailable right now."}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7"
+            disabled={isFetching || isResolvingPrivatePhotos}
+            onClick={() => {
+              void Promise.allSettled([refetch(), refetchPrivatePhotos()]);
+            }}
+            data-testid="plant-detail-photo-strip-retry"
+          >
+            Retry
+          </Button>
+        </div>
+      ) : loadingPhotos ? (
         <div
           data-testid="plant-detail-photo-strip-loading"
           role="status"
@@ -171,29 +220,11 @@ export default function PlantDetailPhotoStrip({
               aria-hidden
             />
           ))}
-          <span className="sr-only">Loading recent photos…</span>
-        </div>
-      ) : isError || (hasPrivatePhotoError && items.length === 0) ? (
-        <div
-          data-testid="plant-detail-photo-strip-error"
-          className="rounded-xl border border-dashed border-border/50 bg-secondary/20 p-3 text-sm text-muted-foreground flex items-center justify-between gap-3"
-        >
-          <span className="inline-flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-[hsl(var(--warning))]" />
-            Recent photo previews are unavailable right now.
+          <span className="text-sm text-muted-foreground">
+            {waitingForConnection
+              ? "Waiting for connection to load recent photos."
+              : "Loading recent photos…"}
           </span>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7"
-            onClick={() => {
-              void refetch();
-            }}
-            data-testid="plant-detail-photo-strip-retry"
-          >
-            Retry
-          </Button>
         </div>
       ) : items.length === 0 ? (
         <div
@@ -205,7 +236,8 @@ export default function PlantDetailPhotoStrip({
             Add a photo to start building visual plant memory.
           </p>
         </div>
-      ) : (
+      ) : null}
+      {hasPlantContext && showPhotos && (!loadingPhotos || photosUnavailable) ? (
         <ul
           data-testid="plant-detail-photo-strip-list"
           className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x"
@@ -275,7 +307,7 @@ export default function PlantDetailPhotoStrip({
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </section>
   );
 }

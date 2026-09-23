@@ -10,6 +10,7 @@ import {
   buildAiDoctorCurrentSensorSnapshot,
   classifyAiDoctorCurrentSensorEvidence,
   currentSensorEvidenceIsFreshLive,
+  mergeAiDoctorCurrentSensorWindows,
   selectAiDoctorSensorEvidenceClassification,
   type AiDoctorCurrentSensorRowLike,
 } from "@/lib/aiDoctorCurrentSensorSnapshotRules";
@@ -17,7 +18,11 @@ import { classificationFromStatusResult } from "@/lib/sensorSnapshotStatusContra
 import { buildAiDoctorReviewRequestPacket } from "@/lib/aiDoctorReviewRequestPacket";
 import type { AiDoctorContextResult } from "@/lib/aiDoctorContextRules";
 import type { TimelineMemoryItem } from "@/lib/timelineFilterRules";
-import type { ManualSnapshotTimelineCard } from "@/lib/manualSensorSnapshotViewModel";
+import {
+  buildManualSnapshotTimelineCard,
+  type ManualSnapshotTimelineCard,
+} from "@/lib/manualSensorSnapshotViewModel";
+import { diaryRowToManualSnapshotRecord } from "@/lib/manualSnapshotDiaryAdapter";
 
 const NOW = new Date("2026-07-17T12:00:00.000Z");
 const FRESH = "2026-07-17T11:58:00.000Z";
@@ -379,6 +384,50 @@ describe("AI Doctor current sensor evidence classification", () => {
     ).toBe("stale");
   });
 
+  it("Golden Toad Pin1: a 9h tent manual stays usable Doctor evidence, not live-15m stale", () => {
+    const capturedAt = "2026-07-17T03:00:00.000Z";
+    const rows = [
+      row("temp_f", 75, "manual", capturedAt, "temp"),
+      row("humidity", 60, "manual", capturedAt, "rh"),
+      row("vpd", 1, "manual", capturedAt, "vpd"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.source).toBe("manual");
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+  });
+
+  it("Golden Toad Pin1: stale live must not park a 9h usable tent manual as cautionary", () => {
+    const manualAt = "2026-07-17T03:00:00.000Z";
+    const liveAt = "2026-07-17T11:44:00.000Z";
+    const rows = [
+      row("temperature_c", 24, "live", liveAt, "live-temp"),
+      row("temp_f", 75, "manual", manualAt, "temp"),
+      row("humidity", 60, "manual", manualAt, "rh"),
+      row("vpd", 1, "manual", manualAt, "vpd"),
+    ];
+    const snapshot = buildAiDoctorCurrentSensorSnapshot(rows, { now: NOW });
+    expect(snapshot?.annotation.source).toBe("manual");
+    expect(snapshot?.annotation.stale).toBe(false);
+    expect(classifyAiDoctorCurrentSensorEvidence(rows, { now: NOW }).status).toBe("usable");
+  });
+
+  it("merges a dedicated manual window so live-cap crowding cannot drop tent manuals", () => {
+    const mixedOnlyLive = [
+      row("temperature_c", 24, "live", "2026-07-17T11:44:00.000Z", "live-temp"),
+      row("humidity_pct", 55, "live", "2026-07-17T11:44:00.000Z", "live-rh"),
+    ];
+    const manuals = [
+      row("temp_f", 75, "manual", "2026-07-17T03:00:00.000Z", "manual-temp"),
+      row("humidity", 60, "manual", "2026-07-17T03:00:00.000Z", "manual-rh"),
+    ];
+    const merged = mergeAiDoctorCurrentSensorWindows(mixedOnlyLive, manuals);
+    expect(merged.map((r) => r.id).sort()).toEqual(
+      ["live-rh", "live-temp", "manual-rh", "manual-temp"].sort(),
+    );
+    expect(classifyAiDoctorCurrentSensorEvidence(merged, { now: NOW }).status).toBe("usable");
+  });
+
   it("does not treat a usable manual snapshot as live-bridge presence", () => {
     expect(
       currentSensorEvidenceIsFreshLive([row("temperature_c", 25, "manual")], { now: NOW }),
@@ -418,6 +467,131 @@ describe("AI Doctor request packet current-sensor selection", () => {
     expect(manual.recentSensorSnapshotAnnotation?.source).toBe("manual");
     expect(manual.missingLiveSensorReadings).toBe(true);
   });
+
+  it.each([
+    ["stale live", row("temperature_c", 30, "live", "2026-07-17T11:44:00.000Z")],
+    ["invalid live", row("temperature_c", 500, "live", "2026-07-17T11:59:00.000Z")],
+  ] as const)("keeps a usable persisted diary manual over newer %s evidence", (_label, currentRow) => {
+    const record = diaryRowToManualSnapshotRecord({
+      id: "persisted-diary-manual",
+      plant_id: "plant-1",
+      tent_id: "tent-1",
+      entry_at: "2026-07-17T03:00:00.000Z",
+      note: "Grower measured the tent",
+      details: {
+        manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 60 },
+      },
+    });
+    expect(record).not.toBeNull();
+    const card = buildManualSnapshotTimelineCard(record!);
+    const result = buildAiDoctorReviewRequestPacket({
+      plant: null,
+      timelineItems: [
+        { kind: "manual_sensor_snapshot", key: card.id, occurredAt: card.capturedAt, card },
+      ],
+      context: context(),
+      currentSensorRows: [currentRow],
+      now: NOW,
+    });
+
+    expect(result.recentSensorSnapshot?.capturedAt).toBe("2026-07-17T03:00:00.000Z");
+    expect(result.recentSensorSnapshot?.readings).toEqual(
+      expect.arrayContaining([
+        { field: "air_temp_c", value: 25, unit: "°C" },
+        { field: "humidity_pct", value: 60, unit: "%" },
+      ]),
+    );
+    expect(result.recentSensorSnapshotAnnotation).toMatchObject({
+      source: "manual",
+      stale: false,
+      trust: "medium",
+      includesValues: true,
+    });
+    expect(result.missingLiveSensorReadings).toBe(true);
+  });
+
+  describe.each([
+    ["temperature", { temp_f: 77 }, { field: "air_temp_c", value: 25, unit: "°C" }, "temp=25°C"],
+    ["humidity", { humidity_percent: 60 }, { field: "humidity_pct", value: 60, unit: "%" }, "humidity=60%"],
+    ["reservoir pH", { ph: 6.2 }, { field: "reservoir_ph", value: 6.2, unit: "pH" }, "reservoir_ph=6.2"],
+    ["reservoir EC", { ec: 1.4 }, { field: "reservoir_ec_mscm", value: 1.4, unit: "mS/cm" }, "reservoir_ec=1.4mS/cm"],
+  ] as const)("single-field persisted diary %s", (_field, persisted, expectedReading, annotationText) => {
+    it.each([
+      ["stale live", row("temperature_c", 30, "live", "2026-07-17T11:44:00.000Z")],
+      ["invalid live", row("temperature_c", 500, "live", "2026-07-17T11:59:00.000Z")],
+    ] as const)("preserves its value and honest annotation over newer %s", (_label, currentRow) => {
+      const record = diaryRowToManualSnapshotRecord({
+        id: "persisted-single-field-manual",
+        plant_id: "plant-1",
+        tent_id: "tent-1",
+        entry_at: "2026-07-17T03:00:00.000Z",
+        note: null,
+        details: { manual_sensor_snapshot: { source: "manual", ...persisted } },
+      });
+      expect(record).not.toBeNull();
+      const card = buildManualSnapshotTimelineCard(record!);
+      expect(card.readings).toHaveLength(1);
+      const result = buildAiDoctorReviewRequestPacket({
+        plant: null,
+        timelineItems: [
+          { kind: "manual_sensor_snapshot", key: card.id, occurredAt: card.capturedAt, card },
+        ],
+        context: context(),
+        currentSensorRows: [currentRow],
+        now: NOW,
+      });
+
+      expect(result.recentSensorSnapshot?.capturedAt).toBe(card.capturedAt);
+      expect(result.recentSensorSnapshot?.readings).toEqual([expectedReading]);
+      expect(result.recentSensorSnapshotAnnotation).toMatchObject({
+        source: "manual",
+        stale: false,
+        trust: "medium",
+        includesValues: true,
+      });
+      expect(result.recentSensorSnapshotAnnotation?.line).toContain(annotationText);
+      expect(result.recentSensorSnapshotAnnotation?.line).not.toContain("no numeric readings");
+      expect(result.recentSensorSnapshotAnnotation?.line).not.toContain("soil_ec");
+      expect(result.missingLiveSensorReadings).toBe(true);
+    });
+  });
+
+  it.each([
+    ["fresh live", "2026-07-17T03:00:00.000Z", "2026-07-17T11:59:00.000Z", false],
+    ["stale live with stale diary", "2026-07-16T11:00:00.000Z", "2026-07-17T11:44:00.000Z", true],
+  ] as const)(
+    "still uses newer %s when keeping the diary would not preserve fresher usable evidence",
+    (_label, manualAt, liveAt, stale) => {
+      const record = diaryRowToManualSnapshotRecord({
+        id: "persisted-diary-manual",
+        plant_id: "plant-1",
+        tent_id: "tent-1",
+        entry_at: manualAt,
+        note: null,
+        details: {
+          manual_sensor_snapshot: { source: "manual", temp_f: 77, humidity_percent: 60 },
+        },
+      });
+      expect(record).not.toBeNull();
+      const card = buildManualSnapshotTimelineCard(record!);
+      const result = buildAiDoctorReviewRequestPacket({
+        plant: null,
+        timelineItems: [
+          { kind: "manual_sensor_snapshot", key: card.id, occurredAt: card.capturedAt, card },
+        ],
+        context: context(),
+        currentSensorRows: [row("temperature_c", 26, "live", liveAt)],
+        now: NOW,
+      });
+
+      expect(result.recentSensorSnapshot?.capturedAt).toBe(liveAt);
+      expect(result.recentSensorSnapshot?.readings).toEqual([
+        { field: "temperature_c", value: 26, unit: "°C" },
+      ]);
+      expect(result.recentSensorSnapshotAnnotation).toMatchObject({ source: "live", stale });
+      expect(result.missingLiveSensorReadings).toBe(stale);
+    },
+  );
 
   it("prefers the newer of direct tent evidence and a diary-attached snapshot", () => {
     const manualCard = {

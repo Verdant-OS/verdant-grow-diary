@@ -10,6 +10,7 @@ const ANALYTICS_FILES = [
   "src/constants/analytics.ts",
   "src/hooks/useGoogleAnalyticsPageViews.ts",
   "src/lib/analyticsPageViewRules.ts",
+  "src/components/ConsentGatedVercelTelemetry.tsx",
   "src/routes/__root.tsx",
 ];
 
@@ -84,5 +85,30 @@ describe("Google Analytics route metadata timing", () => {
     // import + call site (+ optional type mention) — require a single call in AnalyticsShell
     expect(root).toMatch(/function AnalyticsShell\(\)[\s\S]*?useGoogleAnalyticsPageViews\(\)/);
     expect((root.match(/useGoogleAnalyticsPageViews\(\)/g) ?? []).length).toBe(1);
+  });
+});
+
+describe("Vercel Web Analytics wiring uniqueness", () => {
+  it("rechecks stored consent on every SDK send via beforeSend on both mounts", () => {
+    const gated = readFile("src/components/ConsentGatedVercelTelemetry.tsx");
+    expect(gated).toMatch(/readAnalyticsConsent\(\)\s*===\s*["']granted["']/);
+    expect((gated.match(/beforeSend=\{beforeSendWithConsent\}/g) ?? []).length).toBe(2);
+    expect(gated).toMatch(/<Analytics beforeSend=\{beforeSendWithConsent\}/);
+    expect(gated).toMatch(/<SpeedInsights beforeSend=\{beforeSendWithConsent\}/);
+  });
+
+  it("keeps one consent-gated mount in each existing root location with no direct SDK mounts", () => {
+    const root = readFile("src/routes/__root.tsx");
+    expect(root).not.toMatch(/from ["']@vercel\/(analytics|speed-insights)\/react["']/);
+    expect(root).not.toMatch(/<(Analytics|SpeedInsights)\b/);
+    expect(root).toMatch(
+      /function RootDocument\([\s\S]*?<body>[\s\S]*?<ConsentGatedVercelAnalytics \/>\s*\n\s*<Scripts \/>/,
+    );
+    expect((root.match(/<ConsentGatedVercelAnalytics \/>/g) ?? []).length).toBe(1);
+    expect(root).toMatch(
+      /function ApplicationRootComponent\([\s\S]*?<ConsentGatedSpeedInsights \/>/,
+    );
+    expect((root.match(/<ConsentGatedSpeedInsights \/>/g) ?? []).length).toBe(1);
+    expect(root).toMatch(/function AnalyticsShell\(\)[\s\S]*?return <AnalyticsConsentBanner \/>/);
   });
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "@/lib/react-router-compat";
+import { Link, useLocation, useParams } from "@/lib/react-router-compat";
 import { AlertCircle, ArrowLeft, BookOpenCheck, ClipboardCheck, Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,6 +21,8 @@ import {
 import { evaluateStepReadiness } from "@/lib/breeding/breedingProgramProgress";
 import { breedingTemplateStepTitle } from "@/constants/breedingProgramTemplate";
 import type { BreedingCriterionKey } from "@/constants/breedingProgramTemplate";
+import { resolveNavigationGrowId } from "@/lib/navigationGrowIdRules";
+import { breedingProgramsPath } from "@/lib/routes";
 
 interface DiaryEntry {
   id: string;
@@ -31,6 +33,8 @@ interface DiaryEntry {
 
 export default function BreedingProgramDetail() {
   const { programId } = useParams<{ programId: string }>();
+  const { pathname, search } = useLocation();
+  const growId = resolveNavigationGrowId({ pathname, search });
   const [program, setProgram] = useState<BreedingProgramSummary | null>(null);
   const [steps, setSteps] = useState<BreedingStepRecord[]>([]);
   const [evidence, setEvidence] = useState<BreedingEvidenceRecord[]>([]);
@@ -187,7 +191,7 @@ export default function BreedingProgramDetail() {
         }
         actions={
           <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-            <Link to="/breeding">
+            <Link to={breedingProgramsPath(growId)} data-testid="breeding-program-detail-back">
               <ArrowLeft data-icon="inline-start" />
               All programs
             </Link>

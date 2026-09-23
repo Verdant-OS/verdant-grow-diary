@@ -119,6 +119,7 @@ function clickSave() {
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   clearLocalStorageForTest();
   clearTemperatureUnitPreference();
   rpcMock.mockReset();
@@ -408,7 +409,9 @@ describe("QuickLogV2Sheet — structured feeding", () => {
     fillRequiredFeedingFields();
     clickSave();
     await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("Could not log feeding. Nothing else was changed."),
+      expect(toastError).toHaveBeenCalledWith(
+        "This Feeding is unconfirmed. Retry checks the original entry and destination.",
+      ),
     );
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(rpcMock).not.toHaveBeenCalled();

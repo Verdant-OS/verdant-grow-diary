@@ -23,6 +23,10 @@ import {
   type RootZoneObservationV1,
 } from "@/lib/rootZoneObservationRules";
 import { useAuth } from "@/store/auth";
+import {
+  contextEvidenceReadStatus,
+  type ContextEvidenceReadStatus,
+} from "@/lib/aiDoctorContextReadStateRules";
 
 export type RootZoneObservationScope =
   | { kind: "plant"; plantId: string }
@@ -35,6 +39,9 @@ export interface UseRootZoneObservationsResult {
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
+  /** Optional for existing consumers/test doubles; real reads always supply it. */
+  readStatus?: ContextEvidenceReadStatus;
+  hasData?: boolean;
   error: unknown;
   refetch: () => Promise<unknown>;
 }
@@ -183,7 +190,8 @@ export function useRootZoneObservations(
         .order("occurred_at", { ascending: false })
         .limit(Math.max(1, Math.min(ROOT_ZONE_OBSERVATION_CAP, Math.floor(limit))));
       if (error) throw error;
-      const rows = (data ?? []) as unknown as RootZoneGrowEventRowLike[];
+      if (!Array.isArray(data)) throw new Error("Root-zone history is unavailable.");
+      const rows = data as unknown as RootZoneGrowEventRowLike[];
       const companionRows = await fetchManualObservationCompanions(scope, rows);
       return buildRootZoneObservationsFromRows(rows, limit, companionRows);
     },
@@ -205,6 +213,8 @@ export function useRootZoneObservations(
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,
+    readStatus: contextEvidenceReadStatus(query.status, query.fetchStatus),
+    hasData: query.data !== undefined,
     error: query.error,
     refetch: query.refetch,
   };

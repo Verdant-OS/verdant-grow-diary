@@ -33,6 +33,8 @@ import {
 } from "@/lib/sensorSnapshotStatusContract";
 
 export const AI_DOCTOR_CURRENT_SENSOR_SOURCES = ["live", "manual"] as const;
+/** Dedicated manual window so a busy live stream cannot starve tent manuals. */
+export const AI_DOCTOR_MANUAL_SENSOR_SOURCES = ["manual"] as const;
 export const AI_DOCTOR_CURRENT_SENSOR_ROW_CAP = 50;
 /** Allow asynchronously reported tent sensors to form one current snapshot. */
 export const AI_DOCTOR_CURRENT_SENSOR_COHERENCE_MS = 5 * 60 * 1000;
@@ -215,6 +217,34 @@ function compareCandidates(a: Candidate, b: Candidate): number {
 
 function appendUnique(values: readonly string[], addition: string | null): string[] {
   return Array.from(new Set(addition ? [...values, addition] : values)).sort();
+}
+
+function rowIdentity(row: AiDoctorCurrentSensorRowLike): string {
+  const id = typeof row.id === "string" ? row.id.trim() : "";
+  if (id) return `id:${id}`;
+  const source = typeof row.source === "string" ? row.source : "";
+  const metric = typeof row.metric === "string" ? row.metric : "";
+  const captured = String(row.captured_at ?? row.ts ?? row.created_at ?? "");
+  return `${source}\u0000${metric}\u0000${String(row.value)}\u0000${captured}`;
+}
+
+/**
+ * Union a mixed live/manual window with a manual-only window so tent
+ * manuals remain eligible even when live ingest fills the mixed cap.
+ */
+export function mergeAiDoctorCurrentSensorWindows(
+  mixedRows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
+  manualRows: readonly AiDoctorCurrentSensorRowLike[] | null | undefined,
+): AiDoctorCurrentSensorRowLike[] {
+  const seen = new Set<string>();
+  const out: AiDoctorCurrentSensorRowLike[] = [];
+  for (const row of [...(manualRows ?? []), ...(mixedRows ?? [])]) {
+    const key = rowIdentity(row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
 }
 
 function snapshotIsUsableDoctorEvidence(snapshot: AiDoctorCurrentSensorSnapshot): boolean {

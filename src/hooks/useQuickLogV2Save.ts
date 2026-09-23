@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { isUuid } from "@/lib/isUuid";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyQuickLogThrownSaveError } from "@/lib/quickLogSaveErrorMessage";
 import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
@@ -33,6 +34,8 @@ export interface QuickLogV2SaveOptions {
   telemetryIntent?: QuickLogSuccessInput;
   /** Resolve an uncertain Note save against its persisted event before success. */
   verifyPersistedNote?: boolean;
+  /** The owning sheet/account must still be active at each async boundary. */
+  canContinueNote?: () => boolean;
 }
 
 // These normal RPC responses are emitted before the manual event insert.
@@ -60,6 +63,8 @@ export function useQuickLogV2Save() {
       payload: QuickLogV2SavePayload,
       options: QuickLogV2SaveOptions = {},
     ): Promise<QuickLogV2SaveResult> => {
+      const canContinue = () => payload.p_action !== "note" || options.canContinueNote?.() !== false;
+      if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
       setSaving(true);
       setError(null);
       try {
@@ -67,6 +72,7 @@ export function useQuickLogV2Save() {
           "quicklog_save_manual" as any,
           payload as unknown as Record<string, unknown>,
         );
+        if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
         if (rpcError) {
           // Transport/Postgres-level failure (malformed uuid literal, missing
           // function, revoked EXECUTE, offline) — classify so surfaces can
@@ -75,9 +81,9 @@ export function useQuickLogV2Save() {
           setError(reason);
           return { ok: false, reason };
         }
-        const r = (data ?? {}) as RpcResponse;
-        if (!r.ok) {
-          const reason = r.reason || "save_failed";
+        const r = (data !== null && typeof data === "object" && !Array.isArray(data) ? data : {}) as RpcResponse;
+        if (payload.p_action === "note" ? r.ok !== true : !r.ok) {
+          const reason = typeof r.reason === "string" && r.reason ? r.reason : "save_failed";
           setError(reason);
           return {
             ok: false,
@@ -89,6 +95,10 @@ export function useQuickLogV2Save() {
         }
         let persistedNote: string | null | undefined;
         if (payload.p_action === "note") {
+          if (!isUuid(r.grow_event_id)) {
+            setError("receipt_unverified");
+            return { ok: false, reason: "receipt_unverified" };
+          }
           // A new successful atomic RPC confirms the submitted text. A reused
           // key does not: manual-save deliberately returns its original row
           // even if a caller supplies different text. Resolve that row before
@@ -104,6 +114,7 @@ export function useQuickLogV2Save() {
               .select("id,note,plant_id,tent_id")
               .eq("id", r.grow_event_id)
               .maybeSingle();
+            if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
             if (readError || !event) {
               setError("receipt_unverified");
               return { ok: false, reason: "receipt_unverified" };
@@ -125,6 +136,7 @@ export function useQuickLogV2Save() {
             persistedNote = event.note;
           }
         }
+        if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
         if (options.telemetryIntent !== undefined) {
           trackQuickLogSuccess(options.telemetryIntent, { reused: r.reused === true });
         }
@@ -136,11 +148,12 @@ export function useQuickLogV2Save() {
           ...(persistedNote !== undefined ? { persistedNote } : {}),
         };
       } catch (thrown) {
+        if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
         const reason = classifyQuickLogThrownSaveError(thrown);
         setError(reason);
         return { ok: false, reason };
       } finally {
-        setSaving(false);
+        if (canContinue()) setSaving(false);
       }
     },
     [],

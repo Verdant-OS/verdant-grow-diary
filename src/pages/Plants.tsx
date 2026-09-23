@@ -36,6 +36,7 @@ import { useDiaryEntries } from "@/hooks/use-diary-entries";
 import { useSensorReadings } from "@/hooks/use-sensor-readings";
 import { dashboardPath, plantDetailPath, plantsPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { plantHealthTone, type PlantHealthTone } from "@/lib/plantHealthRules";
 import {
   filterVisiblePlants,
   getArchivedPlantLabel,
@@ -79,6 +80,13 @@ import {
 // Stable fail-closed fallback for unset/placeholder query data. Keeping this
 // outside render prevents false dependency changes in the derived view models.
 const EMPTY_QUERY_ROWS: never[] = [];
+
+const HEALTH_DOT_CLASSES: Readonly<Record<PlantHealthTone, string>> = {
+  success: "bg-[hsl(var(--success))]",
+  warning: "bg-[hsl(var(--warning))]",
+  destructive: "bg-destructive",
+  neutral: "bg-muted-foreground",
+};
 
 function formatPlantHealthLabel(health: string | null | undefined): string {
   return `Plant health: ${health ?? "unknown"}`;
@@ -752,12 +760,7 @@ export default function Plants() {
         >
           {filtered.map((p) => {
             const tent = tents.find((t) => t.id === p.tentId);
-            const dot =
-              p.health === "healthy"
-                ? "bg-[hsl(var(--success))]"
-                : p.health === "watch"
-                  ? "bg-[hsl(var(--warning))]"
-                  : "bg-destructive";
+            const dot = HEALTH_DOT_CLASSES[plantHealthTone(p.health)];
             const archivedLabel = getArchivedPlantLabel(p);
             const isInactive = archivedLabel.kind !== "active";
             const dailyCheckEntry = dailyCheckByPlant.get(p.id);

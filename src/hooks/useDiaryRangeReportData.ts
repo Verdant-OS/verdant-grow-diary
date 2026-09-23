@@ -7,7 +7,9 @@
  * to the requested range, and 1-hour signed URLs for storage photo
  * paths. Strictly read-only: no inserts, no updates, no RPCs.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
 import type {
@@ -17,6 +19,11 @@ import type {
   DiaryRangeSensorReadingRow,
 } from "@/lib/diaryRangeReportRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
+import {
+  EFFECTIVE_SENSOR_QUERY_VERSION,
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 
 export type DiaryRangeReportDataStatus = "idle" | "loading" | "ready" | "unavailable";
 
@@ -32,6 +39,7 @@ export interface UseDiaryRangeReportDataResult {
   status: DiaryRangeReportDataStatus;
   data: DiaryRangeReportData | null;
   error: string | null;
+  retry: () => void;
 }
 
 const EMPTY: DiaryRangeReportData = {
@@ -66,8 +74,11 @@ async function signPhotoUrls(rows: DiaryRangeDiaryRow[]): Promise<DiaryRangeDiar
     .map((r) => r.photo_url)
     .filter((p): p is string => !!p && !p.startsWith("http"));
   if (paths.length === 0) return rows;
-  const { data } = await supabase.storage.from("diary-photos").createSignedUrls(paths, 3600);
-  const map = new Map((data ?? []).map((s) => [s.path as string, s.signedUrl]));
+  const { data, error } = await supabase.storage.from("diary-photos").createSignedUrls(paths, 3600);
+  if (error || !Array.isArray(data)) throw new Error("Diary report photos unavailable.");
+  const map = new Map(data.map((s) => [s.path as string, s.signedUrl]));
+  if (paths.some((path) => !map.get(path)?.trim()))
+    throw new Error("Diary report photos unavailable.");
   return rows.map((r) =>
     r.photo_url && map.has(r.photo_url) ? { ...r, photo_url: map.get(r.photo_url)! } : r,
   );
@@ -79,40 +90,34 @@ export function useDiaryRangeReportData(
   endDate: string | null | undefined,
 ): UseDiaryRangeReportDataResult {
   const { user } = useAuth();
-  const [status, setStatus] = useState<DiaryRangeReportDataStatus>("idle");
-  const [data, setData] = useState<DiaryRangeReportData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!user || !growId || !startDate || !endDate) {
-      setStatus("idle");
-      setData(null);
-      setError(null);
-      return;
-    }
-    setStatus("loading");
-    setError(null);
-    const startIso = `${startDate}T00:00:00.000Z`;
-    const endIso = `${endDate}T23:59:59.999Z`;
-    try {
+  const query = useQuery<DiaryRangeReportData>({
+    queryKey: [
+      "diary-range-report",
+      user?.id ?? "anon",
+      growId ?? "none",
+      startDate ?? "none",
+      endDate ?? "none",
+      EFFECTIVE_SENSOR_QUERY_VERSION,
+    ],
+    enabled: !!user && !!growId && !!startDate && !!endDate,
+    retry: false,
+    queryFn: async () => {
+      if (!user || !growId || !startDate || !endDate) return EMPTY;
+      const startIso = `${startDate}T00:00:00.000Z`;
+      const endIso = `${endDate}T23:59:59.999Z`;
       const { data: grow, error: growErr } = await supabase
         .from("grows")
         .select("id,name,stage")
         .eq("id", growId)
         .maybeSingle();
       if (growErr) throw growErr;
-      if (!grow) {
-        setData(null);
-        setStatus("unavailable");
-        setError("Grow not found or unavailable.");
-        return;
-      }
+      if (!grow) throw new Error("Grow not found or unavailable.");
 
       const { data: tents, error: tentErr } = await supabase
         .from("tents")
         .select("id")
         .eq("grow_id", growId);
-      if (tentErr) throw tentErr;
+      if (tentErr || !Array.isArray(tents)) throw new Error("Diary report scope unavailable.");
       const tentIds = (tents ?? []).map((t) => t.id as string).filter(Boolean);
 
       const [diaryRes, eventsRes, harvestRes, sensorRes] = await Promise.all([
@@ -133,9 +138,10 @@ export function useDiaryRangeReportData(
           .order("harvested_at", { ascending: false })
           .limit(50),
         tentIds.length > 0
-          ? supabase
-              .from("sensor_readings")
-              .select("metric,value,ts,captured_at,source,raw_payload")
+          ? effectiveSensorReadingsQuery()
+              .select(
+                "id,user_id,tent_id,metric,value,ts,captured_at,created_at,device_id,source,quality,raw_payload,correction_valid",
+              )
               .in("tent_id", tentIds)
               .in("metric", ["temperature_c", "humidity_pct", "vpd_kpa"])
               // Preserve the requested grower-observation range for CSV
@@ -149,30 +155,44 @@ export function useDiaryRangeReportData(
           : Promise.resolve({ data: [], error: null } as { data: unknown[]; error: null }),
       ]);
 
-      if (diaryRes.error) throw diaryRes.error;
-      if (eventsRes.error) throw eventsRes.error;
-      if (harvestRes.error) throw harvestRes.error;
-      if (sensorRes.error) throw sensorRes.error;
+      for (const response of [diaryRes, eventsRes, harvestRes, sensorRes]) {
+        if (response.error || !Array.isArray(response.data))
+          throw new Error("Diary report evidence unavailable.");
+      }
 
       const diaryRows = await signPhotoUrls((diaryRes.data ?? []) as DiaryRangeDiaryRow[]);
-      setData({
+      return {
         grow: grow as DiaryRangeReportData["grow"],
         diaryEntries: diaryRows,
         growEvents: (eventsRes.data ?? []) as DiaryRangeGrowEventRow[],
         harvests: (harvestRes.data ?? []) as DiaryRangeHarvestRow[],
-        sensorReadings: (sensorRes.data ?? []) as DiaryRangeSensorReadingRow[],
-      });
-      setStatus("ready");
-    } catch (err) {
-      setData(EMPTY);
-      setStatus("unavailable");
-      setError(err instanceof Error ? err.message : "Unable to load diary report data.");
-    }
-  }, [user, growId, startDate, endDate]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  return { status, data, error };
+        sensorReadings: requireEffectiveSensorReadings(sensorRes.data).map((row) => ({
+          metric: row.metric,
+          value: row.value,
+          ts: row.ts,
+          captured_at: row.captured_at,
+          source: row.source,
+          raw_payload: row.raw_payload,
+        })),
+      };
+    },
+  });
+  const ownerId = user?.id ?? null;
+  const enabled = !!ownerId && !!growId && !!startDate && !!endDate;
+  const refetch = query.refetch;
+  const retry = useCallback(() => {
+    if (enabled) void refetch();
+  }, [enabled, refetch]);
+  useEffect(() => subscribeManualSensorCorrections(ownerId, retry), [ownerId, retry]);
+  if (!enabled) return { status: "idle", data: null, error: null, retry };
+  if (query.isPending || query.isFetching || query.fetchStatus === "paused")
+    return { status: "loading", data: null, error: null, retry };
+  if (query.isError)
+    return {
+      status: "unavailable",
+      data: null,
+      error: "Unable to load diary report data. Try again.",
+      retry,
+    };
+  return { status: "ready", data: query.data, error: null, retry };
 }

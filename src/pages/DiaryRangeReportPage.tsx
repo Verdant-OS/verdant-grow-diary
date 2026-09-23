@@ -125,6 +125,7 @@ export default function DiaryRangeReportPage() {
     status: dataStatus,
     data,
     error,
+    retry,
   } = useDiaryRangeReportData(
     gateAllowed ? growId : null,
     gateAllowed ? startDate : null,
@@ -252,6 +253,9 @@ export default function DiaryRangeReportPage() {
         <p className="text-sm text-muted-foreground">
           {error ?? "Unable to load diary report data."}
         </p>
+        <Button type="button" variant="outline" onClick={retry} className="mt-4">
+          Retry report
+        </Button>
       </div>
     );
   }

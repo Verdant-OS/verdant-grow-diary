@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { resolveHistoryTimelineAnchorId } from "@/lib/timelineEntryAnchorRules";
 import { Leaf, AlertTriangle } from "lucide-react";
 
 import { normalizeDiaryEntries, type NormalizeDiaryInput } from "@/lib/diaryEntryRules";
@@ -30,6 +31,8 @@ interface FeedingHistoryPanelProps {
   rawEntries: NormalizeDiaryInput["rawEntries"];
   /** Optional cap for the rendered list. Defaults to 20. */
   limit?: number;
+  /** Fragment identities already owned by visible diary rows on this page. */
+  reservedTimelineAnchorIds?: ReadonlySet<string>;
   className?: string;
   /** Notifies the owner (e.g. Timeline local state) after a correction/retraction. */
   onEntryChanged?: () => void;
@@ -186,6 +189,7 @@ function Row({
 export default function FeedingHistoryPanel({
   rawEntries,
   limit = 20,
+  reservedTimelineAnchorIds,
   className,
   onEntryChanged,
 }: FeedingHistoryPanelProps) {
@@ -204,8 +208,14 @@ export default function FeedingHistoryPanel({
     });
     const normalized = normalizeDiaryEntries({ rawEntries: lifted });
     const all = buildFeedingHistory(normalized);
-    return all.slice(0, Math.max(0, limit));
-  }, [rawEntries, limit]);
+    return all.slice(0, Math.max(0, limit)).map((row) => ({
+      ...row,
+      timelineAnchorId: resolveHistoryTimelineAnchorId(
+        row.timelineAnchorId,
+        reservedTimelineAnchorIds,
+      ),
+    }));
+  }, [rawEntries, limit, reservedTimelineAnchorIds]);
 
   // Correction/retraction wiring (issue #786): handles resolved from the raw
   // entries; rows without a Quick Log handle stay control-free.

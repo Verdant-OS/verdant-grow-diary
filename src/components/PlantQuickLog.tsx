@@ -61,6 +61,7 @@ import {
 } from "@/lib/tenSecondQuickCheckRules";
 import { useQuickLogV2Save } from "@/hooks/useQuickLogV2Save";
 import { buildPlantQuickLogV2SavePayload } from "@/lib/plantQuickLogV2SaveAdapter";
+import type { QuickLogV2SavePayload } from "@/lib/quickLogV2SavePayload";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
 import {
   buildQuickLogPhotoIdentity,
@@ -123,6 +124,14 @@ export default function PlantQuickLog({
   // state: it is never rendered, and a stale render must never hand the
   // server a key that does not match the payload being sent.
   const saveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
+  const saveInFlightRef = useRef(false);
+  const saveContextRevisionRef = useRef(0);
+  const pendingPhotoSaveRef = useRef<{
+    key: string;
+    file: File;
+    path: string;
+    payload: QuickLogV2SavePayload;
+  } | null>(null);
   const responseSectionRef = useRef<HTMLElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const libraryFileRef = useRef<HTMLInputElement | null>(null);
@@ -141,17 +150,28 @@ export default function PlantQuickLog({
   const [error, setError] = useState<string | null>(null);
   const [photoAttachmentUnconfirmed, setPhotoAttachmentUnconfirmed] = useState(false);
 
-  // Missed-log recovery / follow-up prompts open this sheet with the intent
-  // to record a status. Land the tired grower on the Better/Same/Worse
-  // section (scroll + focus). Focus only — never pre-selects a chip.
   useEffect(() => {
-    // Closing ends the logical submission, so the next open starts a new one.
-    // Opening mints nothing: the key is resolved lazily at save time from the
-    // payload signature, which guarantees it is STORED alongside the payload
-    // it was issued for.
-    if (!open) saveKeyRef.current = null;
-  }, [open]);
+    // A draft and its asynchronous save belong to one owner, target and open
+    // session. Invalidate old continuations even if that context later returns.
+    saveContextRevisionRef.current += 1;
+    saveInFlightRef.current = false;
+    saveKeyRef.current = null;
+    pendingPhotoSaveRef.current = null;
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setNote("");
+    setSensors(EMPTY_SENSORS);
+    setError(null);
+    setBusy(false);
+    setPhotoAttachmentUnconfirmed(false);
+    if (fileRef.current) fileRef.current.value = "";
+    if (libraryFileRef.current) libraryFileRef.current.value = "";
+    return () => {
+      saveContextRevisionRef.current += 1;
+    };
+  }, [open, user?.id, plantId, growId, tentId]);
 
+  // Focus a requested response check without pre-selecting a status.
   useEffect(() => {
     if (!open || !focusResponseCheckOnOpen) return;
     const el = responseSectionRef.current;
@@ -222,6 +242,7 @@ export default function PlantQuickLog({
     // here means rotation does not depend on a parent actually honoring that
     // close, which is the only other thing that clears the key.
     saveKeyRef.current = null;
+    pendingPhotoSaveRef.current = null;
     setPhotoFile(null);
     setPhotoPreview(null);
     setNote("");
@@ -232,12 +253,18 @@ export default function PlantQuickLog({
   }
 
   function handleOpenChange(next: boolean) {
-    if (busy) return;
+    if (busy || saveInFlightRef.current) return;
     onOpenChange(next);
     if (!next) resetForm();
   }
 
   function handleFileSelected(file: File | null) {
+    if (file !== photoFile) {
+      // Choosing another file is an edit even if its metadata is identical.
+      // An uncertain prior upload may already be referenced; never delete it.
+      saveKeyRef.current = null;
+      pendingPhotoSaveRef.current = null;
+    }
     setPhotoFile(file);
     setPhotoPreview(file ? URL.createObjectURL(file) : null);
     setError(null);
@@ -271,7 +298,7 @@ export default function PlantQuickLog({
   }
 
   async function handleSave() {
-    if (busy || photoAttachmentUnconfirmed) return;
+    if (busy || saveInFlightRef.current || photoAttachmentUnconfirmed) return;
     blurActiveElement();
     setError(null);
 
@@ -290,10 +317,33 @@ export default function PlantQuickLog({
       return;
     }
 
+    saveInFlightRef.current = true;
     setBusy(true);
-    let uploadedPath: string | null = null;
+    const submissionRevision = saveContextRevisionRef.current;
+    const canContinue = () => saveContextRevisionRef.current === submissionRevision;
+    const resolvedSaveKey = resolveQuickLogSaveKey({
+      current: saveKeyRef.current,
+      signature: buildQuickLogSaveSignature({
+        ownerId: user?.id ?? null,
+        plantId,
+        growId,
+        tentId: tentId ?? null,
+        note: timelineNote,
+        sensors: sensorsForPayload,
+        photo: buildQuickLogPhotoIdentity(photoFile),
+      }),
+      mint: newQuickLogSaveKey,
+    });
+    saveKeyRef.current = resolvedSaveKey.state;
+    const pending = pendingPhotoSaveRef.current;
+    const retry =
+      pending?.key === resolvedSaveKey.state.key && pending.file === photoFile ? pending : null;
+    let uploadedPath: string | null = retry?.path ?? null;
+    // A later rejection cannot disprove an earlier uncertain commit.
+    let cleanupAllowed = !retry;
+    let saveConfirmed = false;
     try {
-      if (photoFile && user) {
+      if (photoFile && user && !retry) {
         const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
         const path = `${user.id}/${growId}/${Date.now()}.${ext}`;
         const { error: upErr } = await supabase.storage
@@ -302,6 +352,7 @@ export default function PlantQuickLog({
             contentType: photoFile.type,
             upsert: false,
           });
+        if (!canContinue()) return;
         if (upErr) {
           console.error("PlantQuickLog photo upload failed", upErr);
           setError(
@@ -312,59 +363,69 @@ export default function PlantQuickLog({
         uploadedPath = path;
       }
 
-      // Reuse the key on a pure retry, rotate it on an edited one (D-B2).
-      // The signature signs the grower's photo CHOICE, never `uploadedPath`:
-      // that path embeds Date.now() and so differs on every attempt, and
-      // signing it would rotate the key on each retry — the exact duplicate
-      // write this policy exists to prevent.
-      const resolvedSaveKey = resolveQuickLogSaveKey({
-        current: saveKeyRef.current,
-        signature: buildQuickLogSaveSignature({
-          plantId,
-          growId,
-          tentId: tentId ?? null,
-          note: timelineNote,
-          sensors: sensorsForPayload,
-          photo: buildQuickLogPhotoIdentity(photoFile),
-        }),
-        mint: newQuickLogSaveKey,
-      });
-      saveKeyRef.current = resolvedSaveKey.state;
-
-      const built = buildPlantQuickLogV2SavePayload({
-        plantId,
-        plantName,
-        growId,
-        tentId: tentId ?? null,
-        note: timelineNote,
-        sensors: sensorsForPayload,
-        photoUrl: uploadedPath,
-        idempotencyKey: resolvedSaveKey.state.key,
-      });
+      // Reuse the first upload and payload together. A reused RPC key returns
+      // the original event, so a newly uploaded replacement would disagree
+      // with its already-persisted details.photo_url.
+      const built = retry
+        ? { ok: true as const, payload: retry.payload }
+        : buildPlantQuickLogV2SavePayload({
+            plantId,
+            plantName,
+            growId,
+            tentId: tentId ?? null,
+            note: timelineNote,
+            sensors: sensorsForPayload,
+            photoUrl: uploadedPath,
+            idempotencyKey: resolvedSaveKey.state.key,
+          });
       if (!built.ok) {
-        if (uploadedPath) {
+        if (uploadedPath && cleanupAllowed) {
           await supabase.storage
             .from("diary-photos")
             .remove([uploadedPath])
             .catch(() => {});
         }
+        if (!canContinue()) return;
         setError("Add what changed, a photo, or a reading before saving.");
         return;
       }
 
-      const result = await save(built.payload, { telemetryIntent: "plant_quick_log" });
+      const prepared =
+        photoFile && uploadedPath
+          ? {
+              key: resolvedSaveKey.state.key,
+              file: photoFile,
+              path: uploadedPath,
+              payload: built.payload,
+            }
+          : null;
+      pendingPhotoSaveRef.current = prepared;
+      cleanupAllowed = false;
+      const result = await save(built.payload, {
+        telemetryIntent: "plant_quick_log",
+        canContinueNote: canContinue,
+      });
+      if (!canContinue()) return;
       if (!result.ok) {
         console.error("PlantQuickLog quicklog_save_manual failed", result.reason);
-        if (uploadedPath) {
+        cleanupAllowed = result.definitiveRejected === true && !retry;
+        if (uploadedPath && cleanupAllowed) {
           await supabase.storage
             .from("diary-photos")
             .remove([uploadedPath])
             .catch(() => {});
+          if (!canContinue()) return;
+          if (pendingPhotoSaveRef.current === prepared) pendingPhotoSaveRef.current = null;
         }
         const failure = describeQuickLogSaveFailure(result.reason);
-        setError(`${failure.message} ${failure.recovery}`);
+        setError(
+          uploadedPath && !cleanupAllowed
+            ? `The photo save is unconfirmed. Your draft is still here. ${failure.recovery}`
+            : `${failure.message} ${failure.recovery}`,
+        );
         return;
       }
+      saveConfirmed = true;
 
       const photoAttachmentFailed = !!uploadedPath && !result.growEventId;
       if (uploadedPath && result.growEventId) {
@@ -388,6 +449,7 @@ export default function PlantQuickLog({
           );
         }
       }
+      if (!canContinue()) return;
 
       // D5: this is a confirmed plant-scoped save, so it is the most recent
       // target. Without this the remembered record goes stale here and an
@@ -428,17 +490,30 @@ export default function PlantQuickLog({
       onOpenChange(false);
       onSaved?.();
     } catch (err: unknown) {
+      if (!canContinue()) return;
+      if (saveConfirmed) {
+        console.warn("PlantQuickLog post-save refresh failed", err);
+        return;
+      }
       console.error("PlantQuickLog save failed", err);
-      if (uploadedPath) {
+      if (uploadedPath && cleanupAllowed) {
         await supabase.storage
           .from("diary-photos")
           .remove([uploadedPath])
           .catch(() => {});
       }
+      if (!canContinue()) return;
       const failure = describeQuickLogSaveFailure(classifyQuickLogThrownSaveError(err));
-      setError(`${failure.message} ${failure.recovery}`);
+      setError(
+        uploadedPath && !cleanupAllowed
+          ? `The photo save is unconfirmed. Your draft is still here. ${failure.recovery}`
+          : `${failure.message} ${failure.recovery}`,
+      );
     } finally {
-      setBusy(false);
+      if (canContinue()) {
+        saveInFlightRef.current = false;
+        setBusy(false);
+      }
     }
   }
 

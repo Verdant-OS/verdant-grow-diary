@@ -42,7 +42,10 @@ export const postGrowLearningReportPath = (growId: string): string =>
 
 export const diaryRangeReportPath = (): string => "/reports/diary-range";
 
-export const phenoHuntsPath = (): string => "/pheno-hunts";
+export const phenoHuntsPath = (growId?: string | null): string =>
+  withGrowId("/pheno-hunts", growId);
+export const breedingProgramsPath = (growId?: string | null): string =>
+  withGrowId("/breeding", growId);
 export const phenoHuntWorkspacePath = (huntId: string): string =>
   `/pheno-hunts/${encodeURIComponent(huntId)}/workspace`;
 export const phenoHuntKeepersPath = (huntId: string): string =>

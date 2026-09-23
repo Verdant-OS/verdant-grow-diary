@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY,
@@ -70,6 +70,28 @@ describe("Quick Log photo attachment recovery fence", () => {
     expect(
       window.sessionStorage.getItem(QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY),
     ).toBeNull();
+  });
+
+  it("preserves an existing recovery lock when sessionStorage.setItem throws", () => {
+    recordQuickLogPhotoAttachmentRecoveryLock(ORIGINAL_SCOPE);
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(ORIGINAL_SCOPE)).toBe(true);
+
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+    ) {
+      if (key === QUICK_LOG_PHOTO_ATTACHMENT_RECOVERY_STORAGE_KEY) {
+        throw new Error("quota exceeded");
+      }
+    });
+
+    const otherPlant = { ...ORIGINAL_SCOPE, plantId: "plant-b" };
+    recordQuickLogPhotoAttachmentRecoveryLock(otherPlant);
+
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(ORIGINAL_SCOPE)).toBe(true);
+    expect(hasQuickLogPhotoAttachmentRecoveryLock(otherPlant)).toBe(false);
+
+    setItem.mockRestore();
   });
 
   it("keeps an older scope-only record locked rather than clearing it on upgrade", () => {

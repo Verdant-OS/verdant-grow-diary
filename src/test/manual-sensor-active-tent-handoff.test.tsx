@@ -9,6 +9,9 @@ const TENT_A = "11111111-1111-4111-8111-111111111111";
 const TENT_B = "22222222-2222-4222-8222-222222222222";
 const TENT_NOT_OWNED = "33333333-3333-4333-8333-333333333333";
 const insertReading = vi.hoisted(() => vi.fn());
+vi.mock("@/store/auth", () => ({
+  useAuth: () => ({ user: { id: "sensors-handoff-owner" }, loading: false }),
+}));
 const growTentsQuery = vi.hoisted(() => ({
   // `vi.hoisted` runs before module constants; each test supplies its rows.
   data: [],
@@ -195,12 +198,13 @@ describe("Sensors manual reading target handoff", () => {
     expect(screen.queryByTestId("csv-import-writer")).not.toBeInTheDocument();
   });
 
-  it.skip(
+  it(
     "does not reuse a prior replacement when the exact-target route is opened again",
     { timeout: 15000 },
     async () => {
-      // TODO(TanStack MemoryRouter): exact-target return loses Tent A selection under compat router; product path covered by neighboring handoff tests.
-      // MemoryRouter handoff under TanStack compat is timing-sensitive; keep assertion but allow longer settle.
+      // The real protected-shell remount is covered separately. This focused
+      // route-return case must also preserve the grower's intermediate choice
+      // and reapply the required destination on a new navigation.
       renderSensors(
         `/sensors?tentId=${TENT_A}&tentIntent=required#manual-reading`,
         "/sensors",

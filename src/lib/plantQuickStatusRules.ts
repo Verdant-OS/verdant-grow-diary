@@ -31,6 +31,8 @@ export interface PlantQuickStatusInput {
   actionCount?: number | null;
   /** Loading flags — shown as muted "Checking…" copy / skeletons. */
   timelineLoading?: boolean;
+  /** Explicit read state takes precedence over the legacy loading flag. */
+  timelineState?: QuickStatusTimelineState;
   alertsLoading?: boolean;
   actionsLoading?: boolean;
   /** Route context for safe quick links. Null → link disabled with reason. */
@@ -39,6 +41,7 @@ export interface PlantQuickStatusInput {
 }
 
 export type QuickStatusLoadState = "ready" | "loading" | "unavailable";
+export type QuickStatusTimelineState = QuickStatusLoadState | "waiting" | "no-plant";
 
 export interface PlantQuickStatusLink {
   label: string;
@@ -75,6 +78,7 @@ export interface PlantQuickStatusView {
 
   // Loading / unavailable states.
   timelineLoading: boolean;
+  timelineState: QuickStatusTimelineState;
   alertsState: QuickStatusLoadState;
   actionsState: QuickStatusLoadState;
   /** Copy to show when alerts are loading or unavailable. */
@@ -100,6 +104,12 @@ export const ACTIONS_NONE_LABEL = "No pending actions";
 export const VIEW_LATEST_LABEL = "View latest entry";
 export const VIEW_LATEST_DISABLED_REASON =
   "Add a quick log, photo, or sensor snapshot to start the timeline.";
+const TIMELINE_READ_LABELS: Record<Exclude<QuickStatusTimelineState, "ready">, string> = {
+  loading: "Checking recent activity…",
+  waiting: "Waiting for connection to check recent activity.",
+  unavailable: "Recent activity unavailable.",
+  "no-plant": "Select a plant to view recent activity.",
+};
 export const ALERTS_LINK_LABEL = "View alerts";
 export const ACTIONS_LINK_LABEL = "View pending actions";
 export const ALERTS_LINK_ARIA_LABEL = "View open alerts for this plant";
@@ -183,7 +193,11 @@ export function buildPlantQuickStatusView(
   const stage = resolveStageLabel(i.stage ?? null);
   const header = formatRelativeTimelineHeader(i.timelineItems ?? []);
 
-  const timelineLoading = i.timelineLoading === true;
+  const timelineState = i.timelineState ?? (i.timelineLoading ? "loading" : "ready");
+  const timelineLoading = timelineState === "loading" || timelineState === "waiting";
+  const timelineStatusLabel =
+    timelineState === "ready" ? null : TIMELINE_READ_LABELS[timelineState];
+  const lastUpdateLabel = timelineStatusLabel ?? header.lastUpdatedLabel;
   const alertsLoading = i.alertsLoading === true;
   const actionsLoading = i.actionsLoading === true;
 
@@ -251,7 +265,8 @@ export function buildPlantQuickStatusView(
         disabledReason: ACTIONS_LINK_DISABLED_REASON,
       };
 
-  const latestId = pickLatestItemId(i.timelineItems ?? null);
+  const latestId = timelineState === "ready" ? pickLatestItemId(i.timelineItems ?? null) : null;
+  const latestDisabledReason = timelineStatusLabel ?? VIEW_LATEST_DISABLED_REASON;
   const viewLatestEntry: PlantQuickStatusViewLatest = latestId
     ? {
         label: VIEW_LATEST_LABEL,
@@ -262,13 +277,13 @@ export function buildPlantQuickStatusView(
       }
     : {
         label: VIEW_LATEST_LABEL,
-        ariaLabel: `${VIEW_LATEST_ARIA_LABEL} (unavailable: ${VIEW_LATEST_DISABLED_REASON})`,
+        ariaLabel: `${VIEW_LATEST_ARIA_LABEL} (unavailable: ${latestDisabledReason})`,
         targetItemId: null,
         disabled: true,
-        disabledReason: VIEW_LATEST_DISABLED_REASON,
+        disabledReason: latestDisabledReason,
       };
 
-  const parts: string[] = [`Stage: ${stage.label}`, header.lastUpdatedLabel];
+  const parts: string[] = [`Stage: ${stage.label}`, lastUpdateLabel];
   if (alertLabel) parts.push(alertLabel);
   else if (alertsStatusLabel) parts.push(alertsStatusLabel);
   if (actionLabel) parts.push(actionLabel);
@@ -277,8 +292,8 @@ export function buildPlantQuickStatusView(
   return {
     stageLabel: stage.label,
     stageIsFallback: stage.isFallback,
-    lastUpdateLabel: header.lastUpdatedLabel,
-    lastUpdateIsFallback: header.lastUpdatedIsFallback,
+    lastUpdateLabel,
+    lastUpdateIsFallback: timelineState !== "ready" || header.lastUpdatedIsFallback,
     alertCount,
     hasAlertCount,
     alertLabel,
@@ -286,6 +301,7 @@ export function buildPlantQuickStatusView(
     hasActionCount,
     actionLabel,
     timelineLoading,
+    timelineState,
     alertsState,
     actionsState,
     alertsStatusLabel,

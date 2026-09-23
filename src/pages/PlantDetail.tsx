@@ -123,7 +123,10 @@ function BlockedStateView({
 }) {
   const isMissingLike = view.kind === "not-found" || view.kind === "archived";
   return (
-    <div data-testid={view.testId} role={view.kind === "loading-slow" ? "alert" : undefined}>
+    <div
+      data-testid={view.testId}
+      role={view.kind === "paused" ? "status" : view.kind === "loading-slow" ? "alert" : undefined}
+    >
       <EmptyState
         icon={
           isMissingLike ? (
@@ -258,8 +261,30 @@ export default function PlantDetail() {
   const [searchParams] = useSearchParams();
   const contextTentId = searchParams.get("tentId");
   const contextGrowId = searchParams.get("growId");
-  const { data: plant, isLoading, isError, refetch } = useGrowPlant(id);
-  const { data: tent } = useGrowTent(plant?.tentId);
+  const { data: plant, isLoading, isPending, fetchStatus, isError, refetch } = useGrowPlant(id);
+  const tentQuery = useGrowTent(plant?.tentId);
+  // The plant row owns the assignment; a missing/failed details read must
+  // neither clear that assignment nor substitute a row for another tent.
+  const tent = tentQuery.data?.id === plant?.tentId ? tentQuery.data : null;
+  const tentReadMessage = tentQuery.isError
+    ? tent
+      ? "Could not refresh assigned tent details. Showing cached details."
+      : "Assigned tent details unavailable."
+    : tentQuery.fetchStatus === "paused"
+      ? tent
+        ? "Waiting for connection to refresh assigned tent details. Showing cached details."
+        : "Waiting for connection to load assigned tent details."
+      : tentQuery.isFetching || tentQuery.isPending
+        ? tent
+          ? "Refreshing assigned tent details. Showing cached details."
+          : "Loading assigned tent details…"
+        : !tent
+          ? "Assigned tent details unavailable."
+          : null;
+  const canRetryTentRead =
+    !tentQuery.isFetching &&
+    tentQuery.fetchStatus !== "paused" &&
+    (tentQuery.isError || (!tent && !tentQuery.isPending));
   const { openGroups, setGroupOpen, revealAndNavigate } = usePlantDetailDisclosureNavigation({
     plantId: plant?.id ?? null,
   });
@@ -297,20 +322,24 @@ export default function PlantDetail() {
   // hung Supabase request, etc.) we must not leave the grower on a blank
   // skeleton. After PLANT_DETAIL_LOAD_TIMEOUT_MS, promote the loading
   // state to a retryable failure surface. Reset whenever the id changes
-  // or the query is no longer pending.
+  // or the query is no longer pending. A paused first read waits for connection
+  // instead of timing out before it can start.
+  const isLoadingPlant = (isPending ?? isLoading) && fetchStatus !== "paused";
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoadingPlant) {
       setLoadTimedOut(false);
       return;
     }
     setLoadTimedOut(false);
     const handle = setTimeout(() => setLoadTimedOut(true), PLANT_DETAIL_LOAD_TIMEOUT_MS);
     return () => clearTimeout(handle);
-  }, [id, isLoading]);
+  }, [id, isLoadingPlant]);
 
   const loadState = classifyPlantDetailLoadState({
     isLoading,
+    isPending,
+    isPaused: fetchStatus === "paused",
     isError,
     hasPlant: !!plant,
     loadTimedOut,
@@ -333,6 +362,10 @@ export default function PlantDetail() {
         className="glass rounded-2xl h-64 animate-pulse"
       />
     );
+  }
+
+  if (blockedView && blockedView.kind === "paused") {
+    return <BlockedStateView view={blockedView} />;
   }
 
   if (blockedView && blockedView.kind === "loading-slow") {
@@ -567,9 +600,25 @@ export default function PlantDetail() {
             <div className="grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <div className="min-w-0" data-testid="plant-detail-tent">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Tent</div>
-                {tent ? (
+                {plant.tentId ? (
                   <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-                    <span className="min-w-0 break-words">{tent.name}</span>
+                    <div className="min-w-0 space-y-1">
+                      <span className="break-words">{tent?.name ?? "Assigned tent"}</span>
+                      {tentReadMessage && (
+                        <p role="status" className="text-xs text-muted-foreground">
+                          {tentReadMessage}
+                        </p>
+                      )}
+                      {canRetryTentRead && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void tentQuery.refetch()}
+                        >
+                          Retry
+                        </Button>
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center gap-1">
                       <Button
                         asChild
@@ -578,7 +627,7 @@ export default function PlantDetail() {
                         className="min-h-11 gap-1 px-2 whitespace-normal"
                         data-testid="plant-detail-view-tent"
                       >
-                        <Link to={tentDetailPath(tent.id)}>
+                        <Link to={tentDetailPath(plant.tentId)}>
                           <Box className="h-3.5 w-3.5" /> View Tent{" "}
                           <ArrowRight className="h-3.5 w-3.5" />
                         </Link>

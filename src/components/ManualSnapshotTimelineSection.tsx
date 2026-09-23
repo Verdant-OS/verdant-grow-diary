@@ -15,6 +15,7 @@
  */
 import { ClipboardList } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import ManualSnapshotTimelineCard from "@/components/ManualSnapshotTimelineCard";
 import {
   useManualSnapshotTimelineCards,
@@ -34,7 +35,7 @@ function toScope(props: Props): ManualSnapshotTimelineScope | null {
 
 export default function ManualSnapshotTimelineSection(props: Props) {
   const scope = toScope(props);
-  const { cards, isLoading, isError } = useManualSnapshotTimelineCards(scope);
+  const { cards, readStatus, refetch } = useManualSnapshotTimelineCards(scope);
 
   return (
     <Card data-testid="manual-snapshot-timeline-section" data-scope={props.scope}>
@@ -63,35 +64,66 @@ export default function ManualSnapshotTimelineSection(props: Props) {
           >
             Open a {props.scope} to see manual snapshots.
           </p>
-        ) : isLoading ? (
-          <div
-            className="h-16 rounded-md bg-muted/40 animate-pulse"
-            data-testid="manual-snapshot-timeline-section-loading"
-          />
-        ) : isError ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="manual-snapshot-timeline-section-error"
-          >
-            Couldn't load manual snapshots right now. Other entries are still shown.
-          </p>
-        ) : cards.length === 0 ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="manual-snapshot-timeline-section-empty"
-          >
-            {props.scope === "plant"
-              ? "No manual sensor snapshots attached to this plant yet."
-              : "No manual sensor snapshots in this tent’s diary yet."}
-          </p>
         ) : (
-          <ul className="space-y-3" data-testid="manual-snapshot-timeline-section-list">
-            {cards.map((card) => (
-              <li key={card.id}>
-                <ManualSnapshotTimelineCard card={card} />
-              </li>
-            ))}
-          </ul>
+          <>
+            {readStatus === "loading" ? (
+              <div
+                role="status"
+                aria-label="Manual snapshot read status"
+                className="h-16 rounded-md bg-muted/40 animate-pulse"
+                data-testid="manual-snapshot-timeline-section-loading"
+              >
+                <span className="sr-only">Loading manual snapshots…</span>
+              </div>
+            ) : readStatus !== "success" ? (
+              <div
+                role="status"
+                aria-label="Manual snapshot read status"
+                className="mb-3 text-sm text-muted-foreground"
+                data-testid={
+                  readStatus === "error" ? "manual-snapshot-timeline-section-error" : undefined
+                }
+              >
+                <p>
+                  {readStatus === "paused"
+                    ? "Waiting for connection to load manual snapshots."
+                    : readStatus === "refreshing"
+                      ? "Refreshing manual snapshots…"
+                      : "Couldn't load manual snapshots right now."}
+                  {cards.length > 0 &&
+                    " Showing previously loaded snapshots; the latest read is unconfirmed."}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  disabled={readStatus === "refreshing"}
+                  onClick={() => void refetch()}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : null}
+            {cards.length > 0 ? (
+              <ul className="space-y-3" data-testid="manual-snapshot-timeline-section-list">
+                {cards.map((card) => (
+                  <li key={card.id}>
+                    <ManualSnapshotTimelineCard card={card} />
+                  </li>
+                ))}
+              </ul>
+            ) : readStatus === "success" ? (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="manual-snapshot-timeline-section-empty"
+              >
+                {props.scope === "plant"
+                  ? "No manual sensor snapshots attached to this plant yet."
+                  : "No manual sensor snapshots in this tent’s diary yet."}
+              </p>
+            ) : null}
+          </>
         )}
       </CardContent>
     </Card>

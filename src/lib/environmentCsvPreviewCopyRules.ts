@@ -26,6 +26,8 @@ export const CSV_IMPORT_HISTORICAL_CONTEXT_NOTE =
 export const CSV_IMPORT_VIEW_HISTORY_LABEL = "View imported history";
 export const CSV_IMPORT_ADD_CURRENT_READING_LABEL = "Add current reading";
 
+export type CsvImportFailureReason = "unverified_duplicate";
+
 export interface CsvImportFailureReceipt {
   insertedCount: number;
   partialWrite?: boolean;
@@ -49,7 +51,22 @@ export function buildCsvImportFailureMessage(
   insertedCount: number,
   partialWrite: boolean,
   unconfirmedWrite = false,
+  failureReason?: CsvImportFailureReason,
 ): string {
+  if (failureReason === "unverified_duplicate") {
+    const saved =
+      insertedCount > 0
+        ? `${insertedCount} CSV reading${insertedCount === 1 ? "" : "s"} confirmed saved. `
+        : unconfirmedWrite
+          ? "Import stopped. "
+          : partialWrite
+            ? "Import stopped. Earlier CSV readings may already have been saved. "
+            : "No new CSV readings were saved in this attempt. ";
+    const uncertain = unconfirmedWrite
+      ? `We couldn't confirm whether ${insertedCount > 0 ? "the remaining" : "any"} CSV readings were saved. `
+      : "";
+    return `${saved}${uncertain}Matching CSV history was detected, but we couldn't verify all matching readings in your current history view. Older readings may be outside that view. Review imported history before retrying; retrying the same file may encounter the same conflict. No live sensor data was created.`;
+  }
   if (unconfirmedWrite) {
     const confirmed =
       insertedCount > 0

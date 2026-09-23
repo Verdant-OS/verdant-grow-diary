@@ -4,7 +4,7 @@ name: Native Save Retrieve Local
 # the published build, runs migrations remotely, or uses deployment credentials.
 on:
   pull_request:
-    branches: [main, verdant-grow-diary]
+    branches: [main, verdant-grow-diary, "codex/native-save-retrieve-proof-*"]
   workflow_dispatch:
 
 permissions:
@@ -37,7 +37,7 @@ jobs:
       - name: Check focused browser files
         run: |
           bunx eslint playwright.native-local.config.ts e2e-local
-          bunx tsc --noEmit --skipLibCheck --strict --target ES2022 --module ESNext --moduleResolution Bundler --types node playwright.native-local.config.ts e2e-local/native-save-retrieve.spec.ts e2e-local/lib/nativeLocalFixtures.ts
+          bunx tsc --noEmit --skipLibCheck --strict --target ES2022 --module ESNext --moduleResolution Bundler --types node playwright.native-local.config.ts e2e-local/native-save-retrieve.spec.ts e2e-local/native-csv-import-reopen.spec.ts e2e-local/native-revision-recovery.spec.ts e2e-local/lib/nativeLocalFixtures.ts
       - name: Set up pinned Supabase CLI
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v1
         with:
@@ -128,8 +128,8 @@ jobs:
             boundary: "Candidate browser with disposable local backend; not published-site acceptance.",
           };
           writeFileSync("native-local-proof.json", JSON.stringify(proof, null, 2) + "\n");
-          if (expected < 3 || unexpected !== 0 || flaky !== 0 || skipped !== 0 || errors !== 0) {
-            throw new Error("Native browser acceptance requires three executed passing scenarios, zero failures, retries, skips, and report errors.");
+          if (expected < 10 || unexpected !== 0 || flaky !== 0 || skipped !== 0 || errors !== 0) {
+            throw new Error("Native browser acceptance requires ten executed passing scenarios, zero failures, retries, skips, and report errors.");
           }
           console.log(`Candidate local-backend browser proof: ${expected} passed, 0 failed, 0 skipped. Published-site acceptance remains separate.`);
           NODE

@@ -145,8 +145,11 @@ describe("Plant Detail AI Doctor root-zone readiness consistency", () => {
     expect(screen.queryByTestId("plant-ai-doctor-safe-review-start")).toBeNull();
     expect(screen.getByTestId("plant-ai-doctor-context-panel")).toHaveAttribute(
       "data-readiness",
-      "insufficient",
+      mocks.rootZone.isError ? "unavailable" : "loading",
     );
+    expect(screen.queryByTestId("plant-ai-doctor-context-readiness")).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-context-missing")).toBeNull();
+    expect(screen.queryByTestId("plant-ai-doctor-context-no-warning")).toBeNull();
   });
 });
 

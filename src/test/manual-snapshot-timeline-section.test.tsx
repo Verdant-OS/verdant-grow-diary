@@ -4,9 +4,9 @@
  *
  * Mocks the Supabase client so the read-only diary fetch is deterministic.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import ManualSnapshotTimelineSection from "@/components/ManualSnapshotTimelineSection";
 
@@ -79,8 +79,19 @@ const ROWS: DiaryRow[] = [
   },
 ];
 
-let nextResponse: { data: DiaryRow[] | null; error: unknown } = { data: [], error: null };
+type ReadResponse = { data: DiaryRow[] | null; error: unknown };
+let nextResponse: ReadResponse | Promise<ReadResponse> = { data: [], error: null };
 let lastFilter: { column?: string; value?: string } = {};
+let readCount = 0;
+const clients: QueryClient[] = [];
+
+function pendingRead() {
+  let resolve!: (response: ReadResponse) => void;
+  const promise = new Promise<ReadResponse>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 vi.mock("@/integrations/supabase/client", () => {
   function makeQuery() {
@@ -93,7 +104,10 @@ vi.mock("@/integrations/supabase/client", () => {
     q.not = () => q;
     q.is = () => q;
     q.order = () => q;
-    q.limit = () => Promise.resolve(nextResponse);
+    q.limit = () => {
+      readCount += 1;
+      return Promise.resolve(nextResponse);
+    };
     return q;
   }
   return {
@@ -107,16 +121,32 @@ function renderSection(props: Parameters<typeof ManualSnapshotTimelineSection>[0
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  clients.push(qc);
+  const section = (nextProps: Parameters<typeof ManualSnapshotTimelineSection>[0]) => (
     <QueryClientProvider client={qc}>
-      <ManualSnapshotTimelineSection {...props} />
-    </QueryClientProvider>,
+      <ManualSnapshotTimelineSection {...nextProps} />
+    </QueryClientProvider>
   );
+  const view = render(section(props));
+  return {
+    ...view,
+    qc,
+    rerenderSection: (nextProps: Parameters<typeof ManualSnapshotTimelineSection>[0]) =>
+      view.rerender(section(nextProps)),
+  };
 }
 
 beforeEach(() => {
   nextResponse = { data: [], error: null };
   lastFilter = {};
+  readCount = 0;
+  onlineManager.setOnline(true);
+});
+
+afterEach(() => {
+  cleanup();
+  clients.splice(0).forEach((client) => client.clear());
+  onlineManager.setOnline(true);
 });
 
 describe("ManualSnapshotTimelineSection — plant scope", () => {
@@ -238,5 +268,208 @@ describe("ManualSnapshotTimelineSection — failure + empty", () => {
   it("renders a no-scope placeholder when the id is missing", () => {
     renderSection({ scope: "plant", plantId: null });
     expect(screen.getByTestId("manual-snapshot-timeline-section-no-scope")).toBeInTheDocument();
+  });
+});
+
+const SCOPES = [
+  {
+    name: "plant",
+    props: { scope: "plant", plantId: "plant-1" } as const,
+    filter: { column: "plant_id", value: "plant-1" },
+  },
+  {
+    name: "tent",
+    props: { scope: "tent", tentId: "tent-1" } as const,
+    filter: { column: "tent_id", value: "tent-1" },
+  },
+];
+
+describe.each(SCOPES)(
+  "ManualSnapshotTimelineSection — real $name read lifecycle",
+  ({ props, filter }) => {
+    it("keeps the first paused read unresolved until reconnect completes an empty read", async () => {
+      onlineManager.setOnline(false);
+      const pending = pendingRead();
+      nextResponse = pending.promise;
+      renderSection(props);
+      expect(readCount).toBe(0);
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+      expect(screen.getByRole("status", { name: "Manual snapshot read status" })).toHaveTextContent(
+        /waiting for connection/i,
+      );
+      expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+
+      act(() => onlineManager.setOnline(true));
+      await waitFor(() => expect(readCount).toBe(1));
+      expect(lastFilter).toEqual(filter);
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+      expect(screen.getByRole("status", { name: "Manual snapshot read status" })).toHaveTextContent(
+        /loading manual snapshots/i,
+      );
+      await act(async () => pending.resolve({ data: [], error: null }));
+      await waitFor(() =>
+        expect(screen.getByTestId("manual-snapshot-timeline-section-empty")).toBeInTheDocument(),
+      );
+      expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    });
+
+    it("retries a failed first read and displays the returned manual snapshot", async () => {
+      nextResponse = { data: null, error: new Error("unavailable") };
+      renderSection(props);
+      await screen.findByTestId("manual-snapshot-timeline-section-error");
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+      const pending = pendingRead();
+      nextResponse = pending.promise;
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(readCount).toBe(2));
+      expect(lastFilter).toEqual(filter);
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+      await act(async () => pending.resolve({ data: [ROWS[0]], error: null }));
+      await screen.findByTestId("manual-snapshot-timeline-section-list");
+      expect(screen.getByTestId("manual-snapshot-timeline-card")).toHaveAttribute(
+        "data-card-id",
+        "plant-1-snap-a",
+      );
+      expect(screen.getByTestId("manual-snapshot-timeline-card-source")).toHaveTextContent(
+        /manual/i,
+      );
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-error")).toBeNull();
+    });
+
+    it("retains prior cards with an unconfirmed-read warning through refresh failure and retry", async () => {
+      nextResponse = { data: [ROWS[0]], error: null };
+      const { qc } = renderSection(props);
+      await screen.findByTestId("manual-snapshot-timeline-section-list");
+      nextResponse = { data: null, error: new Error("refresh unavailable") };
+      await act(async () => {
+        await qc.invalidateQueries();
+      });
+      await screen.findByTestId("manual-snapshot-timeline-section-error");
+      expect(screen.getByTestId("manual-snapshot-timeline-card")).toHaveAttribute(
+        "data-card-id",
+        "plant-1-snap-a",
+      );
+      expect(screen.getByRole("status", { name: "Manual snapshot read status" })).toHaveTextContent(
+        /previously loaded.*unconfirmed/i,
+      );
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+
+      const pending = pendingRead();
+      nextResponse = pending.promise;
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(readCount).toBe(3));
+      expect(screen.getByRole("status", { name: "Manual snapshot read status" })).toHaveTextContent(
+        /refreshing.*previously loaded.*unconfirmed/i,
+      );
+      expect(screen.getByTestId("manual-snapshot-timeline-card")).toHaveAttribute(
+        "data-card-id",
+        "plant-1-snap-a",
+      );
+      expect(screen.getByRole("button", { name: "Retry" })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(readCount).toBe(3);
+      await act(async () => pending.resolve({ data: [], error: null }));
+      await screen.findByTestId("manual-snapshot-timeline-section-empty");
+      expect(screen.queryByTestId("manual-snapshot-timeline-card")).toBeNull();
+      expect(screen.queryByRole("status", { name: "Manual snapshot read status" })).toBeNull();
+    });
+
+    it("does not promote a previously empty result after a failed read or an offline retry", async () => {
+      const { qc } = renderSection(props);
+      await screen.findByTestId("manual-snapshot-timeline-section-empty");
+      nextResponse = { data: null, error: new Error("refresh unavailable") };
+      await act(async () => {
+        await qc.invalidateQueries();
+      });
+      await screen.findByTestId("manual-snapshot-timeline-section-error");
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+      act(() => onlineManager.setOnline(false));
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      await waitFor(() =>
+        expect(
+          screen.getByRole("status", { name: "Manual snapshot read status" }),
+        ).toHaveTextContent(/waiting for connection/i),
+      );
+      expect(readCount).toBe(2);
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+      nextResponse = { data: [], error: null };
+      act(() => onlineManager.setOnline(true));
+      await screen.findByTestId("manual-snapshot-timeline-section-empty");
+      expect(readCount).toBe(3);
+    });
+
+    it("qualifies cached cards when their refresh is paused and preserves manual provenance", async () => {
+      nextResponse = { data: [ROWS[0]], error: null };
+      const { qc } = renderSection(props);
+      await screen.findByTestId("manual-snapshot-timeline-section-list");
+      act(() => onlineManager.setOnline(false));
+      act(() => {
+        void qc.invalidateQueries();
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByRole("status", { name: "Manual snapshot read status" }),
+        ).toHaveTextContent(/waiting for connection.*previously loaded.*unconfirmed/i),
+      );
+      expect(screen.getByTestId("manual-snapshot-timeline-card-source")).toHaveTextContent(
+        /manual/i,
+      );
+      expect(readCount).toBe(1);
+      expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+    });
+  },
+);
+
+describe("ManualSnapshotTimelineSection — pending scope boundaries", () => {
+  it("does not show an old plant's cards when the next plant's first read is paused", async () => {
+    nextResponse = { data: [ROWS[0]], error: null };
+    const { rerenderSection } = renderSection({ scope: "plant", plantId: "plant-1" });
+    await screen.findByTestId("manual-snapshot-timeline-section-list");
+    act(() => onlineManager.setOnline(false));
+    rerenderSection({ scope: "plant", plantId: "plant-2" });
+    expect(screen.queryByTestId("manual-snapshot-timeline-card")).toBeNull();
+    expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+    expect(screen.getByRole("status", { name: "Manual snapshot read status" })).toHaveTextContent(
+      /waiting for connection/i,
+    );
+    nextResponse = { data: [ROWS[3]], error: null };
+    act(() => onlineManager.setOnline(true));
+    await screen.findByTestId("manual-snapshot-timeline-card");
+    expect(screen.getByTestId("manual-snapshot-timeline-card")).toHaveAttribute(
+      "data-card-id",
+      "other-plant-d",
+    );
+    expect(lastFilter).toEqual({ column: "plant_id", value: "plant-2" });
+  });
+
+  it("does not leak a late tent response into the newly selected tent", async () => {
+    const oldRead = pendingRead();
+    nextResponse = oldRead.promise;
+    const { rerenderSection } = renderSection({ scope: "tent", tentId: "tent-1" });
+    const newRead = pendingRead();
+    nextResponse = newRead.promise;
+    rerenderSection({ scope: "tent", tentId: "tent-2" });
+    await act(async () => oldRead.resolve({ data: [ROWS[0]], error: null }));
+    expect(screen.queryByTestId("manual-snapshot-timeline-card")).toBeNull();
+    expect(screen.queryByTestId("manual-snapshot-timeline-section-empty")).toBeNull();
+    expect(screen.getByRole("status", { name: "Manual snapshot read status" })).toHaveTextContent(
+      /loading manual snapshots/i,
+    );
+    await act(async () => newRead.resolve({ data: [ROWS[2]], error: null }));
+    await screen.findByTestId("manual-snapshot-timeline-card");
+    expect(screen.getByTestId("manual-snapshot-timeline-card")).toHaveAttribute(
+      "data-card-id",
+      "other-tent-c",
+    );
+    expect(lastFilter).toEqual({ column: "tent_id", value: "tent-2" });
+  });
+
+  it("keeps missing scope distinct from waiting for connection", () => {
+    onlineManager.setOnline(false);
+    renderSection({ scope: "tent", tentId: null });
+    expect(screen.getByTestId("manual-snapshot-timeline-section-no-scope")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Manual snapshot read status" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(readCount).toBe(0);
   });
 });

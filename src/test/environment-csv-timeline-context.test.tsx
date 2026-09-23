@@ -7,6 +7,8 @@ import {
   CSV_SNAPSHOT_TITLE,
   CSV_SOURCE_LABEL,
   CSV_DERIVED_VPD_LABEL,
+  CSV_SUPPLIED_VPD_LABEL,
+  CSV_UNKNOWN_VPD_LABEL,
 } from "@/lib/environmentCsvTimelineContextViewModel";
 import { CsvTimelineEnvironmentChip } from "@/components/CsvTimelineEnvironmentChip";
 import { parseEnvironmentCSVText } from "@/lib/csvParser";
@@ -128,6 +130,43 @@ describe("CSV timeline VPD origin", () => {
     expect(container.textContent).not.toContain("VPD");
     expect(container.textContent).not.toContain("NaN");
   });
+
+  it("keeps provenance neutral when the matched group has no vpd_kpa row", () => {
+    const snapshot = snapshotFor([
+      csvRow("temperature_c", 25, capturedAt),
+      csvRow("humidity_pct", 55, capturedAt),
+    ]);
+    expect(snapshot.derivedVpdKpa).toBeNull();
+    expect(snapshot.derivedVpdLabel).toBe(CSV_UNKNOWN_VPD_LABEL);
+  });
+
+  it.each([
+    { vpd_source: "CSV", why: "case-sensitive token" },
+    { vpd_source: "live", why: "never relabel live telemetry as CSV VPD" },
+    { vpd_source: undefined, why: "missing vpd_source metadata" },
+  ])("keeps VPD neutral for invalid vpd_source ($why)", ({ vpd_source }) => {
+    const snapshot = snapshotFor([
+      {
+        ...csvRow("vpd_kpa", 1.42, capturedAt),
+        raw_payload: { grow_id: GROW_A, ...(vpd_source !== undefined ? { vpd_source } : {}) },
+      },
+    ]);
+    expect(snapshot.derivedVpdKpa).toBe(1.42);
+    expect(snapshot.derivedVpdLabel).toBe(CSV_UNKNOWN_VPD_LABEL);
+  });
+
+  it.each([null, "not-an-object", ["array"]])(
+    "keeps VPD neutral when vpd_kpa raw_payload is %j",
+    (raw_payload) => {
+      const snapshot = snapshotFor([
+        {
+          ...csvRow("vpd_kpa", 1.42, capturedAt),
+          raw_payload,
+        },
+      ]);
+      expect(snapshot.derivedVpdLabel).toBe(CSV_UNKNOWN_VPD_LABEL);
+    },
+  );
 });
 
 function csvRow(
@@ -170,6 +209,7 @@ describe("buildCsvTimelineContext", () => {
     expect(out[0].snapshot!.temperatureC).toBe(25);
     expect(out[0].snapshot!.humidityPct).toBe(55);
     expect(out[0].snapshot!.derivedVpdKpa).toBe(1.42);
+    expect(out[0].snapshot!.derivedVpdLabel).toBe(CSV_UNKNOWN_VPD_LABEL);
     expect(out[0].matchAgeMinutes).toBe(20);
   });
 
@@ -258,6 +298,25 @@ describe("CsvTimelineEnvironmentChip", () => {
     expect(screen.getByText(/Derived VPD/)).toBeTruthy();
   });
 
+  it("chip renders supplied CSV VPD label from snapshot (not Derived VPD)", () => {
+    render(
+      <CsvTimelineEnvironmentChip
+        diaryEntryId="supplied"
+        snapshot={{
+          capturedAt: "2026-06-01T10:00:00Z",
+          temperatureC: 25,
+          humidityPct: 55,
+          derivedVpdKpa: 1.7,
+          sourceLabel: CSV_SOURCE_LABEL,
+          title: CSV_SNAPSHOT_TITLE,
+          derivedVpdLabel: CSV_SUPPLIED_VPD_LABEL,
+        }}
+      />,
+    );
+    expect(screen.getByText(/CSV VPD/)).toBeTruthy();
+    expect(screen.queryByText(/Derived VPD/)).toBeNull();
+  });
+
   it("chip never says Live or Live VPD (test 37)", () => {
     const { container } = render(
       <CsvTimelineEnvironmentChip
@@ -279,6 +338,32 @@ describe("CsvTimelineEnvironmentChip", () => {
   it("renders nothing when snapshot is null", () => {
     const { container } = render(<CsvTimelineEnvironmentChip diaryEntryId="d1" snapshot={null} />);
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe("CSV timeline VPD label contract", () => {
+  it("exports distinct supplied vs derived labels and maps csv vpd_source to supplied", () => {
+    expect(CSV_SUPPLIED_VPD_LABEL).toBe("CSV VPD");
+    expect(CSV_DERIVED_VPD_LABEL).toBe("Derived VPD");
+    expect(CSV_UNKNOWN_VPD_LABEL).toBe("VPD");
+    expect(CSV_SUPPLIED_VPD_LABEL).not.toBe(CSV_DERIVED_VPD_LABEL);
+    expect(CSV_SUPPLIED_VPD_LABEL).not.toBe(CSV_UNKNOWN_VPD_LABEL);
+
+    const snapshot = buildCsvTimelineContext({
+      diaryEntries: [
+        { id: "contract", grow_id: GROW_A, tent_id: TENT_A, occurred_at: "2026-06-01T10:00:00Z" },
+      ],
+      sensorReadings: [
+        {
+          ...csvRow("vpd_kpa", 1.7, "2026-06-01T10:00:00Z"),
+          raw_payload: { grow_id: GROW_A, vpd_source: "csv" },
+        },
+      ],
+      growId: GROW_A,
+      tentId: TENT_A,
+    })[0].snapshot!;
+
+    expect(snapshot.derivedVpdLabel).toBe(CSV_SUPPLIED_VPD_LABEL);
   });
 });
 

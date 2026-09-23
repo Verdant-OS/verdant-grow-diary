@@ -42,6 +42,16 @@ const CENSUS_SPEC_SOURCE = readFileSync(
 );
 
 describe("core link and form census rules", () => {
+  it("splits the public Playwright lane into independent scheduled batches", () => {
+    expect(CENSUS_SPEC_SOURCE).toContain("PUBLIC_CORE_CENSUS_BATCHES");
+    expect(CENSUS_SPEC_SOURCE).toMatch(
+      /for \(const \[index, routes\] of PUBLIC_CORE_CENSUS_BATCHES\.entries\(\)/,
+    );
+    expect(CENSUS_SPEC_SOURCE).toMatch(
+      /audits every scheduled public page, visible field, and safe internal link \(batch \$\{index \+ 1\}\/\$\{PUBLIC_CORE_CENSUS_BATCHES\.length\}\)/,
+    );
+  });
+
   it("schedules every public route once without changing its order or contract", () => {
     expect(PUBLIC_CORE_CENSUS_BATCHES.flat()).toEqual(PUBLIC_CORE_CENSUS_ROUTES);
     expect(PUBLIC_CORE_CENSUS_BATCHES).toHaveLength(5);

@@ -439,6 +439,34 @@ describe("environment — provenance honesty", () => {
     expect(vm.environment.sources).toEqual([{ kind: "csv", label: "CSV", count: 1 }]);
   });
 
+  it("includes null captured_at rows when ts falls inside the report range", () => {
+    const vm = buildDiaryRangeReport(
+      baseInput({
+        sensorReadings: [
+          {
+            metric: "temperature_c",
+            value: 22,
+            captured_at: null,
+            ts: "2026-07-05T10:00:00Z",
+            source: "live",
+          },
+          {
+            metric: "temperature_c",
+            value: 99,
+            captured_at: null,
+            ts: "2026-06-15T10:00:00Z",
+            source: "live",
+          },
+        ],
+      }),
+    );
+
+    const temp = vm.environment.metrics.find((metric) => metric.key === "temperature_c");
+    expect(temp).toMatchObject({ count: 1, min: 71.6, max: 71.6, avg: 71.6 });
+    expect(vm.environment.readingCount).toBe(1);
+    expect(vm.environment.sources).toEqual([{ kind: "live", label: "Live", count: 1 }]);
+  });
+
   it("excludes diagnostic lineage while retaining physical gateway evidence", () => {
     const vm = buildDiaryRangeReport(
       baseInput({

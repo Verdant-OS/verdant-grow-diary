@@ -299,7 +299,7 @@ describe("Dashboard JSX wiring · empty state", () => {
     expect(DASH).toContain('data-testid="dashboard-environment-snapshot-add-manual-reading"');
     expect(DASH).toContain('data-testid="dashboard-environment-snapshot-go-to-sensors"');
     expect(DASH).toContain('data-testid="dashboard-environment-snapshot-empty-sensors-link"');
-    expect(DASH).toMatch(/to="\/sensors#manual-reading"/);
+    expect(DASH).toMatch(/withGrowId\("\/sensors#manual-reading",\s*scopedGrowId\)/);
   });
 
   it("keeps the existing 'No sensor snapshot yet' + helper copy", () => {

@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { notifyManualSensorCorrectionConfirmed } from "@/lib/manualSensorCorrectionEvents";
+import { invalidateManualSensorCorrectionReaders } from "@/lib/manualSensorCorrectionCache";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   createSensorsPageSession,
@@ -9,6 +11,7 @@ import {
   changeSensorsDraftTarget,
   claimSensorsSave,
   settleSensorsSave,
+  STANDARD_MANUAL_CORRECTION_IDENTITY,
   type SensorsPageSession,
   type ReconcileSensorsSelectionInput,
   type InitializeSensorsDraftInput,
@@ -21,6 +24,16 @@ import {
   type SensorsSaveClaimResult,
   type SettleSensorsSaveInput,
 } from "@/lib/sensorsPageSessionRules";
+import {
+  readPendingManualSnapshot,
+  claimPendingManualSnapshot,
+  clearPendingManualSnapshot,
+  restoreManualSnapshotValues,
+  MANUAL_RECOVERY_STORAGE_ERROR,
+  MANUAL_RECOVERY_PREVIOUS_PENDING,
+  MANUAL_RECOVERY_CLEAR_ERROR,
+  type PendingManualSnapshot,
+} from "@/lib/manualSensorPendingSnapshotStore";
 
 // Counter lifetime follows the router QueryClient, not a mounted protected page.
 // A clear/new same-owner session can never match a detached controller's epoch.
@@ -49,6 +62,7 @@ export interface SensorsPageSessionController {
     payloads: ManualSnapshotPayloads,
   ) => SensorsSaveClaimResult;
   settleSave: (claim: SensorsSaveClaim, result: SettleSensorsSaveInput) => boolean;
+  retryRecovery: () => void;
 }
 
 export function createSensorsPageSessionController(
@@ -59,6 +73,8 @@ export function createSensorsPageSessionController(
   const key = ["sensors-page-session", ownerId.trim()] as const;
   const keyText = JSON.stringify(key);
   let initial = client.getQueryData<SensorsPageSession>(key);
+  let pendingToRestore: PendingManualSnapshot | null = null;
+  let confirmedToClear: PendingManualSnapshot | null = null;
   if (!initial) {
     const generation = (clientGenerations.get(client) ?? 0) + 1;
     clientGenerations.set(client, generation);
@@ -68,6 +84,10 @@ export function createSensorsPageSessionController(
     // sharing would rebuild changed plain objects outside these boundaries.
     client.setQueryDefaults(key, { gcTime: Infinity, structuralSharing: false });
     initial = createSensorsPageSession(generation);
+    const recovery = readPendingManualSnapshot(ownerId);
+    if (recovery.status === "blocked")
+      initial = { ...initial, recoveryError: MANUAL_RECOVERY_STORAGE_ERROR };
+    if (recovery.status === "pending") pendingToRestore = recovery.record;
     client.setQueryData(key, initial);
   }
   const generation = initial.generation;
@@ -102,6 +122,34 @@ export function createSensorsPageSessionController(
       ? draft
       : null;
   };
+  const recordFor = (payloads: ManualSnapshotPayloads): PendingManualSnapshot => ({
+    version: 1,
+    ownerId,
+    payloads,
+  });
+  // Preserve the existing explicit edit/target-change behavior. Only an idle
+  // draft deliberately replaced by the grower can retire its stored identity.
+  // An in-flight operation remains recoverable until its receipt settles.
+  const updateDraftContext = (apply: (session: SensorsPageSession) => SensorsPageSession) =>
+    update((session) => {
+      const next = apply(session);
+      const pending = session.draft?.values.pendingStandardSnapshot;
+      const nextPending =
+        next.draft?.values.pendingStandardSnapshot?.revision === next.draft?.values.revision
+          ? next.draft?.values.pendingStandardSnapshot
+          : undefined;
+      if (
+        next !== session &&
+        !session.inFlight &&
+        pending &&
+        JSON.stringify(pending.payloads) !== JSON.stringify(nextPending?.payloads)
+      ) {
+        const stored = readPendingManualSnapshot(ownerId);
+        if (stored.status !== "empty" && !clearPendingManualSnapshot(recordFor(pending.payloads)))
+          return { ...session, recoveryError: MANUAL_RECOVERY_STORAGE_ERROR };
+      }
+      return next;
+    });
   return {
     getSnapshot,
     subscribe: (listener) =>
@@ -109,14 +157,46 @@ export function createSensorsPageSessionController(
         if (JSON.stringify(event.query.queryKey) === keyText) listener();
       }),
     reconcileSelection: (input) => {
-      update((session) => reconcileSensorsSelection(session, input));
+      updateDraftContext((session) => reconcileSensorsSelection(session, input));
     },
     selectTent: (tentId, intentKey, tents) => {
-      update((session) => selectSensorsTent(session, tentId, intentKey, tents));
+      updateDraftContext((session) => selectSensorsTent(session, tentId, intentKey, tents));
     },
     getOrInitializeDraft: (input) => {
-      const result = update((session) => initializeSensorsDraft(session, input));
+      const recovery = pendingToRestore;
+      // Resolve the initial page intent first. Otherwise its mount effect
+      // could replace a just-restored original tent with the URL's new tent.
+      if (recovery && getSnapshot()?.selection.appliedIntentKey === null) return null;
+      if (
+        recovery &&
+        (input.correctionIdentity !== STANDARD_MANUAL_CORRECTION_IDENTITY ||
+          !input.ownedTentIds.includes(recovery.payloads[0].tent_id))
+      ) {
+        update((session) =>
+          session.recoveryError
+            ? session
+            : {
+                ...session,
+                recoveryError:
+                  "The unconfirmed manual snapshot's original tent is unavailable here. Return to its owned tent before retrying recovery.",
+              },
+        );
+        return null;
+      }
+      const result = updateDraftContext((session) =>
+        initializeSensorsDraft(
+          session,
+          recovery
+            ? {
+                ...input,
+                defaultTentId: recovery.payloads[0].tent_id,
+                initial: restoreManualSnapshotValues(recovery),
+              }
+            : input,
+        ),
+      );
       const draft = result?.draft;
+      if (recovery && draft?.values.pendingStandardSnapshot) pendingToRestore = null;
       return draft?.identity.epoch === input.epoch &&
         draft.correctionIdentity === input.correctionIdentity
         ? draft
@@ -125,11 +205,13 @@ export function createSensorsPageSessionController(
     updateDraft: (identity, apply) =>
       matchingDraft(
         identity,
-        update((session) => updateSensorsDraft(session, identity, apply)),
+        updateDraftContext((session) => updateSensorsDraft(session, identity, apply)),
       ),
     changeDraftTarget: (identity, input) => {
       if (!matchingDraft(identity)) return null;
-      const result = update((session) => changeSensorsDraftTarget(session, identity, input));
+      const result = updateDraftContext((session) =>
+        changeSensorsDraftTarget(session, identity, input),
+      );
       return result?.draft?.tentId === input.tentId &&
         result.draft.correctionIdentity === input.correctionIdentity
         ? result.draft
@@ -138,7 +220,22 @@ export function createSensorsPageSessionController(
     claimSave: (identity, payloads) => {
       let result: SensorsSaveClaimResult = { status: "stale" };
       const accepted = update((session) => {
+        if (session.recoveryError) return session;
         const claimed = claimSensorsSave(session, identity, payloads);
+        if (
+          claimed.result.status === "claimed" &&
+          claimed.result.claim.correctionIdentity === STANDARD_MANUAL_CORRECTION_IDENTITY
+        ) {
+          const stored = claimPendingManualSnapshot(recordFor(claimed.result.claim.payloads));
+          if (stored.status !== "claimed")
+            return {
+              ...session,
+              recoveryError:
+                stored.status === "pending"
+                  ? MANUAL_RECOVERY_PREVIOUS_PENDING
+                  : MANUAL_RECOVERY_STORAGE_ERROR,
+            };
+        }
         result = claimed.result;
         return claimed.session;
       });
@@ -149,9 +246,56 @@ export function createSensorsPageSessionController(
       const accepted = update((session) => {
         const next = settleSensorsSave(session, claim, result);
         settled = next !== session;
+        if (
+          settled &&
+          result.status === "success" &&
+          claim.correctionIdentity === STANDARD_MANUAL_CORRECTION_IDENTITY
+        ) {
+          const record = recordFor(claim.payloads);
+          if (!clearPendingManualSnapshot(record)) {
+            confirmedToClear = record;
+            return { ...next, recoveryError: MANUAL_RECOVERY_CLEAR_ERROR };
+          }
+        }
         return next;
       });
+      if (
+        accepted !== null &&
+        settled &&
+        result.status === "success" &&
+        claim.correctionIdentity !== STANDARD_MANUAL_CORRECTION_IDENTITY &&
+        getSnapshot()
+      ) {
+        // The atomic correction service bypasses the standard insert mutation.
+        // Refresh its existing read families only after a current-owner receipt
+        // is confirmed. A correction is not a newly captured sensor observation.
+        invalidateManualSensorCorrectionReaders(client);
+        notifyManualSensorCorrectionConfirmed(ownerId, claim.tentId);
+      }
       return accepted !== null && settled;
+    },
+    retryRecovery: () => {
+      const current = getSnapshot();
+      if (!current || current.inFlight) return;
+      const stored = readPendingManualSnapshot(ownerId);
+      if (confirmedToClear) {
+        if (stored.status !== "empty" && !clearPendingManualSnapshot(confirmedToClear)) return;
+        confirmedToClear = null;
+        update((session) => ({ ...session, recoveryError: undefined }));
+        return;
+      }
+      if (stored.status === "blocked") return;
+      if (stored.status === "empty") {
+        update((session) => ({ ...session, recoveryError: undefined }));
+        return;
+      }
+      pendingToRestore = stored.status === "pending" ? stored.record : null;
+      update((session) => ({
+        ...session,
+        recoveryError: undefined,
+        draft: null,
+        selection: { ...session.selection, draftEpoch: session.selection.draftEpoch + 1 },
+      }));
     },
   };
 }

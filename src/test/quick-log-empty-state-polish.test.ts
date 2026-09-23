@@ -71,7 +71,7 @@ describe("Quick Log Empty-State Polish v1 — no-tents empty state wiring", () =
     expect(SRC).toContain("DAILY_CHECK_EMPTY_NO_TENT_TITLE");
     expect(SRC).toContain("DAILY_CHECK_EMPTY_NO_TENT_BODY");
     expect(SRC).toMatch(/data-testid="daily-grow-check-add-tent"/);
-    expect(SRC).toMatch(/to=\{tentsPath\(\)\}/);
+    expect(SRC).toMatch(/to=\{tentsPath\(growId\)\}/);
   });
 
   it("offers secondary Go to Plants → /plants", () => {
@@ -82,7 +82,7 @@ describe("Quick Log Empty-State Polish v1 — no-tents empty state wiring", () =
   it("offers secondary Open Timeline → /timeline", () => {
     expect(SRC).toMatch(/data-testid="daily-grow-check-empty-no-tents-open-timeline"/);
     expect(SRC).toContain("DAILY_CHECK_EMPTY_OPEN_TIMELINE_LABEL");
-    expect(SRC).toMatch(/to=\{timelinePath\(\)\}/);
+    expect(SRC).toMatch(/to=\{timelinePath\(growId\)\}/);
   });
 });
 
@@ -91,7 +91,7 @@ describe("Quick Log Empty-State Polish v1 — no-plants empty state wiring", () 
     expect(SRC).toContain("DAILY_CHECK_EMPTY_NO_PLANT_TITLE");
     expect(SRC).toContain("DAILY_CHECK_EMPTY_NO_PLANT_BODY");
     expect(SRC).toMatch(/data-testid="daily-grow-check-add-plant"/);
-    expect(SRC).toMatch(/to=\{plantsPath\(\)\}/);
+    expect(SRC).toMatch(/to=\{plantsPath\(growId\)\}/);
   });
 
   it("offers secondary Go to Tents → /tents", () => {
@@ -102,7 +102,7 @@ describe("Quick Log Empty-State Polish v1 — no-plants empty state wiring", () 
   it("offers secondary Open Sensors → /sensors", () => {
     expect(SRC).toMatch(/data-testid="daily-grow-check-empty-no-plants-open-sensors"/);
     expect(SRC).toContain("DAILY_CHECK_EMPTY_OPEN_SENSORS_LABEL");
-    expect(SRC).toMatch(/to=\{sensorsPath\(\)\}/);
+    expect(SRC).toMatch(/to=\{sensorsPath\(growId\)\}/);
   });
 });
 

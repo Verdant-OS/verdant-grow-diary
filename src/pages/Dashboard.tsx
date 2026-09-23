@@ -46,6 +46,7 @@ import DashboardPendingOutcomeReviewsCard from "@/components/DashboardPendingOut
 import SafeByDesignNotice from "@/components/SafeByDesignNotice";
 import DashboardSensorHealthSummary from "@/components/DashboardSensorHealthSummary";
 import { buildDashboardSensorHealthSummary } from "@/lib/dashboardSensorHealthViewModel";
+import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 import { sanitizeActionCopy } from "@/lib/actionQueueRowView";
 import { APPROVAL_QUEUE_EMPTY_COPY, mapRiskToSeverity } from "@/lib/dashboardActionQueueViewModel";
 import { buildOnboardingChecklistViewModel } from "@/lib/onboardingChecklistViewModel";
@@ -113,9 +114,11 @@ import {
   alertDetailPath,
   alertsPath,
   dashboardPath,
+  sensorsPath,
   timelinePath,
   tentDetailPath,
   tentsPath,
+  withGrowId,
 } from "@/lib/routes";
 import {
   buildTentSnapshotView,
@@ -195,7 +198,8 @@ export default function Dashboard() {
   );
   const targetsState = useGrowTargets(scopedGrowId ?? null);
   const [targetsEditorOpen, setTargetsEditorOpen] = useState(false);
-  const currentSensorSnapshot = sensorState.status === "ok" ? sensorState.snapshot : null;
+  const snapshotReadState = buildSensorSnapshotReadState(sensorState);
+  const currentSensorSnapshot = snapshotReadState.confirmedSnapshot;
   // Tent attribution for a manually saved alert, taken from the same snapshot
   // the alert was derived from. Null when the current view spans several tents
   // — inventing a winner there would pin a real breach on an arbitrary tent.
@@ -390,8 +394,9 @@ export default function Dashboard() {
             <Button asChild variant="outline" data-testid="dashboard-daily-grow-check-entry">
               {/* Route still targets /daily-check (the underlying Quick Log
                   surface). Label unified to "Quick Log" so the Dashboard
-                  presents a single grower-facing logging concept. */}
-              <Link to="/daily-check">Quick Log</Link>
+                  presents a single grower-facing logging concept. Carry
+                  scopedGrowId when present so Daily Check stays on this grow. */}
+              <Link to={withGrowId("/daily-check", scopedGrowId)}>Quick Log</Link>
             </Button>
             <Button asChild className="gradient-leaf text-primary-foreground">
               <Link to={tentsPath()}>Open tents</Link>
@@ -440,7 +445,11 @@ export default function Dashboard() {
         snapshotSource={sensorState.status === "ok" ? sensorState.snapshot.source : undefined}
       />
 
-      <DailyGrowCheckStatusCard className="mb-6" tentIds={tents.map((t) => t.id)} />
+      <DailyGrowCheckStatusCard
+        className="mb-6"
+        growId={scopedGrowId ?? null}
+        tentIds={tents.map((t) => t.id)}
+      />
 
       <DashboardDailyGrowCheckPanel scopedGrowId={scopedGrowId ?? null} className="mb-6" />
 
@@ -491,7 +500,10 @@ export default function Dashboard() {
                 </p>
               </div>
               <Button asChild size="sm" variant="ghost">
-                <Link to="/sensors">
+                <Link
+                  to={sensorsPath(scopedGrowId)}
+                  data-testid="dashboard-environment-snapshot-open-sensors"
+                >
                   Open sensors <ArrowRight className="h-3 w-3" />
                 </Link>
               </Button>
@@ -506,7 +518,7 @@ export default function Dashboard() {
                   sensorStatusByTent[tentId] === "error" ||
                   sensorStatusByTent[tentId] === "refresh_error",
               );
-              const snapshotQuality = sensorState.status === "ok" ? dashboardSensorQuality : null;
+              const snapshotQuality = currentSensorSnapshot ? dashboardSensorQuality : null;
               const isStaleSnap =
                 sensorState.status === "ok" &&
                 !!sensorState.snapshot.ts &&
@@ -514,8 +526,8 @@ export default function Dashboard() {
               const isInvalidSnap =
                 !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
               const isUnverifiedSnap =
-                sensorState.status === "ok" &&
-                sensorState.snapshot.source !== "unavailable" &&
+                currentSensorSnapshot !== null &&
+                currentSensorSnapshot.source !== "unavailable" &&
                 dashboardHealthSnapshot === null;
               if (dashboardReadingsQuery.isLoading || (!anyReading && hasPendingTentRead)) {
                 return (
@@ -558,7 +570,7 @@ export default function Dashboard() {
                     <p className="text-sm text-muted-foreground">
                       Add a manual reading or{" "}
                       <Link
-                        to="/sensors"
+                        to={sensorsPath(scopedGrowId)}
                         data-testid="dashboard-environment-snapshot-empty-sensors-link"
                         className="underline text-primary hover:opacity-80"
                       >
@@ -573,7 +585,7 @@ export default function Dashboard() {
                       Sensors page (no new routes). */}
                       <Button asChild size="sm" className="gradient-leaf text-primary-foreground">
                         <Link
-                          to="/sensors"
+                          to={sensorsPath(scopedGrowId)}
                           data-testid="dashboard-environment-snapshot-go-to-sensors"
                           aria-label="Go to Sensors page"
                         >
@@ -582,7 +594,7 @@ export default function Dashboard() {
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link
-                          to="/sensors#manual-reading"
+                          to={withGrowId("/sensors#manual-reading", scopedGrowId)}
                           data-testid="dashboard-environment-snapshot-add-manual-reading"
                           aria-label="Add manual sensor reading"
                         >
@@ -591,7 +603,7 @@ export default function Dashboard() {
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link
-                          to="/sensors#csv-import"
+                          to={withGrowId("/sensors#csv-import", scopedGrowId)}
                           data-testid="dashboard-environment-snapshot-import-sensor-data"
                           aria-label="Import sensor data"
                         >
@@ -659,7 +671,10 @@ export default function Dashboard() {
                               )}
                             </div>
                             <Button asChild size="sm" variant="ghost">
-                              <Link to="/sensors">
+                              <Link
+                                to={sensorsPath(scopedGrowId)}
+                                data-testid="dashboard-environment-snapshot-sensor-data"
+                              >
                                 Sensor data <ArrowRight className="h-3 w-3" />
                               </Link>
                             </Button>
@@ -1038,16 +1053,27 @@ export default function Dashboard() {
                 )}
               </div>
             )}
-            {sensorState.status === "loading" || sensorState.status === "idle" ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : sensorState.status === "unavailable" ? (
+            {snapshotReadState.pendingNotice && (
+              <p
+                role="status"
+                className="text-sm text-muted-foreground"
+                data-testid="latest-env-read-status"
+              >
+                {snapshotReadState.pendingNotice}
+              </p>
+            )}
+            {sensorState.status === "loading" ||
+            sensorState.status === "idle" ? null : sensorState.status === "unavailable" ? (
               <p className="text-sm text-muted-foreground">Sensor data unavailable.</p>
             ) : sensorState.snapshot.source === "unavailable" ? (
-              <p className="text-sm text-muted-foreground">No sensor data yet.</p>
+              snapshotReadState.pendingNotice ? null : (
+                <p className="text-sm text-muted-foreground">No sensor data yet.</p>
+              )
             ) : (
               <div>
                 <div className="flex items-center gap-2 flex-wrap mb-2">
                   <Badge variant="outline" className="text-[10px] uppercase">
+                    {snapshotReadState.pendingNotice ? "Last loaded · " : null}
                     {sensorState.snapshot.source === "csv"
                       ? buildSensorSourceDisplayLabel({
                           source: "csv",
@@ -1138,7 +1164,7 @@ export default function Dashboard() {
               />
             )}
           </section>
-          {sensorState.status === "ok" && (
+          {currentSensorSnapshot && (
             <section className="glass rounded-2xl p-4 mt-4" aria-label="Sensor Data Quality">
               {(() => {
                 const q = dashboardSensorQuality;
@@ -1467,7 +1493,11 @@ export default function Dashboard() {
                       className="mb-2"
                     />
                   )}
-                  {alerts.length === 0 ? (
+                  {snapshotReadState.pendingNotice ? (
+                    <p role="status" className="text-sm text-muted-foreground">
+                      {snapshotReadState.pendingNotice}
+                    </p>
+                  ) : alerts.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{EMPTY_ALERTS_MESSAGE}</p>
                   ) : (
                     <ul className="space-y-2">

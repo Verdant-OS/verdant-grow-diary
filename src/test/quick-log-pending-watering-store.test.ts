@@ -220,6 +220,12 @@ describe("fail-closed pending Water validation", () => {
       },
     ],
     [
+      "overlong key",
+      (r) => {
+        r.payload.idempotency_key = "x".repeat(201);
+      },
+    ],
+    [
       "normalized-away key whitespace",
       (r) => {
         r.payload.idempotency_key = " watering-key-12345678 ";
@@ -381,6 +387,24 @@ describe("fail-closed pending Water validation", () => {
       "target mismatch",
       (r) => {
         r.resolved.targetId = "different-target";
+      },
+    ],
+    [
+      "plant target without matching plantId",
+      (r) => {
+        r.resolved.targetType = "plant";
+        r.resolved.plantId = "different-plant";
+        r.resolved.targetId = "different-plant";
+      },
+    ],
+    [
+      "tent target with a non-null plantId",
+      (r) => {
+        r.resolved.targetType = "tent";
+        r.resolved.targetId = tentId;
+        r.resolved.tentId = tentId;
+        r.resolved.plantId = "plant-a";
+        r.payload.plant_id = null;
       },
     ],
     ["attachment intentions not boolean", (r) => Object.assign(r.attachments, { photo: "yes" })],

@@ -227,6 +227,7 @@ beforeEach(() => {
   H.now = CLOCK;
   H.growStatus = "success";
   H.aggregateRows = [];
+  H.snapshotState = null;
   H.persist.mockClear();
 });
 
@@ -247,6 +248,34 @@ function setReading(source: string, ageMinutes: number) {
 }
 
 describe("Dashboard source badges use capture age and the ticking clock", () => {
+  it.each([
+    ["live", 16, "15 minutes"],
+    ["manual", 25 * 60, "24 hours"],
+  ] as const)("describes the actual %s stale window", (source, age, windowLabel) => {
+    setReading(source, age);
+    H.snapshotState = {
+      status: "ok",
+      snapshot: {
+        source,
+        ts: new Date(CLOCK - age * 60_000).toISOString(),
+        temp: 24,
+        rh: 55,
+        vpd: 1.2,
+        co2: null,
+        soil: null,
+        soil_ec: null,
+        soil_temp: null,
+        ppfd: null,
+        device_id: null,
+        csvVendor: null,
+      },
+    };
+    renderDashboard();
+    expect(screen.getByTestId("dashboard-environment-snapshot-status-banner")).toHaveTextContent(
+      `older than ${windowLabel}`,
+    );
+  });
+
   it.each([
     ["live", 48 * 60, "stale", "Live"],
     ["manual", 60, "usable", "Manual"],

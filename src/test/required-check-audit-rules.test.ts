@@ -156,7 +156,8 @@ function jobsProducing(context: string) {
  * A pipe whose left side is only `echo`/`printf` cannot hide a failure and is not
  * counted. The left side is the command just before the pipe, after the last `;`,
  * `&&`, `||` or `|`, not the start of the line: `echo starting; deno test … | tee`
- * pipes `deno test` (round 16).
+ * pipes `deno test` (round 16). Every `| tee` on a line is read, so an exempt echo
+ * pipeline cannot hide a later test pipeline (round 17).
  */
 function pipesHidingFailure(workflow: Workflow, job: WorkflowJob): string[] {
   const shell = (step: WorkflowStep) =>
@@ -168,15 +169,16 @@ function pipesHidingFailure(workflow: Workflow, job: WorkflowJob): string[] {
     let pipefail = false;
     for (const line of lines) {
       if (/^\s*set\s+-[a-z]*o\s+pipefail\b/.test(line)) pipefail = true;
-      const pipe = /(?<!\|)\|&?(?!\|)\s*tee\b/.exec(line);
-      if (!pipe || pipefail) continue;
-      const left =
-        line
-          .slice(0, pipe.index)
-          .split(/&&|\|\||;|\|&?/)
-          .pop() ?? "";
-      if (/^\s*(?:(?:then|do|else)\s+)?(?:echo|printf)\b/.test(left)) continue;
-      hidden.push(`${step.name ?? "(unnamed step)"}: ${line.trim()}`);
+      if (pipefail) continue;
+      const hides = [...line.matchAll(/(?<!\|)\|&?(?!\|)\s*tee\b/g)].some((pipe) => {
+        const left =
+          line
+            .slice(0, pipe.index)
+            .split(/&&|\|\||;|\|&?/)
+            .pop() ?? "";
+        return !/^\s*(?:(?:then|do|else)\s+)?(?:echo|printf)\b/.test(left);
+      });
+      if (hides) hidden.push(`${step.name ?? "(unnamed step)"}: ${line.trim()}`);
     }
   }
   return hidden;
@@ -229,6 +231,10 @@ describe("mustBeGreen lanes report the status of the command they gate", () => {
     expect(piped('printf "x" | deno test a_test.ts | tee log')).toHaveLength(1);
     expect(piped("deno test a_test.ts; echo done | tee log")).toEqual([]);
     expect(piped("if true; then echo done | tee log; fi")).toEqual([]);
+    // Every `| tee` on a line is read: an exempt echo pipeline first must not hide a test
+    // pipeline after it (CodeRabbit, #1221 round 17).
+    expect(piped("echo start | tee start.log; deno test a_test.ts | tee test.log")).toHaveLength(1);
+    expect(piped("echo a | tee a.log; echo b | tee b.log")).toEqual([]);
   });
 });
 

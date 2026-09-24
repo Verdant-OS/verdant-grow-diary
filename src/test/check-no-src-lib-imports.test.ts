@@ -175,8 +175,14 @@ describe("CI / package wiring cannot drop the guard", () => {
     // elsewhere in the file, and matched a substring of the value rather than
     // proving the guard is actually invoked by that script.
     const scripts = JSON.parse(pkg).scripts as Record<string, string>;
-    expect(scripts["check:no-src-lib-imports"]).toBeTruthy();
-    for (const name of ["prebuild", "predeploy:functions", "predeploy:functions:all"]) {
+    // The script named after the guard must run it too; truthiness admitted "echo skip"
+    // (CodeRabbit, #1221 round 17).
+    for (const name of [
+      "check:no-src-lib-imports",
+      "prebuild",
+      "predeploy:functions",
+      "predeploy:functions:all",
+    ]) {
       expect(invokesGuard(scripts[name]), `${name} must invoke the guard: ${scripts[name]}`).toBe(
         true,
       );

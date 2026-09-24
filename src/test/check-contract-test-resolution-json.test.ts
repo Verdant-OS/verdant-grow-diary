@@ -55,6 +55,9 @@
  *              `.toString("utf8")`, then chained into a text method or consumed by
  *              `expect(…)`. Only a bare `.toString()` was seen between the read and its
  *              consumer — CodeRabbit, #1221 round 16.
+ *   boundParsedToStringEncodingFence  `JSON.parse(PKG.toString("utf8"))` on a bound Buffer
+ *              read — a parse. The binding side accepted only a bare `.toString()` there,
+ *              so this compliant guard failed — CodeRabbit, #1221 round 17.
  *
  * @source-scan-justified: this file EMBEDS the forbidden shapes as spawn fixtures for the
  * checker itself (see FIXTURES below). It reads no package.json of its own; the strings
@@ -277,6 +280,15 @@ it("x", () => {
   expect(readFileSync("package.json").toString("utf8")).toContain('"test:x"');
 });
 `,
+  boundParsedToStringEncodingFence: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json");
+const { scripts } = JSON.parse(PKG.toString("utf8"));
+it("x", () => {
+  expect(scripts["test:x"]).toBe("bun run x");
+});
+`,
   boundStringParsedFence: `
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
@@ -413,11 +425,13 @@ describe("a package.json binding is compliant only as JSON.parse(ID) (CodeRabbit
     expect(out).toContain(`${name}.test.ts`);
   });
 
-  it.each(["boundParsedToStringFence", "inlineCopyFence", "boundStringParsedFence"] as const)(
-    "accepts %s (FENCE)",
-    (name) => {
-      const { status, out } = runChecker(name);
-      expect(status, out).toBe(0);
-    },
-  );
+  it.each([
+    "boundParsedToStringFence",
+    "inlineCopyFence",
+    "boundStringParsedFence",
+    "boundParsedToStringEncodingFence",
+  ] as const)("accepts %s (FENCE)", (name) => {
+    const { status, out } = runChecker(name);
+    expect(status, out).toBe(0);
+  });
 });

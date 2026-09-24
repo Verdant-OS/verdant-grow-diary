@@ -154,7 +154,7 @@ const USES_BINDING_AS_TEXT = (source, id) => {
     const after = source.slice(m.index + id.length, m.index + id.length + 32);
     if (/(?:const|let|var)\s+$/.test(before)) continue; // its own declaration
     const parsed =
-      (/JSON\.parse\(\s*$/.test(before) && /^\s*(?:\.toString\(\s*\))?\s*[,)]/.test(after)) ||
+      (/JSON\.parse\(\s*$/.test(before) && PARSE_ARG_CLOSES_AFTER.test(after)) ||
       (/JSON\.parse\(\s*String\(\s*$/.test(before) && /^\s*\)\s*[,)]/.test(after));
     if (!parsed) return true;
   }
@@ -191,6 +191,10 @@ const TEXT_METHOD_AFTER = new RegExp(
   String.raw`^\s*${TO_STRING}\s*\.(?:includes|match|matchAll|indexOf|lastIndexOf|search|startsWith|endsWith)\s*\(`,
 );
 const CALL_CLOSES_AFTER = new RegExp(String.raw`^\s*${TO_STRING}\s*\)`);
+// The binding side reads the same optional `.toString(…)` inside `JSON.parse(PKG…)`, so
+// `JSON.parse(PKG.toString("utf8"))` is a parse (round 17). USES_BINDING_AS_TEXT runs only
+// after the module has loaded, so defining this after it is safe.
+const PARSE_ARG_CLOSES_AFTER = new RegExp(String.raw`^\s*${TO_STRING}\s*[,)]`);
 const closingParen = (source, open) => {
   let depth = 0;
   for (let i = open; i < source.length; i++) {

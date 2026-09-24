@@ -70,6 +70,12 @@ describe("TentDetail · real sensor readings", () => {
     expect(TENT_DETAIL).toContain("buildTentSensorHeaderView");
   });
 
+  it("drives header freshness from the shared ticking clock, not render-time Date.now()", () => {
+    expect(TENT_DETAIL).toMatch(/useNowTick/);
+    expect(TENT_DETAIL).toMatch(/const\s+nowMs\s*=\s*useNowTick\(\)/);
+    expect(TENT_DETAIL).toMatch(/buildTentSensorHeaderView\(readings,\s*nowMs\)/);
+  });
+
   it("shows an honest empty state when no readings exist", () => {
     expect(TENT_DETAIL).toContain("No sensor readings yet.");
     expect(TENT_DETAIL).toContain('data-testid="tent-detail-sensor-empty"');

@@ -168,8 +168,7 @@ import {
   PHOTO_NON_DIAGNOSTIC_TESTID,
   shouldShowPhotoNonDiagnosticLabel,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
-import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
-import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
+import TimelineEvidenceDetailPreview from "@/components/TimelineEvidenceDetailPreview";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import {
@@ -2885,12 +2884,12 @@ export default function Timeline() {
           onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
-      <TimelineEvidenceDetailDrawer
+      <TimelineEvidenceDetailPreview
         open={!!detailEntryId}
-        viewModel={(() => {
+        entry={(() => {
           const row = displayEntries.find((r) => r.id === detailEntryId);
           return row
-            ? buildTimelineEvidenceDetailViewModel({
+            ? {
                 id: row.id,
                 note: row.note,
                 photo_url: row.photo_url,
@@ -2899,7 +2898,7 @@ export default function Timeline() {
                 plant_id: row.plant_id,
                 tent_id: row.tent_id,
                 details: row.details,
-              })
+              }
             : null;
         })()}
         onClose={() => setDetailEntryId(null)}

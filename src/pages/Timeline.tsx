@@ -1,4 +1,4 @@
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -222,8 +222,6 @@ import {
   type TimelineCoreReadState,
   type TimelineSupplementalReadSource,
 } from "@/lib/timelinePageReadStateRules";
-
-const TIMELINE_SNAPSHOT_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
 
 // URL query params mirroring the Pro date-range filter, matching the
 // ?start/?end convention of the environment summary report.
@@ -2416,6 +2414,13 @@ export default function Timeline() {
                           const manualCompatSensor = e.details?.manual_sensor_snapshot;
                           const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
                             Record<string, unknown> | undefined;
+                          const rawSource =
+                            typeof sensor?.source === "string" ? sensor.source : null;
+                          // Match the persisted snapshot's manual fallback; explicit
+                          // unknown/invalid provenance keeps the strict canonical window.
+                          const snapshotStaleMs = resolveCurrentStateStaleWindowMs(
+                            rawSource ?? "manual",
+                          );
                           const usesManualCompatSensor =
                             canonicalSensor == null &&
                             legacySensor == null &&
@@ -2648,7 +2653,7 @@ export default function Timeline() {
                                   changesAt={
                                     new Date(
                                       typeof sensor.ts === "string" ? sensor.ts : e.entry_at,
-                                    ).getTime() + TIMELINE_SNAPSHOT_STALE_MS
+                                    ).getTime() + snapshotStaleMs
                                   }
                                 >
                                   {(nowMs) => {
@@ -2671,8 +2676,7 @@ export default function Timeline() {
                                       ? nowMs - new Date(snapTs).getTime()
                                       : Number.POSITIVE_INFINITY;
                                     const snapStale =
-                                      !Number.isFinite(snapAgeMs) ||
-                                      snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
+                                      !Number.isFinite(snapAgeMs) || snapAgeMs > snapshotStaleMs;
                                     const rawVpd =
                                       typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
                                         ? sensor.vpd
@@ -2682,13 +2686,11 @@ export default function Timeline() {
                                       stage: resolveTimelineDiaryEntryStage(e),
                                       stale: snapStale,
                                     });
-                                    const rawSource =
-                                      typeof sensor.source === "string" ? sensor.source : null;
                                     const sourceBadge = classifyTimelineSensorSource({
                                       rawSource,
                                       capturedAt: snapTs ?? null,
                                       now: nowMs,
-                                      staleMs: TIMELINE_SNAPSHOT_STALE_MS,
+                                      staleMs: snapshotStaleMs,
                                       // Persisted Quick Log snapshots are
                                       // intrinsically grower-entered.
                                       fallback: "manual",

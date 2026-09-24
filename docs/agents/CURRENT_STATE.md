@@ -1,5 +1,29 @@
 # Verdant — Current Operating State
 
+## Codex candidate — Timeline manual freshness (#1682), 2026-09-24
+
+Owner: **Codex**, under Cheek's repository-fix/integration assignment. Independent
+review is pending; Codex cannot approve its own implementation. This candidate is
+based on deploy tip `69aca5e738b7d0d49369a636b1b293564ec65203`; it is not a deployment.
+The open-PR file audit found no overlapping edits to the Timeline page or its
+inline-aging regression test. Claude's QA slice and REVIEW ONLY lanes remain untouched.
+
+The inline manual snapshot used the 15-minute live window, disagreeing with the
+evidence drawer's canonical 24-hour manual window. Reuse the source-aware resolver
+for the inline stale decision, one-shot timer and badge input. Explicit bad/unknown
+provenance keeps the strict window; absent source retains the existing manual
+fallback. Missing/invalid capture timestamps still fail closed. Threshold constants,
+source authorization and persisted data are unchanged.
+
+Before the fix, the page regression returned **7 passed / 1 failed / 0 skipped**:
+a 23h59m manual snapshot incorrectly displayed historical guidance. The updated
+test checks the 24-hour boundary and idle transition at +1ms, drawer agreement,
+16-minute manual/fallback snapshots, untrusted sources and invalid timestamps.
+Final validation and the exact candidate SHA belong in the draft PR receipt.
+HOLD #1250. No merge, ready, Publish, production APPLY, device or Action Queue action.
+
+---
+
 **Last updated:** 2026-09-24 UTC (~11:25 UTC; tip, live and board measured 11:14–11:17 UTC)
 **Updated by:** Claude (2026-09-24 late morning, restamp on **deploy tip
 `b0bfdb028600b63ec7b8bff914632a20b06020b7`**, the `#1685` squash. **Four commits** merged since the

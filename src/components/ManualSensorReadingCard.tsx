@@ -56,6 +56,7 @@ import {
   buildManualReadingPayloads,
   validateManualEntry,
   type ManualEntryInput,
+  type ManualReadingMetric,
 } from "@/lib/sensorReadingManualEntryRules";
 import {
   getManualSensorDeviceOptions,
@@ -163,6 +164,31 @@ function correctionToPrefill(
   return out;
 }
 
+function correctionPrefillFromRestoredMetrics(
+  correction: ManualCorrectionContext,
+  metrics: ReadonlyArray<ManualReadingMetric>,
+): ManualCorrectionContext {
+  return {
+    ...correction,
+    originalValues: Object.fromEntries(metrics.map((row) => [row.metric, row.value])),
+  };
+}
+
+/** Match standard snapshot restore: canonical °C digits + explicit C override. */
+function recoveredCorrectionDraftValues(
+  correction: ManualCorrectionContext,
+  metrics: ReadonlyArray<ManualReadingMetric>,
+): ManualDraftValues {
+  return {
+    ...createManualDraftValues(
+      correctionToPrefill(correctionPrefillFromRestoredMetrics(correction, metrics), "C"),
+      "C",
+    ),
+    hasEditedReading: true,
+    saveUnconfirmed: true,
+  };
+}
+
 export default function ManualSensorReadingCard({
   tents,
   defaultTentId,
@@ -197,16 +223,8 @@ export default function ManualSensorReadingCard({
   }, [correction, correctionIdentity, correctionJournal, ownerId, ownedTentIds]);
   const initialValues = useMemo(() => {
     const restored = readCorrectionRecovery();
-    const prefill = restored
-      ? {
-          ...restored.correction,
-          originalValues: Object.fromEntries(
-            restored.metrics.map((row) => [row.metric, row.value]),
-          ),
-        }
-      : correction;
-    const initial = createManualDraftValues(correctionToPrefill(prefill, preferredUnit));
-    return restored ? { ...initial, hasEditedReading: true, saveUnconfirmed: true } : initial;
+    if (restored) return recoveredCorrectionDraftValues(restored.correction, restored.metrics);
+    return createManualDraftValues(correctionToPrefill(correction, preferredUnit));
   }, [correction, preferredUnit, readCorrectionRecovery]);
   const [localDraft, setLocalDraft] = useState<SensorsManualDraft>(() => ({
     identity: { epoch: 0, id: 0 },
@@ -284,10 +302,15 @@ export default function ManualSensorReadingCard({
     ) => {
       if (!draft || (draft.tentId === nextTentId && draft.correctionIdentity === nextContext))
         return;
-      const nextValues = {
-        ...createManualDraftValues({ ...nextForm, airTempUnit }, values.tempUnitOverride),
-        ...(restorePending ? { hasEditedReading: true, saveUnconfirmed: true } : {}),
-      };
+      const nextValues = restorePending
+        ? {
+            ...createManualDraftValues({ ...nextForm, airTempUnit: "C" }, "C"),
+            hasEditedReading: true,
+            saveUnconfirmed: true,
+          }
+        : {
+            ...createManualDraftValues({ ...nextForm, airTempUnit }, values.tempUnitOverride),
+          };
       if (session) {
         session.changeDraftTarget(draft.identity, {
           tentId: nextTentId,
@@ -319,16 +342,11 @@ export default function ManualSensorReadingCard({
     requestedTargetContextRef.current = requestedContext;
     const restored = readCorrectionRecovery();
     const prefill = restored
-      ? {
-          ...restored.correction,
-          originalValues: Object.fromEntries(
-            restored.metrics.map((row) => [row.metric, row.value]),
-          ),
-        }
+      ? correctionPrefillFromRestoredMetrics(restored.correction, restored.metrics)
       : correction;
     changeTentTarget(
       nextTentId,
-      correctionToPrefill(prefill, airTempUnit),
+      correctionToPrefill(prefill, restored ? "C" : airTempUnit),
       correctionIdentity,
       !!restored,
     );
@@ -1179,19 +1197,9 @@ export default function ManualSensorReadingCard({
                     );
                     return;
                   }
-                  const prefill = {
-                    ...restored.correction,
-                    originalValues: Object.fromEntries(
-                      restored.metrics.map((row) => [row.metric, row.value]),
-                    ),
-                  };
-                  updateValues((current) => ({
-                    ...editManualDraftValues(current, {
-                      form: correctionToPrefill(prefill, airTempUnit),
-                      hasEditedReading: true,
-                    }),
-                    saveUnconfirmed: true,
-                  }));
+                  updateValues(() =>
+                    recoveredCorrectionDraftValues(restored.correction, restored.metrics),
+                  );
                   setReviewOpen(false);
                 }}
               >

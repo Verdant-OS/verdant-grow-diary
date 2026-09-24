@@ -4,8 +4,9 @@
  * Verifies the "Export PDF" button renders and calls the pure export
  * helper. All data hooks are mocked so no Supabase calls fire.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
 const exportSpy = vi.hoisted(() => vi.fn(() => "printed" as const));
@@ -68,16 +69,24 @@ vi.mock("@/components/GrowBreadcrumbs", () => ({ default: () => null }));
 
 import GrowDetail from "@/pages/GrowDetail";
 
+let queryClient: QueryClient;
 beforeEach(() => {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   exportSpy.mockClear();
+});
+afterEach(() => {
+  cleanup();
+  queryClient.clear();
 });
 
 describe("GrowDetail — Export PDF button", () => {
   it("renders and calls export helper exactly once", () => {
     render(
-      <MemoryRouter>
-        <GrowDetail />
-      </MemoryRouter>,
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <GrowDetail />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
     const btn = screen.getByTestId("grow-detail-export-pdf");
     expect(btn).toBeInTheDocument();

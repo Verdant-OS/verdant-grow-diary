@@ -22,7 +22,7 @@ describe("Timeline snapshot clock isolation", () => {
     function Parent() {
       parentRendered();
       return (
-        <TimelineSnapshotClock>
+        <TimelineSnapshotClock changesAt={capturedAt + LIVE_CURRENT_STATE_STALE_MS}>
           {(nowMs) => (
             <div>
               <span>VPD 1.1 — Source: manual</span>
@@ -51,7 +51,11 @@ describe("Timeline snapshot clock isolation", () => {
 
   it("cleans up the timer on unmount", () => {
     const renderSnapshot = vi.fn(() => <span>Snapshot</span>);
-    const view = render(<TimelineSnapshotClock>{renderSnapshot}</TimelineSnapshotClock>);
+    const view = render(
+      <TimelineSnapshotClock changesAt={NOW.getTime() + 60_000}>
+        {renderSnapshot}
+      </TimelineSnapshotClock>,
+    );
     view.unmount();
     const count = renderSnapshot.mock.calls.length;
     act(() => vi.advanceTimersByTime(120_000));
@@ -63,8 +67,50 @@ describe("Timeline snapshot clock isolation", () => {
     const view = render(<div />);
     act(() => vi.advanceTimersByTime(120_000));
     view.rerender(
-      <TimelineSnapshotClock>{(nowMs) => <output>{nowMs}</output>}</TimelineSnapshotClock>,
+      <TimelineSnapshotClock changesAt={null}>
+        {(nowMs) => <output>{nowMs}</output>}
+      </TimelineSnapshotClock>,
     );
     expect(screen.getByRole("status")).toHaveTextContent(String(NOW.getTime() + 120_000));
+  });
+
+  it("re-renders once just past the boundary and then holds no timer", () => {
+    const renderSnapshot = vi.fn((nowMs: number) => <output>{nowMs}</output>);
+    const changesAt = NOW.getTime() + 60_000;
+    render(<TimelineSnapshotClock changesAt={changesAt}>{renderSnapshot}</TimelineSnapshotClock>);
+    expect(vi.getTimerCount()).toBe(1);
+    const mounted = renderSnapshot.mock.calls.length;
+
+    act(() => vi.advanceTimersByTime(60_001));
+    expect(renderSnapshot).toHaveBeenCalledTimes(mounted + 1);
+    expect(Number(screen.getByRole("status").textContent)).toBeGreaterThan(changesAt);
+    expect(vi.getTimerCount()).toBe(0);
+
+    act(() => vi.advanceTimersByTime(60 * 60_000));
+    expect(renderSnapshot).toHaveBeenCalledTimes(mounted + 1);
+  });
+
+  it("never arms a timer for a row already past its boundary or without one", () => {
+    const renderSnapshot = vi.fn(() => <span>Historical</span>);
+    for (const changesAt of [NOW.getTime() - 1, null, Number.NaN]) {
+      const view = render(
+        <TimelineSnapshotClock changesAt={changesAt}>{renderSnapshot}</TimelineSnapshotClock>,
+      );
+      expect(vi.getTimerCount()).toBe(0);
+      view.unmount();
+    }
+  });
+
+  it("does not spin on a boundary beyond the longest browser timeout", () => {
+    const renderSnapshot = vi.fn(() => <span>Future-dated</span>);
+    render(
+      <TimelineSnapshotClock changesAt={NOW.getTime() + 400 * 24 * 60 * 60_000}>
+        {renderSnapshot}
+      </TimelineSnapshotClock>,
+    );
+    const mounted = renderSnapshot.mock.calls.length;
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(renderSnapshot).toHaveBeenCalledTimes(mounted);
+    expect(vi.getTimerCount()).toBe(1);
   });
 });

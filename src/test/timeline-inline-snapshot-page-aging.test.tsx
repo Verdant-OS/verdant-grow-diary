@@ -7,8 +7,8 @@
  * the stale stage-guidance qualifier once its age crosses the live freshness
  * window, with no click, no parent re-render trigger, and no refetch.
  *
- * Reverting the page to `Date.now()` in the render body, or dropping the clock
- * wrapper, leaves the unqualified "In Veg VPD range" on screen and fails here.
+ * Dropping the clock wrapper, or a clock that never fires at the freshness
+ * boundary, leaves the unqualified "In Veg VPD range" on screen and fails here.
  */
 import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";

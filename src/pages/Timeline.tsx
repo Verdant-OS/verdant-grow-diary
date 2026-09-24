@@ -2644,7 +2644,13 @@ export default function Timeline() {
                                 </div>
                               )}
                               {sensor && (
-                                <TimelineSnapshotClock>
+                                <TimelineSnapshotClock
+                                  changesAt={
+                                    new Date(
+                                      typeof sensor.ts === "string" ? sensor.ts : e.entry_at,
+                                    ).getTime() + TIMELINE_SNAPSHOT_STALE_MS
+                                  }
+                                >
                                   {(nowMs) => {
                                     const sensorViewModel = usesManualCompatSensor
                                       ? buildTimelineSensorSnapshotViewModel(sensor, {

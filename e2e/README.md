@@ -319,14 +319,28 @@ Prerequisites:
 - A dedicated **test account** (email + password). Never use production
   grower credentials — the smoke creates real diary entries.
 
+Replace `YOUR_TEST_HOST` below with a host that serves the app, such as your
+local dev server (`bun run dev -- --host 127.0.0.1 --port 8080`, then
+`http://127.0.0.1:8080`).
+
+- Use the same host for `E2E_BASE_URL` and `E2E_GROW_1_PLANT_URL`. The
+  signed-in session is stored per origin.
+- Do not use `verdantgrowdiary.com`. The fixture guard
+  (`e2e/lib/fixtureSafety.ts`) refuses to run this write-producing smoke
+  against the production hostname.
+- The old published host `verdantgrowdiary-com.lovable.app` no longer serves
+  the app: it answers HTTP 404 "No Lovable project found at this address".
+  If `E2E_BASE_URL` points at a host like that, `bun run e2e:setup` stops at
+  once with an error that names it.
+
 ### Windows PowerShell
 
 ```powershell
 bun install
 bun run e2e:install
 
-$env:E2E_BASE_URL="https://verdantgrowdiary-com.lovable.app"
-$env:E2E_GROW_1_PLANT_URL="https://verdantgrowdiary-com.lovable.app/plants/YOUR_TEST_PLANT_ID"
+$env:E2E_BASE_URL="https://YOUR_TEST_HOST"
+$env:E2E_GROW_1_PLANT_URL="https://YOUR_TEST_HOST/plants/YOUR_TEST_PLANT_ID"
 $env:E2E_FIXTURE_MODE="true"
 $env:E2E_FIXTURE_EXPECTED_TENT_NAME="E2E Test Tent"
 $env:E2E_FIXTURE_EXPECTED_PLANT_NAME="E2E Test Plant"
@@ -344,8 +358,8 @@ bun run e2e:quicklog-smoke
 bun install
 bun run e2e:install
 
-export E2E_BASE_URL="https://verdantgrowdiary-com.lovable.app"
-export E2E_GROW_1_PLANT_URL="https://verdantgrowdiary-com.lovable.app/plants/YOUR_TEST_PLANT_ID"
+export E2E_BASE_URL="https://YOUR_TEST_HOST"
+export E2E_GROW_1_PLANT_URL="https://YOUR_TEST_HOST/plants/YOUR_TEST_PLANT_ID"
 export E2E_FIXTURE_MODE="true"
 export E2E_FIXTURE_EXPECTED_TENT_NAME="E2E Test Tent"
 export E2E_FIXTURE_EXPECTED_PLANT_NAME="E2E Test Plant"

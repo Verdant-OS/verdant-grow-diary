@@ -2432,9 +2432,9 @@ export default function Timeline() {
                               context: "persisted_snapshot",
                             }).kind,
                           );
-                          // Use the persisted capture time before the diary time,
-                          // matching the evidence drawer's timestamp precedence.
-                          const rawCapturedAt = sensor?.ts ?? sensor?.captured_at ?? e.entry_at;
+                          // Diary event time does not establish snapshot observation time.
+                          // Missing capture time must remain unverified in both views.
+                          const rawCapturedAt = sensor?.ts ?? sensor?.captured_at;
                           const snapshotCapturedAt =
                             typeof rawCapturedAt === "string" ? rawCapturedAt.trim() : "";
                           const usesManualCompatSensor =

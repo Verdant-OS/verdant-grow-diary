@@ -468,6 +468,41 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
     },
   );
 
+  it.each([undefined, null])(
+    "does not use a recent diary date when both snapshot timestamps are %s",
+    async (captureTime) => {
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        entry_at: NOW.toISOString(),
+        details: {
+          source: "manual",
+          sensor_snapshot: {
+            source: "manual",
+            ts: captureTime,
+            captured_at: captureTime,
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        "In Veg VPD range (historical, stale reading)",
+      );
+      expect(screen.getByTestId("timeline-manual-snapshot")).toHaveTextContent("VPD 1.1");
+      expect(harness.update).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(["", "not-a-date"])("keeps an unusable capture timestamp %j stale", async (ts) => {
     const row = {
       ...MANUAL_SNAPSHOT_ROW,

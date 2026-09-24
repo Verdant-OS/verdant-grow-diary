@@ -330,6 +330,32 @@ describe("Timeline drawer sensor evidence honesty", () => {
     expect(result.contextHint.description).toMatch(/timestamp/i);
   });
 
+  it.each([
+    ["sensor_snapshot", undefined],
+    ["sensor_snapshot", null],
+    ["sensor", undefined],
+    ["sensor", null],
+  ])("does not date %s from its diary when capture time is %s", (key, captureTime) => {
+    const result = vm({
+      id: "missing-capture-with-recent-diary",
+      entry_at: recentManual.ts,
+      photo_url: "https://example.test/photo.jpg",
+      details: {
+        [key as string]: {
+          source: "manual",
+          ts: captureTime,
+          captured_at: captureTime,
+          temp: 24,
+        },
+      },
+    })!;
+    expect(result.sensor?.tempC).toBe(24);
+    expect(result.sensor?.capturedAt).toBeNull();
+    expect(result.sensor?.canSupportCurrentContext).toBe(false);
+    expect(result.contextHint.level).toBe("limited");
+    expect(result.contextHint.description).toMatch(/timestamp/i);
+  });
+
   it("uses captured_at before the diary time when ts is absent", () => {
     const result = snapshotVm({ source: "manual", captured_at: "2025-05-30T12:00:00Z", temp: 24 });
     expect(result.sensor?.capturedAt).toBe("2025-05-30T12:00:00Z");

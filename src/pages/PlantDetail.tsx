@@ -591,6 +591,7 @@ export default function PlantDetail() {
             lastNote: plant.lastNote,
             isArchived: plant.isArchived ?? false,
             photo: plant.photo ?? null,
+            plantType: plant.plantType ?? null,
           }}
           variant="row"
           hideView

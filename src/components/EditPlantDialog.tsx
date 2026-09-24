@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { buildPlantTypeUpdate } from "@/lib/plantTypeRules";
 import {
   plantStartDateInputMax,
   plantStartDateInputToIso,
@@ -245,7 +246,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       ...buildPlantHealthUpdate(form.health),
       tent_id: resolvedTentId,
       last_note: form.last_note.trim() || null,
-      plant_type: form.plant_type,
+      ...buildPlantTypeUpdate(plant.plantType, form.plant_type),
       ...(growPatch ?? {}),
     };
     if (newReference) {

@@ -858,6 +858,7 @@ export default function TentDetail() {
                         lastNote: p.lastNote,
                         isArchived: p.isArchived ?? false,
                         photo: p.photo ?? null,
+                        plantType: p.plantType ?? null,
                       }}
                     />
                   </div>

@@ -947,6 +947,7 @@ export default function Plants() {
                       lastNote: p.lastNote ?? null,
                       isArchived: p.isArchived ?? false,
                       photo: p.photo ?? null,
+                      plantType: p.plantType ?? null,
                     }}
                   />
                 </div>

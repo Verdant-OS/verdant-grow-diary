@@ -124,6 +124,7 @@ describe("safety fences over the new sources", () => {
     // classifier. It is not rendered by the page or navigation helper.
     expect(HOOK).toContain('.select("metric,value,ts,captured_at,source,raw_payload")');
     expect(HOOK).toContain("captured_at.gte.${startIso}");
+    expect(HOOK).toContain("and(captured_at.is.null,ts.gte.${startIso},ts.lte.${endIso})");
     expect(RULES).toContain("withoutDiagnosticSensorRows");
     expect(PAGE + NAV).not.toMatch(/raw_payload/i);
     // The page's only invoke path is the premium gate helper import.

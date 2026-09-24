@@ -313,7 +313,7 @@ describe("Daily Grow Check entry access — multi-surface", () => {
     // The visible label was renamed to the grower-native "Quick Log";
     // the entry testid and /daily-check route are the stable contract.
     expect(DASHBOARD).toMatch(/data-testid="dashboard-daily-grow-check-entry"/);
-    expect(DASHBOARD).toMatch(/to="\/daily-check">Quick Log</);
+    expect(DASHBOARD).toMatch(/to=\{withGrowId\("\/daily-check",\s*scopedGrowId\)\}>Quick Log</);
   });
   it("Plant Detail entry preserves ?plantId= prefill", () => {
     expect(PLANT_DETAIL).toMatch(/\/daily-check\?plantId=/);

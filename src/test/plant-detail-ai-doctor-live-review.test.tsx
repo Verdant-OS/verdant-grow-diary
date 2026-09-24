@@ -72,6 +72,7 @@ import PlantDetailAiDoctorLiveReview, {
   AI_DOCTOR_HISTORY_SAVE_FAILED_COPY,
   AI_DOCTOR_LIVE_REVIEW_LOADING_COPY,
   AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY,
+  AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY,
   AI_DOCTOR_LIVE_REVIEW_VALIDATED_LABEL,
 } from "@/components/PlantDetailAiDoctorLiveReview";
 import { buildAiDoctorSessionPersistenceFailureDiagnostic } from "@/lib/aiDoctorSessionPersistenceFailureRules";
@@ -501,6 +502,34 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     await waitFor(() =>
       expect(screen.getByTestId("plant-ai-doctor-live-review-validated-label")).toBeTruthy(),
     );
+  });
+
+  it("says AI Doctor is unavailable, not that context is missing, on a server config failure", async () => {
+    itemsRef.current = strongTimeline();
+    const invoke = vi.fn().mockResolvedValue({
+      data: { ok: false, reason: "config" },
+      error: null,
+    });
+    render(<PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />);
+    fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
+    const failure = await screen.findByTestId("plant-ai-doctor-live-review-failure");
+    expect(failure.textContent).toBe(AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY);
+    expect(failure).toHaveAttribute("data-failure-kind", "service_unavailable");
+    expect(failure.textContent).not.toContain("Add more context");
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the review failure copy for failures that are not server config", async () => {
+    itemsRef.current = strongTimeline();
+    const invoke = vi.fn().mockResolvedValue({
+      data: { ok: false, reason: "timeout" },
+      error: null,
+    });
+    render(<PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />);
+    fireEvent.click(await screen.findByTestId("plant-ai-doctor-live-review-start"));
+    const failure = await screen.findByTestId("plant-ai-doctor-live-review-failure");
+    expect(failure.textContent).toBe(AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY);
+    expect(failure).toHaveAttribute("data-failure-kind", "review");
   });
 
   it("falls into calm failure when server returns contract-invalid content", async () => {

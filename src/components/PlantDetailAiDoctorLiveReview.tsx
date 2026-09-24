@@ -11,8 +11,9 @@
  *  - A successful review delegates one saved-session snapshot to the
  *    existing ownership-checked persistence helper. It never writes alerts,
  *    Action Queue rows, sensor readings, or device commands.
- *  - Failure / timeout / invalid / missing-config all render the same
- *    calm failure copy. Fail closed.
+ *  - Failure / timeout / invalid render the same calm failure copy. A
+ *    server missing-config failure renders an honest "unavailable" copy
+ *    instead, because it is never a gap in the grower's context. Fail closed.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/lib/react-router-compat";
@@ -68,6 +69,7 @@ import { evaluateAiDoctorReviewEligibility } from "@/lib/aiDoctorReviewEligibili
 import {
   buildAiDoctorLiveReviewScopeKey,
   canRetryAiDoctorLiveReviewFailure,
+  isAiDoctorServiceUnavailableFailure,
 } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHistoryRecoveryRules";
 import {
@@ -82,6 +84,8 @@ const NO_ROOT_ZONE_OBSERVATIONS: never[] = [];
 export const AI_DOCTOR_LIVE_REVIEW_LOADING_COPY = "Preparing cautious AI Doctor review…";
 export const AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY =
   "AI Doctor review could not be safely displayed. Add more context or try again later.";
+export const AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY =
+  "AI Doctor is unavailable right now because of a problem on Verdant's side, not your plant's context. No AI credit was used. Try again later.";
 export const AI_DOCTOR_LIVE_REVIEW_PARTIAL_COPY =
   "Context is partial — review may have limited confidence.";
 export const AI_DOCTOR_LIVE_REVIEW_STRONG_COPY = "Context is strong enough for a cautious review.";
@@ -949,10 +953,15 @@ function PlantDetailAiDoctorLiveReviewScope({
           <p
             className="text-xs text-amber-200"
             data-testid="plant-ai-doctor-live-review-failure"
+            data-failure-kind={
+              isAiDoctorServiceUnavailableFailure(review.reason) ? "service_unavailable" : "review"
+            }
             role="status"
             aria-live="polite"
           >
-            {AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY}
+            {isAiDoctorServiceUnavailableFailure(review.reason)
+              ? AI_DOCTOR_LIVE_REVIEW_UNAVAILABLE_COPY
+              : AI_DOCTOR_LIVE_REVIEW_FAILURE_COPY}
           </p>
         )
       ) : null}

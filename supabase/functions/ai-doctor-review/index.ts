@@ -288,6 +288,21 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const billingEnvironmentResolution = resolveRequiredServerBillingEnvironment();
+    // Name the failed precondition with a fixed code (never a value) so an
+    // operator can tell which server configuration is missing from the logs.
+    const configMissing = !serviceRoleKey
+      ? "service_role_key"
+      : !supabaseUrl
+        ? "supabase_url"
+        : !billingEnvironmentResolution.ok
+          ? billingEnvironmentResolution.reason
+          : !receiptHmacSecret
+            ? "receipt_hmac_key"
+            : new TextEncoder().encode(receiptHmacSecret).byteLength < 32
+              ? "receipt_hmac_key_too_short"
+              : !isReceiptHmacKeyId(receiptHmacKeyId)
+                ? "receipt_hmac_key_id"
+                : null;
     if (
       !serviceRoleKey ||
       !supabaseUrl ||
@@ -296,7 +311,7 @@ Deno.serve(async (req) => {
       new TextEncoder().encode(receiptHmacSecret).byteLength < 32 ||
       !isReceiptHmacKeyId(receiptHmacKeyId)
     ) {
-      console.log("ai-doctor-review status=config_missing");
+      console.log(`ai-doctor-review status=config_missing missing=${configMissing ?? "unknown"}`);
       return calmFailure("config");
     }
     const creditSupabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -306,7 +321,7 @@ Deno.serve(async (req) => {
 
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) {
-      console.log("ai-doctor-review status=config_missing");
+      console.log("ai-doctor-review status=config_missing missing=lovable_api_key");
       return calmFailure("config");
     }
 

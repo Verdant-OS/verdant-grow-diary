@@ -220,8 +220,8 @@ Carried rows keep their original labels.
   `origin/verdant-grow-diary` at `98fdd4462700972439c9ab78f000f24aa15a5d76`. Its only file is
   `docs/agents/CURRENT_STATE.md`. It contains no `src/`, `supabase/`, `package.json`, lockfile, test,
   workflow or governance-file changes.
-- **Slice owner: Claude.** The **independent reviewer is routed by GDP**; Grok reviewed the last two
-  restamps. Claude does not self-merge and does not assign its own next slice.
+- **Slice owner: Claude. Independent reviewer: Codex**, routed 2026-09-24 ~01:34 UTC; the HANDOFF is
+  on the PR. Claude does not self-merge and does not assign its own next slice.
 
 ---
 

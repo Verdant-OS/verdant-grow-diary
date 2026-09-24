@@ -101,7 +101,11 @@ beforeEach(() => {
 describe("QuickLogV2Sheet — post-save refresh", () => {
   it("plant-targeted save invalidates plant grouped timeline and plant-scoped keys", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "ge-1", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000001",
+        environment_event_id: null,
+      },
       error: null,
     });
     const { onOpenChange } = renderSheet("plant:plant-1");
@@ -122,7 +126,11 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
 
   it("tent-targeted save invalidates tent grouped timeline keys", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000002",
+        environment_event_id: null,
+      },
       error: null,
     });
     renderSheet("tent:tent-1");
@@ -138,7 +146,11 @@ describe("QuickLogV2Sheet — post-save refresh", () => {
 
   it("plant-in-tent save also refreshes tent grouped timeline (broad prefix)", async () => {
     rpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000003", environment_event_id: null },
+      data: {
+        ok: true,
+        grow_event_id: "77777777-7777-4777-8777-000000000003",
+        environment_event_id: null,
+      },
       error: null,
     });
     renderSheet("plant:plant-1");

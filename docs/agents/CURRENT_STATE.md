@@ -1,7 +1,234 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-22 UTC (~20:15 UTC)
-**Updated by:** Claude (2026-09-22 evening, slice `GDP-CURRENT-STATE-REStamp-after-1621`: **Soft `#1621`
+**Last updated:** 2026-09-24 UTC (~01:35 UTC)
+**Updated by:** Claude (2026-09-24 early, restamp on **deploy tip
+`98fdd4462700972439c9ab78f000f24aa15a5d76`**, the `#1649` squash. The request named `ee14c7ff`; the
+tip moved one docs-only commit past it before this stamp was cut, so this stamp cites the tip it
+measured (§1). **Thirteen commits** merged since the last merged stamp (`387a0006`, `#1624`): **nine
+change product code, four are docs-only, and none adds a migration** (§1, §3). **Live is `NOT_MEASURED`
+by Claude** after a ninth egress refusal at 01:26:35 UTC (§2). **`#1629` was closed unmerged by GDP as
+SUPERSEDED**, and the gate it set, GDP-ARCH-CITE-001, has landed as `#1639` (§4). **The session-backed
+_Restore pending correction_ finding is still open on the tip**; `#1627` is closed, and `#1625` is the
+one remaining fix in flight (§5). The board was re-listed: **36 open PRs**, and **no other PR writes
+this file** (§6). No Publish. No APPLY. No merge. `HOLD #1250`. Prior header follows.)
+
+## 1. Deploy tip `98fdd446` — thirteen commits since `387a0006`
+
+`established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-24
+01:26:16 UTC.
+
+| Field      | Value                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| Tip        | **`98fdd4462700972439c9ab78f000f24aa15a5d76`**                                                 |
+| Subject    | `docs(architecture): follow up GDP-ARCH-CITE-001 — T1-failing cites, #1620 state, …` (`#1649`) |
+| Parent     | `ee14c7ff7b97b17907f81ccd33482f3c46a6eba9` (`#1662`), the SHA the request named                |
+| Merged     | 2026-09-24 **00:57:41 UTC** (commit time)                                                      |
+| Since      | `387a00067` (`#1624`, the last merged stamp): **13 commits**                                   |
+| Migrations | **0** (`git diff --name-only 387a0006 98fdd446 -- supabase/migrations` is empty)               |
+
+**`ee14c7ff` is not the tip.** It is the parent. The one commit between them, `#1649`, changes only
+`docs/architecture-contract.md`, so the product state at `ee14c7ff` and at `98fdd446` is the same.
+
+**Commits since `387a0006`, oldest first:**
+
+| Commit      | PR      | Kind    | Summary                                                                     |
+| ----------- | ------- | ------- | --------------------------------------------------------------------------- |
+| `8b73c1403` | `#1626` | docs    | Architecture contract re-verified at `387a0006`                             |
+| `848ec5a40` | `#1628` | product | Pheno demo contenders board and fight night ranking                         |
+| `442370af1` | `#1088` | product | Sensor source/provenance display canon (display only)                       |
+| `010419677` | `#1630` | docs    | Contract §15 amendment: Start CSRF default and the Lovable preset           |
+| `ea50ec678` | `#1636` | product | Calendar flower-window band and plant day N (GDP-STAGE-WINDOW-001)          |
+| `fd4f34e79` | `#1639` | docs    | GDP-ARCH-CITE-001: `sensorSourceRules` citations and the T1 snippet check   |
+| `3cf34760f` | `#1642` | product | Action-response memory: isolated reads, effective sensor evidence validated |
+| `61000c530` | `#1644` | product | Timeline: one navigation anchor per saved care event                        |
+| `eff08cacc` | `#1646` | product | Plant memory episodes: isolated reads, unusable sensor evidence rejected    |
+| `32820526d` | `#1647` | product | Reports: failed evidence stays unavailable, grow reads isolated             |
+| `f30530cd8` | `#1656` | product | Dashboard: old sensor history no longer shows usable current badges         |
+| `ee14c7ff7` | `#1662` | product | Breeding: plant choices isolated, failed reads shown honestly               |
+| `98fdd4462` | `#1649` | docs    | Contract follow-up to GDP-ARCH-CITE-001 (§15 at `32820526`)                 |
+
+## 2. Live — `NOT_MEASURED` by Claude
+
+| Field             | Value                                                                            |
+| ----------------- | -------------------------------------------------------------------------------- |
+| Claude's own read | **`BLOCKED`** → `curl: (56) CONNECT tunnel failed, response 403`, apex and `www` |
+| When              | 2026-09-24 **01:26:35 UTC**, the **ninth** refusal                               |
+| Proxy record      | `connect_rejected` (policy denial or upstream failure); not routed around        |
+| Last value held   | `8b73c140`, `dirty:false`, buildTime `2026-09-22T23:25:04.802Z`                  |
+| Its source        | the GDP read in Grok review `5285231537` — `source claim`, a past instant        |
+| Live vs tip       | **`NOT_MEASURED`**                                                               |
+
+**Whether any of the nine product commits in §1 is live is unknown.** The last value on record is 13
+commits behind the tip. **`LIVE_LAG` is not a product `FAIL`.**
+
+**The `#1621` C/F fix and the live `"26"` pin.** `8fc38407` is an ancestor of `8b73c140`, so the fix
+was live at that past instant (`source claim` via the GDP read). The pin at
+`e2e-local/native-manual-correction-recovery.spec.ts:153` still reads `toHaveValue("26")` on the tip.
+**A live run of that pin is still `NOT_MEASURED`.**
+
+## 3. What changed for growers — product commits, measured from `git` only
+
+`established fact` for files and subjects. **Runtime behaviour of every row is `NOT_MEASURED` by
+Claude**; these PRs carry their own review and CI evidence.
+
+- **Sensor truth, display only (`#1088`).** The Source label is drawn from the canonical six
+  (`live`, `manual`, `csv`, `demo`, `stale`, `invalid`); vendor and transport tokens such as
+  `pi_bridge` are shown as provenance, not as the Source word. Five non-test files, no schema.
+- **Evidence honesty (`#1642`, `#1646`, `#1647`, `#1656`, `#1662`).** Read failures render as
+  unavailable rather than empty or healthy, reads are isolated per grow or plant, and old or
+  unusable sensor evidence is no longer shown as current.
+- **Timeline (`#1644`).** One navigation anchor per saved care event. The shared rule
+  `timelineEntryAnchorRules.ts` is mirrored into `supabase/functions/_shared/lib/` by the sync gate;
+  **no edge function source changed.**
+- **Calendar (`#1636`).** A flower-window band and "plant day N" on the cultivation calendar.
+- **Pheno demo (`#1628`).** Contenders board and fight-night ranking on the public demo page.
+
+**Architecture contract.** `#1626`, `#1630`, `#1639` and `#1649` amend `docs/architecture-contract.md`.
+It now records (`#1649`) that the AC-4.1 prototype-key defect **reaches the `#1088` display canon**:
+`resolveSensorSourceDisplayCanon("constructor" | "__proto__")` yields `sourceLabel: undefined`, while
+`isHealthyLive` stays `false`. The guard that `#1620` carried was **never merged**. The open fix is
+`#1655` (§6). This stamp repeats the contract's labels and does not re-measure them.
+
+## 4. `#1629` — CLOSED unmerged as SUPERSEDED; its gate has landed
+
+`established fact` from the GitHub API.
+
+- **`#1629`** (the `8b73c140` restamp) was **closed unmerged at 2026-09-23 15:15:55 UTC**. The GDP
+  decision, posted on the PR: the stamp was four merges behind; do not restamp in place (it would reset
+  Grok's PASS); do not merge as-is; hold a fresh restamp until GDP-ARCH-CITE-001 lands.
+- **GDP-ARCH-CITE-001 landed** as `#1639` (`fd4f34e7`, 2026-09-23 15:31:45 UTC). That release condition
+  is met, and this stamp is the fresh restamp it called for.
+- **What `#1629` recorded that still matters is carried here:** the session-restore collision (§5)
+  and the live read attributed to GDP (§2). Nothing in `#1629` is otherwise relied on.
+- **Its branch, `claude/current-state-restamp-8b73c140`, is still on the remote.** Claude's delete was
+  refused five times in-session (`the remote end hung up unexpectedly`). **`BLOCKED`**; the owner
+  deletes it from the closed PR page.
+
+## 5. Session-backed _Restore pending correction_ — still open on the tip
+
+**`inference`, from a static read of `98fdd446`. This is not a runtime measurement.**
+
+- **Unchanged since `8fc38407`:** `git diff 8fc38407 98fdd446` over `ManualSensorReadingCard.tsx`,
+  `sensorsPageSessionRules.ts` and the correction e2e spec is empty.
+- The Restore button still calls `updateValues(() => recoveredCorrectionDraftValues(…))`
+  (`ManualSensorReadingCard.tsx:1200-1202`). That builds a revision-0 draft, and `updateSensorsDraft`
+  still rejects a lower revision on the session-backed page. **The finding stands.**
+
+**Fixes in flight, `established fact` from the GitHub API and `git`:**
+
+| PR      | State                                     | Head         | vs tip                 | Fix                                              |
+| ------- | ----------------------------------------- | ------------ | ---------------------- | ------------------------------------------------ |
+| `#1627` | **CLOSED unmerged**, 2026-09-23 14:46 UTC | `33270e2287` | —                      | Was: `revision: current.revision + 1` on session |
+| `#1625` | **open**, not draft (Cursor)              | `4a177e5df8` | behind 0, merges clean | Restore plus session test, 2 files, +82 / −4     |
+
+`#1625` merged the deploy branch in, so its net diff no longer contains its carried `2685be21`
+(`CURRENT_STATE.md`) change. **It is no longer a writer of this file.** GDP's choice of `#1625` over
+`#1627` is a **`source claim`** relayed through Grok's note on `#1629`; `#1627`'s close is consistent
+with it. **Runtime behaviour of `#1625`: `NOT_MEASURED` by Claude.** Claude does not ready, push to or
+review it.
+
+## 6. Board — re-listed
+
+`established fact`, listed from the GitHub API at ~01:28 UTC. Every head was fetched by
+`refs/pull/N/head` into a deepened clone, diffed against its merge-base with `98fdd446`, and checked
+with `git merge-tree --write-tree` against the tip.
+
+**36 open PRs: 34 target `verdant-grow-diary` and 2 are stacked** (`#1618` on `#1151`, `#1481` on
+`#1478`).
+
+- **No open PR touches `docs/agents/CURRENT_STATE.md`. This PR is the only writer.**
+- **No open PR adds or edits a file under `supabase/migrations/`.**
+- **All 36 merge cleanly into the tip** (`merge-tree`, no conflicts).
+- **Closed since the last merged stamp, unmerged:** `#1620` (prototype-key guard, 14:45 UTC),
+  `#1627` (§5), `#1629` (§4). **`#1623`, `#1619` and `#1617`** are no longer open and are not among
+  the §1 merges.
+
+**New since `387a0006`, grouped:**
+
+| Group                           | PRs                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------- |
+| Evidence and read truth (Codex) | `#1648`, `#1650`, `#1651`, `#1652`, `#1657`, `#1658`, `#1659`, `#1660`, `#1663` |
+| Aging while a page stays open   | `#1664`, `#1665`, `#1666`, `#1668`                                              |
+| Sensor source prototype-key fix | `#1655` — the AC-4.1 defect in §3                                               |
+| Breeding                        | `#1661`                                                                         |
+| CI / proof lanes                | `#1641`, `#1653`, `#1654`                                                       |
+| Tests-only (Cursor)             | `#1632`, `#1638`, `#1643` (T1 snippet pins), `#1645`                            |
+| Docs — architecture contract    | `#1667` (AC-1.5 prose; a different Claude session; does not touch this file)    |
+| Session restore (§5)            | `#1625`                                                                         |
+
+**Carried from before, still open:** `#1151`, `#1174`, `#1175`, `#1221`, `#1250` (**HOLD**), `#1343`
+(dependency sync, Dependabot), `#1355`, `#1369`, `#1478`, `#1481`, `#1494`, `#1618`.
+
+**The Release Topology Specification stays deferred:** `#1175` and `#1221` are both still open.
+
+## 7. Soft-park register — carried
+
+`source claim` (GDP), unchanged since the `#1624` stamp; **not re-measured**.
+
+- **`HOLD #1250`.** Do not touch, ready or merge it.
+- **No Publish. No APPLY.** `#1460` and `#1545` stay parked. No production SQL.
+- **Fixture AUTH Soft-park:** after `cheekhimself` re-banks, re-measure the empty Action Queue and the
+  archived Restore XOR. **Never KEEP on fixture walks.** No owner email is recorded in this file.
+- **Soft P2 — parked, do not implement:** sensors / Start Check `growId` omit; Quick Log target count;
+  `/onboarding` preference gate; Assign true-empty needs a zero-tent fixture.
+
+## 8. CI lanes
+
+- **`Dependency & Security CI`** (`hono` moderate ×3, `js-yaml` **high**): still red on recent heads
+  and **not addressed by this restamp**. `config/dependency-security-exceptions.json` stays **empty**.
+  `#1343` (Dependabot) is the open dependency PR; **no owner is recorded here.**
+- **`Native Manual Correction Local`**: the Soft-ignore stays lifted for heads containing `8fc38407`.
+- **`test:security-db-local`**: `#1649` records that two profiles gamification RPC assertions return
+  early as **BLOCKED** (no local `exec_sql`), so a green lane is not complete DB-security proof.
+  `#1654` proposes requiring that proof. `source claim` via `#1649`.
+- **The tip's own push build on `98fdd446`: `NOT_MEASURED`.**
+
+## 9. Carried, not re-measured
+
+- **Sandbox schema and money-migration gaps.** Last measured on `aabbd2b3` (`TARGET_ENV: sandbox`):
+  core schema 14 of 51 columns missing; money-critical migrations 2 of 17. **Sandbox-scoped only;
+  production applied state is `NOT_MEASURED`. No APPLY.** No migration has merged since.
+- **Golden Toad:** AUTH_NEEDED; the one-tent Next step is `NOT_MEASURED`. This is **not**
+  `AUTH_CHOOSER_READY`. Passkey, 2FA and chooser decisions stay **Cheek's**.
+
+## 10. The `387a0006` / ~20:15 UTC stamp below is SUPERSEDED
+
+`established fact`. Its rows that are now stale:
+
+- It cites the tip as `8fc38407`; the tip is `98fdd446` (§1).
+- It records live as `NOT_MEASURED` with `9a30593d` from a GDP brief; the last value held is now
+  `8b73c140` (§2).
+- It records the session-restore finding as open, unowned and with no fix in flight; `#1627` came and
+  closed, and `#1625` is in flight (§5).
+- Its board counted 30 open PRs; the count is 36 (§6).
+
+Carried rows keep their original labels.
+
+## 11. Current locks
+
+- **No merge. No ready. No Publish. No History-restore. No APPLY. No production SQL.** No device
+  control, no automatic Action Queue writes, no invented credentials. **Never KEEP. No owner email.**
+- **`HOLD #1250`.**
+- **Tip is `98fdd4462700972439c9ab78f000f24aa15a5d76`.** Cite no other SHA as the tip, including
+  `ee14c7ff`, which the request named.
+- **Live is `NOT_MEASURED` by Claude.** Do not green-lane the live `"26"` pin on this stamp's
+  evidence.
+- **§5: `#1625` is the one session-restore fix in flight.** Claude does not choose, push, ready or
+  close.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- This slice is **N=1**, **draft**, on branch `claude/current-state-restamp-98fdd446`, cut from
+  `origin/verdant-grow-diary` at `98fdd4462700972439c9ab78f000f24aa15a5d76`. Its only file is
+  `docs/agents/CURRENT_STATE.md`. It contains no `src/`, `supabase/`, `package.json`, lockfile, test,
+  workflow or governance-file changes.
+- **Slice owner: Claude.** The **independent reviewer is routed by GDP**; Grok reviewed the last two
+  restamps. Claude does not self-merge and does not assign its own next slice.
+
+---
+
+**The block below is SUPERSEDED — see §10 of the current stamp.**
+
+**Prior last updated:** 2026-09-22 UTC (~20:15 UTC)
+**Prior update:** Claude (2026-09-22 evening, slice `GDP-CURRENT-STATE-REStamp-after-1621`: **Soft `#1621`
 GDP-SENSOR-CF-RECOVERY-001 is MERGED** and the **deploy tip is its squash,
 `8fc3840743ed58e8a27dc6b39f68563e16a8e48e`** (§1). The squash is **byte-identical to the reviewed
 head `1a6a9186`** across all three files, and **the e2e pin `"26"` is untouched** (§3). **ACTIVE OWNER

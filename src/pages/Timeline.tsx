@@ -2430,6 +2430,11 @@ export default function Timeline() {
                               context: "persisted_snapshot",
                             }).kind,
                           );
+                          // Use the persisted capture time before the diary time,
+                          // matching the evidence drawer's timestamp precedence.
+                          const rawCapturedAt = sensor?.ts ?? sensor?.captured_at ?? e.entry_at;
+                          const snapshotCapturedAt =
+                            typeof rawCapturedAt === "string" ? rawCapturedAt.trim() : "";
                           const usesManualCompatSensor =
                             canonicalSensor == null &&
                             legacySensor == null &&
@@ -2660,9 +2665,7 @@ export default function Timeline() {
                               {sensor && (
                                 <TimelineSnapshotClock
                                   changesAt={
-                                    new Date(
-                                      typeof sensor.ts === "string" ? sensor.ts : e.entry_at,
-                                    ).getTime() + snapshotStaleMs
+                                    new Date(snapshotCapturedAt).getTime() + snapshotStaleMs
                                   }
                                 >
                                   {(nowMs) => {
@@ -2679,8 +2682,7 @@ export default function Timeline() {
                                       co2?: number;
                                       soil?: number;
                                     };
-                                    const snapTs =
-                                      typeof sensor.ts === "string" ? sensor.ts : e.entry_at;
+                                    const snapTs = snapshotCapturedAt;
                                     const snapAgeMs = snapTs
                                       ? nowMs - new Date(snapTs).getTime()
                                       : Number.POSITIVE_INFINITY;

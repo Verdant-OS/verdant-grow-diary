@@ -213,52 +213,71 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
     vi.useRealTimers();
   });
 
-  it("qualifies stage guidance as stale after the window passes, without interaction or refetch", async () => {
-    render(
-      <MemoryRouter initialEntries={["/timeline"]}>
-        <Timeline />
-      </MemoryRouter>,
-    );
-
-    const hint = await screen.findByTestId("timeline-vpd-stage-hint");
-    expect(hint).toHaveTextContent(/^In Veg VPD range$/);
-    const snapshot = screen.getByTestId("timeline-manual-snapshot");
-    expect(snapshot).toHaveTextContent("VPD 1.1");
-    const readsBeforeIdle = diaryQueryCount();
-    expect(
-      buildTimelineEvidenceDetailViewModel(MANUAL_SNAPSHOT_ROW, { nowMs: Date.now() })?.sensor
-        ?.isStale,
-    ).toBe(false);
-    // findBy* resolves on the DOM commit, before React runs the passive effect
-    // that arms the minute clock. Flush it so the idle advance below is real.
-    await act(async () => {});
-
-    act(() => {
-      vi.advanceTimersByTime(
-        new Date(CAPTURED_AT).getTime() + MANUAL_CURRENT_STATE_STALE_MS - Date.now(),
+  it.each(["ts", "captured_at"])(
+    "qualifies %s stage guidance as stale after the window passes, without interaction or refetch",
+    async (timestampField) => {
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        entry_at: NOW.toISOString(),
+        details: {
+          source: "manual",
+          sensor_snapshot: {
+            source: "manual",
+            [timestampField]: CAPTURED_AT,
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
       );
-    });
-    expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(/^In Veg VPD range$/);
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
 
-    expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
-      /^In Veg VPD range \(historical, stale reading\)$/,
-    );
-    // The historical reading itself is preserved, not withdrawn.
-    expect(screen.getByTestId("timeline-manual-snapshot")).toHaveTextContent("VPD 1.1");
-    // Aging came from the clock, not from a re-read of the diary.
-    expect(diaryQueryCount()).toBe(readsBeforeIdle);
-    expect(
-      buildTimelineEvidenceDetailViewModel(MANUAL_SNAPSHOT_ROW, { nowMs: Date.now() })?.sensor
-        ?.isStale,
-    ).toBe(true);
-    expect(harness.insert).not.toHaveBeenCalled();
-    expect(harness.update).not.toHaveBeenCalled();
-    expect(harness.delete).not.toHaveBeenCalled();
-    expect(harness.upsert).not.toHaveBeenCalled();
-  });
+      const hint = await screen.findByTestId("timeline-vpd-stage-hint");
+      expect(hint).toHaveTextContent(/^In Veg VPD range$/);
+      const snapshot = screen.getByTestId("timeline-manual-snapshot");
+      expect(snapshot).toHaveTextContent("VPD 1.1");
+      const readsBeforeIdle = diaryQueryCount();
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor?.isStale,
+      ).toBe(false);
+      // findBy* resolves on the DOM commit, before React runs the passive effect
+      // that arms the minute clock. Flush it so the idle advance below is real.
+      await act(async () => {});
+
+      act(() => {
+        vi.advanceTimersByTime(
+          new Date(CAPTURED_AT).getTime() + MANUAL_CURRENT_STATE_STALE_MS - Date.now(),
+        );
+      });
+      expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(/^In Veg VPD range$/);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        /^In Veg VPD range \(historical, stale reading\)$/,
+      );
+      // The historical reading itself is preserved, not withdrawn.
+      expect(screen.getByTestId("timeline-manual-snapshot")).toHaveTextContent("VPD 1.1");
+      // Aging came from the clock, not from a re-read of the diary.
+      expect(diaryQueryCount()).toBe(readsBeforeIdle);
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor?.isStale,
+      ).toBe(true);
+      expect(harness.insert).not.toHaveBeenCalled();
+      expect(harness.update).not.toHaveBeenCalled();
+      expect(harness.delete).not.toHaveBeenCalled();
+      expect(harness.upsert).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(["manual", "user", "entry", "log", "", undefined])(
     "keeps %s snapshots current past the live window",
@@ -348,6 +367,45 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
         buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor
           ?.canSupportCurrentContext,
       ).toBe(false);
+    },
+  );
+
+  it.each([undefined, null])(
+    "uses the older captured_at when ts is %s instead of the newer diary time",
+    async (ts) => {
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        entry_at: NOW.toISOString(),
+        details: {
+          source: "manual",
+          sensor_snapshot: {
+            source: "manual",
+            ts,
+            captured_at: new Date(
+              NOW.getTime() - MANUAL_CURRENT_STATE_STALE_MS - MIN,
+            ).toISOString(),
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor?.isStale,
+      ).toBe(true);
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        "In Veg VPD range (historical, stale reading)",
+      );
+      expect(harness.update).not.toHaveBeenCalled();
     },
   );
 

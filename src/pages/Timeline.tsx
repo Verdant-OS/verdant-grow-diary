@@ -2415,7 +2415,11 @@ export default function Timeline() {
                           const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
                             Record<string, unknown> | undefined;
                           const rawSource =
-                            typeof sensor?.source === "string" ? sensor.source : null;
+                            typeof sensor?.source === "string"
+                              ? sensor.source
+                              : typeof e.details?.source === "string"
+                                ? e.details.source
+                                : null;
                           // Resolve freshness from the same provenance as the badge,
                           // including manual aliases and its missing-source fallback.
                           // Persisted live claims and unknown sources stay invalid.

@@ -315,6 +315,42 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
     },
   );
 
+  it.each(["csv", "live", "unknown"])(
+    "honors entry-level %s provenance when the snapshot has no source",
+    async (source) => {
+      const ts = new Date(NOW.getTime() - 16 * MIN).toISOString();
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        details: {
+          source,
+          sensor_snapshot: {
+            ...MANUAL_SNAPSHOT_ROW.details.sensor_snapshot,
+            source: undefined,
+            ts,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      const snapshot = await screen.findByTestId("timeline-manual-snapshot");
+      expect(snapshot).toHaveTextContent(source === "csv" ? "Source: CSV" : "Source: invalid");
+      const hint = screen.queryByTestId("timeline-vpd-stage-hint");
+      if (source === "csv") expect(hint).toHaveTextContent(/historical, stale reading/);
+      else expect(hint).not.toBeInTheDocument();
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor
+          ?.canSupportCurrentContext,
+      ).toBe(false);
+    },
+  );
+
   it.each(["", "not-a-date"])("keeps an unusable capture timestamp %j stale", async (ts) => {
     const row = {
       ...MANUAL_SNAPSHOT_ROW,

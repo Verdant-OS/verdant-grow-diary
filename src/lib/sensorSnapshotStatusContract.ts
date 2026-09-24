@@ -17,6 +17,7 @@
  */
 
 import { DEFAULT_STALE_WINDOW_MS } from "../constants/sensorTiming";
+import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
 import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 // ============================================================================
 // Canonical contract (new spec)
@@ -32,6 +33,7 @@ export type SnapshotReason =
   | "malformed_reading"
   | "out_of_range"
   | "unit_mismatch"
+  | "future_timestamp"
   | "no_rows"
   | "unknown";
 
@@ -112,8 +114,9 @@ function buildClassification(status: SnapshotStatus, reason: SnapshotReason): Cl
  *  4. `validity.isValid === false`     → invalid (validity.reason || malformed_reading)
  *  5. `rowsRejected > 0`               → needs_review / partial_accept
  *  6. accepted but capturedAt unparseable → needs_review / unknown
- *  7. age > resolveStaleWindowMs(src)  → stale / outside_stale_window
- *  8. otherwise                        → usable / fresh_accepted
+ *  7. capture beyond allowed clock skew → invalid / future_timestamp
+ *  8. age > resolveStaleWindowMs(src)  → stale / outside_stale_window
+ *  9. otherwise                        → usable / fresh_accepted
  */
 export function classifyAuditRow(
   row: AuditRowLike | null | undefined,
@@ -149,6 +152,9 @@ export function classifyAuditRow(
   }
 
   const now = opts.now ?? new Date(0); // caller must supply `now`; deterministic fallback
+  if (captured.getTime() - now.getTime() > SENSOR_TRUTH_FUTURE_SKEW_MS) {
+    return buildClassification("invalid", "future_timestamp");
+  }
   const windowMs = resolveStaleWindowMs(row.source ?? null);
   if (now.getTime() - captured.getTime() > windowMs) {
     return buildClassification("stale", "outside_stale_window");
@@ -185,6 +191,7 @@ export type SensorSnapshotReasonCode =
   | "none_accepted"
   | "none_received"
   | "malformed_payload"
+  | "future_timestamp"
   | "missing_timestamp";
 
 export interface SensorSnapshotStatusResult {
@@ -246,6 +253,9 @@ export function classifySensorSnapshotStatus(
     return { status: "needs_review", reasonCode: "missing_timestamp" };
   }
   const now = input.now ?? new Date();
+  if (captured.getTime() - now.getTime() > SENSOR_TRUTH_FUTURE_SKEW_MS) {
+    return { status: "invalid", reasonCode: "future_timestamp" };
+  }
   const staleMs =
     input.staleWindowMs ?? resolveSensorSnapshotStaleWindowMs({ source: input.source });
   if (now.getTime() - captured.getTime() > staleMs) {
@@ -290,6 +300,7 @@ const REASON_CODE_TO_REASON: Record<SensorSnapshotReasonCode, SnapshotReason> = 
   none_accepted: "none_inserted",
   none_received: "no_rows",
   malformed_payload: "malformed_reading",
+  future_timestamp: "future_timestamp",
   missing_timestamp: "unknown",
 };
 

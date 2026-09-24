@@ -51,7 +51,11 @@ jobs:
     name: Browser census (${{ matrix.lane }})
     needs: focused-rules
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # Authenticated: two 30-minute batch waves, three minutes of delayed-read
+    # regressions, and twelve minutes for setup, teardown, and evidence upload.
+    # Public: five sequential seven-minute batches also fit this job budget.
+    # Per-test timeouts, worker counts, assertions, and zero retries stay unchanged.
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:

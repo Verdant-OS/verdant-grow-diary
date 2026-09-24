@@ -1,4 +1,6 @@
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
+import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
+import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -222,8 +224,6 @@ import {
   type TimelineCoreReadState,
   type TimelineSupplementalReadSource,
 } from "@/lib/timelinePageReadStateRules";
-
-const TIMELINE_SNAPSHOT_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
 
 // URL query params mirroring the Pro date-range filter, matching the
 // ?start/?end convention of the environment summary report.
@@ -2416,6 +2416,27 @@ export default function Timeline() {
                           const manualCompatSensor = e.details?.manual_sensor_snapshot;
                           const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
                             Record<string, unknown> | undefined;
+                          const rawSource =
+                            typeof sensor?.source === "string" && sensor.source.trim().length > 0
+                              ? sensor.source
+                              : typeof e.details?.source === "string"
+                                ? e.details.source
+                                : null;
+                          // Resolve freshness from the same provenance as the badge,
+                          // including manual aliases and its missing-source fallback.
+                          // Persisted live claims and unknown sources stay invalid.
+                          const snapshotStaleMs = resolveCurrentStateStaleWindowMs(
+                            classifyTimelineSensorSource({
+                              rawSource,
+                              fallback: "manual",
+                              context: "persisted_snapshot",
+                            }).kind,
+                          );
+                          // Use the persisted capture time before the diary time,
+                          // matching the evidence drawer's timestamp precedence.
+                          const rawCapturedAt = sensor?.ts ?? sensor?.captured_at ?? e.entry_at;
+                          const snapshotCapturedAt =
+                            typeof rawCapturedAt === "string" ? rawCapturedAt.trim() : "";
                           const usesManualCompatSensor =
                             canonicalSensor == null &&
                             legacySensor == null &&
@@ -2645,10 +2666,12 @@ export default function Timeline() {
                               )}
                               {sensor && (
                                 <TimelineSnapshotClock
+                                  recheckAt={
+                                    new Date(snapshotCapturedAt).getTime() -
+                                    SENSOR_TRUTH_FUTURE_SKEW_MS
+                                  }
                                   changesAt={
-                                    new Date(
-                                      typeof sensor.ts === "string" ? sensor.ts : e.entry_at,
-                                    ).getTime() + TIMELINE_SNAPSHOT_STALE_MS
+                                    new Date(snapshotCapturedAt).getTime() + snapshotStaleMs
                                   }
                                 >
                                   {(nowMs) => {
@@ -2665,14 +2688,14 @@ export default function Timeline() {
                                       co2?: number;
                                       soil?: number;
                                     };
-                                    const snapTs =
-                                      typeof sensor.ts === "string" ? sensor.ts : e.entry_at;
+                                    const snapTs = snapshotCapturedAt;
+                                    const hasFutureTimestamp =
+                                      classifySnapshotTimestamp(snapTs, nowMs) === "future";
                                     const snapAgeMs = snapTs
                                       ? nowMs - new Date(snapTs).getTime()
                                       : Number.POSITIVE_INFINITY;
                                     const snapStale =
-                                      !Number.isFinite(snapAgeMs) ||
-                                      snapAgeMs > TIMELINE_SNAPSHOT_STALE_MS;
+                                      !Number.isFinite(snapAgeMs) || snapAgeMs > snapshotStaleMs;
                                     const rawVpd =
                                       typeof sensor.vpd === "number" && Number.isFinite(sensor.vpd)
                                         ? sensor.vpd
@@ -2682,13 +2705,11 @@ export default function Timeline() {
                                       stage: resolveTimelineDiaryEntryStage(e),
                                       stale: snapStale,
                                     });
-                                    const rawSource =
-                                      typeof sensor.source === "string" ? sensor.source : null;
                                     const sourceBadge = classifyTimelineSensorSource({
                                       rawSource,
                                       capturedAt: snapTs ?? null,
                                       now: nowMs,
-                                      staleMs: TIMELINE_SNAPSHOT_STALE_MS,
+                                      staleMs: snapshotStaleMs,
                                       // Persisted Quick Log snapshots are
                                       // intrinsically grower-entered.
                                       fallback: "manual",
@@ -2775,14 +2796,21 @@ export default function Timeline() {
                                           legacyDisplaySensor.soil != null && (
                                             <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
                                           )}
-                                        {rawVpd != null && sourceBadge.canAssessStage && (
-                                          <span
-                                            className="text-[11px] text-muted-foreground"
-                                            data-testid="timeline-vpd-stage-hint"
-                                          >
-                                            {vpdClassification.label}
+                                        {hasFutureTimestamp && (
+                                          <span className="text-[11px] text-muted-foreground">
+                                            Future timestamp — freshness cannot be verified.
                                           </span>
                                         )}
+                                        {rawVpd != null &&
+                                          sourceBadge.canAssessStage &&
+                                          !hasFutureTimestamp && (
+                                            <span
+                                              className="text-[11px] text-muted-foreground"
+                                              data-testid="timeline-vpd-stage-hint"
+                                            >
+                                              {vpdClassification.label}
+                                            </span>
+                                          )}
                                       </div>
                                     );
                                   }}

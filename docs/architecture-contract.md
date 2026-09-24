@@ -4,19 +4,20 @@
 **Verified from source at:** `69aca5e738b7d0d49369a636b1b293564ec65203` (deploy branch
 `verdant-grow-diary`), 2026-09-24, by Claude (§15 re-verification; see §15.1). **This stamp re-read
 every citation instead of carrying earlier stamps by file identity.** Every backticked `path:line`
-cite in this file was extracted, each counted once however many lines it names. The 220 repository
-cites outside the §15.1 record were each read against the claim they support. The 8
-package-internal cites in AC-1.4, AC-1.5 and §14 were re-read from the published tarballs of the
-versions `bun.lock` pins, after each tarball's sha512 matched its `bun.lock` integrity entry. The
-14 cites inside §15.1 rows name superseded lines by design and were not re-read. The counts in §3, §4 and §10 were re-measured, and the AC-4.1
-prototype-key behaviour was re-run under Bun 1.3.11. Citations, counts and that run are therefore
-`established fact` at this stamp, and the earlier provenance chain for them (`ef15b2c1` →
-`32820526` → `ea50ec67` → `8b73c140` / `387a0006`) is superseded rather than carried. Two kinds of
-statement were **not** re-derived and keep the labels and dates they carry: dated runtime results
-recorded with their own runtime (AC-1.4's bare-specifier build), and history about which PR
-introduced a behaviour. Between `ef15b2c1` and this tip, only this file and
-`docs/agents/CURRENT_STATE.md` changed. First verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640`
-on 2026-09-05 by Grok (PR #1281).
+cite in this file was extracted, each counted once however many lines it names. The 226 repository
+cites outside the §15.1 record were each read against the claim they support. The 8 package-internal
+cites in AC-1.4, AC-1.5 and §14 were re-read from the published tarballs of the versions `bun.lock`
+pins, after each tarball's sha512 matched its `bun.lock` integrity entry. The 14 cites inside §15.1
+rows name superseded lines by design and were not re-read. The counts in §3, §4 and §10 were
+re-measured, apart from the AC-4.3 multi-line figure, which did not reproduce and stays a
+`source claim`. The AC-4.1 prototype-key behaviour was re-run under Bun 1.3.11. Citations, the
+reproduced counts and that run are therefore `established fact` at this stamp, and the earlier
+provenance chain for them (`ef15b2c1` → `32820526` → `ea50ec67` → `8b73c140` / `387a0006`) is
+superseded rather than carried. Two kinds of statement were **not** re-derived and keep the labels
+and dates they carry: dated runtime results recorded with their own runtime (AC-1.4's bare-specifier
+build), and history about which PR introduced a behaviour. Between `ef15b2c1` and this tip, only
+this file and `docs/agents/CURRENT_STATE.md` changed. First verified at
+`7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
 **Carries no `Sentinel-Version`.** This is not one of the twelve governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
 
@@ -173,12 +174,14 @@ What follows:
 
 - Removing `csrfMiddleware` from `requestMiddleware` removes the protection. Nothing falls back.
 - Outside production, Start logs one `console.warn` when no CSRF middleware is registered. In
-  production there is no warning, so the removal is silent where it matters. The runtime check, on
-  line 261 of the installed `createStartHandler.js`, skips the warning when the environment variable
-  `TSS_DISABLE_CSRF_MIDDLEWARE_WARNING` is `"true"`. The warning's own text tells the reader to set
-  `serverFns.disableCsrfMiddlewareWarning` instead. How that option reaches the variable lives in a
-  Start plugin package that was not read (`NOT_MEASURED`). Neither name appears in any code,
-  config or workflow file in the repository, so Verdant sets neither.
+  production there is no warning, so the removal is silent where it matters. The check, on line 261
+  of the installed `createStartHandler.js`, reads `process.env.TSS_DISABLE_CSRF_MIDDLEWARE_WARNING`,
+  but **that is not a runtime switch**. The pinned Start plugin, `@tanstack/start-plugin-core`
+  1.171.25, replaces it at build time through Vite `define` with the value of
+  `serverFns.disableCsrfMiddlewareWarning` (`createViteDefineConfig` in its `vite/planning.js`,
+  wired from `vite/plugin.js`), and that option defaults to `false` (its `schema.js`). Setting the
+  environment variable when the server runs therefore changes nothing. Neither the option nor the
+  variable appears in any code, config or workflow file in the repository, so Verdant sets neither.
 - Line 238 of the installed Start package's `createStartHandler.js` falls back to
   `[defaultCsrfMiddleware]` when no Start instance is registered. Deleting `src/start.ts` would
   therefore bring the default back (`inference`; not run), but it would also drop the error and
@@ -336,9 +339,9 @@ stamped SHA, over the root-level `src/lib/*Rules.ts` glob:
 | type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts` |
 
 The clock, randomness and type-import files are legacy, not precedent. Do not cite them, and do not
-extend the pattern. The one file added since `32820526` is `src/lib/plantSensorSourceHistoryRules.ts`
-(#1663), which calls neither `Date.now()` nor `Math.random()` and imports neither React nor
-Supabase.
+extend the pattern. The one file added since `32820526` is
+`src/lib/plantSensorSourceHistoryRules.ts` (#1663), which calls neither `Date.now()` nor
+`Math.random()` and imports neither React nor Supabase.
 
 **Corrected: no root-level `*Rules.ts` imports the Supabase client, and neither named file ever
 did.** Every earlier version of this clause counted the two files as importing Supabase, and since
@@ -664,11 +667,21 @@ That is five files at the stamped SHA. It does **not** scan `src/lib/sensors/`, 
 `src/lib/sensor*.ts` modules, or edge functions. It is **not** invoked by `ci.yml`, which supplies
 every required context, so a violation cannot block a merge by that route. It runs from:
 
-- **every pull request into `verdant-grow-diary` or `main`**, with no path filter.
-  `.github/workflows/ai-doctor-golden-cases.yml:5-7` (`pull_request:`) triggers it, and the step at
-  `.github/workflows/ai-doctor-golden-cases.yml:39` (`bun run test:ai-doctor-phase1`) runs a script
-  that ends with the checker: `package.json:315` (`&& node scripts/sensor-safety-check.mjs`). The
-  job is not one of the 35 required contexts;
+- **every pull request into `verdant-grow-diary` or `main`**, with no path filter, through three
+  workflows. Each runs a package script that ends with the checker:
+  - `.github/workflows/ai-doctor-golden-cases.yml:5-7` (`pull_request:`), whose step at
+    `.github/workflows/ai-doctor-golden-cases.yml:39` (`bun run test:ai-doctor-phase1`) runs
+    `package.json:315` (`&& node scripts/sensor-safety-check.mjs`);
+  - `.github/workflows/ai-doctor-readiness-ui.yml:5-7` (`pull_request:`), whose step at
+    `.github/workflows/ai-doctor-readiness-ui.yml:42` (`bun run test:ai-doctor-readiness-ui`) runs
+    `package.json:316` (`&& node scripts/sensor-safety-check.mjs`);
+  - `.github/workflows/contextual-pheno-comparison-v0.yml:6-8` (`pull_request:`), whose step at
+    `.github/workflows/contextual-pheno-comparison-v0.yml:60`
+    (`bun run test:contextual-pheno-comparison-v0`) runs `package.json:65`
+    (`&& node scripts/sensor-safety-check.mjs`).
+
+  None of the three jobs is one of the 35 required contexts;
+
 - the pre-commit hook, through `scripts/assert-docs-safety.mjs`;
 - pull requests that touch the path filter of `.github/workflows/release-workbook-safety.yml`.
   The filter is broad: it covers `docs/**` at `.github/workflows/release-workbook-safety.yml:6`
@@ -681,9 +694,9 @@ every required context, so a violation cannot block a merge by that route. It ru
 - a path-filtered strain-library gate.
 
 > Earlier versions listed only the pre-commit hook and the last three lanes, and so implied the
-> check never runs on an ordinary pull request. The golden-cases lane and its `test:ai-doctor-phase1` chain were already
-> present at the first stamp. The classification does not change: it runs on every PR, but not as
-> a required check.
+> check never runs on an ordinary pull request. All three every-PR lanes and their script chains
+> were already present at the first stamp. The classification does not change: it runs on every PR,
+> but not as a required check.
 
 ---
 
@@ -1085,7 +1098,7 @@ true; a clause missing from this table would be an unstated gap.
 | AC-4.3  | comment and review; T3 proposed                                                                                                                   | `convention only`   |
 | AC-4.4  | comment and review — deliberate Pi exception                                                                                                      | `convention only`   |
 | AC-4.5  | one-directional only                                                                                                                              | `convention only`   |
-| AC-4.6  | `scripts/sensor-safety-check.mjs` — wording heuristic over 5 files; every PR via non-required `ai-doctor-golden-cases.yml`, not `ci.yml`          | **partially gated** |
+| AC-4.6  | `scripts/sensor-safety-check.mjs` — wording heuristic over 5 files; every PR via three non-required workflows, not `ci.yml`                       | **partially gated** |
 | AC-5.1  | shape of the code as written                                                                                                                      | structural          |
 | AC-5.2  | no code path from the request body to the model constants                                                                                         | structural          |
 | AC-5.3  | shape of the code as written                                                                                                                      | structural          |
@@ -1309,4 +1322,4 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-09-23 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | §15 amendment, follow-up to GDP-ARCH-CITE-001 (#1639). Corrected three citations that fail T1: AC-1.5 prose `:238` now names `createStartHandler.js`, the AC-1.7 historical note spells its superseded range in prose, and AC-5.3 `readToolArguments` is now `:639-649`. AC-4.1: #1620, which carried the prototype-key guard, closed unmerged; the defect now reaches the #1088 display canon (`sourceLabel` undefined, still never healthy), under Bun 1.3.11. AC-4.2: qualified the "always one of the six" display claim accordingly; reclassified partially gated (display split tested). AC-3.2: `*Rules.ts` 517 → 518 (#1636); AC-3.4 shim imports 743 → 744 (#1647), and §12's Next.js row now cites AC-3.4, not a count; other §3 counts and the AC-4.3 union count unchanged. §13 and §14: #1620 and #1619 closed unmerged; #1175 and #1221 still open. T1 text unchanged. Rejoined the §13 table #1639 split with a blank line; applied the repo Prettier config.     |
 | 2026-09-24 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | Editorial follow-up to #1649; stamp unchanged. AC-1.5's in-prose bullet no longer writes the installed Start package as a `path:line` token: it now names line 238 of `createStartHandler.js` in prose, with its `[defaultCsrfMiddleware]` fallback, re-read in `@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins at this SHA. The clause's `_Source:` block keeps its package-internal cites and now says T1 does not cover them: T1 covers repository paths, and a dependency file cannot be opened at the stamped SHA. Copilot, CodeRabbit and the Codex GitHub reviewer raised the bullet on #1649; Copilot raised the `_Source:` block on #1667. No other clause changed.                                                                                                                                                                                                                                                                                 |
 | 2026-09-24 | `ef15b2c1be949d720f34bc33e4b980d18d6114e2` | Claude | §15 re-verification, 12 commits after `32820526` (first #1656, last #1664). No repository file the contract cites by path changed, apart from this file and `docs/agents/CURRENT_STATE.md` (cited as a document), so every citation holds by file identity. AC-3.2: `*Rules.ts` 518 → 519 (#1663 adds a pure rules file); the `Date.now()`, `Math.random()` and Supabase-importer counts are unchanged. AC-3.4: 744 → 750 shim import statements, in 749 files; the prior 744 also counted statements. AC-4.3: the wider union count is unchanged at 105 lines in 85 files. AC-10.2: zero hits on re-run. §13: added the Quick Log deferral row, with every direct RPC caller, and sequencing notes with no PR state (a change to the AC-4.1-cited line, as #1655 proposes, must update its T1 pins, as #1643 adds, in the same change); the release-topology row no longer states PR status. No clause statement changed. Docs-only; no `CURRENT_STATE.md` restamp.             |
-| 2026-09-24 | `69aca5e738b7d0d49369a636b1b293564ec65203` | Claude | §15 re-verification, two docs-only commits after `ef15b2c1`. Re-read all 220 repository `path:line` cites outside this record rather than carrying them by file identity, and the AC-1.4, AC-1.5 and §14 package cites from tarballs whose sha512 matches `bun.lock`. Re-measured the §3, §4 and §10 counts; re-ran the AC-4.1 prototype-key reproduction under Bun 1.3.11. AC-3.2 corrected: no root-level `*Rules.ts` imports the Supabase client; the two named files import a generated type only, as at the first stamp. AC-4.6 corrected: the checker runs on every PR through the non-required `ai-doctor-golden-cases.yml`. AC-1.5: the warning's runtime switch is `TSS_DISABLE_CSRF_MIDDLEWARE_WARNING`. AC-4.3: the multi-line figure is now a `source claim`. §13: `CLAUDE.md` correction deferred. `docs/codebase-map.md` corrected in the same change.                                                                                                             |
+| 2026-09-24 | `69aca5e738b7d0d49369a636b1b293564ec65203` | Claude | §15 re-verification, two docs-only commits after `ef15b2c1`. Re-read all 226 repository `path:line` cites outside this record rather than carrying them by file identity, and the AC-1.4, AC-1.5 and §14 package cites from tarballs whose sha512 matches `bun.lock`. Re-measured the §3, §4 and §10 counts, bar the AC-4.3 multi-line figure; re-ran the AC-4.1 prototype-key reproduction under Bun 1.3.11. AC-3.2 corrected: no root-level `*Rules.ts` imports the Supabase client; the two named files import a generated type only, as at the first stamp. AC-4.6 corrected: the checker runs on every PR through three non-required workflows. AC-1.5: the warning switch is `serverFns.disableCsrfMiddlewareWarning`, compiled in at build time. AC-4.3: the multi-line figure is now a `source claim`. §13: `CLAUDE.md` correction deferred. `docs/codebase-map.md` corrected in the same change. Review follow-ups: AC-3.2 (Copilot); AC-1.5, AC-4.6, header (Codex).   |

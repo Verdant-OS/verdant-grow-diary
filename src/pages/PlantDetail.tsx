@@ -384,16 +384,12 @@ export default function PlantDetail() {
     return <BlockedStateView view={blockedView} onRetry={() => refetch()} />;
   }
 
-  // Renders the "Plant not found" empty state with data-source disclosure.
+  // Renders the "Plant not found" state. A single-plant miss says nothing
+  // about whether the account has other plants, so no account-level
+  // "No real plants yet" disclosure is shown here (QA 2026-09-24, BUG-016).
   if (blockedView && blockedView.kind === "not-found") {
     return (
       <div>
-        <GrowDataSourceDisclosure
-          resource="plants"
-          hasAnyData={false}
-          metas={[plantMeta]}
-          testId="plant-detail-data-source-disclosure"
-        />
         <BlockedStateView view={blockedView} />
       </div>
     );

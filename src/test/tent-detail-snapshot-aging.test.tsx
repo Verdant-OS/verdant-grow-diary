@@ -131,4 +131,29 @@ describe("Tent Detail idle snapshot freshness", () => {
     expect(screen.getByTestId("tent-detail-sensor-empty")).toBeVisible();
     expect(screen.queryByTestId("tent-detail-sensor-stale")).toBeNull();
   });
+
+  it("shows stale guidance immediately when the latest reading is already past threshold", () => {
+    const ts = new Date(NOW.getTime() - 16 * 60000).toISOString();
+    state.rows = [{ metric: "vpd_kpa", value: 1, ts, captured_at: ts, source: "live" }];
+    mount();
+    expect(screen.getByTestId("tent-detail-sensor-stale")).toBeVisible();
+    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent(
+      "historical, stale reading",
+    );
+  });
+
+  it("keeps a newer manual snapshot fresh while an older live group would have aged out", () => {
+    const liveTs = new Date(NOW.getTime() - 14 * 60000).toISOString();
+    const manualTs = new Date(NOW.getTime() - 5 * 60000).toISOString();
+    state.rows = [
+      { metric: "vpd_kpa", value: 1, ts: liveTs, captured_at: liveTs, source: "live" },
+      { metric: "vpd_kpa", value: 1.1, ts: manualTs, captured_at: manualTs, source: "manual" },
+    ];
+    mount();
+    expect(screen.getByTestId("tent-detail-sensor-source")).toHaveTextContent("Manual");
+    expect(screen.queryByTestId("tent-detail-sensor-stale")).toBeNull();
+    act(() => vi.advanceTimersByTime(120_000));
+    expect(screen.queryByTestId("tent-detail-sensor-stale")).toBeNull();
+    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent("In Veg VPD range.");
+  });
 });

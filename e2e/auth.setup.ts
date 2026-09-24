@@ -1,6 +1,7 @@
 import { test as setup, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { describeUnservedE2EBaseUrl } from "./lib/baseUrlPreflight";
 
 /**
  * Authenticated session bootstrap for Verdant Grow OS e2e tests.
@@ -63,7 +64,20 @@ setup("authenticate", async ({ page }) => {
   // Credentials present: fall through to a fresh login, which rewrites BOTH
   // files together (a partial snapshot is treated as stale, not reused).
 
-  await page.goto("/auth");
+  const authResponse = await page.goto("/auth");
+  // Fail at once, with the cause, when the base URL does not serve the app —
+  // otherwise a dead host surfaces as a 15 s `#signin-email` timeout that
+  // reads like a sign-in bug.
+  const unserved = describeUnservedE2EBaseUrl({
+    url: page.url(),
+    status: authResponse ? authResponse.status() : null,
+    bodyText: await page
+      .locator("body")
+      .innerText({ timeout: 5_000 })
+      .catch(() => ""),
+  });
+  if (unserved) throw new Error(unserved);
+
   // The Auth page keeps all three tab panels (sign in / create account /
   // forgot password) mounted, so label-based lookups match 3 email and 3
   // password inputs (Playwright strict-mode violation). Pin to the sign-in

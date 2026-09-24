@@ -123,6 +123,13 @@ new harness cannot land without one. Not `scripts/*harness*`: that root-level ru
 guard built on it would silently exempt the eight it misses. This is the P2(d) pattern applied to
 safety rather than execution.
 
+The guard covers all 41 files `isRuntimeHarness` matches, not only the unrun 18. `missing evidence`: §3
+measured only those 18. The 23 that `security-db-local.yml` already runs were not measured against §2.
+They include the eight `db-security` runners, five of them under `scripts/security/`. Measure them
+before P5.2. Any that lack the envelope join P5.1's scope, or the guard fails on its first run.
+Narrowing the guard to the unrun set would need an exemption for the wired lane. That is the silent
+exemption P5.2 exists to rule out (CodeRabbit, #1221 round 18).
+
 **P5.3 — wire, opt-in, in tranches.** Only then extend `test:security-db-local`, each harness via a
 `:local-lane` alias passing `--confirm-local-security-lane`, matching the existing convention
 (`test:ai-doctor-sessions-rls:local-lane`). Wire in tranches; one red harness must not take the lane

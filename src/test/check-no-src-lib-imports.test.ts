@@ -111,11 +111,13 @@ describe("scanFunctionsTree (fixture)", () => {
  * the guard fails. A bare mention (`echo check-no-src-lib-imports.mjs`) runs nothing
  * (CodeRabbit, #1221 rounds 13 and 15). A script holding `#` is rejected outright: the
  * shell drops a comment's text, which this split would still read as commands (round 16).
+ * A newline ends a command like `;`, so `guard\ntrue` is rejected too; a newline right
+ * after `&&` only continues the line (round 18).
  */
 function invokesGuard(script: string | undefined): boolean {
   if ((script ?? "").includes("#")) return false;
   // Commands and the operators between them, alternating: [cmd, op, cmd, op, cmd].
-  const parts = (script ?? "").trim().split(/\s*(&&|\|\||;)\s*/);
+  const parts = (script ?? "").trim().split(/\s*(&&|\|\||;|\n)\s*/);
   return parts.some(
     (command, i) =>
       i % 2 === 0 &&
@@ -154,6 +156,15 @@ describe("invokesGuard — a script runs the guard, not merely names it (CodeRab
     ).toBe(false);
     // A `;` BEFORE the guard is harmless: the guard runs, and its status is the script's.
     expect(invokesGuard("echo start; node scripts/check-no-src-lib-imports.mjs")).toBe(true);
+  });
+
+  it("rejects a later command on a new line (CodeRabbit, #1221 round 18)", () => {
+    // A newline ends a shell command like `;`: `guard\ntrue` exits 0 when the guard fails.
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs\ntrue")).toBe(false);
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs &&\nnode scripts/b.mjs")).toBe(
+      true,
+    );
+    expect(invokesGuard("echo start\nnode scripts/check-no-src-lib-imports.mjs")).toBe(true);
   });
 
   it("rejects a guard behind a shell comment (CodeRabbit, #1221 round 16)", () => {

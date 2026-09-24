@@ -14,6 +14,7 @@
  *     sensor reading path (ManualSensorReadingCard) already handles it.
  */
 import { useCallback, useState } from "react";
+import { isUuid } from "@/lib/isUuid";
 import { supabase } from "@/integrations/supabase/client";
 import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
@@ -153,7 +154,7 @@ export function useQuickLogActivitySave() {
             return { ok: false, reason: "save_failed" };
           }
           const r = (data ?? {}) as ManualRpcResponse;
-          if (!r.ok) {
+          if (r.ok !== true || !isUuid(r.grow_event_id)) {
             setError("save_failed");
             return { ok: false, reason: "save_failed" };
           }
@@ -211,7 +212,7 @@ export function useQuickLogActivitySave() {
             return { ok: false, reason: "save_failed" };
           }
           const r = (data ?? {}) as EventRpcResponse;
-          if (!r.ok || !r.grow_event_id) {
+          if (r.ok !== true || !isUuid(r.grow_event_id)) {
             // Stale backend fence: v1b client but validator/allow-list
             // does not accept harvest yet. Never fake-save as observation.
             if (input.activityId === "harvest" && r.reason === "invalid_event_type") {

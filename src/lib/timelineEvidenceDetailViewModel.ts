@@ -177,7 +177,6 @@ function readSafeDetail(details: Record<string, unknown> | null | undefined, key
 
 function readSensor(
   details: Record<string, unknown> | null | undefined,
-  fallbackEntryAt: string | null,
   nowMs: number,
 ): TimelineEvidenceSensorSummary | null {
   const raw = readSafeDetail(details, "sensor_snapshot") ?? readSafeDetail(details, "sensor");
@@ -185,7 +184,7 @@ function readSensor(
   const obj = raw as Record<string, unknown>;
 
   const rawCapturedAt = obj.ts ?? obj.captured_at;
-  const capturedAt = rawCapturedAt == null ? fallbackEntryAt : safeString(rawCapturedAt);
+  const capturedAt = safeString(rawCapturedAt);
   const source = classifyTimelineSensorSource({
     rawSource: safeString(obj.source ?? readSafeDetail(details, "source")),
     fallback: "invalid",
@@ -353,7 +352,7 @@ export function buildTimelineEvidenceDetailViewModel(
     ? { hasPhoto: true, altText: buildAltText(plantLabel, entryAt) }
     : null;
 
-  const sensor = readSensor(details, entryAt, nowMs);
+  const sensor = readSensor(details, nowMs);
   const maturityEvidence = readMaturityEvidence(details);
 
   let declaredSource = normalizeSource(readSafeDetail(details, "source"));

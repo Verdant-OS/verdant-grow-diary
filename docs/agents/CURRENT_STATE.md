@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-## Codex candidate — Timeline manual freshness (#1682), 2026-09-24
+## Codex candidate — Timeline manual freshness (#1688), 2026-09-24
 
 Owner: **Codex**, under Cheek's repository-fix/integration assignment. Independent
 review is pending; Codex cannot approve its own implementation. This candidate is
@@ -19,6 +19,10 @@ Before the fix, the page regression returned **7 passed / 1 failed / 0 skipped**
 a 23h59m manual snapshot incorrectly displayed historical guidance. The updated
 test checks the 24-hour boundary and idle transition at +1ms, drawer agreement,
 16-minute manual/fallback snapshots, untrusted sources and invalid timestamps.
+CodeRabbit's current-head review also found that a recent diary date could mask
+missing snapshot capture time. A six-case regression demonstrates the mismatch in
+the inline card and evidence drawer. Both now use only snapshot ts/captured_at;
+values remain visible, but missing capture time cannot support current evidence.
 Final validation and the exact candidate SHA belong in the draft PR receipt.
 HOLD #1250. No merge, ready, Publish, production APPLY, device or Action Queue action.
 

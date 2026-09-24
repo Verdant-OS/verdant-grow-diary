@@ -33,6 +33,7 @@ import {
 } from "@/lib/environmentCsvImportPersistence";
 import {
   SENSOR_READINGS_DEDUPE_SELECT_CLAUSE,
+  type DedupeKeyParts,
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import { collectCsvSensorPresenceKeys } from "@/lib/csvSensorPresenceService";
@@ -95,7 +96,7 @@ function makeInsertClient(canContinue: () => boolean): InsertClient {
             .order("captured_at")
             .range(from, to);
           if (error || !data) throw new Error("CSV presence lookup unavailable");
-          return data;
+          return data as unknown as DedupeKeyParts[];
         }, canContinue);
       } catch {
         return new Set<string>();

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
+import { useNowTick } from "@/hooks/useNowTick";
 import {
   buildPlantEnvironmentReadView,
   buildPlantTentEnvironmentView,
@@ -47,6 +48,7 @@ export default function PlantTentEnvironmentPanel({
   growId,
   plantStage,
 }: Props) {
+  const nowMs = useNowTick();
   const enabled = !!tentId;
   const temperatureUnit = useTemperatureUnitPreference();
   const temperatureUnitSymbol = getTemperatureUnitSymbol(temperatureUnit);
@@ -57,7 +59,7 @@ export default function PlantTentEnvironmentPanel({
     enabled,
     hasCachedReadings: rows.length > 0,
   });
-  const view = buildPlantTentEnvironmentView(rows, undefined, temperatureUnit);
+  const view = buildPlantTentEnvironmentView(rows, nowMs, temperatureUnit);
   const recent = buildRecentSensorSnapshotHistory(rows, { limit: 5 });
   const prefill = buildPlantQuickLogPrefill({ plantId, plantName, growId, tentId, tentName });
   const snap = enabled ? snapshotFromReadings(rows) : null;

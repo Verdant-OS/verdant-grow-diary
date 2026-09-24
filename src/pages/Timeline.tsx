@@ -1,3 +1,5 @@
+import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
+import { classifySnapshotTimestamp } from "@/lib/sensorTruthRules";
 import { resolveCurrentStateStaleWindowMs } from "@/lib/sensorTruthCanon";
 import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
@@ -2664,6 +2666,10 @@ export default function Timeline() {
                               )}
                               {sensor && (
                                 <TimelineSnapshotClock
+                                  recheckAt={
+                                    new Date(snapshotCapturedAt).getTime() -
+                                    SENSOR_TRUTH_FUTURE_SKEW_MS
+                                  }
                                   changesAt={
                                     new Date(snapshotCapturedAt).getTime() + snapshotStaleMs
                                   }
@@ -2683,6 +2689,8 @@ export default function Timeline() {
                                       soil?: number;
                                     };
                                     const snapTs = snapshotCapturedAt;
+                                    const hasFutureTimestamp =
+                                      classifySnapshotTimestamp(snapTs, nowMs) === "future";
                                     const snapAgeMs = snapTs
                                       ? nowMs - new Date(snapTs).getTime()
                                       : Number.POSITIVE_INFINITY;
@@ -2788,14 +2796,21 @@ export default function Timeline() {
                                           legacyDisplaySensor.soil != null && (
                                             <SnapChip>Soil {legacyDisplaySensor.soil}%</SnapChip>
                                           )}
-                                        {rawVpd != null && sourceBadge.canAssessStage && (
-                                          <span
-                                            className="text-[11px] text-muted-foreground"
-                                            data-testid="timeline-vpd-stage-hint"
-                                          >
-                                            {vpdClassification.label}
+                                        {hasFutureTimestamp && (
+                                          <span className="text-[11px] text-muted-foreground">
+                                            Future timestamp — freshness cannot be verified.
                                           </span>
                                         )}
+                                        {rawVpd != null &&
+                                          sourceBadge.canAssessStage &&
+                                          !hasFutureTimestamp && (
+                                            <span
+                                              className="text-[11px] text-muted-foreground"
+                                              data-testid="timeline-vpd-stage-hint"
+                                            >
+                                              {vpdClassification.label}
+                                            </span>
+                                          )}
                                       </div>
                                     );
                                   }}

@@ -1,3 +1,4 @@
+import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
 /**
  * Timeline inline snapshot — page-level idle aging (#1670, review finding F1670-1).
  *
@@ -367,6 +368,60 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
         buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor
           ?.canSupportCurrentContext,
       ).toBe(false);
+    },
+  );
+
+  it.each(["ts", "captured_at"])(
+    "does not assess a future-dated %s snapshot",
+    async (timestampField) => {
+      const row = {
+        ...MANUAL_SNAPSHOT_ROW,
+        details: {
+          source: "manual",
+          sensor_snapshot: {
+            source: "manual",
+            [timestampField]: new Date(NOW.getTime() + 60 * MIN).toISOString(),
+            temp: 24,
+            rh: 55,
+            vpd: 1.1,
+          },
+        },
+      };
+      harness.executeQuery.mockImplementation((spec) => ({
+        data: spec.table === "diary_entries" ? [row] : [],
+        error: null,
+      }));
+      expect(
+        buildTimelineEvidenceDetailViewModel(row, { nowMs: Date.now() })?.sensor
+          ?.canSupportCurrentContext,
+      ).toBe(false);
+      render(
+        <MemoryRouter initialEntries={["/timeline"]}>
+          <Timeline />
+        </MemoryRouter>,
+      );
+      const snapshot = await screen.findByTestId("timeline-manual-snapshot");
+      expect(screen.queryByTestId("timeline-vpd-stage-hint")).not.toBeInTheDocument();
+      expect(snapshot).toHaveTextContent("Future timestamp — freshness cannot be verified.");
+      expect(snapshot).toHaveTextContent("VPD 1.1");
+      const readsBeforeRecovery = diaryQueryCount();
+      await act(async () => {});
+      act(() =>
+        vi.advanceTimersByTime(NOW.getTime() + 60 * MIN - SENSOR_TRUTH_FUTURE_SKEW_MS - Date.now()),
+      );
+      expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(/^In Veg VPD range$/);
+      expect(snapshot).not.toHaveTextContent("Future timestamp");
+      act(() =>
+        vi.advanceTimersByTime(
+          NOW.getTime() + 60 * MIN + MANUAL_CURRENT_STATE_STALE_MS + 1 - Date.now(),
+        ),
+      );
+      expect(screen.getByTestId("timeline-vpd-stage-hint")).toHaveTextContent(
+        "historical, stale reading",
+      );
+      expect(diaryQueryCount()).toBe(readsBeforeRecovery);
+
+      expect(harness.update).not.toHaveBeenCalled();
     },
   );
 

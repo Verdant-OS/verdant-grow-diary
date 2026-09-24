@@ -11,6 +11,7 @@
  */
 import { usePlantMemoryEpisodes } from "@/hooks/usePlantMemoryEpisodes";
 import { PlantMemoryEpisodeCard } from "@/components/PlantMemoryEpisodeCard";
+import { Button } from "@/components/ui/button";
 
 export interface PlantMemoryEpisodesSectionProps {
   readonly growId: string | null | undefined;
@@ -24,6 +25,23 @@ export function PlantMemoryEpisodesSection({ growId, plantId }: PlantMemoryEpiso
     includeSensorEvidence: true,
   });
 
+  if (state.status === "loading")
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        Loading learning episodes…
+      </p>
+    );
+  if (state.status === "unavailable")
+    return (
+      <div className="space-y-2">
+        <p role="status" className="text-sm text-muted-foreground">
+          Learning episodes are unavailable right now.
+        </p>
+        <Button variant="outline" size="sm" onClick={reload}>
+          Retry learning episodes
+        </Button>
+      </div>
+    );
   if (state.status !== "ok" || state.episodes.length === 0) return null;
 
   return (

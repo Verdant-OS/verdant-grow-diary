@@ -2,10 +2,10 @@ import { QueryClient, QueryClientProvider, onlineManager } from "@tanstack/react
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
-  useActionResponseMemory,
-  type ActionResponseMemoryState,
-} from "@/hooks/useActionResponseMemory";
-import type { ActionResponseMemoryLoadResult } from "@/lib/actionResponseMemoryService";
+  usePlantMemoryEpisodes,
+  type PlantMemoryEpisodesState,
+} from "@/hooks/usePlantMemoryEpisodes";
+import type { PlantMemoryEpisodeLoad } from "@/lib/plantMemoryEpisodeService";
 import { notifyManualSensorCorrectionConfirmed } from "@/lib/manualSensorCorrectionEvents";
 
 const io = vi.hoisted(() => ({ owner: "owner-a" as string | null, load: vi.fn() }));
@@ -18,26 +18,31 @@ vi.mock("@/store/auth", () => {
     },
   };
 });
-vi.mock("@/lib/actionResponseMemoryService", () => ({ loadActionResponseMemories: io.load }));
-const loaded = (id: string): ActionResponseMemoryLoadResult => ({
+vi.mock("@/lib/plantMemoryEpisodeService", () => ({ loadPlantMemoryEpisodes: io.load }));
+const loaded = (id: string): PlantMemoryEpisodeLoad => ({
   status: "ok",
-  memories: [{ key: id } as never],
+  episodes: [{ episodeKey: id } as never],
 });
 function deferred() {
-  let resolve!: (value: ActionResponseMemoryLoadResult) => void;
-  const promise = new Promise<ActionResponseMemoryLoadResult>((r) => {
+  let resolve!: (value: PlantMemoryEpisodeLoad) => void;
+  const promise = new Promise<PlantMemoryEpisodeLoad>((r) => {
     resolve = r;
   });
   return { promise, resolve };
 }
 const clients: QueryClient[] = [];
-const frames: ActionResponseMemoryState[] = [];
+const frames: PlantMemoryEpisodesState[] = [];
 function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   clients.push(client);
   return renderHook(
-    ({ grow, plant }) => {
-      const result = useActionResponseMemory({ growId: grow, plantId: plant });
+    ({ grow, plant, action, sensors }) => {
+      const result = usePlantMemoryEpisodes({
+        growId: grow,
+        plantId: plant,
+        actionQueueId: action,
+        includeSensorEvidence: sensors,
+      });
       frames.push(result.state);
       return result;
     },
@@ -45,6 +50,8 @@ function mount() {
       initialProps: {
         grow: "grow-a",
         plant: "plant-a",
+        action: null as string | null,
+        sensors: true,
       },
       wrapper: ({ children }) => (
         <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -53,12 +60,32 @@ function mount() {
   );
 }
 beforeEach(() => {
-  io.owner = "owner-a";
   frames.length = 0;
+  io.owner = "owner-a";
   io.load.mockReset();
   io.load.mockResolvedValue(loaded("current"));
   onlineManager.setOnline(true);
 });
+
+it.each(["owner", "grow", "plant", "action", "sensors", "logout"] as const)(
+  "withholds old episodes on every render immediately after %s changes",
+  async (field) => {
+    const view = mount();
+    await waitFor(() => expect(view.result.current.state).toEqual(loaded("current")));
+    io.load.mockReturnValue(new Promise(() => {}));
+    frames.length = 0;
+    if (field === "owner") io.owner = "owner-b";
+    if (field === "logout") io.owner = null;
+    view.rerender({
+      grow: field === "grow" ? "grow-b" : "grow-a",
+      plant: field === "plant" ? "plant-b" : "plant-a",
+      action: field === "action" ? "action-b" : null,
+      sensors: field !== "sensors",
+    });
+    expect(frames.length).toBeGreaterThan(0);
+    expect(frames.every((frame) => frame.status !== "ok")).toBe(true);
+  },
+);
 afterEach(() => {
   cleanup();
   clients.splice(0).forEach((c) => c.clear());
@@ -83,13 +110,16 @@ it("keeps a pending read loading and passes explicit targeting", async () => {
     expect.objectContaining({
       growId: "grow-a",
       plantId: "plant-a",
+      actionQueueId: null,
+      includeSensorEvidence: true,
+      nowIso: expect.any(String),
     }),
   );
   await act(async () => first.resolve(loaded("current")));
   await waitFor(() => expect(result.current.state).toEqual(loaded("current")));
 });
 
-it.each(["grow", "plant"] as const)(
+it.each(["grow", "plant", "action"] as const)(
   "ignores a late response after the %s scope changes",
   async (field) => {
     const first = deferred();
@@ -98,6 +128,8 @@ it.each(["grow", "plant"] as const)(
     rerender({
       grow: "grow-a",
       plant: "plant-a",
+      action: null,
+      sensors: true,
       [field]: field + "-b",
     });
     await waitFor(() => expect(result.current.state).toEqual(loaded("current")));
@@ -111,7 +143,7 @@ it("ignores a late response after changing owner", async () => {
   io.load.mockReturnValueOnce(first.promise);
   const { result, rerender } = mount();
   io.owner = "owner-b";
-  rerender({ grow: "grow-a", plant: "plant-a" });
+  rerender({ grow: "grow-a", plant: "plant-a", action: null, sensors: true });
   await waitFor(() => expect(result.current.state).toEqual(loaded("current")));
   await act(async () => first.resolve(loaded("obsolete")));
   expect(result.current.state).toEqual(loaded("current"));
@@ -122,7 +154,7 @@ it("stays idle after logout even when the old read resolves", async () => {
   io.load.mockReturnValueOnce(first.promise);
   const { result, rerender } = mount();
   io.owner = null;
-  rerender({ grow: "grow-a", plant: "plant-a" });
+  rerender({ grow: "grow-a", plant: "plant-a", action: null, sensors: true });
   expect(result.current.state).toEqual({ status: "idle" });
   await act(async () => first.resolve(loaded("obsolete")));
   expect(result.current.state).toEqual({ status: "idle" });
@@ -131,7 +163,7 @@ it("stays idle after logout even when the old read resolves", async () => {
 });
 
 it("shows unavailable after a failed read and recovers by explicit reload", async () => {
-  io.load.mockResolvedValueOnce({ status: "failed", reason: "query_failed" });
+  io.load.mockResolvedValueOnce({ status: "error", message: "PRIVATE provider detail" });
   const { result } = mount();
   await waitFor(() => expect(result.current.state).toEqual({ status: "unavailable" }));
   act(() => result.current.reload());
@@ -139,7 +171,7 @@ it("shows unavailable after a failed read and recovers by explicit reload", asyn
   expect(io.load).toHaveBeenCalledTimes(2);
 });
 
-it("withholds cached memories while a reload is paused and recovers on reconnect", async () => {
+it("withholds cached episodes while a reload is paused and recovers on reconnect", async () => {
   const { result } = mount();
   await waitFor(() => expect(result.current.state).toEqual(loaded("current")));
   onlineManager.setOnline(false);
@@ -171,31 +203,36 @@ it("does not load while signed out", () => {
   expect(result.current.state).toEqual({ status: "idle" });
   expect(io.load).not.toHaveBeenCalled();
 });
-it("sanitizes a rejected load into unavailable", async () => {
-  io.load.mockRejectedValueOnce(new Error("PRIVATE"));
+
+it("sanitizes a thrown read without an unhandled rejection", async () => {
+  io.load.mockRejectedValueOnce(new Error("PRIVATE transport detail"));
   const { result } = mount();
   await waitFor(() => expect(result.current.state).toEqual({ status: "unavailable" }));
-});
-it("distinguishes a completed empty read", async () => {
-  io.load.mockResolvedValueOnce({ status: "ok", memories: [] });
-  const { result } = mount();
-  await waitFor(() => expect(result.current.state).toEqual({ status: "ok", memories: [] }));
+  expect(io.load).toHaveBeenCalledTimes(1);
 });
 
-it.each(["owner", "grow", "plant", "logout"] as const)(
-  "withholds old memories on every render immediately after %s changes",
-  async (field) => {
-    const view = mount();
-    await waitFor(() => expect(view.result.current.state).toEqual(loaded("current")));
-    io.load.mockReturnValue(new Promise(() => {}));
-    frames.length = 0;
-    if (field === "owner") io.owner = "owner-b";
-    if (field === "logout") io.owner = null;
-    view.rerender({
-      grow: field === "grow" ? "grow-b" : "grow-a",
-      plant: field === "plant" ? "plant-b" : "plant-a",
-    });
-    expect(frames.length).toBeGreaterThan(0);
-    expect(frames.every((frame) => frame.status !== "ok")).toBe(true);
-  },
-);
+it("withholds old episodes after a reload fails", async () => {
+  const { result } = mount();
+  await waitFor(() => expect(result.current.state).toEqual(loaded("current")));
+  io.load.mockResolvedValue({ status: "error", message: "PRIVATE provider detail" });
+  act(() => result.current.reload());
+  await waitFor(() => expect(result.current.state).toEqual({ status: "unavailable" }));
+});
+
+it("does not query or reload without a grow", () => {
+  const { result, rerender } = mount();
+  rerender({ grow: "", plant: "plant-a", action: null, sensors: true });
+  expect(result.current.state).toEqual({ status: "idle" });
+  const before = io.load.mock.calls.length;
+  act(() => result.current.reload());
+  expect(io.load).toHaveBeenCalledTimes(before);
+});
+
+it("does not refresh the lightweight lane for sensor corrections", async () => {
+  const { result, rerender } = mount();
+  rerender({ grow: "grow-a", plant: "plant-a", action: null, sensors: false });
+  await waitFor(() => expect(result.current.state).toEqual(loaded("current")));
+  const before = io.load.mock.calls.length;
+  act(() => notifyManualSensorCorrectionConfirmed("owner-a", "tent-a"));
+  expect(io.load).toHaveBeenCalledTimes(before);
+});

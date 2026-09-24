@@ -335,8 +335,8 @@ stamped SHA, over the root-level `src/lib/*Rules.ts` glob:
 | import the Supabase client at runtime                         |     0 | —                                                                  |
 | type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts` |
 
-The clock and randomness files are legacy, not precedent. Do not cite them, and do not extend the
-pattern. The one file added since `32820526` is `src/lib/plantSensorSourceHistoryRules.ts`
+The clock, randomness and type-import files are legacy, not precedent. Do not cite them, and do not
+extend the pattern. The one file added since `32820526` is `src/lib/plantSensorSourceHistoryRules.ts`
 (#1663), which calls neither `Date.now()` nor `Math.random()` and imports neither React nor
 Supabase.
 
@@ -345,11 +345,13 @@ did.** Every earlier version of this clause counted the two files as importing S
 #1626 the table has said they "import the Supabase client". They import only a generated row type:
 `src/lib/sensorIngestNormalizationRules.ts:17` (`import type { TablesInsert }`) and
 `src/lib/sensorWebhookIngestRules.ts:19` (`import type { TablesInsert }`). Both lines were the same
-at the first stamp. An `import type` is erased at compile time and performs no I/O, so these files
-do not break the runtime purity this clause protects (`inference`). Whether new rules modules
-should depend on generated row types at all is a design preference this contract does not settle.
-`CLAUDE.md` ("Two `*Rules.ts` import Supabase") still repeats the overstatement; correcting it is
-deferred (§13).
+at the first stamp. An `import type` is erased at compile time, so neither file performs Supabase
+I/O (`inference`). **The rule is unchanged.** Its "no Supabase" does not distinguish a type import
+from a runtime one, so the two files stay recorded as layering drift, at the type level only: they
+depend on generated row types, not on the client. Narrowing the rule to "no Supabase client or I/O"
+would change the clause, and that belongs to its own slice. `CLAUDE.md` ("Two `*Rules.ts` import
+Supabase") still says "import Supabase" without the type-only qualifier; correcting it is deferred
+(§13).
 _Source:_ `AGENTS.md`; counts measured by `ls` and `grep -l` at the stamped SHA, the import rows
 over `from "@/integrations/supabase/client"`, `from "@supabase/supabase-js"` and
 `from "@/integrations/supabase/types"`. The narrative drift inventory is in `CLAUDE.md`.

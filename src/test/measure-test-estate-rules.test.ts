@@ -40,6 +40,7 @@ import {
   runtimeImportSpecifiers,
   stripDisabledBlocks,
   stripJsComments,
+  stripShellComment,
   stripTriggerBlock,
   testFileReach,
   testFileRuntimeSpecifiers,
@@ -1176,5 +1177,40 @@ describe("a comment opens at any word start, not only after whitespace (CodeRabb
     expect(paths.has("e2e/escaped-space.spec.ts")).toBe(true);
     expect(paths.has("e2e/escaped-semicolon.spec.ts")).toBe(true);
     expect(paths.has("e2e/after-quote.spec.ts")).toBe(true);
+  });
+});
+
+describe("ANSI-C $' quoting: a backslash escapes the next character (Cheek, #1221 round 12)", () => {
+  // Round 11 treated every `'` as POSIX single quotes, where backslash is
+  // literal. Bash `$'…'` is ANSI-C quoting: `\'` is an escaped quote, not a
+  // closer. The word below is $'\'' — one literal `'`. `echo $'\'' # bunx …`
+  // therefore runs nothing after the `#` (`bash -c` prints `'` and stops),
+  // but stripShellComment closed at `\'`, opened a new quote at the final `'`,
+  // and returned the line unchanged — the same fail-open as rounds 10 and 11.
+  // `$"…"` already falls into double-quote mode. Every case was run through
+  // `bash -c` before it was pinned.
+  const ansiCQuote = "$'" + "\\'" + "'"; // $'\''
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - run: |",
+    `          echo ${ansiCQuote} # bunx playwright test e2e/ansi-c-quote.spec.ts`,
+    "          echo $'#' && bunx playwright test e2e/ansi-c-hash.spec.ts",
+    '          echo $"#" && bunx playwright test e2e/dollar-double.spec.ts',
+    `      - run: echo ${ansiCQuote} # bunx playwright test e2e/ansi-c-single-line.spec.ts`,
+    "",
+  ].join("\n");
+  const paths = namedPathsIn(buildExecutableCorpus({ workflowTexts: [y] }));
+
+  it("drops a comment after an ANSI-C word whose closer is escaped", () => {
+    expect(stripShellComment(`echo ${ansiCQuote} # echo DEAD`)).toBe(`echo ${ansiCQuote}`);
+    expect(paths.has("e2e/ansi-c-quote.spec.ts")).toBe(false);
+    expect(paths.has("e2e/ansi-c-single-line.spec.ts")).toBe(false);
+  });
+
+  it("keeps a `#` inside $'…' or $\"…\" (FENCE)", () => {
+    expect(paths.has("e2e/ansi-c-hash.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dollar-double.spec.ts")).toBe(true);
   });
 });

@@ -909,7 +909,12 @@ const SHELL_METACHARACTER = /[\s|&;()<>]/;
  * `echo ok;# bunx …` is a comment after the `;` (CodeRabbit, #1221 round 11: round
  * 10 checked for whitespace alone). Escaped and quoted characters continue the
  * word, so `echo "#"`, `echo '#'`, `\#`, `a\ #`, `a\;#`, `"a"#`, `${#ARR[@]}` and
- * `$#` all survive. Pure; null-safe.
+ * `$#` all survive.
+ *
+ * `$'…'` is ANSI-C quoting: a backslash escapes the next character, so `$'\''`
+ * is one word (a literal `'`) and a `#` after it opens a comment (Cheek, #1221
+ * round 12). POSIX `'…'` still treats backslash as literal. `$"…"` already
+ * falls into double-quote mode. Pure; null-safe.
  */
 export function stripShellComment(line) {
   const s = String(line ?? "");
@@ -928,6 +933,16 @@ export function stripShellComment(line) {
     }
     if (quote === '"') {
       if (c === '"') quote = null;
+      continue;
+    }
+    if (quote === "$'") {
+      if (c === "'") quote = null;
+      continue;
+    }
+    if (c === "$" && s[i + 1] === "'") {
+      quote = "$'";
+      i += 1;
+      wordStart = false;
       continue;
     }
     if (c === "'" || c === '"') {

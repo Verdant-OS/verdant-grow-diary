@@ -28,6 +28,10 @@
  *              round 9.
  *   inlineMethod  the same with the text method chained onto a read wrapped
  *              across lines, `readFileSync(\n resolve(…),\n "utf8",\n).includes(…)`.
+ *   dollarMethod  the `bypass` shape through a `$`-prefixed binding and a text
+ *              method, `$PKG.includes(…)`. The method branch opened with `\b`, which
+ *              cannot match before `$`, so only `expect($PKG)` was caught —
+ *              CodeRabbit, #1221 round 10.
  *   inlineResolvedFence  a compliant guard whose parse sits INSIDE a text method:
  *              `Object.keys(JSON.parse(readFileSync(…)).scripts).includes(…)`. A
  *              statement-bounded regex crosses the read's closing parenthesis and
@@ -94,6 +98,16 @@ const UNRELATED = JSON.parse('{"a":1}');
 it("x", () => {
   expect(UNRELATED.a).toBe(1);
   expect(PACKAGE).toContain('"test:x"');
+});
+`,
+  dollarMethod: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const $PKG = readFileSync("package.json", "utf8");
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect($PKG.includes('"test:x"')).toBe(true);
 });
 `,
   inline: `
@@ -198,6 +212,12 @@ describe("check-contract-test-resolution — package.json guards must assert on 
   it("accepts a resolved guard whose read is wrapped across lines — the widening adds no false positive", () => {
     const { status, out } = runChecker("multilineResolved");
     expect(status, out).toBe(0);
+  });
+
+  it("rejects a text method on a `$`-prefixed binding (CodeRabbit, #1221 round 10)", () => {
+    const { status, out } = runChecker("dollarMethod");
+    expect(status, out).toBe(1);
+    expect(out).toContain("$PKG");
   });
 
   it("rejects an unbound read consumed directly by expect() (Codex, #1221 round 9)", () => {

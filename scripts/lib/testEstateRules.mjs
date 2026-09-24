@@ -850,7 +850,8 @@ export function commandLinesIn(workflowText) {
     if (!m) continue;
     const indent = m[1].length;
     const style = m[2] ?? "";
-    if (m[3] && m[3].trim()) out.push(m[3]);
+    const inline = stripShellComment(m[3] ?? "");
+    if (inline.trim()) out.push(inline);
     if (!style) continue; // single-line run:, no block to consume
 
     const block = [];
@@ -875,16 +876,58 @@ export function commandLinesIn(workflowText) {
       //     e2e/core-link-form-census.spec.ts
       // read as never-run despite CI executing it every time. A blank line in
       // a folded scalar is a paragraph break, so it separates commands.
+      // The shell sees each paragraph as ONE line, so a `#` anywhere in it
+      // comments out everything after it, later YAML lines included.
       for (const para of splitOnBlank(block)) {
-        out.push(para.map((l) => l.trim()).join(" "));
+        out.push(stripShellComment(para.map((l) => l.trim()).join(" ")));
       }
     } else {
       // YAML LITERAL scalar: newlines are preserved, each line is its own
-      // shell line. Backslash continuations still join.
-      out.push(...foldContinuations(block));
+      // shell line. Backslash continuations still join. Comments are stripped
+      // per raw line FIRST: a comment runs to its newline, so a `\` inside one
+      // continues nothing.
+      out.push(...foldContinuations(block.map(stripShellComment)));
     }
   }
   return out.filter((l) => isCommandLine(l));
+}
+
+/**
+ * A shell line with its comment removed.
+ *
+ * A `run:` body is shell, and `# bunx playwright test e2e/x.spec.ts` in it runs
+ * nothing — but `isCommandLine` saw the `bunx` token and the path read as
+ * executed (CodeRabbit, #1221 round 10): R4-B's comment-out defeat, still open
+ * in the workflow itself after it was closed for runner bodies.
+ *
+ * `#` opens a comment only as the first character of a word — at line start or
+ * after whitespace — and outside quotes, as in POSIX token recognition. So
+ * `echo "#"`, `echo '#'`, `\#`, `${#ARR[@]}` and `$#` all survive. Pure; null-safe.
+ */
+export function stripShellComment(line) {
+  const s = String(line ?? "");
+  let quote = null;
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s[i];
+    if (quote === "'") {
+      if (c === "'") quote = null;
+      continue;
+    }
+    if (c === "\\") {
+      i += 1;
+      continue;
+    }
+    if (quote === '"') {
+      if (c === '"') quote = null;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      quote = c;
+      continue;
+    }
+    if (c === "#" && (i === 0 || /\s/.test(s[i - 1]))) return s.slice(0, i).trimEnd();
+  }
+  return s;
 }
 
 function splitOnBlank(block) {

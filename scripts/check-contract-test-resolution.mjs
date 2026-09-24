@@ -126,10 +126,14 @@ const PACKAGE_READ_BINDINGS = (source, config) => {
   for (const m of source.matchAll(viaConst)) ids.add(m[1]);
   return [...ids];
 };
+// Identifier boundaries are lookarounds, not `\b`: `$` is not a `\w` character, so
+// `\b$PKG` never matches after a space or `(`, and `$PKG.includes(…)` got through
+// while `expect($PKG)` was caught (CodeRabbit, #1221 round 10). The lookbehind also
+// keeps `a$PKG.includes` from reading as `$PKG`.
 const ASSERTS_ON_BINDING = (source, id) => {
   const e = escapeRegExp(id);
   return new RegExp(
-    `expect\\(\\s*${e}\\s*\\)|\\b${e}\\.(?:includes|match|indexOf|search|startsWith|endsWith)\\s*\\(`,
+    `expect\\(\\s*${e}\\s*\\)|(?<![\\w$])${e}\\s*\\.(?:includes|match|indexOf|search|startsWith|endsWith)\\s*\\(`,
   ).test(source);
 };
 

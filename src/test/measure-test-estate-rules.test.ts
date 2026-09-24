@@ -1098,3 +1098,42 @@ describe("statically disabled steps and jobs are not execution evidence (Codex, 
     expect(stripDisabledBlocks("")).toBe("");
   });
 });
+
+describe("shell comments in run: blocks are not execution evidence (CodeRabbit, #1221 round 10)", () => {
+  // A `run:` body is shell. `# bunx playwright test e2e/x.spec.ts` inside it runs
+  // nothing, yet `isCommandLine` saw the `bunx` token and `namedPathsIn` recorded the
+  // path — the comment-out defeat R4-B closed for runner bodies, still open one level
+  // up in the workflow itself. `#` opens a comment only at the start of a word and
+  // outside quotes, so quoted and parameter-expansion `#` must survive.
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - run: |",
+    "          # bunx playwright test e2e/whole-line.spec.ts",
+    "          echo ok # bunx playwright test e2e/trailing.spec.ts",
+    "          bunx playwright test e2e/live.spec.ts # a note after a real command",
+    '          echo "#" && bunx playwright test e2e/quoted.spec.ts',
+    "          echo ${#ARR[@]} && bunx playwright test e2e/param.spec.ts",
+    "      - run: echo one-liner # bunx playwright test e2e/single-line.spec.ts",
+    "      - run: >-",
+    "          bunx playwright test e2e/folded-live.spec.ts",
+    "          # e2e/folded-dead.spec.ts",
+    "",
+  ].join("\n");
+  const paths = namedPathsIn(buildExecutableCorpus({ workflowTexts: [y] }));
+
+  it("drops a whole-line, a trailing, a single-line and a folded comment", () => {
+    expect(paths.has("e2e/whole-line.spec.ts")).toBe(false);
+    expect(paths.has("e2e/trailing.spec.ts")).toBe(false);
+    expect(paths.has("e2e/single-line.spec.ts")).toBe(false);
+    expect(paths.has("e2e/folded-dead.spec.ts")).toBe(false);
+  });
+
+  it("keeps the command before a comment, a quoted `#`, and `${#…}` (FENCE)", () => {
+    expect(paths.has("e2e/live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/quoted.spec.ts")).toBe(true);
+    expect(paths.has("e2e/param.spec.ts")).toBe(true);
+    expect(paths.has("e2e/folded-live.spec.ts")).toBe(true);
+  });
+});

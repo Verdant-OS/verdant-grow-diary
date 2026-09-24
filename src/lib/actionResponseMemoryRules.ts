@@ -140,6 +140,7 @@ export interface ActionResponseSensorRowInput {
   readonly id: string;
   readonly tent_id?: string | null;
   readonly source?: string | null;
+  readonly quality?: string | null;
   readonly captured_at?: string | null;
   /** Opaque provenance envelope used only to prevent diagnostic promotion. */
   readonly raw_payload?: unknown;
@@ -230,6 +231,8 @@ function classifySensorTrust(row: ActionResponseSensorRowInput): ActionResponseS
   // provenance fence distinguishes Windows diagnostics from physical gateway
   // packets. Diagnostic evidence stays demo-backed historical context.
   if (isDiagnosticSensorProvenanceRow(row)) return "demo";
+  const quality = typeof row.quality === "string" ? row.quality.trim().toLowerCase() : "";
+  if (quality === "invalid" || quality === "stale") return quality;
   const raw = typeof row.source === "string" ? row.source.trim().toLowerCase() : "";
   if (raw.length === 0) return "invalid";
   const normalized = normalizeSensorSource(raw);
@@ -380,7 +383,8 @@ export function buildActionResponseMemories(
       };
     } else {
       const row = sensorsById.get(sensorSnapshotId);
-      if (!row) {
+      const evidenceTentId = primary.row.tent_id || action.tent_id;
+      if (!row || !evidenceTentId || row.tent_id !== evidenceTentId) {
         sensor = {
           state: "unavailable",
           snapshotId: sensorSnapshotId,

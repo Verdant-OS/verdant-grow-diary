@@ -2416,10 +2416,15 @@ export default function Timeline() {
                             Record<string, unknown> | undefined;
                           const rawSource =
                             typeof sensor?.source === "string" ? sensor.source : null;
-                          // Match the persisted snapshot's manual fallback; explicit
-                          // unknown/invalid provenance keeps the strict canonical window.
+                          // Resolve freshness from the same provenance as the badge,
+                          // including manual aliases and its missing-source fallback.
+                          // Persisted live claims and unknown sources stay invalid.
                           const snapshotStaleMs = resolveCurrentStateStaleWindowMs(
-                            rawSource ?? "manual",
+                            classifyTimelineSensorSource({
+                              rawSource,
+                              fallback: "manual",
+                              context: "persisted_snapshot",
+                            }).kind,
                           );
                           const usesManualCompatSensor =
                             canonicalSensor == null &&

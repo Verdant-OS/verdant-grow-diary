@@ -260,7 +260,7 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
     expect(harness.upsert).not.toHaveBeenCalled();
   });
 
-  it.each(["manual", undefined])(
+  it.each(["manual", "user", "entry", "log", "", undefined])(
     "keeps %s snapshots current past the live window",
     async (source) => {
       const ts = new Date(NOW.getTime() - 16 * MIN).toISOString();

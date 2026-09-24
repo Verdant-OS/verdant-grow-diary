@@ -15,9 +15,9 @@ reproduced counts and that run are therefore `established fact` at this stamp, a
 provenance chain for them (`ef15b2c1` → `32820526` → `ea50ec67` → `8b73c140` / `387a0006`) is
 superseded rather than carried. Two kinds of statement were **not** re-derived and keep the labels
 and dates they carry: dated runtime results recorded with their own runtime (AC-1.4's bare-specifier
-build), and history about which PR introduced a behaviour. Between `ef15b2c1` and this tip, only
-this file and `docs/agents/CURRENT_STATE.md` changed. First verified at
-`7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
+build), and history about which PR introduced a behaviour. Between `ef15b2c1` and the stamped tip
+`69aca5e7`, the deploy branch changed only this file and `docs/agents/CURRENT_STATE.md`. First
+verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
 **Carries no `Sentinel-Version`.** This is not one of the twelve governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
 

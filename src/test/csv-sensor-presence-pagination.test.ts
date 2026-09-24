@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  collectCandidateCsvSensorPresenceKeys,
   collectCsvSensorPresenceKeys,
   CSV_PRESENCE_PAGE_SIZE,
+  CSV_PRESENCE_TIMESTAMP_BATCH_SIZE,
 } from "@/lib/csvSensorPresenceService";
 import {
   dedupeKeyOf,
@@ -14,6 +16,77 @@ const history = Array.from({ length: 10000 }, (_, index) => ({
   metric: "temperature_c",
   captured_at: new Date(Date.parse("2026-01-01T00:00:00Z") + index * 60000).toISOString(),
 }));
+
+describe("CSV candidate timestamp lookup", () => {
+  it("reads only sparse candidate timestamps while honoring smaller server pages", async () => {
+    const candidates = [history[1000], history[5000], history[9000]];
+    const timestamps = candidates.map((row) => row.captured_at);
+    const readPage = vi.fn(async (batch: readonly string[], from: number) =>
+      history.filter((row) => batch.includes(row.captured_at)).slice(from, from + 2),
+    );
+    expect(await collectCandidateCsvSensorPresenceKeys(timestamps, readPage, () => true)).toEqual(
+      new Set(candidates.map((row) => dedupeKeyOf(row)!)),
+    );
+    expect(readPage.mock.calls.map((call) => call[1])).toEqual([0, 2, 3]);
+    for (const [batch] of readPage.mock.calls) expect(batch).toEqual(timestamps);
+  });
+
+  it("bounds timestamp batches and normalizes equivalent timestamps without mutating input", async () => {
+    const rows = history.slice(0, CSV_PRESENCE_TIMESTAMP_BATCH_SIZE * 2 + 3);
+    const input = [
+      ...rows.map((row) => row.captured_at).reverse(),
+      "2026-01-01T01:00:00+01:00",
+      null,
+      undefined,
+      "invalid",
+    ];
+    const original = [...input];
+    const readPage = vi.fn(async (batch: readonly string[], from: number, to: number) =>
+      rows.filter((row) => batch.includes(row.captured_at)).slice(from, to + 1),
+    );
+    expect(await collectCandidateCsvSensorPresenceKeys(input, readPage, () => true)).toEqual(
+      new Set(rows.map((row) => dedupeKeyOf(row)!)),
+    );
+    const firstPages = readPage.mock.calls.filter((call) => call[1] === 0);
+    expect(firstPages.map((call) => call[0].length)).toEqual([25, 25, 3]);
+    expect(firstPages.flatMap((call) => [...call[0]])).toEqual(rows.map((row) => row.captured_at));
+    expect(readPage).toHaveBeenCalledTimes(6);
+    expect(input).toEqual(original);
+  });
+
+  it("discards completed batches if ownership changes during a later timestamp batch", async () => {
+    const rows = history.slice(0, CSV_PRESENCE_TIMESTAMP_BATCH_SIZE + 1);
+    let active = true;
+    const readPage = vi.fn(async (batch: readonly string[], from: number, to: number) => {
+      if (batch.includes(rows.at(-1)!.captured_at)) active = false;
+      return rows.filter((row) => batch.includes(row.captured_at)).slice(from, to + 1);
+    });
+    expect(
+      await collectCandidateCsvSensorPresenceKeys(
+        rows.map((row) => row.captured_at),
+        readPage,
+        () => active,
+      ),
+    ).toEqual(new Set());
+    expect(readPage).toHaveBeenCalledTimes(3);
+  });
+
+  it("propagates a later timestamp-batch failure without returning earlier keys", async () => {
+    const rows = history.slice(0, CSV_PRESENCE_TIMESTAMP_BATCH_SIZE + 1);
+    const failure = new Error("second timestamp batch failed");
+    const readPage = vi.fn(async (batch: readonly string[], from: number, to: number) => {
+      if (batch.includes(rows.at(-1)!.captured_at)) throw failure;
+      return rows.filter((row) => batch.includes(row.captured_at)).slice(from, to + 1);
+    });
+    await expect(
+      collectCandidateCsvSensorPresenceKeys(
+        rows.map((row) => row.captured_at),
+        readPage,
+        () => true,
+      ),
+    ).rejects.toBe(failure);
+  });
+});
 
 describe("CSV presence pagination", () => {
   it("reconciles sparse duplicates beyond the first server page without writes", async () => {

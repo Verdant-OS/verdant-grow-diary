@@ -36,7 +36,7 @@ import {
   type DedupeKeyParts,
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
-import { collectCsvSensorPresenceKeys } from "@/lib/csvSensorPresenceService";
+import { collectCandidateCsvSensorPresenceKeys } from "@/lib/csvSensorPresenceService";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 import { tentDetailPath } from "@/lib/routes";
 import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
@@ -58,7 +58,11 @@ export interface EnvironmentCsvImportLauncherProps {
 
 const DEFAULT_LABEL = "Import historical data";
 
-function makeInsertClient(canContinue: () => boolean): InsertClient {
+function makeInsertClient(
+  canContinue: () => boolean,
+  rows: readonly ParsedEnvironmentRow[],
+): InsertClient {
+  const capturedAts = rows.map((row) => row.captured_at);
   return {
     async insertSensorReadings(rows: SensorReadingInsert[]) {
       if (!canContinue()) {
@@ -81,23 +85,28 @@ function makeInsertClient(canContinue: () => boolean): InsertClient {
     async fetchExistingSensorReadingKeys(scope: ExistingKeysQueryScope) {
       if (!canContinue()) return new Set<string>();
       try {
-        return await collectCsvSensorPresenceKeys(async (from, to) => {
-          const { data, error } = await supabase
-            .from("sensor_readings")
-            .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE)
-            .in("tent_id", scope.tentIds)
-            .in("source", scope.sources)
-            .in("metric", scope.metrics)
-            .gte("captured_at", scope.minCapturedAt)
-            .lte("captured_at", scope.maxCapturedAt)
-            .order("tent_id")
-            .order("source")
-            .order("metric")
-            .order("captured_at")
-            .range(from, to);
-          if (error || !data) throw new Error("CSV presence lookup unavailable");
-          return data as unknown as DedupeKeyParts[];
-        }, canContinue);
+        return await collectCandidateCsvSensorPresenceKeys(
+          capturedAts,
+          async (timestamps, from, to) => {
+            const { data, error } = await supabase
+              .from("sensor_readings")
+              .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE)
+              .in("tent_id", scope.tentIds)
+              .in("source", scope.sources)
+              .in("metric", scope.metrics)
+              .in("captured_at", timestamps)
+              .gte("captured_at", scope.minCapturedAt)
+              .lte("captured_at", scope.maxCapturedAt)
+              .order("tent_id")
+              .order("source")
+              .order("metric")
+              .order("captured_at")
+              .range(from, to);
+            if (error || !data) throw new Error("CSV presence lookup unavailable");
+            return data as unknown as DedupeKeyParts[];
+          },
+          canContinue,
+        );
       } catch {
         return new Set<string>();
       }
@@ -202,7 +211,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
           error: "Missing grow or tent context.",
         };
       }
-      const client = makeInsertClient(canContinue);
+      const client = makeInsertClient(canContinue, rows);
       const res = await persistCsvEnvironmentRows(rows, importSession.scope, client);
       // An account switch ends the operation's UI ownership even if its request settles later.
       if (!canContinue()) {

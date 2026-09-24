@@ -20,6 +20,8 @@ let insertError: { message: string; code?: string; details?: string } | null = n
 let insertFailureCall: number | null = null;
 let authUserId = "u-1";
 let existingRows: Array<Record<string, unknown>> = [];
+let lookupPageCap = 1000;
+let lookupCalls: Array<{ timestamps: string[] | null; order: string[] }> = [];
 let insertOverride: ((rows: unknown[]) => Promise<{ error: typeof insertError }>) | null = null;
 let lookupOverride:
   | (() => Promise<{
@@ -33,6 +35,8 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => {
         let tentIds: string[] = [];
+        let timestamps: string[] | null = null;
+        const order: string[] = [];
         let from = 0;
         let to = Infinity;
         let minCapturedAt = "";
@@ -40,6 +44,7 @@ vi.mock("@/integrations/supabase/client", () => ({
         const chain: Record<string, unknown> = {
           in: (key: string, values: string[]) => {
             if (key === "tent_id") tentIds = values;
+            if (key === "captured_at") timestamps = values;
             return chain;
           },
           gte: (_key: string, value: string) => {
@@ -50,7 +55,10 @@ vi.mock("@/integrations/supabase/client", () => ({
             maxCapturedAt = value;
             return chain;
           },
-          order: () => chain,
+          order: (key: string) => {
+            order.push(key);
+            return chain;
+          },
           range: (start: number, end: number) => {
             from = start;
             to = end;
@@ -61,18 +69,21 @@ vi.mock("@/integrations/supabase/client", () => ({
               data: Array<Record<string, unknown>> | null;
               error: { message: string } | null;
             }) => unknown,
-          ) =>
-            (lookupOverride
-              ? lookupOverride()
-              : Promise.resolve({
-                  data: existingRows.filter(
-                    (r) =>
-                      tentIds.includes(String(r.tent_id)) &&
-                      String(r.captured_at) >= minCapturedAt &&
-                      String(r.captured_at) <= maxCapturedAt,
-                  ),
-                  error: null,
-                })
+          ) => {
+            lookupCalls.push({ timestamps, order: [...order] });
+            return (
+              lookupOverride
+                ? lookupOverride()
+                : Promise.resolve({
+                    data: existingRows.filter(
+                      (r) =>
+                        tentIds.includes(String(r.tent_id)) &&
+                        (timestamps === null || timestamps.includes(String(r.captured_at))) &&
+                        String(r.captured_at) >= minCapturedAt &&
+                        String(r.captured_at) <= maxCapturedAt,
+                    ),
+                    error: null,
+                  })
             ).then((result) => {
               if (result.error || !result.data) {
                 resolve(result);
@@ -80,9 +91,18 @@ vi.mock("@/integrations/supabase/client", () => ({
               }
               resolve({
                 ...result,
-                data: result.data.slice(from, Math.min(to + 1, from + 1000)),
+                data: [...result.data]
+                  .sort((a, b) => {
+                    for (const key of order) {
+                      const comparison = String(a[key]).localeCompare(String(b[key]));
+                      if (comparison) return comparison;
+                    }
+                    return 0;
+                  })
+                  .slice(from, Math.min(to + 1, from + lookupPageCap)),
               });
-            }),
+            });
+          },
         };
         return chain;
       },
@@ -119,6 +139,8 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     insertFailureCall = null;
     authUserId = "u-1";
     existingRows = [];
+    lookupPageCap = 1000;
+    lookupCalls = [];
     insertOverride = null;
     lookupOverride = null;
   });
@@ -237,6 +259,9 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
       metric: "temperature_c",
       captured_at: new Date(start + index * 60000).toISOString(),
     }));
+    const timestamps = [1000, 5000, 9000].map((index) => String(existingRows[index].captured_at));
+    existingRows.reverse();
+    lookupPageCap = 125;
     insertError = {
       code: "23505",
       message: 'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
@@ -244,8 +269,7 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
     fireEvent.click(screen.getByTestId("x-button"));
     const csv =
-      "Timestamp,Temperature (C)\n" +
-      [1000, 5000, 9000].map((index) => `${existingRows[index].captured_at},20`).join("\n");
+      "Timestamp,Temperature (C)\n" + timestamps.map((timestamp) => `${timestamp},20`).join("\n");
     fireEvent.change(screen.getByTestId("csv-import-file-input"), {
       target: { files: [new File([csv], "sparse.csv", { type: "text/csv" })] },
     });
@@ -254,6 +278,11 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     await waitFor(() => expect(screen.getByTestId("csv-import-done")).toBeTruthy());
     expect(insertSpy).not.toHaveBeenCalled();
     expect(trackFunnelEvent).toHaveBeenCalledWith("csv_import_completed", { rows: 0 });
+    expect(lookupCalls).toHaveLength(2);
+    for (const call of lookupCalls) {
+      expect(call.timestamps).toEqual(timestamps);
+      expect(call.order).toEqual(["tent_id", "source", "metric", "captured_at"]);
+    }
   });
 
   it("Cancel does not insert (test 8)", async () => {

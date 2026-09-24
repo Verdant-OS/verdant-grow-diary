@@ -127,7 +127,22 @@ export default function Plants() {
   const workspacePlantsQuery = useGrowPlants(undefined, undefined);
   const tentsQuery = useGrowTents(urlGrowId ?? undefined);
   const diaryQuery = useDiaryEntries();
-  const sensorReadingsQuery = useSensorReadings(undefined, 500);
+  // Sensor evidence is read per tent in scope, never as one unscoped
+  // all-tents read (that read hit the Postgres statement timeout). Scope is
+  // unresolved (pending) until both the plants and tents reads have data.
+  const scopePlants = selectCurrentPlantsQueryData(allPlantsQuery);
+  const scopeTents = selectCurrentPlantsQueryData(tentsQuery);
+  const sensorReadingsQuery = useSensorReadings(
+    {
+      tentIds:
+        scopePlants && scopeTents
+          ? [...scopePlants.map((plant) => plant.tentId), ...scopeTents.map((tent) => tent.id)]
+          : null,
+      scopeError: allPlantsQuery.isError || tentsQuery.isError,
+      retryScope: () => Promise.all([allPlantsQuery.refetch(), tentsQuery.refetch()]),
+    },
+    500,
+  );
   const activePlants = selectCurrentPlantsQueryData(activePlantsQuery) ?? EMPTY_QUERY_ROWS;
   const allPlants = selectCurrentPlantsQueryData(allPlantsQuery) ?? EMPTY_QUERY_ROWS;
   const allGrowsActivePlants =

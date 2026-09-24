@@ -151,7 +151,13 @@ export default function Dashboard() {
   const plantsQuery = useGrowPlants(undefined, scopedGrowId);
   const { data: tents = [] } = tentsQuery;
   const { data: plants = [] } = plantsQuery;
-  const dashboardReadingsQuery = useSensorReadings();
+  // Per-tent windows over this scope's tents; never the unscoped all-tents
+  // read, which hit the Postgres statement timeout (QA 2026-09-24).
+  const dashboardReadingsQuery = useSensorReadings({
+    tentIds: tentsQuery.data ? tentsQuery.data.map((tent) => tent.id) : null,
+    scopeError: tentsQuery.isError,
+    retryScope: tentsQuery.refetch,
+  });
   const { data: rawReadings = [] } = dashboardReadingsQuery;
   // Diagnostic packets may be stored with a canonical `live` source. Keep
   // raw provenance only through this shared fence; charts/counts receive the

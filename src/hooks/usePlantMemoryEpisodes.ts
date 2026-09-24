@@ -7,9 +7,12 @@
  *  - User-scoped via RLS; never mutates action_queue / alerts / diary.
  *  - Single `now` captured per load and injected into the pure rules.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { EFFECTIVE_SENSOR_QUERY_VERSION } from "@/lib/effectiveSensorReadings";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { useAuth } from "@/store/auth";
-import { loadPlantMemoryEpisodes, type LoadEpisodesArgs } from "@/lib/plantMemoryEpisodeService";
+import { loadPlantMemoryEpisodes } from "@/lib/plantMemoryEpisodeService";
 import type { PlantMemoryEpisode } from "@/lib/plantMemoryEpisodeRules";
 
 export type PlantMemoryEpisodesState =
@@ -30,33 +33,49 @@ export function usePlantMemoryEpisodes(args: UsePlantMemoryEpisodesArgs): {
   reload: () => void;
 } {
   const { user } = useAuth();
-  const [state, setState] = useState<PlantMemoryEpisodesState>({ status: "idle" });
-  const { growId, plantId, actionQueueId, includeSensorEvidence } = args;
-
-  const load = useCallback(async () => {
-    if (!user || !growId) {
-      setState({ status: "idle" });
-      return;
-    }
-    setState({ status: "loading" });
-    const loadArgs: LoadEpisodesArgs = {
-      growId,
-      plantId: plantId ?? null,
-      actionQueueId: actionQueueId ?? null,
-      includeSensorEvidence: includeSensorEvidence ?? false,
-      nowIso: new Date().toISOString(),
-    };
-    const result = await loadPlantMemoryEpisodes(loadArgs);
-    if (result.status === "error") {
-      setState({ status: "unavailable" });
-      return;
-    }
-    setState({ status: "ok", episodes: result.episodes });
-  }, [user, growId, plantId, actionQueueId, includeSensorEvidence]);
-
+  const { growId, plantId, actionQueueId, includeSensorEvidence = false } = args;
+  const ownerId = user?.id ?? null;
+  const enabled = !!ownerId && !!growId;
+  const query = useQuery({
+    queryKey: [
+      "plant-memory-episodes",
+      ownerId,
+      growId ?? null,
+      plantId ?? null,
+      actionQueueId ?? null,
+      includeSensorEvidence,
+      EFFECTIVE_SENSOR_QUERY_VERSION,
+    ],
+    enabled,
+    retry: false,
+    queryFn: async () => {
+      const result = await loadPlantMemoryEpisodes({
+        growId: growId!,
+        plantId: plantId ?? null,
+        actionQueueId: actionQueueId ?? null,
+        includeSensorEvidence,
+        nowIso: new Date().toISOString(),
+      });
+      if (result.status !== "ok") throw new Error("Learning episodes unavailable.");
+      return result.episodes;
+    },
+  });
+  const pending = query.isPending || query.isFetching || query.fetchStatus === "paused";
+  const state: PlantMemoryEpisodesState = !enabled
+    ? { status: "idle" }
+    : pending
+      ? { status: "loading" }
+      : query.isError
+        ? { status: "unavailable" }
+        : { status: "ok", episodes: query.data ?? [] };
+  const refetch = query.refetch;
+  const reload = useCallback(() => {
+    if (enabled) void refetch();
+  }, [enabled, refetch]);
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!includeSensorEvidence) return;
+    return subscribeManualSensorCorrections(ownerId, reload);
+  }, [includeSensorEvidence, ownerId, reload]);
 
-  return { state, reload: () => void load() };
+  return { state, reload };
 }

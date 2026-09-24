@@ -1,22 +1,9 @@
-import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "@/lib/react-router-compat";
 import { ArrowLeft, FlaskConical, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { BreedingLogContainer } from "@/components/genetics/BreedingLogContainer";
 import { logsPath } from "@/lib/routes";
-import { buildGrowScopedPlantsOrFilter } from "@/lib/growAttributionRules";
-
-interface PlantOption {
-  id: string;
-  name: string;
-  tent_id: string | null;
-}
-
-interface GrowInfo {
-  id: string;
-  name: string;
-}
+import { useBreedingLogContext } from "@/hooks/useBreedingLogContext";
 
 /**
  * /breeding/log/new — log a breeding crossing-workflow event scoped to a grow.
@@ -30,61 +17,36 @@ export default function BreedingLogNew() {
   const growId = params.get("growId");
   const tentId = params.get("tentId");
 
-  const [grow, setGrow] = useState<GrowInfo | null>(null);
-  const [plants, setPlants] = useState<PlantOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  const context = useBreedingLogContext(growId, tentId);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!growId) {
-        setLoading(false);
-        return;
-      }
-      // Plant attribution (BUG-A): a plant belongs to this grow when its own
-      // grow_id matches OR it lives in one of the grow's tents, so
-      // orphan-attributed plants (tent in grow, plant.grow_id null) can still
-      // be logged against. Tent ids are fetched first for the OR filter.
-      const { data: tentRows } = await supabase.from("tents").select("id").eq("grow_id", growId);
-      if (cancelled) return;
-      const tentIds = ((tentRows ?? []) as { id?: string | null }[])
-        .map((t) => t.id ?? "")
-        .filter((id) => id.length > 0);
-      const [{ data: growRow }, { data: plantRows }] = await Promise.all([
-        supabase.from("grows").select("id,name").eq("id", growId).maybeSingle(),
-        (() => {
-          let q = supabase
-            .from("plants")
-            .select("id,name,tent_id")
-            .or(buildGrowScopedPlantsOrFilter(growId, tentIds))
-            .eq("is_archived", false);
-          if (tentId) q = q.eq("tent_id", tentId);
-          return q;
-        })(),
-      ]);
-      if (cancelled) return;
-      if (growRow) setGrow({ id: growRow.id, name: growRow.name });
-      setPlants(
-        (plantRows ?? []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          tent_id: p.tent_id ?? null,
-        })),
-      );
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [growId, tentId]);
-
-  if (loading) {
+  if (context.status === "loading") {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
+      <div
+        role="status"
+        aria-label="Loading breeding context"
+        className="flex items-center justify-center py-20 text-muted-foreground"
+      >
         <Loader2 className="h-5 w-5 animate-spin" />
       </div>
     );
   }
+
+  if (context.status === "unavailable") {
+    return (
+      <div className="max-w-xl mx-auto p-4">
+        <BackLink to={growId ? `/grows/${growId}` : "/grows"} />
+        <section role="alert" className="glass rounded-2xl p-6 text-center space-y-3">
+          <h1 className="text-lg font-semibold">Breeding context unavailable</h1>
+          <p className="text-sm text-muted-foreground">
+            We could not confirm this grow and its plants. Retry before logging an event.
+          </p>
+          <Button onClick={context.retry}>Retry</Button>
+        </section>
+      </div>
+    );
+  }
+
+  const { grow, plants } = context.context;
 
   if (!growId || !grow) {
     return (

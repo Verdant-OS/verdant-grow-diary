@@ -4,6 +4,7 @@ import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/store/auth";
+import { useNowTick } from "@/hooks/useNowTick";
 import { useSensorsPageSession } from "@/hooks/useSensorsPageSession";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { Activity } from "lucide-react";
@@ -83,6 +84,7 @@ const subscribeWithoutSession = () => () => {};
 const readWithoutSession = () => null;
 
 export default function Sensors() {
+  const nowMs = useNowTick();
   const location = useLocation();
   const { user } = useAuth();
   const session = useSensorsPageSession(user?.id);
@@ -298,6 +300,7 @@ export default function Sensors() {
     latest
       ? { source: latestSource, value: latest.temp, timestamp: latest.ts }
       : { source: null, value: null, timestamp: null },
+    { now: nowMs },
   );
 
   const hasReadings = filtered.length > 0;
@@ -476,6 +479,7 @@ export default function Sensors() {
             latestMetricReading
               ? { source: metricSource, value: rawValue, timestamp: latestMetricReading.ts }
               : { source: null, value: null, timestamp: null },
+            { now: nowMs },
           );
           // Derive VPD from temp + RH when no VPD value is present.
           let value: number | null | undefined = rawValue;
@@ -495,7 +499,7 @@ export default function Sensors() {
             value: value ?? null,
             source: metricSource,
             hasAnyReading: hasReadings,
-            isStale: metricTrust.isStale,
+            isStale: metricTrust.isStale || metricClassification.label === "Stale",
             isInvalid: metricTrust.isInvalid,
             isDerived,
             recentValues,
@@ -531,7 +535,8 @@ export default function Sensors() {
           if (
             m.key === "temp" &&
             latestMetricReading &&
-            isUsableGrowSensorReading(latestMetricReading)
+            isUsableGrowSensorReading(latestMetricReading) &&
+            state.kind !== "stale"
           ) {
             const r = classifyTempAgainstStage(rawValue, {
               stage: selectedTentStage,
@@ -541,7 +546,8 @@ export default function Sensors() {
           } else if (
             m.key === "rh" &&
             latestMetricReading &&
-            isUsableGrowSensorReading(latestMetricReading)
+            isUsableGrowSensorReading(latestMetricReading) &&
+            state.kind !== "stale"
           ) {
             const r = classifyRhAgainstStage(rawValue, {
               stage: selectedTentStage,

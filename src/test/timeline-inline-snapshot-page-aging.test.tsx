@@ -335,9 +335,13 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
     },
   );
 
-  it.each(["csv", "live", "unknown"])(
-    "honors entry-level %s provenance when the snapshot has no source",
-    async (source) => {
+  it.each(
+    ["csv", "live", "unknown"].flatMap((source) =>
+      [undefined, "", "   "].map((nestedSource) => ({ source, nestedSource })),
+    ),
+  )(
+    "honors entry-level $source provenance with nested source $nestedSource",
+    async ({ source, nestedSource }) => {
       const ts = new Date(NOW.getTime() - 16 * MIN).toISOString();
       const row = {
         ...MANUAL_SNAPSHOT_ROW,
@@ -345,7 +349,7 @@ describe("Timeline page — inline manual snapshot ages while idle", () => {
           source,
           sensor_snapshot: {
             ...MANUAL_SNAPSHOT_ROW.details.sensor_snapshot,
-            source: undefined,
+            source: nestedSource,
             ts,
           },
         },

@@ -2417,7 +2417,7 @@ export default function Timeline() {
                           const sensor = (canonicalSensor ?? legacySensor ?? manualCompatSensor) as
                             Record<string, unknown> | undefined;
                           const rawSource =
-                            typeof sensor?.source === "string"
+                            typeof sensor?.source === "string" && sensor.source.trim().length > 0
                               ? sensor.source
                               : typeof e.details?.source === "string"
                                 ? e.details.source

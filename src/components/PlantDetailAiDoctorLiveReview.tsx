@@ -134,6 +134,7 @@ export default function PlantDetailAiDoctorLiveReview({
 
 interface AcceptedAiDoctorReviewRequest {
   scopeKey: string;
+  acceptedAtMs: number;
   packet: AiDoctorReviewRequestPacket;
   sensorClassification: Classification | null;
   evidenceAcceptance: AiDoctorReviewEvidenceAcceptance;
@@ -441,13 +442,23 @@ function PlantDetailAiDoctorLiveReviewScope({
     lookupFailed: entitlementLookupFailed,
   } = useMyEntitlements();
   const canRetryReview = canRetryAiDoctorLiveReviewFailure(review.reason);
-  // Preserve the existing same-scope guard when unrelated plant/timeline
-  // context disappears. The narrow exception is a request that was accepted
-  // with root-zone history: a later background refresh cannot hide that
-  // already-started paid request while its frozen packet is still in flight.
+  // Keep the start gate on current time. Accepted visibility also checks the
+  // current sources at acceptance time, so aging alone cannot hide a review.
+  // Real source removal still revokes ordinary context; newly valid current
+  // context and the existing historical/omission/root-zone exceptions remain.
+  const activeReviewEligibility = activeReviewRequest
+    ? evaluateAiDoctorReviewEligibility({
+        context: evaluateContext(activeReviewRequest.acceptedAtMs),
+        hasPlantProfile: plant !== null,
+        importedHistory: candidatePacket.imported_sensor_history,
+        historicalRows: queryTentSensorRows,
+        missingLiveSensorReadings: candidatePacket.missingLiveSensorReadings === true,
+      })
+    : null;
   const activeReviewVisible =
     activeReviewRequest !== null &&
     (allowed ||
+      activeReviewEligibility?.allowed === true ||
       activeReviewRequest.mode === "historical_review" ||
       activeReviewRequest.omittedImportedHistory ||
       activeReviewRequest.omittedRootZoneHistory ||
@@ -731,6 +742,7 @@ function PlantDetailAiDoctorLiveReviewScope({
     pendingAcceptedReviewStartRef.current = historyScopeKey;
     setAcceptedReviewRequest({
       scopeKey: historyScopeKey,
+      acceptedAtMs: acceptedAt.getTime(),
       packet: acceptedPacket,
       sensorClassification: acceptedSensorClassification,
       evidenceAcceptance: acceptedEvidenceAcceptance,

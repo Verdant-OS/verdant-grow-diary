@@ -21,8 +21,12 @@ let insertFailureCall: number | null = null;
 let authUserId = "u-1";
 let existingRows: Array<Record<string, unknown>> = [];
 let insertOverride: ((rows: unknown[]) => Promise<{ error: typeof insertError }>) | null = null;
-let lookupOverride: (() => Promise<{ data: Array<Record<string, unknown>>; error: null }>) | null =
-  null;
+let lookupOverride:
+  | (() => Promise<{
+      data: Array<Record<string, unknown>> | null;
+      error: { message: string } | null;
+    }>)
+  | null = null;
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -53,7 +57,10 @@ vi.mock("@/integrations/supabase/client", () => ({
             return chain;
           },
           then: (
-            resolve: (result: { data: Array<Record<string, unknown>>; error: null }) => unknown,
+            resolve: (result: {
+              data: Array<Record<string, unknown>> | null;
+              error: { message: string } | null;
+            }) => unknown,
           ) =>
             (lookupOverride
               ? lookupOverride()
@@ -66,9 +73,16 @@ vi.mock("@/integrations/supabase/client", () => ({
                   ),
                   error: null,
                 })
-            ).then((result) =>
-              resolve({ ...result, data: result.data.slice(from, Math.min(to + 1, from + 1000)) }),
-            ),
+            ).then((result) => {
+              if (result.error || !result.data) {
+                resolve(result);
+                return;
+              }
+              resolve({
+                ...result,
+                data: result.data.slice(from, Math.min(to + 1, from + 1000)),
+              });
+            }),
         };
         return chain;
       },
@@ -196,6 +210,23 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["grow", "sensors"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["sensor_readings"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["csv-timeline-context"] });
+  });
+
+  it("fails open when presence lookup errors instead of blocking import", async () => {
+    lookupOverride = () =>
+      Promise.resolve({
+        data: null,
+        error: { message: "CSV presence lookup unavailable" },
+      });
+    render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
+    fireEvent.click(screen.getByTestId("x-button"));
+    const csv = "Timestamp,Temperature (C)\n2026-12-01T10:00:00Z,20\n";
+    fireEvent.change(screen.getByTestId("csv-import-file-input"), {
+      target: { files: [new File([csv], "fresh.csv", { type: "text/csv" })] },
+    });
+    await waitFor(() => expect(screen.getByTestId("csv-import-preview")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() => expect(insertSpy).toHaveBeenCalled());
   });
 
   it("recognizes sparse existing readings past the server's first presence page", async () => {

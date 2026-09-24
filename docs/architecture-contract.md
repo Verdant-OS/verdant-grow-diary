@@ -1,16 +1,18 @@
 # Verdant — Current Architecture Contract
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
-**Verified from source at:** `32820526d6e71c5a2ed213da35f3a68f66f86432` (deploy branch
-`verdant-grow-diary`), 2026-09-23, by Claude (§15 amendment, follow-up to GDP-ARCH-CITE-001; see
-§15.1). Re-verified at that tip: the AC-1.5, AC-1.7 and AC-5.3 citations this amendment corrects;
-the AC-3.2 and AC-3.4 counts; AC-4.1 and AC-4.2, including the display canon; the AC-4.3 union count
-(no file changed since its last count adds or removes a union line); and the §13/§14 PR states.
-AC-4.4 and AC-4.5 carry forward from the GDP-ARCH-CITE-001 stamp at
-`ea50ec678dee26e8ad5494c5d41aab8e4de1740e`, whose cited file is unchanged at this tip. Other clauses
-are **not** re-verified here; they carry forward from the `8b73c14031050b51061d4715bedbcdfeb66eee52`
-/ `387a00067a76ca9e2ced453d6b6a0f580e33209b` stamps as `source claim`. First verified at
-`7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
+**Verified from source at:** `ef15b2c1be949d720f34bc33e4b980d18d6114e2` (deploy branch
+`verdant-grow-diary`), 2026-09-24, by Claude (§15 re-verification; see §15.1). Between the previous
+stamp, `32820526d6e71c5a2ed213da35f3a68f66f86432`, and this one, **no repository file this contract
+cites by path changed**, apart from this file and `docs/agents/CURRENT_STATE.md`, which it cites as a
+document and never by line. Every citation verified at `32820526` therefore holds at this tip by file
+identity. Re-measured at this tip: the AC-3.2 and AC-3.4 counts, the AC-4.3 union count, the AC-10.2
+absence search, and the §13/§14 PR states. The provenance recorded at `32820526` otherwise carries
+forward unchanged. The AC-1.5, AC-1.7 and AC-5.3 citations and AC-4.1 and AC-4.2 hold by file
+identity. AC-4.4 and AC-4.5 still rest on the GDP-ARCH-CITE-001 stamp at
+`ea50ec678dee26e8ad5494c5d41aab8e4de1740e`. Every other clause is still a `source claim` carried from
+the `8b73c14031050b51061d4715bedbcdfeb66eee52` / `387a00067a76ca9e2ced453d6b6a0f580e33209b` stamps.
+First verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
 **Carries no `Sentinel-Version`.** This is not one of the twelve governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
 
@@ -319,12 +321,14 @@ stamped SHA, over the root-level `src/lib/*Rules.ts` glob:
 
 | Measure                               | Count | Files                                                              |
 | ------------------------------------- | ----: | ------------------------------------------------------------------ |
-| `*Rules.ts` files                     |   518 | —                                                                  |
+| `*Rules.ts` files                     |   519 | —                                                                  |
 | contain a direct `Date.now()` call    |    55 | raw-text match                                                     |
 | contain a direct `Math.random()` call |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"   |
 | import the Supabase client            |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts` |
 
-Those files are legacy, not precedent. Do not cite them, and do not extend the pattern.
+Those files are legacy, not precedent. Do not cite them, and do not extend the pattern. The one
+file added since `32820526` is `src/lib/plantSensorSourceHistoryRules.ts` (#1663), which calls
+neither `Date.now()` nor `Math.random()` and imports neither React nor Supabase.
 _Source:_ `AGENTS.md`; counts measured by `ls` and `grep -l` at the stamped SHA. The narrative drift
 inventory is in `CLAUDE.md`. `docs/codebase-map.md` records only the two Supabase importers
 (`:466-467`), and an earlier version wrongly pointed here for the `Date.now()` / `Math.random()`
@@ -356,13 +360,15 @@ _Source:_ `src/constants/`; `src/pages/GuidesIndex.tsx:60,63`; `src/constants/ve
 **AC-3.4 — Component code routes through the react-router compat shim, not TanStack Router
 directly.**
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 surface on TanStack Router.
-Measured at the stamped SHA, **744** files statically import the shim (512 under `src/test`, 131
+Measured at the stamped SHA, **750** files statically import the shim (518 under `src/test`, 131
 under `src/components`, 94 under `src/pages`, 7 under `src/hooks`). **Zero** files under
 `src/components/` or `src/pages/` mention `@tanstack/react-router` at all. Vitest aliases the shim to
 a real MemoryRouter, so idiomatic TanStack hooks in a component look correct and fail in tests.
 _Source:_ `src/lib/react-router-compat.tsx`; the Vitest alias is at `vitest.config.ts:50-52`. The count
 is by import statement, cross-checked with Bun's import scanner. The same method gives 682 at the
-first stamp, which recorded 683. The shim's `useNavigate` now returns the navigate promise, which
+first stamp, which recorded 683. At this stamp the count was taken as a delta over `32820526`'s 744:
+one `from` pattern over `src/` finds 745 importers there and 751 here, and all six new importers
+are new test files under `src/test`. The shim's `useNavigate` now returns the navigate promise, which
 does not affect this clause. `established fact`.
 _Enforcement:_ `convention only`, plus the test-time alias.
 
@@ -1145,6 +1151,31 @@ Not rejected — sequenced.
 | Making `Published migration integrity` a required context (AC-9.1)                                      | A ruleset change — Cheek's decision, not a code change                                                                                                              |
 | Removing the declared-but-unimported `@supabase/ssr` dependency (AC-2.1)                                | A dependency change; its own slice under AC-8.2                                                                                                                     |
 | **Authoritative Release Topology Specification**                                                        | §14 — blocked on evidence this contract does not have; tracked via #1175 and #1221, both open at the stamped SHA (#1619 is closed unmerged)                         |
+| Binding Quick Log persistence and target selection as a clause                                          | After #1674, #1675, #1676 and #1678 resolve, because all four change that surface. The facts to bind are recorded below the table                                   |
+
+**Open work on these rows at the stamped SHA.** `established fact`, from the GitHub API and
+`git merge-tree` against the stamped tip. These states are dated; after this stamp,
+`docs/agents/CURRENT_STATE.md` owns them.
+
+- **T1.** #1643 (open) adds a partial runner that pins only the five `sensorSourceRules.ts` cites
+  from GDP-ARCH-CITE-001. It is not the full T1.
+- **Prototype keys.** #1655 (open) carries an own-key guard that rewrites the `normalizeSensorSource`
+  return line AC-4.1 cites. Its merge therefore breaks that AC-4.1 cite and the #1643 pin on the same
+  line. Whichever of #1655 and #1643 merges second must update the other's pin, and AC-4.1 must be
+  amended in the same change, because the defect is then fixed.
+- **Release topology.** #1175 and #1221 are still open, and both merge cleanly into the stamped tip.
+  #1619 and #1620 stay closed.
+- **Quick Log.** At the stamped SHA, Quick Log persists through **two** RPCs, not one:
+  `quicklog_save_manual` and `quicklog_save_event`. The second is called from
+  `src/hooks/useQuickLogActivitySave.ts` and `src/lib/writeQuickLogWateringTypedEvent.ts`. Photo and
+  video entries insert into `diary_entries` directly from `src/lib/quickLogPhotoDiaryEntry.ts` and
+  `src/lib/quickLogVideoDiaryEntry.ts`, and `src/test/quick-log-media-insert-fence.test.ts` holds that
+  divergence to exactly those two files. Target precedence in
+  `src/lib/quickLogTargetResolutionRules.ts` has no remembered-default tier, pinned by
+  `src/test/quick-log-target-resolution-rules.test.ts`, and a remembered target is only ever offered
+  as a suggestion (`src/test/quick-log-recent-target-chip-wiring.test.ts`). Governance prose that
+  speaks of "the single `quicklog_save_manual` write path" is narrower than this tree. None of this is
+  a clause yet.
 
 ---
 
@@ -1226,3 +1257,4 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-09-23 | `ea50ec678dee26e8ad5494c5d41aab8e4de1740e` | Grok   | GDP-ARCH-CITE-001. Soft `#1088` (`442370af1`) inserted two comment lines above `pi_bridge` / the `TRUST_LIVE_ALIASES` pin / `normalizeSensorSource` / `isHealthySensorSource`, so five `sensorSourceRules.ts` cites in AC-4.1, AC-4.4 and AC-4.5 pointed two lines too high while the line numbers still existed. Re-pointed `:80`→`:82`, `:86`→`:88`, `:24-26,86`→`:24-28,88`, `:46`→`:48`, `:46-51`→`:48-53` after re-reading the tip file. `:16` (`SENSOR_SOURCES`) was already correct. Cited `src/lib/sensorSourceDisplayCanon.ts` from AC-4.2 (vendor/transport names are provenance, never the Source label). Amended proposed T1 from path/line existence to require a short expected snippet on the cited line or inside the cited range — existence-only T1 would have passed this drift. No T1 runner was present; this slice does not add one (§13). Docs-only; no `CURRENT_STATE.md` restamp.                                                                       |
 | 2026-09-23 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | §15 amendment, follow-up to GDP-ARCH-CITE-001 (#1639). Corrected three citations that fail T1: AC-1.5 prose `:238` now names `createStartHandler.js`, the AC-1.7 historical note spells its superseded range in prose, and AC-5.3 `readToolArguments` is now `:639-649`. AC-4.1: #1620, which carried the prototype-key guard, closed unmerged; the defect now reaches the #1088 display canon (`sourceLabel` undefined, still never healthy), under Bun 1.3.11. AC-4.2: qualified the "always one of the six" display claim accordingly; reclassified partially gated (display split tested). AC-3.2: `*Rules.ts` 517 → 518 (#1636); AC-3.4 shim imports 743 → 744 (#1647), and §12's Next.js row now cites AC-3.4, not a count; other §3 counts and the AC-4.3 union count unchanged. §13 and §14: #1620 and #1619 closed unmerged; #1175 and #1221 still open. T1 text unchanged. Rejoined the §13 table #1639 split with a blank line; applied the repo Prettier config.     |
 | 2026-09-24 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | Editorial follow-up to #1649; stamp unchanged. AC-1.5's in-prose bullet no longer writes the installed Start package as a `path:line` token: it now names line 238 of `createStartHandler.js` in prose, with its `[defaultCsrfMiddleware]` fallback, re-read in `@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins at this SHA. The clause's `_Source:` block keeps its package-internal cites and now says T1 does not cover them: T1 covers repository paths, and a dependency file cannot be opened at the stamped SHA. Copilot, CodeRabbit and the Codex GitHub reviewer raised the bullet on #1649; Copilot raised the `_Source:` block on #1667. No other clause changed.                                                                                                                                                                                                                                                                                 |
+| 2026-09-24 | `ef15b2c1be949d720f34bc33e4b980d18d6114e2` | Claude | §15 re-verification, 12 commits after `32820526` (#1656, #1662, #1649, #1667, #1669, #1663, #1665, #1666, #1668, #1681, #1670, #1664). No repository file the contract cites by path changed, apart from this file and `docs/agents/CURRENT_STATE.md` (cited as a document), so every citation holds by file identity. AC-3.2: `*Rules.ts` 518 → 519 (#1663 adds a pure rules file); the `Date.now()`, `Math.random()` and Supabase-importer counts are unchanged. AC-3.4: shim importers 744 → 750, all six new test files. AC-4.3: the wider union count is unchanged at 105 lines in 85 files. AC-10.2: zero hits on re-run. §13: added the Quick Log deferral row and an open-work note (#1643 partial T1 runner; #1655 collides with the AC-4.1 cite and the #1643 pin; #1175 and #1221 still open). No clause statement changed. Docs-only; no `CURRENT_STATE.md` restamp.                                                                                                 |

@@ -1075,3 +1075,31 @@ describe("QuickLogV2Sheet — structured watering", () => {
     expect(screen.queryByLabelText("Water temperature (°F)")).toBeNull();
   });
 });
+
+it("retains malformed Water receipt as unresolved through reopen and exact retry", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/writeQuickLogWateringTypedEvent")>(
+    "@/lib/writeQuickLogWateringTypedEvent",
+  );
+  wateringWriterMock.mockImplementation((input) => actual.writeQuickLogWateringTypedEvent(input));
+  rpcMock
+    .mockResolvedValueOnce({ data: { ok: true, grow_event_id: "not-an-event" }, error: null })
+    .mockResolvedValueOnce({
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000004", reused: true },
+      error: null,
+    });
+  const { rerenderOpen } = renderSheet("plant:plant-1", "water");
+  enterVolume("500");
+  clickSave();
+  await waitFor(() => expect(screen.getByTestId("qlv2-watering-retry-lock")).toBeVisible());
+  expect(screen.queryByTestId("qlv2-post-save")).not.toBeInTheDocument();
+  expect(toastSuccess).not.toHaveBeenCalled();
+  const original = rpcMock.mock.calls[0][1];
+  rerenderOpen(false);
+  rerenderOpen(true);
+  expect(screen.getByLabelText("Volume (ml)")).toHaveValue("500");
+  fireEvent.click(screen.getByTestId("qlv2-save-retry"));
+  await waitFor(() => expect(screen.getByTestId("qlv2-post-save")).toBeVisible());
+  expect(rpcMock).toHaveBeenCalledTimes(2);
+  expect(rpcMock.mock.calls[1][1]).toEqual(original);
+  expect(original).toMatchObject({ p_plant_id: "plant-1", p_grow_id: "grow-1" });
+});

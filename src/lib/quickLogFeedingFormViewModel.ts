@@ -141,7 +141,67 @@ export type FeedingFormFailureReason =
   | "products:invalid_amount"
   | "products:contains_secret"
   | "ec_ppm:mismatch"
-  | "numeric:invalid";
+  | "numeric:invalid"
+  | FeedingNumericRangeReason;
+
+/**
+ * Inclusive numeric bounds enforced by `quicklog_save_event` for `p_feed`
+ * (see `20260725023000_core_schema_forward_repair.sql`). Mirrored here so a
+ * value the server will reject is caught before the RPC, with the field named,
+ * instead of producing an unconfirmed save the grower cannot correct.
+ */
+export const FEEDING_SERVER_NUMERIC_BOUNDS = {
+  ph: { min: 0, max: 14 },
+  runoff_ph: { min: 0, max: 14 },
+  ec_in: { min: 0, max: 10 },
+  ec_out: { min: 0, max: 10 },
+  runoff_ec: { min: 0, max: 10 },
+  volume_ml: { min: 0, max: 1_000_000 },
+  runoff_ml: { min: 0, max: 1_000_000 },
+  water_temp_c: { min: -10, max: 60 },
+} as const;
+
+export type FeedingBoundedNumericKey = keyof typeof FEEDING_SERVER_NUMERIC_BOUNDS;
+export type FeedingNumericRangeReason = `${FeedingBoundedNumericKey}:out_of_range`;
+
+const FEEDING_BOUNDED_KEY_ORDER: readonly FeedingBoundedNumericKey[] = [
+  "volume_ml",
+  "ph",
+  "ec_in",
+  "ec_out",
+  "runoff_ml",
+  "runoff_ph",
+  "runoff_ec",
+  "water_temp_c",
+];
+
+export function isFeedingNumericRangeReason(reason: unknown): reason is FeedingNumericRangeReason {
+  return (
+    typeof reason === "string" &&
+    reason.endsWith(":out_of_range") &&
+    Object.prototype.hasOwnProperty.call(
+      FEEDING_SERVER_NUMERIC_BOUNDS,
+      reason.slice(0, -":out_of_range".length),
+    )
+  );
+}
+
+/**
+ * First numeric field (in a fixed, stable order) whose value falls outside the
+ * server bounds, or null. Absent / non-number fields are not range-checked here.
+ */
+export function findFeedingPayloadRangeViolation(
+  payload: Partial<Record<FeedingBoundedNumericKey, unknown>> | null | undefined,
+): FeedingNumericRangeReason | null {
+  if (!payload) return null;
+  for (const key of FEEDING_BOUNDED_KEY_ORDER) {
+    const value = payload[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    const { min, max } = FEEDING_SERVER_NUMERIC_BOUNDS[key];
+    if (value < min || value > max) return `${key}:out_of_range`;
+  }
+  return null;
+}
 
 export interface FeedingFormMapInput {
   growId: string | null | undefined;
@@ -267,6 +327,9 @@ export function buildFeedingFormPayload(input: FeedingFormMapInput): FeedingForm
     }
   }
 
+  const rangeViolation = findFeedingPayloadRangeViolation(parsedNumerics);
+  if (rangeViolation) return { ok: false, reason: rangeViolation };
+
   const note = trim(input.form.note);
 
   const payload: FeedingTypedEventInput = {
@@ -290,6 +353,8 @@ export function buildFeedingFormPayload(input: FeedingFormMapInput): FeedingForm
 
 export const FEEDING_SAVE_SUCCESS_MESSAGE = "Feeding logged.";
 export const FEEDING_SAVE_FAILURE_MESSAGE = "Could not log feeding. Nothing else was changed.";
+export const FEEDING_SERVER_REJECTED_MESSAGE =
+  "Verdant did not save this feeding because a value is outside the accepted range. Nothing was saved. Check the numbers and save again.";
 
 export function feedingFormReasonToHelper(reason: FeedingFormFailureReason | string): string {
   switch (reason) {
@@ -315,6 +380,24 @@ export function feedingFormReasonToHelper(reason: FeedingFormFailureReason | str
       return "Optional metrics must be valid numbers or left blank.";
     case "ec_ppm:mismatch":
       return "EC and PPM must match the 500 scale. Re-enter either value.";
+    case "ph:out_of_range":
+      return "Feed pH must be between 0 and 14.";
+    case "runoff_ph:out_of_range":
+      return "Runoff pH must be between 0 and 14.";
+    case "ec_in:out_of_range":
+      return "Feed EC must be between 0 and 10 mS/cm (0–5,000 PPM on the 500 scale).";
+    case "ec_out:out_of_range":
+      return "Output EC must be between 0 and 10 mS/cm (0–5,000 PPM on the 500 scale).";
+    case "runoff_ec:out_of_range":
+      return "Runoff EC must be between 0 and 10 mS/cm (0–5,000 PPM on the 500 scale).";
+    case "volume_ml:out_of_range":
+      return "Applied volume must be a positive number of milliliters.";
+    case "runoff_ml:out_of_range":
+      return "Runoff volume must be between 0 and 1,000,000 mL.";
+    case "water_temp_c:out_of_range":
+      return "Water temperature must be between -10 °C and 60 °C (14–140 °F).";
+    case "rpc:invalid_typed_payload":
+      return FEEDING_SERVER_REJECTED_MESSAGE;
     default:
       return FEEDING_SAVE_FAILURE_MESSAGE;
   }

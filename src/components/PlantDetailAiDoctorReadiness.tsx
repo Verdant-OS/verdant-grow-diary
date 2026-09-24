@@ -43,6 +43,7 @@ import {
 import { buildSensorsTentRouteHref } from "@/lib/sensorRouteTentIntentRules";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { useSensorBridgeHealth } from "@/hooks/useSensorBridgeHealth";
+import { useNowTick } from "@/hooks/useNowTick";
 import { useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import {
   AI_DOCTOR_CURRENT_SENSOR_ROW_CAP,
@@ -203,6 +204,7 @@ export default function PlantDetailAiDoctorReadiness({
   stage,
   hasPlantPhoto = false,
 }: PlantDetailAiDoctorReadinessProps) {
+  const nowMs = useNowTick();
   const { data: rawRows, isLoading } = usePlantRecentActivity(plantId ?? null);
   const { data: bridgeHealth } = useSensorBridgeHealth();
   const tentIds = isUuid(tentId) ? [tentId] : [];
@@ -245,7 +247,9 @@ export default function PlantDetailAiDoctorReadiness({
   // Audit counts may preserve a cautionary/unsafe state, but a coarse audit
   // `usable` result cannot override row-level no-data/testbench filtering.
   const sensorSnapshot = useMemo<Classification | null>(() => {
-    const current = classifyAiDoctorCurrentSensorEvidence(currentSensorRows);
+    const current = classifyAiDoctorCurrentSensorEvidence(currentSensorRows, {
+      now: new Date(nowMs),
+    });
     const audit = bridgeHealth
       ? classificationFromStatusResult({
           status: bridgeHealth.status,
@@ -253,7 +257,7 @@ export default function PlantDetailAiDoctorReadiness({
         })
       : null;
     return selectAiDoctorSensorEvidenceClassification(current, audit);
-  }, [bridgeHealth, currentSensorRows]);
+  }, [bridgeHealth, currentSensorRows, nowMs]);
 
   // A failed read cannot prove absence; a surviving usable snapshot can still help.
   const currentSensorError = (mixedFailed || manualFailed) && sensorSnapshot?.status !== "usable";

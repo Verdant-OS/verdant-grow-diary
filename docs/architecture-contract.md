@@ -579,17 +579,18 @@ permitted there. The two divergences above are grandfathered and allowlisted so 
 shrink but not grow. **Edge functions are out of this import rule** — they cannot import `src/lib`
 (AC-2.3), and `sensorSourceRules.ts` has no `_shared` mirror today; an edge ingest path needs its
 own mirrored or local vocabulary, not a forbidden cross-import.
-**"Roughly ninety", measured.** Single-line union literals over two or more of the source names,
-outside tests:
+**"Roughly ninety", measured.** Single-line union literals outside tests, counted as lines where
+two quoted canonical labels sit either side of one `|` (`"a" | "b"`, single or double quotes). The
+three single-line counts are the same at the first stamp `7c46855b` and at this stamp, so none has
+grown:
 
-- **76 lines in 66 files**, identical to the count at the first stamp and re-measured at this
-  stamp, so the number has not grown;
-- a wider pattern that also counts `"stale" | "invalid"` pairs, which catches quality unions, gives
-  105 lines in 85 files;
-- multi-line unions add 12 matching lines in 6 files. This figure is a `source claim`. Its pattern
-  was never recorded, and it was not reproduced at this stamp. A one-member-per-line pattern
-  restricted to `live`, `manual`, `csv` and `demo` gives 17 lines in 6 files, and at least one of
-  those unions is not a sensor-source union. T3's AST scan, not a regex, is what settles it.
+- **76 lines in 66 files** when at least one label of the pair is `live`, `manual`, `csv` or `demo`;
+- 69 lines in 60 files when both labels must be among those four;
+- 105 lines in 85 files when a `"stale" | "invalid"` pair also counts, which catches quality unions;
+- multi-line unions add 12 matching lines in 6 files. This figure is a `source claim`: its pattern
+  was never recorded, and it was not reproduced at this stamp. One-member-per-line regex scans also
+  match unions that are not sensor-source unions, such as `ManualSensorTrendOmissionReason`, so no
+  regex count replaces it. T3's AST scan is what settles it.
 
 _Source:_ `src/lib/sensor/sensorSourceRules.ts:16`; `src/constants/sensorIngestProvenance.ts:15`;
 `src/lib/ai/types.ts:15`; `src/lib/aiDoctorEngine.ts:151,266-276,291,389-397`; counts by `grep -rnE`
@@ -1270,7 +1271,7 @@ stale every time the operating picture moved. Only the durable rules stay:
   Resolving it is the Release Topology Specification's job (§13; #1175 and #1221).
 - **Applied production schema is `NOT_MEASURED`** here and belongs to `docs/agents/CURRENT_STATE.md` (AC-9.3).
 - **Per-table RLS policy state** is owned by migrations, not by this file.
-- **Runtime drift among the 76–105 unenumerated sensor-source union literals** (the range depends on
+- **Runtime drift among the 69–105 unenumerated sensor-source union literals** (the range depends on
   the pattern, AC-4.3) is `NOT_MEASURED`; two are confirmed divergent by reading, the rest were not
   enumerated.
 - **A vendor telemetry SDK is not publisher evidence.** `@vercel/analytics` and
@@ -1322,4 +1323,4 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-09-23 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | §15 amendment, follow-up to GDP-ARCH-CITE-001 (#1639). Corrected three citations that fail T1: AC-1.5 prose `:238` now names `createStartHandler.js`, the AC-1.7 historical note spells its superseded range in prose, and AC-5.3 `readToolArguments` is now `:639-649`. AC-4.1: #1620, which carried the prototype-key guard, closed unmerged; the defect now reaches the #1088 display canon (`sourceLabel` undefined, still never healthy), under Bun 1.3.11. AC-4.2: qualified the "always one of the six" display claim accordingly; reclassified partially gated (display split tested). AC-3.2: `*Rules.ts` 517 → 518 (#1636); AC-3.4 shim imports 743 → 744 (#1647), and §12's Next.js row now cites AC-3.4, not a count; other §3 counts and the AC-4.3 union count unchanged. §13 and §14: #1620 and #1619 closed unmerged; #1175 and #1221 still open. T1 text unchanged. Rejoined the §13 table #1639 split with a blank line; applied the repo Prettier config.     |
 | 2026-09-24 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | Editorial follow-up to #1649; stamp unchanged. AC-1.5's in-prose bullet no longer writes the installed Start package as a `path:line` token: it now names line 238 of `createStartHandler.js` in prose, with its `[defaultCsrfMiddleware]` fallback, re-read in `@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins at this SHA. The clause's `_Source:` block keeps its package-internal cites and now says T1 does not cover them: T1 covers repository paths, and a dependency file cannot be opened at the stamped SHA. Copilot, CodeRabbit and the Codex GitHub reviewer raised the bullet on #1649; Copilot raised the `_Source:` block on #1667. No other clause changed.                                                                                                                                                                                                                                                                                 |
 | 2026-09-24 | `ef15b2c1be949d720f34bc33e4b980d18d6114e2` | Claude | §15 re-verification, 12 commits after `32820526` (first #1656, last #1664). No repository file the contract cites by path changed, apart from this file and `docs/agents/CURRENT_STATE.md` (cited as a document), so every citation holds by file identity. AC-3.2: `*Rules.ts` 518 → 519 (#1663 adds a pure rules file); the `Date.now()`, `Math.random()` and Supabase-importer counts are unchanged. AC-3.4: 744 → 750 shim import statements, in 749 files; the prior 744 also counted statements. AC-4.3: the wider union count is unchanged at 105 lines in 85 files. AC-10.2: zero hits on re-run. §13: added the Quick Log deferral row, with every direct RPC caller, and sequencing notes with no PR state (a change to the AC-4.1-cited line, as #1655 proposes, must update its T1 pins, as #1643 adds, in the same change); the release-topology row no longer states PR status. No clause statement changed. Docs-only; no `CURRENT_STATE.md` restamp.             |
-| 2026-09-24 | `69aca5e738b7d0d49369a636b1b293564ec65203` | Claude | §15 re-verification, two docs-only commits after `ef15b2c1`. Re-read all 226 repository `path:line` cites outside this record, not carried by file identity, and the AC-1.4, AC-1.5 and §14 package cites from tarballs whose sha512 matches `bun.lock`. Re-measured §3, §4 and §10 counts, bar the AC-4.3 multi-line figure; re-ran the AC-4.1 prototype-key reproduction under Bun 1.3.11. AC-3.2 corrected: no root-level `*Rules.ts` imports the Supabase client; the two named files import a generated type only, as at the first stamp. AC-4.6 corrected: the checker runs on every PR into `main`/`verdant-grow-diary` via 3 non-required workflows. AC-1.5: the warning switch is `serverFns.disableCsrfMiddlewareWarning`, compiled in at build time. AC-4.3: the multi-line figure is a `source claim`. §13: `CLAUDE.md` correction deferred. `docs/codebase-map.md` corrected too. Review follow-ups: AC-3.2 (Copilot); AC-1.5, AC-4.6, header (Codex, CodeRabbit).  |
+| 2026-09-24 | `69aca5e738b7d0d49369a636b1b293564ec65203` | Claude | §15 re-verification, two docs-only commits after `ef15b2c1`. Re-read all 226 repository `path:line` cites outside this record, not carried by file identity, and the 8 package cites from tarballs whose sha512 matches `bun.lock`. Re-measured §3, §4 and §10 counts, bar the AC-4.3 multi-line figure; re-ran the AC-4.1 prototype-key reproduction under Bun 1.3.11. AC-3.2 corrected: no root-level `*Rules.ts` imports the Supabase client; the two named files import a generated type only, as at the first stamp. AC-4.6 corrected: the checker runs on every PR into `main`/`verdant-grow-diary` via 3 non-required workflows. AC-1.5: the switch is `serverFns.disableCsrfMiddlewareWarning`, compiled in at build time. AC-4.3: patterns recorded; multi-line figure a `source claim`. §13: `CLAUDE.md` correction deferred. `docs/codebase-map.md` corrected too. Follow-ups: AC-3.2 (Copilot); AC-1.5, AC-4.6, header (Codex); header, AC-4.3, AC-4.6 (CodeRabbit). |

@@ -48,7 +48,7 @@ describe("CSV candidate timestamp lookup", () => {
       new Set(rows.map((row) => dedupeKeyOf(row)!)),
     );
     const firstPages = readPage.mock.calls.filter((call) => call[1] === 0);
-    expect(firstPages.map((call) => call[0].length)).toEqual([25, 25, 3]);
+    expect(firstPages.map((call) => call[0].length)).toEqual([100, 100, 3]);
     expect(firstPages.flatMap((call) => [...call[0]])).toEqual(rows.map((row) => row.captured_at));
     expect(readPage).toHaveBeenCalledTimes(6);
     expect(input).toEqual(original);
@@ -68,7 +68,7 @@ describe("CSV candidate timestamp lookup", () => {
         () => active,
       ),
     ).toEqual(new Set());
-    expect(readPage).toHaveBeenCalledTimes(3);
+    expect(readPage).toHaveBeenCalledTimes(2);
   });
 
   it("propagates a later timestamp-batch failure without returning earlier keys", async () => {

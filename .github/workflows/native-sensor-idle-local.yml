@@ -5,7 +5,10 @@ name: Native Sensor Idle Aging Local
 on:
   pull_request:
     branches:
-      [main, verdant-grow-diary, "codex/sensors-idle-freshness-*", "codex/sensor-chart-export-*"]
+      - main
+      - verdant-grow-diary
+      - "codex/sensors-idle-freshness-*"
+      - "codex/sensor-chart-export-*"
   workflow_dispatch:
 
 permissions:

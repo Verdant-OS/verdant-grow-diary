@@ -103,20 +103,24 @@ describe("scanFunctionsTree (fixture)", () => {
 });
 
 /**
- * True when `script` runs the guard as one of its `&&`- or `;`-joined commands:
- * `node scripts/check-no-src-lib-imports.mjs`, optionally with arguments. A bare mention
- * (`echo check-no-src-lib-imports.mjs`) does not run it; neither does a command after
- * `||`, which is skipped when the one before succeeds; and a trailing `|| true`
- * swallows the guard's failure. None of them counts (CodeRabbit, #1221 round 13).
+ * True when `script` runs the guard AND a guard failure fails the script. The guard is
+ * its own command, `node scripts/check-no-src-lib-imports.mjs` with optional arguments;
+ * it is not reached through `||`, which skips it when the command before succeeds; and
+ * every operator after it is `&&`. A later `;` or `||` lets another command's exit
+ * status replace the guard's: `guard; echo build` and `guard || true` both exit 0 when
+ * the guard fails. A bare mention (`echo check-no-src-lib-imports.mjs`) runs nothing
+ * (CodeRabbit, #1221 rounds 13 and 15).
  */
 function invokesGuard(script: string | undefined): boolean {
-  return (script ?? "")
-    .split(/\s*(?:&&|;)\s*/)
-    .some((command) =>
-      /^node\s+(?:\.\/)?scripts\/check-no-src-lib-imports\.mjs(?:\s+[^|&;]*)?$/.test(
-        command.trim(),
-      ),
-    );
+  // Commands and the operators between them, alternating: [cmd, op, cmd, op, cmd].
+  const parts = (script ?? "").trim().split(/\s*(&&|\|\||;)\s*/);
+  return parts.some(
+    (command, i) =>
+      i % 2 === 0 &&
+      /^node\s+(?:\.\/)?scripts\/check-no-src-lib-imports\.mjs(?:\s+[^|&;]*)?$/.test(command) &&
+      parts[i - 1] !== "||" &&
+      parts.slice(i + 1).every((op, k) => k % 2 === 1 || op === "&&"),
+  );
 }
 
 describe("invokesGuard — a script runs the guard, not merely names it (CodeRabbit, #1221 round 13)", () => {
@@ -135,6 +139,19 @@ describe("invokesGuard — a script runs the guard, not merely names it (CodeRab
     expect(invokesGuard("true || node scripts/check-no-src-lib-imports.mjs")).toBe(false);
     expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs || true")).toBe(false);
     expect(invokesGuard(undefined)).toBe(false);
+  });
+
+  it("rejects a later `;` or `||` that replaces the guard's exit status (CodeRabbit, #1221 round 15)", () => {
+    // `false; echo build` exits 0: after `;` the last command's status is the script's.
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs; echo build")).toBe(false);
+    expect(
+      invokesGuard("node scripts/check-no-src-lib-imports.mjs && node scripts/b.mjs; echo x"),
+    ).toBe(false);
+    expect(
+      invokesGuard("node scripts/check-no-src-lib-imports.mjs && node scripts/b.mjs || true"),
+    ).toBe(false);
+    // A `;` BEFORE the guard is harmless: the guard runs, and its status is the script's.
+    expect(invokesGuard("echo start; node scripts/check-no-src-lib-imports.mjs")).toBe(true);
   });
 });
 

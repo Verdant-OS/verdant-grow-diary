@@ -19,6 +19,7 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it, expect } from "vitest";
+import { load as loadYaml } from "js-yaml";
 import {
   buildExecutableCorpus,
   bypassesMockSpecifiers,
@@ -32,6 +33,7 @@ import {
   bucketOf,
   classifyTest,
   commandLinesIn,
+  decodeYamlInlineScalar,
   isCommandLine,
   isPlaywrightSpec,
   isRuntimeHarness,
@@ -1212,5 +1214,66 @@ describe("ANSI-C $' quoting: a backslash escapes the next character (CodeRabbit,
   it("keeps a `#` inside $'…' or $\"…\" (FENCE)", () => {
     expect(paths.has("e2e/ansi-c-hash.spec.ts")).toBe(true);
     expect(paths.has("e2e/dollar-double.spec.ts")).toBe(true);
+  });
+});
+
+describe("a quoted run: value is YAML-decoded before its shell comment is read (CodeRabbit, #1221 round 15)", () => {
+  // `run: "echo ok # bunx …"` hands bash `echo ok # bunx …`: the quotes are YAML's, not
+  // the shell's. Passed raw, stripShellComment read one shell double-quoted word and kept
+  // the path. An escape can also move a `#` out of a raw-text rule's sight: `\x23` is
+  // `#`, and `\n` starts a new shell line. Each dead case was run through `bash -c` on
+  // its decoded value before it was pinned.
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    '      - run: "echo ok # bunx playwright test e2e/dq-comment.spec.ts"',
+    "      - run: 'echo ok # bunx playwright test e2e/sq-comment.spec.ts'",
+    '      - run: "echo ok\\n# bunx playwright test e2e/dq-newline.spec.ts"',
+    '      - run: "echo ok \\x23 bunx playwright test e2e/dq-hex.spec.ts"',
+    '      - run: "bunx playwright test e2e/dq-live.spec.ts" # a YAML comment',
+    "      - run: 'bunx playwright test e2e/sq-live.spec.ts --grep ''#tag'''",
+    '      - run: "bunx playwright test e2e/dq-shell-quoted.spec.ts --grep \\"#tag\\""',
+    '      - run: "echo ok\\nbunx playwright test e2e/dq-second-line.spec.ts"',
+    '      - run: "bunx playwright test e2e/dq-open.spec.ts',
+    '      - run: "bunx playwright test e2e/dq-bad-escape.spec.ts \\q"',
+    "",
+  ].join("\n");
+  const paths = namedPathsIn(buildExecutableCorpus({ workflowTexts: [y] }));
+
+  it("drops a comment inside a quoted value, including one an escape creates", () => {
+    expect(paths.has("e2e/dq-comment.spec.ts")).toBe(false);
+    expect(paths.has("e2e/sq-comment.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dq-newline.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dq-hex.spec.ts")).toBe(false);
+  });
+
+  it("keeps the command, a shell-quoted `#`, and a line after `\\n` (FENCE)", () => {
+    expect(paths.has("e2e/dq-live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/sq-live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dq-shell-quoted.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dq-second-line.spec.ts")).toBe(true);
+  });
+
+  it("counts nothing from a value this line cannot yield: an open quote or an invalid escape", () => {
+    // Fail-closed: an unread command reads as unrun, a loud UNEXEMPT_DEAD, never a silent pass.
+    expect(paths.has("e2e/dq-open.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dq-bad-escape.spec.ts")).toBe(false);
+    expect(decodeYamlInlineScalar('"open')).toBeNull();
+    expect(decodeYamlInlineScalar('"bad \\q"')).toBeNull();
+    expect(decodeYamlInlineScalar('"short \\x2"')).toBeNull();
+  });
+
+  it.each([
+    '"a # b"',
+    "'a # b'",
+    "'it''s'",
+    '"x" # a YAML comment',
+    '"\\x23 \\u00e9 \\U0001F600"',
+    '"\\0\\a\\b\\t\\n\\v\\f\\r\\e\\ \\"\\/\\\\\\N\\_\\L\\P"',
+    '"tab\\\tinside"',
+    "plain text",
+  ])("decodes %s exactly as a YAML parser does", (value) => {
+    expect(decodeYamlInlineScalar(value)).toBe((loadYaml(`v: ${value}`) as { v: string }).v);
   });
 });

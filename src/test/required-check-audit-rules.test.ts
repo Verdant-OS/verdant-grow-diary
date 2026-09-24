@@ -151,7 +151,8 @@ function jobsProducing(context: string) {
  * A `run:` step with no `shell:` executes as `bash -e {0}` — no pipefail — so in
  * `deno test … 2>&1 | tee log` the step's status is tee's, and a failing suite
  * reports success. `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`;
- * a `set -o pipefail` (or `set -eo pipefail`) before the pipe does the same.
+ * a `set -o pipefail` (or `set -eo pipefail`) before the pipe does the same. Bash's
+ * `|& tee` (stdout and stderr) is the same pipe and is counted too (round 15).
  * Pipes whose left side is only `echo`/`printf` cannot hide a failure and are
  * not counted.
  */
@@ -165,7 +166,7 @@ function pipesHidingFailure(workflow: Workflow, job: WorkflowJob): string[] {
     let pipefail = false;
     for (const line of lines) {
       if (/^\s*set\s+-[a-z]*o\s+pipefail\b/.test(line)) pipefail = true;
-      const pipe = /(?<!\|)\|(?!\|)\s*tee\b/.exec(line);
+      const pipe = /(?<!\|)\|&?(?!\|)\s*tee\b/.exec(line);
       if (!pipe || pipefail) continue;
       if (/^\s*(?:echo|printf)\b/.test(line.slice(0, pipe.index))) continue;
       hidden.push(`${step.name ?? "(unnamed step)"}: ${line.trim()}`);
@@ -210,6 +211,9 @@ describe("mustBeGreen lanes report the status of the command they gate", () => {
     );
     expect(pipesHidingFailure({}, job({ name: "s", run: 'echo "x" | tee -a "$F"\n' }))).toEqual([]);
     expect(pipesHidingFailure({}, job({ name: "s", run: "a || tee x\n" }))).toEqual([]);
+    expect(
+      pipesHidingFailure({}, job({ name: "s", run: "deno test a_test.ts |& tee log\n" })),
+    ).toHaveLength(1);
   });
 });
 

@@ -850,8 +850,9 @@ export function commandLinesIn(workflowText) {
     if (!m) continue;
     const indent = m[1].length;
     const style = m[2] ?? "";
-    const inline = stripShellComment(m[3] ?? "");
-    if (inline.trim()) out.push(inline);
+    // A quoted value is YAML-decoded first, and may hold several shell lines (`\n`).
+    const inline = decodeYamlInlineScalar(m[3] ?? "");
+    if (inline !== null) out.push(...foldContinuations(inline.split("\n").map(stripShellComment)));
     if (!style) continue; // single-line run:, no block to consume
 
     const block = [];
@@ -890,6 +891,80 @@ export function commandLinesIn(workflowText) {
     }
   }
   return out.filter((l) => isCommandLine(l));
+}
+
+/**
+ * The string YAML reads from a single-line `run:` value.
+ *
+ * A quoted scalar's quotes and escapes are YAML's, not the shell's:
+ * `run: "echo ok # bunx playwright test e2e/x.spec.ts"` hands bash `echo ok # bunx …`,
+ * whose `#` opens a comment. Passed raw, the stripper read one shell double-quoted word
+ * and kept the path (CodeRabbit, #1221 round 15). An escape can also put a `#` where no
+ * raw-text rule sees it — `\x23` is `#`, and `\n` starts a new shell line — so escapes
+ * are decoded in full, per YAML 1.2.2 §5.7, rather than by a partial replace.
+ *
+ * A plain scalar is returned as written: its ` #` is a YAML comment and a shell comment
+ * alike. `null` means no value can be read from this line — a quoted scalar left open
+ * (it continues on later lines) or an escape YAML rejects. The caller then counts
+ * nothing, so an unreadable command reads as unrun: a loud UNEXEMPT_DEAD, never a
+ * silent pass.
+ */
+const YAML_DQ_ESCAPES = {
+  0: "\0",
+  a: "\x07",
+  b: "\b",
+  t: "\t",
+  "\t": "\t",
+  n: "\n",
+  v: "\v",
+  f: "\f",
+  r: "\r",
+  e: "\x1b",
+  " ": " ",
+  '"': '"',
+  "/": "/",
+  "\\": "\\",
+  N: "\u0085",
+  _: "\u00a0",
+  L: "\u2028",
+  P: "\u2029",
+};
+const YAML_DQ_HEX_DIGITS = { x: 2, u: 4, U: 8 };
+export function decodeYamlInlineScalar(raw) {
+  const s = String(raw ?? "").trimStart();
+  const quote = s[0];
+  if (quote !== '"' && quote !== "'") return s;
+  let out = "";
+  for (let i = 1; i < s.length; i += 1) {
+    const c = s[i];
+    if (quote === "'") {
+      if (c !== "'") out += c;
+      else if (s[i + 1] === "'") {
+        out += "'";
+        i += 1;
+      } else return out;
+      continue;
+    }
+    if (c === '"') return out;
+    if (c !== "\\") {
+      out += c;
+      continue;
+    }
+    const escape = s[i + 1];
+    const digits = Object.hasOwn(YAML_DQ_HEX_DIGITS, escape) ? YAML_DQ_HEX_DIGITS[escape] : 0;
+    if (digits) {
+      const hex = s.slice(i + 2, i + 2 + digits);
+      if (hex.length !== digits || !/^[0-9A-Fa-f]+$/.test(hex)) return null;
+      const codePoint = Number.parseInt(hex, 16);
+      if (codePoint > 0x10ffff) return null;
+      out += String.fromCodePoint(codePoint);
+      i += 1 + digits;
+    } else if (Object.hasOwn(YAML_DQ_ESCAPES, escape)) {
+      out += YAML_DQ_ESCAPES[escape];
+      i += 1;
+    } else return null;
+  }
+  return null;
 }
 
 /** Bash metacharacters: each ends the word before it, so a `#` after one opens a comment. */

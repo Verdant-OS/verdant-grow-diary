@@ -163,7 +163,7 @@ describe("Quick Log starter-handoff consume-once", () => {
     insertMock.mockReset();
     activityRpcMock.mockReset();
     activityRpcMock.mockResolvedValue({
-      data: { ok: true, grow_event_id: "feeding-event-1" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000001" },
       error: null,
     });
   });

@@ -58,7 +58,7 @@ this file** (§6). No Publish. No APPLY. No merge. `HOLD #1250`. Prior header fo
 | Its source        | the GDP read in Grok review `5285231537` — `source claim`, a past instant        |
 | Live vs tip       | **`NOT_MEASURED`**                                                               |
 
-**Whether any of the nine product commits in §1 is live is unknown.** The last value on record is 13
+**Whether any of the nine product commits in §1 is live is unknown.** The last value on record is 12
 commits behind the tip. **`LIVE_LAG` is not a product `FAIL`.**
 
 **The `#1621` C/F fix and the live `"26"` pin.** `8fc38407` is an ancestor of `8b73c140`, so the fix
@@ -136,7 +136,7 @@ with `git merge-tree --write-tree` against the tip.
 **36 open PRs: 34 target `verdant-grow-diary` and 2 are stacked** (`#1618` on `#1151`, `#1481` on
 `#1478`).
 
-- **No open PR touches `docs/agents/CURRENT_STATE.md`. This PR is the only writer.**
+- **No other open PR touches `docs/agents/CURRENT_STATE.md`. This PR is the only writer.**
 - **No open PR adds or edits a file under `supabase/migrations/`.**
 - **All 36 merge cleanly into the tip** (`merge-tree`, no conflicts).
 - **Closed since the last merged stamp, unmerged:** `#1620` (prototype-key guard, 14:45 UTC),

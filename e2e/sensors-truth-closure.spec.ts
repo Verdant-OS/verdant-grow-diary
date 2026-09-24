@@ -22,8 +22,12 @@ const CURRENT_AGREEMENT_ROWS = CURRENT_AGREEMENT_LIST.map((agreement) => ({
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
 const MOCKED_PROJECT = "chromium-mocked";
+// UUIDs throughout: the Sensors loaders read the validated
+// `sensor_readings_effective` view (#1546), and requireEffectiveSensorReadings
+// rejects the whole batch when any row carries a non-UUID id, user_id or tent_id.
+const FAKE_USER_ID = "44444444-4444-4444-8444-444444444444";
 const FAKE_USER = {
-  id: "sensor-truth-browser-user",
+  id: FAKE_USER_ID,
   aud: "authenticated",
   email: "sensor-truth@example.invalid",
   email_confirmed_at: "2020-01-01T00:00:00.000Z",
@@ -50,10 +54,20 @@ function tent(id: string, name: string) {
   };
 }
 
-function sensorRow(id: string, tentId: string, ts: string, metric: string, value: number) {
+function readingId(n: number) {
+  return `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+}
+
+// One shape serves both the raw table and the effective view. The view keeps
+// every sensor_readings column and adds correction metadata; a row without
+// `correction_valid: true` or an explicit `device_id` is rejected as unverifiable
+// evidence, never shown as empty or zero (effectiveSensorReadingRules.ts).
+function sensorRow(n: number, tentId: string, ts: string, metric: string, value: number) {
   return {
-    id,
+    id: readingId(n),
+    user_id: FAKE_USER_ID,
     tent_id: tentId,
+    device_id: null,
     metric,
     value,
     quality: "ok",
@@ -62,6 +76,7 @@ function sensorRow(id: string, tentId: string, ts: string, metric: string, value
     captured_at: ts,
     created_at: ts,
     raw_payload: null,
+    correction_valid: true,
   };
 }
 
@@ -130,7 +145,12 @@ async function mockSignedInSupabase(
       return;
     }
 
-    if (pathname.endsWith("/rest/v1/sensor_readings")) {
+    // Readers moved to the validated view in #1546; the raw table is still read
+    // elsewhere. Serve both, so a tent-scoped read of either kind is observed.
+    if (
+      pathname.endsWith("/rest/v1/sensor_readings") ||
+      pathname.endsWith("/rest/v1/sensor_readings_effective")
+    ) {
       const rawTentScope = url.searchParams.get("tent_id");
       const scopedTentId = rawTentScope?.startsWith("eq.") ? rawTentScope.slice(3) : null;
       if (scopedTentId) options.onTentScopedSensorRead?.(scopedTentId);
@@ -185,15 +205,15 @@ test.describe("Sensors truth closure", () => {
     const newestAir = new Date(now - 60_000).toISOString();
     const otherTent = new Date(now - 60_000).toISOString();
     const rows = [
-      sensorRow("a-old-temp", TENT_A_ID, oldest, "temperature_c", 20),
-      sensorRow("a-old-rh", TENT_A_ID, oldest, "humidity_pct", 50),
-      sensorRow("a-old-soil", TENT_A_ID, oldest, "soil_moisture_pct", 11),
-      sensorRow("a-new-soil", TENT_A_ID, newestSoil, "soil_moisture_pct", 61),
+      sensorRow(1, TENT_A_ID, oldest, "temperature_c", 20),
+      sensorRow(2, TENT_A_ID, oldest, "humidity_pct", 50),
+      sensorRow(3, TENT_A_ID, oldest, "soil_moisture_pct", 11),
+      sensorRow(4, TENT_A_ID, newestSoil, "soil_moisture_pct", 61),
       // The newest overall snapshot is intentionally sparse. Its compatibility
       // soil=0 must not erase the latest actual soil observation above.
-      sensorRow("a-new-temp", TENT_A_ID, newestAir, "temperature_c", 25),
-      sensorRow("a-new-rh", TENT_A_ID, newestAir, "humidity_pct", 60),
-      sensorRow("b-soil", TENT_B_ID, otherTent, "soil_moisture_pct", 88),
+      sensorRow(5, TENT_A_ID, newestAir, "temperature_c", 25),
+      sensorRow(6, TENT_A_ID, newestAir, "humidity_pct", 60),
+      sensorRow(7, TENT_B_ID, otherTent, "soil_moisture_pct", 88),
     ];
 
     await seedFakeSession(page);

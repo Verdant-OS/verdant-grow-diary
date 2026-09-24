@@ -21,6 +21,17 @@
  *              by the statement, not the line.
  *   multilineResolved  the `resolved` shape wrapped the same way: the widening
  *              must not turn a compliant guard into a false positive.
+ *   inline     the `bypass` shape with NO binding: the read is consumed where it
+ *              is made, `expect(readFileSync("package.json", "utf8"))`. The round-3
+ *              signal looks only at identifiers a read is assigned to, so an
+ *              unbound read bound nothing and the checker exited 0 — Codex, #1221
+ *              round 9.
+ *   inlineMethod  the same with the text method chained onto a read wrapped
+ *              across lines, `readFileSync(\n resolve(…),\n "utf8",\n).includes(…)`.
+ *   inlineResolvedFence  a compliant guard whose parse sits INSIDE a text method:
+ *              `Object.keys(JSON.parse(readFileSync(…)).scripts).includes(…)`. A
+ *              statement-bounded regex crosses the read's closing parenthesis and
+ *              flags this; the read's own argument list must be matched instead.
  *
  * @source-scan-justified: this file EMBEDS the forbidden shapes as spawn fixtures for the
  * checker itself (see FIXTURES below). It reads no package.json of its own; the strings
@@ -83,6 +94,40 @@ const UNRELATED = JSON.parse('{"a":1}');
 it("x", () => {
   expect(UNRELATED.a).toBe(1);
   expect(PACKAGE).toContain('"test:x"');
+});
+`,
+  inline: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(readFileSync("package.json", "utf8")).toContain('"test:x"');
+});
+`,
+  inlineMethod: `
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(
+    readFileSync(
+      resolve(process.cwd(), "package.json"),
+      "utf8",
+    ).includes('"test:x"'),
+  ).toBe(true);
+});
+`,
+  inlineResolvedFence: `
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { expect, it } from "vitest";
+it("x", () => {
+  expect(
+    Object.keys(JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf8")).scripts).includes("test:x"),
+  ).toBe(true);
 });
 `,
   multilineResolved: `
@@ -152,6 +197,23 @@ describe("check-contract-test-resolution — package.json guards must assert on 
 
   it("accepts a resolved guard whose read is wrapped across lines — the widening adds no false positive", () => {
     const { status, out } = runChecker("multilineResolved");
+    expect(status, out).toBe(0);
+  });
+
+  it("rejects an unbound read consumed directly by expect() (Codex, #1221 round 9)", () => {
+    const { status, out } = runChecker("inline");
+    expect(status, out).toBe(1);
+    expect(out).toContain("inline.test.ts");
+  });
+
+  it("rejects a text method chained onto a wrapped, unbound read (Codex, #1221 round 9)", () => {
+    const { status, out } = runChecker("inlineMethod");
+    expect(status, out).toBe(1);
+    expect(out).toContain("inlineMethod.test.ts");
+  });
+
+  it("accepts a parsed read nested inside a text method — the read's own parentheses bound the match", () => {
+    const { status, out } = runChecker("inlineResolvedFence");
     expect(status, out).toBe(0);
   });
 });

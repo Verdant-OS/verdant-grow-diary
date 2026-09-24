@@ -50,12 +50,19 @@ name: Mocked E2E closure (previously unrun specs)
 
 on:
   pull_request:
-    branches: [verdant-grow-diary]
+    # Both PR targets ci.yml runs on, so a PR to main is not left with no result
+    # from this lane (CodeRabbit, #1221 round 9).
+    branches: [main, verdant-grow-diary]
     paths:
       - "e2e/**"
       - "src/**"
       - "playwright.config.ts"
       - "vite.config.ts"
+      # The webServer is `bunx vite` in dev mode, which reads the committed client
+      # config from these two; a PR changing only them can stop every spec booting
+      # or authenticating (Codex, #1221 round 9). .env.production is not loaded in dev.
+      - ".env"
+      - ".env.development"
       - "package.json"
       - "bun.lock"
       - "bun.lockb"

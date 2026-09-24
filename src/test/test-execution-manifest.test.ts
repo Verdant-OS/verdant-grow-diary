@@ -95,11 +95,14 @@ const corpus = buildExecutionCorpus({
 });
 // A runner resolves a bare basename against its own root — `bunx playwright test
 // agent-integrations-smoke.spec.ts` runs e2e/agent-integrations-smoke.spec.ts via
-// playwright.config's testDir. Safe only because the corpus is command lines: a bare
-// name there is a runner argument, not prose. Ambiguous basenames stay unresolved.
+// playwright.config's testDir. Only Playwright specs under that resolved testDir are
+// eligible: the corpus also carries package-script and runner bodies with their strings
+// kept, and no other runner resolves a bare name (CodeRabbit, #1221 round 9).
+// Ambiguous basenames stay unresolved.
 const namedPaths = resolveBareBasenames({
   laneFiles: LANES.flatMap((l) => l.files),
   namedPaths: namedPathsIn(corpus),
+  resolvable: (f: string) => isPlaywrightSpec(f, PLAYWRIGHT_TEST_DIR),
 });
 
 /**

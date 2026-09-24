@@ -114,6 +114,17 @@ describe("workflow execution — a mention is not an invocation (FALSE-LIVE guar
       false,
     );
   });
+
+  it("tokenizes a .tsx path whole — never as its .ts prefix (Cursor Bugbot, #1221)", () => {
+    // `\.(?:ts|tsx|…)` tried `ts` first with nothing after it, so `widget.spec.tsx`
+    // was read as `widget.spec.ts`: a wired .tsx spec looked dead, and a sibling .ts
+    // file could look executed for the wrong reason.
+    const paths = namedPathsIn("bunx playwright test e2e/widget.spec.tsx e2e/page.test.jsx");
+    expect(paths.has("e2e/widget.spec.tsx")).toBe(true);
+    expect(paths.has("e2e/widget.spec.ts")).toBe(false);
+    expect(paths.has("e2e/page.test.jsx")).toBe(true);
+    expect(paths.has("e2e/page.test.js")).toBe(false);
+  });
 });
 
 describe("workflow execution — a real invocation must not be missed (FALSE-DEAD guards)", () => {
@@ -900,6 +911,30 @@ describe("resolveBareBasenames — a runner argument names a lane file by basena
     expect(out.has("stray.spec.ts")).toBe(true); // passthrough — not a lane file, not dropped
     expect(named.size).toBe(2);
     expect(named.has("e2e/full.spec.ts")).toBe(true);
+  });
+
+  it("resolves bare names for Playwright specs only — no other runner resolves against testDir (CodeRabbit, #1221 round 9)", () => {
+    // The corpus is not command lines alone: package-script and runner bodies are
+    // appended with their string literals kept. `vitest run foo.test.ts` in any of them
+    // must not mark a Deno test executed that Deno never ran.
+    const laneFiles = [
+      "supabase/functions/x/foo.test.ts",
+      "scripts/run-y-harness.ts",
+      "e2e/bar.spec.ts",
+    ];
+    const namedPaths = new Set(["foo.test.ts", "run-y-harness.ts", "bar.spec.ts"]);
+    const out = resolveBareBasenames({ laneFiles, namedPaths });
+    expect(out.has("supabase/functions/x/foo.test.ts")).toBe(false);
+    expect(out.has("scripts/run-y-harness.ts")).toBe(false);
+    expect(out.has("e2e/bar.spec.ts")).toBe(true);
+    // The eligible set follows the caller's resolved testDir, not a hard-coded "e2e".
+    const custom = resolveBareBasenames({
+      laneFiles: ["tests/ui/bar.spec.ts", "e2e/bar2.spec.ts"],
+      namedPaths: new Set(["bar.spec.ts", "bar2.spec.ts"]),
+      resolvable: (f: string) => isPlaywrightSpec(f, "tests/ui"),
+    });
+    expect(custom.has("tests/ui/bar.spec.ts")).toBe(true);
+    expect(custom.has("e2e/bar2.spec.ts")).toBe(false);
   });
 
   it("is a bare-token match only — a basename inside a longer path is not one", () => {

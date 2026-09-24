@@ -133,6 +133,53 @@ const ASSERTS_ON_BINDING = (source, id) => {
   ).test(source);
 };
 
+/**
+ * An UNBOUND read consumed where it is made: `expect(readFileSync("package.json",
+ * "utf8"))`, or a text method chained onto the read, `readFileSync(…).includes(…)`.
+ * The binding signal above only sees identifiers a read is assigned to, so this
+ * shape bound nothing and, beside an unrelated `JSON.parse`, exited 0 (Codex,
+ * #1221 round 9).
+ *
+ * The read's extent is its own balanced argument list, not a statement-bounded
+ * regex. A lazy `[^;]*?\)` walks past the read's closing parenthesis, so
+ * `Object.keys(JSON.parse(readFileSync(…)).scripts).includes(…)` — a parsed,
+ * compliant guard — would read as `readFileSync(…).includes(…)`. String literals
+ * are skipped while balancing, so a quoted parenthesis does not end the call.
+ */
+const READ_CALL = /(?:[\w.]*readFile(?:Sync)?|\bread|\breadText)\s*\(/g;
+const TEXT_METHOD_AFTER =
+  /^\s*(?:\.toString\(\s*\))?\s*\.(?:includes|match|indexOf|search|startsWith|endsWith)\s*\(/;
+const closingParen = (source, open) => {
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    const c = source[i];
+    if (c === '"' || c === "'" || c === "`") {
+      for (i++; i < source.length && source[i] !== c; i++) if (source[i] === "\\") i++;
+      continue;
+    }
+    if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) return i;
+  }
+  return -1;
+};
+const ASSERTS_ON_INLINE_READ = (source, config) => {
+  const target = new RegExp(
+    `${escapeRegExp(config)}|\\b(?:PKG|PACKAGE_JSON|PACKAGE_PATH|PKG_PATH|pkgPath|packagePath)\\b`,
+  );
+  for (const m of source.matchAll(READ_CALL)) {
+    const open = m.index + m[0].length - 1;
+    const close = closingParen(source, open);
+    if (close < 0 || !target.test(source.slice(open + 1, close))) continue;
+    const after = source.slice(close + 1);
+    if (TEXT_METHOD_AFTER.test(after)) return true;
+    const consumedByExpect =
+      /expect\(\s*(?:await\s+)?$/.test(source.slice(0, m.index)) &&
+      /^\s*(?:\.toString\(\s*\))?\s*\)/.test(after);
+    if (consumedByExpect) return true;
+  }
+  return false;
+};
+
 /** Reads the JSON config's source, directly or through a `PKG`-style constant (statement-bounded). */
 const READS_JSON_SOURCE = (source, config) => {
   const esc = escapeRegExp(config);
@@ -201,13 +248,14 @@ for (const file of listTestFiles(TEST_DIR)) {
     const rawBinding = PACKAGE_READ_BINDINGS(source, config).find((id) =>
       ASSERTS_ON_BINDING(source, id),
     );
-    if (!neverParsed && !assertsOnSource && !rawBinding) continue; // parsed, asserted on the object
+    const inlineRead = ASSERTS_ON_INLINE_READ(source, config);
+    if (!neverParsed && !assertsOnSource && !rawBinding && !inlineRead) continue; // parsed, asserted on the object
     const justification = source.match(JUSTIFICATION_RE);
     if (justification) {
       justified.push({ file: rel, config, reason: justification[1].trim() });
       continue;
     }
-    violations.push({ file: rel, config, json: true, neverParsed, rawBinding });
+    violations.push({ file: rel, config, json: true, neverParsed, rawBinding, inlineRead });
   }
 }
 
@@ -219,9 +267,11 @@ if (violations.length > 0) {
       v.json
         ? v.rawBinding
           ? `    asserts on \`${v.rawBinding}\`, the raw ${v.config} source it read, instead of the parsed object`
-          : v.neverParsed
-            ? `    reads ${v.config} source and never JSON.parse()s it — every assertion on it is on text`
-            : `    asserts on ${v.config} SOURCE TEXT (a "key": pattern) instead of the parsed object`
+          : v.inlineRead
+            ? `    asserts on an unbound ${v.config} read (\`expect(readFileSync(…))\` or \`readFileSync(…).includes(…)\`) instead of the parsed object`
+            : v.neverParsed
+              ? `    reads ${v.config} source and never JSON.parse()s it — every assertion on it is on text`
+              : `    asserts on ${v.config} SOURCE TEXT (a "key": pattern) instead of the parsed object`
         : `    reads ${v.config} source but never imports it`,
     );
   }

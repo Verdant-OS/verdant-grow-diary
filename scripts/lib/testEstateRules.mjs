@@ -1171,20 +1171,31 @@ export function buildExecutableCorpus({ workflowTexts, scripts = {}, readRunner 
  * `testDir: "./e2e"`. Requiring the prefix reported that spec as never-run
  * while CI executed it on every matching PR.
  *
- * It is only safe because the corpus is COMMAND LINES ONLY: a basename that
- * appears there is an argument to a runner, not prose in an allowlist or a
- * job summary. The execution-manifest guard once "found" that same spec through
- * a summary `echo` of its full path — the right answer for the wrong reason —
- * and lost it the moment prose stopped counting. This is the right reason.
+ * ONLY Playwright specs resolve this way (`resolvable`, default
+ * `isPlaywrightSpec` under `e2e`; pass the caller's resolved testDir). The
+ * justification above is Playwright's: it resolves a bare name against testDir.
+ * Deno, the harness runners and pgTAP do not, and the corpus is NOT command
+ * lines alone — `buildExecutableCorpus` appends expanded package-script bodies
+ * and one-hop runner bodies with their string literals kept. So a bare
+ * `foo.test.ts` in `vitest run foo.test.ts`, a log message or a skip list would
+ * otherwise mark a Deno test executed that Deno never ran (CodeRabbit, #1221
+ * round 9). A short token is far likelier than a full path to appear in
+ * unrelated strings, so it gets the narrower rule.
  *
  * AMBIGUOUS basenames are excluded and must be named in full. Two edge
  * functions both ship a `contract.test.ts`, so a bare token could not say which
- * one ran; resolving it to either would be a fabricated reading.
+ * one ran; resolving it to either would be a fabricated reading. Ambiguity is
+ * counted across ALL lane files, eligible or not — the stricter reading.
  *
- * Returns a new Set: `namedPaths` plus every lane file whose basename is unique
- * across `laneFiles` and present in `namedPaths`. Pure; input Set is untouched.
+ * Returns a new Set: `namedPaths` plus every resolvable lane file whose basename
+ * is unique across `laneFiles` and present in `namedPaths`. Pure; input Set is
+ * untouched.
  */
-export function resolveBareBasenames({ laneFiles, namedPaths }) {
+export function resolveBareBasenames({
+  laneFiles,
+  namedPaths,
+  resolvable = (f) => isPlaywrightSpec(f),
+}) {
   const basenameCount = new Map();
   for (const f of laneFiles) {
     const b = f.slice(f.lastIndexOf("/") + 1);
@@ -1192,7 +1203,7 @@ export function resolveBareBasenames({ laneFiles, namedPaths }) {
   }
   const out = new Set(namedPaths);
   for (const f of laneFiles) {
-    if (out.has(f)) continue;
+    if (out.has(f) || !resolvable(f)) continue;
     const b = f.slice(f.lastIndexOf("/") + 1);
     if (basenameCount.get(b) === 1 && namedPaths.has(b)) out.add(f);
   }
@@ -1205,11 +1216,15 @@ export function resolveBareBasenames({ laneFiles, namedPaths }) {
  * Exact path equality only. A prototype that accepted directory prefixes and
  * glob tokens reported all 100 lane files as reached, because a bare `**`
  * appears somewhere in the corpus.
+ *
+ * The extension is matched whole: longest alternative first and no identifier
+ * character after it. `\.(?:ts|tsx|…)` with nothing following took `ts` from
+ * `widget.spec.tsx`, so a wired .tsx spec read as dead and a sibling .ts file
+ * could read as executed (Cursor Bugbot, #1221). The alternatives cover every
+ * extension `IS_TEST_FILE` admits.
  */
+const NAMED_PATH =
+  /[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:tsx|ts|mts|cts|jsx|js|mjs|cjs|sql)(?![A-Za-z0-9_])/g;
 export function namedPathsIn(corpus) {
-  return new Set(
-    [...String(corpus).matchAll(/[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:ts|tsx|mjs|cjs|js|sql)/g)].map(
-      (m) => m[0],
-    ),
-  );
+  return new Set([...String(corpus).matchAll(NAMED_PATH)].map((m) => m[0]));
 }

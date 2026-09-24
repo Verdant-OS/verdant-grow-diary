@@ -669,7 +669,8 @@ That is five files at the stamped SHA. It does **not** scan `src/lib/sensors/`, 
 every required context, so a violation cannot block a merge by that route. It runs from:
 
 - **every pull request into `verdant-grow-diary` or `main`**, with no path filter, through three
-  workflows. Each runs a package script that ends with the checker:
+  workflows. Each runs a package script that ends with the checker, chained with `&&`, so the
+  checker runs only when the script's Vitest suite and the job's earlier steps pass:
   - `.github/workflows/ai-doctor-golden-cases.yml:5-7` (`pull_request:`), whose step at
     `.github/workflows/ai-doctor-golden-cases.yml:39` (`bun run test:ai-doctor-phase1`) runs
     `package.json:315` (`&& node scripts/sensor-safety-check.mjs`);
@@ -689,7 +690,8 @@ every required context, so a violation cannot block a merge by that route. It ru
   (`docs/**`), `package.json`, and the checker itself at
   `.github/workflows/release-workbook-safety.yml:11` (`scripts/sensor-safety-check.mjs`). That job
   reaches the checker through `scripts/verify-release-workbooks.mjs:53`
-  (`scripts/sensor-safety-check.mjs`);
+  (`scripts/sensor-safety-check.mjs`), the fifth of its steps; that script skips every step after
+  the first one that fails;
 - `vitest-batched-full-suite.yml`, on manual dispatch only;
 - `release-receipt-ci.yml`, on `main` only;
 - a path-filtered strain-library gate.
@@ -697,7 +699,7 @@ every required context, so a violation cannot block a merge by that route. It ru
 > Earlier versions listed only the pre-commit hook and the last three lanes, and so implied the
 > check never runs on an ordinary pull request. All three pull-request lanes and their script chains
 > were already present at the first stamp. The classification does not change: it runs on every PR
-> into `verdant-grow-diary` or `main`, but not as a required check.
+> into `verdant-grow-diary` or `main` once the steps ahead of it pass, but not as a required check.
 
 ---
 
@@ -1099,7 +1101,7 @@ true; a clause missing from this table would be an unstated gap.
 | AC-4.3  | comment and review; T3 proposed                                                                                                                   | `convention only`   |
 | AC-4.4  | comment and review — deliberate Pi exception                                                                                                      | `convention only`   |
 | AC-4.5  | one-directional only                                                                                                                              | `convention only`   |
-| AC-4.6  | `scripts/sensor-safety-check.mjs` — wording heuristic, 5 files; PRs into `main`/`verdant-grow-diary` via 3 non-required workflows, not `ci.yml`   | **partially gated** |
+| AC-4.6  | `scripts/sensor-safety-check.mjs` — wording heuristic, 5 files; 3 non-required lanes on PRs to `main`/`verdant-grow-diary`, once suites pass      | **partially gated** |
 | AC-5.1  | shape of the code as written                                                                                                                      | structural          |
 | AC-5.2  | no code path from the request body to the model constants                                                                                         | structural          |
 | AC-5.3  | shape of the code as written                                                                                                                      | structural          |
@@ -1323,4 +1325,4 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-09-23 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | §15 amendment, follow-up to GDP-ARCH-CITE-001 (#1639). Corrected three citations that fail T1: AC-1.5 prose `:238` now names `createStartHandler.js`, the AC-1.7 historical note spells its superseded range in prose, and AC-5.3 `readToolArguments` is now `:639-649`. AC-4.1: #1620, which carried the prototype-key guard, closed unmerged; the defect now reaches the #1088 display canon (`sourceLabel` undefined, still never healthy), under Bun 1.3.11. AC-4.2: qualified the "always one of the six" display claim accordingly; reclassified partially gated (display split tested). AC-3.2: `*Rules.ts` 517 → 518 (#1636); AC-3.4 shim imports 743 → 744 (#1647), and §12's Next.js row now cites AC-3.4, not a count; other §3 counts and the AC-4.3 union count unchanged. §13 and §14: #1620 and #1619 closed unmerged; #1175 and #1221 still open. T1 text unchanged. Rejoined the §13 table #1639 split with a blank line; applied the repo Prettier config.     |
 | 2026-09-24 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | Editorial follow-up to #1649; stamp unchanged. AC-1.5's in-prose bullet no longer writes the installed Start package as a `path:line` token: it now names line 238 of `createStartHandler.js` in prose, with its `[defaultCsrfMiddleware]` fallback, re-read in `@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins at this SHA. The clause's `_Source:` block keeps its package-internal cites and now says T1 does not cover them: T1 covers repository paths, and a dependency file cannot be opened at the stamped SHA. Copilot, CodeRabbit and the Codex GitHub reviewer raised the bullet on #1649; Copilot raised the `_Source:` block on #1667. No other clause changed.                                                                                                                                                                                                                                                                                 |
 | 2026-09-24 | `ef15b2c1be949d720f34bc33e4b980d18d6114e2` | Claude | §15 re-verification, 12 commits after `32820526` (first #1656, last #1664). No repository file the contract cites by path changed, apart from this file and `docs/agents/CURRENT_STATE.md` (cited as a document), so every citation holds by file identity. AC-3.2: `*Rules.ts` 518 → 519 (#1663 adds a pure rules file); the `Date.now()`, `Math.random()` and Supabase-importer counts are unchanged. AC-3.4: 744 → 750 shim import statements, in 749 files; the prior 744 also counted statements. AC-4.3: the wider union count is unchanged at 105 lines in 85 files. AC-10.2: zero hits on re-run. §13: added the Quick Log deferral row, with every direct RPC caller, and sequencing notes with no PR state (a change to the AC-4.1-cited line, as #1655 proposes, must update its T1 pins, as #1643 adds, in the same change); the release-topology row no longer states PR status. No clause statement changed. Docs-only; no `CURRENT_STATE.md` restamp.             |
-| 2026-09-24 | `69aca5e738b7d0d49369a636b1b293564ec65203` | Claude | §15 re-verification, two docs-only commits after `ef15b2c1`. Re-read all 226 repository `path:line` cites outside this record, not by file identity, and the 8 package cites from tarballs whose sha512 matches `bun.lock`. Re-measured §3, §4 and §10 counts, bar AC-4.3's multi-line figure; re-ran the AC-4.1 prototype-key reproduction under Bun 1.3.11. AC-3.2 corrected: no root-level `*Rules.ts` imports the Supabase client; the two named files import a generated type only, as at the first stamp. AC-4.6 corrected: the checker runs on every PR into `main`/`verdant-grow-diary` via 3 non-required workflows. AC-1.5: the switch is `serverFns.disableCsrfMiddlewareWarning`, compiled at build time. AC-4.3: patterns recorded; multi-line figure a `source claim`. §13: `CLAUDE.md` correction deferred. This amendment also fixes `docs/codebase-map.md`. Follow-ups: AC-3.2 (Copilot); AC-1.5, AC-4.6, header (Codex); header, AC-4.3, AC-4.6 (CodeRabbit).  |
+| 2026-09-24 | `69aca5e738b7d0d49369a636b1b293564ec65203` | Claude | §15 re-verification, two docs-only commits after `ef15b2c1`. Re-read all 226 repository `path:line` cites outside this record, not by file identity, and the 8 package cites from tarballs whose sha512 matches `bun.lock`. Re-measured §3, §4 and §10 counts, bar AC-4.3's multi-line figure; re-ran AC-4.1's prototype-key reproduction under Bun 1.3.11. AC-3.2 corrected: no root-level `*Rules.ts` imports the Supabase client; the two named files import a generated type only, as at the first stamp. AC-4.6 corrected: the checker runs on PRs into `main`/`verdant-grow-diary` via 3 non-required lanes once earlier steps pass. AC-1.5: the build-time switch is `serverFns.disableCsrfMiddlewareWarning`. AC-4.3: patterns recorded; multi-line figure a `source claim`. §13: `CLAUDE.md` correction deferred. This amendment also fixes `docs/codebase-map.md`. Follow-ups: AC-3.2 (Copilot); AC-1.5, AC-4.6, header (Codex); header, AC-4.3, AC-4.6 (CodeRabbit).  |

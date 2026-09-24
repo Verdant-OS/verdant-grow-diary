@@ -1,18 +1,22 @@
 # Verdant — Current Architecture Contract
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
-**Verified from source at:** `ef15b2c1be949d720f34bc33e4b980d18d6114e2` (deploy branch
-`verdant-grow-diary`), 2026-09-24, by Claude (§15 re-verification; see §15.1). Between the previous
-stamp, `32820526d6e71c5a2ed213da35f3a68f66f86432`, and this one, **no repository file this contract
-cites by path changed**, apart from this file and `docs/agents/CURRENT_STATE.md`, which it cites as a
-document and never by line. Every citation verified at `32820526` therefore holds at this tip by file
-identity. Re-measured at this tip: the AC-3.2 and AC-3.4 counts, the AC-4.3 union count, the AC-10.2
-absence search, and the §13/§14 PR states. The provenance recorded at `32820526` otherwise carries
-forward unchanged. The AC-1.5, AC-1.7 and AC-5.3 citations and AC-4.1 and AC-4.2 hold by file
-identity. AC-4.4 and AC-4.5 still rest on the GDP-ARCH-CITE-001 stamp at
-`ea50ec678dee26e8ad5494c5d41aab8e4de1740e`. Every other clause is still a `source claim` carried from
-the `8b73c14031050b51061d4715bedbcdfeb66eee52` / `387a00067a76ca9e2ced453d6b6a0f580e33209b` stamps.
-First verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
+**Verified from source at:** `69aca5e738b7d0d49369a636b1b293564ec65203` (deploy branch
+`verdant-grow-diary`), 2026-09-24, by Claude (§15 re-verification; see §15.1). **This stamp re-read
+every citation instead of carrying earlier stamps by file identity.** Every backticked `path:line`
+cite in this file was extracted, each counted once however many lines it names. The 220 repository
+cites outside the §15.1 record were each read against the claim they support. The 8
+package-internal cites in AC-1.4, AC-1.5 and §14 were re-read from the published tarballs of the
+versions `bun.lock` pins, after each tarball's sha512 matched its `bun.lock` integrity entry. The
+14 cites inside §15.1 rows name superseded lines by design and were not re-read. The counts in §3, §4 and §10 were re-measured, and the AC-4.1
+prototype-key behaviour was re-run under Bun 1.3.11. Citations, counts and that run are therefore
+`established fact` at this stamp, and the earlier provenance chain for them (`ef15b2c1` →
+`32820526` → `ea50ec67` → `8b73c140` / `387a0006`) is superseded rather than carried. Two kinds of
+statement were **not** re-derived and keep the labels and dates they carry: dated runtime results
+recorded with their own runtime (AC-1.4's bare-specifier build), and history about which PR
+introduced a behaviour. Between `ef15b2c1` and this tip, only this file and
+`docs/agents/CURRENT_STATE.md` changed. First verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640`
+on 2026-09-05 by Grok (PR #1281).
 **Carries no `Sentinel-Version`.** This is not one of the twelve governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
 
@@ -168,9 +172,13 @@ the automatic install, is therefore **accurate**.
 What follows:
 
 - Removing `csrfMiddleware` from `requestMiddleware` removes the protection. Nothing falls back.
-- Outside production, Start logs one `console.warn` when no CSRF middleware is registered, unless
-  `serverFns.disableCsrfMiddlewareWarning` is set. Verdant does not set it. In production there is
-  no warning, so the removal is silent where it matters.
+- Outside production, Start logs one `console.warn` when no CSRF middleware is registered. In
+  production there is no warning, so the removal is silent where it matters. The runtime check, on
+  line 261 of the installed `createStartHandler.js`, skips the warning when the environment variable
+  `TSS_DISABLE_CSRF_MIDDLEWARE_WARNING` is `"true"`. The warning's own text tells the reader to set
+  `serverFns.disableCsrfMiddlewareWarning` instead. How that option reaches the variable lives in a
+  Start plugin package that was not read (`NOT_MEASURED`). Neither name appears in any code,
+  config or workflow file in the repository, so Verdant sets neither.
 - Line 238 of the installed Start package's `createStartHandler.js` falls back to
   `[defaultCsrfMiddleware]` when no Start instance is registered. Deleting `src/start.ts` would
   therefore bring the default back (`inference`; not run), but it would also drop the error and
@@ -319,20 +327,34 @@ clock, no randomness. Time is injected.**
 This is the contract for **new** code, not a description of every existing file. Re-measured at the
 stamped SHA, over the root-level `src/lib/*Rules.ts` glob:
 
-| Measure                               | Count | Files                                                              |
-| ------------------------------------- | ----: | ------------------------------------------------------------------ |
-| `*Rules.ts` files                     |   519 | —                                                                  |
-| contain a direct `Date.now()` call    |    55 | raw-text match                                                     |
-| contain a direct `Math.random()` call |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"   |
-| import the Supabase client            |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts` |
+| Measure                                                       | Count | Files                                                              |
+| ------------------------------------------------------------- | ----: | ------------------------------------------------------------------ |
+| `*Rules.ts` files                                             |   519 | —                                                                  |
+| contain a direct `Date.now()` call                            |    55 | raw-text match                                                     |
+| contain a direct `Math.random()` call                         |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"   |
+| import the Supabase client at runtime                         |     0 | —                                                                  |
+| type-only import from generated `integrations/supabase/types` |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts` |
 
-Those files are legacy, not precedent. Do not cite them, and do not extend the pattern. The one
-file added since `32820526` is `src/lib/plantSensorSourceHistoryRules.ts` (#1663), which calls
-neither `Date.now()` nor `Math.random()` and imports neither React nor Supabase.
-_Source:_ `AGENTS.md`; counts measured by `ls` and `grep -l` at the stamped SHA. The narrative drift
-inventory is in `CLAUDE.md`. `docs/codebase-map.md` records only the two Supabase importers
-(`:466-467`), and an earlier version wrongly pointed here for the `Date.now()` / `Math.random()`
-drift. `established fact`.
+The clock and randomness files are legacy, not precedent. Do not cite them, and do not extend the
+pattern. The one file added since `32820526` is `src/lib/plantSensorSourceHistoryRules.ts`
+(#1663), which calls neither `Date.now()` nor `Math.random()` and imports neither React nor
+Supabase.
+
+**Corrected: no root-level `*Rules.ts` imports the Supabase client, and neither named file ever
+did.** Every earlier version of this clause counted the two files as importing Supabase, and since
+#1626 the table has said they "import the Supabase client". They import only a generated row type:
+`src/lib/sensorIngestNormalizationRules.ts:17` (`import type { TablesInsert }`) and
+`src/lib/sensorWebhookIngestRules.ts:19` (`import type { TablesInsert }`). Both lines were the same
+at the first stamp. An `import type` is erased at compile time and performs no I/O, so these files
+do not break the runtime purity this clause protects (`inference`). Whether new rules modules
+should depend on generated row types at all is a design preference this contract does not settle.
+`CLAUDE.md` ("Two `*Rules.ts` import Supabase") still repeats the overstatement; correcting it is
+deferred (§13).
+_Source:_ `AGENTS.md`; counts measured by `ls` and `grep -l` at the stamped SHA, the import rows
+over `from "@/integrations/supabase/client"`, `from "@supabase/supabase-js"` and
+`from "@/integrations/supabase/types"`. The narrative drift inventory is in `CLAUDE.md`.
+`docs/codebase-map.md` lists the two files at `:466-467`, and an earlier version wrongly pointed
+here for the `Date.now()` / `Math.random()` drift. `established fact`, except where labelled.
 _Enforcement:_ `convention only`.
 
 **AC-3.3 — Copy that is pinned, reused, or safety-bearing is data, not markup.**
@@ -555,10 +577,14 @@ own mirrored or local vocabulary, not a forbidden cross-import.
 **"Roughly ninety", measured.** Single-line union literals over two or more of the source names,
 outside tests:
 
-- **76 lines in 66 files**, identical to the count at the first stamp, so the number has not grown;
+- **76 lines in 66 files**, identical to the count at the first stamp and re-measured at this
+  stamp, so the number has not grown;
 - a wider pattern that also counts `"stale" | "invalid"` pairs, which catches quality unions, gives
   105 lines in 85 files;
-- multi-line unions add 12 matching lines in 6 files.
+- multi-line unions add 12 matching lines in 6 files. This figure is a `source claim`. Its pattern
+  was never recorded, and it was not reproduced at this stamp. A one-member-per-line pattern
+  restricted to `live`, `manual`, `csv` and `demo` gives 17 lines in 6 files, and at least one of
+  those unions is not a sensor-source union. T3's AST scan, not a regex, is what settles it.
 
 _Source:_ `src/lib/sensor/sensorSourceRules.ts:16`; `src/constants/sensorIngestProvenance.ts:15`;
 `src/lib/ai/types.ts:15`; `src/lib/aiDoctorEngine.ts:151,266-276,291,389-397`; counts by `grep -rnE`
@@ -634,12 +660,28 @@ statically refuses the following, across `ROOTS = ["src/lib/sensor", "src/compon
 
 That is five files at the stamped SHA. It does **not** scan `src/lib/sensors/`, the root-level
 `src/lib/sensor*.ts` modules, or edge functions. It is **not** invoked by `ci.yml`, which supplies
-every required context. It runs from:
+every required context, so a violation cannot block a merge by that route. It runs from:
 
+- **every pull request into `verdant-grow-diary` or `main`**, with no path filter.
+  `.github/workflows/ai-doctor-golden-cases.yml:5-7` (`pull_request:`) triggers it, and the step at
+  `.github/workflows/ai-doctor-golden-cases.yml:39` (`bun run test:ai-doctor-phase1`) runs a script
+  that ends with the checker: `package.json:315` (`&& node scripts/sensor-safety-check.mjs`). The
+  job is not one of the 35 required contexts;
 - the pre-commit hook, through `scripts/assert-docs-safety.mjs`;
+- pull requests that touch the path filter of `.github/workflows/release-workbook-safety.yml`.
+  The filter is broad: it covers `docs/**` at `.github/workflows/release-workbook-safety.yml:6`
+  (`docs/**`), `package.json`, and the checker itself at
+  `.github/workflows/release-workbook-safety.yml:11` (`scripts/sensor-safety-check.mjs`). That job
+  reaches the checker through `scripts/verify-release-workbooks.mjs:53`
+  (`scripts/sensor-safety-check.mjs`);
 - `vitest-batched-full-suite.yml`, on manual dispatch only;
 - `release-receipt-ci.yml`, on `main` only;
 - a path-filtered strain-library gate.
+
+> Earlier versions listed only the pre-commit hook and the last three lanes, and so implied the
+> check never runs on an ordinary pull request. The golden-cases lane and its `test:ai-doctor-phase1` chain were already
+> present at the first stamp. The classification does not change: it runs on every PR, but not as
+> a required check.
 
 ---
 
@@ -1041,7 +1083,7 @@ true; a clause missing from this table would be an unstated gap.
 | AC-4.3  | comment and review; T3 proposed                                                                                                                   | `convention only`   |
 | AC-4.4  | comment and review — deliberate Pi exception                                                                                                      | `convention only`   |
 | AC-4.5  | one-directional only                                                                                                                              | `convention only`   |
-| AC-4.6  | `scripts/sensor-safety-check.mjs` — wording heuristic over 5 files; pre-commit and non-required workflows only, not `ci.yml`                      | **partially gated** |
+| AC-4.6  | `scripts/sensor-safety-check.mjs` — wording heuristic over 5 files; every PR via non-required `ai-doctor-golden-cases.yml`, not `ci.yml`          | **partially gated** |
 | AC-5.1  | shape of the code as written                                                                                                                      | structural          |
 | AC-5.2  | no code path from the request body to the model constants                                                                                         | structural          |
 | AC-5.3  | shape of the code as written                                                                                                                      | structural          |
@@ -1154,6 +1196,7 @@ Not rejected — sequenced.
 | Retiring the unreachable legacy `classifySource` in `aiDoctorEngine.ts` (AC-4.3)                        | Deletion of dead code on a safety surface; its own diff, with a test that the live path is unaffected                                                               |
 | Making `Published migration integrity` a required context (AC-9.1)                                      | A ruleset change — Cheek's decision, not a code change                                                                                                              |
 | Removing the declared-but-unimported `@supabase/ssr` dependency (AC-2.1)                                | A dependency change; its own slice under AC-8.2                                                                                                                     |
+| Correcting `CLAUDE.md`'s "Two `*Rules.ts` import Supabase" (AC-3.2)                                     | A governance-file edit: all twelve files bump `Sentinel-Version` together, so it is its own slice                                                                   |
 | **Authoritative Release Topology Specification**                                                        | §14 — blocked on evidence this contract does not have; tracked via #1175 and #1221                                                                                  |
 | Binding Quick Log persistence and target selection as a clause                                          | After #1674, #1675, #1676 and #1678 resolve, because all four change that surface. The facts to bind are recorded below the table                                   |
 
@@ -1264,3 +1307,4 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-09-23 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | §15 amendment, follow-up to GDP-ARCH-CITE-001 (#1639). Corrected three citations that fail T1: AC-1.5 prose `:238` now names `createStartHandler.js`, the AC-1.7 historical note spells its superseded range in prose, and AC-5.3 `readToolArguments` is now `:639-649`. AC-4.1: #1620, which carried the prototype-key guard, closed unmerged; the defect now reaches the #1088 display canon (`sourceLabel` undefined, still never healthy), under Bun 1.3.11. AC-4.2: qualified the "always one of the six" display claim accordingly; reclassified partially gated (display split tested). AC-3.2: `*Rules.ts` 517 → 518 (#1636); AC-3.4 shim imports 743 → 744 (#1647), and §12's Next.js row now cites AC-3.4, not a count; other §3 counts and the AC-4.3 union count unchanged. §13 and §14: #1620 and #1619 closed unmerged; #1175 and #1221 still open. T1 text unchanged. Rejoined the §13 table #1639 split with a blank line; applied the repo Prettier config.     |
 | 2026-09-24 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | Editorial follow-up to #1649; stamp unchanged. AC-1.5's in-prose bullet no longer writes the installed Start package as a `path:line` token: it now names line 238 of `createStartHandler.js` in prose, with its `[defaultCsrfMiddleware]` fallback, re-read in `@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins at this SHA. The clause's `_Source:` block keeps its package-internal cites and now says T1 does not cover them: T1 covers repository paths, and a dependency file cannot be opened at the stamped SHA. Copilot, CodeRabbit and the Codex GitHub reviewer raised the bullet on #1649; Copilot raised the `_Source:` block on #1667. No other clause changed.                                                                                                                                                                                                                                                                                 |
 | 2026-09-24 | `ef15b2c1be949d720f34bc33e4b980d18d6114e2` | Claude | §15 re-verification, 12 commits after `32820526` (first #1656, last #1664). No repository file the contract cites by path changed, apart from this file and `docs/agents/CURRENT_STATE.md` (cited as a document), so every citation holds by file identity. AC-3.2: `*Rules.ts` 518 → 519 (#1663 adds a pure rules file); the `Date.now()`, `Math.random()` and Supabase-importer counts are unchanged. AC-3.4: 744 → 750 shim import statements, in 749 files; the prior 744 also counted statements. AC-4.3: the wider union count is unchanged at 105 lines in 85 files. AC-10.2: zero hits on re-run. §13: added the Quick Log deferral row, with every direct RPC caller, and sequencing notes with no PR state (a change to the AC-4.1-cited line, as #1655 proposes, must update its T1 pins, as #1643 adds, in the same change); the release-topology row no longer states PR status. No clause statement changed. Docs-only; no `CURRENT_STATE.md` restamp.             |
+| 2026-09-24 | `69aca5e738b7d0d49369a636b1b293564ec65203` | Claude | §15 re-verification, two docs-only commits after `ef15b2c1`. Re-read all 220 repository `path:line` cites outside this record rather than carrying them by file identity, and the AC-1.4, AC-1.5 and §14 package cites from tarballs whose sha512 matches `bun.lock`. Re-measured the §3, §4 and §10 counts; re-ran the AC-4.1 prototype-key reproduction under Bun 1.3.11. AC-3.2 corrected: no root-level `*Rules.ts` imports the Supabase client; the two named files import a generated type only, as at the first stamp. AC-4.6 corrected: the checker runs on every PR through the non-required `ai-doctor-golden-cases.yml`. AC-1.5: the warning's runtime switch is `TSS_DISABLE_CSRF_MIDDLEWARE_WARNING`. AC-4.3: the multi-line figure is now a `source claim`. §13: `CLAUDE.md` correction deferred. `docs/codebase-map.md` corrected in the same change.                                                                                                             |

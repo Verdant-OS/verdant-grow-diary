@@ -145,8 +145,11 @@ for (const source of ["live", "manual"] as const) {
             },
           },
         });
-        const now = Date.now();
-        const capturedAt = new Date(now + 10 * 60_000).toISOString();
+        // The database correctly rejects captures beyond its own five-minute
+        // future fence. Model a slow browser clock with a valid persisted row;
+        // do not bypass the database validator to manufacture future storage.
+        const capturedAt = new Date(Date.now() - 60_000).toISOString();
+        const now = Date.parse(capturedAt) - 10 * 60_000;
         const { error } = await admin.from("sensor_readings").insert(
           [
             { metric: "temperature_c", value: 25 },

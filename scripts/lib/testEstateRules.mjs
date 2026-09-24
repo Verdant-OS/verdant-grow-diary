@@ -912,7 +912,7 @@ const SHELL_METACHARACTER = /[\s|&;()<>]/;
  * `$#` all survive.
  *
  * `$'…'` is ANSI-C quoting: a backslash escapes the next character, so `$'\''`
- * is one word (a literal `'`) and a `#` after it opens a comment (Cheek, #1221
+ * is one word (a literal `'`) and a `#` after it opens a comment (CodeRabbit, #1221
  * round 12). POSIX `'…'` still treats backslash as literal. `$"…"` already
  * falls into double-quote mode. Pure; null-safe.
  */

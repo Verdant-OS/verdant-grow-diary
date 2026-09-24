@@ -1180,7 +1180,7 @@ describe("a comment opens at any word start, not only after whitespace (CodeRabb
   });
 });
 
-describe("ANSI-C $' quoting: a backslash escapes the next character (Cheek, #1221 round 12)", () => {
+describe("ANSI-C $' quoting: a backslash escapes the next character (CodeRabbit, #1221 round 12)", () => {
   // Round 11 treated every `'` as POSIX single quotes, where backslash is
   // literal. Bash `$'…'` is ANSI-C quoting: `\'` is an escaped quote, not a
   // closer. The word below is $'\'' — one literal `'`. `echo $'\'' # bunx …`

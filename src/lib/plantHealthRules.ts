@@ -1,6 +1,9 @@
 /**
- * Recorded profile health is not an assessment. Unknown is a client-only
- * state for absent or invalid input; it must never become a stored value.
+ * Recorded profile health is the grower's own assessment, never derived from
+ * sensors or AI. "unknown" means not assessed: it is the database default for
+ * a new plant (20260924120000) and what absent or invalid input normalizes to.
+ * Clients never WRITE "unknown": when health was not assessed they omit the
+ * column so the default applies (the pre-migration trigger rejects "unknown").
  */
 export type StoredPlantHealth = "healthy" | "watch" | "issue";
 export type PlantHealth = StoredPlantHealth | "unknown";
@@ -34,3 +37,6 @@ export function buildPlantHealthUpdate(
   const health = editablePlantHealth(value);
   return health === "" ? {} : { health };
 }
+
+/** Placeholder for a health select with nothing chosen (QA 2026-09-24, BUG-009). */
+export const PLANT_HEALTH_NOT_ASSESSED_LABEL = "Not assessed yet";

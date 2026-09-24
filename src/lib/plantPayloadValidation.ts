@@ -38,7 +38,9 @@ export const PlantInsertPayloadSchema = z
     name: z.string().trim().min(1, "Plant name is required").max(120),
     strain: z.string().trim().max(120).nullish(),
     stage: z.enum(STAGES),
-    health: z.enum(HEALTHS),
+    // Optional: omitted = not assessed, so the column default applies.
+    // "unknown" is never sent (see plantHealthRules).
+    health: z.enum(HEALTHS).optional(),
     plant_type: z.enum(PLANT_TYPE_VALUES as readonly [PlantType, ...PlantType[]]),
     tent_id: uuid.optional(),
     grow_id: uuid,

@@ -367,6 +367,48 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(selectMock).toHaveBeenCalledWith("*");
   });
 
+  it("creates a plant as not assessed: no health is sent until the grower picks one (BUG-009)", async () => {
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    await waitFor(() => {
+      expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("create-plant-health")).toHaveTextContent("Not assessed yet");
+    expect(screen.getByTestId("create-plant-health")).not.toHaveTextContent("Healthy");
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Unassessed Plant");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalled();
+    });
+    const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
+    // Omitted, never "unknown": the column default applies on both sides of
+    // the 20260924120000 apply ("healthy" before, "unknown" after).
+    expect(payload).not.toHaveProperty("health");
+  });
+
+  it("sends the health the grower explicitly picks", async () => {
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    try {
+      renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+      await waitFor(() => {
+        expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+      });
+      fireEvent.keyDown(screen.getByTestId("create-plant-health"), { key: "ArrowDown" });
+      fireEvent.click(await screen.findByRole("option", { name: "Watch" }));
+      await waitFor(() =>
+        expect(screen.getByTestId("create-plant-health")).toHaveTextContent("Watch"),
+      );
+      await userEvent.type(screen.getByTestId("create-plant-name"), "Watched Plant");
+      await userEvent.click(screen.getByTestId("plant-create-submit"));
+      await waitFor(() => {
+        expect(insertMock).toHaveBeenCalled();
+      });
+      expect((insertMock.mock.calls[0][0] as Record<string, unknown>).health).toBe("watch");
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+
   it("reconciles an exact preallocated plant after a duplicate response", async () => {
     singleMock.mockResolvedValueOnce({
       data: null,

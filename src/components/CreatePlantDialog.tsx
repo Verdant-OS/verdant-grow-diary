@@ -32,6 +32,7 @@ import {
   plantStartDateSaveMessage,
 } from "@/lib/plantStartDateRules";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
+import { PLANT_HEALTH_NOT_ASSESSED_LABEL, buildPlantHealthUpdate } from "@/lib/plantHealthRules";
 import {
   primeConfirmedPlantCaches,
   reaffirmConfirmedPlantCacheMeta,
@@ -99,7 +100,8 @@ function emptyForm(tentId: string) {
     strain: "",
     tent_id: tentId,
     stage: "seedling",
-    health: "healthy",
+    // Not assessed until the grower picks a value (QA 2026-09-24, BUG-009).
+    health: "",
     started_at: "",
     plant_type: "unknown",
   };
@@ -423,7 +425,7 @@ export default function CreatePlantDialog({
         name: form.name.trim(),
         strain: trimmedStrain || null,
         stage: form.stage,
-        health: form.health,
+        ...buildPlantHealthUpdate(form.health),
         plant_type: form.plant_type,
         grow_id: targetGrowId,
       };
@@ -913,8 +915,8 @@ export default function CreatePlantDialog({
                     value={form.health}
                     onValueChange={(v) => setForm({ ...form, health: v })}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger data-testid="create-plant-health">
+                      <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                     </SelectTrigger>
                     <SelectContent>
                       {HEALTH.map((h) => (

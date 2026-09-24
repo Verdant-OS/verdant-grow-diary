@@ -85,3 +85,79 @@ export function appendHardwareReadingsToNote(
   if (!base) return block;
   return `${base}\n\n${block}`;
 }
+
+// ---------------------------------------------------------------------------
+// Validation (QA 2026-09-24, BUG-007)
+// ---------------------------------------------------------------------------
+//
+// These readings are saved as note text through the frozen manual write path
+// (no typed pH/EC parameters may be added to that RPC), so they must be
+// checked here, before the note is built. pH 15, EC 1200 mS/cm, runoff pH -3
+// and "1,8" were all saved and later shown as "Manual readings" with no flag.
+// Bounds match the typed Feed path (`quicklog_save_event` p_feed): pH 0-14,
+// EC 0-10 mS/cm.
+
+export const HARDWARE_READING_BOUNDS: Record<
+  keyof QuickLogHardwareReadings,
+  { min: number; max: number; label: string; unit: string }
+> = {
+  inputPh: { min: 0, max: 14, label: "Feed/Input pH", unit: "" },
+  inputEc: { min: 0, max: 10, label: "Feed/Input EC", unit: " mS/cm" },
+  runoffPh: { min: 0, max: 14, label: "Runoff pH", unit: "" },
+  runoffEc: { min: 0, max: 10, label: "Runoff EC", unit: " mS/cm" },
+  ppfdCanopy: { min: 0, max: 3000, label: "PPFD canopy", unit: " µmol/m²/s" },
+  lightDistance: { min: 0, max: 1000, label: "Light distance", unit: "" },
+};
+
+const PLAIN_NUMBER_RE = /^-?\d+(?:\.\d+)?$/;
+const COMMA_DECIMAL_RE = /^-?\d+,\d+$/;
+/** Light distance may carry a unit ("18 in", "45cm"); the number must still be sane. */
+const NUMBER_WITH_UNIT_RE = /^(-?\d+(?:\.\d+)?)\s*(?:in|inch|inches|"|cm|mm|ft|')?$/i;
+
+export type HardwareReadingsValidation = { ok: true } | { ok: false; message: string };
+
+/**
+ * Single-field check for display of already-saved readings: entries saved
+ * before validation existed (e.g. "pH 15") must be flagged, never shown as a
+ * plausible manual reading.
+ */
+export function isHardwareReadingValueValid(
+  key: keyof QuickLogHardwareReadings,
+  value: string | null | undefined,
+): boolean {
+  return validateHardwareReadings({ [key]: value ?? "" }).ok;
+}
+
+export function validateHardwareReadings(
+  readings: QuickLogHardwareReadings | null | undefined,
+): HardwareReadingsValidation {
+  if (!readings) return { ok: true };
+  for (const { key } of FIELD_ORDER) {
+    const raw = clean(readings[key]);
+    if (!raw) continue;
+    const bounds = HARDWARE_READING_BOUNDS[key];
+    if (COMMA_DECIMAL_RE.test(raw)) {
+      return {
+        ok: false,
+        message: `${bounds.label}: use a period for decimals (for example ${raw.replace(",", ".")}).`,
+      };
+    }
+    const match =
+      key === "lightDistance"
+        ? NUMBER_WITH_UNIT_RE.exec(raw)
+        : PLAIN_NUMBER_RE.test(raw)
+          ? [raw, raw]
+          : null;
+    const value = match ? Number(match[1]) : NaN;
+    if (!Number.isFinite(value)) {
+      return { ok: false, message: `${bounds.label} must be a number.` };
+    }
+    if (value < bounds.min || value > bounds.max) {
+      return {
+        ok: false,
+        message: `${bounds.label} must be between ${bounds.min} and ${bounds.max}${bounds.unit}.`,
+      };
+    }
+  }
+  return { ok: true };
+}

@@ -1,6 +1,10 @@
 import { useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
+  isHardwareReadingValueValid,
+  type QuickLogHardwareReadings,
+} from "@/lib/quickLogHardwareReadingsRules";
+import {
   Activity,
   AlertTriangle,
   Bug,
@@ -132,13 +136,19 @@ function buildRecentDiaryPdfInput(
 function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
   const m = row.manualHandheld;
   if (!m) return null;
-  const items: Array<{ label: string; value: string }> = [];
-  if (m.inputPh) items.push({ label: "Input pH", value: m.inputPh });
-  if (m.inputEc) items.push({ label: "Input EC/PPM", value: m.inputEc });
-  if (m.runoffPh) items.push({ label: "Runoff pH", value: m.runoffPh });
-  if (m.runoffEc) items.push({ label: "Runoff EC/PPM", value: m.runoffEc });
-  if (m.ppfdCanopy) items.push({ label: "PPFD canopy", value: m.ppfdCanopy });
-  if (m.lightDistance) items.push({ label: "Light distance", value: m.lightDistance });
+  const items: Array<{ label: string; value: string; invalid?: boolean }> = [];
+  // Entries saved before handheld validation existed can hold impossible
+  // values (pH 15, runoff pH -3); flag them instead of presenting them as
+  // plausible readings (QA 2026-09-24, BUG-007).
+  const push = (key: keyof QuickLogHardwareReadings, label: string, value: string | undefined) => {
+    if (value) items.push({ label, value, invalid: !isHardwareReadingValueValid(key, value) });
+  };
+  push("inputPh", "Input pH", m.inputPh);
+  push("inputEc", "Input EC/PPM", m.inputEc);
+  push("runoffPh", "Runoff pH", m.runoffPh);
+  push("runoffEc", "Runoff EC/PPM", m.runoffEc);
+  push("ppfdCanopy", "PPFD canopy", m.ppfdCanopy);
+  push("lightDistance", "Light distance", m.lightDistance);
   if (m.other) m.other.forEach((o) => items.push(o));
   if (items.length === 0) return null;
   return (
@@ -157,10 +167,16 @@ function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
         {items.map((it, i) => (
           <span
             key={`${row.id}-mh-${i}`}
-            className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-1 text-xs text-muted-foreground"
+            data-invalid={it.invalid ? "true" : undefined}
+            className={
+              it.invalid
+                ? "inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/10 px-2 py-1 text-xs text-amber-200"
+                : "inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/40 px-2 py-1 text-xs text-muted-foreground"
+            }
           >
             <span className="font-medium text-foreground/80">{it.label}</span>
             <span>{it.value}</span>
+            {it.invalid ? <span>· outside valid range, not used</span> : null}
           </span>
         ))}
       </div>

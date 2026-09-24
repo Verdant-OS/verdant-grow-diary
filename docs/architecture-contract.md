@@ -1,12 +1,16 @@
 # Verdant — Current Architecture Contract
 
 **Scope:** the permanent architectural invariants of the Verdant Grow OS application.
-**Verified from source at:** `387a00067a76ca9e2ced453d6b6a0f580e33209b` (deploy branch
-`verdant-grow-diary`), 2026-09-22, by Claude (§15 re-verification amendment; see §15.1). Every
-clause was re-read against `8fc3840743ed58e8a27dc6b39f68563e16a8e48e`. The only file that differs
-between that tree and the stamped tip is `docs/agents/CURRENT_STATE.md`, which this contract does
-not cite for any clause. First verified at `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05
-by Grok (PR #1281).
+**Verified from source at:** `32820526d6e71c5a2ed213da35f3a68f66f86432` (deploy branch
+`verdant-grow-diary`), 2026-09-23, by Claude (§15 amendment, follow-up to GDP-ARCH-CITE-001; see
+§15.1). Re-verified at that tip: the AC-1.5, AC-1.7 and AC-5.3 citations this amendment corrects;
+the AC-3.2 and AC-3.4 counts; AC-4.1 and AC-4.2, including the display canon; the AC-4.3 union count
+(no file changed since its last count adds or removes a union line); and the §13/§14 PR states.
+AC-4.4 and AC-4.5 carry forward from the GDP-ARCH-CITE-001 stamp at
+`ea50ec678dee26e8ad5494c5d41aab8e4de1740e`, whose cited file is unchanged at this tip. Other clauses
+are **not** re-verified here; they carry forward from the `8b73c14031050b51061d4715bedbcdfeb66eee52`
+/ `387a00067a76ca9e2ced453d6b6a0f580e33209b` stamps as `source claim`. First verified at
+`7c46855b7fd49651cf8ed080a5a931ff8fbdd640` on 2026-09-05 by Grok (PR #1281).
 **Carries no `Sentinel-Version`.** This is not one of the twelve governance files; editing it does
 not require a parity bump. See §15 for how it is amended.
 
@@ -111,35 +115,84 @@ What is **not** tested is general `auth` ↔ `_app` and `public` ↔ public-root
 > It is corrected here, not quietly reworded.
 
 **AC-1.4 — `vite.config.ts` stays a thin wrapper over the Lovable preset.**
-`@lovable.dev/vite-tanstack-config` already supplies TanStack devtools, `tanstackStart`,
-`viteReact`, `tailwindcss`, `tsConfigPaths`, Nitro, `VITE_*` injection, the `@` alias and
-React/TanStack dedupe. Re-adding any of them duplicates a plugin and breaks the app. The preset must
-be imported from its explicit ESM path (`/dist/index.js`); the bare specifier resolves the CJS
-`main`, whose `require("vite")` throws `ERR_REQUIRE_CYCLE_MODULE`.
-_Source:_ `vite.config.ts:1-5` (the preset's plugin list, as stated in the file), `:7-11` (the CJS
-note), `:12` (the ESM import). `established fact` for what the file says and imports. The preset's
-actual internals are a `source claim` carried from the first stamp. They could not be re-read here:
-`node_modules` was absent at re-verification. `bun.lock` resolves the preset at 2.8.5 with peers
-consistent with the comment.
+`@lovable.dev/vite-tanstack-config` already supplies every plugin and setting below. Re-adding any of
+them duplicates it. Measured in the installed preset, 2.8.5, which is the version `bun.lock` pins, in
+`dist/index.js`:
+
+| Supplied by the preset                                          | Condition                                         | Lines     |
+| --------------------------------------------------------------- | ------------------------------------------------- | --------- |
+| TanStack devtools                                               | `mode === "development"` only                     | `535-545` |
+| `tailwindcss`, `tsConfigPaths` (over `./tsconfig.json`)         | always                                            | `546-549` |
+| `tanstackStart`                                                 | always                                            | `553-561` |
+| Nitro                                                           | `command === "build"` only, unless `nitro: false` | `563-596` |
+| `viteReact`                                                     | always                                            | `597-598` |
+| `VITE_*` env define                                             | unless `envDefine: false`                         | `612-615` |
+| `@` alias; dedupe of React, the JSX runtimes and TanStack Query | always                                            | `625-633` |
+
+The preset must be imported from its explicit ESM path (`/dist/index.js`). The package declares
+`main: "./dist/index.cjs"` and `module: "./dist/index.js"` with no `exports` map, and the CJS entry
+calls `require("vite")` (`dist/index.cjs:24`).
+
+**The stated reason for the ESM-path rule did not reproduce.** `vite.config.ts:7-11` says the bare
+specifier throws `ERR_REQUIRE_CYCLE_MODULE` on Node 22. At this amendment, on Node 22.22.2 with Vite
+8.2.0, a disposable worktree with the bare specifier passed both Vite's `loadConfigFromFile` and a
+full `vite build` (exit 0). The independent reviewer reports the same result on Node 22.14.0 with
+Vite 8.2.0 (`source claim`, PR #1630 review). The failure may depend on a Node version or runtime
+that was not measured, such as the Lovable sandbox. **The rule stands**: it is pinned, it costs
+nothing, and it imports the entry the preset's own `module` field names. Only its rationale is
+downgraded to `uncertainty`. Do not cite the rule as proof that the bare specifier fails everywhere.
+_Source:_ `@lovable.dev/vite-tanstack-config@2.8.5`: its `package.json`, `dist/index.js` (the lines
+in the table) and `dist/index.cjs:24`. These are package-internal paths, qualified by version, not
+repository paths; `vite.config.ts:1-5` (the file's own plugin list,
+which matches the table), `:7-11` (the CJS note), `:12` (the ESM import). `established fact` for
+the preset's contents and for the non-reproduction on the measured runtime; `uncertainty` for other
+runtimes.
 _Enforcement:_ **partially gated.** The ESM-path rule is pinned: `src/test/vite-dev-server-binding.test.ts:34-39`
 requires `/dist/index.js` and forbids the bare specifier. "Do not re-add a preset plugin" stays
-`convention only`; the failure there is a broken build, not a gate.
+`convention only`; the file warns that a duplicated plugin breaks the app, and no gate catches it.
 
-**AC-1.5 — CSRF protection for server functions requires explicit middleware registration.**
+**AC-1.5 — CSRF protection for server functions depends on the explicit registration in
+`src/start.ts`.**
 `src/start.ts` registers `createCsrfMiddleware` filtered to `handlerType === "serverFn"` in
-`requestMiddleware`. That registration is what keeps server functions protected. **There is no
-automatic CSRF default to fall back on** if the middleware is removed — deleting it removes
-protection silently. An in-file comment that claims defining `src/start.ts` "opts out" of an
-automatic install is **not** treated as contract evidence; measure the installed Start behaviour,
-not the comment.
-_Source:_ `src/start.ts:24-26` (`createCsrfMiddleware`), `:30` (`requestMiddleware:
-[errorMiddleware, csrfMiddleware]`); the discounted comment is at `:21-23`. `established fact` for the
-explicit registration. The absent automatic install is a **`source claim`** carried from the first
-stamp, where it was measured against the installed package. It could not be re-measured here,
-because `node_modules` was absent. `bun.lock` resolves `@tanstack/react-start` at 1.168.34.
-_Enforcement:_ `convention only`. A search of `src/test`, `scripts` and `e2e` for
-`createCsrfMiddleware`, `csrfMiddleware` or `src/start.ts` finds no hits. This is the highest-value
-unguarded invariant in §1.
+`requestMiddleware`. That registration is what keeps server functions protected.
+
+**Start's own default does not cover Verdant.** The installed Start server handler installs a
+default CSRF middleware only when the application defines no start instance:
+`requestMiddleware: hasStartInstance ? startOptions.requestMiddleware : [defaultCsrfMiddleware]`.
+Verdant defines `startInstance` to carry its error and Supabase-auth middleware, so the default never
+applies. The in-file comment at `src/start.ts:21-23`, which says that defining the file opts out of
+the automatic install, is therefore **accurate**.
+
+What follows:
+
+- Removing `csrfMiddleware` from `requestMiddleware` removes the protection. Nothing falls back.
+- Outside production, Start logs one `console.warn` when no CSRF middleware is registered, unless
+  `serverFns.disableCsrfMiddlewareWarning` is set. Verdant does not set it. In production there is
+  no warning, so the removal is silent where it matters.
+- Line 238 of the installed Start package's `createStartHandler.js` falls back to
+  `[defaultCsrfMiddleware]` when no Start instance is registered. Deleting `src/start.ts` would
+  therefore bring the default back (`inference`; not run), but it would also drop the error and
+  auth middleware. That is not a fix either.
+
+> Earlier versions said there was no automatic CSRF default, and told readers to discount the
+> `src/start.ts` comment. On the installed Start, both were wrong: the default exists and the comment
+> describes it correctly. The operative conclusion, that removing the registration removes
+> protection, was right. Whether the Start version at the first stamp behaved differently is
+> `NOT_MEASURED`.
+
+_Source:_ `src/start.ts:21-23` (comment), `:24-26` (`createCsrfMiddleware`), `:28-31`
+(`startInstance`, with `requestMiddleware: [errorMiddleware, csrfMiddleware]` at `:30`).
+`@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins under `@tanstack/react-start`
+1.168.34: `dist/esm/createStartHandler.js:21` (`defaultCsrfMiddleware`), `:238` (the fallback),
+`:45-68` (the warning), `:261` (its condition). `@tanstack/start-client-core@1.170.14`
+`dist/esm/createCsrfMiddleware.js:4,12`: the middleware is tagged with
+`Symbol.for("tanstack-start:csrf-middleware")`, and only when `NODE_ENV !== "production"`.
+`established fact`. The package cites in this block are not repository paths and cannot be opened
+at the stamped SHA, so T1 does not cover them; they hold only for the pinned versions named here.
+_Enforcement:_ `convention only`, plus a warning that Start logs only outside production. A search
+of `src/test`, `scripts` and `e2e` for `createCsrfMiddleware`, `csrfMiddleware` or `src/start.ts`
+finds no hits. This is still the highest-value unguarded invariant in §1. T8 in §11 is the proposed
+gate.
 
 **AC-1.6 — SSR failures must not be served as h3's JSON 500.**
 h3 swallows in-handler throws into a normal `500` carrying
@@ -161,7 +214,7 @@ _Enforcement:_ **gated, by source scan.** `src/test/funnel-event-db-sink.test.ts
 `AnalyticsShell` immediately followed by the sink, and `:144-150` asserts the sink precedes
 `<Outlet />`. This is ordering structure, which a scan can prove.
 
-> Earlier versions cited `:232-242` and called this `convention only`. The citation ended two lines
+> Earlier versions cited lines 232–242 and called this `convention only`. The citation ended two lines
 > before the sink and the outlet even at the first stamp, and the guarding test predates that stamp.
 
 **AC-1.8 — The UI and client-data stack is React 19, Tailwind v4 (CSS-first), shadcn/ui over
@@ -266,7 +319,7 @@ stamped SHA, over the root-level `src/lib/*Rules.ts` glob:
 
 | Measure                               | Count | Files                                                              |
 | ------------------------------------- | ----: | ------------------------------------------------------------------ |
-| `*Rules.ts` files                     |   517 | —                                                                  |
+| `*Rules.ts` files                     |   518 | —                                                                  |
 | contain a direct `Date.now()` call    |    55 | raw-text match                                                     |
 | contain a direct `Math.random()` call |     7 | the seven named in `CLAUDE.md` "Layering, as actually practised"   |
 | import the Supabase client            |     2 | `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts` |
@@ -303,7 +356,7 @@ _Source:_ `src/constants/`; `src/pages/GuidesIndex.tsx:60,63`; `src/constants/ve
 **AC-3.4 — Component code routes through the react-router compat shim, not TanStack Router
 directly.**
 `src/lib/react-router-compat.tsx` re-implements the react-router-dom v6 surface on TanStack Router.
-Measured at the stamped SHA, **743** files statically import the shim (511 under `src/test`, 131
+Measured at the stamped SHA, **744** files statically import the shim (512 under `src/test`, 131
 under `src/components`, 94 under `src/pages`, 7 under `src/hooks`). **Zero** files under
 `src/components/` or `src/pages/` mention `@tanstack/react-router` at all. Vitest aliases the shim to
 a real MemoryRouter, so idiomatic TanStack hooks in a component look correct and fail in tests.
@@ -340,9 +393,18 @@ instead of `invalid`:
 
 Neither result is a `SensorSource`. Both are still **non-healthy**, because `isHealthySensorSource` is
 `=== "live"`. So "never healthy" holds, and "always one of the six" does not. The defect predates
-the first stamp. A guard exists as `fd33e8ff9` (`guard normalizeSensorSource against prototype
-keys`), but only on the unmerged, stacked PR #1620. It is recorded here and not fixed, because this
-contract is not a code slice.
+the first stamp. A guard was written as `fd33e8ff9` (`guard normalizeSensorSource against prototype
+keys`) on PR #1620, which was **closed unmerged** on 2026-09-23, so no guard is on the deploy branch.
+It is recorded here and not fixed, because this contract is not a code slice.
+
+**The defect now reaches a display surface.** `resolveSensorSourceDisplayCanon` (#1088) calls
+`normalizeSensorSource` without a guard of its own. For `"constructor"` and `"__proto__"` it returns
+a non-string `canonical` and `sourceLabel: undefined`, though its interface types `sourceLabel` as
+`string`. `isHealthyLive` stays `false`, so "never healthy" still holds there too. Its provenance
+lookup is guarded (`hasOwnProperty`) and returns `"External ingest"`. Measured under Bun 1.3.11 at
+the stamped SHA. Neither token is in the schema admit-list below, so a row written under that
+trigger cannot carry them (`inference`). Whether any other input path hands them to the display
+canon is `NOT_MEASURED`.
 
 **Schema is wider than the resolved vocabulary — recorded, not narrowed here.** The latest
 `validate_sensor_reading` trigger (migration `20260617164759_…`) admits **nineteen** `source`
@@ -360,13 +422,15 @@ only from server-side writers such as edge functions.
 Read AC-4.1 as normalizer+display truth. AC-4.4 names the one **first-party write** that stores a
 non-canonical token and promotes it to `live` on read. Other schema-admitted tokens may exist as
 stored values without that promotion.
-_Source:_ `src/lib/sensor/sensorSourceRules.ts:16` (`SENSOR_SOURCES`), `:80` (`ALIAS[v] ?? "invalid"`),
-`:86` (`=== "live"`); `src/constants/sensorIngestProvenance.ts:15`;
-`supabase/migrations/20260617164759_407c0f40-1f3a-4ac8-a25e-289c175f87fc.sql:21-28` (trigger
+_Source:_ `src/lib/sensor/sensorSourceRules.ts:16` (`SENSOR_SOURCES`), `:82` (`ALIAS[v] ?? "invalid"`),
+`:88` (`=== "live"`); `src/lib/sensorSourceDisplayCanon.ts:27` (`sourceLabel: string`), `:90`
+(`hasOwnProperty`), `:107-116` (`resolveSensorSourceDisplayCanon`);
+`src/constants/sensorIngestProvenance.ts:15`; `supabase/migrations/20260617164759_407c0f40-1f3a-4ac8-a25e-289c175f87fc.sql:21-28` (trigger
 admit-list; still the latest of the six migrations that define `validate_sensor_reading`); client
 fence at `supabase/migrations/20260718054345_sensor_readings_client_source_fence.sql:14`, restated
 at `20260827010000_sensor_readings_insert_current_contract.sql:16`. The prototype-key behaviour was
-reproduced by running `normalizeSensorSource` under Bun at the stamped SHA. `established fact`.
+reproduced by running `normalizeSensorSource` and `resolveSensorSourceDisplayCanon` under Bun at the
+stamped SHA. `established fact`, except where labelled otherwise above.
 _Enforcement:_ **unenforced** as a vocabulary gate — see §11; T2/T3 are proposed. Schema width is
 measured fact, not a gate.
 
@@ -412,6 +476,16 @@ wrapper with no callers is not enforcement.
 
 Schema still admits the wider token set for historical rows (AC-4.1). Schema-narrow remains out of
 scope.
+
+**Display is a third axis, not a seventh source.** Soft `#1088` added
+`src/lib/sensorSourceDisplayCanon.ts`. Grower-facing **Source** is always
+`sensorSourceLabel(normalizeSensorSource(...))` — one of the six AC-4.1 labels, apart from the AC-4.1
+prototype-key defect, which yields `undefined` there. Vendor, bridge, app
+and transport names (`pi_bridge`, `home_assistant`, EcoWitt, …) are **provenance copy only**. They
+must not appear as the Source label. The display module does not widen the canonical set, change
+ingest write paths, or alter trust-live membership. Collapsing a vendor name into Source would be
+the same AC-4.2 failure as collapsing it into stored trust state.
+
 **A second provenance envelope exists, and its tokens do not match the registry.** Manual rows now
 carry `raw_payload.manual_provenance = { source: "manual", source_identity: "manual_entry",
 transport: "manual", confidence: null }` (#1492). `source` stays `manual`, so AC-4.2 holds. But
@@ -423,11 +497,17 @@ _Source:_ `src/constants/sensorIngestProvenance.ts:1-13` (header), `:26-35`
 (`NON_CANONICAL_SOURCE_ALIASES`, 18 tokens), `:130` (`isNonCanonicalSourceAlias`);
 `src/lib/sensorIngestProvenanceRules.ts:110-112` (definition only; zero non-test callers in `src/`,
 `supabase/` or `scripts/`); `supabase/functions/sensor-ingest-webhook/storageMapping.ts:4-8,59-78,130-150,161,174-178,185`;
-`src/lib/manualSensorProvenanceRules.ts` (#1492). The consumer set was established by grep at the
+`src/lib/manualSensorProvenanceRules.ts` (#1492); `src/lib/sensorSourceDisplayCanon.ts:3-7`
+(`never appear as the`), `:26` (`Grower-facing Source label`), `:102-105` (`never become live`),
+`:107-116` (`resolveSensorSourceDisplayCanon`). The consumer set was established by grep at the
 stamped SHA. The reasoning is adjudicated in `docs/audits/architecture-audit-adjudication-2026-08-21.md`
-§5. `established fact`.
+§5. `established fact` for the helpers, envelopes and display-canon file; the AC-4.2 display
+paragraph is verified at `ea50ec678dee26e8ad5494c5d41aab8e4de1740e`.
 _Enforcement:_ **unenforced** for the `NON_CANONICAL_SOURCE_ALIASES` helpers. Generic-webhook
-canonicalization is structural in that edge path; the Pi exception is deliberate (AC-4.4).
+canonicalization is structural in that edge path; the Pi exception is deliberate (AC-4.4). The
+display split is **gated** by `src/test/sensor-source-display-canon.test.ts`, which imports the
+module and asserts resolved labels in the required full suite. It does not cover the AC-4.1
+prototype keys.
 
 **AC-4.3 — One canonical union. Every other module derives from it.**
 
@@ -509,20 +589,21 @@ one, or extending this one to a third-party bridge, requires an approved slice.*
 
 _Source:_ `supabase/functions/pi-ingest-readings/index.ts:454`,
 `supabase/functions/pi-ingest-readings/commitBatch.ts:40,108,130` (`:108` refuses any source other
-than `pi_bridge`); `src/lib/sensor/sensorSourceRules.ts:24-26,86`;
+than `pi_bridge`); `src/lib/sensor/sensorSourceRules.ts:24-28` (`pi_bridge: "live"`), `:88`
+(`=== "live"`);
 `src/lib/sensorLiveMembership.ts:70-73` (`VERIFIED_SNAPSHOT_LIVE_ROW_SOURCES` = `{live, pi_bridge}`);
 `supabase/functions/sensor-ingest-webhook/storageMapping.ts`. `established fact`.
 
 **AC-4.5 — The `TRUST_LIVE_ALIASES` pin is one-directional, and the comment beside it overstates
 what it enforces.**
-`sensorSourceRules.ts:46` says "Keep `TRUST_LIVE_ALIASES` and `ALIAS` live entries aligned", but the
+`sensorSourceRules.ts:48` says "Keep `TRUST_LIVE_ALIASES` and `ALIAS` live entries aligned", but the
 loop below it can only **add** aliases missing from `ALIAS`. It cannot detect an `ALIAS` live-entry
 absent from `TRUST_LIVE_ALIASES` — which is exactly the state `pi_bridge` is in
 (`TRUST_LIVE_ALIASES = {live, sensor, realtime}`). The invariant as stated is stronger than the
 invariant as enforced. A second overstatement sits beside the constant: the doc comment at
 `sensorLiveMembership.ts:76-77` calls these "Trust-label aliases that normalizeSensorSource maps to
 live". But `pi_bridge` also maps to `live` and is not listed.
-_Source:_ `src/lib/sensor/sensorSourceRules.ts:46-51`; `src/lib/sensorLiveMembership.ts:76-79`.
+_Source:_ `src/lib/sensor/sensorSourceRules.ts:48-53` (`TRUST_LIVE_ALIASES`); `src/lib/sensorLiveMembership.ts:76-79`.
 `established fact`.
 _Enforcement:_ one-directional only. Either enforce both directions or restate the comment; do not
 leave the stronger claim standing.
@@ -590,7 +671,7 @@ _Source:_ `supabase/functions/ai-doctor-review/index.ts`:
 - `:2` ("Never returns raw model text") and `:14` (the safe-log rule);
 - `:81` (`TOOL_SCHEMA`) and `:515-519` (the live `tools` and `tool_choice`);
 - `:575` (`JSON.parse`), `:581` (`validateAiDoctorReviewResult`), `:586` (the grounding check);
-- `:643-644` (`readToolArguments`).
+- `:639-649` (`readToolArguments`).
 
 `:179-180` repeat `tools` / `tool_choice` inside the HMAC signing frame, not the live request.
 `established fact`.
@@ -933,7 +1014,7 @@ true; a clause missing from this table would be an unstated gap.
 | AC-1.2  | regeneration overwrite (route tree, `_shared`); MCP bundle and `types.ts` by convention (`TREE_HASH_ROOTS` records a change, does not reject one) | **partially gated** |
 | AC-1.3  | URL-set parity, `/operator/` shape, operator/internal ↔ `_operator` layout, `/sensors/*` both ways; general auth ↔ `_app` parity unenforced (T7)  | **partially gated** |
 | AC-1.4  | `vite-dev-server-binding.test.ts` pins the ESM import path; no-duplicate-plugin rule by review                                                    | **partially gated** |
-| AC-1.5  | comment and review — explicit CSRF registration; no test references it                                                                            | `convention only`   |
+| AC-1.5  | comment and review — explicit CSRF registration; Start's default applies only without a start instance; non-prod warning; T8 proposed             | `convention only`   |
 | AC-1.6  | comment and review                                                                                                                                | `convention only`   |
 | AC-1.7  | `funnel-event-db-sink.test.tsx` source-scan pins sink-before-Outlet order                                                                         | **gated**           |
 | AC-1.8  | lockfile + 24 h release-age guard (AC-8.2); major-line moves by review                                                                            | `convention only`   |
@@ -946,7 +1027,7 @@ true; a clause missing from this table would be an unstated gap.
 | AC-3.3  | comment and review — pinned/reused/safety copy in constants; inline JSX prose allowed                                                             | `convention only`   |
 | AC-3.4  | comment and review                                                                                                                                | `convention only`   |
 | AC-4.1  | no gate proves resolved vocabulary is not widened; schema width is measured fact; T2/T3 proposed                                                  | **unenforced**      |
-| AC-4.2  | `isRejectedSourceAlias` has zero non-test callers — unused helpers are not an ingest gate                                                         | **unenforced**      |
+| AC-4.2  | display split gated by `sensor-source-display-canon.test.ts` (#1088); `isRejectedSourceAlias` has zero non-test callers, so no ingest gate        | **partially gated** |
 | AC-4.3  | comment and review; T3 proposed                                                                                                                   | `convention only`   |
 | AC-4.4  | comment and review — deliberate Pi exception                                                                                                      | `convention only`   |
 | AC-4.5  | one-directional only                                                                                                                              | `convention only`   |
@@ -994,26 +1075,29 @@ AC-6.4.
 
 **Proposed gates.** These do not exist yet and are named so the gap is visible rather than implied:
 
-| ID  | Test                                                                                                                                                                         | Guards        |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
-| T1  | Every path cited by a clause in this file exists at the stamped SHA                                                                                                          | this document |
-| T2  | `SENSOR_SOURCES` and `CANONICAL_SENSOR_SOURCES` resolve **equal** — by import and object comparison, not by regex                                                            | AC-4.1        |
-| T3  | No module outside the two canonical files declares a sensor-source union literal, with the two known drifts allowlisted so the count can shrink but not grow                 | AC-4.3        |
-| T4  | `MODEL` and `MODEL_TIER` are module constants and not request-derived                                                                                                        | AC-5.2        |
-| T5  | Zero occurrences of Nelson / modified-Z / MAD across `src/` and `supabase/`                                                                                                  | AC-10.2       |
-| T6  | `DEFAULT_VPD_DRIFT_ALPHA === 0.3`, `DEFAULT_VPD_DRIFT_MIN_READINGS === 6`, and one exact numeric recurrence step                                                             | AC-10.1       |
-| T7  | Every route's declared `access` matches the layout it is mounted under for `auth` ↔ `_app` and `public` ↔ public roots — operator/internal parity is already tested (AC-1.3) | AC-1.3        |
+| ID  | Test                                                                                                                                                                                                                                                                                                                                                                                                                               | Guards        |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| T1  | Every repository path cited by a clause in this file exists at the stamped SHA, **and each cite's short expected snippet appears on the cited line (or inside the cited inclusive range)**. File/line existence alone is not T1. Soft `#1088` drifted five `sensorSourceRules.ts` cites by two lines while those line numbers still existed — existence-only T1 would have stayed green. A cite without a snippet is a T1 failure. | this document |
+| T2  | `SENSOR_SOURCES` and `CANONICAL_SENSOR_SOURCES` resolve **equal** — by import and object comparison, not by regex                                                                                                                                                                                                                                                                                                                  | AC-4.1        |
+| T3  | No module outside the two canonical files declares a sensor-source union literal, with the two known drifts allowlisted so the count can shrink but not grow                                                                                                                                                                                                                                                                       | AC-4.3        |
+| T4  | `MODEL` and `MODEL_TIER` are module constants and not request-derived                                                                                                                                                                                                                                                                                                                                                              | AC-5.2        |
+| T5  | Zero occurrences of Nelson / modified-Z / MAD across `src/` and `supabase/`                                                                                                                                                                                                                                                                                                                                                        | AC-10.2       |
+| T6  | `DEFAULT_VPD_DRIFT_ALPHA === 0.3`, `DEFAULT_VPD_DRIFT_MIN_READINGS === 6`, and one exact numeric recurrence step                                                                                                                                                                                                                                                                                                                   | AC-10.1       |
+| T7  | Every route's declared `access` matches the layout it is mounted under for `auth` ↔ `_app` and `public` ↔ public roots — operator/internal parity is already tested (AC-1.3)                                                                                                                                                                                                                                                       | AC-1.3        |
+| T8  | `startInstance`'s resolved `requestMiddleware` contains a CSRF middleware that **rejects** a cross-site server-function request and **passes through** a non-server-function request                                                                                                                                                                                                                                               | AC-1.5        |
 
 **Each test needs the technique its claim actually admits — they are not all import tests.**
 
-| Test | Technique                  | Why                                                                                                                                                                                                                                                                                                                                       |
-| ---- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T2   | **resolved import**        | Both are runtime `as const` arrays, so the values exist at runtime and can be compared as objects                                                                                                                                                                                                                                         |
-| T3   | **source / AST scan**      | Sensor-source unions are **type-level and erased at runtime**. No import can observe a declaration that does not exist in the emitted output; finding declarations outside the canonical files needs AST                                                                                                                                  |
-| T4   | **source / AST scan only** | `MODEL` and `MODEL_TIER` in `ai-doctor-review/index.ts` are **unexported** module constants, and importing that entrypoint executes `Deno.serve(...)`. A resolved-value import assertion is not available without a structure change; do not fake one. Scan for the const declarations and prove no request field reaches model selection |
-| T5   | **source scan**            | Proving a token is **absent** is exactly what scanning is good for                                                                                                                                                                                                                                                                        |
-| T6   | **resolved import**        | Both are exported runtime numbers; assert the values and one hand-computed EWMA step so a default change fails loudly                                                                                                                                                                                                                     |
-| T7   | **route-tree traversal**   | Access group is a property of the mounted layout, so the check must walk the tree, not the manifest alone                                                                                                                                                                                                                                 |
+| Test | Technique                                      | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1   | **source scan of this document + cited files** | Parse `_Source:` (and in-prose) cites of the form `` `path:line` (`snippet`) ``, `` `:N` (`snippet`) ``, or inclusive ranges `` `:start-end` (`snippet`) ``. The parenthetical is the expected snippet. Open the cited file at the stamped SHA and require that snippet to occur on that line, or on at least one line of a range. Do **not** pass merely because the path exists and the line number is in range — that is the Soft `#1088` miss. A cite that names a line or range but carries no snippet fails T1. Scanning this document for snippets is legitimate source-scan work (proving a string is present on a named line), not a config-resolution case; `scripts/check-contract-test-resolution.mjs` does not apply. **No T1 runner exists in this tree today.** This row specifies the gate; implementing the runner is still sequenced in §13.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| T2   | **resolved import**                            | Both are runtime `as const` arrays, so the values exist at runtime and can be compared as objects                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| T3   | **source / AST scan**                          | Sensor-source unions are **type-level and erased at runtime**. No import can observe a declaration that does not exist in the emitted output; finding declarations outside the canonical files needs AST                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| T4   | **source / AST scan only**                     | `MODEL` and `MODEL_TIER` in `ai-doctor-review/index.ts` are **unexported** module constants, and importing that entrypoint executes `Deno.serve(...)`. A resolved-value import assertion is not available without a structure change; do not fake one. Scan for the const declarations and prove no request field reaches model selection                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| T5   | **source scan**                                | Proving a token is **absent** is exactly what scanning is good for                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| T6   | **resolved import**                            | Both are exported runtime numbers; assert the values and one hand-computed EWMA step so a default change fails loudly                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| T7   | **route-tree traversal**                       | Access group is a property of the mounted layout, so the check must walk the tree, not the manifest alone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| T8   | **resolved import + execution**                | Presence alone proves nothing: the filter is a closure the middleware object does not expose, so `filter: () => false` would still carry the symbol. Import `startInstance` and resolve `getOptions()` (the call Start makes, `start-server-core@1.169.17` `createStartHandler.js:229`). Locate the middleware by `Symbol.for("tanstack-start:csrf-middleware")`, which Start attaches only when `NODE_ENV !== "production"`, so this works under Vitest and not in a production-mode probe. Then **execute** its `options.server` handler (`start-client-core@1.170.14` `createMiddleware.js:13-14,23-24`) with a stub `next`, **twice, on the identical request carrying `Sec-Fetch-Site: cross-site`, varying only `handlerType`**. With `"serverFn"` it must return the 403 failure response (`createCsrfMiddleware.js:56-58`); with any other handler type it must reach `next` (`:8`). Holding the request constant isolates the filter: a same-origin request would pass CSRF validation whatever the filter does, and prove nothing. Whether `src/start.ts` imports cleanly under Vitest is `NOT_MEASURED`; if it does not, the fallback is a declared `@source-scan-justified` AST check that the registered filter compares `handlerType` with `"serverFn"` |
 
 **`scripts/check-contract-test-resolution.mjs` does not apply to any of these.** It flags only tests
 that read the source of `playwright.config` or `vitest.config` without importing them
@@ -1033,7 +1117,7 @@ Rejected means decided, with a reason. Re-proposing one requires new evidence, n
 | **Nelson Rules** for telemetry anomalies               | **REJECTED** | Environmental telemetry violates textbook SPC assumptions — day/night cycles, uneven sampling intervals, stage transitions, maintenance windows, sensor replacement. Wholesale adoption would manufacture alarms |
 | **Modified Z-Score / MAD**                             | **REJECTED** | Same class of assumption violation; no evidence of need, and no implementation to preserve                                                                                                                       |
 | **Moving VPD α from 0.3 to 0.2**                       | **REJECTED** | Named explicitly in the 2026-08-21 adjudication as a change not to make silently. α is a tuned parameter that is **currently unpinned** (AC-10.1 / T6); do not assume CI catches a silent move                   |
-| **Next.js migration**                                  | **REJECTED** | No source pressure. TanStack Start SSR is working, `server-only` is already banned as a foreign idiom (AC-8.4), and the cost is the whole route tree and the 743-file shim                                       |
+| **Next.js migration**                                  | **REJECTED** | No source pressure. TanStack Start SSR is working, `server-only` is already banned as a foreign idiom (AC-8.4), and the cost is the whole route tree and every shim importer (AC-3.4)                            |
 | **Drizzle**                                            | **REJECTED** | Would sit beside an append-only migration history and generated Supabase types; introduces a second schema truth                                                                                                 |
 | **tRPC**                                               | **REJECTED** | Server functions plus edge functions already cover the seam, and RLS — not a typed RPC layer — is the boundary that matters (AC-2.2)                                                                             |
 | **Auth migration off Supabase Auth**                   | **REJECTED** | Auth, RLS, and `auth.uid()` are one system. Replacing the first breaks the authorization model                                                                                                                   |
@@ -1047,20 +1131,20 @@ Rejected means decided, with a reason. Re-proposing one requires new evidence, n
 
 Not rejected — sequenced.
 
-| Item                                                                                                    | Gate                                                                                                                                        |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| The gates T1–T7 in §11 (earlier versions of this row said T1–T5 while §11 proposed seven)               | Their own slice; T2 and T3 are the highest value                                                                                            |
-| Consolidating `docs/architecture.md`, `docs/grow-os-architecture.md`, `docs/grow-diary-architecture.md` | All three predate or contradict the current stack in places; retiring them is a separate reviewed slice                                     |
-| Enumerating the remaining sensor-source union re-declarations                                           | Bounded by T3 rather than by hand                                                                                                           |
-| Renaming `BillingSubscriptionRow` (AC-6.1 hazard)                                                       | Cosmetic; touches entitlement types, so it wants its own diff                                                                               |
-| An enforceable visual-evidence cardinality signal plus a confidence cap for AI Doctor (AC-5.7)          | Safety-bearing; needs a packet-shape change, so it is its own reviewed slice                                                                |
-| Making the AC-4.5 pin bidirectional, or restating its comment                                           | Small, but it changes a safety-adjacent normalizer                                                                                          |
-| Guarding `normalizeSensorSource` against prototype keys (AC-4.1)                                        | Already written as `fd33e8ff9` on unmerged PR #1620 (stacked on #1088); lands with that PR, not here                                        |
-| Aligning the `manual_provenance` envelope with `SENSOR_PROVENANCE_TRANSPORTS` (AC-4.2)                  | Touches a persisted payload shape and its readers; needs its own reviewed slice                                                             |
-| Retiring the unreachable legacy `classifySource` in `aiDoctorEngine.ts` (AC-4.3)                        | Deletion of dead code on a safety surface; its own diff, with a test that the live path is unaffected                                       |
-| Making `Published migration integrity` a required context (AC-9.1)                                      | A ruleset change — Cheek's decision, not a code change                                                                                      |
-| Removing the declared-but-unimported `@supabase/ssr` dependency (AC-2.1)                                | A dependency change; its own slice under AC-8.2                                                                                             |
-| **Authoritative Release Topology Specification**                                                        | §14 — blocked on evidence this contract does not have; tracked via #1175 (with #1619 stacked on it) and #1221, both open at the stamped SHA |
+| Item                                                                                                    | Gate                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The gates T1–T8 in §11 (earlier versions of this row said T1–T5, then T1–T7)                            | Their own slice; T2, T3 and T8 are the highest value. GDP-ARCH-CITE-001 amended **T1's specification** (snippet match, not existence-only) but did not add a runner |
+| Consolidating `docs/architecture.md`, `docs/grow-os-architecture.md`, `docs/grow-diary-architecture.md` | All three predate or contradict the current stack in places; retiring them is a separate reviewed slice                                                             |
+| Enumerating the remaining sensor-source union re-declarations                                           | Bounded by T3 rather than by hand                                                                                                                                   |
+| Renaming `BillingSubscriptionRow` (AC-6.1 hazard)                                                       | Cosmetic; touches entitlement types, so it wants its own diff                                                                                                       |
+| An enforceable visual-evidence cardinality signal plus a confidence cap for AI Doctor (AC-5.7)          | Safety-bearing; needs a packet-shape change, so it is its own reviewed slice                                                                                        |
+| Making the AC-4.5 pin bidirectional, or restating its comment                                           | Small, but it changes a safety-adjacent normalizer                                                                                                                  |
+| Guarding `normalizeSensorSource` against prototype keys (AC-4.1)                                        | Its own small slice; the `fd33e8ff9` guard went with #1620, closed unmerged 2026-09-23. Since #1088 it also reaches the display canon                               |
+| Aligning the `manual_provenance` envelope with `SENSOR_PROVENANCE_TRANSPORTS` (AC-4.2)                  | Touches a persisted payload shape and its readers; needs its own reviewed slice                                                                                     |
+| Retiring the unreachable legacy `classifySource` in `aiDoctorEngine.ts` (AC-4.3)                        | Deletion of dead code on a safety surface; its own diff, with a test that the live path is unaffected                                                               |
+| Making `Published migration integrity` a required context (AC-9.1)                                      | A ruleset change — Cheek's decision, not a code change                                                                                                              |
+| Removing the declared-but-unimported `@supabase/ssr` dependency (AC-2.1)                                | A dependency change; its own slice under AC-8.2                                                                                                                     |
+| **Authoritative Release Topology Specification**                                                        | §14 — blocked on evidence this contract does not have; tracked via #1175 and #1221, both open at the stamped SHA (#1619 is closed unmerged)                         |
 
 ---
 
@@ -1088,7 +1172,7 @@ stale every time the operating picture moved. Only the durable rules stay:
   reconciling them requires deployment metadata this repository does not contain. The durable
   requirement: **a release topology claim is measured or it is `NOT_MEASURED`** — never inferred from
   build configuration, response headers, Make comments, vendor SDKs, or tip-equals-live parity.
-  Resolving it is the Release Topology Specification's job (§13; #1175 with #1619, and #1221).
+  Resolving it is the Release Topology Specification's job (§13; #1175 and #1221).
 - **Applied production schema is `NOT_MEASURED`** here and belongs to `docs/agents/CURRENT_STATE.md` (AC-9.3).
 - **Per-table RLS policy state** is owned by migrations, not by this file.
 - **Runtime drift among the 76–105 unenumerated sensor-source union literals** (the range depends on
@@ -1100,10 +1184,13 @@ stale every time the operating picture moved. Only the durable rules stay:
   telemetry is sent, not who builds, publishes, or serves the application. The same rule as for
   response headers applies.
 - **Two product-surface facts that bear on topology but do not settle it.** The preset comment names
-  Nitro's build-only default target as Cloudflare (`vite.config.ts:4`), and `prebuild` runs
-  `restore-env-production-from-head.mjs` and `assert-paddle-production-sandbox.mjs` before the edge
-  and stamp gates (`package.json:9`). Both are build inputs; neither measures the serving target or
-  the publish trigger.
+  Nitro's build-only default target as Cloudflare (`vite.config.ts:4`), and the preset code agrees:
+  it sets `defaultPreset: "cloudflare-module"`, and inside a Lovable sandbox it forces
+  `preset: "cloudflare-module"` with output under `dist/` (preset 2.8.5, `dist/index.js:576-592`).
+  That is the configured build target, not the serving target. Separately, `prebuild`
+  runs `restore-env-production-from-head.mjs` and `assert-paddle-production-sandbox.mjs` before
+  the edge and stamp gates (`package.json:9`). Both are build inputs; neither measures the serving
+  target or the publish trigger.
 
 ---
 
@@ -1131,7 +1218,11 @@ stale every time the operating picture moved. Only the durable rules stay:
 
 ### 15.1 Amendment record
 
-| Date       | Verified at                                | By     | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ---------- | ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-09-05 | `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` | Grok   | First stamp (PR #1281).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| 2026-09-22 | `387a00067a76ca9e2ced453d6b6a0f580e33209b` | Claude | Full §15 re-verification of the 47 existing clauses, 327 commits after the first stamp, plus new AC-1.8 (stack majors); 48 clauses in total. Corrected enforcement for AC-1.3, 1.4, 1.7, 2.4 (tests existed at the first stamp) and AC-4.6, 9.1 (not required checks), and for the AC-1.2 MCP bundle (convention only; `TREE_HASH_ROOTS` does not reject hand edits). Recorded the AC-4.1 prototype-key defect, the AC-4.2 catch-all and registry divergence, the AC-4.3 unreachable promotion, the AC-5.6 second site, and the AC-7.3 explicit breeding writer. Corrected the AC-2.1 client-library and RPC claims. Re-pointed drifted citations. Carried the AC-1.4 preset internals and the AC-1.5 automatic-CSRF absence as `source claim` (not re-measurable without `node_modules`). |
+| Date       | Verified at                                | By     | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------- | ------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-05 | `7c46855b7fd49651cf8ed080a5a931ff8fbdd640` | Grok   | First stamp (PR #1281).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 2026-09-22 | `387a00067a76ca9e2ced453d6b6a0f580e33209b` | Claude | Full §15 re-verification of the 47 existing clauses, 327 commits after the first stamp, plus new AC-1.8 (stack majors); 48 clauses in total. Corrected enforcement for AC-1.3, 1.4, 1.7, 2.4 (tests existed at the first stamp) and AC-4.6, 9.1 (not required checks), and for the AC-1.2 MCP bundle (convention only; `TREE_HASH_ROOTS` does not reject hand edits). Recorded the AC-4.1 prototype-key defect, the AC-4.2 catch-all and registry divergence, the AC-4.3 unreachable promotion, the AC-5.6 second site, and the AC-7.3 explicit breeding writer. Corrected the AC-2.1 client-library and RPC claims. Re-pointed drifted citations. Carried the AC-1.4 preset internals and the AC-1.5 automatic-CSRF absence as `source claim` (not re-measurable without `node_modules`).                                                                                                                                                                                       |
+| 2026-09-23 | `8b73c14031050b51061d4715bedbcdfeb66eee52` | Claude | §15 amendment, verified against installed packages whose versions match `bun.lock`. AC-1.4: measured the preset internals, previously a `source claim` (devtools are development-only; Nitro is build-only); recorded that the ESM-path rationale did not reproduce on Node 22.22.2 with Vite 8.2.0, and kept the rule. AC-1.5: corrected. Start installs a default CSRF middleware only when no start instance exists, the `src/start.ts` comment is accurate, and Start logs the missing-middleware warning only outside production (`NODE_ENV !== "production"`, which includes `test`). Added proposed gate T8 (AC-1.5), which executes the registered middleware rather than only detecting it. §14: recorded the preset's Nitro build target from its code. The dated observation stays here, not in §14: a local production build at 8b73c140 logged `preset: cloudflare-module` and wrote `.output/`. No other clause touched; the code tree is identical to `387a0006`. |
+| 2026-09-23 | `ea50ec678dee26e8ad5494c5d41aab8e4de1740e` | Grok   | GDP-ARCH-CITE-001. Soft `#1088` (`442370af1`) inserted two comment lines above `pi_bridge` / the `TRUST_LIVE_ALIASES` pin / `normalizeSensorSource` / `isHealthySensorSource`, so five `sensorSourceRules.ts` cites in AC-4.1, AC-4.4 and AC-4.5 pointed two lines too high while the line numbers still existed. Re-pointed `:80`→`:82`, `:86`→`:88`, `:24-26,86`→`:24-28,88`, `:46`→`:48`, `:46-51`→`:48-53` after re-reading the tip file. `:16` (`SENSOR_SOURCES`) was already correct. Cited `src/lib/sensorSourceDisplayCanon.ts` from AC-4.2 (vendor/transport names are provenance, never the Source label). Amended proposed T1 from path/line existence to require a short expected snippet on the cited line or inside the cited range — existence-only T1 would have passed this drift. No T1 runner was present; this slice does not add one (§13). Docs-only; no `CURRENT_STATE.md` restamp.                                                                       |
+| 2026-09-23 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | §15 amendment, follow-up to GDP-ARCH-CITE-001 (#1639). Corrected three citations that fail T1: AC-1.5 prose `:238` now names `createStartHandler.js`, the AC-1.7 historical note spells its superseded range in prose, and AC-5.3 `readToolArguments` is now `:639-649`. AC-4.1: #1620, which carried the prototype-key guard, closed unmerged; the defect now reaches the #1088 display canon (`sourceLabel` undefined, still never healthy), under Bun 1.3.11. AC-4.2: qualified the "always one of the six" display claim accordingly; reclassified partially gated (display split tested). AC-3.2: `*Rules.ts` 517 → 518 (#1636); AC-3.4 shim imports 743 → 744 (#1647), and §12's Next.js row now cites AC-3.4, not a count; other §3 counts and the AC-4.3 union count unchanged. §13 and §14: #1620 and #1619 closed unmerged; #1175 and #1221 still open. T1 text unchanged. Rejoined the §13 table #1639 split with a blank line; applied the repo Prettier config.     |
+| 2026-09-24 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | Editorial follow-up to #1649; stamp unchanged. AC-1.5's in-prose bullet no longer writes the installed Start package as a `path:line` token: it now names line 238 of `createStartHandler.js` in prose, with its `[defaultCsrfMiddleware]` fallback, re-read in `@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins at this SHA. The clause's `_Source:` block keeps its package-internal cites and now says T1 does not cover them: T1 covers repository paths, and a dependency file cannot be opened at the stamped SHA. Copilot, CodeRabbit and the Codex GitHub reviewer raised the bullet on #1649; Copilot raised the `_Source:` block on #1667. No other clause changed.                                                                                                                                                                                                                                                                                 |

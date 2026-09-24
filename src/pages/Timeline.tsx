@@ -168,8 +168,7 @@ import {
   PHOTO_NON_DIAGNOSTIC_TESTID,
   shouldShowPhotoNonDiagnosticLabel,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
-import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
-import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
+import TimelineEvidenceDetailPreview from "@/components/TimelineEvidenceDetailPreview";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import {
@@ -211,6 +210,7 @@ import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoSc
 import { useTimelineHashAnchorHandoff } from "@/hooks/useTimelineHashAnchorHandoff";
 import {
   buildLinkedGrowEventTimelineAnchorId,
+  buildRenderedDiaryTimelineAnchorIds,
   buildTimelineEntryAnchorId,
 } from "@/lib/timelineEntryAnchorRules";
 import {
@@ -1199,6 +1199,11 @@ export default function Timeline() {
     effectiveStartDate,
     effectiveEndDate,
   ]);
+
+  const renderedDiaryAnchorIds = useMemo(
+    () => buildRenderedDiaryTimelineAnchorIds(filtered),
+    [filtered],
+  );
 
   function clearEvidenceFilters() {
     setSearchQuery("");
@@ -2214,12 +2219,14 @@ export default function Timeline() {
         <DiaryCalendarSection
           rawEntries={recentLaneRawEntries}
           activeStage={activeGrow?.stage ?? null}
+          plantStartedAt={activeGrow?.started_at ?? null}
         />
       </div>
 
       <div className="mt-4">
         <WateringHistoryPanel
           rawEntries={recentLaneRawEntries}
+          reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2230,6 +2237,7 @@ export default function Timeline() {
       <div className="mt-4">
         <FeedingHistoryPanel
           rawEntries={recentLaneRawEntries}
+          reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2876,12 +2884,12 @@ export default function Timeline() {
           onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
-      <TimelineEvidenceDetailDrawer
+      <TimelineEvidenceDetailPreview
         open={!!detailEntryId}
-        viewModel={(() => {
+        entry={(() => {
           const row = displayEntries.find((r) => r.id === detailEntryId);
           return row
-            ? buildTimelineEvidenceDetailViewModel({
+            ? {
                 id: row.id,
                 note: row.note,
                 photo_url: row.photo_url,
@@ -2890,7 +2898,7 @@ export default function Timeline() {
                 plant_id: row.plant_id,
                 tent_id: row.tent_id,
                 details: row.details,
-              })
+              }
             : null;
         })()}
         onClose={() => setDetailEntryId(null)}

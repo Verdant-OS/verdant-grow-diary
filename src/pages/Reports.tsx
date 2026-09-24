@@ -18,6 +18,7 @@ import { LineChart, ArrowRight } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useGrows } from "@/store/grows";
 import { useReportsHubData } from "@/hooks/useReportsHubData";
@@ -41,21 +42,22 @@ export default function Reports() {
   const grow = scopedGrow ?? activeGrow ?? null;
   const data = useReportsHubData(grow?.id ?? null);
 
-  const summary = grow
-    ? buildReportsHubSummary({
-        growId: grow.id,
-        growName: grow.name,
-        outcomeSummary: data.outcomeSummary,
-        outcomeLearning: data.outcomeLearning,
-        alertsOpen: data.alertsOpen,
-        alertsCritical: data.alertsCritical,
-        alertsWarning: data.alertsWarning,
-        latestSensorCapturedAt: data.latestSensorCapturedAt,
-        recentSensorReadingCount: data.recentSensorReadingCount,
-        diaryEntriesLast7d: data.diaryEntriesLast7d,
-        diaryEntriesTotal: data.diaryEntriesTotal,
-      })
-    : null;
+  const summary =
+    grow && data.status === "ready"
+      ? buildReportsHubSummary({
+          growId: grow.id,
+          growName: grow.name,
+          outcomeSummary: data.outcomeSummary,
+          outcomeLearning: data.outcomeLearning,
+          alertsOpen: data.alertsOpen,
+          alertsCritical: data.alertsCritical,
+          alertsWarning: data.alertsWarning,
+          latestSensorCapturedAt: data.latestSensorCapturedAt,
+          recentSensorReadingCount: data.recentSensorReadingCount,
+          diaryEntriesLast7d: data.diaryEntriesLast7d,
+          diaryEntriesTotal: data.diaryEntriesTotal,
+        })
+      : null;
 
   const learningGroups = data.outcomeLearning?.groups ?? [];
   const lowSampleGroups = learningGroups.filter((g) => g.needs_more_data);
@@ -124,7 +126,7 @@ export default function Reports() {
         <ReportsReviewQueueSection items={reviewQueue.items} showEmptyState={reviewQueue.empty} />
       )}
 
-      {grow?.id && !showEmptyState && !showOnboarding && (
+      {grow?.id && data.status === "ready" && !showEmptyState && !showOnboarding && (
         <div className="mt-4 space-y-2">
           <GrowFollowUpReviewSection growId={grow.id} heading="Unresolved learning work" />
           <p className="text-xs text-muted-foreground">
@@ -138,7 +140,18 @@ export default function Reports() {
         </div>
       )}
 
-      {showEmptyState ? (
+      {grow && data.status === "unavailable" ? (
+        <div role="alert">
+          <EmptyState
+            icon={<LineChart className="h-6 w-6" />}
+            title="Reports unavailable"
+            description="Your report could not be loaded. Retry to check your grow data."
+          />
+          <Button variant="outline" onClick={data.retry}>
+            Retry reports
+          </Button>
+        </div>
+      ) : showEmptyState ? (
         <EmptyState
           icon={<LineChart className="h-6 w-6" />}
           title="No reports yet"

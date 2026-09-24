@@ -454,7 +454,10 @@ describe("Quick Log shared in-flight coordination", () => {
     );
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });
+      pending.resolve({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002" },
+        error: null,
+      });
       await pending.promise;
     });
 
@@ -526,7 +529,10 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(mainSave.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });
+      pending.resolve({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002" },
+        error: null,
+      });
       await pending.promise;
     });
   });
@@ -565,7 +571,10 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(mainSave.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });
+      pending.resolve({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002" },
+        error: null,
+      });
       await pending.promise;
     });
 
@@ -711,7 +720,10 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(harness.toastMessage).toHaveBeenCalledWith(expect.stringMatching(/save in progress/i));
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });
+      pending.resolve({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002" },
+        error: null,
+      });
       await pending.promise;
     });
 
@@ -819,7 +831,10 @@ describe("Quick Log shared in-flight coordination", () => {
     );
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });
+      pending.resolve({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002" },
+        error: null,
+      });
       await pending.promise;
     });
   });
@@ -862,7 +877,10 @@ describe("Quick Log shared in-flight coordination", () => {
     expect(harness.rpc).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      pending.resolve({ data: { ok: true, grow_event_id: "child-event" }, error: null });
+      pending.resolve({
+        data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000002" },
+        error: null,
+      });
       await pending.promise;
     });
   });

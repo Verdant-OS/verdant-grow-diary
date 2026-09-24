@@ -1,5 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
+import AlertReasonText from "@/components/AlertReasonText";
+import { ALERT_LIST_MANUAL_RESOLUTION_NOTE } from "@/lib/alertReasonDisplayRules";
 import { Link } from "@/lib/react-router-compat";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -428,6 +430,14 @@ export default function Alerts() {
                   {group.label}{" "}
                   <span className="text-xs text-muted-foreground">{items.length}</span>
                 </h2>
+                {group.key === "open" ? (
+                  <p
+                    className="text-xs text-muted-foreground mb-2"
+                    data-testid="alerts-open-manual-resolution-note"
+                  >
+                    {ALERT_LIST_MANUAL_RESOLUTION_NOTE}
+                  </p>
+                ) : null}
                 <ul className="space-y-2">
                   {items.map((a) => (
                     <AlertCard
@@ -581,7 +591,7 @@ function AlertCard({
             {seenLabel}
           </time>
         </div>
-        <p className="text-xs text-muted-foreground">{a.reason}</p>
+        <AlertReasonText reason={a.reason} className="text-xs text-muted-foreground" />
         <AlertTargetContext
           tentId={targetInput.tentId}
           plantId={targetInput.plantId}

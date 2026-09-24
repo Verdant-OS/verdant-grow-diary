@@ -579,10 +579,10 @@ permitted there. The two divergences above are grandfathered and allowlisted so 
 shrink but not grow. **Edge functions are out of this import rule** — they cannot import `src/lib`
 (AC-2.3), and `sensorSourceRules.ts` has no `_shared` mirror today; an edge ingest path needs its
 own mirrored or local vocabulary, not a forbidden cross-import.
-**"Roughly ninety", measured.** Single-line union literals outside tests, counted as lines where
-two quoted canonical labels sit either side of one `|` (`"a" | "b"`, single or double quotes). The
-three single-line counts are the same at the first stamp `7c46855b` and at this stamp, so none has
-grown:
+**"Roughly ninety", measured as text.** Single-line union literals outside tests, counted as lines
+where two quoted canonical labels sit either side of one `|` (`"a" | "b"`, single or double
+quotes). The three single-line counts are the same at the first stamp `7c46855b` and at this stamp,
+so none has grown:
 
 - **76 lines in 66 files** when at least one label of the pair is `live`, `manual`, `csv` or `demo`;
 - 69 lines in 60 files when both labels must be among those four;
@@ -591,6 +591,10 @@ grown:
   was never recorded, and it was not reproduced at this stamp. One-member-per-line regex scans also
   match unions that are not sensor-source unions, such as `ManualSensorTrendOmissionReason`, so no
   regex count replaces it. T3's AST scan is what settles it.
+
+Every figure above counts lines that match a text pattern. A matching line is not necessarily a
+sensor-source union: the wider pattern catches quality unions, and any pattern can catch an
+unrelated one. The sensor-source count is T3's to settle.
 
 _Source:_ `src/lib/sensor/sensorSourceRules.ts:16`; `src/constants/sensorIngestProvenance.ts:15`;
 `src/lib/ai/types.ts:15`; `src/lib/aiDoctorEngine.ts:151,266-276,291,389-397`; counts by `grep -rnE`
@@ -693,13 +697,15 @@ every required context, so a violation cannot block a merge by that route. It ru
   (`scripts/sensor-safety-check.mjs`), the fifth of its steps; that script skips every step after
   the first one that fails;
 - `vitest-batched-full-suite.yml`, on manual dispatch only;
-- `release-receipt-ci.yml`, on `main` only;
+- `release-receipt-ci.yml`, on `main` only. Every validation step there is `continue-on-error`, so
+  the checker runs even after an earlier failure; a final step fails the job if any of them failed;
 - a path-filtered strain-library gate.
 
 > Earlier versions listed only the pre-commit hook and the last three lanes, and so implied the
 > check never runs on an ordinary pull request. All three pull-request lanes and their script chains
-> were already present at the first stamp. The classification does not change: it runs on every PR
-> into `verdant-grow-diary` or `main` once the steps ahead of it pass, but not as a required check.
+> were already present at the first stamp. The classification does not change: through those three
+> lanes it runs on every PR into `verdant-grow-diary` or `main` once the steps ahead of it pass, but
+> not as a required check.
 
 ---
 
@@ -1273,9 +1279,9 @@ stale every time the operating picture moved. Only the durable rules stay:
   Resolving it is the Release Topology Specification's job (§13; #1175 and #1221).
 - **Applied production schema is `NOT_MEASURED`** here and belongs to `docs/agents/CURRENT_STATE.md` (AC-9.3).
 - **Per-table RLS policy state** is owned by migrations, not by this file.
-- **Runtime drift among the 69–105 unenumerated sensor-source union literals** (the range depends on
-  the pattern, AC-4.3) is `NOT_MEASURED`; two are confirmed divergent by reading, the rest were not
-  enumerated.
+- **Runtime drift among the 69–105 unenumerated union literals matching AC-4.3's text patterns** is
+  `NOT_MEASURED`, and not every match is a sensor-source union; two are confirmed divergent by
+  reading, the rest were not enumerated.
 - **A vendor telemetry SDK is not publisher evidence.** `@vercel/analytics` and
   `@vercel/speed-insights` were added in #1336 and render through
   `src/components/ConsentGatedVercelTelemetry.tsx`. A client-side analytics package says where

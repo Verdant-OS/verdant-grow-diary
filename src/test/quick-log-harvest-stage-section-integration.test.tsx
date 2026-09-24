@@ -61,7 +61,7 @@ describe("QuickLogAllActivitiesSection harvest stage fence", () => {
 
   it("preserves eligible flower harvest persistence as event_type=harvest", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "harvest-1" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000200" },
       error: null,
     });
     const entryCreated = vi.fn();
@@ -91,7 +91,7 @@ describe("QuickLogAllActivitiesSection harvest stage fence", () => {
 
   it("drops plant A's Harvest draft before an explicit plant B re-selection", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "harvest-b" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000201" },
       error: null,
     });
     const { rerender } = render(section("flower", { plantId: "plant-a" }));
@@ -133,7 +133,7 @@ describe("QuickLogAllActivitiesSection harvest stage fence", () => {
 
   it("clears a target-specific saved receipt when the plant changes", async () => {
     rpcMock.mockResolvedValueOnce({
-      data: { ok: true, grow_event_id: "harvest-a" },
+      data: { ok: true, grow_event_id: "77777777-7777-4777-8777-000000000202" },
       error: null,
     });
     const { rerender } = render(section("flower", { plantId: "plant-a" }));

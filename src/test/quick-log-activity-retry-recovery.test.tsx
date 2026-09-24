@@ -9,6 +9,7 @@ const backend = vi.hoisted(() => ({
   rows: new Map<string, Payload>(),
   loseFirstReply: true,
   rejectFirstWrite: false,
+  malformedFirstReply: false,
 }));
 const telemetry = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/quickLogSuccessTelemetry", () => ({ trackQuickLogSuccess: telemetry }));
@@ -24,10 +25,22 @@ vi.mock("@/integrations/supabase/client", () => ({
       const key = String(payload.p_idempotency_key);
       const existing = backend.rows.get(key);
       if (!existing) backend.rows.set(key, payload);
+      if (backend.posts.length === 1 && backend.malformedFirstReply) {
+        return { data: { ok: "false", grow_event_id: {} }, error: null };
+      }
       if (backend.posts.length === 1 && backend.loseFirstReply) {
         return { data: null, error: { message: "Reply unavailable" } };
       }
-      return { data: { ok: true, grow_event_id: "event-" + key, reused: !!existing }, error: null };
+      return {
+        data: {
+          ok: true,
+          grow_event_id:
+            "77777777-7777-4777-8777-" +
+            String([...backend.rows.keys()].indexOf(key) + 1).padStart(12, "0"),
+          reused: !!existing,
+        },
+        error: null,
+      };
     },
   },
 }));
@@ -77,11 +90,35 @@ beforeEach(() => {
   backend.rows = new Map();
   backend.loseFirstReply = true;
   backend.rejectFirstWrite = false;
+  backend.malformedFirstReply = false;
   telemetry.mockReset();
   window.sessionStorage.clear();
 });
 
 describe("All activity types retry confirmation", () => {
+  it.each(["training", "note", "environment_check"])(
+    "keeps the %s draft and original submission after a malformed success reply",
+    async (activity) => {
+      backend.malformedFirstReply = true;
+      mount();
+      await loseReply(activity);
+      expect(screen.getByTestId("quick-log-all-activities-error")).toHaveTextContent(
+        /save is unconfirmed/i,
+      );
+      expect(screen.getByTestId("quick-log-all-activities-note")).toHaveValue(
+        "My observed activity",
+      );
+      expect(screen.queryByTestId("quick-log-all-activities-saved")).not.toBeInTheDocument();
+      expect(telemetry).not.toHaveBeenCalled();
+      save();
+      await screen.findByTestId("quick-log-all-activities-saved");
+      expect(backend.posts).toHaveLength(2);
+      expect(backend.posts[1]).toEqual(backend.posts[0]);
+      expect(backend.rows.size).toBe(1);
+      expect(telemetry).toHaveBeenCalledTimes(1);
+      expect(telemetry).toHaveBeenCalledWith(activity, { reused: true });
+    },
+  );
   for (const activity of ["training", "note", "environment_check"]) {
     it(`keeps the logical ${activity} key after an accepted write loses its reply`, async () => {
       mount();

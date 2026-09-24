@@ -36,6 +36,16 @@
  *              `Object.keys(JSON.parse(readFileSync(…)).scripts).includes(…)`. A
  *              statement-bounded regex crosses the read's closing parenthesis and
  *              flags this; the read's own argument list must be matched instead.
+ *   boundRegexTest / boundLastIndexOf / boundSplit  a bound read consumed by a regex
+ *              `.test(PKG)`, by `PKG.lastIndexOf(…)`, and by `PKG.split(…)`. Each list
+ *              of text methods missed one (rounds 3, 10, 12), so a binding is now
+ *              compliant only as `JSON.parse(PKG)`; `split` is on no list at all —
+ *              CodeRabbit, #1221 round 12.
+ *   inlineRegexTest / inlineLastIndexOf  the same two shapes on an unbound read.
+ *   boundParsedToStringFence  `JSON.parse(PKG.toString())` — still a parse.
+ *   inlineCopyFence  `writeFileSync(…, readFileSync("package.json", "utf8"))`, a
+ *              copy into a fixture root, as check-bun-lockfile-policy does. An
+ *              inline read that feeds no assertion must stay green.
  *
  * @source-scan-justified: this file EMBEDS the forbidden shapes as spawn fixtures for the
  * checker itself (see FIXTURES below). It reads no package.json of its own; the strings
@@ -144,6 +154,74 @@ it("x", () => {
   ).toBe(true);
 });
 `,
+  boundRegexTest: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json", "utf8");
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(/"test:x"/.test(PKG)).toBe(true);
+});
+`,
+  boundLastIndexOf: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json", "utf8");
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(PKG.lastIndexOf('"test:x"')).toBeGreaterThan(-1);
+});
+`,
+  boundSplit: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json", "utf8");
+const UNRELATED = JSON.parse('{"a":1}');
+const PARTS = PKG.split(",");
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(PARTS.some((part) => part.includes('"test:x"'))).toBe(true);
+});
+`,
+  inlineRegexTest: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(/"test:x"/.test(readFileSync("package.json", "utf8"))).toBe(true);
+});
+`,
+  inlineLastIndexOf: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(readFileSync("package.json", "utf8").lastIndexOf('"test:x"')).toBeGreaterThan(-1);
+});
+`,
+  boundParsedToStringFence: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json");
+const { scripts } = JSON.parse(PKG.toString());
+it("x", () => {
+  expect(scripts["test:x"]).toBe("bun run x");
+});
+`,
+  inlineCopyFence: `
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { expect, it } from "vitest";
+const { scripts } = JSON.parse(readFileSync("package.json", "utf8"));
+it("x", () => {
+  writeFileSync(join("/tmp/fixture-root", "package.json"), readFileSync("package.json", "utf8"), "utf8");
+  expect(scripts["test:x"]).toBe("bun run x");
+});
+`,
   multilineResolved: `
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -236,4 +314,41 @@ describe("check-contract-test-resolution — package.json guards must assert on 
     const { status, out } = runChecker("inlineResolvedFence");
     expect(status, out).toBe(0);
   });
+});
+
+describe("a package.json binding is compliant only as JSON.parse(ID) (CodeRabbit, #1221 round 12)", () => {
+  // Three rounds each found one text method the binding list lacked: `$PKG.includes`
+  // (round 10), then a regex `.test(PKG)` and `PKG.lastIndexOf` (round 12). The
+  // binding side is inverted instead of extended: any reference to the raw text
+  // other than its declaration and `JSON.parse(…)` is an assertion on text.
+  // The unbound side keeps a consumer list, because an inline read can legitimately
+  // feed a copy (the inlineCopyFence), and it gains `.test(`/`.exec(` and
+  // `lastIndexOf`.
+  it.each([
+    ["boundRegexTest", "PKG"],
+    ["boundLastIndexOf", "PKG"],
+    ["boundSplit", "PKG"],
+  ] as const)("rejects the bound read in %s", (name, id) => {
+    const { status, out } = runChecker(name);
+    expect(status, out).toBe(1);
+    expect(out).toContain(`${name}.test.ts`);
+    expect(out).toContain(`\`${id}\``);
+  });
+
+  it.each(["inlineRegexTest", "inlineLastIndexOf"] as const)(
+    "rejects the unbound read in %s",
+    (name) => {
+      const { status, out } = runChecker(name);
+      expect(status, out).toBe(1);
+      expect(out).toContain(`${name}.test.ts`);
+    },
+  );
+
+  it.each(["boundParsedToStringFence", "inlineCopyFence"] as const)(
+    "accepts %s (FENCE)",
+    (name) => {
+      const { status, out } = runChecker(name);
+      expect(status, out).toBe(0);
+    },
+  );
 });

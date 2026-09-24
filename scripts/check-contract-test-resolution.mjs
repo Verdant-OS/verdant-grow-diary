@@ -126,15 +126,34 @@ const PACKAGE_READ_BINDINGS = (source, config) => {
   for (const m of source.matchAll(viaConst)) ids.add(m[1]);
   return [...ids];
 };
-// Identifier boundaries are lookarounds, not `\b`: `$` is not a `\w` character, so
-// `\b$PKG` never matches after a space or `(`, and `$PKG.includes(…)` got through
-// while `expect($PKG)` was caught (CodeRabbit, #1221 round 10). The lookbehind also
-// keeps `a$PKG.includes` from reading as `$PKG`.
-const ASSERTS_ON_BINDING = (source, id) => {
+// A binding of the package source is compliant only as `JSON.parse(ID)` — or
+// `JSON.parse(ID.toString())` / `JSON.parse(String(ID))`. Every other reference
+// (`expect(ID)`, `ID.includes(…)`, `/re/.test(ID)`, `ID.split(…)`) consumes the raw
+// text. This was a list of consumers until three rounds each found one it lacked:
+// `$PKG.includes(…)` (round 10), then `/re/.test(PKG)` and `PKG.lastIndexOf(…)`
+// (CodeRabbit, #1221 round 12). The binding side is inverted rather than extended;
+// measured before inverting, no test outside the justified fixture file references
+// a package binding other than to parse it.
+//
+// Deliberately lexical: a mention in a comment or a string also counts. That fails
+// loudly and is fixed by parsing at the read; a consumer list that misses a method
+// fails silently. The checker stays dependency-free (its workflow installs nothing),
+// so it does not borrow a JS lexer to tell comments apart.
+//
+// Identifier boundaries are lookarounds, not `\b`: `$` is not a `\w` character
+// (round 10), and the lookbehind also skips `obj.ID` and `a$ID`.
+const USES_BINDING_AS_TEXT = (source, id) => {
   const e = escapeRegExp(id);
-  return new RegExp(
-    `expect\\(\\s*${e}\\s*\\)|(?<![\\w$])${e}\\s*\\.(?:includes|match|indexOf|search|startsWith|endsWith)\\s*\\(`,
-  ).test(source);
+  for (const m of source.matchAll(new RegExp(`(?<![\\w$.])${e}(?![\\w$])`, "g"))) {
+    const before = source.slice(Math.max(0, m.index - 64), m.index);
+    const after = source.slice(m.index + id.length, m.index + id.length + 32);
+    if (/(?:const|let|var)\s+$/.test(before)) continue; // its own declaration
+    const parsed =
+      (/JSON\.parse\(\s*$/.test(before) && /^\s*(?:\.toString\(\s*\))?\s*[,)]/.test(after)) ||
+      (/JSON\.parse\(\s*String\(\s*$/.test(before) && /^\s*\)\s*[,)]/.test(after));
+    if (!parsed) return true;
+  }
+  return false;
 };
 
 /**
@@ -149,10 +168,16 @@ const ASSERTS_ON_BINDING = (source, id) => {
  * `Object.keys(JSON.parse(readFileSync(…)).scripts).includes(…)` — a parsed,
  * compliant guard — would read as `readFileSync(…).includes(…)`. String literals
  * are skipped while balancing, so a quoted parenthesis does not end the call.
+ *
+ * Unlike a binding, an unbound read keeps a list of consumers: it can legitimately
+ * feed something that is not an assertion, such as a copy into a fixture root
+ * (`writeFileSync(…, readFileSync(…/package.json))` in check-bun-lockfile-policy).
+ * Round 12 added the regex consumers `/re/.test(…)` and `/re/.exec(…)`, and
+ * `lastIndexOf` / `matchAll` to the chained text methods (CodeRabbit, #1221).
  */
 const READ_CALL = /(?:[\w.]*readFile(?:Sync)?|\bread|\breadText)\s*\(/g;
 const TEXT_METHOD_AFTER =
-  /^\s*(?:\.toString\(\s*\))?\s*\.(?:includes|match|indexOf|search|startsWith|endsWith)\s*\(/;
+  /^\s*(?:\.toString\(\s*\))?\s*\.(?:includes|match|matchAll|indexOf|lastIndexOf|search|startsWith|endsWith)\s*\(/;
 const closingParen = (source, open) => {
   let depth = 0;
   for (let i = open; i < source.length; i++) {
@@ -176,10 +201,10 @@ const ASSERTS_ON_INLINE_READ = (source, config) => {
     if (close < 0 || !target.test(source.slice(open + 1, close))) continue;
     const after = source.slice(close + 1);
     if (TEXT_METHOD_AFTER.test(after)) return true;
-    const consumedByExpect =
-      /expect\(\s*(?:await\s+)?$/.test(source.slice(0, m.index)) &&
+    const consumedByCall =
+      /(?:expect|\.test|\.exec)\(\s*(?:await\s+)?$/.test(source.slice(0, m.index)) &&
       /^\s*(?:\.toString\(\s*\))?\s*\)/.test(after);
-    if (consumedByExpect) return true;
+    if (consumedByCall) return true;
   }
   return false;
 };
@@ -250,7 +275,7 @@ for (const file of listTestFiles(TEST_DIR)) {
     const neverParsed = !PARSES_JSON.test(source);
     const assertsOnSource = ASSERTS_ON_JSON_SOURCE.test(source);
     const rawBinding = PACKAGE_READ_BINDINGS(source, config).find((id) =>
-      ASSERTS_ON_BINDING(source, id),
+      USES_BINDING_AS_TEXT(source, id),
     );
     const inlineRead = ASSERTS_ON_INLINE_READ(source, config);
     if (!neverParsed && !assertsOnSource && !rawBinding && !inlineRead) continue; // parsed, asserted on the object
@@ -270,9 +295,9 @@ if (violations.length > 0) {
     console.error(
       v.json
         ? v.rawBinding
-          ? `    asserts on \`${v.rawBinding}\`, the raw ${v.config} source it read, instead of the parsed object`
+          ? `    uses \`${v.rawBinding}\`, the raw ${v.config} source it read, other than as \`JSON.parse(${v.rawBinding})\` — comments and strings count; parse at the read`
           : v.inlineRead
-            ? `    asserts on an unbound ${v.config} read (\`expect(readFileSync(…))\` or \`readFileSync(…).includes(…)\`) instead of the parsed object`
+            ? `    asserts on an unbound ${v.config} read (\`expect(readFileSync(…))\`, \`/re/.test(readFileSync(…))\` or \`readFileSync(…).includes(…)\`) instead of the parsed object`
             : v.neverParsed
               ? `    reads ${v.config} source and never JSON.parse()s it — every assertion on it is on text`
               : `    asserts on ${v.config} SOURCE TEXT (a "key": pattern) instead of the parsed object`

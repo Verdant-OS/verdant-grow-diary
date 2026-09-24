@@ -473,11 +473,18 @@ export default function Sensors() {
           const metricReadings = readingsByMetric[m.key];
           const latestMetricReading = metricReadings[0] ?? null;
           const rawValue = readObservedSensorMetric(latestMetricReading, m.key);
-          const metricTrust = classifySensorReadingTrust(latestMetricReading);
-          const metricSource = latestMetricReading?.source ?? null;
+          const metricEvidenceReading =
+            latestMetricReading ??
+            (m.key === "vpd" ? (latestTrustedVpdInputs?.reading ?? null) : null);
+          const metricTrust = classifySensorReadingTrust(metricEvidenceReading);
+          const metricSource = metricEvidenceReading?.source ?? null;
           const metricClassification = classifyGrowDataSource(
-            latestMetricReading
-              ? { source: metricSource, value: rawValue, timestamp: latestMetricReading.ts }
+            metricEvidenceReading
+              ? {
+                  source: metricSource,
+                  value: rawValue ?? derivedVpdKpa,
+                  timestamp: metricEvidenceReading.ts,
+                }
               : { source: null, value: null, timestamp: null },
             { now: nowMs },
           );

@@ -105,28 +105,44 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe("Sensor Data idle freshness", () => {
-  it.each(["live", "manual"])("ages %s without replacing query rows", (source) => {
-    vi.useFakeTimers();
-    const now = new Date("2026-09-23T12:00:00Z");
-    vi.setSystemTime(now);
-    const age = source === "manual" ? 1439 : 14;
-    const ts = new Date(now.getTime() - age * 60000).toISOString();
-    state.sensors = [
-      { ...manual(), source: source as SensorReading["source"], ts, capturedAt: ts },
-    ];
-    state.manuals.data = [];
-    mount();
-    expect(screen.getByTestId("sensors-stage-status-temp")).toBeInTheDocument();
-    expect(screen.getByTestId("sensors-metric-state-temp")).not.toHaveAttribute(
-      "data-kind",
-      "stale",
-    );
-    act(() => {
-      vi.advanceTimersByTime(120000);
-    });
-    expect(screen.getByTestId("sensors-metric-state-temp")).toHaveAttribute("data-kind", "stale");
-    expect(screen.queryByTestId("sensors-stage-status-temp")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("sensors-stage-status-rh")).not.toBeInTheDocument();
-    expect(screen.getByTestId("chart-temp")).toHaveTextContent(source + ":25");
-  });
+  it.each([
+    ["live", true],
+    ["manual", true],
+    ["live", false],
+    ["manual", false],
+  ] as const)(
+    "ages %s with observed VPD=%s without replacing query rows",
+    (source, observedVpd) => {
+      vi.useFakeTimers();
+      const now = new Date("2026-09-23T12:00:00Z");
+      vi.setSystemTime(now);
+      const age = source === "manual" ? 1439 : 14;
+      const ts = new Date(now.getTime() - age * 60000).toISOString();
+      state.sensors = [
+        {
+          ...manual(),
+          source,
+          ts,
+          capturedAt: ts,
+          observedMetrics: observedVpd ? ["temp", "rh", "vpd"] : ["temp", "rh"],
+        },
+      ];
+      state.manuals.data = [];
+      mount();
+      expect(screen.getByTestId("sensors-stage-status-temp")).toBeInTheDocument();
+      expect(screen.getByTestId("sensors-metric-state-temp")).not.toHaveAttribute(
+        "data-kind",
+        "stale",
+      );
+      act(() => {
+        vi.advanceTimersByTime(120000);
+      });
+      expect(screen.getByTestId("sensors-metric-state-temp")).toHaveAttribute("data-kind", "stale");
+      expect(screen.getByTestId("sensors-metric-state-vpd")).toHaveAttribute("data-kind", "stale");
+      if (!observedVpd) expect(screen.getByTestId("sensors-vpd-derived-value")).toBeInTheDocument();
+      expect(screen.queryByTestId("sensors-stage-status-temp")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("sensors-stage-status-rh")).not.toBeInTheDocument();
+      expect(screen.getByTestId("chart-temp")).toHaveTextContent(source + ":25");
+    },
+  );
 });

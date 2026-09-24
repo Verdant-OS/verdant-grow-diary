@@ -55,6 +55,7 @@ import { countActivatingSensorReadings } from "@/lib/onboardingSensorActivationR
 import { useOneTentActivationEvidence } from "@/hooks/useOneTentActivationEvidence";
 import { useSensorReadings, useSensorReadingsByTents } from "@/hooks/use-sensor-readings";
 import { useNowTick } from "@/hooks/useNowTick";
+import { describeCurrentStateStaleWindow } from "@/lib/sensorTruthCanon";
 import { isUuid } from "@/lib/isUuid";
 import { useScopedGrow } from "@/hooks/useScopedGrow";
 import { useDashboardScopedData } from "@/hooks/useDashboardScopedData";
@@ -130,6 +131,7 @@ import {
   dashboardSnapshotForHealthyCues,
   evaluateDashboardSensorQuality,
   groupDashboardSensorReadings,
+  resolveDashboardSensorBadgeStatus,
   selectDashboardSensorEvidenceRows,
 } from "@/lib/dashboardSensorEvidenceRules";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
@@ -522,7 +524,7 @@ export default function Dashboard() {
               const isStaleSnap =
                 sensorState.status === "ok" &&
                 !!sensorState.snapshot.ts &&
-                isSnapshotStale(sensorState.snapshot);
+                isSnapshotStale(sensorState.snapshot, nowTick);
               const isInvalidSnap =
                 !!snapshotQuality && snapshotQuality.suspiciousFields.length > 0;
               const isUnverifiedSnap =
@@ -628,7 +630,7 @@ export default function Dashboard() {
                         ? "Latest reading has unverified or simulated provenance — shown as context only, never as healthy sensor evidence."
                         : isInvalidSnap
                           ? "Latest reading looks invalid — not shown as current. Check the sensor source on the Sensors page."
-                          : "Latest reading is stale (older than 30 minutes) — not shown as current."}
+                          : `Latest reading is stale (${describeCurrentStateStaleWindow(sensorState.snapshot.source)}) — not shown as current.`}
                     </div>
                   )}
                   <div className="grid lg:grid-cols-3 gap-4">
@@ -665,7 +667,7 @@ export default function Dashboard() {
                               {latest && (
                                 <SensorSourceBadge
                                   source={latest.source}
-                                  status={latest.status}
+                                  status={resolveDashboardSensorBadgeStatus(latest, nowTick)}
                                   testId="dashboard-tent-chart-source-badge"
                                 />
                               )}
@@ -721,7 +723,7 @@ export default function Dashboard() {
                             return (
                               <SensorSourceBadge
                                 source={latest.source}
-                                status={latest.status}
+                                status={resolveDashboardSensorBadgeStatus(latest, nowTick)}
                                 testId="dashboard-env-strip-source-badge"
                               />
                             );

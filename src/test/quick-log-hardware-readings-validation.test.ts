@@ -73,7 +73,9 @@ describe("wiring", () => {
       resolve(process.cwd(), "src/components/QuickLogHistoryPanels.tsx"),
       "utf8",
     );
-    expect(src).toMatch(/isHardwareReadingValueValid\(key, value\)/);
+    // The flag itself is computed (and rendered) in
+    // quicklog-manual-ec-unit-label.test.tsx; this pins the chip wiring.
+    expect(src).toMatch(/buildManualReadingChips\(row\.manualHandheld\)/);
     expect(src).toMatch(/outside valid range, not used/);
   });
 });

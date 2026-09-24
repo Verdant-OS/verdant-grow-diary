@@ -1,9 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
-import {
-  isHardwareReadingValueValid,
-  type QuickLogHardwareReadings,
-} from "@/lib/quickLogHardwareReadingsRules";
+import { buildManualReadingChips } from "@/lib/quickLogManualReadingChipsViewModel";
 import {
   Activity,
   AlertTriangle,
@@ -133,23 +130,8 @@ function buildRecentDiaryPdfInput(
   };
 }
 
-function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
-  const m = row.manualHandheld;
-  if (!m) return null;
-  const items: Array<{ label: string; value: string; invalid?: boolean }> = [];
-  // Entries saved before handheld validation existed can hold impossible
-  // values (pH 15, runoff pH -3); flag them instead of presenting them as
-  // plausible readings (QA 2026-09-24, BUG-007).
-  const push = (key: keyof QuickLogHardwareReadings, label: string, value: string | undefined) => {
-    if (value) items.push({ label, value, invalid: !isHardwareReadingValueValid(key, value) });
-  };
-  push("inputPh", "Input pH", m.inputPh);
-  push("inputEc", "Input EC/PPM", m.inputEc);
-  push("runoffPh", "Runoff pH", m.runoffPh);
-  push("runoffEc", "Runoff EC/PPM", m.runoffEc);
-  push("ppfdCanopy", "PPFD canopy", m.ppfdCanopy);
-  push("lightDistance", "Light distance", m.lightDistance);
-  if (m.other) m.other.forEach((o) => items.push(o));
+export function ManualReadingsChips({ row }: { row: QuickLogHistoryRow }) {
+  const items = buildManualReadingChips(row.manualHandheld);
   if (items.length === 0) return null;
   return (
     <div

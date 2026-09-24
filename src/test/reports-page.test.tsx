@@ -8,10 +8,11 @@
  *  - Scoped grow takes precedence over active grow.
  *  - Safe page surface (no writes, automation, device control, service_role).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 
 vi.mock("@/hooks/useReportsHubData", () => ({
@@ -115,11 +116,21 @@ beforeEach(() => {
   vi.mocked(useGrows).mockReset();
 });
 
+const queryClients: QueryClient[] = [];
+afterEach(() => {
+  cleanup();
+  queryClients.splice(0).forEach((client) => client.clear());
+});
+
 function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  queryClients.push(queryClient);
   return render(
-    <MemoryRouter>
-      <Reports />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <Reports />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -238,7 +249,10 @@ describe("Reports page · static safety", () => {
     expect(HOOK_SRC).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(|\.rpc\(/);
     expect(HOOK_SRC).not.toMatch(/service_role/);
     expect(HOOK_SRC).not.toMatch(/ai-coach|ai_coach|functions\.invoke/);
-    expect(HOOK_SRC).toContain('.select("ts,captured_at,source,raw_payload")');
+    expect(HOOK_SRC).toContain("effectiveSensorReadingsQuery()");
+    expect(HOOK_SRC).toContain("raw_payload,correction_valid");
+    expect(HOOK_SRC).toContain("requireEffectiveSensorReadings(data)");
+    expect(HOOK_SRC).not.toMatch(/\.from\(["']sensor_readings["']\)/);
     expect(HOOK_SRC).toContain("isDiagnosticSensorProvenanceRow");
   });
 });

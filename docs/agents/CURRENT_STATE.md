@@ -1,17 +1,19 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-24 UTC (~07:50 UTC)
+**Last updated:** 2026-09-24 UTC (~08:11 UTC; tip and board measured ~07:48, review state ~08:10)
 **Updated by:** Claude (2026-09-24 morning, restamp on **deploy tip
 `f6b2fb97ad960b7ff0b189343d87a69128e7c759`**, the `#1668` squash. The request named `967de055`
 (`#1663`); three more product commits merged on top of it before this stamp was cut, so this stamp
 cites the tip it measured (§1). **Six commits** merged since the `98fdd446` stamp: **two docs-only
-(`#1667`, `#1669`) and four product (`#1663`, `#1665`, `#1666`, `#1668`)**, and none adds a migration
-(§1, §3). **Live is `NOT_MEASURED` by Claude** after an eleventh egress refusal at 07:48:07 UTC (§2).
-**`#1669` merged with two review corrections still unapplied**, and they are carried here (§4). The
-session-backed _Restore pending correction_ finding is **still open**, and `#1625` is still the one fix
-in flight (§5). The board was re-listed: **42 open PRs besides this one**, **no other open PR writes
-this file**, and **`#1670` now conflicts with the tip** (§6). **Three stale restamp branches** remain
-on the remote (§4). No Publish. No APPLY. `HOLD #1250`. Prior header follows.)
+(`#1667`, `#1669`) and four product (`#1663`, `#1665`, `#1666`, `#1668`)**, and none adds a
+migration (§1, §3). **All four product PRs merged without a recorded peer review, with three bot
+findings unanswered on the merged heads** (§3). **Live is `NOT_MEASURED` by Claude** after an
+eleventh egress refusal at 07:48:07 UTC (§2). **`#1669` merged with two review corrections still
+unapplied**, and they are carried here (§4). The session-backed _Restore pending correction_ finding
+is **still open**, and `#1625` is still the one fix in flight (§5). The board was re-listed: **42
+open PRs besides this one**, **no other open PR writes this file**, and **`#1670` now conflicts with
+the tip** (§6). **Three stale restamp branches** remain on the remote (§4). No Publish. No APPLY.
+`HOLD #1250`. Prior header follows.)
 
 ## 1. Deploy tip `f6b2fb97` — six commits since `98fdd446`, four of them product
 
@@ -62,8 +64,8 @@ tip; **a live run of it is still `NOT_MEASURED`.**
 ## 3. What changed for growers — four product commits, measured from `git` only
 
 `established fact` for files and subjects. **Runtime behaviour of every row is `NOT_MEASURED` by
-Claude**; these PRs carry their own review and CI evidence. None touches `supabase/`, an edge
-function or a migration.
+Claude**. All four merged through the merge queue; their review state is recorded below. None
+touches `supabase/`, an edge function or a migration.
 
 - **Plant sensor source history (`#1663`).** A new pure rule, `plantSensorSourceHistoryRules.ts`,
   recognises saved manual source history; `PlantSensorSourceBreakdownCard.tsx` shows honest read
@@ -76,6 +78,29 @@ function or a migration.
   changes when a review may start; **it is not a provider, model, credit or Action Queue change.**
 - **Timeline evidence drawer aging (`#1668`).** `TimelineEvidenceDetailPreview.tsx` and
   `Timeline.tsx` let drawer context age while the drawer stays open. 3 files, +127 / −6.
+
+**Review state of the four product PRs** — `established fact` from the GitHub API, read 2026-09-24
+~08:10 UTC, unless labelled otherwise.
+
+- **None of `#1663`, `#1665`, `#1666` or `#1668` carries a peer review or a formal approval before
+  merge.** Each shows only automated activity: a Copilot overview, CodeRabbit (rate-limited on
+  `#1668`, so it never reviewed it) and the Codex app's automatic review. The constitution's rule is
+  "no code ships without peer review"; this stamp records the gap and does not resolve it. That
+  decision belongs to the owner and Cheek.
+- **`#1668` names Claude as its requested independent reviewer.** That review stopped at its SHA lock
+  after the merge and issued no verdict (`source claim`: the stopped review, relayed ~08:06 UTC). The
+  merged patch is byte-identical to the reviewed head `8b10ade7` (tree `9e0b8f08`, parent `98fdd446`),
+  so what landed is what was submitted for review.
+- **Bot findings posted against the exact heads that merged, never answered or resolved:**
+
+| PR      | Bot        | Label  | Finding (`source claim`, not verified by Claude)                                                                | Thread        |
+| ------- | ---------- | ------ | --------------------------------------------------------------------------------------------------------------- | ------------- |
+| `#1666` | CodeRabbit | Major  | An accepted standard AI Doctor review started just before the seven-day cutoff can vanish after expiry          | `r4090888921` |
+| `#1665` | Copilot    | Medium | History freshness reads the clock separately from the injected `nowMs`, so rows can disagree for up to a minute | `r4090885085` |
+| `#1663` | Copilot    | Low    | The new "refreshing" read state has no regression test                                                          | `r4090903265` |
+
+Runtime behaviour of all three is `NOT_MEASURED`. The `#1666` finding touches AI Doctor visibility
+only; it does not describe a provider, credit, Action Queue or device change.
 
 `#1667` rewrites the AC-1.5 Start package reference in `docs/architecture-contract.md` as prose
 (+7 / −4). It changes no rule, label or verdict that this file carries. The grower-facing summary in

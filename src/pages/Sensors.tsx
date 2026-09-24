@@ -5,6 +5,8 @@ import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/store/auth";
 import { useNowTick } from "@/hooks/useNowTick";
+import { refreshSensorReadingsStatus } from "@/lib/growAdapters";
+import { selectSensorVpdDisplayEvidence } from "@/lib/sensorVpdDisplayEvidenceRules";
 import { useSensorsPageSession } from "@/hooks/useSensorsPageSession";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { Activity } from "lucide-react";
@@ -67,7 +69,7 @@ import {
   classifySensorReadingTrust,
   indexSensorReadingsByObservedMetric,
   readObservedSensorMetric,
-  selectLatestTrustedVpdInputs,
+  type LatestTrustedVpdInputs,
   sortSensorReadingsNewestFirst,
 } from "@/lib/sensorReadingSelectionRules";
 
@@ -148,9 +150,14 @@ export default function Sensors() {
   const readingsQuery = useGrowSensorReadings(activeTentId);
   const quickLogManualQuery = useSensorsQuickLogManualReadings(activeTentId);
   const { data: tentReadings = [] } = readingsQuery;
+  const clockedTentReadings = useMemo(
+    () => refreshSensorReadingsStatus(tentReadings, new Date(nowMs)),
+    [tentReadings, nowMs],
+  );
   const readings = useMemo(
-    () => mergeSensorsSeriesWithQuickLogManuals(tentReadings, quickLogManualQuery.data ?? []),
-    [quickLogManualQuery.data, tentReadings],
+    () =>
+      mergeSensorsSeriesWithQuickLogManuals(clockedTentReadings, quickLogManualQuery.data ?? []),
+    [quickLogManualQuery.data, clockedTentReadings],
   );
   const operatorRole = useHasRole("operator");
 
@@ -259,7 +266,14 @@ export default function Sensors() {
   const selectedTentStage =
     (selectedTent as unknown as { stage?: string | null } | null)?.stage ?? null;
   const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
-  const latestTrustedVpdInputs = useMemo(() => selectLatestTrustedVpdInputs(filtered), [filtered]);
+  const [previousVpdInputs, setPreviousVpdInputs] = useState<LatestTrustedVpdInputs | null>(null);
+  const latestTrustedVpdInputs = useMemo(
+    () => selectSensorVpdDisplayEvidence(filtered, previousVpdInputs),
+    [filtered, previousVpdInputs],
+  );
+  useEffect(() => {
+    setPreviousVpdInputs(latestTrustedVpdInputs);
+  }, [latestTrustedVpdInputs]);
   const derivedVpdKpa = useMemo(() => {
     if (latestObservedVpd !== null || !latestTrustedVpdInputs) return null;
     const derived = deriveVpd({

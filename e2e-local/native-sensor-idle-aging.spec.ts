@@ -122,3 +122,102 @@ for (const source of ["live", "manual"] as const) {
     });
   }
 }
+
+for (const source of ["live", "manual"] as const) {
+  for (const quality of ["ok", "invalid"] as const) {
+    test(`${source} future capture with quality=${quality} rechecks without refetch and survives reopening`, async ({
+      page,
+      context,
+    }) => {
+      const f = await createLocalFixture();
+      try {
+        await fenceBrowser(context, f.env);
+        await signIn(page, f);
+        const env = localEnvironment();
+        const admin = createClient(env.api, env.service, {
+          auth: { persistSession: false, autoRefreshToken: false },
+          global: {
+            fetch: async (input, init) => {
+              const request = new Request(input, init);
+              if (new URL(request.url).origin !== env.api)
+                throw new Error("Non-local seed blocked");
+              return fetch(request, { redirect: "error" });
+            },
+          },
+        });
+        const now = Date.now();
+        const capturedAt = new Date(now + 10 * 60_000).toISOString();
+        const { error } = await admin.from("sensor_readings").insert(
+          [
+            { metric: "temperature_c", value: 25 },
+            { metric: "humidity_pct", value: 55 },
+          ].map((metric) => ({
+            ...metric,
+            user_id: f.owner.id,
+            tent_id: f.primary.tentId,
+            source,
+            captured_at: capturedAt,
+            ts: capturedAt,
+            quality,
+            raw_payload:
+              source === "live"
+                ? {
+                    vendor: "ecowitt_windows_testbench",
+                    metadata: {
+                      reported_verdant_source: "live",
+                      raw_payload: { stationtype: "GW2000", model: "GW2000" },
+                    },
+                  }
+                : { fixture: "native-local-manual" },
+          })),
+        );
+        if (error) throw new Error("Local clock-recovery seed failed");
+        const before = await ownerRows(f.owner);
+        const otherBefore = await witnessRows(f);
+        const own = before.sensor_readings.filter((row) => row.tent_id === f.primary.tentId);
+        expect(own).toHaveLength(2);
+        expect(
+          own.every(
+            (row) =>
+              row.source === source &&
+              row.quality === quality &&
+              Date.parse(String(row.captured_at)) === Date.parse(capturedAt),
+          ),
+        ).toBe(true);
+        let sensorReads = 0;
+        page.on("request", (request) => {
+          if (new URL(request.url()).pathname === "/rest/v1/sensor_readings_effective")
+            sensorReads++;
+        });
+        await page.clock.install({ time: new Date(now) });
+        await page.goto(`${env.ui}/sensors?tentId=${f.primary.tentId}&tentIntent=required`);
+        const temp = page.getByTestId("sensors-metric-state-temp");
+        await expect(temp).toHaveAttribute("data-kind", "invalid");
+        await expect(page.getByTestId("sensors-stage-status-temp")).toHaveCount(0);
+        await expect(page.getByTestId("sensors-vpd-derived-value")).toHaveCount(0);
+        const readsBeforeClock = sensorReads;
+        expect(readsBeforeClock).toBeGreaterThan(0);
+        await page.clock.fastForward(6 * 60_000 + 1000);
+        await expect(temp).toHaveAttribute("data-kind", quality === "ok" ? source : "invalid");
+        expect(sensorReads).toBe(readsBeforeClock);
+        if (quality === "ok") {
+          await expect(page.getByTestId("sensors-stage-status-temp")).toBeVisible();
+          await expect(page.getByTestId("sensors-vpd-derived-value")).toBeVisible();
+        } else {
+          await expect(page.getByTestId("sensors-stage-status-temp")).toHaveCount(0);
+          await expect(page.getByTestId("sensors-vpd-derived-value")).toHaveCount(0);
+        }
+        await page.reload();
+        await expect(temp).toHaveAttribute("data-kind", quality === "ok" ? source : "invalid");
+        await expect(page.getByTestId("sensors-vpd-derived-value")).toHaveCount(
+          quality === "ok" ? 1 : 0,
+        );
+        expect(fingerprint(await ownerRows(f.owner))).toBe(fingerprint(before));
+        expect(fingerprint(await witnessRows(f))).toBe(fingerprint(otherBefore));
+      } finally {
+        await page.close();
+        await f.cleanup();
+      }
+    });
+  }
+}

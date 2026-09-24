@@ -198,6 +198,10 @@ export default function Dashboard() {
     ? resolveAlertContextStage({
         growStage: scopedGrow.stage,
         tentStages: stageContextTents.map((t) => t.stage),
+        // Plants in the same selection scope (QA 2026-09-24, BUG-006).
+        plantStages: plants
+          .filter((p) => !p.isArchived && selectedTentIds.includes(p.tentId))
+          .map((p) => p.stage),
       }).stage
     : null;
   const trendsState = useEnvironmentTrends(
@@ -288,7 +292,8 @@ export default function Dashboard() {
     // is a placeholder empty array and alertContextStage falls back to the
     // grow row alone — an alert persisted against a stale grow stage in
     // that window would not be removed once the tent stages arrive.
-    enabled: !!scopedGrowId && tentsQuery.isFetched,
+    // Plants gate the same way: their stages now feed alertContextStage.
+    enabled: !!scopedGrowId && tentsQuery.isFetched && plantsQuery.isFetched,
     stage: alertContextStage,
   });
 

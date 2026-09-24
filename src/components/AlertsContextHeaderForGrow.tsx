@@ -27,6 +27,8 @@ interface Props {
    * PLUS the grow's tents' stages via `resolveAlertContextStage`, so a
    * stale `grows.stage` cannot claim outdated targets (live audit #14). */
   stage: string | null;
+  /** Stages of the grow's active plants; see resolveAlertContextStage rule 8. */
+  plantStages?: ReadonlyArray<string | null> | null;
   /** When true, shows a small "Showing alert context for X" note so the
    * operator can tell the header is using a fallback grow, not the one
    * in the URL. */
@@ -40,6 +42,7 @@ export default function AlertsContextHeaderForGrow({
   growId,
   growName,
   stage,
+  plantStages,
   isFallback = false,
   hasOpenAlerts = false,
 }: Props) {
@@ -55,8 +58,9 @@ export default function AlertsContextHeaderForGrow({
       resolveAlertContextStage({
         growStage: stage,
         tentStages: tents.map((t) => t.stage),
+        plantStages: plantStages ?? null,
       }).stage,
-    [stage, tents],
+    [stage, tents, plantStages],
   );
 
   const snapshotReadState = buildSensorSnapshotReadState(sensorState);

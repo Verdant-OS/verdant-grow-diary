@@ -32,9 +32,15 @@ interface Props {
    * resolved from this PLUS the grow's tents' stages, so a stale
    * `grows.stage` cannot drive outdated stage bands (live audit #14). */
   stage?: string | null;
+  /**
+   * Stages of the grow's active plants (QA 2026-09-24, BUG-006). `null`
+   * means the plant read has not settled: persistence waits, as it does for
+   * tents. Omitted keeps the grow + tent resolution.
+   */
+  plantStages?: ReadonlyArray<string | null> | null;
 }
 
-export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
+export default function AlertsAutoPersistForGrow({ growId, stage, plantStages }: Props) {
   const safeGrowId = growId ?? null;
   const tentsQuery = useGrowTents(safeGrowId ?? undefined);
   const tents = tentsQuery.data ?? [];
@@ -54,7 +60,9 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
   const resolvedStage = resolveAlertContextStage({
     growStage: stage,
     tentStages: tents.map((t) => t.stage),
+    plantStages: plantStages ?? null,
   }).stage;
+  const plantsSettled = plantStages !== null;
 
   usePersistEnvironmentAlerts({
     growId: safeGrowId,
@@ -68,7 +76,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
       snapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    enabled: !!safeGrowId && tentsSettled,
+    enabled: !!safeGrowId && tentsSettled && plantsSettled,
     stage: resolvedStage,
   });
 

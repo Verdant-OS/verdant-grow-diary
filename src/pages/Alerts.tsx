@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import OneTentLoopNextStepCard from "@/components/OneTentLoopNextStepCard";
 import AlertReasonText from "@/components/AlertReasonText";
+import { usePlants } from "@/hooks/use-plants";
 import { ALERT_LIST_MANUAL_RESOLUTION_NOTE } from "@/lib/alertReasonDisplayRules";
 import { Link } from "@/lib/react-router-compat";
 import { Bell } from "lucide-react";
@@ -116,6 +117,16 @@ export default function Alerts() {
   const stageByGrow = new Map<string, string | null>(
     grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
   );
+  // Plant stages count toward the alert stage (QA 2026-09-24, BUG-006). While
+  // the plant read is pending, `null` holds alert persistence back; a failed
+  // read contributes no plant signal rather than blocking alerting.
+  const plantsQuery = usePlants();
+  const plantStagesForGrow = (growId: string): ReadonlyArray<string | null> | null =>
+    plantsQuery.isError
+      ? []
+      : plantsQuery.data
+        ? plantsQuery.data.filter((p) => p.grow_id === growId).map((p) => p.stage ?? null)
+        : null;
 
   const headerStage = scopedGrowId ? (stageByGrow.get(scopedGrowId) ?? null) : null;
 
@@ -225,7 +236,12 @@ export default function Alerts() {
       {/* Side-effect only: evaluate latest valid snapshot vs grow targets
           and persist breaches into public.alerts. Renders nothing. */}
       {persistGrowIds.map((gid) => (
-        <AlertsAutoPersistForGrow key={gid} growId={gid} stage={stageByGrow.get(gid) ?? null} />
+        <AlertsAutoPersistForGrow
+          key={gid}
+          growId={gid}
+          stage={stageByGrow.get(gid) ?? null}
+          plantStages={plantStagesForGrow(gid)}
+        />
       ))}
       <GrowBreadcrumbs
         growId={urlGrowId}
@@ -265,6 +281,7 @@ export default function Alerts() {
           growId={headerContext.growId}
           growName={headerContext.growName}
           stage={headerContext.stage}
+          plantStages={plantStagesForGrow(headerContext.growId)}
           isFallback={headerContext.isFallback}
           hasOpenAlerts={growIdsWithOpenAlerts.includes(headerContext.growId)}
         />

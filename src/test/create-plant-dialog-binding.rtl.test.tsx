@@ -764,6 +764,7 @@ describe("CreatePlantDialog RTL binding", () => {
       medium: null,
       potSize: null,
       plantType: "unknown",
+      createdAt: CREATED_ROW.created_at,
     };
     expect(client.getQueryData(activeGrowPlantsKey)).toEqual([expectedMappedPlant]);
     expect(client.getQueryData(archivedGrowPlantsKey)).toEqual([expectedMappedPlant]);

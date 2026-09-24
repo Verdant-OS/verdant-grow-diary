@@ -2,6 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import {
+  plantStartDateInputMax,
+  plantStartDateInputToIso,
+  plantStartDateInputValue,
+  plantStartDateSaveMessage,
+} from "@/lib/plantStartDateRules";
 import { useTents } from "@/hooks/use-tents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -125,7 +131,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     stage: plant.stage ?? "seedling",
     health: editablePlantHealth(plant.health),
     tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
-    started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
+    started_at: plantStartDateInputValue(plant.startedAt),
     last_note: plant.lastNote ?? "",
     plant_type: plant.plantType ?? "unknown",
   });
@@ -146,7 +152,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
         stage: plant.stage ?? "seedling",
         health: editablePlantHealth(plant.health),
         tent_id: normalizePlantEditTentSelectValue(plant.tentId, availableTentIds),
-        started_at: plant.startedAt ? plant.startedAt.slice(0, 10) : "",
+        started_at: plantStartDateInputValue(plant.startedAt),
         last_note: plant.lastNote ?? "",
         plant_type: plant.plantType ?? "unknown",
       });
@@ -185,6 +191,17 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     if (!user) {
       toast.error("Not signed in");
       return;
+    }
+    // Validate the calendar start date before any upload or write
+    // (QA 2026-09-24, BUG-004/005).
+    let startedAtIso: string | null = null;
+    if (form.started_at) {
+      const startedAt = plantStartDateInputToIso(form.started_at, new Date());
+      if (startedAt.ok !== true) {
+        toast.error(plantStartDateSaveMessage(startedAt.reason));
+        return;
+      }
+      startedAtIso = startedAt.iso;
     }
     setBusy(true);
 
@@ -236,8 +253,8 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
     } else if (clearPhoto) {
       payload.photo_url = null;
     }
-    if (form.started_at) {
-      payload.started_at = new Date(form.started_at).toISOString();
+    if (startedAtIso) {
+      payload.started_at = startedAtIso;
     }
 
     const { error } = await supabase
@@ -560,6 +577,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             <Label>Started at</Label>
             <Input
               type="date"
+              max={plantStartDateInputMax(new Date())}
               value={form.started_at}
               onChange={(e) => setForm({ ...form, started_at: e.target.value })}
             />

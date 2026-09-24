@@ -35,6 +35,8 @@ export interface Plant {
   potSize?: string | null;
   /** Declared plant type: autoflower | photoperiod | unknown. Never inferred. */
   plantType?: string | null;
+  /** When the plant row was created in Verdant (tracking start), when known. */
+  createdAt?: string | null;
 }
 
 /**

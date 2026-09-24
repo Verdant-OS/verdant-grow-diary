@@ -26,6 +26,11 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "@/lib/react-router-compat";
 import CreateTentDialog, { type CreatedTent } from "@/components/CreateTentDialog";
+import {
+  plantStartDateInputMax,
+  plantStartDateInputToIso,
+  plantStartDateSaveMessage,
+} from "@/lib/plantStartDateRules";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
   primeConfirmedPlantCaches,
@@ -395,6 +400,18 @@ export default function CreatePlantDialog({
       return;
     }
 
+    // A start date is a calendar date: save the picked day at local midnight
+    // and reject future dates before any write (QA 2026-09-24, BUG-004/005).
+    let startedAtIso: string | null = null;
+    if (form.started_at) {
+      const startedAt = plantStartDateInputToIso(form.started_at, new Date());
+      if (startedAt.ok !== true) {
+        toast.error(plantStartDateSaveMessage(startedAt.reason));
+        return;
+      }
+      startedAtIso = startedAt.iso;
+    }
+
     handoffSuppressedRef.current = false;
     createInFlightRef.current = true;
     setBusy(true);
@@ -411,7 +428,7 @@ export default function CreatePlantDialog({
         grow_id: targetGrowId,
       };
       if (form.tent_id && form.tent_id !== "none") payload.tent_id = form.tent_id;
-      if (form.started_at) payload.started_at = new Date(form.started_at).toISOString();
+      if (startedAtIso) payload.started_at = startedAtIso;
 
       const validation = validatePlantInsertPayload(payload);
       if (!validation.ok || !validation.value) {
@@ -912,6 +929,7 @@ export default function CreatePlantDialog({
                   <Label>Started at (optional)</Label>
                   <Input
                     type="date"
+                    max={plantStartDateInputMax(new Date())}
                     value={form.started_at}
                     onChange={(e) => setForm({ ...form, started_at: e.target.value })}
                   />

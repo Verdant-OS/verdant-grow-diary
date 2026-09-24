@@ -327,7 +327,7 @@ describe("each funnel event fires from its canonical seam", () => {
 describe("ordering and safety constraints at the seams", () => {
   it("shared manual RPC telemetry defaults off and fires only after explicit confirmed success", () => {
     const src = read("src/hooks/useQuickLogV2Save.ts");
-    const okBranch = src.indexOf('if (payload.p_action === "note" ? r.ok !== true : !r.ok)');
+    const okBranch = src.indexOf("if (r.ok !== true)");
     const uuidGate = src.indexOf("if (!isUuid(r.grow_event_id))");
     const optIn = src.indexOf("if (options.telemetryIntent !== undefined)");
     const track = src.indexOf("trackQuickLogSuccess(options.telemetryIntent");

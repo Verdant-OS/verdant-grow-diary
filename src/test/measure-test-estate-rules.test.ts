@@ -1137,3 +1137,44 @@ describe("shell comments in run: blocks are not execution evidence (CodeRabbit, 
     expect(paths.has("e2e/folded-live.spec.ts")).toBe(true);
   });
 });
+
+describe("a comment opens at any word start, not only after whitespace (CodeRabbit, #1221 round 11)", () => {
+  // Round 10 opened a comment at `#` only at line start or after whitespace. Bash
+  // opens one wherever a new word starts, and a metacharacter (`; & | ( ) < >`)
+  // ends the word before it: `echo ok;# bunx …` runs nothing after the `;`. The same
+  // test also fences the opposite error: an escaped or quoted character does not end
+  // a word, so `a\ #`, `a\;#` and `"a"#` are all one word, and the command after them
+  // runs. Every case was run through `bash -c` before it was pinned.
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - run: |",
+    "          echo ok;# bunx playwright test e2e/after-semicolon.spec.ts",
+    "          true &&# bunx playwright test e2e/after-and.spec.ts",
+    "          echo ok|# bunx playwright test e2e/after-pipe.spec.ts",
+    "          (echo ok)# bunx playwright test e2e/after-paren.spec.ts",
+    "          echo ok &# bunx playwright test e2e/after-background.spec.ts",
+    "          echo a\\ # && bunx playwright test e2e/escaped-space.spec.ts",
+    "          echo a\\;# && bunx playwright test e2e/escaped-semicolon.spec.ts",
+    '          echo "a"# && bunx playwright test e2e/after-quote.spec.ts',
+    "      - run: echo one-liner;# bunx playwright test e2e/single-line-semicolon.spec.ts",
+    "",
+  ].join("\n");
+  const paths = namedPathsIn(buildExecutableCorpus({ workflowTexts: [y] }));
+
+  it("drops a comment opened right after `;`, `&&`, `|`, `)` and `&`", () => {
+    expect(paths.has("e2e/after-semicolon.spec.ts")).toBe(false);
+    expect(paths.has("e2e/after-and.spec.ts")).toBe(false);
+    expect(paths.has("e2e/after-pipe.spec.ts")).toBe(false);
+    expect(paths.has("e2e/after-paren.spec.ts")).toBe(false);
+    expect(paths.has("e2e/after-background.spec.ts")).toBe(false);
+    expect(paths.has("e2e/single-line-semicolon.spec.ts")).toBe(false);
+  });
+
+  it("keeps a `#` inside a word: after an escaped space, an escaped `;`, or a quote (FENCE)", () => {
+    expect(paths.has("e2e/escaped-space.spec.ts")).toBe(true);
+    expect(paths.has("e2e/escaped-semicolon.spec.ts")).toBe(true);
+    expect(paths.has("e2e/after-quote.spec.ts")).toBe(true);
+  });
+});

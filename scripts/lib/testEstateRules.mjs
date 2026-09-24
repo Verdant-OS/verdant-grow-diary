@@ -892,6 +892,9 @@ export function commandLinesIn(workflowText) {
   return out.filter((l) => isCommandLine(l));
 }
 
+/** Bash metacharacters: each ends the word before it, so a `#` after one opens a comment. */
+const SHELL_METACHARACTER = /[\s|&;()<>]/;
+
 /**
  * A shell line with its comment removed.
  *
@@ -900,13 +903,18 @@ export function commandLinesIn(workflowText) {
  * executed (CodeRabbit, #1221 round 10): R4-B's comment-out defeat, still open
  * in the workflow itself after it was closed for runner bodies.
  *
- * `#` opens a comment only as the first character of a word — at line start or
- * after whitespace — and outside quotes, as in POSIX token recognition. So
- * `echo "#"`, `echo '#'`, `\#`, `${#ARR[@]}` and `$#` all survive. Pure; null-safe.
+ * `#` opens a comment only as the first character of a word, and outside
+ * quotes, as in POSIX token recognition. A word starts at line start or after an
+ * unquoted, unescaped metacharacter — whitespace or one of `| & ; ( ) < >` — so
+ * `echo ok;# bunx …` is a comment after the `;` (CodeRabbit, #1221 round 11: round
+ * 10 checked for whitespace alone). Escaped and quoted characters continue the
+ * word, so `echo "#"`, `echo '#'`, `\#`, `a\ #`, `a\;#`, `"a"#`, `${#ARR[@]}` and
+ * `$#` all survive. Pure; null-safe.
  */
 export function stripShellComment(line) {
   const s = String(line ?? "");
   let quote = null;
+  let wordStart = true;
   for (let i = 0; i < s.length; i += 1) {
     const c = s[i];
     if (quote === "'") {
@@ -915,6 +923,7 @@ export function stripShellComment(line) {
     }
     if (c === "\\") {
       i += 1;
+      wordStart = false;
       continue;
     }
     if (quote === '"') {
@@ -923,9 +932,11 @@ export function stripShellComment(line) {
     }
     if (c === "'" || c === '"') {
       quote = c;
+      wordStart = false;
       continue;
     }
-    if (c === "#" && (i === 0 || /\s/.test(s[i - 1]))) return s.slice(0, i).trimEnd();
+    if (c === "#" && wordStart) return s.slice(0, i).trimEnd();
+    wordStart = SHELL_METACHARACTER.test(c);
   }
   return s;
 }

@@ -409,6 +409,32 @@ describe("CreatePlantDialog RTL binding", () => {
     }
   });
 
+  it("lets the grower take a pick back to Not assessed yet before saving", async () => {
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+    try {
+      renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+      await waitFor(() => {
+        expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+      });
+      const health = () => screen.getByTestId("create-plant-health");
+      fireEvent.keyDown(health(), { key: "ArrowDown" });
+      fireEvent.click(await screen.findByRole("option", { name: "Watch" }));
+      await waitFor(() => expect(health()).toHaveTextContent("Watch"));
+      fireEvent.keyDown(health(), { key: "ArrowDown" });
+      fireEvent.click(await screen.findByRole("option", { name: "Not assessed yet" }));
+      await waitFor(() => expect(health()).toHaveTextContent("Not assessed yet"));
+      await userEvent.type(screen.getByTestId("create-plant-name"), "Undecided Plant");
+      await userEvent.click(screen.getByTestId("plant-create-submit"));
+      await waitFor(() => {
+        expect(insertMock).toHaveBeenCalled();
+      });
+      expect(insertMock.mock.calls[0][0] as Record<string, unknown>).not.toHaveProperty("health");
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+
   it("reconciles an exact preallocated plant after a duplicate response", async () => {
     singleMock.mockResolvedValueOnce({
       data: null,

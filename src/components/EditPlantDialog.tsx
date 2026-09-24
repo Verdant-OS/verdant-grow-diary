@@ -50,7 +50,13 @@ import {
   normalizePlantEditTentSelectValue,
   resolvePlantEditTentOptions,
 } from "@/lib/plantEditSaveRules";
-import { buildPlantHealthUpdate, editablePlantHealth } from "@/lib/plantHealthRules";
+import {
+  PLANT_HEALTH_NOT_ASSESSED_LABEL,
+  PLANT_HEALTH_NOT_ASSESSED_OPTION,
+  buildPlantHealthEditUpdate,
+  editablePlantHealth,
+  plantHealthFromSelectValue,
+} from "@/lib/plantHealthRules";
 
 /**
  * Edits an existing plant's user-facing fields. Profile photo is now
@@ -243,7 +249,7 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       name: form.name.trim(),
       strain: form.strain.trim(),
       stage: form.stage,
-      ...buildPlantHealthUpdate(form.health),
+      ...buildPlantHealthEditUpdate(plant.health, form.health),
       tent_id: resolvedTentId,
       last_note: form.last_note.trim() || null,
       ...buildPlantTypeUpdate(plant.plantType, form.plant_type),
@@ -540,12 +546,15 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
               <Label>Health</Label>
               <Select
                 value={form.health}
-                onValueChange={(v) => setForm({ ...form, health: editablePlantHealth(v) })}
+                onValueChange={(v) => setForm({ ...form, health: plantHealthFromSelectValue(v) })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Unknown" />
+                  <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={PLANT_HEALTH_NOT_ASSESSED_OPTION}>
+                    {PLANT_HEALTH_NOT_ASSESSED_LABEL}
+                  </SelectItem>
                   {HEALTH.map((h) => (
                     <SelectItem key={h.value} value={h.value}>
                       {h.label}

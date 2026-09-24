@@ -32,7 +32,12 @@ import {
   plantStartDateSaveMessage,
 } from "@/lib/plantStartDateRules";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
-import { PLANT_HEALTH_NOT_ASSESSED_LABEL, buildPlantHealthUpdate } from "@/lib/plantHealthRules";
+import {
+  PLANT_HEALTH_NOT_ASSESSED_LABEL,
+  PLANT_HEALTH_NOT_ASSESSED_OPTION,
+  buildPlantHealthUpdate,
+  plantHealthFromSelectValue,
+} from "@/lib/plantHealthRules";
 import {
   primeConfirmedPlantCaches,
   reaffirmConfirmedPlantCacheMeta,
@@ -913,12 +918,17 @@ export default function CreatePlantDialog({
                   <Label>Health</Label>
                   <Select
                     value={form.health}
-                    onValueChange={(v) => setForm({ ...form, health: v })}
+                    onValueChange={(v) =>
+                      setForm({ ...form, health: plantHealthFromSelectValue(v) })
+                    }
                   >
                     <SelectTrigger data-testid="create-plant-health">
                       <SelectValue placeholder={PLANT_HEALTH_NOT_ASSESSED_LABEL} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={PLANT_HEALTH_NOT_ASSESSED_OPTION}>
+                        {PLANT_HEALTH_NOT_ASSESSED_LABEL}
+                      </SelectItem>
                       {HEALTH.map((h) => (
                         <SelectItem key={h.value} value={h.value}>
                           {h.label}

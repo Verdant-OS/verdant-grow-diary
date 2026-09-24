@@ -16,8 +16,12 @@ import { describe, expect, it } from "vitest";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
   PLANT_HEALTH_NOT_ASSESSED_LABEL,
+  PLANT_HEALTH_NOT_ASSESSED_OPTION,
+  buildPlantHealthEditUpdate,
   buildPlantHealthUpdate,
+  isPlantHealthClearRejected,
   normalizePlantHealth,
+  plantHealthFromSelectValue,
 } from "@/lib/plantHealthRules";
 import { buildStartRoomPlantPayload, DEFAULT_START_YOUR_ROOM_FORM } from "@/lib/startYourRoomRules";
 
@@ -59,8 +63,8 @@ describe("plants.health migration shape", () => {
   });
 });
 
-describe("client never claims or writes health it did not assess", () => {
-  it("omits health when not assessed and never sends 'unknown'", () => {
+describe("client never claims health it did not assess", () => {
+  it("create omits health when not assessed and never sends 'unknown'", () => {
     expect(buildPlantHealthUpdate("")).toEqual({});
     expect(buildPlantHealthUpdate("unknown")).toEqual({});
     expect(buildPlantHealthUpdate("watch")).toEqual({ health: "watch" });
@@ -70,7 +74,7 @@ describe("client never claims or writes health it did not assess", () => {
   it("insert validation accepts an omitted health and still rejects 'unknown'", () => {
     expect(validatePlantInsertPayload({ ...base }).ok).toBe(true);
     expect(validatePlantInsertPayload({ ...base, health: "issue" }).ok).toBe(true);
-    // The pre-apply trigger rejects 'unknown'; the client must never send it.
+    // Inserts omit health instead; only an explicit Edit Plant clear writes it.
     expect(validatePlantInsertPayload({ ...base, health: "unknown" }).ok).toBe(false);
     expect(validatePlantInsertPayload({ ...base, health: "great" }).ok).toBe(false);
   });
@@ -88,6 +92,30 @@ describe("client never claims or writes health it did not assess", () => {
       "utf8",
     );
     expect(adapter).not.toMatch(/health:\s*"healthy"/);
+  });
+
+  it("Not assessed yet maps to an empty selection, never a stored value", () => {
+    expect(plantHealthFromSelectValue(PLANT_HEALTH_NOT_ASSESSED_OPTION)).toBe("");
+    expect(plantHealthFromSelectValue("issue")).toBe("issue");
+    expect(plantHealthFromSelectValue("unknown")).toBe("");
+    expect(plantHealthFromSelectValue("great")).toBe("");
+  });
+
+  it("edit writes 'unknown' only to clear a recorded assessment", () => {
+    expect(buildPlantHealthEditUpdate("healthy", "")).toEqual({ health: "unknown" });
+    expect(buildPlantHealthEditUpdate("issue", "")).toEqual({ health: "unknown" });
+    expect(buildPlantHealthEditUpdate("unknown", "")).toEqual({});
+    expect(buildPlantHealthEditUpdate(null, "")).toEqual({});
+    expect(buildPlantHealthEditUpdate("great", "")).toEqual({});
+    expect(buildPlantHealthEditUpdate("unknown", "watch")).toEqual({ health: "watch" });
+    expect(buildPlantHealthEditUpdate("healthy", "healthy")).toEqual({ health: "healthy" });
+  });
+
+  it("recognizes only the trigger's rejection of 'unknown'", () => {
+    expect(isPlantHealthClearRejected("invalid plant health: unknown")).toBe(true);
+    expect(isPlantHealthClearRejected("invalid plant health: great")).toBe(false);
+    expect(isPlantHealthClearRejected("invalid plant stage: unknown")).toBe(false);
+    expect(isPlantHealthClearRejected(undefined)).toBe(false);
   });
 
   it("a stored 'unknown' reads as not assessed", () => {

@@ -46,6 +46,11 @@
  *   inlineCopyFence  `writeFileSync(…, readFileSync("package.json", "utf8"))`, a
  *              copy into a fixture root, as check-bun-lockfile-policy does. An
  *              inline read that feeds no assertion must stay green.
+ *   boundStringWrapped / inlineStringWrapped / inlineStringMethod  the read wrapped
+ *              in `String(…)`: bound, consumed by `expect(…)`, and with a text method
+ *              chained onto the wrapper. None of the three was seen — CodeRabbit, #1221
+ *              round 14.
+ *   boundStringParsedFence  `JSON.parse(PKG)` on a `String(…)`-wrapped binding — a parse.
  *
  * @source-scan-justified: this file EMBEDS the forbidden shapes as spawn fixtures for the
  * checker itself (see FIXTURES below). It reads no package.json of its own; the strings
@@ -222,6 +227,43 @@ it("x", () => {
   expect(scripts["test:x"]).toBe("bun run x");
 });
 `,
+  boundStringWrapped: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = String(readFileSync("package.json"));
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(PKG).toContain('"test:x"');
+});
+`,
+  inlineStringWrapped: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(String(readFileSync("package.json", "utf8"))).toContain('"test:x"');
+});
+`,
+  inlineStringMethod: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(String(readFileSync("package.json")).includes('"test:x"')).toBe(true);
+});
+`,
+  boundStringParsedFence: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = String(readFileSync("package.json"));
+const { scripts } = JSON.parse(PKG);
+it("x", () => {
+  expect(scripts["test:x"]).toBe("bun run x");
+});
+`,
   multilineResolved: `
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -328,6 +370,7 @@ describe("a package.json binding is compliant only as JSON.parse(ID) (CodeRabbit
     ["boundRegexTest", "PKG"],
     ["boundLastIndexOf", "PKG"],
     ["boundSplit", "PKG"],
+    ["boundStringWrapped", "PKG"],
   ] as const)("rejects the bound read in %s", (name, id) => {
     const { status, out } = runChecker(name);
     expect(status, out).toBe(1);
@@ -335,16 +378,18 @@ describe("a package.json binding is compliant only as JSON.parse(ID) (CodeRabbit
     expect(out).toContain(`\`${id}\``);
   });
 
-  it.each(["inlineRegexTest", "inlineLastIndexOf"] as const)(
-    "rejects the unbound read in %s",
-    (name) => {
-      const { status, out } = runChecker(name);
-      expect(status, out).toBe(1);
-      expect(out).toContain(`${name}.test.ts`);
-    },
-  );
+  it.each([
+    "inlineRegexTest",
+    "inlineLastIndexOf",
+    "inlineStringWrapped",
+    "inlineStringMethod",
+  ] as const)("rejects the unbound read in %s", (name) => {
+    const { status, out } = runChecker(name);
+    expect(status, out).toBe(1);
+    expect(out).toContain(`${name}.test.ts`);
+  });
 
-  it.each(["boundParsedToStringFence", "inlineCopyFence"] as const)(
+  it.each(["boundParsedToStringFence", "inlineCopyFence", "boundStringParsedFence"] as const)(
     "accepts %s (FENCE)",
     (name) => {
       const { status, out } = runChecker(name);

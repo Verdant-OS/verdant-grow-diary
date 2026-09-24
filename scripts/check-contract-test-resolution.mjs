@@ -110,15 +110,20 @@ const PARSES_JSON = /JSON\.parse\s*\(/;
  * and the checker exited 0 (Codex, #1221 round 4). Measured before widening: no
  * present reader in src/test was missed by the single-line form; the gap was
  * open to the next wrapped read, not to any existing one.
+ *
+ * A `String(…)` wrapper around the read is transparent: `const PKG =
+ * String(readFileSync("package.json"))` binds `PKG` like the bare read does. It
+ * bound nothing before, and beside an unrelated `JSON.parse` exited 0 (CodeRabbit,
+ * #1221 round 14).
  */
 const PACKAGE_READ_BINDINGS = (source, config) => {
   const esc = escapeRegExp(config);
   const direct = new RegExp(
-    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\([^;]*?${esc}[^;]*?\\)\\s*;`,
+    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:String\\(\\s*)?(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\([^;]*?${esc}[^;]*?\\)\\s*;`,
     "g",
   );
   const viaConst = new RegExp(
-    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\(\\s*(?:PKG|PACKAGE_JSON|PACKAGE_PATH|PKG_PATH|pkgPath|packagePath)\\b[^;]*?\\)\\s*;`,
+    `(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:String\\(\\s*)?(?:await\\s+)?(?:[\\w.]*readFile(?:Sync)?|read|readText)\\s*\\(\\s*(?:PKG|PACKAGE_JSON|PACKAGE_PATH|PKG_PATH|pkgPath|packagePath)\\b[^;]*?\\)\\s*;`,
     "g",
   );
   const ids = new Set();
@@ -174,6 +179,9 @@ const USES_BINDING_AS_TEXT = (source, id) => {
  * (`writeFileSync(…, readFileSync(…/package.json))` in check-bun-lockfile-policy).
  * Round 12 added the regex consumers `/re/.test(…)` and `/re/.exec(…)`, and
  * `lastIndexOf` / `matchAll` to the chained text methods (CodeRabbit, #1221).
+ * Round 14: a `String(…)` wrapper is transparent here too, so the read's extent
+ * becomes the wrapper's: `expect(String(readFileSync(…)))` and
+ * `String(readFileSync(…)).includes(…)` are consumed like the bare read.
  */
 const READ_CALL = /(?:[\w.]*readFile(?:Sync)?|\bread|\breadText)\s*\(/g;
 const TEXT_METHOD_AFTER =
@@ -199,10 +207,17 @@ const ASSERTS_ON_INLINE_READ = (source, config) => {
     const open = m.index + m[0].length - 1;
     const close = closingParen(source, open);
     if (close < 0 || !target.test(source.slice(open + 1, close))) continue;
-    const after = source.slice(close + 1);
+    let start = m.index;
+    let end = close;
+    const wrapper = /(?<![\w$.])String\(\s*(?:await\s+)?$/.exec(source.slice(0, start));
+    if (wrapper) {
+      const wrapperClose = closingParen(source, wrapper.index + "String".length);
+      if (wrapperClose > end) [start, end] = [wrapper.index, wrapperClose];
+    }
+    const after = source.slice(end + 1);
     if (TEXT_METHOD_AFTER.test(after)) return true;
     const consumedByCall =
-      /(?:expect|\.test|\.exec)\(\s*(?:await\s+)?$/.test(source.slice(0, m.index)) &&
+      /(?:expect|\.test|\.exec)\(\s*(?:await\s+)?$/.test(source.slice(0, start)) &&
       /^\s*(?:\.toString\(\s*\))?\s*\)/.test(after);
     if (consumedByCall) return true;
   }

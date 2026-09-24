@@ -10,8 +10,9 @@
  *  - Read-only: the audit reports, it never mutates a ruleset or a merge.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { load as loadYaml } from "js-yaml";
 import {
   AUDIT_VERDICT,
   CHECK_STATUS,
@@ -120,6 +121,95 @@ describe("config/required-status-checks.json", () => {
       (e: { context: string }) => e.context === "test:security-regression",
     );
     expect(entry?.alwaysRuns).toBe(true);
+  });
+});
+
+type WorkflowStep = { name?: string; run?: string; shell?: string };
+type WorkflowJob = {
+  name?: string;
+  steps?: WorkflowStep[];
+  defaults?: { run?: { shell?: string } };
+};
+type Workflow = { jobs?: Record<string, WorkflowJob>; defaults?: { run?: { shell?: string } } };
+
+/** Every job, across every workflow, whose name is `context` — the job that produces it. */
+function jobsProducing(context: string) {
+  const dir = resolve(ROOT, ".github/workflows");
+  const found: { file: string; workflow: Workflow; job: WorkflowJob }[] = [];
+  for (const file of readdirSync(dir)
+    .filter((f) => /\.ya?ml$/.test(f))
+    .sort()) {
+    const workflow = loadYaml(readFileSync(resolve(dir, file), "utf8")) as Workflow;
+    for (const job of Object.values(workflow?.jobs ?? {})) {
+      if (job?.name === context) found.push({ file, workflow, job });
+    }
+  }
+  return found;
+}
+
+/**
+ * A `run:` step with no `shell:` executes as `bash -e {0}` — no pipefail — so in
+ * `deno test … 2>&1 | tee log` the step's status is tee's, and a failing suite
+ * reports success. `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`;
+ * a `set -o pipefail` (or `set -eo pipefail`) before the pipe does the same.
+ * Pipes whose left side is only `echo`/`printf` cannot hide a failure and are
+ * not counted.
+ */
+function pipesHidingFailure(workflow: Workflow, job: WorkflowJob): string[] {
+  const shell = (step: WorkflowStep) =>
+    step.shell ?? job.defaults?.run?.shell ?? workflow.defaults?.run?.shell;
+  const hidden: string[] = [];
+  for (const step of job.steps ?? []) {
+    if (typeof step.run !== "string" || shell(step) === "bash") continue;
+    const lines = step.run.replace(/\\\n/g, " ").split("\n");
+    let pipefail = false;
+    for (const line of lines) {
+      if (/^\s*set\s+-[a-z]*o\s+pipefail\b/.test(line)) pipefail = true;
+      const pipe = /(?<!\|)\|(?!\|)\s*tee\b/.exec(line);
+      if (!pipe || pipefail) continue;
+      if (/^\s*(?:echo|printf)\b/.test(line.slice(0, pipe.index))) continue;
+      hidden.push(`${step.name ?? "(unnamed step)"}: ${line.trim()}`);
+    }
+  }
+  return hidden;
+}
+
+describe("mustBeGreen lanes report the status of the command they gate", () => {
+  // CodeRabbit, #1221 round 14: `Deno bridge auth + handler E2E` joined mustBeGreen
+  // in this PR while its step piped `deno test` into `tee` with no pipefail, so a
+  // red suite was a green check and the audit would have counted it as passing.
+  it("resolves every mustBeGreen context to the job that produces it", () => {
+    for (const context of MUST_BE_GREEN) {
+      expect(jobsProducing(context).length, context).toBeGreaterThan(0);
+    }
+  });
+
+  it("pipes no gated command into tee without pipefail", () => {
+    const hidden = MUST_BE_GREEN.flatMap((context) =>
+      jobsProducing(context).flatMap(({ file, workflow, job }) =>
+        pipesHidingFailure(workflow, job).map((where) => `${file} › ${context} › ${where}`),
+      ),
+    );
+    expect(hidden).toEqual([]);
+  });
+
+  it("classifies the shapes it exists to catch", () => {
+    const job = (step: WorkflowStep): WorkflowJob => ({ steps: [step] });
+    const run = "deno test \\\n  a_test.ts \\\n  2>&1 | tee log\n";
+    expect(pipesHidingFailure({}, job({ name: "s", run }))).toHaveLength(1);
+    expect(pipesHidingFailure({}, job({ name: "s", run, shell: "bash" }))).toEqual([]);
+    expect(pipesHidingFailure({}, job({ name: "s", run: `set -eo pipefail\n${run}` }))).toEqual([]);
+    expect(
+      pipesHidingFailure({ defaults: { run: { shell: "bash" } } }, job({ name: "s", run })),
+    ).toEqual([]);
+    // A custom shell string is not GitHub's `bash` shortcut and gets no pipefail.
+    expect(pipesHidingFailure({}, job({ name: "s", run, shell: "bash -e {0}" }))).toHaveLength(1);
+    // `set -o pipefail` AFTER the pipe does not cover it.
+    expect(pipesHidingFailure({}, job({ name: "s", run: `${run}set -o pipefail\n` }))).toHaveLength(
+      1,
+    );
+    expect(pipesHidingFailure({}, job({ name: "s", run: 'echo "x" | tee -a "$F"\n' }))).toEqual([]);
+    expect(pipesHidingFailure({}, job({ name: "s", run: "a || tee x\n" }))).toEqual([]);
   });
 });
 

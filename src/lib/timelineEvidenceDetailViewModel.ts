@@ -10,7 +10,13 @@
  * URLs and similar secrets MUST NEVER appear in the returned model.
  */
 
-import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { isCurrentStateStale } from "@/lib/sensorTruthCanon";
+import {
+  classifyManualMetric,
+  classifySnapshotTimestamp,
+  isHumidityStuckExtreme,
+} from "@/lib/sensorTruthRules";
+import { classifyTimelineSensorSource } from "@/lib/timelineSensorSourceBadgeRules";
 export type TimelineEvidenceSource =
   "manual" | "live" | "csv" | "demo" | "stale" | "invalid" | "unknown";
 
@@ -72,8 +78,6 @@ const SAFE_DETAIL_KEYS: ReadonlySet<string> = new Set([
   "outcome",
 ]);
 
-const TIMELINE_DETAIL_STALE_MS = LIVE_CURRENT_STATE_STALE_MS;
-
 export interface TimelineEvidenceDetailInput {
   id: string;
   note?: string | null;
@@ -94,6 +98,8 @@ export interface TimelineEvidenceSensorSummary {
   vpdKpa: number | null;
   co2Ppm: number | null;
   soilPercent: number | null;
+  warnings: string[];
+  canSupportCurrentContext: boolean;
 }
 
 export interface TimelineEvidencePhotoSummary {
@@ -175,27 +181,64 @@ function readSensor(
   nowMs: number,
 ): TimelineEvidenceSensorSummary | null {
   const raw = readSafeDetail(details, "sensor_snapshot") ?? readSafeDetail(details, "sensor");
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const obj = raw as Record<string, unknown>;
 
-  const capturedAt = safeString(obj.ts) ?? fallbackEntryAt;
-  let isStale = true;
-  if (capturedAt) {
-    const t = new Date(capturedAt).getTime();
-    isStale = !Number.isFinite(t) || nowMs - t > TIMELINE_DETAIL_STALE_MS;
+  const rawCapturedAt = obj.ts ?? obj.captured_at;
+  const capturedAt = rawCapturedAt == null ? fallbackEntryAt : safeString(rawCapturedAt);
+  const source = classifyTimelineSensorSource({
+    rawSource: safeString(obj.source ?? readSafeDetail(details, "source")),
+    fallback: "invalid",
+    context: "persisted_snapshot",
+  }).kind;
+  const warnings: string[] = [];
+  const readMetric = (value: unknown, metric: string): number | null => {
+    if (value == null) return null;
+    const number = typeof value === "number" ? value : Number.NaN;
+    const truth = classifyManualMetric(metric, number);
+    if (!truth.valid) {
+      warnings.push(truth.chip ?? "Invalid reading");
+      return null;
+    }
+    return number;
+  };
+  const tempC = readMetric(obj.temp ?? obj.temp_c ?? obj.tempC, "temperature_c");
+  const rhPercent = readMetric(obj.rh ?? obj.humidity ?? obj.rh_percent, "humidity_pct");
+  const vpdKpa = readMetric(obj.vpd ?? obj.vpd_kpa ?? obj.vpdKpa, "vpd_kpa");
+  const co2Ppm = readMetric(obj.co2 ?? obj.co2_ppm, "co2_ppm");
+  const soilPercent = readMetric(obj.soil ?? obj.soil_percent, "soil_moisture_pct");
+  if (isHumidityStuckExtreme(rhPercent)) warnings.push("Humidity stuck — review this reading.");
+  if ([tempC, rhPercent, vpdKpa, co2Ppm, soilPercent].every((value) => value === null)) {
+    warnings.push("No usable sensor readings.");
   }
-
-  const source = normalizeSource(obj.source ?? readSafeDetail(details, "source"));
+  const timestamp = classifySnapshotTimestamp(capturedAt, nowMs);
+  if (timestamp !== "ok") {
+    warnings.push(
+      timestamp === "future"
+        ? "Future timestamp — freshness cannot be verified."
+        : "Invalid timestamp — freshness cannot be verified.",
+    );
+  }
+  const isStale =
+    source === "stale" ||
+    (timestamp === "ok" && isCurrentStateStale(capturedAt, { now: nowMs, source }));
+  if (isStale) warnings.push("Sensor snapshot is older than the current-context freshness limit.");
+  if (source === "invalid") warnings.push("Snapshot source is invalid or unverified.");
+  if (source === "demo") warnings.push("Demo data is not real plant evidence.");
+  if (source === "csv")
+    warnings.push("CSV readings are historical context, not current telemetry.");
 
   return {
     source,
     capturedAt,
     isStale,
-    tempC: safeNumber(obj.temp ?? obj.temp_c ?? obj.tempC),
-    rhPercent: safeNumber(obj.rh ?? obj.humidity ?? obj.rh_percent),
-    vpdKpa: safeNumber(obj.vpd ?? obj.vpd_kpa ?? obj.vpdKpa),
-    co2Ppm: safeNumber(obj.co2 ?? obj.co2_ppm),
-    soilPercent: safeNumber(obj.soil ?? obj.soil_percent),
+    tempC,
+    rhPercent,
+    vpdKpa,
+    co2Ppm,
+    soilPercent,
+    warnings,
+    canSupportCurrentContext: source === "manual" && warnings.length === 0,
   };
 }
 
@@ -249,24 +292,30 @@ function buildAltText(plantName: string | null, entryAt: string | null): string 
 
 function decideContext(
   hasPhoto: boolean,
-  hasSensor: boolean,
-  staleSensor: boolean,
+  sensor: TimelineEvidenceSensorSummary | null,
 ): TimelineEvidenceContextHint {
-  if (hasPhoto && hasSensor && !staleSensor) {
+  if (sensor && !sensor.canSupportCurrentContext) {
+    return {
+      level: "limited",
+      label: "Sensor context needs review",
+      description: `${hasPhoto ? "Photo and sensor record are present." : "Sensor record is present; no photo is attached."} ${sensor.warnings.join(" ")}`,
+    };
+  }
+  if (hasPhoto && sensor) {
     return {
       level: "strong",
       label: "Useful for AI Doctor context",
-      description: "Photo and recent sensor snapshot — strong evidence for AI Doctor.",
+      description: "Photo and recent manual sensor snapshot — useful context for AI Doctor.",
     };
   }
-  if (hasPhoto && !hasSensor) {
+  if (hasPhoto && !sensor) {
     return {
       level: "partial_missing_sensor",
       label: "Missing sensor context",
       description: "Has a photo but no sensor snapshot — AI Doctor context is partial.",
     };
   }
-  if (!hasPhoto && hasSensor) {
+  if (!hasPhoto && sensor) {
     return {
       level: "partial_missing_photo",
       label: "Missing photo context",
@@ -307,7 +356,13 @@ export function buildTimelineEvidenceDetailViewModel(
   const sensor = readSensor(details, entryAt, nowMs);
   const maturityEvidence = readMaturityEvidence(details);
 
-  const declaredSource = normalizeSource(readSafeDetail(details, "source"));
+  let declaredSource = normalizeSource(readSafeDetail(details, "source"));
+  if (declaredSource !== "unknown") {
+    declaredSource = classifyTimelineSensorSource({
+      rawSource: declaredSource,
+      context: "persisted_snapshot",
+    }).kind;
+  }
   const sources: TimelineEvidenceSource[] = [];
   if (declaredSource !== "unknown") sources.push(declaredSource);
   if (sensor) {
@@ -336,7 +391,7 @@ export function buildTimelineEvidenceDetailViewModel(
   if (maturityEvidence) badges.push("maturity_evidence");
   if (sensor && sensor.isStale) badges.push("stale_sensor");
 
-  const contextHint = decideContext(hasPhoto, !!sensor, !!sensor?.isStale);
+  const contextHint = decideContext(hasPhoto, sensor);
 
   const title = plantLabel ?? eventTypeLabel;
   const subtitleParts = [eventTypeLabel];

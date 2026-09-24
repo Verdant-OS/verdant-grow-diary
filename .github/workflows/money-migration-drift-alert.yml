@@ -2,6 +2,11 @@ name: Money migration drift alert (production)
 
 # Are the billing-critical migrations actually applied in production?
 #
+# ENV-RETIRE-001: the daily schedule is retired because verdant-production is
+# owner-reported hollow. The original monitor rationale below is historical.
+# Manual dispatch retains its guards; no run means NOT_MEASURED.
+# See docs/production-environment-retirement-runbook.md before any dispatch.
+#
 # WHY A SECOND, MONEY-SPECIFIC JOB
 #
 # migration-drift-probe.yml already diffs EVERY repo migration against
@@ -38,11 +43,6 @@ name: Money migration drift alert (production)
 # production is current; it says nothing about sandbox.
 
 on:
-  schedule:
-    # 07:30 UTC, half an hour after migration-drift-probe.yml. Staggered so the
-    # two jobs do not open the same database at once, and so the general
-    # "something is unapplied" signal lands before the money-specific triage.
-    - cron: "30 7 * * *"
   workflow_dispatch: {}
 
 permissions:
@@ -82,11 +82,8 @@ jobs:
     if: github.ref == 'refs/heads/verdant-grow-diary'
     # Holds the verdant-production environment's SUPABASE_DB_URL.
     #
-    # OPERATIONAL CAVEAT, same as migration-drift-probe.yml: if a REQUIRED
-    # REVIEWER is ever added to verdant-production, every scheduled run parks
-    # awaiting approval and this monitor silently stops monitoring. Verified at
-    # authoring time that the environment has only a branch policy and zero
-    # reviewers.
+    # No unattended monitoring is active. Restoring it requires a separately
+    # approved read-only environment and target-specific verification receipt.
     environment: verdant-production
     # Bounds the whole job well under the 360-minute default, but deliberately
     # LARGER than the checker step's own timeout below. That ordering is the

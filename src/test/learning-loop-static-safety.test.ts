@@ -104,8 +104,12 @@ describe("episode service — persistence & query safety static contract", () =>
   it("selects raw_payload only with sensor rows so provenance can fail closed", () => {
     // The adapter consumes this opaque envelope for classification and does
     // not include it in the episode evidence contract.
-    const select = SERVICE.match(/from\(["']sensor_readings["']\)[\s\S]{0,200}/)?.[0] ?? "";
+    const select =
+      SERVICE.match(/effectiveSensorReadingsQuery\(\)\s*\.select\(\s*"([^"]+)"/)?.[1] ?? "";
     expect(select).toContain("raw_payload");
+    expect(select).toContain("correction_valid");
+    expect(SERVICE).toContain("requireEffectiveSensorReadings(sensorData)");
+    expect(SERVICE).not.toMatch(/\.from\(["']sensor_readings["']\)/);
   });
 
   it("uses bounded limits (no unbounded full-table client fetch)", () => {

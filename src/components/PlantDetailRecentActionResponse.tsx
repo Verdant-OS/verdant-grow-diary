@@ -19,6 +19,7 @@ import { selectRecentPlantActionResponse } from "@/lib/actionResponseMemoryRules
 import { buildActionResponseMemoryCardViewModel } from "@/lib/actionResponseMemoryViewModel";
 import ActionResponseMemoryCard from "@/components/ActionResponseMemoryCard";
 import ActionFollowUpExistingPhotoEvidence from "@/components/ActionFollowUpExistingPhotoEvidence";
+import { Button } from "@/components/ui/button";
 
 const HEADING_ID = "plant-detail-recent-action-response-heading";
 
@@ -31,7 +32,7 @@ export default function PlantDetailRecentActionResponse({
   growId,
   plantId,
 }: PlantDetailRecentActionResponseProps) {
-  const { state } = useActionResponseMemory({ growId, plantId });
+  const { state, reload } = useActionResponseMemory({ growId, plantId });
 
   const viewModel = useMemo(() => {
     if (state.status !== "ok") return null;
@@ -39,8 +40,24 @@ export default function PlantDetailRecentActionResponse({
     return buildActionResponseMemoryCardViewModel({ memory });
   }, [state, plantId]);
 
-  // Calm card: no loading placeholder, no empty placeholder, no error chrome.
-  // A failed or empty read renders nothing and never disturbs the page.
+  if (state.status === "loading")
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        Loading action response history…
+      </p>
+    );
+  if (state.status === "unavailable")
+    return (
+      <div className="space-y-2">
+        <p role="status" className="text-sm text-muted-foreground">
+          Action response history is unavailable right now.
+        </p>
+        <Button variant="outline" size="sm" onClick={reload}>
+          Retry action response history
+        </Button>
+      </div>
+    );
+  // Completed empty reads remain quiet; an unresolved read is not an empty history.
   if (!viewModel) return null;
 
   return (

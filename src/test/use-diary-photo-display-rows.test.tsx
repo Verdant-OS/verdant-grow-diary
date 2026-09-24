@@ -1,7 +1,7 @@
-import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { useAuthMock, storageFromMock, createSignedUrlsMock } = vi.hoisted(() => {
   const createSignedUrlsMock = vi.fn();
@@ -22,7 +22,7 @@ import { useDiaryPhotoDisplayRows } from "@/hooks/useDiaryPhotoDisplayRows";
 
 function makeWrapper() {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, retryDelay: 0 } },
   });
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return React.createElement(QueryClientProvider, { client }, children);
@@ -30,10 +30,124 @@ function makeWrapper() {
 }
 
 describe("useDiaryPhotoDisplayRows", () => {
+  afterEach(() => {
+    cleanup();
+    onlineManager.setOnline(true);
+  });
   beforeEach(() => {
     useAuthMock.mockReturnValue({ user: { id: "owner-1" } });
     storageFromMock.mockClear();
     createSignedUrlsMock.mockReset();
+  });
+
+  const ownedRows = [{ id: "owned-photo", photo_url: "owner-1/grow-1/leaf.jpg" }];
+  const signed = {
+    data: [{ path: "owner-1/grow-1/leaf.jpg", signedUrl: "https://project.example/leaf.jpg" }],
+    error: null,
+  };
+
+  it("keeps an offline first signing request pending, then resolves on reconnect", async () => {
+    onlineManager.setOnline(false);
+    createSignedUrlsMock.mockResolvedValue(signed);
+    const { result } = renderHook(() => useDiaryPhotoDisplayRows(ownedRows), {
+      wrapper: makeWrapper(),
+    });
+    expect(result.current.hasPhotoReference).toBe(true);
+    expect(result.current.isResolvingPrivatePhotos).toBe(true);
+    expect(result.current.isPrivatePhotoReadPaused).toBe(true);
+    expect(result.current.rows[0].photo_url).toBeNull();
+    expect(createSignedUrlsMock).not.toHaveBeenCalled();
+    act(() => onlineManager.setOnline(true));
+    await waitFor(() =>
+      expect(result.current.rows[0].photo_url).toBe("https://project.example/leaf.jpg"),
+    );
+    expect(result.current.isPrivatePhotoReadPaused).toBe(false);
+  });
+
+  it("retries a failed signing request with unchanged diary rows and recovers the image", async () => {
+    createSignedUrlsMock.mockResolvedValue({ data: null, error: { message: "private failure" } });
+    const { result } = renderHook(() => useDiaryPhotoDisplayRows(ownedRows), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.hasPrivatePhotoError).toBe(true));
+    const attemptsBeforeRetry = createSignedUrlsMock.mock.calls.length;
+    createSignedUrlsMock.mockResolvedValue(signed);
+    await act(async () => {
+      await result.current.refetchPrivatePhotos();
+    });
+    await waitFor(() =>
+      expect(result.current.rows[0].photo_url).toBe("https://project.example/leaf.jpg"),
+    );
+    expect(createSignedUrlsMock).toHaveBeenCalledTimes(attemptsBeforeRetry + 1);
+    expect(result.current.hasPrivatePhotoError).toBe(false);
+  });
+
+  it("hides cached private previews after a failed refresh while preserving external photos", async () => {
+    createSignedUrlsMock.mockResolvedValue(signed);
+    const rows = [
+      ...ownedRows,
+      { id: "external", photo_url: "https://images.example.com/external.jpg" },
+    ];
+    const { result } = renderHook(() => useDiaryPhotoDisplayRows(rows), { wrapper: makeWrapper() });
+    await waitFor(() =>
+      expect(result.current.rows[0].photo_url).toBe("https://project.example/leaf.jpg"),
+    );
+    createSignedUrlsMock.mockResolvedValue({ data: null, error: { message: "failed refresh" } });
+    await act(async () => {
+      await result.current.refetchPrivatePhotos();
+    });
+    await waitFor(() => expect(result.current.hasPrivatePhotoError).toBe(true));
+    expect(result.current.rows[0].photo_url).toBeNull();
+    expect(result.current.rows[1].photo_url).toBe("https://images.example.com/external.jpg");
+  });
+
+  it("does not reuse or retry the prior owner's signed path after the viewer changes", async () => {
+    createSignedUrlsMock.mockResolvedValue(signed);
+    const { result, rerender } = renderHook(() => useDiaryPhotoDisplayRows(ownedRows), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() =>
+      expect(result.current.rows[0].photo_url).toBe("https://project.example/leaf.jpg"),
+    );
+    const attempts = createSignedUrlsMock.mock.calls.length;
+    useAuthMock.mockReturnValue({ user: { id: "owner-2" } });
+    rerender();
+    expect(result.current.rows[0].photo_url).toBeNull();
+    expect(result.current.hasPhotoReference).toBe(false);
+    await act(async () => {
+      await result.current.refetchPrivatePhotos();
+    });
+    expect(createSignedUrlsMock).toHaveBeenCalledTimes(attempts);
+  });
+
+  it.each([
+    ["missing batch", null],
+    ["empty batch", []],
+    ["per-path error", [{ path: "owner-1/grow-1/leaf.jpg", signedUrl: null, error: "not found" }]],
+    [
+      "different path",
+      [{ path: "owner-1/grow-1/other.jpg", signedUrl: "https://project.example/other.jpg" }],
+    ],
+  ])("reports %s as unavailable rather than successful empty history", async (_name, data) => {
+    createSignedUrlsMock.mockResolvedValue({ data, error: null });
+    const { result } = renderHook(() => useDiaryPhotoDisplayRows(ownedRows), {
+      wrapper: makeWrapper(),
+    });
+    await waitFor(() => expect(result.current.hasPrivatePhotoError).toBe(true));
+    expect(result.current.hasPhotoReference).toBe(true);
+    expect(result.current.rows[0].photo_url).toBeNull();
+  });
+
+  it.each([
+    ["empty", []],
+    ["external", [{ photo_url: "https://images.example.com/leaf.jpg" }]],
+    ["wrong owner", [{ photo_url: "other-owner/grow-1/leaf.jpg" }]],
+  ])("does not enable an unnecessary signing read when retrying %s rows", async (_name, rows) => {
+    const { result } = renderHook(() => useDiaryPhotoDisplayRows(rows), { wrapper: makeWrapper() });
+    await act(async () => {
+      await result.current.refetchPrivatePhotos();
+    });
+    expect(createSignedUrlsMock).not.toHaveBeenCalled();
   });
 
   it("signs only a validated owner-scoped private path and exposes its temporary display URL", async () => {

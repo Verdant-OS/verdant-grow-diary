@@ -49,6 +49,11 @@ import { validatePlantProfilePhotoFile } from "@/lib/plantProfilePhotoFileRules"
 import { dispatchQuickLogV2EntryCreated } from "@/lib/quickLogV2EntryCreatedEvent";
 import { trackQuickLogSuccess } from "@/lib/quickLogSuccessTelemetry";
 import {
+  buildQuickLogSaveSignature,
+  resolveQuickLogSaveKey,
+  type QuickLogSaveKeyState,
+} from "@/lib/quickLogSaveKeyPolicy";
+import {
   QUICK_LOG_ACTIVITY_DEFINITIONS,
   QUICK_LOG_WEIGHT_UNITS,
   type QuickLogActivityDefinition,
@@ -309,6 +314,12 @@ export default function QuickLogAllActivitiesSection({
   const [structuredWaterError, setStructuredWaterError] = useState<string | null>(null);
   const { save, saving } = useQuickLogActivitySave();
   const localSaveInFlightRef = useRef(false);
+  const activitySaveKeyRef = useRef<QuickLogSaveKeyState | null>(null);
+  useEffect(() => {
+    // Selecting/cancelling an editor, completing a save, or changing owner
+    // starts a new logical draft. Field edits are compared at submission.
+    activitySaveKeyRef.current = null;
+  }, [selectedDraft, user?.id]);
   const temperatureUnit = useTemperatureUnitPreference();
   // Pinned at the moment the Environment Check manual Temperature draft
   // transitions from empty to non-empty (see the detail-field onChange
@@ -649,7 +660,27 @@ export default function QuickLogAllActivitiesSection({
     if (!onSaveStart) localSaveInFlightRef.current = true;
 
     try {
-      const idempotencyKey = newIdempotencyKey(selected.id);
+      const activityInput = {
+        activityId: selected.id,
+        growId: capturedTarget.growId,
+        tentId: capturedTarget.tentId,
+        plantId: capturedTarget.plantId,
+        note: note.trim().length > 0 ? note.trim() : null,
+        extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
+      };
+      const resolvedSaveKey =
+        selected.id === "photo"
+          ? null
+          : resolveQuickLogSaveKey({
+              current: activitySaveKeyRef.current,
+              signature: buildQuickLogSaveSignature({
+                ownerId: user?.id ?? null,
+                ...activityInput,
+              }),
+              mint: () => newIdempotencyKey(selected.id),
+            });
+      if (resolvedSaveKey) activitySaveKeyRef.current = resolvedSaveKey.state;
+      const idempotencyKey = resolvedSaveKey?.state.key ?? newIdempotencyKey(selected.id);
       let savedGrowEventId: string | null = null;
       if (selected.id === "photo") {
         // Photo goes diary-only through the proven QuickLog photo-attachment
@@ -760,19 +791,14 @@ export default function QuickLogAllActivitiesSection({
         }
       } else {
         const result = await save({
-          activityId: selected.id,
-          growId: capturedTarget.growId,
-          tentId: capturedTarget.tentId,
-          plantId: capturedTarget.plantId,
-          note: note.trim().length > 0 ? note.trim() : null,
+          ...activityInput,
           idempotencyKey,
-          extraDetails: Object.keys(extraDetails).length > 0 ? extraDetails : null,
         });
 
         if (!result.ok) {
           setErrorReason(
             result.reason === "save_failed"
-              ? "Save failed. Nothing was saved."
+              ? "Save is unconfirmed. Your draft is still here. Retry to confirm it."
               : (result.disabledReason ?? "Save was refused."),
           );
           setErrorForActivity(selected.id);

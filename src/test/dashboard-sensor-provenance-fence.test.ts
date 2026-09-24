@@ -234,14 +234,22 @@ describe("Dashboard sensor provenance fence", () => {
 
   it("filters quality and provenance before the latest snapshot is assembled", () => {
     expect(LATEST_SNAPSHOT_HOOK).toMatch(
-      /select\("id,ts,captured_at,metric,value,quality,source,tent_id,created_at,raw_payload"\)/,
+      /effectiveSensorReadingsQuery\(\)[\s\S]*?\.select\("\*"\)/,
     );
     const filterIndex = LATEST_SNAPSHOT_HOOK.indexOf(
-      "selectDashboardSensorEvidenceRows(data ?? [])",
+      "selectDashboardSensorEvidenceRows(requireEffectiveSensorReadings(data))",
     );
     const assemblyIndex = LATEST_SNAPSHOT_HOOK.lastIndexOf("snapshotFromReadings(");
     expect(filterIndex).toBeGreaterThan(-1);
     expect(assemblyIndex).toBeGreaterThan(filterIndex);
+  });
+
+  it("exposes background fetch and paused states on completed reads (#1555)", () => {
+    expect(LATEST_SNAPSHOT_HOOK).toMatch(/isFetching:\s*query\.isFetching/);
+    expect(LATEST_SNAPSHOT_HOOK).toMatch(/isPaused:\s*query\.isPaused/);
+    expect(LATEST_SNAPSHOT_HOOK).toMatch(
+      /TanStack Query preserves cached data during a background refetch/,
+    );
   });
 
   it("wires the evidence-only rows into counts, charts, snapshots, and per-tent stability", () => {
@@ -259,6 +267,12 @@ describe("Dashboard sensor provenance fence", () => {
       "countActivatingSensorReadings(readingsByTent[activationGraph.tentId] ?? [])",
     );
     expect(DASHBOARD).toContain("sensorReadingCount: connectedSensorReadingCount");
+    expect(DASHBOARD).toMatch(/buildSensorSnapshotReadState\s*\(\s*sensorState\s*\)/);
+    expect(DASHBOARD).toMatch(
+      /const\s+currentSensorSnapshot\s*=\s*snapshotReadState\.confirmedSnapshot/,
+    );
+    expect(DASHBOARD).toMatch(/dashboardSnapshotForHealthyCues\s*\(\s*currentSensorSnapshot\s*\)/);
+    expect(DASHBOARD).toMatch(/evaluateDashboardSensorQuality\s*\(\s*currentSensorSnapshot/);
     expect(DASHBOARD).toContain("dashboardSnapshotForHealthyCues(");
     expect(DASHBOARD).toContain("evaluateDashboardSensorQuality(");
     expect(DASHBOARD).toMatch(

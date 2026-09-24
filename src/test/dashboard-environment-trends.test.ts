@@ -293,8 +293,9 @@ describe("environmentTrends helper safety", () => {
 });
 
 describe("useEnvironmentTrends hook contract", () => {
-  it("queries sensor_readings by tent ids", () => {
-    expect(HOOK).toMatch(/\.from\(["']sensor_readings["']\)/);
+  it("queries effective sensor readings by tent ids", () => {
+    expect(HOOK).toContain("effectiveSensorReadingsQuery()");
+    expect(HOOK).toContain("requireEffectiveSensorReadings(data)");
     expect(HOOK).toMatch(/\.in\(["']tent_id["']/);
     expect(HOOK).toMatch(/temperature_c/);
     expect(HOOK).toMatch(/humidity_pct/);

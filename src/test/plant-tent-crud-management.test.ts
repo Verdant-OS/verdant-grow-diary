@@ -18,6 +18,9 @@ import {
   buildArchivePlantPayload,
   buildRestorePlantPayload,
   resolvePlantArchiveMenuAction,
+  plantMoveRequiresPhenoUntag,
+  buildPlantPhenoUntagPayload,
+  buildPlantTentMoveUpdate,
 } from "@/lib/plantTentRelationshipRules";
 
 const ROOT = resolve(__dirname, "../..");
@@ -93,6 +96,81 @@ describe("plantTentRelationshipRules · getEligibleTentsForPlantMove", () => {
     const out = getEligibleTentsForPlantMove(tents, null, "g1");
     expect(out.current).toEqual([]);
     expect(out.others.map((t) => t.id).sort()).toEqual(["t1", "t2"]);
+  });
+
+  it("keeps cross-grow tents out until includeCrossGrow after explicit untag", () => {
+    const blocked = getEligibleTentsForPlantMove(tents, "t1", "g1");
+    expect(blocked.others.map((t) => t.id)).not.toContain("t4");
+    const released = getEligibleTentsForPlantMove(tents, "t1", "g1", { includeCrossGrow: true });
+    expect(released.others.map((t) => t.id).sort()).toEqual(["t2", "t4"]);
+  });
+});
+
+describe("plantTentRelationshipRules · hunt-linked cross-grow untag gate", () => {
+  it("blocks silent grow_id change while pheno_hunt_id is set", () => {
+    expect(
+      plantMoveRequiresPhenoUntag({
+        phenoHuntId: "hunt-1",
+        plantGrowId: "g1",
+        destinationGrowId: "g2",
+      }),
+    ).toBe(true);
+    expect(
+      buildPlantTentMoveUpdate({
+        tentId: "t4",
+        plantGrowId: "g1",
+        destinationGrowId: "g2",
+        usedGrowFallback: false,
+        phenoHuntId: "hunt-1",
+      }),
+    ).toBeNull();
+  });
+
+  it("allows same-grow move without untag", () => {
+    expect(
+      plantMoveRequiresPhenoUntag({
+        phenoHuntId: "hunt-1",
+        plantGrowId: "g1",
+        destinationGrowId: "g1",
+      }),
+    ).toBe(false);
+    expect(
+      buildPlantTentMoveUpdate({
+        tentId: "t2",
+        plantGrowId: "g1",
+        destinationGrowId: "g1",
+        usedGrowFallback: false,
+        phenoHuntId: "hunt-1",
+      }),
+    ).toEqual({ tent_id: "t2" });
+  });
+
+  it("after untag, cross-grow move sets grow_id without touching pheno_hunt_id", () => {
+    expect(buildPlantPhenoUntagPayload()).toEqual({
+      pheno_hunt_id: null,
+      candidate_label: null,
+    });
+    expect(buildPlantPhenoUntagPayload()).not.toHaveProperty("tent_id");
+    expect(buildPlantPhenoUntagPayload()).not.toHaveProperty("grow_id");
+    expect(
+      buildPlantTentMoveUpdate({
+        tentId: "t4",
+        plantGrowId: "g1",
+        destinationGrowId: "g2",
+        usedGrowFallback: false,
+        phenoHuntId: null,
+      }),
+    ).toEqual({ tent_id: "t4", grow_id: "g2" });
+  });
+
+  it("does not require untag when destination tent has no grow_id", () => {
+    expect(
+      plantMoveRequiresPhenoUntag({
+        phenoHuntId: "hunt-1",
+        plantGrowId: "g1",
+        destinationGrowId: null,
+      }),
+    ).toBe(false);
   });
 });
 
@@ -252,6 +330,13 @@ describe("AssignTentDialog · Move Plant empty-state and current-tent labeling",
 
   it("shows empty message when no eligible tents exist", () => {
     expect(ASSIGN_DIALOG).toMatch(/No tents available/i);
+  });
+
+  it("requires a dedicated pheno untag confirm before any grow_id move write", () => {
+    expect(ASSIGN_DIALOG).toContain("confirmPhenoUntag");
+    expect(ASSIGN_DIALOG).toContain("buildPlantPhenoUntagPayload");
+    expect(ASSIGN_DIALOG).toContain("buildPlantTentMoveUpdate");
+    expect(ASSIGN_DIALOG).not.toMatch(/pheno_hunt_id:\s*null[\s\S]{0,80}tent_id/);
   });
 });
 

@@ -1,4 +1,5 @@
 import { LIVE_CURRENT_STATE_STALE_MS } from "@/lib/sensorTruthCanon";
+import { subscribeManualSensorCorrections } from "@/lib/manualSensorCorrectionEvents";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineEmptyState from "@/components/TimelineEmptyState";
@@ -116,8 +117,11 @@ import {
   isTimelineSensorDerivedDiaryId,
   manualSensorReadingsToTimelineEntries,
   mergeTimelineMeasurementDisplayEntries,
-  type ManualSensorTimelineMetricRow,
 } from "@/lib/timelineManualSensorMeasurementRules";
+import {
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 import { presentTimelineDiaryEntryDetails } from "@/lib/timelineDiaryEntryDetailPresentationRules";
 import { classifyVpdAgainstStage } from "@/lib/vpdStageTargetRules";
 import {
@@ -164,8 +168,7 @@ import {
   PHOTO_NON_DIAGNOSTIC_TESTID,
   shouldShowPhotoNonDiagnosticLabel,
 } from "@/lib/photoEventNonDiagnosticLabelRules";
-import TimelineEvidenceDetailDrawer from "@/components/TimelineEvidenceDetailDrawer";
-import { buildTimelineEvidenceDetailViewModel } from "@/lib/timelineEvidenceDetailViewModel";
+import TimelineEvidenceDetailPreview from "@/components/TimelineEvidenceDetailPreview";
 import TimelineSensorSourceBadge from "@/components/TimelineSensorSourceBadge";
 import { buildTimelineSensorSnapshotViewModel } from "@/lib/timelineSensorSnapshotViewModel";
 import {
@@ -207,6 +210,7 @@ import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoSc
 import { useTimelineHashAnchorHandoff } from "@/hooks/useTimelineHashAnchorHandoff";
 import {
   buildLinkedGrowEventTimelineAnchorId,
+  buildRenderedDiaryTimelineAnchorIds,
   buildTimelineEntryAnchorId,
 } from "@/lib/timelineEntryAnchorRules";
 import {
@@ -862,11 +866,8 @@ export default function Timeline() {
                 setManualSensorMeasurementEntries([]);
                 return;
               }
-              let sensorQuery = supabase
-                .from("sensor_readings")
-                .select(
-                  "id,tent_id,metric,value,source,ts,captured_at,quality,user_id,created_at,device_id",
-                )
+              let sensorQuery = effectiveSensorReadingsQuery()
+                .select("*")
                 .in("tent_id", tentIds)
                 .eq("source", "manual")
                 .order("captured_at", { ascending: false, nullsFirst: false })
@@ -886,7 +887,7 @@ export default function Timeline() {
                 return;
               }
               let receipts = manualSensorReadingsToTimelineEntries(
-                sensorResult.data as ManualSensorTimelineMetricRow[],
+                requireEffectiveSensorReadings(sensorResult.data),
                 new Date(),
               );
               if (timelineDateRangeBounds.startIso) {
@@ -1035,6 +1036,13 @@ export default function Timeline() {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(
+    () =>
+      subscribeManualSensorCorrections(ownerId, () => {
+        void load();
+      }),
+    [ownerId, load],
+  );
   useEffect(() => {
     const h = () => load();
     window.addEventListener("verdant:entry-created", h);
@@ -1191,6 +1199,11 @@ export default function Timeline() {
     effectiveStartDate,
     effectiveEndDate,
   ]);
+
+  const renderedDiaryAnchorIds = useMemo(
+    () => buildRenderedDiaryTimelineAnchorIds(filtered),
+    [filtered],
+  );
 
   function clearEvidenceFilters() {
     setSearchQuery("");
@@ -1480,7 +1493,7 @@ export default function Timeline() {
     hasInvalidScope,
     activeReadKey,
     coreRead,
-    evidenceCount: recentLaneRawEntries.length,
+    evidenceCount: recentLaneRawEntries.length + manualSensorMeasurementEntries.length,
     hasAppliedDateBounds: Boolean(effectiveStartDate || effectiveEndDate),
     supplementalLoading,
     partialSources: partialReadSources,
@@ -2206,12 +2219,14 @@ export default function Timeline() {
         <DiaryCalendarSection
           rawEntries={recentLaneRawEntries}
           activeStage={activeGrow?.stage ?? null}
+          plantStartedAt={activeGrow?.started_at ?? null}
         />
       </div>
 
       <div className="mt-4">
         <WateringHistoryPanel
           rawEntries={recentLaneRawEntries}
+          reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2222,6 +2237,7 @@ export default function Timeline() {
       <div className="mt-4">
         <FeedingHistoryPanel
           rawEntries={recentLaneRawEntries}
+          reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2868,12 +2884,12 @@ export default function Timeline() {
           onNavigate={(i) => setLightboxPhotoId(lightboxItems[i]?.id ?? null)}
         />
       )}
-      <TimelineEvidenceDetailDrawer
+      <TimelineEvidenceDetailPreview
         open={!!detailEntryId}
-        viewModel={(() => {
+        entry={(() => {
           const row = displayEntries.find((r) => r.id === detailEntryId);
           return row
-            ? buildTimelineEvidenceDetailViewModel({
+            ? {
                 id: row.id,
                 note: row.note,
                 photo_url: row.photo_url,
@@ -2882,7 +2898,7 @@ export default function Timeline() {
                 plant_id: row.plant_id,
                 tent_id: row.tent_id,
                 details: row.details,
-              })
+              }
             : null;
         })()}
         onClose={() => setDetailEntryId(null)}

@@ -40,6 +40,11 @@ import {
 import { isDiaryRowInTentScope } from "@/lib/diaryEvidenceTentScopeRules";
 import { selectDashboardSensorEvidenceRows } from "@/lib/dashboardSensorEvidenceRules";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
+import {
+  EFFECTIVE_SENSOR_QUERY_VERSION,
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 
 /**
  * A stale sensor snapshot must not suppress fresher grower evidence (Codex
@@ -74,7 +79,13 @@ export function useLatestSensorSnapshot(
   const tentKey = tentIds.join("|");
 
   const query = useQuery<SensorSnapshot>({
-    queryKey: ["latest-sensor-snapshot", user?.id ?? "anon", growId ?? "none", tentKey],
+    queryKey: [
+      "latest-sensor-snapshot",
+      user?.id ?? "anon",
+      growId ?? "none",
+      tentKey,
+      EFFECTIVE_SENSOR_QUERY_VERSION,
+    ],
     enabled: !!user && !!growId,
     queryFn: async () => {
       try {
@@ -82,17 +93,25 @@ export function useLatestSensorSnapshot(
         // kept only as a candidate that strictly-newer diary evidence may
         // replace (see preferNewer).
         let staleSensorCandidate: SensorSnapshot | null = null;
+        let sensorReadFailed = false;
         // 1) Prefer live sensor_readings if any tents are scoped.
         if (tentIds.length > 0) {
-          const { data, error } = await supabase
-            .from("sensor_readings")
-            .select("id,ts,captured_at,metric,value,quality,source,tent_id,created_at,raw_payload")
-            .in("tent_id", tentIds)
-            .order("captured_at", { ascending: false, nullsFirst: false })
-            .order("ts", { ascending: false })
-            .order("created_at", { ascending: false })
-            .limit(50);
-          const evidenceRows = !error ? selectDashboardSensorEvidenceRows(data ?? []) : [];
+          let evidenceRows: ReturnType<typeof requireEffectiveSensorReadings> = [];
+          try {
+            const { data, error } = await effectiveSensorReadingsQuery()
+              .select("*")
+              .in("tent_id", tentIds)
+              .order("captured_at", { ascending: false, nullsFirst: false })
+              .order("ts", { ascending: false })
+              .order("created_at", { ascending: false })
+              .limit(50);
+            if (error) throw error;
+            evidenceRows = selectDashboardSensorEvidenceRows(requireEffectiveSensorReadings(data));
+          } catch {
+            // A separate, usable diary read may survive this failure. If no
+            // such evidence exists, this is unavailable rather than empty.
+            sensorReadFailed = true;
+          }
           if (evidenceRows.length > 0) {
             const snap = snapshotFromReadings(
               evidenceRows.map((r) => ({
@@ -127,8 +146,8 @@ export function useLatestSensorSnapshot(
             return query.eq("grow_id", growId).order("entry_at", { ascending: false }).limit(20);
           },
         );
-        if (diaryErr) throw diaryErr;
-        for (const row of diaryRows ?? []) {
+        if (diaryErr || !Array.isArray(diaryRows)) throw new Error("unavailable");
+        for (const row of diaryRows) {
           const details = (row.details ?? null) as Record<string, unknown> | null;
           if (!details || typeof details !== "object") continue;
           // #602 / #601: tent-scoped views only accept diary rows attributed
@@ -182,6 +201,7 @@ export function useLatestSensorSnapshot(
         }
         // 3) Nothing newer in the diary: a stale sensor snapshot is still the
         // latest evidence (rendered with its stale badge), else nothing.
+        if (sensorReadFailed) throw new Error("unavailable");
         return staleSensorCandidate ?? EMPTY_SNAPSHOT;
       } catch {
         throw new Error("unavailable");
@@ -192,11 +212,13 @@ export function useLatestSensorSnapshot(
   if (!user || !growId) {
     return { status: "idle", snapshot: EMPTY_SNAPSHOT, isFetching: false, isPaused: false };
   }
-  if (query.isLoading || (query.isFetching && !query.data)) {
+  // A first read paused for connectivity is still unresolved. Only a
+  // completed read can establish that there is no sensor evidence.
+  if (query.isPending || (query.isFetching && !query.data)) {
     return {
       status: "loading",
       snapshot: EMPTY_SNAPSHOT,
-      isFetching: true,
+      isFetching: query.isFetching,
       isPaused: query.isPaused,
     };
   }

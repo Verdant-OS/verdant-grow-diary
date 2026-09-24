@@ -24,6 +24,7 @@ import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
+import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 
 interface Props {
   growId: string | null | undefined;
@@ -46,6 +47,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
   const tentsSettled = tentsQuery.isFetched;
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(safeGrowId, tentIds);
+  const snapshot = buildSensorSnapshotReadState(sensorState).confirmedSnapshot;
   const targetsState = useGrowTargets(safeGrowId);
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
   // stages, most advanced known stage wins on disagreement.
@@ -59,11 +61,11 @@ export default function AlertsAutoPersistForGrow({ growId, stage }: Props) {
     // Attribution rides on the snapshot, so it always describes the same
     // evidence the alert was derived from. Null when that evidence spans
     // tents (this component scopes every tent in the grow).
-    tentId: sensorState.status === "ok" ? (sensorState.snapshot.tent_id ?? null) : null,
-    snapshot: sensorState.status === "ok" ? sensorState.snapshot : null,
-    quality: evaluateSensorQuality(sensorState.status === "ok" ? sensorState.snapshot : null),
+    tentId: snapshot ? (snapshot.tent_id ?? null) : null,
+    snapshot,
+    quality: evaluateSensorQuality(snapshot),
     targets: compareSnapshotToTargets(
-      sensorState.status === "ok" ? sensorState.snapshot : null,
+      snapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
     enabled: !!safeGrowId && tentsSettled,

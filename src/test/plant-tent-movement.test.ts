@@ -145,19 +145,12 @@ describe("AssignTentDialog · movement timeline event", () => {
     expect(DIALOG).toMatch(/invalidateQueries\(\{\s*queryKey:\s*\["diary_entries"\]/);
   });
 
-  it("updates plants.tent_id; grow_id only via empty-grow re-home helper", () => {
-    const plantUpdates = [
-      ...DIALOG.matchAll(/\.from\(["']plants["']\)\s*\.update\(\s*\{([^}]*)\}\s*\)/g),
-    ];
-    expect(plantUpdates.length).toBe(1);
-    const payload = plantUpdates[0][1];
-    expect(payload).toMatch(/tent_id/);
-    expect(payload).not.toMatch(/\buser_id\b/);
-    expect(payload).not.toMatch(/\bstrain\b/);
-    expect(payload).not.toMatch(/\bstage\b/);
-    expect(payload).not.toMatch(/\bnotes\b/);
-    expect(DIALOG).toMatch(/buildPlantEditGrowIdFromTent\(/);
-    expect(DIALOG).toMatch(/\.\.\.\(growPatch\s*\?\?\s*\{\}\)/);
+  it("updates plants.tent_id via a dedicated move payload; untag is a separate write", () => {
+    expect(DIALOG).toMatch(/buildPlantTentMoveUpdate\(/);
+    expect(DIALOG).toMatch(/buildPlantPhenoUntagPayload\(/);
+    expect(DIALOG).toMatch(/\.from\(["']plants["']\)\s*\.update\(\s*movePayload\s*\)/);
+    expect(DIALOG).not.toMatch(/pheno_hunt_id:\s*null[\s\S]{0,120}tent_id/);
+    expect(DIALOG).toMatch(/confirmPhenoUntag/);
   });
 
   it("does NOT write sensor_readings / alerts / action_queue when moving a plant", () => {

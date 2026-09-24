@@ -39,7 +39,10 @@ describe("Dashboard · single daily grow-check surface", () => {
     // logging concept. Route target is unchanged.
     expect(dashboardSrc).toMatch(/dashboard-daily-grow-check-entry/);
     expect(dashboardSrc).toMatch(/>Quick Log</);
-    expect(dashboardSrc).toMatch(/\/daily-check/);
+    expect(dashboardSrc).toMatch(/withGrowId\("\/daily-check",\s*scopedGrowId\)/);
+    expect(dashboardSrc).not.toMatch(
+      /dashboard-daily-grow-check-entry[\s\S]{0,120}to=["']\/daily-check["']/,
+    );
     // The PageHeader actions block must not present "Daily Grow Check" as
     // a competing primary CTA label alongside Quick Log.
     const headerActions =

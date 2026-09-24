@@ -354,4 +354,48 @@ describe("tent manual snapshot batch query", () => {
       code: "PGRST301",
     });
   });
+
+  it.each([null, undefined])(
+    "fail-closed to error when owner is unresolved (%s) even if batch data is present",
+    (ownerId) => {
+      H.queryResult = {
+        data: {
+          byTent: {
+            [TENT_A]: {
+              kind: "found",
+              card: {
+                id: "manual-a",
+                title: "Manual sensor snapshot",
+                capturedAt: "2026-08-20T12:00:00.000Z",
+                sourceLabel: "Manual",
+                source: "manual",
+                tentId: TENT_A,
+                plantId: null,
+                isTentLevel: true,
+                notes: null,
+                readings: [{ field: "air_temp_c", value: 22, unit: "°C", derived: false }],
+                severity: "ok",
+                warnings: [],
+                errors: [],
+              },
+            },
+          },
+          pageRequests: 1,
+        } satisfies TentManualSnapshotBatchData,
+        isLoading: false,
+        isFetching: false,
+        isError: false,
+        error: null,
+      };
+
+      const { result } = renderHook(() => useTentManualSnapshotBatch(ownerId, [TENT_A]));
+
+      expect(H.queryOptions).toMatchObject({ enabled: false });
+      expect(result.current.byTent[TENT_A]).toEqual({
+        cards: [],
+        status: "error",
+        unavailableReason: null,
+      });
+    },
+  );
 });

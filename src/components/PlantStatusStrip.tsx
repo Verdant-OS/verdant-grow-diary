@@ -18,7 +18,11 @@ import { Link } from "@/lib/react-router-compat";
 import { AlertTriangle, Bell, Box, Gauge, ListTodo } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { usePlantTentLatestReadings } from "@/hooks/usePlantTentLatestReadings";
-import { buildPlantTentEnvironmentView } from "@/lib/plantTentEnvironmentRules";
+import { useNowTick } from "@/hooks/useNowTick";
+import {
+  buildPlantEnvironmentReadView,
+  buildPlantTentEnvironmentView,
+} from "@/lib/plantTentEnvironmentRules";
 import { usePlantAssignedTentAlerts } from "@/hooks/usePlantAssignedTentAlerts";
 import { usePlantAssignedTentActions } from "@/hooks/usePlantAssignedTentActions";
 
@@ -31,11 +35,16 @@ interface Props {
 }
 
 export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
+  const nowMs = useNowTick();
   const hasTent = !!tentId;
-  const { data: readings, isLoading: envLoading } = usePlantTentLatestReadings(
-    hasTent ? (tentId ?? null) : null,
-  );
-  const env = buildPlantTentEnvironmentView(hasTent ? (readings ?? []) : []);
+  const environmentQuery = usePlantTentLatestReadings(hasTent ? (tentId ?? null) : null);
+  const readings = hasTent ? (environmentQuery.data ?? []) : [];
+  const env = buildPlantTentEnvironmentView(readings, nowMs);
+  const environmentReadView = buildPlantEnvironmentReadView({
+    ...environmentQuery,
+    enabled: hasTent,
+    hasCachedReadings: readings.length > 0,
+  });
 
   const { openCount: openAlertCount, status: alertStatus } = usePlantAssignedTentAlerts(
     hasTent ? (tentId ?? null) : null,
@@ -46,16 +55,14 @@ export default function PlantStatusStrip({ tentId, tentName, growId }: Props) {
     growId ?? null,
   );
 
-  const envKnown = hasTent && !envLoading && env.hasReadings;
-  const envLabel = !hasTent
-    ? "No tent"
-    : envLoading
-      ? "Loading…"
-      : !env.hasReadings
-        ? "Unknown"
-        : env.stale
-          ? `Stale${env.sourceLabel ? ` · ${env.sourceLabel}` : ""}`
-          : (env.sourceLabel ?? "Unknown");
+  const envKnown = environmentReadView.canAssessCurrent && env.hasReadings;
+  const envLabel =
+    environmentReadView.summaryLabel ??
+    (!env.hasReadings
+      ? "Unknown"
+      : env.stale
+        ? `Stale${env.sourceLabel ? ` · ${env.sourceLabel}` : ""}`
+        : (env.sourceLabel ?? "Unknown"));
 
   const alertsKnown = hasTent && alertStatus === "ok";
   // openCount, not rows.length — the hook's rows include acknowledged alerts

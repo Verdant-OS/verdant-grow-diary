@@ -94,11 +94,7 @@ const sensorQueryState = vi.hoisted(() => ({
   currentReadCalls: [] as Array<{ limit: number; sources: readonly string[] }>,
 }));
 vi.mock("@/hooks/use-sensor-readings", () => ({
-  useSensorReadingsByTents: (
-    tentIds: string[],
-    limit: number,
-    sources: readonly string[] = [],
-  ) => {
+  useSensorReadingsByTents: (tentIds: string[], limit: number, sources: readonly string[] = []) => {
     sensorQueryState.currentReadCalls.push({ limit, sources: [...sources] });
     const isManualOnly = sources.length === 1 && sources[0] === "manual";
     const status = isManualOnly
@@ -306,6 +302,59 @@ function mount(
   render(reviewElement(invoke));
   return invoke;
 }
+
+it.each([false, true])(
+  "rechecks expired seven-day context at click time (CSV fallback: %s)",
+  async (historical) => {
+    const now = new Date("2026-09-23T12:00:00Z");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    try {
+      itemsRef.current = [];
+      sensorQueryState.csvRows = historical ? historicalCsvRows : [];
+      const capturedAt = new Date(now.getTime() - (7 * 24 * 60 - 1) * 60_000).toISOString();
+      sensorQueryState.currentRows = [
+        {
+          id: "manual-aging",
+          tent_id: TENT_ID,
+          source: "manual",
+          quality: "ok",
+          metric: "temperature_c",
+          value: 24,
+          captured_at: capturedAt,
+          ts: capturedAt,
+          created_at: capturedAt,
+        },
+      ];
+      const invoke = mount();
+      expect(screen.getByTestId("plant-ai-doctor-live-review")).toHaveAttribute(
+        "data-readiness",
+        "partial",
+      );
+      const start = screen.getByTestId("plant-ai-doctor-live-review-start");
+      expect(start).toBeEnabled();
+      vi.setSystemTime(new Date(now.getTime() + 120_000));
+      fireEvent.click(start);
+      if (historical) {
+        await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+        const body = invoke.mock.calls[0][1].body;
+        expect(body.packet.readiness.state).toBe("insufficient");
+        expect(body.evidence_acceptance?.reviewMode).toBe("historical_review");
+        expect(screen.getByTestId("plant-ai-doctor-live-review-confidence-copy")).toHaveTextContent(
+          AI_DOCTOR_LIVE_REVIEW_HISTORICAL_COPY,
+        );
+      } else {
+        await waitFor(() =>
+          expect(screen.queryByTestId("plant-ai-doctor-live-review-start")).toBeNull(),
+        );
+        expect(invoke).not.toHaveBeenCalled();
+      }
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  },
+);
 
 beforeEach(() => {
   cleanup();
@@ -803,9 +852,7 @@ describe("CSV history pending/error gating", () => {
       const packet = invoke.mock.calls[0][1].body.packet;
       expect(packet.recentSensorSnapshot?.capturedAt).toBe(capturedAt);
       expect(packet.recentSensorSnapshot?.readings).toEqual(
-        expect.arrayContaining([
-          { field: "air_temp_c", value: 25, unit: "°C" },
-        ]),
+        expect.arrayContaining([{ field: "air_temp_c", value: 25, unit: "°C" }]),
       );
       expect(packet.recentSensorSnapshotAnnotation).toMatchObject({
         source: "manual",

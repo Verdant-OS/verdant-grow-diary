@@ -185,6 +185,23 @@ function CandidateCard({ c }: { c: DemoCandidate }) {
   );
 }
 
+/**
+ * One mapping for both the board and fight night. plantType and stage must
+ * travel with the scores — without them the comparability guard reads every
+ * plant as "Type unknown" and hides the ranking the fixture is built to show.
+ */
+function toContenderInput(c: DemoCandidate): ContenderInput {
+  return {
+    id: c.candidateNumber,
+    name: c.name,
+    verdict: c.verdict,
+    aroma: c.aroma,
+    axes: c.loud,
+    plantType: c.plantType,
+    stage: c.stage,
+  };
+}
+
 export default function PhenoHuntDemo() {
   const pedigree = useMemo(() => buildPhenoPedigree(DEMO_KEEPERS, DEMO_CROSSES), []);
   const cloneRowsByKeeperId = useMemo(
@@ -195,28 +212,9 @@ export default function PhenoHuntDemo() {
     () => [...DEMO_CANDIDATES].sort((a, b) => a.candidateNumber - b.candidateNumber),
     [],
   );
-  const contenders = useMemo(
-    () =>
-      buildContenders(
-        DEMO_CANDIDATES.map((c) => ({
-          id: c.candidateNumber,
-          name: c.name,
-          verdict: c.verdict,
-          aroma: c.aroma,
-          axes: c.loud,
-        })),
-      ),
-    [],
-  );
+  const contenders = useMemo(() => buildContenders(DEMO_CANDIDATES.map(toContenderInput)), []);
   const fightPool = useMemo<ContenderInput[]>(
-    () =>
-      DEMO_CANDIDATES.filter((c) => c.verdict !== "cull").map((c) => ({
-        id: c.candidateNumber,
-        name: c.name,
-        verdict: c.verdict,
-        aroma: c.aroma,
-        axes: c.loud,
-      })),
+    () => DEMO_CANDIDATES.filter((c) => c.verdict !== "cull").map(toContenderInput),
     [],
   );
   const keeperIds = useMemo(

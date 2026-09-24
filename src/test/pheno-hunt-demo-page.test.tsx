@@ -3,7 +3,7 @@
  * walkthrough page. Fixture-only; no fetch, no writes.
  */
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import PhenoHuntDemo from "@/pages/PhenoHuntDemo";
 import { DEMO_CANDIDATES } from "@/lib/demo/phenoHuntDemoFixture";
@@ -58,6 +58,25 @@ describe("PhenoHuntDemo page", () => {
     renderPage();
     expect(screen.getByTestId("pheno-fight")).toBeInTheDocument();
     expect(screen.getByTestId("pheno-fight-caveat").textContent).toMatch(/you make the call/i);
+  });
+
+  // Regression: the fixture is uniformly photoperiod at the cure so the demo
+  // renders a ranked board, but the page once dropped plantType/stage when
+  // mapping candidates, so every plant read "Type unknown" and ranking hid.
+  it("ranks the contenders board (fixture plant type reaches the board)", () => {
+    renderPage();
+    const board = screen.getByTestId("pheno-contenders");
+    expect(within(board).queryByTestId("pheno-comparability-banner")).toBeNull();
+    expect(within(board).queryAllByTestId(/pheno-contenders-score-hidden-/)).toHaveLength(0);
+    expect(within(board).queryAllByText(/type unknown/i)).toHaveLength(0);
+    expect(within(board).getAllByTestId(/pheno-contenders-leader-/).length).toBeGreaterThan(0);
+  });
+
+  it("ranks fight night (fixture plant type reaches the pairing)", () => {
+    renderPage();
+    const fight = screen.getByTestId("pheno-fight");
+    expect(within(fight).queryByTestId("pheno-comparability-banner")).toBeNull();
+    expect(within(fight).getByTestId("pheno-fight-tally")).toBeInTheDocument();
   });
 
   it("shows where keepers were earned (cure + stability timelines)", () => {

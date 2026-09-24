@@ -128,7 +128,7 @@ shows 78.8.
 `#1151`, `#1620` on `#1088`, `#1481` on `#1478`). `#1621` and `#1622` merged and `#1616` is closed.
 The new entry is `#1623`.
 
-**No open PR touches `docs/agents/CURRENT_STATE.md`. This PR is the only writer.**
+**No other open PR touches `docs/agents/CURRENT_STATE.md`. This PR (`#1624`) is the only writer.**
 
 **Method correction, recorded rather than hidden.** The first pass ran on a shallow clone. It reported
 `CURRENT_STATE.md` touches and C/F-surface overlap for `#1250`, `#1295`, `#1340`, `#1344`, `#1355`
@@ -212,12 +212,14 @@ original labels.
 - **ACTIVE OWNER Soft-couple CLEAR.** The §4 thread is open and unowned. **Do not revive `#1556`** to
   compete with the merged fix.
 - **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
-- This slice is **N=1** and stays **draft**, on branch `claude/current-state-restamp-after-1621`, cut
-  from `origin/verdant-grow-diary` at `8fc3840743ed58e8a27dc6b39f68563e16a8e48e`. Its only file is
+- This slice is **N=1**, on branch `claude/current-state-restamp-after-1621`, cut from
+  `origin/verdant-grow-diary` at `8fc3840743ed58e8a27dc6b39f68563e16a8e48e`. Its only file is
   `docs/agents/CURRENT_STATE.md`. It contains no `src/`, `supabase/`, `package.json`, lockfile, test,
-  workflow or governance-file changes. The §15 architecture contract is **not** part of this slice.
-  **GDP routes the independent review. Claude does not self-merge and does not assign its own next
-  slice.**
+  workflow or governance-file changes. The architecture-contract work that the GDP brief numbers §15
+  is a separate slice; this file has no §15, and nothing here claims it.
+- **Slice owner: Claude. Independent reviewer: Grok** (routed by GDP; HANDOFF on `#1624`). Claude
+  opened the PR as a draft. **Cheek marked it ready and armed auto-merge at 20:18 UTC**; that is
+  Cheek's decision, not Claude's. Claude does not self-merge and does not assign its own next slice.
 
 ---
 

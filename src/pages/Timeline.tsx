@@ -211,6 +211,7 @@ import { useTimelineHighlightAutoScroll } from "@/lib/useTimelineHighlightAutoSc
 import { useTimelineHashAnchorHandoff } from "@/hooks/useTimelineHashAnchorHandoff";
 import {
   buildLinkedGrowEventTimelineAnchorId,
+  buildRenderedDiaryTimelineAnchorIds,
   buildTimelineEntryAnchorId,
 } from "@/lib/timelineEntryAnchorRules";
 import {
@@ -1199,6 +1200,11 @@ export default function Timeline() {
     effectiveStartDate,
     effectiveEndDate,
   ]);
+
+  const renderedDiaryAnchorIds = useMemo(
+    () => buildRenderedDiaryTimelineAnchorIds(filtered),
+    [filtered],
+  );
 
   function clearEvidenceFilters() {
     setSearchQuery("");
@@ -2214,12 +2220,14 @@ export default function Timeline() {
         <DiaryCalendarSection
           rawEntries={recentLaneRawEntries}
           activeStage={activeGrow?.stage ?? null}
+          plantStartedAt={activeGrow?.started_at ?? null}
         />
       </div>
 
       <div className="mt-4">
         <WateringHistoryPanel
           rawEntries={recentLaneRawEntries}
+          reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
             void load();
@@ -2230,6 +2238,7 @@ export default function Timeline() {
       <div className="mt-4">
         <FeedingHistoryPanel
           rawEntries={recentLaneRawEntries}
+          reservedTimelineAnchorIds={renderedDiaryAnchorIds}
           limit={20}
           onEntryChanged={() => {
             void load();

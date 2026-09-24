@@ -63,7 +63,8 @@ export function useQuickLogV2Save() {
       payload: QuickLogV2SavePayload,
       options: QuickLogV2SaveOptions = {},
     ): Promise<QuickLogV2SaveResult> => {
-      const canContinue = () => payload.p_action !== "note" || options.canContinueNote?.() !== false;
+      const canContinue = () =>
+        payload.p_action !== "note" || options.canContinueNote?.() !== false;
       if (!canContinue()) return { ok: false, reason: "receipt_unverified" };
       setSaving(true);
       setError(null);
@@ -81,8 +82,10 @@ export function useQuickLogV2Save() {
           setError(reason);
           return { ok: false, reason };
         }
-        const r = (data !== null && typeof data === "object" && !Array.isArray(data) ? data : {}) as RpcResponse;
-        if (payload.p_action === "note" ? r.ok !== true : !r.ok) {
+        const r = (
+          data !== null && typeof data === "object" && !Array.isArray(data) ? data : {}
+        ) as RpcResponse;
+        if (r.ok !== true) {
           const reason = typeof r.reason === "string" && r.reason ? r.reason : "save_failed";
           setError(reason);
           return {
@@ -92,6 +95,12 @@ export function useQuickLogV2Save() {
               ? { definitiveRejected: true }
               : {}),
           };
+        }
+        // The public starter Water path still uses this manual RPC. A
+        // success flag without a valid event receipt cannot confirm its save.
+        if (payload.p_action === "water" && !isUuid(r.grow_event_id)) {
+          setError("receipt_unverified");
+          return { ok: false, reason: "receipt_unverified" };
         }
         let persistedNote: string | null | undefined;
         if (payload.p_action === "note") {

@@ -11,6 +11,7 @@
  *    via `convertCelsiusForDisplay`.
  */
 import { useMemo } from "react";
+import { useNowTick } from "@/hooks/useNowTick";
 import AlertsContextHeader from "@/components/AlertsContextHeader";
 import { useGrowTents } from "@/hooks/useGrowData";
 import { useGrowTargets } from "@/hooks/useGrowTargets";
@@ -48,6 +49,7 @@ export default function AlertsContextHeaderForGrow({
   const sensorState = useLatestSensorSnapshot(growId, tentIds);
   const targetsState = useGrowTargets(growId);
   const tempUnit = useTemperatureUnitPreference();
+  const now = useNowTick();
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
   // stages, most advanced known stage wins on disagreement.
   const resolvedStage = useMemo(
@@ -79,6 +81,7 @@ export default function AlertsContextHeaderForGrow({
         snapshot: confirmedSnapshot,
         status: headerStatus,
         tempUnit,
+        now,
       }),
     [
       growName,
@@ -88,12 +91,14 @@ export default function AlertsContextHeaderForGrow({
       confirmedSnapshot,
       headerStatus,
       tempUnit,
+      now,
     ],
   );
 
   const freshnessArgs = {
     snapshot: confirmedSnapshot,
     status: headerStatus,
+    now,
   } as const;
 
   return (

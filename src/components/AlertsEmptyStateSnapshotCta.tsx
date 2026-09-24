@@ -9,6 +9,7 @@
  *  - Tone copy is derived from the same gate the alert engine uses.
  */
 import { useMemo } from "react";
+import { useNowTick } from "@/hooks/useNowTick";
 import { Link } from "@/lib/react-router-compat";
 import { Button } from "@/components/ui/button";
 import { useGrowTents } from "@/hooks/useGrowData";
@@ -23,14 +24,16 @@ export default function AlertsEmptyStateSnapshotCta({ growId }: Props) {
   const { data: tents = [] } = useGrowTents(growId);
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(growId, tentIds);
+  const now = useNowTick();
 
   const cta = useMemo(
     () =>
       emptyStateSnapshotCta({
         snapshot: sensorState.status === "ok" ? sensorState.snapshot : null,
         status: sensorState.status,
+        now,
       }),
-    [sensorState.status, sensorState.snapshot],
+    [sensorState.status, sensorState.snapshot, now],
   );
 
   if (!cta) return null;

@@ -58,6 +58,9 @@ on:
       - "src/**"
       - "playwright.config.ts"
       - "vite.config.ts"
+      # The Vite preset's tsconfigPaths resolves the `@/*` alias from tsconfig.json, so a PR
+      # changing only it can break every import the specs boot (CodeRabbit, #1221 round 13).
+      - "tsconfig.json"
       # The webServer is `bunx vite` in dev mode, which reads the committed client
       # config from these two; a PR changing only them can stop every spec booting
       # or authenticating (Codex, #1221 round 9). .env.production is not loaded in dev.

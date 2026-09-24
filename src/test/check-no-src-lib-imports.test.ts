@@ -102,6 +102,42 @@ describe("scanFunctionsTree (fixture)", () => {
   });
 });
 
+/**
+ * True when `script` runs the guard as one of its `&&`- or `;`-joined commands:
+ * `node scripts/check-no-src-lib-imports.mjs`, optionally with arguments. A bare mention
+ * (`echo check-no-src-lib-imports.mjs`) does not run it; neither does a command after
+ * `||`, which is skipped when the one before succeeds; and a trailing `|| true`
+ * swallows the guard's failure. None of them counts (CodeRabbit, #1221 round 13).
+ */
+function invokesGuard(script: string | undefined): boolean {
+  return (script ?? "")
+    .split(/\s*(?:&&|;)\s*/)
+    .some((command) =>
+      /^node\s+(?:\.\/)?scripts\/check-no-src-lib-imports\.mjs(?:\s+[^|&;]*)?$/.test(
+        command.trim(),
+      ),
+    );
+}
+
+describe("invokesGuard — a script runs the guard, not merely names it (CodeRabbit, #1221 round 13)", () => {
+  it("accepts the guard as a command, alone or chained with &&", () => {
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs")).toBe(true);
+    expect(
+      invokesGuard(
+        "node scripts/a.mjs && node scripts/check-no-src-lib-imports.mjs && node scripts/b.mjs",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a mention, a command after ||, a swallowed failure, and a missing script", () => {
+    expect(invokesGuard("echo check-no-src-lib-imports.mjs")).toBe(false);
+    expect(invokesGuard("echo node scripts/check-no-src-lib-imports.mjs")).toBe(false);
+    expect(invokesGuard("true || node scripts/check-no-src-lib-imports.mjs")).toBe(false);
+    expect(invokesGuard("node scripts/check-no-src-lib-imports.mjs || true")).toBe(false);
+    expect(invokesGuard(undefined)).toBe(false);
+  });
+});
+
 describe("CI / package wiring cannot drop the guard", () => {
   const pkg = readFileSync(join(ROOT, "package.json"), "utf8");
   const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
@@ -117,8 +153,8 @@ describe("CI / package wiring cannot drop the guard", () => {
     const scripts = JSON.parse(pkg).scripts as Record<string, string>;
     expect(scripts["check:no-src-lib-imports"]).toBeTruthy();
     for (const name of ["prebuild", "predeploy:functions", "predeploy:functions:all"]) {
-      expect(scripts[name], `${name} must invoke the guard`).toContain(
-        "check-no-src-lib-imports.mjs",
+      expect(invokesGuard(scripts[name]), `${name} must invoke the guard: ${scripts[name]}`).toBe(
+        true,
       );
     }
   });

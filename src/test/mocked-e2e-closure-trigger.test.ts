@@ -40,11 +40,14 @@ describe("mocked E2E closure lane — its trigger covers what the lane depends o
     expect(closure.branches).toEqual(expect.arrayContaining(ciBranches));
   });
 
-  it("triggers on every committed file its `bunx vite` webServer reads (Codex, #1221 rounds 6 and 9)", () => {
+  it("triggers on every committed file its `bunx vite` webServer reads (Codex, #1221 rounds 6 and 9; CodeRabbit, round 13)", () => {
+    // tsconfig.json: the Vite preset's tsconfigPaths resolves the `@/*` alias from it, so
+    // a PR changing only it can break every import the specs boot (round 13).
     expect(closure.paths).toEqual(
       expect.arrayContaining([
         "playwright.config.ts",
         "vite.config.ts",
+        "tsconfig.json",
         ".env",
         ".env.development",
       ]),

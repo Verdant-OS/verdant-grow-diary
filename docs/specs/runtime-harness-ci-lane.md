@@ -111,7 +111,7 @@ production writes from a test.
 
 Each step is independently reviewable and independently revertible.
 
-**P5.1 — envelope, no wiring.** Give each of the 17 the four properties above, preferring
+**P5.1 — envelope, no wiring.** Give each of the 17 the five properties in §2, preferring
 `assertSupabaseDatabaseTargetIdentity` over another hand-rolled ref check. Add a static test per
 harness mirroring `genetics-propagation-rls-harness-static.test.ts`. **No workflow change.** After
 this the harnesses are safe to run manually — which is what `AGENTS.md` already tells people to do,

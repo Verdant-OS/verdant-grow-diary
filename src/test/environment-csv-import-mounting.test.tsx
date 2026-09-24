@@ -29,23 +29,46 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => {
         let tentIds: string[] = [];
+        let from = 0;
+        let to = Infinity;
+        let minCapturedAt = "";
+        let maxCapturedAt = "~";
         const chain: Record<string, unknown> = {
           in: (key: string, values: string[]) => {
             if (key === "tent_id") tentIds = values;
             return chain;
           },
-          gte: () => chain,
-          lte: () => chain,
+          gte: (_key: string, value: string) => {
+            minCapturedAt = value;
+            return chain;
+          },
+          lte: (_key: string, value: string) => {
+            maxCapturedAt = value;
+            return chain;
+          },
+          order: () => chain,
+          range: (start: number, end: number) => {
+            from = start;
+            to = end;
+            return chain;
+          },
           then: (
             resolve: (result: { data: Array<Record<string, unknown>>; error: null }) => unknown,
           ) =>
             (lookupOverride
               ? lookupOverride()
               : Promise.resolve({
-                  data: existingRows.filter((r) => tentIds.includes(String(r.tent_id))),
+                  data: existingRows.filter(
+                    (r) =>
+                      tentIds.includes(String(r.tent_id)) &&
+                      String(r.captured_at) >= minCapturedAt &&
+                      String(r.captured_at) <= maxCapturedAt,
+                  ),
                   error: null,
                 })
-            ).then(resolve),
+            ).then((result) =>
+              resolve({ ...result, data: result.data.slice(from, Math.min(to + 1, from + 1000)) }),
+            ),
         };
         return chain;
       },
@@ -173,6 +196,33 @@ describe("EnvironmentCsvImportLauncher — mounting", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["grow", "sensors"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["sensor_readings"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["csv-timeline-context"] });
+  });
+
+  it("recognizes sparse existing readings past the server's first presence page", async () => {
+    const start = Date.parse("2026-01-01T00:00:00Z");
+    existingRows = Array.from({ length: 10000 }, (_, index) => ({
+      tent_id: "t1",
+      source: "csv",
+      metric: "temperature_c",
+      captured_at: new Date(start + index * 60000).toISOString(),
+    }));
+    insertError = {
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "sensor_readings_dedupe_uidx"',
+    };
+    render(withQuery(<EnvironmentCsvImportLauncher growId="g1" tentId="t1" testIdPrefix="x" />));
+    fireEvent.click(screen.getByTestId("x-button"));
+    const csv =
+      "Timestamp,Temperature (C)\n" +
+      [1000, 5000, 9000].map((index) => `${existingRows[index].captured_at},20`).join("\n");
+    fireEvent.change(screen.getByTestId("csv-import-file-input"), {
+      target: { files: [new File([csv], "sparse.csv", { type: "text/csv" })] },
+    });
+    await waitFor(() => expect(screen.getByTestId("csv-import-preview")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("csv-import-confirm"));
+    await waitFor(() => expect(screen.getByTestId("csv-import-done")).toBeTruthy());
+    expect(insertSpy).not.toHaveBeenCalled();
+    expect(trackFunnelEvent).toHaveBeenCalledWith("csv_import_completed", { rows: 0 });
   });
 
   it("Cancel does not insert (test 8)", async () => {

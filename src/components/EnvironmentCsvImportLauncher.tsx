@@ -32,10 +32,10 @@ import {
   type SensorReadingInsert,
 } from "@/lib/environmentCsvImportPersistence";
 import {
-  dedupeKeyOf,
   SENSOR_READINGS_DEDUPE_SELECT_CLAUSE,
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
+import { collectCsvSensorPresenceKeys } from "@/lib/csvSensorPresenceService";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 import { tentDetailPath } from "@/lib/routes";
 import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
@@ -80,26 +80,23 @@ function makeInsertClient(canContinue: () => boolean): InsertClient {
     async fetchExistingSensorReadingKeys(scope: ExistingKeysQueryScope) {
       if (!canContinue()) return new Set<string>();
       try {
-        const { data, error } = await supabase
-          .from("sensor_readings")
-          .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE)
-          .in("tent_id", scope.tentIds)
-          .in("source", scope.sources)
-          .in("metric", scope.metrics)
-          .gte("captured_at", scope.minCapturedAt)
-          .lte("captured_at", scope.maxCapturedAt);
-        if (!canContinue() || error || !data) return new Set<string>();
-        const keys = new Set<string>();
-        for (const row of data as unknown as Array<{
-          tent_id: string;
-          source: string;
-          metric: string;
-          captured_at: string;
-        }>) {
-          const key = dedupeKeyOf(row);
-          if (key) keys.add(key);
-        }
-        return keys;
+        return await collectCsvSensorPresenceKeys(async (from, to) => {
+          const { data, error } = await supabase
+            .from("sensor_readings")
+            .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE)
+            .in("tent_id", scope.tentIds)
+            .in("source", scope.sources)
+            .in("metric", scope.metrics)
+            .gte("captured_at", scope.minCapturedAt)
+            .lte("captured_at", scope.maxCapturedAt)
+            .order("tent_id")
+            .order("source")
+            .order("metric")
+            .order("captured_at")
+            .range(from, to);
+          if (error || !data) throw new Error("CSV presence lookup unavailable");
+          return data;
+        }, canContinue);
       } catch {
         return new Set<string>();
       }

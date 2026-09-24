@@ -1,7 +1,207 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-24 UTC (~01:35 UTC)
-**Updated by:** Claude (2026-09-24 early, restamp on **deploy tip
+**Last updated:** 2026-09-24 UTC (~06:55 UTC)
+**Updated by:** Claude (2026-09-24 morning, restamp on **deploy tip
+`1d7b28933fba0662cb25f87b04da5a15fde92501`**, the `#1669` squash. **Two commits** merged since the
+`98fdd446` stamp, **both docs-only**, and none adds a migration, so **product state is unchanged**
+(§1, §3). **Live is `NOT_MEASURED` by Claude** after a tenth egress refusal at 06:52:15 UTC (§2).
+**`#1669` merged with two review corrections still unapplied**, and they are carried here (§4). The
+session-backed _Restore pending correction_ finding is **still open**, and `#1625` is still the one fix
+in flight (§5). The board was re-listed: **46 open PRs**, and **no other open PR writes this file**
+(§6). **Three stale restamp branches** remain on the remote (§4). No Publish. No APPLY. No merge.
+`HOLD #1250`. Prior header follows.)
+
+## 1. Deploy tip `1d7b2893` — two docs-only commits since `98fdd446`
+
+`established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-24
+06:52:02 UTC.
+
+| Field      | Value                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------- |
+| Tip        | **`1d7b28933fba0662cb25f87b04da5a15fde92501`**                                         |
+| Subject    | `docs(state): restamp on 98fdd446 — 13 merges since 387a0006, …` (`#1669`)             |
+| Parent     | `22adad659612925f62a5063d83050c4eebf5a8ca` (`#1667`)                                   |
+| Merged     | 2026-09-24 **06:47:12 UTC** (GitHub `merged_at`); commit time 06:42:08 UTC             |
+| Since      | `98fdd446` (`#1649`, the tip the last stamp cited): **2 commits**                      |
+| Migrations | **0** (`git diff --name-only 98fdd446 1d7b2893 -- supabase/migrations` is empty)       |
+| Files      | `docs/agents/CURRENT_STATE.md`, `docs/architecture-contract.md` — nothing else changed |
+
+| Commit      | PR      | Kind | Summary                                               |
+| ----------- | ------- | ---- | ----------------------------------------------------- |
+| `22adad659` | `#1667` | docs | Architecture contract: AC-1.5 Start package reference |
+| `1d7b28933` | `#1669` | docs | CURRENT_STATE restamp on `98fdd446`                   |
+
+## 2. Live — `NOT_MEASURED` by Claude
+
+| Field             | Value                                                                              |
+| ----------------- | ---------------------------------------------------------------------------------- |
+| Claude's own read | **`BLOCKED`** → HTTP `000`, apex and `www`; one attempt each, not routed around    |
+| When              | 2026-09-24 **06:52:15 UTC**, the **tenth** refusal                                 |
+| Proxy record      | `connect_rejected`: "gateway answered 403 to CONNECT (policy denial or upstream…)" |
+| Last value held   | `8b73c140`, `dirty:false`, buildTime `2026-09-22T23:25:04.802Z`                    |
+| Its source        | the GDP read in Grok review `5285231537` — `source claim`, a past instant          |
+| Live vs tip       | **`NOT_MEASURED`**                                                                 |
+
+The last value on record is **14 commits behind the tip** (`git rev-list --count 8b73c140..1d7b2893`
+= 14). **Whether any of the nine product commits listed in the `98fdd446` stamp is live is unknown.**
+**`LIVE_LAG` is not a product `FAIL`.** The live `"26"` pin
+(`e2e-local/native-manual-correction-recovery.spec.ts:153`, `toHaveValue("26")`) is unchanged on the
+tip; **a live run of it is still `NOT_MEASURED`.**
+
+## 3. What changed for growers — nothing since `98fdd446`
+
+`established fact`: `git diff --name-only 98fdd446 1d7b2893` lists two docs files only. **The product
+code at `1d7b2893` is identical to `98fdd446`.** The grower-facing summary in the `98fdd446` stamp
+below (§3 there) still describes the product; its runtime rows stay `NOT_MEASURED` by Claude.
+
+`#1667` rewrites the AC-1.5 Start package reference in `docs/architecture-contract.md` as prose
+(+7 / −4). It changes no rule, label or verdict that this file carries.
+
+## 4. `#1669` merged with two review corrections unapplied — carried here
+
+`established fact` from the GitHub API and `git`.
+
+Copilot review `5300768201` on `#1669` found two errors. Claude verified both and committed the fix as
+`7a034f8e`, but the push was refused by the protected-branch hook while `#1669` sat in the merge
+queue, and `#1669` merged from head `8850c7e2` at 06:47:12 UTC. **The `98fdd446` stamp below
+therefore still carries both errors. Read it with these corrections:**
+
+| Where in the `98fdd446` stamp | It says                                          | Correct                                                     |
+| ----------------------------- | ------------------------------------------------ | ----------------------------------------------------------- |
+| §2 there                      | last live value "13 commits behind the tip"      | **12** — `8b73c140` is itself the first of the 13 (§2 here) |
+| §6 there                      | "No open PR touches `docs/agents/CURRENT_STATE…` | "No **other** open PR" — `#1669` itself was the writer      |
+
+That stamp's tail is left byte-identical, as for every prior stamp; the correction lives here. The
+correction was also posted on `#1669` (comment `5809209874`). CodeRabbit's Minor finding on `#1669`
+(re-pin to `22adad65`) is resolved by this stamp.
+
+**Stale restamp branches on the remote** (`git ls-remote` at 06:52 UTC; `BLOCKED` for Claude, whose
+remote deletes were refused in-session — the owner deletes them):
+
+- `claude/current-state-restamp-98fdd446` → `7a034f8e`. Recreated by Claude's push after `#1669`
+  merged and its branch was auto-deleted. It holds only the two corrections above, which this stamp
+  now carries. **Stray; delete.**
+- `claude/current-state-restamp-8b73c140` → `cb031eac`. The closed `#1629`. **Delete.**
+- `claude/current-state-restamp-1231` → `7762b0e9`. An older restamp branch. **Delete** after the
+  owner confirms no open PR uses it (none of the 46 in §6 does).
+
+## 5. Session-backed _Restore pending correction_ — still open on the tip
+
+**`inference`, from a static read of `1d7b2893`. This is not a runtime measurement.**
+
+- `git diff 8fc38407 1d7b2893` over `ManualSensorReadingCard.tsx`, `sensorsPageSessionRules.ts` and
+  the correction e2e spec is **empty**. Restore still calls
+  `updateValues(() => recoveredCorrectionDraftValues(…))` at `ManualSensorReadingCard.tsx:1200-1202`.
+  **The finding stands.**
+- **`#1625`** (Cursor) is still **open**, not draft, head `4a177e5df8`: 2 files, +82 / −4, 2 commits
+  behind the tip, **merges cleanly**. It is the one fix in flight. **Runtime behaviour:
+  `NOT_MEASURED` by Claude.** Claude does not choose, push, ready or review it.
+
+## 6. Board — re-listed
+
+`established fact`, listed from the GitHub API at ~06:52 UTC. Every head was fetched by
+`refs/pull/N/head`, diffed against its merge-base with `1d7b2893`, and checked with
+`git merge-tree --write-tree` against the tip.
+
+**46 open PRs: 41 target `verdant-grow-diary` and 5 are stacked** (`#1680` on `#1677`, `#1679` on
+`#1680`, `#1670` on `#1668`, `#1618` on `#1151`, `#1481` on `#1478`).
+
+- **No other open PR touches `docs/agents/CURRENT_STATE.md`.**
+- **No open PR adds or edits a file under `supabase/migrations/`.**
+- **All 46 merge cleanly into the tip** (`merge-tree`, no conflicts).
+- **Since the `98fdd446` stamp:** `#1667` and `#1669` merged; **no PR closed unmerged**; **11 opened**.
+
+**New since the `98fdd446` stamp, all Codex, all draft:**
+
+| Group                                | PRs                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Aging while a page stays open        | `#1670` (Timeline inline), `#1671` (Plant Detail), `#1672` (Tent Detail), `#1673` (Alerts) |
+| Sensor Data freshness (a 3-PR stack) | `#1677` → `#1680` (chart export) → `#1679` (native idle proof, adds a workflow)            |
+| Quick Log save-receipt validation    | `#1674` (activity), `#1676` (starter Water), `#1678` (typed Water / Feed)                  |
+| Quick Log tests                      | `#1675` (media write-fence paths across platforms)                                         |
+
+The Quick Log receipt PRs touch the save-confirmation path. **Whether they stay inside the frozen
+single write path (`quicklog_save_manual`) is not reviewed by this stamp** — `NOT_MEASURED`.
+
+**Carried from the `98fdd446` board, still open (35):** the evidence and read-truth group (`#1648`,
+`#1650`–`#1652`, `#1657`–`#1660`, `#1663`), aging (`#1664`–`#1666`, `#1668`), `#1655` (the AC-4.1
+prototype-key fix), `#1661`, CI and proof lanes (`#1641`, `#1653`, `#1654`), Cursor tests-only
+(`#1632`, `#1638`, `#1643`, `#1645`), `#1625` (§5), and the older `#1151`, `#1174`, `#1175`,
+`#1221`, `#1250` (**HOLD**), `#1343` (Dependabot), `#1355`, `#1369`, `#1478`, `#1481`, `#1494`,
+`#1618`.
+
+**The Release Topology Specification stays deferred:** `#1175` and `#1221` are both still open.
+
+## 7. Soft-park register — carried
+
+`source claim` (GDP), unchanged since the `#1624` stamp; **not re-measured**.
+
+- **`HOLD #1250`.** Do not touch, ready or merge it.
+- **No Publish. No APPLY.** `#1460` and `#1545` stay parked. No production SQL.
+- **Fixture AUTH Soft-park:** after `cheekhimself` re-banks, re-measure the empty Action Queue and the
+  archived Restore XOR. **Never KEEP on fixture walks.** No owner email is recorded in this file.
+- **Soft P2 — parked, do not implement:** sensors / Start Check `growId` omit; Quick Log target count;
+  `/onboarding` preference gate; Assign true-empty needs a zero-tent fixture.
+
+## 8. CI lanes
+
+- **Dependency & Security** (`hono` moderate ×3, `js-yaml` **high**): carried from the `98fdd446`
+  stamp and **not re-measured here**. Not one of the 35 required contexts.
+  `config/dependency-security-exceptions.json` stays **empty**. `#1343` is the open dependency PR;
+  **no owner is recorded.**
+- **`#1669`'s own merge path:** its 35 required contexts were green on `8850c7e2` at 03:23 UTC, and it
+  merged through the merge queue. The merge-group run itself was not read by Claude.
+- **The tip's own push build on `1d7b2893`: `NOT_MEASURED`.** The latest `ci.yml` push run on
+  `verdant-grow-diary` that the Actions API lists is from 2026-09-17.
+- `test:security-db-local` and `Native Manual Correction Local`: carried unchanged from the `98fdd446`
+  stamp.
+
+## 9. Carried, not re-measured
+
+- **Sandbox schema and money-migration gaps.** Last measured on `aabbd2b3` (`TARGET_ENV: sandbox`):
+  core schema 14 of 51 columns missing; money-critical migrations 2 of 17. **Sandbox-scoped only;
+  production applied state is `NOT_MEASURED`. No APPLY.** No migration has merged since.
+- **Golden Toad:** AUTH_NEEDED; the one-tent Next step is `NOT_MEASURED`. This is **not**
+  `AUTH_CHOOSER_READY`. Passkey, 2FA and chooser decisions stay **Cheek's**.
+- **AC-4.1 prototype-key defect** reaches the `#1088` display canon, per the contract as amended by
+  `#1649`; `#1655` is the open fix. Not re-measured.
+
+## 10. The `98fdd446` / ~01:35 UTC stamp below is SUPERSEDED
+
+`established fact`. Its rows that are now stale:
+
+- It cites the tip as `98fdd446`; the tip is `1d7b2893` (§1).
+- Its §2 live lag reads 13; it was 12 at `98fdd446` and is 14 at `1d7b2893` (§2, §4).
+- Its §6 says "No open PR touches" this file; it meant "no other" (§4).
+- Its board counted 36 open PRs and listed `#1667` as open; the count is 46, and `#1667` merged (§6).
+- Its §11 says the slice is draft, not merged; `#1669` merged at 06:47:12 UTC.
+
+Carried rows keep their original labels.
+
+## 11. Current locks
+
+- **No merge. No ready. No Publish. No History-restore. No APPLY. No production SQL.** No device
+  control, no automatic Action Queue writes, no invented credentials. **Never KEEP. No owner email.**
+- **`HOLD #1250`.**
+- **Tip is `1d7b28933fba0662cb25f87b04da5a15fde92501`.** Cite no other SHA as the tip.
+- **Live is `NOT_MEASURED` by Claude.** Do not green-lane the live `"26"` pin on this stamp's
+  evidence.
+- **§5: `#1625` is the one session-restore fix in flight.** Claude does not choose, push, ready or
+  close.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- This slice is **N=1**, **draft**, on branch `claude/current-state-restamp-1d7b2893`, cut from
+  `origin/verdant-grow-diary` at `1d7b28933fba0662cb25f87b04da5a15fde92501`. Its only file is
+  `docs/agents/CURRENT_STATE.md`. It contains no `src/`, `supabase/`, `package.json`, lockfile, test,
+  workflow or governance-file changes.
+- **Slice owner: Claude. Independent reviewer: not yet routed** — Codex reviewed `#1669`; routing
+  this one is Cheek's call. Claude does not self-merge and does not assign its own next slice.
+
+---
+
+**The block below is SUPERSEDED — see §10 of the current stamp.**
+
+**Prior last updated:** 2026-09-24 UTC (~01:35 UTC)
+**Prior update:** Claude (2026-09-24 early, restamp on **deploy tip
 `98fdd4462700972439c9ab78f000f24aa15a5d76`**, the `#1649` squash. The request named `ee14c7ff`; the
 tip moved one docs-only commit past it before this stamp was cut, so this stamp cites the tip it
 measured (§1). **Thirteen commits** merged since the last merged stamp (`387a0006`, `#1624`): **nine

@@ -135,6 +135,8 @@ export function useDiaryRangeReportData(
           .from("harvests")
           .select("harvested_at,yield_grams")
           .eq("grow_id", growId)
+          .gte("harvested_at", startIso)
+          .lte("harvested_at", endIso)
           .order("harvested_at", { ascending: false })
           .limit(50),
         tentIds.length > 0

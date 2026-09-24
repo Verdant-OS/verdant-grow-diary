@@ -23,7 +23,11 @@ import { Switch } from "@/components/ui/switch";
 import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { STAGES } from "@/lib/grow";
-import { buildTentUpdatePayload, isTentUpdatePayloadValid } from "@/lib/tentManagementRules";
+import {
+  buildTentUpdatePayload,
+  isTentUpdatePayloadValid,
+  tentSizeValidationMessage,
+} from "@/lib/tentManagementRules";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 
 /**
@@ -92,6 +96,11 @@ export default function EditTentDialog({ tent, trigger }: Props) {
       light_schedule: form.light_schedule,
       light_wattage: form.light_wattage ? Number(form.light_wattage) : null,
     });
+    const sizeMessage = tentSizeValidationMessage(payload.size);
+    if (sizeMessage) {
+      toast.error(sizeMessage);
+      return;
+    }
     if (!isTentUpdatePayloadValid(payload)) {
       toast.error("Tent name is required");
       return;

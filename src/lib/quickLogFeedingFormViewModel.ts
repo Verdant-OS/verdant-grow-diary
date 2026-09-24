@@ -51,6 +51,24 @@ export interface QuickLogFeedingFormState {
 }
 
 export const FEEDING_FORM_DEFAULT_UNIT = "ml_per_l";
+/** Grower-facing spelling of the canonical `ml_per_l` product unit. */
+export const FEEDING_FORM_DEFAULT_UNIT_LABEL = "mL/L";
+
+/**
+ * The stored product unit stays the canonical token; growers see "mL/L"
+ * (QA 2026-09-24, BUG-017: the Feed form showed the raw `ml_per_l`).
+ */
+export function feedingProductUnitDisplay(unit: string | null | undefined): string {
+  if (typeof unit !== "string") return "";
+  return unit.trim().toLowerCase() === FEEDING_FORM_DEFAULT_UNIT
+    ? FEEDING_FORM_DEFAULT_UNIT_LABEL
+    : unit;
+}
+
+/** Typed unit text → stored value; "mL/L" (any case/spacing) maps back to the token. */
+export function feedingProductUnitFromInput(text: string): string {
+  return text.replace(/\s+/g, "").toLowerCase() === "ml/l" ? FEEDING_FORM_DEFAULT_UNIT : text;
+}
 export const FEEDING_FORM_PRODUCT_CAP = ROOT_ZONE_PRODUCT_CAP;
 
 export const EMPTY_FEEDING_PRODUCT_ROW: QuickLogFeedingFormProductRow = {

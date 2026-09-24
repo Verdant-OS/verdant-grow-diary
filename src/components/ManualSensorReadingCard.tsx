@@ -435,13 +435,24 @@ export default function ManualSensorReadingCard({
       else if (m.metric === "vpd_kpa") fields.vpd_kpa = m.value;
       else if (m.metric === "soil_moisture_pct") fields.soil_moisture_pct = m.value;
     }
+    // Percentages the grower typed but validation rejected (e.g. RH 101) must
+    // still reach the quality check, or the badge grades the remaining metrics
+    // as "Usable current reading" while the save is blocked (QA 2026-09-24,
+    // BUG-017). These are unit-free, so the typed number is the value.
+    for (const [raw, key] of [
+      [form.humidityPct, "humidity_pct"],
+      [form.soilMoisturePct, "soil_moisture_pct"],
+    ] as const) {
+      const typed = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+      if (!(key in fields) && Number.isFinite(typed)) fields[key] = typed;
+    }
     const snap: ManualSensorSnapshotInput = {
       source: "manual",
       captured_at: draftCapturedAt ?? new Date().toISOString(),
       ...fields,
     };
     return evaluateManualSensorSnapshotQuality(snap);
-  }, [validation.metrics, draftCapturedAt]);
+  }, [validation.metrics, draftCapturedAt, form.humidityPct, form.soilMoisturePct]);
 
   // Structured pre-save review (source: "manual", never live). Renders inside
   // the review prompt so the grower sees findings + normalized preview before

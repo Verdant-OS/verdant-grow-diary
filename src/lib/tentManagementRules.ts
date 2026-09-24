@@ -61,7 +61,36 @@ export function buildTentUpdatePayload(input: TentEditableFields): TentUpdatePay
 }
 
 export function isTentUpdatePayloadValid(p: TentUpdatePayload): boolean {
-  return p.name.length > 0;
+  return p.name.length > 0 && tentSizeValidationMessage(p.size) === null;
+}
+
+export const TENT_SIZE_MAX_LENGTH = 40;
+/** Largest plausible tent/room dimension in any common unit (ft, in, cm). */
+export const TENT_SIZE_MAX_DIMENSION = 1000;
+export const TENT_SIZE_INVALID_MESSAGE =
+  "Tent size must use positive dimensions, like 4x4, 2x4 ft, or 120x120 cm.";
+export const TENT_SIZE_TOO_LONG_MESSAGE = `Keep tent size under ${TENT_SIZE_MAX_LENGTH} characters, like 4x4 or 120x120 cm.`;
+
+/**
+ * Tent size stays free text ("4x4", "5' x 5'", "120x120 cm"), but a value
+ * that cannot describe a real tent is rejected before save: a negative,
+ * zero, or absurd dimension (QA 2026-09-24, BUG-012: "-999999x0" was saved).
+ * Returns null when acceptable (including empty/absent).
+ */
+export function tentSizeValidationMessage(size: string | null | undefined): string | null {
+  const value = typeof size === "string" ? size.trim() : "";
+  if (value === "") return null;
+  if (value.length > TENT_SIZE_MAX_LENGTH) return TENT_SIZE_TOO_LONG_MESSAGE;
+  // A minus sign directly before a digit is a negative dimension.
+  if (/(^|[^0-9A-Za-z])[-\u2212]\s*\d/.test(value)) return TENT_SIZE_INVALID_MESSAGE;
+  const numbers = value.match(/\d+(?:[.,]\d+)?/g) ?? [];
+  for (const raw of numbers) {
+    const n = Number(raw.replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0 || n > TENT_SIZE_MAX_DIMENSION) {
+      return TENT_SIZE_INVALID_MESSAGE;
+    }
+  }
+  return null;
 }
 
 export interface TentDeleteGuardInput {

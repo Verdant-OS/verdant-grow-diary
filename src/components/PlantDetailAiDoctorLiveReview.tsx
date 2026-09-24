@@ -72,6 +72,7 @@ import {
   isAiDoctorServiceUnavailableFailure,
 } from "@/lib/aiDoctorLiveReviewRecoveryRules";
 import { resolveAiDoctorImportedHistoryRecovery } from "@/lib/aiDoctorImportedHistoryRecoveryRules";
+import { applyStageTargetSeverityToPacket } from "@/lib/aiDoctorPacketStageTargetRules";
 import {
   AI_DOCTOR_POST_VALUE_UPGRADE_SURFACE,
   buildAiDoctorPostValueUpgradeViewModel,
@@ -292,18 +293,22 @@ function PlantDetailAiDoctorLiveReviewScope({
   // so a tab left open cannot silently preserve an out-of-date sensor state.
   const buildReviewPacket = useCallback(
     (classification: Classification | null, now?: Date, reviewContext = context) =>
-      buildAiDoctorReviewRequestPacket({
-        plant,
-        timelineItems: evidenceItems,
-        context: reviewContext,
-        csvHistoryRows: queryTentSensorRows,
-        currentSensorRows,
-        rootZoneObservations: queryRootZoneObservations,
-        now,
-        hasFreshLiveSensorReadings: currentSensorEvidenceIsFreshLive(currentSensorRows, {
+      // Grade the current reading against the plant's own stage targets so
+      // an out-of-target reading never reaches the model as "ok" (BUG-008).
+      applyStageTargetSeverityToPacket(
+        buildAiDoctorReviewRequestPacket({
+          plant,
+          timelineItems: evidenceItems,
+          context: reviewContext,
+          csvHistoryRows: queryTentSensorRows,
+          currentSensorRows,
+          rootZoneObservations: queryRootZoneObservations,
           now,
+          hasFreshLiveSensorReadings: currentSensorEvidenceIsFreshLive(currentSensorRows, {
+            now,
+          }),
         }),
-      }),
+      ),
     [
       plant,
       evidenceItems,

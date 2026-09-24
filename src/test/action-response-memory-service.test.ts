@@ -23,9 +23,9 @@ interface RecordedQuery {
 }
 
 function makeFakeClient(data: {
-  diaryRows?: unknown[];
-  actionRows?: unknown[];
-  sensorRows?: unknown[];
+  diaryRows?: unknown[] | null;
+  actionRows?: unknown[] | null;
+  sensorRows?: unknown[] | null;
   failDiary?: boolean;
   failActions?: boolean;
   failSensors?: boolean;
@@ -81,15 +81,15 @@ function makeFakeClient(data: {
         if (table === "diary_entries") {
           result = data.failDiary
             ? { data: null, error: { message: "boom" } }
-            : { data: data.diaryRows ?? [], error: null };
+            : { data: Object.hasOwn(data, "diaryRows") ? data.diaryRows : [], error: null };
         } else if (table === "action_queue") {
           result = data.failActions
             ? { data: null, error: { message: "boom" } }
-            : { data: data.actionRows ?? [], error: null };
+            : { data: Object.hasOwn(data, "actionRows") ? data.actionRows : [], error: null };
         } else {
           result = data.failSensors
             ? { data: null, error: { message: "boom" } }
-            : { data: data.sensorRows ?? [], error: null };
+            : { data: Object.hasOwn(data, "sensorRows") ? data.sensorRows : [], error: null };
         }
         return Promise.resolve(onFulfilled(result));
       },
@@ -302,12 +302,104 @@ describe("query shape (owner/RLS-scoped)", () => {
     });
     await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client });
     for (const q of queries) {
-      if (q.table === "sensor_readings") expect(q.select).toContain("raw_payload");
+      if (q.table === "sensor_readings_effective") expect(q.select).toContain("raw_payload");
       else expect(q.select).not.toContain("raw_payload");
       expect(q.select).not.toContain("*");
       expect(q.select.toLowerCase()).not.toMatch(/token|secret|service_role/);
     }
   });
+});
+
+describe("effective sensor evidence and honest failed reads", () => {
+  const sensorId = "11111111-1111-4111-8111-111111111111";
+  const tentId = "22222222-2222-4222-8222-222222222222";
+  const ownerId = "33333333-3333-4333-8333-333333333333";
+  const reading = {
+    id: sensorId,
+    user_id: ownerId,
+    tent_id: tentId,
+    metric: "temperature",
+    value: 26,
+    quality: "stale",
+    source: "manual",
+    device_id: null,
+    ts: "2026-07-02T11:00:00Z",
+    captured_at: "2026-07-02T11:00:00Z",
+    created_at: "2026-07-02T11:00:00Z",
+    raw_payload: null,
+    correction_valid: true,
+  };
+  const diary = {
+    ...RESPONSE_ROW,
+    tent_id: tentId,
+    details: { ...RESPONSE_ROW.details, sensor_snapshot_id: sensorId },
+  };
+  const action = { ...ACTION_ROW, tent_id: tentId };
+
+  it("reads validated effective evidence and retains manual source plus flagged quality", async () => {
+    const { client, queries, writes } = makeFakeClient({
+      diaryRows: [diary],
+      actionRows: [action],
+      sensorRows: [reading],
+    });
+    const result = await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client });
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("Expected a confirmed memory");
+    expect(result.memories[0].sensor).toMatchObject({
+      state: "available",
+      source: "manual",
+      trustState: "stale",
+      snapshotId: sensorId,
+      capturedAt: "2026-07-02T11:00:00Z",
+    });
+    expect(queries.map((q) => q.table)).toEqual([
+      "diary_entries",
+      "action_queue",
+      "sensor_readings_effective",
+    ]);
+    expect(queries[2].filters).toContainEqual(["in:id", [sensorId]]);
+    expect(queries[2].select).toContain("correction_valid");
+    expect(writes).toEqual([]);
+  });
+
+  it.each([
+    { name: "invalid correction", rows: [{ ...reading, correction_valid: false }] },
+    { name: "missing validity", rows: [{ ...reading, correction_valid: undefined }] },
+    { name: "missing owner", rows: [{ ...reading, user_id: undefined }] },
+    { name: "duplicate identity", rows: [reading, reading] },
+    { name: "null read", rows: null },
+  ])(
+    "withholds $name without losing the recorded response or falling back to raw rows",
+    async ({ rows }) => {
+      const { client, queries } = makeFakeClient({
+        diaryRows: [diary],
+        actionRows: [action],
+        sensorRows: rows,
+      });
+      const result = await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client });
+      expect(result.status).toBe("ok");
+      if (result.status !== "ok")
+        throw new Error("Outcome must survive unavailable sensor evidence");
+      expect(result.memories[0].sensor.state).toBe("unavailable");
+      expect(result.memories[0].response.outcome).toBe("improved");
+      expect(result.memories[0].limitations).toContain("sensor_lookup_unavailable");
+      expect(queries.some((q) => q.table === "sensor_readings")).toBe(false);
+    },
+  );
+
+  it.each(["diary", "actions"] as const)(
+    "reports a null %s read as unavailable, not successful empty",
+    async (failed) => {
+      const { client } = makeFakeClient({
+        diaryRows: failed === "diary" ? null : [diary],
+        actionRows: failed === "actions" ? null : [action],
+      });
+      expect(await loadActionResponseMemories({ growId: "grow-1" }, { supabase: client })).toEqual({
+        status: "failed",
+        reason: "query_failed",
+      });
+    },
+  );
 });
 
 describe("static read-only contract", () => {
@@ -319,7 +411,6 @@ describe("static read-only contract", () => {
     expect(SRC).not.toMatch(/storage\.(from|upload)/);
     expect(SRC).not.toMatch(/openai|anthropic|gemini/i);
     expect(SRC).not.toMatch(/service_role/i);
-    expect(SRC).toMatch(/\.from\("sensor_readings"\)[\s\S]{0,160}raw_payload/);
     expect(SRC).toMatch(/raw_payload[\s\S]{0,120}never copied/i);
     expect(SRC).not.toMatch(/user_id\s*[:=]/);
   });

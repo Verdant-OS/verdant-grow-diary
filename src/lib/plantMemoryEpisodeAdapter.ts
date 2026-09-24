@@ -8,6 +8,7 @@
  * and never as causal comparisons.
  *  - unknown provenance → status needs_review, never usable
  *  - demo → labeled demo, never usable evidence
+ *  - explicit non-ok quality → labelled context, never usable evidence
  *  - future captured_at → invalid
  *  - cross-tent rows are handled (excluded + surfaced) by the rules layer
  */
@@ -63,6 +64,7 @@ export function classifyEpisodeSensorRow(
   if (window === null) return null;
 
   const rawSource = (row.source ?? "").trim().toLowerCase();
+  const quality = typeof row.quality === "string" ? row.quality.trim().toLowerCase() : "";
   let source: string;
   let status: string;
   let usable: boolean;
@@ -83,8 +85,15 @@ export function classifyEpisodeSensorRow(
     usable = false;
   } else if (KNOWN_REAL_SOURCES.has(rawSource)) {
     source = rawSource;
-    status = "usable";
-    usable = true;
+    // Preserve provenance separately from fitness as evidence. Historical
+    // placement does not rehabilitate a reading explicitly flagged unusable.
+    status =
+      quality === "stale" || quality === "invalid"
+        ? quality
+        : row.quality == null || quality === "ok"
+          ? "usable"
+          : "needs_review";
+    usable = status === "usable";
   } else {
     // Unknown provenance is never presented as live.
     source = rawSource === "" ? "invalid" : rawSource;

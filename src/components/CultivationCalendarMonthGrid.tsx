@@ -5,6 +5,7 @@ import {
   type CultivationCalendarMonthGridLoggedGroup,
 } from "@/lib/cultivationCalendarMonthGridRules";
 import {
+  CULTIVATION_CALENDAR_STAGE_PALETTE,
   resolveCultivationCalendarStagePalette,
   type CultivationCalendarProjectedReviewBlock,
 } from "@/lib/cultivationCalendarProjectionRules";
@@ -30,6 +31,11 @@ export interface CultivationCalendarMonthGridProps {
   now?: Date | string | null;
   /** Opens the existing detail view for a logged fact only. */
   onOpenEvent?: (event: DiaryCalendarEvent) => void;
+  /** Derived UTC keys for the flower window overlay. Never writes diary rows. */
+  flowerWindowBandDateKeys?: readonly string[] | null;
+  plantDayLabel?: string | null;
+  flowerDayLabel?: string | null;
+  durationHonestyLabel?: string | null;
 }
 
 function buildLoggedGroups(
@@ -89,14 +95,17 @@ function dayAriaLabel({
   isToday,
   loggedCount,
   advisoryCount,
+  hasStageBand,
 }: {
   dateKey: string;
   isToday: boolean;
   loggedCount: number;
   advisoryCount: number;
+  hasStageBand: boolean;
 }): string {
   const parts = [dateKey];
   if (isToday) parts.push("today");
+  if (hasStageBand) parts.push("flower window");
   parts.push(
     loggedCount === 0
       ? "no logged care"
@@ -122,6 +131,10 @@ export default function CultivationCalendarMonthGrid({
   activeStage,
   now,
   onOpenEvent,
+  flowerWindowBandDateKeys,
+  plantDayLabel,
+  flowerDayLabel,
+  durationHonestyLabel,
 }: CultivationCalendarMonthGridProps) {
   const grid = useMemo(
     () =>
@@ -130,8 +143,9 @@ export default function CultivationCalendarMonthGrid({
         loggedGroups: buildLoggedGroups(groups),
         projectedReviews,
         today: now ?? new Date(),
+        stageBandDateKeys: flowerWindowBandDateKeys,
       }),
-    [groups, monthKey, now, projectedReviews],
+    [flowerWindowBandDateKeys, groups, monthKey, now, projectedReviews],
   );
   const eventsById = useMemo(() => buildEventLookup(groups), [groups]);
 
@@ -150,7 +164,9 @@ export default function CultivationCalendarMonthGrid({
   }
 
   const currentStagePalette = resolveCultivationCalendarStagePalette(activeStage);
+  const flowerBandPalette = CULTIVATION_CALENDAR_STAGE_PALETTE.flower;
   const gridHasEvents = grid.days.some((day) => day.hasLoggedFacts || day.hasAdvisoryReviews);
+  const gridHasFlowerBand = grid.days.some((day) => day.hasStageBand);
 
   return (
     <section
@@ -165,6 +181,27 @@ export default function CultivationCalendarMonthGrid({
             Logged care is solid. Dashed blocks are history-derived review opportunities, not
             scheduled work.
           </p>
+          {(plantDayLabel || flowerDayLabel) && (
+            <p
+              className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-foreground"
+              data-testid="cultivation-calendar-relative-days"
+            >
+              {plantDayLabel ? (
+                <span data-testid="cultivation-calendar-plant-day">{plantDayLabel}</span>
+              ) : null}
+              {flowerDayLabel ? (
+                <span data-testid="cultivation-calendar-flower-day">{flowerDayLabel}</span>
+              ) : null}
+              {durationHonestyLabel ? (
+                <span
+                  className="text-muted-foreground"
+                  data-testid="cultivation-calendar-duration-honesty"
+                >
+                  {durationHonestyLabel}
+                </span>
+              ) : null}
+            </p>
+          )}
         </div>
         <span
           className={cn(
@@ -185,6 +222,9 @@ export default function CultivationCalendarMonthGrid({
       >
         <span className="mr-1 text-[11px] text-muted-foreground">
           Stage colour follows the manually logged stage.
+          {gridHasFlowerBand
+            ? " The flower window is a derived overlay, not a logged stage write."
+            : ""}
         </span>
         {STAGE_LEGEND_STAGES.map((stage) => {
           const palette = resolveCultivationCalendarStagePalette(stage);
@@ -259,14 +299,17 @@ export default function CultivationCalendarMonthGrid({
                     isToday: day.isToday,
                     loggedCount: day.loggedFacts.length,
                     advisoryCount: day.advisoryReviews.length,
+                    hasStageBand: day.hasStageBand,
                   })}
                   className={cn(
                     "min-h-28 bg-card/80 p-1.5 sm:min-h-32 sm:p-2",
                     !day.isInMonth && "bg-muted/20 text-muted-foreground",
+                    day.hasStageBand && flowerBandPalette.blockClassName,
                     day.isToday && "ring-1 ring-inset ring-primary/70",
                   )}
                   data-testid="cultivation-calendar-day"
                   data-date-key={day.dateKey}
+                  data-stage-band={day.stageBandPaletteKey ?? undefined}
                 >
                   <div className="flex items-center justify-between gap-1">
                     <span

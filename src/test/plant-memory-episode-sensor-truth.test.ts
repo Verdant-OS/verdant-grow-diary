@@ -10,6 +10,12 @@ import {
   type EpisodeSensorRowInput,
 } from "../lib/plantMemoryEpisodeAdapter";
 
+import {
+  DEFAULT_GROW_LEARNING_FILTERS,
+  filterGrowLearningEpisodes,
+} from "../lib/growLearningReviewViewModel";
+import { buildPostGrowLearningLoopSummary } from "../lib/postGrowLearningLoopSummaryRules";
+
 const T0 = Date.parse("2026-07-01T12:00:00Z");
 const iso = (ms: number) => new Date(T0 + ms).toISOString();
 const HOUR = 60 * 60 * 1000;
@@ -27,6 +33,19 @@ function row(overrides: Partial<EpisodeSensorRowInput>): EpisodeSensorRowInput {
 }
 
 const args = { completedAtMs: T0, nowMs: T0 + 2 * HOUR };
+it.each(["live", "manual", "csv"])(
+  "%s provenance cannot make explicit degraded, blank or unknown quality usable",
+  (source) => {
+    for (const quality of ["degraded", " DEGRADED ", "", " ", "unknown", "good", "high"]) {
+      expect(classifyEpisodeSensorRow(row({ source, quality }), args)).toMatchObject({
+        source,
+        status: "needs_review",
+        usable: false,
+        confidence: quality,
+      });
+    }
+  },
+);
 const PHYSICAL_WINDOWS_PAYLOAD = {
   vendor: "ecowitt_windows_testbench",
   metadata: {
@@ -178,4 +197,123 @@ describe("adapter uses provenance without exposing raw payloads", () => {
     expect(episodes[0].evidence.sensorSnapshots).toHaveLength(0);
     expect(episodes[0].warnings.some((w) => w.code === "snapshot_tent_mismatch")).toBe(true);
   });
+});
+
+describe("quality flags cannot become usable historical evidence", () => {
+  it.each([
+    ["live", "stale"],
+    ["live", "invalid"],
+    ["manual", "stale"],
+    ["manual", "invalid"],
+    ["csv", "stale"],
+    ["csv", "invalid"],
+  ])("keeps %s source but excludes %s quality", (source, quality) => {
+    const input = row({ source, quality });
+    const result = classifyEpisodeSensorRow(input, args);
+    expect(result).toMatchObject({
+      source,
+      status: quality,
+      usable: false,
+      confidence: quality,
+      capturedAt: input.captured_at,
+      snapshotId: input.id,
+      window: "before",
+    });
+    expect(classifyEpisodeSensorRow(input, args)).toEqual(result);
+  });
+
+  it("normalizes the flag without changing its provenance or recorded confidence", () => {
+    expect(
+      classifyEpisodeSensorRow(row({ source: "manual", quality: " STALE " }), args),
+    ).toMatchObject({ source: "manual", status: "stale", usable: false, confidence: " STALE " });
+  });
+
+  it.each(["ok", " OK ", null, undefined])(
+    "preserves canonical or missing legacy quality: %s",
+    (quality) => {
+      expect(classifyEpisodeSensorRow(row({ source: "manual", quality }), args)).toMatchObject({
+        source: "manual",
+        status: "usable",
+        usable: true,
+        confidence: quality ?? null,
+      });
+    },
+  );
+
+  it("does not relabel a diagnostic sender as physical live evidence", () => {
+    expect(
+      classifyEpisodeSensorRow(
+        row({
+          source: "live",
+          quality: "stale",
+          raw_payload: {
+            vendor: "ecowitt_windows_testbench",
+            metadata: { confidence: "test", verdant_source: "live" },
+          },
+        }),
+        args,
+      ),
+    ).toMatchObject({ source: "demo", status: "needs_review", usable: false });
+  });
+
+  it.each(["stale", "invalid"])(
+    "keeps %s readings out of complete-evidence filters and export claims",
+    (quality) => {
+      const episodes = buildPlantMemoryEpisodes({
+        actions: [
+          {
+            id: "act-quality",
+            grow_id: "grow-1",
+            tent_id: "tent-1",
+            plant_id: "plant-1",
+            source: "manual",
+            action_type: "environment",
+            target_metric: "temp",
+            suggested_change: null,
+            reason: "Grower adjustment",
+            status: "completed",
+            completed_at: iso(0),
+          },
+        ],
+        diaryRows: [
+          {
+            id: "out-quality",
+            grow_id: "grow-1",
+            tent_id: "tent-1",
+            plant_id: "plant-1",
+            note: null,
+            entry_at: iso(25 * HOUR),
+            details: {
+              event_type: "action_outcome",
+              action_queue_id: "act-quality",
+              outcome_status: "improved",
+              recorded_by: "grower",
+              recorded_at: iso(25 * HOUR),
+            },
+          },
+        ],
+        sensorRows: [row({ source: "manual", quality })],
+        now: T0 + 30 * HOUR,
+      });
+      expect(episodes).toHaveLength(1);
+      expect(episodes[0].outcome.status).toBe("improved"); // Do not rewrite the grower's report.
+      expect(episodes[0].evidence.sensorSnapshots).toHaveLength(1); // Keep labelled audit context.
+      expect(episodes[0].warnings.some((w) => w.code === "evidence_limited")).toBe(true);
+      expect(
+        filterGrowLearningEpisodes(episodes, {
+          ...DEFAULT_GROW_LEARNING_FILTERS,
+          evidenceCompleteness: "complete",
+        }),
+      ).toEqual([]);
+      expect(
+        filterGrowLearningEpisodes(episodes, {
+          ...DEFAULT_GROW_LEARNING_FILTERS,
+          evidenceCompleteness: "limited",
+        }),
+      ).toEqual(episodes);
+      expect(buildPostGrowLearningLoopSummary(episodes).evidenceQualityNotes.join(" ")).toMatch(
+        /limited/i,
+      );
+    },
+  );
 });

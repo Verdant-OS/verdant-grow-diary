@@ -1366,9 +1366,14 @@ export function resolveBareBasenames({
  * `widget.spec.tsx`, so a wired .tsx spec read as dead and a sibling .ts file
  * could read as executed (Cursor Bugbot, #1221). The alternatives cover every
  * extension `IS_TEST_FILE` admits.
+ *
+ * Nor may the path go on: no `/`, `-` or further `.ext` after the extension. The
+ * match backed off to `e2e/v.spec.ts` inside Playwright's `e2e/v.spec.ts-snapshots/`
+ * and inside a backup `x.spec.ts.bak`, so a `git add` of baselines read as a run
+ * (CodeRabbit, #1221 round 16). A `:line` suffix, a quote or a full stop still ends it.
  */
 const NAMED_PATH =
-  /[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:tsx|ts|mts|cts|jsx|js|mjs|cjs|sql)(?![A-Za-z0-9_])/g;
+  /[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:tsx|ts|mts|cts|jsx|js|mjs|cjs|sql)(?![A-Za-z0-9_/-]|\.[A-Za-z0-9_])/g;
 export function namedPathsIn(corpus) {
   return new Set([...String(corpus).matchAll(NAMED_PATH)].map((m) => m[0]));
 }

@@ -51,6 +51,10 @@
  *              chained onto the wrapper. None of the three was seen — CodeRabbit, #1221
  *              round 14.
  *   boundStringParsedFence  `JSON.parse(PKG)` on a `String(…)`-wrapped binding — a parse.
+ *   inlineToStringEncoding / inlineToStringEncodingExpect  an unbound read decoded with
+ *              `.toString("utf8")`, then chained into a text method or consumed by
+ *              `expect(…)`. Only a bare `.toString()` was seen between the read and its
+ *              consumer — CodeRabbit, #1221 round 16.
  *
  * @source-scan-justified: this file EMBEDS the forbidden shapes as spawn fixtures for the
  * checker itself (see FIXTURES below). It reads no package.json of its own; the strings
@@ -255,6 +259,24 @@ it("x", () => {
   expect(String(readFileSync("package.json")).includes('"test:x"')).toBe(true);
 });
 `,
+  inlineToStringEncoding: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(readFileSync("package.json").toString("utf8").includes('"test:x"')).toBe(true);
+});
+`,
+  inlineToStringEncodingExpect: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(readFileSync("package.json").toString("utf8")).toContain('"test:x"');
+});
+`,
   boundStringParsedFence: `
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
@@ -383,6 +405,8 @@ describe("a package.json binding is compliant only as JSON.parse(ID) (CodeRabbit
     "inlineLastIndexOf",
     "inlineStringWrapped",
     "inlineStringMethod",
+    "inlineToStringEncoding",
+    "inlineToStringEncodingExpect",
   ] as const)("rejects the unbound read in %s", (name) => {
     const { status, out } = runChecker(name);
     expect(status, out).toBe(1);

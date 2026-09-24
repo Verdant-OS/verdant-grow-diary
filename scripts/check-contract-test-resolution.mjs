@@ -182,10 +182,15 @@ const USES_BINDING_AS_TEXT = (source, id) => {
  * Round 14: a `String(…)` wrapper is transparent here too, so the read's extent
  * becomes the wrapper's: `expect(String(readFileSync(…)))` and
  * `String(readFileSync(…)).includes(…)` are consumed like the bare read.
+ * Round 16: `.toString()` between the read and its consumer may name an encoding,
+ * `.toString("utf8")`, as a Buffer read decodes (CodeRabbit, #1221).
  */
 const READ_CALL = /(?:[\w.]*readFile(?:Sync)?|\bread|\breadText)\s*\(/g;
-const TEXT_METHOD_AFTER =
-  /^\s*(?:\.toString\(\s*\))?\s*\.(?:includes|match|matchAll|indexOf|lastIndexOf|search|startsWith|endsWith)\s*\(/;
+const TO_STRING = String.raw`(?:\.toString\(\s*(?:["'][\w-]+["'])?\s*\))?`;
+const TEXT_METHOD_AFTER = new RegExp(
+  String.raw`^\s*${TO_STRING}\s*\.(?:includes|match|matchAll|indexOf|lastIndexOf|search|startsWith|endsWith)\s*\(`,
+);
+const CALL_CLOSES_AFTER = new RegExp(String.raw`^\s*${TO_STRING}\s*\)`);
 const closingParen = (source, open) => {
   let depth = 0;
   for (let i = open; i < source.length; i++) {
@@ -218,7 +223,7 @@ const ASSERTS_ON_INLINE_READ = (source, config) => {
     if (TEXT_METHOD_AFTER.test(after)) return true;
     const consumedByCall =
       /(?:expect|\.test|\.exec)\(\s*(?:await\s+)?$/.test(source.slice(0, start)) &&
-      /^\s*(?:\.toString\(\s*\))?\s*\)/.test(after);
+      CALL_CLOSES_AFTER.test(after);
     if (consumedByCall) return true;
   }
   return false;

@@ -31,13 +31,56 @@ function pullRequestTrigger(workflow: string): PullRequestTrigger {
   return on?.pull_request ?? {};
 }
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Whether a `pull_request` trigger with these `branches` filters runs for a PR into
+ * `target`. GitHub reads the filters in order: a `!` pattern excludes, and the last
+ * pattern that matches decides. `*` stops at `/`; `**` does not. A membership check
+ * passed with `!main` listed after `main`, which stops the lane for PRs into main
+ * (CodeRabbit, #1221 round 16).
+ */
+function branchFilterAdmits(filters: readonly string[], target: string): boolean {
+  let admitted = false;
+  for (const filter of filters) {
+    const negated = filter.startsWith("!");
+    const pattern = negated ? filter.slice(1) : filter;
+    if (/[?+[\]]/.test(pattern)) throw new Error(`branch filter syntax not modelled: ${filter}`);
+    const source = pattern
+      .split("**")
+      .map((part) => part.split("*").map(escapeRegExp).join("[^/]*"))
+      .join(".*");
+    if (new RegExp(`^${source}$`).test(target)) admitted = !negated;
+  }
+  return admitted;
+}
+
 describe("mocked E2E closure lane — its trigger covers what the lane depends on", () => {
   const closure = pullRequestTrigger("mocked-e2e-unwired-closure.yml");
 
-  it("runs on every PR target ci.yml runs on (CodeRabbit, #1221 round 9)", () => {
+  it("runs on every PR target ci.yml runs on (CodeRabbit, #1221 rounds 9 and 16)", () => {
     const ciBranches = pullRequestTrigger("ci.yml").branches ?? [];
     expect(ciBranches.length).toBeGreaterThan(0);
-    expect(closure.branches).toEqual(expect.arrayContaining(ciBranches));
+    for (const target of ciBranches) {
+      // ci.yml's filters are plain branch names, so each one is a PR target.
+      expect(target).toMatch(/^[\w./-]+$/);
+      // No `branches` key means every target.
+      expect(branchFilterAdmits(closure.branches ?? ["**"], target), target).toBe(true);
+    }
+  });
+
+  it("reads branch filters the way GitHub does: in order, the last match wins", () => {
+    expect(branchFilterAdmits(["main", "verdant-grow-diary"], "main")).toBe(true);
+    expect(branchFilterAdmits(["main", "verdant-grow-diary", "!main"], "main")).toBe(false);
+    expect(branchFilterAdmits(["!main", "main"], "main")).toBe(true);
+    expect(branchFilterAdmits(["**", "!main"], "verdant-grow-diary")).toBe(true);
+    expect(branchFilterAdmits(["**", "!main"], "main")).toBe(false);
+    expect(branchFilterAdmits(["release/*"], "release/a")).toBe(true);
+    expect(branchFilterAdmits(["release/*"], "release/a/b")).toBe(false);
+    expect(branchFilterAdmits(["release/**"], "release/a/b")).toBe(true);
+    expect(branchFilterAdmits(["main"], "mainline")).toBe(false);
+    // Syntax this model does not cover fails loudly instead of guessing.
+    expect(() => branchFilterAdmits(["v[0-9]"], "v1")).toThrow(/not modelled/);
   });
 
   it("triggers on every committed file its `bunx vite` webServer reads (Codex, #1221 rounds 6 and 9; CodeRabbit, round 13)", () => {

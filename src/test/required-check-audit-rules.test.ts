@@ -153,8 +153,10 @@ function jobsProducing(context: string) {
  * reports success. `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`;
  * a `set -o pipefail` (or `set -eo pipefail`) before the pipe does the same. Bash's
  * `|& tee` (stdout and stderr) is the same pipe and is counted too (round 15).
- * Pipes whose left side is only `echo`/`printf` cannot hide a failure and are
- * not counted.
+ * A pipe whose left side is only `echo`/`printf` cannot hide a failure and is not
+ * counted. The left side is the command just before the pipe, after the last `;`,
+ * `&&`, `||` or `|`, not the start of the line: `echo starting; deno test … | tee`
+ * pipes `deno test` (round 16).
  */
 function pipesHidingFailure(workflow: Workflow, job: WorkflowJob): string[] {
   const shell = (step: WorkflowStep) =>
@@ -168,7 +170,12 @@ function pipesHidingFailure(workflow: Workflow, job: WorkflowJob): string[] {
       if (/^\s*set\s+-[a-z]*o\s+pipefail\b/.test(line)) pipefail = true;
       const pipe = /(?<!\|)\|&?(?!\|)\s*tee\b/.exec(line);
       if (!pipe || pipefail) continue;
-      if (/^\s*(?:echo|printf)\b/.test(line.slice(0, pipe.index))) continue;
+      const left =
+        line
+          .slice(0, pipe.index)
+          .split(/&&|\|\||;|\|&?/)
+          .pop() ?? "";
+      if (/^\s*(?:(?:then|do|else)\s+)?(?:echo|printf)\b/.test(left)) continue;
       hidden.push(`${step.name ?? "(unnamed step)"}: ${line.trim()}`);
     }
   }
@@ -214,6 +221,14 @@ describe("mustBeGreen lanes report the status of the command they gate", () => {
     expect(
       pipesHidingFailure({}, job({ name: "s", run: "deno test a_test.ts |& tee log\n" })),
     ).toHaveLength(1);
+    // The echo/printf exemption reads the command just before the pipe, not the start
+    // of the line (CodeRabbit, #1221 round 16).
+    const piped = (line: string) => pipesHidingFailure({}, job({ name: "s", run: `${line}\n` }));
+    expect(piped("echo starting; deno test a_test.ts | tee log")).toHaveLength(1);
+    expect(piped("echo starting && deno test a_test.ts | tee log")).toHaveLength(1);
+    expect(piped('printf "x" | deno test a_test.ts | tee log')).toHaveLength(1);
+    expect(piped("deno test a_test.ts; echo done | tee log")).toEqual([]);
+    expect(piped("if true; then echo done | tee log; fi")).toEqual([]);
   });
 });
 

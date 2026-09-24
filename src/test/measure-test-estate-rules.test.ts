@@ -128,6 +128,19 @@ describe("workflow execution — a mention is not an invocation (FALSE-LIVE guar
     expect(paths.has("e2e/page.test.jsx")).toBe(true);
     expect(paths.has("e2e/page.test.js")).toBe(false);
   });
+
+  it("does not read a path that only continues past the extension as the file itself (CodeRabbit, #1221 round 16)", () => {
+    // Playwright keeps a spec's baselines in `<spec>-snapshots/`, and `git add` or
+    // `rm -rf` on that directory runs nothing. The lookahead let the match back off
+    // to `e2e/v.spec.ts` there, and at a backup such as `x.spec.ts.bak`.
+    expect([...namedPathsIn("git add e2e/v.spec.ts-snapshots/a.png")]).toEqual([]);
+    expect([...namedPathsIn("rm -rf e2e/v.spec.ts-snapshots/")]).toEqual([]);
+    expect([...namedPathsIn("cp e2e/x.spec.ts.bak /tmp")]).toEqual([]);
+    // FENCE: a `:line` suffix, a closing quote, or a full stop still ends the path.
+    expect([...namedPathsIn("bunx playwright test e2e/v.spec.ts:12")]).toEqual(["e2e/v.spec.ts"]);
+    expect([...namedPathsIn("run 'e2e/v.spec.ts'")]).toEqual(["e2e/v.spec.ts"]);
+    expect([...namedPathsIn("see e2e/v.spec.ts.")]).toEqual(["e2e/v.spec.ts"]);
+  });
 });
 
 describe("workflow execution — a real invocation must not be missed (FALSE-DEAD guards)", () => {

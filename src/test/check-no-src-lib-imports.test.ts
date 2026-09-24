@@ -109,9 +109,11 @@ describe("scanFunctionsTree (fixture)", () => {
  * every operator after it is `&&`. A later `;` or `||` lets another command's exit
  * status replace the guard's: `guard; echo build` and `guard || true` both exit 0 when
  * the guard fails. A bare mention (`echo check-no-src-lib-imports.mjs`) runs nothing
- * (CodeRabbit, #1221 rounds 13 and 15).
+ * (CodeRabbit, #1221 rounds 13 and 15). A script holding `#` is rejected outright: the
+ * shell drops a comment's text, which this split would still read as commands (round 16).
  */
 function invokesGuard(script: string | undefined): boolean {
+  if ((script ?? "").includes("#")) return false;
   // Commands and the operators between them, alternating: [cmd, op, cmd, op, cmd].
   const parts = (script ?? "").trim().split(/\s*(&&|\|\||;)\s*/);
   return parts.some(
@@ -152,6 +154,11 @@ describe("invokesGuard — a script runs the guard, not merely names it (CodeRab
     ).toBe(false);
     // A `;` BEFORE the guard is harmless: the guard runs, and its status is the script's.
     expect(invokesGuard("echo start; node scripts/check-no-src-lib-imports.mjs")).toBe(true);
+  });
+
+  it("rejects a guard behind a shell comment (CodeRabbit, #1221 round 16)", () => {
+    // After `#` the rest of the line is a comment, so the shell never runs the guard.
+    expect(invokesGuard("echo setup # && node scripts/check-no-src-lib-imports.mjs")).toBe(false);
   });
 });
 

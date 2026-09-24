@@ -85,7 +85,12 @@ posted on `#1691`, `#1690`, `#1688` and `#1677`. **None is merge authorization.*
 
 ## 4. `#1695` — Claude's clock-recovery repair, stacked on `#1691`
 
-`established fact` from `git` and the GitHub API.
+`established fact` from `git` and the GitHub API. **Superseded after this stamp was cut:** at
+23:25 UTC Codex pushed `7f81aa1371af851d2eef1c0a7fdd54a66b2175ef` to `#1677`, whose history
+contains `#1695`'s commit `e4637f01` unchanged and adds the Sensors call site; Claude reviewed it
+`PASS` (9 files 236/0/0; RED with only the call site disabled 9/2; `tsc` 0). **`#1695` was closed
+as superseded on Cheek's instruction.** `#1677` now depends on `#1691` and must merge after it.
+The rows below describe `#1695` as it stood at the stamp.
 
 | Field | Value                                                                                                       |
 | ----- | ----------------------------------------------------------------------------------------------------------- |

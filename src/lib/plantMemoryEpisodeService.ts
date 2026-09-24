@@ -5,13 +5,17 @@
  * SAFETY:
  *  - Read-only. Never mutates action_queue, alerts, or diary rows.
  *  - RLS-scoped client reads only; no service role.
- *  - sensor_readings selects raw_payload only for the shared provenance
+ *  - Effective sensor reads select raw_payload only for the shared provenance
  *    classifier; the episode contract never returns or renders it.
  *  - Errors are sanitized; provider messages never surface.
  *  - No query per episode: one action query, one diary query, one bounded
- *    sensor query per distinct tent (one-tent grows → one query).
+ *    sensor query across the distinct tents.
  */
 import { supabase } from "@/integrations/supabase/client";
+import {
+  effectiveSensorReadingsQuery,
+  requireEffectiveSensorReadings,
+} from "@/lib/effectiveSensorReadings";
 import type { Json } from "@/integrations/supabase/types";
 import { ACTION_FOLLOWUP_EVENT_TYPE } from "@/lib/actionFollowupRules";
 import { ACTION_OUTCOME_EVENT_TYPE } from "@/lib/actionOutcomeRules";
@@ -72,8 +76,9 @@ export async function loadPlantMemoryEpisodes(
     if (args.actionQueueId) actionQuery = actionQuery.eq("id", args.actionQueueId);
 
     const { data: actionRows, error: actionError } = await actionQuery;
-    if (actionError) return { status: "error", message: SANITIZED_ERROR };
-    const actions = (actionRows ?? []) as unknown as EpisodeActionInput[];
+    if (actionError || !Array.isArray(actionRows))
+      return { status: "error", message: SANITIZED_ERROR };
+    const actions = actionRows as unknown as EpisodeActionInput[];
     if (actions.length === 0) return { status: "ok", episodes: [] };
 
     const { data: diaryRows, error: diaryError } = await supabase
@@ -88,7 +93,8 @@ export async function loadPlantMemoryEpisodes(
       ])
       .order("entry_at", { ascending: false })
       .limit(EPISODE_DIARY_LIMIT);
-    if (diaryError) return { status: "error", message: SANITIZED_ERROR };
+    if (diaryError || !Array.isArray(diaryRows))
+      return { status: "error", message: SANITIZED_ERROR };
 
     let sensorRows: EpisodeSensorRowInput[] = [];
     if (args.includeSensorEvidence) {
@@ -105,23 +111,24 @@ export async function loadPlantMemoryEpisodes(
         ).toISOString();
         // Bounded window and limit. raw_payload is classification-only and
         // never copied into episode evidence.
-        const { data: sensorData, error: sensorError } = await supabase
-          .from("sensor_readings")
-          .select("id,tent_id,metric,source,quality,captured_at,raw_payload")
+        const { data: sensorData, error: sensorError } = await effectiveSensorReadingsQuery()
+          .select(
+            "id,user_id,tent_id,metric,value,ts,captured_at,created_at,device_id,source,quality,raw_payload,correction_valid",
+          )
           .in("tent_id", tentIds)
           .gte("captured_at", fromIso)
           .lte("captured_at", toIso)
           .order("captured_at", { ascending: false })
           .limit(EPISODE_SENSOR_LIMIT);
-        if (!sensorError) sensorRows = (sensorData ?? []) as unknown as EpisodeSensorRowInput[];
-        // Sensor evidence is optional context; its absence is an honest
-        // evidence_limited state, never a hard failure.
+        if (sensorError) return { status: "error", message: SANITIZED_ERROR };
+        // A requested read must succeed before absence can mean limited evidence.
+        sensorRows = requireEffectiveSensorReadings(sensorData);
       }
     }
 
     const episodes = buildPlantMemoryEpisodes({
       actions,
-      diaryRows: (diaryRows ?? []) as unknown as EpisodeDiaryRowInput[],
+      diaryRows: diaryRows as unknown as EpisodeDiaryRowInput[],
       sensorRows,
       now: args.nowIso,
     });

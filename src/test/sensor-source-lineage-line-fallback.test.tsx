@@ -26,10 +26,11 @@ function assertNoLeaks(text: string) {
 }
 
 describe("SensorSourceLineageLine — fallback safety", () => {
-  it("unknown source renders verbatim as safe plain text fallback", () => {
+  it("unknown source never renders as the Source word — canonical Invalid reading", () => {
     render(<SensorSourceLineageLine source="future-transport-xyz" />);
     const root = screen.getByTestId("sensor-source-lineage");
-    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe(
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("Invalid reading");
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).not.toBe(
       "future-transport-xyz",
     );
     // Unknown source must not be implicitly promoted to Live.
@@ -47,8 +48,9 @@ describe("SensorSourceLineageLine — fallback safety", () => {
     render(<SensorSourceLineageLine source="random-thing" vendor="ecowitt" />);
     const root = screen.getByTestId("sensor-source-lineage");
     expect(root.textContent).not.toContain("Live");
-    // Source label preserved verbatim, vendor label normalized.
-    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("random-thing");
+    // Unknown raw tokens never appear as Source; vendor stays provenance.
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("Invalid reading");
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).not.toBe("random-thing");
     expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("EcoWitt");
   });
 
@@ -82,9 +84,10 @@ describe("SensorSourceLineageLine — fallback safety", () => {
     },
   );
 
-  it("empty / null source falls back to 'Unknown' safely", () => {
+  it("empty / null source falls back to canonical Invalid reading, never Live", () => {
     render(<SensorSourceLineageLine source={null} vendor={null} />);
-    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("Unknown");
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("Invalid reading");
+    expect(screen.getByTestId("sensor-source-lineage").textContent).not.toContain("Live");
     expect(screen.queryByTestId("sensor-source-lineage-vendor")).toBeNull();
   });
 });

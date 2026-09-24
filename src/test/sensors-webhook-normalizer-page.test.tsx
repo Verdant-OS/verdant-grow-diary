@@ -76,8 +76,8 @@ describe("SensorsIngestNormalizer", () => {
     expect(screen.getByTestId("webhook-normalizer-result")).toBeInTheDocument();
     expect(screen.getByTestId("webhook-normalizer-source-canonical").textContent).toBe("mqtt");
     expect(screen.getByTestId("webhook-normalizer-vendor-canonical").textContent).toBe("ecowitt");
-    // SensorSourceLineageLine renders the polished labels.
-    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("MQTT");
+    // Source is canonical (mqtt is not a sixth source); vendor stays provenance.
+    expect(screen.getByTestId("sensor-source-lineage-source").textContent).toBe("Invalid reading");
     expect(screen.getByTestId("sensor-source-lineage-vendor").textContent).toBe("EcoWitt");
     // Disclaimer must always render with a successful preview.
     expect(

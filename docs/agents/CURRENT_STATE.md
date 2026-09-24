@@ -7,9 +7,9 @@
 (§1, §3). **Live is `NOT_MEASURED` by Claude** after a tenth egress refusal at 06:52:15 UTC (§2).
 **`#1669` merged with two review corrections still unapplied**, and they are carried here (§4). The
 session-backed _Restore pending correction_ finding is **still open**, and `#1625` is still the one fix
-in flight (§5). The board was re-listed: **46 open PRs**, and **no other open PR writes this file**
-(§6). **Three stale restamp branches** remain on the remote (§4). No Publish. No APPLY. No merge.
-`HOLD #1250`. Prior header follows.)
+in flight (§5). The board was re-listed: **46 open PRs besides this one**, and **no other open PR
+writes this file** (§6). **Three stale restamp branches** remain on the remote (§4). No Publish. No
+APPLY. No merge. `HOLD #1250`. Prior header follows.)
 
 ## 1. Deploy tip `1d7b2893` — two docs-only commits since `98fdd446`
 
@@ -103,7 +103,8 @@ remote deletes were refused in-session — the owner deletes them):
 `refs/pull/N/head`, diffed against its merge-base with `1d7b2893`, and checked with
 `git merge-tree --write-tree` against the tip.
 
-**46 open PRs: 41 target `verdant-grow-diary` and 5 are stacked** (`#1680` on `#1677`, `#1679` on
+**46 open PRs, listed at ~06:52 UTC before this PR (`#1681`, opened 06:54) existed, so 47 with it: of
+the 46, 41 target `verdant-grow-diary` and 5 are stacked** (`#1680` on `#1677`, `#1679` on
 `#1680`, `#1670` on `#1668`, `#1618` on `#1151`, `#1481` on `#1478`).
 
 - **No other open PR touches `docs/agents/CURRENT_STATE.md`.**
@@ -183,7 +184,9 @@ Carried rows keep their original labels.
 - **No merge. No ready. No Publish. No History-restore. No APPLY. No production SQL.** No device
   control, no automatic Action Queue writes, no invented credentials. **Never KEEP. No owner email.**
 - **`HOLD #1250`.**
-- **Tip is `1d7b28933fba0662cb25f87b04da5a15fde92501`.** Cite no other SHA as the tip.
+- **The tip this stamp measured is `1d7b28933fba0662cb25f87b04da5a15fde92501`.** Once this PR merges,
+  the tip is its squash commit, one docs-only commit past it; cite `git rev-parse` at the time, not this
+  line.
 - **Live is `NOT_MEASURED` by Claude.** Do not green-lane the live `"26"` pin on this stamp's
   evidence.
 - **§5: `#1625` is the one session-restore fix in flight.** Claude does not choose, push, ready or

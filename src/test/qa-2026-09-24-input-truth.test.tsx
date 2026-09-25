@@ -19,6 +19,7 @@ import {
   TENT_SIZE_TOO_LONG_MESSAGE,
   buildTentUpdatePayload,
   isTentUpdatePayloadValid,
+  tentSizeEditValidationMessage,
   tentSizeValidationMessage,
 } from "@/lib/tentManagementRules";
 import {
@@ -51,7 +52,7 @@ describe("tent size validation (BUG-012)", () => {
     "4x0",
     "4 x -4",
     "−4x4",
-    "5000x5000",
+    "20000x20000",
     "4x4x0",
     // A minus right after the "x" separator is still a negative dimension.
     "4x-4",
@@ -74,8 +75,24 @@ describe("tent size validation (BUG-012)", () => {
     "1.2 x 1.2 m",
     "small closet",
     "2-3 ft",
+    // Millimetre sizes and spaced ranges (CodeRabbit review on #1683).
+    "1200x1200mm",
+    "1200x1200x2000 mm",
+    "4 - 5 ft",
+    "4 − 5 ft",
   ])("accepts %s", (size) => {
     expect(tentSizeValidationMessage(size)).toBeNull();
+  });
+
+  it("an unchanged stored size never blocks an unrelated tent edit", () => {
+    // A tent saved before BUG-012 may hold "-999999x0"; renaming it must work.
+    expect(tentSizeEditValidationMessage("-999999x0", "-999999x0")).toBeNull();
+    expect(tentSizeEditValidationMessage(" -999999x0 ", "-999999x0")).toBeNull();
+    expect(tentSizeEditValidationMessage(null, "")).toBeNull();
+    expect(tentSizeEditValidationMessage("4x4", "-1x4")).toBe(TENT_SIZE_INVALID_MESSAGE);
+    const legacy = buildTentUpdatePayload({ name: "Renamed", size: "-999999x0" });
+    expect(isTentUpdatePayloadValid(legacy, "-999999x0")).toBe(true);
+    expect(isTentUpdatePayloadValid(legacy, "4x4")).toBe(false);
   });
 
   it("rejects overlong sizes and invalidates the edit payload", () => {
@@ -96,7 +113,9 @@ describe("tent size validation (BUG-012)", () => {
       "src/components/EditTentDialog.tsx",
     ]) {
       const src = readFileSync(resolve(process.cwd(), path), "utf8");
-      expect(src).toMatch(/tentSizeValidationMessage\((form|payload)\.size\)/);
+      expect(src).toMatch(
+        /tentSizeValidationMessage\(form\.size\)|tentSizeEditValidationMessage\(tent\.size, payload\.size\)/,
+      );
     }
   });
 });

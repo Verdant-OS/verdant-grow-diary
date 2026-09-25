@@ -60,13 +60,21 @@ export function buildTentUpdatePayload(input: TentEditableFields): TentUpdatePay
   };
 }
 
-export function isTentUpdatePayloadValid(p: TentUpdatePayload): boolean {
-  return p.name.length > 0 && tentSizeValidationMessage(p.size) === null;
+/**
+ * `storedSize` is the tent's saved size: when the edit leaves it unchanged
+ * it is not re-validated, so a size saved before BUG-012 never blocks a
+ * rename (CodeRabbit review on #1683).
+ */
+export function isTentUpdatePayloadValid(
+  p: TentUpdatePayload,
+  storedSize?: string | null,
+): boolean {
+  return p.name.length > 0 && tentSizeEditValidationMessage(storedSize, p.size) === null;
 }
 
 export const TENT_SIZE_MAX_LENGTH = 40;
-/** Largest plausible tent/room dimension in any common unit (ft, in, cm). */
-export const TENT_SIZE_MAX_DIMENSION = 1000;
+/** Largest plausible tent/room dimension in any common unit (ft, in, cm, mm). */
+export const TENT_SIZE_MAX_DIMENSION = 10000;
 export const TENT_SIZE_INVALID_MESSAGE =
   "Tent size must use positive dimensions, like 4x4, 2x4 ft, or 120x120 cm.";
 export const TENT_SIZE_TOO_LONG_MESSAGE = `Keep tent size under ${TENT_SIZE_MAX_LENGTH} characters, like 4x4 or 120x120 cm.`;
@@ -81,9 +89,13 @@ export function tentSizeValidationMessage(size: string | null | undefined): stri
   const value = typeof size === "string" ? size.trim() : "";
   if (value === "") return null;
   if (value.length > TENT_SIZE_MAX_LENGTH) return TENT_SIZE_TOO_LONG_MESSAGE;
-  // A minus sign directly before a digit is a negative dimension, including
-  // right after the "x" separator ("4x-4"). A minus between digits is a range.
-  if (/(^|[^0-9A-Za-z]|[xX]\s*)[-\u2212]\s*\d/.test(value)) return TENT_SIZE_INVALID_MESSAGE;
+  // A minus between two digits is a range ("2-3 ft", "4 - 5 ft"); set those
+  // aside first. Any other minus directly before a digit is a negative
+  // dimension, including right after the "x" separator ("4x-4").
+  const withoutRanges = value.replace(/(\d)\s*[-\u2212]\s*(?=\d)/g, "$1 ");
+  if (/(^|[^0-9A-Za-z]|[xX]\s*)[-\u2212]\s*\d/.test(withoutRanges)) {
+    return TENT_SIZE_INVALID_MESSAGE;
+  }
   const numbers = value.match(/\d+(?:[.,]\d+)?/g) ?? [];
   for (const raw of numbers) {
     const n = Number(raw.replace(",", "."));
@@ -92,6 +104,19 @@ export function tentSizeValidationMessage(size: string | null | undefined): stri
     }
   }
   return null;
+}
+
+/**
+ * Edit Tent's size check: an unchanged stored size is accepted as is, and
+ * only a changed size is validated.
+ */
+export function tentSizeEditValidationMessage(
+  storedSize: string | null | undefined,
+  nextSize: string | null | undefined,
+): string | null {
+  const stored = typeof storedSize === "string" ? storedSize.trim() : "";
+  const next = typeof nextSize === "string" ? nextSize.trim() : "";
+  return next === stored ? null : tentSizeValidationMessage(next);
 }
 
 export interface TentDeleteGuardInput {

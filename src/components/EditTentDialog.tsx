@@ -26,7 +26,7 @@ import { STAGES } from "@/lib/grow";
 import {
   buildTentUpdatePayload,
   isTentUpdatePayloadValid,
-  tentSizeValidationMessage,
+  tentSizeEditValidationMessage,
 } from "@/lib/tentManagementRules";
 import { hasTrimmedRequiredIdentity } from "@/lib/formIdentityFailClosedRules";
 
@@ -96,12 +96,14 @@ export default function EditTentDialog({ tent, trigger }: Props) {
       light_schedule: form.light_schedule,
       light_wattage: form.light_wattage ? Number(form.light_wattage) : null,
     });
-    const sizeMessage = tentSizeValidationMessage(payload.size);
+    // Only a changed size is validated: a size saved before BUG-012 must not
+    // block renaming the tent.
+    const sizeMessage = tentSizeEditValidationMessage(tent.size, payload.size);
     if (sizeMessage) {
       toast.error(sizeMessage);
       return;
     }
-    if (!isTentUpdatePayloadValid(payload)) {
+    if (!isTentUpdatePayloadValid(payload, tent.size)) {
       toast.error("Tent name is required");
       return;
     }

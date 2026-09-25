@@ -1,4 +1,4 @@
-import { test as setup, expect } from "@playwright/test";
+import { test as setup, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { describeUnservedE2EBaseUrl } from "./lib/baseUrlPreflight";
@@ -8,7 +8,8 @@ import { describeUnservedE2EBaseUrl } from "./lib/baseUrlPreflight";
  *
  * Strategy (in priority order):
  *   1. If e2e/.auth/user.json already exists (developer-generated storageState),
- *      we reuse it as-is. No login attempted.
+ *      we reuse it as-is once /auth shows the base URL serves the app. No
+ *      login attempted.
  *   2. Otherwise, if E2E_TEST_EMAIL + E2E_TEST_PASSWORD are present, drive the
  *      real /auth UI to sign in, then persist storageState.
  *   3. Otherwise, skip — Playwright tests downstream will skip with a clear
@@ -21,6 +22,25 @@ const STORAGE_PATH = path.resolve("e2e/.auth/user.json");
 // We snapshot it separately; e2e/lib/authedTest.ts re-injects it per test.
 const SESSION_STORAGE_PATH = path.resolve("e2e/.auth/session-storage.json");
 
+/**
+ * Fail at once, with the cause, when the base URL does not serve the app —
+ * otherwise a dead host surfaces as a 15 s `#signin-email` timeout that reads
+ * like a sign-in bug, or, with cached auth state, as opaque failures in every
+ * authenticated spec. Leaves the page on /auth.
+ */
+async function assertBaseUrlServesApp(page: Page): Promise<void> {
+  const authResponse = await page.goto("/auth");
+  const unserved = describeUnservedE2EBaseUrl({
+    url: page.url(),
+    status: authResponse ? authResponse.status() : null,
+    bodyText: await page
+      .locator("body")
+      .innerText({ timeout: 5_000 })
+      .catch(() => ""),
+  });
+  if (unserved) throw new Error(unserved);
+}
+
 setup("authenticate", async ({ page }) => {
   fs.mkdirSync(path.dirname(STORAGE_PATH), { recursive: true });
 
@@ -28,6 +48,9 @@ setup("authenticate", async ({ page }) => {
   const haveSessionSnapshot = fs.existsSync(SESSION_STORAGE_PATH);
 
   if (haveStorageState && haveSessionSnapshot) {
+    // Cached state is only as good as the host it will run against: probe it
+    // first, so a dead or retired E2E_BASE_URL fails here with its cause.
+    await assertBaseUrlServesApp(page);
     setup.info().annotations.push({
       type: "auth",
       description: "Reusing existing auth state at e2e/.auth/ (user.json + session-storage.json).",
@@ -64,19 +87,7 @@ setup("authenticate", async ({ page }) => {
   // Credentials present: fall through to a fresh login, which rewrites BOTH
   // files together (a partial snapshot is treated as stale, not reused).
 
-  const authResponse = await page.goto("/auth");
-  // Fail at once, with the cause, when the base URL does not serve the app —
-  // otherwise a dead host surfaces as a 15 s `#signin-email` timeout that
-  // reads like a sign-in bug.
-  const unserved = describeUnservedE2EBaseUrl({
-    url: page.url(),
-    status: authResponse ? authResponse.status() : null,
-    bodyText: await page
-      .locator("body")
-      .innerText({ timeout: 5_000 })
-      .catch(() => ""),
-  });
-  if (unserved) throw new Error(unserved);
+  await assertBaseUrlServesApp(page);
 
   // The Auth page keeps all three tab panels (sign in / create account /
   // forgot password) mounted, so label-based lookups match 3 email and 3

@@ -61,13 +61,26 @@ describe("applyStageTargetSeverityToPacket", () => {
     );
   });
 
-  it("never pushes safety notes past the server cap", () => {
+  it("never pushes safety notes past the server cap, yet always carries the breach", () => {
     const full = Array.from({ length: AI_DOCTOR_PACKET_SAFETY_NOTE_CAP }, (_, i) => `note ${i}`);
     const out = applyStageTargetSeverityToPacket(packet("flower", RH_95, "ok", full));
     expect(out.recentSensorSnapshot?.severity).toBe("warning");
-    expect(out.recentSensorSnapshotAnnotation?.safetyNotes).toHaveLength(
-      AI_DOCTOR_PACKET_SAFETY_NOTE_CAP,
-    );
+    const notes = out.recentSensorSnapshotAnnotation?.safetyNotes ?? [];
+    expect(notes).toHaveLength(AI_DOCTOR_PACKET_SAFETY_NOTE_CAP);
+    // The breach raised severity, so the model must see which metric and range.
+    expect(notes.at(-1)).toMatch(/^Current humidity 95% is above the flower target range/);
+    expect(notes.slice(0, -1)).toEqual(full.slice(0, -1));
+  });
+
+  it("does not call a stale snapshot current", () => {
+    const stale = packet("flower", RH_95);
+    stale.recentSensorSnapshotAnnotation.stale = true;
+    const notes =
+      applyStageTargetSeverityToPacket(stale).recentSensorSnapshotAnnotation?.safetyNotes;
+    expect(notes).toEqual([
+      "Stale reading captured 2026-09-24T07:32:45.975Z: humidity 95% was above the flower target range (40–55%). It is not the current environment; do not describe the environment as stable or healthy.",
+    ]);
+    expect(notes?.some((n) => /^Current /.test(n))).toBe(false);
   });
 
   it("checks temperature from Fahrenheit readings and VPD", () => {

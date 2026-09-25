@@ -29,6 +29,15 @@ import {
 } from "@/lib/quickLogFeedingFormViewModel";
 import QuickLogFeedingForm from "@/components/QuickLogFeedingForm";
 import ManualSensorReadingCard from "@/components/ManualSensorReadingCard";
+import {
+  MANUAL_ENTRY_EMPTY_ERROR,
+  manualEntryValueErrors,
+  validateManualEntry,
+} from "@/lib/sensorReadingManualEntryRules";
+import {
+  applyManualEntryBlockingErrors,
+  evaluateManualSensorSnapshotQuality,
+} from "@/lib/manualSensorSnapshotQualityRules";
 
 vi.mock("@/lib/growRepo", () => ({
   insertSensorReading: vi.fn().mockResolvedValue(undefined),
@@ -140,6 +149,53 @@ describe("manual reading quality never says usable while a value blocks the save
     expect(quality.getAttribute("data-quality")).not.toBe("usable");
     expect(within(quality).queryByText("Usable current reading")).not.toBeInTheDocument();
     expect(within(quality).getByText(/Humidity outside 0–100%/i)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["VPD", "-1", /VPD cannot be negative/i],
+    ["CO₂", "-5", /CO₂ ppm cannot be negative/i],
+    ["PPFD", "5000", /PPFD must be between 0 and/i],
+  ])("flags a blocking %s of %s as invalid while air temp is valid", (label, value, reason) => {
+    renderCard();
+    fireEvent.change(screen.getByLabelText(/Air temp/i), { target: { value: "75" } });
+    fireEvent.change(screen.getByLabelText(new RegExp(`^${label}`)), { target: { value } });
+    const quality = screen.getByTestId("manual-snapshot-quality");
+    expect(quality.getAttribute("data-quality")).toBe("invalid");
+    expect(within(quality).queryByText("Usable current reading")).not.toBeInTheDocument();
+    expect(within(quality).getByText(reason)).toBeInTheDocument();
+  });
+
+  it("any blocking validation error makes the evaluation invalid, never usable", () => {
+    const usable = evaluateManualSensorSnapshotQuality(
+      {
+        source: "manual",
+        captured_at: "2026-09-24T12:00:00.000Z",
+        temperature_c: 24,
+      },
+      { nowMs: Date.parse("2026-09-24T12:05:00.000Z") },
+    );
+    expect(usable.quality).toBe("usable");
+
+    const blocked = applyManualEntryBlockingErrors(usable, [
+      "Air temperature must be a finite number.",
+    ]);
+    expect(blocked.quality).toBe("invalid");
+    expect(blocked.summary).toBe("Invalid reading");
+    expect(blocked.reasons).toContain("Air temperature must be a finite number.");
+    expect(blocked.canSupportAiDoctorCurrentContext).toBe(false);
+    expect(blocked.canSupportActionSuggestionPreview).toBe(false);
+
+    // No blocking error: the evaluation is returned unchanged.
+    expect(applyManualEntryBlockingErrors(usable, [])).toBe(usable);
+  });
+
+  it("the empty-form prompt is not a blocking value error", () => {
+    // A blank form stays "missing", not "invalid".
+    expect(manualEntryValueErrors(validateManualEntry({}))).toEqual([]);
+    expect(validateManualEntry({}).errors).toEqual([MANUAL_ENTRY_EMPTY_ERROR]);
+    expect(manualEntryValueErrors(validateManualEntry({ vpdKpa: "-1" }))).toEqual([
+      "VPD cannot be negative.",
+    ]);
   });
 
   it("still grades a valid entry usable", () => {

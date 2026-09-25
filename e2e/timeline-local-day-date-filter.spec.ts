@@ -15,6 +15,7 @@
 //
 // SAFETY:
 // - All /auth/v1/** and /rest/v1/** traffic is intercepted via page.route().
+//   Any unmatched external request is aborted; only the loopback app can load.
 //   No real Supabase calls, no real accounts, no real rows.
 // - This spec only reads. Only the exact read-only has_role fixture may POST;
 //   all other non-GET REST requests are recorded and rejected before any mock
@@ -25,6 +26,7 @@ const MOCKED_PROJECT = "chromium-mocked";
 
 const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
+const FIXTURE_ORIGIN = "https://timeline-fixture.invalid";
 
 const FAKE_USER = {
   id: "test-user-id",
@@ -106,6 +108,7 @@ interface Captured {
   diaryUrls: string[];
   growEventUrls: string[];
   nonGetRestCalls: string[];
+  blockedExternalRequests: string[];
 }
 
 /** Identify the core Timeline reads independently of the date bounds under test. */
@@ -140,6 +143,17 @@ function isReadOnlyRoleFixture(req: Request): boolean {
 }
 
 async function mockSignedInSupabase(page: Page, captured: Captured) {
+  // Registered first so specific fixtures below run before this egress fence.
+  // A new backend surface must receive an explicit mock rather than reach a host.
+  await page.route("**/*", async (route, req) => {
+    const url = new URL(req.url());
+    if (["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) {
+      return route.continue();
+    }
+    captured.blockedExternalRequests.push(req.url());
+    await route.abort("blockedbyclient");
+  });
+
   await page.route(/\/auth\/v1\//, async (route, req) => {
     const url = req.url();
     if (/\/user/i.test(url)) {
@@ -207,11 +221,6 @@ async function mockSignedInSupabase(page: Page, captured: Captured) {
   // gte/lte filtering over the fixture set so the rendered UI genuinely
   // reflects whatever bounds Timeline.tsx sent over the wire.
   await page.route(/\/rest\/v1\/diary_entries/, async (route, req) => {
-    if (req.method() !== "GET") {
-      captured.nonGetRestCalls.push(`${req.method()} ${req.url()}`);
-      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
-      return;
-    }
     if (isCoreTimelineRead(req.url(), "diary_entries")) captured.diaryUrls.push(req.url());
     const { gte, lte } = extractBounds(req.url(), "entry_at");
     const kept = DIARY_FIXTURE_ROWS.filter((row) => {
@@ -230,11 +239,6 @@ async function mockSignedInSupabase(page: Page, captured: Captured) {
   // grow_events: same bounds object, different column — captured to prove
   // cross-table agreement. No rows needed for this proof.
   await page.route(/\/rest\/v1\/grow_events/, async (route, req) => {
-    if (req.method() !== "GET") {
-      captured.nonGetRestCalls.push(`${req.method()} ${req.url()}`);
-      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
-      return;
-    }
     if (isCoreTimelineRead(req.url(), "grow_events")) captured.growEventUrls.push(req.url());
     await route.fulfill({
       status: 200,
@@ -276,7 +280,12 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
   test("selecting 2026-07-15 applies identical America/Chicago local-day bounds to diary_entries and grow_events, keeps the URL plain, and writes nothing", async ({
     page,
   }) => {
-    const captured: Captured = { diaryUrls: [], growEventUrls: [], nonGetRestCalls: [] };
+    const captured: Captured = {
+      diaryUrls: [],
+      growEventUrls: [],
+      nonGetRestCalls: [],
+      blockedExternalRequests: [],
+    };
     await mockSignedInSupabase(page, captured);
     await seedFakeSession(page);
 
@@ -350,7 +359,12 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
   test("an inverted range (start after end) sends no date bound at all, matching the existing no-op contract", async ({
     page,
   }) => {
-    const captured: Captured = { diaryUrls: [], growEventUrls: [], nonGetRestCalls: [] };
+    const captured: Captured = {
+      diaryUrls: [],
+      growEventUrls: [],
+      nonGetRestCalls: [],
+      blockedExternalRequests: [],
+    };
     await mockSignedInSupabase(page, captured);
     await seedFakeSession(page);
 
@@ -359,6 +373,9 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
     await expect(page.getByTestId("timeline-date-range-error")).toBeVisible();
     await expect
       .poll(() => captured.diaryUrls.length, { message: "diary_entries must have been queried" })
+      .toBeGreaterThan(0);
+    await expect
+      .poll(() => captured.growEventUrls.length, { message: "grow_events must have been queried" })
       .toBeGreaterThan(0);
 
     await test.info().attach("timeline-core-read-queries", {
@@ -370,6 +387,11 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
       expect(diaryBounds.gte, "an invalid range must not guess a lower bound").toBeNull();
       expect(diaryBounds.lte, "an invalid range must not guess an upper bound").toBeNull();
     }
+    for (const url of captured.growEventUrls) {
+      const eventBounds = extractBounds(url, "occurred_at");
+      expect(eventBounds.gte, "an invalid range must not guess an event lower bound").toBeNull();
+      expect(eventBounds.lte, "an invalid range must not guess an event upper bound").toBeNull();
+    }
 
     expect(captured.nonGetRestCalls, "read-only load must never write").toEqual([]);
   });
@@ -377,12 +399,36 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
   test("the fixture rejects table writes, mutating RPCs and altered role probes", async ({
     page,
   }) => {
-    const captured: Captured = { diaryUrls: [], growEventUrls: [], nonGetRestCalls: [] };
+    const captured: Captured = {
+      diaryUrls: [],
+      growEventUrls: [],
+      nonGetRestCalls: [],
+      blockedExternalRequests: [],
+    };
     await mockSignedInSupabase(page, captured);
     await seedFakeSession(page);
     await page.goto(`/timeline?growId=${GROW_ID}&start=2026-07-20&end=2026-07-10`);
     await expect(page.getByTestId("timeline-date-range-error")).toBeVisible();
     expect(captured.nonGetRestCalls).toEqual([]);
+
+    const roleResult = await page.evaluate(
+      async ({ origin, userId }) => {
+        const response = await fetch(`${origin}/rest/v1/rpc/has_role`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ _user_id: userId, _role: "operator" }),
+        });
+        return { status: response.status, body: await response.json() };
+      },
+      { origin: FIXTURE_ORIGIN, userId: FAKE_USER.id },
+    );
+    expect(roleResult, "the exact read fixture must deny the operator role").toEqual({
+      status: 200,
+      body: false,
+    });
+    expect(captured.nonGetRestCalls, "the exact read fixture is not recorded as a write").toEqual(
+      [],
+    );
 
     const probes = [
       { method: "POST", path: "grows", body: {} },
@@ -394,13 +440,23 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
         path: "rpc/has_role",
         body: { _user_id: "another-user", _role: "operator" },
       },
+      {
+        method: "POST",
+        path: "rpc/has_role",
+        body: { _user_id: FAKE_USER.id, _role: "staff" },
+      },
+      {
+        method: "POST",
+        path: "rpc/has_role",
+        body: { _user_id: FAKE_USER.id, _role: "operator", _extra: true },
+      },
       { method: "PUT", path: "rpc/has_role", body: { _user_id: FAKE_USER.id, _role: "operator" } },
     ];
     const statuses = await page.evaluate(
-      async ({ ref, probes }) => {
+      async ({ origin, probes }) => {
         const statuses: number[] = [];
         for (const probe of probes) {
-          const response = await fetch(`https://${ref}.supabase.co/rest/v1/${probe.path}`, {
+          const response = await fetch(`${origin}/rest/v1/${probe.path}`, {
             method: probe.method,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(probe.body),
@@ -409,13 +465,28 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
         }
         return statuses;
       },
-      { ref: SB_PROJECT_REF, probes },
+      { origin: FIXTURE_ORIGIN, probes },
     );
     expect(statuses).toEqual(probes.map(() => 405));
     expect(captured.nonGetRestCalls).toEqual(
-      probes.map(
-        (probe) => `${probe.method} https://${SB_PROJECT_REF}.supabase.co/rest/v1/${probe.path}`,
-      ),
+      probes.map((probe) => `${probe.method} ${FIXTURE_ORIGIN}/rest/v1/${probe.path}`),
     );
+
+    const unmatchedBackendBlocked = await page.evaluate(async (origin) => {
+      try {
+        await fetch(`${origin}/functions/v1/unmocked`);
+        return false;
+      } catch {
+        return true;
+      }
+    }, FIXTURE_ORIGIN);
+    expect(
+      unmatchedBackendBlocked,
+      "an unmatched external request must not reach the network",
+    ).toBe(true);
+    expect(
+      captured.blockedExternalRequests,
+      "the fixture must intercept the unmatched request",
+    ).toContain(`${FIXTURE_ORIGIN}/functions/v1/unmocked`);
   });
 });

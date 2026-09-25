@@ -37,6 +37,7 @@ import {
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import { collectCandidateCsvSensorPresenceKeys } from "@/lib/csvSensorPresenceService";
+import { filterCsvPresenceTimestampsForScope } from "@/lib/csvSensorPresenceScopeRules";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 import { tentDetailPath } from "@/lib/routes";
 import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
@@ -86,11 +87,11 @@ function makeInsertClient(
       if (!canContinue()) return new Set<string>();
       try {
         return await collectCandidateCsvSensorPresenceKeys(
-          capturedAts,
+          filterCsvPresenceTimestampsForScope(capturedAts, scope),
           async (timestamps, from, to) => {
-            const { data, error } = await supabase
+            const { data, error, count } = await supabase
               .from("sensor_readings")
-              .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE)
+              .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE, { count: "exact" })
               .in("tent_id", scope.tentIds)
               .in("source", scope.sources)
               .in("metric", scope.metrics)
@@ -103,7 +104,7 @@ function makeInsertClient(
               .order("captured_at")
               .range(from, to);
             if (error || !data) throw new Error("CSV presence lookup unavailable");
-            return data as unknown as DedupeKeyParts[];
+            return { rows: data as unknown as DedupeKeyParts[], totalCount: count ?? null };
           },
           canContinue,
         );

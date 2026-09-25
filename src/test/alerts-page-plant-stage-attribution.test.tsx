@@ -14,7 +14,11 @@ import { MemoryRouter } from "@/lib/react-router-compat";
 import Alerts from "@/pages/Alerts";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
-import { resolveGrowPlantStages } from "@/lib/alertPlantStageScopeRules";
+import {
+  plantsForAlertPersistence,
+  resolveGrowPlantStages,
+  resolveSelectedTentPlantStages,
+} from "@/lib/alertPlantStageScopeRules";
 
 type PlantRow = { id: string; grow_id: string | null; tent_id: string | null; stage: string };
 
@@ -151,6 +155,69 @@ describe("resolveGrowPlantStages (growAttributionRules order)", () => {
   });
 });
 
+describe("resolveSelectedTentPlantStages (Dashboard selection scope)", () => {
+  const tents = [{ id: "tent-g1" }, { id: "tent-g1b" }];
+
+  it("a plant naming another grow never counts, even in a selected tent of this grow", () => {
+    // Codex review on #1683: the grow-scoped plant read also returns plants by
+    // tent, so tent membership alone would let grow B's plant move grow A.
+    expect(
+      resolveSelectedTentPlantStages(
+        [
+          { growId: "g2", tentId: "tent-g1", stage: "flower" },
+          { growId: "g1", tentId: "tent-g1", stage: "veg" },
+        ],
+        "g1",
+        tents,
+        ["tent-g1"],
+      ),
+    ).toEqual(["veg"]);
+  });
+
+  it("a grow-less plant in a selected tent of this grow counts through the tent", () => {
+    expect(
+      resolveSelectedTentPlantStages(
+        [{ growId: null, tentId: "tent-g1", stage: "flower" }],
+        "g1",
+        tents,
+        ["tent-g1"],
+      ),
+    ).toEqual(["flower"]);
+  });
+
+  it("only the selected tents count, and archived plants never do", () => {
+    expect(
+      resolveSelectedTentPlantStages(
+        [
+          { growId: "g1", tentId: "tent-g1b", stage: "flower" },
+          { growId: "g1", tentId: "tent-g1", stage: "flower", isArchived: true },
+          { growId: "g1", tentId: "tent-g1", stage: "veg", isArchived: false },
+        ],
+        "g1",
+        tents,
+        ["tent-g1"],
+      ),
+    ).toEqual(["veg"]);
+  });
+});
+
+describe("plantsForAlertPersistence", () => {
+  const rows = [TENT_ROLLED_UP_FLOWER];
+
+  it("returns the rows of a current, successful read", () => {
+    expect(plantsForAlertPersistence({ data: rows, isError: false })).toBe(rows);
+    expect(plantsForAlertPersistence({ data: [], isError: false })).toEqual([]);
+  });
+
+  it("holds (null) while pending, on placeholder data, and on any failed read", () => {
+    expect(plantsForAlertPersistence({ data: undefined, isError: false })).toBeNull();
+    expect(plantsForAlertPersistence({ data: rows, isPlaceholderData: true })).toBeNull();
+    expect(plantsForAlertPersistence({ data: undefined, isError: true })).toBeNull();
+    // A failed refresh keeps cached rows for display; they never decide a write.
+    expect(plantsForAlertPersistence({ data: rows, isError: true })).toBeNull();
+  });
+});
+
 describe("Alerts judges a grow by its tent-attributed plants", () => {
   it("persists against Flower for a grow-less Flower plant in the grow's Veg tent", async () => {
     plantsState.value = { data: [TENT_ROLLED_UP_FLOWER], isError: false };
@@ -174,26 +241,29 @@ describe("Alerts judges a grow by its tent-attributed plants", () => {
     expect(lastPersistFor("g1")?.enabled).toBe(false);
   });
 
-  it("a failed plant refresh keeps the cached plant stages (Codex review on #1683)", async () => {
+  it("a failed plant refresh holds persistence; the header keeps the cached stages", async () => {
+    // Codex review on #1683: a write needs a current, successful plant read.
+    // The cached rows still describe the grow for display.
     plantsState.value = { data: [TENT_ROLLED_UP_FLOWER], isError: true };
     render(
       <MemoryRouter initialEntries={["/alerts"]}>
         <Alerts />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(lastPersistFor("g1")?.enabled).toBe(true));
-    expect(lastPersistFor("g1")?.stage).toBe("flower");
+    await waitFor(() => expect(lastPersistFor("g1")).toBeDefined());
+    expect(lastPersistFor("g1")?.enabled).toBe(false);
+    expect(screen.getByTestId("alerts-context-header-stage").textContent).toMatch(/Flower/);
   });
 
-  it("a failed plant read adds no plant signal; the grow and tent decide", async () => {
+  it("a failed plant read holds persistence instead of judging without plants", async () => {
     plantsState.value = { data: undefined, isError: true };
     render(
       <MemoryRouter initialEntries={["/alerts"]}>
         <Alerts />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(lastPersistFor("g1")?.enabled).toBe(true));
-    expect(lastPersistFor("g1")?.stage).toBe("veg");
+    await waitFor(() => expect(lastPersistFor("g1")).toBeDefined());
+    expect(lastPersistFor("g1")?.enabled).toBe(false);
   });
 
   it("the components roll up tent-attributed plants themselves", () => {

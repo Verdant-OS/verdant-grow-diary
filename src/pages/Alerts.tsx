@@ -27,6 +27,7 @@ import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow"
 import AlertsEmptyStateSnapshotCta from "@/components/AlertsEmptyStateSnapshotCta";
 import GrowTargetsEditor from "@/components/GrowTargetsEditor";
 import { pickAlertsGrowContext } from "@/lib/alertFreshnessContext";
+import { plantsForAlertPersistence } from "@/lib/alertPlantStageScopeRules";
 import SensorSourceProvenanceBadge from "@/components/SensorSourceProvenanceBadge";
 import { deriveAlertReadingSource } from "@/lib/alertReadingSourceRules";
 import { Badge } from "@/components/ui/badge";
@@ -119,13 +120,13 @@ export default function Alerts() {
   );
   // Plant stages count toward the alert stage (QA 2026-09-24, BUG-006). Each
   // alert component keeps the plants that resolve to its grow, by grow_id or
-  // through the grow's tents (growAttributionRules). While the plant read is
-  // pending, `null` holds alert persistence back; a failed read contributes
-  // no plant signal rather than blocking alerting.
+  // through the grow's tents (growAttributionRules). The header shows the
+  // cached stages through a failed refresh; persistence needs a current,
+  // successful read, so a pending or failed read (`null`) holds it back
+  // (Codex review on #1683).
   const plantsQuery = usePlants();
-  // A failed refresh keeps the cached stages; only a read that never
-  // returned data falls back to no plant signal.
-  const plantsForAlertStage = plantsQuery.data ?? (plantsQuery.isError ? [] : null);
+  const plantsForAlertStage = plantsQuery.data ?? null;
+  const plantsForPersistence = plantsForAlertPersistence(plantsQuery);
 
   const headerStage = scopedGrowId ? (stageByGrow.get(scopedGrowId) ?? null) : null;
 
@@ -239,7 +240,7 @@ export default function Alerts() {
           key={gid}
           growId={gid}
           stage={stageByGrow.get(gid) ?? null}
-          plants={plantsForAlertStage}
+          plants={plantsForPersistence}
         />
       ))}
       <GrowBreadcrumbs

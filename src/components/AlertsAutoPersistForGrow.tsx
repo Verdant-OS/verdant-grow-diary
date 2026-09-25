@@ -36,9 +36,9 @@ interface Props {
   /**
    * Active plants (any grow), QA 2026-09-24 BUG-006. The ones that resolve
    * to this grow, by their own grow_id or else through one of this grow's
-   * tents, add their stages. `null` means the plant read has not settled:
-   * persistence waits, as it does for tents. Omitted keeps the grow + tent
-   * resolution.
+   * tents, add their stages. `null` means there is no current, successful
+   * plant read (pending or failed): persistence waits. Omitted keeps the
+   * grow + tent resolution.
    */
   plants?: ReadonlyArray<AlertStagePlant> | null;
 }

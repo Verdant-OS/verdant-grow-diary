@@ -5,8 +5,6 @@
  * Flower targets are 40–55%. Plant stages now join the alert stage
  * resolution under the same consensus / harvest-cap / most-advanced rules.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
@@ -136,12 +134,7 @@ describe("alert surfaces use the plant stage", () => {
     expect(screen.getByTestId("alerts-context-header-stage").textContent).toMatch(/Flower/);
   });
 
-  it("the scoped Dashboard passes plant stages to the resolver", () => {
-    // @source-scan-justified: the Dashboard needs the full auth/grow/query
-    // harness; the resolver input is asserted at the call site. The Alerts
-    // page wiring is rendered in alerts-page-plant-stage-attribution.
-    const dashboard = readFileSync(resolve(process.cwd(), "src/pages/Dashboard.tsx"), "utf8");
-    expect(dashboard).toMatch(/plantStages: plants\s*\.filter/);
-    expect(dashboard).toMatch(/tentsQuery\.isFetched && plantsQuery\.isFetched/);
-  });
+  // The scoped Dashboard's plant-stage and persistence wiring is rendered in
+  // dashboard-alert-persistence-plant-read; the Alerts page wiring in
+  // alerts-page-plant-stage-attribution.
 });

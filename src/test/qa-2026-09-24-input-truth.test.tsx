@@ -66,6 +66,13 @@ describe("tent size validation (BUG-012)", () => {
     "4x-,5",
     "-.5x4",
     "4 x −.5",
+    // The maximum applies after unit conversion (Codex review on #1683).
+    "10000x10000 ft",
+    "400 x 400 m",
+    "5000x5000 in",
+    "4x4x200000 mm",
+    "100.5 x 20 m",
+    "340' x 10'",
   ])("rejects %s", (size) => {
     expect(tentSizeValidationMessage(size)).toBe(TENT_SIZE_INVALID_MESSAGE);
   });
@@ -87,6 +94,14 @@ describe("tent size validation (BUG-012)", () => {
     "4 - 5 ft",
     "4 − 5 ft",
     "4x.5",
+    // A room just over 10 m is a real room, not an absurd one.
+    "10001x10001 mm",
+    "12000 x 8000 mm",
+    "20x40 ft",
+    "100 x 100 m",
+    "300 x 150 ft",
+    "30 m x 10 m",
+    "1000 x 1000 cm",
   ])("accepts %s", (size) => {
     expect(tentSizeValidationMessage(size)).toBeNull();
   });

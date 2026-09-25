@@ -3,6 +3,10 @@ import EcowittLatestSnapshotCard from "@/components/EcowittLatestSnapshotCard";
 import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
+import {
+  plantsForAlertPersistence,
+  resolveSelectedTentPlantStages,
+} from "@/lib/alertPlantStageScopeRules";
 import { formatStabilityChipView } from "@/lib/dashboardStabilityChipCopyRules";
 import StabilityChipDrilldown from "@/components/StabilityChipDrilldown";
 import {
@@ -198,12 +202,13 @@ export default function Dashboard() {
     ? resolveAlertContextStage({
         growStage: scopedGrow.stage,
         tentStages: stageContextTents.map((t) => t.stage),
-        // Plants in the same selection scope (QA 2026-09-24, BUG-006).
-        plantStages: plants
-          .filter((p) => !p.isArchived && selectedTentIds.includes(p.tentId))
-          .map((p) => p.stage),
+        // Plants in the same selection scope that belong to this grow by the
+        // canonical attribution (QA 2026-09-24, BUG-006; Codex on #1683).
+        plantStages: resolveSelectedTentPlantStages(plants, scopedGrow.id, tents, selectedTentIds),
       }).stage
     : null;
+  // Only a current, successful plant read may decide a persisted stage.
+  const plantsForPersistence = plantsForAlertPersistence(plantsQuery);
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,
     tents.map((t) => t.id),
@@ -292,8 +297,9 @@ export default function Dashboard() {
     // is a placeholder empty array and alertContextStage falls back to the
     // grow row alone — an alert persisted against a stale grow stage in
     // that window would not be removed once the tent stages arrive.
-    // Plants gate the same way: their stages now feed alertContextStage.
-    enabled: !!scopedGrowId && tentsQuery.isFetched && plantsQuery.isFetched,
+    // Plants gate on a current, successful read: their stages feed
+    // alertContextStage, and `isFetched` is also true after a failed read.
+    enabled: !!scopedGrowId && tentsQuery.isFetched && plantsForPersistence !== null,
     stage: alertContextStage,
   });
 

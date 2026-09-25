@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PrivacyNote, SupportLayout } from "./SupportLayout";
 import { HoneypotField } from "./HoneypotField";
-import { registerKeepingTypedText } from "@/lib/preHydrationFormInput";
 import { checkSpam, fingerprint, recordSubmission } from "./spamGuard";
 
 const RATING_LABELS = ["Poor", "Below average", "Okay", "Good", "Excellent"] as const;
@@ -141,9 +140,7 @@ export default function Feedback() {
     },
   });
 
-  const { handleSubmit, setValue, watch, formState } = form;
-  // Every registered field is text; keep what a visitor typed before hydration.
-  const register = registerKeepingTypedText(form);
+  const { register, handleSubmit, setValue, watch, formState } = form;
 
   const onSubmit = async (values: FeedbackValues) => {
     setSubmitState("submitting");

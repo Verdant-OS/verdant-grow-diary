@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/select";
 import { PrivacyNote, SupportLayout } from "./SupportLayout";
 import { HoneypotField } from "./HoneypotField";
-import { registerKeepingTypedText } from "@/lib/preHydrationFormInput";
 import { checkSpam, fingerprint, recordSubmission } from "./spamGuard";
 
 const CATEGORIES = [
@@ -66,9 +65,7 @@ export default function Contact() {
     },
   });
 
-  const { handleSubmit, setValue, watch, formState } = form;
-  // Every registered field is text; keep what a visitor typed before hydration.
-  const register = registerKeepingTypedText(form);
+  const { register, handleSubmit, setValue, watch, formState } = form;
 
   const onSubmit = async (values: ContactValues) => {
     setSubmitState("submitting");

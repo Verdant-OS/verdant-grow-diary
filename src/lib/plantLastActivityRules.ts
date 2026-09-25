@@ -45,14 +45,39 @@ function entryTime(row: { entry_at?: string | null; created_at?: string | null }
   return null;
 }
 
-/** The newest row by entry time (first one wins a tie), or null. */
+function createdTime(row: ActivityRow): number {
+  const ms = typeof row.created_at === "string" ? Date.parse(row.created_at) : Number.NaN;
+  return Number.isFinite(ms) ? ms : Number.NEGATIVE_INFINITY;
+}
+
+function rowId(row: ActivityRow): string {
+  return typeof row.id === "string" ? row.id : "";
+}
+
+/**
+ * True when `a` is the newer activity: entry time, then created_at, then id
+ * (Codex review on #1683). Companion rows from one Quick Log action can share
+ * an entry time, and the read orders by entry_at only, so the order rows
+ * arrive in must never decide which one is shown.
+ */
+function isNewerActivity(a: { row: ActivityRow; ms: number }, b: { row: ActivityRow; ms: number }) {
+  if (a.ms !== b.ms) return a.ms > b.ms;
+  const createdA = createdTime(a.row);
+  const createdB = createdTime(b.row);
+  if (createdA !== createdB) return createdA > createdB;
+  return rowId(a.row) > rowId(b.row);
+}
+
+/** The newest row by entry time, with a deterministic tie-break, or null. */
 function newestActivity<T extends ActivityRow>(
   rows: ReadonlyArray<T>,
 ): { row: T; ms: number } | null {
   let newest: { row: T; ms: number } | null = null;
   for (const row of rows) {
     const ms = entryTime(row);
-    if (ms !== null && (newest === null || ms > newest.ms)) newest = { row, ms };
+    if (ms === null) continue;
+    const candidate = { row, ms };
+    if (newest === null || isNewerActivity(candidate, newest)) newest = candidate;
   }
   return newest;
 }

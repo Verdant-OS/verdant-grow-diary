@@ -243,9 +243,12 @@ export default function Plants() {
   );
 
   // Grow filter — sourced from the workspace grows list + active plants.
+  // Until the grows list has loaded it is empty, so the "in archived grows"
+  // count would name every assigned plant.
+  const growsListResolved = !growsLoading && !growsError;
   const growFilterOptions = useMemo(
-    () => buildGrowFilterOptions(grows, allGrowsActivePlants, tentGrowById),
-    [grows, allGrowsActivePlants, tentGrowById],
+    () => buildGrowFilterOptions(grows, allGrowsActivePlants, tentGrowById, { growsListResolved }),
+    [grows, allGrowsActivePlants, tentGrowById, growsListResolved],
   );
 
   // Grow scope: real grows are scoped server-side via urlGrowId; the

@@ -77,10 +77,14 @@ async function fetchTentSensorWindow(
   if (sources.length > 0) {
     query = query.in("source", [...sources]);
   }
+  // `id` is the unique last key: one ingest writes several metric rows with
+  // the same captured_at, ts and created_at, and without it the limit could
+  // keep a different subset of them on each read.
   const { data, error } = await query
     .order("captured_at", { ascending: false, nullsFirst: false })
     .order("ts", { ascending: false })
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(perTentLimit);
   if (error) throw error;
   return requireEffectiveSensorReadings(data);

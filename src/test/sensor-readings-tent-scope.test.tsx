@@ -22,7 +22,7 @@ const io = vi.hoisted(() => ({
   owner: "11111111-1111-4111-8111-111111111111",
   responses: new Map<string, unknown>(),
   failTents: new Set<string>(),
-  requests: [] as Array<{ tentId: string | null; limit: number }>,
+  requests: [] as Array<{ tentId: string | null; limit: number; orders: string[] }>,
 }));
 
 vi.mock("@/store/auth", () => ({ useAuth: () => ({ user: { id: io.owner } }) }));
@@ -30,6 +30,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => {
       let tentId: string | null = null;
+      const orders: string[] = [];
       const query = {
         select: () => query,
         eq: (_column: string, value: string) => {
@@ -37,10 +38,13 @@ vi.mock("@/integrations/supabase/client", () => ({
           return query;
         },
         in: () => query,
-        order: () => query,
+        order: (column: string) => {
+          orders.push(column);
+          return query;
+        },
         limit: (limit: number) => {
           const settle = async () => {
-            io.requests.push({ tentId, limit });
+            io.requests.push({ tentId, limit, orders: [...orders] });
             if (tentId && io.failTents.has(tentId)) {
               return { data: null, error: { code: "57014", message: "statement timeout" } };
             }
@@ -188,6 +192,19 @@ describe("useSensorReadings({ tentIds })", () => {
     await result.current.refetch();
     expect(retryScope).toHaveBeenCalledTimes(1);
     expect(io.requests).toEqual([]);
+  });
+
+  it("orders each tent window by a unique id before the limit", async () => {
+    // Codex review on #1683: one ingest writes several metric rows with the
+    // same captured_at, ts and created_at. Without a unique last key the
+    // database picks an arbitrary subset of them at the window boundary.
+    io.responses.set(TENT_A, [row(A1, TENT_A, "2026-09-20T10:00:00Z")]);
+    const { result } = renderHook(() => useSensorReadings({ tentIds: [TENT_A] }, 500), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(io.requests).toHaveLength(1);
+    expect(io.requests[0].orders).toEqual(["captured_at", "ts", "created_at", "id"]);
   });
 
   it("a failed scope refetch is an error even while cached tent ids remain", async () => {

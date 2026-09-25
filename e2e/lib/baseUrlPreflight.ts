@@ -20,7 +20,12 @@ export interface BaseUrlProbe {
   readonly status: number | null;
   /** Visible text of the loaded page. */
   readonly bodyText: string;
+  /** Document title of the loaded page. */
+  readonly title?: string;
 }
+
+/** Every Verdant /auth page names the app in its title and heading. */
+const VERDANT_LANDMARK = /verdant/i;
 
 /**
  * A message naming why the base URL is not serving the app, or null when it
@@ -29,7 +34,12 @@ export interface BaseUrlProbe {
 export function describeUnservedE2EBaseUrl(probe: BaseUrlProbe): string | null {
   const noProject = probe.bodyText.includes(LOVABLE_NO_PROJECT_MARKER);
   const badStatus = probe.status === null || probe.status >= 400;
-  if (!noProject && !badStatus) return null;
+  // A 2xx/3xx page must also be Verdant's: a wrong host or soft-404 would
+  // otherwise pass here and fail later as a #signin-email timeout, or not at
+  // all when cached auth from that origin is reused (Codex review on #1683).
+  const notVerdant =
+    !VERDANT_LANDMARK.test(probe.bodyText) && !VERDANT_LANDMARK.test(probe.title ?? "");
+  if (!noProject && !badStatus && !notVerdant) return null;
 
   let origin = probe.url;
   try {
@@ -38,7 +48,11 @@ export function describeUnservedE2EBaseUrl(probe: BaseUrlProbe): string | null {
     // keep the raw value
   }
   const answered = probe.status === null ? "gave no response" : `answered HTTP ${probe.status}`;
-  const detail = noProject ? ` ("${LOVABLE_NO_PROJECT_MARKER}.")` : "";
+  const detail = noProject
+    ? ` ("${LOVABLE_NO_PROJECT_MARKER}.")`
+    : badStatus
+      ? ""
+      : ', but its /auth page shows no "Verdant" title or heading';
   return (
     `E2E_BASE_URL is not serving the Verdant app: ${origin} ${answered}${detail}. ` +
     "This is a configuration problem, not a sign-in failure. Point the E2E_BASE_URL and " +

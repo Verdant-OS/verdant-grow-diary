@@ -40,6 +40,7 @@ async function assertBaseUrlServesApp(page: Page): Promise<void> {
       .locator("body")
       .innerText({ timeout: 5_000 })
       .catch(() => ""),
+    title: await page.title().catch(() => ""),
   });
   if (unserved) throw new Error(unserved);
 }

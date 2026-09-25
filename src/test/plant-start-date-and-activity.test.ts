@@ -289,6 +289,50 @@ describe("last activity text and time come from the same diary row (Codex, #1683
     });
   });
 
+  it("breaks an entry-time tie by created_at, then id, whatever order the rows arrive in", () => {
+    // Codex review on #1683: companion rows from one Quick Log action can
+    // share entry_at, and the read orders by entry_at only, so the first row
+    // returned must not decide which activity is shown.
+    const sameEntry = "2026-09-24T10:00:00Z";
+    const tiedByCreated = [
+      {
+        id: "b",
+        entry_at: sameEntry,
+        created_at: "2026-09-24T10:00:01Z",
+        note: "Earlier companion",
+        details: { event_type: "observation" },
+      },
+      {
+        id: "a",
+        entry_at: sameEntry,
+        created_at: "2026-09-24T10:00:02Z",
+        note: "Later companion",
+        details: { event_type: "watering" },
+      },
+    ];
+    const tiedById = [
+      { id: "a", entry_at: sameEntry, note: "Row a", details: { event_type: "observation" } },
+      { id: "b", entry_at: sameEntry, note: "Row b", details: { event_type: "watering" } },
+    ];
+    for (const set of [tiedByCreated, tiedById]) {
+      const forward = resolvePlantLastActivitySummary({ status: "ready", rows: set, now });
+      const reversed = resolvePlantLastActivitySummary({
+        status: "ready",
+        rows: [...set].reverse(),
+        now,
+      });
+      expect(reversed).toEqual(forward);
+    }
+    expect(resolvePlantLastActivitySummary({ status: "ready", rows: tiedByCreated, now })).toEqual({
+      eventType: "watering",
+      text: "Later companion",
+    });
+    expect(resolvePlantLastActivitySummary({ status: "ready", rows: tiedById, now })).toEqual({
+      eventType: "watering",
+      text: "Row b",
+    });
+  });
+
   it("an entry with no note keeps its type and empty text", () => {
     expect(
       resolvePlantLastActivitySummary({

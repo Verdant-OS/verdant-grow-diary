@@ -115,7 +115,15 @@ export function buildGrowFilterOptions(
   grows: ReadonlyArray<MinimalGrow>,
   plants: ReadonlyArray<MinimalPlant>,
   tentGrowById?: ReadonlyMap<string, string | null>,
+  options: {
+    /**
+     * False while the grows list is loading or failed. It is empty then, so
+     * no plant can be said to sit in an archived grow (Codex review on #1683).
+     */
+    growsListResolved?: boolean;
+  } = {},
 ): PlantsPageGrowOption[] {
+  const growsListResolved = options.growsListResolved ?? true;
   const activePlants = plants.filter((p) => !isInactive(p));
   const totalActive = activePlants.length;
 
@@ -154,7 +162,7 @@ export function buildGrowFilterOptions(
     return !growId || !listedGrowIds.has(growId);
   }).length;
   const allLabel =
-    inUnlistedGrows > 0
+    growsListResolved && inUnlistedGrows > 0
       ? `All grows (${pluralPlants(totalActive)} · ${inUnlistedGrows} in archived grows)`
       : `All grows (${pluralPlants(totalActive)})`;
 

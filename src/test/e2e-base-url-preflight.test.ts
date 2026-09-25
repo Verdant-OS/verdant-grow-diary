@@ -57,13 +57,35 @@ describe("describeUnservedE2EBaseUrl", () => {
         bodyText: "Sign in to Verdant",
       }),
     ).toBeNull();
+    // The server-rendered title is enough when the body text is not read yet.
     expect(
       describeUnservedE2EBaseUrl({
         url: "http://127.0.0.1:5173/auth",
         status: 304,
         bodyText: "",
+        title: "Sign in to Verdant Grow Diary",
       }),
     ).toBeNull();
+  });
+
+  it("flags a healthy page that is not Verdant's (Codex review on #1683)", () => {
+    // A wrong host or soft-404 that answers 2xx/3xx must fail here, not as a
+    // later #signin-email timeout or, with cached auth, not at all.
+    for (const probe of [
+      { bodyText: "Welcome to nginx!", title: "Welcome to nginx!" },
+      { bodyText: "", title: "" },
+      { bodyText: "Page not found" },
+    ]) {
+      const message = describeUnservedE2EBaseUrl({
+        url: "https://wrong.example/auth",
+        status: 200,
+        ...probe,
+      });
+      expect(message).toContain("https://wrong.example");
+      expect(message).toContain("HTTP 200");
+      expect(message).toContain('no "Verdant"');
+      expect(message).toContain("E2E_GROW_1_PLANT_URL");
+    }
   });
 });
 

@@ -35,6 +35,23 @@ describe("grow filter counts reconcile", () => {
     expect(all.label).toBe("All grows (2 plants)");
   });
 
+  it("makes no archived claim until the grows list has loaded", () => {
+    // Codex review on #1683: while useGrows() is loading or failed, `grows`
+    // is empty and every assigned plant looked "in archived grows".
+    const plants = [
+      { id: "p1", name: "A", growId: "g1" },
+      { id: "p2", name: "B", growId: "g2" },
+    ];
+    const [pending] = buildGrowFilterOptions([], plants, undefined, {
+      growsListResolved: false,
+    });
+    expect(pending.label).toBe("All grows (2 plants)");
+    const [resolved] = buildGrowFilterOptions([], plants, undefined, {
+      growsListResolved: true,
+    });
+    expect(resolved.label).toBe("All grows (2 plants · 2 in archived grows)");
+  });
+
   it("attributes through the tent before calling a grow unlisted", () => {
     const tentGrowById = new Map<string, string | null>([["t1", "g2"]]);
     const [all] = buildGrowFilterOptions(

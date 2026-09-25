@@ -8,6 +8,15 @@
  * connect to the pinned production Supabase project. Raw psql execution does
  * not update Supabase's migration tracker, so the generated single transaction
  * records each current migration after its exact body succeeds.
+ *
+ * WARNING before any dispatch (#1701): this lane used to stop at PREFLIGHT on
+ * production with `unexpected_ledger_contract`, because it pinned a ledger
+ * shape production does not have. With the measured shape it now passes
+ * preflight, and production has no ledger rows for these three files, so a
+ * dispatch would go on to APPLY all three. Whether they re-run cleanly on the
+ * current production schema is NOT_MEASURED. The APPLY is one transaction and
+ * fails closed, but read the PREFLIGHT receipt and get a separate owner
+ * decision on these three files before any APPLY.
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";

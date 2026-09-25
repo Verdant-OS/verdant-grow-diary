@@ -121,6 +121,28 @@ describe("alert surfaces use the plant stage", () => {
     expect(args?.enabled).toBe(true);
   });
 
+  it.each([
+    ["failed", { isError: true, isFetched: true }],
+    ["refetching", { isError: false, isFetched: true, isFetching: true }],
+  ])("holds persistence while the tent read is %s (Codex review on #1683)", (_s, state) => {
+    // A failed first read leaves `tents` empty with isFetched true, so a
+    // grow-less plant whose grow is known only through its tent would drop
+    // out of the stage; a refetch may be replacing stale tent rows.
+    vi.mocked(useGrowTents).mockReturnValue({
+      data: state.isError ? undefined : [{ id: "tent-0", name: "Tent 0", stage: "seedling" }],
+      ...state,
+    } as never);
+    render(
+      <AlertsAutoPersistForGrow
+        growId="g1"
+        stage="veg"
+        plants={[{ grow_id: null, tent_id: "tent-0", stage: "flower" }]}
+      />,
+    );
+    const args = vi.mocked(usePersistEnvironmentAlerts).mock.calls.at(-1)?.[0];
+    expect(args?.enabled).toBe(false);
+  });
+
   it("the header names the plant's Flower targets", () => {
     mockTents(["seedling"]);
     render(

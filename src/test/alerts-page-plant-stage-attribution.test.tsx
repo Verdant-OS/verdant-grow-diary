@@ -15,6 +15,7 @@ import Alerts from "@/pages/Alerts";
 import AlertsAutoPersistForGrow from "@/components/AlertsAutoPersistForGrow";
 import AlertsContextHeaderForGrow from "@/components/AlertsContextHeaderForGrow";
 import {
+  isCurrentReadForAlertWrite,
   plantsForAlertPersistence,
   resolveGrowPlantStages,
   resolveSelectedTentPlantStages,
@@ -23,7 +24,11 @@ import {
 type PlantRow = { id: string; grow_id: string | null; tent_id: string | null; stage: string };
 
 const plantsState = vi.hoisted(() => ({
-  value: { data: [] as PlantRow[] | undefined, isError: false },
+  value: { data: [] as PlantRow[] | undefined, isError: false } as {
+    data: PlantRow[] | undefined;
+    isError: boolean;
+    isFetching?: boolean;
+  },
 }));
 const persistMock = vi.hoisted(() => vi.fn());
 
@@ -215,6 +220,17 @@ describe("plantsForAlertPersistence", () => {
     expect(plantsForAlertPersistence({ data: undefined, isError: true })).toBeNull();
     // A failed refresh keeps cached rows for display; they never decide a write.
     expect(plantsForAlertPersistence({ data: rows, isError: true })).toBeNull();
+    // A refetch in flight may be replacing stale rows (Codex review on #1683).
+    expect(plantsForAlertPersistence({ data: rows, isFetching: true })).toBeNull();
+  });
+
+  it("isCurrentReadForAlertWrite accepts only a settled, successful, current read", () => {
+    expect(isCurrentReadForAlertWrite({ data: [], isError: false, isFetching: false })).toBe(true);
+    expect(isCurrentReadForAlertWrite({ data: [] })).toBe(true);
+    expect(isCurrentReadForAlertWrite({ data: undefined })).toBe(false);
+    expect(isCurrentReadForAlertWrite({ data: [], isError: true })).toBe(false);
+    expect(isCurrentReadForAlertWrite({ data: [], isFetching: true })).toBe(false);
+    expect(isCurrentReadForAlertWrite({ data: [], isPlaceholderData: true })).toBe(false);
   });
 });
 
@@ -253,6 +269,17 @@ describe("Alerts judges a grow by its tent-attributed plants", () => {
     await waitFor(() => expect(lastPersistFor("g1")).toBeDefined());
     expect(lastPersistFor("g1")?.enabled).toBe(false);
     expect(screen.getByTestId("alerts-context-header-stage").textContent).toMatch(/Flower/);
+  });
+
+  it("a plant refetch in flight holds persistence (Codex review on #1683)", async () => {
+    plantsState.value = { data: [TENT_ROLLED_UP_FLOWER], isError: false, isFetching: true };
+    render(
+      <MemoryRouter initialEntries={["/alerts"]}>
+        <Alerts />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(lastPersistFor("g1")).toBeDefined());
+    expect(lastPersistFor("g1")?.enabled).toBe(false);
   });
 
   it("a failed plant read holds persistence instead of judging without plants", async () => {

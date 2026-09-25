@@ -149,7 +149,12 @@ describe("Dashboard — static wiring of the shared stage resolver", () => {
     expect(DASHBOARD_PAGE).not.toMatch(/stage:\s*scopedGrow\?\.stage/);
   });
 
-  it("persistence waits for the tent read to settle before trusting the stage", () => {
-    expect(DASHBOARD_PAGE).toContain("enabled: !!scopedGrowId && tentsQuery.isFetched");
+  it("persistence waits for a current tent read before trusting the stage", () => {
+    // A failed read also counts as fetched, so the gate needs a current,
+    // successful read (Codex review on #1683). The behavior is rendered in
+    // dashboard-alert-persistence-plant-read.
+    expect(DASHBOARD_PAGE).toMatch(
+      /enabled:\s*!!scopedGrowId && isCurrentReadForAlertWrite\(tentsQuery\)/,
+    );
   });
 });

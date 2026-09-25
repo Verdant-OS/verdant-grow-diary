@@ -87,6 +87,10 @@ describe("formatAlertReasonForDisplay (BUG-015)", () => {
 describe("alerts say resolution is manual (BUG-018)", () => {
   it("states that an in-range reading does not close an alert", () => {
     expect(ALERT_MANUAL_RESOLUTION_NOTE).toMatch(/does not close it automatically/);
+    // Shown for every open alert, including ones no reading triggered (for
+    // example missing targets), so it names no triggering reading (Codex
+    // review on #1683).
+    expect(ALERT_MANUAL_RESOLUTION_NOTE).not.toMatch(/reading above|triggered/i);
     expect(ALERT_LIST_MANUAL_RESOLUTION_NOTE).toMatch(/doesn't close them/);
     // @source-scan-justified: the notes render inside heavy page harnesses.
     const detail = readFileSync(resolve(process.cwd(), "src/pages/AlertDetail.tsx"), "utf8");

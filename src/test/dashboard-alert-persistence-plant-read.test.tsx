@@ -25,6 +25,7 @@ type PlantsQuery = {
   isError: boolean;
   isFetched: boolean;
   isPlaceholderData?: boolean;
+  isFetching?: boolean;
 };
 
 const H = vi.hoisted(() => ({
@@ -32,6 +33,7 @@ const H = vi.hoisted(() => ({
   growStatus: "success" as "loading" | "error" | "success",
   perTentRows: [] as Array<Record<string, unknown>>,
   plantsQuery: { data: [], isError: false, isFetched: true } as PlantsQuery,
+  tentsPatch: {} as Record<string, unknown>,
   persistCalls: [] as PersistArgs[],
 }));
 
@@ -89,6 +91,7 @@ vi.mock("@/hooks/useGrowData", () => ({
     isError: H.growStatus === "error",
     isFetched: H.growStatus === "success",
     refetch: vi.fn(),
+    ...H.tentsPatch,
   }),
   useGrowPlants: () => ({ ...H.plantsQuery, isLoading: false, refetch: vi.fn() }),
 }));
@@ -237,6 +240,7 @@ beforeEach(() => {
   H.growStatus = "success";
   H.perTentRows = [];
   H.plantsQuery = { data: [], isError: false, isFetched: true };
+  H.tentsPatch = {};
   H.persistCalls.length = 0;
 });
 
@@ -283,6 +287,28 @@ describe("scoped Dashboard alert persistence waits for a current plant read", ()
       isFetched: true,
       isPlaceholderData: true,
     };
+    expect(renderDashboard().enabled).toBe(false);
+  });
+});
+
+describe("scoped Dashboard alert persistence waits for current reads (Codex review on #1683)", () => {
+  it("holds while a plant refetch is in flight over cached rows", () => {
+    H.plantsQuery = {
+      data: [plant("p-own", GROW, "flower")],
+      isError: false,
+      isFetched: true,
+      isFetching: true,
+    };
+    expect(renderDashboard().enabled).toBe(false);
+  });
+
+  it("holds when the tent read failed although it counts as fetched", () => {
+    H.tentsPatch = { data: [], isError: true, isFetched: true };
+    expect(renderDashboard().enabled).toBe(false);
+  });
+
+  it("holds while a tent refetch is in flight", () => {
+    H.tentsPatch = { isFetching: true };
     expect(renderDashboard().enabled).toBe(false);
   });
 });

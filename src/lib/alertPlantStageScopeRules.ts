@@ -64,22 +64,34 @@ export function resolveSelectedTentPlantStages(
   return [...(resolveGrowPlantStages(inSelection, growId, growTents) ?? [])];
 }
 
-export interface PlantReadForAlertPersistence<T> {
+export interface ReadForAlertWrite<T> {
   readonly data?: ReadonlyArray<T> | null;
   readonly isError?: boolean;
   readonly isPlaceholderData?: boolean;
+  readonly isFetching?: boolean;
+}
+
+/**
+ * True only for a read whose rows are current: it succeeded, shows no
+ * placeholder data, and no refetch is in flight. A failed refresh keeps
+ * cached rows, and a refetch may be replacing stale ones; either can decide
+ * a stage that the next rows contradict, and a persisted alert is not
+ * removed when they arrive (Codex review on #1683). Display may still use
+ * cached rows.
+ */
+export function isCurrentReadForAlertWrite<T>(query: ReadForAlertWrite<T>): boolean {
+  return (
+    query.isError !== true &&
+    query.isPlaceholderData !== true &&
+    query.isFetching !== true &&
+    Array.isArray(query.data)
+  );
 }
 
 /**
  * The plants that may decide a persisted alert stage: only those of a
- * current, successful read. `null` holds persistence while the read is
- * pending, shows placeholder data, or has failed, including a failed refresh
- * over cached rows (Codex review on #1683). Cached rows may still describe
- * the grow on screen; they never decide a write.
+ * current read (see isCurrentReadForAlertWrite). `null` holds persistence.
  */
-export function plantsForAlertPersistence<T>(
-  query: PlantReadForAlertPersistence<T>,
-): ReadonlyArray<T> | null {
-  if (query.isError === true || query.isPlaceholderData === true) return null;
-  return Array.isArray(query.data) ? query.data : null;
+export function plantsForAlertPersistence<T>(query: ReadForAlertWrite<T>): ReadonlyArray<T> | null {
+  return isCurrentReadForAlertWrite(query) ? (query.data ?? null) : null;
 }

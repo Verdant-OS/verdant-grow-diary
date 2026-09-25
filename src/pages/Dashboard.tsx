@@ -4,6 +4,7 @@ import { stripBackPointerTokens } from "@/lib/actionQueueProvenanceRules";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
 import {
+  isCurrentReadForAlertWrite,
   plantsForAlertPersistence,
   resolveSelectedTentPlantStages,
 } from "@/lib/alertPlantStageScopeRules";
@@ -293,13 +294,12 @@ export default function Dashboard() {
       dashboardHealthSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    // Gated on the tent read having settled: while it is pending, `tents`
-    // is a placeholder empty array and alertContextStage falls back to the
-    // grow row alone — an alert persisted against a stale grow stage in
-    // that window would not be removed once the tent stages arrive.
-    // Plants gate on a current, successful read: their stages feed
-    // alertContextStage, and `isFetched` is also true after a failed read.
-    enabled: !!scopedGrowId && tentsQuery.isFetched && plantsForPersistence !== null,
+    // Gated on current, successful tent and plant reads: while either is
+    // pending, has failed (`isFetched` is true then too) or is refetching,
+    // alertContextStage may rest on missing or stale rows, and an alert
+    // persisted in that window would not be removed once they arrive.
+    enabled:
+      !!scopedGrowId && isCurrentReadForAlertWrite(tentsQuery) && plantsForPersistence !== null,
     stage: alertContextStage,
   });
 

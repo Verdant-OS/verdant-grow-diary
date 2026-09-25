@@ -274,11 +274,18 @@ Deno.serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return calmFailure("http");
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: auth } } },
-    );
+    // createClient throws on a missing URL or key, which would surface as an
+    // unexpected failure instead of the configuration outage it is.
+    const authSupabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!authSupabaseUrl || !supabaseAnonKey) {
+      const missing = !authSupabaseUrl ? "supabase_url" : "supabase_anon_key";
+      console.log(`ai-doctor-review status=config_missing missing=${missing}`);
+      return calmFailure("config");
+    }
+    const supabase = createClient(authSupabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: auth } },
+    });
     const { data: u } = await supabase.auth.getUser();
     if (!u?.user) return calmFailure("http");
     const userId = u.user.id;

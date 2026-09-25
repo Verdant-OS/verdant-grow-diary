@@ -72,7 +72,7 @@ export function formatSnapshotCapturedAt(
  * actions so the rule is stated, not discovered.
  */
 export const ALERT_MANUAL_RESOLUTION_NOTE =
-  "This alert stays open until you resolve or dismiss it. A newer reading back in range does not close it automatically, and the reading above is the one that triggered it.";
+  "This alert stays open until you resolve or dismiss it. A newer reading back in range does not close it automatically.";
 
 /** Short form for the Open section of the Alerts list. */
 export const ALERT_LIST_MANUAL_RESOLUTION_NOTE =

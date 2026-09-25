@@ -24,7 +24,11 @@ import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
-import { type AlertStagePlant, resolveGrowPlantStages } from "@/lib/alertPlantStageScopeRules";
+import {
+  type AlertStagePlant,
+  isCurrentReadForAlertWrite,
+  resolveGrowPlantStages,
+} from "@/lib/alertPlantStageScopeRules";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 
 interface Props {
@@ -47,13 +51,13 @@ export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Prop
   const safeGrowId = growId ?? null;
   const tentsQuery = useGrowTents(safeGrowId ?? undefined);
   const tents = tentsQuery.data ?? [];
-  // Persistence is gated on the tent read having SETTLED (success or
-  // error): while the query is pending, `tents` is a placeholder empty
-  // array and the resolver would fall back to the grow row alone — an
-  // alert persisted against a stale grow stage in that window would not
-  // be removed when the tent stages arrive. After an error, proceeding
-  // with the grow row alone matches the pre-resolver behavior.
-  const tentsSettled = tentsQuery.isFetched;
+  // Persistence needs a current, successful tent read. While it is pending
+  // or has failed, `tents` is empty: the stage would fall back to the grow
+  // row alone and a grow-less plant, placed in this grow only through its
+  // tent, would drop out. A refetch may be replacing stale tent rows. An
+  // alert persisted in any of those windows is not removed when the tent
+  // stages arrive (Codex review on #1683).
+  const tentsCurrent = isCurrentReadForAlertWrite(tentsQuery);
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(safeGrowId, tentIds);
   const snapshot = buildSensorSnapshotReadState(sensorState).confirmedSnapshot;
@@ -80,7 +84,7 @@ export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Prop
       snapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    enabled: !!safeGrowId && tentsSettled && plantsSettled,
+    enabled: !!safeGrowId && tentsCurrent && plantsSettled,
     stage: resolvedStage,
   });
 

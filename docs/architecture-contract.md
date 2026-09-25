@@ -1187,8 +1187,14 @@ AC-6.4.
 shapes of test: one that reads the source of `playwright.config` or `vitest.config` without
 importing it (`CONFIG_FILES = ["playwright.config", "vitest.config"]`, `:53`), and, since `#1221`,
 one that reads `package.json` as raw text and asserts on that text instead of the parsed object
-(`JSON_CONFIG_FILES = ["package.json"]`, `:68`). Neither shape is any of T1–T8, which read no
-config. Citing it as the reason T2–T4 must import was wrong: the underlying principle — verify
+(`JSON_CONFIG_FILES = ["package.json"]`, `:68`). T2–T8 read no config, so neither shape is any
+of them. T1 is the one exception: it opens every cited file and matches a snippet on the named
+line, and this document cites `package.json` at six lines (`:9`, `:20-21`, `:65`, `:317`,
+`:318`, `:361`). That is citation integrity, not verification of effective configuration, which
+is the only thing the checker guards; it is the "proving a string is present or absent" use
+`AGENTS.md` keeps for source scans. A T1 runner placed anywhere the checker scans therefore
+declares `@source-scan-justified: citation integrity` rather than importing `package.json`. Citing
+the checker as the reason T2–T4 must import was wrong: the underlying principle — verify
 effective configuration by resolving it when possible, and use scanning to prove absence,
 structure, or unexported Deno-entry constants — is what governs here, not that checker's scope.
 

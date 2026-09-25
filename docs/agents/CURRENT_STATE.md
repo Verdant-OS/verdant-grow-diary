@@ -1,7 +1,293 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-25 UTC (tip read 20:17 UTC; tip lanes read 20:17 UTC, now settled, the three push-lane logs that turned red after the 14:27 read (`CI`, `Full Vitest Suite (PR gate)`, `Core Link and Form Census`) read 20:18 UTC; `#1696` head `d5b85628` lanes settled 15:28 UTC on their first attempt, read 20:17 UTC; Vercel production deployment list and alias records re-read 20:17 UTC for `verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app` and the project alias; public serving state `NOT_MEASURED`; this stamp's own time is its git commit time)
-**Updated by:** Claude (2026-09-25 evening, restamp on the **same deploy tip `db0f3d73d63ebc7ab780f9d1b561cef4eed1cc74`**, the `#1700` squash, on Cheek's explicit instruction: "Restamp CURRENT_STATE with the settled head lanes on d5b85628". **Zero commits** merged since the 14:53 stamp; no migration (§1). This stamp records **this file's own PR head `d5b85628` lanes after they settled: 27 runs, 25 green, 1 skipped, 1 red — every lane green on its first attempt, nothing cancelled, nothing re-run; the one red is the dependency audit for the known cause** (§8), **the tip's own lanes now settled: 38 runs, 28 green, 1 skipped, 9 red — the three reds added since 14:27 are two `bun install` tarball-integrity deaths (push `CI` shard 15/32, Vitest gate batch 9/16) and the authenticated link census timing out on `/tents/…` after a `/pheno-hunts/new` click** (§8), and **Codex's independent review: still seventeen passes on seventeen heads, four P1 and thirty-seven P2, all carried; no pass had started on `d5b85628` by 20:17** (§5). Vercel at 20:17: unchanged since 14:28 — the project alias on the `db0f3d73` build, the apex, `www` and `verdant-grow-diary.vercel.app` on `9b06be3f` (§2). No Publish. No APPLY. `HOLD #1250`. Prior header follows.)
+**Last updated:** 2026-09-25 UTC (tip read 21:04 UTC; tip lanes read 21:04 UTC; `#1696` head `14c603da` lanes: 26 of 27 concluded by 20:48 UTC, `deployment-preview` still queued at its final publish job when read at 21:04 UTC — stamped on Cheek's instruction with that lane recorded as queued; Vercel production deployment list and alias records read 20:52 UTC for `verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app` and the project alias; public serving state `NOT_MEASURED`; this stamp's own time is its git commit time)
+**Updated by:** Claude (2026-09-25 evening, restamp on the **new deploy tip `2f67a54583e20a4b10debf8c4883a887d8a402b6`**, the `#1657` squash, on Cheek's explicit instruction: "Restamp CURRENT_STATE with the settled head lanes on 14c603da". **Five commits** merged since the 20:21 stamp: `#1711` at 20:21:44 through the merge queue with the 35 pinned required contexts green on its merge-group head, then **`#1704`, `#1705`, `#1661` and `#1657` between 20:30:37 and 20:33:32, each merged by the owner directly — no merge-group run, the PR head's `CI` still queued at merge time, the `Required-check audit` `FAIL` on each tip it has reached** (§4). **`#1704` adds a migration, `20260925090000_user_roles_client_grant_hardening.sql` — committed, not applied** (§1, §9). This stamp records **this file's own PR head `14c603da` lanes after they settled: 27 runs, 24 green, 1 skipped, 1 red, 1 still queued — every run on attempt 1, nothing cancelled, nothing re-run; the red is the dependency audit for the known cause; the queued one is `deployment-preview`'s final publish job, its preflight and build jobs green** (§8), the new tip's lanes as read (§8), **Codex's independent review: eighteen passes on eighteen heads, four P1 and forty-one P2, all carried; the eighteenth pass ran on `14c603da` and its four P2 are carried by this stamp; `d5b85628` was never reviewed; a second owner-side self-check (`5322413620`, 20:31) is recorded with its five findings carried or answered** (§5), and Vercel at 20:52: five more git production builds, one per merge; the project alias now points to the `2f67a545` build, the tenth since the rollback, while the apex, `www` and `verdant-grow-diary.vercel.app` still point to `9b06be3f` (§2). No Publish. No APPLY. `HOLD #1250`. Prior header follows.)
+
+## 1. Deploy tip `2f67a545` — five commits since the 20:21 stamp; one adds a migration
+
+`established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
+21:04 UTC; `git log db0f3d73..origin/verdant-grow-diary`; the GitHub API for `#1711`.
+
+| Field      | Value                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| Tip        | **`2f67a54583e20a4b10debf8c4883a887d8a402b6`**                                              |
+| Subject    | `fix(blueprint): withhold current scores for stale and unconfirmed evidence` (`#1657`, author and merger `cheekhimself`, from Codex branch `codex/blueprint-sensor-evidence-truth-20260923`; merged 20:33:32 by the owner directly, not through the merge queue — §4) |
+| Parents    | `b77d28a8` (`#1661`, 20:32:12) ← `84814341` (`#1705`, 20:31:04) ← `0f7b12db` (`#1704`, 20:30:37) ← `f9f697ae` (`#1711`, 20:21:44, merge queue) ← `db0f3d73` (`#1700`) ← `054a4e3e` ← `5a5094cc` ← `b099bbf7` ← `c10c095e` ← `9b06be3f` |
+| Since      | the 20:21 stamp: **5 commits**, 17 files, +2,082 / −93. `#1711`: one test file. `#1704`: the migration below, a PG15 harness workflow `.github/workflows/user-roles-client-grant-hardening-pg15.yml`, `scripts/run-user-roles-client-grant-hardening-pg15-harness.mjs`, a migration test, and `scripts/run-staff-role-rls-harness.ts` (+8/−4). `#1705`: `docs/architecture-contract.md` only. `#1661`: `src/components/genetics/BreedingLogContainer.tsx` and a test. `#1657`: `src/lib/blueprintEvidenceRules.ts` (new), `src/lib/blueprintOverlayViewModel.ts`, `src/components/PlantBlueprintOverlaySection.tsx`, `src/components/ProBlueprintOverlay.tsx` and four tests. No `config/`, no governance file, not this file |
+| Migrations | **1 — `supabase/migrations/20260925090000_user_roles_client_grant_hardening.sql` (`#1704`).** Its header (`source claim` from the file): removes `anon`'s and `PUBLIC`'s privileges on `public.user_roles` and narrows `authenticated` to `SELECT`; fails closed (SQLSTATE 55000) if a prerequisite differs; re-running is a no-op; it cites a read-only production measurement on 2026-09-25 as its motivation. **Committed is not applied**: `#1704`'s own body says "This PR applies nothing … Delivering it to production needs a protected apply lane (like #1701 and #1703) or an owner-run path; not built here." Production applied state `NOT_MEASURED` by this session. No APPLY. |
+| Config     | `config/required-status-checks.json` unchanged: 35 pinned **required** contexts, 7 **mustBeGreen** |
+
+A commit alone never proves deployment: the tip was built as a Vercel production deployment, but the
+custom-domain alias records still point to `9b06be3f` (§2); public serving state `NOT_MEASURED`. This
+PR's branch carries `2f67a545` by forward merge (`b9f88e40e`, after `93794aeb` for `f9f697ae`); the diff
+against the tip is still this one file.
+
+## 2. Live — the custom-domain alias records still point to `9b06be3f`; the project alias has moved to the `2f67a545` build, the tenth unpromoted git build since the rollback
+
+`established fact` from Vercel's API (project `prj_i2IbBKEA9K2rLLaAO3nrBeJkTXTy`, read-only, 20:23 and 20:52 UTC):
+
+- **Five production deployments since the 20:21 stamp**, all `source: git`, `target: production`, one per merge: `dpl_7VRbqFNpBbk3hEdSNCLhVMZ4xQdG` (`f9f697ae`, created 20:21:45, READY 20:22:19), `dpl_D3m8dp3URRP9oRTL3otXvNwseqah` (`0f7b12db`, 20:30:39), `dpl_69LgCtMpYH4havs1zvdn7PwZMSux` (`84814341`, 20:31:07), `dpl_CBByw3jPuYMQAsRijMCTHgZHYYFe` (`b77d28a8`, 20:32:15) and `dpl_9EW5UbtB7d6ffgkGqJBwLkvirhTi` (`2f67a545`, 20:33:35, READY 20:34:16), the newest listed.
+- **At 20:52 the hostname lookups say: `verdantgrowdiary.com`, `www.verdantgrowdiary.com` and `verdant-grow-diary.vercel.app` → `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY` (`9b06be3f`); the project alias `verdant-grow-diary-verdantgrowdiary.vercel.app` → `dpl_9EW5UbtB…` (`2f67a545`), and the branch alias with it** (at 20:23 it pointed to the `f9f697ae` build).
+  Internal alias records, not a public DNS or HTTP check. `practical observation`: the
+  `dpl_6fVRiJ3X…` deployment's own `alias` array still lists all five hostnames; the per-hostname
+  lookup is the assignment this file cites.
+- **Ten git production deployments after the instant rollback have now each taken only the project and branch aliases, never the custom domains** (`c10c095e` 12:04, `b099bbf7` 13:30, `5a5094cc` 13:46, `054a4e3e` 13:51, `db0f3d73` 14:13, `f9f697ae` 20:21, `0f7b12db` 20:30, `84814341` 20:31, `b77d28a8` 20:32, `2f67a545` 20:33). That the rollback is what withholds
+  the custom domains is `inference`; the alias records are the observation. **Promoting the tip (or
+  not) is Cheek's decision; no Publish, promote or rollback by Claude.** By Vercel's alias records,
+  three of the four production-facing hostnames are assigned to the `9b06be3f` build, the last tip
+  the owner approved, and the fourth, the project alias, to the `2f67a545` build; what growers
+  actually receive is the public serving state, `NOT_MEASURED` (next bullet).
+- **`NOT_MEASURED`:** the public serving state — no DNS or HTTP check from outside has been made by
+  this session (the egress refuses the apex: HTTP `000` at 11:51, the eighteenth attempt; `CLAUDE.md`
+  names Lovable as publisher; the Quick Log smoke lane targets `verdantgrowdiary-com.lovable.app`).
+  One `established fact` from a job log: the scheduled `lighthouse-ci` run at 13:19 fetched sixteen
+  `https://verdantgrowdiary.com/…` URLs from a GitHub-hosted runner, so the apex answers HTTP from
+  outside; **which build answered is not in that log and stays `NOT_MEASURED`.**
+- **The incident record stands as the 11:25 stamp records it after its amendments** (§2, §3 of the
+  superseded blocks): the Cursor Agent's token redeploy of `7053af8f` aliased 08:29:17 (five aliases:
+  the four production-facing hostnames plus its own branch alias), the owner-authorized rollback
+  09:45:15, the four production-facing aliases back on `dpl_6fVRiJ3X…` at 09:45:16.
+- **Cheek's decisions, recorded, not actioned:** whether the Cursor Agent's token keeps production
+  scope; whether to promote the tip.
+
+## 3. What changed for growers — the 75-minute-59-second window stands; nothing new
+
+`inference` from §2, carried: if the apex is Vercel-served, new page loads got `7053af8f` from 08:29:17 to 09:45:16 UTC; **data
+impact is `NOT_MEASURED`** (no server-side import audit rows; the feasible check is `sensor_readings`
+rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sessions loaded before
+09:45:16 can be excluded — an operator or service-role read). Since 09:45:16 the custom-domain alias records point to `9b06be3f`; no later tip is on the custom domains (§2); what growers receive is `NOT_MEASURED`.
+
+## 4. Merge — `#1711` through the merge queue with the pinned contexts on its head; `#1704`, `#1705`, `#1661` and `#1657` merged directly by the owner with their `CI` still queued
+
+`established fact` from the GitHub API and the Actions API (runs by head SHA, all events); the
+merge-group `CI` jobs were compared by name to the 35 pinned required contexts in
+`config/required-status-checks.json` (the 2026-08-10 snapshot of ruleset `20421416`; whether the live
+ruleset still requires exactly these is `BLOCKED` — no admin token):
+
+- **`#1711` → `f9f697ae`** (author and merger `cheekhimself`, merged 20:21:44): merge-group `CI` run
+  `36184771128` on head branch `gh-readonly-queue/verdant-grow-diary/pr-1711-db0f3d73…` — 35 jobs,
+  all 35 pinned contexts present and green (attempt 1, completed 20:21:35). The merge group's
+  `Security regression` and four PG15 forward-repair lanes green; its `Dependency & Security CI` red
+  (20:16, the known advisories, log not read); its `Full Vitest Suite (PR gate)` green (run `36184771133`, 20:23:56).
+- **Four direct merges by the owner, none through the merge queue** (`established fact`: no `merge_group` run exists for any of the four merge commits; each PR's events show `ready_for_review` on 2026-09-24 then `merged` by `cheekhimself`; each PR's `pull_request`-event `CI` run was still `queued` at `merged_at`):
+  - **`#1704` → `0f7b12db`** (author and merger `cheekhimself`, branch `claude/user-roles-client-grant-hardening`, another Claude session's slice, merged 20:30:37): PR-head `CI` run `36186178958` queued at merge; 29 of its 35 pinned contexts went green after the merge, `Lint, typecheck, test, build` never reported on the head. **Its body says "Independent review required … It needs a different peer (Codex or Grok) before merge"; the reviews on it are two owner-side Claude self-checks, one Copilot and one Codex pass, no verdict.** `Required-check audit` on `0f7b12db` (run `36186200536`, 20:41): `FAIL` — every required shard "was still queued when the merge landed", `Lint, typecheck, test, build` `MISSING`, the seven must-be-green rows "had not finished when the merge landed".
+  - **`#1705` → `84814341`** (`cheekhimself`, branch `claude/new-session-07zuju`, another Claude session's slice, `docs/architecture-contract.md` only, merged 20:31:04): PR-head `CI` run `36186235951` queued at merge, 12 of 35 green afterwards. Audit on `84814341` (run `36186246454`, 20:48): `FAIL`, the same rows.
+  - **`#1661` → `b77d28a8`** (`cheekhimself`, Codex branch `codex/breeding-retry-draft-retention-20260923`, merged 20:32:12): PR-head `CI` run `36186265181` queued at merge, 3 of 35 green afterwards; one Copilot review, no Codex pass. Audit on `b77d28a8` in progress at 20:55.
+  - **`#1657` → `2f67a545`** (`cheekhimself`, Codex branch `codex/blueprint-sensor-evidence-truth-20260923`, merged 20:33:32): PR-head `CI` run `36186469497` queued at merge, 0 of 35 green, its `Lint, typecheck, test, build` job absent from the run; one Codex and one Copilot review. Audit on `2f67a545` queued at 20:55.
+  - These four are the `#1680` class: a merge without the required contexts green on its head. **Merging is Cheek's; this file records it, does not waive it, and does not treat it as precedent** (§11). Whether the four heads pass their lanes is being measured by the runs that started after the merges; the results belong to the tip lanes (§8) and to the next stamp.
+- **`#1700` → `db0f3d73`** (14:13:18), **`#1708` → `b099bbf7`** (13:30:57), **`#1709` → `5a5094cc`**
+  (13:46:37), **`#1692` → `054a4e3e`** (13:51:07) and **`#1702` → `c10c095e`** (12:03:27): as the
+  14:53, 14:11 and 12:25 stamps record, 35 of 35 present and green on each merge-group head.
+- **`Required-check audit`:** `FAIL` on each of the five earlier tips today for the `test:security-db-local` must-be-green coverage-hole row (14:53 stamp §4) — that class is a coverage hole, not a bypass; on `f9f697ae` `FAIL` (run `36185307051`, 20:23; its row not read this stamp — the same class is the inference, not a reading). On `0f7b12db` and `84814341` the audit reports the bypass class above; `#1680` (07:28 stamp §4) is no longer the only recorded bypass. Audit lanes record historical facts and are never re-run.
+- Verdicts `#1692` `PASS` `24d9e197` (now merged at `054a4e3e`), `#1679` `PASS` `c2ce9b10`, `#1698`
+  `PASS` `9e276853`, `#1697` `STALE CHILD` `bd64ca8b` stand; `#1684` independent `PASS` stands.
+  `#1711`, `#1704`, `#1705`, `#1661` and `#1657` were not reviewed by this session; their merge records above are the GitHub and Actions APIs', not verdicts.
+
+## 5. Reviews on `#1696` — Codex: eighteen passes, four P1 and forty-one P2 findings, all carried; `d5b85628` never reviewed; verdict open
+
+`established fact`:
+
+- **`d5b85628` was never reviewed:** no pass started on it in the six hours it was the head (15:14–20:21); Codex's summary stayed on `7d60f045` until the `14c603da` push, which it picked up within a minute (20:21:23). Claude did not request a manual Codex review (§11). **The eighteenth pass ran on `14c603da`** (Security Review completed 20:24, nothing posted; Code Review 20:27, four P2 — carried by this stamp, below).
+- **Cheek marked `#1696` ready for review at 11:18 UTC.** Codex (the named independent reviewer) has run its Security Review and Code Review on exactly eighteen heads (the 14:53 stamp's first commit `f61a1cc7` reviewed 15:01, its amendments `5aa75103` 15:08 and `7d60f045` 15:14, the 20:21 stamp `14c603da` 20:27): `538ca410`, `6eb12549`, `dd75f7b0`, `96a7e0df`, `600c9902`, `b8a3cc17`, `f164c1d5`, `9b4caa63`, `e426bd83`, `c9deaf47`, `e7fabede`, `ccf132dc`, `d22053dd`, `4924e8fb`, `f61a1cc7`, `5aa75103`, `7d60f045` and `14c603da`. **Counting rule:** this record counts every pass whose findings it carries, so the pass on the head an amendment supersedes is always counted by that amendment; **Three heads received no pass:** `51b142b6` (superseded by `96a7e0df` 22 seconds after its push), `aaa2dbb5` (superseded 37 minutes after its push) and `d5b85628` (superseded by `14c603da` after six hours with no pass started). No other head existed; **each new head, this stamp's included, has no pass by construction until Codex runs on it.** (Codex's fourteenth pass also cites a `4c0d142` "with an identical tree"; no object by that id exists on this branch — `git cat-file -t` at 14:30.) The Security Reviews posted nothing.
+  The Code Reviews posted, in order: `538ca410` — **P1** (record the verified rollback; carried at
+  `6eb12549`); `6eb12549` — **P1** (bound the exposure by verified evidence) and **P2** (data impact must stay `NOT_MEASURED`: CSV-import occurrence and possible partial batched writes unreconciled), carried at `dd75f7b0`; `dd75f7b0` — **five P2** (exposure start at the alias event; §1
+  contradiction; no server-side audit rows; alias record is not public DNS; future-dated header),
+  carried at `51b142b6` and `96a7e0df`; `96a7e0df` — **two P2** (header interval still
+  future-dated; data-impact window must not end at the rollback), carried at `600c9902`;
+  `600c9902` — **one P2** (`4104219207`: §5's heading undercounted the P1s), carried at `b8a3cc17`;
+  `b8a3cc17` — **three P2** (`4104366547` header said "live measured"; `4104366557` P2 total said
+  eight when the list summed to nine; `4104366566` five aliases vs four re-assigned), carried at
+  `f164c1d5`; **`f164c1d5` — one P1 and two P2, carried at `9b4caa63`:** `4104421334` (**P1**:
+  `#1702` had merged before the stamp was committed, so "zero commits" and tip `9b06be3f` were
+  stale when published — the 12:25 stamp is on `c10c095e`); `4104421351` (**P2**: the header summary
+  said five passes while §5 said six — the header now counts with §5); `4104421341` (**P2**: §8
+  presented `600c9902`'s settled lanes as this file's own head result after later heads existed —
+  §8 now states the current head's lanes as read, and this stamp's own head as `NOT_MEASURED`); **`9b4caa63` — two P2, carried at `e426bd83`:** `4104492611` (§2 and §3 said what growers were getting when only the alias record was read — reworded to the alias record, serving state `NOT_MEASURED`) and `4104492619` (§8's push-red count said six when five were push runs and the sixth was the merge-group dependency audit). CodeRabbit raised the same two points on `9b4caa63` (`4104485695`, `4104485709`); **`e426bd83` — four P2, carried at `c9deaf47`:** `4104551659` (the 35 contexts are the pinned snapshot, live ruleset match `BLOCKED` — header, §4, §8, §11), `4104551650` (the exposure window keeps its "if the apex is Vercel-served" condition and no "production domain serves" claim remains — header, §2, §3), `4104551663` (the `6eb12549` P2 is the unmeasured-data-impact finding, not "a stale marker"), `4104551668` (`c10c095e` lacks the custom-domain aliases, not all aliases; the project alias then pointed to it — §2); **`c9deaf47` — two P2, carried at `e7fabede`:** `4104608929` (§2's summary sentence and the §11 lock said "the production hostnames" point to `9b06be3f` when one of the four, the project alias, pointed to `c10c095e` — both now state the split) and `4104608934` (the header now records the alias reads separately); **`e7fabede` — one P2, carried at `aaa2dbb5`:** `4104637361` (§1 said the tip was "not serving", a negative result for a `NOT_MEASURED` state — it now states the alias records and keeps serving `NOT_MEASURED`); **`ccf132dc` — one P2, carried at `d22053dd`:** `4105010320` (§5 said both reviews ran "on every head" while `aaa2dbb5` had none — this section names the reviewed heads and the unreviewed ones); **`d22053dd` — four P2, carried at `4924e8fb`:** `4105414341` (the range "from `538ca410` to `e7fabede`" still swept in the unreviewed `51b142b6` — the reviewed SHAs are enumerated), `4105414371` (the `ccf132dc` finding's comment id was mistyped as `4104010320`; it is `4105010320`), `4105414359` (§7 named one of the three migrations the pinned lane applies — all three are named), `4105414349` (§9 called the sandbox gap counts "re-measured" when §8 said their logs were not re-read); **`4924e8fb` — one P1 and two P2, carried by the 14:53 stamp:** `4105483125` (**P1**: `#1700` merged at 14:13:18, before the `4924e8fb` amendment was committed at 14:19 with §1 still on `054a4e3e` and "three commits" — this stamp is on `db0f3d73` with `#1700`'s merge-queue record, §1, §4), `4105483100` (**P2**: the reviewed-heads list omitted `4924e8fb`, which had no pass when it was committed and could not list itself — it is now named, reviewed by the very pass that raised this, and the rule that a stamp's own head is unreviewed until Codex runs on it is stated above), `4105483112` (**P2**: §8 still said the sandbox gap counts were "re-measured by every tip push" while their logs were not read — this stamp read the `db0f3d73` logs and states the counts as a 14:16 measurement, §8, §9; the `b099bbf7`, `5a5094cc` and `054a4e3e` logs remain unread). **`f61a1cc7` — three P2, carried by the `5aa75103` amendment:** `4105807398` (the header said all four red push-lane logs were read when the push-event dependency audit's was not — provenance now stated lane by lane, that lane's cause `NOT_MEASURED`), `4105807439` (§7 said the pinned lane "requires the PREFLIGHT receipt"; the workflow at the tip has no such artifact — it takes three dispatch inputs and runs its preflight inside the apply job, now stated), `4105807424` ("four earlier tips" undercounted five). **`5aa75103` — three P2, carried by the `7d60f045` amendment:** `4105867928` (the header said five red push-lane logs; the tip's six red runs are four `push`, one `merge_group`, one `schedule`, three of the four push logs read — now stated), `4105867944` (§5 omitted the fifteenth pass whose findings the amendment carried — enumerated), `4105867958` (§9's file growth was the `f61a1cc7` figure — remeasured on the committed blob). **`7d60f045` — one P2, carried at `d5b85628`:** `4105912206` (§5 in turn omitted the sixteenth pass whose findings it carried — the counting rule above now makes the record self-consistent: sixteen counted at `7d60f045` would have been right, seventeen is right here). **`14c603da` — four P2, carried by this stamp:** `4108359064` (§5 said two heads had no pass while stating that none ran on `d5b85628` — three unreviewed heads are now named), `4108359044` (the header said `d5b85628`'s lanes were "every lane green on its first attempt" while one was red and one skipped — this stamp says every run was on attempt 1 and gives the counts), `4108359082` (§8 said the tip's push `CI` run had 30 jobs, 29 green — a paginated read; the full read is 35 jobs, 34 green, one red, §8), `4108359075` (§7 said "one dispatch executes all three" and left a clean re-run `NOT_MEASURED` — the script's ledger classification is now recorded: apply, verify-only, or blocked, §7). **Four P1 and forty-one P2 in all, all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files (Markdown excluded); CodeRabbit reviewed `9b4caa63` once (two findings, both carried, both resolved) and skipped every other head.
+- **An owner-side self-check by another Claude session, SHA-locked to `ccf132dc`, posted as a comment review (`5318265378`, 13:31, under the owner's login; not the independent seat).** It verified the rollback, the `c10c095e` build and the split alias state against Vercel (`PASS`), kept the Cursor Agent attribution a `source claim` from its seat, and raised four findings: (1) this file is 1,116,718 bytes / 14,266 lines at that head, +39% over the tip, with twenty-one stamps from this PR — it suggests landing only the final stamp block; (2) stamps that record this PR's own lanes cannot converge — it suggests stamping the tip and production only; (3) `#1701`'s pinned-lane warning was not carried — **carried in §7 since `d22053dd`**; (4) the base had moved to `b099bbf7` — **carried since `d22053dd`**. Findings 1 and 2 are process decisions put to Cheek verbatim in reply `5833265946`; every own-lane restamp was on Cheek's explicit instruction or, as this one, for a reviewer finding; archiving superseded stamps has been Cheek's recorded decision since `a6ec1210`. Its verdict: production record accurate where checkable; it would not merge in the current shape because of finding 1.
+- **A second owner-side self-check by a peer Claude session, SHA-locked to `14c603da`, posted as a comment review (`5322413620`, 20:31; not the independent seat).** Its checks: conflicts `PASS` (merge-tree clean against `f9f697ae`); `#1695` closure `PASS`; hygiene `PASS`; the 20:21 stamp's tip claim `FAIL`; the four Codex P2 on `14c603da` "resolved without a reply" `FAIL`; this head's lanes `NOT_MEASURED` at its read. Its five findings and their disposition here: (1) **"stale when published, for the third time today"** — the facts: `#1711`'s merge-queue commit was created 20:16:09, the PR's `merged_at` (the moment the deploy-branch ref advanced; the tip's push-event runs were created 20:21:45) is 20:21:44, the 20:21 stamp's tip read at 20:17 saw `db0f3d73`, and its commit at 20:21:07 preceded the ref move by 37 seconds — so that stamp stated the tip correctly at its own commit time and was superseded 37 seconds later, unlike the `f164c1d5` and `4924e8fb` cases, which were committed after their merges; the conclusion stands and **this stamp is on `f9f697ae`** (§1). (2) The four P2 are **carried by this stamp** (above) with a reply on each thread naming it; who resolved those four threads between 20:27 and 20:31 is not in the API (`NOT_MEASURED`); Claude did not. (3) The sixth unpromoted build is in §2. (4) **Thirty-three of 47 review threads were unresolved at 20:32**, every one carried by a later commit and last answered by Claude; resolving the threads this PR's commits carried is the owner's hygiene and is done after this stamp's push — the next stamp or the PR body records the count. (5) File growth: the 13:31 self-check's "land only the final stamp block" question to Cheek stands (§9).
+- The two owner-side Claude reads (`5315633209`, `5315834826`) and Claude's replies stand as the 09:21 stamp §5 records; the 13:31 self-check (`5318265378`) stands as the 14:53 stamp records.
+
+## 6. Board — carried; `#1695` confirmed closed
+
+`established fact` at 06:24 UTC (48 open, 18 drafts, 5 stacked); 51 open at the 07:45 read in
+review `5315633209`; `#1702`, `#1708`, `#1709`, `#1692` and `#1700` have since merged. Not re-listed.
+Only `#1696` touches this file. `#1683` is still the one open PR adding a migration; committed is
+not applied. **`#1695`** (`fix(sensors): retain freshness inputs so cached reading status can recover
+with the clock`, draft, stacked on `#1691`): Cheek instructed at 20:1x UTC "Close #1695 as superseded
+by #1677"; the GitHub API showed it already closed by the owner's login at 23:58:15 UTC on
+2026-09-24 with the comment "Closing as superseded by #1677" (`5824283285`), and `#1677` merged at
+06:05:40 today — nothing was re-closed and no second comment was posted.
+
+## 7. Soft-park register — carried
+
+`source claim` (GDP), unchanged since the `#1624` stamp; **not re-measured**.
+
+- **`HOLD #1250`.** Do not touch, ready or merge it.
+- **No Publish. No APPLY.** `#1460` and `#1545` stay parked. `#1701` proposes a delivery lane for `#1460`'s migration; it does not apply it and does not lift the park. Any APPLY is Cheek's dispatch after PREFLIGHT, never Claude's.
+- **Pinned-production lane warning, carried from `#1701` (comment `5829431054`, `source claim` from that slice; the script's own header at the tip is `established fact`):** a `workflow_dispatch` of the lane that runs `scripts/apply-pinned-production-migrations.mjs` would APPLY all three pinned `20260728` migration files against production behind the single confirmation phrase `APPLY PINNED PRODUCTION MIGRATIONS` — the tip's script resolves `20260728090000_production_schema_reconciliation.sql`, `20260728090736_ai_credit_pack_portability.sql` and `20260728103000_schema_audit_trust_hardening.sql`, and one dispatch applies all three in one transaction **only when the production ledger holds none of the three rows** — `established fact` from `classifyTargetLedger` in the script at the tip: all three absent → `apply`; all three present as exact rows → `verify_only` (the apply block is skipped and the report says no persistent production migration write was attempted); any partial, colliding or malformed ledger → `mixed`, `collision` or `invalid`, on which the runner exits with `LEDGER_DRIFT` before writing. A clean re-dispatch after a full apply is therefore verify-only by design; a partial state blocks. `established fact` from `.github/workflows/apply-pinned-production-migrations.yml` at the tip: the dispatch takes three inputs — `expected_head_sha` (must equal the checked-out deploy-branch commit), `confirm_project_ref` (must equal the pinned production project ref) and `confirm_apply` (the phrase above) — validated by a `validate` job; the `apply` job ("Preflight, apply once, and verify", environment `verdant-production-solo-founder`) then runs its read-only preflight inside the same dispatch before applying. There is no separate PREFLIGHT receipt artifact that gates it; the gate is those confirmations, the environment, and the owner's decision to dispatch at all. `#1701`'s header warning is in that open PR, not yet at the tip. Never dispatched by Claude.
+- **Fixture AUTH Soft-park:** after `cheekhimself` re-banks, re-measure the empty Action Queue and the
+  archived Restore XOR. **Never KEEP on fixture walks.** No owner email is recorded in this file.
+- **Soft P2 — parked, do not implement:** sensors / Start Check `growId` omit; Quick Log target count;
+  `/onboarding` preference gate; Assign true-empty needs a zero-tent fixture.
+
+## 8. CI lanes — `#1696` head `14c603da` settled; tip `2f67a545` and its four predecessors as read; this stamp's own head `NOT_MEASURED`
+
+`established fact` from the GitHub Actions API (workflow runs by head SHA, all events, latest
+attempt). **This stamp's own head is a commit that does not exist until this file is committed; its
+lanes are `NOT_MEASURED` here by construction** and belong to the next stamp or to the PR body.
+
+**`#1696` head `14c603da` (pushed 20:21:07 UTC), read 21:04 UTC — 27 runs (24 `pull_request`, 1 `push`,
+2 `dynamic`): 24 green, 1 skipped, 1 red, **1 still queued**; 0 cancelled; every run on attempt 1;
+nothing re-run. Not fully settled: stamped on Cheek's instruction ("Stamp it with the preview lane
+recorded as queued") after the last lane had sat 30 minutes in a starved runner queue.**
+
+- **`CI` (run `36185260296`) — `success`, 20:48:32 UTC** after queueing from 20:21 to 20:33; the
+  workflow's 35 jobs, every pinned required context among them, green on the first attempt.
+- **`Full Vitest Suite (PR gate)` (run `36185260433`) — `success`, 20:38:20 UTC.**
+- **`Security DB Local` (run `36185260412`) — `success`, 20:26:36 UTC.**
+- **`Native Save Retrieve Local` (run `36185260417`) — `success`, 20:29:40 UTC.**
+- **`deployment-preview` (run `36185260458`) — `queued` at 21:04:** its `Preflight — edge shared-lib
+  mirror` job green 20:22:58 and `Production build (preview-bound)` green 20:33:34; the third job,
+  `Publish preview status to PR`, queued since 20:33:34 with no runner. A queued lane is not a
+  result: this lane's conclusion is `NOT_MEASURED` here. This stamp's push cancels it by
+  concurrency; it is not re-run.
+- **Dynamic review lanes:** `Code Quality: PR #1696` — `success` (20:28:21); `PR #1696` — `success` (20:30:36).
+- **Green, the rest (18 runs, 17 names):** `AI Doctor Golden Cases`, `AI Doctor Readiness UI`, `Contextual Pheno Comparison v0`, `ESLint`, `Irrigation pgTAP + Harness Typecheck`, `Native Manual Correction Local`, `One-Tent Loop smoke test`, `Paddle preflight renderer tests`, `Quick Log gate (typecheck + targeted tests)`, `SEO parity & head fidelity`, `Security regression`, `Sentinel version parity`, `TypeScript typecheck`, `docs-safety`, `edge-shared-sync`, `release-workbook-safety`, `Typecheck (tsgo) + build` (once on the pull_request event, once on the push event).
+- **Skipped (1):** `Stabilization PR scope gate`.
+- **Red — `Dependency & Security CI` (run `36185260556`, 20:23:48):** job log read at 20:24 —
+  `check-dependency-security: BLOCKED`, `hono` advisories `1193729`, `1193730`, `1193731` (moderate)
+  and `js-yaml` `1193727` (high), under both `bun` and `npm`. Identical to every head today; the diff
+  touches no dependency; `#1343` separately owned; standing-down comment already on the PR; **no
+  re-run**.
+- **Versus `d5b85628` (settled 15:28):** no row differs by name and event; the difference is the
+  preview lane's queued publish job, a runner-queue condition that also holds every lane on the
+  tips merged after 20:30 (below).
+
+- **Superseded head `d5b85628`:** settled 15:28 as the 20:21 stamp records (27 runs, 25 green, 1
+  skipped, 1 red, every lane green on its first attempt); superseded by the `14c603da` push with
+  nothing cancelled.
+
+**Tip `2f67a545` (pushed 20:33:32), read 21:04 UTC — 25 runs: 21 `push`, 3 `dynamic`, 1 `workflow_run`;
+1 green (the `dynamic` push-review lane, 20:54), 22 queued and 2 pending since 20:33, 0 concluded
+otherwise. Not settled: every push lane on the tip has waited more than thirty minutes for a runner.
+Its `Required-check audit`, sandbox schema and money lanes, `CI`, Vitest gate and census are all
+unread by construction; the push-event result belongs to a later read. No `merge_group` runs exist
+for this commit (§4).**
+
+- **The four commits between `db0f3d73` and the tip, as read 21:02–21:04, none re-run:**
+  - **`f9f697ae` (`#1711`, merge queue) — settled: 33 runs, 26 green, 5 red, 2 cancelled.** Merge-group
+    `CI` (run `36184771128`) 35 of 35 pinned contexts green; merge-group Vitest gate green; merge-group
+    dependency audit red. Push-event reds: `Required-check audit` (run `36185307051`, row not read),
+    `Dependency & Security CI`, `Required core schema present` (20:32) and `Required money-critical
+    migrations present` (20:55) — the two sandbox lanes' logs not read on this tip; `Core Link and Form
+    Census` and the push Vitest gate cancelled by the `0f7b12db` push (`NOT_MEASURED`).
+  - **`0f7b12db` (`#1704`, direct merge) — 28 runs: 18 green, 2 red, 4 cancelled, 1 skipped, 3 queued.**
+    Red: `Required-check audit` (run `36186200536`, log read, §4) and the dependency audit. Cancelled by
+    the next push: Vitest gate, census, `Required core schema present`, `SEO parity & head fidelity`.
+    Still queued at 21:04: push `CI`, `Required money-critical migrations present`, `Prefix Diff — SARIF
+    upload`. **The tip that added the migration has no concluded `CI` and no concluded sandbox lane.**
+  - **`84814341` (`#1705`, direct merge) — 22 runs: 13 green, 2 red, 5 cancelled, 2 queued.** Red: audit
+    (run `36186246454`, log read, §4) and the dependency audit; push `CI` and the money lane queued.
+  - **`b77d28a8` (`#1661`, direct merge) — 24 runs: 13 green, 2 red, 5 cancelled, 3 queued, 1 in
+    progress.** Red: audit (run `36186362183`, concluded after 20:55, log not read) and the dependency
+    audit; push `CI`, the two sandbox lanes queued.
+- **The runner queue:** from about 20:30 the push lanes on five successive tips, this PR's preview
+  publish job, and the four merged PRs' own `CI` runs all queued at once; which lanes conclude, and
+  when, is a later read. `inference`: the four direct merges' PR-head `CI` runs (35 jobs each) and
+  the five tip pushes (21–25 lanes each) landing within three minutes is the load; the cause is not
+  measured.
+
+- **`db0f3d73`:** settled as the 20:21 stamp records (38 runs, 28 green, 1 skipped, 9 red — the six 14:27 reds plus the push `CI` and Vitest-gate `bun install` deaths and the authenticated `Core Link and Form Census` timeout, each log read; none re-run). The census lane was cancelled by the next push on `f9f697ae`, `0f7b12db`, `84814341` and `b77d28a8` alike (`NOT_MEASURED` on each); whether it still times out is measured only if it concludes on `2f67a545`.
+- **The five earlier tips today** (`054a4e3e`, `b099bbf7`, `5a5094cc`, `c10c095e`, `9b06be3f`):
+  carried as history as the 14:53, 14:11 and 13:27 stamps record; none re-run.
+- **`GA E2E (webkit)`:** not run on these heads; its `be214d7c` record (red on attempt 1 and the
+  single re-run, chromium green, proposed test-only patch on the PR, not applied) stands.
+
+## 9. Carried and updated
+
+- **Sandbox schema and money-migration gaps — last measured on `db0f3d73` at 14:16 UTC** (14:53
+  stamp §8, both job logs read): 14 of 51 required core columns missing, all from the Quick Log
+  corrections/retractions migration; 2 of 17 money-critical migrations missing, both founder-refund
+  migrations. `#1704` adds `20260925090000_user_roles_client_grant_hardening.sql`; whether the two sandbox lanes' expected sets include it is `NOT_MEASURED` until their logs on `2f67a545` are read; the two lanes on `2f67a545` were `pending` and `queued` at 21:04 (on `f9f697ae` both concluded red, 20:32 and 20:55, logs not read). Sandbox-scoped only; production applied state is `NOT_MEASURED` by this session. No APPLY. **One migration has merged today (`#1704`); committed is not applied** (§1).
+- **Golden Toad:** AUTH_NEEDED; the one-tent Next step is `NOT_MEASURED`. Passkey, 2FA and chooser
+  decisions stay **Cheek's**.
+- **AC-4.1 prototype-key defect** still reaches the `#1088` display canon; `#1655` is the open fix
+  and `#1643` pins the line; whichever merges second amends the other and AC-4.1.
+- **Release Topology Specification:** `#1699` (Claude, another session, draft, head `cdc0559f` at
+  the last read) is open. Not reviewed by this session. `#1175` is still open.
+- **File growth:** 1,257,728 bytes / 15,403 lines with this stamp (`wc` on the committed content;
+  `14c603da` measured 1,214,032 / 15,117). Archiving superseded stamps to `CURRENT_STATE_ARCHIVE.md`,
+  or landing only the final stamp block, is Cheek's process decision, not actioned.
+- **The Codex handoff attachments** were not received.
+- **Stale restamp branches** on the remote were not re-listed.
+
+## 10. The `db0f3d73` / 20:21 UTC stamp below is SUPERSEDED
+
+`established fact`. Its rows that are now stale:
+
+- Its §1 says the tip is `db0f3d73` with zero commits since 14:53; five commits merged between 20:21:44 and 20:33:32, one adding a migration (§1, §4).
+- Its §2 has the project alias on `db0f3d73`; it is on `2f67a545` (§2).
+- Its §8 presents `d5b85628` as this file's head; the head is `14c603da`, settled (§8).
+- Its §5 says no pass had run on `d5b85628`; none ever did — `d5b85628` was superseded unreviewed; the eighteenth pass ran on `14c603da` and its four P2 are carried here (§5).
+
+- Its §9 says no migration has merged today; `#1704`'s has (§1, §9).
+- Its §11 says `#1680` is the one recorded bypass; four more direct merges are recorded (§4, §11).
+
+Everything else in it is carried unchanged with its original labels, including the `#1700` merge-queue record, the `db0f3d73` lane record, the incident and rollback record, the sandbox measurements and the pinned-lane warning.
+
+## 11. Current locks
+
+`established fact` unless labelled otherwise. Carried from the 20:21 stamp; the alias, tip, branch and restamp lines are updated.
+
+- **No Publish. No History-restore. No APPLY. No production SQL. No rollback, redeploy or promote by
+  Claude.** No device control, no automatic Action Queue writes, no invented credentials. **Never
+  KEEP. No owner email.** Claude merges only on the owner's explicit instruction (`#1691`, `#1690`,
+  `#1677` and `#1680` were four such instructions; none generalises).
+- **Vercel's alias records are split (§2): the apex, `www` and `verdant-grow-diary.vercel.app` point to `9b06be3f`; the project alias points to the newest tip build (`2f67a545` at 20:52) — by per-hostname alias record, not by list order, deployment recency or a deployment's own alias array; public DNS/HTTP serving state is `NOT_MEASURED`.** A newer READY production
+  deployment is not production until the alias record says so. Before citing production for any
+  tip, read the alias record and say so.
+- **An API token on the owner's Vercel account, used by the Cursor Agent, deployed a non-tip
+  commit to production (§2 of the superseded block).** Scoping or revoking it is Cheek's; until then
+  every stamp reads Vercel's production alias record before citing production.
+- **A merge without the required contexts on its head is not precedent.** `#1680` and now `#1704`, `#1705`, `#1661` and `#1657` (§4) are recorded, not waived; `#1702`, `#1708`, `#1709`, `#1692`, `#1700` and `#1711` had them. Claude treats every future merge instruction as requiring the 35 pinned required contexts green on the exact head first (the live ruleset match stays `BLOCKED` until Cheek reads the ruleset), and says so before merging if they are not.
+- **`HOLD #1250`.** `#1369` / `#1641` REVIEW ONLY. `#1343` separately owned. `#1340` owner-closed.
+  `#1695` owner-closed as superseded by `#1677` (§6). Manual CodeRabbit requests are authorized for
+  `#1678` / `#1688` and, per its own PR body, `#1699`. No manual Codex review request by Claude.
+- **The tip this stamp measured is `2f67a54583e20a4b10debf8c4883a887d8a402b6`.** Once this PR
+  merges, the tip is its squash commit; cite `git rev-parse` at the time, not this line.
+- **A `PASS` in §4 is a reviewer's verdict at an exact SHA, not merge authorization.** Landing
+  order, retargets and readiness are Cheek's; children are never merged into feature branches.
+- **`#1692`, `#1697`, `#1679`, `#1700`, `#1711`, `#1704` and `#1705` are not Claude's to restack or update.** All are merged except `#1697`, `#1679` and `#1701`; `#1700`, `#1711`, `#1704`, `#1705` and `#1701` are other Claude sessions' slices; this session does not review or edit them unless assigned. **`#1704`'s migration is committed, not applied; its delivery is a separate owner decision through a protected lane (`#1701`, `#1703`) — never Claude's dispatch.**
+- **`#1701` is a lane, not an apply.** Its merge changes nothing in production; dispatch is Cheek's.
+- **One re-run per failing lane per head, and only after a standing-down comment, or when a job died
+  before any test body ran.** A lane cancelled by a later push on a superseded tip is `NOT_MEASURED`,
+  never re-run, never `FAIL`. An audit lane that records a historical fact is never re-run. A
+  scheduled lane, and any lane on the deploy branch itself, is never re-run by Claude. A queued lane
+  is not a result. An empty API page is not a settle. Lane counts are Actions API workflow runs by
+  head SHA, all events (§8). A stamp header states read times and past commit times only; its own
+  time is its git commit time; its own head's lanes are `NOT_MEASURED` and its own head unreviewed
+  by construction.
+- **§5 of the `b0bfdb02` stamp: `#1625` is the one session-restore fix in flight.** Claude does not
+  choose, push, ready or close.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- This slice is **N=1** on branch `claude/current-state-restamp-08994aa8` (name kept; the PR is
+  `#1696`). Its only changed file against the tip is `docs/agents/CURRENT_STATE.md`; the branch
+  carries the tip `2f67a545` by forward merge (`b9f88e40e`); its head at this stamp's reads is `14c603da`. It contains no `src/`, `supabase/`,
+  `package.json`, lockfile, test, workflow or governance-file changes.
+- **Restamps on this PR happen only for a reviewer finding or on Cheek's instruction;** this one is on Cheek's instruction ("Restamp CURRENT_STATE with the settled head lanes on 14c603da") and carries the eighteenth pass's four P2 (`4108359064`, `4108359044`, `4108359082`, `4108359075`).
+- **Slice owner: Claude. Independent reviewer: Codex.** Claude does not self-merge, ready, or accept
+  its own work; Cheek readied this PR. Claude does not assign its own next slice.
+
+---
+
+---
+
+---
+
+**The block below is SUPERSEDED — see §10 of the current stamp.**
+
+**Prior last updated:** 2026-09-25 UTC (tip read 20:17 UTC; tip lanes read 20:17 UTC, now settled, the three push-lane logs that turned red after the 14:27 read (`CI`, `Full Vitest Suite (PR gate)`, `Core Link and Form Census`) read 20:18 UTC; `#1696` head `d5b85628` lanes settled 15:28 UTC on their first attempt, read 20:17 UTC; Vercel production deployment list and alias records re-read 20:17 UTC for `verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app` and the project alias; public serving state `NOT_MEASURED`; this stamp's own time is its git commit time)
+**Prior update:** Claude (2026-09-25 evening, restamp on the **same deploy tip `db0f3d73d63ebc7ab780f9d1b561cef4eed1cc74`**, the `#1700` squash, on Cheek's explicit instruction: "Restamp CURRENT_STATE with the settled head lanes on d5b85628". **Zero commits** merged since the 14:53 stamp; no migration (§1). This stamp records **this file's own PR head `d5b85628` lanes after they settled: 27 runs, 25 green, 1 skipped, 1 red — every lane green on its first attempt, nothing cancelled, nothing re-run; the one red is the dependency audit for the known cause** (§8), **the tip's own lanes now settled: 38 runs, 28 green, 1 skipped, 9 red — the three reds added since 14:27 are two `bun install` tarball-integrity deaths (push `CI` shard 15/32, Vitest gate batch 9/16) and the authenticated link census timing out on `/tents/…` after a `/pheno-hunts/new` click** (§8), and **Codex's independent review: still seventeen passes on seventeen heads, four P1 and thirty-seven P2, all carried; no pass had started on `d5b85628` by 20:17** (§5). Vercel at 20:17: unchanged since 14:28 — the project alias on the `db0f3d73` build, the apex, `www` and `verdant-grow-diary.vercel.app` on `9b06be3f` (§2). No Publish. No APPLY. `HOLD #1250`. Prior header follows.)
 
 ## 1. Deploy tip `db0f3d73` — unchanged since the 14:53 stamp
 

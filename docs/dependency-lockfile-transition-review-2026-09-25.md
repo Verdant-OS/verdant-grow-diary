@@ -2,7 +2,7 @@
 
 Repository review by Codex, based on deploy tip
 `2f67a54583e20a4b10debf8c4883a887d8a402b6`. Dependency repair #1343 is
-separate and unmerged. Independent review: Grok, pending.
+separate and unmerged. Independent review: Claude, pending.
 This is a repository CI decision, not production or release acceptance.
 
 ## Decision and reason

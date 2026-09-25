@@ -1,4 +1,4 @@
-name: user_roles client grant hardening PG15
+name: user_roles client grant hardening PG15 and PG17
 
 on:
   pull_request:
@@ -25,20 +25,21 @@ jobs:
     services:
       postgres:
         image: postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e
-        env:
+        env: &user_roles_grants_postgres_env
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: verdant-runtime-only
           POSTGRES_DB: verdant_user_roles_grants
-        ports:
+        ports: &user_roles_grants_postgres_ports
           - 5432:5432
-        options: >-
+        options: &user_roles_grants_postgres_options >-
           --health-cmd "pg_isready -U postgres -d verdant_user_roles_grants"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
       USER_ROLES_GRANTS_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_user_roles_grants
-    steps:
+      USER_ROLES_GRANTS_PG_MAJOR: "15"
+    steps: &user_roles_grants_runtime_steps
       - name: Checkout exact candidate
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
 
@@ -72,5 +73,23 @@ jobs:
           values ('verdant_user_roles_grants_pg15_disposable_v1');
           SQL
 
-      - name: Run isolated PostgreSQL 15 harness
+      - name: Run isolated PostgreSQL runtime harness
         run: node scripts/run-user-roles-client-grant-hardening-pg15-harness.mjs
+
+  # Production runs PostgreSQL 17, where the browser roles also hold MAINTAIN.
+  # Only this job executes the migration's MAINTAIN branch and the harness's
+  # PostgreSQL 17 proofs.
+  pg17_runtime:
+    name: PostgreSQL 17 runtime contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+        env: *user_roles_grants_postgres_env
+        ports: *user_roles_grants_postgres_ports
+        options: *user_roles_grants_postgres_options
+    env:
+      USER_ROLES_GRANTS_PG15_URL: postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_user_roles_grants
+      USER_ROLES_GRANTS_PG_MAJOR: "17"
+    steps: *user_roles_grants_runtime_steps

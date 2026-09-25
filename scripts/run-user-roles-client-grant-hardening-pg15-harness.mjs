@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * Local-only PostgreSQL 15 runtime harness for
- * 20260925090000_user_roles_client_grant_hardening.
+ * Local-only PostgreSQL 15 and 17 runtime harness for
+ * 20260925090000_user_roles_client_grant_hardening. The target's major version
+ * is attested against USER_ROLES_GRANTS_PG_MAJOR (default 15). Production runs
+ * PostgreSQL 17, where the browser roles also hold MAINTAIN.
  *
  * Builds production's measured baseline — public.user_roles from the reviewed
  * 20260517010926 migration, Supabase-style default grants that give anon and
@@ -16,7 +18,10 @@
  *     SECURITY DEFINER role grant still work;
  *   - re-applying the migration is a no-op;
  *   - it fails closed, changing nothing, on inherited client privileges,
- *     disabled RLS, owner drift or an RLS-bypassing client role.
+ *     disabled RLS, owner drift or an RLS-bypassing client role;
+ *   - on PostgreSQL 17 only: the browser roles hold MAINTAIN at baseline and
+ *     can REINDEX, lose both after the migration, and an inherited MAINTAIN
+ *     makes the migration fail closed.
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -39,11 +44,14 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OPERATOR_ID = "11111111-1111-4111-8111-111111111111";
 const GROWER_ID = "22222222-2222-4222-8222-222222222222";
 
+/** Server major versions the harness runs against; 17 is production's. */
+export const SUPPORTED_PG_MAJORS = Object.freeze(["15", "17"]);
+
 /** The measured browser-role end state: PUBLIC and anon nothing, authenticated SELECT. */
 export const EXPECTED_CLIENT_ACL = Object.freeze(["authenticated|SELECT|f"]);
 
 function fail(code) {
-  process.stderr.write(`user_roles grant hardening PG15 harness failed: ${code}\n`);
+  process.stderr.write(`user_roles grant hardening harness failed: ${code}\n`);
   return 1;
 }
 
@@ -234,7 +242,10 @@ revoke all on function public.harness_definer_grant(uuid) from public, anon;
 grant execute on function public.harness_definer_grant(uuid) to authenticated;
 `;
 
-const TARGET_ATTESTATION_SQL = `
+/** Read-only proof that the target is the disposable database on the expected major version. */
+export function buildTargetAttestationSql(pgMajor) {
+  if (!SUPPORTED_PG_MAJORS.includes(pgMajor)) throw new Error("pg_major_rejected");
+  return `
 begin;
 set transaction read only;
 set local lock_timeout = '5s';
@@ -243,8 +254,7 @@ set local search_path = pg_catalog, pg_temp;
 select case
   when current_database() = '${DISPOSABLE_DATABASE}'
    and current_user = '${DISPOSABLE_DATABASE_USER}'
-   and current_setting('server_version_num')::integer >= 150000
-   and current_setting('server_version_num')::integer < 160000
+   and current_setting('server_version_num')::integer / 10000 = ${pgMajor}
    and coalesce((
      select n.nspowner = current_user::regrole
         and c.relowner = current_user::regrole
@@ -264,9 +274,10 @@ select case
 end;
 commit;
 `;
+}
 
-function attestDisposableTarget(env, spawnImpl) {
-  const observed = executeSql(TARGET_ATTESTATION_SQL, env, {
+function attestDisposableTarget(pgMajor, env, spawnImpl) {
+  const observed = executeSql(buildTargetAttestationSql(pgMajor), env, {
     stage: "target_attestation",
     spawnImpl,
   });
@@ -520,8 +531,23 @@ export const FAIL_CLOSED_CASES = Object.freeze([
   },
 ]);
 
-function proveFailClosed(env, spawnImpl) {
-  for (const drift of FAIL_CLOSED_CASES) {
+/** PostgreSQL 17 only: MAINTAIN, and so this case, does not exist before 17. */
+export const PG17_FAIL_CLOSED_CASES = Object.freeze([
+  {
+    label: "inherited_client_maintain",
+    setup: `do $r$ begin
+              if not exists (select 1 from pg_roles where rolname = 'user_roles_harness_maintainer') then
+                create role user_roles_harness_maintainer nologin;
+              end if;
+            end $r$;
+            grant maintain on public.user_roles to user_roles_harness_maintainer;
+            grant user_roles_harness_maintainer to authenticated;`,
+    cleanup: "revoke user_roles_harness_maintainer from authenticated;",
+  },
+]);
+
+function proveFailClosed(cases, env, spawnImpl) {
+  for (const drift of cases) {
     resetBaseline(env, spawnImpl);
     executeSql(drift.setup, env, { stage: `${drift.label}_setup`, spawnImpl });
     try {
@@ -538,23 +564,73 @@ function proveFailClosed(env, spawnImpl) {
   }
 }
 
+/**
+ * PostgreSQL 17 only. Supabase's default grants give the browser roles
+ * MAINTAIN (VACUUM, ANALYZE, REINDEX, CLUSTER, LOCK TABLE), which RLS does
+ * not govern; the migration's MAINTAIN branch must remove it.
+ */
+function proveMaintainRevoked(env, spawnImpl) {
+  resetBaseline(env, spawnImpl);
+  requireSqlTrue(
+    "baseline_client_maintain",
+    `select has_table_privilege('anon', 'public.user_roles', 'MAINTAIN')
+        and has_table_privilege('authenticated', 'public.user_roles', 'MAINTAIN');`,
+    env,
+    spawnImpl,
+  );
+  requireSqlTrue(
+    "baseline_anon_reindex_succeeds",
+    asRole("anon", "reindex table public.user_roles;\nselect true;"),
+    env,
+    spawnImpl,
+  );
+  requireMigrationSuccess("maintain_apply", env, spawnImpl);
+  requireSqlTrue(
+    "client_maintain_revoked",
+    `select not has_table_privilege('anon', 'public.user_roles', 'MAINTAIN')
+        and not has_table_privilege('authenticated', 'public.user_roles', 'MAINTAIN');`,
+    env,
+    spawnImpl,
+  );
+  requireSqlFailure(
+    "anon_reindex",
+    asRole("anon", "reindex table public.user_roles;"),
+    "42501",
+    env,
+    spawnImpl,
+  );
+  requireSqlFailure(
+    "operator_client_reindex",
+    asRole("authenticated", "reindex table public.user_roles;", OPERATOR_ID),
+    "42501",
+    env,
+    spawnImpl,
+  );
+}
+
 export async function runPg15Harness({
   databaseUrl = process.env.USER_ROLES_GRANTS_PG15_URL,
+  pgMajor = process.env.USER_ROLES_GRANTS_PG_MAJOR ?? "15",
   spawnImpl = spawnSync,
 } = {}) {
+  if (!SUPPORTED_PG_MAJORS.includes(pgMajor)) return fail("pg_major_rejected");
   const connection = disposableConnection(databaseUrl);
   if (!connection) return fail("database_target_rejected");
   const env = psqlEnvironment(connection);
   try {
-    attestDisposableTarget(env, spawnImpl);
+    attestDisposableTarget(pgMajor, env, spawnImpl);
     proveBaselineHole(env, spawnImpl);
     proveHardenedEndState(env, spawnImpl);
     proveColumnGrantsRemoved(env, spawnImpl);
-    proveFailClosed(env, spawnImpl);
+    proveFailClosed(FAIL_CLOSED_CASES, env, spawnImpl);
+    if (pgMajor === "17") {
+      proveMaintainRevoked(env, spawnImpl);
+      proveFailClosed(PG17_FAIL_CLOSED_CASES, env, spawnImpl);
+    }
   } catch (error) {
     return fail(error instanceof Error ? error.message : "unknown");
   }
-  process.stdout.write("user_roles grant hardening PG15 harness PASS\n");
+  process.stdout.write(`user_roles grant hardening PG${pgMajor} harness PASS\n`);
   return 0;
 }
 

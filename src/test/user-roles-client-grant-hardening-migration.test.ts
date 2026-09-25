@@ -14,6 +14,9 @@ const HARNESS_PATH = resolve("scripts/run-user-roles-client-grant-hardening-pg15
 const WORKFLOW_PATH = resolve(".github/workflows/user-roles-client-grant-hardening-pg15.yml");
 const POSTGRES_IMAGE =
   "postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e";
+// Production's major version (17.6, measured 2026-09-25), where MAINTAIN exists.
+const POSTGRES_17_IMAGE =
+  "postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929";
 const DISPOSABLE_DATABASE_URL =
   "postgresql://postgres:verdant-runtime-only@127.0.0.1:5432/verdant_user_roles_grants";
 const DISPOSABLE_SENTINEL = "verdant_user_roles_grants_pg15_disposable_v1";
@@ -101,7 +104,7 @@ describe("user_roles client grant hardening migration", () => {
   });
 });
 
-describe("user_roles client grant hardening PostgreSQL 15 runtime gate", () => {
+describe("user_roles client grant hardening PostgreSQL 15 and 17 runtime gate", () => {
   it("uses bounded tuple-only quiet psql output and redacted failure codes", async () => {
     const harness = await load(HARNESS_PATH);
 
@@ -138,6 +141,30 @@ describe("user_roles client grant hardening PostgreSQL 15 runtime gate", () => {
       undefined,
     ]) {
       await expect(harness.runPg15Harness({ databaseUrl, spawnImpl })).resolves.toBe(1);
+    }
+    expect(spawnCount).toBe(0);
+  });
+
+  it("attests the expected major version and refuses any other before spawning psql", async () => {
+    const harness = await load(HARNESS_PATH);
+    let spawnCount = 0;
+    const spawnImpl = () => {
+      spawnCount += 1;
+      return { status: 1, stdout: "", stderr: "" };
+    };
+
+    expect(harness.SUPPORTED_PG_MAJORS).toEqual(["15", "17"]);
+    expect(harness.buildTargetAttestationSql("17")).toContain(
+      "current_setting('server_version_num')::integer / 10000 = 17",
+    );
+    expect(harness.buildTargetAttestationSql("15")).toContain(
+      "current_setting('server_version_num')::integer / 10000 = 15",
+    );
+    expect(() => harness.buildTargetAttestationSql("16")).toThrow("pg_major_rejected");
+    for (const pgMajor of ["16", "", "17; drop schema public"]) {
+      await expect(
+        harness.runPg15Harness({ databaseUrl: DISPOSABLE_DATABASE_URL, pgMajor, spawnImpl }),
+      ).resolves.toBe(1);
     }
     expect(spawnCount).toBe(0);
   });
@@ -203,6 +230,16 @@ describe("user_roles client grant hardening PostgreSQL 15 runtime gate", () => {
       "owner_drift",
       "client_role_bypassrls",
     ]);
+    // PostgreSQL 17 only: an inherited MAINTAIN must fail closed through the
+    // migration's MAINTAIN branch (Copilot review on #1704).
+    expect(
+      (harness.PG17_FAIL_CLOSED_CASES as Array<{ label: string; setup: string }>).map(
+        (drift) => drift.label,
+      ),
+    ).toEqual(["inherited_client_maintain"]);
+    expect(harness.PG17_FAIL_CLOSED_CASES[0].setup).toContain(
+      "grant maintain on public.user_roles to user_roles_harness_maintainer;",
+    );
     expect(harness.EXPECTED_CLIENT_ACL).toEqual(["authenticated|SELECT|f"]);
     expect(harness.MIGRATION_FILE).toBe("20260925090000_user_roles_client_grant_hardening.sql");
     expect(harness.readMigration()).toBe(readFileSync(MIGRATION_PATH, "utf8"));
@@ -226,12 +263,29 @@ describe("user_roles client grant hardening PostgreSQL 15 runtime gate", () => {
     expect(trigger.push.branches).toEqual(["verdant-grow-diary"]);
     expect(job.services.postgres.image).toBe(POSTGRES_IMAGE);
     expect(job.env.USER_ROLES_GRANTS_PG15_URL).toBe(DISPOSABLE_DATABASE_URL);
+    expect(job.env.USER_ROLES_GRANTS_PG_MAJOR).toBe("15");
     expect(job.steps.at(-1).run).toBe(
       "node scripts/run-user-roles-client-grant-hardening-pg15-harness.mjs",
     );
     expect(source).not.toContain("continue-on-error");
     expect(source).not.toContain("supabase.co");
     expect(source).not.toContain("secrets.");
+  });
+
+  it("also runs the harness on a pinned PostgreSQL 17.6 service, production's major version", () => {
+    const workflow = loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
+    const pg15 = workflow.jobs.pg15_runtime;
+    const pg17 = workflow.jobs.pg17_runtime;
+
+    expect(pg17.name).toBe("PostgreSQL 17 runtime contract");
+    expect(pg17.services.postgres.image).toBe(POSTGRES_17_IMAGE);
+    expect(pg17.services.postgres.env).toEqual(pg15.services.postgres.env);
+    expect(pg17.services.postgres.ports).toEqual(pg15.services.postgres.ports);
+    expect(pg17.env.USER_ROLES_GRANTS_PG15_URL).toBe(DISPOSABLE_DATABASE_URL);
+    expect(pg17.env.USER_ROLES_GRANTS_PG_MAJOR).toBe("17");
+    // Same sentinel, same harness invocation: only the server differs.
+    expect(pg17.steps).toEqual(pg15.steps);
+    expect(pg17["continue-on-error"]).toBeUndefined();
   });
 
   it("initializes the exact disposable sentinel in one transaction", () => {

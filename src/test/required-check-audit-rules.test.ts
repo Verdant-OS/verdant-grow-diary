@@ -10,8 +10,9 @@
  *  - Read-only: the audit reports, it never mutates a ruleset or a merge.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { load as loadYaml } from "js-yaml";
 import {
   AUDIT_VERDICT,
   CHECK_STATUS,
@@ -73,6 +74,41 @@ describe("config/required-status-checks.json", () => {
     for (const context of MUST_BE_GREEN) expect(required.has(context)).toBe(false);
   });
 
+  it("lists every self-declared gate that the ruleset does not actually enforce", () => {
+    // Six workflows call themselves a required gate or stop-ship check, or were
+    // created by this remediation to run coverage nothing else runs; only ci.yml
+    // has a job name in `required`. The other five are coverage holes, and
+    // `required-check-audit.yml` can only catch a hole that is declared. The
+    // closure lane is the one P2(b) added — a PR that wires 15 specs and then
+    // leaves its own job ungated repeats exactly what P4 exists to close
+    // (Codex, round 3 on #1221).
+    for (const context of [
+      "test:security-regression",
+      "test:security-db-local",
+      "pgTAP irrigation (feeding + watering)",
+      "irrigation harness typecheck (tsc --noEmit)",
+      "Deno bridge auth + handler E2E",
+      "Mocked E2E closure (15 previously unrun specs)",
+    ]) {
+      expect(MUST_BE_GREEN).toContain(context);
+      expect(PINNED.required).not.toContain(context);
+    }
+  });
+
+  it("marks the opt-in and path-filtered lanes conditional, so a legitimate skip is not a red", () => {
+    const entries = normalizeMustBeGreen(PINNED.mustBeGreen);
+    for (const context of [
+      "test:security-db-local",
+      "pgTAP irrigation (feeding + watering)",
+      "irrigation harness typecheck (tsc --noEmit)",
+      "Deno bridge auth + handler E2E",
+      "Mocked E2E closure (15 previously unrun specs)",
+    ]) {
+      const entry = entries.find((e: { context: string }) => e.context === context);
+      expect(entry?.alwaysRuns).toBe(false);
+    }
+  });
+
   it("lists test:security-regression as a coverage hole, not a ruleset gate", () => {
     // The workflow's own header calls it "the required PR gate". It is not in
     // the ruleset, so nothing enforces it — that is the whole point of the list.
@@ -85,6 +121,120 @@ describe("config/required-status-checks.json", () => {
       (e: { context: string }) => e.context === "test:security-regression",
     );
     expect(entry?.alwaysRuns).toBe(true);
+  });
+});
+
+type WorkflowStep = { name?: string; run?: string; shell?: string };
+type WorkflowJob = {
+  name?: string;
+  steps?: WorkflowStep[];
+  defaults?: { run?: { shell?: string } };
+};
+type Workflow = { jobs?: Record<string, WorkflowJob>; defaults?: { run?: { shell?: string } } };
+
+/** Every job, across every workflow, whose name is `context` — the job that produces it. */
+function jobsProducing(context: string) {
+  const dir = resolve(ROOT, ".github/workflows");
+  const found: { file: string; workflow: Workflow; job: WorkflowJob }[] = [];
+  for (const file of readdirSync(dir)
+    .filter((f) => /\.ya?ml$/.test(f))
+    .sort()) {
+    const workflow = loadYaml(readFileSync(resolve(dir, file), "utf8")) as Workflow;
+    for (const job of Object.values(workflow?.jobs ?? {})) {
+      if (job?.name === context) found.push({ file, workflow, job });
+    }
+  }
+  return found;
+}
+
+/**
+ * A `run:` step with no `shell:` executes as `bash -e {0}` — no pipefail — so in
+ * `deno test … 2>&1 | tee log` the step's status is tee's, and a failing suite
+ * reports success. `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`;
+ * a `set -o pipefail` (or `set -eo pipefail`) before the pipe does the same. Bash's
+ * `|& tee` (stdout and stderr) is the same pipe and is counted too (round 15).
+ * A pipe whose left side is only `echo`/`printf` cannot hide a failure and is not
+ * counted. The left side is the command just before the pipe, after the last `;`,
+ * `&&`, `||` or `|`, not the start of the line: `echo starting; deno test … | tee`
+ * pipes `deno test` (round 16). Every `| tee` on a line is read, so an exempt echo
+ * pipeline cannot hide a later test pipeline (round 17).
+ */
+function pipesHidingFailure(workflow: Workflow, job: WorkflowJob): string[] {
+  const shell = (step: WorkflowStep) =>
+    step.shell ?? job.defaults?.run?.shell ?? workflow.defaults?.run?.shell;
+  const hidden: string[] = [];
+  for (const step of job.steps ?? []) {
+    if (typeof step.run !== "string" || shell(step) === "bash") continue;
+    const lines = step.run.replace(/\\\n/g, " ").split("\n");
+    let pipefail = false;
+    for (const line of lines) {
+      if (/^\s*set\s+-[a-z]*o\s+pipefail\b/.test(line)) pipefail = true;
+      if (pipefail) continue;
+      const hides = [...line.matchAll(/(?<!\|)\|&?(?!\|)\s*tee\b/g)].some((pipe) => {
+        const left =
+          line
+            .slice(0, pipe.index)
+            .split(/&&|\|\||;|\|&?/)
+            .pop() ?? "";
+        return !/^\s*(?:(?:then|do|else)\s+)?(?:echo|printf)\b/.test(left);
+      });
+      if (hides) hidden.push(`${step.name ?? "(unnamed step)"}: ${line.trim()}`);
+    }
+  }
+  return hidden;
+}
+
+describe("mustBeGreen lanes report the status of the command they gate", () => {
+  // CodeRabbit, #1221 round 14: `Deno bridge auth + handler E2E` joined mustBeGreen
+  // in this PR while its step piped `deno test` into `tee` with no pipefail, so a
+  // red suite was a green check and the audit would have counted it as passing.
+  it("resolves every mustBeGreen context to the job that produces it", () => {
+    for (const context of MUST_BE_GREEN) {
+      expect(jobsProducing(context).length, context).toBeGreaterThan(0);
+    }
+  });
+
+  it("pipes no gated command into tee without pipefail", () => {
+    const hidden = MUST_BE_GREEN.flatMap((context) =>
+      jobsProducing(context).flatMap(({ file, workflow, job }) =>
+        pipesHidingFailure(workflow, job).map((where) => `${file} › ${context} › ${where}`),
+      ),
+    );
+    expect(hidden).toEqual([]);
+  });
+
+  it("classifies the shapes it exists to catch", () => {
+    const job = (step: WorkflowStep): WorkflowJob => ({ steps: [step] });
+    const run = "deno test \\\n  a_test.ts \\\n  2>&1 | tee log\n";
+    expect(pipesHidingFailure({}, job({ name: "s", run }))).toHaveLength(1);
+    expect(pipesHidingFailure({}, job({ name: "s", run, shell: "bash" }))).toEqual([]);
+    expect(pipesHidingFailure({}, job({ name: "s", run: `set -eo pipefail\n${run}` }))).toEqual([]);
+    expect(
+      pipesHidingFailure({ defaults: { run: { shell: "bash" } } }, job({ name: "s", run })),
+    ).toEqual([]);
+    // A custom shell string is not GitHub's `bash` shortcut and gets no pipefail.
+    expect(pipesHidingFailure({}, job({ name: "s", run, shell: "bash -e {0}" }))).toHaveLength(1);
+    // `set -o pipefail` AFTER the pipe does not cover it.
+    expect(pipesHidingFailure({}, job({ name: "s", run: `${run}set -o pipefail\n` }))).toHaveLength(
+      1,
+    );
+    expect(pipesHidingFailure({}, job({ name: "s", run: 'echo "x" | tee -a "$F"\n' }))).toEqual([]);
+    expect(pipesHidingFailure({}, job({ name: "s", run: "a || tee x\n" }))).toEqual([]);
+    expect(
+      pipesHidingFailure({}, job({ name: "s", run: "deno test a_test.ts |& tee log\n" })),
+    ).toHaveLength(1);
+    // The echo/printf exemption reads the command just before the pipe, not the start
+    // of the line (CodeRabbit, #1221 round 16).
+    const piped = (line: string) => pipesHidingFailure({}, job({ name: "s", run: `${line}\n` }));
+    expect(piped("echo starting; deno test a_test.ts | tee log")).toHaveLength(1);
+    expect(piped("echo starting && deno test a_test.ts | tee log")).toHaveLength(1);
+    expect(piped('printf "x" | deno test a_test.ts | tee log')).toHaveLength(1);
+    expect(piped("deno test a_test.ts; echo done | tee log")).toEqual([]);
+    expect(piped("if true; then echo done | tee log; fi")).toEqual([]);
+    // Every `| tee` on a line is read: an exempt echo pipeline first must not hide a test
+    // pipeline after it (CodeRabbit, #1221 round 17).
+    expect(piped("echo start | tee start.log; deno test a_test.ts | tee test.log")).toHaveLength(1);
+    expect(piped("echo a | tee a.log; echo b | tee b.log")).toEqual([]);
   });
 });
 
@@ -622,9 +772,20 @@ describe("auditRequiredChecks — PR #769 regression (real evidence)", () => {
   };
   const AT_MERGE = { ...AT_FINAL_STATE, mergedAt: PR_769.mergedAt };
 
-  it("reading final state alone, flags the red shard and the ungated security gate", () => {
+  it("reading final state alone, flags the red shard and BOTH ungated security gates", () => {
     // What the audit sees with no merge timestamp: the right outcome, but it
     // credits results that only landed after the merge.
+    //
+    // This count was 2 until `test:security-db-local` joined `mustBeGreen`.
+    // Widening that list did not change the audit's logic; it changed what the
+    // audit can see. #769 shipped TWO ungated red checks, not one, and the
+    // second was invisible for as long as the list omitted it. Renegotiated
+    // here in the same commit as the config change, per CLAUDE.md.
+    //
+    // The other three contexts added alongside it produce no finding on this
+    // fixture and that is correct: the two irrigation jobs are `skipped`
+    // (NOT_MEASURED) and `Deno bridge auth + handler E2E` is absent (MISSING),
+    // and a conditional entry fails only on FAIL.
     const result = auditRequiredChecks({
       pinned: PINNED,
       checkRuns: PR_769.checkRuns,
@@ -634,7 +795,23 @@ describe("auditRequiredChecks — PR #769 regression (real evidence)", () => {
     const failing = result.failingFindings.map((f) => f.context);
     expect(failing).toContain("Full test suite (shard 26/32)");
     expect(failing).toContain("test:security-regression");
-    expect(result.failingFindings).toHaveLength(2);
+    expect(failing).toContain("test:security-db-local");
+    expect(result.failingFindings).toHaveLength(3);
+  });
+
+  it("stays quiet about conditional gates that skipped or never reported on #769", () => {
+    // The guard against the obvious failure mode of widening `mustBeGreen`:
+    // a path-filtered or opt-in lane that legitimately did not apply must not
+    // become a false red, or the audit gets switched off within a week.
+    const result = auditRequiredChecks({
+      pinned: PINNED,
+      checkRuns: PR_769.checkRuns,
+      prResolution: AT_FINAL_STATE,
+    });
+    const failing = result.failingFindings.map((f) => f.context);
+    expect(failing).not.toContain("pgTAP irrigation (feeding + watering)");
+    expect(failing).not.toContain("irrigation harness typecheck (tsc --noEmit)");
+    expect(failing).not.toContain("Deno bridge auth + handler E2E");
   });
 
   it("read as of the merge, shows the truth: nothing had finished (Copilot, PR #818)", () => {

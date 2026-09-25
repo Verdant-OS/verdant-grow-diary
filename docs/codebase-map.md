@@ -463,8 +463,12 @@ Recorded as `established fact` about the tree, not as defects anyone has been as
 - **`docs/architecture.md` is partly pre-migration** — it describes react-router-style route
   mounting and "the AI Coach" as the AI layer. Its product-layer, RLS-ownership and Action
   Queue sections remain accurate and useful.
-- **Two `*Rules.ts` modules import Supabase**, breaking the purity contract:
-  `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`.
+- **Two `*Rules.ts` modules import a generated Supabase type, not the client**:
+  `sensorIngestNormalizationRules.ts`, `sensorWebhookIngestRules.ts`, each through
+  `import type { TablesInsert } from "@/integrations/supabase/types"`. The import is erased at
+  compile time, so neither file performs Supabase I/O. No root-level `*Rules.ts` imports the
+  Supabase client (re-measured at `69aca5e7`). `docs/architecture-contract.md` AC-3.2 still records
+  the two as type-level drift from its "no Supabase" rule.
 - **38 of 492 components and 33 of 139 pages import `@/integrations/supabase/client`
   directly** rather than going through a hook.
 - **`src/lib/*Advisor.ts` has zero files**, though the architecture table once named it as a

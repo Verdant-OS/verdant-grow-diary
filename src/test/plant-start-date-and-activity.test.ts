@@ -100,6 +100,28 @@ describe("plant start date is a calendar date (BUG-004)", () => {
     });
   });
 
+  it("reads a bare YYYY-MM-DD start date as that calendar day in every zone", () => {
+    // Codex review on #1683: date-only rows (the mock plants use
+    // "2026-02-10") were parsed as UTC midnight and read in the local zone,
+    // so Los Angeles saw Feb 9 in the Edit Plant prefill and the age.
+    for (const tz of ["America/Los_Angeles", "America/Chicago", "Asia/Tokyo", "Pacific/Auckland"]) {
+      withTimeZone(tz, () => {
+        expect(resolvePlantStartCalendarDate("2026-02-10")).toEqual({
+          year: 2026,
+          month: 2,
+          day: 10,
+        });
+        expect(plantStartDateInputValue("2026-02-10")).toBe("2026-02-10");
+        expect(format(plantStartDisplayDate("2026-02-10")!, "PP")).toBe("Feb 10, 2026");
+        expect(formatPlantAge(resolvePlantAge("2026-02-10", new Date(2026, 1, 11, 9)))).toBe(
+          "1 day",
+        );
+      });
+    }
+    // An impossible date-only value is not rolled over into the next month.
+    expect(resolvePlantStartCalendarDate("2026-02-30")).toBeNull();
+  });
+
   it("reads a non-midnight instant (default now()) in the grower's zone", () => {
     withTimeZone("America/Chicago", () => {
       // 02:30 UTC on Sep 24 is still Sep 23 in Chicago.

@@ -13,10 +13,10 @@
  *    legacy date-only save, so the date does not depend on the zone of the
  *    device that saved it or the one that reads it (picked Jul 1 in Auckland
  *    still reads Jul 1 in Los Angeles).
- *  - Reading: an instant that is exactly UTC midnight is a date-only save;
- *    its UTC calendar date is the date the grower picked. Any other instant
- *    (the column default now(), or an earlier local-midnight save) is read in
- *    the grower's local zone.
+ *  - Reading: a bare `YYYY-MM-DD` is that calendar date. An instant that is
+ *    exactly UTC midnight is a date-only save; its UTC calendar date is the
+ *    date the grower picked. Any other instant (the column default now(), or
+ *    an earlier local-midnight save) is read in the grower's local zone.
  *  - A start date after today (local) is rejected on save and never yields
  *    a negative age.
  *
@@ -97,9 +97,14 @@ export function plantStartDateSaveMessage(reason: "invalid" | "future"): string 
   return reason === "future" ? PLANT_START_DATE_FUTURE_MESSAGE : PLANT_START_DATE_INVALID_MESSAGE;
 }
 
-/** Stored instant → the calendar date the grower picked. */
+/**
+ * Stored instant → the calendar date the grower picked. A bare `YYYY-MM-DD`
+ * (date-only rows, such as the mock plants) is that calendar date as is;
+ * `Date.parse` would read it as UTC midnight and roll impossible dates over.
+ */
 export function resolvePlantStartCalendarDate(iso: string | null | undefined): CalendarDate | null {
   if (typeof iso !== "string" || iso.trim() === "") return null;
+  if (DATE_INPUT_RE.test(iso.trim())) return parsePlantStartDateInput(iso);
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
   const instant = new Date(ms);

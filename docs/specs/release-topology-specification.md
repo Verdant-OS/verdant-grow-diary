@@ -1,18 +1,25 @@
 # Authoritative Release Topology Specification
 
 **Author:** Claude (Knowledge Library / Product Specification Architect), slice owner
-**Independent reviewer:** CodeRabbit, under the owner's strict rule (a review counts only when it is
-finding-free and lists no unreviewed files) — Cheek, 2026-09-25
-**Date:** 2026-09-25
+**Independent reviewer:** Grok, the peer the assignment names. CodeRabbit remains the fallback seat
+under the owner's strict rule (a review counts only when it is finding-free and lists no unreviewed
+files) — Cheek, 2026-09-25. Which seat satisfies peer review is Cheek's decision (§15)
+**Date:** 2026-09-25 (founding measurement); amended 2026-09-25 late evening (§2.4)
 **Slice:** Authoritative Release Topology Specification — docs-only, the second slice of the
-architecture-contract work, sequenced after `#1221` merged (`cb6c3288`, 2026-09-25 00:12 UTC)
-**Status:** **Specification with a measured baseline.** §§3–9 are durable: the topology model,
-the rules, and the measurement procedures. Appendix A is the founding measurement, dated, and is
-superseded by every later `docs/agents/CURRENT_STATE.md` stamp that re-runs the procedures.
+architecture-contract work, sequenced after `#1221` merged (`cb6c3288`, 2026-09-25 00:12 UTC).
+First opened as `#1699`; carried forward on `claude/clever-davinci-hk7o03` after its owning session
+was archived (§2.4)
+**Status:** **Specification with a measured baseline and one measured incident.** §§3–9 are
+durable: the topology model, the rules, and the measurement procedures. Appendix A is the founding
+measurement and Appendix B the promotion incident that followed it; both are dated and superseded by
+every later `docs/agents/CURRENT_STATE.md` stamp that re-runs the procedures.
 **Measured against:** deploy tip `e1d541e2559eb42d5e452035e79b1d796c91c0f9` (the `#1691` squash,
 committed 2026-09-25 01:10:00 UTC) on `verdant-grow-diary`, read locally. Live and platform reads
 ran between 01:19 and 01:25 UTC on 2026-09-25 through the owner-connected GitHub, Vercel, Lovable
-and Supabase tools, one attempt each, nothing routed around.
+and Supabase tools, one attempt each, nothing routed around. **Amended against** deploy tip
+`c9bc1df37b6f0ae1494cf02dffb6a122b39a6f77` (the `#1713` squash): every repository cite re-read at
+that SHA, the stack conclusions of §6.1 verified from source there, and the promotion axis (§3, §4,
+§5.7, M10–M11) measured by Vercel reads at 23:28–23:37 UTC (Appendix B).
 
 Every claim carries a Sentinel label: `established fact`, `source claim`, `practical observation`,
 `inference`, `uncertainty`, `missing evidence`. Every topology check carries one status from the
@@ -30,7 +37,7 @@ serving target_ — and deferred the rest to this specification (§13 of the con
 
 This document does three things and only three:
 
-1. **Names the topology model** — the five axes along which "what is live" is decided, and which
+1. **Names the topology model** — the six axes along which "what is live" is decided, and which
    system owns each (§3).
 2. **Records the measurement chain that closes each axis** — what evidence counts, what does not,
    and the exact read that produces it (§4, §8). The chain is the durable part.
@@ -58,6 +65,17 @@ code is written in this slice.
   configured production-branch setting is `NOT_MEASURED`. The chain domain → project → deployment →
   commit → served stamp is closed by measurement (§4). Status **`PASS`**, `established fact` at the
   Appendix A instant.
+- **Building a production deployment is not promoting it.** Seven hours after Appendix A, a
+  production deployment of an unmerged PR-branch commit was created through a platform API token and
+  took the apex for about 77 minutes, bypassing the merge queue and every repository gate. An
+  owner-authorised Instant Rollback restored the deploy-branch build at 09:45 UTC. From then on,
+  **every deploy-branch merge built a READY production deployment that did not receive the custom
+  domains**: at 23:29 UTC the apex served `9b06be3f`, 13 first-parent commits behind the tip
+  `c9bc1df3` (Appendix B). The founding measurement's "six of six auto-promoted" is therefore
+  history, not standing behaviour. This amendment adds the **promotion axis** (§3), resolves what is served
+  **per hostname** rather than from the newest production deployment (§4 step 3, M10), and makes
+  every redeploy, promote, rollback or production-setting change a **publish action** with a
+  recorded actor (D-RT-12, D-RT-13).
 - **The publisher is not who the repository says it is.** `CLAUDE.md`, `docs/codebase-map.md`,
   `README.md`, `scripts/stamp-version.mjs`, `deployment-preview.yml` and `Makefile:77` all name
   Lovable as the production publisher. At the measured instant the apex is published by Vercel.
@@ -93,7 +111,7 @@ code is written in this slice.
 | Requirement                                                               | How this document meets it                                                                                |
 | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Source-grounded, Verdant-specific                                         | Every rule cites a repository path or a named platform read with its UTC time (Appendix A)                |
-| Audit the deploy branch, not `main`                                       | Measured at `e1d541e2` on `verdant-grow-diary`; `main` is not read                                        |
+| Audit the deploy branch, not `main`                                       | Measured at `e1d541e2`, amended at `c9bc1df3`, both on `verdant-grow-diary`; `main` is not read           |
 | Reuse merged architecture documentation                                   | Builds on contract §9, §12, §13, §14 and `docs/release-provenance-runbook.md`; amends, does not duplicate |
 | Separate permanent architecture from CURRENT_STATE facts                  | §§3–9 durable; Appendix A dated and superseded; no `CURRENT_STATE.md` edit                                |
 | Define rejected/deferred alternatives                                     | §14                                                                                                       |
@@ -116,6 +134,9 @@ code is written in this slice.
   queue pushed it. `inference`. It is used only for the deployment-latency figures in Appendix A.4,
   which are informational; no rule depends on them.
 - **A4.** Docs-only. Nothing in this slice changes what is built, published, deployed or applied.
+- **A5.** The archived session that owned `#1699` will not push to it again, so carrying its two
+  commits forward gives one lineage. If it is revived and pushes, the owner reconciles the two heads
+  before either merges. `inference` from the session record (archived 02:01 UTC).
 
 ### 2.3 Collision audit — `established fact`, GitHub API at 01:19 UTC
 
@@ -133,9 +154,59 @@ code is written in this slice.
 
 No competing implementation exists; none is created.
 
+### 2.4 The amendment — carried forward, not re-implemented
+
+`established fact`, GitHub API and `git`, 2026-09-25, read between about 23:05 and 23:35 UTC.
+
+- **Why a new branch.** `#1699` was opened by Claude session `…HmR` on
+  `claude/upbeat-davinci-1rf5ix`; that session has been **archived** since 02:01 UTC. Five
+  owner-side self-checks on `#1699` (08:34, 11:52, 13:33, 20:25, 21:36 UTC) listed the amendments it
+  needed. Nobody pushed them, and `#1705` then made `#1699` **conflict** with the tip in
+  `docs/architecture-contract.md` (§15.1). The slice owner is still Claude. This amendment carries
+  `#1699`'s two commits unchanged, forward-merges the tip `c9bc1df3`, and adds the amendments on
+  top. It is **the same implementation continued**, not a second one. Exactly one of `#1699` and
+  this PR should merge; closing `#1699` is Cheek's action (§15).
+- **Conflict resolution.** Both §15.1 rows are kept: `#1705`'s `9b06be3f` re-verification first,
+  then this slice's row, re-pointed from `69aca5e7` to the `9b06be3f` stamp it now amends. The
+  header stamp stays `9b06be3f`, because no AC clause changes (contract §15, rule 2).
+- **Board at the amendment: 48 open PRs.** Every head was fetched as `refs/pull/N/head` and diffed
+  against its merge-base with `c9bc1df3`. None besides `#1699` adds or edits
+  `docs/specs/release-topology-specification.md`, and `git merge-tree` of this branch against each
+  PR below is **clean**. The ones bearing on this surface:
+
+| PR      | State at the amendment's read                                        | Bearing                                                                                                                                                                    |
+| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#1699` | open draft, head `cdc0559f`, base `e1d541e2`, **conflicts** with tip | Superseded by this carry-forward on merge; its commits are included unchanged                                                                                              |
+| `#1696` | open, `CURRENT_STATE.md` restamp on `2f67a545`                       | Records the incident, the rollback and the unpromoted tip. **Sole writer of `CURRENT_STATE.md`**; this slice does not edit that file                                       |
+| `#1703` | open, delivery lane for migration `20260924120000`                   | Edits `docs/codebase-map.md` §"Migration replay and appliers" (seven → ten appliers); this slice edits the same file at the `vercel.json` paragraph only. Disjoint hunks   |
+| `#1701` | open draft, delivery lane for `20260916111000`                       | Same file and same disjoint relationship as `#1703`. Database axis (§5.4): a delivery lane is an apply path, not an applied state                                          |
+| `#1683` | open, 82 files, adds a migration and edits an edge function          | Edge and database axes (§5.3, §5.4); committed is neither deployed nor applied. No file overlap                                                                            |
+| `#1175` | open, base `aabbd2b3`                                                | Unchanged input to §11                                                                                                                                                     |
+| `#1643` | open, T1 snippet pins for the contract                               | This slice changes no AC clause. Its §9 hunk shifts the contract's later lines by two, so any line-anchored pin below AC-9.3 must be re-pointed by whichever merges second |
+| `#1250` | open, `HOLD`                                                         | Untouched                                                                                                                                                                  |
+
+- **The contract past its `9b06be3f` stamp — measured, not amended here.** Intersecting every path
+  cited in `docs/architecture-contract.md` (179 distinct) with the 35 files that
+  `git diff --name-only 9b06be3f c9bc1df3` lists finds two:
+  - `config/required-status-checks.json` (`#1708`). AC-9.1's claim that the published-migration
+    integrity check is neither required nor in `mustBeGreen` **still holds** (35 required, 7
+    `mustBeGreen`, none of them that check).
+  - `src/components/genetics/BreedingLogContainer.tsx` (`#1661`). AC-7.3 cites `:141` for the
+    `create-breeding-suggestions` invocation; at `c9bc1df3` that string is on **`:143`**. The claim
+    is true and the cite is two lines stale, which is a T1 failure.
+
+  The re-point belongs to the contract's own §15 re-verification slice, sequenced after this merges
+  (§14), because this slice touches no AC clause (AT-6).
+
+The collision audit the assignment asked for also covered work on signup and migration hardening
+(`#1703` and `#1701` open; `#1704` merged), CI runners (`#1221` and `#1708` merged), Quick Log
+remembered-target recovery and billing. No open PR changes `src/lib/entitlements/`, an
+`ai_credit_*` path, `quickLogTargetResolutionRules` or a remembered-target file (path grep over all
+48 diffs). None of this touches this document.
+
 ---
 
-## 3. The topology model — five axes, one owner each
+## 3. The topology model — six axes, one owner each
 
 ```text
   PR ──merge queue (squash, 35 required contexts)──▶ verdant-grow-diary tip
@@ -149,9 +220,18 @@ No competing implementation exists; none is created.
                                                             │
   (C) Build inside the publisher:  prebuild chain (package.json:9) → vite build (Nitro) → stamp
   (D) Edge functions:  supabase functions deploy — deployer NOT_MEASURED; no Actions path
-  (E) Database:  supabase/migrations/** (append-only) → operator-dispatched apply workflow;
+  (E) Database:  supabase/migrations/** (append-only) → operator-dispatched apply workflows;
                  applied state NOT_MEASURED here (CURRENT_STATE axis)
+  (F) Promotion:  which READY deployment each production hostname resolves to.
+                  Git auto-assignment ─┐
+                  promote / redeploy ──┼──▶ apex, www, verdant-grow-diary.vercel.app
+                  instant rollback ────┘    (any platform token can move them; no repository gate)
 ```
+
+**Building is not serving.** Axis (B) produces READY production deployments; axis (F) decides which
+of them the production hostnames resolve to. They are separate. Appendix A observed them move
+together six times; Appendix B observed one out-of-band promotion and then thirteen builds that
+(F) never picked up.
 
 | Axis                   | Owner of the truth                                                                              | Proof that counts                                                                                                    | Never counts as proof                                                                                          |
 | ---------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -159,7 +239,8 @@ No competing implementation exists; none is created.
 | Frontend / SSR publish | The platform whose project holds the apex domain and whose deployment produced the served stamp | The §4 chain: domain binding → project ↔ repo → deployment ↔ commit → served `/version.json` inside the build window | `server:` headers alone; `vercel.json` presence; a vendor SDK; Make or script comments; tip-equals-live parity |
 | Build                  | `package.json` `prebuild`/`build`/`postbuild` and the publisher's build settings                | The served stamp's fields; the publisher's build log where readable                                                  | The preset's default Nitro target (build target ≠ serving target)                                              |
 | Edge functions         | Whoever runs `supabase functions deploy` against `knkwiiywfkbqznbxwqfh`                         | A read of the production project's function versions, or the deployer's own log                                      | The `Makefile:77` comment; the Lovable knowledge note; committed source                                        |
-| Database               | The operator apply path (`apply-pinned-production-migrations.yml`) and Lovable-authored exports | `supabase_migrations.schema_migrations` on production, or the drift probe's output                                   | A merged migration file; a green `Published migration integrity` run                                           |
+| Database               | The operator apply paths (`apply-*.yml`, §5.4) and Lovable-authored exports                     | `supabase_migrations.schema_migrations` on production, or the drift probe's output                                   | A merged migration file; a green `Published migration integrity` run                                           |
+| Promotion              | The platform's alias records: which deployment each production hostname resolves to             | M10: resolve **each hostname** to its deployment; the team event log for the action and actor (M11)                  | "Newest production deployment"; a deployment's own `alias` array; a READY build; a merge; a green check        |
 
 ---
 
@@ -168,14 +249,14 @@ No competing implementation exists; none is created.
 Each step names its read, its label, and its status. The values are in Appendix A; the method is
 here. A future restamp re-runs the same steps in the same order.
 
-| Step | Question the step answers                                  | Read (tool or command)                                                                                                                           | Label at A                                                     | Status |
-| ---- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------ |
-| 1    | Which platform project holds the apex domain?              | Vercel `list_project_domains` for the project; DNS resolution of apex and `www`                                                                  | `established fact`                                             | `PASS` |
-| 2    | Is that project bound to this repository?                  | Vercel `list_projects` filtered by this repository's URL; deployment `meta.githubOrg/Repo`                                                       | `established fact`                                             | `PASS` |
-| 3    | Did its latest production deployment build the deploy tip? | Vercel `list_deployments` (`target=production`) and `get_deployment` with git info                                                               | `established fact`                                             | `PASS` |
-| 4    | Are the served bytes that deployment's bytes?              | `GET https://verdantgrowdiary.com/version.json`; compare `commit` and `buildTime` with the deployment's `githubCommitSha`, `buildingAt`, `ready` | `established fact` for the fields; `inference` for attribution | `PASS` |
-| 5    | Is this one publish or a standing behaviour?               | The previous N production deployments against the previous N deploy-branch tips                                                                  | `established fact`                                             | `PASS` |
-| 6    | What triggered the observed deployments?                   | Deployment `source` (`git`) and `meta.githubCommitRef`; latency from commit to deployment                                                        | `established fact` + `inference`                               | `PASS` |
+| Step | Question the step answers                                                                  | Read (tool or command)                                                                                                                           | Label at A                                                     | Status                             |
+| ---- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ---------------------------------- |
+| 1    | Which platform project holds the apex domain?                                              | Vercel `list_project_domains` for the project; DNS resolution of apex and `www`                                                                  | `established fact`                                             | `PASS`                             |
+| 2    | Is that project bound to this repository?                                                  | Vercel `list_projects` filtered by this repository's URL; deployment `meta.githubOrg/Repo`                                                       | `established fact`                                             | `PASS`                             |
+| 3    | Which deployment does **each production hostname** serve, and did it build the deploy tip? | Vercel `get_deployment <hostname>` for the apex, `www`, `verdant-grow-diary.vercel.app` and the project alias (M10); then git info for each      | `established fact`                                             | `PASS` at A (via A.1); `FAIL` at B |
+| 4    | Are the served bytes that deployment's bytes?                                              | `GET https://verdantgrowdiary.com/version.json`; compare `commit` and `buildTime` with the deployment's `githubCommitSha`, `buildingAt`, `ready` | `established fact` for the fields; `inference` for attribution | `PASS` at A; `BLOCKED` at B        |
+| 5    | Is this one publish or a standing behaviour?                                               | The previous N production deployments against the previous N deploy-branch tips, **and** which of them each hostname resolved to                 | `established fact`                                             | `PASS` at A; `FAIL` from 09:45 UTC |
+| 6    | What triggered the observed deployments?                                                   | Deployment `source` (`git`) and `meta.githubCommitRef`; latency from commit to deployment                                                        | `established fact` + `inference`                               | `PASS`                             |
 
 **Conclusion at the Appendix A instant.** The publisher of `verdantgrowdiary.com` is Vercel's Git
 integration for project `verdant-grow-diary`. On the six observed production deployments the
@@ -184,6 +265,15 @@ trigger was a push to `verdant-grow-diary`; the project's configured trigger set
 ref). This satisfies contract
 §14's rule — the publisher was **measured**, not read off a header — and it is exactly the kind
 of statement §14 said must not live in the contract.
+
+**Step 3 was the wrong question, and the amendment replaces it.** The founding chain asked for the
+_newest_ production deployment. Twice on 2026-09-25 that returned a different deployment from the
+one the apex served: after the 09:45 rollback the newest was the stale 08:28 redeploy, and from 12:03
+onwards it was each new tip build that the custom domains never received. A deployment's own `alias`
+array is not a substitute either: at 23:29 UTC the `9b06be3f` deployment still listed the project
+alias, while resolving that hostname returned the `c9bc1df3` build (Appendix B.2). The only reading
+that answers "what is served" is **hostname → deployment**, per hostname (M10). A split between
+hostnames is itself a finding (D-RT-12).
 
 **What the chain does not establish**, stated so silence is not read as agreement:
 
@@ -230,7 +320,10 @@ not pick one. It records that the choice is open and gives it to Cheek (§7, §1
   `NOT_MEASURED`.
 - Ruleset `20421416` requires 35 contexts, all produced by `ci.yml`, pinned in
   `config/required-status-checks.json` (`capturedAt: 2026-08-10`; `#1221` added `mustBeGreen`
-  entries and left the required list unchanged). Merges are squash through the merge queue.
+  entries and `#1708` a seventh, leaving `required` at 35 — parsed at `c9bc1df3`). Merges are
+  squash through the merge queue.
+- **A merge produces a production build, not a promotion.** Everything in this subsection sits
+  upstream of axis (F). Whether a merged tip is served is answered only by M10 (§5.7).
 - `auto-tag-release.yml` tags every push to `main` or `verdant-grow-diary` as
   `v<yyyy>.<mm>.<dd>-<shortSha>` with a `Tree-Hash:` annotation (`:86-93`). Tags exist for the last
   four deploy tips (Appendix A.7). This is the only durable link from a served `treeHash` back to
@@ -243,18 +336,23 @@ not pick one. It records that the choice is open and gives it to Cheek (§7, §1
   `check-no-src-lib-imports.mjs`, `stamp-version.mjs`. `build` is `vite build`; `postbuild` runs
   the SEO validators against `dist` (`:11-12`). `#1175` would append a sixth step (§11).
 - `stamp-version.mjs` writes `public/version.json` and `src/generated/buildInfo.ts`, both tracked
-  (`:11-15`, `:67`). It never exits non-zero for provenance reasons (`:42-44`). `commitSource` is
+  (`:11-15`, `:67`). It never exits non-zero for provenance reasons (`:41-42`). `commitSource` is
   `github-env` | `git` | `none` (`:148`); `ref` prefers `GITHUB_REF_NAME`, then
   `VERCEL_GIT_COMMIT_REF`, then the git ref (`:126-135`); `ciRunId` is `GITHUB_RUN_ID` or `null`
-  (`:283`). A Vercel build is detected only for diagnostics and never flips `dirty` (`:70-71`,
-  `:165-171`).
+  (`:283`). A Vercel build (`:70-71`) changes `dirty` in one way only: the builder rewrites
+  `vercel.json` before `prebuild`, so on Vercel `.vercel/` and `vercel.json` are excluded from the
+  porcelain that decides `dirty` (`:109-113`, rationale `:96-103`). Beyond that exclusion the
+  detection is diagnostic and never turns a dirty tree clean (`:165-171`). _Corrected at the
+  amendment; the founding text said the detection was diagnostic only._
 - **The tracked stamp is lineage, never identity** (`:37-39`, `:196-198`). At the tip,
-  `public/version.json` still says `686fef4d`, `dirty: true`, from 2026-09-12 — 54 commits behind.
+  `public/version.json` still says `686fef4d`, `dirty: true`, from 2026-09-12 — 54 commits behind
+  at `e1d541e2` (founding count; the amendment's clone is shallow and did not re-count it).
   That is expected: the file is overwritten inside the publisher's build, and its committed copy
   surfaces only as `inherited` (`trusted: false`) when a build has no git identity.
-- `treeHash` covers `TREE_HASH_ROOTS` (`scripts/lib/tree-hash.mjs:43-65`): `src`, `public`,
+- `treeHash` covers `TREE_HASH_ROOTS` (`scripts/lib/tree-hash.mjs:43-70`): `src`, `public`,
   `supabase`, `scripts`, `config`, the four committed env files, `index.html`, `package.json`, both
-  lockfiles, `vite.config.ts` and the tsconfigs. Docs, `e2e/`, and `.github/` do not move it, so one
+  lockfiles, `vite.config.ts`, the tsconfigs, `tailwind.config.ts`, `postcss.config.js`,
+  `components.json` and `eslint.config.js`. Docs, `e2e/`, and `.github/` do not move it, so one
   hash can name several commits.
 - **Rule (D-RT-3).** The preset's Nitro target is the configured build target and says nothing
   about the serving target (contract §14). Record the two separately and never derive one from the
@@ -262,10 +360,13 @@ not pick one. It records that the choice is open and gives it to Cheek (§7, §1
 
 ### 5.3 Edge functions — `NOT_MEASURED` deployer, `BLOCKED` state
 
-- No workflow under `.github/workflows/` deploys edge functions. Re-grepped at the tip for
-  `supabase functions deploy`, `supabase db push`, `supabase link`, `vercel deploy` and the common
-  deploy actions: the only two hits are a comment in `mcp-local-rls-integration.yml:12` and two
-  quoted instruction strings in `required-money-migrations.yml:124,201`. `established fact`.
+- No workflow under `.github/workflows/` deploys edge functions. Re-grepped at `c9bc1df3` for
+  `supabase functions deploy`, `supabase db push`, `supabase link`, `vercel deploy`,
+  `vercel --prod` and the common deploy actions: the hits are two header comments in
+  `mcp-local-rls-integration.yml:11-12` and two quoted instruction strings in
+  `required-money-migrations.yml:124,201`. Seven workflows install the Supabase CLI
+  (`supabase/setup-cli`), and all seven drive disposable local or replay stacks only; none runs
+  `link`, `db push`, `functions deploy` or `--project-ref`. `established fact`.
 - `package.json:20-21` and `:218` carry `deploy:functions`, `deploy:functions:all` and
   `sb:functions:deploy` (`supabase functions deploy`); `Makefile:77` carries `functions-deploy`
   with the comment "Lovable does this automatically". The comment is comment text (contract §9).
@@ -284,14 +385,22 @@ not pick one. It records that the choice is open and gives it to Cheek (§7, §1
 - Migrations are append-only and immutable once merged (`AGENTS.md`); the `Published migration
 integrity` gate compares SHA-256 against the base and is not a required context (contract
   AC-9.1, §13).
-- The production apply path is `apply-pinned-production-migrations.yml`: `workflow_dispatch` with
+- **There are eight operator apply paths, not one.** At `c9bc1df3`, `.github/workflows/` holds eight
+  `apply-*.yml` workflows, each `workflow_dispatch`-only and each running in GitHub environment
+  `verdant-production-solo-founder`: the general `apply-pinned-production-migrations.yml` and seven
+  pinned single-purpose appliers (`action-queue-transition-forward-repair`,
+  `agreement-acceptance-insert-forward-repair`, `candidate-number-maintenance-migrations`,
+  `pinned-breeding-reconciliation`, `quicklog-corrections-retractions`,
+  `quicklog-manual-delegate-forward-repair`, `signup-acquisition-forward-repair`). `#1701` and
+  `#1703` propose two more. The founding text named only the first; `established fact` by listing.
+- The general apply path is `apply-pinned-production-migrations.yml`: `workflow_dispatch` with
   `expected_head_sha`, `confirm_project_ref` (must equal `knkwiiywfkbqznbxwqfh`, `:59`) and
   `confirm_apply`; it runs in GitHub environment `verdant-production-solo-founder` (`:73`) with the
   `SUPABASE_DB_URL` secret (`:94-95`) and executes `scripts/apply-pinned-production-migrations.mjs`
   (`:113`). `migration-drift-probe.yml` is the read-only counterpart (`workflow_dispatch`,
   environment `verdant-production`, `psql`). `supabase/config.toml:1` pins the same project ref.
 - Lovable authors migrations under its own naming (157 UUID-slug exports in the ledger per
-  `docs/codebase-map.md:416-420`) and, as a `source claim`, applies what it authors through its
+  `docs/codebase-map.md:417-421`) and, as a `source claim`, applies what it authors through its
   Cloud. Nothing in this repository shows that path.
 - Applied state on production is a `docs/agents/CURRENT_STATE.md` axis (contract AC-9.3) and stays
   `NOT_MEASURED` here; through this session's Supabase tool it is `BLOCKED` (sandbox only). The
@@ -299,12 +408,12 @@ integrity` gate compares SHA-256 against the base and is not a required context 
 
 ### 5.5 Post-deploy signals — never gates
 
-| Workflow             | Trigger at the tip                                                  | What it can say                                                                       |
-| -------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `quicklog-smoke.yml` | `push`/`pull_request` on `verdant-grow-diary`, dispatch (`:50-102`) | Authenticated smoke against the deployed app; `blocked` without owner credentials     |
-| `seo-monitoring.yml` | `workflow_run` after `ci` on `verdant-grow-diary` (`:23-26`)        | Public-surface probes of `verdantgrowdiary.com`                                       |
-| `lighthouse-ci.yml`  | daily `cron`, dispatch (`:13-17`)                                   | Performance of the live host, not of a commit                                         |
-| `test:legal-seo`     | required context; Vitest over source (`package.json:101`)           | Nothing about production — the Playwright probe is `test:legal-seo:e2e`, not required |
+| Workflow             | Trigger at the tip                                                                                                                | What it can say                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `quicklog-smoke.yml` | `push`/`pull_request` on `verdant-grow-diary`, path-filtered to `e2e/**`, `playwright.config.ts` and itself; dispatch (`:50-106`) | Authenticated smoke against the deployed app; `blocked` without owner credentials        |
+| `seo-monitoring.yml` | `workflow_run` after `ci` on `verdant-grow-diary` (`:23-26`); dispatch                                                            | Public-surface probes of `verdantgrowdiary.com` — the host, which may lag the tip (§5.7) |
+| `lighthouse-ci.yml`  | daily `cron`, dispatch (`:13-17`)                                                                                                 | Performance of the live host, not of a commit                                            |
+| `test:legal-seo`     | required context; Vitest over source (`package.json:101`)                                                                         | Nothing about production — the Playwright probe is `test:legal-seo:e2e`, not required    |
 
 **Rule (D-RT-10).** A post-deploy signal runs after the publisher has already published and can be
 green for a commit that was never served (it reads the host, not the commit). It informs a restamp;
@@ -324,6 +433,52 @@ all_except_custom_domains`), so preview URLs are not public while the apex is.
   filtered listing; whether it still exists is `NOT_MEASURED` (a team-wide listing was not
   requested). The document predates SSR and is a retirement candidate (§14).
 
+### 5.7 Promotion — which build the production hostnames serve
+
+This axis was missing from the founding text. The 2026-09-25 incident (Appendix B) is its worked
+example. Every bullet is `established fact` from Vercel reads unless labelled.
+
+- **Four ways a deployment reaches the production hostnames, and only one passes a repository
+  gate.**
+  1. _Git auto-assignment_: a push to the deploy branch builds a production deployment, and the
+     platform assigns the production domains to it when auto-assignment is in effect. The merge
+     queue and the 35 required contexts sit upstream of this path.
+  2. _Promote or redeploy_: any READY deployment, including a preview built from an unmerged PR
+     branch, can be made production through the dashboard, the CLI (`vercel promote`,
+     `vercel --prod`) or the REST API. No repository gate is involved; the authority is whatever
+     platform credential issued the call.
+  3. _Instant Rollback_: the production domains move to an earlier production deployment. Also no
+     repository gate.
+  4. _Manual alias assignment_ (`vercel alias set`) and domain moves: the same class as 2 and 3.
+- **The event log distinguishes the actor classes.** In the two windows read (B.3), the
+  Git-integration deployment events carry no token identifier and no `via` application. The 08:28:39 UTC production deployment of PR-branch commit
+  `7053af8f` carried an **API-token identifier and no `via` application**. The 09:45:15 UTC
+  `instant-rollback-created` event carried **`via: Claude.ai`**, a different token, and the reason
+  text "Owner-authorized rollback …". Every event records the owner's Vercel identity as the
+  principal, so the principal alone never identifies the actor (Appendix B.3). The identifier values
+  themselves are deliberately not recorded here (AT-10).
+- **The same token that promoted the PR build also changed production settings.** Within 90 seconds
+  it enabled Skew Protection (08:28:52) and disabled "include files outside root directory"
+  (08:29:43). At 08:26:14 it had attached the project to a GitHub connector for all environments.
+  A production-setting change is a publish action in its own right (D-RT-13).
+- **Who held that token is `NOT_MEASURED`.** The event's `github_login` attribution is
+  `cursoragent`, but that is the **author of the commit being deployed**, not proof of the caller.
+  `#1696` records the actor as the Cursor agent, which stays a `source claim` here.
+- **After the rollback, auto-assignment stopped taking effect.** Thirteen consecutive deploy-branch
+  merges, from `c10c095e` at 12:03 UTC to `c9bc1df3` at 23:17 UTC, each built a READY
+  production-target deployment from `verdant-grow-diary`. None received the apex, `www` or
+  `verdant-grow-diary.vercel.app`, and all three still resolved to the `9b06be3f` rollback target
+  at 23:29 UTC. `list_promote_aliases` reported all three `pending`. The effect over thirteen
+  builds is `established fact`. That an Instant Rollback pauses auto-assignment until an explicit
+  promote is `inference`: Vercel's documentation searched for this amendment describes
+  `promote`, `rollback` and `--skip-domain` but did not state the pause.
+- **Skew Protection changes what a rollback ends.** With it enabled, a client that already loaded
+  one deployment's assets keeps being served from that deployment for the configured window, so a
+  rollback or promote stops _new_ loads of the old build, not necessarily sessions already open.
+  The effect is a `source claim` from Vercel's product description; the configured window is
+  `NOT_MEASURED`.
+- **Rule (D-RT-12), (D-RT-13), (D-RT-14)** — §7.
+
 ---
 
 ## 6. Corrections to repository statements
@@ -334,27 +489,38 @@ Evaluation; no file in the repository carries that title (`grep -rlI "Optimal Te
 tip returns nothing), so the corrections are made against the listed conclusions themselves.
 **§6.2** corrects repository text that the topology measurement contradicts.
 
-### 6.1 The evaluation's conclusions, verified
+### 6.1 The evaluation's conclusions, verified from source at `c9bc1df3`
 
-| Conclusion                                                                                                                       | Status                                                | Basis                                                                                                                                                                                               |
-| -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| TanStack Start SSR, TanStack Router, Vite, Nitro                                                                                 | `PASS`                                                | Contract AC-1.1–AC-1.7, verified at `69aca5e7`; `vite.config.ts:12,31-36` at the tip; Vercel reports framework `tanstack-start-lovable` (A.3). Carried, not re-measured here beyond the cited lines |
-| React 19, Tailwind 4, shadcn/Radix, TanStack Query current                                                                       | `source claim`                                        | Contract AC-1.8 at `69aca5e7`; `bun.lock` not re-read in this slice                                                                                                                                 |
-| Supabase Postgres/Auth/RLS/RPC/Edge Functions current                                                                            | `source claim`                                        | Contract §2, §9 at `69aca5e7`; `supabase/config.toml:1` at the tip                                                                                                                                  |
-| Bun canonical; npm compatibility may remain                                                                                      | `PASS`                                                | `bun.lock` and `package-lock.json` both in `TREE_HASH_ROOTS` (`tree-hash.mjs:57-61`); `vercel.json:3-5` declares Bun for the publisher                                                              |
-| AI Doctor: gateway path, server-pinned model, validated tool output, credit/idempotency, receipts, no Action Queue/device writes | `source claim`                                        | Contract §5 at `69aca5e7`; outside this slice's measurement                                                                                                                                         |
-| Canonical sensor sources `live/manual/csv/demo/stale/invalid`; vendor/transport are provenance                                   | `source claim`                                        | Contract §4 at `69aca5e7`                                                                                                                                                                           |
-| VPD EWMA exists; Modified Z-Score/MAD and Nelson Rules not implemented                                                           | `source claim`                                        | Contract §10, §12 at `69aca5e7`                                                                                                                                                                     |
-| **Lovable Cloud is the production publisher** (implied wherever the evaluation says "Lovable")                                   | **`FAIL`**                                            | §4: the apex is published by Vercel's Git integration at the measured instant. Lovable remains a second, unmeasured publisher (§4.1)                                                                |
-| **`vercel.json` is inert in production**                                                                                         | **`FAIL`**                                            | A.6: `/strains` → `308 /cultivars`, `/terms-of-service` → `308 /terms`, and the five `vercel.json:33-42` headers are served on `/`                                                                  |
-| The Nitro build target is Cloudflare, therefore production is served on Cloudflare                                               | `FAIL` as an inference; the premise is `source claim` | Contract §14; the deployment type is Vercel `LAMBDAS` (A.4). Which preset ran is `NOT_MEASURED`                                                                                                     |
+The founding text left five of these rows as `source claim` because they were carried from the
+contract. The assignment says to verify them from source rather than assume them, so the amendment
+re-read each one in the `c9bc1df3` blobs (`git show c9bc1df:<path>`). "Source" here means the
+repository. None of these rows says anything about what production runs; that belongs to §4, §5.7
+and M1–M11.
+
+| #   | Conclusion                                                                                                  | Status                     | Evidence at `c9bc1df3`                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | ----------------------------------------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | TanStack Start SSR, TanStack Router, Vite, Nitro                                                            | `PASS`                     | `src/server.ts:14` (Start server entry), `src/start.ts:28` (`createStart`), `src/router.tsx:2` (`createRouter`); `package.json:365-366` (Router, Start), `:426` (`nitro` `3.0.260603-beta`), `:431` (`vite`); resolved `bun.lock:722` Start 1.168.34, `:720` Router 1.170.18, `:2040` Vite 8.2.0, `:1638` Nitro. Nitro reaches the build through the Lovable preset (`vite.config.ts:4,12`; contract AC-1.4)                                                                                 |
+| 2   | React 19, Tailwind 4, shadcn/Radix, TanStack Query current                                                  | `PASS`                     | `package.json:380,382` React `^19.2.0` → `bun.lock:1764,1768` 19.2.8; `package.json:388,363` Tailwind `^4.2.1` → `bun.lock:1934,702` 4.3.3; `src/styles.css:1` CSS-first import; `components.json:3` `new-york`; 27 direct `@radix-ui/*` dependencies (`package.json:334-360`); `package.json:364` Query `^5.101.1` → `bun.lock:718` 5.101.4                                                                                                                                                 |
+| 3   | Supabase Postgres, Auth, RLS, RPC and Edge Functions current                                                | `PASS` in source           | `package.json:362` → `bun.lock:668` supabase-js 2.111.0; `src/integrations/supabase/client.ts:6,18` (client, `sessionStorage`); 34 function directories besides `_shared`; 284 migrations, 93 of them enabling RLS (case-insensitive match); `src/hooks/useHasRole.ts:35` (`.rpc("has_role")`); `supabase/config.toml:1` project ref. Applied schema and deployed functions stay `NOT_MEASURED` (§5.3, §5.4)                                                                                 |
+| 4   | Bun canonical; npm compatibility may remain                                                                 | `PASS`                     | `bun.lock:2` present, **no `bun.lockb`**, `package-lock.json:4` present; `bunfig.toml:2,4`; `scripts/check-bun-lockfile-policy.mjs:5` ("Bun and bun.lock are canonical"), `:53` forbids `bun.lockb`; `config/dependency-lockfile-transition.json:3,5`. `CLAUDE.md:77` still calls `bun.lockb` authoritative: stale (§6.2)                                                                                                                                                                    |
+| 5   | AI Doctor inference through the Lovable AI gateway                                                          | `PASS`                     | `supabase/functions/ai-doctor-review/index.ts:65` (`GATEWAY_URL`), `:307` (`LOVABLE_API_KEY` read server-side), `:502` (fetch)                                                                                                                                                                                                                                                                                                                                                               |
+| 6   | Server-pinned model selection                                                                               | `PASS`                     | same file `:66` (`MODEL`), `:69` (`MODEL_TIER`), `:510` (`model: MODEL`), `:282-284` (user from `auth.getUser()`), `:13` (the server-side rule). The pinned value is dated evidence; the invariant is contract AC-5.2                                                                                                                                                                                                                                                                        |
+| 7   | Validated tool output, credit and idempotency controls, evidence receipts, no Action Queue or device writes | `PASS`                     | Forced tool `:515,518`; `JSON.parse` `:575`, `validateAiDoctorReviewResult` `:581`, grounding `:586`; `ai_credit_spend` `:382` with `p_idempotency_key` `:388`, refund `:405,408`; receipt `:364`, `ai_doctor_finalize_review` `:595,599`. Prohibition `:8-9`. In that file, `action_queue`, `device` and `sensor_readings` occur only in the `:8-9` comment, and there is no `.insert(`, `.upsert(`, `.update(` or `.delete(`                                                               |
+| 8   | Canonical sources `live/manual/csv/demo/stale/invalid`; vendor and transport are provenance                 | `PASS`, two known limits   | `src/lib/sensor/sensorSourceRules.ts:16` (`SENSOR_SOURCES`), `:82` (unknown → `invalid`); `src/constants/sensorIngestProvenance.ts:15,26,39`; webhook keeps vendor and transport in `raw_payload` (`storageMapping.ts:161,177`). Limits, both already contract clauses: `pi_bridge` → `live` (`sensorSourceRules.ts:28`, AC-4.4), and the generic webhook maps an unknown label to the **candidate** `live` (`storageMapping.ts:71,77`), later narrowed by confidence and freshness (AC-4.2) |
+| 9   | VPD EWMA exists                                                                                             | `PASS`                     | `src/lib/vpdDriftRules.ts:56` (α `0.3`), `:57` (minimum 6 readings), `:65` (out-of-range α falls back), `:86` (the recurrence). α is documented, not test-pinned (contract AC-10.1, T6)                                                                                                                                                                                                                                                                                                      |
+| 10  | Modified Z-Score / MAD and Nelson Rules not implemented                                                     | `PASS`                     | `git grep -i -P` over `src/` and `supabase/` at `c9bc1df3`: zero hits for each of `nelson`, `modified z`, `modifiedZ`, `median absolute deviation`, `\bMAD\b`, `z-?score`, `zscore`, `robust ?z`. Must never be described as implemented (contract AC-10.2)                                                                                                                                                                                                                                  |
+| 11  | **Lovable Cloud is the production publisher** (wherever the evaluation says "Lovable")                      | **`FAIL`**                 | §4: Vercel's Git integration published the apex at the Appendix A instant; §5.7: promotion is a separate axis. Lovable remains a second, unmeasured publisher (§4.1)                                                                                                                                                                                                                                                                                                                         |
+| 12  | **`vercel.json` is inert in production**                                                                    | **`FAIL`**                 | A.6: `/strains` → `308 /cultivars`, `/terms-of-service` → `308 /terms`, and the five `vercel.json:33-42` headers served on `/`                                                                                                                                                                                                                                                                                                                                                               |
+| 13  | The Nitro build target is Cloudflare, therefore production is served on Cloudflare                          | `FAIL` as an inference     | Contract §14; the deployment type is Vercel `LAMBDAS` (A.4, and every Appendix B read). Which preset the Vercel build ran is `NOT_MEASURED`                                                                                                                                                                                                                                                                                                                                                  |
+| 14  | **A merge to the deploy branch goes live**                                                                  | **`FAIL`** since 09:45 UTC | §5.7 and Appendix B: thirteen merges built READY production deployments and none reached the production hostnames. A merge is not a deployment, and a production build is not a promotion                                                                                                                                                                                                                                                                                                    |
 
 ### 6.2 Repository text contradicted by the measurement
 
 | File and lines                                                  | Statement                                                                                                                  | Status         | Correction and owner                                                                                                                                 |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CLAUDE.md:130`                                                 | "**Lovable is the production publisher**"                                                                                  | `FAIL`         | Governance file: one of the twelve; all twelve bump `Sentinel-Version` together. **Deferred** to its own slice (§14). Until then, read it against §4 |
-| `CLAUDE.md:138-143`                                             | "`vercel.json` does not govern production … Never reason about production redirect or header behaviour from `vercel.json`" | `FAIL`         | Same slice. The durable form is D-RT-5: a host file governs when the measured publisher applies it                                                   |
+| `CLAUDE.md:138-144`                                             | "`vercel.json` does not govern production … Never reason about production redirect or header behaviour from `vercel.json`" | `FAIL`         | Same slice. The durable form is D-RT-5: a host file governs when the measured publisher applies it                                                   |
+| `CLAUDE.md:77`                                                  | "`bun.lockb` authoritative"                                                                                                | `FAIL`         | Same governance slice. The tree has `bun.lock` and no `bun.lockb`, and the lockfile policy forbids `bun.lockb` (§6.1 row 4; contract AC-8.1)         |
 | `docs/architecture-contract.md` §12                             | "Treating `vercel.json` as production configuration — REJECTED — measured as not applied"                                  | `FAIL`         | **Amended in this slice** to the durable form; §15.1 records why                                                                                     |
 | `docs/architecture-contract.md` §9 prose, §13 row, §14 pointers | "release topology deferred — #1221 / #1175"                                                                                | stale          | **Amended in this slice** to point here                                                                                                              |
 | `docs/codebase-map.md:87-93`                                    | "Those redirects do not fire in production. Lovable is the production publisher …"                                         | `FAIL`         | **Amended in this slice** to the durable rule and a pointer; the eight-entry inventory is kept                                                       |
@@ -362,9 +528,11 @@ tip returns nothing), so the corrections are made against the listed conclusions
 | `scripts/stamp-version.mjs:23-26`                               | "the production publisher (Lovable) sometimes builds from a history-less snapshot"                                         | stale comment  | A script edit with test pins nearby; **deferred** (§14). The observation it records (2026-08-05) stays true as history                               |
 | `.github/workflows/deployment-preview.yml:4-12`                 | "Publishing to Lovable's published URL is a manual action from the Lovable UI"                                             | partial        | True of the Lovable path only. Workflow file; **deferred**                                                                                           |
 | `Makefile:77`                                                   | "Lovable does this automatically"                                                                                          | `NOT_MEASURED` | Comment text (contract §9). **Deferred** with the script comment                                                                                     |
-| `docs/preview-deployment-verification.md:3-8, 15-22`            | preview-only Vercel project `verdant-command-center-preview`, npm, `/index.html` rewrite                                   | stale          | Retirement candidate (§14); not edited here                                                                                                          |
+| `docs/preview-deployment-verification.md:3-8, 14-27`            | preview-only Vercel project `verdant-command-center-preview`, npm, `/index.html` rewrite                                   | stale          | Retirement candidate (§14); not edited here                                                                                                          |
 | `docs/seo/lighting-launch-verification.md:157-161`              | "redirects … return HTTP 200 … Lovable is the production publisher"                                                        | dated          | Generated 2026-08-02; historically consistent with contract §14's earlier measurement. Left as a dated record                                        |
 | `docs/lovable/verdant-project-knowledge-2026-08-18.md:33`       | "Publish deploys frontend + edge only"                                                                                     | `source claim` | Dated Lovable knowledge snapshot; left, and cited as a claim in §5.3                                                                                 |
+| `.github/workflows/lighthouse-ci.yml:4-6`                       | "Verdant publishes locally from Windows"                                                                                   | stale comment  | Found at the amendment. Contradicted by §4 and Appendix B. Workflow file; **deferred** with the other stale comments                                 |
+| `.github/workflows/auto-tag-release.yml:86-87`                  | "Production builds may lack git context (history-less Lovable snapshots …)"                                                | dated          | Found at the amendment. True of the Lovable path; the measured Vercel builds carry git identity (A.1). Tagging is unaffected; comment **deferred**   |
 | `docs/agents/CURRENT_STATE.md:186`                              | "Release Topology Specification stays deferred: `#1175` and `#1221` are both still open"                                   | stale          | `#1221` merged; this document exists. **Handed to `#1696`'s owner** (§15); not edited here                                                           |
 
 ---
@@ -389,45 +557,74 @@ Durable. Each is a rule a future slice can be held to; none carries a date.
 - **D-RT-5 — A host configuration file governs when the measured publisher applies it.** While
   Vercel serves the apex, `vercel.json` is production configuration: reviewed like one, and
   measured after each change (M7). The contract's §12 row now says this in its durable form.
-- **D-RT-6 — The served stamp is the only proof of what is live.** `/version.json` on the apex,
-  read at a stated instant, with `commit`, `dirty`, `commitSource`, `ref`, `buildTime` and
-  `treeHash` recorded. A stamp with `commitSource: "none"` is resolved through `treeHash` and the
-  tag annotations (`docs/release-provenance-runbook.md`), never through `inherited`.
+- **D-RT-6 — What is live is proved by what is served, never by what was built.** The primary proof
+  is `/version.json` on the apex, read at a stated instant, with `commit`, `dirty`, `commitSource`,
+  `ref`, `buildTime` and `treeHash` recorded. When session egress blocks that read, the
+  hostname → deployment reading of M10 is the platform-side proof, and the stamp stays `BLOCKED`,
+  not inferred. A stamp with `commitSource: "none"` is resolved through `treeHash` and the tag
+  annotations (`docs/release-provenance-runbook.md`), never through `inherited`.
 - **D-RT-7 — Tags are the provenance anchor, not the release.** `auto-tag-release` proves that a
   push reached GitHub and records its `Tree-Hash`; it proves nothing about a publish.
 - **D-RT-8 — Edge functions are a separate release.** No frontend publish implies an edge deploy.
   Until M6 is run by someone with production read access, the edge axis stays `NOT_MEASURED` and
   release notes say so.
-- **D-RT-9 — Migrations reach production only through the operator apply path.** Committed is not
-  applied; the dispatch workflow with its confirmations is the path; `No APPLY` is the standing
-  lock until Cheek lifts it.
+- **D-RT-9 — Migrations reach production only through the operator apply paths.** Committed is
+  not applied; the dispatch workflows with their confirmations are the paths (§5.4 lists eight);
+  `No APPLY` is the standing lock until Cheek lifts it.
 - **D-RT-10 — Post-deploy probes are signals.** They inform a restamp and never gate a merge or
   certify a release.
 - **D-RT-11 — Dated values never enter a durable document twice.** They live in
   `docs/agents/CURRENT_STATE.md`; this document's Appendix A is the founding measurement and is not
-  updated in place — a later measurement is a stamp, not an edit here.
+  updated in place — a later measurement is a stamp, not an edit here. Appendix B is not an update
+  of A: it records a separate event that the durable rules below were written from.
+- **D-RT-12 — Serving is resolved per hostname, and a split is a finding.** The apex, `www`,
+  `verdant-grow-diary.vercel.app` and the project alias are each resolved to a deployment (M10).
+  "Newest production deployment" and a deployment's own `alias` array are never used as the
+  answer. If the hostnames resolve to different deployments, or the apex resolves to anything
+  other than a `source: git` build of the current deploy tip, the release state is **`FAIL`**
+  until the owner closes it, and every `CURRENT_STATE.md` stamp says so.
+- **D-RT-13 — Every change to what production serves is a publish action.** A promote, redeploy,
+  Instant Rollback, manual alias assignment, domain move, or production-setting change (Skew
+  Protection, build settings, connectors, auto-assignment) needs the same authority as Publish.
+  An agent session issues one only on the owner's explicit instruction for that action, records
+  the action, the deployment IDs, the actor class and the reason in its report, and the next
+  `CURRENT_STATE.md` stamp records the same. The 09:45 rollback is the model: owner-instructed,
+  reason text on the event, confirmed by per-hostname reads afterwards. The 08:28 promotion is the
+  counter-example: no owner instruction found in this slice's reads, no reason text, and a
+  PR-branch commit.
+- **D-RT-14 — A production-scoped platform credential is a publish path.** Any token that can
+  promote, redeploy, roll back or change project settings is part of the release topology, like a
+  publisher. Which sessions and agents hold one is a topology fact. The owner records it and scopes
+  or revokes it; this document cannot measure it (§10). Until it is recorded, D-RT-13 is held by
+  convention only.
 
 ---
 
 ## 8. Measurement procedures
 
 Each procedure names what it proves, how, and the status it reports when it cannot run. A restamp
-that cites this document runs M1–M5 at minimum and records M6–M9 as `BLOCKED` or `NOT_MEASURED`
-when it cannot run them.
+that cites this document runs M1–M5 and **M10** at minimum and records M6–M9 and M11 as `BLOCKED` or
+`NOT_MEASURED` when it cannot run them. M4 alone never answers "what is served": since the
+amendment it answers "what was built", and M10 answers "what is served".
 
-| ID  | Proves                                        | How                                                                                                                                                                                                                      | If it cannot run                                                                      |
-| --- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| M1  | What is served                                | `GET https://verdantgrowdiary.com/version.json` once; record UTC time, HTTP status, `commit`, `ref`, `dirty`, `commitSource`, `buildTime`, `treeHash`, `ciRunId`, and the `server`/`x-vercel-id` headers as observations | `BLOCKED` (egress)                                                                    |
-| M2  | Which project holds the apex                  | Vercel `list_project_domains` for the candidate project; DNS `A`/`CNAME` for apex and `www`                                                                                                                              | `BLOCKED` (no account access)                                                         |
-| M3  | Project ↔ repository                          | Vercel `list_projects` with `repoUrl = https://github.com/Verdant-OS/verdant-grow-diary`                                                                                                                                 | `BLOCKED`                                                                             |
-| M4  | Deployment ↔ commit, and the trigger          | Vercel `list_deployments` with `target=production`, then `get_deployment` with git info for the newest; compare `githubCommitSha` with the tip and `buildTime` with `[buildingAt, ready]`                                | `BLOCKED`                                                                             |
-| M5  | The second publisher's state                  | Lovable `get_project 66255e7b-…`: `latest_commit_sha`, `is_published`, `publish_audience`, and — when the tool exposes it — the published URL                                                                            | `NOT_MEASURED` for the URL                                                            |
-| M6  | Deployed edge-function versions on production | Supabase `list_edge_functions` against `knkwiiywfkbqznbxwqfh` (per-function `version`/`updated_at`), or the deployer's own log                                                                                           | `BLOCKED` when only the sandbox is reachable                                          |
-| M7  | `vercel.json` in effect                       | `HEAD` on one redirect source (`/strains`) and on `/`; expect `308` + `Location` and the five headers of `vercel.json:33-42`                                                                                             | `BLOCKED` (egress)                                                                    |
-| M8  | Tag anchor for the tip                        | `git ls-remote --tags origin 'v<yyyy>.<mm>.<dd>-*'`; expect a tag whose short SHA is the tip's                                                                                                                           | `NOT_MEASURED`                                                                        |
-| M9  | Applied migrations on production              | `migration-drift-probe.yml` output, or `select version from supabase_migrations.schema_migrations` by an operator                                                                                                        | `NOT_MEASURED` (CURRENT_STATE axis); never run from an agent session under `No APPLY` |
+| ID  | Proves                                        | How                                                                                                                                                                                                                                                                                                                                                                                                                                        | If it cannot run                                                                      |
+| --- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| M1  | What is served                                | `GET https://verdantgrowdiary.com/version.json` once; record UTC time, HTTP status, `commit`, `ref`, `dirty`, `commitSource`, `buildTime`, `treeHash`, `ciRunId`, and the `server`/`x-vercel-id` headers as observations                                                                                                                                                                                                                   | `BLOCKED` (egress)                                                                    |
+| M2  | Which project holds the apex                  | Vercel `list_project_domains` for the candidate project; DNS `A`/`CNAME` for apex and `www`                                                                                                                                                                                                                                                                                                                                                | `BLOCKED` (no account access)                                                         |
+| M3  | Project ↔ repository                          | Vercel `list_projects` with `repoUrl = https://github.com/Verdant-OS/verdant-grow-diary`                                                                                                                                                                                                                                                                                                                                                   | `BLOCKED`                                                                             |
+| M4  | What was built, and the trigger               | Vercel `list_deployments` with `target=production` since the last stamp; for each, `githubCommitRef`, `githubCommitSha` and state against the deploy-branch first-parent history. Answers "was every tip built", not "what is served"                                                                                                                                                                                                      | `BLOCKED`                                                                             |
+| M5  | The second publisher's state                  | Lovable `get_project 66255e7b-…`: `latest_commit_sha`, `is_published`, `publish_audience`, and — when the tool exposes it — the published URL                                                                                                                                                                                                                                                                                              | `NOT_MEASURED` for the URL                                                            |
+| M6  | Deployed edge-function versions on production | Supabase `list_edge_functions` against `knkwiiywfkbqznbxwqfh` (per-function `version`/`updated_at`), or the deployer's own log                                                                                                                                                                                                                                                                                                             | `BLOCKED` when only the sandbox is reachable                                          |
+| M7  | `vercel.json` in effect                       | `HEAD` on one redirect source (`/strains`) and on `/`; expect `308` + `Location` and the five headers of `vercel.json:33-42`                                                                                                                                                                                                                                                                                                               | `BLOCKED` (egress)                                                                    |
+| M8  | Tag anchor for the tip                        | `git ls-remote --tags origin 'v<yyyy>.<mm>.<dd>-*'`; expect a tag whose short SHA is the tip's                                                                                                                                                                                                                                                                                                                                             | `NOT_MEASURED`                                                                        |
+| M9  | Applied migrations on production              | `migration-drift-probe.yml` output, or `select version from supabase_migrations.schema_migrations` by an operator                                                                                                                                                                                                                                                                                                                          | `NOT_MEASURED` (CURRENT_STATE axis); never run from an agent session under `No APPLY` |
+| M10 | What each production hostname serves          | Vercel `get_deployment <hostname>` for `verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app` and `verdant-grow-diary-verdantgrowdiary.vercel.app`; record `id`, `source`, `githubCommitRef`, `githubCommitSha` per hostname; then `list_promote_aliases` for pending or failed alias moves. `PASS` only when all four resolve to one `source: git` build of the current tip                                  | `BLOCKED` (no account access); never replaced by M4                                   |
+| M11 | Out-of-band publish actions and their actors  | Vercel `list_user_events` for the project since the last stamp; list every event whose type is a production deployment not from the Git integration, `instant-rollback-created`, an alias assignment to a production hostname, or a project-setting change; record time, type, actor class (Git integration, token without `via`, `via` application) and reason text. Never copy token IDs, session IDs or email addresses into a document | `BLOCKED` (no account access)                                                         |
 
-Reads only. No procedure publishes, deploys, applies, or writes.
+Reads only. No procedure publishes, deploys, promotes, rolls back, applies, or writes. A procedure
+that finds the release state `FAIL` reports it to the owner; closing it (a promote, a rollback, a
+setting change) is a publish action under D-RT-13 and is never taken by the measuring session on its
+own initiative.
 
 ---
 
@@ -436,18 +633,22 @@ Reads only. No procedure publishes, deploys, applies, or writes.
 Reviewable by reading; no runner is added in this slice (a T1-style pin for the cited lines is a
 candidate follow-up, §14).
 
-| ID    | Assertion                                                                                                                                   | Result at authoring                       |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| AT-1  | Every topology claim in §4, §5 and §6 carries one status from the constitution's vocabulary                                                 | `PASS` (by reading)                       |
-| AT-2  | Every `PASS` in §4 names the read that produced it and Appendix A carries that read with a UTC time                                         | `PASS`                                    |
-| AT-3  | No production behaviour is asserted from repository presence or a green check (D-RT-2); each such input is labelled as an input             | `PASS`                                    |
-| AT-4  | Every `path:line` cite resolves at `e1d541e2` to the quoted content                                                                         | `PASS` (re-read while writing; no runner) |
-| AT-5  | `docs/agents/CURRENT_STATE.md` is not edited by this slice                                                                                  | `PASS`                                    |
-| AT-6  | `docs/architecture-contract.md` edits are confined to §9 prose, §12, §13, §14 and a §15.1 row; no AC clause statement changes               | `PASS`                                    |
-| AT-7  | `node scripts/assert-docs-safety.mjs` and `node scripts/assert-release-docs-safety.mjs` exit 0                                              | recorded in the PR body                   |
-| AT-8  | Prettier (`.prettierrc.json`) reports the touched files clean                                                                               | recorded in the PR body                   |
-| AT-9  | The corrections table (§6.2) names a file and line for every contradicted statement and an owner for every deferred edit                    | `PASS`                                    |
-| AT-10 | The document contains no secret, token, connection string, or private environment value; platform identifiers are project and team IDs only | `PASS`                                    |
+| ID    | Assertion                                                                                                                                   | Result at authoring                                           |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| AT-1  | Every topology claim in §4, §5 and §6 carries one status from the constitution's vocabulary                                                 | `PASS` (by reading)                                           |
+| AT-2  | Every `PASS` in §4 names the read that produced it and Appendix A carries that read with a UTC time                                         | `PASS`                                                        |
+| AT-3  | No production behaviour is asserted from repository presence or a green check (D-RT-2); each such input is labelled as an input             | `PASS`                                                        |
+| AT-4  | Every `path:line` cite resolves at `c9bc1df3` to the quoted content (it did at `e1d541e2` for the founding text)                            | `PASS` (re-read at the amendment; no runner)                  |
+| AT-5  | `docs/agents/CURRENT_STATE.md` is not edited by this slice                                                                                  | `PASS`                                                        |
+| AT-6  | `docs/architecture-contract.md` edits are confined to §9 prose, §12, §13, §14 and a §15.1 row; no AC clause statement changes               | `PASS`                                                        |
+| AT-7  | `node scripts/assert-docs-safety.mjs` and `node scripts/assert-release-docs-safety.mjs` exit 0                                              | recorded in the PR body                                       |
+| AT-8  | Prettier (`.prettierrc.json`) reports the touched files clean                                                                               | recorded in the PR body                                       |
+| AT-9  | The corrections table (§6.2) names a file and line for every contradicted statement and an owner for every deferred edit                    | `PASS`                                                        |
+| AT-10 | The document contains no secret, token, connection string, or private environment value; platform identifiers are project and team IDs only | `PASS`                                                        |
+| AT-11 | The promotion axis is present end to end: a §3 row, §4 step 3 asking per hostname, §5.7, D-RT-12–14, M10 and M11                            | `PASS` (by reading)                                           |
+| AT-12 | No token identifier, session identifier or email address from the platform event log appears in this document (M11's rule)                  | `PASS` (`grep` for `tokenId`, `sessionId`, `@` in Appendix B) |
+| AT-13 | Every row of §6.1 carries at least one `path:line` cite read at `c9bc1df3`, and none is left as a `source claim`                            | `PASS`                                                        |
+| AT-14 | Every figure in Appendix B names the read that produced it and a UTC time; nothing there is copied from another session without a label     | `PASS`                                                        |
 
 ---
 
@@ -455,18 +656,23 @@ candidate follow-up, §14).
 
 Stated so nobody reads silence as agreement.
 
-| Unknown                                                                                                                                          | Status         | What would close it                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------- |
-| The URL the Lovable project publishes to, and whether it is public                                                                               | `NOT_MEASURED` | Owner reads the Lovable project's publish settings; records it in `CURRENT_STATE.md`                     |
-| When the apex moved from Lovable to Vercel                                                                                                       | `NOT_MEASURED` | Vercel domain history (`createdAt` 2026-09-01 19:06 UTC is the earliest bound); DNS change record        |
-| Who deploys edge functions, and what version each runs on production                                                                             | `BLOCKED`      | M6 with production read access                                                                           |
-| Applied migrations on production                                                                                                                 | `NOT_MEASURED` | M9 by an operator; `CURRENT_STATE.md` axis                                                               |
-| Which Nitro preset the Vercel build runs                                                                                                         | `NOT_MEASURED` | The Vercel build log, or a `nitro` preset line in it                                                     |
-| The Vercel project's production-branch and build settings                                                                                        | `NOT_MEASURED` | Project settings read by the owner                                                                       |
-| Whether `main` pushes are suppressed on the Vercel project                                                                                       | `NOT_MEASURED` | `list_deployments` unfiltered, or a `main` push observed                                                 |
-| Whether `verdant-command-center-preview` still exists                                                                                            | `NOT_MEASURED` | Team-wide `list_projects`                                                                                |
-| Whether `vercel.json:16`'s `/~oauth/*` redirect to the Lovable project host is still correct for OAuth callbacks now that Vercel serves the apex | `NOT_MEASURED` | Owner check of the OAuth callback path; a probe of `/~oauth/` was not made (auth surface)                |
-| The publisher of the 2026-08-05 and 2026-08-28 stamps (`commit: "unknown"`, `ref: "__orphan__"`)                                                 | `inference`    | Those were Lovable builds; consistent with `stamp-version.mjs:23-26` and `#1175`'s body, not re-measured |
+| Unknown                                                                                                                                          | Status         | What would close it                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The URL the Lovable project publishes to, and whether it is public                                                                               | `NOT_MEASURED` | Owner reads the Lovable project's publish settings; records it in `CURRENT_STATE.md`                                                                                      |
+| When the apex moved from Lovable to Vercel                                                                                                       | `NOT_MEASURED` | Vercel domain history (`createdAt` 2026-09-01 19:06 UTC is the earliest bound); DNS change record                                                                         |
+| Who deploys edge functions, and what version each runs on production                                                                             | `BLOCKED`      | M6 with production read access                                                                                                                                            |
+| Applied migrations on production                                                                                                                 | `NOT_MEASURED` | M9 by an operator; `CURRENT_STATE.md` axis                                                                                                                                |
+| Which Nitro preset the Vercel build runs                                                                                                         | `NOT_MEASURED` | The Vercel build log, or a `nitro` preset line in it                                                                                                                      |
+| The Vercel project's production-branch and build settings                                                                                        | `NOT_MEASURED` | Project settings read by the owner                                                                                                                                        |
+| Whether `main` pushes are suppressed on the Vercel project                                                                                       | `NOT_MEASURED` | `list_deployments` unfiltered, or a `main` push observed                                                                                                                  |
+| Whether `verdant-command-center-preview` still exists                                                                                            | `NOT_MEASURED` | Team-wide `list_projects`                                                                                                                                                 |
+| Whether `vercel.json:16`'s `/~oauth/*` redirect to the Lovable project host is still correct for OAuth callbacks now that Vercel serves the apex | `NOT_MEASURED` | Owner check of the OAuth callback path; a probe of `/~oauth/` was not made (auth surface)                                                                                 |
+| The publisher of the 2026-08-05 and 2026-08-28 stamps (`commit: "unknown"`, `ref: "__orphan__"`)                                                 | `inference`    | Those were Lovable builds; consistent with `stamp-version.mjs:23-26` and `#1175`'s body, not re-measured                                                                  |
+| **Why the production hostnames stopped following deploy-branch builds after the 09:45 Instant Rollback**                                         | `inference`    | Owner reads the project's production-domain auto-assignment state, or promotes the tip build and watches whether the next merge follows on its own (M10 before and after) |
+| **Who held the API token that promoted `7053af8f` at 08:28 UTC**                                                                                 | `NOT_MEASURED` | Owner reads the token's name and owner in the Vercel account settings; `#1696`'s "Cursor agent" stays a `source claim` until then                                         |
+| **Which sessions and agents hold production-scoped Vercel credentials (D-RT-14)**                                                                | `NOT_MEASURED` | Owner inventory of Vercel tokens and connected apps; recorded in `CURRENT_STATE.md`, then scoped or revoked                                                               |
+| The Skew Protection window, and whether sessions opened during 08:28–09:45 kept loading `7053af8f` assets after the rollback                     | `NOT_MEASURED` | Project settings read by the owner; the served-bytes question is not measurable after the fact                                                                            |
+| `/version.json` on the apex at the amendment                                                                                                     | `BLOCKED`      | M1 from a session whose egress reaches the apex (23:28:47 UTC read refused with a proxy `403`)                                                                            |
 
 ---
 
@@ -499,7 +705,7 @@ publisher regresses; (c) keep parked. This slice does not push to, review, or en
 
 | File                                           | Change                                                                                                                                                                                                                |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/specs/release-topology-specification.md` | New — this document                                                                                                                                                                                                   |
+| `docs/specs/release-topology-specification.md` | New — this document, including the amendment: promotion axis, §5.4 appliers, §6.1 verified at `c9bc1df3`, D-RT-12–14, M10–M11, AT-11–14, §10 rows, Appendix B                                                         |
 | `docs/architecture-contract.md`                | §9 prose pointer; §12 `vercel.json` row to its durable form; §13 row from "blocked … #1175 and #1221" to the follow-ups this document names; §14 pointers; §15.1 row. Header stamp unchanged: no AC clause is touched |
 | `docs/codebase-map.md`                         | Replace the "do not fire in production / Lovable is the production publisher" paragraph with the durable rule and a pointer; keep the eight-entry inventory                                                           |
 | `README.md`                                    | One bullet: certificates belong to the measured apex platform, with a pointer                                                                                                                                         |
@@ -508,16 +714,21 @@ publisher regresses; (c) keep parked. This slice does not push to, review, or en
 
 Owners are Cheek's to assign; each needs an independent reviewer.
 
-| Follow-up                                                                                             | Kind                                                       |
-| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Governance correction: `CLAUDE.md:130` and `:138-143`, with the twelve-file `Sentinel-Version` bump   | Governance slice                                           |
-| Stale comments: `scripts/stamp-version.mjs:23-26`, `deployment-preview.yml:4-12`, `Makefile:77`       | Small code/workflow slice, with any test pins renegotiated |
-| Retire or rewrite `docs/preview-deployment-verification.md`                                           | Docs slice                                                 |
-| M6 run with production read access; record the edge-function versions in `CURRENT_STATE.md`           | Operator measurement                                       |
-| Cheek's D-RT-4 decision on the Lovable publisher, recorded in `CURRENT_STATE.md`                      | Owner decision                                             |
-| `#1175` disposition (§11)                                                                             | Owner decision                                             |
-| `#1696`: carry the live `PASS`, the publisher measurement pointer, and drop the "stays deferred" line | `#1696`'s owner                                            |
-| A T1-style pin for this document's `path:line` cites                                                  | Test slice                                                 |
+| Follow-up                                                                                                                                              | Kind                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Governance correction: `CLAUDE.md:130` and `:138-144`, with the twelve-file `Sentinel-Version` bump                                                    | Governance slice                                             |
+| Stale comments: `scripts/stamp-version.mjs:23-26`, `deployment-preview.yml:4-12`, `Makefile:77`, `lighthouse-ci.yml:4-6`, `auto-tag-release.yml:86-87` | Small code/workflow slice, with any test pins renegotiated   |
+| Retire or rewrite `docs/preview-deployment-verification.md`                                                                                            | Docs slice                                                   |
+| M6 run with production read access; record the edge-function versions in `CURRENT_STATE.md`                                                            | Operator measurement                                         |
+| Cheek's D-RT-4 decision on the Lovable publisher, recorded in `CURRENT_STATE.md`                                                                       | Owner decision                                               |
+| `#1175` disposition (§11)                                                                                                                              | Owner decision                                               |
+| `#1696`: carry the live `PASS`, the publisher measurement pointer, and drop the "stays deferred" line                                                  | `#1696`'s owner                                              |
+| A T1-style pin for this document's `path:line` cites                                                                                                   | Test slice                                                   |
+| **Close the release-state `FAIL` (D-RT-12): promote the current tip build, or restore auto-assignment, then run M10**                                  | **Owner action now** — a publish action under D-RT-13        |
+| Record the 08:28 token's holder, then scope or revoke production-scoped platform credentials (D-RT-14)                                                 | Owner action                                                 |
+| Close `#1699` as superseded once this carry-forward is reviewed                                                                                        | Owner action                                                 |
+| A promotion-drift probe: a scheduled read-only job that runs M10 and reports a split or a stale apex                                                   | Workflow slice; a signal under D-RT-10, never a gate         |
+| `docs/codebase-map.md` "Seven … appliers" → eight at the tip (`#1703` proposes ten)                                                                    | Lands with `#1703`; not edited here, to avoid a third writer |
 
 ---
 
@@ -526,7 +737,12 @@ Owners are Cheek's to assign; each needs an independent reviewer.
 - **No schema, RLS, auth, edge-function, migration, or application code** is touched. Files are
   `docs/**` and one `README.md` bullet.
 - **No publish, deploy, or apply** was performed or triggered. Every platform interaction was a
-  read (`list_*`, `get_*`, `GET`/`HEAD`), one attempt each.
+  read (`list_*`, `get_*`, `GET`/`HEAD`), one attempt each. The amendment's session likewise issued
+  **no promote, rollback, redeploy or setting change**; it found the release state `FAIL` (D-RT-12)
+  and hands the close to the owner.
+- **Event-log data is minimised.** The Vercel event log returns the owner's email address, token
+  identifiers and session identifiers. None is copied here (AT-12); actor classes are recorded
+  instead.
 - **No secret** is recorded. Platform identifiers in Appendix A are team, project, deployment and
   domain identifiers; the `.env.production` token is referred to by class (`test_`) only, as the
   prebuild scripts themselves do.
@@ -545,27 +761,35 @@ Verdict: **safe to merge as documentation.** It changes what readers believe, no
 
 **Deferred — sequenced, not rejected**
 
-| Item                                                                           | Gate                                                                                 |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `CLAUDE.md` publisher and `vercel.json` corrections                            | Twelve-file governance bump; its own slice                                           |
-| `stamp-version.mjs`, `deployment-preview.yml`, `Makefile` comment corrections  | Touch scripts and workflows; test pins nearby; its own small slice                   |
-| `docs/preview-deployment-verification.md` retirement                           | Docs slice after the owner confirms whether the preview project exists               |
-| Edge-function deployer measurement (M6) and applied-migration measurement (M9) | Need production read access this session does not hold; `No APPLY` stands regardless |
-| The Lovable publisher decision (D-RT-4)                                        | Cheek                                                                                |
-| `#1175`                                                                        | Cheek (§11)                                                                          |
-| A runner for AT-4                                                              | Test slice, alongside the contract's T1                                              |
+| Item                                                                                | Gate                                                                                 |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `CLAUDE.md` publisher and `vercel.json` corrections                                 | Twelve-file governance bump; its own slice                                           |
+| `stamp-version.mjs`, `deployment-preview.yml`, `Makefile` comment corrections       | Touch scripts and workflows; test pins nearby; its own small slice                   |
+| `docs/preview-deployment-verification.md` retirement                                | Docs slice after the owner confirms whether the preview project exists               |
+| Edge-function deployer measurement (M6) and applied-migration measurement (M9)      | Need production read access this session does not hold; `No APPLY` stands regardless |
+| The Lovable publisher decision (D-RT-4)                                             | Cheek                                                                                |
+| `#1175`                                                                             | Cheek (§11)                                                                          |
+| A runner for AT-4                                                                   | Test slice, alongside the contract's T1                                              |
+| Closing the release-state `FAIL` (promote the tip build or restore auto-assignment) | Owner — a publish action (D-RT-13)                                                   |
+| Credential inventory and scoping (D-RT-14)                                          | Owner                                                                                |
+| A scheduled M10 promotion-drift probe                                               | Workflow slice after this merges; signal only (D-RT-10)                              |
+| Re-verifying `docs/architecture-contract.md` at the tip past `9b06be3f`             | Its own §15 slice after this merges, so two PRs do not append §15.1 rows at once     |
 
 **Rejected — decided, with a reason**
 
-| Alternative                                                                                 | Verdict      | Why                                                                                                                                              |
-| ------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Writing the measured values into `docs/architecture-contract.md`                            | **REJECTED** | The contract's header forbids production axes; §14 exists to keep them out. This document and `CURRENT_STATE.md` carry them                      |
-| Editing `docs/agents/CURRENT_STATE.md` in this slice                                        | **REJECTED** | `#1696` is the open restamp; two writers on the shift report is the collision the constitution forbids                                           |
-| Inferring the publisher from `server: Vercel` and the `@vercel/*` SDKs                      | **REJECTED** | Contract §14; the chain in §4 was closed precisely so this inference is never needed                                                             |
-| Declaring Lovable retired as a publisher                                                    | **REJECTED** | `is_published: true` is measured; the published URL is not. A retirement is Cheek's action, then a measurement, then a `CURRENT_STATE.md` row    |
-| Adding a Vercel deploy step, a Supabase deploy step, or a migration apply to GitHub Actions | **REJECTED** | Out of scope (production deployment, migration application); it would also create a third publisher                                              |
-| Treating `#1175`'s gate as current behaviour                                                | **REJECTED** | It is an open PR on a stale base with no reviewer; describing it as current would be inferring production from repository presence               |
-| Re-stamping the contract header to `e1d541e2`                                               | **REJECTED** | §15.2 ties a re-stamp to re-verifying every touched clause; no clause is touched, and a re-stamp would claim a re-verification that was not done |
+| Alternative                                                                                 | Verdict      | Why                                                                                                                                               |
+| ------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Writing the measured values into `docs/architecture-contract.md`                            | **REJECTED** | The contract's header forbids production axes; §14 exists to keep them out. This document and `CURRENT_STATE.md` carry them                       |
+| Editing `docs/agents/CURRENT_STATE.md` in this slice                                        | **REJECTED** | `#1696` is the open restamp; two writers on the shift report is the collision the constitution forbids                                            |
+| Inferring the publisher from `server: Vercel` and the `@vercel/*` SDKs                      | **REJECTED** | Contract §14; the chain in §4 was closed precisely so this inference is never needed                                                              |
+| Declaring Lovable retired as a publisher                                                    | **REJECTED** | `is_published: true` is measured; the published URL is not. A retirement is Cheek's action, then a measurement, then a `CURRENT_STATE.md` row     |
+| Adding a Vercel deploy step, a Supabase deploy step, or a migration apply to GitHub Actions | **REJECTED** | Out of scope (production deployment, migration application); it would also create a third publisher                                               |
+| Treating `#1175`'s gate as current behaviour                                                | **REJECTED** | It is an open PR on a stale base with no reviewer; describing it as current would be inferring production from repository presence                |
+| Re-stamping the contract header in this slice (past `9b06be3f`)                             | **REJECTED** | Contract §15 ties a re-stamp to re-verifying every clause; no clause is touched, and a re-stamp would claim a re-verification that was not done   |
+| Promoting the tip build or rolling back from the measuring session                          | **REJECTED** | A publish action (D-RT-13). The owner has not instructed one in this slice; the session reports the `FAIL` and stops                              |
+| Writing a second topology specification beside `#1699`                                      | **REJECTED** | The constitution's one-implementation rule. The amendment carries `#1699`'s commits forward instead (§2.4)                                        |
+| Pushing to `#1699`'s branch                                                                 | **REJECTED** | This session may push only to its designated branch; `#1699`'s owning session is archived. Carry-forward keeps one lineage without that push      |
+| Adding a merge gate that fails when the apex is not the tip                                 | **REJECTED** | The apex is moved after merge by the platform; a pre-merge gate cannot observe it and would red every PR during an owner-held promotion (D-RT-10) |
 
 ---
 
@@ -574,46 +798,71 @@ Verdict: **safe to merge as documentation.** It changes what readers believe, no
 ```text
 HANDOFF
 from_agent: Claude
-to_agent: CodeRabbit (independent reviewer, strict rule); then Cheek for the §7 and §11 decisions
+to_agent: Grok (independent reviewer); then Cheek for the owner actions in §12 and the §7, §11 decisions
 sentinel_version: 2026-09-01.5
 date: 2026-09-25
 
-slice_owner: Claude
-independent_reviewer: CodeRabbit — a review counts only when it is finding-free and lists no
-  files under "not reviewed"; a new content commit restarts the requirement
+slice_owner: Claude (the #1699 slice, carried forward on claude/clever-davinci-hk7o03)
+independent_reviewer: Grok, the peer the assignment names. Fallback seat: CodeRabbit under the
+  owner's strict rule (finding-free, no files under "not reviewed"; a new content commit restarts
+  it). CodeRabbit is not a constitution peer; whether it satisfies peer review is Cheek's decision.
+  No Claude session can fill this seat.
 
 completed:
-  - docs/specs/release-topology-specification.md: topology model (§3), the measured chain for the
-    frontend/SSR publisher (§4), the remaining axes (§5), corrections (§6), decisions (§7),
-    procedures M1–M9 (§8), acceptance tests (§9), unknowns (§10), #1175 disposition (§11)
-  - docs/architecture-contract.md: §9 prose pointer, §12 vercel.json row in durable form,
-    §13 row, §14 pointers, §15.1 row; header stamp unchanged
-  - docs/codebase-map.md and README.md: the two measured-false publisher statements corrected
+  - Founding text (#1699, commits 3ec3578f and cdc0559f, unchanged): topology model, measured
+    frontend/SSR chain, remaining axes, corrections, D-RT-1–11, M1–M9, AT-1–10, unknowns, #1175
+  - Forward merge of c9bc1df3 with the §15.1 conflict resolved (both rows kept, re-pointed)
+  - Amendment: promotion axis (§3 row F, §4 step 3, §5.7), eight operator appliers (§5.4),
+    §6.1 verified from source at c9bc1df3 (14 rows, no source claims left), CLAUDE.md:77 row in
+    §6.2, D-RT-12–14, M4 re-scoped and M10–M11 added, AT-11–14, five §10 rows, owner actions
+    in §12 and §14, Appendix B (the promotion incident), verdict re-calibrated
+  - docs/architecture-contract.md: #1699's §9/§12/§13/§14 edits plus the §15.1 row now naming
+    the 9b06be3f stamp it amends; the §9 pointer is dated. Header stamp unchanged
+  - docs/codebase-map.md, README.md: #1699's two publisher corrections, unchanged
 
 verified_by:
-  - deploy tip e1d541e2559eb42d5e452035e79b1d796c91c0f9 read locally (git fetch at 01:19 UTC)
-  - Appendix A: apex /version.json 01:20:53 UTC; Vercel team/project/domains/deployments
-    01:21–01:23 UTC; Lovable get_me/get_project 01:22–01:23 UTC; DNS 01:23 UTC; vercel.json
-    probes 01:24:11 UTC; Supabase list_projects 01:24 UTC; GitHub open-PR list 01:19 UTC
-  - node scripts/assert-docs-safety.mjs and prettier --check: results in the PR body
+  - git: deploy tip c9bc1df37b6f0ae1494cf02dffb6a122b39a6f77 fetched 2026-09-25 ~23:05 UTC
+  - every repository path:line cite in this document re-read at c9bc1df3 (§2.4, AT-4)
+  - §6.1: each row's cites read from the c9bc1df3 blobs; the counts and zero-hit greps re-run
+  - Vercel reads 23:28–23:37 UTC (Appendix B): get_deployment per hostname ×4 plus the 08:28 one,
+    list_deployments (production, since 08:25 UTC), list_promote_aliases, list_user_events ×2
+  - GitHub: 48 open PR heads fetched and merge-tested against this branch (§2.4)
+  - prettier --check, assert-docs-safety, assert-release-docs-safety: results in the PR body
+
+review_asks (for Grok):
+  - Is §5.7's actor-class reading of the event log sound, and is anything identifying leaked
+    (AT-12)?
+  - Does D-RT-13 draw the line between a read-only measuring session and a publish action at
+    the right place?
+  - Is the per-hostname rule (D-RT-12, M10) sufficient, or does it need a DNS step as well?
+  - Does §6.1's 14-row table overstate anything that was verified only in source?
+  - Re-run AT-4 on any five cites of your choice at c9bc1df3
 
 not_done:
-  - No CURRENT_STATE.md edit (#1696 owns it); no governance-file edit (twelve-file bump)
-  - No M6 (edge versions) and no M9 (applied migrations): BLOCKED / NOT_MEASURED
-  - No push, review, or enqueue on #1175
+  - No CURRENT_STATE.md edit (#1696 is its sole writer); no governance-file edit (twelve-file bump)
+  - No promote, rollback, redeploy or setting change — the release-state FAIL is the owner's to close
+  - M1 /version.json BLOCKED (session egress 403 at 23:28:47 UTC); M5, M6, M7, M9 not re-run
+  - No push, review, or enqueue on #1175 or #1699
 
 unknowns:
-  - §10 in full; above all the Lovable published URL and the edge-function deployer
+  - §10 in full; above all: why auto-assignment stopped, who held the 08:28 token, which sessions
+    hold production-scoped platform credentials, the Lovable published URL, the edge deployer
 
 blocked:
-  - M6/M9: production read access; owner or an operator session
+  - M1 from this session (egress); M6/M9 (production read access)
 
 assumptions:
-  - A1–A4 in §2.2; A3 (committer date ≈ push time) affects only the latency figures
+  - A1–A5 in §2.2; A5 is that the archived #1699 session will not push again
 
 next_slice:
-  - Cheek: decide D-RT-4 (Lovable publisher) and #1175 (§11); record both in CURRENT_STATE.md
-  - #1696's owner: carry Appendix A.1 as the live row, cite this document, drop the "deferred" line
+  - Cheek, now: close the release-state FAIL (promote the tip build or restore auto-assignment),
+    then have someone run M10; record the 08:28 token holder; close #1699 once this is reviewed
+  - #1696's owner: cite this document for the promotion axis; carry Appendix B's per-hostname
+    reading as the latest live row (a CURRENT_STATE stamp outranks it for the value)
+  - Next Claude slice after merge: contract §15 re-verification at the then-current tip. At
+    c9bc1df3 two contract-cited files have changed since 9b06be3f (§2.4): AC-7.3's
+    BreedingLogContainer.tsx:141 is now :143 (#1661, a T1 failure); AC-9.1's mustBeGreen claim
+    still holds. Then the governance slice for CLAUDE.md:77, :130 and :138-144
 
 files_touched:
   - docs/specs/release-topology-specification.md
@@ -665,7 +914,7 @@ as the `www` targets); the domain's `verified: true` on the project (A.3) is the
 | Protection         | `ssoProtection: enabled, all_except_custom_domains`; password protection off; trusted IPs off                                                                                                                |
 | `latestDeployment` | `dpl_CXeL5CpM…`, created 01:14:20.661, `target: null` (non-production)                                                                                                                                       |
 
-### A.4 Production deployments — M4, 01:22
+### A.4 Production deployments — M4, 01:22 (history since 08:28 UTC; see Appendix B)
 
 Six newest with `target=production`, all `source: git`, `meta.githubCommitRef: verdant-grow-diary`,
 `meta.githubOrg/Repo: Verdant-OS/verdant-grow-diary`, state `READY`, creator `cheekhimself-1647`
@@ -726,11 +975,115 @@ non-production deployments, A.3).
 
 ---
 
-**Verdict.** The frontend and SSR release topology is **measured and specified**: Vercel's Git
-integration published the last six `verdant-grow-diary` tips to `verdantgrowdiary.com`, and the
-chain that proves it is written down so it can be re-run. The edge-function and database axes are
-**specified but not measured** from this session and are labelled so. The repository's own
-description of its publisher is wrong at the measured instant, and the corrections that need a
-governance bump are named, not smuggled in. Confidence in §4: high at the instant, by construction
-of the chain; in the standing behaviour: moderate, on six consecutive deployments; in everything
-under `NOT_MEASURED`: none, by design.
+## Appendix B. The promotion incident and the unpromoted tip — 2026-09-25, dated
+
+Measured by the amendment's session with Vercel reads, one attempt each, at 23:28–23:37 UTC. Every
+row is `established fact` unless labelled. Deployment IDs are truncated. Per M11's rule, the event
+log's token identifiers, session identifiers and email address are not copied (AT-12). Like
+Appendix A, this appendix is a dated record. A later `CURRENT_STATE.md` stamp outranks it for any
+value.
+
+### B.1 The out-of-band production deployment — M4 and `get_deployment`
+
+| Field           | Value                                                                                                                                                 |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deployment      | `dpl_BhuJT6qq…`, `target: production`, **`source: redeploy`**, `READY`, created 08:28:39, ready 08:29:16                                              |
+| Git metadata    | `githubCommitRef: cursor/missing-test-coverage-b7df`, `githubCommitSha: 7053af8f` — a commit on `#1692`'s branch that never reached the deploy branch |
+| Held the apex   | 08:28:39 until the 09:45:15 rollback, about 77 minutes (the 08:29:17 alias event is B.3)                                                              |
+| Rollback target | `dpl_6fVRiJ3X…`: `source: git`, `verdant-grow-diary` @ `9b06be3f` (`#1680`), created 06:22:23                                                         |
+
+### B.2 What each hostname served at 23:28–23:29 — M10
+
+| Hostname                                                   | Deployment      | `source` | Ref @ commit                                                |
+| ---------------------------------------------------------- | --------------- | -------- | ----------------------------------------------------------- |
+| `verdantgrowdiary.com`                                     | `dpl_6fVRiJ3X…` | `git`    | `verdant-grow-diary` @ `9b06be3f` (`#1680`)                 |
+| `www.verdantgrowdiary.com`                                 | `dpl_6fVRiJ3X…` | `git`    | same                                                        |
+| `verdant-grow-diary.vercel.app`                            | `dpl_6fVRiJ3X…` | `git`    | same                                                        |
+| `verdant-grow-diary-verdantgrowdiary.vercel.app` (project) | `dpl_GChM9WA1…` | `git`    | `verdant-grow-diary` @ `c9bc1df3` (`#1713`), ready 23:17:55 |
+
+- **Split: `FAIL` under D-RT-12.** The three production hostnames serve a build 13 first-parent
+  commits behind the tip (`git rev-list --first-parent --count 9b06be3f..c9bc1df3`). The project
+  alias serves the tip.
+- **A deployment's alias array misleads.** `dpl_6fVRiJ3X…`'s own `alias` array still lists the
+  project alias, while resolving that hostname returns `dpl_GChM9WA1…`. This is why M10 resolves
+  hostnames rather than reading alias arrays.
+- `list_promote_aliases`: apex, `www` and `verdant-grow-diary.vercel.app` are all **`pending`**.
+- `GET https://verdantgrowdiary.com/version.json` at 23:28:47: **`BLOCKED`**. The session proxy
+  refused the CONNECT with `403`.
+
+**Production deployments created since 08:25 UTC** (`list_deployments`, `target=production`, 14
+rows). Each row after the first has ref `verdant-grow-diary`, is `READY`, and holds **no**
+production hostname:
+
+| Created  | Commit     | PR      | Application files the apex is missing (non-test `src/`, edge)                                      |
+| -------- | ---------- | ------- | -------------------------------------------------------------------------------------------------- |
+| 08:28:39 | `7053af8f` | —       | (the B.1 deployment; ref `cursor/missing-test-coverage-b7df`)                                      |
+| 12:03:29 | `c10c095e` | `#1702` | none                                                                                               |
+| 13:30:59 | `b099bbf7` | `#1708` | none                                                                                               |
+| 13:46:40 | `5a5094cc` | `#1709` | none                                                                                               |
+| 13:51:10 | `054a4e3e` | `#1692` | none                                                                                               |
+| 14:13:21 | `db0f3d73` | `#1700` | `src/lib/sensorChartExport.ts`                                                                     |
+| 20:21:45 | `f9f697ae` | `#1711` | none                                                                                               |
+| 20:30:39 | `0f7b12db` | `#1704` | none; its migration is an operator apply, independent of promotion (§5.4)                          |
+| 20:31:07 | `84814341` | `#1705` | none                                                                                               |
+| 20:32:15 | `b77d28a8` | `#1661` | `src/components/genetics/BreedingLogContainer.tsx`                                                 |
+| 20:33:35 | `2f67a545` | `#1657` | four Blueprint files (`blueprintEvidenceRules.ts`, `blueprintOverlayViewModel.ts`, two components) |
+| 23:01:39 | `4ca764c1` | `#1716` | `src/components/FounderOwnerPrefsForm.tsx`                                                         |
+| 23:04:04 | `7d58a904` | `#1710` | none                                                                                               |
+| 23:17:25 | `c9bc1df3` | `#1713` | none                                                                                               |
+
+The "missing files" column comes from `git diff --name-only` of each first-parent commit, restricted
+to `src/` and `supabase/functions/` minus tests. It says what the served build lacks, not what
+growers experienced (`NOT_MEASURED`). **Correction to an earlier self-check:** the 21:36 UTC pass
+on `#1699` said `#1704`'s `src/lib/db.ts` change ships with the frontend. `#1704` changes no file
+under `src/` except a test, so that does not reproduce.
+
+### B.3 The team event log — M11, `list_user_events`, windows 08:25–08:35 and 09:40–09:50
+
+| Time     | Event type                                            | Actor class                             | What happened                                                                                                                                                                      |
+| -------- | ----------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 08:26:14 | `connect-attach-project`                              | API token **T1**, no `via` application  | Project attached to a GitHub connector for Production, Preview and Development                                                                                                     |
+| 08:28:39 | `deployment` (target production)                      | API token **T1**, no `via` application  | `7053af8f` from `cursor/missing-test-coverage-b7df` to production; `github_login` attribution `cursoragent`                                                                        |
+| 08:28:52 | `project-skew-protection-max-age-updated`             | API token **T1**                        | Skew Protection enabled                                                                                                                                                            |
+| 08:29:17 | `aliases-assigned`                                    | attribution `cursoragent`               | Five aliases assigned to the `7053af8f` deployment                                                                                                                                 |
+| 08:29:43 | `project-source-files-outside-root-directory-updated` | API token **T1**                        | "Include files outside root directory" disabled                                                                                                                                    |
+| 09:45:15 | `instant-rollback-created`                            | **`via: Claude.ai`**, a different token | `dpl_BhuJT6qq…` → `dpl_6fVRiJ3X…`, reason "Owner-authorized rollback: restore production to deploy tip 9b06be3f (#1680) from the 08:28 UTC redeploy of PR-branch commit 7053af8f." |
+| 09:45:16 | `aliases-assigned`                                    | attribution `cheekhimself`              | Four aliases assigned to the `9b06be3f` deployment                                                                                                                                 |
+
+- **T1** is a label for one token identifier that appears on all four token-bearing 08:26–08:29
+  events. Its value is not recorded. Every event names the owner's Vercel identity as principal, and
+  the Git integration's own deployments in the same window carry no token identifier.
+- `github_login` is the attribution of the **commit** being deployed, not of the caller. That the
+  Cursor agent issued T1's calls is therefore `inference` here (`#1696` records it as a
+  `source claim`). Closing it is the §10 row "Who held the API token".
+- The rollback was owner-instructed. The session that issued it recorded the instruction on `#1699`
+  at 09:46 UTC, and the event carries the reason text D-RT-13 asks for.
+
+### B.4 What Appendix B does not establish
+
+- Why the production hostnames stopped following git builds after 09:45 (`inference`: the Instant
+  Rollback; the documentation searched for this amendment did not state it).
+- Who held T1 (`NOT_MEASURED`), or which other credentials can promote (`NOT_MEASURED`, D-RT-14).
+- What any grower session actually loaded between 08:28 and 09:45 (Skew Protection;
+  `NOT_MEASURED`).
+- The served `/version.json` at any time on 2026-09-25 after 01:20 (`BLOCKED` from this session).
+- Lovable (M5), DNS (A.2), `vercel.json` probes (M7), edge versions (M6) and applied migrations
+  (M9). None was re-run.
+
+---
+
+**Verdict.** The frontend and SSR release topology is **measured and specified**, and its
+weakest link is now named. Vercel's Git integration builds every `verdant-grow-diary` tip as a
+production deployment. What the production hostnames serve is a **separate promotion axis**, which
+a platform credential can move with no repository gate. On 2026-09-25 it was moved once without an
+owner instruction on record (08:28) and once on one (09:45), and it has not followed a merge since.
+At the amendment's reading the apex serves `9b06be3f`, 13 commits behind `c9bc1df3`: a release
+state of **`FAIL`**, the owner's to close. The edge-function and database axes are **specified but
+not measured** from this session and are labelled so. The repository's own description of its
+publisher is wrong, and the corrections that need a governance bump are named, not smuggled in.
+
+Confidence: **high** in §4 at the Appendix A instant and in Appendix B at its instant, by
+construction of the reads. **Low** in any standing behaviour of the promotion axis: it changed
+twice in one day, and its current cause is `inference`. **None** in everything under
+`NOT_MEASURED`, by design. The method (M1–M11, D-RT-1–14) is what this document asks a reader to
+trust; its dated values are not.

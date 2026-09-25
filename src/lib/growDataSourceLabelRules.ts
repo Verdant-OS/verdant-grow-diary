@@ -11,6 +11,7 @@ import {
   LIVE_CURRENT_STATE_STALE_MS,
   resolveCurrentStateStaleWindowMs,
 } from "@/lib/sensorTruthCanon";
+import { SENSOR_TRUTH_FUTURE_SKEW_MS } from "@/constants/sensorTruthRanges";
 export type GrowDataSourceLabel =
   "Live" | "Manual" | "CSV history" | "Simulated" | "Demo" | "Stale" | "Unavailable";
 
@@ -198,6 +199,24 @@ export function classifyGrowDataSource(
       label: "Stale",
       severity: "warning",
       message: "Reading timestamp is invalid.",
+      shouldDisplayBadge: true,
+      isTrustedForAi: false,
+      reasons,
+    };
+  }
+
+  // Future clock skew is a validity bound, separate from source-specific age.
+  // CSV/demo provenance stays historical/testing and is handled separately.
+  if (
+    (MANUAL_SOURCES.has(source) || LIVE_SOURCES.has(source)) &&
+    ageMs !== null &&
+    ageMs < -SENSOR_TRUTH_FUTURE_SKEW_MS
+  ) {
+    reasons.push("capture timestamp is in the future");
+    return {
+      label: "Unavailable",
+      severity: "warning",
+      message: "Reading capture time is in the future. Check the reading timestamp or clock.",
       shouldDisplayBadge: true,
       isTrustedForAi: false,
       reasons,

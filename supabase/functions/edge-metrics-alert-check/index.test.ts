@@ -235,6 +235,50 @@ Deno.test(
   },
 );
 
+Deno.test("postWebhook: a zero-delay retry is still announced (jitter pinned to 0)", async () => {
+  // computeBackoffMs draws full jitter in [0, cap]. With base 1 ms / max 2 ms the two
+  // retries in the exhausted case both draw 0 one run in six, and the retry log was
+  // gated on `delayBefore > 0` — so that case failed at exactly that rate on CI
+  // (0861d87, 4a0ea0605) while nothing about timers or ports was wrong. Pin the draw
+  // to 0 and require the announcement; RED before the gate was removed.
+  const origRandom = Math.random;
+  const origFetch = globalThis.fetch;
+  const events: Array<{ event: string; extra: Record<string, unknown> }> = [];
+  const logger = (
+    _severity: "info" | "warn" | "error",
+    event: string,
+    extra: Record<string, unknown> = {},
+  ) => {
+    events.push({ event, extra });
+  };
+  Math.random = () => 0;
+  globalThis.fetch = (() => Promise.reject(new Error("network down"))) as typeof fetch;
+  Deno.env.set("ALERT_WEBHOOK_URL", "https://hooks.example.test/verdant");
+  Deno.env.set("ALERT_WEBHOOK_BASE_DELAY_MS", "1");
+  Deno.env.set("ALERT_WEBHOOK_MAX_DELAY_MS", "2");
+  Deno.env.set("ALERT_WEBHOOK_MAX_ATTEMPTS", "3");
+  try {
+    const res = await postWebhook(breachFixture, baseThresholds, logger);
+    assertEquals(res.attempts.length, 3);
+    assertEquals(res.gave_up_transient, true);
+    assertEquals(res.attempts[1].delay_before_ms, 0);
+    assertEquals(res.attempts[2].delay_before_ms, 0);
+    const scheduled = events.filter((e) => e.event === "webhook_retry_scheduled");
+    assertEquals(
+      scheduled.map((e) => e.extra.attempt),
+      [2, 3],
+    );
+    for (const s of scheduled) assertEquals(s.extra.delay_ms, 0);
+  } finally {
+    Math.random = origRandom;
+    globalThis.fetch = origFetch;
+    Deno.env.delete("ALERT_WEBHOOK_URL");
+    Deno.env.delete("ALERT_WEBHOOK_BASE_DELAY_MS");
+    Deno.env.delete("ALERT_WEBHOOK_MAX_DELAY_MS");
+    Deno.env.delete("ALERT_WEBHOOK_MAX_ATTEMPTS");
+  }
+});
+
 Deno.test("postWebhook: 4xx is permanent, no retries", async () => {
   const origFetch = globalThis.fetch;
   let calls = 0;

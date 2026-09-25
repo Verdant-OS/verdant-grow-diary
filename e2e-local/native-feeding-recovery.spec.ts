@@ -93,6 +93,7 @@ function assertFeed(rows: OwnerRows, feed: Row[], f: LocalFixture, id: string, p
       sensor_snapshot: null,
     },
   });
+  expect(Number.isFinite(Date.parse(String(payload.p_occurred_at)))).toBe(true);
   expect(Date.parse(String(rows.grow_events[0].occurred_at))).toBe(
     Date.parse(String(payload.p_occurred_at)),
   );

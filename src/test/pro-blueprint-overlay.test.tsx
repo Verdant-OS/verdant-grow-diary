@@ -15,8 +15,9 @@ const METRICS = ["vpdKpa", "tempC", "rh", "ppfd", "dli", "ec", "ph"] as const;
 
 function healthySeedling(): BuildBlueprintOverlayInput {
   return {
+    now: Date.parse("2026-09-23T12:00:00Z"),
     stage: "seedling",
-    snapshot: { source: "live", temp: 25, rh: 75, vpd: 0.6, ppfd: 200 },
+    snapshot: { source: "live", ts: "2026-09-23T11:59:00Z", temp: 25, rh: 75, vpd: 0.6, ppfd: 200 },
     latestFeeding: { ec: 0.7, ph: 6.0 },
     dli: null,
     isDay: true,
@@ -53,7 +54,14 @@ describe("ProBlueprintOverlay", () => {
     renderVm({
       ...healthySeedling(),
       // temp 30 vs seedling day band 24-26 → out_high (red)
-      snapshot: { source: "live", temp: 30, rh: 75, vpd: 0.6, ppfd: 200 },
+      snapshot: {
+        source: "live",
+        ts: "2026-09-23T11:59:00Z",
+        temp: 30,
+        rh: 75,
+        vpd: 0.6,
+        ppfd: 200,
+      },
     });
     expect(screen.getByTestId("pro-blueprint-overlay-row-tempC").getAttribute("data-tone")).toBe(
       "red",

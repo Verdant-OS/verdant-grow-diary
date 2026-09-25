@@ -93,6 +93,7 @@ function assertWater(
   if (!isRow(details) || !isRow(details.sensor_snapshot)) {
     throw new Error("Persisted Water manual evidence is missing.");
   }
+  expect(Number.isFinite(Date.parse(String(payload.p_occurred_at)))).toBe(true);
   expect(Date.parse(String(rows.grow_events[0].occurred_at))).toBe(
     Date.parse(String(payload.p_occurred_at)),
   );

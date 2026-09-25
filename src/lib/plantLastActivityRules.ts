@@ -9,12 +9,27 @@
  * Pure: `now` is injected.
  */
 import { formatDistance } from "date-fns";
+import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
+import { buildRecentQuickLogActivity } from "@/lib/quickLogHistoryRules";
+
+/** A diary row: only the times are read directly; the rest goes to the normalizer. */
+type ActivityRow = { entry_at?: string | null; created_at?: string | null; [key: string]: unknown };
 
 export interface PlantLastActivityInput {
   status: "loading" | "error" | "ready";
-  rows: ReadonlyArray<{ entry_at?: string | null; created_at?: string | null }> | null | undefined;
+  rows: ReadonlyArray<ActivityRow> | null | undefined;
   now: Date;
 }
+
+/** What the newest diary entry was, for the "Last activity" line. */
+export interface PlantLastActivitySummary {
+  /** Diary event type, e.g. "watering"; "note" when the row has none. */
+  eventType: string;
+  /** First line of the entry's note (readings block removed), or "". */
+  text: string;
+}
+
+export const PLANT_LAST_ACTIVITY_TEXT_MAX = 140;
 
 export const PLANT_LAST_ACTIVITY_LOADING = "Checking recent activity…";
 export const PLANT_LAST_ACTIVITY_UNAVAILABLE = "Recent activity unavailable.";
@@ -30,18 +45,56 @@ function entryTime(row: { entry_at?: string | null; created_at?: string | null }
   return null;
 }
 
+/** The newest row by entry time (first one wins a tie), or null. */
+function newestActivity<T extends ActivityRow>(
+  rows: ReadonlyArray<T>,
+): { row: T; ms: number } | null {
+  let newest: { row: T; ms: number } | null = null;
+  for (const row of rows) {
+    const ms = entryTime(row);
+    if (ms !== null && (newest === null || ms > newest.ms)) newest = { row, ms };
+  }
+  return newest;
+}
+
 export function resolvePlantLastActivityLabel(input: PlantLastActivityInput): string {
   if (input.status === "loading") return PLANT_LAST_ACTIVITY_LOADING;
   if (input.status === "error" || !Array.isArray(input.rows))
     return PLANT_LAST_ACTIVITY_UNAVAILABLE;
-  let latest: number | null = null;
-  for (const row of input.rows) {
-    const ms = entryTime(row);
-    if (ms !== null && (latest === null || ms > latest)) latest = ms;
-  }
+  const latest = newestActivity(input.rows)?.ms ?? null;
   if (latest === null) return PLANT_LAST_ACTIVITY_NONE;
   const nowMs = input.now.getTime();
   // A clock-skewed future entry is still the latest activity, never "in 2 minutes".
   const at = new Date(Math.min(latest, nowMs));
   return `Updated ${formatDistance(at, input.now, { addSuffix: true })}`;
+}
+
+/**
+ * The activity the "Last activity" time describes: the same newest diary row
+ * the label is computed from (Codex review on #1683). The plant's profile note
+ * (`plants.last_note`) is a separate grower field that Quick Log never
+ * updates, so it must not be shown as this activity. Null when the read is
+ * not ready, is empty, or the row cannot be read as a diary entry.
+ */
+export function resolvePlantLastActivitySummary(
+  input: PlantLastActivityInput,
+): PlantLastActivitySummary | null {
+  if (input.status !== "ready" || !Array.isArray(input.rows)) return null;
+  const newest = newestActivity(input.rows);
+  if (!newest) return null;
+  const [entry] = buildRecentQuickLogActivity(
+    normalizeDiaryEntries({ rawEntries: [newest.row], now: input.now.getTime() }),
+    1,
+  );
+  if (!entry) return null;
+  const firstLine =
+    entry.noteBody
+      .split("\n")
+      .map((line) => line.trim())
+      .find(Boolean) ?? "";
+  const text =
+    firstLine.length > PLANT_LAST_ACTIVITY_TEXT_MAX
+      ? `${firstLine.slice(0, PLANT_LAST_ACTIVITY_TEXT_MAX - 1).trimEnd()}…`
+      : firstLine;
+  return { eventType: entry.eventType, text };
 }

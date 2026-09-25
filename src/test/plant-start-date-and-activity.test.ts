@@ -28,6 +28,7 @@ import {
   PLANT_LAST_ACTIVITY_NONE,
   PLANT_LAST_ACTIVITY_UNAVAILABLE,
   resolvePlantLastActivityLabel,
+  resolvePlantLastActivitySummary,
 } from "@/lib/plantLastActivityRules";
 import {
   buildDailyGrowCheckConsistency,
@@ -259,5 +260,48 @@ describe("daily check does not count days before tracking started (BUG-013)", ()
     expect(summary.missedDays).toBe(7);
     expect(summary).not.toHaveProperty("trackingStartDayKey");
     expect(buildDailyMethodBreakdown(summary).every((d) => d.method === "missed")).toBe(true);
+  });
+});
+
+describe("last activity text and time come from the same diary row (Codex, #1683)", () => {
+  const now = new Date("2026-09-24T12:00:00Z");
+  const rows = [
+    {
+      id: "older",
+      entry_at: "2026-09-20T12:00:00Z",
+      note: "Old observation",
+      details: { event_type: "observation" },
+    },
+    {
+      id: "newest",
+      entry_at: "2026-09-24T10:00:00Z",
+      note: "Watered 1 L to runoff\nsecond line",
+      details: { event_type: "watering" },
+    },
+  ];
+
+  it("summarises the newest row the label is computed from", () => {
+    const input = { status: "ready" as const, rows, now };
+    expect(resolvePlantLastActivityLabel(input)).toBe("Updated about 2 hours ago");
+    expect(resolvePlantLastActivitySummary(input)).toEqual({
+      eventType: "watering",
+      text: "Watered 1 L to runoff",
+    });
+  });
+
+  it("an entry with no note keeps its type and empty text", () => {
+    expect(
+      resolvePlantLastActivitySummary({
+        status: "ready",
+        rows: [{ id: "a", entry_at: "2026-09-24T10:00:00Z", note: "", details: {} }],
+        now,
+      }),
+    ).toEqual({ eventType: "note", text: "" });
+  });
+
+  it("has no summary while loading, after a failed read, or with no rows", () => {
+    expect(resolvePlantLastActivitySummary({ status: "loading", rows: undefined, now })).toBeNull();
+    expect(resolvePlantLastActivitySummary({ status: "error", rows, now })).toBeNull();
+    expect(resolvePlantLastActivitySummary({ status: "ready", rows: [], now })).toBeNull();
   });
 });

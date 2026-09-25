@@ -29,7 +29,11 @@ import QuickLogV2Fab from "@/components/QuickLogV2Fab";
 import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { formatPlantAge, plantStartDisplayDate, resolvePlantAge } from "@/lib/plantStartDateRules";
-import { resolvePlantLastActivityLabel } from "@/lib/plantLastActivityRules";
+import {
+  resolvePlantLastActivityLabel,
+  resolvePlantLastActivitySummary,
+} from "@/lib/plantLastActivityRules";
+import { getEventType } from "@/lib/diary";
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
@@ -449,15 +453,19 @@ export default function PlantDetail() {
   // day the grower picked, and a future date never yields a negative age.
   const ageDaysLabel = formatPlantAge(resolvePlantAge(plant.startedAt, new Date()));
   const startedDisplayDate = plantStartDisplayDate(plant.startedAt);
-  const lastActivityLabel = resolvePlantLastActivityLabel({
+  const lastActivityInput = {
     status: recentActivityQuery.isError
-      ? "error"
+      ? ("error" as const)
       : recentActivityQuery.isPending
-        ? "loading"
-        : "ready",
+        ? ("loading" as const)
+        : ("ready" as const),
     rows: recentActivityQuery.data,
     now: new Date(),
-  });
+  };
+  const lastActivityLabel = resolvePlantLastActivityLabel(lastActivityInput);
+  // Text and time come from the same newest diary row; the profile note is
+  // shown separately under its Edit Plant name, "Notes".
+  const lastActivitySummary = resolvePlantLastActivitySummary(lastActivityInput);
   const harvestWatchEligible = isHarvestWatchEligible({
     stage: plant.stage,
     isArchived: plant.isArchived,
@@ -698,7 +706,12 @@ export default function PlantDetail() {
               <div className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
                 Last activity
               </div>
-              <p className="break-words text-sm">{plant.lastNote}</p>
+              {lastActivitySummary ? (
+                <p className="break-words text-sm" data-testid="plant-detail-last-activity-summary">
+                  {getEventType(lastActivitySummary.eventType).label}
+                  {lastActivitySummary.text ? `: ${lastActivitySummary.text}` : ""}
+                </p>
+              ) : null}
               <p
                 className="mt-1 text-xs text-muted-foreground"
                 data-testid="plant-detail-last-activity-age"
@@ -706,6 +719,16 @@ export default function PlantDetail() {
                 {lastActivityLabel}
               </p>
             </div>
+            {plant.lastNote?.trim() ? (
+              <div className="min-w-0">
+                <div className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
+                  Notes
+                </div>
+                <p className="break-words text-sm" data-testid="plant-detail-profile-note">
+                  {plant.lastNote}
+                </p>
+              </div>
+            ) : null}
             <div className="flex min-w-0 flex-wrap gap-2">
               <Button
                 size="sm"

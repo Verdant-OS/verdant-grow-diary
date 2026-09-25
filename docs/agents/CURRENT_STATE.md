@@ -21,8 +21,7 @@ states this PR's head lanes as read (§8). No Publish. No APPLY. `HOLD #1250`. P
 | Since      | the 11:25 stamp: **1 commit** (`#1702`); committer date 11:51:54 (the merge-queue commit); merged 12:03:27 |
 | Migrations | **0** — `#1702` changes `e2e/timeline-local-day-date-filter.spec.ts`, `.github/workflows/mocked-e2e-unwired-closure.yml` and `src/test/test-execution-manifest.test.ts` only |
 
-A commit alone never proves deployment, and this one proves the point: the tip is built but not
-serving (§2). This PR's branch carries `c10c095e` by forward merge (`b1f70076`, 12:22).
+A commit alone never proves deployment, and this one proves the point: the tip is built, the three custom-domain alias records remain on `9b06be3f` while the project alias points to this build (§2), and the public serving state is `NOT_MEASURED`. This PR's branch carries `c10c095e` by forward merge (`b1f70076`, 12:22).
 
 ## 2. Live — the custom-domain alias records still point to `9b06be3f`; the `c10c095e` build is READY with the project and branch aliases only
 
@@ -76,7 +75,7 @@ rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sess
 - Verdicts `#1692` `PASS` `24d9e197`, `#1679` `PASS` `c2ce9b10`, `#1698` `PASS` `9e276853`, `#1697`
   `STALE CHILD` `bd64ca8b` stand; `#1684` independent `PASS` stands.
 
-## 5. Reviews on `#1696` — Codex: ten passes, three P1 and twenty-two P2 findings, all carried; verdict open
+## 5. Reviews on `#1696` — Codex: eleven passes, three P1 and twenty-three P2 findings, all carried; verdict open
 
 `established fact`:
 
@@ -95,7 +94,7 @@ rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sess
   stale when published — this stamp is on `c10c095e`, §1); `4104421351` (**P2**: the header summary
   said five passes while §5 said six — the header now counts with §5); `4104421341` (**P2**: §8
   presented `600c9902`'s settled lanes as this file's own head result after later heads existed —
-  §8 now states the current head's lanes as read, and this stamp's own head as `NOT_MEASURED`); **`9b4caa63` — two P2, carried by this amendment:** `4104492611` (§2 and §3 said what growers were getting when only the alias record was read — reworded to the alias record, serving state `NOT_MEASURED`) and `4104492619` (§8's push-red count said six when five were push runs and the sixth was the merge-group dependency audit). CodeRabbit raised the same two points on `9b4caa63` (`4104485695`, `4104485709`); **`e426bd83` — four P2, carried by this amendment:** `4104551659` (the 35 contexts are the pinned snapshot, live ruleset match `BLOCKED` — header, §4, §8, §11), `4104551650` (the exposure window keeps its "if the apex is Vercel-served" condition and no "production domain serves" claim remains — header, §2, §3), `4104551663` (the `6eb12549` P2 is the unmeasured-data-impact finding, not "a stale marker"), `4104551668` (`c10c095e` lacks the custom-domain aliases, not all aliases; the project alias now points to it — §2); **`c9deaf47` — two P2, carried by this amendment:** `4104608929` (§2's summary sentence and the §11 lock said "the production hostnames" point to `9b06be3f` when one of the four, the project alias, points to `c10c095e` — both now state the split) and `4104608934` (the header now records the 12:39 alias reads separately from the 12:22 ones). **Three P1 and twenty-two P2 in all, all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files (Markdown excluded); CodeRabbit skipped every earlier head.
+  §8 now states the current head's lanes as read, and this stamp's own head as `NOT_MEASURED`); **`9b4caa63` — two P2, carried by this amendment:** `4104492611` (§2 and §3 said what growers were getting when only the alias record was read — reworded to the alias record, serving state `NOT_MEASURED`) and `4104492619` (§8's push-red count said six when five were push runs and the sixth was the merge-group dependency audit). CodeRabbit raised the same two points on `9b4caa63` (`4104485695`, `4104485709`); **`e426bd83` — four P2, carried by this amendment:** `4104551659` (the 35 contexts are the pinned snapshot, live ruleset match `BLOCKED` — header, §4, §8, §11), `4104551650` (the exposure window keeps its "if the apex is Vercel-served" condition and no "production domain serves" claim remains — header, §2, §3), `4104551663` (the `6eb12549` P2 is the unmeasured-data-impact finding, not "a stale marker"), `4104551668` (`c10c095e` lacks the custom-domain aliases, not all aliases; the project alias now points to it — §2); **`c9deaf47` — two P2, carried by this amendment:** `4104608929` (§2's summary sentence and the §11 lock said "the production hostnames" point to `9b06be3f` when one of the four, the project alias, points to `c10c095e` — both now state the split) and `4104608934` (the header now records the 12:39 alias reads separately from the 12:22 ones); **`e7fabede` — one P2, carried by this amendment:** `4104637361` (§1 said the tip was "not serving", a negative result for a `NOT_MEASURED` state — it now states the alias records and keeps serving `NOT_MEASURED`). **Three P1 and twenty-three P2 in all, all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files (Markdown excluded); CodeRabbit skipped every earlier head.
 - The two owner-side Claude reads (`5315633209`, `5315834826`) and Claude's replies stand as the
   09:21 stamp §5 records.
 
@@ -179,7 +178,7 @@ red, 2 still in progress (`Core Link and Form Census`, and the `dynamic` push-re
   (§1, §4).
 - Its §2 says no production deployment since 09:45 and auto-promotion untested; `dpl_Excxdc…` was
   built at 12:03 and did not take the custom-domain aliases (§2).
-- Its header says five review passes; six were, and ten now (§5).
+- Its header says five review passes; six were, and eleven now (§5).
 - Its §8 presents `600c9902` as this file's head; the head is now this stamp's commit (§8).
 
 Everything else in it is carried unchanged with its original labels, including the incident and

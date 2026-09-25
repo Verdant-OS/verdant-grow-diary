@@ -96,14 +96,25 @@ describe("resolveTentEnvironmentStage", () => {
     ).toBe("flower");
   });
 
-  it("pending or failed plant reads add no signal", () => {
+  it("a plant read with no data yet withholds grading (Codex review on #1683)", () => {
+    // Pending, or failed before returning rows: a Flower plant may be in the
+    // tent, so the tent and grow alone must not decide.
     expect(
       resolveTentEnvironmentStage({
         tentId: TENT,
         tentGrowId: "g1",
         tentStage: "veg",
-        growStage: null,
+        growStage: "veg",
         plants: null,
+      }),
+    ).toBeNull();
+    expect(
+      resolveTentEnvironmentStage({
+        tentId: TENT,
+        tentGrowId: "g1",
+        tentStage: "veg",
+        growStage: "veg",
+        plants: [],
       }),
     ).toBe("veg");
   });
@@ -372,6 +383,23 @@ describe("Sensors page stage chips follow the plants in the tent", () => {
       "In Veg RH range",
     );
   });
+
+  it.each([
+    ["pending", false],
+    ["failed with no data", true],
+  ])(
+    "never grades by the tent and grow alone while the first plant read is %s",
+    async (_s, isError) => {
+      // Codex review on #1683: with no plant rows yet, a Flower plant may be
+      // in this Veg tent, so RH 60% must not read as in the Veg range.
+      plantsState.data = undefined;
+      plantsState.isError = isError;
+      renderSensors();
+      const chip = await screen.findByTestId("sensors-stage-status-rh");
+      expect(chip).not.toHaveTextContent("In Veg RH range");
+      expect(chip).toHaveTextContent("set stage for humidity guidance");
+    },
+  );
 
   it("without a plant signal the tent and grow still decide", async () => {
     renderSensors();

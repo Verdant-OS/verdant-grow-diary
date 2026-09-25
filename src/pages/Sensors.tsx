@@ -269,9 +269,8 @@ export default function Sensors() {
   // Stage for the stage chips, VPD stability and the stage-missing badge. It
   // is resolved like the scoped Dashboard's single-tent view and the Alerts
   // page: this tent's grow row, the tent, and the active plants in it (QA
-  // 2026-09-24, BUG-006 follow-up). A pending or failed plant read adds no
-  // plant signal.
-  // Until this tent's grow row is known, stage grading is withheld.
+  // 2026-09-24, BUG-006 follow-up). Until this tent's grow row and the plant
+  // rows are known, stage grading is withheld (Codex review on #1683).
   const { grows, loading: growsLoading, error: growsError } = useGrows();
   const plantsQuery = usePlants();
   const selectedTentStage = resolveTentEnvironmentStage({

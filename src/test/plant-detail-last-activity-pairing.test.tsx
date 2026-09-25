@@ -167,6 +167,25 @@ describe("Plant Detail last activity", () => {
     );
   });
 
+  it.each([
+    ["an untyped entry", {}, "Note: Checked the jars"],
+    ["a cure check", { event_type: "cure_check" }, "Cure check: Checked the jars"],
+  ])(
+    "labels %s by its own type, not Observation (Codex review on #1683)",
+    async (_s, details, text) => {
+      renderWith("Clone from mother A", [
+        {
+          id: "d-1",
+          entry_at: new Date(Date.now() - 3600_000).toISOString(),
+          note: "Checked the jars",
+          details,
+        },
+      ]);
+      const summary = await screen.findByTestId("plant-detail-last-activity-summary");
+      expect(summary.textContent).toBe(text);
+    },
+  );
+
   it("with no diary entries it claims no activity and still shows the profile note", async () => {
     renderWith("Clone from mother A", []);
     await waitFor(() =>

@@ -13,7 +13,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import type { Plant } from "@/mock";
 
-let plants: Plant[] = [];
+let plants: Plant[] | undefined = [];
 let plantsIsError = false;
 const NOW = new Date().toISOString();
 const STABLE_READINGS = [
@@ -137,6 +137,20 @@ describe("Tent Detail stage hint follows the plants in the tent", () => {
     plants = [{ ...plant("flower"), growId: "grow-2" }];
     renderTent();
     expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent("In Veg VPD range");
+  });
+
+  it.each([
+    ["pending", false],
+    ["failed with no data", true],
+  ])("never grades by the tent and grow alone while the first plant read is %s", (_s, isError) => {
+    // Codex review on #1683: with no plant rows yet, a Flower plant may be in
+    // this Veg tent, so the hint must not claim the Veg range.
+    plants = undefined;
+    plantsIsError = isError;
+    renderTent();
+    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).not.toHaveTextContent(
+      "In Veg VPD range",
+    );
   });
 
   it("without a plant signal the tent and grow still decide", () => {

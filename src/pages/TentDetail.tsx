@@ -147,9 +147,9 @@ export default function TentDetail() {
   // Stage for the environment chips, VPD hint, stage-missing badge and
   // stability card. Resolved like the Sensors page and the scoped Dashboard's
   // single-tent view: the tent's grow row, the tent, and the active plants in
-  // it (QA 2026-09-24, BUG-006 follow-up). A pending or failed plant read adds
-  // no plant signal. The stage badge and tent menu still show the tent's own.
-  // Until the tent's grow row is known, stage grading is withheld.
+  // it (QA 2026-09-24, BUG-006 follow-up). The stage badge and tent menu still
+  // show the tent's own. Until the tent's grow row and the plant rows are
+  // known, stage grading is withheld (Codex review on #1683).
   const { grows, loading: growsLoading, error: growsError } = useGrows();
   const envStage = resolveTentEnvironmentStage({
     tentId: tent?.id ?? null,

@@ -9,6 +9,8 @@
  * Pure: `now` is injected.
  */
 import { formatDistance } from "date-fns";
+import { QUICK_LOG_HARVEST_CURE_LABELS } from "@/constants/quickLogEventTypes";
+import { EVENT_TYPE_MAP } from "@/lib/diary";
 import { normalizeDiaryEntries } from "@/lib/diaryEntryRules";
 import { buildRecentQuickLogActivity } from "@/lib/quickLogHistoryRules";
 
@@ -122,4 +124,30 @@ export function resolvePlantLastActivitySummary(
       ? `${firstLine.slice(0, PLANT_LAST_ACTIVITY_TEXT_MAX - 1).trimEnd()}…`
       : firstLine;
   return { eventType: entry.eventType, text };
+}
+
+/** Types the diary type table lacks, with the names Quick Log gives them. */
+const LAST_ACTIVITY_EXTRA_TYPE_LABELS: Readonly<Record<string, string>> = {
+  note: "Note",
+  cure_check: QUICK_LOG_HARVEST_CURE_LABELS.cure_check,
+};
+
+function ownLabel(table: Readonly<Record<string, { label: string } | string>>, key: string) {
+  if (!Object.prototype.hasOwnProperty.call(table, key)) return null;
+  const entry = table[key];
+  return typeof entry === "string" ? entry : entry.label;
+}
+
+/**
+ * The name shown for the last activity's type (Codex review on #1683). The
+ * diary type table has no "note" (a row without a type) or "cure_check" (a
+ * Quick Log type), and its lookup falls back to "Observation" for both. Any
+ * other type it lacks reads "Activity", never a type the row is not.
+ */
+export function plantLastActivityTypeLabel(eventType: string): string {
+  return (
+    ownLabel(LAST_ACTIVITY_EXTRA_TYPE_LABELS, eventType) ??
+    ownLabel(EVENT_TYPE_MAP, eventType) ??
+    "Activity"
+  );
 }

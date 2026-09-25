@@ -27,6 +27,7 @@ import {
   PLANT_LAST_ACTIVITY_LOADING,
   PLANT_LAST_ACTIVITY_NONE,
   PLANT_LAST_ACTIVITY_UNAVAILABLE,
+  plantLastActivityTypeLabel,
   resolvePlantLastActivityLabel,
   resolvePlantLastActivitySummary,
 } from "@/lib/plantLastActivityRules";
@@ -363,6 +364,16 @@ describe("last activity text and time come from the same diary row (Codex, #1683
         now,
       }),
     ).toEqual({ eventType: "note", text: "" });
+  });
+
+  it("labels each type by its own name, never falling back to Observation (Codex review on #1683)", () => {
+    expect(plantLastActivityTypeLabel("note")).toBe("Note");
+    expect(plantLastActivityTypeLabel("cure_check")).toBe("Cure check");
+    expect(plantLastActivityTypeLabel("watering")).toBe("Watering");
+    expect(plantLastActivityTypeLabel("harvest")).toBe("Harvest");
+    expect(plantLastActivityTypeLabel("observation")).toBe("Observation");
+    expect(plantLastActivityTypeLabel("not_a_type")).toBe("Activity");
+    expect(plantLastActivityTypeLabel("toString")).toBe("Activity");
   });
 
   it("has no summary while loading, after a failed read, or with no rows", () => {

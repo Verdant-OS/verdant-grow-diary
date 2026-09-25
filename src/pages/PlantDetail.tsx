@@ -30,10 +30,10 @@ import PlantQuickStatusStrip from "@/components/PlantQuickStatusStrip";
 import { usePlantRecentActivity } from "@/hooks/usePlantRecentActivity";
 import { formatPlantAge, plantStartDisplayDate, resolvePlantAge } from "@/lib/plantStartDateRules";
 import {
+  plantLastActivityTypeLabel,
   resolvePlantLastActivityLabel,
   resolvePlantLastActivitySummary,
 } from "@/lib/plantLastActivityRules";
-import { getEventType } from "@/lib/diary";
 import PlantLogStreakMarker from "@/components/PlantLogStreakMarker";
 import PlantDetailQuickActions from "@/components/PlantDetailQuickActions";
 import PlantDetailPhotoStrip from "@/components/PlantDetailPhotoStrip";
@@ -708,7 +708,7 @@ export default function PlantDetail() {
               </div>
               {lastActivitySummary ? (
                 <p className="break-words text-sm" data-testid="plant-detail-last-activity-summary">
-                  {getEventType(lastActivitySummary.eventType).label}
+                  {plantLastActivityTypeLabel(lastActivitySummary.eventType)}
                   {lastActivitySummary.text ? `: ${lastActivitySummary.text}` : ""}
                 </p>
               ) : null}

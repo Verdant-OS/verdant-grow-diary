@@ -18,7 +18,7 @@ const H = vi.hoisted(() => {
   const capturedAt = new Date(Date.now() - 5 * 60_000).toISOString();
   const state = {
     tentGrowId: "grow-1" as string | null,
-    plants: [] as Array<Record<string, unknown>>,
+    plants: [] as Array<Record<string, unknown>> | undefined,
     plantsIsError: false,
     grows: [{ id: "grow-1", stage: "veg" }] as Array<{ id: string; stage: string }>,
     growsLoading: false,
@@ -165,6 +165,18 @@ describe("Tents list stage follows the plants in the tent", () => {
     H.state.plants = [plant("flower", { tentId: H.OTHER_TENT_ID })];
     renderTents();
     expect(vpdChipGrade()).toBe("ok");
+  });
+
+  it.each([
+    ["pending", false],
+    ["failed with no data", true],
+  ])("never grades by the tent and grow alone while the first plant read is %s", (_s, isError) => {
+    // Codex review on #1683: with no plant rows yet, a Flower plant may be in
+    // this Veg tent, so 0.85 kPa must not be graded as in the Veg range.
+    H.state.plants = undefined;
+    H.state.plantsIsError = isError;
+    renderTents();
+    expect(vpdChipGrade()).not.toBe("ok");
   });
 
   it("without a plant signal the tent and grow still decide", () => {

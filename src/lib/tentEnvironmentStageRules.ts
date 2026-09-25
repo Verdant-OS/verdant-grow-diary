@@ -46,8 +46,10 @@ export interface TentEnvironmentStageInput {
   readonly growStageResolved?: boolean;
   /**
    * Active plants (any tent; only this tent's count). `null` while the plant
-   * read is pending or has failed: plants then add no signal and the grow +
-   * tent decide.
+   * read has no data (pending, or failed before returning rows): stage
+   * grading is then withheld, because a plant in the tent may outrank the
+   * grow and tent (Codex review on #1683). A failed refresh passes its cached
+   * rows.
    */
   readonly plants: ReadonlyArray<TentEnvironmentStagePlant> | null | undefined;
 }
@@ -56,13 +58,14 @@ export interface TentEnvironmentStageInput {
 export function resolveTentEnvironmentStage(input: TentEnvironmentStageInput): string | null {
   if (!input.tentId) return null;
   if (input.growStageResolved === false) return null;
+  if (input.plants == null) return null;
   const tentId = input.tentId;
   const tentGrowById = buildTentGrowIndex([{ id: tentId, growId: input.tentGrowId ?? null }]);
   const tentGrowId = resolvePlantGrowId({ tentId }, tentGrowById);
   return resolveAlertContextStage({
     growStage: input.growStage,
     tentStages: [input.tentStage],
-    plantStages: (input.plants ?? [])
+    plantStages: input.plants
       .filter(
         (plant) =>
           (plant.tent_id ?? plant.tentId) === tentId &&

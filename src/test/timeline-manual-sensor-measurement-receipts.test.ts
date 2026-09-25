@@ -53,7 +53,7 @@ describe("manualSensorReadingsToTimelineEntries", () => {
   });
 
   it("uses captured_at for receipt entry_at when ts differs from the observation time", () => {
-    const now = new Date("2026-07-15T20:00:00.000Z");
+    const now = new Date("2026-07-16T05:05:00.000Z");
     const ts = "2026-07-15T19:55:00.000Z";
     const capturedAt = "2026-07-16T05:00:00.000Z";
     const tempC = fahrenheitToCelsius(76);
@@ -71,7 +71,7 @@ describe("manualSensorReadingsToTimelineEntries", () => {
   it("post-filter on entry_at drops receipts whose captured_at sits outside the active window", () => {
     const startIso = "2026-07-15T05:00:00.000Z";
     const endIso = "2026-07-16T04:59:59.999Z";
-    const now = new Date("2026-07-15T20:00:00.000Z");
+    const now = new Date("2026-07-16T05:05:00.000Z");
     const ts = "2026-07-15T19:55:00.000Z";
     const capturedAt = "2026-07-16T05:00:00.000Z";
     const tempC = fahrenheitToCelsius(76);
@@ -82,9 +82,36 @@ describe("manualSensorReadingsToTimelineEntries", () => {
       ],
       now,
     );
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].entry_at).toBe(capturedAt);
     receipts = receipts.filter((row) => row.entry_at >= startIso && row.entry_at <= endIso);
     expect(receipts).toEqual([]);
   });
+
+  it.each([
+    [5 * 60 * 1000, 1],
+    [5 * 60 * 1000 + 1, 0],
+    [9 * 60 * 60 * 1000, 0],
+  ])(
+    "applies future capture validity at +%i ms instead of trusting a fresh ts",
+    (offsetMs, count) => {
+      const now = new Date("2026-07-15T20:00:00.000Z");
+      const ts = "2026-07-15T19:55:00.000Z";
+      const capturedAt = new Date(now.getTime() + offsetMs).toISOString();
+      const receipts = manualSensorReadingsToTimelineEntries(
+        [
+          metricRow("temperature_c", fahrenheitToCelsius(76), "manual", {
+            ts,
+            captured_at: capturedAt,
+          }),
+          metricRow("humidity_pct", 58, "manual", { ts, captured_at: capturedAt }),
+        ],
+        now,
+      );
+      expect(receipts).toHaveLength(count);
+      if (count === 1) expect(receipts[0].entry_at).toBe(capturedAt);
+    },
+  );
 
   it("includes a grouped manual temp+RH snapshot in the Measurements query/view", () => {
     const tempC = fahrenheitToCelsius(76);

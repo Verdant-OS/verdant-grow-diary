@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import {
   LOVABLE_NO_PROJECT_MARKER,
+  describeCachedAuthOriginMismatch,
   describeUnservedE2EBaseUrl,
 } from "../../e2e/lib/baseUrlPreflight";
 
@@ -63,5 +64,40 @@ describe("describeUnservedE2EBaseUrl", () => {
         bodyText: "",
       }),
     ).toBeNull();
+  });
+});
+
+describe("describeCachedAuthOriginMismatch (Codex review on #1683)", () => {
+  // authedTest injects the saved sessionStorage only on the origin it was
+  // saved from, so reusing a snapshot from another origin runs every
+  // authenticated spec logged out.
+  it("passes a snapshot saved on the origin the base URL now serves", () => {
+    expect(
+      describeCachedAuthOriginMismatch({
+        savedSnapshot: '{"origin":"http://127.0.0.1:8080","entries":{}}',
+        currentUrl: "http://127.0.0.1:8080/auth",
+      }),
+    ).toBeNull();
+  });
+
+  it("names both origins when they differ", () => {
+    const message = describeCachedAuthOriginMismatch({
+      savedSnapshot: '{"origin":"https://verdantgrowdiary.com","entries":{}}',
+      currentUrl: "http://127.0.0.1:8080/auth",
+    });
+    expect(message).toContain("https://verdantgrowdiary.com");
+    expect(message).toContain("http://127.0.0.1:8080");
+    expect(message).toContain("e2e/.auth/");
+  });
+
+  it("treats an unreadable or origin-less snapshot as a mismatch", () => {
+    for (const savedSnapshot of ["not json", "{}", '{"origin":42}', '{"entries":{}}']) {
+      expect(
+        describeCachedAuthOriginMismatch({
+          savedSnapshot,
+          currentUrl: "http://127.0.0.1:8080/auth",
+        }),
+      ).toContain("an unknown origin");
+    }
   });
 });

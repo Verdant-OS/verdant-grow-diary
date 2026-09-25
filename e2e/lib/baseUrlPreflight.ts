@@ -45,3 +45,38 @@ export function describeUnservedE2EBaseUrl(probe: BaseUrlProbe): string | null {
     "E2E_GROW_1_PLANT_URL variables at a host that serves the app, then re-run."
   );
 }
+
+/**
+ * A message when cached auth state cannot be used against the current base
+ * URL, or null when it can (Codex review on #1683). `authedTest` injects the
+ * saved sessionStorage only on the origin it was saved from, so a snapshot
+ * from another origin would run every authenticated spec logged out. An
+ * unreadable snapshot, or one with no origin, never matches.
+ */
+export function describeCachedAuthOriginMismatch(input: {
+  /** Raw contents of e2e/.auth/session-storage.json. */
+  readonly savedSnapshot: string;
+  /** Final URL after probing /auth on E2E_BASE_URL. */
+  readonly currentUrl: string;
+}): string | null {
+  let savedOrigin: string | null = null;
+  try {
+    const parsed = JSON.parse(input.savedSnapshot) as { origin?: unknown };
+    savedOrigin = typeof parsed?.origin === "string" && parsed.origin ? parsed.origin : null;
+  } catch {
+    savedOrigin = null;
+  }
+  let currentOrigin = input.currentUrl;
+  try {
+    currentOrigin = new URL(input.currentUrl).origin;
+  } catch {
+    // keep the raw value
+  }
+  if (savedOrigin !== null && savedOrigin === currentOrigin) return null;
+  return (
+    `Cached auth state in e2e/.auth/ was saved on ${savedOrigin ?? "an unknown origin"}, ` +
+    `but E2E_BASE_URL now serves ${currentOrigin}. Its session would not be injected there, so ` +
+    "authenticated specs would run logged out. Delete the e2e/.auth/ directory, or set " +
+    "E2E_TEST_EMAIL / E2E_TEST_PASSWORD so this setup signs in again on this origin."
+  );
+}

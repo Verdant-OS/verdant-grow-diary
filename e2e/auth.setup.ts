@@ -1,7 +1,10 @@
 import { test as setup, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { describeUnservedE2EBaseUrl } from "./lib/baseUrlPreflight";
+import {
+  describeCachedAuthOriginMismatch,
+  describeUnservedE2EBaseUrl,
+} from "./lib/baseUrlPreflight";
 
 /**
  * Authenticated session bootstrap for Verdant Grow OS e2e tests.
@@ -47,19 +50,31 @@ setup("authenticate", async ({ page }) => {
   const haveStorageState = fs.existsSync(STORAGE_PATH);
   const haveSessionSnapshot = fs.existsSync(SESSION_STORAGE_PATH);
 
+  const email = process.env.E2E_TEST_EMAIL;
+  const password = process.env.E2E_TEST_PASSWORD;
+
   if (haveStorageState && haveSessionSnapshot) {
     // Cached state is only as good as the host it will run against: probe it
     // first, so a dead or retired E2E_BASE_URL fails here with its cause.
     await assertBaseUrlServesApp(page);
-    setup.info().annotations.push({
-      type: "auth",
-      description: "Reusing existing auth state at e2e/.auth/ (user.json + session-storage.json).",
+    // The snapshot must also belong to the origin now served, or authedTest
+    // never injects it and every authenticated spec runs logged out.
+    const mismatch = describeCachedAuthOriginMismatch({
+      savedSnapshot: fs.readFileSync(SESSION_STORAGE_PATH, "utf8"),
+      currentUrl: page.url(),
     });
-    return;
+    if (!mismatch) {
+      setup.info().annotations.push({
+        type: "auth",
+        description:
+          "Reusing existing auth state at e2e/.auth/ (user.json + session-storage.json).",
+      });
+      return;
+    }
+    if (!email || !password) throw new Error(mismatch);
+    // Credentials present: sign in again below, rewriting both files.
+    setup.info().annotations.push({ type: "auth", description: mismatch });
   }
-
-  const email = process.env.E2E_TEST_EMAIL;
-  const password = process.env.E2E_TEST_PASSWORD;
 
   if (!email || !password) {
     // A PARTIAL snapshot (one file without the other — e.g. an old

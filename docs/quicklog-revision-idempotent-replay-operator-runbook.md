@@ -62,13 +62,15 @@ control and creates no hidden automation.
 
 ## Production shape this lane pins (measured 2026-09-25)
 
-Older delivery lanes pin a three-column `supabase_migrations.schema_migrations`
+Delivery lanes used to pin a three-column `supabase_migrations.schema_migrations`
 and NOINHERIT client roles. Production has neither: its ledger has six columns
 (`version`, `statements`, `name`, `created_by`, `idempotency_key`, `rollback`)
 with `UNIQUE (idempotency_key)`, and `anon`, `authenticated` and `service_role`
-are INHERIT roles. This lane pins the measured shape instead; every privilege
-check it makes uses `has_*_privilege`, which already follows role membership.
-The delivered ledger row sets only `version`, `name` and `statements`.
+are INHERIT roles. Every lane, this one included, now renders the measured shape
+from `scripts/lib/supabaseMigrationLedgerShape.mjs`, and every PostgreSQL 15
+harness builds its scaffold ledger from the same module. Every privilege check
+uses `has_*_privilege`, which already follows role membership. The delivered
+ledger row sets only `version`, `name` and `statements`.
 
 ## Required solo-founder environment controls
 

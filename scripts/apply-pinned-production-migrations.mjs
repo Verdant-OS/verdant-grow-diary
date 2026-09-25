@@ -19,9 +19,13 @@ import {
   sanitizeSupabaseDatabaseUrlForPsql,
   SupabaseDatabaseTargetIdentityError,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
+import { ledgerInformationSchemaColumns } from "./lib/supabaseMigrationLedgerShape.mjs";
 
 export const PRODUCTION_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 export const APPLY_CONFIRMATION = "APPLY PINNED PRODUCTION MIGRATIONS";
+
+/** Measured production ledger columns, in ordinal order (see supabaseMigrationLedgerShape). */
+export const EXPECTED_LEDGER_COLUMNS = Object.freeze(ledgerInformationSchemaColumns());
 
 export const PINNED_PRODUCTION_MIGRATIONS = Object.freeze([
   Object.freeze({
@@ -2412,11 +2416,7 @@ function validatePreflight(preflight) {
   ) {
     throw new Error("unexpected_ledger_shape");
   }
-  const expectedLedgerColumns = [
-    { name: "version", data_type: "text", udt_name: "text", nullable: "NO" },
-    { name: "name", data_type: "text", udt_name: "text", nullable: "YES" },
-    { name: "statements", data_type: "ARRAY", udt_name: "_text", nullable: "YES" },
-  ];
+  const expectedLedgerColumns = EXPECTED_LEDGER_COLUMNS;
   const observedLedgerColumns = preflight?.ledger_ordered_columns;
   if (
     !Array.isArray(observedLedgerColumns) ||

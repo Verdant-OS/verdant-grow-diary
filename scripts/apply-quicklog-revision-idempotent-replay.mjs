@@ -27,6 +27,10 @@ import { buildPsqlEnvironment, writeTextFile } from "./lib/candidateNumberToolRu
 import { hardenProductionPsqlEnvironment } from "./lib/productionSupabaseTls.mjs";
 import { SOLO_FOUNDER_POLICY } from "./lib/solo-founder-production-authorization.mjs";
 import {
+  ledgerColumnRowsWithNoDefaultFlag,
+  ledgerConstraintRows,
+} from "./lib/supabaseMigrationLedgerShape.mjs";
+import {
   assertSupabaseDatabaseTargetIdentity,
   SUPABASE_DATABASE_TARGETS,
 } from "./lib/supabaseDatabaseTargetIdentity.mjs";
@@ -335,24 +339,10 @@ const FUNCTION_EXPECTED_VALUES_SQL = FUNCTION_EXPECTATIONS.map(
     ].join(",")})`,
 ).join(",\n");
 
-// The Supabase migration ledger as MEASURED on production (knk) on 2026-09-25:
-// six columns and a unique idempotency_key. Older delivery lanes pin the
-// three-column shape and NOINHERIT client roles; production has neither, so
-// those contracts would block there. The delivered INSERT names only
-// version/name/statements; the other three columns are nullable with no
-// default, and a NULL idempotency_key cannot collide with the unique key.
-export const MIGRATION_LEDGER_COLUMNS = Object.freeze([
-  "1|version|text|t|||t",
-  "2|statements|text[]|f|||t",
-  "3|name|text|f|||t",
-  "4|created_by|text|f|||t",
-  "5|idempotency_key|text|f|||t",
-  "6|rollback|text[]|f|||t",
-]);
-export const MIGRATION_LEDGER_CONSTRAINTS = Object.freeze([
-  "schema_migrations_idempotency_key_key|u|t|f|f|UNIQUE (idempotency_key)",
-  "schema_migrations_pkey|p|t|f|f|PRIMARY KEY (version)",
-]);
+// The migration ledger as measured on production (see
+// scripts/lib/supabaseMigrationLedgerShape.mjs), rendered in this lane's format.
+export const MIGRATION_LEDGER_COLUMNS = Object.freeze(ledgerColumnRowsWithNoDefaultFlag());
+export const MIGRATION_LEDGER_CONSTRAINTS = Object.freeze(ledgerConstraintRows());
 
 export const RESULT_KEYS = Object.freeze([
   "ledger_exact_count",

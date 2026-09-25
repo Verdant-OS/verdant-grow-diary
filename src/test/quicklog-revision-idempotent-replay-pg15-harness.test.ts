@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 const HARNESS_PATH = resolve("scripts/run-quicklog-revision-idempotent-replay-pg15-harness.mjs");
 const RUNNER_PATH = resolve("scripts/apply-quicklog-revision-idempotent-replay.mjs");
 const WORKFLOW_PATH = resolve(".github/workflows/quicklog-revision-idempotent-replay-pg15.yml");
+const SHAPE_PATH = resolve("scripts/lib/supabaseMigrationLedgerShape.mjs");
 const POSTGRES_IMAGE =
   "postgres:15.18@sha256:bb0df8b69f086efa2cbe4b8128df2f368a362bbdadef743731a63dd0f2f24c9e";
 const DISPOSABLE_DATABASE_URL =
@@ -114,7 +115,8 @@ describe("Quick Log revision idempotent replay PostgreSQL 15 runtime gate", () =
       ),
     );
     // The measured production ledger shape and inheriting client roles.
-    expect(baseline).toContain("idempotency_key text unique, rollback text[]");
+    const shape = await load(SHAPE_PATH);
+    expect(baseline).toContain(shape.MIGRATION_LEDGER_CREATE_TABLE_SQL);
     expect(baseline).toContain(
       "create role service_role nologin nosuperuser nocreatedb nocreaterole inherit noreplication bypassrls",
     );

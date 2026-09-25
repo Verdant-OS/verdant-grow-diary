@@ -28,6 +28,7 @@ import {
   classifyPreflight,
   parsePreflightStdout,
 } from "./apply-quicklog-revision-idempotent-replay.mjs";
+import { MIGRATION_LEDGER_CREATE_TABLE_SQL } from "./lib/supabaseMigrationLedgerShape.mjs";
 
 const MAX_PSQL_OUTPUT_BYTES = 1_048_576;
 const DISPOSABLE_DATABASE = "verdant_quicklog_revision_replay";
@@ -212,10 +213,7 @@ create schema auth authorization postgres;
 create schema supabase_migrations authorization postgres;
 grant usage on schema public, auth to anon, authenticated, service_role;
 -- The production (knk) ledger shape, measured 2026-09-25.
-create table supabase_migrations.schema_migrations(
-  version text primary key, statements text[], name text, created_by text,
-  idempotency_key text unique, rollback text[]
-);
+${MIGRATION_LEDGER_CREATE_TABLE_SQL}
 create function auth.uid()
 returns uuid
 language sql

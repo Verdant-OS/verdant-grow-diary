@@ -10,6 +10,7 @@ on:
       - "scripts/lib/candidateNumberToolRuntime.mjs"
       - "scripts/lib/supabaseDatabaseTargetIdentity.mjs"
       - "scripts/lib/productionSupabaseTls.mjs"
+      - "scripts/lib/supabaseMigrationLedgerShape.mjs"
       - "scripts/lib/solo-founder-production-authorization.mjs"
       - "scripts/verify-solo-founder-production-authorization.mjs"
       - "supabase/migrations/20260916111000_quicklog_revision_idempotent_replay.sql"

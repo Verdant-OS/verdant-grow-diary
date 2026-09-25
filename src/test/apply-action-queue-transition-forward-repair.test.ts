@@ -831,6 +831,7 @@ describe("Action Queue transition production delivery", () => {
       "apply-quicklog-manual-delegate-forward-repair.yml",
       "apply-action-queue-transition-forward-repair.yml",
       "apply-agreement-acceptance-insert-forward-repair.yml",
+      "apply-quicklog-revision-idempotent-replay.yml",
     ];
 
     expect(guard).toBeDefined();
@@ -877,6 +878,7 @@ describe("Action Queue transition production delivery", () => {
       "apply-quicklog-manual-delegate-forward-repair.yml",
       "apply-action-queue-transition-forward-repair.yml",
       "apply-agreement-acceptance-insert-forward-repair.yml",
+      "apply-quicklog-revision-idempotent-replay.yml",
     ];
 
     for (const writer of writers) {

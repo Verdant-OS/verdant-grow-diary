@@ -29,6 +29,14 @@ const AGREEMENT_ACCEPTANCE_APPLY_WORKFLOW_PATH = resolve(
   __dirname,
   "../../.github/workflows/apply-agreement-acceptance-insert-forward-repair.yml",
 );
+const REVISION_REPLAY_APPLY_WORKFLOW_PATH = resolve(
+  __dirname,
+  "../../.github/workflows/apply-quicklog-revision-idempotent-replay.yml",
+);
+const REVISION_REPLAY_PG15_WORKFLOW_PATH = resolve(
+  __dirname,
+  "../../.github/workflows/quicklog-revision-idempotent-replay-pg15.yml",
+);
 const CORE_WORKFLOW_PATH = resolve(
   __dirname,
   "../../.github/workflows/required-core-migrations.yml",
@@ -290,6 +298,7 @@ describe("production Supabase CA workflow boundary", () => {
       PG15_WORKFLOW_PATH,
       SIGNUP_PG15_WORKFLOW_PATH,
       DELEGATE_PG15_WORKFLOW_PATH,
+      REVISION_REPLAY_PG15_WORKFLOW_PATH,
     ]) {
       const source = readFileSync(path, "utf8");
       expect(source).toContain('"scripts/lib/productionSupabaseTls.mjs"');
@@ -382,6 +391,21 @@ describe("production Supabase CA workflow boundary", () => {
     expect(JSON.stringify(runner)).not.toContain("SUPABASE_DB_CA_CERT_B64");
   });
 
+  it("protects, validates, and removes the CA in the Quick Log revision replay workflow", () => {
+    const parsed = workflow(REVISION_REPLAY_APPLY_WORKFLOW_PATH);
+    const job = parsed.jobs.apply;
+
+    expectProtectedCaWorkflow(job, "verdant-production-solo-founder");
+    const runner = job.steps.find(
+      (step) => step.name === "Run the environment-gated Quick Log revision replay",
+    );
+    expect(runner?.env).toEqual({
+      SUPABASE_DB_URL: "${{ secrets.SUPABASE_DB_URL }}",
+      SUPABASE_DB_CA_CERT_PATH: FIXED_WORKFLOW_CA_PATH,
+    });
+    expect(JSON.stringify(runner)).not.toContain("SUPABASE_DB_CA_CERT_B64");
+  });
+
   it("protects the production core verifier without exposing CA material to sandbox", () => {
     const parsed = workflow(CORE_WORKFLOW_PATH);
     const production = parsed.jobs["verify-production"];
@@ -404,6 +428,7 @@ describe("production Supabase CA workflow boundary", () => {
       DELEGATE_APPLY_WORKFLOW_PATH,
       ACTION_QUEUE_APPLY_WORKFLOW_PATH,
       AGREEMENT_ACCEPTANCE_APPLY_WORKFLOW_PATH,
+      REVISION_REPLAY_APPLY_WORKFLOW_PATH,
       CORE_WORKFLOW_PATH,
     ]) {
       const source = readFileSync(path, "utf8");

@@ -290,11 +290,12 @@ that it failed on the head of PR #769 and merged anyway — a documented enforce
 
 Replay gates: `action-queue-transition-forward-repair-pg15`,
 `quicklog-corrections-retractions-pg15`, `quicklog-manual-delegate-forward-repair-pg15`,
-`signup-acquisition-forward-repair-pg15`.
+`quicklog-revision-idempotent-replay-pg15`, `signup-acquisition-forward-repair-pg15`.
 
-Seven `workflow_dispatch`-only appliers: `apply-pinned-production-migrations`,
-`apply-action-queue-transition-forward-repair`, `apply-quicklog-corrections-retractions`,
-`apply-quicklog-manual-delegate-forward-repair`, `apply-signup-acquisition-forward-repair`,
+Nine `workflow_dispatch`-only appliers: `apply-pinned-production-migrations`,
+`apply-action-queue-transition-forward-repair`, `apply-agreement-acceptance-insert-forward-repair`,
+`apply-quicklog-corrections-retractions`, `apply-quicklog-manual-delegate-forward-repair`,
+`apply-quicklog-revision-idempotent-replay`, `apply-signup-acquisition-forward-repair`,
 `apply-candidate-number-maintenance-migrations`, `apply-pinned-breeding-reconciliation`.
 
 ### Security

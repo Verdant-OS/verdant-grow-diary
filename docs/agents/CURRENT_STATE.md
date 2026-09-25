@@ -1,15 +1,17 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-25 UTC (~11:25 UTC; publisher serving state re-read 11:17 UTC; tip and live measured 11:24 UTC)
+**Last updated:** 2026-09-25 UTC (~11:40 UTC; Vercel event log and alias records read 11:36 UTC; publisher serving state re-read 11:24 UTC; tip and live measured 11:24 UTC)
 **Updated by:** Claude (2026-09-25 late morning, restamp on the **same deploy tip
-`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`**, the `#1680` squash, to carry a **P1 finding from
-Codex's independent review** of this PR (§5). **Zero commits** merged since the 09:21 stamp; no
-migration (§1). **The production incident is closed: an owner-authorized rollback at ~09:45 UTC
-returned the production slot to the git-built tip deployment `dpl_6fVRiJ3X…` (`9b06be3f`), and at
-11:17 UTC every production hostname resolves to it** (§2). The 09:21 stamp's §2 and §3 described
+`9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`**, the `#1680` squash, to carry **Codex's independent-review findings** on this PR — a P1 at `538ca410` and, amended in
+place at `6eb12549`, a second-pass P1 and P2 (§5). **Zero commits** merged since the 09:21 stamp; no
+migration (§1). **The production incident is closed: an owner-authorized rollback at 09:45:15 UTC returned the production slot to the git-built tip
+deployment `dpl_6fVRiJ3X…` (`9b06be3f`), its aliases were re-assigned at 09:45:16, and at 11:24 UTC
+every production hostname resolves to it** (§2). The 09:21 stamp's §2 and §3 described
 the pre-rollback state at their 09:13 read and became stale at 09:45; this stamp records **both
-events with times** (§2, §3). Growers were on the stale Cursor commit `7053af8f` for about 77
-minutes, if the apex is Vercel-served (§3). Whether new git production deployments auto-promote
+events with times** (§2, §3). Growers were on the stale Cursor commit `7053af8f` for **76 minutes 37 seconds** (08:28:39 to
+09:45:16), if the apex is Vercel-served; **data impact is `NOT_MEASURED`** until import rows for that
+window are reconciled (§3). **The redeploy's actor is established: the Cursor Agent, using an API
+token on the owner's Vercel account** (§2). Whether new git production deployments auto-promote
 after a rollback is `NOT_MEASURED` and matters before the next merge lands (§2). `#1696` was
 marked ready for review by Cheek at 11:18 UTC; Codex's code and security reviews have run on
 `538ca410` (§5). Tip lanes, board and locks are carried. No Publish. No APPLY. `HOLD #1250`.
@@ -38,9 +40,10 @@ unless labelled otherwise.
 | Time (UTC)    | Event                                                                                              | Source                                                   |
 | ------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | 06:22:23      | `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY` (`source: git`, `9b06be3f`) built and takes the production slot  | deployment record, read 08:52                            |
-| **08:28:39**  | **`dpl_BhuJT6qqVNckHMibRxYNXDHK4DM7` (`source: redeploy`, `7053af8f` on `cursor/missing-test-coverage-b7df`) takes the slot.** Actor `NOT_MEASURED` | deployment record, read 08:52; alias order confirmed 09:04, 09:13 |
-| **~09:45**    | **Owner-authorized rollback to `dpl_6fVRiJ3X…`**, issued by another Claude session on Cheek's explicit instruction (`source claim`: PR comment `5830322101`, 09:46) | comment `5830322101`                                     |
-| 10:19, 11:17  | **`verdantgrowdiary.com`, `www.verdantgrowdiary.com` and `verdant-grow-diary.vercel.app` all resolve to `dpl_6fVRiJ3X…` (`9b06be3f`)** — `get_deployment` by hostname, this session | this session's reads                                     |
+| **08:28:39**  | **`dpl_BhuJT6qqVNckHMibRxYNXDHK4DM7` (`source: redeploy`, `7053af8f` on `cursor/missing-test-coverage-b7df`) deployed to production by the Cursor Agent** (event log: GitHub login `cursoragent`, under the owner's account via an API token); `cursoragent` assigned its 5 aliases at 08:29:17 | deployment record, read 08:52; event log, read 11:36 |
+| **09:45:15**  | **`instant-rollback-created`: rolled back from `dpl_BhuJT6qq…` to `dpl_6fVRiJ3X…`** by the `cheekhimself` principal — owner-authorized, issued by another Claude session on Cheek's explicit instruction (`source claim` for the instruction: PR comment `5830322101`) | Vercel team event log, read 11:36 |
+| **09:45:16**  | **Four production aliases re-assigned to `dpl_6fVRiJ3X…`** (`aliases-assigned`; alias records `updatedAt` 09:45:16.8) — the rollback's completion | event log and alias records, read 11:36 |
+| 10:19, 11:17, 11:24 | **`verdantgrowdiary.com`, `www.verdantgrowdiary.com` and `verdant-grow-diary.vercel.app` all resolve to `dpl_6fVRiJ3X…` (`9b06be3f`)** — `get_deployment` by hostname, this session | this session's reads |
 
 - **A rollback re-points the production alias without creating a deployment**, so the production
   list ordered by creation time still shows `dpl_BhuJT6qq…` first. That order is not the serving
@@ -48,25 +51,37 @@ unless labelled otherwise.
 - **What `7053af8f` lacked and carried** is as the 08:55 stamp §2 records: six merged tip commits
   absent (`#1687`, `#1221`, `#1691`, `#1690`, `#1677`, `#1680`), five never-merged CSV-lookup
   commits present, 18 non-test files differing.
-- **Still `NOT_MEASURED`:** who or what issued the 08:28:39 redeploy (every production
-  deployment shows the git-integration identity `cheekhimself-1647`); whether the apex DNS
+- **The 08:28:39 actor, `established fact` from the Vercel team event log (read 11:36):** the
+  deployment event reads "deployed … (7053af8 in cursor/missing-test-coverage-b7df) to production"
+  with GitHub login `cursoragent` ("Cursor Agent"), recorded under the owner's Vercel account
+  through an API token. The same token, minutes around it: 08:26:14 attached the project to the
+  GitHub connector, 08:28:52 enabled Skew Protection, 08:29:43 disabled "include files outside
+  root directory". Every deployment shows the owner's identity because the token acts as the
+  owner; the `cursoragent` login is the distinguishing field. **Whether that token was meant to
+  have production scope, and whether to revoke or narrow it, is Cheek's decision** — recorded, not
+  actioned.
+- **Still `NOT_MEASURED`:** whether the apex DNS
   resolves to Vercel at all (`CLAUDE.md` names Lovable as publisher; the session egress refuses
   the apex — HTTP `000` at 11:24, the seventeenth attempt this shift); `/version.json` body
   `BLOCKED`; and **whether new git production deployments auto-promote after a Vercel rollback**
-  (`source claim` from comment `5830322101`: a possible rollback side effect). That last item
+  (`source claim` from comment `5830322101`: a possible rollback side effect; the event log shows
+  only preview deployments after 09:45, none to production, so it is untested). That last item
   matters before the next merge to the tip: if promotion is paused, a merge will build but not
   serve, and the next stamp must read the hostname, not the list.
 - **No rollback, redeploy or Publish by this session.** Any further production action is Cheek's.
 
-## 3. What changed for growers — a 77-minute window, now closed
+## 3. What changed for growers — a 76-minute-37-second window, closed; data impact `NOT_MEASURED`
 
 `inference` from §2: if the apex is Vercel-served, growers were on `7053af8f` from 08:28:39 to
-~09:45 UTC — without the future-timestamp rejection (`#1691`), the bounded CSV duplicate
+09:45:16 UTC (76 min 37 s, both ends from Vercel's records) — without the future-timestamp rejection (`#1691`), the bounded CSV duplicate
 reconciliation (`#1690`), the Sensors clock recovery and aging (`#1677`) and the export freshness
 recheck (`#1680`), and with an unreviewed CSV presence-lookup path — and have been on the tip
-`9b06be3f` since. Stored data was not affected by any of those; they are read-side and
-import-side behaviors. A CSV import made during the window used the unreviewed lookup path;
-whether any was made is `NOT_MEASURED`.
+`9b06be3f` since. **Data impact is `NOT_MEASURED`.** The four missing fixes are read-side, but the served build's
+CSV import ran the unreviewed presence-lookup path without `#1690`, and the duplicate-aware CSV
+history import is a batched write path that can report failure after earlier batches inserted.
+Whether any CSV import ran in the window, and whether it left partial rows, is unknown until
+import and audit rows for 08:28–09:46 UTC are reconciled; until then, do not state that stored
+data was unaffected.
 
 ## 4. Merge, reviews and children — carried from the 08:55 stamp
 
@@ -93,6 +108,14 @@ CHILD` `bd64ca8b` stand.
   10:19; the stamp became stale, it was not written stale. The PR body recorded the rollback at
   10:19 and named the restamp as pending Cheek's instruction; Codex's P1 is that instruction's
   equivalent from the independent seat, and the lock against in-place restamps yields to it.
+- **Codex's second pass on `6eb12549` (Security Review 11:28, no findings; Code Review 11:31)**
+  posted a **P1** (comment `4104072918`: bound the exposure by the first verified evidence, 10:19,
+  not the 09:45 issuance claim — a 77–111-minute range) and a **P2** (comment `4104072922`: the
+  unconditional "stored data was not affected" is unsupported while a CSV import in the window is
+  `NOT_MEASURED`). **Both carried by amending this stamp in place:** the rollback's completion is
+  now verified from Vercel's event log and alias records at 09:45:15–09:45:16, so the window is
+  76 min 37 s rather than a range (§2, §3); data impact is `NOT_MEASURED` until import rows are
+  reconciled (§3). The same read established the redeploy's actor (§2).
 - The two owner-side Claude reads (`5315633209`, `5315834826`) and Claude's replies stand as the
   09:21 stamp §5 records. **Codex's independent verdict on the PR as a whole is still the one open
   item on Claude's side;** a P1 finding is a review, not a verdict.
@@ -169,7 +192,10 @@ Everything else in it is carried unchanged with its original labels.
   Claude.** No device control, no automatic Action Queue writes, no invented credentials. **Never
   KEEP. No owner email.** Claude merges only on the owner's explicit instruction (`#1691`, `#1690`,
   `#1677` and `#1680` were four such instructions; none generalises).
-- **Production is the tip again as of ~09:45 (§2), by hostname lookup, not by list order.** Before
+- **Production is the tip again as of 09:45:16 (§2), by hostname lookup, not by list order.**
+- **An API token on the owner's Vercel account, used by the Cursor Agent, deployed a non-tip
+  commit to production (§2).** Scoping or revoking it is Cheek's; until then every stamp reads the
+  production hostname before citing production. Before
   citing production for any later tip, read the hostname; whether git deployments auto-promote
   after the rollback is `NOT_MEASURED`.
 - **A merge without the required contexts on its head is not precedent.** `#1680` (07:28 stamp

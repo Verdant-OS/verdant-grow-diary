@@ -6,7 +6,7 @@
  * No I/O, no React. Deterministic.
  */
 import { isCurrentStateStale } from "@/lib/sensorTruthCanon";
-import { refreshSensorReadingsStatus } from "@/lib/growAdapters";
+import { refreshSensorReadingStatus } from "@/lib/growAdapters";
 import type { SensorReading } from "@/mock";
 import { readObservedSensorMetric } from "@/lib/sensorReadingSelectionRules";
 
@@ -43,18 +43,31 @@ function csvEscape(value: string | number | null | undefined): string {
  * usable current live/manual evidence; provenance and historical values stay
  * unchanged. Omitting it preserves the supplied snapshot status.
  *
- * Readings that retain their freshness inputs are recomputed first, so a
- * grouped live + manual row ages on its live window rather than the manual
- * window its merged `source` implies. Readings without those inputs fall back
- * to the source-window check below.
+ * Readings whose retained freshness inputs are all current-state evidence
+ * (live or manual) are recomputed first, so a grouped live + manual row ages on
+ * its live window rather than the manual window its merged `source` implies.
+ * Any reading carrying a CSV (historical) time source keeps its supplied status:
+ * CSV history is never aged as current state. Readings without retained inputs
+ * fall back to the source-window check below.
  */
+function isCurrentStateFreshness(reading: SensorReading): boolean {
+  const timeSources = reading.freshness?.timeSources;
+  return (
+    Array.isArray(timeSources) &&
+    timeSources.length > 0 &&
+    timeSources.every((source) => source === "live" || source === "manual")
+  );
+}
+
 export function buildSensorReadingsCsv(
   readings: ReadonlyArray<SensorReading>,
   nowMs?: number,
 ): string {
   const clocked =
     nowMs !== undefined && Number.isFinite(nowMs)
-      ? refreshSensorReadingsStatus(readings, new Date(nowMs))
+      ? readings.map((r) =>
+          isCurrentStateFreshness(r) ? refreshSensorReadingStatus(r, new Date(nowMs)) : r,
+        )
       : readings;
   const rows = clocked.map((r) =>
     [

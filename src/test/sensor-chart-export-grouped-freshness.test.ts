@@ -98,6 +98,23 @@ describe("buildSensorReadingsCsv — grouped live + manual readings", () => {
     expect(statusColumn(buildSensorReadingsCsv(mixedGroup()))).toEqual(["usable"]);
   });
 
+  it.each([1, 10])(
+    "keeps a mapped CSV history row usable when it was usable at fetch (captured %i min before)",
+    (minutes) => {
+      const ts = new Date(FETCHED_AT - minutes * MIN).toISOString();
+      const [csv] = groupSensorReadingRows(
+        [row("csv", "temperature_c", 20, { ts, captured_at: ts })],
+        new Date(FETCHED_AT),
+      );
+      expect(csv.freshness?.timeSources).toEqual(["csv"]);
+      expect(csv.status).toBe("usable");
+      const line = buildSensorReadingsCsv([csv], FETCHED_AT + 16 * MIN)
+        .split("\n")
+        .slice(1)[0];
+      expect(line).toContain(",csv,usable,");
+    },
+  );
+
   it("recovers a clock-skew invalid once the export clock catches up", () => {
     // Captured ten minutes ahead of the fetch clock: beyond the future-skew
     // fence, so the group is invalid at fetch. That invalid is time-derived,

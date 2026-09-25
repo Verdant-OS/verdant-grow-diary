@@ -63,6 +63,17 @@ describe("plants.health migration shape", () => {
     expect(sql).not.toMatch(/UPDATE\s+public\.plants/i);
     expect(sql).not.toMatch(/DROP\s+(TRIGGER|FUNCTION)/i);
   });
+
+  it("bounds its lock wait: SET DEFAULT takes ACCESS EXCLUSIVE on plants (Copilot review on #1703)", () => {
+    // As the other forward-repair migrations do: fail fast behind a
+    // long-running transaction instead of queueing and blocking plant reads.
+    expect(sql).toMatch(
+      /\nBEGIN;\n\nSET LOCAL lock_timeout = '5s';\nSET LOCAL statement_timeout = '30s';\n/,
+    );
+    expect(sql.indexOf("SET LOCAL lock_timeout")).toBeLessThan(
+      sql.indexOf("ALTER TABLE public.plants"),
+    );
+  });
 });
 
 describe("client never claims health it did not assess", () => {

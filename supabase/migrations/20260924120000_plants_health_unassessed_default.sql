@@ -26,8 +26,15 @@
 -- health field and omits the column, so the default applies there: 'healthy'
 -- before this migration, as it always was, and 'unknown' after. The client is
 -- therefore safe on both sides of the operator's apply.
+--
+-- Timeouts, as in the other forward-repair migrations: SET DEFAULT takes an
+-- ACCESS EXCLUSIVE lock on plants, so behind a long-running transaction the
+-- apply fails fast instead of queueing and blocking later reads of the table.
 
 BEGIN;
+
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
 
 CREATE OR REPLACE FUNCTION public.validate_plant_row()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$

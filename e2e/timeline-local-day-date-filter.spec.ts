@@ -15,15 +15,18 @@
 //
 // SAFETY:
 // - All /auth/v1/** and /rest/v1/** traffic is intercepted via page.route().
+//   Any unmatched external request is aborted; only the loopback app can load.
 //   No real Supabase calls, no real accounts, no real rows.
-// - This spec only reads. Any non-GET request to /rest/v1/** or
-//   /rest/v1/rpc/** fails the test.
+// - This spec only reads. Only the exact read-only has_role fixture may POST;
+//   all other non-GET REST requests are recorded and rejected before any mock
+//   table handler can quietly accept them.
 import { test, expect, type Page, type Route, type Request } from "@playwright/test";
 
 const MOCKED_PROJECT = "chromium-mocked";
 
 const SB_PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const SB_SESSION_KEY = `sb-${SB_PROJECT_REF}-auth-token`;
+const FIXTURE_ORIGIN = "https://timeline-fixture.invalid";
 
 const FAKE_USER = {
   id: "test-user-id",
@@ -105,9 +108,52 @@ interface Captured {
   diaryUrls: string[];
   growEventUrls: string[];
   nonGetRestCalls: string[];
+  blockedExternalRequests: string[];
+}
+
+/** Identify the core Timeline reads independently of the date bounds under test. */
+function isCoreTimelineRead(url: string, table: "diary_entries" | "grow_events"): boolean {
+  const query = new URL(url).searchParams;
+  if (query.get("grow_id") !== `eq.${GROW_ID}` || query.get("limit") !== "100") return false;
+  if (table === "diary_entries") {
+    return (
+      query.get("select") === "id,note,photo_url,stage,details,entry_at,plant_id,tent_id" &&
+      query.get("order") === "entry_at.desc"
+    );
+  }
+  return query.get("order") === "occurred_at.desc";
+}
+
+function isReadOnlyRoleFixture(req: Request): boolean {
+  if (req.method() !== "POST" || new URL(req.url()).pathname !== "/rest/v1/rpc/has_role") {
+    return false;
+  }
+  try {
+    const args = req.postDataJSON();
+    return (
+      args !== null &&
+      typeof args === "object" &&
+      Object.keys(args).sort().join(",") === "_role,_user_id" &&
+      args._role === "operator" &&
+      args._user_id === FAKE_USER.id
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function mockSignedInSupabase(page: Page, captured: Captured) {
+  // Registered first so specific fixtures below run before this egress fence.
+  // A new backend surface must receive an explicit mock rather than reach a host.
+  await page.route("**/*", async (route, req) => {
+    const url = new URL(req.url());
+    if (["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) {
+      return route.continue();
+    }
+    captured.blockedExternalRequests.push(req.url());
+    await route.abort("blockedbyclient");
+  });
+
   await page.route(/\/auth\/v1\//, async (route, req) => {
     const url = req.url();
     if (/\/user/i.test(url)) {
@@ -136,14 +182,7 @@ async function mockSignedInSupabase(page: Page, captured: Captured) {
     await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
 
-  // Write guard FIRST: any non-GET rest/rpc call is a bug for a read-only
-  // Timeline load — record it instead of quietly succeeding it.
-  await page.route(/\/rest\/v1\//, async (route: Route, req: Request) => {
-    if (req.method() !== "GET") {
-      captured.nonGetRestCalls.push(`${req.method()} ${req.url()}`);
-      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
-      return;
-    }
+  await page.route(/\/rest\/v1\//, async (route: Route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
 
@@ -182,12 +221,7 @@ async function mockSignedInSupabase(page: Page, captured: Captured) {
   // gte/lte filtering over the fixture set so the rendered UI genuinely
   // reflects whatever bounds Timeline.tsx sent over the wire.
   await page.route(/\/rest\/v1\/diary_entries/, async (route, req) => {
-    if (req.method() !== "GET") {
-      captured.nonGetRestCalls.push(`${req.method()} ${req.url()}`);
-      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
-      return;
-    }
-    captured.diaryUrls.push(req.url());
+    if (isCoreTimelineRead(req.url(), "diary_entries")) captured.diaryUrls.push(req.url());
     const { gte, lte } = extractBounds(req.url(), "entry_at");
     const kept = DIARY_FIXTURE_ROWS.filter((row) => {
       if (gte && row.entry_at < gte) return false;
@@ -205,17 +239,30 @@ async function mockSignedInSupabase(page: Page, captured: Captured) {
   // grow_events: same bounds object, different column — captured to prove
   // cross-table agreement. No rows needed for this proof.
   await page.route(/\/rest\/v1\/grow_events/, async (route, req) => {
-    if (req.method() !== "GET") {
-      captured.nonGetRestCalls.push(`${req.method()} ${req.url()}`);
-      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
-      return;
-    }
-    captured.growEventUrls.push(req.url());
+    if (isCoreTimelineRead(req.url(), "grow_events")) captured.growEventUrls.push(req.url());
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       headers: { "content-range": "0-0/0" },
       body: "[]",
+    });
+  });
+
+  // Playwright tries routes in reverse registration order. This guard must
+  // run before every table-specific handler, including grows/tents/plants.
+  await page.route(/\/rest\/v1\//, async (route, req) => {
+    if (req.method() === "GET") return route.fallback();
+    // useHasRole asks the existing STABLE SELECT-only has_role RPC via POST.
+    // Answer only this exact fixture and never grant an operator role.
+    if (isReadOnlyRoleFixture(req)) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: "false" });
+      return;
+    }
+    captured.nonGetRestCalls.push(`${req.method()} ${req.url()}`);
+    await route.fulfill({
+      status: 405,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Fixture blocked a write" }),
     });
   });
 }
@@ -233,7 +280,12 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
   test("selecting 2026-07-15 applies identical America/Chicago local-day bounds to diary_entries and grow_events, keeps the URL plain, and writes nothing", async ({
     page,
   }) => {
-    const captured: Captured = { diaryUrls: [], growEventUrls: [], nonGetRestCalls: [] };
+    const captured: Captured = {
+      diaryUrls: [],
+      growEventUrls: [],
+      nonGetRestCalls: [],
+      blockedExternalRequests: [],
+    };
     await mockSignedInSupabase(page, captured);
     await seedFakeSession(page);
 
@@ -262,6 +314,24 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
     expect(captured.diaryUrls.length, "diary_entries must have been queried").toBeGreaterThan(0);
     expect(captured.growEventUrls.length, "grow_events must have been queried").toBeGreaterThan(0);
 
+    await test.info().attach("timeline-core-read-queries", {
+      body: JSON.stringify(captured, null, 2),
+      contentType: "application/json",
+    });
+    // Supplemental context reads can finish last; inspect every core request
+    // instead of allowing whichever diary query completed last to decide.
+    for (const url of captured.diaryUrls) {
+      expect(extractBounds(url, "entry_at")).toEqual({
+        gte: LOCAL_DAY_START_ISO,
+        lte: LOCAL_DAY_END_ISO,
+      });
+    }
+    for (const url of captured.growEventUrls) {
+      expect(extractBounds(url, "occurred_at")).toEqual({
+        gte: LOCAL_DAY_START_ISO,
+        lte: LOCAL_DAY_END_ISO,
+      });
+    }
     const diaryBounds = extractBounds(captured.diaryUrls.at(-1)!, "entry_at");
     const growEventBounds = extractBounds(captured.growEventUrls.at(-1)!, "occurred_at");
 
@@ -289,7 +359,12 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
   test("an inverted range (start after end) sends no date bound at all, matching the existing no-op contract", async ({
     page,
   }) => {
-    const captured: Captured = { diaryUrls: [], growEventUrls: [], nonGetRestCalls: [] };
+    const captured: Captured = {
+      diaryUrls: [],
+      growEventUrls: [],
+      nonGetRestCalls: [],
+      blockedExternalRequests: [],
+    };
     await mockSignedInSupabase(page, captured);
     await seedFakeSession(page);
 
@@ -299,11 +374,119 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
     await expect
       .poll(() => captured.diaryUrls.length, { message: "diary_entries must have been queried" })
       .toBeGreaterThan(0);
+    await expect
+      .poll(() => captured.growEventUrls.length, { message: "grow_events must have been queried" })
+      .toBeGreaterThan(0);
 
-    const diaryBounds = extractBounds(captured.diaryUrls.at(-1)!, "entry_at");
-    expect(diaryBounds.gte, "an invalid range must not guess a lower bound").toBeNull();
-    expect(diaryBounds.lte, "an invalid range must not guess an upper bound").toBeNull();
+    await test.info().attach("timeline-core-read-queries", {
+      body: JSON.stringify(captured, null, 2),
+      contentType: "application/json",
+    });
+    for (const url of captured.diaryUrls) {
+      const diaryBounds = extractBounds(url, "entry_at");
+      expect(diaryBounds.gte, "an invalid range must not guess a lower bound").toBeNull();
+      expect(diaryBounds.lte, "an invalid range must not guess an upper bound").toBeNull();
+    }
+    for (const url of captured.growEventUrls) {
+      const eventBounds = extractBounds(url, "occurred_at");
+      expect(eventBounds.gte, "an invalid range must not guess an event lower bound").toBeNull();
+      expect(eventBounds.lte, "an invalid range must not guess an event upper bound").toBeNull();
+    }
 
     expect(captured.nonGetRestCalls, "read-only load must never write").toEqual([]);
+  });
+
+  test("the fixture rejects table writes, mutating RPCs and altered role probes", async ({
+    page,
+  }) => {
+    const captured: Captured = {
+      diaryUrls: [],
+      growEventUrls: [],
+      nonGetRestCalls: [],
+      blockedExternalRequests: [],
+    };
+    await mockSignedInSupabase(page, captured);
+    await seedFakeSession(page);
+    await page.goto(`/timeline?growId=${GROW_ID}&start=2026-07-20&end=2026-07-10`);
+    await expect(page.getByTestId("timeline-date-range-error")).toBeVisible();
+    expect(captured.nonGetRestCalls).toEqual([]);
+
+    const roleResult = await page.evaluate(
+      async ({ origin, userId }) => {
+        const response = await fetch(`${origin}/rest/v1/rpc/has_role`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ _user_id: userId, _role: "operator" }),
+        });
+        return { status: response.status, body: await response.json() };
+      },
+      { origin: FIXTURE_ORIGIN, userId: FAKE_USER.id },
+    );
+    expect(roleResult, "the exact read fixture must deny the operator role").toEqual({
+      status: 200,
+      body: false,
+    });
+    expect(captured.nonGetRestCalls, "the exact read fixture is not recorded as a write").toEqual(
+      [],
+    );
+
+    const probes = [
+      { method: "POST", path: "grows", body: {} },
+      { method: "PATCH", path: "diary_entries", body: {} },
+      { method: "DELETE", path: "grow_events", body: {} },
+      { method: "POST", path: "rpc/quicklog_save_event", body: {} },
+      {
+        method: "POST",
+        path: "rpc/has_role",
+        body: { _user_id: "another-user", _role: "operator" },
+      },
+      {
+        method: "POST",
+        path: "rpc/has_role",
+        body: { _user_id: FAKE_USER.id, _role: "staff" },
+      },
+      {
+        method: "POST",
+        path: "rpc/has_role",
+        body: { _user_id: FAKE_USER.id, _role: "operator", _extra: true },
+      },
+      { method: "PUT", path: "rpc/has_role", body: { _user_id: FAKE_USER.id, _role: "operator" } },
+    ];
+    const statuses = await page.evaluate(
+      async ({ origin, probes }) => {
+        const statuses: number[] = [];
+        for (const probe of probes) {
+          const response = await fetch(`${origin}/rest/v1/${probe.path}`, {
+            method: probe.method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(probe.body),
+          });
+          statuses.push(response.status);
+        }
+        return statuses;
+      },
+      { origin: FIXTURE_ORIGIN, probes },
+    );
+    expect(statuses).toEqual(probes.map(() => 405));
+    expect(captured.nonGetRestCalls).toEqual(
+      probes.map((probe) => `${probe.method} ${FIXTURE_ORIGIN}/rest/v1/${probe.path}`),
+    );
+
+    const unmatchedBackendBlocked = await page.evaluate(async (origin) => {
+      try {
+        await fetch(`${origin}/functions/v1/unmocked`);
+        return false;
+      } catch {
+        return true;
+      }
+    }, FIXTURE_ORIGIN);
+    expect(
+      unmatchedBackendBlocked,
+      "an unmatched external request must not reach the network",
+    ).toBe(true);
+    expect(
+      captured.blockedExternalRequests,
+      "the fixture must intercept the unmatched request",
+    ).toContain(`${FIXTURE_ORIGIN}/functions/v1/unmocked`);
   });
 });

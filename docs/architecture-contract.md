@@ -1030,8 +1030,9 @@ Actions deploy proves only that Actions does not deploy them. A `Makefile` comme
 (`functions-deploy: … # Lovable does this automatically`) is **comment text, not measurement** —
 do not treat it as publisher evidence. Label the edge path as separate and environment-verified;
 do not assert "manual only" or "Lovable automatic" until the publish trigger is measured
-(§14; the publish trigger for the frontend is measured, and the edge path is still
-`NOT_MEASURED`, in `docs/specs/release-topology-specification.md` §4 and §5.3).
+(§14; six frontend production deployments are observed against the deploy tips, the configured
+trigger setting is still `NOT_MEASURED`, and so is the edge path —
+`docs/specs/release-topology-specification.md` §4 and §5.3).
 
 An earlier draft said publishing "ships frontend and edge functions". No repository evidence supports
 an automatic joint ship, and a release operator relying on it could publish a frontend expecting

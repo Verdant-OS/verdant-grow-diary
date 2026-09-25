@@ -53,10 +53,11 @@ code is written in this slice.
 ## 1. Summary
 
 - **Frontend and SSR.** `verdantgrowdiary.com` is served by Vercel project `verdant-grow-diary`
-  (team `verdantgrowdiary`), which is git-linked to `Verdant-OS/verdant-grow-diary` and creates a
-  **production** deployment from each push to `verdant-grow-diary`. The chain domain → project →
-  deployment → commit → served stamp is closed by measurement (§4). Status **`PASS`**,
-  `established fact` at the Appendix A instant.
+  (team `verdantgrowdiary`), which is git-linked to `Verdant-OS/verdant-grow-diary` and has created
+  a **production** deployment for each of the last six pushes to `verdant-grow-diary`; its
+  configured production-branch setting is `NOT_MEASURED`. The chain domain → project → deployment →
+  commit → served stamp is closed by measurement (§4). Status **`PASS`**, `established fact` at the
+  Appendix A instant.
 - **The publisher is not who the repository says it is.** `CLAUDE.md`, `docs/codebase-map.md`,
   `README.md`, `scripts/stamp-version.mjs`, `deployment-preview.yml` and `Makefile:77` all name
   Lovable as the production publisher. At the measured instant the apex is published by Vercel.
@@ -174,11 +175,13 @@ here. A future restamp re-runs the same steps in the same order.
 | 3    | Did its latest production deployment build the deploy tip? | Vercel `list_deployments` (`target=production`) and `get_deployment` with git info                                                               | `established fact`                                             | `PASS` |
 | 4    | Are the served bytes that deployment's bytes?              | `GET https://verdantgrowdiary.com/version.json`; compare `commit` and `buildTime` with the deployment's `githubCommitSha`, `buildingAt`, `ready` | `established fact` for the fields; `inference` for attribution | `PASS` |
 | 5    | Is this one publish or a standing behaviour?               | The previous N production deployments against the previous N deploy-branch tips                                                                  | `established fact`                                             | `PASS` |
-| 6    | What is the trigger?                                       | Deployment `source` (`git`) and `meta.githubCommitRef`; latency from commit to deployment                                                        | `established fact` + `inference`                               | `PASS` |
+| 6    | What triggered the observed deployments?                   | Deployment `source` (`git`) and `meta.githubCommitRef`; latency from commit to deployment                                                        | `established fact` + `inference`                               | `PASS` |
 
 **Conclusion at the Appendix A instant.** The publisher of `verdantgrowdiary.com` is Vercel's Git
-integration for project `verdant-grow-diary`, triggered by pushes to `verdant-grow-diary`, building
-inside Vercel (`ciRunId: null`, `commitSource: "git"`, real branch ref). This satisfies contract
+integration for project `verdant-grow-diary`. On the six observed production deployments the
+trigger was a push to `verdant-grow-diary`; the project's configured trigger setting is
+`NOT_MEASURED`. The builds ran inside Vercel (`ciRunId: null`, `commitSource: "git"`, real branch
+ref). This satisfies contract
 §14's rule — the publisher was **measured**, not read off a header — and it is exactly the kind
 of statement §14 said must not live in the contract.
 
@@ -220,9 +223,11 @@ not pick one. It records that the choice is open and gives it to Cheek (§7, §1
 
 - Deploy branch `verdant-grow-diary`; `main` is divergent and never establishes production
   (`CLAUDE.md`, contract §9). Vercel's `git.deploymentEnabled` disables `main` and `master` only
-  (`vercel.json:7-11`); the deploy branch is not named there, so a git-linked Vercel project deploys
-  it. The six observed production deployments agree. Whether `main` pushes are in fact suppressed
-  was not observed (the deployment list was filtered to `target=production`): `NOT_MEASURED`.
+  (`vercel.json:7-11`); the deploy branch is not named there, so the file does not suppress it. The
+  six observed production deployments show it being deployed; whether the project's
+  production-branch setting names it is `NOT_MEASURED` (§4). Whether `main` pushes are in fact
+  suppressed was not observed (the deployment list was filtered to `target=production`):
+  `NOT_MEASURED`.
 - Ruleset `20421416` requires 35 contexts, all produced by `ci.yml`, pinned in
   `config/required-status-checks.json` (`capturedAt: 2026-08-10`; `#1221` added `mustBeGreen`
   entries and left the required list unchanged). Merges are squash through the merge queue.
@@ -722,10 +727,10 @@ non-production deployments, A.3).
 ---
 
 **Verdict.** The frontend and SSR release topology is **measured and specified**: Vercel's Git
-integration publishes `verdantgrowdiary.com` from pushes to `verdant-grow-diary`, and the chain that
-proves it is written down so it can be re-run. The edge-function and database axes are **specified
-but not measured** from this session and are labelled so. The repository's own description of its
-publisher is wrong at the measured instant, and the corrections that need a governance bump are
-named, not smuggled in. Confidence in §4: high at the instant, by construction of the chain; in the
-standing behaviour: moderate, on six consecutive deployments; in everything under `NOT_MEASURED`:
-none, by design.
+integration published the last six `verdant-grow-diary` tips to `verdantgrowdiary.com`, and the
+chain that proves it is written down so it can be re-run. The edge-function and database axes are
+**specified but not measured** from this session and are labelled so. The repository's own
+description of its publisher is wrong at the measured instant, and the corrections that need a
+governance bump are named, not smuggled in. Confidence in §4: high at the instant, by construction
+of the chain; in the standing behaviour: moderate, on six consecutive deployments; in everything
+under `NOT_MEASURED`: none, by design.

@@ -1,7 +1,203 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-25 UTC (~02:05 UTC; tip, board and lanes measured 01:58–02:03 UTC)
-**Updated by:** Claude (2026-09-25 early, restamp on **deploy tip
+**Last updated:** 2026-09-25 UTC (~05:25 UTC; tip, live and board measured 05:15–05:20 UTC; reviews measured 05:03–05:12 UTC)
+**Updated by:** Claude (2026-09-25 early, restamp on the **same deploy tip
+`e1d541e2559eb42d5e452035e79b1d796c91c0f9`**, the `#1691` squash. **Zero commits** merged since the
+02:05 stamp; no migration (§1). **Live is `BLOCKED`** for Claude again: one `version.json` attempt was
+refused at the session egress with a `403` CONNECT (§2). **The Codex handoff queue from 01:17 UTC is
+now fully reviewed on Cheek's instruction, every verdict SHA-locked and posted on its own PR:** `#1690`
+`PASS` at `35ab3762`, `#1692` `PASS` at `24d9e197`, `#1677` `PASS` at `52669125`, `#1680` `PASS` at
+`dbddd328`, `#1679` `PASS` at `c2ce9b10`, `#1698` `PASS` at `9e276853`, and **`#1697` `STALE CHILD`**
+at `bd64ca8b` (§4). Every PASS is a comment review, not a GitHub approval; Cheek retains acceptance.
+The board is unchanged at **49 open PRs, 19 drafts, 9 stacked**; only `#1683`'s head moved (§6). CI
+lanes on the tip are carried from the 02:05 stamp, not re-read; the lanes on the seven reviewed heads
+were re-read and are in §8. No merge, ready, Publish or APPLY by Claude this shift. `HOLD #1250`.
+Prior header follows.)
+
+## 1. Deploy tip `e1d541e2` — unchanged since the 02:05 stamp
+
+`established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
+05:15 UTC.
+
+| Field      | Value                                                                  |
+| ---------- | ---------------------------------------------------------------------- |
+| Tip        | **`e1d541e2559eb42d5e452035e79b1d796c91c0f9`** (same as the 02:05 stamp) |
+| Subject    | `fix(sensors): reject future timestamps as healthy evidence` (`#1691`) |
+| Parent     | `cb6c3288b…` (`#1221`)                                                 |
+| Since      | the 02:05 stamp: **0 commits**                                         |
+| Migrations | **0**                                                                  |
+
+The two-commit history since `08994aa8` (`#1221`, `#1691`) is in the superseded 02:05 stamp §1 and
+is unchanged. Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
+
+## 2. Live — `BLOCKED` for Claude this session
+
+`established fact` for the attempt; `BLOCKED` for the value.
+
+- `curl https://verdantgrowdiary.com/version.json` at 05:18:08 UTC: `CONNECT tunnel failed,
+response 403`, HTTP `000`. One attempt. The 01:58 UTC attempt returned `000` with no response; the
+  23:26 UTC attempt was the same `403`.
+- The last measured live read is still the `b0bfdb02` stamp's, 11:14:43 UTC on 2026-09-24. Whether
+  either publisher has built `e1d541e2` is `NOT_MEASURED`. `#1699`'s publisher measurement (01:20 UTC,
+  another Claude session) is that PR's evidence, not re-measured here.
+
+## 3. What changed for growers — nothing since the 02:05 stamp
+
+`established fact`: zero commits on the tip since 02:05. The future-timestamp fence (`#1691`) is
+the last product commit; the clock-recovery repair that lets a fenced reading recover without a
+reload is still **not on the tip** — it lives in `#1677` (`52669125`, §4), now reviewed `PASS` and
+waiting on Cheek's landing decision.
+
+## 4. Independent reviews by Claude this shift — the Codex queue, seven heads, exact SHAs
+
+`established fact`, measured locally in detached worktrees (Vitest 3.2.7, `tsc -p tsconfig.json
+--noEmit`, ESLint, Prettier, `git merge-tree --write-tree`) and from the GitHub check-runs API,
+between 05:03 and 05:12 UTC, on Cheek's instruction ("Start the Codex handoff review queue, #1690
+first"). Each verdict is posted on its own PR as a comment review or comment; none is a GitHub
+approval state. Claude authored no commit in any of these heads except the `#1677` deploy-tip merge
+`52669125`, which was verified as blob-identical only, not self-accepted. Overlapping suites are not
+summed; CI job counts are not test counts.
+
+| PR      | Head       | Verdict         | Local evidence                                                                                                                  | Hosted lanes on the head                                                                                                     |
+| ------- | ---------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `#1690` | `35ab3762` | **`PASS`**      | focused 4 files **58/0/0**; RED (launcher without the range filter) **2 failed / 9 passed**, 501 recovery reads vs 6; tsc/lint/prettier clean; merge-clean into `e1d541e2` | 35 required contexts green; `test:security-db-local` and both native local-backend jobs green; red: authenticated census, dependency audit, nested SDK audit |
+| `#1692` | `24d9e197` | **`PASS`**      | tree `d5fa400b`; one file **+65/−0**; added lines byte-identical to `7053af8f`; **62/0/0**; lint/prettier clean                  | carried from its body (Main 35/35, full 16/16, census 2/1/0); not re-read                                                    |
+| `#1677` | `52669125` | **`PASS`**      | `47e7d019` is one regex line; old expression absent from `Sensors.tsx`, new present once; selection file **20/0/0**; PR files unchanged by the merge; stack tree **212/0/0**; tsc 0 | 35 required contexts green; `tsc`, `tsgo + build`, `test:security-db-local`, native jobs, GA E2E green; red: authenticated census, dependency audit, nested SDK audit |
+| `#1680` | `dbddd328` | **`PASS`**      | ancestor check yes; delta 3 files **+108/−4**, blobs identical to `5ee4ff3d`; stack tree **212/0/0**                            | **every job green, authenticated census 3/0/0** (28.5 min) — the only head where that lane passed                            |
+| `#1679` | `c2ce9b10` | **`PASS`**      | ancestor check yes; delta 3 proof files **+388/−0**, blobs identical to `76afd88f`; stack tree **212/0/0**                       | native 8-scenario lane green; full 16/16; red: **GA E2E (webkit)** consent-banner assertion, not attributed (inference)       |
+| `#1698` | `9e276853` | **`PASS`**      | ancestor check yes; delta 4 files **+371/−3**, blobs identical to `588d793d`; **212/0/0** on tree `226c7805`; RED (hook reverted to the `#1679` blob) **8 failed / 7 passed** of 15; tsc 0; eslint 0; merge-tree vs tip returns the head's own tree | native **12-scenario** lane green; full 16/16; red: authenticated census (all-route timeout)                                 |
+| `#1697` | `bd64ca8b` | **`STALE CHILD`** | based on `97c8e9ad`, not `35ab3762` (`merge-base --is-ancestor`: no); own delta 2 test files **+78/−0**; composed onto `35ab3762` merge-clean (tree `f7a04669`) and **63/0/0** | API `mergeable_state: clean`; lanes not re-read                                                                              |
+
+- **`#1690`'s open Codex P2** (`discussion_r4099773068`, restrict race recovery to the failed batch)
+  was confirmed fixed by the RED/GREEN pair, replied to, and **resolved by Claude as reviewer**. The
+  earlier body findings 2–3 from the `5be476fb` review are fixed; finding 1 (`#1692` order) is
+  resolved structurally by the restack.
+- **Stack structure** (`#1677` → `#1680` → `#1679` → `#1698`): ancestry holds at every level;
+  child deltas are exactly 3/3/4 files; every commit since each child's prior reviewed head is a
+  merge carrying `e1d541e2` through `#1677`. `#1698` merges into the tip as its own tree because the
+  stack already contains `e1d541e2`.
+- **`#1697` needs a forward-only restack** by its owner (Cursor Agent) or Codex onto `35ab3762`,
+  the shape `#1692` already has; Claude did not absorb its two test files and did not push to that
+  branch.
+- **Landing order is Cheek's decision:** `#1690` first, then retarget `#1692` and a restacked
+  `#1697` to the resulting tip; `#1677`, then each sensor child retargeted and remeasured in turn.
+  The 35-context ruleset does not run on feature-branch bases, so required-context status on
+  `#1680`/`#1679`/`#1698` exists only after retarget.
+- **Not measured anywhere:** production; hosted latency of `count: "exact"` under four readers and
+  of the minute tick on large Quick Log histories; root causes of the authenticated-census timeout,
+  the dependency-audit lanes and the GA WebKit consent failure. A merge is not a deployment.
+- Review worktrees were removed; the main checkout is clean.
+
+## 5. Codex handoff update (01:17 UTC) — the assigned queue, now closed out
+
+`established fact`: every item in the 02:05 stamp's §5 table has a verdict in §4. The handoff's
+attachments (two receipts, JSON snapshot, ZIP) were still not received; Codex's counts were
+reproduced locally where §4 says so and remain `source claim` elsewhere. Two items stay open for
+other actors: the `#1697` restack (owner: Cursor Agent / Codex) and the dependency and census lane
+root causes (`#1343` separately owned; `#1478` is the census batching lane). Codex's independent
+review of **this file's PR `#1696`** is still pending.
+
+## 6. Board — re-listed
+
+`established fact`, listed from the GitHub API at 05:19 UTC.
+
+**49 open PRs, 19 drafts, 40 target `verdant-grow-diary`, 9 stacked** — the same set as the 02:05
+stamp. The only head that moved: **`#1683`** (Claude, draft) is now `30cfbf07` (was `a1a4b011`);
+its content was not re-read. The seven reviewed heads (§4) were fetched and diffed; the other 42
+heads and their merge-cleanliness are **carried from the 02:05 stamp, not re-fetched**.
+
+- **Only `#1696` (this file's own PR) touches `docs/agents/CURRENT_STATE.md`** — carried; `#1683`'s
+  new head was not checked for this file.
+- **`#1683`** is still the one open PR adding a migration; committed is not applied.
+- **No PR opened or closed since 02:05.**
+
+## 7. Soft-park register — carried
+
+`source claim` (GDP), unchanged since the `#1624` stamp; **not re-measured**.
+
+- **`HOLD #1250`.** Do not touch, ready or merge it.
+- **No Publish. No APPLY.** `#1460` and `#1545` stay parked. No production SQL.
+- **Fixture AUTH Soft-park:** after `cheekhimself` re-banks, re-measure the empty Action Queue and the
+  archived Restore XOR. **Never KEEP on fixture walks.** No owner email is recorded in this file.
+- **Soft P2 — parked, do not implement:** sensors / Start Check `growId` omit; Quick Log target count;
+  `/onboarding` preference gate; Assign true-empty needs a zero-tent fixture.
+
+## 8. CI lanes — tip carried, reviewed heads re-read
+
+- **On the tip `e1d541e2`: carried from the 02:05 stamp §8, not re-read** (no new commit, no new
+  push build). Red there: `Dependency & Security CI` (`hono`/`js-yaml`), `Required core schema
+present`, `Required money-critical migrations present`, **`Security DB Local`** (Quick Log
+  dual-timestamp harness crash, root cause `NOT_MEASURED`) and **`Core Link and Form Census`**
+  (30-minute all-route timeout).
+- **On the reviewed heads (§4 table, `established fact` from the check-runs API):**
+  - `test:security-db-local` is **green** on `#1690` `35ab3762` and `#1677` `52669125`, both of
+    which contain `e1d541e2`. That is one data point against the tip crash being deterministic on
+    the code; it is not a root cause and the tip lane was not re-run.
+  - The authenticated census all-route timeout is red on `#1690`, `#1677`, `#1698` and `#1696`;
+    it **passed 3/0/0 on `#1680` `dbddd328`** at 02:09 UTC. Root cause still `NOT_MEASURED`.
+  - The dependency audit and nested SDK audit are red on every head that runs them.
+  - `GA E2E (webkit)` is red on `#1679` only (consent-banner assertion); green on `#1677`, `#1680`
+    and `#1698`.
+- **`#1696`'s own head `1b276a71`:** every required context green; only the dependency-audit lane
+  red, already commented as not this PR's.
+
+## 9. Carried and updated, not re-measured
+
+- **Sandbox schema and money-migration gaps.** Last measured on `aabbd2b3`: core schema 14 of 51
+  columns missing; money-critical migrations 2 of 17. Sandbox-scoped only; production applied state
+  is `NOT_MEASURED`. No APPLY. No migration has merged since.
+- **Golden Toad:** AUTH_NEEDED; the one-tent Next step is `NOT_MEASURED`. Passkey, 2FA and chooser
+  decisions stay **Cheek's**.
+- **AC-4.1 prototype-key defect** still reaches the `#1088` display canon; `#1655` is the open fix
+  and `#1643` pins the line; whichever merges second amends the other and AC-4.1.
+- **`#1684` independent `PASS` by Claude** stands; open, not draft.
+- **Release Topology Specification:** `#1699` (Claude, another session, draft, head `cdc0559f`,
+  base `e1d541e2`) is open and unchanged since 01:50 UTC; not reviewed by this session. `#1175` is
+  still open.
+- **The Codex handoff attachments** were not received (§5).
+- **Stale restamp branches** on the remote were not re-listed.
+
+## 10. The `e1d541e2` / ~02:05 UTC stamp below is SUPERSEDED
+
+`established fact`. Its rows that are now stale:
+
+- Its header and §5 say the Codex queue is unreviewed; every item now has a SHA-locked verdict (§4).
+- Its §6 board is carried except `#1683`'s head (§6).
+- Its §8 tip lanes are carried unchanged; the per-head lane reads in §8 are new.
+- Its §11 says the queue is pending Cheek's confirmation; Cheek confirmed it at ~05:00 UTC and it
+  is done.
+
+Carried rows keep their original labels. The tip, live status and product delta are unchanged from
+that stamp.
+
+## 11. Current locks
+
+- **No Publish. No History-restore. No APPLY. No production SQL.** No device control, no automatic
+  Action Queue writes, no invented credentials. **Never KEEP. No owner email.** Claude merges only on
+  the owner's explicit instruction (`#1691` was one such instruction; it does not generalise).
+- **`HOLD #1250`.** `#1369` / `#1641` REVIEW ONLY. `#1343` separately owned. `#1340` owner-closed.
+  Manual CodeRabbit requests are authorized for `#1678` / `#1688` and, per its own PR body, `#1699`.
+- **The tip this stamp measured is `e1d541e2559eb42d5e452035e79b1d796c91c0f9`.** Once this PR
+  merges, the tip is its squash commit; cite `git rev-parse` at the time, not this line.
+- **Live is `BLOCKED` this session** (§2). Do not cite it as equal to the tip from this stamp.
+- **A `PASS` in §4 is a reviewer's verdict at an exact SHA, not merge authorization.** Landing
+  order, retargets and readiness are Cheek's; children are never merged into feature branches.
+- **`#1697` is not Claude's to restack or absorb.** Do not push to Cursor's branch.
+- **§5 of the `b0bfdb02` stamp: `#1625` is the one session-restore fix in flight.** Claude does not
+  choose, push, ready or close.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- This slice is **N=1** on branch `claude/current-state-restamp-08994aa8` (name kept; the PR is
+  `#1696`). Its only file is `docs/agents/CURRENT_STATE.md`. It contains no `src/`, `supabase/`,
+  `package.json`, lockfile, test, workflow or governance-file changes.
+- **Slice owner: Claude. Independent reviewer: Codex.** Claude does not self-merge without
+  instruction and does not assign its own next slice.
+
+---
+
+**The block below is SUPERSEDED — see §10 of the current stamp.**
+
+**Prior last updated:** 2026-09-25 UTC (~02:05 UTC; tip, board and lanes measured 01:58–02:03 UTC)
+**Prior update:** Claude (2026-09-25 early, restamp on **deploy tip
 `e1d541e2559eb42d5e452035e79b1d796c91c0f9`**, the `#1691` squash. **Two commits** merged since the
 `08994aa8` stamp: **`#1221` (CI lanes) and `#1691` (product: the five-minute future-timestamp fence)**;
 no migration (§1). **Live is `BLOCKED`** for Claude again: one `version.json` attempt returned no

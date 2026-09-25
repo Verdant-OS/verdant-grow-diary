@@ -6,9 +6,13 @@ import { OrchestrationError } from "./errors.ts";
  */
 export const SUPPORTED_NODE_RANGE = "^22.13.0 || >=24.0.0";
 
-/** True when `version` (a `process.versions.node` string, e.g. "22.13.0") is in range. */
+/**
+ * True when `version` (a `process.versions.node` string, e.g. "22.13.0") is in range.
+ * Only a complete release version counts: semver ranges exclude prereleases by default, so
+ * a suffixed string such as "24.0.0-nightly…" or "22.13.0-rc.1" is rejected.
+ */
 export function isSupportedNodeVersion(version: string): boolean {
-  const match = /^(\d+)\.(\d+)\.\d+/.exec(version);
+  const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
   if (!match) {
     return false;
   }

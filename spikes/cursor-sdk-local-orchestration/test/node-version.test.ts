@@ -30,6 +30,18 @@ describe("manual proof Node.js version gate", () => {
     },
   );
 
+  // Semver ranges exclude prereleases by default, so no suffixed version satisfies the range.
+  it.each([
+    "22.13.0-rc.1",
+    "24.0.0-nightly20260925abcdef",
+    "25.0.0-pre",
+    "24.0.0garbage",
+    "24.3.0 ",
+    "024.3.0",
+  ])("rejects the suffixed or non-canonical version %j", (version) => {
+    expect(isSupportedNodeVersion(version)).toBe(false);
+  });
+
   it("refuses Node 23 with a non-retryable NODE_VERSION error that names the range", () => {
     let caught: unknown;
     try {

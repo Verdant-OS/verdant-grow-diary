@@ -1,7 +1,170 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-25 UTC (~06:12 UTC; tip, live, board and lanes measured 06:06–06:09 UTC)
-**Updated by:** Claude (2026-09-25 early, restamp on **deploy tip
+**Last updated:** 2026-09-25 UTC (~06:15 UTC; tip, live and lanes measured 06:11–06:13 UTC)
+**Updated by:** Claude (2026-09-25 early, restamp on the **same deploy tip
+`bbcc2faa403278a451ca400d9e21eacbec3d8e71`**, the `#1677` squash. **Zero commits** merged since the
+06:12 stamp; no migration (§1). This stamp exists to replace the 06:12 stamp's `NOT_MEASURED` tip
+lanes with a read: **21 workflow runs on `bbcc2faa`'s push build; 18 concluded — 15 green including
+`Security DB Local`, both typechecks, `ESLint` and `Security regression`; 3 red, all carried from
+earlier tips (`Dependency & Security CI`, the two sandbox schema/money-migration gaps); 3 still in
+progress at read time: `CI` (the required contexts), `Full Vitest Suite (PR gate)` and the
+authenticated census** (§8). **Live is `BLOCKED`** again (§2). Board, reviews, the `#1677` merge,
+the `#1680` retarget and the two new PRs are carried from the 06:12 stamp unchanged. No Publish. No
+APPLY. `HOLD #1250`. Prior header follows.)
+
+## 1. Deploy tip `bbcc2faa` — unchanged since the 06:12 stamp
+
+`established fact`: `git fetch` then `git rev-parse origin/verdant-grow-diary` at 2026-09-25
+06:11:42 UTC.
+
+| Field      | Value                                                                            |
+| ---------- | -------------------------------------------------------------------------------- |
+| Tip        | **`bbcc2faa403278a451ca400d9e21eacbec3d8e71`** (same as the 06:12 stamp)         |
+| Subject    | `fix(sensors): age and recover cached sensor evidence without refetch` (`#1677`) |
+| Parent     | `6e910615d…` (`#1690`)                                                           |
+| Since      | the 06:12 stamp: **0 commits**                                                   |
+| Migrations | **0**                                                                            |
+
+The one-commit delta from `6e910615` (eight sensor files, `+762/−14`) is in the superseded 06:12
+stamp §1. Committed is not deployed; edge-function deploy state stays `NOT_MEASURED`.
+
+## 2. Live — `BLOCKED` for Claude this session
+
+`established fact` for the attempt; `BLOCKED` for the value.
+
+- `curl https://verdantgrowdiary.com/version.json` at 06:11 UTC returned HTTP `000` (no response
+  through the session egress). One attempt; the sixth refusal or non-response this shift.
+- The last measured live read is still the `b0bfdb02` stamp's, 11:14:43 UTC on 2026-09-24.
+  Whether either publisher has built `bbcc2faa` is `NOT_MEASURED`. `auto-tag-release` ran green on
+  the tip (§8); that is a repository workflow, not a publisher measurement.
+
+## 3. What changed for growers — nothing since the 06:12 stamp
+
+`established fact`: zero commits on the tip since 06:12. The Sensors clock recovery and aging
+(`#1677`) is the last product commit and is on the tip; the export-time recheck (`#1680`) and the
+Quick Log manual-series clock (`#1698`) are not.
+
+## 4. Merge, reviews and children — carried from the 06:12 stamp
+
+`established fact`, unchanged: `#1677` merged at `52669125` as squash `bbcc2faa` on Cheek's
+instruction; `#1680` auto-retargeted to the deploy base and merge-clean (behind, not conflicting);
+`#1692`/`#1697` still conflicting, owners notified; verdicts `#1692` `PASS` `24d9e197`, `#1680`
+`PASS` `dbddd328`, `#1679` `PASS` `c2ce9b10`, `#1698` `PASS` `9e276853`, `#1697` `STALE CHILD`
+`bd64ca8b` stand. A `PASS` is a reviewer's verdict at an exact SHA, not merge authorization.
+Landing order stays Cheek's: `#1680` after its tip merge, then `#1679` → `#1698`; `#1692`/`#1697`
+after their owners restack; `#1700` after or into `#1680`.
+
+## 5. Codex handoff update (01:17 UTC) — closed out; `#1696` review still pending
+
+`established fact`: carried. Codex's independent review of this file's PR `#1696` is the one open
+item on Claude's side; the PR merges cleanly into `bbcc2faa` (measured at 06:08).
+
+## 6. Board — carried
+
+`established fact` at 06:07 UTC, not re-listed for this stamp: **49 open PRs, 19 drafts, 42 target
+`verdant-grow-diary`, 7 stacked.** New since 05:40: `#1700` (Claude, another session, export
+grouped-freshness fix stacked on `#1680`) and `#1701` (Claude, another session, founder-gated
+delivery lane for the `#1460` migration; merging it applies nothing). `#1692` and `#1697` conflict;
+`#1696`, `#1680`, `#1679`, `#1698`, `#1683`, `#1699`, `#1700`, `#1701` are measured merge-clean; the
+rest are carried as clean. Only `#1696` touches this file. `#1683` is still the one open PR adding
+a migration; committed is not applied.
+
+## 7. Soft-park register — carried
+
+`source claim` (GDP), unchanged since the `#1624` stamp; **not re-measured**.
+
+- **`HOLD #1250`.** Do not touch, ready or merge it.
+- **No Publish. No APPLY.** `#1460` and `#1545` stay parked. `#1701` proposes a delivery lane for
+  `#1460`'s migration; it does not apply it and does not lift the park. Any APPLY is Cheek's
+  dispatch after PREFLIGHT, never Claude's.
+- **Fixture AUTH Soft-park:** after `cheekhimself` re-banks, re-measure the empty Action Queue and the
+  archived Restore XOR. **Never KEEP on fixture walks.** No owner email is recorded in this file.
+- **Soft P2 — parked, do not implement:** sensors / Start Check `growId` omit; Quick Log target count;
+  `/onboarding` preference gate; Assign true-empty needs a zero-tent fixture.
+
+## 8. CI lanes — tip `bbcc2faa` read, three lanes still running
+
+`established fact` from the GitHub Actions API at 06:12 UTC: **21 workflow runs on the tip's push
+build** (started 06:05:43 UTC); 18 concluded, 3 in progress.
+
+- **Green (15):** **`Security DB Local` (06:09)**, `TypeScript typecheck`, `Typecheck (tsgo) +
+build`, `ESLint`, `Security regression`, `edge-shared-sync`, `Required-check audit`, `Contract
+test resolution`, `SEO parity & head fidelity`, `jsonld-rich-results`, `One-Tent Loop smoke test`,
+  `EcoWitt-only safety scan`, `EcoWitt Windows Testbench safety`, `Paddle preflight renderer
+tests`, `auto-tag-release`.
+- **Red (3), all carried from earlier tips, none new:** `Dependency & Security CI` (`hono` ×3
+  moderate, `js-yaml` high; `#1343` separately owned), `Required core schema present`, `Required
+money-critical migrations present` (sandbox gaps, §9).
+- **In progress (3) at 06:12:** **`CI` (run `36101342242`)** — the workflow that produces every
+  required context (32 shards, `Lint, typecheck, test, build`, edge mirror preflight,
+  `test:legal-seo`); **`Full Vitest Suite (PR gate)` (run `36101342121`)**; **`Core Link and Form
+Census` (run `36101342196`)**, inside its 30-minute budget. **All three are `NOT_MEASURED` on
+  this tip** until the next read. The same three lanes were green on the PR head `52669125` that
+  became this tip (05:05 UTC read) and on the previous tip `6e910615`; that is not a result for
+  `bbcc2faa`.
+- **What changed versus `6e910615`:** nothing in the concluded set. `Security DB Local` is green
+  on a second consecutive tip push after the `e1d541e2` crash; root cause of that crash still
+  `NOT_MEASURED`.
+- **`#1696`'s own head `6669d810`:** dependency audit red (`hono`/`js-yaml`, identical to the
+  tip, already commented); the rest of its lanes were not re-read for this stamp.
+
+## 9. Carried and updated, not re-measured
+
+- **Sandbox schema and money-migration gaps.** Last measured on `aabbd2b3`: core schema 14 of 51
+  columns missing; money-critical migrations 2 of 17. Sandbox-scoped only; production applied state
+  is `NOT_MEASURED` by this session. No APPLY. No migration has merged. The two red tip lanes in §8
+  are these.
+- **Golden Toad:** AUTH_NEEDED; the one-tent Next step is `NOT_MEASURED`. Passkey, 2FA and chooser
+  decisions stay **Cheek's**.
+- **AC-4.1 prototype-key defect** still reaches the `#1088` display canon; `#1655` is the open fix
+  and `#1643` pins the line; whichever merges second amends the other and AC-4.1.
+- **`#1684` independent `PASS` by Claude** stands; open, not draft.
+- **Release Topology Specification:** `#1699` (Claude, another session, draft, head `cdc0559f`,
+  merge-clean against `bbcc2faa`) is open and unchanged; not reviewed by this session. `#1175` is
+  still open.
+- **The Codex handoff attachments** were not received.
+- **Stale restamp branches** on the remote were not re-listed.
+
+## 10. The `bbcc2faa` / ~06:12 UTC stamp below is SUPERSEDED
+
+`established fact`. Its one row that is now stale:
+
+- Its §8 records every lane on `bbcc2faa` as `NOT_MEASURED`; 18 are read, 3 remain in progress (§8).
+
+Everything else in it is carried unchanged with its original labels.
+
+## 11. Current locks
+
+- **No Publish. No History-restore. No APPLY. No production SQL.** No device control, no automatic
+  Action Queue writes, no invented credentials. **Never KEEP. No owner email.** Claude merges only on
+  the owner's explicit instruction (`#1691`, `#1690` and `#1677` were three such instructions; none
+  generalises).
+- **`HOLD #1250`.** `#1369` / `#1641` REVIEW ONLY. `#1343` separately owned. `#1340` owner-closed.
+  Manual CodeRabbit requests are authorized for `#1678` / `#1688` and, per its own PR body, `#1699`.
+- **The tip this stamp measured is `bbcc2faa403278a451ca400d9e21eacbec3d8e71`.** Once this PR
+  merges, the tip is its squash commit; cite `git rev-parse` at the time, not this line.
+- **Live is `BLOCKED` this session** (§2). Do not cite it as equal to the tip from this stamp.
+- **A `PASS` in §4 is a reviewer's verdict at an exact SHA, not merge authorization.** Landing
+  order, retargets and readiness are Cheek's; children are never merged into feature branches.
+- **`#1692`, `#1697` and `#1680` are not Claude's to restack or update.** `#1700` and `#1701` are
+  other Claude sessions' slices; this session does not review or edit them unless assigned.
+- **`#1701` is a lane, not an apply.** Its merge changes nothing in production; dispatch is Cheek's.
+- **One re-run per failing lane per head, and only after a standing-down comment.**
+- **§5 of the `b0bfdb02` stamp: `#1625` is the one session-restore fix in flight.** Claude does not
+  choose, push, ready or close.
+- **Quick Log remembered-target and only-plant auto-selection stay banned and test-pinned.**
+- This slice is **N=1** on branch `claude/current-state-restamp-08994aa8` (name kept; the PR is
+  `#1696`). Its only file is `docs/agents/CURRENT_STATE.md`. It contains no `src/`, `supabase/`,
+  `package.json`, lockfile, test, workflow or governance-file changes.
+- **Slice owner: Claude. Independent reviewer: Codex.** Claude does not self-merge without
+  instruction and does not assign its own next slice.
+
+---
+
+**The block below is SUPERSEDED — see §10 of the current stamp.**
+
+**Prior last updated:** 2026-09-25 UTC (~06:12 UTC; tip, live, board and lanes measured 06:06–06:09 UTC)
+**Prior update:** Claude (2026-09-25 early, restamp on **deploy tip
 `bbcc2faa403278a451ca400d9e21eacbec3d8e71`**, the `#1677` squash. **One commit** merged since the
 05:58 stamp on `6e910615`: **`#1677` (product: Sensors readings age and recover on the minute clock
 without refetch; VPD display evidence retained as stale, never re-derived from stale inputs)**; no

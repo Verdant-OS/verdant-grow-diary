@@ -138,6 +138,11 @@ import {
 } from "@/lib/dashboardSensorEvidenceRules";
 import GrowRecoveryPrompt from "@/components/GrowRecoveryPrompt";
 
+/**
+ * Renders the grower's overview for a valid URL-selected grow or the full account.
+ * Keeps sensor history and saved environment evidence distinct, with scoped
+ * evidence retries and in-page access to the existing reading details.
+ */
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const latestEnvironmentRef = useRef<HTMLElement>(null);

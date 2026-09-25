@@ -203,6 +203,10 @@ vi.mock("@/components/DashboardZeroTentEmptyState", () => ({
 
 import Dashboard from "@/pages/Dashboard";
 
+/**
+ * Renders Dashboard with an isolated query client and in-memory router.
+ * Returns the render helpers, client, and a rerender helper that reuses the client.
+ */
 function renderDashboard() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -231,6 +235,10 @@ beforeEach(() => {
   H.persist.mockClear();
 });
 
+/**
+ * Seeds aggregate and selected-tent sensor history with one temperature reading.
+ * Uses the supplied source and a capture time ageMinutes before the fixed CLOCK.
+ */
 function setReading(source: string, ageMinutes: number) {
   H.aggregateRows = [
     {
@@ -247,6 +255,10 @@ function setReading(source: string, ageMinutes: number) {
   H.perTentRows = H.aggregateRows;
 }
 
+/**
+ * Builds a successful synthetic snapshot for the selected tent with diary evidence.
+ * Defaults to a manual reading captured 60 minutes before the fixed CLOCK.
+ */
 function savedSnapshot(source: "manual" | "diary" = "manual", ageMinutes = 60): SnapshotState {
   return {
     status: "ok",

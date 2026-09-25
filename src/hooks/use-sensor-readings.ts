@@ -116,21 +116,25 @@ export function useSensorReadings(
   // Both hooks run on every render (rules of hooks); only one is active.
   const normalizedScope = tentScope ? normalizeSensorReadingTentScope(tentScope.tentIds) : null;
   const scopeIds = normalizedScope ?? NO_TENT_SCOPE;
-  const scopeFailed = Boolean(tentScope?.scopeError) && normalizedScope === null;
+  // A failed scope read is an error even when cached tent ids remain: React
+  // Query keeps `data` on a failed refetch, and that tent set may be stale or
+  // incomplete. The windows stay mounted so recovery needs no new request.
+  const scopeFailed = Boolean(tentScope?.scopeError);
   const scopeSignature = tentScope
-    ? (normalizedScope?.join(",") ?? (scopeFailed ? "failed" : "unresolved"))
+    ? scopeFailed
+      ? `failed:${normalizedScope?.join(",") ?? ""}`
+      : (normalizedScope?.join(",") ?? "unresolved")
     : "off";
   const retryScopeRef = useRef<(() => unknown) | undefined>(undefined);
   retryScopeRef.current = tentScope?.retryScope;
   const combineTentWindows = useCallback(
     (results: QueryObserverResult<SensorReadingRow[]>[]): TentScopedSensorReadingsResult => {
-      const combined =
-        scopeSignature === "failed"
-          ? { status: "error" as const, data: undefined }
-          : combineTentScopedSensorWindows(
-              scopeSignature === "unresolved" ? null : scopeIds,
-              results.map((r) => ({ data: r.data, isPending: r.isPending, isError: r.isError })),
-            );
+      const combined = scopeFailed
+        ? { status: "error" as const, data: undefined }
+        : combineTentScopedSensorWindows(
+            scopeSignature === "unresolved" ? null : scopeIds,
+            results.map((r) => ({ data: r.data, isPending: r.isPending, isError: r.isError })),
+          );
       return {
         data: combined.data,
         status: combined.status,

@@ -190,6 +190,33 @@ describe("useSensorReadings({ tentIds })", () => {
     expect(io.requests).toEqual([]);
   });
 
+  it("a failed scope refetch is an error even while cached tent ids remain", async () => {
+    // React Query keeps `data` when a tents refetch fails and sets `isError`,
+    // so callers pass cached ids together with `scopeError: true`. The old
+    // tent set may be stale or incomplete; its windows must not read as a
+    // current, successful scope (Codex review on #1683).
+    io.responses.set(TENT_A, [row(A1, TENT_A, "2026-09-20T10:00:00Z")]);
+    const retryScope = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ scopeError }: { scopeError: boolean }) =>
+        useSensorReadings({ tentIds: [TENT_A], scopeError, retryScope }, 500),
+      { wrapper, initialProps: { scopeError: false } },
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    rerender({ scopeError: true });
+    expect(result.current.isError).toBe(true);
+    expect(result.current.isSuccess).toBe(false);
+    expect(result.current.data).toBeUndefined();
+    await result.current.refetch();
+    expect(retryScope).toHaveBeenCalledTimes(1);
+
+    // Once the scope read recovers, the same windows report success again.
+    rerender({ scopeError: false });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.map((r) => r.id)).toEqual([A1]);
+  });
+
   it("surfaces a failed tent window as an error instead of an empty result", async () => {
     io.failTents.add(TENT_B);
     io.responses.set(TENT_A, [row(A1, TENT_A, "2026-09-20T10:00:00Z")]);

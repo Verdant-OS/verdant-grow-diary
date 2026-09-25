@@ -200,9 +200,11 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
       return;
     }
     // Validate the calendar start date before any upload or write
-    // (QA 2026-09-24, BUG-004/005).
+    // (QA 2026-09-24, BUG-004/005), but only when the grower changed it: an
+    // unchanged prefill is never rewritten, and a stored future date must
+    // not block an unrelated edit (CodeRabbit review on #1683).
     let startedAtIso: string | null = null;
-    if (form.started_at) {
+    if (form.started_at && form.started_at !== plantStartDateInputValue(plant.startedAt)) {
       const startedAt = plantStartDateInputToIso(form.started_at, new Date());
       if (startedAt.ok !== true) {
         toast.error(plantStartDateSaveMessage(startedAt.reason));
@@ -587,7 +589,13 @@ export default function EditPlantDialog({ plant, trigger }: Props) {
             <Label>Started at</Label>
             <Input
               type="date"
-              max={plantStartDateInputMax(new Date())}
+              // An unchanged stored date (even a legacy future one) must not
+              // trip the browser's own limit and block unrelated edits.
+              max={
+                form.started_at === plantStartDateInputValue(plant.startedAt)
+                  ? undefined
+                  : plantStartDateInputMax(new Date())
+              }
               value={form.started_at}
               onChange={(e) => setForm({ ...form, started_at: e.target.value })}
             />

@@ -5,6 +5,7 @@
  *
  * No I/O, no React. Deterministic.
  */
+import { isCurrentStateStale } from "@/lib/sensorTruthCanon";
 import type { SensorReading } from "@/mock";
 import { readObservedSensorMetric } from "@/lib/sensorReadingSelectionRules";
 
@@ -37,9 +38,14 @@ function csvEscape(value: string | number | null | undefined): string {
 
 /**
  * Build CSV text from sensor readings. Output is RFC 4180-ish and
- * deterministic so tests can assert exact rows.
+ * deterministic so tests can assert exact rows. An explicit export clock ages
+ * usable current live/manual evidence; provenance and historical values stay
+ * unchanged. Omitting it preserves the supplied snapshot status.
  */
-export function buildSensorReadingsCsv(readings: ReadonlyArray<SensorReading>): string {
+export function buildSensorReadingsCsv(
+  readings: ReadonlyArray<SensorReading>,
+  nowMs?: number,
+): string {
   const rows = readings.map((r) =>
     [
       formatUtcTimestamp(r.ts),
@@ -50,7 +56,13 @@ export function buildSensorReadingsCsv(readings: ReadonlyArray<SensorReading>): 
       readObservedSensorMetric(r, "soil"),
       readObservedSensorMetric(r, "ppfd"),
       r.source,
-      r.status,
+      nowMs !== undefined &&
+      Number.isFinite(nowMs) &&
+      r.status === "usable" &&
+      (r.source === "live" || r.source === "manual") &&
+      isCurrentStateStale(r.capturedAt, { now: nowMs, source: r.source })
+        ? "stale"
+        : r.status,
       formatUtcTimestamp(r.capturedAt),
     ]
       .map(csvEscape)

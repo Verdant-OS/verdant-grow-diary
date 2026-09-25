@@ -435,6 +435,13 @@ test.describe("Timeline local-day date-range filter (issue #587, America/Chicago
       { method: "PATCH", path: "diary_entries", body: {} },
       { method: "DELETE", path: "grow_events", body: {} },
       { method: "POST", path: "rpc/quicklog_save_event", body: {} },
+      // The exact has_role arguments sent to a write RPC must still be a write:
+      // the fixture exemption is bound to the has_role path, not to the body.
+      {
+        method: "POST",
+        path: "rpc/quicklog_save_event",
+        body: { _user_id: FAKE_USER.id, _role: "operator" },
+      },
       {
         method: "POST",
         path: "rpc/has_role",

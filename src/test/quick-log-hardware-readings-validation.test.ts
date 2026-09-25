@@ -66,6 +66,27 @@ describe("validateHardwareReadings", () => {
     });
   });
 
+  it("reads a thousands separator as a thousands separator where values run that high", () => {
+    // Following "use a period" for "1,200" would save PPFD 1.2 (CodeRabbit, #1683).
+    expect(validateHardwareReadings({ ppfdCanopy: "1,200" })).toEqual({
+      ok: false,
+      message: "PPFD canopy: enter the number without commas (for example 1200).",
+    });
+    expect(validateHardwareReadings({ lightDistance: "1,000" })).toEqual({
+      ok: false,
+      message: "Light distance: enter the number without commas (for example 1000).",
+    });
+    // pH and EC never reach the thousands, so a comma there is a decimal comma.
+    expect(validateHardwareReadings({ inputEc: "1,200" })).toEqual({
+      ok: false,
+      message: "Feed/Input EC: use a period for decimals (for example 1.200).",
+    });
+    expect(validateHardwareReadings({ ppfdCanopy: "650,5" })).toEqual({
+      ok: false,
+      message: "PPFD canopy: use a period for decimals (for example 650.5).",
+    });
+  });
+
   it("flags already-saved impossible values for display", () => {
     expect(isHardwareReadingValueValid("inputPh", "15")).toBe(false);
     expect(isHardwareReadingValueValid("runoffPh", "-3")).toBe(false);

@@ -112,6 +112,8 @@ export const HARDWARE_READING_BOUNDS: Record<
 // A leading-decimal value (".8") is a number too: JavaScript and growers read it as 0.8.
 const PLAIN_NUMBER_RE = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/;
 const COMMA_DECIMAL_RE = /^-?\d*,\d+$/;
+/** "1,200" / "12,000": a thousands separator, not a decimal comma. */
+const THOUSANDS_GROUP_RE = /^-?\d{1,3}(?:,\d{3})+$/;
 /** Light distance may carry a unit ("18 in", "45cm"); the number must still be sane. */
 const NUMBER_WITH_UNIT_RE = /^(-?(?:\d+(?:\.\d+)?|\.\d+))\s*(?:in|inch|inches|"|cm|mm|ft|')?$/i;
 
@@ -137,6 +139,14 @@ export function validateHardwareReadings(
     const raw = clean(readings[key]);
     if (!raw) continue;
     const bounds = HARDWARE_READING_BOUNDS[key];
+    // Where values reach the thousands (PPFD, light distance), "1,200" is a
+    // grouped 1200; "use a period" would turn it into 1.2.
+    if (bounds.max >= 1000 && THOUSANDS_GROUP_RE.test(raw)) {
+      return {
+        ok: false,
+        message: `${bounds.label}: enter the number without commas (for example ${raw.replace(/,/g, "")}).`,
+      };
+    }
     if (COMMA_DECIMAL_RE.test(raw)) {
       return {
         ok: false,

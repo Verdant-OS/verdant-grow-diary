@@ -2,9 +2,10 @@
  * QA 2026-09-24, BUG-008: the AI Doctor request tagged an RH 95% snapshot in
  * a flowering plant's tent `severity: "ok"` while an open alert existed for
  * that reading; grounding lets the model call an "ok" environment stable.
+ *
+ * That the live review actually sends the adjusted packet is asserted on the
+ * captured invoke body in plant-detail-ai-doctor-live-review.test.tsx.
  */
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   AI_DOCTOR_PACKET_SAFETY_NOTE_CAP,
@@ -81,15 +82,5 @@ describe("applyStageTargetSeverityToPacket", () => {
       ["temperature", "above"],
       ["vpd", "below"],
     ]);
-  });
-
-  it("the live review sends the adjusted packet", () => {
-    // @source-scan-justified: asserts the wrap at the single packet build
-    // site; driving it end to end needs the full sensor/timeline harness.
-    const src = readFileSync(
-      resolve(process.cwd(), "src/components/PlantDetailAiDoctorLiveReview.tsx"),
-      "utf8",
-    );
-    expect(src).toMatch(/applyStageTargetSeverityToPacket\(\s*buildAiDoctorReviewRequestPacket\(/);
   });
 });

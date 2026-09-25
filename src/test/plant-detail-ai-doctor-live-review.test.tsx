@@ -205,6 +205,48 @@ describe("PlantDetailAiDoctorLiveReview", () => {
     expect(screen.queryByText(/reject/i)).toBeNull();
   });
 
+  it("sends the model a stage-graded snapshot: RH 95% in flower is a warning, not ok (BUG-008)", async () => {
+    const timeline = strongTimeline();
+    const snapshot = timeline[0] as Extract<TimelineMemoryItem, { kind: "manual_sensor_snapshot" }>;
+    snapshot.card = {
+      ...snapshot.card,
+      severity: "ok",
+      readings: [
+        { field: "temperature_c", value: 23.9, unit: "C" },
+        { field: "humidity_pct", value: 95, unit: "%" },
+      ],
+    } as unknown as ManualSnapshotTimelineCard;
+    itemsRef.current = timeline;
+    const invoke = vi.fn().mockResolvedValue({
+      data: { ok: true, result: validResult() },
+      error: null,
+    });
+    render(<PlantDetailAiDoctorLiveReview plantId="p1" plant={strongPlant} invoke={invoke} />);
+    await screen.findByTestId("plant-ai-doctor-live-review");
+    fireEvent.click(screen.getByTestId("plant-ai-doctor-live-review-start"));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+
+    const [fn, init] = invoke.mock.calls[0] as [
+      string,
+      {
+        body: {
+          packet: {
+            recentSensorSnapshot: { severity: string } | null;
+            recentSensorSnapshotAnnotation: { safetyNotes: string[] } | null;
+          };
+        };
+      },
+    ];
+    expect(fn).toBe("ai-doctor-review");
+    const sent = init.body.packet;
+    expect(sent.recentSensorSnapshot?.severity).toBe("warning");
+    expect(sent.recentSensorSnapshotAnnotation?.safetyNotes).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^Current humidity 95% is above the flower target range/),
+      ]),
+    );
+  });
+
   it("shows a durable saved-history receipt and links the exact session", async () => {
     itemsRef.current = strongTimeline();
     const invoke = vi.fn().mockResolvedValue({

@@ -11,6 +11,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { newQuickLogSaveKey } from "@/lib/quickLogIdempotencyKey";
+import { isUuid } from "@/lib/isUuid";
 import type { Database, Json } from "@/integrations/supabase/types";
 import {
   parseQuickLogRevisionRow,
@@ -159,16 +160,14 @@ function parseRpcResult(data: unknown): QuickLogRevisionWriteResult {
     };
   }
   if (
-    typeof data.revision_id !== "string" ||
-    data.revision_id.length === 0 ||
+    !isUuid(data.revision_id) ||
     typeof data.revision_no !== "number" ||
     !Number.isInteger(data.revision_no) ||
     data.revision_no < 1 ||
-    !isNullableString(data.grow_event_id) ||
+    (data.grow_event_id !== null && !isUuid(data.grow_event_id)) ||
     !Array.isArray(data.diary_entry_ids) ||
-    !data.diary_entry_ids.every(
-      (value): value is string => typeof value === "string" && value.length > 0,
-    )
+    !data.diary_entry_ids.every(isUuid) ||
+    (data.grow_event_id === null && data.diary_entry_ids.length === 0)
   ) {
     return { ok: false, reason: "rpc_error" };
   }

@@ -20,7 +20,7 @@ import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { usePlants } from "@/hooks/use-plants";
 import { useGrows } from "@/store/grows";
-import { resolveSensorsTentStage } from "@/lib/sensorsTentStageRules";
+import { resolveTentEnvironmentStage } from "@/lib/tentEnvironmentStageRules";
 import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
@@ -264,7 +264,7 @@ export default function Sensors() {
   // plant signal.
   const { grows } = useGrows();
   const plantsQuery = usePlants();
-  const selectedTentStage = resolveSensorsTentStage({
+  const selectedTentStage = resolveTentEnvironmentStage({
     tentId: selectedTent?.id ?? null,
     tentStage: selectedTent?.stage ?? null,
     growStage: (grows ?? []).find((grow) => grow.id === selectedGrowId)?.stage ?? null,

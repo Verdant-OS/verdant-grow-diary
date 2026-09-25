@@ -55,14 +55,17 @@ describe("Tent Detail — stage-aware Temp/RH wiring", () => {
   it("imports the helpers", () => {
     expect(DETAIL).toMatch(IMPORT_RE);
   });
+  it("judges readings by the resolved stage, not tents.stage alone (BUG-006 follow-up)", () => {
+    expect(DETAIL).toMatch(/const envStage = resolveTentEnvironmentStage\(/);
+  });
   it("wires Temperature MetricChip through classifyTempAgainstStage with stale flag", () => {
     expect(DETAIL).toMatch(
-      /label="T"[\s\S]*classifyTempAgainstStage\(snap\.temp,\s*\{\s*stage:\s*tent\.stage,\s*stale:\s*header\.stale\s*\}\)/,
+      /label="T"[\s\S]*classifyTempAgainstStage\(snap\.temp,\s*\{\s*stage:\s*envStage,\s*stale:\s*header\.stale\s*\}\)/,
     );
   });
   it("wires RH MetricChip through classifyRhAgainstStage with stale flag", () => {
     expect(DETAIL).toMatch(
-      /label="RH"[\s\S]*classifyRhAgainstStage\(snap\.rh,\s*\{\s*stage:\s*tent\.stage,\s*stale:\s*header\.stale\s*\}\)/,
+      /label="RH"[\s\S]*classifyRhAgainstStage\(snap\.rh,\s*\{\s*stage:\s*envStage,\s*stale:\s*header\.stale\s*\}\)/,
     );
   });
   it("removes hardcoded temp threshold expressions", () => {

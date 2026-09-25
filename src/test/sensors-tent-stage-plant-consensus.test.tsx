@@ -12,15 +12,15 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Sensors from "@/pages/Sensors";
-import { resolveSensorsTentStage } from "@/lib/sensorsTentStageRules";
+import { resolveTentEnvironmentStage } from "@/lib/tentEnvironmentStageRules";
 
 const TENT = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f";
 const OTHER_TENT = "6b2d7f10-3c4e-4d6f-9a01-2b3c4d5e6f70";
 
-describe("resolveSensorsTentStage", () => {
+describe("resolveTentEnvironmentStage", () => {
   it("QA repro: a Flower plant outranks a tent and grow still marked Veg", () => {
     expect(
-      resolveSensorsTentStage({
+      resolveTentEnvironmentStage({
         tentId: TENT,
         tentStage: "veg",
         growStage: "veg",
@@ -31,7 +31,7 @@ describe("resolveSensorsTentStage", () => {
 
   it("ignores plants in other tents", () => {
     expect(
-      resolveSensorsTentStage({
+      resolveTentEnvironmentStage({
         tentId: TENT,
         tentStage: "veg",
         growStage: null,
@@ -40,9 +40,23 @@ describe("resolveSensorsTentStage", () => {
     ).toBe("veg");
   });
 
+  it("reads mapped plants (tentId) the same as plant rows (tent_id)", () => {
+    expect(
+      resolveTentEnvironmentStage({
+        tentId: TENT,
+        tentStage: "veg",
+        growStage: "veg",
+        plants: [
+          { tentId: TENT, stage: "flower" },
+          { tentId: OTHER_TENT, stage: "seedling" },
+        ],
+      }),
+    ).toBe("flower");
+  });
+
   it("mixed plant stages abstain, so the tent decides", () => {
     expect(
-      resolveSensorsTentStage({
+      resolveTentEnvironmentStage({
         tentId: TENT,
         tentStage: "veg",
         growStage: null,
@@ -56,7 +70,7 @@ describe("resolveSensorsTentStage", () => {
 
   it("a harvested plant cannot switch an actively staged grow off", () => {
     expect(
-      resolveSensorsTentStage({
+      resolveTentEnvironmentStage({
         tentId: TENT,
         tentStage: "veg",
         growStage: "veg",
@@ -67,7 +81,7 @@ describe("resolveSensorsTentStage", () => {
 
   it("the grow row rescues a tent left at a stale earlier stage", () => {
     expect(
-      resolveSensorsTentStage({
+      resolveTentEnvironmentStage({
         tentId: TENT,
         tentStage: "seedling",
         growStage: "flower",
@@ -78,13 +92,18 @@ describe("resolveSensorsTentStage", () => {
 
   it("pending or failed plant reads add no signal", () => {
     expect(
-      resolveSensorsTentStage({ tentId: TENT, tentStage: "veg", growStage: null, plants: null }),
+      resolveTentEnvironmentStage({
+        tentId: TENT,
+        tentStage: "veg",
+        growStage: null,
+        plants: null,
+      }),
     ).toBe("veg");
   });
 
   it("returns null without a tent or any recognized stage — never guesses", () => {
     expect(
-      resolveSensorsTentStage({
+      resolveTentEnvironmentStage({
         tentId: null,
         tentStage: "flower",
         growStage: "flower",
@@ -92,7 +111,7 @@ describe("resolveSensorsTentStage", () => {
       }),
     ).toBeNull();
     expect(
-      resolveSensorsTentStage({ tentId: TENT, tentStage: null, growStage: "", plants: [] }),
+      resolveTentEnvironmentStage({ tentId: TENT, tentStage: null, growStage: "", plants: [] }),
     ).toBeNull();
   });
 });

@@ -1,0 +1,437 @@
+/**
+ * The package.json half of scripts/check-contract-test-resolution.mjs, exercised
+ * end to end: the checker is spawned against a disposable repo layout, so what is
+ * pinned is the script's actual exit code, not a re-implementation of its regexes.
+ *
+ * Three fixtures, one per way a guard can assert on package.json:
+ *
+ *   bypass     reads the source, JSON.parses something UNRELATED, then asserts a
+ *              quoted key with no colon on the raw text. A file-level "contains
+ *              JSON.parse" check let this through — Codex reproduced it on #1221
+ *              (round 3) and the checker exited 0. The signal has to be tied to
+ *              the variable the package read is bound to.
+ *   raw        reads the source and never parses anything.
+ *   resolved   parses the package and asserts on the object. The only shape that
+ *              satisfies AGENTS.md > "Contract tests must assert against resolved
+ *              values, not source text".
+ *   multiline  the `bypass` shape with the read call wrapped across lines, as
+ *              prettier writes any call over 100 columns. The read binding was
+ *              matched with `[^\n]*`, so a wrapped read bound nothing and the
+ *              checker exited 0 — Codex, #1221 round 4. Matching is now bounded
+ *              by the statement, not the line.
+ *   multilineResolved  the `resolved` shape wrapped the same way: the widening
+ *              must not turn a compliant guard into a false positive.
+ *   inline     the `bypass` shape with NO binding: the read is consumed where it
+ *              is made, `expect(readFileSync("package.json", "utf8"))`. The round-3
+ *              signal looks only at identifiers a read is assigned to, so an
+ *              unbound read bound nothing and the checker exited 0 — Codex, #1221
+ *              round 9.
+ *   inlineMethod  the same with the text method chained onto a read wrapped
+ *              across lines, `readFileSync(\n resolve(…),\n "utf8",\n).includes(…)`.
+ *   dollarMethod  the `bypass` shape through a `$`-prefixed binding and a text
+ *              method, `$PKG.includes(…)`. The method branch opened with `\b`, which
+ *              cannot match before `$`, so only `expect($PKG)` was caught —
+ *              CodeRabbit, #1221 round 10.
+ *   inlineResolvedFence  a compliant guard whose parse sits INSIDE a text method:
+ *              `Object.keys(JSON.parse(readFileSync(…)).scripts).includes(…)`. A
+ *              statement-bounded regex crosses the read's closing parenthesis and
+ *              flags this; the read's own argument list must be matched instead.
+ *   boundRegexTest / boundLastIndexOf / boundSplit  a bound read consumed by a regex
+ *              `.test(PKG)`, by `PKG.lastIndexOf(…)`, and by `PKG.split(…)`. Each list
+ *              of text methods missed one (rounds 3, 10, 12), so a binding is now
+ *              compliant only as `JSON.parse(PKG)`; `split` is on no list at all —
+ *              CodeRabbit, #1221 round 12.
+ *   inlineRegexTest / inlineLastIndexOf  the same two shapes on an unbound read.
+ *   boundParsedToStringFence  `JSON.parse(PKG.toString())` — still a parse.
+ *   inlineCopyFence  `writeFileSync(…, readFileSync("package.json", "utf8"))`, a
+ *              copy into a fixture root, as check-bun-lockfile-policy does. An
+ *              inline read that feeds no assertion must stay green.
+ *   boundStringWrapped / inlineStringWrapped / inlineStringMethod  the read wrapped
+ *              in `String(…)`: bound, consumed by `expect(…)`, and with a text method
+ *              chained onto the wrapper. None of the three was seen — CodeRabbit, #1221
+ *              round 14.
+ *   boundStringParsedFence  `JSON.parse(PKG)` on a `String(…)`-wrapped binding — a parse.
+ *   inlineToStringEncoding / inlineToStringEncodingExpect  an unbound read decoded with
+ *              `.toString("utf8")`, then chained into a text method or consumed by
+ *              `expect(…)`. Only a bare `.toString()` was seen between the read and its
+ *              consumer — CodeRabbit, #1221 round 16.
+ *   boundParsedToStringEncodingFence  `JSON.parse(PKG.toString("utf8"))` on a bound Buffer
+ *              read — a parse. The binding side accepted only a bare `.toString()` there,
+ *              so this compliant guard failed — CodeRabbit, #1221 round 17.
+ *
+ * @source-scan-justified: this file EMBEDS the forbidden shapes as spawn fixtures for the
+ * checker itself (see FIXTURES below). It reads no package.json of its own; the strings
+ * are written to a disposable repo and the checker is run there. The checker scans
+ * src/test textually and cannot tell fixture text from live code, so it is declared
+ * here, visibly, rather than dodged by obfuscating the fixtures.
+ */
+import { describe, it, expect } from "vitest";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+const CHECKER = resolve(__dirname, "../../scripts/check-contract-test-resolution.mjs");
+
+const FIXTURES: Record<string, string> = {
+  bypass: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PACKAGE = readFileSync("package.json", "utf8");
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(PACKAGE).toContain('"test:x"');
+});
+`,
+  raw: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PACKAGE = readFileSync("package.json", "utf8");
+it("x", () => {
+  expect(PACKAGE).toContain('"test:x"');
+});
+`,
+  resolved: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const SCRIPTS = JSON.parse(readFileSync("package.json", "utf8")).scripts;
+it("x", () => {
+  expect(SCRIPTS["test:x"]).toBe("bun run x");
+});
+`,
+  dollar: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const $PKG = readFileSync("package.json", "utf8");
+it("x", () => {
+  expect($PKG).toContain('"test:x"');
+});
+`,
+  multiline: `
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { expect, it } from "vitest";
+const PACKAGE = readFileSync(
+  resolve(process.cwd(), "package.json"),
+  "utf8",
+);
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(PACKAGE).toContain('"test:x"');
+});
+`,
+  dollarMethod: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const $PKG = readFileSync("package.json", "utf8");
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect($PKG.includes('"test:x"')).toBe(true);
+});
+`,
+  inline: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(readFileSync("package.json", "utf8")).toContain('"test:x"');
+});
+`,
+  inlineMethod: `
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(
+    readFileSync(
+      resolve(process.cwd(), "package.json"),
+      "utf8",
+    ).includes('"test:x"'),
+  ).toBe(true);
+});
+`,
+  inlineResolvedFence: `
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { expect, it } from "vitest";
+it("x", () => {
+  expect(
+    Object.keys(JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf8")).scripts).includes("test:x"),
+  ).toBe(true);
+});
+`,
+  boundRegexTest: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json", "utf8");
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(/"test:x"/.test(PKG)).toBe(true);
+});
+`,
+  boundLastIndexOf: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json", "utf8");
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(PKG.lastIndexOf('"test:x"')).toBeGreaterThan(-1);
+});
+`,
+  boundSplit: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json", "utf8");
+const UNRELATED = JSON.parse('{"a":1}');
+const PARTS = PKG.split(",");
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(PARTS.some((part) => part.includes('"test:x"'))).toBe(true);
+});
+`,
+  inlineRegexTest: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(/"test:x"/.test(readFileSync("package.json", "utf8"))).toBe(true);
+});
+`,
+  inlineLastIndexOf: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(readFileSync("package.json", "utf8").lastIndexOf('"test:x"')).toBeGreaterThan(-1);
+});
+`,
+  boundParsedToStringFence: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json");
+const { scripts } = JSON.parse(PKG.toString());
+it("x", () => {
+  expect(scripts["test:x"]).toBe("bun run x");
+});
+`,
+  inlineCopyFence: `
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { expect, it } from "vitest";
+const { scripts } = JSON.parse(readFileSync("package.json", "utf8"));
+it("x", () => {
+  writeFileSync(join("/tmp/fixture-root", "package.json"), readFileSync("package.json", "utf8"), "utf8");
+  expect(scripts["test:x"]).toBe("bun run x");
+});
+`,
+  boundStringWrapped: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = String(readFileSync("package.json"));
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(PKG).toContain('"test:x"');
+});
+`,
+  inlineStringWrapped: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(String(readFileSync("package.json", "utf8"))).toContain('"test:x"');
+});
+`,
+  inlineStringMethod: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(String(readFileSync("package.json")).includes('"test:x"')).toBe(true);
+});
+`,
+  inlineToStringEncoding: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(readFileSync("package.json").toString("utf8").includes('"test:x"')).toBe(true);
+});
+`,
+  inlineToStringEncodingExpect: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const UNRELATED = JSON.parse('{"a":1}');
+it("x", () => {
+  expect(UNRELATED.a).toBe(1);
+  expect(readFileSync("package.json").toString("utf8")).toContain('"test:x"');
+});
+`,
+  boundParsedToStringEncodingFence: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = readFileSync("package.json");
+const { scripts } = JSON.parse(PKG.toString("utf8"));
+it("x", () => {
+  expect(scripts["test:x"]).toBe("bun run x");
+});
+`,
+  boundStringParsedFence: `
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+const PKG = String(readFileSync("package.json"));
+const { scripts } = JSON.parse(PKG);
+it("x", () => {
+  expect(scripts["test:x"]).toBe("bun run x");
+});
+`,
+  multilineResolved: `
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { expect, it } from "vitest";
+const SCRIPTS = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), "package.json"),
+    "utf8",
+  ),
+).scripts;
+it("x", () => {
+  expect(SCRIPTS["test:x"]).toBe("bun run x");
+});
+`,
+};
+
+/** Run the checker against a repo containing exactly one test file. */
+function runChecker(name: keyof typeof FIXTURES) {
+  const root = mkdtempSync(join(tmpdir(), "contract-json-"));
+  try {
+    mkdirSync(join(root, "src", "test"), { recursive: true });
+    writeFileSync(join(root, "src", "test", `${name}.test.ts`), FIXTURES[name]);
+    const res = spawnSync(process.execPath, [CHECKER], { cwd: root, encoding: "utf8" });
+    return { status: res.status, out: `${res.stdout}\n${res.stderr}` };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+describe("check-contract-test-resolution — package.json guards must assert on the parsed object", () => {
+  it("rejects a raw assertion even when an unrelated JSON.parse is present (Codex, #1221 round 3)", () => {
+    const { status, out } = runChecker("bypass");
+    expect(status, out).toBe(1);
+    expect(out).toContain("bypass.test.ts");
+    expect(out).toContain("package.json");
+  });
+
+  it("rejects a file that reads the source and never parses it", () => {
+    const { status, out } = runChecker("raw");
+    expect(status, out).toBe(1);
+    expect(out).toContain("raw.test.ts");
+  });
+
+  it("accepts a guard that parses the package and asserts on the object", () => {
+    const { status, out } = runChecker("resolved");
+    expect(status, out).toBe(0);
+  });
+
+  it("still catches a raw assertion when the bound identifier holds a regex metacharacter", () => {
+    // FENCE, green before and after: the identifier is interpolated into a RegExp, and
+    // `$` is the one metacharacter the identifier grammar admits. CodeQL (alert 256,
+    // high) flagged the escape for handling `$` alone; it is now a complete escape.
+    // This pins that the binding is still found and still flagged, whatever the escape.
+    const { status, out } = runChecker("dollar");
+    expect(status, out).toBe(1);
+    expect(out).toContain("$PKG");
+  });
+
+  it("rejects the raw assertion when the package read is wrapped across lines (Codex, #1221 round 4)", () => {
+    const { status, out } = runChecker("multiline");
+    expect(status, out).toBe(1);
+    expect(out).toContain("multiline.test.ts");
+    expect(out).toContain("PACKAGE");
+  });
+
+  it("accepts a resolved guard whose read is wrapped across lines — the widening adds no false positive", () => {
+    const { status, out } = runChecker("multilineResolved");
+    expect(status, out).toBe(0);
+  });
+
+  it("rejects a text method on a `$`-prefixed binding (CodeRabbit, #1221 round 10)", () => {
+    const { status, out } = runChecker("dollarMethod");
+    expect(status, out).toBe(1);
+    expect(out).toContain("$PKG");
+  });
+
+  it("rejects an unbound read consumed directly by expect() (Codex, #1221 round 9)", () => {
+    const { status, out } = runChecker("inline");
+    expect(status, out).toBe(1);
+    expect(out).toContain("inline.test.ts");
+  });
+
+  it("rejects a text method chained onto a wrapped, unbound read (Codex, #1221 round 9)", () => {
+    const { status, out } = runChecker("inlineMethod");
+    expect(status, out).toBe(1);
+    expect(out).toContain("inlineMethod.test.ts");
+  });
+
+  it("accepts a parsed read nested inside a text method — the read's own parentheses bound the match", () => {
+    const { status, out } = runChecker("inlineResolvedFence");
+    expect(status, out).toBe(0);
+  });
+});
+
+describe("a package.json binding is compliant only as JSON.parse(ID) (CodeRabbit, #1221 round 12)", () => {
+  // Three rounds each found one text method the binding list lacked: `$PKG.includes`
+  // (round 10), then a regex `.test(PKG)` and `PKG.lastIndexOf` (round 12). The
+  // binding side is inverted instead of extended: any reference to the raw text
+  // other than its declaration and `JSON.parse(…)` is an assertion on text.
+  // The unbound side keeps a consumer list, because an inline read can legitimately
+  // feed a copy (the inlineCopyFence), and it gains `.test(`/`.exec(` and
+  // `lastIndexOf`.
+  it.each([
+    ["boundRegexTest", "PKG"],
+    ["boundLastIndexOf", "PKG"],
+    ["boundSplit", "PKG"],
+    ["boundStringWrapped", "PKG"],
+  ] as const)("rejects the bound read in %s", (name, id) => {
+    const { status, out } = runChecker(name);
+    expect(status, out).toBe(1);
+    expect(out).toContain(`${name}.test.ts`);
+    expect(out).toContain(`\`${id}\``);
+  });
+
+  it.each([
+    "inlineRegexTest",
+    "inlineLastIndexOf",
+    "inlineStringWrapped",
+    "inlineStringMethod",
+    "inlineToStringEncoding",
+    "inlineToStringEncodingExpect",
+  ] as const)("rejects the unbound read in %s", (name) => {
+    const { status, out } = runChecker(name);
+    expect(status, out).toBe(1);
+    expect(out).toContain(`${name}.test.ts`);
+  });
+
+  it.each([
+    "boundParsedToStringFence",
+    "inlineCopyFence",
+    "boundStringParsedFence",
+    "boundParsedToStringEncodingFence",
+  ] as const)("accepts %s (FENCE)", (name) => {
+    const { status, out } = runChecker(name);
+    expect(status, out).toBe(0);
+  });
+});

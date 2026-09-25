@@ -1030,7 +1030,8 @@ Actions deploy proves only that Actions does not deploy them. A `Makefile` comme
 (`functions-deploy: … # Lovable does this automatically`) is **comment text, not measurement** —
 do not treat it as publisher evidence. Label the edge path as separate and environment-verified;
 do not assert "manual only" or "Lovable automatic" until the publish trigger is measured
-(§14; release topology deferred — #1221 / #1175).
+(§14; the publish trigger for the frontend is measured, and the edge path is still
+`NOT_MEASURED`, in `docs/specs/release-topology-specification.md` §4 and §5.3).
 
 An earlier draft said publishing "ships frontend and edge functions". No repository evidence supports
 an automatic joint ship, and a release operator relying on it could publish a frontend expecting
@@ -1199,7 +1200,7 @@ Rejected means decided, with a reason. Re-proposing one requires new evidence, n
 | **Auth migration off Supabase Auth**                   | **REJECTED** | Auth, RLS, and `auth.uid()` are one system. Replacing the first breaks the authorization model                                                                                                                   |
 | **Collapsing vendor/transport into `source`**          | **REJECTED** | Directly contradicts AC-4.2. Would let a vendor name imply health                                                                                                                                                |
 | **Device control / automatic Action Queue**            | **REJECTED** | Product-level safety commitment, not a technical one (AC-7.1)                                                                                                                                                    |
-| **Treating `vercel.json` as production configuration** | **REJECTED** | Its runtime directives are measured as not applied in production. Never reason about production redirects or headers from that file                                                                              |
+| **Inferring production behaviours from `vercel.json`** | **REJECTED** | Governs only when the measured publisher applies it: a topology measurement (`docs/specs/release-topology-specification.md` M7), not a property of the file. Earlier rationale: an earlier publisher             |
 
 ---
 
@@ -1221,7 +1222,7 @@ Not rejected — sequenced.
 | Making `Published migration integrity` a required context (AC-9.1)                                      | A ruleset change — Cheek's decision, not a code change                                                                                                              |
 | Removing the declared-but-unimported `@supabase/ssr` dependency (AC-2.1)                                | A dependency change; its own slice under AC-8.2                                                                                                                     |
 | Correcting `CLAUDE.md`'s "Two `*Rules.ts` import Supabase" (AC-3.2)                                     | A governance-file edit: all twelve files bump `Sentinel-Version` together, so it is its own slice                                                                   |
-| **Authoritative Release Topology Specification**                                                        | §14 — blocked on evidence this contract does not have; tracked via #1175 and #1221                                                                                  |
+| Release-topology follow-ups                                                                             | The follow-ups `docs/specs/release-topology-specification.md` §12 names: `CLAUDE.md` (governance bump), stale comments, the preview doc, `#1175`                    |
 | Binding Quick Log persistence and target selection as a clause                                          | After #1674, #1675, #1676 and #1678 resolve, because all four change that surface. The facts to bind are recorded below the table                                   |
 
 **Sequencing notes for these rows.** Durable rules only. Whether any PR named here is open,
@@ -1264,19 +1265,20 @@ stale every time the operating picture moved. Only the durable rules stay:
 
 - **Publisher identity is not established by response headers.** Serving infrastructure and publisher
   identity are different claims; measuring the first says nothing about the second. Repository
-  documents currently disagree (`CLAUDE.md` names Lovable; `docs/agents/CURRENT_STATE.md` carries
-  Vercel as a source claim while retracting an earlier header-based proof), and one dated
-  repository observation in `scripts/stamp-version.mjs` bears on it. **`Makefile:77`'s
+  documents disagree (`CLAUDE.md` names Lovable; `scripts/stamp-version.mjs:23-26` carries a dated
+  Lovable observation), and the measured answer, with its date, lives in
+  `docs/specs/release-topology-specification.md` (Appendix A) and in later
+  `docs/agents/CURRENT_STATE.md` stamps — never here. **`Makefile:77`'s
   "Lovable does this automatically" line is a Make recipe comment only — not publisher
-  evidence.** The evidence and its dates belong in `docs/agents/CURRENT_STATE.md`, not here. The
-  durable requirement: **measure the publish trigger before asserting a publisher.**
-  `NOT_MEASURED`.
+  evidence.** The durable requirement: **measure the publish trigger before asserting a
+  publisher**, by the chain that specification's §4 defines. Not measured in this file, by design.
 - **The build target is not the serving target, and neither may be assumed from the other.** The
   Lovable preset configures Nitro against one target while production is served through another;
   reconciling them requires deployment metadata this repository does not contain. The durable
   requirement: **a release topology claim is measured or it is `NOT_MEASURED`** — never inferred from
   build configuration, response headers, Make comments, vendor SDKs, or tip-equals-live parity.
-  Resolving it is the Release Topology Specification's job (§13; #1175 and #1221).
+  `docs/specs/release-topology-specification.md` §4 and §8 define the measurement chain; its
+  dated results are not restated here.
 - **Applied production schema is `NOT_MEASURED`** here and belongs to `docs/agents/CURRENT_STATE.md` (AC-9.3).
 - **Per-table RLS policy state** is owned by migrations, not by this file.
 - **Runtime drift among the 69–105 unenumerated union literals matching AC-4.3's text patterns** is
@@ -1332,3 +1334,4 @@ stale every time the operating picture moved. Only the durable rules stay:
 | 2026-09-24 | `32820526d6e71c5a2ed213da35f3a68f66f86432` | Claude | Editorial follow-up to #1649; stamp unchanged. AC-1.5's in-prose bullet no longer writes the installed Start package as a `path:line` token: it now names line 238 of `createStartHandler.js` in prose, with its `[defaultCsrfMiddleware]` fallback, re-read in `@tanstack/start-server-core` 1.169.17, the version `bun.lock` pins at this SHA. The clause's `_Source:` block keeps its package-internal cites and now says T1 does not cover them: T1 covers repository paths, and a dependency file cannot be opened at the stamped SHA. Copilot, CodeRabbit and the Codex GitHub reviewer raised the bullet on #1649; Copilot raised the `_Source:` block on #1667. No other clause changed.                                                                                                                                                                                                                                                                                 |
 | 2026-09-24 | `ef15b2c1be949d720f34bc33e4b980d18d6114e2` | Claude | §15 re-verification, 12 commits after `32820526` (first #1656, last #1664). No repository file the contract cites by path changed, apart from this file and `docs/agents/CURRENT_STATE.md` (cited as a document), so every citation holds by file identity. AC-3.2: `*Rules.ts` 518 → 519 (#1663 adds a pure rules file); the `Date.now()`, `Math.random()` and Supabase-importer counts are unchanged. AC-3.4: 744 → 750 shim import statements, in 749 files; the prior 744 also counted statements. AC-4.3: the wider union count is unchanged at 105 lines in 85 files. AC-10.2: zero hits on re-run. §13: added the Quick Log deferral row, with every direct RPC caller, and sequencing notes with no PR state (a change to the AC-4.1-cited line, as #1655 proposes, must update its T1 pins, as #1643 adds, in the same change); the release-topology row no longer states PR status. No clause statement changed. Docs-only; no `CURRENT_STATE.md` restamp.             |
 | 2026-09-24 | `69aca5e738b7d0d49369a636b1b293564ec65203` | Claude | §15 re-verification, two docs-only commits after `ef15b2c1`. Re-read all 226 repository `path:line` cites outside this record, not by file identity, and the 8 package cites from tarballs whose sha512 matches `bun.lock`. Re-measured §3, §4 and §10 counts, bar AC-4.3's multi-line figure; re-ran AC-4.1's prototype-key reproduction under Bun 1.3.11. AC-3.2 corrected: no root-level `*Rules.ts` imports the Supabase client; the two named files import a generated type only, as at the first stamp. AC-4.6 corrected: the checker runs on PRs into `main`/`verdant-grow-diary` via 3 non-required lanes once earlier steps pass. AC-1.5: the build-time switch is `serverFns.disableCsrfMiddlewareWarning`. AC-4.3: patterns recorded; multi-line figure a `source claim`. §13: `CLAUDE.md` correction deferred. This amendment also fixes `docs/codebase-map.md`. Follow-ups: AC-3.2 (Copilot); AC-1.5, AC-4.6, header (Codex); header, AC-4.3, AC-4.6 (CodeRabbit).  |
+| 2026-09-25 | `69aca5e738b7d0d49369a636b1b293564ec65203` | Claude | Release-topology amendment; stamp unchanged because no AC clause is touched and no citation was re-verified. §12: the `vercel.json` row is restated in durable form — a host file governs only when the measured publisher applies it — because its earlier rationale ("measured as not applied") was measured under a publisher that no longer serves the apex; `docs/specs/release-topology-specification.md` Appendix A.6 carries the new measurement. §13: the topology row becomes the follow-ups that specification names. §9 prose and §14: pointers now name the specification instead of `#1175` / `#1221`; the two durable §14 rules are unchanged. Dated values stay out of this file.                                                                                                                                                                                                                                                                                |

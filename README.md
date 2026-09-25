@@ -85,9 +85,10 @@ Production domain: **https://verdantgrowdiary.com** (also served on
 - Public acquisition, guide, cultivar, support, and local-tool routes are
   registered explicitly. Private workspace routes remain gated behind
   Supabase Auth.
-- SSL/TLS certificates are managed by the Lovable hosting platform. Both the
-  apex and `www` hostnames must serve a valid certificate before announcing a
-  release.
+- SSL/TLS certificates belong to whichever platform the measured apex domain
+  binding names — see `docs/specs/release-topology-specification.md` §4; do not
+  assume a platform. Both the apex and `www` hostnames must serve a valid
+  certificate before announcing a release.
 - DNS changes (apex `A` record, `www` `A` record) can interrupt SSL issuance —
   re-verify the certificate after any DNS update.
 - See [`docs/launch-checklist.md`](docs/launch-checklist.md) for the full

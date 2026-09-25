@@ -84,14 +84,15 @@ table's shape — the manifest records that a path redirects, not where.
 Several legal/marketing duplicates exist as routes **and** as redirect entries in
 `vercel.json` (`/strains → /cultivars`, `/features → /welcome`, `/terms-of-service → /terms`,
 `/privacy-policy → /privacy`, `/refunds` and `/refund-policy → /refund`, `/demo → /welcome`).
-**Those redirects do not fire in production.** Lovable is the production publisher and does
-not apply Vercel host configuration — all **eight** redirect entries in that file return HTTP 200 with no
-`Location` header, so the destination is reached by client rendering, not by a host redirect
-(`docs/seo/lighting-launch-verification.md`, §Non-blocking host mismatch — that document says
-"six", counting only the aliases its own slice added; the file holds eight, and Lovable ignores
-all of them). The eight are `/strains`, `/strains/:slug`, `/features`, `/demo`, `/refunds`,
-`/refund-policy`, `/terms-of-service`, `/privacy-policy`. `vercel.json` is stale pre-SSR
-configuration that `CURRENT_STATE_ARCHIVE.md` lists for retirement.
+**Whether those redirects fire is a topology measurement, not a property of the file.** A host
+configuration file governs only when the measured publisher applies it
+(`docs/specs/release-topology-specification.md`, rule D-RT-5 and procedure M7). An earlier version
+of this paragraph said they never fire; that was measured under a publisher that no longer serves
+the apex (`docs/seo/lighting-launch-verification.md`, §Non-blocking host mismatch, generated
+2026-08-02). The eight entries are `/strains`, `/strains/:slug`, `/features`, `/demo`,
+`/refunds`, `/refund-policy`, `/terms-of-service`, `/privacy-policy`. Do not reason about
+production redirects or headers from this file or from that dated document; read the
+specification's Appendix A or the current `docs/agents/CURRENT_STATE.md` stamp.
 
 ### Authenticated routes (`src/routes/_app/*.tsx`)
 

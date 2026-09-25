@@ -89,6 +89,21 @@ export function isCurrentReadForAlertWrite<T>(query: ReadForAlertWrite<T>): bool
 }
 
 /**
+ * Whether the Alerts header may state a stage (Codex review on #1683). Plant
+ * stages count toward it, and a plant with no grow_id reaches its grow only
+ * through the grow's tents, so the stage is unknown until both reads have
+ * data. Display keeps cached rows through a failed refresh; persistence asks
+ * for more (isCurrentReadForAlertWrite). `plants` undefined means the caller
+ * supplies none, so there is nothing to wait for.
+ */
+export function alertHeaderStageReadsSettled(input: {
+  readonly tents: unknown;
+  readonly plants: ReadonlyArray<unknown> | null | undefined;
+}): boolean {
+  return Array.isArray(input.tents) && input.plants !== null;
+}
+
+/**
  * The plants that may decide a persisted alert stage: only those of a
  * current read (see isCurrentReadForAlertWrite). `null` holds persistence.
  */

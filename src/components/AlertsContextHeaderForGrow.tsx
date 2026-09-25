@@ -18,7 +18,11 @@ import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildAlertsHeaderContext } from "@/lib/alertFreshnessContext";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
-import { type AlertStagePlant, resolveGrowPlantStages } from "@/lib/alertPlantStageScopeRules";
+import {
+  type AlertStagePlant,
+  alertHeaderStageReadsSettled,
+  resolveGrowPlantStages,
+} from "@/lib/alertPlantStageScopeRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
@@ -31,7 +35,8 @@ interface Props {
   /**
    * Active plants (any grow). The ones that resolve to this grow, by their own
    * grow_id or else through one of this grow's tents, add their stages; see
-   * resolveAlertContextStage rule 8. `null` while the plant read is pending.
+   * resolveAlertContextStage rule 8. `null` while the plant read is pending
+   * or failed with no data: the header then withholds the stage.
    */
   plants?: ReadonlyArray<AlertStagePlant> | null;
   /** When true, shows a small "Showing alert context for X" note so the
@@ -51,13 +56,17 @@ export default function AlertsContextHeaderForGrow({
   isFallback = false,
   hasOpenAlerts = false,
 }: Props) {
-  const { data: tents = [] } = useGrowTents(growId);
+  const { data: tentRows } = useGrowTents(growId);
+  const tents = useMemo(() => tentRows ?? [], [tentRows]);
   const tentIds = tents.map((t) => t.id);
   const sensorState = useLatestSensorSnapshot(growId, tentIds);
   const targetsState = useGrowTargets(growId);
   const tempUnit = useTemperatureUnitPreference();
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
-  // stages, most advanced known stage wins on disagreement.
+  // stages, most advanced known stage wins on disagreement. Until the tent
+  // and plant reads have data the stage is not known, so the header says so
+  // instead of stating the grow/tent stage (Codex review on #1683).
+  const stagePending = !alertHeaderStageReadsSettled({ tents: tentRows, plants });
   const resolvedStage = useMemo(
     () =>
       resolveAlertContextStage({
@@ -84,6 +93,7 @@ export default function AlertsContextHeaderForGrow({
       buildAlertsHeaderContext({
         growName,
         stage: resolvedStage,
+        stagePending,
         targets: targetsState.status === "ok" ? targetsState.targets : null,
         snapshot: confirmedSnapshot,
         status: headerStatus,
@@ -92,6 +102,7 @@ export default function AlertsContextHeaderForGrow({
     [
       growName,
       resolvedStage,
+      stagePending,
       targetsState.status,
       targetsState.targets,
       confirmedSnapshot,

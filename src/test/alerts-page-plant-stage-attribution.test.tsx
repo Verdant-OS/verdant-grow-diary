@@ -271,6 +271,23 @@ describe("Alerts judges a grow by its tent-attributed plants", () => {
     expect(screen.getByTestId("alerts-context-header-stage").textContent).toMatch(/Flower/);
   });
 
+  it.each([
+    ["pending", { data: undefined, isError: false }],
+    ["failed with no data", { data: undefined, isError: true }],
+  ])("the header withholds the stage while the plant read is %s", async (_s, state) => {
+    // Codex review on #1683: without the plants the grow's Veg tent alone
+    // would claim "Using Veg targets." for a grow whose plant is in Flower.
+    plantsState.value = state;
+    render(
+      <MemoryRouter initialEntries={["/alerts"]}>
+        <Alerts />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(lastPersistFor("g1")).toBeDefined());
+    expect(screen.getByTestId("alerts-context-header-stage-pending")).toBeTruthy();
+    expect(screen.queryByTestId("alerts-context-header-stage")).toBeNull();
+  });
+
   it("a plant refetch in flight holds persistence (Codex review on #1683)", async () => {
     plantsState.value = { data: [TENT_ROLLED_UP_FLOWER], isError: false, isFetching: true };
     render(

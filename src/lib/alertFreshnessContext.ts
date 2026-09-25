@@ -199,6 +199,9 @@ export interface LatestSnapshotDetail {
 export interface AlertsHeaderContextViewModel {
   growName: string | null;
   stageLabel: string | null;
+  /** True while the stage cannot be known yet (its reads have no data);
+   * stageLabel is then null and the header says the stage is unconfirmed. */
+  stagePending: boolean;
   ranges: {
     temp: AlertsHeaderRange | null;
     rh: AlertsHeaderRange | null;
@@ -259,6 +262,9 @@ function buildVpdRange(targets: GrowTargets | null): AlertsHeaderRange | null {
 export interface BuildAlertsHeaderContextArgs {
   growName: string | null;
   stage: string | null;
+  /** True while the reads that decide the stage have no data (Codex review
+   * on #1683). Omitted means the stage is known. */
+  stagePending?: boolean;
   targets: GrowTargets | null;
   snapshot: SensorSnapshot | null;
   status: "idle" | "loading" | "ok" | "unavailable";
@@ -287,7 +293,8 @@ export function buildAlertsHeaderContext(
   const tempUnit: TemperatureUnitPreference = args.tempUnit ?? "celsius";
   return {
     growName: args.growName ?? null,
-    stageLabel: args.stage ? formatStageLabel(args.stage) : null,
+    stageLabel: !args.stagePending && args.stage ? formatStageLabel(args.stage) : null,
+    stagePending: args.stagePending === true,
     ranges: {
       temp: buildTempRange(args.targets, tempUnit),
       rh: buildRhRange(args.targets),

@@ -37,6 +37,7 @@ import {
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
 import { collectCandidateCsvSensorPresenceKeys } from "@/lib/csvSensorPresenceService";
+import { filterCsvPresenceTimestampsForScope } from "@/lib/csvSensorPresenceScopeRules";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 import { tentDetailPath } from "@/lib/routes";
 import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
@@ -86,7 +87,7 @@ function makeInsertClient(
       if (!canContinue()) return new Set<string>();
       try {
         return await collectCandidateCsvSensorPresenceKeys(
-          capturedAts,
+          filterCsvPresenceTimestampsForScope(capturedAts, scope),
           async (timestamps, from, to) => {
             const { data, error, count } = await supabase
               .from("sensor_readings")

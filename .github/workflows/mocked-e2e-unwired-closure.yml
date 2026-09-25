@@ -34,9 +34,6 @@ name: Mocked E2E closure (previously unrun specs)
 #   quick-log-activation-handoff  1 of 3 tests fails deterministically (2/2
 #     runs): the saved entry never becomes visible in the Timeline assertion at
 #     :336. Credential-free, so this is a real signal, not an environment gap.
-#   timeline-local-day-date-filter  both tests fail (2/2). One is a diary lower
-#     bound returning null; the other is "read-only load must never write",
-#     which observed a POST to /rest/v1/rpc/has_role on a read-only load.
 #   ui-overhaul-responsive  2 of 9 fail at 320px and 1440px on /daily-check
 #     concealing intrinsic horizontal overflow. The other 7 pass.
 #   pheno-comparison-reload  needs fonts.googleapis.com, which is unreachable
@@ -80,6 +77,67 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # #1702 repairs and wires the Timeline date proof. Keep it on its own runner:
+  # the first scenario must pass against a cold app without another spec warming
+  # Vite, retrying a failure, or extending the existing assertion/test budgets.
+  timeline-local-day:
+    name: Timeline local-day date filter (mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium only (with deps)
+        run: bunx playwright install chromium --with-deps
+
+      - name: Typecheck the Timeline spec outside the src-only project config
+        run: >-
+          bunx tsc --noEmit --skipLibCheck --strict --target ES2022 --module ESNext
+          --moduleResolution Bundler --types node e2e/timeline-local-day-date-filter.spec.ts
+
+      - name: Run Timeline local-day and fixture boundaries from cold start
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: e2e/results/timeline-local-day.json
+        run: >-
+          bunx playwright test e2e/timeline-local-day-date-filter.spec.ts
+          --project=chromium-mocked --workers=2 --retries=0 --reporter=list,html,json
+
+      - name: Require all three scenarios with zero failures, skips or retries
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync('e2e/results/timeline-local-day.json', 'utf8'));
+          const stats = report.stats ?? {};
+          if (stats.expected !== 3 || stats.unexpected !== 0 || stats.flaky !== 0 ||
+              stats.skipped !== 0 || !Array.isArray(report.errors) || report.errors.length !== 0) {
+            throw new Error(`Timeline local-day proof incomplete: ${JSON.stringify(stats)}`);
+          }
+          const project = report.config?.projects?.find((entry) => entry.name === 'chromium-mocked');
+          if (project?.retries !== 0) throw new Error('Timeline local-day proof must not retry');
+          console.log('Timeline local-day proof: 3 PASS / 0 FAIL / 0 SKIP / 0 FLAKY');
+          NODE
+
+      - name: Upload Timeline local-day proof
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: timeline-local-day-proof
+          path: |
+            e2e/results/timeline-local-day.json
+            playwright-report
+            test-results
+          retention-days: 14
+          if-no-files-found: error
+
   mocked-e2e-closure:
     name: Mocked E2E closure (15 previously unrun specs)
     runs-on: ubuntu-latest

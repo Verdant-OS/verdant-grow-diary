@@ -38,22 +38,31 @@ describe("CSV candidate timestamp lookup", () => {
     expect(readPage).not.toHaveBeenCalled();
   });
 
-  it("discards keys from earlier timestamp batches when ownership ends mid-import", async () => {
-    const rows = history.slice(0, CSV_PRESENCE_TIMESTAMP_BATCH_SIZE + 1);
+  it("discards keys from batches that completed before ownership ends in a later batch", async () => {
+    // Enough batches that the last one can only start after a worker has
+    // stored an earlier batch's keys, whatever the lookup concurrency.
+    const batchCount = 8;
+    const rows = history.slice(0, CSV_PRESENCE_TIMESTAMP_BATCH_SIZE * (batchCount - 1) + 1);
+    const lastTimestamp = rows.at(-1)!.captured_at;
     let active = true;
+    let completedBatches = 0;
+    let completedBeforeCancel = -1;
     const readPage = vi.fn(async (batch: readonly string[], from: number, to: number) => {
       const page = rows.filter((row) => batch.includes(row.captured_at)).slice(from, to + 1);
-      if (batch.includes(rows.at(-1)!.captured_at) && page.length > 0) active = false;
+      if (page.length === 0) completedBatches += 1;
+      if (active && batch.includes(lastTimestamp)) {
+        completedBeforeCancel = completedBatches;
+        active = false;
+      }
       return page;
     });
-    expect(
-      await collectCandidateCsvSensorPresenceKeys(
-        rows.map((row) => row.captured_at),
-        readPage,
-        () => active,
-      ),
-    ).toEqual(new Set());
-    expect(readPage.mock.calls.length).toBeGreaterThan(0);
+    const keys = await collectCandidateCsvSensorPresenceKeys(
+      rows.map((row) => row.captured_at),
+      readPage,
+      () => active,
+    );
+    expect(completedBeforeCancel).toBeGreaterThan(0);
+    expect(keys).toEqual(new Set());
   });
 
   it("reads only sparse candidate timestamps while honoring smaller server pages", async () => {

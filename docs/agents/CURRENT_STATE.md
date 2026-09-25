@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-25 UTC (amended 11:42–11:45 UTC; Vercel event log and alias records read 11:32–11:33 UTC; Vercel alias lookups by hostname 10:19, 11:17, 11:24 UTC; tip and live measured 11:24 UTC; amendments committed 11:34:37, 11:43:03 and the time correction that follows)
+**Last updated:** 2026-09-25 UTC (Vercel event log and alias records read 11:32–11:33 UTC; Vercel alias lookups by hostname 10:19, 11:17, 11:24 UTC; tip and live measured 11:24 UTC; prior amendments committed 11:34:37, 11:43:03, 11:43:25 — the current amendment's own time is its git commit time, which this line cannot know)
 **Updated by:** Claude (2026-09-25 late morning, restamp on the **same deploy tip
 `9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`**, the `#1680` squash, to carry **Codex's independent-review findings** on this PR — a P1 at `538ca410`, a second-pass P1 and P2 at `6eb12549`, and five third-pass P2s at
 `dd75f7b0`, the last two rounds carried by amending this stamp in place (§5). **Zero commits** merged since the 09:21 stamp; no
@@ -86,9 +86,14 @@ history import is a batched write path that can report failure after earlier bat
 Whether any CSV import ran in the window, and whether it left partial rows, is unknown. **There
 are no server-side import audit rows to reconcile:** the import audit ledger
 (`sensorHistoryImportAuditLog`) is browser-`localStorage` only, declares no network and no
-Supabase, and has no production caller under `src/`. The feasible durable check is a read of
-`sensor_readings` rows with `source = 'csv'` and `created_at` between 08:29:17 and 09:45:16 UTC —
-an operator or service-role read, not this session's, since this session has no database access.
+Supabase, and has no production caller under `src/`. The feasible durable check is a read of `sensor_readings` rows with `source = 'csv'` and
+`created_at` from 08:29:17 UTC onward **with an open end**: a browser tab that loaded `7053af8f`
+before 09:45:16 kept running that build's JavaScript after the alias re-assignment, and Skew
+Protection (enabled at 08:28:52 by the same token, §2) can pin such clients to the deployment they
+loaded, so a CSV import from a stale session after 09:45:16 still used the unreviewed path. The
+window closes only when the operator can exclude sessions loaded before 09:45:16 (for example by
+the deployment id such rows' `raw_payload` or request logs carry, if any). This is an operator or
+service-role read, not this session's, since this session has no database access.
 Until that read is made, import occurrence and data impact stay `NOT_MEASURED`; do not state that
 stored data was unaffected.
 
@@ -135,6 +140,11 @@ CHILD` `bd64ca8b` stand.
   aliases point to" and public DNS/HTTP stays `NOT_MEASURED`, §2); and the header's read and
   update times were written ahead of the 11:34:37 commit (`4104134443`; actual read times
   11:32–11:33 are recorded).
+- **Codex's fourth pass on `96a7e0df` (Security Review 11:46, no findings; Code Review 11:47)**
+  posted two **P2**s, carried here: the corrected header still claimed an interval ending after
+  its own commit (`4104184074`; the header now states only read times and past commit times); and
+  the `sensor_readings` window must not end at 09:45:16 because stale sessions keep running the
+  old build (`4104184070`; the window is now open-ended until such sessions can be excluded, §3).
 - The two owner-side Claude reads (`5315633209`, `5315834826`) and Claude's replies stand as the
   09:21 stamp §5 records. **Codex's independent verdict on the PR as a whole is still the one open
   item on Claude's side;** a P1 finding is a review, not a verdict.

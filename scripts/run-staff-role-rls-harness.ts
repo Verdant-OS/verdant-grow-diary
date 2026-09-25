@@ -211,9 +211,13 @@ async function main() {
       .eq("user_id", victimId)
       .eq("role", "staff")
       .select();
+    // RLS alone filters the row (no error, zero rows); once
+    // 20260925090000 removes the browser write grants the request is refused
+    // outright (42501). Either way nothing changes, which the admin read
+    // below proves.
     check(
-      "attacker UPDATE on victim's staff row affects zero rows",
-      !updErr && (upd?.length ?? 0) === 0,
+      "attacker UPDATE on victim's staff row is refused or affects zero rows",
+      updErr ? updErr.code === "42501" : (upd?.length ?? 0) === 0,
       updErr?.message ?? `rows=${upd?.length}`,
     );
     // Verify unchanged from admin view.
@@ -235,8 +239,8 @@ async function main() {
       .eq("role", "staff")
       .select();
     check(
-      "attacker DELETE on victim's staff row affects zero rows",
-      !delErr && (del?.length ?? 0) === 0,
+      "attacker DELETE on victim's staff row is refused or affects zero rows",
+      delErr ? delErr.code === "42501" : (del?.length ?? 0) === 0,
       delErr?.message ?? `rows=${del?.length}`,
     );
     const { data: after } = await admin

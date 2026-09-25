@@ -4,8 +4,8 @@
   "canonicalLockfile": "bun.lock",
   "compatibilityLockfile": "package-lock.json",
   "owner": "Verdant dependency security",
-  "reason": "package-lock.json remains synchronized while SEO, local setup, and the Vercel preview dashboard checklist still invoke or document npm. vercel.json pins bun install/build (canonical) via top-level commands — not an npm consumer.",
-  "reviewBy": "2026-09-25",
+  "reason": "The 2026-09-25 review retained the synchronized npm compatibility lock for the four enumerated repository consumers through 2026-10-02; see docs/dependency-lockfile-transition-review-2026-09-25.md. Bun remains canonical, and vercel.json pins Bun install/build. Preview dashboard settings are not verified by this repository review.",
+  "reviewBy": "2026-10-02",
   "consumerContracts": [
     {
       "path": ".github/workflows/seo-monitoring.yml",

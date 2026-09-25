@@ -9,8 +9,8 @@
  *   - Read-only derivation over injected inputs; fully unit-testable.
  *
  * Data sources (see docs/spec-pro-blueprint-overlay.md §2, metric provenance):
- *   - temp / rh / vpd / ppfd ← `SensorSnapshot` (temp/rh live via ECOWITT,
- *     vpd derived, ppfd manual/CSV).
+ *   - temp / rh / vpd / ppfd ← `SensorSnapshot`, preserving its supplied
+ *     provenance. A supplied VPD value is not proof of local computation.
  *   - ec / ph              ← latest `feeding_events` values (manually logged).
  *   - dli                  ← `aggregateDli()` result (derived; often absent).
  *   - isDay                ← the tent's `light.on` flag (`tents.light_on`),
@@ -43,8 +43,14 @@ import {
   type TemperatureUnitPreference,
 } from "@/lib/temperatureUnitPreference";
 import { normalizeVpdStage, type VpdStage } from "@/lib/vpdStageTargetRules";
+import {
+  resolveBlueprintReadState,
+  resolveBlueprintSensorEvidence,
+  type BlueprintReadState,
+} from "@/lib/blueprintEvidenceRules";
 
-export type BlueprintMetricProvenance = "live" | "manual" | "derived" | "missing";
+export type BlueprintMetricProvenance =
+  "live" | "manual" | "derived" | "missing" | "csv" | "sim" | "diary" | "unverified";
 
 export interface BlueprintOverlayRow {
   metricKey: BlueprintMetricKey;
@@ -75,15 +81,24 @@ export interface BlueprintOverlayViewModel {
   isDay: boolean | null;
   rows: BlueprintOverlayRow[];
   summary: BlueprintOverlaySummary;
+  sensorNotice: string | null;
+  feedingNotice: string | null;
+  retryEvidence: boolean;
 }
 
 /** The subset of a full `SensorSnapshot` the overlay reads. */
 export type BlueprintSnapshotInput = Pick<
   SensorSnapshot,
   "source" | "temp" | "rh" | "vpd" | "ppfd"
->;
+> &
+  Partial<Pick<SensorSnapshot, "ts">>;
 
 export interface BuildBlueprintOverlayInput {
+  /** Clock and read state injected by the live container; no clock means no current score. */
+  now?: number;
+  sensorRead?: BlueprintReadState;
+  feedingRead?: BlueprintReadState;
+  hasTent?: boolean;
   stage: string | null | undefined;
   snapshot: BlueprintSnapshotInput | null | undefined;
   /** Latest logged feed values (from `feeding_events`). */
@@ -186,18 +201,26 @@ function provenanceFor(
 ): BlueprintMetricProvenance {
   if (value === null || !Number.isFinite(value)) return "missing";
   switch (metricKey) {
-    case "vpdKpa":
     case "dli":
       return "derived";
-    case "ppfd":
     case "ec":
     case "ph":
       return "manual";
+    case "vpdKpa":
+    case "ppfd":
     case "tempC":
     case "rh":
-      // temp/rh are the only genuinely live-capable metrics; "live" requires
-      // the snapshot to literally be a live reading, else it was logged.
-      return snapshotSource === "live" ? "live" : "manual";
+      // The snapshot carries supplied values, not proof that VPD was computed
+      // here or that PPFD was entered manually. Preserve its actual source.
+      if (
+        snapshotSource === "live" ||
+        snapshotSource === "manual" ||
+        snapshotSource === "csv" ||
+        snapshotSource === "sim" ||
+        snapshotSource === "diary"
+      )
+        return snapshotSource;
+      return "unverified";
   }
 }
 
@@ -233,13 +256,26 @@ export function buildBlueprintOverlayViewModel(
   const isDay = input.isDay ?? null;
 
   const summary: BlueprintOverlaySummary = { green: 0, amber: 0, red: 0, missing: 0 };
+  const sensorEvidence = resolveBlueprintSensorEvidence(
+    input.snapshot,
+    input.sensorRead,
+    input.now,
+    input.hasTent,
+  );
+  const feedingEvidence = resolveBlueprintReadState(input.feedingRead, "Feeding");
 
   const rows: BlueprintOverlayRow[] = METRIC_META.map((meta) => {
     const value = readValue(meta.key, input);
+    const evidence =
+      meta.key === "ec" || meta.key === "ph"
+        ? feedingEvidence
+        : meta.key === "dli"
+          ? null
+          : sensorEvidence;
     const result = evaluateBlueprintMetric({
       stage: input.stage,
       metricKey: meta.key,
-      value,
+      value: evidence && !evidence.canScore ? null : value,
       isDay,
       bands: input.bands,
       warnMargin: input.warnMargin,
@@ -286,7 +322,7 @@ export function buildBlueprintOverlayViewModel(
       result,
       provenance,
     };
-    if (provenance === "missing") {
+    if (provenance === "missing" && !evidence?.notice) {
       row.nudge = meta.missingNudge;
     }
     if (meta.key === "tempC" && stageKnown && result.band) {
@@ -295,5 +331,14 @@ export function buildBlueprintOverlayViewModel(
     return row;
   });
 
-  return { stageLabel, stageKnown, isDay, rows, summary };
+  return {
+    stageLabel,
+    stageKnown,
+    isDay,
+    rows,
+    summary,
+    sensorNotice: sensorEvidence.notice,
+    feedingNotice: feedingEvidence.notice,
+    retryEvidence: sensorEvidence.retryable || feedingEvidence.retryable,
+  };
 }

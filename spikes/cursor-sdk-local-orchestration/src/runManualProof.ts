@@ -1,25 +1,15 @@
 import { execFileSync } from "node:child_process";
 
 import { FIXED_CATALOG_MODEL_ID } from "./constants.ts";
-import { OrchestrationError } from "./errors.ts";
+import { assertSupportedNodeVersion } from "./nodeVersion.ts";
 import { runOrchestration } from "./runCoordinator.ts";
-
-function assertNodeVersion(): void {
-  const [major, minor] = process.versions.node.split(".").map(Number);
-  if ((major ?? 0) < 22 || (major === 22 && (minor ?? 0) < 13)) {
-    throw new OrchestrationError("Node.js 22.13 or newer is required", {
-      code: "NODE_VERSION",
-      retryable: false,
-    });
-  }
-}
 
 function repoRoot(): string {
   return execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 }
 
 async function main(): Promise<void> {
-  assertNodeVersion();
+  assertSupportedNodeVersion(process.versions.node);
   const authorized = process.argv.includes("--authorize-live-proof");
   if (!process.env.CURSOR_API_KEY) {
     process.stdout.write("SDK LIVE PROOF: BLOCKED — CURSOR_API_KEY NOT PROVIDED\n");

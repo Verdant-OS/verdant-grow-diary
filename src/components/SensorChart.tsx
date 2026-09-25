@@ -84,7 +84,7 @@ export default function SensorChart({
   }, [filteredData, metric, temperatureUnit]);
 
   const handleExport = () => {
-    const csv = buildSensorReadingsCsv(filteredData);
+    const csv = buildSensorReadingsCsv(filteredData, Date.now());
     const filename = `sensor-readings-${metric}-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
     downloadTextFile(csv, filename);
   };

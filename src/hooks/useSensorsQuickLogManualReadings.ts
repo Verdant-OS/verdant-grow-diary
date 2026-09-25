@@ -11,6 +11,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/store/auth";
+import { useNowTick } from "@/hooks/useNowTick";
 import { isUuid } from "@/lib/isUuid";
 import { selectWithRetractionCompat } from "@/lib/quick-log/retractionFilterCompat";
 import type { RawGrowEventRow } from "@/lib/quickLogGroupedTimelineRowAdapter";
@@ -61,6 +62,7 @@ async function fetchManualDiary(tentId: string): Promise<SensorsQuickLogDiaryRow
 
 export function useSensorsQuickLogManualReadings(tentId?: string | null) {
   const { user } = useAuth();
+  const nowMs = useNowTick();
   const enabled = Boolean(user) && isUuid(tentId);
   const queryKey = [...buildSensorsQuickLogManualReadingsQueryKey(tentId), user?.id ?? "anon"];
   const events = useQuery({
@@ -82,9 +84,10 @@ export function useSensorsQuickLogManualReadings(tentId?: string | null) {
             tentId,
             growEvents: events.data,
             diaryEntries: diary.data,
+            now: new Date(nowMs),
           })
         : [],
-    [enabled, tentId, events.data, diary.data],
+    [enabled, tentId, events.data, diary.data, nowMs],
   );
   return {
     data,

@@ -1,12 +1,15 @@
+import { randomUUID } from "node:crypto";
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import {
+  acceptedReceipt,
   createLocalFixture,
   fenceBrowser,
   fingerprint,
   localEnvironment,
   ownerRows,
   signIn,
+  visibleEventIds,
   witnessRows,
 } from "./lib/nativeLocalFixtures";
 
@@ -215,6 +218,125 @@ for (const source of ["live", "manual"] as const) {
         await expect(page.getByTestId("sensors-vpd-derived-value")).toHaveCount(
           quality === "ok" ? 1 : 0,
         );
+        expect(fingerprint(await ownerRows(f.owner))).toBe(fingerprint(before));
+        expect(fingerprint(await witnessRows(f))).toBe(fingerprint(otherBefore));
+      } finally {
+        await page.close();
+        await f.cleanup();
+      }
+    });
+  }
+}
+
+for (const projection of ["event", "diary"] as const) {
+  for (const transition of ["future-recovery", "manual-aging"] as const) {
+    test(`Quick Log ${projection} ${transition} reprojects without refetch or writes and survives reopening`, async ({
+      page,
+      context,
+    }) => {
+      const f = await createLocalFixture();
+      try {
+        await fenceBrowser(context, f.env);
+        await signIn(page, f);
+        const wallNow = Date.now();
+        const capturedAt = new Date(
+          wallNow - (transition === "future-recovery" ? 1 : 1436) * 60_000,
+        ).toISOString();
+        // Keep the actual write within the database's timestamp fence; only the
+        // browser clock is slow in the future-recovery scenario.
+        const now =
+          transition === "future-recovery" ? Date.parse(capturedAt) - 10 * 60_000 : wallNow;
+        const manualSnapshot = { source: "manual", temp_f: 77, humidity_percent: 55 };
+        const saved = await f.owner.client.rpc("quicklog_save_manual", {
+          p_target_type: "plant",
+          p_target_id: f.primary.plantId,
+          p_action: "note",
+          p_note: "Native local Quick Log manual clock proof",
+          p_occurred_at: capturedAt,
+          p_idempotency_key: randomUUID(),
+          ...(projection === "event"
+            ? { p_temperature_c: 25, p_humidity_pct: 55 }
+            : { p_details: { manual_sensor_snapshot: manualSnapshot } }),
+        });
+        if (saved.error) throw new Error("Local Quick Log manual clock save failed");
+        const receipt = acceptedReceipt(saved.data);
+        const before = await ownerRows(f.owner);
+        const otherBefore = await witnessRows(f);
+        // Each case exercises only its intended manual projection. A matching
+        // sensor_readings row or the other projection cannot rescue the UI.
+        expect(before.sensor_readings).toHaveLength(0);
+        const events = before.grow_events.filter((row) => row.event_type === "environment");
+        expect(events).toHaveLength(projection === "event" ? 1 : 0);
+        expect(before.environment_events).toHaveLength(projection === "event" ? 1 : 0);
+        expect(before.diary_entries).toHaveLength(1);
+        expect(
+          before.grow_events.some(
+            (row) => row.id === receipt.grow_event_id && row.source === "manual",
+          ),
+        ).toBe(true);
+        for (const row of [...before.grow_events, ...before.diary_entries]) {
+          expect(row).toMatchObject({
+            user_id: f.owner.id,
+            grow_id: f.primary.growId,
+            tent_id: f.primary.tentId,
+            plant_id: f.primary.plantId,
+          });
+          expect(Date.parse(String(row.occurred_at ?? row.entry_at))).toBe(Date.parse(capturedAt));
+        }
+        if (projection === "event") {
+          expect(events[0]).toMatchObject({ source: "manual", is_deleted: false });
+          expect(before.environment_events[0]).toMatchObject({
+            event_id: events[0].id,
+            temperature_c: 25,
+            humidity_pct: 55,
+            vpd_kpa: null,
+          });
+          expect(before.diary_entries[0].details).not.toHaveProperty("manual_sensor_snapshot");
+        } else {
+          expect(before.diary_entries[0]).toMatchObject({
+            retracted_at: null,
+            details: { manual_sensor_snapshot: manualSnapshot },
+          });
+        }
+        expect(
+          await visibleEventIds(
+            f.other,
+            before.grow_events.map((row) => String(row.id)),
+          ),
+        ).toEqual([]);
+        let projectionReads = 0;
+        page.on("request", (request) => {
+          if (
+            [
+              "/rest/v1/sensor_readings_effective",
+              "/rest/v1/grow_events",
+              "/rest/v1/diary_entries",
+            ].includes(new URL(request.url()).pathname)
+          )
+            projectionReads++;
+        });
+        await page.clock.install({ time: new Date(now) });
+        await page.goto(`${f.env.ui}/sensors?tentId=${f.primary.tentId}&tentIntent=required`);
+        const temp = page.getByTestId("sensors-metric-state-temp");
+        const vpd = page.getByTestId("sensors-metric-state-vpd");
+        const future = transition === "future-recovery";
+        await expect(temp).toHaveAttribute("data-kind", future ? "invalid" : "manual");
+        await expect(page.getByTestId("sensors-stage-status-temp")).toHaveCount(future ? 0 : 1);
+        await expect(page.getByTestId("sensors-vpd-derived-value")).toHaveCount(future ? 0 : 1);
+        const readsBeforeClock = projectionReads;
+        expect(readsBeforeClock).toBeGreaterThan(0);
+        await page.clock.fastForward(future ? 6 * 60_000 + 1000 : 5 * 60_000);
+        await expect(temp).toHaveAttribute("data-kind", future ? "manual" : "stale");
+        await expect(vpd).toHaveAttribute("data-kind", future ? "derived" : "stale");
+        await expect(page.getByTestId("sensors-stage-status-temp")).toHaveCount(future ? 1 : 0);
+        await expect(page.getByTestId("sensors-vpd-derived-value")).toBeVisible();
+        expect(projectionReads).toBe(readsBeforeClock);
+        expect(fingerprint(await ownerRows(f.owner))).toBe(fingerprint(before));
+        await page.reload();
+        await expect(temp).toHaveAttribute("data-kind", future ? "manual" : "stale");
+        await expect(vpd).toHaveAttribute("data-kind", future ? "derived" : "no_reading_yet");
+        await expect(page.getByTestId("sensors-stage-status-temp")).toHaveCount(future ? 1 : 0);
+        await expect(page.getByTestId("sensors-vpd-derived-value")).toHaveCount(future ? 1 : 0);
         expect(fingerprint(await ownerRows(f.owner))).toBe(fingerprint(before));
         expect(fingerprint(await witnessRows(f))).toBe(fingerprint(otherBefore));
       } finally {

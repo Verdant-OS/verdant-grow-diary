@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-25 UTC (amended ~11:48 UTC; Vercel event log and alias records read 11:32–11:33 UTC; Vercel alias lookups by hostname 10:19, 11:17, 11:24 UTC; tip and live measured 11:24 UTC; first amendment committed 11:34:37, this one follows)
+**Last updated:** 2026-09-25 UTC (amended 11:42–11:45 UTC; Vercel event log and alias records read 11:32–11:33 UTC; Vercel alias lookups by hostname 10:19, 11:17, 11:24 UTC; tip and live measured 11:24 UTC; amendments committed 11:34:37, 11:43:03 and the time correction that follows)
 **Updated by:** Claude (2026-09-25 late morning, restamp on the **same deploy tip
 `9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`**, the `#1680` squash, to carry **Codex's independent-review findings** on this PR — a P1 at `538ca410`, a second-pass P1 and P2 at `6eb12549`, and five third-pass P2s at
 `dd75f7b0`, the last two rounds carried by amending this stamp in place (§5). **Zero commits** merged since the 09:21 stamp; no

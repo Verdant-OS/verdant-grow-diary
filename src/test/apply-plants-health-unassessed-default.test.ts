@@ -1034,4 +1034,14 @@ describe("plants health unassessed default workflow", () => {
     expect(runbook).toMatch(/never delete/i);
     expect(runbook).toMatch(/does not rewrite existing/i);
   });
+
+  it("orders APPLY before promoting the #1683 client (owner decision, 2026-09-25)", () => {
+    const runbook = readFileSync(RUNBOOK_PATH, "utf8");
+
+    expect(runbook).toMatch(/apply before promotion/i);
+    expect(runbook).toMatch(/only then promote/i);
+    expect(runbook).toMatch(/applied_verified[\s\S]*promote the #1683 client/i);
+    // The superseded order must not survive as a second instruction.
+    expect(runbook).not.toMatch(/apply it soon\s+after the #1683 client is published/i);
+  });
 });

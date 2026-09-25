@@ -14,10 +14,16 @@ The workflow is intentionally not a general migration runner. It rejects any
 other filename, version, byte hash, repository, branch, commit, project, or
 catalog shape.
 
-**Order of operations.** The migration and the client change that relies on
-it arrive with #1683. This lane can only run after #1683 is merged into
-`verdant-grow-diary`, because it runs from the deploy branch and pins the
-migration's bytes.
+**Order of operations: apply before promotion** (owner decision, 2026-09-25).
+
+1. Merge #1683, then #1701, then the PR that adds this lane. The migration and
+   the client change that relies on it arrive with #1683. This lane runs from
+   `verdant-grow-diary` and pins the migration's bytes, so #1683 must be
+   merged first. It does not need to be live.
+2. PREFLIGHT, review, then APPLY this migration.
+3. Only then promote the build that carries the #1683 client to production.
+
+The reasons for this order are under "What the migration does".
 
 ## Why this lane exists
 
@@ -49,8 +55,19 @@ dialog asks the grower to choose a health value. After the apply, both save.
 Guided setup has no health field and omits the column, so the default applies
 there: `'healthy'` before the apply, as it always was, and `'unknown'` after.
 
-Until this apply runs, Create Plant refuses "Not assessed yet". Apply it soon
-after the #1683 client is published.
+Apply before promotion. The client that production runs before #1683 is also
+safe on the new default (source at deploy tip `c10c095`):
+
+- a stored `'unknown'` renders as a neutral "Unknown" (`plantHealthRules.ts`);
+- Edit Plant omits health on save rather than writing `'unknown'` back
+  (`buildPlantHealthUpdate`);
+- Create Plant preselects and sends `'healthy'` explicitly, so the new default
+  does not affect it.
+
+So only inserts that omit health change: guided-setup plants go from a false
+"Healthy" to "Unknown", which is BUG-009's fix. The reverse order opens a
+window. With the #1683 client live and this migration not applied, Create
+Plant refuses "Not assessed yet", and guided-setup plants still read Healthy.
 
 ## Safety boundary
 
@@ -258,6 +275,10 @@ changes nothing, but recovery never replays it.
 Retain the sanitized APPLY evidence artifact and the GitHub run URLs. A PASS
 shows `applied_verified`, the pinned migration version and hash, the exact
 deploy SHA, and recovery path `migration_then_ledger` or `ledger_only`.
+
+Only after that PASS, promote the #1683 client (step 3 of the order of
+operations). A failed or stopped APPLY keeps the #1683 client unpromoted until
+a later APPLY passes.
 
 There is no destructive automatic rollback. If the default must be withdrawn,
 prepare a separately reviewed forward migration (for example

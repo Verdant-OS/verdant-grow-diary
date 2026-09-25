@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-25 UTC (tip read 14:27 UTC; tip lanes read 14:27 UTC; the tip's four red push-lane logs read 14:28 UTC; `#1696` head `4924e8fb` lanes settled 14:51 UTC on the latest attempt, read 14:52 UTC; Vercel production deployment list and alias records re-read 14:28 UTC for `verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app` and the project alias; public serving state `NOT_MEASURED`; this stamp's own time is its git commit time)
+**Last updated:** 2026-09-25 UTC (tip read 14:27 UTC; tip lanes read 14:27 UTC; three of the tip's five red push-lane logs (the audit, schema and money lanes) and the scheduled sandbox smoke's log read 14:28 UTC, the push-event dependency audit's not re-read; `#1696` head `4924e8fb` lanes settled 14:51 UTC on the latest attempt, read 14:52 UTC; Vercel production deployment list and alias records re-read 14:28 UTC for `verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app` and the project alias; public serving state `NOT_MEASURED`; this stamp's own time is its git commit time)
 **Updated by:** Claude (2026-09-25 afternoon, restamp on the **new deploy tip `db0f3d73d63ebc7ab780f9d1b561cef4eed1cc74`**, the `#1700` squash, **for a reviewer finding**: Codex's fourteenth pass (`4105483125`, **P1**) found that `#1700` had merged at 14:13:18, before the `4924e8fb` amendment was committed at 14:19 with §1 still on `054a4e3e`. **One commit** merged since the 14:11 stamp (`#1700`), through the merge queue with the 35 pinned required contexts green on its merge-group head; no migration (§1, §4). This stamp records **this file's own PR head `4924e8fb` lanes after they settled: 27 runs, 25 green, 1 skipped, 1 red — `CI` green on its first attempt; the two Local lanes green on the one permitted re-run each after dying in `bun install`** (§8), the tip's sandbox schema and money-migration gaps **re-measured from the `db0f3d73` job logs** (§8, §9), and **Codex's independent review so far: fourteen passes on fourteen heads, four P1 and thirty P2, all carried; the fourteenth pass's one P1 and two P2 are carried by this stamp** (§5). Vercel: the `db0f3d73` build is the fifth git production deployment since the rollback; the project alias now points to it, while the apex, `www` and `verdant-grow-diary.vercel.app` still point to `9b06be3f` (§2). No Publish. No APPLY. `HOLD #1250`. Prior header follows.)
 
 ## 1. Deploy tip `db0f3d73` — one commit since the 14:11 stamp
@@ -128,7 +128,7 @@ review `5315633209`; `#1702` has since merged. Not re-listed. Only `#1696` touch
 
 - **`HOLD #1250`.** Do not touch, ready or merge it.
 - **No Publish. No APPLY.** `#1460` and `#1545` stay parked. `#1701` proposes a delivery lane for `#1460`'s migration; it does not apply it and does not lift the park. Any APPLY is Cheek's dispatch after PREFLIGHT, never Claude's.
-- **Pinned-production lane warning, carried from `#1701` (comment `5829431054`, `source claim` from that slice; the script's own header at the tip is `established fact`):** a `workflow_dispatch` of the lane that runs `scripts/apply-pinned-production-migrations.mjs` would APPLY all three pinned `20260728` migration files against production behind the single confirmation phrase `APPLY PINNED PRODUCTION MIGRATIONS` — the tip's script resolves `20260728090000_production_schema_reconciliation.sql`, `20260728090736_ai_credit_pack_portability.sql` and `20260728103000_schema_audit_trust_hardening.sql`, and one dispatch executes all three; whether a clean re-run is safe is `NOT_MEASURED`. It requires the PREFLIGHT receipt and a separate owner decision first. `#1701`'s header warning is in that open PR, not yet at the tip. Never dispatched by Claude.
+- **Pinned-production lane warning, carried from `#1701` (comment `5829431054`, `source claim` from that slice; the script's own header at the tip is `established fact`):** a `workflow_dispatch` of the lane that runs `scripts/apply-pinned-production-migrations.mjs` would APPLY all three pinned `20260728` migration files against production behind the single confirmation phrase `APPLY PINNED PRODUCTION MIGRATIONS` — the tip's script resolves `20260728090000_production_schema_reconciliation.sql`, `20260728090736_ai_credit_pack_portability.sql` and `20260728103000_schema_audit_trust_hardening.sql`, and one dispatch executes all three; whether a clean re-run is safe is `NOT_MEASURED`. `established fact` from `.github/workflows/apply-pinned-production-migrations.yml` at the tip: the dispatch takes three inputs — `expected_head_sha` (must equal the checked-out deploy-branch commit), `confirm_project_ref` (must equal the pinned production project ref) and `confirm_apply` (the phrase above) — validated by a `validate` job; the `apply` job ("Preflight, apply once, and verify", environment `verdant-production-solo-founder`) then runs its read-only preflight inside the same dispatch before applying. There is no separate PREFLIGHT receipt artifact that gates it; the gate is those confirmations, the environment, and the owner's decision to dispatch at all. `#1701`'s header warning is in that open PR, not yet at the tip. Never dispatched by Claude.
 - **Fixture AUTH Soft-park:** after `cheekhimself` re-banks, re-measure the empty Action Queue and the
   archived Restore XOR. **Never KEEP on fixture walks.** No owner email is recorded in this file.
 - **Soft P2 — parked, do not implement:** sensors / Start Check `growId` omit; Quick Log target count;
@@ -159,9 +159,7 @@ lanes are `NOT_MEASURED` here by construction** and belong to the next stamp or 
 - **Dynamic review lanes:** `Code Quality: PR #1696` — `success` (14:27:51); `PR #1696` — `success` (14:27:38).
 - **Green, the rest (18 runs, 17 names):** `AI Doctor Golden Cases`, `AI Doctor Readiness UI`, `Contextual Pheno Comparison v0`, `ESLint`, `Irrigation pgTAP + Harness Typecheck`, `Native Manual Correction Local`, `One-Tent Loop smoke test`, `Paddle preflight renderer tests`, `Quick Log gate (typecheck + targeted tests)`, `SEO parity & head fidelity`, `Security regression`, `Sentinel version parity`, `TypeScript typecheck`, `docs-safety`, `edge-shared-sync`, `release-workbook-safety`, `Typecheck (tsgo) + build` (once on the pull_request event, once on the push event).
 - **Skipped (1):** `Stabilization PR scope gate`.
-- **Red — `Dependency & Security CI` (run `36146690103`):** not re-read on this head; the same
-  `hono` and `js-yaml` advisories as on every head today and on the tip's merge group (§8 below);
-  the diff touches no dependency; `#1343` separately owned; standing-down comment already on the
+- **Red — `Dependency & Security CI` (run `36146690103`):** its log not re-read on this head, so its cause on this head is `NOT_MEASURED` here; the `hono` and `js-yaml` advisories were read on `ccf132dc` (14:11 stamp §8) and on every earlier head today; the diff touches no dependency; `#1343` separately owned; standing-down comment already on the
   PR; **no re-run**.
 - **Versus `ccf132dc` (settled 14:06):** no row differs by name and event; the differences are which
   lanes needed the install-fault re-run (`CI` there; the two Local lanes here).
@@ -177,9 +175,7 @@ result belongs to a later read.**
 
 - **Merge-group (the merge gate):** `CI` (35 pinned required contexts) green; the Vitest gate,
   `Security regression` and the four PG15 forward-repair lanes green; `Dependency & Security CI` red.
-- **Red (6), each log read 14:28 unless stated:** `Required-check audit` `FAIL` (§4);
-  `Dependency & Security CI` on the merge-group and push events (not re-read; the same `hono` and
-  `js-yaml` advisories on every head today, `#1343` separately owned); **`Required core schema
+- **Red (6); the audit, schema, money and scheduled-smoke logs read 14:28, the two dependency-audit logs not re-read:** `Required-check audit` `FAIL` (§4); `Dependency & Security CI` on the merge-group and push events — logs not re-read on this tip, cause `NOT_MEASURED` here (the `hono` and `js-yaml` advisories were read on this PR's `ccf132dc` head, 14:11 stamp §8; `#1343` separately owned); **`Required core schema
   present` — "14 of 51 required core column(s) are missing"** in the sandbox (identity verified,
   `shared-supavisor-transaction`), every one from
   `supabase/migrations/20260811090000_quicklog_corrections_retractions.sql` (thirteen
@@ -193,7 +189,7 @@ result belongs to a later read.**
   file's, never re-run by Claude.
 - **Neither re-run.** The two sandbox lanes report the state of the pinned sandbox, not production
   (§9); `#1683` is still the open PR carrying the Quick Log corrections migration.
-- **The four earlier tips today:** `054a4e3e` — as the 14:11 stamp records at 14:08 (36 runs, 24
+- **The five earlier tips today:** `054a4e3e` — as the 14:11 stamp records at 14:08 (36 runs, 24
   green, 1 skipped, 6 red, 1 cancelled, 4 open; not re-read since). `b099bbf7`, `5a5094cc`,
   `c10c095e` and `9b06be3f` — carried as history as the 14:11 and 13:27 stamps record; none re-run.
 - **`GA E2E (webkit)`:** not run on these heads; its `be214d7c` record (red on attempt 1 and the

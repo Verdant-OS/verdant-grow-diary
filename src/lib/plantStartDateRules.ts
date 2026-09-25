@@ -9,10 +9,14 @@
  * negative age ("AGE -463 days").
  *
  * Contract:
- *  - New saves store the picked date at LOCAL midnight.
- *  - Reading: an instant that is exactly UTC midnight is a legacy date-only
- *    save; its UTC calendar date is the date the grower picked. Any other
- *    instant is read in the grower's local zone.
+ *  - New saves store the picked date at UTC midnight, the same shape as a
+ *    legacy date-only save, so the date does not depend on the zone of the
+ *    device that saved it or the one that reads it (picked Jul 1 in Auckland
+ *    still reads Jul 1 in Los Angeles).
+ *  - Reading: an instant that is exactly UTC midnight is a date-only save;
+ *    its UTC calendar date is the date the grower picked. Any other instant
+ *    (the column default now(), or an earlier local-midnight save) is read in
+ *    the grower's local zone.
  *  - A start date after today (local) is rejected on save and never yields
  *    a negative age.
  *
@@ -79,14 +83,14 @@ export const PLANT_START_DATE_FUTURE_MESSAGE =
   "Start date can't be in the future. Pick today or an earlier date.";
 export const PLANT_START_DATE_INVALID_MESSAGE = "Enter a valid start date.";
 
-/** Date input → stored instant (local midnight of the picked date). */
+/** Date input → stored instant (UTC midnight of the picked date). */
 export function plantStartDateInputToIso(value: string, now: Date): PlantStartDateSaveResult {
   const date = parsePlantStartDateInput(value);
   if (!date) return { ok: false, reason: "invalid" };
   if (calendarDaysBetween(localCalendarDate(now), date) > 0) {
     return { ok: false, reason: "future" };
   }
-  return { ok: true, iso: new Date(date.year, date.month - 1, date.day).toISOString() };
+  return { ok: true, iso: new Date(Date.UTC(date.year, date.month - 1, date.day)).toISOString() };
 }
 
 export function plantStartDateSaveMessage(reason: "invalid" | "future"): string {

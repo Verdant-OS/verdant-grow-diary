@@ -63,14 +63,13 @@ describe("plant start date is a calendar date (BUG-004)", () => {
     });
   });
 
-  it("saves the picked day at local midnight and reads it back as the same day", () => {
-    for (const tz of ["America/Chicago", "Australia/Brisbane", "UTC"]) {
+  it("saves the picked day as a timezone-independent date and reads it back as that day", () => {
+    for (const tz of ["America/Chicago", "Australia/Brisbane", "Pacific/Auckland", "UTC"]) {
       withTimeZone(tz, () => {
         const now = new Date(2026, 8, 24, 9, 0, 0);
         const saved = plantStartDateInputToIso("2026-07-01", now);
-        expect(saved.ok).toBe(true);
+        expect(saved).toEqual({ ok: true, iso: "2026-07-01T00:00:00.000Z" });
         if (saved.ok !== true) return;
-        expect(new Date(saved.iso).getHours()).toBe(0);
         expect(resolvePlantStartCalendarDate(saved.iso)).toEqual({
           year: 2026,
           month: 7,
@@ -80,6 +79,24 @@ describe("plant start date is a calendar date (BUG-004)", () => {
         expect(format(plantStartDisplayDate(saved.iso)!, "PP")).toBe("Jul 1, 2026");
       });
     }
+  });
+
+  it("a date picked in one zone reads as the same day on a device in another", () => {
+    const saved = withTimeZone("Pacific/Auckland", () =>
+      plantStartDateInputToIso("2026-07-01", new Date(2026, 8, 24, 9, 0, 0)),
+    );
+    expect(saved.ok).toBe(true);
+    if (saved.ok !== true) return;
+    for (const tz of ["America/Los_Angeles", "America/Chicago", "Europe/London", "Asia/Tokyo"]) {
+      withTimeZone(tz, () => {
+        expect(plantStartDateInputValue(saved.iso)).toBe("2026-07-01");
+        expect(format(plantStartDisplayDate(saved.iso)!, "PP")).toBe("Jul 1, 2026");
+      });
+    }
+    // As PostgREST returns the timestamptz.
+    withTimeZone("America/Los_Angeles", () => {
+      expect(plantStartDateInputValue("2026-07-01T00:00:00+00:00")).toBe("2026-07-01");
+    });
   });
 
   it("reads a non-midnight instant (default now()) in the grower's zone", () => {

@@ -319,9 +319,10 @@ Prerequisites:
 - A dedicated **test account** (email + password). Never use production
   grower credentials — the smoke creates real diary entries.
 
-Replace `YOUR_TEST_HOST` below with a host that serves the app, such as your
-local dev server (`bun run dev -- --host 127.0.0.1 --port 8080`, then
-`http://127.0.0.1:8080`).
+Replace `YOUR_TEST_HOST` below with an HTTPS host that serves the app. The
+templates below use `https://`. To run against your local dev server, which
+serves plain HTTP on `http://127.0.0.1:8080`, use the local examples under
+"Local setup" instead of substituting it here.
 
 - Use the same host for `E2E_BASE_URL` and `E2E_GROW_1_PLANT_URL`. The
   signed-in session is stored per origin.

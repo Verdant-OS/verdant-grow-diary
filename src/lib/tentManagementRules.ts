@@ -81,8 +81,9 @@ export function tentSizeValidationMessage(size: string | null | undefined): stri
   const value = typeof size === "string" ? size.trim() : "";
   if (value === "") return null;
   if (value.length > TENT_SIZE_MAX_LENGTH) return TENT_SIZE_TOO_LONG_MESSAGE;
-  // A minus sign directly before a digit is a negative dimension.
-  if (/(^|[^0-9A-Za-z])[-\u2212]\s*\d/.test(value)) return TENT_SIZE_INVALID_MESSAGE;
+  // A minus sign directly before a digit is a negative dimension, including
+  // right after the "x" separator ("4x-4"). A minus between digits is a range.
+  if (/(^|[^0-9A-Za-z]|[xX]\s*)[-\u2212]\s*\d/.test(value)) return TENT_SIZE_INVALID_MESSAGE;
   const numbers = value.match(/\d+(?:[.,]\d+)?/g) ?? [];
   for (const raw of numbers) {
     const n = Number(raw.replace(",", "."));

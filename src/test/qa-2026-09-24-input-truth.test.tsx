@@ -36,12 +36,23 @@ vi.mock("@/lib/growRepo", () => ({
 }));
 
 describe("tent size validation (BUG-012)", () => {
-  it.each(["-999999x0", "0x0", "4x0", "4 x -4", "−4x4", "5000x5000", "4x4x0"])(
-    "rejects %s",
-    (size) => {
-      expect(tentSizeValidationMessage(size)).toBe(TENT_SIZE_INVALID_MESSAGE);
-    },
-  );
+  it.each([
+    "-999999x0",
+    "0x0",
+    "4x0",
+    "4 x -4",
+    "−4x4",
+    "5000x5000",
+    "4x4x0",
+    // A minus right after the "x" separator is still a negative dimension.
+    "4x-4",
+    "4X-4",
+    "4x −4",
+    "4 X-4 ft",
+    "120x-120 cm",
+  ])("rejects %s", (size) => {
+    expect(tentSizeValidationMessage(size)).toBe(TENT_SIZE_INVALID_MESSAGE);
+  });
 
   it.each([
     "",

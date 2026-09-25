@@ -68,4 +68,76 @@ describe("Manual Sensor Memory ages with unchanged history", () => {
     unmount();
     expect(vi.getTimerCount()).toBe(timersBefore);
   });
+
+  it("does not nag when fresh and missing metrics stay within the fresh window", () => {
+    state.data!.temp_f = {
+      value: 77,
+      loggedAt: new Date(NOW.getTime() - 2 * 3_600_000).toISOString(),
+    };
+    render(<PlantManualSensorFreshnessCard plantId="plant-a" onUpdate={vi.fn()} />);
+    const card = screen.getByTestId("plant-manual-sensor-freshness-card");
+    expect(card).toHaveAttribute("data-cta", "none");
+    expect(screen.queryByTestId("plant-manual-sensor-freshness-update")).toBeNull();
+    act(() => vi.advanceTimersByTime(120_000));
+    expect(card).toHaveAttribute("data-cta", "none");
+    expect(screen.queryByTestId("plant-manual-sensor-freshness-update")).toBeNull();
+  });
+
+  it("shows the aging indicator and card CTA when a metric crosses fresh to aging", () => {
+    state.data!.temp_f = {
+      value: 77,
+      loggedAt: new Date(NOW.getTime() - 24 * 3_600_000 + 60_000).toISOString(),
+    };
+    render(<PlantManualSensorFreshnessCard plantId="plant-a" onUpdate={vi.fn()} />);
+    const card = screen.getByTestId("plant-manual-sensor-freshness-card");
+    expect(card).toHaveAttribute("data-cta", "none");
+    expect(screen.queryByTestId("plant-manual-sensor-freshness-temp_f-indicator")).toBeNull();
+    act(() => vi.advanceTimersByTime(120_000));
+    expect(card).toHaveAttribute("data-cta", "update");
+    expect(screen.getByTestId("plant-manual-sensor-freshness-temp_f-indicator")).toBeVisible();
+  });
+
+  it("ages only the metric that crosses a boundary while siblings stay fresh", () => {
+    state.data!.temp_f = {
+      value: 77,
+      loggedAt: new Date(NOW.getTime() - 24 * 3_600_000 + 60_000).toISOString(),
+    };
+    state.data!.humidity_percent = {
+      value: 55,
+      loggedAt: new Date(NOW.getTime() - 2 * 3_600_000).toISOString(),
+    };
+    render(<PlantManualSensorFreshnessCard plantId="plant-a" onUpdate={vi.fn()} />);
+    expect(screen.getByTestId("plant-manual-sensor-freshness-temp_f")).toHaveAttribute(
+      "data-state",
+      "fresh",
+    );
+    expect(screen.getByTestId("plant-manual-sensor-freshness-humidity_percent")).toHaveAttribute(
+      "data-state",
+      "fresh",
+    );
+    act(() => vi.advanceTimersByTime(120_000));
+    expect(screen.getByTestId("plant-manual-sensor-freshness-temp_f")).toHaveAttribute(
+      "data-state",
+      "aging",
+    );
+    expect(screen.getByTestId("plant-manual-sensor-freshness-humidity_percent")).toHaveAttribute(
+      "data-state",
+      "fresh",
+    );
+    expect(
+      screen.queryByTestId("plant-manual-sensor-freshness-humidity_percent-indicator"),
+    ).toBeNull();
+  });
+
+  it("refreshes the last-log stamp label while history data stays unchanged", () => {
+    state.data!.temp_f = {
+      value: 77,
+      loggedAt: new Date(NOW.getTime() - 24 * 3_600_000 + 60_000).toISOString(),
+    };
+    render(<PlantManualSensorFreshnessCard plantId="plant-a" onUpdate={vi.fn()} />);
+    const stamp = screen.getByTestId("plant-manual-sensor-freshness-temp_f-last-log");
+    expect(stamp.textContent ?? "").toMatch(/^Fresh · Last manual log/i);
+    act(() => vi.advanceTimersByTime(120_000));
+    expect(stamp.textContent ?? "").toMatch(/^Aging · Last manual log/i);
+  });
 });

@@ -115,6 +115,47 @@ describe("buildSensorReadingsCsv — grouped live + manual readings", () => {
     },
   );
 
+  describe("grouped live + CSV readings", () => {
+    function liveCsvGroup(liveQuality = "ok") {
+      return groupSensorReadingRows(
+        [
+          row("live", "temperature_c", 25, { quality: liveQuality }),
+          row("csv", "humidity_pct", 55),
+        ],
+        new Date(FETCHED_AT),
+      );
+    }
+
+    it("fixture: one CSV-provenance row carrying both time sources, usable at fetch", () => {
+      const [grouped] = liveCsvGroup();
+      expect(grouped.source).toBe("csv");
+      expect(grouped.freshness?.timeSources).toEqual(["live", "csv"]);
+      expect(grouped.status).toBe("usable");
+    });
+
+    it("stays usable while the live component is inside its window", () => {
+      expect(statusColumn(buildSensorReadingsCsv(liveCsvGroup(), FETCHED_AT + 14 * MIN))).toEqual([
+        "usable",
+      ]);
+    });
+
+    it("exports stale once the live component passes its window, keeping CSV provenance", () => {
+      const [line] = buildSensorReadingsCsv(liveCsvGroup(), FETCHED_AT + 16 * MIN)
+        .split("\n")
+        .slice(1);
+      expect(line).toContain(",25,55,");
+      expect(line).toContain(",csv,stale,");
+    });
+
+    it("never promotes an explicitly invalid live component", () => {
+      for (const offset of [0, 16 * MIN]) {
+        expect(
+          statusColumn(buildSensorReadingsCsv(liveCsvGroup("invalid"), FETCHED_AT + offset)),
+        ).toEqual(["invalid"]);
+      }
+    });
+  });
+
   it("recovers a clock-skew invalid once the export clock catches up", () => {
     // Captured ten minutes ahead of the fetch clock: beyond the future-skew
     // fence, so the group is invalid at fetch. That invalid is time-derived,

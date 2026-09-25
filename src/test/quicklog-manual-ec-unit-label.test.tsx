@@ -92,6 +92,10 @@ describe("manual EC reading chips name the recorded unit", () => {
     expect(chips(legacyNote("- Feed / Input EC (ppm): 800"))).toEqual([
       ["Input EC (ppm)", "800", false],
     ]);
+    // A leading-decimal value is a plain number in any unit.
+    expect(chips(legacyNote("- Input EC/PPM: .8"))).toEqual([
+      ["Input EC/PPM (unit not recorded)", ".8", false],
+    ]);
   });
 
   it("canonicalises hand-edited unit spellings and keeps unknown ones verbatim", () => {

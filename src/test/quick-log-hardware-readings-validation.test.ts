@@ -41,6 +41,31 @@ describe("validateHardwareReadings", () => {
     expect(validateHardwareReadings({ lightDistance: "45cm" })).toEqual({ ok: true });
   });
 
+  it("accepts a leading-decimal reading, which JavaScript reads as 0.8", () => {
+    expect(
+      validateHardwareReadings({
+        inputEc: ".8",
+        runoffEc: ".95",
+        inputPh: ".5",
+        lightDistance: ".5 ft",
+      }),
+    ).toEqual({ ok: true });
+    expect(isHardwareReadingValueValid("inputEc", ".8")).toBe(true);
+    // Still bounded, and a leading comma still gets the period guidance.
+    expect(validateHardwareReadings({ inputEc: "-.8" })).toEqual({
+      ok: false,
+      message: "Feed/Input EC must be between 0 and 10 mS/cm.",
+    });
+    expect(validateHardwareReadings({ runoffEc: ",8" })).toEqual({
+      ok: false,
+      message: "Runoff EC: use a period for decimals (for example .8).",
+    });
+    expect(validateHardwareReadings({ inputPh: "." })).toEqual({
+      ok: false,
+      message: "Feed/Input pH must be a number.",
+    });
+  });
+
   it("flags already-saved impossible values for display", () => {
     expect(isHardwareReadingValueValid("inputPh", "15")).toBe(false);
     expect(isHardwareReadingValueValid("runoffPh", "-3")).toBe(false);

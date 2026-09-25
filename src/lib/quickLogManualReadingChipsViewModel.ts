@@ -28,7 +28,7 @@ export const MANUAL_EC_UNIT_NOT_RECORDED = "unit not recorded";
 /** The unit the Quick Log writer records, and the one the 0–10 bounds are in. */
 const RANGE_CHECKED_EC_UNIT = "mS/cm";
 
-const NON_NEGATIVE_NUMBER_RE = /^\d+(?:\.\d+)?$/;
+const NON_NEGATIVE_NUMBER_RE = /^(?:\d+(?:\.\d+)?|\.\d+)$/;
 
 export function manualEcChipLabel(side: "Input" | "Runoff", unit: string | undefined): string {
   return unit ? `${side} EC (${unit})` : `${side} EC/PPM (${MANUAL_EC_UNIT_NOT_RECORDED})`;

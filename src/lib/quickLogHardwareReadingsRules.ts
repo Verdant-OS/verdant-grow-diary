@@ -109,10 +109,11 @@ export const HARDWARE_READING_BOUNDS: Record<
   lightDistance: { min: 0, max: 1000, label: "Light distance", unit: "" },
 };
 
-const PLAIN_NUMBER_RE = /^-?\d+(?:\.\d+)?$/;
-const COMMA_DECIMAL_RE = /^-?\d+,\d+$/;
+// A leading-decimal value (".8") is a number too: JavaScript and growers read it as 0.8.
+const PLAIN_NUMBER_RE = /^-?(?:\d+(?:\.\d+)?|\.\d+)$/;
+const COMMA_DECIMAL_RE = /^-?\d*,\d+$/;
 /** Light distance may carry a unit ("18 in", "45cm"); the number must still be sane. */
-const NUMBER_WITH_UNIT_RE = /^(-?\d+(?:\.\d+)?)\s*(?:in|inch|inches|"|cm|mm|ft|')?$/i;
+const NUMBER_WITH_UNIT_RE = /^(-?(?:\d+(?:\.\d+)?|\.\d+))\s*(?:in|inch|inches|"|cm|mm|ft|')?$/i;
 
 export type HardwareReadingsValidation = { ok: true } | { ok: false; message: string };
 

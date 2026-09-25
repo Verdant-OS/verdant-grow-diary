@@ -51,21 +51,15 @@ jobs:
     name: Browser census (${{ matrix.lane }})
     needs: focused-rules
     runs-on: ubuntu-latest
-    # Authenticated: two 30-minute batch waves, three minutes of delayed-read
-    # regressions, and twelve minutes for setup, teardown, and evidence upload.
-    # Public: five sequential seven-minute batches also fit this job budget.
-    # Per-test timeouts, worker counts, assertions, and zero retries stay unchanged.
-    timeout-minutes: 75
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         include:
           - lane: public
             grep: scheduled public
-            workers: 1
           - lane: authenticated
             grep: scheduled authenticated
-            workers: 2
     env:
       PLAYWRIGHT_RETRIES: "0"
     steps:
@@ -97,7 +91,6 @@ jobs:
           --project=chromium-mocked
           e2e/core-link-form-census.spec.ts
           --grep "${{ matrix.grep }}"
-          --workers "${{ matrix.workers }}"
           --reporter=list
       - name: Upload failure evidence
         if: failure()

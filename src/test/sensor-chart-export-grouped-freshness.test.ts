@@ -4,9 +4,11 @@
  * A grouped reading takes its least-trusted source as `source`, so a live row
  * and a manual row captured at the same instant export as `manual`. Aging that
  * row by the source alone applies the 24-hour manual window while its live
- * component is already stale after 15 minutes. Dashboard and Tent Detail pass
- * fetch-time readings straight to the chart, so the export must recompute the
- * status from the retained freshness inputs before writing the Status column.
+ * component is already stale after 15 minutes. The export must therefore
+ * recompute the status from the retained freshness inputs before writing the
+ * Status column, for any caller that passes grouped readings. Today the only
+ * such caller is Sensors, which also refreshes on its minute tick; this pins the
+ * builder's own contract rather than a page defect.
  */
 import { describe, expect, it } from "vitest";
 import type { SensorReadingRow } from "@/lib/db";
@@ -94,5 +96,25 @@ describe("buildSensorReadingsCsv — grouped live + manual readings", () => {
 
   it("leaves the supplied status alone when no export clock is given", () => {
     expect(statusColumn(buildSensorReadingsCsv(mixedGroup()))).toEqual(["usable"]);
+  });
+
+  it("recovers a clock-skew invalid once the export clock catches up", () => {
+    // Captured ten minutes ahead of the fetch clock: beyond the future-skew
+    // fence, so the group is invalid at fetch. That invalid is time-derived,
+    // not persisted, so it recovers when the export clock is within the fence.
+    const ahead = new Date(FETCHED_AT + 10 * MIN).toISOString();
+    const future = () =>
+      groupSensorReadingRows(
+        [
+          row("live", "temperature_c", 25, { ts: ahead, captured_at: ahead }),
+          row("manual", "humidity_pct", 55, { ts: ahead, captured_at: ahead }),
+        ],
+        new Date(FETCHED_AT),
+      );
+    expect(future()[0].status).toBe("invalid");
+    expect(statusColumn(buildSensorReadingsCsv(future(), FETCHED_AT))).toEqual(["invalid"]);
+    expect(statusColumn(buildSensorReadingsCsv(future(), FETCHED_AT + 6 * MIN))).toEqual([
+      "usable",
+    ]);
   });
 });

@@ -765,6 +765,60 @@ export function isCommandLine(line) {
  * executes. Counting it reported 32 unrun Playwright specs when the truth
  * was 25.
  */
+/**
+ * Only a LITERAL false is statically decidable: `false`, `${{ false }}`, and their
+ * quoted forms. `env.X == 'false'` may be false at runtime but cannot be known here
+ * and is left alone.
+ */
+const LITERAL_FALSE_IF =
+  /^\s*(?:-\s+)?if:\s*(?:\$\{\{\s*false\s*\}\}|false|'false'|"false"|'\$\{\{\s*false\s*\}\}'|"\$\{\{\s*false\s*\}\}")\s*(?:#.*)?$/;
+
+/**
+ * Workflow text with every step or job disabled by a literal-false `if:` blanked.
+ *
+ * `if: ${{ false }}` switches a step (or a whole job) off without deleting it, and
+ * the corpus took its `run:` lines as evidence all the same — so a lane disabled
+ * that way still read as executed (Codex, #1221 round 6). The owning block is the
+ * nearest preceding non-blank line with a smaller indent (the step's `- ` item or
+ * the job's key), and it runs until the next non-blank line at that indent or less.
+ * Blanked lines stay as empty lines, so line numbers are preserved. Idempotent.
+ */
+export function stripDisabledBlocks(text) {
+  const lines = String(text ?? "").split("\n");
+  const indentOf = (l) => l.length - l.trimStart().length;
+  const skippable = (l) => l.trim() === "" || l.trim().startsWith("#");
+  const drop = new Set();
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!LITERAL_FALSE_IF.test(lines[i])) continue;
+    // `- if: false` inline: the item line is its own owner, at the dash's indent.
+    const inline = /^\s*-\s+if:/.test(lines[i]);
+    let owner = inline ? i : -1;
+    let ownerIndent = inline ? lines[i].indexOf("-") : 0;
+    if (!inline) {
+      const ifIndent = indentOf(lines[i]);
+      for (let j = i - 1; j >= 0; j -= 1) {
+        if (skippable(lines[j])) continue;
+        if (indentOf(lines[j]) < ifIndent) {
+          owner = j;
+          ownerIndent = indentOf(lines[j]);
+          break;
+        }
+      }
+      if (owner === -1) continue;
+    }
+    drop.add(owner);
+    for (let k = owner + 1; k < lines.length; k += 1) {
+      if (skippable(lines[k])) {
+        drop.add(k);
+        continue;
+      }
+      if (indentOf(lines[k]) <= ownerIndent) break;
+      drop.add(k);
+    }
+  }
+  return lines.map((l, i) => (drop.has(i) ? "" : l)).join("\n");
+}
+
 export function stripTriggerBlock(text) {
   const out = [];
   let inTrigger = false;
@@ -796,7 +850,9 @@ export function commandLinesIn(workflowText) {
     if (!m) continue;
     const indent = m[1].length;
     const style = m[2] ?? "";
-    if (m[3] && m[3].trim()) out.push(m[3]);
+    // A quoted value is YAML-decoded first, and may hold several shell lines (`\n`).
+    const inline = decodeYamlInlineScalar(m[3] ?? "");
+    if (inline !== null) out.push(...foldContinuations(inline.split("\n").map(stripShellComment)));
     if (!style) continue; // single-line run:, no block to consume
 
     const block = [];
@@ -821,16 +877,158 @@ export function commandLinesIn(workflowText) {
       //     e2e/core-link-form-census.spec.ts
       // read as never-run despite CI executing it every time. A blank line in
       // a folded scalar is a paragraph break, so it separates commands.
+      // The shell sees each paragraph as ONE line, so a `#` anywhere in it
+      // comments out everything after it, later YAML lines included.
       for (const para of splitOnBlank(block)) {
-        out.push(para.map((l) => l.trim()).join(" "));
+        out.push(stripShellComment(para.map((l) => l.trim()).join(" ")));
       }
     } else {
       // YAML LITERAL scalar: newlines are preserved, each line is its own
-      // shell line. Backslash continuations still join.
-      out.push(...foldContinuations(block));
+      // shell line. Backslash continuations still join. Comments are stripped
+      // per raw line FIRST: a comment runs to its newline, so a `\` inside one
+      // continues nothing.
+      out.push(...foldContinuations(block.map(stripShellComment)));
     }
   }
   return out.filter((l) => isCommandLine(l));
+}
+
+/**
+ * The string YAML reads from a single-line `run:` value.
+ *
+ * A quoted scalar's quotes and escapes are YAML's, not the shell's:
+ * `run: "echo ok # bunx playwright test e2e/x.spec.ts"` hands bash `echo ok # bunx …`,
+ * whose `#` opens a comment. Passed raw, the stripper read one shell double-quoted word
+ * and kept the path (CodeRabbit, #1221 round 15). An escape can also put a `#` where no
+ * raw-text rule sees it — `\x23` is `#`, and `\n` starts a new shell line — so escapes
+ * are decoded in full, per YAML 1.2.2 §5.7, rather than by a partial replace.
+ *
+ * A plain scalar is returned as written: its ` #` is a YAML comment and a shell comment
+ * alike. `null` means no value can be read from this line — a quoted scalar left open
+ * (it continues on later lines) or an escape YAML rejects. The caller then counts
+ * nothing, so an unreadable command reads as unrun: a loud UNEXEMPT_DEAD, never a
+ * silent pass.
+ */
+const YAML_DQ_ESCAPES = {
+  0: "\0",
+  a: "\x07",
+  b: "\b",
+  t: "\t",
+  "\t": "\t",
+  n: "\n",
+  v: "\v",
+  f: "\f",
+  r: "\r",
+  e: "\x1b",
+  " ": " ",
+  '"': '"',
+  "/": "/",
+  "\\": "\\",
+  N: "\u0085",
+  _: "\u00a0",
+  L: "\u2028",
+  P: "\u2029",
+};
+const YAML_DQ_HEX_DIGITS = { x: 2, u: 4, U: 8 };
+export function decodeYamlInlineScalar(raw) {
+  const s = String(raw ?? "").trimStart();
+  const quote = s[0];
+  if (quote !== '"' && quote !== "'") return s;
+  let out = "";
+  for (let i = 1; i < s.length; i += 1) {
+    const c = s[i];
+    if (quote === "'") {
+      if (c !== "'") out += c;
+      else if (s[i + 1] === "'") {
+        out += "'";
+        i += 1;
+      } else return out;
+      continue;
+    }
+    if (c === '"') return out;
+    if (c !== "\\") {
+      out += c;
+      continue;
+    }
+    const escape = s[i + 1];
+    const digits = Object.hasOwn(YAML_DQ_HEX_DIGITS, escape) ? YAML_DQ_HEX_DIGITS[escape] : 0;
+    if (digits) {
+      const hex = s.slice(i + 2, i + 2 + digits);
+      if (hex.length !== digits || !/^[0-9A-Fa-f]+$/.test(hex)) return null;
+      const codePoint = Number.parseInt(hex, 16);
+      if (codePoint > 0x10ffff) return null;
+      out += String.fromCodePoint(codePoint);
+      i += 1 + digits;
+    } else if (Object.hasOwn(YAML_DQ_ESCAPES, escape)) {
+      out += YAML_DQ_ESCAPES[escape];
+      i += 1;
+    } else return null;
+  }
+  return null;
+}
+
+/** Bash metacharacters: each ends the word before it, so a `#` after one opens a comment. */
+const SHELL_METACHARACTER = /[\s|&;()<>]/;
+
+/**
+ * A shell line with its comment removed.
+ *
+ * A `run:` body is shell, and `# bunx playwright test e2e/x.spec.ts` in it runs
+ * nothing — but `isCommandLine` saw the `bunx` token and the path read as
+ * executed (CodeRabbit, #1221 round 10): R4-B's comment-out defeat, still open
+ * in the workflow itself after it was closed for runner bodies.
+ *
+ * `#` opens a comment only as the first character of a word, and outside
+ * quotes, as in POSIX token recognition. A word starts at line start or after an
+ * unquoted, unescaped metacharacter — whitespace or one of `| & ; ( ) < >` — so
+ * `echo ok;# bunx …` is a comment after the `;` (CodeRabbit, #1221 round 11: round
+ * 10 checked for whitespace alone). Escaped and quoted characters continue the
+ * word, so `echo "#"`, `echo '#'`, `\#`, `a\ #`, `a\;#`, `"a"#`, `${#ARR[@]}` and
+ * `$#` all survive.
+ *
+ * `$'…'` is ANSI-C quoting: a backslash escapes the next character, so `$'\''`
+ * is one word (a literal `'`) and a `#` after it opens a comment (CodeRabbit, #1221
+ * round 12). POSIX `'…'` still treats backslash as literal. `$"…"` already
+ * falls into double-quote mode. Pure; null-safe.
+ */
+export function stripShellComment(line) {
+  const s = String(line ?? "");
+  let quote = null;
+  let wordStart = true;
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s[i];
+    if (quote === "'") {
+      if (c === "'") quote = null;
+      continue;
+    }
+    if (c === "\\") {
+      i += 1;
+      wordStart = false;
+      continue;
+    }
+    if (quote === '"') {
+      if (c === '"') quote = null;
+      continue;
+    }
+    if (quote === "$'") {
+      if (c === "'") quote = null;
+      continue;
+    }
+    if (c === "$" && s[i + 1] === "'") {
+      quote = "$'";
+      i += 1;
+      wordStart = false;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      quote = c;
+      wordStart = false;
+      continue;
+    }
+    if (c === "#" && wordStart) return s.slice(0, i).trimEnd();
+    wordStart = SHELL_METACHARACTER.test(c);
+  }
+  return s;
 }
 
 function splitOnBlank(block) {
@@ -932,17 +1130,167 @@ const RUNNER_PATH = /(?:^|[\s"'`])((?:scripts|e2e|tools)\/[A-Za-z0-9_./-]+\.(?:m
 const IS_TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/;
 
 /**
+ * A file Playwright will run: under `testDir`, at ANY depth, matching Playwright's
+ * default testMatch (`**\/*.@(spec|test).?(c|m)[jt]s?(x)`) and its default ignore of
+ * node_modules. The audit and the manifest guard both filtered root-level
+ * `e2e/*.spec.ts`, so a spec in a subdirectory — which `playwright test --list`
+ * shows and CI runs — was invisible to both (Codex and the Vercel reviewer, #1221
+ * round 5). `auth.setup.ts` is not a spec: only the `setup` project's explicit
+ * testMatch names it. `testDir` accepts Playwright's own spelling (`./e2e`).
+ */
+export function isPlaywrightSpec(rel, testDir = "e2e") {
+  if (typeof rel !== "string") return false;
+  const root = String(testDir).replace(/^\.\//, "").replace(/\/+$/, "");
+  return rel.startsWith(`${root}/`) && !rel.includes("/node_modules/") && IS_TEST_FILE.test(rel);
+}
+
+/** Tokens after which a `/` opens a regex literal rather than dividing. */
+const REGEX_MAY_FOLLOW_PUNCTUATOR = new Set([..."(,=:[!&|?{};+-*%<>~^"]);
+const REGEX_MAY_FOLLOW_KEYWORD = new Set([
+  "return",
+  "typeof",
+  "instanceof",
+  "in",
+  "of",
+  "new",
+  "delete",
+  "void",
+  "throw",
+  "case",
+  "do",
+  "else",
+  "yield",
+  "await",
+]);
+
+/**
+ * JavaScript source with its comments removed; strings and regex literals kept.
+ *
+ * A runner body is execution evidence one hop from a workflow, and a command
+ * commented out inside one — `// bunx playwright test e2e/x.spec.ts` — is the
+ * same comment-out defeat commandLinesIn closes for workflow bodies, one hop
+ * further in (Codex, #1221 round 4). Strings are kept because a path literal in
+ * a runner IS a spec list being executed: an allowlist array, a spawn argument.
+ * Every newline survives, so line-oriented readers keep their numbering.
+ *
+ * A `/` opens a regex literal only where a division cannot stand — after a
+ * punctuator or a keyword, or at the start of input — so `/https?:\/\//` is
+ * not read as a line comment and `a / b / c` is not read as a regex. An
+ * unterminated comment runs to end of input; an unterminated string or regex
+ * ends at its line. Template-literal `${}` nesting is not modelled: a backtick
+ * inside an interpolation ends the literal early. Deterministic; null-safe.
+ */
+export function stripJsComments(source) {
+  const src = source == null ? "" : String(source);
+  const n = src.length;
+  let out = "";
+  let i = 0;
+  let prevToken = ""; // last significant token: a word, a punctuator, or a literal marker
+  let inWord = false;
+
+  if (src.startsWith("#!")) {
+    const eol = src.indexOf("\n");
+    const end = eol === -1 ? n : eol;
+    out += src.slice(0, end);
+    i = end;
+  }
+
+  const regexMayFollow = () =>
+    prevToken === "" ||
+    REGEX_MAY_FOLLOW_PUNCTUATOR.has(prevToken) ||
+    REGEX_MAY_FOLLOW_KEYWORD.has(prevToken);
+
+  while (i < n) {
+    const c = src[i];
+    const next = src[i + 1];
+
+    if (c === "/" && next === "/") {
+      const eol = src.indexOf("\n", i);
+      i = eol === -1 ? n : eol;
+      continue;
+    }
+    if (c === "/" && next === "*") {
+      const close = src.indexOf("*/", i + 2);
+      const end = close === -1 ? n : close + 2;
+      out += src.slice(i, end).replace(/[^\n]/g, "");
+      i = end;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {
+      let j = i + 1;
+      while (j < n && src[j] !== c) {
+        if (src[j] === "\\") j += 1;
+        else if (c !== "`" && src[j] === "\n") break;
+        j += 1;
+      }
+      const end = Math.min(j + 1, n);
+      out += src.slice(i, end);
+      prevToken = "string";
+      inWord = false;
+      i = end;
+      continue;
+    }
+    if (c === "/" && regexMayFollow()) {
+      let j = i + 1;
+      let inClass = false;
+      let close = -1;
+      while (j < n && src[j] !== "\n") {
+        const ch = src[j];
+        if (ch === "\\") {
+          j += 2;
+          continue;
+        }
+        if (ch === "[") inClass = true;
+        else if (ch === "]") inClass = false;
+        else if (ch === "/" && !inClass) {
+          close = j;
+          break;
+        }
+        j += 1;
+      }
+      if (close !== -1) {
+        let end = close + 1;
+        while (end < n && /[A-Za-z]/.test(src[end])) end += 1;
+        out += src.slice(i, end);
+        prevToken = "regex";
+        inWord = false;
+        i = end;
+        continue;
+      }
+    }
+
+    out += c;
+    if (/\s/.test(c)) {
+      inWord = false;
+    } else if (/[A-Za-z0-9_$]/.test(c)) {
+      prevToken = inWord ? prevToken + c : c;
+      inWord = true;
+    } else {
+      prevToken = c;
+      inWord = false;
+    }
+    i += 1;
+  }
+  return out;
+}
+
+/**
  * Everything CI actually executes, as one text corpus.
  *
- * Three sources, in order: workflow COMMAND LINES only; the package scripts
- * those name, expanded; and one hop into repo runner scripts those name. A
- * runner script's own body is taken whole — a path literal there is a spec
- * list being executed, not prose. One hop only: arbitrary depth turns any
- * transitive mention into "executed".
+ * Three sources, in order: workflow COMMAND LINES only, with steps and jobs
+ * disabled by a literal-false `if:` removed first; the package scripts those
+ * name, expanded; and one hop into repo runner scripts those name. A
+ * runner script's body is taken with its comments stripped (stripJsComments):
+ * a path literal there is a spec list being executed, not prose, while a
+ * commented-out command is the same comment-out defeat commandLinesIn closes
+ * for workflow bodies. One hop only: arbitrary depth turns any transitive
+ * mention into "executed".
  */
 export function buildExecutableCorpus({ workflowTexts, scripts = {}, readRunner = () => null }) {
   const scriptNames = Object.keys(scripts);
-  let corpus = workflowTexts.map((t) => commandLinesIn(stripTriggerBlock(t)).join("\n")).join("\n");
+  let corpus = workflowTexts
+    .map((t) => commandLinesIn(stripDisabledBlocks(stripTriggerBlock(t))).join("\n"))
+    .join("\n");
   for (const called of scriptNamesIn(corpus, scriptNames)) {
     corpus += ` ${expandScript(called, scripts)}`;
   }
@@ -952,9 +1300,58 @@ export function buildExecutableCorpus({ workflowTexts, scripts = {}, readRunner 
     if (followed.has(rel) || IS_TEST_FILE.test(rel)) continue;
     followed.add(rel);
     const bodyText = readRunner(rel);
-    if (typeof bodyText === "string") corpus += ` ${bodyText}`;
+    if (typeof bodyText === "string") corpus += ` ${stripJsComments(bodyText)}`;
   }
   return corpus;
+}
+
+/**
+ * Lane files a corpus executes, by full repo-relative path OR by unambiguous
+ * bare basename.
+ *
+ * Basename resolution is needed because runners resolve against their own
+ * root: `bunx playwright test agent-integrations-smoke.spec.ts` runs
+ * `e2e/agent-integrations-smoke.spec.ts` via playwright.config's
+ * `testDir: "./e2e"`. Requiring the prefix reported that spec as never-run
+ * while CI executed it on every matching PR.
+ *
+ * ONLY Playwright specs resolve this way (`resolvable`, default
+ * `isPlaywrightSpec` under `e2e`; pass the caller's resolved testDir). The
+ * justification above is Playwright's: it resolves a bare name against testDir.
+ * Deno, the harness runners and pgTAP do not, and the corpus is NOT command
+ * lines alone — `buildExecutableCorpus` appends expanded package-script bodies
+ * and one-hop runner bodies with their string literals kept. So a bare
+ * `foo.test.ts` in `vitest run foo.test.ts`, a log message or a skip list would
+ * otherwise mark a Deno test executed that Deno never ran (CodeRabbit, #1221
+ * round 9). A short token is far likelier than a full path to appear in
+ * unrelated strings, so it gets the narrower rule.
+ *
+ * AMBIGUOUS basenames are excluded and must be named in full. Two edge
+ * functions both ship a `contract.test.ts`, so a bare token could not say which
+ * one ran; resolving it to either would be a fabricated reading. Ambiguity is
+ * counted across ALL lane files, eligible or not — the stricter reading.
+ *
+ * Returns a new Set: `namedPaths` plus every resolvable lane file whose basename
+ * is unique across `laneFiles` and present in `namedPaths`. Pure; input Set is
+ * untouched.
+ */
+export function resolveBareBasenames({
+  laneFiles,
+  namedPaths,
+  resolvable = (f) => isPlaywrightSpec(f),
+}) {
+  const basenameCount = new Map();
+  for (const f of laneFiles) {
+    const b = f.slice(f.lastIndexOf("/") + 1);
+    basenameCount.set(b, (basenameCount.get(b) ?? 0) + 1);
+  }
+  const out = new Set(namedPaths);
+  for (const f of laneFiles) {
+    if (out.has(f) || !resolvable(f)) continue;
+    const b = f.slice(f.lastIndexOf("/") + 1);
+    if (basenameCount.get(b) === 1 && namedPaths.has(b)) out.add(f);
+  }
+  return out;
 }
 
 /**
@@ -963,11 +1360,20 @@ export function buildExecutableCorpus({ workflowTexts, scripts = {}, readRunner 
  * Exact path equality only. A prototype that accepted directory prefixes and
  * glob tokens reported all 100 lane files as reached, because a bare `**`
  * appears somewhere in the corpus.
+ *
+ * The extension is matched whole: longest alternative first and no identifier
+ * character after it. `\.(?:ts|tsx|…)` with nothing following took `ts` from
+ * `widget.spec.tsx`, so a wired .tsx spec read as dead and a sibling .ts file
+ * could read as executed (Cursor Bugbot, #1221). The alternatives cover every
+ * extension `IS_TEST_FILE` admits.
+ *
+ * Nor may the path go on: no `/`, `-` or further `.ext` after the extension. The
+ * match backed off to `e2e/v.spec.ts` inside Playwright's `e2e/v.spec.ts-snapshots/`
+ * and inside a backup `x.spec.ts.bak`, so a `git add` of baselines read as a run
+ * (CodeRabbit, #1221 round 16). A `:line` suffix, a quote or a full stop still ends it.
  */
+const NAMED_PATH =
+  /[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:tsx|ts|mts|cts|jsx|js|mjs|cjs|sql)(?![A-Za-z0-9_/-]|\.[A-Za-z0-9_])/g;
 export function namedPathsIn(corpus) {
-  return new Set(
-    [...String(corpus).matchAll(/[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:ts|tsx|mjs|cjs|js|sql)/g)].map(
-      (m) => m[0],
-    ),
-  );
+  return new Set([...String(corpus).matchAll(NAMED_PATH)].map((m) => m[0]));
 }

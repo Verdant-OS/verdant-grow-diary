@@ -42,6 +42,7 @@ import { validateAiDoctorReviewResult } from "./contract.ts";
 import { buildAiDoctorPromptMessages } from "../_shared/aiDoctorPromptAssembly.ts";
 import { parseAiDoctorReviewRequestEnvelope } from "../_shared/aiDoctorReviewRequestTransportRules.ts";
 import { validateAndNormalizeAiDoctorReviewRequestPacket } from "../_shared/aiDoctorReviewRequestPacketValidationRules.ts";
+import { applyStageTargetSeverityToPacket } from "../_shared/aiDoctorPacketStageTargetRules.ts";
 import { validateAiDoctorReviewGrounding } from "../_shared/aiDoctorReviewGroundingRules.ts";
 import {
   buildAiDoctorReviewEvidenceReceiptSnapshot,
@@ -345,10 +346,16 @@ Deno.serve(async (req) => {
     // Validate the complete model-context schema before the first credit RPC.
     // Reconstruction drops unknown/prototype keys and bounds every promptable
     // string, array, and number; malformed packets fail without a spend.
-    const validatedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet);
-    if (!validatedPacket) {
+    const normalizedPacket = validateAndNormalizeAiDoctorReviewRequestPacket(request.packet);
+    if (!normalizedPacket) {
       return calmFailure("shape");
     }
+    // Grade the current reading against the plant's stage targets here too.
+    // The client does this before send (BUG-008), but a direct caller could
+    // send an out-of-target reading as "ok", and the grounding rules would let
+    // the model call it stable (Codex review on #1683). Idempotent for a packet
+    // the client already graded; everything below sees only the graded packet.
+    const validatedPacket = applyStageTargetSeverityToPacket(normalizedPacket);
 
     // Server resolves grow scope from an untrusted transport envelope; the
     // atomic credit RPC re-checks ownership. `request.packet` is deliberately

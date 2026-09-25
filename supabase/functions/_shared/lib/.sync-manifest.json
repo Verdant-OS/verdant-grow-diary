@@ -1,6 +1,6 @@
 {
   "generator": "scripts/sync-edge-shared.mjs",
-  "sourceCount": 101,
+  "sourceCount": 105,
   "sourceHashes": {
     "src/constants/aiDoctorContextReadiness.ts": "387a0f98abfe7eeaeda0a24cc289b6491b5c017592989e095facf1efb2e671f2",
     "src/constants/aiDoctorImportedHistory.ts": "f04d998dea22c9e8e7aaa6489a64cf4af44202435982039a1f216ccba9c317a0",
@@ -17,6 +17,7 @@
     "src/lib/aiDoctorEnvironmentCheckRules.ts": "2a53ccec5b83ffa941d343cb83b63eff33baf9519acc92140e4251486b156b46",
     "src/lib/aiDoctorImportedHistoryPromptRules.ts": "700905b4624844c393eab1ede66b5385ed2836c3d70065ad0d011d6796c3ed51",
     "src/lib/aiDoctorManualTentSensorSnapshotAdapter.ts": "3ac30a0f787bbef12720a30d368371064fa92343ccb50c44748b914d61e51327",
+    "src/lib/aiDoctorPacketStageTargetRules.ts": "a344b5fe5795c8bf120bcc36f3d6ccc7c086d3a790f61c0992e30a79ea787ce5",
     "src/lib/aiDoctorPromptAssembly.ts": "d1c7a5a0472ad910a10a0a6438887ae1f6acaf929b231e1da591cbd1f6c1a37c",
     "src/lib/aiDoctorPromptVocabularyRules.ts": "8ae5730352434fed3caabfbfb938ef81e444654b37abe7a21ef93a11c2b60b07",
     "src/lib/aiDoctorReviewEvidenceReceiptRules.ts": "0bc47bc4d88c01ac966f92ec1d0fb41858ee34b916800b1f4b1a1f12c185b4ca",
@@ -49,6 +50,7 @@
     "src/lib/entitlements/resolveEntitlements.ts": "8b79ebe09ef8638e6ce87404d2e39c27c7b39139a3958dcfcd90c03a48e36ed2",
     "src/lib/entitlements/types.ts": "04b420bcd426ab20912312997e8b4f2fe1e51ef4e4b4ca6ee6c62f597bf948b1",
     "src/lib/entitlements/unionEntitlements.ts": "303f0f37fdf46c960e70c1c63be455fbb5b41998becfa29f168cd114bbbe6147",
+    "src/lib/environmentStageTargetRules.ts": "74cf91bb21652f1930b92fac2d9eb71fa195aa11fb12ae8ce46a5a00541708f0",
     "src/lib/environmentTargetComparison.ts": "bc164f329ddf9f34d57d3846e330b0a7ba24391f9f5e51c070d60b3ae1286275",
     "src/lib/ggsRealPayloadIngestRules.ts": "df85bb4b0fe4b0f6f05c87b6c49d8536c5c7683bd75093ed38671805f403329c",
     "src/lib/ggsSoilSensorReadingNormalizer.ts": "5814455baf58ad7b55a3f9a53dc7647113d1f79bc1f909a78924784aaa33d6e7",
@@ -97,11 +99,13 @@
     "src/lib/sensorTruthCanon.ts": "a076c5544f77aa66056854482dafc533db5d6897febc3efa68a2eb70b318aca9",
     "src/lib/sensorTruthRules.ts": "20c5e681d016727e1133836875861cb88c405f8740dcf3a38e2ca8439e27fc3b",
     "src/lib/spiderFarmerGgsMappingRules.ts": "dca4a2e6cca9af03cbb8f3af0c89547c7f587d5bb102b49ca76baa1dcb626a60",
+    "src/lib/temperatureUnitPreference.ts": "1272533f8aaf3eff41a8ee16073535a09f1cda9d505dfe12e8c6c71d4b6479c9",
     "src/lib/temperatureUnits.ts": "1f8aeb96ffcc869601a0ffd11f85836d60aa9496b67ca817c5aac4810424ef7f",
     "src/lib/timelineEntryAnchorRules.ts": "069dc7a085d0ad025f59ed3799778df442c329df3baf340e668babfb52d8d8ae",
     "src/lib/timelineEntryClassification.ts": "7b2d3ae86f926b105ce3b025a35350d0a622b9bd661350ba7090af1030ca5a9f",
     "src/lib/timelineFilterRules.ts": "1765526a75f064a2524c514796d7a96ce2b2fd219220380316aeb5f674b554e3",
     "src/lib/vpdDriftRules.ts": "c6323c0f6fd9d9700ded58103a0f20cb10a162e27834ff39552226e3723cf6c7",
-    "src/lib/vpdRules.ts": "a0e403169a4afe081115459a9a05dc5e16fe4915e288a05d618cac1344f19754"
+    "src/lib/vpdRules.ts": "a0e403169a4afe081115459a9a05dc5e16fe4915e288a05d618cac1344f19754",
+    "src/lib/vpdStageTargetRules.ts": "e937901b731807d9f0648668a9c3fac469d24d962699e5cf6bcd8019f5a35d7c"
   }
 }

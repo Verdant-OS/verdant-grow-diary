@@ -67,6 +67,8 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
     details: unknown;
     requestActionQueueSuggestions: boolean;
   }) => {
+    // A retained, hidden draft must not submit while the RPC error is shown.
+    if (auditRpcMissing) return;
     setBusy(true);
     // Clear first so a warning from an earlier refusal can never outlive the
     // submission that caused it and attach itself to an unrelated later one.
@@ -197,20 +199,22 @@ export function BreedingLogContainer({ activeGrowId, plants, onCreated, onCancel
     }
   };
 
-  if (auditRpcMissing) {
-    return (
-      <AuditRpcMissingFallback
-        rpcName={BREEDING_LOG_SAVE_EVENT_RPC_NAME}
-        surfaceLabel="Breeding event"
-        onRetry={() => setAuditRpcMissing(false)}
-        onDismiss={onCancel}
-      />
-    );
-  }
-
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-pink-500/30 bg-pink-500/5 p-4">
+      {auditRpcMissing && (
+        <AuditRpcMissingFallback
+          rpcName={BREEDING_LOG_SAVE_EVENT_RPC_NAME}
+          surfaceLabel="Breeding event"
+          onRetry={() => setAuditRpcMissing(false)}
+          onDismiss={onCancel}
+        />
+      )}
+      {/* Keep the form mounted so Retry restores its actual draft, including
+          event-specific fields and the explicit suggestions preference. */}
+      <div
+        hidden={auditRpcMissing}
+        className="rounded-lg border border-pink-500/30 bg-pink-500/5 p-4"
+      >
         <h3 className="text-sm font-medium text-pink-400 mb-2">Breeding Event</h3>
         <p className="text-xs text-muted-foreground mb-4">
           Log genetic events. Follow-up suggestions are optional and always require your review.

@@ -17,13 +17,15 @@
 -- tell a grower's explicit "Healthy" from the old default, so a backfill would
 -- erase real assessments. Growers can change any plant's health in Edit Plant.
 --
--- Compatibility: inserts never write 'unknown'. When health was not assessed
--- they omit the column, so the column default applies — 'healthy' before this
--- migration is applied, 'unknown' after. The only client write of 'unknown'
--- is a grower explicitly clearing an assessment in Edit Plant ("Not assessed
--- yet"). Before this migration is applied the trigger rejects that update as a
--- whole (nothing is saved) and the client explains it; after, it succeeds.
--- The client is therefore safe on both sides of the operator's apply.
+-- Compatibility: the client writes 'unknown' only explicitly. Create Plant
+-- sends 'unknown' when the grower chose "Not assessed yet", so a new plant's
+-- health never comes from the old 'healthy' default; Edit Plant sends it only
+-- when the grower clears an assessment. Before this migration is applied the
+-- trigger rejects either write as a whole (nothing is saved) and the client
+-- asks the grower to choose a value; after, both succeed. Guided setup has no
+-- health field and omits the column, so the default applies there: 'healthy'
+-- before this migration, as it always was, and 'unknown' after. The client is
+-- therefore safe on both sides of the operator's apply.
 
 BEGIN;
 

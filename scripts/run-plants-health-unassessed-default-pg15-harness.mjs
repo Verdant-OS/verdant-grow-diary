@@ -8,8 +8,9 @@
  * proves, against a disposable database only:
  *   - the delivery preflight classifies baseline / canonical+ledger-absent /
  *     canonical+ledger exactly as the production runner will;
- *   - before delivery a grower's new plant is 'healthy' and "not assessed" is
- *     rejected; after it, a new plant is 'unknown', "not assessed" saves,
+ *   - before delivery a grower's new plant that omits health is 'healthy', and
+ *     an explicit "not assessed" ('unknown') is rejected whole, on insert and
+ *     on update; after it, a new plant is 'unknown', "not assessed" saves,
  *     invalid values are still rejected and existing rows are untouched;
  *   - CREATE OR REPLACE keeps validate_plant_row()'s oid, grants and trigger;
  *   - the guarded ledger insert records the migration once, and re-applying
@@ -356,6 +357,15 @@ commit;`,
   );
 }
 
+/** Create Plant's insert: health is always explicit, "unknown" when not assessed. */
+function growerInsertExplicitHealthSql(name, health) {
+  return `begin;
+set local request.jwt.claim.sub = '${OWNER_ID}';
+set local role authenticated;
+insert into public.plants(user_id, name, health) values ('${OWNER_ID}', '${name}', '${health}') returning health;
+commit;`;
+}
+
 function growerSetHealthSql(plantId, health) {
   return `begin;
 set local request.jwt.claim.sub = '${OWNER_ID}';
@@ -376,6 +386,20 @@ function proveBaselineApplyAndLedger(env, spawnImpl) {
     "legacy_rejects_unknown",
     growerSetHealthSql(ASSESSED_PLANT_ID, "unknown"),
     "P0001",
+    env,
+    spawnImpl,
+  );
+  // Create Plant's explicit "Not assessed yet" is rejected whole: no row.
+  requireSqlFailure(
+    "legacy_rejects_unknown_insert",
+    growerInsertExplicitHealthSql("create not assessed", "unknown"),
+    "P0001",
+    env,
+    spawnImpl,
+  );
+  requireSqlTrue(
+    "legacy_unknown_insert_wrote_nothing",
+    "select count(*) = 0 from public.plants where name = 'create not assessed';",
     env,
     spawnImpl,
   );
@@ -403,6 +427,14 @@ function proveBaselineApplyAndLedger(env, spawnImpl) {
   // After delivery: new plants are not assessed; explicit values still work.
   if (growerInsertHealth("delivered_insert", "new plant", env, spawnImpl) !== "unknown") {
     throw new Error("delivered_insert:not_unknown");
+  }
+  if (
+    executeSql(growerInsertExplicitHealthSql("create not assessed", "unknown"), env, {
+      stage: "delivered_explicit_unknown_insert",
+      spawnImpl,
+    }) !== "unknown"
+  ) {
+    throw new Error("delivered_explicit_unknown_insert:not_unknown");
   }
   executeSql(growerSetHealthSql(WATCH_PLANT_ID, "unknown"), env, {
     stage: "grower_clears_assessment",

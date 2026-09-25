@@ -4,7 +4,7 @@ This runbook delivers exactly one reviewed production migration:
 
 - Version: `20260924120000`
 - File: `20260924120000_plants_health_unassessed_default.sql` (introduced by #1683, BUG-009)
-- SHA-256: `70FCA107B96E74B1E6B0100EBEB53E404CFD9407E50251273E592CF7EE0098FC`
+- SHA-256: `B0F6C2717679BD19FA51C1FB1D3CDFC8405739A081C9B1B8D408055E72B9655B`
 - Production project: `knkwiiywfkbqznbxwqfh`
 - Deploy branch: `verdant-grow-diary`
 - Protected GitHub environment: `verdant-production-solo-founder`
@@ -41,10 +41,16 @@ It does not rewrite existing rows. The database cannot tell a grower's explicit
 "Healthy" from the old default, so rewriting `'healthy'` rows would erase real
 assessments. Growers change any plant's health in Edit Plant.
 
-The #1683 client is safe on both sides of this apply: when health is not
-assessed it omits the column, so the default applies. Before the apply, a
-grower's explicit "Not assessed yet" is rejected whole by the old trigger and
-the client explains it. After the apply, it saves.
+The #1683 client is safe on both sides of this apply because it writes
+`'unknown'` only explicitly. Create Plant sends `'unknown'` for "Not assessed
+yet", and Edit Plant sends it only to clear an assessment. Before the apply,
+the old trigger rejects either write as a whole, nothing is saved, and the
+dialog asks the grower to choose a health value. After the apply, both save.
+Guided setup has no health field and omits the column, so the default applies
+there: `'healthy'` before the apply, as it always was, and `'unknown'` after.
+
+Until this apply runs, Create Plant refuses "Not assessed yet". Apply it soon
+after the #1683 client is published.
 
 ## Safety boundary
 
@@ -268,8 +274,8 @@ reviewed `20260516204601` migration, Supabase-style default grants and the
 measured ledger/role shape, then proves:
 
 - the classification in each state;
-- before the apply, a grower's new plant (signed in, under RLS) is `healthy`
-  and "not assessed" is rejected;
+- before the apply, a grower's new plant that omits health (signed in, under
+  RLS) is `healthy`, and an explicit `'unknown'` is rejected;
 - after the apply, a new plant is `unknown`, "not assessed" saves, invalid
   values are still rejected and existing rows are unchanged;
 - the function keeps its oid and grants;

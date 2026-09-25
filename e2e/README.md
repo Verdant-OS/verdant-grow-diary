@@ -55,7 +55,7 @@ hunts with `buildE2eHuntName` (never append to the wizard prefill).
 
 | Name                              | Purpose                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `E2E_BASE_URL`                    | Base URL of the running app (e.g. http://localhost:5173)                                                                                                                                                                                                                                                                                         |
+| `E2E_BASE_URL`                    | Base URL of the running app (e.g. `http://127.0.0.1:8080` from `bun run dev -- --host 127.0.0.1 --port 8080`). If unset, Playwright starts its own server on `http://localhost:5173`.                                                                                                                                                            |
 | `E2E_GROW_1_PLANT_URL`            | Full URL of a Grow #1 plant page to open first                                                                                                                                                                                                                                                                                                   |
 | `E2E_TEST_EMAIL`                  | Login email for the smoke account                                                                                                                                                                                                                                                                                                                |
 | `E2E_TEST_PASSWORD`               | Login password for the smoke account                                                                                                                                                                                                                                                                                                             |
@@ -262,15 +262,15 @@ an empty or missing token does not fail the Playwright run.
 ### Bash / macOS / Linux
 
 ```bash
-export E2E_BASE_URL="http://localhost:5173"
-export E2E_GROW_1_PLANT_URL="http://localhost:5173/plants/<grow1-plant-id>"
+export E2E_BASE_URL="http://127.0.0.1:8080"
+export E2E_GROW_1_PLANT_URL="http://127.0.0.1:8080/plants/<grow1-plant-id>"
 export E2E_FIXTURE_MODE="true"
 export E2E_FIXTURE_EXPECTED_TENT_NAME="E2E Test Tent"
 export E2E_FIXTURE_EXPECTED_PLANT_NAME="E2E Test Plant"
 export E2E_TEST_EMAIL="you+e2e@example.com"
 export E2E_TEST_PASSWORD="••••••••"
 
-bun run dev &           # serve the app on E2E_BASE_URL
+bun run dev -- --host 127.0.0.1 --port 8080 &   # serve the app on E2E_BASE_URL
 bun run e2e:setup       # writes e2e/.auth/user.json
 bun run e2e:quicklog-smoke
 ```
@@ -284,15 +284,15 @@ and relationship are visible, and fails before writes on any mismatch.
 ### Windows PowerShell
 
 ```powershell
-$env:E2E_BASE_URL          = "http://localhost:5173"
-$env:E2E_GROW_1_PLANT_URL  = "http://localhost:5173/plants/<grow1-plant-id>"
+$env:E2E_BASE_URL          = "http://127.0.0.1:8080"
+$env:E2E_GROW_1_PLANT_URL  = "http://127.0.0.1:8080/plants/<grow1-plant-id>"
 $env:E2E_FIXTURE_MODE                = "true"
 $env:E2E_FIXTURE_EXPECTED_TENT_NAME  = "E2E Test Tent"
 $env:E2E_FIXTURE_EXPECTED_PLANT_NAME = "E2E Test Plant"
 $env:E2E_TEST_EMAIL        = "you+e2e@example.com"
 $env:E2E_TEST_PASSWORD     = "********"
 
-bun run dev               # in another terminal
+bun run dev -- --host 127.0.0.1 --port 8080   # in another terminal
 bun run e2e:setup
 bun run e2e:quicklog-smoke
 ```

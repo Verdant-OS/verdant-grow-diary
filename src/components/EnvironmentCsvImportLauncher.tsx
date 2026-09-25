@@ -32,10 +32,12 @@ import {
   type SensorReadingInsert,
 } from "@/lib/environmentCsvImportPersistence";
 import {
-  dedupeKeyOf,
   SENSOR_READINGS_DEDUPE_SELECT_CLAUSE,
+  type DedupeKeyParts,
   type ExistingKeysQueryScope,
 } from "@/lib/csv-import/sensorReadingsBatchInsert";
+import { collectCandidateCsvSensorPresenceKeys } from "@/lib/csvSensorPresenceService";
+import { filterCsvPresenceTimestampsForScope } from "@/lib/csvSensorPresenceScopeRules";
 import type { ParsedEnvironmentRow } from "@/lib/csvParser";
 import { tentDetailPath } from "@/lib/routes";
 import { buildSensorsTentRouteHref, SENSORS_TENT_ROUTE } from "@/lib/sensorRouteTentIntentRules";
@@ -57,7 +59,11 @@ export interface EnvironmentCsvImportLauncherProps {
 
 const DEFAULT_LABEL = "Import historical data";
 
-function makeInsertClient(canContinue: () => boolean): InsertClient {
+function makeInsertClient(
+  canContinue: () => boolean,
+  rows: readonly ParsedEnvironmentRow[],
+): InsertClient {
+  const capturedAts = rows.map((row) => row.captured_at);
   return {
     async insertSensorReadings(rows: SensorReadingInsert[]) {
       if (!canContinue()) {
@@ -80,26 +86,28 @@ function makeInsertClient(canContinue: () => boolean): InsertClient {
     async fetchExistingSensorReadingKeys(scope: ExistingKeysQueryScope) {
       if (!canContinue()) return new Set<string>();
       try {
-        const { data, error } = await supabase
-          .from("sensor_readings")
-          .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE)
-          .in("tent_id", scope.tentIds)
-          .in("source", scope.sources)
-          .in("metric", scope.metrics)
-          .gte("captured_at", scope.minCapturedAt)
-          .lte("captured_at", scope.maxCapturedAt);
-        if (!canContinue() || error || !data) return new Set<string>();
-        const keys = new Set<string>();
-        for (const row of data as unknown as Array<{
-          tent_id: string;
-          source: string;
-          metric: string;
-          captured_at: string;
-        }>) {
-          const key = dedupeKeyOf(row);
-          if (key) keys.add(key);
-        }
-        return keys;
+        return await collectCandidateCsvSensorPresenceKeys(
+          filterCsvPresenceTimestampsForScope(capturedAts, scope),
+          async (timestamps, from, to) => {
+            const { data, error, count } = await supabase
+              .from("sensor_readings")
+              .select(SENSOR_READINGS_DEDUPE_SELECT_CLAUSE, { count: "exact" })
+              .in("tent_id", scope.tentIds)
+              .in("source", scope.sources)
+              .in("metric", scope.metrics)
+              .in("captured_at", timestamps)
+              .gte("captured_at", scope.minCapturedAt)
+              .lte("captured_at", scope.maxCapturedAt)
+              .order("tent_id")
+              .order("source")
+              .order("metric")
+              .order("captured_at")
+              .range(from, to);
+            if (error || !data) throw new Error("CSV presence lookup unavailable");
+            return { rows: data as unknown as DedupeKeyParts[], totalCount: count ?? null };
+          },
+          canContinue,
+        );
       } catch {
         return new Set<string>();
       }
@@ -204,7 +212,7 @@ export function EnvironmentCsvImportLauncher(props: EnvironmentCsvImportLauncher
           error: "Missing grow or tent context.",
         };
       }
-      const client = makeInsertClient(canContinue);
+      const client = makeInsertClient(canContinue, rows);
       const res = await persistCsvEnvironmentRows(rows, importSession.scope, client);
       // An account switch ends the operation's UI ownership even if its request settles later.
       if (!canContinue()) {

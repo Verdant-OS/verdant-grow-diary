@@ -7,7 +7,13 @@ const HARNESS = readFileSync(
   resolve(ROOT, "scripts/run-ai-doctor-review-completion-rls-harness.ts"),
   "utf8",
 );
-const PACKAGE = readFileSync(resolve(ROOT, "package.json"), "utf8");
+// Resolved, not scanned: a regex over package.json source cannot tell which nesting
+// level a key sits at, and a quoted key with no colon slipped past the checker
+// (scripts/check-contract-test-resolution.mjs) while asserting on raw text.
+const SCRIPTS = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")).scripts as Record<
+  string,
+  string
+>;
 
 describe("AI Doctor review completion runtime harness contract", () => {
   it("requires explicit opt-in and remote acknowledgement before writing fixtures", () => {
@@ -60,6 +66,8 @@ describe("AI Doctor review completion runtime harness contract", () => {
   });
 
   it("is exposed through an explicit, opt-in package command", () => {
-    expect(PACKAGE).toContain('"test:ai-doctor-review-completion-rls"');
+    expect(SCRIPTS["test:ai-doctor-review-completion-rls"]).toBe(
+      "bun run scripts/run-ai-doctor-review-completion-rls-harness.ts",
+    );
   });
 });

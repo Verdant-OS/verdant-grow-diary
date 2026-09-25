@@ -80,7 +80,7 @@
     "src/lib/quick-log/quickLogSnapshotMetricNormalizer.ts": "c458e70f476d3d1bb70c5d22b425865eeeb8cce3c4ab1baa9921208b988fe0ce",
     "src/lib/quickLogEventIdentityRules.ts": "51b5f4a9637591c00816dc0caec3f19ea6adfe41cb09d5fa52fc6c78707bffb0",
     "src/lib/quickLogHardwareReadingsDisplayRules.ts": "57b3a026337bbc98f6dd1eac3b217a61a0cd4595fe1db1c810b05662dd6ef9fe",
-    "src/lib/quickLogHardwareReadingsRules.ts": "e1a93432738133b075a7e30bdbf8bf12aed84234b4c17b388762758e934b3a74",
+    "src/lib/quickLogHardwareReadingsRules.ts": "8b42d620e5acf4c7bfb38c0a7cbb29b5967dd067d63fd4457ce96965af9ce80d",
     "src/lib/rootZoneManualObservationRules.ts": "c594853f2ee05f9aff3ee4b5492544c2f693e06e57b47f6c75679eb4469d4b69",
     "src/lib/rootZoneObservationRules.ts": "9b8e24c016a2b39b66ee7b94f54fcf8e577e128184d5c5fcb1e631f9e3305532",
     "src/lib/routes.ts": "c3f3797a82dfe162738ecf66b13480a80e0dd536d4dc2d112b4c2a9b7d67e83e",

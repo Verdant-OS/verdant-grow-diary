@@ -179,7 +179,10 @@ const STABLE_READINGS = [
     status: "usable",
   },
 ];
-const plantsState: { data: Array<{ tent_id: string; stage: string }> | undefined } = {
+const plantsState: {
+  data: Array<{ tent_id: string; stage: string }> | undefined;
+  isError?: boolean;
+} = {
   data: [],
 };
 
@@ -202,7 +205,7 @@ vi.mock("@/hooks/useGrowData", () => ({
   }),
 }));
 vi.mock("@/hooks/use-plants", () => ({
-  usePlants: () => ({ data: plantsState.data, isError: false }),
+  usePlants: () => ({ data: plantsState.data, isError: plantsState.isError ?? false }),
 }));
 const growsState: {
   grows: Array<{ id: string; stage: string }>;
@@ -255,6 +258,7 @@ function renderSensors() {
 describe("Sensors page stage chips follow the plants in the tent", () => {
   beforeEach(() => {
     plantsState.data = [];
+    plantsState.isError = false;
     growsState.grows = [{ id: "g1", stage: "veg" }];
     growsState.loading = false;
     growsState.error = null;
@@ -277,6 +281,16 @@ describe("Sensors page stage chips follow the plants in the tent", () => {
 
   it("QA repro: RH 60% with a Flower plant in a Veg tent is above the Flower range", async () => {
     plantsState.data = [{ tent_id: TENT, stage: "flower" }];
+    renderSensors();
+    expect(await screen.findByTestId("sensors-stage-status-rh")).toHaveTextContent(
+      "Above Flower RH range",
+    );
+  });
+
+  it("a failed plant refresh keeps the cached plant stages (Codex review on #1683)", async () => {
+    // React Query keeps `data` when a refetch fails; those stages still hold.
+    plantsState.data = [{ tent_id: TENT, stage: "flower" }];
+    plantsState.isError = true;
     renderSensors();
     expect(await screen.findByTestId("sensors-stage-status-rh")).toHaveTextContent(
       "Above Flower RH range",

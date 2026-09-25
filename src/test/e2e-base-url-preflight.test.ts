@@ -39,6 +39,19 @@ describe("describeUnservedE2EBaseUrl", () => {
     ).toContain("no response");
   });
 
+  it("names a navigation failure as a configuration problem (Codex review on #1683)", () => {
+    // page.goto throws on DNS, TLS or timeout failures instead of returning null.
+    const message = describeUnservedE2EBaseUrl({
+      url: "https://gone.example/auth",
+      status: null,
+      bodyText: "",
+      navigationError: "net::ERR_NAME_NOT_RESOLVED at https://gone.example/auth",
+    });
+    expect(message).toContain("https://gone.example");
+    expect(message).toContain("could not be loaded (net::ERR_NAME_NOT_RESOLVED");
+    expect(message).toContain("E2E_GROW_1_PLANT_URL");
+  });
+
   it("flags the Lovable marker even when the host answers 200", () => {
     expect(
       describeUnservedE2EBaseUrl({

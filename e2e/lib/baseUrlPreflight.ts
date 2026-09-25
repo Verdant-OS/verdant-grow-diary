@@ -22,6 +22,8 @@ export interface BaseUrlProbe {
   readonly bodyText: string;
   /** Document title of the loaded page. */
   readonly title?: string;
+  /** Message of a navigation that threw (DNS, TLS, timeout) instead of answering. */
+  readonly navigationError?: string;
 }
 
 /** Every Verdant /auth page names the app in its title and heading. */
@@ -47,7 +49,11 @@ export function describeUnservedE2EBaseUrl(probe: BaseUrlProbe): string | null {
   } catch {
     // keep the raw value
   }
-  const answered = probe.status === null ? "gave no response" : `answered HTTP ${probe.status}`;
+  const answered = probe.navigationError
+    ? `could not be loaded (${probe.navigationError.split("\n")[0].trim()})`
+    : probe.status === null
+      ? "gave no response"
+      : `answered HTTP ${probe.status}`;
   const detail = noProject
     ? ` ("${LOVABLE_NO_PROJECT_MARKER}.")`
     : badStatus

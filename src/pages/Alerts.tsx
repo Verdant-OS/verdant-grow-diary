@@ -123,7 +123,9 @@ export default function Alerts() {
   // pending, `null` holds alert persistence back; a failed read contributes
   // no plant signal rather than blocking alerting.
   const plantsQuery = usePlants();
-  const plantsForAlertStage = plantsQuery.isError ? [] : (plantsQuery.data ?? null);
+  // A failed refresh keeps the cached stages; only a read that never
+  // returned data falls back to no plant signal.
+  const plantsForAlertStage = plantsQuery.data ?? (plantsQuery.isError ? [] : null);
 
   const headerStage = scopedGrowId ? (stageByGrow.get(scopedGrowId) ?? null) : null;
 

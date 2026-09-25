@@ -31,8 +31,23 @@ const SESSION_STORAGE_PATH = path.resolve("e2e/.auth/session-storage.json");
  * like a sign-in bug, or, with cached auth state, as opaque failures in every
  * authenticated spec. Leaves the page on /auth.
  */
-async function assertBaseUrlServesApp(page: Page): Promise<void> {
-  const authResponse = await page.goto("/auth");
+async function assertBaseUrlServesApp(page: Page, baseURL: string | undefined): Promise<void> {
+  // page.goto throws on DNS, TLS and timeout failures; name those too.
+  let navigationError: string | undefined;
+  const authResponse = await page.goto("/auth").catch((error: unknown) => {
+    navigationError = error instanceof Error ? error.message : String(error);
+    return null;
+  });
+  if (navigationError) {
+    throw new Error(
+      describeUnservedE2EBaseUrl({
+        url: new URL("/auth", baseURL ?? "http://invalid.invalid").href,
+        status: null,
+        bodyText: "",
+        navigationError,
+      }) ?? navigationError,
+    );
+  }
   const unserved = describeUnservedE2EBaseUrl({
     url: page.url(),
     status: authResponse ? authResponse.status() : null,
@@ -45,7 +60,7 @@ async function assertBaseUrlServesApp(page: Page): Promise<void> {
   if (unserved) throw new Error(unserved);
 }
 
-setup("authenticate", async ({ page }) => {
+setup("authenticate", async ({ page, baseURL }) => {
   fs.mkdirSync(path.dirname(STORAGE_PATH), { recursive: true });
 
   const haveStorageState = fs.existsSync(STORAGE_PATH);
@@ -57,7 +72,7 @@ setup("authenticate", async ({ page }) => {
   if (haveStorageState && haveSessionSnapshot) {
     // Cached state is only as good as the host it will run against: probe it
     // first, so a dead or retired E2E_BASE_URL fails here with its cause.
-    await assertBaseUrlServesApp(page);
+    await assertBaseUrlServesApp(page, baseURL);
     // The snapshot must also belong to the origin now served, or authedTest
     // never injects it and every authenticated spec runs logged out.
     const mismatch = describeCachedAuthOriginMismatch({
@@ -103,7 +118,7 @@ setup("authenticate", async ({ page }) => {
   // Credentials present: fall through to a fresh login, which rewrites BOTH
   // files together (a partial snapshot is treated as stale, not reused).
 
-  await assertBaseUrlServesApp(page);
+  await assertBaseUrlServesApp(page, baseURL);
 
   // The Auth page keeps all three tab panels (sign in / create account /
   // forgot password) mounted, so label-based lookups match 3 email and 3

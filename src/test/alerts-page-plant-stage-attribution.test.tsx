@@ -174,6 +174,17 @@ describe("Alerts judges a grow by its tent-attributed plants", () => {
     expect(lastPersistFor("g1")?.enabled).toBe(false);
   });
 
+  it("a failed plant refresh keeps the cached plant stages (Codex review on #1683)", async () => {
+    plantsState.value = { data: [TENT_ROLLED_UP_FLOWER], isError: true };
+    render(
+      <MemoryRouter initialEntries={["/alerts"]}>
+        <Alerts />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(lastPersistFor("g1")?.enabled).toBe(true));
+    expect(lastPersistFor("g1")?.stage).toBe("flower");
+  });
+
   it("a failed plant read adds no plant signal; the grow and tent decide", async () => {
     plantsState.value = { data: undefined, isError: true };
     render(

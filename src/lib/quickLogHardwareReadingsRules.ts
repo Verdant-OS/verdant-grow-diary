@@ -115,7 +115,24 @@ const COMMA_DECIMAL_RE = /^-?\d*,\d+$/;
 /** "1,200" / "12,000": a thousands separator, not a decimal comma. */
 const THOUSANDS_GROUP_RE = /^-?\d{1,3}(?:,\d{3})+$/;
 /** Light distance may carry a unit ("18 in", "45cm"); the number must still be sane. */
-const NUMBER_WITH_UNIT_RE = /^(-?(?:\d+(?:\.\d+)?|\.\d+))\s*(?:in|inch|inches|"|cm|mm|ft|')?$/i;
+const NUMBER_WITH_UNIT_RE = /^(-?(?:\d+(?:\.\d+)?|\.\d+))\s*(in|inch|inches|"|cm|mm|ft|')?$/i;
+
+/**
+ * A light distance with a unit is bounded in centimetres, so "1000 ft" is
+ * rejected and "1001 mm" is not (Codex review on #1683). A bare number keeps
+ * the unit-agnostic bound.
+ */
+const LIGHT_DISTANCE_MAX_CM = 1000;
+const LIGHT_DISTANCE_UNITS: Record<string, { label: string; cm: number }> = {
+  in: { label: "in", cm: 2.54 },
+  inch: { label: "in", cm: 2.54 },
+  inches: { label: "in", cm: 2.54 },
+  '"': { label: "in", cm: 2.54 },
+  ft: { label: "ft", cm: 30.48 },
+  "'": { label: "ft", cm: 30.48 },
+  cm: { label: "cm", cm: 1 },
+  mm: { label: "mm", cm: 0.1 },
+};
 
 export type HardwareReadingsValidation = { ok: true } | { ok: false; message: string };
 
@@ -162,6 +179,18 @@ export function validateHardwareReadings(
     const value = match ? Number(match[1]) : NaN;
     if (!Number.isFinite(value)) {
       return { ok: false, message: `${bounds.label} must be a number.` };
+    }
+    const unit =
+      key === "lightDistance" && match?.[2] ? LIGHT_DISTANCE_UNITS[match[2].toLowerCase()] : null;
+    if (unit) {
+      const max = Math.round((LIGHT_DISTANCE_MAX_CM / unit.cm) * 10) / 10;
+      if (value < 0 || value > max) {
+        return {
+          ok: false,
+          message: `${bounds.label} must be between 0 and ${max} ${unit.label}.`,
+        };
+      }
+      continue;
     }
     if (value < bounds.min || value > bounds.max) {
       return {

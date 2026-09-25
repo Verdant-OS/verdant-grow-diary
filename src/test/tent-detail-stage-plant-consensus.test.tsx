@@ -14,6 +14,7 @@ import { MemoryRouter, Route, Routes } from "@/lib/react-router-compat";
 import type { Plant } from "@/mock";
 
 let plants: Plant[] = [];
+let plantsIsError = false;
 const NOW = new Date().toISOString();
 const STABLE_READINGS = [
   { ts: NOW, metric: "vpd_kpa", value: 0.85, source: "manual", tent_id: "tent-77" },
@@ -69,7 +70,12 @@ vi.mock("@/hooks/useGrowData", async (importOriginal) => ({
     isLoading: false,
     isError: false,
   }),
-  useGrowPlants: () => ({ data: plants, isLoading: false, isFetching: false, isError: false }),
+  useGrowPlants: () => ({
+    data: plants,
+    isLoading: false,
+    isFetching: false,
+    isError: plantsIsError,
+  }),
 }));
 
 import TentDetail from "@/pages/TentDetail";
@@ -101,6 +107,7 @@ function renderTent() {
 
 beforeEach(() => {
   plants = [];
+  plantsIsError = false;
   growsState.grows = [{ id: "grow-1", stage: "veg" }];
   growsState.loading = false;
   growsState.error = null;
@@ -109,6 +116,15 @@ beforeEach(() => {
 describe("Tent Detail stage hint follows the plants in the tent", () => {
   it("QA repro: VPD 0.85 with a Flower plant in a Veg tent is below the Flower range", () => {
     plants = [plant("flower")];
+    renderTent();
+    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent(
+      "Below Flower VPD range",
+    );
+  });
+
+  it("a failed plant refresh keeps the cached plant stages (Codex review on #1683)", () => {
+    plants = [plant("flower")];
+    plantsIsError = true;
     renderTent();
     expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent(
       "Below Flower VPD range",

@@ -283,7 +283,8 @@ export default function Sensors() {
       loading: growsLoading,
       error: growsError,
     }),
-    plants: plantsQuery.isError ? null : (plantsQuery.data ?? null),
+    // A failed refresh keeps the cached stages (React Query retains data).
+    plants: plantsQuery.data ?? null,
   });
   const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
   const [previousVpdInputs, setPreviousVpdInputs] = useState<LatestTrustedVpdInputs | null>(null);

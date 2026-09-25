@@ -21,6 +21,13 @@ describe("validateHardwareReadings", () => {
     [{ inputPh: "six" }, "Feed/Input pH must be a number."],
     [{ ppfdCanopy: "-5" }, "PPFD canopy must be between 0 and 3000 µmol/m²/s."],
     [{ lightDistance: "18 miles" }, "Light distance must be a number."],
+    // A unit is converted before the bound (Codex review on #1683).
+    [{ lightDistance: "1000 ft" }, "Light distance must be between 0 and 32.8 ft."],
+    [{ lightDistance: "400 in" }, "Light distance must be between 0 and 393.7 in."],
+    [{ lightDistance: '400"' }, "Light distance must be between 0 and 393.7 in."],
+    [{ lightDistance: "10001 mm" }, "Light distance must be between 0 and 10000 mm."],
+    [{ lightDistance: "1001 cm" }, "Light distance must be between 0 and 1000 cm."],
+    [{ lightDistance: "1001" }, "Light distance must be between 0 and 1000."],
   ])("rejects %j", (readings, message) => {
     expect(validateHardwareReadings(readings)).toEqual({ ok: false, message });
   });
@@ -39,6 +46,12 @@ describe("validateHardwareReadings", () => {
     expect(validateHardwareReadings({ inputPh: "  " })).toEqual({ ok: true });
     expect(validateHardwareReadings(null)).toEqual({ ok: true });
     expect(validateHardwareReadings({ lightDistance: "45cm" })).toEqual({ ok: true });
+    for (const lightDistance of ["1001 mm", "10000mm", "393 in", "32 ft", "30'", "1000"]) {
+      expect(validateHardwareReadings({ lightDistance })).toEqual({ ok: true });
+    }
+    // Saved readings are flagged by the same unit-aware bound.
+    expect(isHardwareReadingValueValid("lightDistance", "1000 ft")).toBe(false);
+    expect(isHardwareReadingValueValid("lightDistance", "1001 mm")).toBe(true);
   });
 
   it("accepts a leading-decimal reading, which JavaScript reads as 0.8", () => {

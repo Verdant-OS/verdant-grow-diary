@@ -160,7 +160,8 @@ export default function TentDetail() {
       loading: growsLoading,
       error: growsError,
     }),
-    plants: activePlantsIsError ? null : (activePlantsQuery.data ?? null),
+    // A failed refresh keeps the cached stages (React Query retains data).
+    plants: activePlantsQuery.data ?? null,
   });
   const allPlantsQuery = useGrowPlants(id, undefined, { includeArchived: true });
   const plantListRead = buildTentPlantListReadView(allPlantsQuery, activePlantsQuery);

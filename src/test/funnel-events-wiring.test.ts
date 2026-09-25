@@ -548,7 +548,9 @@ describe("ordering and safety constraints at the seams", () => {
       "if (!packet || pendingAcceptedReviewStartRef.current === historyScopeKey) return;",
       canStartGate,
     );
-    const acceptedGate = src.indexOf("if (!acceptedEligibility.allowed) return;", requestGate);
+    const acceptedGate = src.indexOf("if (!acceptedEligibility.allowed) {", requestGate);
+    const rejectedReturn = src.indexOf("return;", acceptedGate);
+    const acceptedMode = src.indexOf("const acceptedMode =", acceptedGate);
     const acceptedRequest = src.indexOf("setAcceptedReviewRequest({", acceptedGate);
     const historicalGate = src.indexOf(
       'acceptedEligibility.mode === "historical_review" &&',
@@ -565,7 +567,10 @@ describe("ordering and safety constraints at the seams", () => {
     expect(canStartGate).toBeGreaterThan(handler);
     expect(requestGate).toBeGreaterThan(canStartGate);
     expect(acceptedGate).toBeGreaterThan(requestGate);
-    expect(acceptedRequest).toBeGreaterThan(acceptedGate);
+    expect(rejectedReturn).toBeGreaterThan(acceptedGate);
+    expect(acceptedMode).toBeGreaterThan(rejectedReturn);
+    expect(src.slice(acceptedGate, acceptedMode)).toMatch(/return;\s*\}\s*$/);
+    expect(acceptedRequest).toBeGreaterThan(acceptedMode);
     expect(historicalGate).toBeGreaterThan(acceptedRequest);
     expect(track).toBeGreaterThan(historicalGate);
     expect(src.slice(handler, handlerEnd)).not.toContain("startReview()");

@@ -1189,9 +1189,9 @@ importing it (`CONFIG_FILES = ["playwright.config", "vitest.config"]`, `:53`), a
 one that reads `package.json` as raw text and asserts on that text instead of the parsed object
 (`JSON_CONFIG_FILES = ["package.json"]`, `:68`). T2–T8 read no config, so neither shape is any
 of them. T1 is the one exception: it opens every cited file and matches a snippet on the named
-line, and this document cites `package.json` at six lines (`:9`, `:20-21`, `:65`, `:317`,
-`:318`, `:361`). That is citation integrity, not verification of effective configuration, which
-is the only thing the checker guards; it is the "proving a string is present or absent" use
+line, and this document cites `package.json` at seven places (`:9`, `:20-21`, `:65`, `:218`,
+`:317`, `:318`, `:361`). That is citation integrity, not verification of effective configuration,
+which is the only thing the checker guards; it is the "proving a string is present or absent" use
 `AGENTS.md` keeps for source scans. A T1 runner placed anywhere the checker scans therefore
 declares `@source-scan-justified: citation integrity` rather than importing `package.json`. Citing
 the checker as the reason T2–T4 must import was wrong: the underlying principle — verify

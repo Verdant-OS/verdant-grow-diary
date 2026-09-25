@@ -5,6 +5,7 @@ import type {
   Tent,
   Plant,
   SensorReading,
+  SensorReadingFreshness,
   SensorReadingSource,
   SensorReadingHealthStatus,
   SensorReadingMetricKey,
@@ -60,13 +61,32 @@ function deriveReadingStatus(
   quality: string | null | undefined,
   now: Date = new Date(),
 ): SensorReadingHealthStatus {
+  return persistedStatusFloor(source, quality) ?? classifyCaptureTime(capturedAt, source, now);
+}
+
+/**
+ * The part of a row's status fixed by persisted source and quality. These are
+ * independent trust inputs and their least trusted result wins before
+ * freshness is considered. Returns null when only capture time decides.
+ */
+function persistedStatusFloor(
+  source: SensorReadingSource,
+  quality: string | null | undefined,
+): SensorReadingHealthStatus | null {
   const normalizedQuality = (quality ?? "").trim().toLowerCase();
-  // Persisted source and quality are independent trust inputs. Their least
-  // trusted result wins before freshness is considered.
   if (source === "invalid" || normalizedQuality === "invalid") return "invalid";
   if (source === "demo" || normalizedQuality === "degraded") return "needs_review";
   if (source === "stale" || normalizedQuality === "stale") return "stale";
   if (normalizedQuality && normalizedQuality !== "ok") return "needs_review";
+  return null;
+}
+
+/** The time-sensitive part of a row's status, from the canonical contract. */
+function classifyCaptureTime(
+  capturedAt: string | null | undefined,
+  source: SensorReadingSource,
+  now: Date,
+): SensorReadingHealthStatus {
   const result = classifySensorSnapshotStatus({
     rowsReceived: 1,
     rowsAccepted: 1,
@@ -75,6 +95,80 @@ function deriveReadingStatus(
     now,
   });
   return result.status as SensorSnapshotStatus;
+}
+
+function freshnessForRow(
+  source: SensorReadingSource,
+  quality: string | null | undefined,
+): SensorReadingFreshness {
+  const floor = persistedStatusFloor(source, quality);
+  return floor === null ? { floor: null, timeSources: [source] } : { floor, timeSources: [] };
+}
+
+/** Fold one more row's recompute inputs into a grouped reading's. */
+function mergeFreshness(
+  left: SensorReadingFreshness,
+  right: SensorReadingFreshness,
+): SensorReadingFreshness {
+  const floor =
+    left.floor === null
+      ? right.floor
+      : right.floor === null
+        ? left.floor
+        : leastTrustedStatus(left.floor, right.floor);
+  const timeSources = [...left.timeSources];
+  for (const source of right.timeSources) {
+    if (!timeSources.includes(source)) timeSources.push(source);
+  }
+  return { floor, timeSources };
+}
+
+/**
+ * Recompute a mapped reading's status against `now` without a refetch.
+ *
+ * `groupSensorReadingRows` classifies once, at fetch time, and caches the
+ * result on `status`. A presenter that ticks its own clock (Sensor Data)
+ * re-labels the source badge against `now` while `classifySensorReadingTrust`
+ * still reads the cached status, so a quality-ok reading captured a few
+ * minutes ahead of the clock stays "invalid" after the clock catches up until
+ * the page reloads. This recomputes only the time-sensitive part from the
+ * retained inputs: the persisted floor (explicit invalid, degraded, demo,
+ * stale) is never revised, so nothing untrusted is ever promoted.
+ *
+ * Readings without retained inputs (legacy fixtures) are returned unchanged.
+ * Returns the same object when the status does not change, so memoised
+ * presenters do not churn.
+ */
+export function refreshSensorReadingStatus<T extends SensorReading | null | undefined>(
+  reading: T,
+  now: Date,
+): T {
+  if (!reading || !reading.freshness) return reading;
+  const { floor, timeSources } = reading.freshness;
+  let status: SensorReadingHealthStatus | null = floor;
+  for (const source of timeSources) {
+    const timed = classifyCaptureTime(reading.capturedAt, source, now);
+    status = status === null ? timed : leastTrustedStatus(status, timed);
+  }
+  if (status === null || status === reading.status) return reading;
+  return { ...reading, status } as T;
+}
+
+/**
+ * `refreshSensorReadingStatus` over a list. Order is preserved, inputs are not
+ * mutated, and the same array is returned when no reading changed.
+ */
+export function refreshSensorReadingsStatus(
+  readings: readonly SensorReading[],
+  now: Date,
+): SensorReading[] {
+  let changed = false;
+  const out = readings.map((reading) => {
+    const next = refreshSensorReadingStatus(reading, now);
+    if (next !== reading) changed = true;
+    return next;
+  });
+  return changed ? out : (readings as SensorReading[]);
 }
 
 const STATUS_TRUST_RANK: Record<SensorReadingHealthStatus, number> = {
@@ -189,6 +283,7 @@ export function mapSensorReadingRow(row: SensorReadingRow, now: Date = new Date(
     source,
     status: deriveReadingStatus(capturedAt, source, row.quality, now),
     capturedAt,
+    freshness: freshnessForRow(source, row.quality),
   };
   const observedMetric = applyMetric(reading, row.metric, row.value);
   if (observedMetric) reading.observedMetrics?.push(observedMetric);
@@ -250,6 +345,7 @@ export function groupSensorReadingRows(
     const key = `${row.tent_id}|${rowCapturedAt}`;
     const rowSource = resolveSensorReadingSource(row);
     const rowStatus = deriveReadingStatus(rowCapturedAt, rowSource, row.quality, now);
+    const rowFreshness = freshnessForRow(rowSource, row.quality);
     let reading = byKey.get(key);
     if (!reading) {
       reading = {
@@ -264,6 +360,7 @@ export function groupSensorReadingRows(
         source: rowSource,
         status: rowStatus,
         capturedAt: rowCapturedAt,
+        freshness: rowFreshness,
       };
       byKey.set(key, reading);
     } else {
@@ -272,6 +369,7 @@ export function groupSensorReadingRows(
       // must never let the first physical-looking row promote the group.
       reading.source = leastTrustedSource(reading.source, rowSource);
       reading.status = leastTrustedStatus(reading.status, rowStatus);
+      reading.freshness = mergeFreshness(reading.freshness ?? rowFreshness, rowFreshness);
     }
     const observedMetric = applyMetric(reading, row.metric, row.value);
     if (observedMetric && !reading.observedMetrics?.includes(observedMetric)) {

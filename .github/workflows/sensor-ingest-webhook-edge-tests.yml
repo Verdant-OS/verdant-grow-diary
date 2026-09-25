@@ -45,6 +45,10 @@ jobs:
 
       - name: Run sensor ingest Deno tests
         # Fake env only — no production secrets are used or required.
+        # `shell: bash` runs with `-eo pipefail`. Without it the step runs as
+        # `bash -e`, and the pipe into `tee` reports tee's status, so a failing
+        # suite was a green check (CodeRabbit, #1221 round 14).
+        shell: bash
         env:
           SUPABASE_URL: https://example.test
           SUPABASE_ANON_KEY: test-anon-key

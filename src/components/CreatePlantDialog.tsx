@@ -33,9 +33,11 @@ import {
 } from "@/lib/plantStartDateRules";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
+  PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
   PLANT_HEALTH_NOT_ASSESSED_LABEL,
   PLANT_HEALTH_NOT_ASSESSED_OPTION,
-  buildPlantHealthUpdate,
+  buildPlantHealthCreateInsert,
+  isPlantHealthClearRejected,
   plantHealthFromSelectValue,
 } from "@/lib/plantHealthRules";
 import {
@@ -430,7 +432,9 @@ export default function CreatePlantDialog({
         name: form.name.trim(),
         strain: trimmedStrain || null,
         stage: form.stage,
-        ...buildPlantHealthUpdate(form.health),
+        // Always explicit, "unknown" when not assessed: the column default is
+        // "healthy" until 20260924120000 is applied (QA 2026-09-24, BUG-009).
+        ...buildPlantHealthCreateInsert(form.health),
         plant_type: form.plant_type,
         grow_id: targetGrowId,
       };
@@ -497,7 +501,13 @@ export default function CreatePlantDialog({
           typeof (error as { message?: unknown }).message === "string"
             ? (error as { message: string }).message
             : "Plant could not be created";
-        toast.error(message);
+        // Before 20260924120000 the trigger rejects "unknown" and nothing is
+        // written; the form stays open so the grower can pick a health value.
+        toast.error(
+          isPlantHealthClearRejected(message)
+            ? PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE
+            : message,
+        );
         return;
       }
       // The insert is now durable. Record that fact before any cache refresh can

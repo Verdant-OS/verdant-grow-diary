@@ -16,7 +16,9 @@ import { describe, expect, it } from "vitest";
 import { validatePlantInsertPayload } from "@/lib/plantPayloadValidation";
 import {
   PLANT_HEALTH_NOT_ASSESSED_LABEL,
+  PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
   PLANT_HEALTH_NOT_ASSESSED_OPTION,
+  buildPlantHealthCreateInsert,
   buildPlantHealthEditUpdate,
   buildPlantHealthUpdate,
   isPlantHealthClearRejected,
@@ -64,19 +66,34 @@ describe("plants.health migration shape", () => {
 });
 
 describe("client never claims health it did not assess", () => {
-  it("create omits health when not assessed and never sends 'unknown'", () => {
+  it("create writes the grower's choice, 'unknown' when not assessed", () => {
+    // Explicit, never the column default: before 20260924120000 is applied
+    // that default is 'healthy', a claim nobody made.
+    expect(buildPlantHealthCreateInsert("")).toEqual({ health: "unknown" });
+    expect(buildPlantHealthCreateInsert(undefined)).toEqual({ health: "unknown" });
+    expect(buildPlantHealthCreateInsert("great")).toEqual({ health: "unknown" });
+    expect(buildPlantHealthCreateInsert("watch")).toEqual({ health: "watch" });
+    expect(buildPlantHealthCreateInsert("healthy")).toEqual({ health: "healthy" });
+    // Unrelated profile edits still never submit a health they did not change.
     expect(buildPlantHealthUpdate("")).toEqual({});
     expect(buildPlantHealthUpdate("unknown")).toEqual({});
     expect(buildPlantHealthUpdate("watch")).toEqual({ health: "watch" });
     expect(PLANT_HEALTH_NOT_ASSESSED_LABEL).toBe("Not assessed yet");
   });
 
-  it("insert validation accepts an omitted health and still rejects 'unknown'", () => {
+  it("insert validation accepts 'unknown' and an omitted health, and rejects anything else", () => {
     expect(validatePlantInsertPayload({ ...base }).ok).toBe(true);
     expect(validatePlantInsertPayload({ ...base, health: "issue" }).ok).toBe(true);
-    // Inserts omit health instead; only an explicit Edit Plant clear writes it.
-    expect(validatePlantInsertPayload({ ...base, health: "unknown" }).ok).toBe(false);
+    expect(validatePlantInsertPayload({ ...base, health: "unknown" }).ok).toBe(true);
     expect(validatePlantInsertPayload({ ...base, health: "great" }).ok).toBe(false);
+    expect(validatePlantInsertPayload({ ...base, health: null }).ok).toBe(false);
+  });
+
+  it("a create rejected before the apply tells the grower how to proceed", () => {
+    expect(isPlantHealthClearRejected("invalid plant health: unknown")).toBe(true);
+    expect(PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE).toBe(
+      "\"Not assessed yet\" isn't available yet, so the plant wasn't added. Choose Healthy, Watch or Issue to add it.",
+    );
   });
 
   it("guided setup plants are created without a health claim", () => {

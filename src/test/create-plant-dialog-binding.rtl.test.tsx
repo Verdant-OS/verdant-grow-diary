@@ -5,6 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
+import { PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE } from "@/lib/plantHealthRules";
 import { unstable_batchedUpdates } from "react-dom";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
@@ -367,7 +369,7 @@ describe("CreatePlantDialog RTL binding", () => {
     expect(selectMock).toHaveBeenCalledWith("*");
   });
 
-  it("creates a plant as not assessed: no health is sent until the grower picks one (BUG-009)", async () => {
+  it("creates a plant as not assessed: 'unknown' is sent until the grower picks one (BUG-009)", async () => {
     renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
     await waitFor(() => {
       expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
@@ -380,9 +382,38 @@ describe("CreatePlantDialog RTL binding", () => {
       expect(insertMock).toHaveBeenCalled();
     });
     const payload = insertMock.mock.calls[0][0] as Record<string, unknown>;
-    // Omitted, never "unknown": the column default applies on both sides of
-    // the 20260924120000 apply ("healthy" before, "unknown" after).
-    expect(payload).not.toHaveProperty("health");
+    // Written explicitly, never left to the column default: before
+    // 20260924120000 is applied that default is "healthy", a claim the
+    // grower did not make.
+    expect(payload.health).toBe("unknown");
+  });
+
+  it("fails closed when the database does not accept Not assessed yet", async () => {
+    // validate_plant_row() before 20260924120000: the whole insert is rejected.
+    singleMock.mockResolvedValueOnce({
+      data: null,
+      error: { code: "P0001", message: "invalid plant health: unknown" },
+    });
+    renderDialog({ defaultGrowId: G1, defaultTentId: T1 });
+    await waitFor(() => {
+      expect(screen.getByTestId("create-plant-form")).toBeInTheDocument();
+    });
+    await userEvent.type(screen.getByTestId("create-plant-name"), "Unassessed Plant");
+    await userEvent.click(screen.getByTestId("plant-create-submit"));
+
+    await waitFor(() =>
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
+        PLANT_HEALTH_NOT_ASSESSED_CREATE_UNAVAILABLE_MESSAGE,
+      ),
+    );
+    expect(insertMock).toHaveBeenCalledTimes(1);
+    // A definitive rejection: no reconciliation read, no success, no handoff.
+    expect(plantLookupSelectMock).not.toHaveBeenCalled();
+    expect(successToastMock).not.toHaveBeenCalled();
+    expect(funnelEventMock).not.toHaveBeenCalledWith("plant_created");
+    // The form stays open with the grower's entries, ready for a health pick.
+    expect(screen.getByTestId("create-plant-name")).toHaveValue("Unassessed Plant");
+    expect(screen.getByTestId("plant-create-submit")).not.toBeDisabled();
   });
 
   it("sends the health the grower explicitly picks", async () => {
@@ -429,7 +460,7 @@ describe("CreatePlantDialog RTL binding", () => {
       await waitFor(() => {
         expect(insertMock).toHaveBeenCalled();
       });
-      expect(insertMock.mock.calls[0][0] as Record<string, unknown>).not.toHaveProperty("health");
+      expect((insertMock.mock.calls[0][0] as Record<string, unknown>).health).toBe("unknown");
     } finally {
       Element.prototype.scrollIntoView = originalScrollIntoView;
     }

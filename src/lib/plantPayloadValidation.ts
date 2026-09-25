@@ -20,6 +20,8 @@ import { normalizePlantType, PLANT_TYPE_VALUES, type PlantType } from "@/lib/pla
 
 const STAGES = ["seedling", "veg", "flower", "flush", "harvest", "cure"] as const;
 const HEALTHS = ["healthy", "watch", "issue"] as const;
+/** "unknown" = not assessed; accepted by validate_plant_row() from 20260924120000. */
+const INSERT_HEALTHS = [...HEALTHS, "unknown"] as const;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuid = z.string().regex(UUID_RE, "must be a UUID");
@@ -38,9 +40,9 @@ export const PlantInsertPayloadSchema = z
     name: z.string().trim().min(1, "Plant name is required").max(120),
     strain: z.string().trim().max(120).nullish(),
     stage: z.enum(STAGES),
-    // Optional: omitted = not assessed, so the column default applies.
-    // "unknown" is never sent (see plantHealthRules).
-    health: z.enum(HEALTHS).optional(),
+    // Create Plant always sends it, "unknown" for not assessed; guided setup
+    // omits it so the column default applies (see plantHealthRules).
+    health: z.enum(INSERT_HEALTHS).optional(),
     plant_type: z.enum(PLANT_TYPE_VALUES as readonly [PlantType, ...PlantType[]]),
     tent_id: uuid.optional(),
     grow_id: uuid,

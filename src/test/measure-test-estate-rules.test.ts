@@ -19,6 +19,7 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it, expect } from "vitest";
+import { load as loadYaml } from "js-yaml";
 import {
   buildExecutableCorpus,
   bypassesMockSpecifiers,
@@ -32,15 +33,21 @@ import {
   bucketOf,
   classifyTest,
   commandLinesIn,
+  decodeYamlInlineScalar,
   isCommandLine,
+  isPlaywrightSpec,
   isRuntimeHarness,
   namedPathsIn,
   resolveSpec,
   runtimeImportSpecifiers,
+  stripDisabledBlocks,
+  stripJsComments,
+  stripShellComment,
   stripTriggerBlock,
   testFileReach,
   testFileRuntimeSpecifiers,
-  // Pure rules; the script supplies all I/O.
+  // Pure rules; the script supplies all I/O.,
+  resolveBareBasenames,
 } from "../../scripts/lib/testEstateRules.mjs";
 
 const wf = (s: string) => s.replace(/\n {6}/g, "\n");
@@ -109,6 +116,30 @@ describe("workflow execution — a mention is not an invocation (FALSE-LIVE guar
     expect(namedPathsIn("we run e2e/one.spec.ts and also e2e/**").has("e2e/two.spec.ts")).toBe(
       false,
     );
+  });
+
+  it("tokenizes a .tsx path whole — never as its .ts prefix (Cursor Bugbot, #1221)", () => {
+    // `\.(?:ts|tsx|…)` tried `ts` first with nothing after it, so `widget.spec.tsx`
+    // was read as `widget.spec.ts`: a wired .tsx spec looked dead, and a sibling .ts
+    // file could look executed for the wrong reason.
+    const paths = namedPathsIn("bunx playwright test e2e/widget.spec.tsx e2e/page.test.jsx");
+    expect(paths.has("e2e/widget.spec.tsx")).toBe(true);
+    expect(paths.has("e2e/widget.spec.ts")).toBe(false);
+    expect(paths.has("e2e/page.test.jsx")).toBe(true);
+    expect(paths.has("e2e/page.test.js")).toBe(false);
+  });
+
+  it("does not read a path that only continues past the extension as the file itself (CodeRabbit, #1221 round 16)", () => {
+    // Playwright keeps a spec's baselines in `<spec>-snapshots/`, and `git add` or
+    // `rm -rf` on that directory runs nothing. The lookahead let the match back off
+    // to `e2e/v.spec.ts` there, and at a backup such as `x.spec.ts.bak`.
+    expect([...namedPathsIn("git add e2e/v.spec.ts-snapshots/a.png")]).toEqual([]);
+    expect([...namedPathsIn("rm -rf e2e/v.spec.ts-snapshots/")]).toEqual([]);
+    expect([...namedPathsIn("cp e2e/x.spec.ts.bak /tmp")]).toEqual([]);
+    // FENCE: a `:line` suffix, a closing quote, or a full stop still ends the path.
+    expect([...namedPathsIn("bunx playwright test e2e/v.spec.ts:12")]).toEqual(["e2e/v.spec.ts"]);
+    expect([...namedPathsIn("run 'e2e/v.spec.ts'")]).toEqual(["e2e/v.spec.ts"]);
+    expect([...namedPathsIn("see e2e/v.spec.ts.")]).toEqual(["e2e/v.spec.ts"]);
   });
 });
 
@@ -864,5 +895,398 @@ describe("reproducer CLI — `--rev` never reaches a shell", () => {
     const result = run("--upload-pack=touch");
     expect(result.status).toBe(2);
     expect(result.stderr).toContain("cannot resolve");
+  });
+});
+
+describe("resolveBareBasenames — a runner argument names a lane file by basename", () => {
+  // `bunx playwright test agent-integrations-smoke.spec.ts` runs
+  // e2e/agent-integrations-smoke.spec.ts via testDir. Exact-path matching alone
+  // called that spec never-run while CI executed it on every matching PR.
+  it("resolves an unambiguous bare basename to its one lane file", () => {
+    const out = resolveBareBasenames({
+      laneFiles: ["e2e/a.spec.ts", "e2e/b.spec.ts"],
+      namedPaths: new Set(["a.spec.ts"]),
+    });
+    expect(out.has("e2e/a.spec.ts")).toBe(true);
+    expect(out.has("e2e/b.spec.ts")).toBe(false);
+  });
+
+  it("refuses an ambiguous basename — two lane files, one token, no fabricated reading", () => {
+    const out = resolveBareBasenames({
+      laneFiles: ["supabase/functions/x/contract.test.ts", "supabase/functions/y/contract.test.ts"],
+      namedPaths: new Set(["contract.test.ts"]),
+    });
+    expect(out.has("supabase/functions/x/contract.test.ts")).toBe(false);
+    expect(out.has("supabase/functions/y/contract.test.ts")).toBe(false);
+  });
+
+  it("keeps every full path already named, and never mutates its input", () => {
+    const named = new Set(["e2e/full.spec.ts", "stray.spec.ts"]);
+    const out = resolveBareBasenames({ laneFiles: ["e2e/full.spec.ts"], namedPaths: named });
+    expect(out.has("e2e/full.spec.ts")).toBe(true);
+    expect(out.has("stray.spec.ts")).toBe(true); // passthrough — not a lane file, not dropped
+    expect(named.size).toBe(2);
+    expect(named.has("e2e/full.spec.ts")).toBe(true);
+  });
+
+  it("resolves bare names for Playwright specs only — no other runner resolves against testDir (CodeRabbit, #1221 round 9)", () => {
+    // The corpus is not command lines alone: package-script and runner bodies are
+    // appended with their string literals kept. `vitest run foo.test.ts` in any of them
+    // must not mark a Deno test executed that Deno never ran.
+    const laneFiles = [
+      "supabase/functions/x/foo.test.ts",
+      "scripts/run-y-harness.ts",
+      "e2e/bar.spec.ts",
+    ];
+    const namedPaths = new Set(["foo.test.ts", "run-y-harness.ts", "bar.spec.ts"]);
+    const out = resolveBareBasenames({ laneFiles, namedPaths });
+    expect(out.has("supabase/functions/x/foo.test.ts")).toBe(false);
+    expect(out.has("scripts/run-y-harness.ts")).toBe(false);
+    expect(out.has("e2e/bar.spec.ts")).toBe(true);
+    // The eligible set follows the caller's resolved testDir, not a hard-coded "e2e".
+    const custom = resolveBareBasenames({
+      laneFiles: ["tests/ui/bar.spec.ts", "e2e/bar2.spec.ts"],
+      namedPaths: new Set(["bar.spec.ts", "bar2.spec.ts"]),
+      resolvable: (f: string) => isPlaywrightSpec(f, "tests/ui"),
+    });
+    expect(custom.has("tests/ui/bar.spec.ts")).toBe(true);
+    expect(custom.has("e2e/bar2.spec.ts")).toBe(false);
+  });
+
+  it("is a bare-token match only — a basename inside a longer path is not one", () => {
+    // `e2e/nested/a.spec.ts` named in full must not make bare `a.spec.ts` resolve to a
+    // DIFFERENT lane file that happens to share the basename.
+    const out = resolveBareBasenames({
+      laneFiles: ["e2e/a.spec.ts", "e2e/nested/a.spec.ts"],
+      namedPaths: new Set(["e2e/nested/a.spec.ts"]),
+    });
+    expect(out.has("e2e/nested/a.spec.ts")).toBe(true);
+    expect(out.has("e2e/a.spec.ts")).toBe(false);
+  });
+});
+
+describe("runner bodies — a comment is not an invocation (Codex, #1221 round 4)", () => {
+  // The one-hop runner body was appended to the corpus WHOLE, so a runner carrying
+  // `// bunx playwright test e2e/dead.spec.ts` marked the spec executed: the same
+  // comment-out defeat F1 closed for workflow bodies, one hop further in.
+  it("strips line and block comments but keeps strings, template literals and regex literals", () => {
+    const src = [
+      'const url = "https://example.test/e2e/kept-in-string.spec.ts"; // playwright test e2e/line-comment.spec.ts',
+      "/* bunx vitest run src/test/block-comment.test.ts",
+      "   spans lines */",
+      "const tpl = `bunx playwright test e2e/kept-in-template.spec.ts`;",
+      "const re = /https?:\\/\\//; run('e2e/kept-after-regex.spec.ts');",
+      "const s = 'it\\'s // not a comment e2e/kept-in-single.spec.ts';",
+    ].join("\n");
+    const out = stripJsComments(src);
+    expect(out).toContain("e2e/kept-in-string.spec.ts");
+    expect(out).toContain("e2e/kept-in-template.spec.ts");
+    expect(out).toContain("e2e/kept-after-regex.spec.ts");
+    expect(out).toContain("e2e/kept-in-single.spec.ts");
+    expect(out).not.toContain("e2e/line-comment.spec.ts");
+    expect(out).not.toContain("src/test/block-comment.test.ts");
+    // Line structure survives, so line-oriented consumers keep their numbering.
+    expect(out.split("\n")).toHaveLength(src.split("\n").length);
+  });
+
+  it("a command commented out inside a runner does not mark its spec executed", () => {
+    const runner = [
+      "// bunx playwright test e2e/dead-line.spec.ts",
+      "/* bunx playwright test e2e/dead-block.spec.ts */",
+      "spawn('bunx', ['playwright', 'test', 'e2e/live.spec.ts']);",
+    ].join("\n");
+    const paths = namedPathsIn(
+      buildExecutableCorpus({
+        workflowTexts: ["jobs:\n  a:\n    steps:\n      - run: node scripts/run-x.mjs\n"],
+        readRunner: (rel: string) => (rel === "scripts/run-x.mjs" ? runner : null),
+      }),
+    );
+    expect(paths.has("e2e/live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dead-line.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dead-block.spec.ts")).toBe(false);
+  });
+
+  it("is idempotent, deterministic, and null-safe", () => {
+    const src = "a(); // c\n/* d */ b();";
+    expect(stripJsComments(stripJsComments(src))).toBe(stripJsComments(src));
+    expect(stripJsComments(src)).toBe(stripJsComments(src));
+    expect(stripJsComments("")).toBe("");
+    expect(stripJsComments(null)).toBe("");
+    expect(stripJsComments("/* unterminated")).toBe("");
+  });
+});
+
+describe("Playwright lane discovery — testMatch under testDir, at any depth (Codex + Vercel, #1221 round 5)", () => {
+  // Both the audit and the manifest guard filtered `^e2e/[^/]+\.spec\.ts$`. Playwright's
+  // testDir is "./e2e" and its default testMatch is `**\/*.@(spec|test).?(c|m)[jt]s?(x)`,
+  // scanned recursively — so a spec in a subdirectory, or a `.spec.tsx`, was run by
+  // Playwright and invisible to the guard. Reproduced: `e2e/zz-nested/dead.spec.ts` was
+  // listed by `playwright test --list` while the manifest suite stayed green.
+  it("accepts a spec at any depth and every extension Playwright matches", () => {
+    expect(isPlaywrightSpec("e2e/root.spec.ts")).toBe(true);
+    expect(isPlaywrightSpec("e2e/mobile/nested.spec.ts")).toBe(true);
+    expect(isPlaywrightSpec("e2e/a/b/c/deep.test.ts")).toBe(true);
+    expect(isPlaywrightSpec("e2e/component.spec.tsx")).toBe(true);
+    expect(isPlaywrightSpec("e2e/legacy.spec.mjs")).toBe(true);
+    expect(isPlaywrightSpec("e2e/legacy.test.cjs")).toBe(true);
+  });
+
+  it("rejects helpers, fixtures, the auth setup file, node_modules, and files outside testDir", () => {
+    expect(isPlaywrightSpec("e2e/helpers/session.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e/fixtures/plant.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e/auth.setup.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e/node_modules/pkg/x.spec.ts")).toBe(false);
+    expect(isPlaywrightSpec("src/test/unit.spec.ts")).toBe(false);
+    expect(isPlaywrightSpec("e2e-old/x.spec.ts")).toBe(false);
+  });
+
+  it("honours a configured testDir, with or without the ./ prefix and trailing slash", () => {
+    expect(isPlaywrightSpec("tests/x.spec.ts", "./tests/")).toBe(true);
+    expect(isPlaywrightSpec("e2e/x.spec.ts", "./tests")).toBe(false);
+    expect(isPlaywrightSpec(null as unknown as string)).toBe(false);
+  });
+});
+
+describe("statically disabled steps and jobs are not execution evidence (Codex, #1221 round 6)", () => {
+  // `if: ${{ false }}` (or `if: false`) disables a step or a whole job without deleting
+  // it. The corpus took every `run:` line as evidence, so a lane switched off that way
+  // still read as executed. Only a LITERAL false is decidable statically; expressions
+  // that happen to be false at runtime are not, and are left alone.
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - name: dead step",
+    "        if: ${{ false }}",
+    "        run: bunx playwright test e2e/dead-step.spec.ts",
+    "      - name: live step",
+    "        if: always()",
+    "        run: bunx playwright test e2e/live.spec.ts",
+    "  b:",
+    "    if: false",
+    "    steps:",
+    "      - run: bunx playwright test e2e/dead-job.spec.ts",
+    "      - run: bunx playwright test e2e/dead-job-two.spec.ts",
+    "  c:",
+    "    if: env.FLAG == 'false'",
+    "    steps:",
+    "      - run: bunx playwright test e2e/live-expr.spec.ts",
+    "",
+  ].join("\n");
+
+  it("drops a step and a job disabled with a literal false, keeps their siblings", () => {
+    const paths = pathsOf(y);
+    expect(paths.has("e2e/dead-step.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dead-job.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dead-job-two.spec.ts")).toBe(false);
+    expect(paths.has("e2e/live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/live-expr.spec.ts")).toBe(true);
+  });
+
+  it("recognises every literal-false spelling and no expression", () => {
+    for (const cond of [
+      "false",
+      "${{ false }}",
+      "'false'",
+      '"false"',
+      "'${{ false }}'",
+      "${{false}}",
+    ]) {
+      const w = `jobs:\n  a:\n    steps:\n      - if: ${cond}\n        run: bunx playwright test e2e/x.spec.ts\n`;
+      expect(pathsOf(w).has("e2e/x.spec.ts"), cond).toBe(false);
+    }
+    for (const cond of [
+      "always()",
+      "${{ !cancelled() }}",
+      "github.ref == 'false'",
+      "steps.x.outputs.ok == 'false'",
+    ]) {
+      const w = `jobs:\n  a:\n    steps:\n      - if: ${cond}\n        run: bunx playwright test e2e/x.spec.ts\n`;
+      expect(pathsOf(w).has("e2e/x.spec.ts"), cond).toBe(true);
+    }
+  });
+
+  it("preserves line count, is idempotent, and is null-safe", () => {
+    const out = stripDisabledBlocks(y);
+    expect(out.split("\n")).toHaveLength(y.split("\n").length);
+    expect(stripDisabledBlocks(out)).toBe(out);
+    expect(stripDisabledBlocks(null)).toBe("");
+    expect(stripDisabledBlocks("")).toBe("");
+  });
+});
+
+describe("shell comments in run: blocks are not execution evidence (CodeRabbit, #1221 round 10)", () => {
+  // A `run:` body is shell. `# bunx playwright test e2e/x.spec.ts` inside it runs
+  // nothing, yet `isCommandLine` saw the `bunx` token and `namedPathsIn` recorded the
+  // path — the comment-out defeat R4-B closed for runner bodies, still open one level
+  // up in the workflow itself. `#` opens a comment only at the start of a word and
+  // outside quotes, so quoted and parameter-expansion `#` must survive.
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - run: |",
+    "          # bunx playwright test e2e/whole-line.spec.ts",
+    "          echo ok # bunx playwright test e2e/trailing.spec.ts",
+    "          bunx playwright test e2e/live.spec.ts # a note after a real command",
+    '          echo "#" && bunx playwright test e2e/quoted.spec.ts',
+    "          echo ${#ARR[@]} && bunx playwright test e2e/param.spec.ts",
+    "      - run: echo one-liner # bunx playwright test e2e/single-line.spec.ts",
+    "      - run: >-",
+    "          bunx playwright test e2e/folded-live.spec.ts",
+    "          # e2e/folded-dead.spec.ts",
+    "",
+  ].join("\n");
+  const paths = namedPathsIn(buildExecutableCorpus({ workflowTexts: [y] }));
+
+  it("drops a whole-line, a trailing, a single-line and a folded comment", () => {
+    expect(paths.has("e2e/whole-line.spec.ts")).toBe(false);
+    expect(paths.has("e2e/trailing.spec.ts")).toBe(false);
+    expect(paths.has("e2e/single-line.spec.ts")).toBe(false);
+    expect(paths.has("e2e/folded-dead.spec.ts")).toBe(false);
+  });
+
+  it("keeps the command before a comment, a quoted `#`, and `${#…}` (FENCE)", () => {
+    expect(paths.has("e2e/live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/quoted.spec.ts")).toBe(true);
+    expect(paths.has("e2e/param.spec.ts")).toBe(true);
+    expect(paths.has("e2e/folded-live.spec.ts")).toBe(true);
+  });
+});
+
+describe("a comment opens at any word start, not only after whitespace (CodeRabbit, #1221 round 11)", () => {
+  // Round 10 opened a comment at `#` only at line start or after whitespace. Bash
+  // opens one wherever a new word starts, and a metacharacter (`; & | ( ) < >`)
+  // ends the word before it: `echo ok;# bunx …` runs nothing after the `;`. The same
+  // test also fences the opposite error: an escaped or quoted character does not end
+  // a word, so `a\ #`, `a\;#` and `"a"#` are all one word, and the command after them
+  // runs. Every case was run through `bash -c` before it was pinned.
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - run: |",
+    "          echo ok;# bunx playwright test e2e/after-semicolon.spec.ts",
+    "          true &&# bunx playwright test e2e/after-and.spec.ts",
+    "          echo ok|# bunx playwright test e2e/after-pipe.spec.ts",
+    "          (echo ok)# bunx playwright test e2e/after-paren.spec.ts",
+    "          echo ok &# bunx playwright test e2e/after-background.spec.ts",
+    "          echo a\\ # && bunx playwright test e2e/escaped-space.spec.ts",
+    "          echo a\\;# && bunx playwright test e2e/escaped-semicolon.spec.ts",
+    '          echo "a"# && bunx playwright test e2e/after-quote.spec.ts',
+    "      - run: echo one-liner;# bunx playwright test e2e/single-line-semicolon.spec.ts",
+    "",
+  ].join("\n");
+  const paths = namedPathsIn(buildExecutableCorpus({ workflowTexts: [y] }));
+
+  it("drops a comment opened right after `;`, `&&`, `|`, `)` and `&`", () => {
+    expect(paths.has("e2e/after-semicolon.spec.ts")).toBe(false);
+    expect(paths.has("e2e/after-and.spec.ts")).toBe(false);
+    expect(paths.has("e2e/after-pipe.spec.ts")).toBe(false);
+    expect(paths.has("e2e/after-paren.spec.ts")).toBe(false);
+    expect(paths.has("e2e/after-background.spec.ts")).toBe(false);
+    expect(paths.has("e2e/single-line-semicolon.spec.ts")).toBe(false);
+  });
+
+  it("keeps a `#` inside a word: after an escaped space, an escaped `;`, or a quote (FENCE)", () => {
+    expect(paths.has("e2e/escaped-space.spec.ts")).toBe(true);
+    expect(paths.has("e2e/escaped-semicolon.spec.ts")).toBe(true);
+    expect(paths.has("e2e/after-quote.spec.ts")).toBe(true);
+  });
+});
+
+describe("ANSI-C $' quoting: a backslash escapes the next character (CodeRabbit, #1221 round 12)", () => {
+  // Round 11 treated every `'` as POSIX single quotes, where backslash is
+  // literal. Bash `$'…'` is ANSI-C quoting: `\'` is an escaped quote, not a
+  // closer. The word below is $'\'' — one literal `'`. `echo $'\'' # bunx …`
+  // therefore runs nothing after the `#` (`bash -c` prints `'` and stops),
+  // but stripShellComment closed at `\'`, opened a new quote at the final `'`,
+  // and returned the line unchanged — the same fail-open as rounds 10 and 11.
+  // `$"…"` already falls into double-quote mode. Every case was run through
+  // `bash -c` before it was pinned.
+  const ansiCQuote = "$'" + "\\'" + "'"; // $'\''
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    "      - run: |",
+    `          echo ${ansiCQuote} # bunx playwright test e2e/ansi-c-quote.spec.ts`,
+    "          echo $'#' && bunx playwright test e2e/ansi-c-hash.spec.ts",
+    '          echo $"#" && bunx playwright test e2e/dollar-double.spec.ts',
+    `      - run: echo ${ansiCQuote} # bunx playwright test e2e/ansi-c-single-line.spec.ts`,
+    "",
+  ].join("\n");
+  const paths = namedPathsIn(buildExecutableCorpus({ workflowTexts: [y] }));
+
+  it("drops a comment after an ANSI-C word whose closer is escaped", () => {
+    expect(stripShellComment(`echo ${ansiCQuote} # echo DEAD`)).toBe(`echo ${ansiCQuote}`);
+    expect(paths.has("e2e/ansi-c-quote.spec.ts")).toBe(false);
+    expect(paths.has("e2e/ansi-c-single-line.spec.ts")).toBe(false);
+  });
+
+  it("keeps a `#` inside $'…' or $\"…\" (FENCE)", () => {
+    expect(paths.has("e2e/ansi-c-hash.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dollar-double.spec.ts")).toBe(true);
+  });
+});
+
+describe("a quoted run: value is YAML-decoded before its shell comment is read (CodeRabbit, #1221 round 15)", () => {
+  // `run: "echo ok # bunx …"` hands bash `echo ok # bunx …`: the quotes are YAML's, not
+  // the shell's. Passed raw, stripShellComment read one shell double-quoted word and kept
+  // the path. An escape can also move a `#` out of a raw-text rule's sight: `\x23` is
+  // `#`, and `\n` starts a new shell line. Each dead case was run through `bash -c` on
+  // its decoded value before it was pinned.
+  const y = [
+    "jobs:",
+    "  a:",
+    "    steps:",
+    '      - run: "echo ok # bunx playwright test e2e/dq-comment.spec.ts"',
+    "      - run: 'echo ok # bunx playwright test e2e/sq-comment.spec.ts'",
+    '      - run: "echo ok\\n# bunx playwright test e2e/dq-newline.spec.ts"',
+    '      - run: "echo ok \\x23 bunx playwright test e2e/dq-hex.spec.ts"',
+    '      - run: "bunx playwright test e2e/dq-live.spec.ts" # a YAML comment',
+    "      - run: 'bunx playwright test e2e/sq-live.spec.ts --grep ''#tag'''",
+    '      - run: "bunx playwright test e2e/dq-shell-quoted.spec.ts --grep \\"#tag\\""',
+    '      - run: "echo ok\\nbunx playwright test e2e/dq-second-line.spec.ts"',
+    '      - run: "bunx playwright test e2e/dq-open.spec.ts',
+    '      - run: "bunx playwright test e2e/dq-bad-escape.spec.ts \\q"',
+    "",
+  ].join("\n");
+  const paths = namedPathsIn(buildExecutableCorpus({ workflowTexts: [y] }));
+
+  it("drops a comment inside a quoted value, including one an escape creates", () => {
+    expect(paths.has("e2e/dq-comment.spec.ts")).toBe(false);
+    expect(paths.has("e2e/sq-comment.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dq-newline.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dq-hex.spec.ts")).toBe(false);
+  });
+
+  it("keeps the command, a shell-quoted `#`, and a line after `\\n` (FENCE)", () => {
+    expect(paths.has("e2e/dq-live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/sq-live.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dq-shell-quoted.spec.ts")).toBe(true);
+    expect(paths.has("e2e/dq-second-line.spec.ts")).toBe(true);
+  });
+
+  it("counts nothing from a value this line cannot yield: an open quote or an invalid escape", () => {
+    // Fail-closed: an unread command reads as unrun, a loud UNEXEMPT_DEAD, never a silent pass.
+    expect(paths.has("e2e/dq-open.spec.ts")).toBe(false);
+    expect(paths.has("e2e/dq-bad-escape.spec.ts")).toBe(false);
+    expect(decodeYamlInlineScalar('"open')).toBeNull();
+    expect(decodeYamlInlineScalar('"bad \\q"')).toBeNull();
+    expect(decodeYamlInlineScalar('"short \\x2"')).toBeNull();
+  });
+
+  it.each([
+    '"a # b"',
+    "'a # b'",
+    "'it''s'",
+    '"x" # a YAML comment',
+    '"\\x23 \\u00e9 \\U0001F600"',
+    '"\\0\\a\\b\\t\\n\\v\\f\\r\\e\\ \\"\\/\\\\\\N\\_\\L\\P"',
+    '"tab\\\tinside"',
+    "plain text",
+  ])("decodes %s exactly as a YAML parser does", (value) => {
+    expect(decodeYamlInlineScalar(value)).toBe((loadYaml(`v: ${value}`) as { v: string }).v);
   });
 });

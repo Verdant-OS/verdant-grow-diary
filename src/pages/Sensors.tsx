@@ -4,6 +4,9 @@ import EnvironmentStabilityCard from "@/components/EnvironmentStabilityCard";
 import { computeEnvironmentStability } from "@/lib/environmentStabilityRules";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useAuth } from "@/store/auth";
+import { useNowTick } from "@/hooks/useNowTick";
+import { refreshSensorReadingsStatus } from "@/lib/growAdapters";
+import { selectSensorVpdDisplayEvidence } from "@/lib/sensorVpdDisplayEvidenceRules";
 import { useSensorsPageSession } from "@/hooks/useSensorsPageSession";
 import { decodeManualCorrectionHash } from "@/lib/manualSensorCorrectionContext";
 import { Activity } from "lucide-react";
@@ -66,7 +69,7 @@ import {
   classifySensorReadingTrust,
   indexSensorReadingsByObservedMetric,
   readObservedSensorMetric,
-  selectLatestTrustedVpdInputs,
+  type LatestTrustedVpdInputs,
   sortSensorReadingsNewestFirst,
 } from "@/lib/sensorReadingSelectionRules";
 
@@ -83,6 +86,7 @@ const subscribeWithoutSession = () => () => {};
 const readWithoutSession = () => null;
 
 export default function Sensors() {
+  const nowMs = useNowTick();
   const location = useLocation();
   const { user } = useAuth();
   const session = useSensorsPageSession(user?.id);
@@ -146,9 +150,14 @@ export default function Sensors() {
   const readingsQuery = useGrowSensorReadings(activeTentId);
   const quickLogManualQuery = useSensorsQuickLogManualReadings(activeTentId);
   const { data: tentReadings = [] } = readingsQuery;
+  const clockedTentReadings = useMemo(
+    () => refreshSensorReadingsStatus(tentReadings, new Date(nowMs)),
+    [tentReadings, nowMs],
+  );
   const readings = useMemo(
-    () => mergeSensorsSeriesWithQuickLogManuals(tentReadings, quickLogManualQuery.data ?? []),
-    [quickLogManualQuery.data, tentReadings],
+    () =>
+      mergeSensorsSeriesWithQuickLogManuals(clockedTentReadings, quickLogManualQuery.data ?? []),
+    [quickLogManualQuery.data, clockedTentReadings],
   );
   const operatorRole = useHasRole("operator");
 
@@ -257,7 +266,14 @@ export default function Sensors() {
   const selectedTentStage =
     (selectedTent as unknown as { stage?: string | null } | null)?.stage ?? null;
   const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");
-  const latestTrustedVpdInputs = useMemo(() => selectLatestTrustedVpdInputs(filtered), [filtered]);
+  const [previousVpdInputs, setPreviousVpdInputs] = useState<LatestTrustedVpdInputs | null>(null);
+  const latestTrustedVpdInputs = useMemo(
+    () => selectSensorVpdDisplayEvidence(filtered, previousVpdInputs),
+    [filtered, previousVpdInputs],
+  );
+  useEffect(() => {
+    setPreviousVpdInputs(latestTrustedVpdInputs);
+  }, [latestTrustedVpdInputs]);
   const derivedVpdKpa = useMemo(() => {
     if (latestObservedVpd !== null || !latestTrustedVpdInputs) return null;
     const derived = deriveVpd({
@@ -298,6 +314,7 @@ export default function Sensors() {
     latest
       ? { source: latestSource, value: latest.temp, timestamp: latest.ts }
       : { source: null, value: null, timestamp: null },
+    { now: nowMs },
   );
 
   const hasReadings = filtered.length > 0;
@@ -470,12 +487,20 @@ export default function Sensors() {
           const metricReadings = readingsByMetric[m.key];
           const latestMetricReading = metricReadings[0] ?? null;
           const rawValue = readObservedSensorMetric(latestMetricReading, m.key);
-          const metricTrust = classifySensorReadingTrust(latestMetricReading);
-          const metricSource = latestMetricReading?.source ?? null;
+          const metricEvidenceReading =
+            latestMetricReading ??
+            (m.key === "vpd" ? (latestTrustedVpdInputs?.reading ?? null) : null);
+          const metricTrust = classifySensorReadingTrust(metricEvidenceReading);
+          const metricSource = metricEvidenceReading?.source ?? null;
           const metricClassification = classifyGrowDataSource(
-            latestMetricReading
-              ? { source: metricSource, value: rawValue, timestamp: latestMetricReading.ts }
+            metricEvidenceReading
+              ? {
+                  source: metricSource,
+                  value: rawValue ?? derivedVpdKpa,
+                  timestamp: metricEvidenceReading.ts,
+                }
               : { source: null, value: null, timestamp: null },
+            { now: nowMs },
           );
           // Derive VPD from temp + RH when no VPD value is present.
           let value: number | null | undefined = rawValue;
@@ -495,7 +520,7 @@ export default function Sensors() {
             value: value ?? null,
             source: metricSource,
             hasAnyReading: hasReadings,
-            isStale: metricTrust.isStale,
+            isStale: metricTrust.isStale || metricClassification.label === "Stale",
             isInvalid: metricTrust.isInvalid,
             isDerived,
             recentValues,
@@ -531,7 +556,8 @@ export default function Sensors() {
           if (
             m.key === "temp" &&
             latestMetricReading &&
-            isUsableGrowSensorReading(latestMetricReading)
+            isUsableGrowSensorReading(latestMetricReading) &&
+            state.kind !== "stale"
           ) {
             const r = classifyTempAgainstStage(rawValue, {
               stage: selectedTentStage,
@@ -541,7 +567,8 @@ export default function Sensors() {
           } else if (
             m.key === "rh" &&
             latestMetricReading &&
-            isUsableGrowSensorReading(latestMetricReading)
+            isUsableGrowSensorReading(latestMetricReading) &&
+            state.kind !== "stale"
           ) {
             const r = classifyRhAgainstStage(rawValue, {
               stage: selectedTentStage,

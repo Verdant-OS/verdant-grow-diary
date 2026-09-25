@@ -1,13 +1,12 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-25 UTC (head lanes read settled 12:03 UTC; tip and live measured 11:51 UTC; Vercel production alias record re-read 11:51 UTC; this stamp's own time is its git commit time)
+**Last updated:** 2026-09-25 UTC (head lanes read settled 12:03 UTC; tip read 11:51 UTC; public serving state `NOT_MEASURED` (HTTP `000`, §2); Vercel production alias record re-read 11:51 UTC; this stamp's own time is its git commit time)
 **Updated by:** Claude (2026-09-25 midday, restamp on the **same deploy tip
 `9b06be3fd6d6001d75473e9bd9c3de92b9b35af2`**, the `#1680` squash, on Cheek's explicit instruction.
 **Zero commits** merged since the 11:25 stamp; no migration (§1). This stamp records **this file's own
 PR head `600c9902` lanes after they settled: 27 runs, 25 green, 1 skipped, 1 red** (the dependency
 audit, identical to the tip) (§8), and closes out **Codex's independent review so far: five passes
-on five heads, two P1 and eight P2 findings, all carried** — the last, that §5's heading undercounted
-the P1s, is carried here (§5). **The production incident stands as the 11:25 stamp records it after
+on six heads, two P1 and twelve P2 findings, all carried** — the latest three, on `b8a3cc17`, are carried by this amendment (§5). **The production incident stands as the 11:25 stamp records it after
 its amendments:** the Cursor Agent, using an API token on the owner's Vercel account, deployed the
 stale commit `7053af8f` to production at 08:28:39 and aliased it at 08:29:17; an owner-authorized
 rollback re-pointed the aliases to the tip build at 09:45:16; Vercel's alias record still points to
@@ -39,9 +38,9 @@ the 11:25 stamp §2 records after its amendments, unchanged at the 11:51 re-read
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | 06:22:23     | `dpl_6fVRiJ3XrDbCcGXrtDvCbLvB7HoY` (`git`, tip `9b06be3f`) built                                                                                    | deployment record                       |
 | 08:28:39     | `dpl_BhuJT6qqVNckHMibRxYNXDHK4DM7` (`redeploy`, `7053af8f` on `cursor/missing-test-coverage-b7df`) created **by the Cursor Agent** — event-log GitHub login `cursoragent`, under the owner's account via an API token; the same token attached the GitHub connector 08:26:14, enabled Skew Protection 08:28:52, changed a project setting 08:29:43 | team event log, read 11:32              |
-| **08:29:17** | **`cursoragent` assigns the 5 production aliases to it — exposure of new page loads starts**                                                       | team event log                          |
+| **08:29:17** | **`cursoragent` assigns 5 aliases to it — exposure of new page loads starts.** The event payload carries the count only (`aliasCount: 5`); the deployment record names them: the four production-facing hostnames `verdantgrowdiary.com`, `www.verdantgrowdiary.com`, `verdant-grow-diary.vercel.app`, `verdant-grow-diary-verdantgrowdiary.vercel.app`, plus its own branch alias `verdant-grow-diary-git-cursor-missing-t-795c8d-…` | team event log; `get_deployment` `dpl_BhuJT6qq…`, read 12:16 |
 | **09:45:15** | **`instant-rollback-created`** to `dpl_6fVRiJ3X…` by the owner principal (owner-authorized; issued by another Claude session on Cheek's instruction, `source claim` for the instruction: comment `5830322101`) | team event log                          |
-| **09:45:16** | **Aliases re-assigned to `dpl_6fVRiJ3X…` — exposure of new page loads ends**                                                                        | event log; alias `updatedAt`            |
+| **09:45:16** | **The four production-facing aliases re-assigned to `dpl_6fVRiJ3X…` (`aliasCount: 4`) — exposure of new page loads ends.** The fifth, the Cursor branch alias, is not production-facing and stays with `dpl_BhuJT6qq…` | event log; alias `updatedAt` |
 | 10:19–11:51  | Vercel's alias records for `verdantgrowdiary.com`, `www.` and `verdant-grow-diary.vercel.app` point to `dpl_6fVRiJ3X…` (internal alias record, not a public DNS or HTTP check) | `get_deployment` by hostname, five reads |
 
 - **`NOT_MEASURED`:** the public serving state — no DNS or HTTP check from outside has been made
@@ -74,7 +73,7 @@ an operator or service-role read, not this session's.
 `#1692` `PASS` `24d9e197`, `#1679` `PASS` `c2ce9b10`, `#1698` `PASS` `9e276853`, `#1697` `STALE
 CHILD` `bd64ca8b` stand.
 
-## 5. Reviews on `#1696` — Codex: five passes, two P1 and eight P2 findings, all carried; verdict open
+## 5. Reviews on `#1696` — Codex: six passes, two P1 and twelve P2 findings, all carried; verdict open
 
 `established fact`:
 
@@ -87,8 +86,7 @@ CHILD` `bd64ca8b` stand.
   future-dated header), carried at `51b142b6` and `96a7e0df`; `96a7e0df` — **two P2s** (header
   interval still future-dated; data-impact window must not end at the rollback), carried at
   `600c9902`; `600c9902` — **one P2** (`4104219207`: §5's heading said one P1 was carried when two
-  were), **carried here** by this section's heading and this list. **Two P1 and eight P2 in all,
-  all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files
+  were), carried at `b8a3cc17` by this section's heading and this list; `b8a3cc17` — **three P2** (`4104366547`: the header said "live measured" when only the alias record was read; `4104366557`: the P2 total said eight when this list sums to nine; `4104366566`: §2 called all five 08:29:17 aliases production aliases when the rollback re-assigned four), **carried by this amendment** (header, §2 table, this section). **Two P1 and twelve P2 in all, all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files
   (Markdown excluded); CodeRabbit skipped every head (no reviewable changes).
 - The two owner-side Claude reads (`5315633209`, `5315834826`) and Claude's replies stand as the
   09:21 stamp §5 records.
@@ -166,7 +164,7 @@ BLOCKED` — `hono` advisories `1193729`, `1193730`, `1193731` (moderate) and `j
 
 `established fact`. Its rows that are now stale:
 
-- Its §5 heading says one P1 was carried; two were, plus eight P2s (§5).
+- Its §5 heading says one P1 was carried; two were, plus nine P2s by then, twelve now (§5).
 - Its §8 says the head it lands on is not yet read; `600c9902` is read and settled (§8).
 
 Everything else in it is carried unchanged with its original labels, including the incident and

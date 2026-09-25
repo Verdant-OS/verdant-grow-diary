@@ -1,6 +1,6 @@
 # Verdant — Current Operating State
 
-**Last updated:** 2026-09-25 UTC (tip read 12:22 UTC; tip lanes read 12:22 UTC; Vercel production alias record re-read 12:22 UTC; public serving state `NOT_MEASURED`; head lanes read 12:24 UTC; this stamp's own time is its git commit time)
+**Last updated:** 2026-09-25 UTC (tip read 12:22 UTC; tip lanes read 12:22 UTC; Vercel custom-domain alias records re-read 12:22 UTC and again 12:39 UTC; the project alias `verdant-grow-diary-verdantgrowdiary.vercel.app` read 12:39 UTC, when it was found pointing to the `c10c095e` build; public serving state `NOT_MEASURED`; head lanes read 12:24 UTC; this stamp's own time is its git commit time)
 **Updated by:** Claude (2026-09-25 midday, restamp on the **new deploy tip
 `c10c095ec7f6ec734a56ed6331269757bde7bfff`**, the `#1702` squash, for a reviewer finding — Codex's
 seventh-pass **P1** `4104421334`: the previous stamp still said the tip was `9b06be3f` and that zero
@@ -40,7 +40,7 @@ serving (§2). This PR's branch carries `c10c095e` by forward merge (`b1f70076`,
   deployment after the instant rollback did **not** auto-promote to the custom domains. Whether
   that is Vercel's post-rollback rule or something else is `inference`; the observation is the alias
   record. **Promoting `c10c095e` (or not) is Cheek's decision; no Publish, promote or rollback by
-  Claude.** By Vercel's alias record, the production hostnames are assigned to the `9b06be3f` build, the last tip the owner approved; what growers actually receive is the public serving state, `NOT_MEASURED` (next bullet). `#1702`'s change is test and workflow files only.
+  Claude.** By Vercel's alias records, three of the four production-facing hostnames — the apex, `www` and `verdant-grow-diary.vercel.app` — are assigned to the `9b06be3f` build, the last tip the owner approved, while the fourth, the project alias, is assigned to the `c10c095e` build (12:39); what growers actually receive is the public serving state, `NOT_MEASURED` (next bullet). `#1702`'s change is test and workflow files only.
 - **`NOT_MEASURED`:** the public serving state — no DNS or HTTP check from outside has been made
   this session (the egress refuses the apex: HTTP `000` at 11:51, the eighteenth attempt; `CLAUDE.md`
   names Lovable as publisher; the Quick Log smoke lane targets `verdantgrowdiary-com.lovable.app`).
@@ -76,7 +76,7 @@ rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sess
 - Verdicts `#1692` `PASS` `24d9e197`, `#1679` `PASS` `c2ce9b10`, `#1698` `PASS` `9e276853`, `#1697`
   `STALE CHILD` `bd64ca8b` stand; `#1684` independent `PASS` stands.
 
-## 5. Reviews on `#1696` — Codex: nine passes, three P1 and twenty P2 findings, all carried; verdict open
+## 5. Reviews on `#1696` — Codex: ten passes, three P1 and twenty-two P2 findings, all carried; verdict open
 
 `established fact`:
 
@@ -95,7 +95,7 @@ rows with `source = 'csv'` and `created_at` from 08:29:17, open-ended until sess
   stale when published — this stamp is on `c10c095e`, §1); `4104421351` (**P2**: the header summary
   said five passes while §5 said six — the header now counts with §5); `4104421341` (**P2**: §8
   presented `600c9902`'s settled lanes as this file's own head result after later heads existed —
-  §8 now states the current head's lanes as read, and this stamp's own head as `NOT_MEASURED`); **`9b4caa63` — two P2, carried by this amendment:** `4104492611` (§2 and §3 said what growers were getting when only the alias record was read — reworded to the alias record, serving state `NOT_MEASURED`) and `4104492619` (§8's push-red count said six when five were push runs and the sixth was the merge-group dependency audit). CodeRabbit raised the same two points on `9b4caa63` (`4104485695`, `4104485709`); **`e426bd83` — four P2, carried by this amendment:** `4104551659` (the 35 contexts are the pinned snapshot, live ruleset match `BLOCKED` — header, §4, §8, §11), `4104551650` (the exposure window keeps its "if the apex is Vercel-served" condition and no "production domain serves" claim remains — header, §2, §3), `4104551663` (the `6eb12549` P2 is the unmeasured-data-impact finding, not "a stale marker"), `4104551668` (`c10c095e` lacks the custom-domain aliases, not all aliases; the project alias now points to it — §2). **Three P1 and twenty P2 in all, all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files (Markdown excluded); CodeRabbit skipped every earlier head.
+  §8 now states the current head's lanes as read, and this stamp's own head as `NOT_MEASURED`); **`9b4caa63` — two P2, carried by this amendment:** `4104492611` (§2 and §3 said what growers were getting when only the alias record was read — reworded to the alias record, serving state `NOT_MEASURED`) and `4104492619` (§8's push-red count said six when five were push runs and the sixth was the merge-group dependency audit). CodeRabbit raised the same two points on `9b4caa63` (`4104485695`, `4104485709`); **`e426bd83` — four P2, carried by this amendment:** `4104551659` (the 35 contexts are the pinned snapshot, live ruleset match `BLOCKED` — header, §4, §8, §11), `4104551650` (the exposure window keeps its "if the apex is Vercel-served" condition and no "production domain serves" claim remains — header, §2, §3), `4104551663` (the `6eb12549` P2 is the unmeasured-data-impact finding, not "a stale marker"), `4104551668` (`c10c095e` lacks the custom-domain aliases, not all aliases; the project alias now points to it — §2); **`c9deaf47` — two P2, carried by this amendment:** `4104608929` (§2's summary sentence and the §11 lock said "the production hostnames" point to `9b06be3f` when one of the four, the project alias, points to `c10c095e` — both now state the split) and `4104608934` (the header now records the 12:39 alias reads separately from the 12:22 ones). **Three P1 and twenty-two P2 in all, all carried; Codex's verdict on the PR as a whole is still open.** Copilot reviewed no files (Markdown excluded); CodeRabbit skipped every earlier head.
 - The two owner-side Claude reads (`5315633209`, `5315834826`) and Claude's replies stand as the
   09:21 stamp §5 records.
 
@@ -179,7 +179,7 @@ red, 2 still in progress (`Core Link and Form Census`, and the `dynamic` push-re
   (§1, §4).
 - Its §2 says no production deployment since 09:45 and auto-promotion untested; `dpl_Excxdc…` was
   built at 12:03 and did not take the custom-domain aliases (§2).
-- Its header says five review passes; six were, and nine now (§5).
+- Its header says five review passes; six were, and ten now (§5).
 - Its §8 presents `600c9902` as this file's head; the head is now this stamp's commit (§8).
 
 Everything else in it is carried unchanged with its original labels, including the incident and
@@ -194,8 +194,7 @@ branch line are updated.
   Claude.** No device control, no automatic Action Queue writes, no invented credentials. **Never
   KEEP. No owner email.** Claude merges only on the owner's explicit instruction (`#1691`, `#1690`,
   `#1677` and `#1680` were four such instructions; none generalises).
-- **Vercel's production aliases point to `9b06be3f` (§2), by alias record, not by list order or
-  deployment recency; public DNS/HTTP serving state is `NOT_MEASURED`.** A newer READY production
+- **Vercel's alias records are split (§2): the apex, `www` and `verdant-grow-diary.vercel.app` point to `9b06be3f`; the project alias points to `c10c095e` — by alias record, not by list order or deployment recency; public DNS/HTTP serving state is `NOT_MEASURED`.** A newer READY production
   deployment is not production until the alias record says so. Before citing production for any
   tip, read the alias record and say so.
 - **An API token on the owner's Vercel account, used by the Cursor Agent, deployed a non-tip

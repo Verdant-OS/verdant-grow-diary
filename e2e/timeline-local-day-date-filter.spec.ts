@@ -270,6 +270,34 @@ async function mockSignedInSupabase(page: Page, captured: Captured) {
 test.describe("Timeline local-day date-range filter (issue #587, America/Chicago)", () => {
   test.use({ timezoneId: "America/Chicago" });
 
+  test.beforeAll(async ({ browser, baseURL }, testInfo) => {
+    // Keep cold Vite compilation outside the boundary assertions. The first
+    // Timeline visit in a run pays the dev server's on-demand compile, which
+    // can outlast the default 10 s expect budget, so startup time would read
+    // as a missing local-day row. Warm the same route once, fully mocked.
+    if (testInfo.project.name !== MOCKED_PROJECT) return;
+    testInfo.setTimeout(120_000);
+    const page = await browser.newPage({ baseURL, timezoneId: "America/Chicago" });
+    try {
+      await mockSignedInSupabase(page, {
+        diaryUrls: [],
+        growEventUrls: [],
+        nonGetRestCalls: [],
+        blockedExternalRequests: [],
+      });
+      await seedFakeSession(page);
+      await page.goto(`/timeline?growId=${GROW_ID}&start=2026-07-20&end=2026-07-10`, {
+        waitUntil: "domcontentloaded",
+        timeout: 110_000,
+      });
+      await expect(page.getByTestId("timeline-date-range-error")).toBeVisible({
+        timeout: 110_000,
+      });
+    } finally {
+      await page.close();
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     test.skip(
       test.info().project.name !== MOCKED_PROJECT,

@@ -17,6 +17,7 @@ function baseInput(
   overrides: Partial<BuildBlueprintOverlayInput> = {},
 ): BuildBlueprintOverlayInput {
   return {
+    now: Date.parse("2026-09-23T12:00:00Z"),
     stage: "seedling",
     snapshot: null,
     latestFeeding: null,
@@ -30,6 +31,7 @@ function baseInput(
 function healthySeedling(): BuildBlueprintOverlayInput {
   const snapshot: BlueprintSnapshotInput = {
     source: "live",
+    ts: "2026-09-23T11:59:00Z",
     temp: 25, // seedling day band 24-26
     rh: 75, // 70-80
     vpd: 0.6, // seedling VPD 0.4-0.8
@@ -116,31 +118,42 @@ describe("buildBlueprintOverlayViewModel — provenance", () => {
     const csv = buildBlueprintOverlayViewModel(
       baseInput({ snapshot: { source: "csv", temp: 25, rh: 75, vpd: 0.6, ppfd: 200 } }),
     );
-    expect(csv.rows.find((r) => r.metricKey === "tempC")?.provenance).toBe("manual");
+    expect(csv.rows.find((r) => r.metricKey === "tempC")?.provenance).toBe("csv");
   });
 
-  it("marks vpd and dli as derived, ppfd/ec/ph as manual", () => {
+  it("preserves supplied VPD and PPFD source; only DLI is derived", () => {
     const vm = buildBlueprintOverlayViewModel(
       baseInput({
         stage: "veg",
-        snapshot: { source: "live", temp: 25, rh: 67, vpd: 1.0, ppfd: 500 },
+        snapshot: {
+          source: "live",
+          ts: "2026-09-23T11:59:00Z",
+          temp: 25,
+          rh: 67,
+          vpd: 1.0,
+          ppfd: 500,
+        },
         latestFeeding: { ec: 1.2, ph: 5.85 },
         dli: 30,
       }),
     );
     const prov = Object.fromEntries(vm.rows.map((r) => [r.metricKey, r.provenance]));
-    expect(prov.vpdKpa).toBe("derived");
+    expect(prov.vpdKpa).toBe("live");
     expect(prov.dli).toBe("derived");
-    expect(prov.ppfd).toBe("manual");
+    expect(prov.ppfd).toBe("live");
     expect(prov.ec).toBe("manual");
     expect(prov.ph).toBe("manual");
   });
 
-  it("marks absent values missing and attaches a nudge (only there)", () => {
+  it("marks absent values missing and supplies read or metric guidance", () => {
     const vm = buildBlueprintOverlayViewModel(baseInput()); // everything null
     for (const row of vm.rows) {
       expect(row.provenance).toBe("missing");
-      expect(row.nudge).toBeTruthy();
+      if (["tempC", "rh", "vpdKpa", "ppfd"].includes(row.metricKey)) {
+        expect(vm.sensorNotice).toBe("No sensor evidence is available for this tent.");
+      } else {
+        expect(row.nudge).toBeTruthy();
+      }
     }
     const healthy = buildBlueprintOverlayViewModel(healthySeedling());
     expect(healthy.rows.find((r) => r.metricKey === "tempC")?.nudge).toBeUndefined();
@@ -154,7 +167,14 @@ describe("buildBlueprintOverlayViewModel — scoring & summary", () => {
         stage: "seedling",
         // temp 28 vs day band 24-26 (width 2, margin 0.3) → out_high (red)
         // rh 81 vs band 70-80 (width 10, margin 1.5) → warn_high (amber)
-        snapshot: { source: "live", temp: 28, rh: 81, vpd: 0.6, ppfd: 200 },
+        snapshot: {
+          source: "live",
+          ts: "2026-09-23T11:59:00Z",
+          temp: 28,
+          rh: 81,
+          vpd: 0.6,
+          ppfd: 200,
+        },
         latestFeeding: { ec: 0.7, ph: 6.0 },
         isDay: true,
       }),
@@ -170,7 +190,14 @@ describe("buildBlueprintOverlayViewModel — scoring & summary", () => {
     const vm = buildBlueprintOverlayViewModel(
       baseInput({
         stage: "cure",
-        snapshot: { source: "live", temp: 16, rh: 60, vpd: 1.0, ppfd: null },
+        snapshot: {
+          source: "live",
+          ts: "2026-09-23T11:59:00Z",
+          temp: 16,
+          rh: 60,
+          vpd: 1.0,
+          ppfd: null,
+        },
         isDay: false,
       }),
     );
@@ -186,7 +213,14 @@ describe("buildBlueprintOverlayViewModel — scoring & summary", () => {
     const vm = buildBlueprintOverlayViewModel(
       baseInput({
         stage: "banana",
-        snapshot: { source: "live", temp: 25, rh: 75, vpd: 0.6, ppfd: 200 },
+        snapshot: {
+          source: "live",
+          ts: "2026-09-23T11:59:00Z",
+          temp: 25,
+          rh: 75,
+          vpd: 0.6,
+          ppfd: 200,
+        },
         latestFeeding: { ec: 0.7, ph: 6.0 },
         dli: 30,
       }),

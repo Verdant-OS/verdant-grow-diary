@@ -55,7 +55,7 @@ export const PINNED_MIGRATION = Object.freeze({
   version: "20260924120000",
   name: "plants_health_unassessed_default",
   file: "20260924120000_plants_health_unassessed_default.sql",
-  sha256: "B0F6C2717679BD19FA51C1FB1D3CDFC8405739A081C9B1B8D408055E72B9655B",
+  sha256: "5642E1A7AC35E2A81FA608718B1D03B19747FD44F2CF4F1D7E9E8EFC2AE388B8",
 });
 
 export const ACCEPTED_LEDGER_NAMES = Object.freeze([

@@ -109,7 +109,6 @@ workflows to have no `queued`, `in_progress`, `waiting`, `pending`, or
 - `apply-quicklog-manual-delegate-forward-repair.yml`
 - `apply-action-queue-transition-forward-repair.yml`
 - `apply-agreement-acceptance-insert-forward-repair.yml`
-- `apply-agreement-acceptance-insert-forward-repair.yml`
 - `apply-quicklog-revision-idempotent-replay.yml`
 - `apply-plants-health-unassessed-default.yml`
 

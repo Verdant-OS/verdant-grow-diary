@@ -4,7 +4,7 @@ This runbook delivers exactly one reviewed production migration:
 
 - Version: `20260924120000`
 - File: `20260924120000_plants_health_unassessed_default.sql` (introduced by #1683, BUG-009)
-- SHA-256: `B0F6C2717679BD19FA51C1FB1D3CDFC8405739A081C9B1B8D408055E72B9655B`
+- SHA-256: `5642E1A7AC35E2A81FA608718B1D03B19747FD44F2CF4F1D7E9E8EFC2AE388B8`
 - Production project: `knkwiiywfkbqznbxwqfh`
 - Deploy branch: `verdant-grow-diary`
 - Protected GitHub environment: `verdant-production-solo-founder`
@@ -38,6 +38,8 @@ until the grower assesses it.
 
 Inside its own `BEGIN`/`COMMIT`, and nothing else:
 
+- `SET LOCAL lock_timeout = '5s'` and `statement_timeout = '30s'`, first, as
+  in the other forward-repair migrations (see "Safety boundary").
 - `public.validate_plant_row()` also accepts `'unknown'`. `CREATE OR REPLACE`
   keeps the function's oid, owner, grants and its `trg_plants_validate` trigger.
 - `public.plants.health` defaults to `'unknown'`. The column stays `NOT NULL`.
@@ -71,10 +73,15 @@ Plant refuses "Not assessed yet", and guided-setup plants still read Healthy.
 
 ## Safety boundary
 
-Do not freeze write activity. No application-table lock and no write freeze is
-part of this procedure. `ALTER COLUMN … SET DEFAULT` changes catalog metadata
-only; the later ledger step locks only `supabase_migrations.schema_migrations`
-for a short transaction.
+Do not freeze write activity; no write freeze is part of this procedure.
+`ALTER COLUMN … SET DEFAULT` changes catalog metadata only, but it takes a brief
+`ACCESS EXCLUSIVE` lock on `public.plants`. Behind a long-running transaction
+the migration's 5-second `lock_timeout` makes APPLY stop with "FAIL - migration
+apply failed": the transaction rolls back, nothing is applied and no ledger row
+is written. It never queues behind that transaction, where it would block every
+later read of plants. Run a fresh PREFLIGHT, review it, and dispatch APPLY
+again; never remove the timeouts. The later ledger step locks only
+`supabase_migrations.schema_migrations` for a short transaction.
 
 Do not edit the reviewed SQL, concatenate it with other SQL, add
 `--single-transaction`, or use the generic migration runner. The reviewed file

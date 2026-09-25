@@ -18,7 +18,13 @@ export async function fetchPlantRecentActivityRows(plantId: string) {
   const { data, error } = await selectWithRetractionCompat((withRetractionFilter) => {
     let query = supabase.from("diary_entries").select("*").eq("plant_id", plantId);
     if (withRetractionFilter) query = query.is("retracted_at", null);
-    return query.order("entry_at", { ascending: false }).limit(PLANT_RECENT_ACTIVITY_LIMIT);
+    // created_at, then id, break entry_at ties before the limit: companion
+    // rows can share entry_at, and the limit must keep the true newest ones.
+    return query
+      .order("entry_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(PLANT_RECENT_ACTIVITY_LIMIT);
   });
 
   if (error) throw error;

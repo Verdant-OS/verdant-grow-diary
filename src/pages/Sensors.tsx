@@ -23,7 +23,7 @@ import SensorsTestbenchPanel from "@/components/SensorsTestbenchPanel";
 import { useGrowTents, useGrowSensorReadings } from "@/hooks/useGrowData";
 import { usePlants } from "@/hooks/use-plants";
 import { useGrows } from "@/store/grows";
-import { resolveTentEnvironmentStage } from "@/lib/tentEnvironmentStageRules";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { useSensorsQuickLogManualReadings } from "@/hooks/useSensorsQuickLogManualReadings";
 import { mergeSensorsSeriesWithQuickLogManuals } from "@/lib/sensorsQuickLogManualSeriesRules";
 import GrowDataLoadError, { GrowDataLoadingState } from "@/components/GrowDataLoadError";
@@ -271,12 +271,18 @@ export default function Sensors() {
   // page: this tent's grow row, the tent, and the active plants in it (QA
   // 2026-09-24, BUG-006 follow-up). A pending or failed plant read adds no
   // plant signal.
-  const { grows } = useGrows();
+  // Until this tent's grow row is known, stage grading is withheld.
+  const { grows, loading: growsLoading, error: growsError } = useGrows();
   const plantsQuery = usePlants();
   const selectedTentStage = resolveTentEnvironmentStage({
     tentId: selectedTent?.id ?? null,
     tentStage: selectedTent?.stage ?? null,
-    growStage: (grows ?? []).find((grow) => grow.id === selectedGrowId)?.stage ?? null,
+    ...resolveTentGrowStage({
+      growId: selectedGrowId,
+      grows,
+      loading: growsLoading,
+      error: growsError,
+    }),
     plants: plantsQuery.isError ? null : (plantsQuery.data ?? null),
   });
   const latestObservedVpd = readObservedSensorMetric(vpdStabilityReadings[0] ?? null, "vpd");

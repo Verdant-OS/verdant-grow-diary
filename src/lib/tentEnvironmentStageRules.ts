@@ -32,6 +32,12 @@ export interface TentEnvironmentStageInput {
   /** The tent's grow row stage; null when unknown. */
   readonly growStage: unknown;
   /**
+   * False while the tent's grow row is not known yet (the grows list is
+   * loading or failed): stage grading is then withheld, never done from the
+   * tent alone (Codex review on #1683). Omitted means resolved.
+   */
+  readonly growStageResolved?: boolean;
+  /**
    * Active plants (any tent; only this tent's count). `null` while the plant
    * read is pending or has failed: plants then add no signal and the grow +
    * tent decide.
@@ -42,6 +48,7 @@ export interface TentEnvironmentStageInput {
 /** RAW stored stage value for the tent, or null when none is known. */
 export function resolveTentEnvironmentStage(input: TentEnvironmentStageInput): string | null {
   if (!input.tentId) return null;
+  if (input.growStageResolved === false) return null;
   return resolveAlertContextStage({
     growStage: input.growStage,
     tentStages: [input.tentStage],
@@ -49,4 +56,26 @@ export function resolveTentEnvironmentStage(input: TentEnvironmentStageInput): s
       .filter((plant) => (plant.tent_id ?? plant.tentId) === input.tentId)
       .map((plant) => plant.stage ?? null),
   }).stage;
+}
+
+/**
+ * The grow stage input for one tent, from the grows list (`useGrows()`).
+ * That list is empty while loading and after a failed read, so a missing row
+ * is "not known yet", not "no stage": the stage is unresolved until the row is
+ * listed, or the list has loaded without error (an archived grow is not
+ * listed; the tent and plants then decide). A tent with no grow has nothing
+ * to wait for, and a listed row is used even while a refresh is in flight.
+ */
+export function resolveTentGrowStage(input: {
+  readonly growId: string | null | undefined;
+  readonly grows:
+    ReadonlyArray<{ readonly id: string; readonly stage?: unknown }> | null | undefined;
+  readonly loading: boolean | undefined;
+  readonly error: unknown;
+}): { growStage: unknown; growStageResolved: boolean } {
+  if (!input.growId) return { growStage: null, growStageResolved: true };
+  const row = (input.grows ?? []).find((grow) => grow.id === input.growId);
+  if (row) return { growStage: row.stage ?? null, growStageResolved: true };
+  const listSettled = !input.loading && !input.error;
+  return { growStage: null, growStageResolved: listSettled };
 }

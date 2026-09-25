@@ -29,8 +29,13 @@ vi.mock("@/hooks/useImportedSensorHistory", async (importOriginal) => ({
 vi.mock("@/hooks/useTentPlantRosterActivity", () => ({
   useTentPlantRosterActivity: () => ({ byPlantId: {}, isLoading: false, isError: false }),
 }));
+const growsState: {
+  grows: Array<{ id: string; stage: string }>;
+  loading: boolean;
+  error: string | null;
+} = { grows: [{ id: "grow-1", stage: "veg" }], loading: false, error: null };
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({ grows: [{ id: "grow-1", stage: "veg" }] }),
+  useGrows: () => growsState,
 }));
 // Sibling panels with unrelated reads; the stage-driven header stays real.
 vi.mock("@/components/EcowittLatestSnapshotCard", () => ({ default: () => null }));
@@ -96,6 +101,9 @@ function renderTent() {
 
 beforeEach(() => {
   plants = [];
+  growsState.grows = [{ id: "grow-1", stage: "veg" }];
+  growsState.loading = false;
+  growsState.error = null;
 });
 
 describe("Tent Detail stage hint follows the plants in the tent", () => {
@@ -110,5 +118,20 @@ describe("Tent Detail stage hint follows the plants in the tent", () => {
   it("without a plant signal the tent and grow still decide", () => {
     renderTent();
     expect(screen.getByTestId("tent-detail-vpd-stage-hint")).toHaveTextContent("In Veg VPD range");
+  });
+
+  it.each([
+    ["loading", true, null],
+    ["failed", false, "network"],
+  ])("never grades by the tent alone while the grows list is %s", (_s, loading, error) => {
+    // Codex review on #1683: the grow may be Flower; until its row is known
+    // the hint must not claim the reading is in the tent's Veg range.
+    growsState.grows = [];
+    growsState.loading = loading;
+    growsState.error = error;
+    renderTent();
+    expect(screen.getByTestId("tent-detail-vpd-stage-hint")).not.toHaveTextContent(
+      "In Veg VPD range",
+    );
   });
 });

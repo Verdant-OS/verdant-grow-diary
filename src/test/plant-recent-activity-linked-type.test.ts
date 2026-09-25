@@ -41,6 +41,7 @@ const backend = vi.hoisted(() => ({
   spineError: null as unknown,
   spineThrows: false,
   spineCalls: [] as string[][],
+  diaryOrders: [] as string[],
 }));
 
 vi.mock("@/lib/quick-log/retractionFilterCompat", () => ({
@@ -53,9 +54,16 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (table === "diary_entries") {
         return {
           select: () => ({
-            eq: () => ({
-              order: () => ({ limit: async () => ({ data: backend.diary, error: null }) }),
-            }),
+            eq: () => {
+              const chain = {
+                order: (column: string) => {
+                  backend.diaryOrders.push(column);
+                  return chain;
+                },
+                limit: async () => ({ data: backend.diary, error: null }),
+              };
+              return chain;
+            },
           }),
         };
       }
@@ -136,6 +144,16 @@ describe("fetchPlantRecentActivityRows", () => {
     const rows = await fetchPlantRecentActivityRows(PLANT);
     expect(backend.spineCalls).toEqual([[SPINE]]);
     expect(recapLabels(rows)).toEqual(["Watering", "Watering"]);
+  });
+
+  it("orders by entry_at, then created_at, then id before the limit", async () => {
+    // Codex review on #1683: with more than `limit` rows sharing the newest
+    // entry_at, ordering by entry_at alone let the database return any subset.
+    const { fetchPlantRecentActivityRows } = await import("@/hooks/usePlantRecentActivity");
+    backend.diaryOrders.length = 0;
+    backend.diary = [waterMirror({ event_type: "watering" })];
+    await fetchPlantRecentActivityRows(PLANT);
+    expect(backend.diaryOrders).toEqual(["entry_at", "created_at", "id"]);
   });
 
   it("skips the lookup when every row is already typed", async () => {

@@ -47,7 +47,7 @@ import {
 import { useCsvHistoryWindow } from "@/hooks/useCsvHistoryWindow";
 import { useGrowTent, useGrowPlants, getGrowDataMeta } from "@/hooks/useGrowData";
 import { useGrows } from "@/store/grows";
-import { resolveTentEnvironmentStage } from "@/lib/tentEnvironmentStageRules";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { buildTentSensorChartSeries, buildTentSensorHeaderView } from "@/lib/tentSensorChartRules";
 import { resolveVerifiedAssignedPlantCount } from "@/lib/tentManagementRules";
 import { buildTentPlantListReadView } from "@/lib/tentPlantListReadStateRules";
@@ -149,11 +149,17 @@ export default function TentDetail() {
   // single-tent view: the tent's grow row, the tent, and the active plants in
   // it (QA 2026-09-24, BUG-006 follow-up). A pending or failed plant read adds
   // no plant signal. The stage badge and tent menu still show the tent's own.
-  const { grows } = useGrows();
+  // Until the tent's grow row is known, stage grading is withheld.
+  const { grows, loading: growsLoading, error: growsError } = useGrows();
   const envStage = resolveTentEnvironmentStage({
     tentId: tent?.id ?? null,
     tentStage: tent?.stage ?? null,
-    growStage: (grows ?? []).find((grow) => grow.id === tent?.growId)?.stage ?? null,
+    ...resolveTentGrowStage({
+      growId: tent?.growId,
+      grows,
+      loading: growsLoading,
+      error: growsError,
+    }),
     plants: activePlantsIsError ? null : (activePlantsQuery.data ?? null),
   });
   const allPlantsQuery = useGrowPlants(id, undefined, { includeArchived: true });

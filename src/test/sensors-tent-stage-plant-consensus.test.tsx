@@ -12,7 +12,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "@/lib/react-router-compat";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Sensors from "@/pages/Sensors";
-import { resolveTentEnvironmentStage } from "@/lib/tentEnvironmentStageRules";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 
 const TENT = "5a1c6e0f-2b3d-4c5e-8f90-1a2b3c4d5e6f";
 const OTHER_TENT = "6b2d7f10-3c4e-4d6f-9a01-2b3c4d5e6f70";
@@ -116,6 +116,51 @@ describe("resolveTentEnvironmentStage", () => {
   });
 });
 
+describe("resolveTentGrowStage (Codex review on #1683)", () => {
+  // useGrows() exposes an empty list while loading and after a failed read,
+  // so a missing grow row must not read as "this grow has no stage".
+  const grows = [{ id: "g1", stage: "flower" }];
+
+  it("withholds the grow stage until the list resolves the tent's grow", () => {
+    expect(resolveTentGrowStage({ growId: "g1", grows: [], loading: true, error: null })).toEqual({
+      growStage: null,
+      growStageResolved: false,
+    });
+    expect(
+      resolveTentGrowStage({ growId: "g1", grows: [], loading: false, error: "network" }),
+    ).toEqual({ growStage: null, growStageResolved: false });
+  });
+
+  it("uses a listed grow even while a refresh is in flight", () => {
+    expect(resolveTentGrowStage({ growId: "g1", grows, loading: true, error: null })).toEqual({
+      growStage: "flower",
+      growStageResolved: true,
+    });
+  });
+
+  it("a loaded list without the grow, or a tent with no grow, lets tent and plants decide", () => {
+    expect(
+      resolveTentGrowStage({ growId: "archived", grows, loading: false, error: null }),
+    ).toEqual({ growStage: null, growStageResolved: true });
+    expect(resolveTentGrowStage({ growId: null, grows: [], loading: true, error: null })).toEqual({
+      growStage: null,
+      growStageResolved: true,
+    });
+  });
+
+  it("an unresolved grow stage withholds stage grading entirely", () => {
+    expect(
+      resolveTentEnvironmentStage({
+        tentId: TENT,
+        tentStage: "veg",
+        growStage: null,
+        growStageResolved: false,
+        plants: [{ tent_id: TENT, stage: "flower" }],
+      }),
+    ).toBeNull();
+  });
+});
+
 /** Stable tent list — see sensors-operator-diagnostics-wiring for why. */
 const STABLE_GROW_TENTS = [{ id: TENT, name: "Tent 1", growId: "g1", stage: "veg" }] as const;
 const NOW = new Date().toISOString();
@@ -159,8 +204,13 @@ vi.mock("@/hooks/useGrowData", () => ({
 vi.mock("@/hooks/use-plants", () => ({
   usePlants: () => ({ data: plantsState.data, isError: false }),
 }));
+const growsState: {
+  grows: Array<{ id: string; stage: string }>;
+  loading: boolean;
+  error: string | null;
+} = { grows: [{ id: "g1", stage: "veg" }], loading: false, error: null };
 vi.mock("@/store/grows", () => ({
-  useGrows: () => ({ grows: [{ id: "g1", stage: "veg" }] }),
+  useGrows: () => growsState,
 }));
 vi.mock("@/hooks/useSensorsQuickLogManualReadings", () => ({
   useSensorsQuickLogManualReadings: () => ({
@@ -205,6 +255,24 @@ function renderSensors() {
 describe("Sensors page stage chips follow the plants in the tent", () => {
   beforeEach(() => {
     plantsState.data = [];
+    growsState.grows = [{ id: "g1", stage: "veg" }];
+    growsState.loading = false;
+    growsState.error = null;
+  });
+
+  it.each([
+    ["loading", true, null],
+    ["failed", false, "network"],
+  ])("never grades by the tent alone while the grows list is %s", async (_s, loading, error) => {
+    // Codex review on #1683: the grow may be Flower; until its row is known
+    // the chip must not claim the reading is in the tent's Veg range.
+    growsState.grows = [];
+    growsState.loading = loading;
+    growsState.error = error;
+    renderSensors();
+    const chip = await screen.findByTestId("sensors-stage-status-rh");
+    expect(chip).not.toHaveTextContent("In Veg RH range");
+    expect(chip).toHaveTextContent("set stage for humidity guidance");
   });
 
   it("QA repro: RH 60% with a Flower plant in a Veg tent is above the Flower range", async () => {

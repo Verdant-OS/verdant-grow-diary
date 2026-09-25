@@ -833,6 +833,7 @@ describe("Quick Log manual delegate production delivery", () => {
       "apply-action-queue-transition-forward-repair.yml",
       "apply-agreement-acceptance-insert-forward-repair.yml",
       "apply-quicklog-revision-idempotent-replay.yml",
+      "apply-plants-health-unassessed-default.yml",
     ];
 
     expect(guard).toBeDefined();
@@ -880,6 +881,7 @@ describe("Quick Log manual delegate production delivery", () => {
       "apply-action-queue-transition-forward-repair.yml",
       "apply-agreement-acceptance-insert-forward-repair.yml",
       "apply-quicklog-revision-idempotent-replay.yml",
+      "apply-plants-health-unassessed-default.yml",
     ];
 
     for (const writer of writers) {

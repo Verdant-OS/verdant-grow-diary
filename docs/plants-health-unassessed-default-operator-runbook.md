@@ -1,54 +1,57 @@
-# Quick Log revision idempotent replay operator runbook
+# Plants health unassessed default operator runbook
 
-This runbook delivers exactly one reviewed, already-merged production migration:
+This runbook delivers exactly one reviewed production migration:
 
-- Version: `20260916111000`
-- File: `20260916111000_quicklog_revision_idempotent_replay.sql` (merged in #1460)
-- SHA-256: `CE6A9DBFB51CAF5CE20256EA0C957F88EC8FD76D6A4047BA6832B25A7933D70C`
+- Version: `20260924120000`
+- File: `20260924120000_plants_health_unassessed_default.sql` (introduced by #1683, BUG-009)
+- SHA-256: `70FCA107B96E74B1E6B0100EBEB53E404CFD9407E50251273E592CF7EE0098FC`
 - Production project: `knkwiiywfkbqznbxwqfh`
 - Deploy branch: `verdant-grow-diary`
 - Protected GitHub environment: `verdant-production-solo-founder`
-- Workflow: `.github/workflows/apply-quicklog-revision-idempotent-replay.yml`
+- Workflow: `.github/workflows/apply-plants-health-unassessed-default.yml`
 
 The workflow is intentionally not a general migration runner. It rejects any
 other filename, version, byte hash, repository, branch, commit, project, or
 catalog shape.
 
+**Order of operations.** The migration and the client change that relies on
+it arrive with #1683. This lane can only run after #1683 is merged into
+`verdant-grow-diary`, because it runs from the deploy branch and pins the
+migration's bytes.
+
 ## Why this lane exists
 
-The deployed client (`src/lib/quickLogRevisionService.ts`) always calls the
-keyed overloads `quicklog_correct_entry(p_idempotency_key, …)` and
-`quicklog_retract_entry(p_idempotency_key, …)` that this migration adds. A
-read-only catalog probe of production on 2026-09-25 found the migration
-**not applied**: no `quicklog_revision_idempotency` table, no
-`quicklog_revision_apply_once`, and only the legacy unkeyed overloads. Until it
-is delivered, Quick Log corrections and retractions from the deployed client
-have no matching RPC in production (`inference` from source plus the catalog;
-the failing request itself was not replayed).
-
-The same probe measured the prerequisites this lane pins: both legacy
-functions' source fingerprints, ABI, owner and grants match
-`20260811090000_quicklog_corrections_retractions.sql` exactly.
+QA on 2026-09-24 (BUG-009) found that every new plant was stored with
+`health = 'healthy'`, the column default since `20260516204601`. The plant
+pages then claimed "Plant health: healthy" for a plant with no logs: a health
+claim with no evidence behind it. #1683 fixes the client and adds this migration
+so the database default matches: a new plant is `unknown` ("not assessed")
+until the grower assesses it.
 
 ## What the migration does
 
-Purely additive, inside its own `BEGIN`/`COMMIT`:
+Inside its own `BEGIN`/`COMMIT`, and nothing else:
 
-- `public.quicklog_revision_idempotency` — internal receipt table, RLS on, no
-  policies, no client privileges, `service_role` only.
-- `public.quicklog_revision_apply_once(…)` — SECURITY DEFINER helper, EXECUTE
-  for its owner only.
-- Keyed overloads of `quicklog_correct_entry` and `quicklog_retract_entry` —
-  EXECUTE for `authenticated` and `service_role`, never `anon`.
+- `public.validate_plant_row()` also accepts `'unknown'`. `CREATE OR REPLACE`
+  keeps the function's oid, owner, grants and its `trg_plants_validate` trigger.
+- `public.plants.health` defaults to `'unknown'`. The column stays `NOT NULL`.
+- `public.plants.health` gets a column comment.
 
-The legacy unkeyed signatures are not touched and keep working.
+It does not rewrite existing rows. The database cannot tell a grower's explicit
+"Healthy" from the old default, so rewriting `'healthy'` rows would erase real
+assessments. Growers change any plant's health in Edit Plant.
+
+The #1683 client is safe on both sides of this apply: when health is not
+assessed it omits the column, so the default applies. Before the apply, a
+grower's explicit "Not assessed yet" is rejected whole by the old trigger and
+the client explains it. After the apply, it saves.
 
 ## Safety boundary
 
 Do not freeze write activity. No application-table lock and no write freeze is
-part of this procedure. The migration creates new objects only; the later
-ledger step locks only `supabase_migrations.schema_migrations` for a short
-transaction.
+part of this procedure. `ALTER COLUMN … SET DEFAULT` changes catalog metadata
+only; the later ledger step locks only `supabase_migrations.schema_migrations`
+for a short transaction.
 
 Do not edit the reviewed SQL, concatenate it with other SQL, add
 `--single-transaction`, or use the generic migration runner. The reviewed file
@@ -60,17 +63,40 @@ This procedure does not delete application data, migration history, functions,
 or audit evidence. Never delete a ledger row to retry. It performs no device
 control and creates no hidden automation.
 
-## Production shape this lane pins (measured 2026-09-25)
+## What the preflight requires
 
-Delivery lanes used to pin a three-column `supabase_migrations.schema_migrations`
-and NOINHERIT client roles. Production has neither: its ledger has six columns
-(`version`, `statements`, `name`, `created_by`, `idempotency_key`, `rollback`)
-with `UNIQUE (idempotency_key)`, and `anon`, `authenticated` and `service_role`
-are INHERIT roles. Every lane, this one included, now renders the measured shape
-from `scripts/lib/supabaseMigrationLedgerShape.mjs`, and every PostgreSQL 15
-harness builds its scaffold ledger from the same module. Every privilege check
-uses `has_*_privilege`, which already follows role membership. The delivered
-ledger row sets only `version`, `name` and `statements`.
+Prerequisites, before and after delivery:
+
+- the measured migration-ledger and client-role shape
+  (`scripts/lib/supabaseMigrationLedgerShape.mjs`);
+- `public.plants` is a plain table with RLS on, owned by `postgres`;
+- `trg_plants_validate` is the enabled `BEFORE INSERT OR UPDATE … FOR EACH ROW`
+  trigger calling `validate_plant_row()`;
+- `plants.health` is plain `text NOT NULL`;
+- exactly one `public.validate_plant_row`, a non-SECURITY DEFINER plpgsql
+  trigger function with `search_path=public`;
+- **nothing else guards health values**: no CHECK constraint on `health`, no
+  other plants trigger whose function mentions health, and no plants policy
+  whose expression mentions health. Any of those could reject `'unknown'`, and
+  every insert that omits health would then fail. The preflight reports this as
+  `prerequisite_drift` with reason `health_guard_drift_count`.
+
+Target states:
+
+- `SAFE_TO_APPLY`: the legacy function body (297 bytes, md5
+  `b58d8cc95ea0c85a9c18045fa77123b1`), `DEFAULT 'healthy'::text`, no delivered
+  comment, no ledger row.
+- `schema_live_ledger_absent`: the delivered body (307 bytes, md5
+  `1a2dc73c88871084508ece97352abcb5`), `DEFAULT 'unknown'::text` and the
+  delivered comment, but no ledger row.
+
+`validate_plant_row()`'s ACL is read and bound into the receipt digest. The
+apply must leave it exactly as the reviewed PREFLIGHT observed it; otherwise the
+lane stops before recording the ledger.
+
+Production's actual state for this lane is `NOT_MEASURED` so far: the
+production SQL tool was unavailable when the lane was written. The first
+PREFLIGHT is the measurement.
 
 ## Required solo-founder environment controls
 
@@ -155,9 +181,8 @@ defense in depth. Allow no other migration dispatch until APPLY is terminal.
 
 ## Dispatch 1: read-only PREFLIGHT
 
-Open **Actions → Apply Quick Log revision idempotent replay → Run workflow**
-from `verdant-grow-diary` as a fresh dispatch. Do not use **Re-run jobs**.
-Enter:
+Open **Actions → Apply plants health unassessed default → Run workflow** from
+`verdant-grow-diary` as a fresh dispatch. Do not use **Re-run jobs**. Enter:
 
 - `operation`: `PREFLIGHT`
 - `expected_head_sha`: the exact reviewed 40-character deploy commit
@@ -170,18 +195,12 @@ Enter:
 
 Approve the `verdant-production-solo-founder` environment as `cheekhimself`.
 
-An APPLY receipt is uploaded only for one of these recoverable states:
-
-- `SAFE_TO_APPLY`: the legacy prerequisites are exact, none of the delivered
-  objects exists, and no target ledger identity exists. This is the state
-  measured on 2026-09-25.
-- `schema_live_ledger_absent`: every delivered object is exact but the ledger
-  row is absent, normally because an earlier run committed the migration and
-  stopped before the separate ledger transaction.
-
-`already_applied_verified` is a read-only success and creates no receipt.
-Every other status is a hard stop, reported with its reason
-(`prerequisite_drift`, `schema_drift` or `ledger_drift`). Do not override it.
+An APPLY receipt is uploaded only for `SAFE_TO_APPLY` or
+`schema_live_ledger_absent` (see above). `already_applied_verified` is a
+read-only success and creates no receipt. Every other status is a hard stop,
+reported with its reason (`prerequisite_drift`, `schema_drift` or
+`ledger_drift`). Do not override it. A `health_guard_drift_count` stop needs its
+own reviewed fix first; do not drop a constraint, trigger or policy by hand.
 
 ## Review gate
 
@@ -189,9 +208,9 @@ Before APPLY:
 
 1. Confirm the PREFLIGHT run concluded successfully.
 2. In the artifacts of that run, require exactly one non-expired artifact named
-   `quicklog-revision-idempotent-replay-preflight-run-<RUN_ID>-attempt-1` and
+   `plants-health-unassessed-default-preflight-run-<RUN_ID>-attempt-1` and
    record its lowercase `.digest` without the `sha256:` prefix. Never use the
-   similarly named `quicklog-revision-idempotent-replay-evidence` artifact.
+   similarly named `plants-health-unassessed-default-evidence` artifact.
 3. Confirm the deploy branch still points to the same reviewed SHA.
 4. Record the PREFLIGHT run ID, its run attempt `1`, and the artifact SHA-256.
 5. Wait at least 15 minutes, and no more than 24 hours, after the PREFLIGHT
@@ -205,21 +224,28 @@ Dispatch the same workflow from the same exact deploy SHA with:
 - `operation`: `APPLY`
 - `expected_head_sha`: the same reviewed SHA
 - `confirm_project_ref`: `knkwiiywfkbqznbxwqfh`
-- `confirm_apply`: `APPLY QUICKLOG REVISION IDEMPOTENT REPLAY`
+- `confirm_apply`: `APPLY PLANTS HEALTH UNASSESSED DEFAULT`
 - `preflight_run_id`: the successful reviewed PREFLIGHT run ID
 - `expected_preflight_run_attempt`: `1`
 - `expected_preflight_artifact_sha256`: the recorded artifact SHA-256
 - `solo_founder_acknowledgement`: `I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN`
 
-The runner then: re-runs the exact state-bound read-only preflight; for
-`SAFE_TO_APPLY` submits only the exact migration with plain `psql --file`;
-requires a read-only `schema_live_ledger_absent` postflight; inserts only the
-collision-guarded ledger row in a separate short transaction; and requires a
-final read-only `already_applied_verified` postflight.
+The runner then:
+
+1. re-runs the exact state-bound read-only preflight;
+2. for `SAFE_TO_APPLY`, submits only the exact migration with plain
+   `psql --file`;
+3. requires a read-only `schema_live_ledger_absent` postflight with
+   `validate_plant_row()`'s ACL unchanged;
+4. inserts only the collision-guarded ledger row in a separate short
+   transaction;
+5. requires a final read-only `already_applied_verified` postflight.
 
 If the migration step fails, it rolls back as a whole and no ledger row is
 inserted. If the migration commits but a later step fails, run a new
-PREFLIGHT; the accepted recovery state is `schema_live_ledger_absent`.
+PREFLIGHT; the accepted recovery state is `schema_live_ledger_absent`. Every
+statement in the migration is idempotent, and the harness proves a replay
+changes nothing, but recovery never replays it.
 
 ## Evidence and rollback posture
 
@@ -227,19 +253,27 @@ Retain the sanitized APPLY evidence artifact and the GitHub run URLs. A PASS
 shows `applied_verified`, the pinned migration version and hash, the exact
 deploy SHA, and recovery path `migration_then_ledger` or `ledger_only`.
 
-There is no destructive automatic rollback, and none is needed to restore the
-legacy behaviour: the legacy RPCs are untouched. If the new objects must be
-withdrawn, prepare a separately reviewed forward migration (for example,
-revoking EXECUTE on the keyed overloads). Never delete the ledger row, drop
-objects by hand, or edit the merged migration.
+There is no destructive automatic rollback. If the default must be withdrawn,
+prepare a separately reviewed forward migration (for example
+`ALTER COLUMN health SET DEFAULT 'healthy'`). That would bring back BUG-009 for
+new plants. Never delete the ledger row, alter objects by hand, or edit the
+merged migration.
 
 ## Runtime proof
 
-`scripts/run-quicklog-revision-idempotent-replay-pg15-harness.mjs` runs in
-`.github/workflows/quicklog-revision-idempotent-replay-pg15.yml` against a
+`scripts/run-plants-health-unassessed-default-pg15-harness.mjs` runs in
+`.github/workflows/plants-health-unassessed-default-pg15.yml` against a
 disposable PostgreSQL 15 service. It builds the production baseline from the
-reviewed prerequisite migration and the measured ledger/role shape, then
-proves the classification, the apply, the guarded ledger insert and collision,
-owner-scoped idempotent replay, rejected requests left unstored, the client
-fences, and that every drifted prerequisite, target object, ACL or ledger row
-blocks.
+reviewed `20260516204601` migration, Supabase-style default grants and the
+measured ledger/role shape, then proves:
+
+- the classification in each state;
+- before the apply, a grower's new plant (signed in, under RLS) is `healthy`
+  and "not assessed" is rejected;
+- after the apply, a new plant is `unknown`, "not assessed" saves, invalid
+  values are still rejected and existing rows are unchanged;
+- the function keeps its oid and grants;
+- the guarded ledger insert and its collision;
+- an idempotent replay;
+- a detected ACL change;
+- every drifted prerequisite, health guard, target object or ledger row blocks.

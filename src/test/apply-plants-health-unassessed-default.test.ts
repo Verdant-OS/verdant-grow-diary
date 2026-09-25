@@ -8,24 +8,22 @@ import { load as loadYaml } from "js-yaml";
 import { afterEach, describe, expect, it } from "vitest";
 import { PRODUCTION_SUPABASE_CA_FILENAME } from "../../scripts/lib/productionSupabaseTls.mjs";
 
-const RUNNER_PATH = resolve("scripts/apply-quicklog-revision-idempotent-replay.mjs");
-const WORKFLOW_PATH = resolve(".github/workflows/apply-quicklog-revision-idempotent-replay.yml");
-const PG15_WORKFLOW_PATH = resolve(
-  ".github/workflows/quicklog-revision-idempotent-replay-pg15.yml",
-);
-const RUNBOOK_PATH = resolve("docs/quicklog-revision-idempotent-replay-operator-runbook.md");
+const RUNNER_PATH = resolve("scripts/apply-plants-health-unassessed-default.mjs");
+const WORKFLOW_PATH = resolve(".github/workflows/apply-plants-health-unassessed-default.yml");
+const PG15_WORKFLOW_PATH = resolve(".github/workflows/plants-health-unassessed-default-pg15.yml");
+const RUNBOOK_PATH = resolve("docs/plants-health-unassessed-default-operator-runbook.md");
 const MIGRATION_PATH = resolve(
-  "supabase/migrations/20260916111000_quicklog_revision_idempotent_replay.sql",
+  "supabase/migrations/20260924120000_plants_health_unassessed_default.sql",
 );
 const PREREQUISITE_MIGRATION_PATH = resolve(
-  "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql",
+  "supabase/migrations/20260516204601_eb069c76-870d-4f19-8d23-800be7bbfe01.sql",
 );
 
 const PROJECT_REF = "knkwiiywfkbqznbxwqfh";
 const EXPECTED_HEAD_SHA = "a".repeat(40);
 const ADVANCED_HEAD_SHA = "b".repeat(40);
 const EXPECTED_REPOSITORY = "Verdant-OS/verdant-grow-diary";
-const DATABASE_SECRET = "revision-production-password-sentinel";
+const DATABASE_SECRET = "plants-health-production-password-sentinel";
 const DATABASE_URL = `postgresql://postgres:${DATABASE_SECRET}@db.${PROJECT_REF}.supabase.co:5432/postgres?sslmode=require`;
 const CA_SECRET_SENTINEL = "raw-production-ca-secret-sentinel";
 const SOLO_FOUNDER_ACKNOWLEDGEMENT = "I AM THE SOLE FOUNDER AND AUTHORIZE THIS PRODUCTION RUN";
@@ -52,7 +50,19 @@ const SOLO_FOUNDER_AUTHORIZATION_RECEIPT = Object.freeze({
   maximum_review_seconds: 86400,
 });
 
-/** The production state measured read-only on 2026-09-25: legacy live, target absent. */
+/**
+ * The legacy state the lane expects before delivery. Production's own values
+ * are NOT_MEASURED here (the production SQL tool was unavailable); the real
+ * PREFLIGHT measures them and binds them into its receipt.
+ */
+const SUPABASE_DEFAULT_FUNCTION_ACL = Object.freeze([
+  "PUBLIC|EXECUTE|f|postgres",
+  "anon|EXECUTE|f|postgres",
+  "authenticated|EXECUTE|f|postgres",
+  "postgres|EXECUTE|f|postgres",
+  "service_role|EXECUTE|f|postgres",
+]);
+
 const BASELINE_STATE = Object.freeze({
   ledger_exact_count: 0,
   ledger_conflict_count: 0,
@@ -60,49 +70,35 @@ const BASELINE_STATE = Object.freeze({
   ledger_statements_contract: false,
   migration_ledger_contract: true,
   required_roles_contract: true,
-  legacy_functions_contract: true,
-  legacy_correct_oid: 46230,
-  legacy_retract_oid: 46228,
-  correct_overload_count: 1,
-  retract_overload_count: 1,
-  apply_once_overload_count: 0,
-  receipt_table_present: false,
-  receipt_table_contract: false,
-  receipt_table_oid: 0,
-  apply_once_present: false,
-  apply_once_contract: false,
-  apply_once_oid: 0,
-  keyed_correct_present: false,
-  keyed_correct_contract: false,
-  keyed_correct_oid: 0,
-  keyed_retract_present: false,
-  keyed_retract_contract: false,
-  keyed_retract_oid: 0,
+  plants_table_contract: true,
+  plants_table_oid: 41000,
+  validate_trigger_contract: true,
+  health_column_contract: true,
+  health_guard_drift_count: 0,
+  validate_function_overload_count: 1,
+  validate_function_contract: true,
+  validate_function_oid: 41010,
+  validate_function_acl: SUPABASE_DEFAULT_FUNCTION_ACL,
+  validate_function_legacy_source: true,
+  validate_function_delivered_source: false,
+  health_default_legacy: true,
+  health_default_delivered: false,
+  health_comment_delivered: false,
 });
 
 const CANONICAL_LEDGER_ABSENT_STATE = Object.freeze({
   ...BASELINE_STATE,
-  correct_overload_count: 2,
-  retract_overload_count: 2,
-  apply_once_overload_count: 1,
-  receipt_table_present: true,
-  receipt_table_contract: true,
-  receipt_table_oid: 50001,
-  apply_once_present: true,
-  apply_once_contract: true,
-  apply_once_oid: 50002,
-  keyed_correct_present: true,
-  keyed_correct_contract: true,
-  keyed_correct_oid: 50003,
-  keyed_retract_present: true,
-  keyed_retract_contract: true,
-  keyed_retract_oid: 50004,
+  validate_function_legacy_source: false,
+  validate_function_delivered_source: true,
+  health_default_legacy: false,
+  health_default_delivered: true,
+  health_comment_delivered: true,
 });
 
 const RECORDED_CANONICAL_STATE = Object.freeze({
   ...CANONICAL_LEDGER_ABSENT_STATE,
   ledger_exact_count: 1,
-  ledger_exact_names: ["quicklog_revision_idempotent_replay"],
+  ledger_exact_names: ["plants_health_unassessed_default"],
   ledger_statements_contract: true,
 });
 
@@ -146,9 +142,9 @@ function baseEnv(extra: Record<string, string> = {}) {
     GITHUB_RUN_ATTEMPT: "1",
     GITHUB_EVENT_NAME: "workflow_dispatch",
     GITHUB_WORKFLOW_REF:
-      "Verdant-OS/verdant-grow-diary/.github/workflows/apply-quicklog-revision-idempotent-replay.yml@refs/heads/verdant-grow-diary",
+      "Verdant-OS/verdant-grow-diary/.github/workflows/apply-plants-health-unassessed-default.yml@refs/heads/verdant-grow-diary",
     CONFIRM_PROJECT_REF: PROJECT_REF,
-    CONFIRM_APPLY: "APPLY QUICKLOG REVISION IDEMPOTENT REPLAY",
+    CONFIRM_APPLY: "APPLY PLANTS HEALTH UNASSESSED DEFAULT",
     PREFLIGHT_RUN_ID: "13579",
     PREFLIGHT_RECEIPT_DIGEST: "",
     SOLO_FOUNDER_ACKNOWLEDGEMENT,
@@ -164,7 +160,7 @@ async function loadRunner() {
     return await import(`${pathToFileURL(RUNNER_PATH).href}?test=${Date.now()}-${Math.random()}`);
   } catch (error) {
     expect.fail(
-      `Quick Log revision delivery runner could not be imported: ${error instanceof Error ? error.message : String(error)}`,
+      `Plants health delivery runner could not be imported: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
@@ -172,7 +168,7 @@ async function loadRunner() {
 const temporaryRoots: string[] = [];
 
 function evidenceEnv() {
-  const root = mkdtempSync(join(tmpdir(), "verdant-quicklog-revision-delivery-test-"));
+  const root = mkdtempSync(join(tmpdir(), "verdant-plants-health-delivery-test-"));
   temporaryRoots.push(root);
   const caPath = join(root, PRODUCTION_SUPABASE_CA_FILENAME);
   const ca = rootCertificates[0];
@@ -205,7 +201,7 @@ afterEach(() => {
   }
 });
 
-describe("Quick Log revision idempotent replay production delivery", () => {
+describe("plants health unassessed default production delivery", () => {
   it("pins the exact merged LF migration bytes and preserves its own BEGIN/COMMIT boundary", async () => {
     const runner = await loadRunner();
     const raw = readFileSync(MIGRATION_PATH);
@@ -213,9 +209,9 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     const migration = runner.validatePinnedMigrationFile();
 
     expect(runner.PINNED_MIGRATION).toEqual({
-      version: "20260916111000",
-      name: "quicklog_revision_idempotent_replay",
-      file: "20260916111000_quicklog_revision_idempotent_replay.sql",
+      version: "20260924120000",
+      name: "plants_health_unassessed_default",
+      file: "20260924120000_plants_health_unassessed_default.sql",
       sha256: observed,
     });
     expect(raw.includes(13)).toBe(false);
@@ -226,26 +222,33 @@ describe("Quick Log revision idempotent replay production delivery", () => {
       runner.validatePinnedMigrationFile({
         readFile: () => Buffer.concat([raw, Buffer.from(" ")]),
       }),
-    ).toThrow("hash_mismatch:20260916111000");
+    ).toThrow("hash_mismatch:20260924120000");
   });
 
-  it("derives every pinned function fingerprint from the reviewed migration sources", async () => {
+  it("derives the legacy and delivered fingerprints and the delivered comment from the migrations", async () => {
     const runner = await loadRunner();
-    const delivered = prosrcFingerprints(MIGRATION_PATH);
-    const legacy = prosrcFingerprints(PREREQUISITE_MIGRATION_PATH);
-    const byName = (rows: typeof delivered, name: string) => {
-      const matches = rows.filter((row) => row.name === name);
-      expect(matches, name).toHaveLength(1);
+    const byName = (path: string) => {
+      const matches = prosrcFingerprints(path).filter((row) => row.name === "validate_plant_row");
+      expect(matches, path).toHaveLength(1);
       return { bytes: matches[0].bytes, md5: matches[0].md5 };
     };
 
     expect(runner.EXPECTED_FUNCTION_FINGERPRINTS).toEqual({
-      legacyCorrect: byName(legacy, "quicklog_correct_entry"),
-      legacyRetract: byName(legacy, "quicklog_retract_entry"),
-      applyOnce: byName(delivered, "quicklog_revision_apply_once"),
-      keyedCorrect: byName(delivered, "quicklog_correct_entry"),
-      keyedRetract: byName(delivered, "quicklog_retract_entry"),
+      legacy: byName(PREREQUISITE_MIGRATION_PATH),
+      delivered: byName(MIGRATION_PATH),
     });
+    const migration = readFileSync(MIGRATION_PATH, "utf8");
+    expect(migration).toContain(
+      `COMMENT ON COLUMN public.plants.health IS\n  '${runner.DELIVERED_HEALTH_COMMENT}';`,
+    );
+    expect(migration).toContain("ALTER COLUMN health SET DEFAULT 'unknown';");
+    expect(readFileSync(PREREQUISITE_MIGRATION_PATH, "utf8")).toContain(
+      "health          text NOT NULL DEFAULT 'healthy',",
+    );
+    expect(runner.LEGACY_HEALTH_DEFAULT).toBe("'healthy'::text");
+    expect(runner.DELIVERED_HEALTH_DEFAULT).toBe("'unknown'::text");
+    // The migration rewrites no existing row.
+    expect(migration).not.toMatch(/^\s*UPDATE\b/im);
   });
 
   it("classifies only baseline+absent, canonical+absent and canonical+exact as recoverable", async () => {
@@ -264,20 +267,34 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     for (const key of [
       "migration_ledger_contract",
       "required_roles_contract",
-      "legacy_functions_contract",
+      "plants_table_contract",
+      "validate_trigger_contract",
+      "health_column_contract",
+      "validate_function_contract",
     ]) {
       expect(runner.classifyPreflight({ ...BASELINE_STATE, [key]: false })).toEqual({
         status: "prerequisite_drift",
         reason: key,
       });
     }
+    expect(
+      runner.classifyPreflight({ ...BASELINE_STATE, validate_function_overload_count: 2 }),
+    ).toEqual({ status: "prerequisite_drift", reason: "validate_function_overload_count" });
+    // Anything else guarding health could reject 'unknown' after delivery.
+    for (const state of [BASELINE_STATE, CANONICAL_LEDGER_ABSENT_STATE, RECORDED_CANONICAL_STATE]) {
+      expect(runner.classifyPreflight({ ...state, health_guard_drift_count: 1 })).toEqual({
+        status: "prerequisite_drift",
+        reason: "health_guard_drift_count",
+      });
+    }
     for (const partial of [
-      { receipt_table_present: true },
-      { apply_once_present: true, apply_once_overload_count: 1 },
-      { correct_overload_count: 2 },
-      { ...CANONICAL_LEDGER_ABSENT_STATE, keyed_retract_contract: false },
-      { ...CANONICAL_LEDGER_ABSENT_STATE, receipt_table_contract: false },
-      { ...CANONICAL_LEDGER_ABSENT_STATE, apply_once_overload_count: 2 },
+      { health_default_legacy: false, health_default_delivered: true },
+      { validate_function_legacy_source: false, validate_function_delivered_source: true },
+      { health_comment_delivered: true },
+      { validate_function_legacy_source: false },
+      { health_default_legacy: false },
+      { ...CANONICAL_LEDGER_ABSENT_STATE, health_comment_delivered: false },
+      { ...CANONICAL_LEDGER_ABSENT_STATE, validate_function_delivered_source: false },
     ]) {
       expect(runner.classifyPreflight({ ...BASELINE_STATE, ...partial })).toEqual({
         status: "schema_drift",
@@ -288,7 +305,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
       runner.classifyPreflight({
         ...BASELINE_STATE,
         ledger_exact_count: 1,
-        ledger_exact_names: ["quicklog_revision_idempotent_replay"],
+        ledger_exact_names: ["plants_health_unassessed_default"],
         ledger_statements_contract: true,
       }),
     ).toEqual({ status: "schema_drift", reason: "recorded_effect_mismatch" });
@@ -307,8 +324,18 @@ describe("Quick Log revision idempotent replay production delivery", () => {
       runner.parsePreflightStdout(`${stdout(BASELINE_STATE)}${stdout(BASELINE_STATE)}`),
     ).toThrow("preflight_row_count:2");
     expect(() =>
-      runner.parsePreflightStdout(stdout({ ...BASELINE_STATE, apply_once_present: "false" })),
+      runner.parsePreflightStdout(stdout({ ...BASELINE_STATE, health_comment_delivered: "false" })),
     ).toThrow("preflight_result_shape");
+    for (const acl of [
+      "PUBLIC|EXECUTE|f|postgres",
+      ["anon|EXECUTE|f|postgres", "anon|EXECUTE|f|postgres"],
+      ["anon|SELECT|f|postgres"],
+      ["anon|EXECUTE|f|postgres; drop table plants"],
+    ]) {
+      expect(() =>
+        runner.parsePreflightStdout(stdout({ ...BASELINE_STATE, validate_function_acl: acl })),
+      ).toThrow("preflight_result_shape");
+    }
     expect(() =>
       runner.parsePreflightStdout(stdout({ ...BASELINE_STATE, ledger_exact_names: ["other"] })),
     ).toThrow("preflight_result_shape");
@@ -319,38 +346,45 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     );
   });
 
-  it("pins the prerequisite and delivered ABIs, owners, configs and exact ACLs", async () => {
+  it("pins the trigger, column, function ABI and every other health guard", async () => {
     const runner = await loadRunner();
     const sql = runner.CATALOG_STATE_QUERY_SQL as string;
 
-    expect(runner.FUNCTION_SIGNATURES).toEqual({
-      legacyCorrect: "public.quicklog_correct_entry(text,jsonb,uuid,uuid,text)",
-      legacyRetract: "public.quicklog_retract_entry(text,uuid,uuid,text)",
-      applyOnce: "public.quicklog_revision_apply_once(text,text,text,jsonb,uuid,uuid,text)",
-      keyedCorrect: "public.quicklog_correct_entry(text,text,jsonb,uuid,uuid,text)",
-      keyedRetract: "public.quicklog_retract_entry(text,text,uuid,uuid,text)",
-    });
-    for (const signature of Object.values(runner.FUNCTION_SIGNATURES) as string[]) {
-      expect(sql).toContain(`'${signature}'`);
-    }
-    expect(sql).toContain("owner_role.rolname = 'postgres'");
-    expect(sql).toContain("p.prosecdef");
-    expect(sql).toContain("p.proconfig = array['search_path=public, pg_temp']::text[]");
+    expect(runner.VALIDATE_FUNCTION_SIGNATURE).toBe("public.validate_plant_row()");
+    expect(runner.VALIDATE_TRIGGER_NAME).toBe("trg_plants_validate");
+    expect(sql).toContain("'public.validate_plant_row()'");
+    expect(sql).toContain("'trg_plants_validate'");
+    // BEFORE INSERT OR UPDATE FOR EACH ROW, enabled, no column list or WHEN.
+    expect(sql).toContain("tg.tgtype = 23");
+    expect(sql).toContain("tg.tgenabled = 'O'");
+    expect(sql).toContain("tg.tgqual is null");
+    expect(sql).toContain("a.atttypid = 'text'::regtype");
+    expect(sql).toContain("and a.attnotnull");
+    expect(sql).toContain("p.prorettype = 'trigger'::regtype");
+    expect(sql).toContain("and not p.prosecdef");
+    expect(sql).toContain("p.proconfig = array['search_path=public']::text[]");
     expect(sql).toContain("md5(replace(p.prosrc, E'\\r', ''))");
-    expect(sql).toContain("not has_function_privilege('anon', p.oid, 'EXECUTE')");
-    // Client EXECUTE only on the keyed and legacy RPCs; the helper is owner-only.
-    expect(sql.match(/'authenticated\|EXECUTE\|f\|postgres'/g) ?? []).toHaveLength(4);
-    expect(sql).toContain("array['postgres|EXECUTE|f|postgres']::text[]");
-    // Receipt table: RLS on, no policies, no client privilege, service_role only.
+    // CHECK constraints on health, other plants triggers and policies that
+    // mention health are all counted as drift.
+    expect(sql).toContain("con.contype = 'c'");
+    expect(sql).toContain("con.conkey @> array[a.attnum]::smallint[]");
+    expect(sql).toContain("fn.prosrc ilike '%health%'");
+    expect(sql).toContain("pg_get_expr(pol.polwithcheck, pol.polrelid), '') ilike '%health%'");
     expect(sql).toContain("c.relrowsecurity");
-    expect(sql).toContain("not exists(select 1 from pg_policy pol where pol.polrelid = c.oid)");
-    expect(sql).toContain(
-      "not has_table_privilege('authenticated', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')",
-    );
-    expect(sql).toContain("PRIMARY KEY (user_id, idempotency_key)");
-    expect(sql).toContain(
-      "CHECK (char_length(idempotency_key) >= 8 AND char_length(idempotency_key) <= 200)",
-    );
+    expect(sql).toContain(`= '${runner.DELIVERED_HEALTH_COMMENT}'`);
+  });
+
+  it("requires validate_plant_row() to keep the grants the reviewed PREFLIGHT saw", async () => {
+    const runner = await loadRunner();
+
+    expect(runner.aclUnchanged(BASELINE_STATE, CANONICAL_LEDGER_ABSENT_STATE)).toBe(true);
+    expect(
+      runner.aclUnchanged(BASELINE_STATE, {
+        ...CANONICAL_LEDGER_ABSENT_STATE,
+        validate_function_acl: SUPABASE_DEFAULT_FUNCTION_ACL.slice(1),
+      }),
+    ).toBe(false);
+    expect(runner.aclUnchanged(BASELINE_STATE, null)).toBe(false);
   });
 
   it("pins the production migration-ledger shape and inheriting client roles as measured", async () => {
@@ -386,22 +420,23 @@ describe("Quick Log revision idempotent replay production delivery", () => {
 
     expect(sql).toMatch(/^\\set ON_ERROR_STOP on\nbegin;/i);
     expect(sql).toMatch(/\ncommit;\s*$/i);
-    expect(sql).toContain("pg_advisory_xact_lock(20260916, 111000)");
+    expect(sql).toContain("pg_advisory_xact_lock(20260924, 120000)");
     expect(sql).toContain("lock table supabase_migrations.schema_migrations");
-    expect(sql).toContain("quicklog revision replay ledger collision");
+    expect(sql).toContain("plants health default ledger collision");
     expect(sql).toContain(
       "insert into supabase_migrations.schema_migrations(version,name,statements)",
     );
     expect(sql).toContain(runner.PINNED_MIGRATION.sha256);
     for (const key of [
-      "legacy_functions_contract",
-      "receipt_table_contract",
-      "apply_once_contract",
-      "keyed_correct_contract",
-      "keyed_retract_contract",
+      "validate_trigger_contract",
+      "validate_function_contract",
+      "validate_function_delivered_source",
+      "health_default_delivered",
+      "health_comment_delivered",
     ]) {
       expect(sql).toContain(`not coalesce((v_state->>'${key}')::boolean,false)`);
     }
+    expect(sql).toContain("coalesce((v_state->>'health_guard_drift_count')::integer,-1) <> 0");
     expect(sql).not.toMatch(/lock table public\./i);
     // Privilege names inside has_table_privilege('…') literals are not statements.
     const outsideLiterals = sql.replace(/'[^']*'/g, "''");
@@ -419,7 +454,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
   ])("emits an immutable recoverable PREFLIGHT receipt (%#)", async (state, outcome) => {
     const runner = await loadRunner();
     const evidence = evidenceEnv();
-    const status = runner.runQuickLogRevisionIdempotentReplay({
+    const status = runner.runPlantsHealthUnassessedDefault({
       env: baseEnv({
         ...evidence,
         OPERATION: "PREFLIGHT",
@@ -438,14 +473,14 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     expect(status).toBe(runner.EXIT.OK);
     expect(JSON.parse(readFileSync(evidence.PREFLIGHT_RECEIPT_PATH, "utf8"))).toMatchObject({
       schema_version: 1,
-      tool: "apply-quicklog-revision-idempotent-replay",
+      tool: "apply-plants-health-unassessed-default",
       operation: "PREFLIGHT",
       outcome,
       safe_to_apply: true,
-      workflow_path: ".github/workflows/apply-quicklog-revision-idempotent-replay.yml",
+      workflow_path: ".github/workflows/apply-plants-health-unassessed-default.yml",
       head_sha: EXPECTED_HEAD_SHA,
       project_ref: PROJECT_REF,
-      migration_version: "20260916111000",
+      migration_version: "20260924120000",
       migration_sha256: runner.PINNED_MIGRATION.sha256,
       state_digest: expect.stringMatching(/^[0-9a-f]{64}$/),
       ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
@@ -458,12 +493,17 @@ describe("Quick Log revision idempotent replay production delivery", () => {
       state: BASELINE_STATE,
       headSha: EXPECTED_HEAD_SHA,
     });
-    const replaced = runner.buildPreflightReceipt({
-      state: { ...BASELINE_STATE, legacy_retract_oid: 99999 },
-      headSha: EXPECTED_HEAD_SHA,
-    });
-
-    expect(replaced.digest).not.toBe(original.digest);
+    for (const change of [
+      { validate_function_oid: 99999 },
+      { plants_table_oid: 99999 },
+      { validate_function_acl: SUPABASE_DEFAULT_FUNCTION_ACL.slice(1) },
+    ]) {
+      const replaced = runner.buildPreflightReceipt({
+        state: { ...BASELINE_STATE, ...change },
+        headSha: EXPECTED_HEAD_SHA,
+      });
+      expect(replaced.digest, JSON.stringify(change)).not.toBe(original.digest);
+    }
   });
 
   it("runs the exact self-transactional migration without --single-transaction, postflights, then records the ledger separately", async () => {
@@ -475,7 +515,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     });
     const calls: Array<{ args: string[]; fileText?: string }> = [];
     let query = 0;
-    const status = runner.runQuickLogRevisionIdempotentReplay({
+    const status = runner.runPlantsHealthUnassessedDefault({
       env: baseEnv({ ...evidence, PREFLIGHT_RECEIPT_DIGEST: receipt.digest }),
       spawnImpl: (_command: string, args: string[]) => {
         const fileIndex = args.indexOf("--file");
@@ -514,7 +554,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     expect(JSON.parse(readFileSync(evidence.AUDIT_PATH, "utf8"))).toMatchObject({
       outcome: "applied_verified",
       recovery_path: "migration_then_ledger",
-      migration_version: "20260916111000",
+      migration_version: "20260924120000",
       ...SOLO_FOUNDER_AUTHORIZATION_RECEIPT,
     });
   });
@@ -528,7 +568,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     });
     const calls: string[][] = [];
     let query = 0;
-    const status = runner.runQuickLogRevisionIdempotentReplay({
+    const status = runner.runPlantsHealthUnassessedDefault({
       env: baseEnv({ ...evidence, PREFLIGHT_RECEIPT_DIGEST: receipt.digest }),
       spawnImpl: (_command: string, args: string[]) => {
         calls.push([...args]);
@@ -561,7 +601,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     const runner = await loadRunner();
     const evidence = evidenceEnv();
     const calls: string[][] = [];
-    const status = runner.runQuickLogRevisionIdempotentReplay({
+    const status = runner.runPlantsHealthUnassessedDefault({
       env: baseEnv({ ...evidence, PREFLIGHT_RECEIPT_DIGEST: "f".repeat(64) }),
       spawnImpl: (_command: string, args: string[]) => {
         calls.push([...args]);
@@ -582,7 +622,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     const runner = await loadRunner();
     const evidence = evidenceEnv();
     const calls: string[][] = [];
-    const status = runner.runQuickLogRevisionIdempotentReplay({
+    const status = runner.runPlantsHealthUnassessedDefault({
       env: baseEnv({
         ...evidence,
         OPERATION: "PREFLIGHT",
@@ -593,7 +633,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
         calls.push([...args]);
         return {
           status: 0,
-          stdout: stdout({ ...BASELINE_STATE, legacy_functions_contract: false }),
+          stdout: stdout({ ...BASELINE_STATE, health_guard_drift_count: 1 }),
           stderr: "",
         };
       },
@@ -605,10 +645,10 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     expect(existsSync(evidence.PREFLIGHT_RECEIPT_PATH)).toBe(false);
     expect(JSON.parse(readFileSync(evidence.AUDIT_PATH, "utf8"))).toMatchObject({
       outcome: "prerequisite_drift",
-      reason: "legacy_functions_contract",
+      reason: "health_guard_drift_count",
     });
     expect(readFileSync(evidence.REPORT_PATH, "utf8")).toContain(
-      "Reason: legacy_functions_contract",
+      "Reason: health_guard_drift_count",
     );
   });
 
@@ -633,7 +673,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     for (const scenario of scenarios) {
       const evidence = evidenceEnv();
       let calls = 0;
-      const status = runner.runQuickLogRevisionIdempotentReplay({
+      const status = runner.runPlantsHealthUnassessedDefault({
         env: baseEnv({ ...evidence, ...scenario }),
         spawnImpl: () => {
           calls += 1;
@@ -672,7 +712,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
         if (value === undefined) delete (env as Record<string, string | undefined>)[key];
         else (env as Record<string, string | undefined>)[key] = value;
 
-        const status = runner.runQuickLogRevisionIdempotentReplay({
+        const status = runner.runPlantsHealthUnassessedDefault({
           env,
           spawnImpl: () => {
             calls += 1;
@@ -710,7 +750,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
       const evidence = evidenceEnv();
       const calls: string[][] = [];
       let query = 0;
-      const status = runner.runQuickLogRevisionIdempotentReplay({
+      const status = runner.runPlantsHealthUnassessedDefault({
         env: baseEnv({ ...evidence, PREFLIGHT_RECEIPT_DIGEST: receipt.digest }),
         spawnImpl: (_command: string, args: string[]) => {
           calls.push([...args]);
@@ -743,11 +783,50 @@ describe("Quick Log revision idempotent replay production delivery", () => {
     }
   });
 
+  it("never records the ledger when the apply changed validate_plant_row()'s grants", async () => {
+    const runner = await loadRunner();
+    const evidence = evidenceEnv();
+    const receipt = runner.buildPreflightReceipt({
+      state: BASELINE_STATE,
+      headSha: EXPECTED_HEAD_SHA,
+    });
+    const calls: string[][] = [];
+    let query = 0;
+    const status = runner.runPlantsHealthUnassessedDefault({
+      env: baseEnv({ ...evidence, PREFLIGHT_RECEIPT_DIGEST: receipt.digest }),
+      spawnImpl: (_command: string, args: string[]) => {
+        calls.push([...args]);
+        if (args.includes("-c")) {
+          query += 1;
+          return {
+            status: 0,
+            stdout:
+              query === 1
+                ? stdout(BASELINE_STATE)
+                : stdout({
+                    ...CANONICAL_LEDGER_ABSENT_STATE,
+                    validate_function_acl: ["postgres|EXECUTE|f|postgres"],
+                  }),
+            stderr: "",
+          };
+        }
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      logger: { log() {}, error() {} },
+    });
+
+    expect(status).toBe(runner.EXIT.POSTFLIGHT_CONTRACT_FAILED);
+    expect(calls.filter((args) => args.includes("--file"))).toHaveLength(1);
+    expect(JSON.parse(readFileSync(evidence.AUDIT_PATH, "utf8"))).toMatchObject({
+      outcome: "postflight_contract_failed",
+    });
+  });
+
   it("keeps credentials, CA material, and database output out of evidence", async () => {
     const runner = await loadRunner();
     const evidence = evidenceEnv();
     const lines: string[] = [];
-    const status = runner.runQuickLogRevisionIdempotentReplay({
+    const status = runner.runPlantsHealthUnassessedDefault({
       env: baseEnv({ ...evidence, OPERATION: "PREFLIGHT", CONFIRM_APPLY: "" }),
       spawnImpl: () => ({
         status: 1,
@@ -777,7 +856,7 @@ describe("Quick Log revision idempotent replay production delivery", () => {
   });
 });
 
-describe("Quick Log revision idempotent replay workflow", () => {
+describe("plants health unassessed default workflow", () => {
   function parsed() {
     return loadYaml(readFileSync(WORKFLOW_PATH, "utf8")) as Record<string, any>;
   }
@@ -806,7 +885,7 @@ describe("Quick Log revision idempotent replay workflow", () => {
     for (const required of [
       "refs/heads/verdant-grow-diary",
       "knkwiiywfkbqznbxwqfh",
-      "APPLY QUICKLOG REVISION IDEMPOTENT REPLAY",
+      "APPLY PLANTS HEALTH UNASSESSED DEFAULT",
       SOLO_FOUNDER_ACKNOWLEDGEMENT,
       "GITHUB_ACTOR_ID",
       "GITHUB_TRIGGERING_ACTOR",
@@ -823,7 +902,7 @@ describe("Quick Log revision idempotent replay workflow", () => {
     const index = (fragment: string) =>
       steps.findIndex((step) => String(step.name ?? "").includes(fragment));
     const runner = steps.find(
-      (step) => step.name === "Run the environment-gated Quick Log revision replay",
+      (step) => step.name === "Run the environment-gated plants health default delivery",
     );
 
     expect(index("solo-founder production authorization")).toBe(
@@ -837,7 +916,7 @@ describe("Quick Log revision idempotent replay workflow", () => {
     );
     expect(index("production migration writer to be idle")).toBeLessThan(steps.indexOf(runner!));
     expect(index("Re-resolve current deploy branch head")).toBeLessThan(steps.indexOf(runner!));
-    expect(runner?.run).toBe("node scripts/apply-quicklog-revision-idempotent-replay.mjs");
+    expect(runner?.run).toBe("node scripts/apply-plants-health-unassessed-default.mjs");
     expect(runner?.env).toEqual({
       SUPABASE_DB_URL: "${{ secrets.SUPABASE_DB_URL }}",
       SUPABASE_DB_CA_CERT_PATH: "${{ runner.temp }}/verdant-production-supabase-root.crt",
@@ -845,7 +924,7 @@ describe("Quick Log revision idempotent replay workflow", () => {
     expect(
       steps.find((step) => String(step.name ?? "").includes("authenticated PREFLIGHT artifact"))
         ?.run,
-    ).toContain("node scripts/verify-quicklog-revision-idempotent-replay-preflight-artifact.mjs");
+    ).toContain("node scripts/verify-plants-health-unassessed-default-preflight-artifact.mjs");
   });
 
   it("uploads immutable evidence and fails closed when the success upload fails", () => {
@@ -864,10 +943,10 @@ describe("Quick Log revision idempotent replay workflow", () => {
     expect(failure?.if).toBe("failure() || cancelled()");
     expect(failure?.["continue-on-error"]).toBe(true);
     expect(receipt?.with.name).toBe(
-      "quicklog-revision-idempotent-replay-preflight-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
+      "plants-health-unassessed-default-preflight-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}",
     );
     expect(receipt?.with.path).toBe(
-      "audit/quicklog-revision-idempotent-replay/preflight-receipt.json",
+      "audit/plants-health-unassessed-default/preflight-receipt.json",
     );
   });
 
@@ -913,19 +992,20 @@ describe("Quick Log revision idempotent replay workflow", () => {
     expect(workflow.on.push.paths).toEqual(paths);
     expect(paths).toEqual(
       expect.arrayContaining([
-        "scripts/apply-quicklog-revision-idempotent-replay.mjs",
-        "scripts/run-quicklog-revision-idempotent-replay-pg15-harness.mjs",
-        "scripts/verify-quicklog-revision-idempotent-replay-preflight-artifact.mjs",
+        "scripts/apply-plants-health-unassessed-default.mjs",
+        "scripts/run-plants-health-unassessed-default-pg15-harness.mjs",
+        "scripts/verify-plants-health-unassessed-default-preflight-artifact.mjs",
         "scripts/lib/solo-founder-production-authorization.mjs",
         "scripts/lib/productionSupabaseTls.mjs",
-        "supabase/migrations/20260916111000_quicklog_revision_idempotent_replay.sql",
-        "supabase/migrations/20260811090000_quicklog_corrections_retractions.sql",
-        ".github/workflows/apply-quicklog-revision-idempotent-replay.yml",
-        "src/test/apply-quicklog-revision-idempotent-replay.test.ts",
+        "scripts/lib/supabaseMigrationLedgerShape.mjs",
+        "supabase/migrations/20260924120000_plants_health_unassessed_default.sql",
+        "supabase/migrations/20260516204601_eb069c76-870d-4f19-8d23-800be7bbfe01.sql",
+        ".github/workflows/apply-plants-health-unassessed-default.yml",
+        "src/test/apply-plants-health-unassessed-default.test.ts",
       ]),
     );
     expect(workflow.jobs.pg15_runtime.steps.at(-1).run).toBe(
-      "node scripts/run-quicklog-revision-idempotent-replay-pg15-harness.mjs",
+      "node scripts/run-plants-health-unassessed-default-pg15-harness.mjs",
     );
   });
 
@@ -937,13 +1017,13 @@ describe("Quick Log revision idempotent replay workflow", () => {
       "SAFE_TO_APPLY",
       "schema_live_ledger_absent",
       "already_applied_verified",
-      "APPLY QUICKLOG REVISION IDEMPOTENT REPLAY",
-      "20260916111000",
+      "APPLY PLANTS HEALTH UNASSESSED DEFAULT",
+      "20260924120000",
       "verdant-production-solo-founder",
       "verdant-production-migration-writer",
       "expected_preflight_run_attempt",
       "expected_preflight_artifact_sha256",
-      "quicklog-revision-idempotent-replay-preflight-run-<RUN_ID>-attempt-1",
+      "plants-health-unassessed-default-preflight-run-<RUN_ID>-attempt-1",
       "verify-full",
       SOLO_FOUNDER_ACKNOWLEDGEMENT,
       ...WRITERS,
@@ -952,5 +1032,6 @@ describe("Quick Log revision idempotent replay workflow", () => {
     }
     expect(runbook).toMatch(/no write freeze/i);
     expect(runbook).toMatch(/never delete/i);
+    expect(runbook).toMatch(/does not rewrite existing/i);
   });
 });

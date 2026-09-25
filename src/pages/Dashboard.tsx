@@ -87,7 +87,11 @@ import {
   EMPTY_ALERTS_MESSAGE,
   type EnvironmentAlert,
 } from "@/lib/environmentAlerts";
-import { describeAlertSaveBlock } from "@/lib/alertFreshnessContext";
+import {
+  ALERT_SAVE_STAGE_UNCONFIRMED_MESSAGE,
+  describeAlertSaveBlock,
+} from "@/lib/alertFreshnessContext";
+import { resolveTentEnvironmentStage, resolveTentGrowStage } from "@/lib/tentEnvironmentStageRules";
 import { saveAlert, logAlertEvent } from "@/lib/alerts";
 import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts";
 import { useAlertsList } from "@/hooks/useAlertsList";
@@ -210,6 +214,14 @@ export default function Dashboard() {
     : null;
   // Only a current, successful plant read may decide a persisted stage.
   const plantsForPersistence = plantsForAlertPersistence(plantsQuery);
+  // Both alert writes, automatic and the manual save button, need current,
+  // successful tent and plant reads: while either is pending, has failed
+  // (`isFetched` is true then too) or is refetching, alertContextStage may
+  // rest on missing or stale rows, and an alert saved in that window would
+  // not be removed once they arrive (Codex review on #1683).
+  const stageReadsCurrentForWrite =
+    isCurrentReadForAlertWrite(tentsQuery) && plantsForPersistence !== null;
+  const stageSaveBlock = stageReadsCurrentForWrite ? null : ALERT_SAVE_STAGE_UNCONFIRMED_MESSAGE;
   const trendsState = useEnvironmentTrends(
     scopedGrowId ?? null,
     tents.map((t) => t.id),
@@ -234,7 +246,7 @@ export default function Dashboard() {
 
   // First-run activation is relationship-aware. Independent grow/tent/plant
   // counts cannot prove that a usable One-Tent chain exists.
-  const { grows, activeGrowId } = useGrows();
+  const { grows, activeGrowId, loading: growsLoading, error: growsError } = useGrows();
   const activationGraph = selectConnectedOneTentGraph({
     grows,
     tents,
@@ -294,12 +306,8 @@ export default function Dashboard() {
       dashboardHealthSnapshot,
       targetsState.status === "ok" ? targetsState.targets : null,
     ),
-    // Gated on current, successful tent and plant reads: while either is
-    // pending, has failed (`isFetched` is true then too) or is refetching,
-    // alertContextStage may rest on missing or stale rows, and an alert
-    // persisted in that window would not be removed once they arrive.
-    enabled:
-      !!scopedGrowId && isCurrentReadForAlertWrite(tentsQuery) && plantsForPersistence !== null,
+    // Gated on current tent and plant reads; see stageReadsCurrentForWrite.
+    enabled: !!scopedGrowId && stageReadsCurrentForWrite,
     stage: alertContextStage,
   });
 
@@ -308,13 +316,31 @@ export default function Dashboard() {
 
   // Latest reading per tent for the strip + a read-only stability summary
   // computed from the same tent-scoped readings (no extra fetches, no writes).
+  // Each tent is graded by the stage Alerts use: its grow row, the tent and
+  // the active plants in it, like the Tents list and Tent Detail (Codex
+  // review on #1683). Grading is withheld until the grow row and the plant
+  // rows are known; a failed plant refresh keeps its cached rows.
+  const plantsForStage = plantsQuery.isPlaceholderData ? null : (plantsQuery.data ?? null);
   const latestPerTent = tents.map((t) => {
     const tentRows = selectDashboardSensorEvidenceRows(readingsByTent[t.id] ?? []);
     const chartRows = groupDashboardSensorReadings(tentRows);
     const rs = buildDashboardStabilityReadings(tentRows);
-    const stability = computeEnvironmentStability(rs, { stage: t.stage });
+    const envStage = resolveTentEnvironmentStage({
+      tentId: t.id,
+      tentGrowId: t.growId ?? null,
+      tentStage: t.stage,
+      ...resolveTentGrowStage({
+        growId: t.growId,
+        grows,
+        loading: growsLoading,
+        error: growsError,
+      }),
+      plants: plantsForStage,
+    });
+    const stability = computeEnvironmentStability(rs, { stage: envStage });
     return {
       tent: t,
+      envStage,
       last: chartRows[chartRows.length - 1],
       stability,
       tentRows,
@@ -762,11 +788,11 @@ export default function Dashboard() {
                       </div>
 
                       <div className="space-y-2.5">
-                        {latestPerTent.map(({ tent, stability, tentRows }) => {
+                        {latestPerTent.map(({ tent, envStage, stability, tentRows }) => {
                           const stabilityView = formatStabilityChipView(stability);
                           const snapView = buildTentSnapshotView(
                             tentRows as BuildTentSnapshotInput[],
-                            tent.stage,
+                            envStage,
                             nowTick,
                           );
                           // Pending/failed reads must not masquerade as established
@@ -1488,10 +1514,11 @@ export default function Dashboard() {
               // present, just ineligible. Passing the unfiltered snapshot lets
               // "context_only_source" reach the grower instead of misreporting
               // a real (if untrusted) reading as no reading at all.
-              const saveBlockedReason = describeAlertSaveBlock({
-                snapshot: currentSensorSnapshot,
-                quality: quality.quality,
-              });
+              const saveBlockedReason =
+                describeAlertSaveBlock({
+                  snapshot: currentSensorSnapshot,
+                  quality: quality.quality,
+                }) ?? stageSaveBlock;
               const canPersistAlerts = saveBlockedReason === null;
               const vpdStageMissing =
                 snap?.vpd != null && normalizeVpdStage(alertContextStage) === "unknown";
@@ -1557,10 +1584,11 @@ export default function Dashboard() {
                                     // expired reading as a brand-new alert.
                                     // `currentSensorSnapshot`, not `snap` — see
                                     // the render-time comment above for why.
-                                    const blockedNow = describeAlertSaveBlock({
-                                      snapshot: currentSensorSnapshot,
-                                      quality: quality.quality,
-                                    });
+                                    const blockedNow =
+                                      describeAlertSaveBlock({
+                                        snapshot: currentSensorSnapshot,
+                                        quality: quality.quality,
+                                      }) ?? stageSaveBlock;
                                     if (blockedNow !== null) {
                                       toast.error(blockedNow);
                                       return;

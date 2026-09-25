@@ -152,9 +152,11 @@ describe("Dashboard — static wiring of the shared stage resolver", () => {
   it("persistence waits for a current tent read before trusting the stage", () => {
     // A failed read also counts as fetched, so the gate needs a current,
     // successful read (Codex review on #1683). The behavior is rendered in
-    // dashboard-alert-persistence-plant-read.
+    // dashboard-alert-persistence-plant-read. Since round 15 the manual save
+    // button shares the same gate (dashboard-strip-stage-and-manual-save-gate).
     expect(DASHBOARD_PAGE).toMatch(
-      /enabled:\s*!!scopedGrowId && isCurrentReadForAlertWrite\(tentsQuery\)/,
+      /const stageReadsCurrentForWrite =\s*isCurrentReadForAlertWrite\(tentsQuery\) && plantsForPersistence !== null/,
     );
+    expect(DASHBOARD_PAGE).toMatch(/enabled:\s*!!scopedGrowId && stageReadsCurrentForWrite/);
   });
 });

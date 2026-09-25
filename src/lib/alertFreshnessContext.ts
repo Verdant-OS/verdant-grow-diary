@@ -62,6 +62,15 @@ export const ALERT_SAVE_BLOCK_MESSAGE: Record<PersistenceBlockReason, string> = 
   outside_live_window: `This reading is outside the ${FRESHNESS_WINDOW_LABEL}, so it cannot raise a new alert. Enter a fresh manual snapshot.`,
 };
 
+/**
+ * Why the manual "Save alert" action is unavailable while the tent or plant
+ * read behind the alert stage is not current (pending, placeholder, failed or
+ * refetching). The automatic path holds for the same reason (Codex review on
+ * #1683).
+ */
+export const ALERT_SAVE_STAGE_UNCONFIRMED_MESSAGE =
+  "Tent and plant stages aren't confirmed yet, so this alert can't be saved. Try again once they load.";
+
 /** Explanation for the current gate result, or null when saving is allowed. */
 export function describeAlertSaveBlock(ctx: PersistenceContext): string | null {
   const reason = snapshotPersistenceBlockReason(ctx);

@@ -117,16 +117,13 @@ export default function Alerts() {
   const stageByGrow = new Map<string, string | null>(
     grows.map((g) => [g.id, (g as { stage?: string | null }).stage ?? null]),
   );
-  // Plant stages count toward the alert stage (QA 2026-09-24, BUG-006). While
-  // the plant read is pending, `null` holds alert persistence back; a failed
-  // read contributes no plant signal rather than blocking alerting.
+  // Plant stages count toward the alert stage (QA 2026-09-24, BUG-006). Each
+  // alert component keeps the plants that resolve to its grow, by grow_id or
+  // through the grow's tents (growAttributionRules). While the plant read is
+  // pending, `null` holds alert persistence back; a failed read contributes
+  // no plant signal rather than blocking alerting.
   const plantsQuery = usePlants();
-  const plantStagesForGrow = (growId: string): ReadonlyArray<string | null> | null =>
-    plantsQuery.isError
-      ? []
-      : plantsQuery.data
-        ? plantsQuery.data.filter((p) => p.grow_id === growId).map((p) => p.stage ?? null)
-        : null;
+  const plantsForAlertStage = plantsQuery.isError ? [] : (plantsQuery.data ?? null);
 
   const headerStage = scopedGrowId ? (stageByGrow.get(scopedGrowId) ?? null) : null;
 
@@ -240,7 +237,7 @@ export default function Alerts() {
           key={gid}
           growId={gid}
           stage={stageByGrow.get(gid) ?? null}
-          plantStages={plantStagesForGrow(gid)}
+          plants={plantsForAlertStage}
         />
       ))}
       <GrowBreadcrumbs
@@ -281,7 +278,7 @@ export default function Alerts() {
           growId={headerContext.growId}
           growName={headerContext.growName}
           stage={headerContext.stage}
-          plantStages={plantStagesForGrow(headerContext.growId)}
+          plants={plantsForAlertStage}
           isFallback={headerContext.isFallback}
           hasOpenAlerts={growIdsWithOpenAlerts.includes(headerContext.growId)}
         />

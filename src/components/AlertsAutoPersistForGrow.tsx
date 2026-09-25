@@ -24,6 +24,7 @@ import { usePersistEnvironmentAlerts } from "@/hooks/usePersistEnvironmentAlerts
 import { evaluateSensorQuality } from "@/lib/sensorQuality";
 import { compareSnapshotToTargets } from "@/lib/environmentTargetComparison";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
+import { type AlertStagePlant, resolveGrowPlantStages } from "@/lib/alertPlantStageScopeRules";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 
 interface Props {
@@ -33,14 +34,16 @@ interface Props {
    * `grows.stage` cannot drive outdated stage bands (live audit #14). */
   stage?: string | null;
   /**
-   * Stages of the grow's active plants (QA 2026-09-24, BUG-006). `null`
-   * means the plant read has not settled: persistence waits, as it does for
-   * tents. Omitted keeps the grow + tent resolution.
+   * Active plants (any grow), QA 2026-09-24 BUG-006. The ones that resolve
+   * to this grow, by their own grow_id or else through one of this grow's
+   * tents, add their stages. `null` means the plant read has not settled:
+   * persistence waits, as it does for tents. Omitted keeps the grow + tent
+   * resolution.
    */
-  plantStages?: ReadonlyArray<string | null> | null;
+  plants?: ReadonlyArray<AlertStagePlant> | null;
 }
 
-export default function AlertsAutoPersistForGrow({ growId, stage, plantStages }: Props) {
+export default function AlertsAutoPersistForGrow({ growId, stage, plants }: Props) {
   const safeGrowId = growId ?? null;
   const tentsQuery = useGrowTents(safeGrowId ?? undefined);
   const tents = tentsQuery.data ?? [];
@@ -57,12 +60,13 @@ export default function AlertsAutoPersistForGrow({ growId, stage, plantStages }:
   const targetsState = useGrowTargets(safeGrowId);
   // Stage precedence lives in resolveAlertContextStage: grow stage + tent
   // stages, most advanced known stage wins on disagreement.
+  const plantStages = safeGrowId ? resolveGrowPlantStages(plants, safeGrowId, tents) : plants;
   const resolvedStage = resolveAlertContextStage({
     growStage: stage,
     tentStages: tents.map((t) => t.stage),
     plantStages: plantStages ?? null,
   }).stage;
-  const plantsSettled = plantStages !== null;
+  const plantsSettled = plants !== null;
 
   usePersistEnvironmentAlerts({
     growId: safeGrowId,

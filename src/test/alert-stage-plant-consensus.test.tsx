@@ -96,7 +96,13 @@ describe("resolveAlertContextStage with plant stages", () => {
 describe("alert surfaces use the plant stage", () => {
   it("persists alerts against the Flower plant stage", () => {
     mockTents(["seedling"]);
-    render(<AlertsAutoPersistForGrow growId="g1" stage="veg" plantStages={["flower"]} />);
+    render(
+      <AlertsAutoPersistForGrow
+        growId="g1"
+        stage="veg"
+        plants={[{ grow_id: "g1", tent_id: null, stage: "flower" }]}
+      />,
+    );
     const args = vi.mocked(usePersistEnvironmentAlerts).mock.calls.at(-1)?.[0];
     expect(args?.stage).toBe("flower");
     expect(args?.enabled).toBe(true);
@@ -104,7 +110,7 @@ describe("alert surfaces use the plant stage", () => {
 
   it("holds persistence while the plant read has not settled", () => {
     mockTents(["seedling"]);
-    render(<AlertsAutoPersistForGrow growId="g1" stage="veg" plantStages={null} />);
+    render(<AlertsAutoPersistForGrow growId="g1" stage="veg" plants={null} />);
     const args = vi.mocked(usePersistEnvironmentAlerts).mock.calls.at(-1)?.[0];
     expect(args?.enabled).toBe(false);
   });
@@ -124,18 +130,16 @@ describe("alert surfaces use the plant stage", () => {
         growId="g1"
         growName="Grow A"
         stage="veg"
-        plantStages={["flower"]}
+        plants={[{ grow_id: "g1", tent_id: null, stage: "flower" }]}
       />,
     );
     expect(screen.getByTestId("alerts-context-header-stage").textContent).toMatch(/Flower/);
   });
 
-  it("the Alerts page and scoped Dashboard pass plant stages to the resolver", () => {
-    // @source-scan-justified: both pages need the full auth/grow/query harness;
-    // the prop and resolver input are asserted at the call sites.
-    const alerts = readFileSync(resolve(process.cwd(), "src/pages/Alerts.tsx"), "utf8");
-    expect(alerts).toMatch(/plantStages=\{plantStagesForGrow\(gid\)\}/);
-    expect(alerts).toMatch(/plantStages=\{plantStagesForGrow\(headerContext\.growId\)\}/);
+  it("the scoped Dashboard passes plant stages to the resolver", () => {
+    // @source-scan-justified: the Dashboard needs the full auth/grow/query
+    // harness; the resolver input is asserted at the call site. The Alerts
+    // page wiring is rendered in alerts-page-plant-stage-attribution.
     const dashboard = readFileSync(resolve(process.cwd(), "src/pages/Dashboard.tsx"), "utf8");
     expect(dashboard).toMatch(/plantStages: plants\s*\.filter/);
     expect(dashboard).toMatch(/tentsQuery\.isFetched && plantsQuery\.isFetched/);

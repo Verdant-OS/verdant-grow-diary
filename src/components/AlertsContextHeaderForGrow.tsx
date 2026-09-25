@@ -18,6 +18,7 @@ import { useLatestSensorSnapshot } from "@/hooks/useLatestSensorSnapshot";
 import { buildAlertsHeaderContext } from "@/lib/alertFreshnessContext";
 import { buildSensorSnapshotReadState } from "@/lib/sensorSnapshotReadStateRules";
 import { resolveAlertContextStage } from "@/lib/alertStageResolution";
+import { type AlertStagePlant, resolveGrowPlantStages } from "@/lib/alertPlantStageScopeRules";
 import { useTemperatureUnitPreference } from "@/hooks/useTemperatureUnitPreference";
 
 interface Props {
@@ -27,8 +28,12 @@ interface Props {
    * PLUS the grow's tents' stages via `resolveAlertContextStage`, so a
    * stale `grows.stage` cannot claim outdated targets (live audit #14). */
   stage: string | null;
-  /** Stages of the grow's active plants; see resolveAlertContextStage rule 8. */
-  plantStages?: ReadonlyArray<string | null> | null;
+  /**
+   * Active plants (any grow). The ones that resolve to this grow, by their own
+   * grow_id or else through one of this grow's tents, add their stages; see
+   * resolveAlertContextStage rule 8. `null` while the plant read is pending.
+   */
+  plants?: ReadonlyArray<AlertStagePlant> | null;
   /** When true, shows a small "Showing alert context for X" note so the
    * operator can tell the header is using a fallback grow, not the one
    * in the URL. */
@@ -42,7 +47,7 @@ export default function AlertsContextHeaderForGrow({
   growId,
   growName,
   stage,
-  plantStages,
+  plants,
   isFallback = false,
   hasOpenAlerts = false,
 }: Props) {
@@ -58,9 +63,9 @@ export default function AlertsContextHeaderForGrow({
       resolveAlertContextStage({
         growStage: stage,
         tentStages: tents.map((t) => t.stage),
-        plantStages: plantStages ?? null,
+        plantStages: resolveGrowPlantStages(plants, growId, tents) ?? null,
       }).stage,
-    [stage, tents, plantStages],
+    [stage, tents, plants, growId],
   );
 
   const snapshotReadState = buildSensorSnapshotReadState(sensorState);
